@@ -6,8 +6,8 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("tooling-contract gate denies direct raw graph.json reads", async () => {
   await runInTemp("tooling-contract-deny", async (tmp, $) => {
-    // Create a forbidden script that reads build-tools/tools/buck/graph.json directly
-    const badDir = path.join(tmp, "build-tools", "tools", "scripts");
+    // Create a forbidden script that reads viberoots/build-tools/tools/buck/graph.json directly
+    const badDir = path.join(tmp, "viberoots", "build-tools", "tools", "scripts");
     await fs.mkdirp(badDir);
     const badFile = path.join(badDir, "read-raw-graph.ts");
     await fs.writeFile(
@@ -15,7 +15,7 @@ test("tooling-contract gate denies direct raw graph.json reads", async () => {
       [
         "import fs from 'fs-extra';",
         "async function main(){",
-        "  await fs.readFile('build-tools/tools/buck/graph.json', 'utf8');",
+        "  await fs.readFile('viberoots/build-tools/tools/buck/graph.json', 'utf8');",
         "}",
         "main().catch(()=>{});",
         "",
@@ -26,7 +26,7 @@ test("tooling-contract gate denies direct raw graph.json reads", async () => {
     // Run the gate and expect failure
     const fail = await $({
       cwd: tmp,
-    })`node build-tools/tools/ci/tooling-contract-check.ts`.nothrow();
+    })`node viberoots/build-tools/tools/ci/tooling-contract-check.ts`.nothrow();
     if (fail.exitCode === 0) {
       console.error("expected tooling-contract to fail when a raw read is present");
       process.exit(2);
@@ -34,7 +34,9 @@ test("tooling-contract gate denies direct raw graph.json reads", async () => {
 
     // Remove the offender and expect success
     await fs.remove(badFile);
-    const ok = await $({ cwd: tmp })`node build-tools/tools/ci/tooling-contract-check.ts`.nothrow();
+    const ok = await $({
+      cwd: tmp,
+    })`node viberoots/build-tools/tools/ci/tooling-contract-check.ts`.nothrow();
     if (ok.exitCode !== 0) {
       console.error("expected tooling-contract to succeed after removing raw read");
       process.exit(2);

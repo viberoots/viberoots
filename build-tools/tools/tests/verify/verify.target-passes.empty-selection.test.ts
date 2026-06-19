@@ -7,7 +7,7 @@ test("verify fails fast when explicit selectors resolve to zero concrete targets
   assert.throws(
     () =>
       assertVerifyTargetPlanNotEmpty({
-        requestedTargets: ["//build-tools/tools/tests/deployments/..."],
+        requestedTargets: ["@viberoots//build-tools/tools/tests/deployments/..."],
         plan: {
           targetLabels: [],
           passes: [],

@@ -48,9 +48,9 @@ The verify log should also include both final cleanup summaries, including
 
 ## Timing analysis (`TEST_TIMING=summary`)
 
-When you run `build-tools/tools/bin/verify` with `TEST_TIMING=summary`, zx tests that use `runInTemp(...)` will emit `[timing]` bucket summaries. At the end of the verify run, `build-tools/tools/bin/verify` appends an **aggregated** report into the verify log (comment-prefixed) by running:
+When you run `v` with `TEST_TIMING=summary`, zx tests that use `runInTemp(...)` will emit `[timing]` bucket summaries. At the end of the verify run, `v` appends an **aggregated** report into the verify log (comment-prefixed) by running:
 
-- `build-tools/tools/dev/analyze-verify-timing.ts`
+- `viberoots/build-tools/tools/dev/analyze-verify-timing.ts`
 
 This report includes:
 
@@ -60,7 +60,7 @@ This report includes:
 
 ## Verify status
 
-Use `l --status`, `s`, or `build-tools/tools/bin/tail-log --status` while `v` is running or after the
+Use `l --status`, `s`, or `tail-log --status` while `v` is running or after the
 latest run completes. The text view reports elapsed/projected time, pass/fail/fatal/skip/build
 failure counts, remaining tests, and GC detection. For multi-pass verify plans it can show both the
 active pass group count and total test count in the `Tests:` row, plus `Pass group: <name>
@@ -72,18 +72,15 @@ Use `--json` when a script needs stable fields. The JSON line includes `pass_ind
 ### Verify helper
 
 - Default scoped verify:
-  - `build-tools/tools/bin/verify`
   - `v`
 - Force verify to run every Buck test, even when scope selection would narrow it:
-  - `ALL_TESTS=1 build-tools/tools/bin/verify`
-  - `ALL_TESTS=true build-tools/tools/bin/verify`
   - `ALL_TESTS=1 v`
+  - `ALL_TESTS=true v`
 - Full suite with coverage (single merged report):
-  - `ALL_TESTS=1 build-tools/tools/bin/verify --coverage`
   - `ALL_TESTS=1 v --coverage`
 - Focused target(s):
-  - `build-tools/tools/bin/verify //<target>`
-  - `build-tools/tools/bin/verify --coverage //<target>`
+  - `v //<target>`
+  - `v --coverage //<target>`
 
 ## Running
 
@@ -118,8 +115,8 @@ not be used as clean timing evidence without a rerun.
 ## External runner helper (C++)
 
 - For C++ tests and binaries built via the Nix planner, use the centralized helper:
-  - `node build-tools/tools/dev/build-selected.ts` (or `nix run .#zx-wrapper -- build-tools/tools/dev/build-selected.ts`)
-- It ensures `build-tools/tools/buck/graph.json` exists for the current workspace and runs:
+  - `node viberoots/build-tools/tools/dev/build-selected.ts`
+- It ensures `.viberoots/workspace/buck/graph.json` exists for the current workspace and runs:
   - `nix build .#graph-generator-selected` with `BUCK_TARGET` and `--accept-flake-config`
 - Output: prints only the Nix out path on stdout; logs go to stderr. Buck macros call this helper under the hood.
 
@@ -152,9 +149,9 @@ Do not copy/paste shell fragments between languages. If you need to change the b
 ## Go dependencies (gomod2nix)
 
 - After editing `go.mod` or `go.sum`, run:
-  - `node build-tools/tools/dev/install-deps.ts` (regenerates `gomod2nix.toml` deterministically)
+  - `i` (regenerates `gomod2nix.toml` deterministically)
 - Preview without changes:
-  - `node build-tools/tools/dev/install-deps.ts --dry-run`
+  - `node viberoots/build-tools/tools/dev/install-deps.ts --dry-run`
 
 ## Nix-first runtime validation (Go)
 

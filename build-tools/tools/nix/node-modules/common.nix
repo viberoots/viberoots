@@ -15,9 +15,9 @@ let
       candidates =
         if wr == "" then []
         else [
-          (builtins.toPath (wr + "/build-tools/tools/nix/node-modules.hashes.json"))
           (builtins.toPath (wr + "/viberoots/build-tools/tools/nix/node-modules.hashes.json"))
           (builtins.toPath (wr + "/.viberoots/current/build-tools/tools/nix/node-modules.hashes.json"))
+          (builtins.toPath (wr + "/projects/node-modules.hashes.json"))
         ];
     in
       lib.foldl' (acc: p: acc // (readHashMap p)) {} candidates;

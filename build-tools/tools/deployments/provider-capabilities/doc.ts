@@ -1,10 +1,18 @@
 #!/usr/bin/env zx-wrapper
 import fsp from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { REVIEWED_PROVIDER_CAPABILITIES } from "./registry";
 import { renderProviderCapabilityEntries } from "./render";
 
-export const PROVIDER_CAPABILITIES_DOC_PATH = "docs/deployment-provider-capabilities.md";
+const viberootsSourceRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../../..",
+);
+export const PROVIDER_CAPABILITIES_DOC_PATH = path.join(
+  viberootsSourceRoot,
+  "docs/deployment-provider-capabilities.md",
+);
 export const GENERATED_PROVIDER_CAPABILITIES_START =
   "<!-- BEGIN GENERATED PROVIDER CAPABILITIES -->";
 export const GENERATED_PROVIDER_CAPABILITIES_END = "<!-- END GENERATED PROVIDER CAPABILITIES -->";

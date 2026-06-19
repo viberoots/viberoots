@@ -5,6 +5,7 @@ import path from "node:path";
 
 const INSTALL_SCRIPT = path.join(
   process.cwd(),
+  "viberoots",
   "build-tools",
   "tools",
   "deployments",

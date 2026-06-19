@@ -25,6 +25,7 @@ import {
   writeJenkinsAuthFiles,
 } from "./nixos-shared-host.jenkins.fixture";
 import { readBackendSnapshot } from "./nixos-shared-host.control-plane.helpers";
+import { viberootsToolScript } from "./deployment-command";
 import { writeAuthSession } from "./nixos-shared-host.service-auth-boundary.helpers";
 
 const CONTROL_PLANE_TOKEN = "test-control-plane-token";
@@ -124,11 +125,14 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
       hostRoot: remoteRuntimeRoot,
     });
     const authSessionId = await writeJenkinsSubmitterAuthSession(remoteRecordsRoot, deployment);
+    const jenkinsDeploy = viberootsToolScript(
+      "viberoots/build-tools/tools/bin/nixos-shared-host-jenkins-deploy",
+    );
     const jenkinsCommand = (sessionId: string) =>
       $({
         cwd: tmp,
         env: jenkinsExecEnv(env),
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino/dev:deploy --admission-evidence-json ${admissionEvidencePath} --idempotency-key jenkins-pleomino-dev-1 --auth-session-id ${sessionId} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`${jenkinsDeploy} --deployment //projects/deployments/pleomino/dev:deploy --admission-evidence-json ${admissionEvidencePath} --idempotency-key jenkins-pleomino-dev-1 --auth-session-id ${sessionId} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
     try {
       const result = await jenkinsCommand(authSessionId);
       const summary = JSON.parse(String(result.stdout));
@@ -222,6 +226,9 @@ test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid h
     );
     const { admissionEvidencePath } = await writeReviewedPleominoAdmissionEvidence(tmp, $);
     const auth = await writeJenkinsAuthFiles(tmp);
+    const jenkinsDeploy = viberootsToolScript(
+      "viberoots/build-tools/tools/bin/nixos-shared-host-jenkins-deploy",
+    );
     const server = await startNixosSharedHostPublicServer({
       deployment,
       hostRoot: remoteRuntimeRoot,
@@ -231,7 +238,7 @@ test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid h
       const result = await $({
         cwd: tmp,
         env: jenkinsExecEnv(env),
-      })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment //projects/deployments/pleomino/dev:deploy --admission-evidence-json ${admissionEvidencePath} --admit-and-deploy deploy/pleomino-dev --auth-session-id ${authSessionId} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`${jenkinsDeploy} --deployment //projects/deployments/pleomino/dev:deploy --admission-evidence-json ${admissionEvidencePath} --admit-and-deploy deploy/pleomino-dev --auth-session-id ${authSessionId} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.ok, true);
       assert.equal(summary.remoteExecution.controlPlane.finalOutcome, "succeeded");

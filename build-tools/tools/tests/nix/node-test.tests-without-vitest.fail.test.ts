@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -41,7 +41,7 @@ test(
       );
       await fsp.writeFile(
         path.join(impDir, "TARGETS"),
-        'load("//build-tools/node:defs.bzl", "nix_node_test")\n\nnix_node_test(\n    name = "demo-node-tests",\n)\n',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_test")\n\nnix_node_test(\n    name = "demo-node-tests",\n)\n',
         "utf8",
       );
       // Create a test file that matches the default pattern
@@ -60,14 +60,15 @@ test(
         cwd: tmp,
         stdio: "inherit",
         env,
-      })`zx-wrapper build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
+      })`zx-wrapper viberoots/build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
       await $({ cwd: tmp, stdio: "pipe" })`git add -A ${importer}`;
+      const flakeRef = await workspaceFlakeRef(tmp);
       // Expect build to fail because tests are present but vitest is not installed
       const res = await $({
         cwd: tmp,
         stdio: "pipe",
         env,
-      })`bash --noprofile --norc -c 'timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-test.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs'`.nothrow();
+      })`bash --noprofile --norc -c 'timeout ${TIMEOUT_SECS}s nix build "path:${flakeRef}#node-test.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs'`.nothrow();
       if (res.exitCode === 0) {
         throw new Error(
           "expected node-test derivation to fail when vitest is missing and tests exist",

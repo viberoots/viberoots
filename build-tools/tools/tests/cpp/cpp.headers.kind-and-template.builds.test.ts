@@ -16,7 +16,7 @@ function parseOutPath(stdout: unknown): string {
 }
 
 await runInTemp("cpp-headers-builds", async (tmp, $) => {
-  const repo = process.cwd();
+  const repo = path.join(process.cwd(), "viberoots");
 
   // Sanity check: macro exists in this workspace revision.
   const defs = await fsp.readFile(path.join(repo, "build-tools", "cpp", "defs.bzl"), "utf8");

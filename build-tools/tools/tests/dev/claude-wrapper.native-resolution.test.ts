@@ -3,10 +3,9 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { binWrapper, repoRoot, scratchRoot } from "./agent-wrapper-test-helpers.ts";
 
-const repoRoot = process.cwd();
-const wrapper = path.join(repoRoot, "build-tools", "tools", "bin", "claude");
-const scratchRoot = path.join(repoRoot, "buck-out", "tmp");
+const wrapper = binWrapper("claude");
 
 async function writeExecutable(file: string, text: string): Promise<void> {
   await fsp.writeFile(file, text, "utf8");

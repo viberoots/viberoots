@@ -29,7 +29,7 @@ test("node lib scaffold: TARGETS includes lockfile label and auto_map wires prov
       ],
       { spaces: 2 },
     );
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out ${DEFAULT_AUTO_MAP_PATH}`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out ${DEFAULT_AUTO_MAP_PATH}`;
     const autoMap = await fs.readFile(path.join(tmp, DEFAULT_AUTO_MAP_PATH), "utf8");
     if (!autoMap.includes("//projects/libs/demo:demo"))
       throw new Error("auto_map missing provider mapping for demo");

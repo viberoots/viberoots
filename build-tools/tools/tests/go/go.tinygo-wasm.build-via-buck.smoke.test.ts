@@ -29,7 +29,7 @@ func main() {}
     );
     await fs.writeFile(
       path.join(apiDir, "TARGETS"),
-      `load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
+      `load("@viberoots//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
 
 nix_go_tiny_wasm_lib(
     name = "wasm",

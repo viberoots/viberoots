@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 async function nixBuildSelected(tmp: string, $: any, target: string): Promise<string> {
   const res = await $({
@@ -24,7 +24,7 @@ async function nixBuildSelected(tmp: string, $: any, target: string): Promise<st
         },
       }),
     },
-  })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+  })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
   if (res.exitCode !== 0) {
     console.error(String(res.stderr || ""));
     throw new Error(`nix build failed (exit=${res.exitCode})`);
@@ -108,7 +108,7 @@ test("python wasm (pyodide): extension build_py_deps headers are available", asy
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       `
-load("//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_extension_module")
+load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_extension_module")
 
 nix_python_wasm_extension_module(
   name = "ext",
@@ -130,7 +130,7 @@ nix_python_wasm_app(
       "utf8",
     );
 
-    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    await $`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const outPath = await nixBuildSelected(tmp, $, "//projects/apps/pywasm:pyapp");
     const outDir = path.join(outPath, "site", "demo");
     const entries = await fs.readdir(outDir);

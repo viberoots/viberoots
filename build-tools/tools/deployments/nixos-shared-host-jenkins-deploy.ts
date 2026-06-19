@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli";
 import { runNodeWithZx } from "../lib/node-run";
-import { findRepoRoot } from "../lib/repo";
+import { findRepoRoot, resolveWorkspaceRootsSync } from "../lib/repo";
 import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import {
   REMOTE_SSH_IDENTITY_FILE_ENV,
@@ -101,17 +101,23 @@ async function runDeployChild<T>(
   source: "plan" | "deploy",
 ): Promise<T> {
   const controlPlaneToken = String(process.env.VBR_DEPLOY_CONTROL_PLANE_TOKEN || "").trim();
+  const viberootsRoot = resolveWorkspaceRootsSync({
+    start: ctx.repoRoot,
+    env: { ...process.env, WORKSPACE_ROOT: ctx.repoRoot },
+  }).viberootsRoot;
   try {
     const { stdout } = await runNodeWithZx({
-      script: path.join(ctx.repoRoot, "build-tools/tools/deployments/deploy.ts"),
+      script: path.join(viberootsRoot, "build-tools/tools/deployments/deploy.ts"),
       args,
       cwd: process.cwd(),
       env: scrubControlPlaneChildEnv({
+        WORKSPACE_ROOT: ctx.repoRoot,
+        VIBEROOTS_ROOT: viberootsRoot,
         ...(controlPlaneToken ? { VBR_DEPLOY_CONTROL_PLANE_TOKEN: controlPlaneToken } : {}),
         [REMOTE_SSH_IDENTITY_FILE_ENV]: ctx.sshIdentityFile,
         [REMOTE_SSH_KNOWN_HOSTS_FILE_ENV]: ctx.sshKnownHostsFile,
       }),
-      zxInitPath: path.join(ctx.repoRoot, "build-tools/tools/dev/zx-init.mjs"),
+      zxInitPath: path.join(viberootsRoot, "build-tools/tools/dev/zx-init.mjs"),
       stdio: "pipe",
     });
     return await parseJson<T>(stdout, `deploy.ts ${source}`);

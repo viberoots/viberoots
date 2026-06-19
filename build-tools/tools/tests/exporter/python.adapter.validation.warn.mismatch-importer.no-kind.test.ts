@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("python adapter validates lockfile importer mismatch even without kind:* (warn mode)", async () => {
   await runInTemp("exp-python-warn-mismatch-no-kind", async (tmp, $) => {
-    const out = path.join(tmp, "build-tools/tools/buck/.tmp.graph.json");
+    const out = path.join(tmp, "viberoots/build-tools/tools/buck/.tmp.graph.json");
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       {
@@ -20,14 +20,14 @@ test("python adapter validates lockfile importer mismatch even without kind:* (w
         srcs: ["main.py"],
       },
     ];
-    const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");
+    const sim = path.join(tmp, "viberoots/build-tools/tools/buck/simulated.json");
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
 
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${out} --validation warn`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${out} --validation warn`;
     const txt = String(res.stdout || "") + String(res.stderr || "");
     if (res.exitCode !== 0) {
       console.error("exporter should succeed in warn mode", txt);

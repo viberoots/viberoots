@@ -11,7 +11,7 @@ test("PATCH_PKG_DEBUG enables debug output for patch-go", async () => {
     await fsp.writeFile(path.join(origin, "README.md"), "hello\n", "utf8");
     const map = { "example.com/foo": { version: "v1.0.0", originPath: origin } };
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const out = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -20,7 +20,7 @@ test("PATCH_PKG_DEBUG enables debug output for patch-go", async () => {
     )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(
       tmp,
       "gomodcache",
-    )} build-tools/tools/bin/patch-pkg start go example.com/foo`;
+    )} viberoots/build-tools/tools/bin/patch-pkg start go example.com/foo`;
     const all = String(out.stdout || "") + String(out.stderr || "");
     if (!all.includes("[patch-go][debug]")) {
       console.error("expected debug output missing with PATCH_PKG_DEBUG=1");

@@ -7,6 +7,7 @@ import { runInScratchTemp } from "../lib/test-helpers";
 
 const EXPORT_GRAPH_SCRIPT = path.join(
   process.cwd(),
+  "viberoots",
   "build-tools",
   "tools",
   "buck",

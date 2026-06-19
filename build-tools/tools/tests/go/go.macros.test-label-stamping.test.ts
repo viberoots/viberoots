@@ -48,7 +48,7 @@ test("go macros: nix_go_test stamps lang:go and kind:test (including auto-wired 
       [
         "",
         "# test: go.macros.test-label-stamping.test.ts",
-        'load("//build-tools/go:defs.bzl", "nix_go_library", "nix_go_test")',
+        'load("@viberoots//build-tools/go:defs.bzl", "nix_go_library", "nix_go_test")',
         "",
         "nix_go_library(",
         '  name = "lib",',

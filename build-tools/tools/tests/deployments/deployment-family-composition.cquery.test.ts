@@ -118,8 +118,8 @@ test("deployment family composition rejects provider args that drift family defa
     await writeFamilyDriftFixture(
       tmp,
       [
-        'load("//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
-        'load("//build-tools/deployments:family_defs.bzl", "compose_deployment_family_kwargs", "deployment_family_defaults", "deployment_stage_delta")',
+        'load("@viberoots//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
+        'load("@viberoots//build-tools/deployments:family_defs.bzl", "compose_deployment_family_kwargs", "deployment_family_defaults", "deployment_stage_delta")',
         "nixos_shared_host_static_webapp_deployment(**compose_deployment_family_kwargs(",
         '    deployment_family_defaults(component = "//projects/apps/demo:app", lane_policy = "//projects/deployments/demo-shared:lane"),',
         '    deployment_stage_delta(stage = "dev", admission_policy = "//projects/deployments/demo-shared:dev_release", protection_class = "shared_nonprod"),',
@@ -141,8 +141,8 @@ test("deployment family composition rejects provider args that drift explicit pr
     await writeFamilyDriftFixture(
       tmp,
       [
-        'load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
-        'load("//build-tools/deployments:family_defs.bzl", "compose_deployment_family_kwargs", "deployment_family_defaults", "deployment_stage_delta")',
+        'load("@viberoots//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
+        'load("@viberoots//build-tools/deployments:family_defs.bzl", "compose_deployment_family_kwargs", "deployment_family_defaults", "deployment_stage_delta")',
         "cloudflare_pages_static_webapp_deployment(**compose_deployment_family_kwargs(",
         '    deployment_family_defaults(component = "//projects/apps/demo:app", lane_policy = "//projects/deployments/demo-shared:lane"),',
         "    deployment_stage_delta(",
@@ -168,8 +168,8 @@ test("deployment family composition rejects provider-native facts that contradic
     await writeFamilyDriftFixture(
       tmp,
       [
-        'load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
-        'load("//build-tools/deployments:family_defs.bzl", "compose_deployment_family_kwargs", "deployment_family_defaults", "deployment_stage_delta")',
+        'load("@viberoots//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
+        'load("@viberoots//build-tools/deployments:family_defs.bzl", "compose_deployment_family_kwargs", "deployment_family_defaults", "deployment_stage_delta")',
         "cloudflare_pages_static_webapp_deployment(**compose_deployment_family_kwargs(",
         '    deployment_family_defaults(component = "//projects/apps/demo:app", lane_policy = "//projects/deployments/demo-shared:lane"),',
         "    deployment_stage_delta(",

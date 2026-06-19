@@ -25,7 +25,7 @@ test("stamping-lint flags targets that have lang:* but are missing patch_scope:*
       cwd: tmp,
       quiet: true,
       env: { ...process.env },
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/dev/stamping-lint.ts`.nothrow();
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/dev/stamping-lint.ts`.nothrow();
     const out = String(res.stdout || "") + String(res.stderr || "");
     assert.notEqual(res.exitCode, 0);
     assert.match(out, /missing label patch_scope:package-local/);

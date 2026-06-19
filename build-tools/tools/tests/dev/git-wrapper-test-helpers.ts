@@ -1,9 +1,29 @@
 import * as fsp from "node:fs/promises";
+import fs from "node:fs";
 import path from "node:path";
 
 export const repoRoot = process.cwd();
-export const wrapper = path.join(repoRoot, "build-tools", "tools", "bin", "git");
-export const scratchRoot = path.join(repoRoot, "buck-out", "tmp");
+export const viberootsRoot = (() => {
+  const candidates = [
+    process.env.VIBEROOTS_SOURCE_ROOT || "",
+    process.env.VIBEROOTS_ROOT || "",
+    path.join(repoRoot, "viberoots"),
+    path.join(repoRoot, ".viberoots", "current"),
+    repoRoot,
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    const root = path.resolve(candidate);
+    if (fs.existsSync(path.join(root, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"))) {
+      return path.join(root, "viberoots");
+    }
+    if (fs.existsSync(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"))) {
+      return root;
+    }
+  }
+  return repoRoot;
+})();
+export const wrapper = path.join(viberootsRoot, "build-tools", "tools", "bin", "git");
+export const scratchRoot = path.join(repoRoot, ".viberoots", "workspace", "buck", "tmp");
 
 export async function writeExecutable(file: string, text: string): Promise<void> {
   await fsp.writeFile(file, text, "utf8");

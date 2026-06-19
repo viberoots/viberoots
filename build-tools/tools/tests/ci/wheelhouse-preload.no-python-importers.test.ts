@@ -49,7 +49,7 @@ test("wheelhouse-preload: no python importers → no-op and success", async () =
       cwd: tmp,
       stdio: "inherit",
       env: { ...process.env },
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/ci/run-stage.ts --stage wheelhouse-preload`.nothrow();
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/ci/run-stage.ts --stage wheelhouse-preload`.nothrow();
     if (rc.exitCode !== 0) {
       console.error("wheelhouse-preload stage failed unexpectedly without python importers");
       process.exit(2);

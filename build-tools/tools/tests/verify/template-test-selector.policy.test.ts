@@ -11,35 +11,37 @@ import {
 
 test("template id extraction supports direct, delete, and rename paths", () => {
   assert.equal(
-    templateIdFromPath("build-tools/tools/scaffolding/templates/go/lib/copier.yaml"),
+    templateIdFromPath("viberoots/build-tools/tools/scaffolding/templates/go/lib/copier.yaml"),
     "go/lib",
   );
   assert.equal(
-    templateIdFromPath("build-tools/tools/scaffolding/templates/ts/wasm-app/README.md.jinja"),
+    templateIdFromPath(
+      "viberoots/build-tools/tools/scaffolding/templates/ts/wasm-app/README.md.jinja",
+    ),
     "ts/wasm-app",
   );
   assert.equal(
-    templateIdFromPath("build-tools/tools/scaffolding/templates/ts/README.md.jinja"),
+    templateIdFromPath("viberoots/build-tools/tools/scaffolding/templates/ts/README.md.jinja"),
     null,
   );
-  assert.equal(templateIdFromPath("build-tools/tools/scaffolding/templates/go"), null);
+  assert.equal(templateIdFromPath("viberoots/build-tools/tools/scaffolding/templates/go"), null);
   assert.equal(templateIdFromPath("docs/handbook/getting-started-on-a-pr.md"), null);
 });
 
 test("changed template id extraction is sorted and unique", () => {
   const ids = changedTemplateIdsFromPaths([
-    "build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
-    "build-tools/tools/scaffolding/templates/ts/webapp-static/copier.yaml",
-    "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/server/index.ts.jinja",
-    "build-tools/tools/scaffolding/templates/go/lib/README.md.jinja",
+    "viberoots/build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
+    "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/copier.yaml",
+    "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/server/index.ts.jinja",
+    "viberoots/build-tools/tools/scaffolding/templates/go/lib/README.md.jinja",
   ]);
   assert.deepEqual(ids, ["go/lib", "ts/webapp-ssr-vite", "ts/webapp-static"]);
 });
 
 test("selector mode classification handles template-only, mixed, and no-template-impact", async () => {
   const templateOnly = await classifyTemplateSelectorMode(process.cwd(), [
-    "build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
-    "build-tools/tools/scaffolding/templates/go/lib/README.md.jinja",
+    "viberoots/build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
+    "viberoots/build-tools/tools/scaffolding/templates/go/lib/README.md.jinja",
   ]);
   assert.equal(templateOnly.mode, "template-only");
   assert.deepEqual(templateOnly.changedTemplateIds, ["go/lib"]);
@@ -48,14 +50,16 @@ test("selector mode classification handles template-only, mixed, and no-template
   assert.deepEqual(templateOnly.nonTemplateBuildSystemPaths, []);
 
   const mixed = await classifyTemplateSelectorMode(process.cwd(), [
-    "build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
-    "build-tools/tools/dev/verify.ts",
+    "viberoots/build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
+    "viberoots/build-tools/tools/dev/verify.ts",
   ]);
   assert.equal(mixed.mode, "mixed");
   assert.deepEqual(mixed.changedTemplateIds, ["go/lib"]);
   assert.deepEqual(mixed.ownedChangedTestPaths, []);
   assert.deepEqual(mixed.ownedChangedTestTargets, []);
-  assert.deepEqual(mixed.nonTemplateBuildSystemPaths, ["build-tools/tools/dev/verify.ts"]);
+  assert.deepEqual(mixed.nonTemplateBuildSystemPaths, [
+    "viberoots/build-tools/tools/dev/verify.ts",
+  ]);
 
   const noTemplate = await classifyTemplateSelectorMode(process.cwd(), [
     "workspace/apps/myapp/src/index.ts",
@@ -71,7 +75,7 @@ test("template-only mode allows changed template-owned tests and selects changed
   const result = await resolveTemplateTestSelection({
     root: process.cwd(),
     changedPaths: [
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/server/index.ts.jinja",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/server/index.ts.jinja",
       "build-tools/tools/tests/scaffolding/webapp-ssr-vite.runnable-contracts.test.ts",
     ],
     deps: {
@@ -93,8 +97,8 @@ test("template-only mode allows changed template-owned tests and selects changed
 
 test("template-only mode accepts template-support build-system files", async () => {
   const classification = await classifyTemplateSelectorMode(process.cwd(), [
-    "build-tools/tools/scaffolding/templates/ts/webapp-static/copier.yaml",
-    "build-tools/tools/tests/template_conventions.bzl",
+    "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/copier.yaml",
+    "viberoots/build-tools/tools/tests/template_conventions.bzl",
     "build-tools/tools/tests/scaffolding/template-conventions.metadata.cquery.test.ts",
     "build-tools/tools/tests/scaffolding/lib/webapp-static-hmr.ts",
   ]);
@@ -106,7 +110,7 @@ test("template-only mode accepts template-support build-system files", async () 
 test("template-only selection unions label targets and safety floor", async () => {
   const result = await resolveTemplateTestSelection({
     root: process.cwd(),
-    changedPaths: ["build-tools/tools/scaffolding/templates/go/lib/copier.yaml"],
+    changedPaths: ["viberoots/build-tools/tools/scaffolding/templates/go/lib/copier.yaml"],
     deps: {
       queryTargetsForTemplateLabel: async (_root, templateId) => {
         assert.equal(templateId, "go/lib");
@@ -131,8 +135,8 @@ test("mixed and no-template-impact modes do not select narrowed targets", async 
   const mixed = await resolveTemplateTestSelection({
     root: process.cwd(),
     changedPaths: [
-      "build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
-      "build-tools/tools/dev/verify.ts",
+      "viberoots/build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
+      "viberoots/build-tools/tools/dev/verify.ts",
     ],
   });
   assert.equal(mixed.mode, "mixed");

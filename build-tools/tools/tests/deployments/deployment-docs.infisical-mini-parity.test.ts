@@ -17,15 +17,16 @@ import {
 } from "../../deployments/nixos-shared-host-install-contract";
 import { maybePromptClientInstallInput } from "../../deployments/nixos-shared-host-install-prompt";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
+import { viberootsRepoPath } from "./deployment-command";
 import { infisicalRequirement, infisicalRuntime } from "./deployment-secret-infisical.fixture";
 
-const repoRoot = process.cwd();
 const oldControlPlaneTokenEnv = ["B", "NX_DEPLOY_CONTROL_PLANE_TOKEN"].join("");
 const currentControlPlaneTokenEnv = "VBR_DEPLOY_CONTROL_PLANE_TOKEN";
 const oldRemoteRepoPath = ["/srv", "common"].join("/");
+const repoRoot = process.cwd();
 
 async function readDoc(name: string): Promise<string> {
-  return await fsp.readFile(path.join(repoRoot, "docs", name), "utf8");
+  return await fsp.readFile(viberootsRepoPath(path.posix.join("docs", name)), "utf8");
 }
 
 test("mini migration docs cover Infisical worker secret boundary", async () => {

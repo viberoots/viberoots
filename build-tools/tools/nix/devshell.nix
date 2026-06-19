@@ -59,7 +59,13 @@ in {
 
       _vbr_apply_dev_path() {
         local vbr_nix_bin="${viberootsCommand}/bin"
-        local repo_prefix="$PWD/build-tools/tools/bin:$PWD/.direnv/bin:$PWD/node_modules/.bin"
+        local vbr_tools_bin="$PWD/build-tools/tools/bin"
+        local vbr_node_bin="$PWD/node_modules/.bin"
+        if [ ! -d "$vbr_tools_bin" ] && [ -d "$PWD/viberoots/build-tools/tools/bin" ]; then
+          vbr_tools_bin="$PWD/viberoots/build-tools/tools/bin"
+          vbr_node_bin="$PWD/viberoots/node_modules/.bin"
+        fi
+        local repo_prefix="$vbr_tools_bin:$PWD/.direnv/bin:$vbr_node_bin"
         local nix_prefix="''${HOST_PATH:-}"
         local host_tail
         host_tail="$(_vbr_filter_host_path "$PATH")"
@@ -75,9 +81,14 @@ in {
         fi
       fi
 
-      if [ -d "$PWD/build-tools/tools/bin" ]; then
-        export CMUX_CUSTOM_CLAUDE_PATH="$PWD/build-tools/tools/bin/claude"
-        export CMUX_CUSTOM_CODEX_PATH="$PWD/build-tools/tools/bin/codex"
+      vbr_tools_bin="$PWD/build-tools/tools/bin"
+      if [ ! -d "$vbr_tools_bin" ] && [ -d "$PWD/viberoots/build-tools/tools/bin" ]; then
+        vbr_tools_bin="$PWD/viberoots/build-tools/tools/bin"
+      fi
+
+      if [ -d "$vbr_tools_bin" ]; then
+        export CMUX_CUSTOM_CLAUDE_PATH="$vbr_tools_bin/claude"
+        export CMUX_CUSTOM_CODEX_PATH="$vbr_tools_bin/codex"
         mkdir -p "$PWD/.direnv/bin" 2>/dev/null || true
         if [ "$(uname -s 2>/dev/null || true)" = "Darwin" ]; then
           if [ ! -x "$PWD/.direnv/bin/apfs-clone-checker" ] && command -v clang >/dev/null 2>&1; then
@@ -138,7 +149,7 @@ EOF
       # from an older shellHook revision.
       unalias i b v t >/dev/null 2>&1 || true
       
-      cache_dir="$PWD/buck-out/tmp/devshell-cache"
+      cache_dir="$PWD/.viberoots/workspace/buck/tmp/devshell-cache"
       mkdir -p "$cache_dir" 2>/dev/null || true
       lock_hash=""
       if [ -f flake.lock ]; then
@@ -174,14 +185,20 @@ EOF
       fi
       _vbr_apply_dev_path
 
-      if [ -f flake.nix ]; then
+      if [ -f flake.nix ] || [ -f viberoots/flake.nix ]; then
         vbr_source="${viberootsRoot}"
         if [ -f "$PWD/build-tools/tools/dev/viberoots.ts" ]; then
           vbr_source="$PWD"
         elif [ -f "$PWD/viberoots/flake.nix" ]; then
           vbr_source="$PWD/viberoots"
+          mkdir -p "$PWD/.viberoots" "$PWD/.viberoots/workspace"
+          if [ "$(readlink "$PWD/.viberoots/current" 2>/dev/null || true)" != "../viberoots" ]; then
+            rm -f "$PWD/.viberoots/current"
+            ln -s ../viberoots "$PWD/.viberoots/current"
+          fi
         fi
         export VIBEROOTS_ROOT="$vbr_source"
+        export VIBEROOTS_SOURCE_ROOT="$vbr_source"
         viberoots init-workspace --shell-entry --source "$vbr_source" >/dev/null || {
           echo "(devShell) viberoots workspace activation failed" >&2
           return 1 2>/dev/null || exit 1
@@ -207,19 +224,25 @@ _vbr_update_path() {
   local vbr_nix_bin="${viberootsCommand}/bin"
   local d="$PWD"
   while [[ "$d" != "/" ]]; do
-    if [[ -f "$d/flake.nix" && -d "$d/build-tools/tools/bin" ]]; then
+    local vbr_tools_bin="$d/build-tools/tools/bin"
+    local vbr_node_bin="$d/node_modules/.bin"
+    if [[ ! -d "$vbr_tools_bin" && -d "$d/viberoots/build-tools/tools/bin" ]]; then
+      vbr_tools_bin="$d/viberoots/build-tools/tools/bin"
+      vbr_node_bin="$d/viberoots/node_modules/.bin"
+    fi
+    if [[ -f "$d/flake.nix" && -d "$vbr_tools_bin" ]]; then
       local old_ifs="$IFS"
       local entry
       local out=""
       IFS=':'
       for entry in $PATH; do
         case "$entry" in
-          ""|/opt/homebrew/bin|/opt/homebrew/sbin|/usr/local/Homebrew/*|/usr/local/Cellar/*|"$vbr_nix_bin"|"$d/build-tools/tools/bin"|"$d/.direnv/bin"|"$d/node_modules/.bin") ;;
+          ""|/opt/homebrew/bin|/opt/homebrew/sbin|/usr/local/Homebrew/*|/usr/local/Cellar/*|"$vbr_nix_bin"|"$vbr_tools_bin"|"$d/.direnv/bin"|"$d/node_modules/.bin"|"$d/viberoots/node_modules/.bin"|"$vbr_node_bin") ;;
           *) out="''${out:+$out:}$entry" ;;
         esac
       done
       IFS="$old_ifs"
-      export PATH="$vbr_nix_bin:$d/build-tools/tools/bin:$d/.direnv/bin:$d/node_modules/.bin''${HOST_PATH:+:$HOST_PATH}''${out:+:$out}"
+      export PATH="$vbr_nix_bin:$vbr_tools_bin:$d/.direnv/bin:$vbr_node_bin''${HOST_PATH:+:$HOST_PATH}''${out:+:$out}"
       return
     fi
     d="$(dirname "$d")"
@@ -250,39 +273,8 @@ EOF
         fi
       fi
 
-      # Symlink prelude from flake output for local dev. Validate the actual
-      # Buck entrypoint so stale/broken symlinks are repaired, not just present.
-      if [ ! -f prelude/prelude.bzl ]; then
-        pre_cache="$cache_dir/prelude-path$lock_suffix"
-        pre_cached=""
-        pre_target=""
-        if [ -f "$pre_cache" ]; then
-          pre_cached="$(cat "$pre_cache" 2>/dev/null || true)"
-        fi
-        if [ -n "$pre_cached" ] && [ -f "$pre_cached/prelude/prelude.bzl" ]; then
-          pre_target="$pre_cached/prelude"
-        else
-          pre_out=$(nix build .#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)
-          if [ -z "$pre_out" ]; then
-            pre_out="$(${pkgs.nix}/bin/nix eval --raw .#inputs.buck2.outPath 2>/dev/null || true)"
-          fi
-          if [ -n "$pre_out" ] && [ -f "$pre_out/prelude/prelude.bzl" ]; then
-            pre_target="$pre_out/prelude"
-            printf "%s\n" "$pre_out" > "$pre_cache" 2>/dev/null || true
-          fi
-        fi
-        if [ -n "$pre_target" ]; then
-          if [ -L prelude ] || [ ! -e prelude ]; then
-            rm -f prelude
-            ln -s "$pre_target" prelude
-          else
-            echo "(devShell) prelude exists but is not a valid symlink; expected prelude/prelude.bzl" >&2
-          fi
-        fi
-      fi
-      if [ -f .buckconfig ] && [ ! -f prelude/prelude.bzl ]; then
-        echo "(devShell) failed to materialize Buck prelude at prelude/prelude.bzl" >&2
-      fi
+      # Strict consumer workspaces route the Buck prelude through
+      # .viberoots/current/prelude; do not recreate a visible root prelude shim.
     '';
     buildInputs = [
       pkgs.git pkgs.nix pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 pkgs.python3 pkgs.uv zx-wrapper viberootsCommand pkgs.jq pkgs.rsync pkgs.copier pkgs.yq

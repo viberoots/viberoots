@@ -14,7 +14,7 @@ test("ts package packaging with conditional exports and artifact staging", async
     await git`git config user.name test`;
 
     // Enable C++ in this temp workspace for planner path parity
-    await sh`bash --noprofile --norc -c 'mkdir -p build-tools/tools/nix && printf %s \'{"enabled":["cpp"]}\' > build-tools/tools/nix/langs.json'`;
+    await sh`bash --noprofile --norc -c 'mkdir -p build-tools/tools/nix && printf %s \'{"enabled":["cpp"]}\' > viberoots/build-tools/tools/nix/langs.json'`;
 
     // 1) Scaffold minimal C wrapper for pure compute: add(a,b)
     const coreDir = path.join(tmp, "projects", "libs", "math-core");
@@ -40,7 +40,7 @@ int add(int a, int b) { return a + b; }
     );
     await fs.outputFile(
       path.join(coreDir, "TARGETS"),
-      `load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
+      `load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "core_wasm",
@@ -90,7 +90,7 @@ func main() {}
     );
     await fs.writeFile(
       path.join(apiDir, "TARGETS"),
-      `load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib", "nix_go_carchive")
+      `load("@viberoots//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib", "nix_go_carchive")
 
 nix_go_tiny_wasm_lib(
     name = "wasm",
@@ -153,7 +153,7 @@ NAPI_MODULE(NODE_GYP_MODULE_NAME, Init);
     );
     await fs.writeFile(
       path.join(nativeDir, "TARGETS"),
-      `load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
+      `load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
     name = "napi_addon",
@@ -171,12 +171,12 @@ nix_cpp_node_addon(
 
     // 4) Provide C++ defs in the temp repo (planner-visible)
     await fs.outputFile(
-      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
-      await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
+      await fs.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
     );
     await fs.outputFile(
-      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
-      await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
+      await fs.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
     );
 
     // 5) TS package with dual entries and conditional exports
@@ -296,7 +296,7 @@ genrule(
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`${process.execPath} build-tools/tools/dev/install/deps-main.ts --glue-only`;
+    })`${process.execPath} viberoots/build-tools/tools/dev/install/deps-main.ts --glue-only`;
 
     // 7) Build artifacts via selected builders and stage to dist/ manually (equivalent to the genrule)
     // Build TinyGo wasm via build-selected (same path used for addon below).

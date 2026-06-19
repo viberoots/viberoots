@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
@@ -112,7 +113,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
             cwd: tmp,
             env,
             stdio: "pipe",
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactA} --profile-root ${profileRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(normalServer.port)} --smoke-connect-protocol https:`;
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactA} --profile-root ${profileRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(normalServer.port)} --smoke-connect-protocol https:`;
           const firstSummary = JSON.parse(String(firstRun.stdout));
           assert.equal(firstSummary.finalOutcome, "succeeded");
           assert.equal("recordPath" in firstSummary, false);
@@ -147,7 +148,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
             cwd: tmp,
             env,
             stdio: "pipe",
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --preview --source-run-id ${firstSummary.deployRunId} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(previewServer.port)} --smoke-connect-protocol https:`;
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --preview --source-run-id ${firstSummary.deployRunId} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(previewServer.port)} --smoke-connect-protocol https:`;
           const previewSummary = JSON.parse(String(previewRun.stdout));
           assert.equal(previewSummary.finalOutcome, "succeeded");
           assert.equal("recordPath" in previewSummary, false);
@@ -156,7 +157,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
             cwd: tmp,
             env,
             stdio: "pipe",
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --preview-cleanup --source-run-id ${firstSummary.deployRunId} --cleanup-reason manual_cleanup --control-plane-url ${harness.controlPlane.url}`;
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --preview-cleanup --source-run-id ${firstSummary.deployRunId} --cleanup-reason manual_cleanup --control-plane-url ${harness.controlPlane.url}`;
           const cleanupSummary = JSON.parse(String(cleanupRun.stdout));
           assert.equal(cleanupSummary.finalOutcome, "succeeded");
           assert.equal("recordPath" in cleanupSummary, false);
@@ -165,7 +166,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
             cwd: tmp,
             env,
             stdio: "pipe",
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactB} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(normalServer.port)} --smoke-connect-protocol https:`;
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactB} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(normalServer.port)} --smoke-connect-protocol https:`;
           const secondSummary = JSON.parse(String(secondRun.stdout));
           assert.equal(secondSummary.finalOutcome, "succeeded");
 
@@ -173,7 +174,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
             cwd: tmp,
             env,
             stdio: "pipe",
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --publish-only --rollback --source-run-id ${firstSummary.deployRunId} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(normalServer.port)} --smoke-connect-protocol https:`;
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --publish-only --rollback --source-run-id ${firstSummary.deployRunId} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(normalServer.port)} --smoke-connect-protocol https:`;
           const rollbackSummary = JSON.parse(String(rollbackRun.stdout));
           assert.equal(rollbackSummary.finalOutcome, "succeeded");
           assert.equal("recordPath" in rollbackSummary, false);

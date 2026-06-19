@@ -54,27 +54,27 @@ int add(int a, int b) { return a + b; }
 
     // Ensure C++ macros are available in the temp repo
     await fs.outputFile(
-      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
-      await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
+      await fs.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
     );
     await fs.outputFile(
-      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
-      await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
+      await fs.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
     );
     // Make planner templates visible (temp repo will prefer main workspace templates when absent)
-    await fs.mkdirp(path.join(tmp, "build-tools/tools/nix/templates"));
+    await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/templates"));
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/templates/cpp.nix"),
-      path.join(tmp, "build-tools/tools/nix/templates/cpp.nix"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/nix/templates/cpp.nix"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/templates/cpp.nix"),
     );
-    await fs.mkdirp(path.join(tmp, "build-tools/tools/nix/planner"));
+    await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/planner"));
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/planner/cpp.nix"),
-      path.join(tmp, "build-tools/tools/nix/planner/cpp.nix"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/nix/planner/cpp.nix"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix"),
     );
 
     // TARGETS: wasm static lib
-    const targets = `load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
+    const targets = `load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")
 
 nix_cpp_wasm_static_lib(
     name = "core_wasm",

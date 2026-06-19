@@ -3,14 +3,18 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagBool } from "../../lib/cli";
+import { getFlagBool, getFlagStr } from "../../lib/cli";
 import { writeIfChanged } from "../../lib/fs-helpers";
 import { resolveImporterDir } from "../../lib/lockfiles";
 import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
 import { pathExists, repoRoot } from "../../lib/repo";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
-import { makeFilteredFlakeRef } from "../update-pnpm-hash/lockfile";
+import {
+  makeFilteredFlakeRef,
+  prepareExactPnpmStore,
+  withResolvedExactPrefetchedStore,
+} from "../update-pnpm-hash/lockfile";
 import { flakeRefForImporter, sanitizeName } from "./common";
 import {
   ensureNodeModulesGcRoot,
@@ -38,11 +42,11 @@ function usesTempRepoFakeNix(root: string, env: NodeJS.ProcessEnv = process.env)
   return nixPath.startsWith(`${path.resolve(root)}${path.sep}`);
 }
 
-export async function relinkNodeModules(force: boolean) {
+export async function relinkNodeModules(force: boolean, importerOverride = "") {
   const root = repoRoot();
   await applyNixCacheHealthPolicy(root);
   const cwd = path.resolve(process.cwd());
-  const importer = await resolveImporterDir(process.cwd()).catch(() => "."); // POSIX repo-relative
+  const importer = importerOverride || (await resolveImporterDir(process.cwd()).catch(() => ".")); // POSIX repo-relative
   const attr = !importer || importer === "." ? "default" : sanitizeName(importer);
   let outPath = "";
   const flakeRoot = (process.env.WORKSPACE_ROOT || process.cwd()).trim();
@@ -52,9 +56,17 @@ export async function relinkNodeModules(force: boolean) {
   const isDefaultImporter = !importer || importer === ".";
   const lockRel = isDefaultImporter ? "pnpm-lock.yaml" : `${importer}/pnpm-lock.yaml`;
   const lockAbs = path.join(root, lockRel);
-  const nm = path.join(process.cwd(), "node_modules");
+  const importerDir = isDefaultImporter ? process.cwd() : path.join(root, importer);
+  const nm = path.join(importerDir, "node_modules");
   const markerKey = isDefaultImporter ? "root" : sanitizeName(importer);
-  const markerPath = path.join(root, "buck-out", "tmp", `node-modules-link.${markerKey}.json`);
+  const markerPath = path.join(
+    root,
+    ".viberoots",
+    "workspace",
+    "buck",
+    "tmp",
+    `node-modules-link.${markerKey}.json`,
+  );
   {
     try {
       const [lockBuf, markerRaw] = await Promise.all([
@@ -107,11 +119,15 @@ export async function relinkNodeModules(force: boolean) {
     }
   }
   const flakeRef = flakeRefForImporter(flakeRoot, importer);
-  let tempFlake: { flakeRef: string; cleanup: () => Promise<void> } | null = null;
+  let tempFlake: { flakeRef: string; workspaceRoot: string; cleanup: () => Promise<void> } | null =
+    null;
   let buildFlakeRefBase = flakeRef;
   if (!outPath && attr) {
     try {
-      if (!isDefaultImporter) {
+      if (importer === "viberoots") {
+        const viberootsRoot = path.join(root, "viberoots");
+        buildFlakeRefBase = `path:${viberootsRoot}`;
+      } else if (!isDefaultImporter) {
         console.error("[link-node] preparing filtered flake snapshot for importer", importer);
         tempFlake = await withHeartbeat(
           `importer=${importer} step=prepare-filtered-flake`,
@@ -143,29 +159,41 @@ export async function relinkNodeModules(force: boolean) {
         stdoutBytes: 0,
         stderrBytes: 0,
       };
-      const built = await withHeartbeat(
-        `importer=${importer} step=build attr=node-modules.${attr}`,
-        runManagedCommand({
-          command: "nix",
-          args: [
-            "build",
-            `${buildFlakeRefBase}#node-modules.${attr}`,
-            "--no-link",
-            "--accept-flake-config",
-            "--option",
-            "min-free",
-            "0",
-            "--option",
-            "max-free",
-            "0",
-            "--print-out-paths",
-          ],
-          cwd: root,
-          env: process.env,
-          timeoutMs: nixBuildTimeoutMs,
-          activity,
-        }),
-        { activity },
+      const built = await withResolvedExactPrefetchedStore(
+        {
+          repoRoot: root,
+          importer,
+          flakeRef: buildFlakeRefBase,
+          attrPath: `pnpm-store.${attr}`,
+        },
+        async (exactStoreEnv) =>
+          await withHeartbeat(
+            `importer=${importer} step=build attr=node-modules.${attr}`,
+            runManagedCommand({
+              command: "nix",
+              args: [
+                "build",
+                `${buildFlakeRefBase}#node-modules.${attr}`,
+                "--no-link",
+                "--accept-flake-config",
+                "--impure",
+                "--option",
+                "min-free",
+                "0",
+                "--option",
+                "max-free",
+                "0",
+                "--print-out-paths",
+              ],
+              cwd: root,
+              env: tempFlake
+                ? { ...exactStoreEnv, WORKSPACE_ROOT: tempFlake.workspaceRoot }
+                : exactStoreEnv,
+              timeoutMs: nixBuildTimeoutMs,
+              activity,
+            }),
+            { activity },
+          ),
       );
       if (!built.ok) {
         const output = String(built.stdout || "") + String(built.stderr || "");
@@ -187,6 +215,9 @@ export async function relinkNodeModules(force: boolean) {
     throw new Error(
       `[link-node] failed to resolve outPath for importer '${importer}' attr node-modules.${attr}`,
     );
+  }
+  if (!usesTempRepoFakeNix(root) && (await pathExists(lockAbs))) {
+    await prepareExactPnpmStore({ repoRoot: root, importer });
   }
   await ensureNodeModulesGcRoot(root, markerKey, outPath);
   try {
@@ -238,7 +269,7 @@ export async function relinkNodeModules(force: boolean) {
 
 async function main(): Promise<void> {
   const force = getFlagBool("force");
-  await relinkNodeModules(force);
+  await relinkNodeModules(force, getFlagStr("importer"));
 }
 
 main().catch((err) => {

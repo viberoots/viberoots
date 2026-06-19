@@ -35,14 +35,29 @@ export async function pathExists(p: string): Promise<boolean> {
 export async function findRepoRoot(start: string): Promise<string> {
   const candidates = [
     (process.env.WORKSPACE_ROOT || "").trim(),
+    (process.env._VIBEROOTS_DEVSHELL_ROOT || "").trim(),
     (process.env.LIVE_ROOT || "").trim(),
     start,
   ].filter(Boolean);
   for (const candidate of candidates) {
     let dir = path.resolve(candidate);
     for (;;) {
-      if (await pathExists(path.join(dir, "flake.nix"))) return dir;
       const parent = path.dirname(dir);
+      if (
+        path.basename(dir) === "workspace" &&
+        path.basename(parent) === ".viberoots" &&
+        (await pathExists(path.join(dir, "flake.nix")))
+      ) {
+        return path.dirname(parent);
+      }
+      if (
+        path.basename(dir) === "viberoots" &&
+        (await pathExists(path.join(parent, VIBEROOTS_WORKSPACE_REL, "flake.nix")))
+      ) {
+        return parent;
+      }
+      if (await pathExists(path.join(dir, VIBEROOTS_WORKSPACE_REL, "flake.nix"))) return dir;
+      if (await pathExists(path.join(dir, "flake.nix"))) return dir;
       if (parent === dir) break;
       dir = parent;
     }
@@ -72,8 +87,22 @@ function canonicalPath(p: string): string {
 function findFlakeRootSync(start: string): string | null {
   let dir = canonicalPath(start);
   for (;;) {
-    if (fs.existsSync(path.join(dir, "flake.nix"))) return dir;
     const parent = path.dirname(dir);
+    if (
+      path.basename(dir) === "workspace" &&
+      path.basename(parent) === ".viberoots" &&
+      fs.existsSync(path.join(dir, "flake.nix"))
+    ) {
+      return path.dirname(parent);
+    }
+    if (
+      path.basename(dir) === "viberoots" &&
+      fs.existsSync(path.join(parent, VIBEROOTS_WORKSPACE_REL, "flake.nix"))
+    ) {
+      return parent;
+    }
+    if (fs.existsSync(path.join(dir, VIBEROOTS_WORKSPACE_REL, "flake.nix"))) return dir;
+    if (fs.existsSync(path.join(dir, "flake.nix"))) return dir;
     if (parent === dir) break;
     dir = parent;
   }
@@ -86,6 +115,7 @@ export function resolveWorkspaceRootSync(
 ): string {
   const candidates = [
     (env.WORKSPACE_ROOT || "").trim(),
+    (env._VIBEROOTS_DEVSHELL_ROOT || "").trim(),
     (env.BUCK_TEST_SRC || "").trim(),
     (env.LIVE_ROOT || "").trim(),
     start,

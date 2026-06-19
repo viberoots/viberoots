@@ -17,7 +17,7 @@ test("provider wiring does not map Go module labels to providers (Node-only)", a
 
     await $({
       cwd: tmp,
-    })`build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out .viberoots/workspace/providers/auto_map.bzl`;
+    })`viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out .viberoots/workspace/providers/auto_map.bzl`;
 
     const autoMap = await fs.readFile(
       path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl"),

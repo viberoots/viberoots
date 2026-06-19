@@ -46,7 +46,7 @@ test("node exporter does not auto-attach lockfile labels for unsupported importe
         cwd: tmp,
         stdio: "pipe",
         reject: false,
-      })`build-tools/tools/buck/export-graph.ts --simulate ${simPath} --out ${outPath} --validation warn`;
+      })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${simPath} --out ${outPath} --validation warn`;
       const txt = String(res.stdout || "") + String(res.stderr || "");
       if (res.exitCode !== 0) {
         console.error("exporter should succeed in warn mode", txt);
@@ -73,7 +73,7 @@ test("node exporter does not auto-attach lockfile labels for unsupported importe
         const res = await $({
           cwd: tmp,
           stdio: "pipe",
-        })`build-tools/tools/buck/export-graph.ts --simulate ${simPath} --out ${outPath}`;
+        })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${simPath} --out ${outPath}`;
         out = String(res.stdout || "") + String(res.stderr || "");
         code = res.exitCode || 0;
       } catch (e: any) {

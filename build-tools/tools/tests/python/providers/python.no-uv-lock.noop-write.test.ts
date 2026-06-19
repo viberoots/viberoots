@@ -10,7 +10,7 @@ test("providers: Python sync with no uv.lock writes stable header and no entries
   await runInTemp("python-no-uv-noop", async (tmp, $) => {
     // No uv.lock under projects/apps/* or projects/libs/* — narrow to python to exercise writer no-op behavior
     const runner = `#!/usr/bin/env zx-wrapper
-import { syncAllProviders } from "./build-tools/tools/buck/providers/index";
+import { syncAllProviders } from "./viberoots/build-tools/tools/buck/providers/index";
 await syncAllProviders({ lang: "python" });
 `;
     const runnerPath = path.join(tmp, "run-sync.mjs");
@@ -22,10 +22,7 @@ await syncAllProviders({ lang: "python" });
     const txt = await fsp.readFile(outFile, "utf8");
     // Header + load line present
     assert.match(txt, /# GENERATED FILE — DO NOT EDIT\./);
-    assert.match(
-      txt,
-      /load\("@root\/\/third_party\/providers:defs_python\.bzl", "python_importer_deps"\)/,
-    );
+    assert.match(txt, /load\("\/\/:defs_python\.bzl", "python_importer_deps"\)/);
     // No provider entries since no uv.lock under projects/apps/* or projects/libs/*
     assert.ok(!/python_importer_deps\(name="/.test(txt), "no providers should be listed");
   });

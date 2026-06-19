@@ -19,7 +19,7 @@ test("exporter verbose timing logs for node adapter and sidecar", async () => {
         ],
       },
     ];
-    const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");
+    const sim = path.join(tmp, "viberoots/build-tools/tools/buck/simulated.json");
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
 
     const res = await $({
@@ -27,7 +27,7 @@ test("exporter verbose timing logs for node adapter and sidecar", async () => {
       stdio: "pipe",
       reject: false,
       env: { ...process.env, EXPORTER_VERBOSE: "1" },
-    })`build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${out}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${out}`;
     const txt = String(res.stdout || "") + String(res.stderr || "");
     if (res.exitCode !== 0) {
       console.error("exporter should succeed in verbose mode", txt);

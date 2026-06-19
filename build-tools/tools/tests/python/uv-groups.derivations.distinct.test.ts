@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("python uv groups: base vs dev/test produce distinct, stable derivations", async () => {
   await runInTemp("py-uv-groups", async (tmp, _$) => {
@@ -25,7 +25,7 @@ test("python uv groups: base vs dev/test produce distinct, stable derivations", 
         cwd: tmp,
         stdio: "pipe",
         env: { ...process.env },
-      })`nix build --impure --accept-flake-config --no-link --print-out-paths ${`path:${tmp}#${attr}`}`;
+      })`nix build --impure --accept-flake-config --no-link --print-out-paths ${`path:${await workspaceFlakeRef(tmp)}#${attr}`}`;
       return String(stdout || "")
         .trim()
         .split(/\s+/)

@@ -1,4 +1,4 @@
-{ pkgs, importerDirs, nodeWebapp, filterRepo, repoSnapshot, repoRoot }:
+{ pkgs, importerDirs, nodeWebapp, filterRepo, repoSnapshot, repoRoot, viberootsRoot }:
 let
   sanitize = (import ../../templates-common.nix { inherit pkgs; }).sanitizeName;
   makeVercelNext =
@@ -23,6 +23,7 @@ let
           CONFIG_REL="${let v = builtins.getEnv "VBR_VERCEL_CONFIG"; in if v != "" then v else "vercel.project.json"}"
           CONFIG="$APP_DIR/$CONFIG_REL"
           DIST="$APP_DIR/dist"
+          VIBEROOTS_SOURCE_ROOT="${viberootsRoot}"
           test -f "$CONFIG" || {
             echo "node-vercel-next: missing declared Vercel config: ${importerDir}/$CONFIG_REL" >&2
             exit 2
@@ -32,8 +33,8 @@ let
           chmod -R u+w "$DIST" 2>/dev/null || true
           node --experimental-strip-types \
             --disable-warning=ExperimentalWarning \
-            --import "$REPO_ROOT/build-tools/tools/dev/zx-init.mjs" \
-            "$REPO_ROOT/build-tools/tools/vercel/next-artifact.ts" \
+            --import "$VIBEROOTS_SOURCE_ROOT/build-tools/tools/dev/zx-init.mjs" \
+            "$VIBEROOTS_SOURCE_ROOT/build-tools/tools/vercel/next-artifact.ts" \
             --app-dir "$APP_DIR" \
             --dist-dir "$DIST" \
             --config "$CONFIG" \

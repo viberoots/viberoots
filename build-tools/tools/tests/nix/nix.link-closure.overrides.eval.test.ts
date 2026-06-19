@@ -19,7 +19,7 @@ test("planner link-closure: per-dep overrides apply and unknown modes fail fast"
     const expr = `
       let
         pkgs = import <nixpkgs> {};
-        LC = import ./build-tools/tools/nix/planner/link-closure.nix { lib = pkgs.lib; };
+        LC = import ./viberoots/build-tools/tools/nix/planner/link-closure.nix { lib = pkgs.lib; };
         ${graph}
       in LC.resolveLinkClosure {
         inherit byName linkDepsOf;
@@ -36,7 +36,7 @@ test("planner link-closure: per-dep overrides apply and unknown modes fail fast"
     const badExpr = `
       let
         pkgs = import <nixpkgs> {};
-        LC = import ./build-tools/tools/nix/planner/link-closure.nix { lib = pkgs.lib; };
+        LC = import ./viberoots/build-tools/tools/nix/planner/link-closure.nix { lib = pkgs.lib; };
         ${graph}
       in LC.resolveLinkClosure {
         inherit byName linkDepsOf;

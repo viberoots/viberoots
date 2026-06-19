@@ -38,14 +38,23 @@ in {
       lockInput = if hasLockFs then (builtins.path { path = lockAbsStrFs; name = "pnpm-lock.yaml"; }) else (if hasLockStore then (builtins.path { path = lockAbsStrStore; name = "pnpm-lock.yaml"; }) else null);
       # Prefer an explicit mkPnpmStore argument; fall back to the global arg/env.
       chosenPrefetchedPath = if prefetchedStorePath == null || prefetchedStorePath == "" then prefetchedStorePathGlobal else prefetchedStorePath;
+      exactPrefetchedMap =
+        let s = builtins.getEnv "NIX_PNPM_EXACT_STORE_MAP"; in
+        if s == "" then {} else builtins.fromJSON s;
+      exactPrefetchedMappedPath =
+        if builtins.hasAttr importerDir exactPrefetchedMap
+        then exactPrefetchedMap.${importerDir}
+        else null;
       exactPrefetchedPath =
         let s = builtins.getEnv "NIX_PNPM_EXACT_STORE"; in
-        if s != "" then s else null;
+        if exactPrefetchedMappedPath != null && exactPrefetchedMappedPath != "" then exactPrefetchedMappedPath
+        else if s != "" then s
+        else null;
       exactPrefetchedInput =
         if exactPrefetchedPath == null || exactPrefetchedPath == ""
         then null
         else if lib.hasPrefix builtins.storeDir exactPrefetchedPath
-        then builtins.storePath exactPrefetchedPath
+        then exactPrefetchedPath
         else throw "NIX_PNPM_EXACT_STORE must be a /nix/store path";
       # Do not use prefetched stores for pnpm-store FODs. They can include extra packages
       # beyond the lockfile, which makes the fixed-output hash unstable.
@@ -240,9 +249,18 @@ in {
       lockInput = if hasLockFs then (builtins.path { path = lockAbsStrFs; name = "pnpm-lock.yaml"; }) else (if hasLockStore then (builtins.path { path = lockAbsStrStore; name = "pnpm-lock.yaml"; }) else null);
       chosenPrefetchedPath = if prefetchedStorePath == null || prefetchedStorePath == "" then prefetchedStorePathGlobal else prefetchedStorePath;
       prefetchedInput = if chosenPrefetchedPath == null || chosenPrefetchedPath == "" then null else chosenPrefetchedPath;
+      exactPrefetchedMap =
+        let s = builtins.getEnv "NIX_PNPM_EXACT_STORE_MAP"; in
+        if s == "" then {} else builtins.fromJSON s;
+      exactPrefetchedMappedPath =
+        if builtins.hasAttr importerDir exactPrefetchedMap
+        then exactPrefetchedMap.${importerDir}
+        else null;
       exactPrefetchedPath =
         let s = builtins.getEnv "NIX_PNPM_EXACT_STORE"; in
-        if s != "" then s else null;
+        if exactPrefetchedMappedPath != null && exactPrefetchedMappedPath != "" then exactPrefetchedMappedPath
+        else if s != "" then s
+        else null;
       exactPrefetchedInput =
         if exactPrefetchedPath == null || exactPrefetchedPath == ""
         then null

@@ -7,6 +7,7 @@ const EXCLUDED_DIRS = new Set([
   ".claude",
   ".codex",
   ".git",
+  ".viberoots",
   ".direnv",
   ".nix-zsh",
   "buck-out",
@@ -59,6 +60,11 @@ function normalizeRel(p: string): string {
   return p.replaceAll("\\", "/").replace(/^\.\/+/, "");
 }
 
+function reviewedRel(p: string): string {
+  const rel = normalizeRel(p);
+  return rel.startsWith("viberoots/") ? rel.slice("viberoots/".length) : rel;
+}
+
 function isExcludedDir(relDir: string): boolean {
   return normalizeRel(relDir)
     .split("/")
@@ -98,7 +104,7 @@ test("process inspection commands stay in reviewed helper modules", async () => 
 
   for (const abs of await listRepoFiles(repoRoot)) {
     const rel = normalizeRel(path.relative(repoRoot, abs));
-    if (ALLOWED_PATHS.has(rel)) continue;
+    if (ALLOWED_PATHS.has(reviewedRel(rel))) continue;
 
     let text = "";
     try {

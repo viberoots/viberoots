@@ -35,7 +35,14 @@ export async function prewarmUnifiedPnpmStore(opts: {
     });
   } catch (e: any) {
     const msg = e?.message ? String(e.message) : String(e);
-    const lockPath = path.join(opts.repoRoot, "buck-out", ".unified-pnpm-store", "require.lock");
+    const lockPath = path.join(
+      opts.repoRoot,
+      ".viberoots",
+      "workspace",
+      "buck",
+      "unified-pnpm-store",
+      "require.lock",
+    );
     throw new Error(
       [
         `[install-deps] unified pnpm prewarm failed: ${msg}`,

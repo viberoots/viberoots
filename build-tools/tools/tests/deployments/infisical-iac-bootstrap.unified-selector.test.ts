@@ -39,7 +39,7 @@ test("repo resolver profile discovery reads project config from graph workspace 
   const oldCwd = process.cwd();
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-workspace-root-"));
   const nested = path.join(root, "projects", "deployments", "nested");
-  const graphPath = path.join(root, "build-tools", "tools", "buck", "graph.json");
+  const graphPath = path.join(root, ".viberoots", "workspace", "buck", "graph.json");
   try {
     await fs.mkdir(nested, { recursive: true });
     await writeProjectConfig(root, "vault/default");

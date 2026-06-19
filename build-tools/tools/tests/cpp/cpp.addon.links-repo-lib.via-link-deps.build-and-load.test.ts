@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import fs from "fs-extra";
 import path from "node:path";
-import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 function parseOutPath(stdout: unknown): string {
   return String(stdout || "")
@@ -17,7 +17,7 @@ function parseOutPath(stdout: unknown): string {
 test("cpp Node-API addon links an in-repo C++ lib via link_deps (build + load)", async () => {
   await runInTemp("cpp-addon-links-repo-lib", async (tmp, $) => {
     await fs.outputFile(
-      path.join(tmp, "build-tools", "tools", "nix", "langs.json"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "nix", "langs.json"),
       JSON.stringify({ enabled: ["cpp"] }, null, 2) + "\n",
       "utf8",
     );
@@ -35,7 +35,7 @@ test("cpp Node-API addon links an in-repo C++ lib via link_deps (build + load)",
     await fs.outputFile(
       path.join(tmp, "libs", "greeter", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "greeter",',
@@ -75,7 +75,7 @@ test("cpp Node-API addon links an in-repo C++ lib via link_deps (build + load)",
     await fs.outputFile(
       path.join(tmp, "libs", "addon-native", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")',
         "",
         "nix_cpp_node_addon(",
         '  name = "addon",',
@@ -99,14 +99,14 @@ test("cpp Node-API addon links an in-repo C++ lib via link_deps (build + load)",
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const build = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//projects/libs/addon-native:addon" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.equal(build.exitCode, 0, String(build.stderr || build.stdout));
 
     const outPath = parseOutPath(build.stdout);

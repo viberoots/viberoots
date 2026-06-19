@@ -5,6 +5,7 @@ import { execSync } from "node:child_process";
 
 import { ensureTemplateVariables } from "./template-vars";
 import { pathExists } from "../../../lib/repo";
+import { templateRootPath } from "../../scaf/templates/paths";
 
 function workspaceRoot(): string {
   const envRoot = String(process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || "").trim();
@@ -66,13 +67,19 @@ async function resolveTemplateSource(targetDir: string, answersFile: string): Pr
     /^scaf_src_path:\s*(\S+)/m.exec(txt)?.[1]?.trim() || "",
   );
   if (fromRecorded && (await templateSourceExists(fromRecorded))) return fromRecorded;
+  if (fromRecorded.startsWith("build-tools/tools/scaffolding/templates/")) {
+    const relocated = path.join("viberoots", fromRecorded);
+    if (await templateSourceExists(relocated)) return relocated;
+  }
 
   const language = /^language:\s*(\S+)/m.exec(txt)?.[1]?.trim() || "";
   const template = /^template:\s*(\S+)/m.exec(txt)?.[1]?.trim() || "";
   if (!language || !template) {
     throw new Error("scaf_src_path missing and language/template not present in answers");
   }
-  const inferred = path.join(
+  const inferred = toRepoRelativeIfPossible(templateRootPath(language, template));
+  if (await templateSourceExists(inferred)) return inferred;
+  const legacyInferred = path.join(
     "build-tools",
     "tools",
     "scaffolding",
@@ -80,10 +87,10 @@ async function resolveTemplateSource(targetDir: string, answersFile: string): Pr
     language,
     template,
   );
-  if (await templateSourceExists(inferred)) return inferred;
+  if (await templateSourceExists(legacyInferred)) return legacyInferred;
 
   throw new Error(
-    `cannot resolve scaffold template source for ${targetDir}; tried '${fromRecorded || "(none)"}' and '${inferred}'`,
+    `cannot resolve scaffold template source for ${targetDir}; tried '${fromRecorded || "(none)"}', '${inferred}', and '${legacyInferred}'`,
   );
 }
 

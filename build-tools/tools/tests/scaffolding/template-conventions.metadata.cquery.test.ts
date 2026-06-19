@@ -18,112 +18,139 @@ const TEMPLATE_CLASSIFICATIONS = new Set([
   "template:shared",
 ]);
 
+function templateInputIncludes(src: string, expectedRoot: string): boolean {
+  if (src.includes(expectedRoot)) return true;
+  if (expectedRoot.startsWith("viberoots/"))
+    return src.includes(expectedRoot.slice("viberoots/".length));
+  return false;
+}
+
 const EXPECTATIONS: TemplateExpectation[] = [
   {
     script: "build-tools/tools/tests/scaffolding/smoke.lib-readme.test.ts",
     requiredLabels: ["template:go/lib", "template:smoke"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/go/lib/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/go/lib/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/smoke.cli-readme.test.ts",
     requiredLabels: ["template:go/cli", "template:smoke"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/go/cli/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/go/cli/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/go-lib.scaffold-and-build.test.ts",
     requiredLabels: ["template:go/lib", "template:contract"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/go/lib/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/go/lib/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/go-cli.scaffold-and-build.test.ts",
     requiredLabels: ["template:go/cli", "template:contract"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/go/cli/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/go/cli/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/cpp.lib.shape-and-build.test.ts",
     requiredLabels: ["template:cpp/lib", "template:contract"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/cpp/lib/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/cpp/lib/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/node-lib.nix-node-test.with-tests-pass.test.ts",
     requiredLabels: ["template:ts/lib", "template:contract"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/lib/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/ts/lib/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/node-cli.nix-node-test.with-tests-pass.test.ts",
     requiredLabels: ["template:ts/cli", "template:contract"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/cli/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/ts/cli/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp.scaffold-and-build.test.ts",
     requiredLabels: ["template:ts/webapp-static", "template:contract"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-static/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-static.dev-hmr.local-ts-dep.test.ts",
     requiredLabels: ["template:ts/webapp-static", "template:contract", "verify:isolated"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-static/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-static.dev-reload.wasm-producer.test.ts",
     requiredLabels: ["template:ts/webapp-static", "template:contract", "verify:isolated"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-static/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp.dev-server.running.test.ts",
     requiredLabels: ["template:ts/webapp-static", "template:contract", "verify:isolated"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-static/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/"],
   },
   {
     script:
       "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-contract-and-runtime-smoke.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-next", "template:shared", "verify:isolated"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
+    requiredTemplateRoots: [
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+    ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr.next-contracts.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
+    requiredTemplateRoots: [
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+    ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-hmr.local-ts-dep.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
+    requiredTemplateRoots: [
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+    ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-reload.wasm-producer.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
+    requiredTemplateRoots: [
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+    ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-runtime-consistency.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/"],
+    requiredTemplateRoots: [
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+    ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.baseline-contract.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
+    requiredTemplateRoots: [
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+    ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.runnable-contracts.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
+    requiredTemplateRoots: [
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+    ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-hmr.local-ts-dep.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
+    requiredTemplateRoots: [
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+    ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
+    requiredTemplateRoots: [
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+    ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-consistency.test.ts",
     requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/"],
+    requiredTemplateRoots: [
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+    ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp.wasm-producer-policy.contract.test.ts",
@@ -134,9 +161,9 @@ const EXPECTATIONS: TemplateExpectation[] = [
       "template:shared",
     ],
     requiredTemplateRoots: [
-      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
     ],
   },
   {
@@ -148,8 +175,8 @@ const EXPECTATIONS: TemplateExpectation[] = [
       "template:shared",
     ],
     requiredTemplateRoots: [
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
     ],
   },
   {
@@ -161,9 +188,9 @@ const EXPECTATIONS: TemplateExpectation[] = [
       "template:shared",
     ],
     requiredTemplateRoots: [
-      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
     ],
   },
   {
@@ -175,9 +202,9 @@ const EXPECTATIONS: TemplateExpectation[] = [
       "template:shared",
     ],
     requiredTemplateRoots: [
-      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
     ],
   },
   {
@@ -189,9 +216,9 @@ const EXPECTATIONS: TemplateExpectation[] = [
       "template:shared",
     ],
     requiredTemplateRoots: [
-      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
     ],
   },
   {
@@ -204,9 +231,9 @@ const EXPECTATIONS: TemplateExpectation[] = [
       "template:shared",
     ],
     requiredTemplateRoots: [
-      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
     ],
   },
   {
@@ -219,9 +246,9 @@ const EXPECTATIONS: TemplateExpectation[] = [
       "template:shared",
     ],
     requiredTemplateRoots: [
-      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
     ],
   },
   {
@@ -234,52 +261,52 @@ const EXPECTATIONS: TemplateExpectation[] = [
       "template:shared",
     ],
     requiredTemplateRoots: [
-      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
     ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/python-lib.scaffold-files.test.ts",
     requiredLabels: ["template:python/lib", "template:smoke"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/python/lib/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/python/lib/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/python-app.scaffold-files.test.ts",
     requiredLabels: ["template:python/app", "template:smoke"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/python/app/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/python/app/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/python-wasm-app.scaffold-smoke.test.ts",
     requiredLabels: ["template:python/wasm-app", "template:smoke"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/python/wasm-app/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/python/wasm-app/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/scaf-language-new.manifest-write.test.ts",
     requiredLabels: ["template:language/kit", "template:contract"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/language/kit/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/language/kit/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/lang-kit.scaffold-smoke.test.ts",
     requiredLabels: ["template:language/kit", "template:smoke"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/language/kit/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/language/kit/"],
   },
   {
     script: "build-tools/tools/tests/ts-cpp-go-wasm/scaffolding.scaf-new-dry-run.test.ts",
     requiredLabels: ["template:ts/go-cpp-lib", "template:smoke"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/go-cpp-lib/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/ts/go-cpp-lib/"],
   },
   {
     script: "build-tools/tools/tests/ts-cpp-go-wasm/scaffolding.wasm-app.scaffold-smoke.test.ts",
     requiredLabels: ["template:ts/wasm-app", "template:smoke"],
-    requiredTemplateRoots: ["build-tools/tools/scaffolding/templates/ts/wasm-app/"],
+    requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/ts/wasm-app/"],
   },
   {
     script: "build-tools/tools/tests/ts-cpp-go-wasm/scaffolding.templates-exist.test.ts",
     requiredLabels: ["template:ts/go-cpp-lib", "template:ts/wasm-app", "template:shared"],
     requiredTemplateRoots: [
-      "build-tools/tools/scaffolding/templates/ts/go-cpp-lib/",
-      "build-tools/tools/scaffolding/templates/ts/wasm-app/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/go-cpp-lib/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/wasm-app/",
     ],
   },
   {
@@ -291,9 +318,9 @@ const EXPECTATIONS: TemplateExpectation[] = [
       "template:shared",
     ],
     requiredTemplateRoots: [
-      "build-tools/tools/scaffolding/templates/ts/lib/",
-      "build-tools/tools/scaffolding/templates/ts/cli/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/lib/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/cli/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/",
     ],
   },
   {
@@ -308,12 +335,12 @@ const EXPECTATIONS: TemplateExpectation[] = [
       "template:shared",
     ],
     requiredTemplateRoots: [
-      "build-tools/tools/scaffolding/templates/ts/lib/",
-      "build-tools/tools/scaffolding/templates/ts/cli/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-static/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
-      "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
-      "build-tools/tools/scaffolding/templates/ts/cpp-addon/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/lib/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/cli/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/cpp-addon/",
     ],
   },
 ];
@@ -359,7 +386,7 @@ after(async () => {
 });
 
 test("template-owned tests expose labels and template inputs", async () => {
-  const targets = EXPECTATIONS.map((entry) => `//:${targetNameFromScript(entry.script)}`);
+  const targets = EXPECTATIONS.map((entry) => `viberoots//:${targetNameFromScript(entry.script)}`);
   const query = `set(${targets.join(" ")})`;
   const out = await withBuckTransientRetry(
     async () =>
@@ -382,7 +409,7 @@ test("template-owned tests expose labels and template inputs", async () => {
   }
 
   for (const entry of EXPECTATIONS) {
-    const target = `root//:${targetNameFromScript(entry.script)}`;
+    const target = `viberoots//:${targetNameFromScript(entry.script)}`;
     const node = byTarget.get(target);
     if (!node) throw new Error(`missing cquery result for ${target}`);
 
@@ -404,7 +431,7 @@ test("template-owned tests expose labels and template inputs", async () => {
     }
 
     for (const root of entry.requiredTemplateRoots) {
-      if (!node.templateInputs.some((src) => src.includes(root))) {
+      if (!node.templateInputs.some((src) => templateInputIncludes(src, root))) {
         throw new Error(`expected template_inputs for ${target} to include ${root}`);
       }
     }
@@ -417,7 +444,7 @@ test("non-template tests do not carry template labels", async () => {
       await $({
         stdio: "pipe",
         env: buckEnv,
-      })`buck2 --isolation-dir ${templateConventionsIsolation} cquery --target-platforms ${TARGET_PLATFORM} //:scaffolding_macros_exports_present --json --output-attribute labels`,
+      })`buck2 --isolation-dir ${templateConventionsIsolation} cquery --target-platforms ${TARGET_PLATFORM} viberoots//:scaffolding_macros_exports_present --json --output-attribute labels`,
   );
   const raw = JSON.parse(out.stdout) as Record<string, { labels?: string[] }>;
   const first = Object.values(raw)[0] || {};

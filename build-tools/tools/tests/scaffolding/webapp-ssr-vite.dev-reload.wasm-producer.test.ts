@@ -6,7 +6,12 @@ import path from "node:path";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { ensureNodeModulesForDevApp } from "./lib/dev-node-modules";
-import { assertSingleQueueInvariant, producerByteLength, waitForValue } from "./lib/wasm-watch";
+import {
+  assertSingleQueueInvariant,
+  producerByteLength,
+  waitForValue,
+  writeAndBumpMtime,
+} from "./lib/wasm-watch";
 import {
   GENERATED_DEV_READY_TIMEOUT_MS,
   httpGet,
@@ -34,7 +39,7 @@ test(
       const entryServerPath = path.join(appAbs, "src", "entry-server.ts");
       const runtimeWasmPath = path.join(appAbs, "wasm", "top.wasm");
       const serverWasmPath = path.join(appAbs, "server", "wasm", "top.wasm");
-      await fsp.writeFile(payloadPath, "phase2-a", "utf8");
+      await writeAndBumpMtime(payloadPath, "phase2-a");
       await fsp.writeFile(
         entryClientPath,
         [
@@ -116,9 +121,7 @@ test(
         );
         assert.equal(initialServer.status, 200);
 
-        await fsp.writeFile(payloadPath, "phase2-bbb", "utf8");
-        const now = new Date();
-        await fsp.utimes(payloadPath, now, now);
+        await writeAndBumpMtime(payloadPath, "phase2-bbb");
         const expectedB = producerByteLength("phase2-bbb");
         const nextClientLen = await waitForValue(readClientWasmLength, (v) => v === expectedB);
         assert.equal(nextClientLen, expectedB);
@@ -137,10 +140,8 @@ test(
         );
         assert.equal(missingWasmResponse.status, 500);
 
-        await fsp.writeFile(payloadPath, "phase2-c1", "utf8");
-        await fsp.writeFile(payloadPath, "phase2-c22", "utf8");
-        const burstNow = new Date();
-        await fsp.utimes(payloadPath, burstNow, burstNow);
+        await writeAndBumpMtime(payloadPath, "phase2-c1");
+        await writeAndBumpMtime(payloadPath, "phase2-c22");
         const expectedC = producerByteLength("phase2-c22");
         const latestClientLen = await waitForValue(readClientWasmLength, (v) => v === expectedC);
         assert.equal(latestClientLen, expectedC);

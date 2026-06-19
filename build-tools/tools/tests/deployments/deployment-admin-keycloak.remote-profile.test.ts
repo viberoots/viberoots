@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -65,7 +66,7 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
     const syncResult = await $({
       cwd: tmp,
       env: baseEnv,
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin identity sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${syncConfigRoot} --acting-principal user:shape-admin --admin-group ${shapeAdminGroup()}`;
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin identity sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${syncConfigRoot} --acting-principal user:shape-admin --admin-group ${shapeAdminGroup()}`;
     const syncSummary = JSON.parse(String(syncResult.stdout));
     assert.equal(syncSummary.executionMode, "remote-profile");
     assert.equal(
@@ -85,7 +86,7 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
     const authzResult = await $({
       cwd: tmp,
       env: baseEnv,
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin identity sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${authzConfigRoot} --acting-principal user:submitter-only --admin-group ${reviewedHumanGroupName(pleominoDeploymentFixture(), "submitter")}`.nothrow();
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin identity sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${authzConfigRoot} --acting-principal user:submitter-only --admin-group ${reviewedHumanGroupName(pleominoDeploymentFixture(), "submitter")}`.nothrow();
     assert.notEqual(authzResult.exitCode, 0);
     assert.match(
       String(authzResult.stderr),
@@ -158,7 +159,7 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
         FAKE_NIXOS_REBUILD_LOG: rebuildLog,
         FAKE_SYSTEMCTL_LOG: systemctlLog,
       }),
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin identity grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${hostApplyConfigRoot} --apply-host --action submit --user-email alice@example.com --acting-principal user:membership-admin --admin-group ${membershipAdminGroup()}`;
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin identity grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${hostApplyConfigRoot} --apply-host --action submit --user-email alice@example.com --acting-principal user:membership-admin --admin-group ${membershipAdminGroup()}`;
     const hostApplySummary = JSON.parse(String(hostApplyResult.stdout));
     assert.equal(hostApplySummary.hostApply.requestedMode, "switch");
     assert.equal(hostApplySummary.hostApply.result.mode, "switch");
@@ -175,7 +176,7 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
     const providerResult = await $({
       cwd: tmp,
       env: baseEnv,
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts admin identity sync --deployment ${providerDeployment.label} --profile mini --acting-principal user:shape-admin --admin-group ${shapeAdminGroup()}`.nothrow();
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin identity sync --deployment ${providerDeployment.label} --profile mini --acting-principal user:shape-admin --admin-group ${shapeAdminGroup()}`.nothrow();
     assert.notEqual(providerResult.exitCode, 0);
     assert.match(
       String(providerResult.stderr),

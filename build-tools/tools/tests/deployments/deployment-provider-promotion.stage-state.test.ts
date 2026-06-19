@@ -13,10 +13,11 @@ import {
   nixosSharedHostDeploymentFixture,
   nixosSharedHostLanePolicyFixture,
 } from "./nixos-shared-host.fixture";
+import { viberootsRepoPath } from "./deployment-command";
 
 async function readDeploySource(relativePath: string): Promise<string> {
   return await fsp.readFile(
-    path.join(process.cwd(), "build-tools/tools/deployments", relativePath),
+    viberootsRepoPath(path.join("build-tools/tools/deployments", relativePath)),
     "utf8",
   );
 }

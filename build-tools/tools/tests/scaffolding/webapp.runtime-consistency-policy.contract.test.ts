@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
-const REPO_ROOT = process.cwd();
+const VIBEROOTS_ROOT = path.join(process.cwd(), "viberoots");
 
 type Phase3TemplateContract = {
   id: string;
@@ -44,7 +44,7 @@ const SSR_CONTRACTS: Phase3TemplateContract[] = [
 
 test("SSR runtime-consistency: script and path contracts stay deterministic across templates", async () => {
   for (const contract of SSR_CONTRACTS) {
-    const templateAbs = path.join(REPO_ROOT, contract.templateRoot);
+    const templateAbs = path.join(VIBEROOTS_ROOT, contract.templateRoot);
     const packageJson = await fsp.readFile(path.join(templateAbs, "package.json.jinja"), "utf8");
     const devScript = await fsp.readFile(
       path.join(templateAbs, "scripts", "dev.mjs.jinja"),
@@ -121,7 +121,7 @@ test("SSR runtime-consistency: script and path contracts stay deterministic acro
 test("SSR runtime-consistency policy docs: runtime consistency and startup guidance stay explicit", async () => {
   const templateReadme = await fsp.readFile(
     path.join(
-      REPO_ROOT,
+      VIBEROOTS_ROOT,
       "build-tools",
       "tools",
       "scaffolding",
@@ -141,7 +141,7 @@ test("SSR runtime-consistency policy docs: runtime consistency and startup guida
   assert.match(templateReadme, /\[wasm-watch\] sync:ok/);
 
   const hmrPlan = await fsp.readFile(
-    path.join(REPO_ROOT, "docs", "history", "designs", "legacy", "hmr-plan.md"),
+    path.join(VIBEROOTS_ROOT, "docs", "history", "designs", "legacy", "hmr-plan.md"),
     "utf8",
   );
   assert.match(hmrPlan, /### Phase 3 Closeout Status/);
@@ -163,7 +163,7 @@ test("SSR runtime-consistency policy docs: runtime consistency and startup guida
   assert.match(hmrPlan, /Escalation triggers to adopt Playwright coverage in a future phase/);
 
   const scaffoldingDoc = await fsp.readFile(
-    path.join(REPO_ROOT, "build-tools", "docs", "scaffolding.md"),
+    path.join(VIBEROOTS_ROOT, "build-tools", "docs", "scaffolding.md"),
     "utf8",
   );
   assert.match(scaffoldingDoc, /Dev-update contract matrix for in-scope templates/);
@@ -190,7 +190,7 @@ test("SSR runtime-consistency policy docs: runtime consistency and startup guida
 test("shared helper reuse: representative template local-dep tests import shared helpers", async () => {
   const staticLocalDep = await fsp.readFile(
     path.join(
-      REPO_ROOT,
+      VIBEROOTS_ROOT,
       "build-tools",
       "tools",
       "tests",
@@ -203,7 +203,7 @@ test("shared helper reuse: representative template local-dep tests import shared
 
   const viteLocalDep = await fsp.readFile(
     path.join(
-      REPO_ROOT,
+      VIBEROOTS_ROOT,
       "build-tools",
       "tools",
       "tests",
@@ -216,7 +216,7 @@ test("shared helper reuse: representative template local-dep tests import shared
 
   const viteLocalDepHelper = await fsp.readFile(
     path.join(
-      REPO_ROOT,
+      VIBEROOTS_ROOT,
       "build-tools",
       "tools",
       "tests",
@@ -231,7 +231,7 @@ test("shared helper reuse: representative template local-dep tests import shared
 
   const staticLocalDepHelper = await fsp.readFile(
     path.join(
-      REPO_ROOT,
+      VIBEROOTS_ROOT,
       "build-tools",
       "tools",
       "tests",
@@ -247,7 +247,7 @@ test("shared helper reuse: representative template local-dep tests import shared
 
   const staticPwaLocalDep = await fsp.readFile(
     path.join(
-      REPO_ROOT,
+      VIBEROOTS_ROOT,
       "build-tools",
       "tools",
       "tests",
@@ -260,7 +260,7 @@ test("shared helper reuse: representative template local-dep tests import shared
 
   const nextLocalDep = await fsp.readFile(
     path.join(
-      REPO_ROOT,
+      VIBEROOTS_ROOT,
       "build-tools",
       "tools",
       "tests",

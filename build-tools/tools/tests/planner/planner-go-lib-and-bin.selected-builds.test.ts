@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("planner builds selected go lib and bin", async () => {
   await runInTemp("planner-go-lib-bin", async (tmp, $) => {
@@ -58,7 +58,7 @@ test("planner builds selected go lib and bin", async () => {
       const { stdout } = await $({
         cwd: tmp,
         env: { ...process.env, BUCK_TARGET, BUCK_TEST_SRC: tmp, BUCK_GRAPH_JSON: graphPath },
-      })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+      })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
       const outPath =
         String(stdout || "")
           .trim()

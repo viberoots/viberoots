@@ -13,7 +13,7 @@ test("wire_planner_visible_inputs attaches providers dict-safe and stable", asyn
       [
         "",
         "# test: planner-visible-wiring.provider-edges.dict-safe.test.ts",
-        'load("//build-tools/lang:planner_visible_wiring_probe.bzl", "planner_visible_inputs_probe")',
+        'load("@viberoots//build-tools/lang:planner_visible_wiring_probe.bzl", "planner_visible_inputs_probe")',
         "",
         "planner_visible_inputs_probe(",
         '  name = "dict_safe_inputs",',

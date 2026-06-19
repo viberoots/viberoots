@@ -1,11 +1,13 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { GENERATED_REPO_STATE_PATHS } from "../../../dev/verify/generated-state-excludes";
 
-const requiredFiles = ["flake.nix", ".buckconfig"];
+const requiredFiles = [".buckconfig"];
+const requiredFlakeFiles = ["flake.nix", path.join(".viberoots", "workspace", "flake.nix")];
 const requiredToolFiles = [
-  "build-tools/deployments/defs.bzl",
-  "build-tools/tools/buck/export-graph.ts",
-  "build-tools/tools/dev/zx-init.mjs",
+  "viberoots/build-tools/deployments/defs.bzl",
+  "viberoots/build-tools/tools/buck/export-graph.ts",
+  "viberoots/build-tools/tools/dev/zx-init.mjs",
 ];
 const fastCopyOpts = { stdio: "pipe" as const, reject: false, nothrow: true };
 const darwinCloneFileScript = String.raw`
@@ -117,6 +119,15 @@ export async function missingRequiredSeedFiles(
   opts: { allowMissingToolRoot?: boolean } = {},
 ): Promise<string[]> {
   const missing: string[] = [];
+  let hasFlake = false;
+  for (const rel of requiredFlakeFiles) {
+    try {
+      await fsp.access(path.join(dir, rel));
+      hasFlake = true;
+      break;
+    } catch {}
+  }
+  if (!hasFlake) missing.push(requiredFlakeFiles.join(" or "));
   for (const rel of requiredFiles) {
     try {
       await fsp.access(path.join(dir, rel));
@@ -126,16 +137,11 @@ export async function missingRequiredSeedFiles(
   }
   if (opts.allowMissingToolRoot) return missing;
   for (const rel of requiredToolFiles) {
-    const activeRel = path.join("viberoots", rel);
     const hasStandalone = await fsp
       .access(path.join(dir, rel))
       .then(() => true)
       .catch(() => false);
-    const hasSubmodule = await fsp
-      .access(path.join(dir, activeRel))
-      .then(() => true)
-      .catch(() => false);
-    if (!hasStandalone && !hasSubmodule) missing.push(`${rel} or ${activeRel}`);
+    if (!hasStandalone) missing.push(rel);
   }
   return missing;
 }
@@ -219,6 +225,14 @@ async function copyTreeCow(srcRoot: string, dstRoot: string): Promise<void> {
   }
 }
 
+async function removeGeneratedRepoState(root: string): Promise<void> {
+  await Promise.all(
+    GENERATED_REPO_STATE_PATHS.map(async (rel) => {
+      await fsp.rm(path.join(root, rel), { recursive: true, force: true }).catch(() => {});
+    }),
+  );
+}
+
 export async function copySeedStoreToTempRepo(args: {
   seedPath: string;
   tmpDir: string;
@@ -234,6 +248,7 @@ export async function copySeedStoreToTempRepo(args: {
     let copyError: unknown = null;
     try {
       await copyTreeCow(args.seedPath, stagingDir);
+      await removeGeneratedRepoState(stagingDir);
     } catch (e) {
       copyError = e;
     }

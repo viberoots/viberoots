@@ -4,6 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import { runNodeWithZx } from "../../lib/node-run";
 import { resolveToolPath } from "../../lib/tool-paths";
+import { buildToolPath } from "../dev-build/paths";
 
 function parsePositiveInt(s: string | undefined): number | null {
   const n = Number(String(s || "").trim());
@@ -85,7 +86,7 @@ export async function runVerifyHousekeeping(opts: {
 
   await runNodeWithZx({
     cwd: root,
-    script: path.join(root, "build-tools/tools/dev/clean-temp-outs.ts"),
+    script: buildToolPath(root, "tools/dev/clean-temp-outs.ts"),
     args: ["--minutes", "30"],
     zxInitPath: opts.zxInitPath,
     stdio: "pipe",

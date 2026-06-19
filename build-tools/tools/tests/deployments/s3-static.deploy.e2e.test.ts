@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -56,7 +57,7 @@ test("s3-static deploy CLI completes the static-webapp flow end to end", async (
           VBR_S3_STATIC_FAKE_AWS_LOG: fake.logPath,
           VBR_S3_STATIC_AWS_BIN: path.join(fake.binDir, "aws"),
         },
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.finalOutcome, "succeeded");
       assert.equal(summary.publicUrl, "https://staging.example.test/");

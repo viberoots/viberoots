@@ -3,7 +3,7 @@ import { makeFilteredFlakeRef } from "./filtered-flake";
 
 export async function withPnpmStoreBuildFlakeRef<T>(
   opts: { repoRoot: string; importer: string; baseFlakeRef: string },
-  fn: (buildFlakeRef: string) => Promise<T>,
+  fn: (buildFlakeRef: string, filteredEnv?: Record<string, string>) => Promise<T>,
 ): Promise<T> {
   if (opts.importer === ".") {
     return await fn(opts.baseFlakeRef);
@@ -19,7 +19,9 @@ export async function withPnpmStoreBuildFlakeRef<T>(
         `filtered pnpm flake ref must end with #pnpm for ${opts.importer}: ${filtered.flakeRef}`,
       );
     }
-    return await fn(filtered.flakeRef.slice(0, -"#pnpm".length));
+    return await fn(filtered.flakeRef.slice(0, -"#pnpm".length), {
+      WORKSPACE_ROOT: filtered.workspaceRoot,
+    });
   } finally {
     await filtered.cleanup();
   }

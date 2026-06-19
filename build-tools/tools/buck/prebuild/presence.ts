@@ -8,7 +8,6 @@ import { findUvLockfiles } from "../../lib/lockfiles";
 import { providerNameForImporter } from "../../lib/providers";
 import {
   DEFAULT_NODE_LOCK_INDEX_PATH,
-  LEGACY_NODE_LOCK_INDEX_PATH,
   WORKSPACE_PROVIDER_DIR,
   providerAutoTargetsPath,
 } from "../../lib/workspace-state-paths";
@@ -18,12 +17,9 @@ type NodeLockIndexSidecar = Partial<{
 }>;
 
 async function readNodeLockIndexLabels(): Promise<string[]> {
-  const rel = fs.existsSync(DEFAULT_NODE_LOCK_INDEX_PATH)
-    ? DEFAULT_NODE_LOCK_INDEX_PATH
-    : LEGACY_NODE_LOCK_INDEX_PATH;
   let txt = "";
   try {
-    txt = await fsp.readFile(rel, "utf8");
+    txt = await fsp.readFile(DEFAULT_NODE_LOCK_INDEX_PATH, "utf8");
   } catch {
     return [];
   }

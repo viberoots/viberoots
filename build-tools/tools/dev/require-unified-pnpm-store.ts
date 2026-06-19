@@ -1,10 +1,14 @@
 #!/usr/bin/env zx-wrapper
-// Builds/maintains unified pnpm store under buck-out/.unified-pnpm-store.
+// Builds/maintains unified pnpm store under hidden viberoots workspace state.
 import * as fsp from "node:fs/promises";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { findImporterLockfiles, computeImporterLabel } from "../lib/importers";
+import {
+  computeImporterLabel,
+  findImporterLockfiles,
+  isSupportedImporterLabel,
+} from "../lib/importers";
 import { unifiedPnpmStoreEpochDigest } from "./unified-pnpm-store-epoch";
 import { prepareExactPnpmStore } from "./update-pnpm-hash/lockfile";
 import { mergePnpmStore } from "./update-pnpm-hash/prefetched-store";
@@ -125,8 +129,7 @@ async function withFileLock(lockPath: string, fn: () => Promise<void>) {
 
 async function main() {
   const repo = process.cwd();
-  const buckOut = path.join(repo, "buck-out");
-  const stateDir = path.join(buckOut, ".unified-pnpm-store");
+  const stateDir = path.join(repo, ".viberoots", "workspace", "buck", "unified-pnpm-store");
   await ensureDir(stateDir);
 
   // Invalidate the unified store whenever either package hashes or the assembly logic changes.
@@ -176,7 +179,9 @@ async function main() {
 
     // Discover PNPM importer lockfiles and build unfixed stores
     const lockfiles = await findImporterLockfiles(["pnpm-lock.yaml"]);
-    const importers = lockfiles.map((lf) => computeImporterLabel(lf));
+    const importers = lockfiles
+      .map((lf) => computeImporterLabel(lf))
+      .filter((importer) => importer === "viberoots" || isSupportedImporterLabel(importer));
     // Always include repo-root importer '.' if lockfile present there
     const uniq = Array.from(new Set(importers));
 

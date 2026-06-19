@@ -26,7 +26,12 @@ export function repoPath(root: string, filePath: string): string {
 }
 
 export function classifyDormantSurface(relPath: string): string | undefined {
-  if (relPath.startsWith("build-tools/tools/remote-exec/")) return "remote-exec-tooling";
+  if (
+    relPath.startsWith("viberoots/build-tools/tools/remote-exec/") ||
+    relPath.startsWith("build-tools/tools/remote-exec/")
+  ) {
+    return "remote-exec-tooling";
+  }
   if (/remote_execution_(profiles|platforms)\.bzl$/.test(relPath)) return "remote-toolchain-model";
   if (
     /remote.*(template|example|fixture).*\.(json|toml|ya?ml|ini|cfg|buckconfig|txt)$/.test(relPath)

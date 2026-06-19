@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -13,7 +14,7 @@ test("deploy --print-target-identity prints the canonical normal-flow target ide
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --print-target-identity`;
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-staging:deploy --print-target-identity`;
     assert.equal(
       String(result.stdout).trim(),
       "cloudflare-pages:web-platform-staging/demo-staging-pages",
@@ -36,7 +37,7 @@ test("deploy --print-target-identity is mutually exclusive with --validate-only"
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --print-target-identity --validate-only`,
+        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-staging:deploy --print-target-identity --validate-only`,
       /--print-target-identity cannot be combined/,
     );
   });

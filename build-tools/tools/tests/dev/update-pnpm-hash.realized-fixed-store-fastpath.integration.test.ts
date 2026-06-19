@@ -3,12 +3,15 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("update-pnpm-hash reuses realized fixed pnpm-store outputs before exact-store prep", async () => {
-  const mainTxt = await fsp.readFile("build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
+  const mainTxt = await fsp.readFile("viberoots/build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
   const helperTxt = await fsp.readFile(
-    "build-tools/tools/dev/update-pnpm-hash/realized-store.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/realized-store.ts",
     "utf8",
   );
-  const storeTxt = await fsp.readFile("build-tools/tools/nix/node-modules/store.nix", "utf8");
+  const storeTxt = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/node-modules/store.nix",
+    "utf8",
+  );
   if (!mainTxt.includes("withResolvedExactPrefetchedStore")) {
     throw new Error("update-pnpm-hash.ts must reuse realized fixed stores before exact-store prep");
   }

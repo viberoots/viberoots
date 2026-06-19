@@ -14,7 +14,7 @@ test("gen-auto-map: Go module labels are ignored (no provider mapping)", async (
 
     // Generate auto_map
     const outPath = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out ${outPath}`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out ${outPath}`;
 
     // Expect no Go module provider mapping present
     const data = await fsp.readFile(outPath, "utf8");

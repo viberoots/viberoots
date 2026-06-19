@@ -26,6 +26,10 @@ export function sharedExactPnpmStateRootPath(lockHash: string): string {
   return path.join(stablePnpmStateBase(), "exact", sanitizeFragment(lockHash));
 }
 
+export function sharedExactPnpmStateIndexPath(importer: string): string {
+  return path.join(stablePnpmStateBase(), "exact-index", `${sanitizeFragment(importer)}.json`);
+}
+
 export async function sharedExactPnpmStateRoot(lockHash: string): Promise<string> {
   const rootDir = sharedExactPnpmStateRootPath(lockHash);
   await fsp.mkdir(rootDir, { recursive: true });

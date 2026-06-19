@@ -22,7 +22,7 @@ test("auto-map: with no Go patches, module: labels are ignored", async () => {
     );
 
     const out = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out ${out}`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out ${out}`;
     const txt = await fs.readFile(out, "utf8");
     assert.ok(
       !/third_party\/providers:mod_/i.test(txt),

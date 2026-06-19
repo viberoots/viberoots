@@ -3,8 +3,8 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("update-pnpm-hash uses importer-aware fast path and fixed-first root path", async () => {
-  const mainFile = "build-tools/tools/dev/update-pnpm-hash.ts";
-  const nondefaultFile = "build-tools/tools/dev/update-pnpm-hash/nondefault.ts";
+  const mainFile = "viberoots/build-tools/tools/dev/update-pnpm-hash.ts";
+  const nondefaultFile = "viberoots/build-tools/tools/dev/update-pnpm-hash/nondefault.ts";
   const mainTxt = await fsp.readFile(mainFile, "utf8");
   const nondefaultTxt = await fsp.readFile(nondefaultFile, "utf8");
 
@@ -42,7 +42,12 @@ test("update-pnpm-hash uses importer-aware fast path and fixed-first root path",
   if (!mainTxt.includes("buildStore(storeAttr, buildFlakeRef")) {
     throw new Error("update-pnpm-hash.ts must verify fixed store first for root importer");
   }
-  if (!mainTxt.includes("buildUnfixedAndHash(unfixedAttr, buildFlakeRef, activity, extraEnv)")) {
+  if (!mainTxt.includes("const nixEnv = { ...extraEnv, ...filteredEnv };")) {
+    throw new Error(
+      "update-pnpm-hash.ts must merge exact-store env into the filtered nix environment",
+    );
+  }
+  if (!mainTxt.includes("buildUnfixedAndHash(unfixedAttr, buildFlakeRef, activity, nixEnv)")) {
     throw new Error(
       "update-pnpm-hash.ts must pass the exact-store env into unfixed fallback builds",
     );

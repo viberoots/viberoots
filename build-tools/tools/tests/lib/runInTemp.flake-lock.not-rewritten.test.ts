@@ -7,11 +7,11 @@ import { runInTemp } from "./test-helpers";
 
 test("runInTemp does not rewrite flake.lock", async () => {
   const repoRoot = process.cwd();
-  const lockPath = path.join(repoRoot, "flake.lock");
+  const lockPath = path.join(repoRoot, ".viberoots", "workspace", "flake.lock");
   const original = await fsp.readFile(lockPath, "utf8");
 
   await runInTemp("flake-lock-no-rewrite", async (tmp) => {
-    const tmpLockPath = path.join(tmp, "flake.lock");
+    const tmpLockPath = path.join(tmp, ".viberoots", "workspace", "flake.lock");
     const tmpLock = await fsp.readFile(tmpLockPath, "utf8");
     assert.equal(tmpLock, original);
   });

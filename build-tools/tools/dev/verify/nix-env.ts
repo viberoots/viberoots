@@ -7,6 +7,12 @@ import { nixEvalTempDirOutsideWorkspace, pinnedNixpkgsOutPathExpr } from "../../
 export async function ensureVerifyPinnedNixpkgs(root: string): Promise<void> {
   const nixEvalTmp = nixEvalTempDirOutsideWorkspace(root);
   await fsp.mkdir(nixEvalTmp, { recursive: true }).catch(() => {});
+  const hiddenLock = path.join(root, ".viberoots", "workspace", "flake.lock");
+  const rootLock = path.join(root, "flake.lock");
+  const lockPath = await fsp
+    .access(hiddenLock)
+    .then(() => hiddenLock)
+    .catch(() => rootLock);
   const nixpkgsPath = await $({
     cwd: root,
     stdio: "pipe",
@@ -14,7 +20,7 @@ export async function ensureVerifyPinnedNixpkgs(root: string): Promise<void> {
       ...process.env,
       TMPDIR: nixEvalTmp,
     },
-  })`nix eval --impure --accept-flake-config --raw --expr ${pinnedNixpkgsOutPathExpr(path.join(root, "flake.lock"))}`
+  })`nix eval --impure --accept-flake-config --raw --expr ${pinnedNixpkgsOutPathExpr(lockPath)}`
     .then((res) => String(res.stdout || "").trim())
     .catch(() => "");
   if (!nixpkgsPath) return;

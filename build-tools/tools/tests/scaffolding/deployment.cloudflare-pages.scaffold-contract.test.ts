@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "../deployments/deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -11,7 +12,7 @@ import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 async function writeDefaults(tmp: string): Promise<void> {
   await fsp.writeFile(
     path.join(tmp, "projects/deployments/TARGETS"),
-    'load("//build-tools/deployments:defs.bzl", "deployment_defaults")\ndeployment_defaults(name = "defaults", visibility = ["PUBLIC"])\n',
+    'load("@viberoots//build-tools/deployments:defs.bzl", "deployment_defaults")\ndeployment_defaults(name = "defaults", visibility = ["PUBLIC"])\n',
     "utf8",
   );
 }
@@ -108,7 +109,7 @@ test("generated cloudflare-pages deployment fails validate-only on wrangler conf
       await fsp.rm(wranglerPath);
       await assert.rejects(
         async () =>
-          await $`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment} --validate-only`,
+          await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment} --validate-only`,
         /cloudflare-pages provider config not found.*wrangler\.jsonc/,
       );
     });
@@ -117,7 +118,7 @@ test("generated cloudflare-pages deployment fails validate-only on wrangler conf
       await fsp.writeFile(wranglerPath, '{ "compatibility_date": ', "utf8");
       await assert.rejects(
         async () =>
-          await $`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment} --validate-only`,
+          await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment} --validate-only`,
         /invalid wrangler config/,
       );
     });

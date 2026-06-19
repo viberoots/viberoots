@@ -9,10 +9,11 @@ test("prebuild-guard: detects stale node-lock-index.json vs graph.json", async (
     const providersDir = path.join(tmp, "third_party", "providers");
     await fsp.mkdir(providersDir, { recursive: true });
 
-    const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
-    const sidecarPath = path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json");
+    const graphPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
+    const sidecarPath = path.join(tmp, ".viberoots", "workspace", "buck", "node-lock-index.json");
     const invalidationReport = path.join(
       tmp,
+      "viberoots",
       "build-tools",
       "tools",
       "buck",
@@ -42,7 +43,7 @@ test("prebuild-guard: detects stale node-lock-index.json vs graph.json", async (
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, CI: "true" },
-      })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+      })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
     } catch {
       failed = true;
     }
@@ -54,7 +55,7 @@ test("prebuild-guard: detects stale node-lock-index.json vs graph.json", async (
     // Local run should auto-fix by regenerating glue
     await $({
       cwd: tmp,
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
     if (!(await exists(sidecarPath))) {
       throw new Error("expected node-lock-index.json to exist after auto-fix");
     }

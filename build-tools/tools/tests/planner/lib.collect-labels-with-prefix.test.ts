@@ -20,7 +20,7 @@ test("collectLabelsWithPrefix performs DFS, dedupes, sorts, and bounds", async (
           { name = "//projects/apps/demo:D"; labels = [ "nixpkg:pkgs.zlib" "nixpkg:pkgs.libcurl" "misc:ignore" ]; deps = []; srcs = []; }
         ];
         pkgPathOf = name: "apps/demo";
-        L = import ./build-tools/tools/nix/planner/lib.nix { inherit lib get nodes pkgPathOf; };
+        L = import ./viberoots/build-tools/tools/nix/planner/lib.nix { inherit lib get nodes pkgPathOf; };
         fromA = L.collectLabelsWithPrefix "//projects/apps/demo:A" "nixpkg:";
         fromB = L.collectLabelsWithPrefix "//projects/apps/demo:B" "nixpkg:";
         fromD = L.collectLabelsWithPrefix "//projects/apps/demo:D" "nixpkg:";

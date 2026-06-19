@@ -1,7 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagBool } from "../lib/cli";
-import { findRepoRoot } from "../lib/repo";
+import { findRepoRoot, resolveWorkspaceRootsSync } from "../lib/repo";
 import type { AwsAccountConfig, AwsAccountStatus, PhaseRecord, RunDeps } from "./aws-account-types";
 import { defaultCommandRunner, writeEvidence } from "./aws-account-utils";
 
@@ -22,8 +22,9 @@ export async function bootstrapState(
     };
   }
   const repoRoot = await findRepoRoot(deps.cwd || process.cwd());
+  const viberootsRoot = resolveWorkspaceRootsSync({ start: repoRoot }).viberootsRoot;
   const moduleDir = path.join(
-    repoRoot,
+    viberootsRoot,
     "build-tools",
     "deployments",
     "aws-control-plane-state-bootstrap",

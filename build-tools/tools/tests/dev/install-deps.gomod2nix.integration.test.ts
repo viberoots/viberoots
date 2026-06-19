@@ -48,20 +48,27 @@ EOF
       WORKSPACE_ROOT: tmp,
       INSTALL_DEPS_SKIP_GO_TIDY: "0",
       // Prefer the repo-pinned gomod2nix entrypoint for deterministic, offline-friendly runs.
-      INSTALL_DEPS_GOMOD2NIX_BIN: path.join(tmp, "build-tools", "tools", "bin", "gomod2nix"),
+      INSTALL_DEPS_GOMOD2NIX_BIN: path.join(
+        tmp,
+        "viberoots",
+        "build-tools",
+        "tools",
+        "bin",
+        "gomod2nix",
+      ),
     } as any;
     await $({
       cwd: tmp,
       stdio: "inherit",
       env,
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs ./build-tools/tools/dev/install-deps.ts --glue-only --skip-glue --verbose`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs ./viberoots/build-tools/tools/dev/install-deps.ts --glue-only --skip-glue --verbose`;
     const first = await fsp.readFile(path.join(tmp, "gomod2nix.toml"), "utf8");
     // Run again; output should be stable
     await $({
       cwd: tmp,
       stdio: "inherit",
       env,
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs ./build-tools/tools/dev/install-deps.ts --glue-only --skip-glue --verbose`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs ./viberoots/build-tools/tools/dev/install-deps.ts --glue-only --skip-glue --verbose`;
     const second = await fsp.readFile(path.join(tmp, "gomod2nix.toml"), "utf8");
     if (first !== second) {
       console.error("gomod2nix.toml not stable across runs");

@@ -14,7 +14,7 @@ test("patches-lint (cpp): duplicate nixAttr@version detected in strict mode", as
 
     const res = await $({
       nothrow: true,
-    })`node build-tools/tools/dev/patches-lint.ts --lang cpp --strict`;
+    })`node viberoots/build-tools/tools/dev/patches-lint.ts --lang cpp --strict`;
     if (res.exitCode === 0) {
       console.error("expected strict lint to fail due to duplicate module key");
       process.exit(2);

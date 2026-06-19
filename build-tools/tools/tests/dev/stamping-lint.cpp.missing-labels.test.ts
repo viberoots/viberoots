@@ -18,7 +18,7 @@ await runInTemp("stamping-lint-cpp-missing", async (tmp, $) => {
     cwd: tmp,
     quiet: true,
     env,
-  })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/dev/stamping-lint.ts`.nothrow();
+  })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/dev/stamping-lint.ts`.nothrow();
   const out = String(res.stdout || "") + String(res.stderr || "");
   assert.notEqual(res.exitCode, 0);
   assert.match(out, /missing label lang:cpp/);
@@ -27,7 +27,7 @@ await runInTemp("stamping-lint-cpp-missing", async (tmp, $) => {
   await fs.outputFile(
     path.join(lib, "TARGETS"),
     [
-      'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+      'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
       "nix_cpp_library(",
       '  name = "demo",',
       '  srcs = ["demo.cpp"],',
@@ -37,12 +37,12 @@ await runInTemp("stamping-lint-cpp-missing", async (tmp, $) => {
     "utf8",
   );
   await fs.outputFile(
-    path.join(tmp, "build-tools", "cpp", "defs.bzl"),
-    await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
+    path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
+    await fs.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
   );
   await fs.outputFile(
-    path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
-    await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
+    path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
+    await fs.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
   );
   await $({
     cwd: tmp,
@@ -53,7 +53,7 @@ await runInTemp("stamping-lint-cpp-missing", async (tmp, $) => {
     cwd: tmp,
     quiet: true,
     env,
-  })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/dev/stamping-lint.ts`;
+  })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/dev/stamping-lint.ts`;
   const out2 = String(res2.stdout || "") + String(res2.stderr || "");
   assert.match(out2, /stamping-lint: OK/);
 });

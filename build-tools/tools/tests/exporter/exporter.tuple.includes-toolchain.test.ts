@@ -26,7 +26,7 @@ test("exporter tuple includes toolchain hash or 'unknown' and exposes in metrics
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${metrics}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${metrics}`;
     const m = JSON.parse(await fs.readFile(metrics, "utf8"));
     const keys: string[] = m.tupleKeys || [];
     if (!Array.isArray(keys) || keys.length === 0) {

@@ -13,12 +13,12 @@ test("patch-go start creates session and workspace (idempotent)", async () => {
     const map = { "golang.org/x/net": { version: "v0.24.0", originPath: origin } };
 
     // Ensure CLI is executable
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
 
     // First start
     const r1 = await $({ cwd: tmp })`NIX_GO_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} NIX_GO_DEV_OVERRIDE_JSON={} build-tools/tools/bin/patch-pkg start go golang.org/x/net`;
+    )} NIX_GO_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg start go golang.org/x/net`;
     const ws1 = String(r1.stdout || "")
       .trim()
       .split(/\s+/)
@@ -39,7 +39,7 @@ test("patch-go start creates session and workspace (idempotent)", async () => {
     // Second start should be idempotent and print the same workspace
     const r2 = await $({ cwd: tmp })`NIX_GO_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} NIX_GO_DEV_OVERRIDE_JSON={} build-tools/tools/bin/patch-pkg start go golang.org/x/net`;
+    )} NIX_GO_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg start go golang.org/x/net`;
     const ws2 = String(r2.stdout || "")
       .trim()
       .split(/\s+/)

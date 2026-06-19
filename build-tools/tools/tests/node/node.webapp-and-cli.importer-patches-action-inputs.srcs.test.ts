@@ -20,7 +20,7 @@ test("node_webapp and nix_node_cli_bin(bundle=True) include importer-local patch
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "node_webapp", "nix_node_cli_bin")',
+        'load("@viberoots//build-tools/node:defs.bzl", "node_webapp", "nix_node_cli_bin")',
         "",
         "node_webapp(",
         '  name = "bundle",',

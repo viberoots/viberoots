@@ -8,7 +8,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("p uses graph-generator-selected and skips full graph-generator for runnable target", async () => {
   await runInTemp("runnable-selected-fast-path", async (tmp, $) => {
     const target = "//projects/apps/demo:demo";
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.writeFile(
       path.join(graphDir, "graph.json"),
@@ -73,7 +73,7 @@ test("p uses graph-generator-selected and skips full graph-generator for runnabl
         ...process.env,
         PATH: `${stubBin}:${process.env.PATH || ""}`,
       },
-    })`build-tools/tools/bin/p ${target}`;
+    })`viberoots/build-tools/tools/bin/p ${target}`;
     assert.match(String(run.stdout || ""), /selected-prod-ok/);
     assert.doesNotMatch(
       String(run.stderr || ""),
@@ -90,7 +90,7 @@ test("p uses graph-generator-selected and skips full graph-generator for runnabl
 test("p auto source falls back to path flake for relevant untracked files", async () => {
   await runInTemp("runnable-selected-auto-source", async (tmp, $) => {
     const target = "//projects/apps/demo:demo";
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     const projectDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.mkdir(path.join(projectDir, "src"), { recursive: true });
@@ -159,7 +159,7 @@ test("p auto source falls back to path flake for relevant untracked files", asyn
         ...process.env,
         PATH: `${stubBin}:${process.env.PATH || ""}`,
       },
-    })`build-tools/tools/bin/p ${target}`;
+    })`viberoots/build-tools/tools/bin/p ${target}`;
     assert.match(String(run.stdout || ""), /selected-prod-ok/);
 
     const logTxt = await fsp.readFile(nixLog, "utf8");
@@ -170,7 +170,7 @@ test("p auto source falls back to path flake for relevant untracked files", asyn
 test("p --source=git keeps git flake source even with relevant untracked files", async () => {
   await runInTemp("runnable-selected-git-source", async (tmp, $) => {
     const target = "//projects/apps/demo:demo";
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     const projectDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.mkdir(path.join(projectDir, "src"), { recursive: true });
@@ -239,7 +239,7 @@ test("p --source=git keeps git flake source even with relevant untracked files",
         ...process.env,
         PATH: `${stubBin}:${process.env.PATH || ""}`,
       },
-    })`build-tools/tools/bin/p ${target} --source=git`;
+    })`viberoots/build-tools/tools/bin/p ${target} --source=git`;
     assert.match(String(run.stdout || ""), /selected-prod-ok/);
 
     const logTxt = await fsp.readFile(nixLog, "utf8");

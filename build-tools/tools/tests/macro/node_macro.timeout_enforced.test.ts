@@ -42,7 +42,7 @@ test("nix_node_test: external timeout is enforced", { timeout: 420_000 }, async 
 
     // Replace TARGETS with a dedicated nix_node_test target that only runs the slow test and has a tiny timeout.
     const targets = [
-      'load("//build-tools/node:defs.bzl", "nix_node_test")',
+      'load("@viberoots//build-tools/node:defs.bzl", "nix_node_test")',
       "",
       "nix_node_test(",
       '    name = "timeout_short",',

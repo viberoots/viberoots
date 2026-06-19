@@ -5,8 +5,11 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("patch-pkg usage mentions Node and Python glue behavior consistently", async () => {
   await runInTemp("patch-pkg-help-glue-msg", async (tmp, $) => {
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
-    const out = await $({ cwd: tmp, stdio: "pipe" })`build-tools/tools/bin/patch-pkg`.nothrow();
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
+    const out = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`viberoots/build-tools/tools/bin/patch-pkg`.nothrow();
     const all = String(out.stdout || "") + String(out.stderr || "");
     if (out.exitCode === 0) {
       console.error("expected non-zero exit for usage output");

@@ -24,7 +24,13 @@ async function readText(p: string): Promise<string> {
 }
 
 function flakeUsesLocalViberoots(text: string): boolean {
-  return /viberoots\.url\s*=\s*"(?:path:\.\/viberoots|git\+file:\.\/viberoots)"/.test(text);
+  return /viberoots\.url\s*=\s*"(?:path|git\+file):[^"]*viberoots"/.test(text);
+}
+
+async function readWorkspaceFlakeText(): Promise<string> {
+  const hidden = await readText(path.join(".viberoots", "workspace", "flake.nix"));
+  if (hidden) return hidden;
+  return await readText("flake.nix");
 }
 
 async function git(args: string[], cwd = "."): Promise<string> {
@@ -52,26 +58,29 @@ async function requireLocalViberootsFlake(flakeText: string): Promise<void> {
 async function requireLocalFlakeLock(flakeText: string): Promise<void> {
   if (!flakeUsesLocalViberoots(flakeText)) return;
   try {
-    const lock = JSON.parse(await fsp.readFile("flake.lock", "utf8"));
+    const lockText =
+      (await readText(path.join(".viberoots", "workspace", "flake.lock"))) ||
+      (await readText("flake.lock"));
+    const lock = JSON.parse(lockText);
     const node = lock?.nodes?.viberoots || lock?.nodes?.viberootsInput;
     const locked = node?.locked || {};
     const original = node?.original || {};
     if (
       (locked.type === "path" &&
-        locked.path === "./viberoots" &&
+        (locked.path === "./viberoots" || locked.path === "../../viberoots") &&
         original.type === "path" &&
-        original.path === "./viberoots") ||
+        (original.path === "./viberoots" || original.path === "../../viberoots")) ||
       (locked.type === "git" &&
-        locked.url === "file:./viberoots" &&
+        (locked.url === "file:./viberoots" || locked.url === "file:../../viberoots") &&
         original.type === "git" &&
-        original.url === "file:./viberoots")
+        (original.url === "file:./viberoots" || original.url === "file:../../viberoots"))
     ) {
       return;
     }
   } catch {
-    throw new Error("[startup-check] root flake.lock is missing or invalid");
+    throw new Error("[startup-check] workspace flake.lock is missing or invalid");
   }
-  throw new Error("[startup-check] root flake.lock is not aligned with local viberoots input");
+  throw new Error("[startup-check] workspace flake.lock is not aligned with local viberoots input");
 }
 
 async function requireLocalCurrentTarget(flakeText: string): Promise<void> {
@@ -120,9 +129,13 @@ function warnOrThrowSubmoduleState(message: string): void {
 
 async function requireSubmoduleGitState(flakeText: string): Promise<void> {
   if (!flakeUsesLocalViberoots(flakeText)) return;
+  if (!(await exists("viberoots/.git")) && !(await exists(".git/modules/viberoots"))) return;
   const expected = await expectedGitlinkRevision();
   if (!expected) {
-    throw new Error("[startup-check] viberoots is not recorded as a git submodule gitlink");
+    warnOrThrowSubmoduleState(
+      "[startup-check] viberoots is not recorded as a git submodule gitlink",
+    );
+    return;
   }
   const actual = await git(["rev-parse", "HEAD"], "viberoots");
   if (!actual) {
@@ -155,19 +168,48 @@ async function requireBuckconfigCells(buckconfig: string): Promise<void> {
   }
 }
 
-async function requirePreludeEntrypoint(flakeText: string): Promise<void> {
-  const rel = flakeUsesLocalViberoots(flakeText)
-    ? ".viberoots/current/prelude/prelude.bzl"
-    : "prelude/prelude.bzl";
-  if (await exists(rel)) return;
+async function requirePreludeEntrypoint(): Promise<void> {
+  const hiddenRel = ".viberoots/current/prelude/prelude.bzl";
+  if (await exists(hiddenRel)) return;
   throw new Error(
-    `[startup-check] invalid Buck prelude: ${rel} is missing. Re-enter the dev shell or run \`viberoots init-workspace\`.`,
+    `[startup-check] invalid Buck prelude: ${hiddenRel} is missing. Re-enter the dev shell or run \`viberoots init-workspace\`.`,
   );
+}
+
+async function cleanupVerifyOwnedRootBuckOut(): Promise<void> {
+  const buckOut = "buck-out";
+  const entries = await fsp.readdir(buckOut, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    const name = entry.name;
+    const verifyOwned =
+      name === ".metadata_never_index" ||
+      name === "test-logs" ||
+      name === "tmp" ||
+      name === "zx_shims" ||
+      name === "v2" ||
+      name.startsWith("v-") ||
+      name.startsWith("verify-nested-") ||
+      name.startsWith("deployment-query-") ||
+      name.startsWith("zxtest-shared-");
+    if (!verifyOwned) continue;
+    if (name === "v2") {
+      await execFileAsync("buck2", ["kill"]).catch(() => {});
+    } else if (
+      name.startsWith("v-") ||
+      name.startsWith("verify-nested-") ||
+      name.startsWith("deployment-query-") ||
+      name.startsWith("zxtest-shared-")
+    ) {
+      await execFileAsync("buck2", ["--isolation-dir", name, "kill"]).catch(() => {});
+    }
+    await fsp.rm(path.join(buckOut, name), { recursive: true, force: true }).catch(() => {});
+  }
+  await fsp.rmdir(buckOut).catch(() => {});
 }
 
 export async function validateStartupWorkspaceState(): Promise<void> {
   await requireBuckroot();
-  const flakeText = await readText("flake.nix");
+  const flakeText = await readWorkspaceFlakeText();
   await requireLocalViberootsFlake(flakeText);
   await requireLocalCurrentTarget(flakeText);
 
@@ -184,10 +226,11 @@ export async function validateStartupWorkspaceState(): Promise<void> {
       "[startup-check] invalid .buckconfig: missing prelude mapping in [repositories] or [cells]. Run 'nix develop' to provision or fix the mapping.",
     );
   }
-  await requirePreludeEntrypoint(flakeText);
+  await requirePreludeEntrypoint();
   await requireBuckconfigCells(buckconfig);
   await requireLocalFlakeLock(flakeText);
   await requireSubmoduleGitState(flakeText);
+  await cleanupVerifyOwnedRootBuckOut();
   const blockers = findExtractionBlockers(process.cwd());
   if (blockers.length === 0) return;
   const message = `[startup-check] extraction old-layout blockers remain:\n${formatExtractionBlockers(blockers)}`;

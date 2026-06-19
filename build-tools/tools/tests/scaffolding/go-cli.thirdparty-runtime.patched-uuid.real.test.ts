@@ -28,29 +28,36 @@ name = TARGETS
 
 [repositories]
 root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
+viberoots = ./.viberoots/current
+prelude = ./.viberoots/current/prelude
+toolchains = ./.viberoots/current/toolchains
+repo_toolchains = ./.viberoots/current/toolchains
+fbsource = ./.viberoots/current/config/fbsource_stub
+fbcode = ./.viberoots/current/config/fbcode_stub
+config = ./.viberoots/current/prelude
+workspace_providers = ./.viberoots/workspace/providers
+workspace_buck = ./.viberoots/workspace/buck
 
 [cells]
 root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
+viberoots = ./.viberoots/current
+prelude = ./.viberoots/current/prelude
+toolchains = ./.viberoots/current/toolchains
+repo_toolchains = ./.viberoots/current/toolchains
+fbsource = ./.viberoots/current/config/fbsource_stub
+fbcode = ./.viberoots/current/config/fbcode_stub
+config = ./.viberoots/current/prelude
+workspace_providers = ./.viberoots/workspace/providers
+workspace_buck = ./.viberoots/workspace/buck
 
 [build]
 prelude = prelude
 user_platform = prelude//platforms:default
 target_platforms = prelude//platforms:default
 EOF
-    mkdir -p toolchains
-    printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
+    mkdir -p .viberoots/workspace/providers .viberoots/workspace/buck
+    printf '[buildfile]\nname = TARGETS\n' > .viberoots/workspace/providers/.buckconfig
+    printf '[buildfile]\nname = TARGETS\n' > .viberoots/workspace/buck/.buckconfig
   `}`;
 }
 
@@ -96,9 +103,9 @@ async function scaffoldCli(sh: any, tmp: string) {
 }
 
 async function regenerateProviders(sh: any) {
-  await sh`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
-  await sh`node build-tools/tools/buck/sync-providers.ts`;
-  await sh`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+  await sh`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+  await sh`node viberoots/build-tools/tools/buck/sync-providers.ts`;
+  await sh`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
 }
 
 test("go cli with local lib + third-party patched uuid runtime (prefetched real snapshot)", async () => {
@@ -113,6 +120,7 @@ test("go cli with local lib + third-party patched uuid runtime (prefetched real 
     // Use a prefetched, fixed snapshot of the module under test (fixture in repo)
     const origin = path.join(
       process.cwd(),
+      "viberoots",
       "build-tools",
       "tools",
       "tests",
@@ -134,7 +142,7 @@ test("go cli with local lib + third-party patched uuid runtime (prefetched real 
         NIX_GO_TEST_RESOLVE_JSON: resolveMap,
         NO_DEV_SHELL: "1",
         NODE_BIN: process.execPath,
-        ZX_INIT: path.join(_tmp, "build-tools", "tools", "dev", "zx-init.mjs"),
+        ZX_INIT: path.join(_tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
         WORKSPACE_ROOT: _tmp,
         NODE_PATH: [path.join(process.cwd(), "node_modules"), process.env.NODE_PATH || ""]
           .filter(Boolean)
@@ -142,7 +150,7 @@ test("go cli with local lib + third-party patched uuid runtime (prefetched real 
         PATH: `${path.dirname(process.execPath)}:${process.env.PATH || ""}`,
         ...resolvedToolEnv(),
       },
-    })`build-tools/tools/bin/patch-pkg start go github.com/google/uuid`;
+    })`viberoots/build-tools/tools/bin/patch-pkg start go github.com/google/uuid`;
     const ws =
       String(startRes.stdout || startRes.stderr || "")
         .split(/\r?\n/)
@@ -171,7 +179,7 @@ test("go cli with local lib + third-party patched uuid runtime (prefetched real 
         NIX_GO_TEST_RESOLVE_JSON: resolveMap,
         NO_DEV_SHELL: "1",
         NODE_BIN: process.execPath,
-        ZX_INIT: path.join(_tmp, "build-tools", "tools", "dev", "zx-init.mjs"),
+        ZX_INIT: path.join(_tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
         WORKSPACE_ROOT: _tmp,
         NODE_PATH: [path.join(process.cwd(), "node_modules"), process.env.NODE_PATH || ""]
           .filter(Boolean)
@@ -179,7 +187,7 @@ test("go cli with local lib + third-party patched uuid runtime (prefetched real 
         PATH: `${path.dirname(process.execPath)}:${process.env.PATH || ""}`,
         ...resolvedToolEnv(),
       },
-    })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
+    })`viberoots/build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
 
     const patchFile = path.join(
       _tmp,

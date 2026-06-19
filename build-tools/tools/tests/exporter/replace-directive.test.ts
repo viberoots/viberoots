@@ -44,7 +44,7 @@ test("exporter labels use Module.Replace when present", async () => {
     // Use simulate mode for hermetic parsing of imports + go.mod replace
     await $({
       cwd: tmp,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
     const outNodes = await readGraph(graph);
     const target = outNodes.find((n: any) => n.name === "//mod:bin");
     const labels: string[] = target?.labels || [];

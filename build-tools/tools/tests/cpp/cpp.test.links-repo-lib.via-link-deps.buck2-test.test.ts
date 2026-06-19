@@ -7,7 +7,7 @@ import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 test("nix_cpp_test links an in-repo C++ lib via link_deps (buck2 test)", async () => {
   await runInTemp("cpp-test-links-repo-lib", async (tmp, $) => {
     await fs.outputFile(
-      path.join(tmp, "build-tools", "tools", "nix", "langs.json"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "nix", "langs.json"),
       JSON.stringify({ enabled: ["cpp"] }, null, 2) + "\n",
       "utf8",
     );
@@ -25,7 +25,7 @@ test("nix_cpp_test links an in-repo C++ lib via link_deps (buck2 test)", async (
     await fs.outputFile(
       path.join(tmp, "libs", "greeter", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "greeter",',
@@ -54,7 +54,7 @@ test("nix_cpp_test links an in-repo C++ lib via link_deps (buck2 test)", async (
     await fs.outputFile(
       path.join(tmp, "projects", "apps", "demo", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_test")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_test")',
         "",
         "nix_cpp_test(",
         '  name = "t",',
@@ -78,7 +78,7 @@ test("nix_cpp_test links an in-repo C++ lib via link_deps (buck2 test)", async (
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     await $({
       cwd: tmp,
     })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_test_link_deps")} test //projects/apps/demo:t`;

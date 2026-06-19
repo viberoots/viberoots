@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
@@ -9,6 +10,7 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { formatRunnableLine, inferRunnableFromOutPath } from "../../../lib/runnables";
 import { DEFAULT_GRAPH_PATH } from "../../../lib/workspace-state-paths";
+import { prepareExactPnpmStore } from "../../../dev/update-pnpm-hash/exact-store";
 import { terminateChildTree } from "../../lib/process-tree";
 import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
@@ -20,7 +22,18 @@ export const TEST_TIMEOUT_MS =
 
 function viberootsDevTool(name: string): string {
   const root = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || process.cwd();
-  return path.join(root, "build-tools", "tools", "dev", name);
+  return path.join(viberootsRoot(root), "build-tools", "tools", "dev", name);
+}
+
+function viberootsBuckTool(name: string): string {
+  const root = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || process.cwd();
+  return path.join(viberootsRoot(root), "build-tools", "tools", "buck", name);
+}
+
+function viberootsRoot(candidate: string): string {
+  const root = path.resolve(candidate);
+  if (fs.existsSync(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"))) return root;
+  return path.join(root, "viberoots");
 }
 
 async function pickFreePort(): Promise<number> {
@@ -53,7 +66,7 @@ async function httpGet(url: string): Promise<{ status: number; body: string }> {
 export async function withTempRoots<T>(run: () => Promise<T>): Promise<T> {
   const prevRoots = process.env.TEST_RSYNC_ROOTS;
   if (!prevRoots) {
-    process.env.TEST_RSYNC_ROOTS = "build-tools toolchains third_party/providers prelude patches";
+    process.env.TEST_RSYNC_ROOTS = "viberoots";
   }
   try {
     return await run();
@@ -61,6 +74,15 @@ export async function withTempRoots<T>(run: () => Promise<T>): Promise<T> {
     if (prevRoots === undefined) delete process.env.TEST_RSYNC_ROOTS;
     else process.env.TEST_RSYNC_ROOTS = prevRoots;
   }
+}
+
+async function workspaceFlakeRef(root: string): Promise<string> {
+  const hidden = path.join(root, ".viberoots", "workspace", "flake.nix");
+  const hasHidden = await fsp
+    .access(hidden)
+    .then(() => true)
+    .catch(() => false);
+  return hasHidden ? path.dirname(hidden) : root;
 }
 
 export async function scaffoldAndPrepareWorkspace(
@@ -74,18 +96,10 @@ export async function scaffoldAndPrepareWorkspace(
   const appLabel = `//${appRel}:app`;
   const $ = _$({ cwd: tmp, stdio: "inherit" });
   await $`scaf new ts ${template} ${name} --yes --no-tests --skip-lockfile-gen`;
-  await _$({
-    cwd: tmp,
-    stdio: "inherit",
-    env: { ...process.env, WORKSPACE_ROOT: tmp, BUCK_TARGET: appLabel },
-  })`zx-wrapper ${viberootsDevTool("install/deps-main.ts")} --verbose --glue-only`;
-  // deps-main --glue-only is the single authoritative glue path for this flow.
-  await fsp.access(graphJsonAbs);
   await stageTempRepoPaths({
     tmp,
     _$,
     recursiveRoots: [appRel],
-    explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS],
   });
   await _$({
     cwd: tmp,
@@ -95,7 +109,27 @@ export async function scaffoldAndPrepareWorkspace(
   await stageTempRepoPaths({
     tmp,
     _$,
-    explicitPaths: ["build-tools/tools/nix/node-modules.hashes.json"],
+    recursiveRoots: [appRel],
+    explicitPaths: ["projects/node-modules.hashes.json"],
+  });
+  await _$({
+    cwd: tmp,
+    stdio: "inherit",
+    env: { ...process.env, WORKSPACE_ROOT: tmp, BUCK_TARGET: appLabel },
+  })`zx-wrapper ${viberootsDevTool("install/deps-main.ts")} --verbose --glue-only`;
+  await fsp.rm(graphJsonAbs, { force: true });
+  await _$({
+    cwd: tmp,
+    stdio: "inherit",
+    env: { ...process.env, WORKSPACE_ROOT: tmp, BUCK_TEST_SRC: tmp, BUCK_TARGET: appLabel },
+  })`zx-wrapper ${viberootsBuckTool("export-graph.ts")} --out ${graphJsonAbs}`;
+  // deps-main --glue-only is the single authoritative glue path for this flow.
+  await fsp.access(graphJsonAbs);
+  await stageTempRepoPaths({
+    tmp,
+    _$,
+    recursiveRoots: [appRel],
+    explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS],
   });
 }
 
@@ -106,16 +140,28 @@ export async function buildSelectedSsr(
   framework: "express" | "next" | "vite",
 ): Promise<{ outPath: string; importer: string }> {
   const graphJson = path.join(tmp, DEFAULT_GRAPH_PATH);
+  const importer = label.replace(/^\/\//, "").replace(/:app$/, "");
+  await stageTempRepoPaths({
+    tmp,
+    _$,
+    recursiveRoots: [importer],
+    explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS, "projects/node-modules.hashes.json"],
+  });
+  const flakeRef = await workspaceFlakeRef(tmp);
+  const exactStore = await prepareExactPnpmStore({ repoRoot: tmp, importer });
   const built = await _$({
     cwd: tmp,
     stdio: "pipe",
     env: {
       ...process.env,
+      WORKSPACE_ROOT: tmp,
+      BUCK_TEST_SRC: tmp,
       NIX_PNPM_ALLOW_GENERATE: "1",
+      NIX_PNPM_EXACT_STORE: exactStore.exactStorePath,
       BUCK_GRAPH_JSON: graphJson,
       BUCK_TARGET: label,
     },
-  })`bash --noprofile --norc -c ${`set -euo pipefail; nix build "${tmp}#graph-generator-pure-selected" --impure --no-link --accept-flake-config --builders "" --print-build-logs --print-out-paths`}`;
+  })`bash --noprofile --norc -c ${`set -euo pipefail; nix build "path:${flakeRef}#graph-generator-pure-selected" --impure --no-link --accept-flake-config --builders "" --print-build-logs --print-out-paths`}`;
   const outPath =
     String(built.stdout || "")
       .trim()
@@ -123,7 +169,6 @@ export async function buildSelectedSsr(
       .pop() || "";
   assert.ok(outPath, `expected selected graph out path for ${label}`);
 
-  const importer = label.replace(/^\/\//, "").replace(/:app$/, "");
   const runnable = await inferRunnableFromOutPath({
     label,
     outPath,

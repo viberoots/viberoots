@@ -19,13 +19,19 @@ async function workspace(prefix: string): Promise<string> {
   const root = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), `${prefix}-`)));
   await fsp.writeFile(path.join(root, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
   await fsp.writeFile(path.join(root, ".buckroot"), ".\n", "utf8");
+  await fsp.mkdir(path.join(root, ".viberoots"), { recursive: true });
+  await fsp.symlink("../viberoots", path.join(root, ".viberoots", "current"));
   await fsp.writeFile(
     path.join(root, ".buckconfig"),
-    "[cells]\nprelude = ./prelude\n[repositories]\nprelude = ./prelude\n",
+    "[cells]\nprelude = ./.viberoots/current/prelude\n[repositories]\nprelude = ./.viberoots/current/prelude\n",
     "utf8",
   );
-  await fsp.mkdir(path.join(root, "prelude"), { recursive: true });
-  await fsp.writeFile(path.join(root, "prelude", "prelude.bzl"), "# prelude\n", "utf8");
+  await fsp.mkdir(path.join(root, "viberoots", "prelude"), { recursive: true });
+  await fsp.writeFile(
+    path.join(root, "viberoots", "prelude", "prelude.bzl"),
+    "# prelude\n",
+    "utf8",
+  );
   return root;
 }
 
@@ -182,9 +188,49 @@ test("startup-check rejects misaligned local viberoots flake lock", async () => 
     process.chdir(root);
     await assert.rejects(
       validateStartupWorkspaceState(),
-      /root flake\.lock is not aligned with local viberoots input/,
+      /workspace flake\.lock is not aligned with local viberoots input/,
     );
   } finally {
+    process.chdir(oldCwd);
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("startup-check warns but allows local viberoots checkout without parent gitlink", async () => {
+  const { root } = await submoduleWorkspace("vbr-startup-local-checkout");
+  const oldCwd = process.cwd();
+  const oldWarn = console.warn;
+  const warnings: string[] = [];
+  try {
+    await git(root, ["rm", "--cached", "viberoots"]);
+    process.chdir(root);
+    console.warn = (message?: unknown) => {
+      warnings.push(String(message || ""));
+    };
+    await validateStartupWorkspaceState();
+    assert.match(warnings.join("\n"), /not recorded as a git submodule gitlink/);
+  } finally {
+    console.warn = oldWarn;
+    process.chdir(oldCwd);
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("startup-check strict mode rejects local viberoots checkout without parent gitlink", async () => {
+  const { root } = await submoduleWorkspace("vbr-startup-local-checkout-strict");
+  const oldCwd = process.cwd();
+  const oldStrict = process.env.VIBEROOTS_STRICT_SUBMODULE_STATE;
+  try {
+    await git(root, ["rm", "--cached", "viberoots"]);
+    process.chdir(root);
+    process.env.VIBEROOTS_STRICT_SUBMODULE_STATE = "1";
+    await assert.rejects(
+      validateStartupWorkspaceState(),
+      /not recorded as a git submodule gitlink/,
+    );
+  } finally {
+    if (oldStrict === undefined) delete process.env.VIBEROOTS_STRICT_SUBMODULE_STATE;
+    else process.env.VIBEROOTS_STRICT_SUBMODULE_STATE = oldStrict;
     process.chdir(oldCwd);
     await fsp.rm(root, { recursive: true, force: true });
   }

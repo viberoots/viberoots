@@ -5,6 +5,7 @@ import { spawn } from "node:child_process";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { buildToolPath } from "../../dev/dev-build/paths";
 
 test("tail-log: latest --status -w discovers verify runs in worktree subdirs", async () => {
   const ws = await fsp.mkdtemp(path.join(os.tmpdir(), "tail-log-worktree-"));
@@ -19,7 +20,7 @@ test("tail-log: latest --status -w discovers verify runs in worktree subdirs", a
   const wtLogReal = await fsp.realpath(wtLog);
 
   const tailLog = spawn(
-    path.join(process.cwd(), "build-tools", "tools", "bin", "tail-log"),
+    buildToolPath(process.cwd(), "tools/bin/tail-log"),
     ["--status", "-w", "0.05", "--json"],
     {
       cwd: process.cwd(),
@@ -27,7 +28,7 @@ test("tail-log: latest --status -w discovers verify runs in worktree subdirs", a
         ...process.env,
         WORKSPACE_ROOT: ws,
         NO_DEV_SHELL: "1",
-        ZX_INIT: path.join(process.cwd(), "build-tools", "tools", "dev", "zx-init.mjs"),
+        ZX_INIT: buildToolPath(process.cwd(), "tools/dev/zx-init.mjs"),
       },
       stdio: ["ignore", "pipe", "pipe"],
     },

@@ -1068,7 +1068,7 @@ The expected fix is not to disable remote execution broadly. The expected fix is
 
 ### Local Conformance Checklist
 
-`//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles` is the only initial `remote:ready` target. It is a tiny local/dry-run conformance target used to prove the evidence contract before production remote execution is enabled. The remaining wrapper families stay `remote:local-only` until their source snapshot, command input, Nix materialization, artifact, tool closure, and policy evidence is complete.
+`root//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles` is the only initial `remote:ready` target. It is a tiny local/dry-run conformance target used to prove the evidence contract before production remote execution is enabled. The remaining wrapper families stay `remote:local-only` until their source snapshot, command input, Nix materialization, artifact, tool closure, and policy evidence is complete.
 
 Local/dry-run conformance uses fixture or generated Buck config only:
 

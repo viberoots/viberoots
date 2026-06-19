@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("node nix runner: minimal importer with no tests passes", async () => {
   await runInTemp("node-nix-runner-smoke", async (tmp, _$) => {
@@ -36,7 +36,7 @@ test("node nix runner: minimal importer with no tests passes", async () => {
     await fsp.writeFile(path.join(app, "pnpm-lock.yaml"), lock, "utf8");
     // TARGETS wiring using nix_node_test external runner; allow lockfile generation in FOD
     const targets = [
-      'load("//build-tools/node:defs.bzl", "nix_node_test")',
+      'load("@viberoots//build-tools/node:defs.bzl", "nix_node_test")',
       "",
       "nix_node_test(",
       '    name = "node_tests",',
@@ -47,10 +47,10 @@ test("node nix runner: minimal importer with no tests passes", async () => {
     ].join("\n");
     await fsp.writeFile(path.join(app, "TARGETS"), targets, "utf8");
     // Update pnpm-store FOD hash mapping for this importer lockfile
-    await $`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/apps/mini/pnpm-lock.yaml`;
+    await $`zx-wrapper viberoots/build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/apps/mini/pnpm-lock.yaml`;
     await $`buck2 cquery --target-platforms prelude//platforms:default "kind(nix_node_test, //projects/apps/mini:node_tests)"`;
     await $`buck2 test --target-platforms prelude//platforms:default //projects/apps/mini:node_tests`;
     // Supplemental no-link policy coverage for the Nix runner attr invoked by nix_node_test.
-    await $`nix build --no-link --print-out-paths --impure --accept-flake-config ${`path:${tmp}#node-test.projects-apps-mini`} -L`;
+    await $`nix build --no-link --print-out-paths --impure --accept-flake-config ${`path:${await workspaceFlakeRef(tmp)}#node-test.projects-apps-mini`} -L`;
   });
 });

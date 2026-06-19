@@ -35,13 +35,18 @@ def nix_bootstrap_env_core():
         + "(cd \"$WORKSPACE_ROOT\" 2>/dev/null && pwd -P > \"$WS_PHYS_FILE\") || true; "
         + "WS_PHYS=\"\"; read -r WS_PHYS < \"$WS_PHYS_FILE\" 2>/dev/null || true; "
         + "if [ -n \"$WS_PHYS\" ]; then WORKSPACE_ROOT=\"$WS_PHYS\"; fi; "
+        + "if [ -f \"$WORKSPACE_ROOT/.viberoots/workspace/buck/workspace-root.env\" ]; then . \"$WORKSPACE_ROOT/.viberoots/workspace/buck/workspace-root.env\" 2>/dev/null || true; fi; "
+        + "if [ -f \"$WORKSPACE_ROOT/build-tools/tools/buck/workspace-root.env\" ]; then . \"$WORKSPACE_ROOT/build-tools/tools/buck/workspace-root.env\" 2>/dev/null || true; fi; "
+        + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$PWD}\"; "
         + "FLK_ROOT=\"${FLK_ROOT:-}\"; "
         + "if [ -z \"${FLK_ROOT:-}\" ] || [ ! -f \"$FLK_ROOT/flake.nix\" ]; then "
         + "  FLK_ROOT=\"${WORKSPACE_ROOT:-${REPO_ROOT:-$PWD}}\"; "
+        + "  if [ -f \"$FLK_ROOT/.viberoots/workspace/flake.nix\" ]; then FLK_ROOT=\"$FLK_ROOT/.viberoots/workspace\"; fi; "
         + "  if [ ! -f \"$FLK_ROOT/flake.nix\" ]; then "
         + "    SEARCH_FROM=\"${WORKSPACE_ROOT:-${REPO_ROOT:-$PWD}}\"; "
         + "    CAND=\"$SEARCH_FROM\"; "
         + "    while [ \"$CAND\" != \"/\" ] && [ ! -f \"$CAND/flake.nix\" ]; do "
+        + "      if [ -f \"$CAND/.viberoots/workspace/flake.nix\" ]; then CAND=\"$CAND/.viberoots/workspace\"; break; fi; "
         + "      CAND=\"${CAND%/*}\"; "
         + "      if [ -z \"$CAND\" ]; then CAND=\"/\"; fi; "
         + "    done; "
@@ -61,10 +66,10 @@ def nix_bootstrap_env_core():
         + "(cd \"$FLK_ROOT\" 2>/dev/null && pwd -P > \"$FLK_PHYS_FILE\") || true; "
         + "FLK_PHYS=\"\"; read -r FLK_PHYS < \"$FLK_PHYS_FILE\" 2>/dev/null || true; "
         + "if [ -n \"$FLK_PHYS\" ]; then FLK_ROOT=\"$FLK_PHYS\"; fi; "
-        + "VBR_ROOT=\"${VIBEROOTS_ROOT:-}\"; if [ -z \"$VBR_ROOT\" ] || [ ! -f \"$VBR_ROOT/build-tools/tools/dev/zx-init.mjs\" ]; then if [ -f \"$WORKSPACE_ROOT/.viberoots/current/build-tools/tools/dev/zx-init.mjs\" ]; then VBR_ROOT=\"$WORKSPACE_ROOT/.viberoots/current\"; else VBR_ROOT=\"$FLK_ROOT\"; fi; fi; "
+        + "VBR_ROOT=\"${VIBEROOTS_ROOT:-}\"; if [ -z \"$VBR_ROOT\" ] || [ ! -f \"$VBR_ROOT/build-tools/tools/dev/zx-init.mjs\" ]; then if [ -f \"$WORKSPACE_ROOT/viberoots/build-tools/tools/dev/zx-init.mjs\" ]; then VBR_ROOT=\"$WORKSPACE_ROOT/viberoots\"; elif [ -f \"$WORKSPACE_ROOT/.viberoots/current/build-tools/tools/dev/zx-init.mjs\" ]; then VBR_ROOT=\"$WORKSPACE_ROOT/.viberoots/current\"; else VBR_ROOT=\"$FLK_ROOT\"; fi; fi; "
         + "VBR_PHYS_FILE=\"$TMP/vbr-source-root.phys\"; (cd \"$VBR_ROOT\" 2>/dev/null && pwd -P > \"$VBR_PHYS_FILE\") || true; VBR_PHYS=\"\"; read -r VBR_PHYS < \"$VBR_PHYS_FILE\" 2>/dev/null || true; if [ -n \"$VBR_PHYS\" ]; then VBR_ROOT=\"$VBR_PHYS\"; fi; export VIBEROOTS_ROOT=\"$VBR_ROOT\"; "
         + "cd \"$WORKSPACE_ROOT\"; "
-        + "test -f \"$FLK_ROOT/flake.nix\"; "
+        + "test -f \"$FLK_ROOT/flake.nix\" || { echo \"nix bootstrap: missing flake.nix (WORKSPACE_ROOT=$WORKSPACE_ROOT FLK_ROOT=$FLK_ROOT checked hidden=$WORKSPACE_ROOT/.viberoots/workspace/flake.nix)\" >&2; exit 2; }; "
         + nix_cache_health_shell()
     )
 def nix_bootstrap_env_pnpm_store():
@@ -153,7 +158,7 @@ def nix_calling_genrule_bootstrap(
     """
     pre = ""
     if source_workspace_root_env:
-        pre = pre + "if [ -f build-tools/tools/buck/workspace-root.env ]; then . build-tools/tools/buck/workspace-root.env 2>/dev/null || true; fi; "
+        pre = pre + "if [ -f .viberoots/workspace/buck/workspace-root.env ]; then . .viberoots/workspace/buck/workspace-root.env 2>/dev/null || true; elif [ -n \"${SRCDIR:-}\" ] && [ -f \"$SRCDIR/.viberoots/workspace/buck/workspace-root.env\" ]; then . \"$SRCDIR/.viberoots/workspace/buck/workspace-root.env\" 2>/dev/null || true; elif [ -f build-tools/tools/buck/workspace-root.env ]; then . build-tools/tools/buck/workspace-root.env 2>/dev/null || true; elif [ -n \"${SRCS:-}\" ]; then for VBR_SRC in $SRCS; do case \"$VBR_SRC\" in */.viberoots/workspace/buck/workspace-root.env|.viberoots/workspace/buck/workspace-root.env) if [ -f \"$VBR_SRC\" ]; then . \"$VBR_SRC\" 2>/dev/null || true; break; fi ;; esac; done; fi; "
     pre = pre + "if [ -n \"${WORKSPACE_ROOT:-}\" ]; then export REPO_ROOT=\"$WORKSPACE_ROOT\"; fi; "
     if skip_require_unified_pnpm_store:
         pre = pre + "export VBR_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "

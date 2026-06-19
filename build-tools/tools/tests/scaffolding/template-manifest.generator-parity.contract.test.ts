@@ -17,7 +17,7 @@ test("parity: generated taxonomy adapter is fresh from canonical manifest", asyn
   assert.equal(
     current,
     expected,
-    "template taxonomy adapter is stale; run node build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts",
+    "template taxonomy adapter is stale; run node viberoots/build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts",
   );
 });
 
@@ -28,6 +28,6 @@ test("parity: generated runtime taxonomy data is fresh from canonical manifest",
   assert.equal(
     current,
     expected,
-    "runtime taxonomy data is stale; run node build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts",
+    "runtime taxonomy data is stale; run node viberoots/build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts",
   );
 });

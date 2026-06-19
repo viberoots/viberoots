@@ -11,16 +11,16 @@ test("patch-cpp apply uses double-underscore encoding for attr path", async () =
     await fs.outputFile(path.join(storeSrc, "file.txt"), "A\n", "utf8");
     const map = { "pkgs.openssl": { version: "3.3.1", srcPath: storeSrc, pname: "openssl" } };
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const wsOut = await $({ cwd: tmp })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} build-tools/tools/bin/patch-pkg start cpp pkgs.openssl`;
+    )} viberoots/build-tools/tools/bin/patch-pkg start cpp pkgs.openssl`;
     const ws = String(wsOut.stdout).trim().split(/\s+/).pop() as string;
     await fs.outputFile(path.join(ws, "file.txt"), "B\n", "utf8");
 
     const out = await $({ cwd: tmp })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} build-tools/tools/bin/patch-pkg apply cpp openssl --patch-dir patches/cpp`;
+    )} viberoots/build-tools/tools/bin/patch-pkg apply cpp openssl --patch-dir patches/cpp`;
 
     const patch = path.join(tmp, "patches/cpp", "pkgs__openssl@3.3.1.patch");
     if (!(await fs.pathExists(patch))) {

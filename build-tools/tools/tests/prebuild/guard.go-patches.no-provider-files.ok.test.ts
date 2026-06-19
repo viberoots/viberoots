@@ -17,14 +17,18 @@ test("prebuild-guard: Go patches present but no Go provider/index files — ok",
 
     // Minimal required glue presence
     await fsp.mkdir(path.join(tmp, "third_party/providers"), { recursive: true });
-    await fsp.writeFile(path.join(tmp, "build-tools", "tools", "buck", "graph.json"), "[]", "utf8");
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
+      "[]",
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(tmp, ".viberoots", "workspace", "buck", "node-lock-index.json"),
       "{}\n",
       "utf8",
     );
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "invalidation-report.txt"),
       "# invalidation-report\n",
       "utf8",
     );
@@ -72,6 +76,6 @@ EOF
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
   });
 });

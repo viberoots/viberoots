@@ -14,28 +14,28 @@ test("cpp planner imports and detects cxx_* and lang:cpp", async () => {
         {
           id: "go",
           displayName: "Go",
-          requiredPaths: ["build-tools/go/defs.bzl"],
+          requiredPaths: ["viberoots/build-tools/go/defs.bzl"],
           kinds: ["lib"],
-          templatesDir: "build-tools/tools/scaffolding/templates/go",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/go",
         },
         {
           id: "cpp",
           displayName: "C++",
-          requiredPaths: ["build-tools/tools/nix/planner/cpp.nix"],
+          requiredPaths: ["viberoots/build-tools/tools/nix/planner/cpp.nix"],
           kinds: ["bin", "lib"],
-          templatesDir: "build-tools/tools/scaffolding/templates/cpp",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/cpp",
         },
       ],
     } as any;
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/nix/langs.json"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/langs.json"),
       JSON.stringify(manifest, null, 2) + "\n",
     );
 
     // Ensure planner plugin is present (copied from workspace)
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/planner/cpp.nix"),
-      path.join(tmp, "build-tools/tools/nix/planner/cpp.nix"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/nix/planner/cpp.nix"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix"),
     );
 
     // Export a tiny Buck graph JSON with two nodes: one cxx_*, one with lang:cpp label
@@ -49,11 +49,13 @@ test("cpp planner imports and detects cxx_* and lang:cpp", async () => {
     );
 
     // Build graph-generator to force plugin load and selection
-    const flake = path.join(process.cwd(), "build-tools/tools/nix/graph-generator.nix");
+    const flake = path.join(process.cwd(), "viberoots/build-tools/tools/nix/graph-generator.nix");
     const res = await $({
       cwd: tmp,
     })`nix build --accept-flake-config -f ${flake} --argstr system ${process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux"} --no-link --print-out-paths`.nothrow();
     // Nix call shape varies across environments; just assert plugin file exists and no syntax errors on import
-    assert.ok(await fs.pathExists(path.join(tmp, "build-tools/tools/nix/planner/cpp.nix")));
+    assert.ok(
+      await fs.pathExists(path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix")),
+    );
   });
 });

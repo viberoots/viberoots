@@ -97,13 +97,16 @@ test(
       assert.match(serverTsHelper, /MODULE_CONTRACTS_DIR/);
       assert.doesNotMatch(serverTsHelper, /\.\.\/src\/ts-modules\.manifest\.json/);
       assert.match(buildSsrScript, /for \(const entry of wasmManifest\.modules \|\| \[\]\)/);
-      assert.match(buildSsrScript, /sync-module-contracts\.ts --cwd \. --print-json 1/);
+      assert.match(
+        buildSsrScript,
+        /sync-module-contracts\.ts["']?\),\s*"--cwd",\s*"\.",\s*"--print-json",\s*"1",?/,
+      );
 
       const logs: string[] = [];
       const watcher = spawn(
         "zx-wrapper",
         [
-          "../../../build-tools/tools/dev/watch-wasm-coordinator.ts",
+          "../../../viberoots/build-tools/tools/dev/watch-wasm-coordinator.ts",
           "--cwd",
           appAbs,
           "--poll-ms",

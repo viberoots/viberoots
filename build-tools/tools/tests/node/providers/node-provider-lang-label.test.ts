@@ -18,7 +18,9 @@ test("node providers carry lang:node label", async () => {
       "utf8",
     );
     // Generate Node providers
-    await $({ cwd: tmp })`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $({
+      cwd: tmp,
+    })`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
     const provider = providerNameForImporter(
       "projects/apps/demo/pnpm-lock.yaml",
       "projects/apps/demo",

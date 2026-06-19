@@ -10,7 +10,9 @@ await runInTemp("exp-cpp-bin-labels", async (tmp, $) => {
   const out = path.join(tmp, ".viberoots/workspace/buck/graph.json");
   await fs.outputFile(out, JSON.stringify(nodes) + "\n");
 
-  await $({ cwd: tmp })`build-tools/tools/buck/export-graph.ts --simulate ${out} --out ${out}`;
+  await $({
+    cwd: tmp,
+  })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${out} --out ${out}`;
 
   const after = (await readGraph(out)) as any[];
   assert.equal(after.length, 1);

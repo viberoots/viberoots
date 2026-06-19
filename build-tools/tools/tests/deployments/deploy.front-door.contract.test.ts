@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -86,7 +87,7 @@ test("deploy --validate-only preserves cloudflare-pages front-door contracts", a
         cwd: tmp,
         stdio: "pipe",
         env: freshBuckEnv(tmp, "deploy-validate"),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --validate-only`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-staging:deploy --validate-only`;
       const payload = JSON.parse(String(result.stdout));
       assert.equal(payload.schemaVersion, "deploy-validate@1");
       assert.equal(payload.valid, true);
@@ -109,7 +110,7 @@ test("deploy --validate-only preserves cloudflare-pages front-door contracts", a
             cwd: tmp,
             stdio: "pipe",
             env: freshBuckEnv(tmp, "deploy-validate"),
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --validate-only`,
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-staging:deploy --validate-only`,
         /invalid wrangler config/,
       );
     });
@@ -124,7 +125,7 @@ test("deploy --validate-only preserves cloudflare-pages front-door contracts", a
             cwd: tmp,
             stdio: "pipe",
             env: freshBuckEnv(tmp, "deploy-validate"),
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --validate-only`,
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-staging:deploy --validate-only`,
         /is not a supported static-webapp/,
       );
     });
@@ -140,7 +141,7 @@ test("public deploy front door rejects --deployment-json as an operator input", 
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment-json ${deploymentJson} --validate-only`,
+        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment-json ${deploymentJson} --validate-only`,
       /public repo-level deploy requires --deployment <label>/,
     );
   });
@@ -181,7 +182,7 @@ test("deploy front door runs a cloudflare-pages deploy from Buck-backed metadata
           const result = await $({
             cwd: tmp,
             env: fakeCloudflareEnv(fake),
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
           const summary = JSON.parse(String(result.stdout));
           assert.equal(summary.finalOutcome, "succeeded");
           assert.equal(summary.publicUrl, "https://demo-staging-pages.pages.dev/");
@@ -213,7 +214,7 @@ test("internal deploy entrypoint preserves provider reuse guardrails", async (t)
             cwd: tmp,
             stdio: "pipe",
             env: freshBuckEnv(tmp, "provider-reuse"),
-          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --provision-only`,
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deployment.label} --provision-only`,
         /does not support --provision-only/,
       );
     });
@@ -227,7 +228,7 @@ test("internal deploy entrypoint preserves provider reuse guardrails", async (t)
             cwd: tmp,
             stdio: "pipe",
             env: freshBuckEnv(tmp, "provider-reuse"),
-          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --publish-only`,
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deployment.label} --publish-only`,
         /s3-static --publish-only requires --source-run-id/,
       );
     });
@@ -241,7 +242,7 @@ test("internal deploy entrypoint preserves provider reuse guardrails", async (t)
             cwd: tmp,
             stdio: "pipe",
             env: freshBuckEnv(tmp, "provider-reuse"),
-          })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --publish-only`,
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deployment.label} --publish-only`,
         /kubernetes --publish-only requires --source-run-id/,
       );
     });

@@ -131,16 +131,16 @@ export function computeInvalidationRow(
   const packageLocalPatchesExpected = patchScope === "package-local";
   const packageLocalPatchesObserved: string[] = [];
 
-  const globalNixLabelsStamped = hasLabel(labels, "//:flake.lock");
+  const globalNixLabelsStamped = hasLabel(labels, "//.viberoots/workspace:flake.lock");
   const globalNixObserved: string[] = [];
   const globalNixExpected =
-    listValues(n.srcs).some((v) => v === "//:flake.lock") ||
+    listValues(n.srcs).some((v) => v === "//.viberoots/workspace:flake.lock") ||
     prefixKeys(n.srcs, "__global_nix_inputs__/").length > 0 ||
-    listValues(n.nix_inputs).some((v) => v === "//:flake.lock");
+    listValues(n.nix_inputs).some((v) => v === "//.viberoots/workspace:flake.lock");
 
   if (Array.isArray(n.srcs)) {
     const srcsList = n.srcs as unknown[];
-    if (srcsList.some((x) => x === "//:flake.lock")) {
+    if (srcsList.some((x) => x === "//.viberoots/workspace:flake.lock")) {
       globalNixObserved.push("srcs(list)/global_nix_inputs");
     }
     if (importerLocalPatchesExpected && primaryLang) {
@@ -191,7 +191,7 @@ export function computeInvalidationRow(
 
   if (Array.isArray(n.nix_inputs)) {
     const nixInputs = n.nix_inputs as unknown[];
-    if (nixInputs.some((x) => x === "//:flake.lock")) {
+    if (nixInputs.some((x) => x === "//.viberoots/workspace:flake.lock")) {
       globalNixObserved.push("nix_inputs(list)/global_nix_inputs");
     }
   } else if (n.nix_inputs && typeof n.nix_inputs === "object") {

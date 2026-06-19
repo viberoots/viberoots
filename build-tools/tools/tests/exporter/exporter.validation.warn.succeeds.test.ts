@@ -12,7 +12,11 @@ test("exporter --validation=warn prints warnings and exits zero", async () => {
 
     // Node with .go srcs but no rule_type and no labels triggers a go finding
     const nodes = [
-      { name: "//build-tools/go/app:bin", srcs: ["build-tools/go/app/main.go"], labels: [] },
+      {
+        name: "//viberoots/build-tools/go/app:bin",
+        srcs: ["viberoots/build-tools/go/app/main.go"],
+        labels: [],
+      },
     ];
     const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     await fs.mkdirp(path.dirname(graph));
@@ -22,7 +26,7 @@ test("exporter --validation=warn prints warnings and exits zero", async () => {
       cwd: tmp,
       reject: false,
       stdio: "pipe",
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --validation warn`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --validation warn`;
     const out = String(res.stdout || "") + String(res.stderr || "");
     if (res.exitCode !== 0) {
       console.error("expected exporter to succeed in warn mode", out);

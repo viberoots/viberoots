@@ -29,7 +29,7 @@ test("sync-providers exports renamed helpers and they behave as expected (dry-ru
     await fsp.writeFile(harnessPath, harness, "utf8");
 
     const rel = path.relative(tmp, harnessPath);
-    await $`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs ${rel}`.nothrow();
+    await $`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs ${rel}`.nothrow();
     const existsOut = await exists(outFile);
     if (!existsOut) {
       console.error("harness did not write output file:", outFile);

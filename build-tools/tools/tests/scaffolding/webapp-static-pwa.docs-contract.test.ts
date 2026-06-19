@@ -9,9 +9,9 @@ async function read(path: string): Promise<string> {
 
 test("webapp-static-pwa docs cover template selection and validation guidance", async () => {
   const [meta, readmeTemplate, scaffoldingDoc] = await Promise.all([
-    read("build-tools/tools/scaffolding/templates/ts/webapp-static-pwa/meta.json"),
-    read("build-tools/tools/scaffolding/templates/ts/README.md.jinja"),
-    read("build-tools/docs/scaffolding.md"),
+    read("viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static-pwa/meta.json"),
+    read("viberoots/build-tools/tools/scaffolding/templates/ts/README.md.jinja"),
+    read("viberoots/build-tools/docs/scaffolding.md"),
   ]);
 
   assert.match(meta, /Choose webapp-static when you want a simple static site/);

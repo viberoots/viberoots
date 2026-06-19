@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("planner selected outputs resolve for go/cpp/python targets", async () => {
   await runInTemp("planner-go-targets", async (tmp, $) => {
@@ -75,9 +75,9 @@ test("planner selected outputs resolve for go/cpp/python targets", async () => {
           modulesTomlFor = name: "";
           localModuleOverrides = {};
         };
-        go = (import ./build-tools/tools/nix/planner/go.nix { inherit lib; }) ctx;
-        cpp = (import ./build-tools/tools/nix/planner/cpp.nix { inherit lib; }) ctx;
-        py = (import ./build-tools/tools/nix/planner/python-core.nix { inherit lib; ctx = ctx; });
+        go = (import ./viberoots/build-tools/tools/nix/planner/go.nix { inherit lib; }) ctx;
+        cpp = (import ./viberoots/build-tools/tools/nix/planner/cpp.nix { inherit lib; }) ctx;
+        py = (import ./viberoots/build-tools/tools/nix/planner/python-core.nix { inherit lib; ctx = ctx; });
         pick = name: builtins.head (builtins.filter (n: (get n "name") == name) nodes);
         goKind = go.kindOf (pick "//projects/apps/goapp:goapp");
         cppKind = cpp.kindOf (pick "//projects/apps/cppapp:cppapp");
@@ -99,7 +99,7 @@ test("planner selected outputs resolve for go/cpp/python targets", async () => {
       const { stdout } = await $({
         cwd: tmp,
         env: { ...process.env, BUCK_TARGET, BUCK_TEST_SRC: tmp },
-      })`nix eval --impure --accept-flake-config ${`path:${tmp}#graph-generator-selected.drvPath`} --raw`;
+      })`nix eval --impure --accept-flake-config ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected.drvPath`} --raw`;
       const out = String(stdout || "").trim();
       assert.ok(out.endsWith(".drv"), `expected drvPath for ${BUCK_TARGET}`);
     }

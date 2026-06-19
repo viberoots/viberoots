@@ -6,7 +6,7 @@ test("nix_cpp_node_addon builds a .node artifact via Buck/Nix", async () => {
   await runInTemp("cpp-node-addon-macro", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "inherit" });
     // Enable C++ in the temp workspace so the planner picks it up
-    await $`bash --noprofile --norc -c 'mkdir -p build-tools/tools/nix && printf "%s\n" "{\"enabled\":[\"cpp\"]}" > build-tools/tools/nix/langs.json'`;
+    await $`bash --noprofile --norc -c 'mkdir -p build-tools/tools/nix && printf "%s\n" "{\"enabled\":[\"cpp\"]}" > viberoots/build-tools/tools/nix/langs.json'`;
 
     // Create minimal Node-API addon sources
     await $`bash --noprofile --norc -c 'mkdir -p projects/libs/demo-native/src'`;
@@ -31,7 +31,7 @@ EOF'`;
 
     // TARGETS using the new macro
     await $`bash --noprofile --norc -c 'cat > projects/libs/demo-native/TARGETS <<"EOF"
-load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
     name = "napi_addon",

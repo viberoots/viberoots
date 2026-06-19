@@ -235,7 +235,7 @@ test("production zx_test provider exposes Nix builder policy metadata", async ()
     "audit",
     "providers",
     ...targetPlatformArgsForPolicy(remotePolicy),
-    "//:remote_exec_remote_target_policy",
+    "viberoots//:remote_exec_remote_target_policy",
   ];
   const res = await $({
     stdio: "pipe",

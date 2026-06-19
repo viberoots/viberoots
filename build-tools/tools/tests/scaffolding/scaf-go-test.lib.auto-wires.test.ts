@@ -55,7 +55,7 @@ test("scaf go test: lib auto-wires *_test.go under pkg/**", async () => {
     await $`scaf new go test extra_case --path=${testPath}`;
 
     // Glue and test
-    await $`build-tools/tools/dev/install-deps.ts --glue-only`;
+    await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
     // Run tests; platform is set by runInTemp's .buckconfig
     await $`buck2 test //projects/libs/demo-lib:demo-lib_test --target-platforms //:no_cgo`;
   });

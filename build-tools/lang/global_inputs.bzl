@@ -7,9 +7,10 @@ def global_nix_inputs():
     Prefer builder/Nix-level consideration; when macro-level stamping is justified,
     consume this helper instead of hardcoding labels in macros.
     """
-    # Current policy: include repo-level flake.lock as a single global input.
-    # This keeps behavior consistent across languages and avoids ad-hoc stamping.
-    return ["//:flake.lock"]
+    # Current policy: include the generated workspace flake lock as a single
+    # global input. This keeps strict consumer roots free of visible flake files
+    # while preserving language-wide Nix invalidation.
+    return ["//.viberoots/workspace:flake.lock"]
 
 
 def attach_global_nix_inputs(kwargs, into = "srcs", key_prefix = GLOBAL_NIX_INPUTS_KEY_PREFIX):
@@ -18,7 +19,7 @@ def attach_global_nix_inputs(kwargs, into = "srcs", key_prefix = GLOBAL_NIX_INPU
 
     - Supports list-shaped and dict-shaped input attributes.
     - For dict-shaped inputs, creates deterministic synthetic keys under key_prefix.
-    - Call-sites must not hardcode //:flake.lock; they should call this helper.
+    - Call-sites must not hardcode //.viberoots/workspace:flake.lock; they should call this helper.
     """
     if kwargs == None or not isinstance(kwargs, dict):
         return
@@ -42,4 +43,3 @@ def attach_global_nix_inputs(kwargs, into = "srcs", key_prefix = GLOBAL_NIX_INPU
         return
 
     # Unknown shape; leave untouched.
-

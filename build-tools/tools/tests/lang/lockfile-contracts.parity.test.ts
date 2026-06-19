@@ -43,7 +43,7 @@ test("lockfile basenames are consistent (Starlark ↔ TS)", async () => {
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/lang:lockfile_contracts.bzl", "lockfile_contract_probe")',
+        'load("@viberoots//build-tools/lang:lockfile_contracts.bzl", "lockfile_contract_probe")',
         "",
         'lockfile_contract_probe(name = "node", lang = "node")',
         'lockfile_contract_probe(name = "python", lang = "python")',

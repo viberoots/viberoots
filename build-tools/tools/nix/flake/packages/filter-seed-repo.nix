@@ -10,6 +10,7 @@ let
   rootWithSlash = root + "/";
   rootDirs = [
     ".husky"
+    ".viberoots"
     "build-tools"
     "cpp"
     "go"
@@ -52,6 +53,16 @@ let
     (lib.hasPrefix "v." base && lib.hasSuffix ".out" base);
   isExcludedPath = rel:
     rel == ".viberoots/workspace/buck/graph.json" ||
+    rel == ".viberoots/workspace/buck" ||
+    (lib.hasPrefix ".viberoots/workspace/buck/" rel) ||
+    rel == ".viberoots/workspace/.viberoots" ||
+    (lib.hasPrefix ".viberoots/workspace/.viberoots/" rel) ||
+    rel == ".viberoots/buck" ||
+    (lib.hasPrefix ".viberoots/buck/" rel) ||
+    rel == ".viberoots/cache" ||
+    (lib.hasPrefix ".viberoots/cache/" rel) ||
+    rel == "viberoots/.viberoots" ||
+    (lib.hasPrefix "viberoots/.viberoots/" rel) ||
     rel == ".viberoots/workspace/providers/nix_attr_map.bzl" ||
     (lib.hasPrefix ".viberoots/workspace/providers/TARGETS" rel && lib.hasSuffix ".auto" rel) ||
     rel == "build-tools/tools/buck/graph.json" ||
@@ -66,6 +77,8 @@ let
   allowByRoots = rel:
     rel == "flake.nix" ||
     rel == "flake.lock" ||
+    rel == ".viberoots" ||
+    lib.hasPrefix ".viberoots/" rel ||
     rel == "prelude" ||
     lib.hasPrefix "prelude/" rel ||
     rel == "viberoots" ||

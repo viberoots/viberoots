@@ -11,10 +11,10 @@ import {
 } from "./doc-command-contract.inventory";
 
 const DOC_SCOPE_ROOTS = [
-  "docs/handbook",
-  "build-tools/docs",
-  "docs/history/designs/legacy",
-  "docs/history/build-system/pnpm",
+  "viberoots/docs/handbook",
+  "viberoots/build-tools/docs",
+  "viberoots/docs/history/designs/legacy",
+  "viberoots/docs/history/build-system/pnpm",
 ] as const;
 
 function escapeRegexFragment(value: string): string {

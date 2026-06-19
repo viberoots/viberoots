@@ -12,7 +12,7 @@ test("node_webapp default lockfile label fails fast when missing", async () => {
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "node_webapp")',
+        'load("@viberoots//build-tools/node:defs.bzl", "node_webapp")',
         "",
         "node_webapp(",
         '  name = "web",',

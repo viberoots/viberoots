@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
@@ -60,7 +61,7 @@ test("remote profile grant-user reviewed auth errors", async (t) => {
           cwd: tmp,
           env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)} --action submit`.nothrow();
+        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)} --action submit`.nothrow();
         await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
         const result = await resultPromise;
         assert.notEqual(result.exitCode, 0);
@@ -114,7 +115,7 @@ test("remote profile grant-user reviewed auth errors", async (t) => {
           cwd: tmp,
           env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)} --action submit`.nothrow();
+        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)} --action submit`.nothrow();
         await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot, 400);
         const result = await resultPromise;
         assert.notEqual(result.exitCode, 0);

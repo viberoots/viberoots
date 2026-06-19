@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 test("update-pnpm-hash uses filtered flake snapshots for non-default importer builds", async () => {
   const helper = await fsp.readFile(
-    "build-tools/tools/dev/update-pnpm-hash/build-flake.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/build-flake.ts",
     "utf8",
   );
   if (!helper.includes("makeFilteredFlakeRef")) {

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 async function nixBuildSelected(tmp: string, $: any, target: string): Promise<string> {
   const res = await $({
@@ -21,7 +21,7 @@ async function nixBuildSelected(tmp: string, $: any, target: string): Promise<st
         hello: { version: "1.0.0", originPath: "projects/apps/pywasm/vendor/hello" },
       }),
     },
-  })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+  })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
   if (res.exitCode == 0) {
     throw new Error("expected nix build to fail for WASI pyext_wasm");
   }
@@ -91,7 +91,7 @@ test("python wasm (wasi): app includes extension overlay", async () => {
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       `
-load("//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_extension_module")
+load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_extension_module")
 
 nix_python_wasm_extension_module(
   name = "ext",
@@ -112,7 +112,7 @@ nix_python_wasm_app(
       "utf8",
     );
 
-    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    await $`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     await nixBuildSelected(tmp, $, "//projects/apps/pywasm:pyapp");
   });
 });

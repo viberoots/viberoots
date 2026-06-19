@@ -40,7 +40,7 @@ test("gen-auto-map: Python lockfile label maps to importer-scoped provider; unla
 
     // Generate auto_map from the synthetic graph
     const outPath = path.join(tmp, DEFAULT_AUTO_MAP_PATH);
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
 
     const out = await fsp.readFile(outPath, "utf8");
 

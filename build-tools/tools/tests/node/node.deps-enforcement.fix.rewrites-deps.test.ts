@@ -27,7 +27,7 @@ test("node deps enforcement: fix rewrites deps", async () => {
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs_core.bzl", "nix_node_lib")',
+        'load("@viberoots//build-tools/node:defs_core.bzl", "nix_node_lib")',
         "",
         "nix_node_lib(",
         '  name = "admin",',
@@ -37,9 +37,9 @@ test("node deps enforcement: fix rewrites deps", async () => {
       ].join("\n"),
       "utf8",
     );
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "node"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, ".viberoots", "workspace", "node"), { recursive: true });
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "node", "workspace-map.json"),
+      path.join(tmp, ".viberoots", "workspace", "node", "workspace-map.json"),
       JSON.stringify(
         { "@repo/ui": "//projects/libs/ui:ui", "@repo/old": "//projects/libs/old:old" },
         null,
@@ -53,7 +53,7 @@ test("node deps enforcement: fix rewrites deps", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`node build-tools/tools/buck/enforce-node-deps.ts --fix`;
+    })`node viberoots/build-tools/tools/buck/enforce-node-deps.ts --fix`;
     assert.equal(res.exitCode, 0);
 
     const updated = await fsp.readFile(path.join(appDir, "TARGETS"), "utf8");

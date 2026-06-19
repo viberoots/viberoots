@@ -27,13 +27,13 @@ test("sync-providers --lang node regenerates downstream glue via the centralized
       "utf8",
     );
 
-    await $`node build-tools/tools/buck/sync-providers.ts --lang node`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node`;
 
     assert.equal(await exists(path.join(tmp, DEFAULT_GRAPH_PATH)), true);
     assert.equal(await exists(path.join(tmp, DEFAULT_AUTO_MAP_PATH)), true);
     assert.equal(await exists(path.join(tmp, providerAutoTargetsPath("node"))), true);
 
-    await $`node build-tools/tools/buck/sync-providers.ts --lang node --emit-index`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --emit-index`;
     assert.equal(await exists(path.join(tmp, DEFAULT_PROVIDER_INDEX_PATH)), true);
   });
 });

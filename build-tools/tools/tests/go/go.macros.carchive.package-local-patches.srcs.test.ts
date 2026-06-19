@@ -24,7 +24,7 @@ test("go macros: nix_go_carchive includes package-local patches in srcs (cquery)
       [
         "",
         "# test: go.macros.carchive.package-local-patches.srcs.test.ts",
-        'load("//build-tools/go:defs.bzl", "nix_go_carchive")',
+        'load("@viberoots//build-tools/go:defs.bzl", "nix_go_carchive")',
         "",
         "nix_go_carchive(",
         '  name = "arc",',

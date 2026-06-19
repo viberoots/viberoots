@@ -19,6 +19,7 @@ export function normalizeImporter(imp: string): string {
   const isSegment = (s: string) => /^[A-Za-z0-9._-]+$/.test(s);
 
   const parts = raw.replace(/\\/g, "/").split("/").filter(Boolean);
+  if (parts[0] === "viberoots") return "viberoots";
   const rootPartsList = workspaceRoots
     .map((root) => root.split("/").filter(Boolean))
     .filter((rootParts) => rootParts.length > 0);

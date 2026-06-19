@@ -26,7 +26,12 @@ function findingsFor(nodes: Node[], entryName: "go" | "cpp" | "node" | "python")
 test("language classification registry preserves validation wording", () => {
   {
     const out = findingsFor(
-      [{ name: "//build-tools/go/app:bin", srcs: ["build-tools/go/app/main.go"] }],
+      [
+        {
+          name: "//viberoots/build-tools/go/app:bin",
+          srcs: ["viberoots/build-tools/go/app/main.go"],
+        },
+      ],
       "go",
     );
     assert.equal(out.length, 1);
@@ -39,7 +44,12 @@ test("language classification registry preserves validation wording", () => {
 
   {
     const out = findingsFor(
-      [{ name: "//build-tools/cpp/app:bin", srcs: ["build-tools/cpp/app/main.cpp"] }],
+      [
+        {
+          name: "//viberoots/build-tools/cpp/app:bin",
+          srcs: ["viberoots/build-tools/cpp/app/main.cpp"],
+        },
+      ],
       "cpp",
     );
     assert.equal(out.length, 1);

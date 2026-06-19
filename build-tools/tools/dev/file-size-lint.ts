@@ -185,7 +185,7 @@ function isMain(): boolean {
   try {
     const self = fileURLToPath(import.meta.url);
     const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
-    return invoked === self;
+    return invoked === self || path.basename(invoked) === path.basename(self);
   } catch {
     return true;
   }

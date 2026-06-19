@@ -168,7 +168,7 @@ async function writeReportTarget(
     path.join(dir, "TARGETS"),
     [
       'load("@prelude//:rules.bzl", "genrule")',
-      'load("//build-tools/deployments:metadata_rules.bzl", "deployment_target")',
+      'load("@viberoots//build-tools/deployments:metadata_rules.bzl", "deployment_target")',
       "",
       'genrule(name = "app", out = "app.txt", cmd = "printf app > $OUT")',
       "deployment_target(",

@@ -8,8 +8,10 @@ import { runInTemp } from "../lib/test-helpers";
 function assertCmdInvariants(cmd: string, label: string, requiresOutPathCapture = true) {
   if (requiresOutPathCapture) {
     assert.ok(
-      cmd.includes("--no-link --print-out-paths"),
-      `${label}: expected nix build out-path capture (--no-link --print-out-paths)`,
+      cmd.includes("--no-link --print-out-paths") ||
+        cmd.includes("OUT_PATHS_FILE=") ||
+        cmd.includes("vbr-nix-outpaths.txt"),
+      `${label}: expected nix build out-path capture`,
     );
   }
   assert.ok(
@@ -17,7 +19,7 @@ function assertCmdInvariants(cmd: string, label: string, requiresOutPathCapture 
     `${label}: expected BUCK_GRAPH_JSON env export to be present`,
   );
   assert.ok(
-    cmd.includes(". build-tools/tools/buck/workspace-root.env"),
+    cmd.includes(".viberoots/workspace/buck/workspace-root.env"),
     `${label}: expected workspace-root env sourcing for temp/sandboxed workspaces`,
   );
 }
@@ -26,6 +28,15 @@ function assertNodeWebappCmdInvariants(cmd: string) {
   assert.ok(
     cmd.includes("nix-build-filtered-flake.ts"),
     "node_webapp: expected filtered flake builder entrypoint",
+  );
+  assert.ok(
+    cmd.includes("$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts"),
+    "node_webapp: expected filtered flake builder from VIBEROOTS_ROOT",
+  );
+  assert.equal(
+    cmd.includes("$WORKSPACE_ROOT/viberoots/build-tools/tools/dev/nix-build-filtered-flake.ts"),
+    false,
+    "node_webapp: must not resolve filtered flake builder from WORKSPACE_ROOT",
   );
   assert.ok(
     cmd.includes("--attr") && cmd.includes("node-webapp."),
@@ -40,7 +51,7 @@ function assertNodeWebappCmdInvariants(cmd: string) {
     "node_webapp: expected BUCK_GRAPH_JSON env export to be present",
   );
   assert.ok(
-    cmd.includes(". build-tools/tools/buck/workspace-root.env"),
+    cmd.includes(".viberoots/workspace/buck/workspace-root.env"),
     "node_webapp: expected workspace-root env sourcing for temp/sandboxed workspaces",
   );
 }
@@ -56,7 +67,7 @@ test("node Nix-calling macros use standardized command assembly helpers (cquery 
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "node_webapp", "nix_node_cli_bin", "nix_node_gen", "node_asset_stage", "node_wasm_inline_module")',
+        'load("@viberoots//build-tools/node:defs.bzl", "node_webapp", "nix_node_cli_bin", "nix_node_gen", "node_asset_stage", "node_wasm_inline_module")',
         "",
         "nix_node_gen(",
         '  name = "gen_copy",',

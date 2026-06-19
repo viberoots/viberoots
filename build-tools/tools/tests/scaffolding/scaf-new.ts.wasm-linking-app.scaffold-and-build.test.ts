@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsTool } from "./lib/viberoots-tools";
 
 async function buckOutPath(args: {
   tmp: string;
@@ -80,7 +81,7 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`node build-tools/tools/scaffolding/scaf.ts new ts wasm-linking-app ${name} --yes`;
+    })`node ${viberootsTool("viberoots/build-tools/tools/scaffolding/scaf.ts")} new ts wasm-linking-app ${name} --yes`;
 
     const appTargets = path.join(tmp, "projects", "apps", name, "TARGETS");
     const cliTargets = path.join(tmp, "projects", "apps", `${name}-cli`, "TARGETS");
@@ -149,7 +150,7 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    })`node ${viberootsTool("viberoots/build-tools/tools/buck/export-graph.ts")} --out .viberoots/workspace/buck/graph.json`;
 
     const webappOut = await buckOutPath({
       tmp,

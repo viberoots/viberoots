@@ -8,16 +8,16 @@ import { runInTemp } from "../lib/test-helpers";
 test("exporter discovers adapters by glob and ignores non-existent", async () => {
   await runInTemp("exporter-discovery", async (tmp, $) => {
     // Set up exporter lang dir with a toy adapter next to go.ts
-    const langDir = path.join(tmp, "build-tools/tools/buck/exporter/lang");
+    const langDir = path.join(tmp, "viberoots/build-tools/tools/buck/exporter/lang");
     await fs.mkdirp(langDir);
     // Minimal exporter main/types to allow import without buck
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/buck/exporter/types.ts"),
-      path.join(tmp, "build-tools/tools/buck/exporter/types.ts"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/buck/exporter/types.ts"),
+      path.join(tmp, "viberoots/build-tools/tools/buck/exporter/types.ts"),
     );
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/buck/exporter/lang/contract.ts"),
-      path.join(tmp, "build-tools/tools/buck/exporter/lang/contract.ts"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/buck/exporter/lang/contract.ts"),
+      path.join(tmp, "viberoots/build-tools/tools/buck/exporter/lang/contract.ts"),
     );
     // Create a simple adapter file adapter.ts exporting { adapter }
     const toy = [
@@ -35,7 +35,7 @@ test("exporter discovers adapters by glob and ignores non-existent", async () =>
 
     // Now import loadPresentAdapters from the temp tree
     const { loadPresentAdapters } = await import(
-      path.join(tmp, "build-tools/tools/buck/exporter/lang/contract.ts")
+      path.join(tmp, "viberoots/build-tools/tools/buck/exporter/lang/contract.ts")
     );
     const adapters = await loadPresentAdapters();
     const names = adapters.map((a: any) => a.name).sort();

@@ -12,13 +12,9 @@ test("inspect-cpp-attrs lists nixpkg attrs from graph nodes", async () => {
       { name: "//projects/apps/a:bin", labels: ["lang:cpp", "nixpkg:pkgs.zlib"] },
       { name: "//projects/apps/b:test", labels: ["lang:cpp", "nixpkg:pkgs.gtest"] },
     ];
-    await fs.outputFile(
-      path.join(tmp, DEFAULT_GRAPH_PATH),
-      JSON.stringify(graph),
-      "utf8",
-    );
+    await fs.outputFile(path.join(tmp, DEFAULT_GRAPH_PATH), JSON.stringify(graph), "utf8");
 
-    const cli = path.join(process.cwd(), "build-tools/tools/buck/inspect-cpp-attrs.ts");
+    const cli = path.join(process.cwd(), "viberoots/build-tools/tools/buck/inspect-cpp-attrs.ts");
     const { stdout } = await $({ cwd: tmp, stdio: "pipe" })`node ${cli} --json`;
     const data = JSON.parse(String(stdout || "{}"));
     const targets = (data && data.targets) || {};

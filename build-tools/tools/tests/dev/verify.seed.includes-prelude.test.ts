@@ -3,11 +3,14 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { workspaceFlakeRef } from "../lib/test-helpers";
 
 test("verify test-seed includes build-system paths needed by temp Buck repos", async () => {
+  const flakeRef = `path:${await workspaceFlakeRef(process.cwd())}#test-seed`;
+  const localViberoots = `path:${path.resolve("viberoots")}`;
   const out = await $({
     stdio: "pipe",
-  })`nix build --impure .#test-seed --accept-flake-config --no-link --print-out-paths`;
+  })`nix build --impure --override-input viberoots ${localViberoots} ${flakeRef} --accept-flake-config --no-link --print-out-paths`;
   const seedPath = String(out.stdout || "")
     .trim()
     .split("\n")
@@ -15,14 +18,14 @@ test("verify test-seed includes build-system paths needed by temp Buck repos", a
     .pop();
   assert.ok(seedPath, "expected nix build .#test-seed to output a store path");
 
-  const prelude = path.join(seedPath, "prelude");
+  const prelude = path.join(seedPath, "viberoots", "prelude");
   const preludeStat = await fsp.lstat(prelude);
   assert.ok(
     preludeStat.isDirectory() || preludeStat.isSymbolicLink(),
     "expected prelude in verify test-seed snapshot",
   );
 
-  const deploymentDefs = path.join(seedPath, "build-tools", "deployments", "defs.bzl");
+  const deploymentDefs = path.join(seedPath, "viberoots", "build-tools", "deployments", "defs.bzl");
   const deploymentDefsStat = await fsp.lstat(deploymentDefs);
   assert.ok(deploymentDefsStat.isFile(), "expected deployment defs in verify test-seed snapshot");
 

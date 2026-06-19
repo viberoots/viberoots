@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 async function nixEvalSelectedDrvPath(tmp: string, $: any, target: string): Promise<string> {
   const res = await $({
@@ -17,7 +17,7 @@ async function nixEvalSelectedDrvPath(tmp: string, $: any, target: string): Prom
       BUCK_TARGET: target,
       WORKSPACE_ROOT: tmp,
     },
-  })`nix eval --impure -L --accept-flake-config --raw ${`path:${tmp}#graph-generator-selected.drvPath`}`;
+  })`nix eval --impure -L --accept-flake-config --raw ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected.drvPath`}`;
   if (res.exitCode !== 0) {
     console.error(String(res.stderr || ""));
     throw new Error(`nix eval failed (exit=${res.exitCode})`);
@@ -97,9 +97,9 @@ test("python: pyext link input ordering is deterministic across builds", async (
     const libBLabel = `//${libBPosix}:b`;
     const extLabel = `//${relPosix}:ext`;
 
-    await fs.mkdirp(path.join(tmp, "build-tools", "tools", "buck"));
+    await fs.mkdirp(path.join(tmp, ".viberoots", "workspace", "buck"));
     await fs.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
       JSON.stringify(
         [
           {

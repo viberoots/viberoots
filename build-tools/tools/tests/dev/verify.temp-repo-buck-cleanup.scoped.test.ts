@@ -16,6 +16,53 @@ import { parseVerifyOwnedState } from "../../dev/verify/owned-process-state";
 import { buckProcessTableLines, processCommandLines } from "../../lib/process-inspection";
 import { terminateChildTree } from "../lib/process-tree";
 
+async function killAndWait(child: ReturnType<typeof spawn>, timeoutMs = 2000): Promise<void> {
+  const done =
+    child.exitCode !== null || child.signalCode !== null
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, timeoutMs);
+          child.once("close", () => {
+            clearTimeout(timer);
+            resolve();
+          });
+        });
+  try {
+    child.kill("SIGKILL");
+  } catch {}
+  await done;
+  child.stdout?.destroy();
+  child.stderr?.destroy();
+}
+
+async function withSyntheticOrphanScanUser<T>(user: string, fn: () => Promise<T>): Promise<T> {
+  const originalUser = process.env.USER;
+  const originalVerifyStateFile = process.env.VBR_VERIFY_PROCESS_STATE_FILE;
+  const originalBuckReaperStateFile = process.env.VBR_BUCK_REAPER_STATE_FILE;
+  try {
+    process.env.USER = user;
+    delete process.env.VBR_VERIFY_PROCESS_STATE_FILE;
+    delete process.env.VBR_BUCK_REAPER_STATE_FILE;
+    return await fn();
+  } finally {
+    if (originalUser === undefined) {
+      delete process.env.USER;
+    } else {
+      process.env.USER = originalUser;
+    }
+    if (originalVerifyStateFile === undefined) {
+      delete process.env.VBR_VERIFY_PROCESS_STATE_FILE;
+    } else {
+      process.env.VBR_VERIFY_PROCESS_STATE_FILE = originalVerifyStateFile;
+    }
+    if (originalBuckReaperStateFile === undefined) {
+      delete process.env.VBR_BUCK_REAPER_STATE_FILE;
+    } else {
+      process.env.VBR_BUCK_REAPER_STATE_FILE = originalBuckReaperStateFile;
+    }
+  }
+}
+
 async function psForkserversForToken(token: string): Promise<string[]> {
   const lines = await buckProcessTableLines(2000);
   return lines.filter(
@@ -105,9 +152,7 @@ test("verify cleanup: process tree termination reaps node grandchildren without 
     await terminateChildTree(parent, 2000);
     await waitForNoProcess(childScript, 10_000);
   } finally {
-    try {
-      parent.kill("SIGKILL");
-    } catch {}
+    await killAndWait(parent);
     await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
   }
 });
@@ -208,12 +253,7 @@ test(
       await waitForNoForkserver(ownedBase, 30_000);
       await waitForForkserver(foreignBase, 10_000);
     } finally {
-      try {
-        foreign.kill("SIGKILL");
-      } catch {}
-      try {
-        owned.kill("SIGKILL");
-      } catch {}
+      await Promise.all([killAndWait(foreign), killAndWait(owned)]);
       if (stateDir) {
         await fsp.rm(stateDir, { recursive: true, force: true }).catch(() => {});
       }
@@ -230,7 +270,7 @@ test(
     const ownedScript = path.join(ownedTmp, "projects/apps/demo-vite-ssr/server/dev.mjs");
     const ownedWasmScript = path.join(
       ownedTmp,
-      "build-tools/tools/dev/wasm-watch-coordinator-daemon.ts",
+      "viberoots/build-tools/tools/dev/wasm-watch-coordinator-daemon.ts",
     );
     const foreignScript = path.join(foreignTmp, "projects/apps/demo-vite-ssr/server/dev.mjs");
     const mkScript = async (p: string) => {
@@ -248,7 +288,7 @@ test(
     const ownedWasm = spawnMarkerProcess(ownedWasmScript);
     const foreign = spawnMarkerProcess(foreignScript);
     const ownedKey = `${ownedTmp}/projects/apps/demo-vite-ssr/server/dev.mjs`;
-    const ownedWasmKey = `${ownedTmp}/build-tools/tools/dev/wasm-watch-coordinator-daemon.ts`;
+    const ownedWasmKey = `${ownedTmp}/viberoots/build-tools/tools/dev/wasm-watch-coordinator-daemon.ts`;
     const foreignKey = `${foreignTmp}/projects/apps/demo-vite-ssr/server/dev.mjs`;
     let stateDir = "";
     try {
@@ -263,15 +303,7 @@ test(
       await waitForNoProcess(ownedWasmKey, 10_000);
       await waitForProcess(foreignKey, 10_000);
     } finally {
-      try {
-        owned.kill("SIGKILL");
-      } catch {}
-      try {
-        ownedWasm.kill("SIGKILL");
-      } catch {}
-      try {
-        foreign.kill("SIGKILL");
-      } catch {}
+      await Promise.all([killAndWait(owned), killAndWait(ownedWasm), killAndWait(foreign)]);
       if (stateDir) {
         await fsp.rm(stateDir, { recursive: true, force: true }).catch(() => {});
       }
@@ -424,7 +456,7 @@ test("verify cleanup: registered buck isolation matching does not trust unproven
   };
   const pids = registeredIsolationProcessPidsFromLines(entry, [
     "50 49 00:00 (buck2-forkserver) forkserver --fd 23 --state-dir /private/tmp/viberoots-run-in-temp-example/buck-out/zxtest-shared-abcdef1234/forkserver",
-    "49 1 00:00 /Users/example/repo/build-tools/tools/bin/tail-log --status -w 2",
+    "49 1 00:00 /Users/example/repo/viberoots/build-tools/tools/bin/tail-log --status -w 2",
   ]);
 
   assert.deepEqual(pids, [50]);
@@ -466,28 +498,23 @@ test("verify cleanup: temp root path matching accepts macOS /tmp aliases", () =>
 
 test("verify cleanup: stale verify state files remove registered temp roots", async () => {
   const ownedTmp = await fsp.mkdtemp(path.join(os.tmpdir(), "verify-owned-stale-root-"));
-  const originalUser = process.env.USER;
   const user = `verify-stale-${process.pid}-${Date.now()}`;
   const scanRoot = path.resolve("/tmp", `viberoots-verify-${user}.noindex`);
   const scanDir = path.join(scanRoot, "tmpdir");
   const stateFile = path.join(scanDir, "viberoots-buck-reaper-v-999999-1700000000000.txt");
   try {
-    process.env.USER = user;
     await fsp.mkdir(scanDir, { recursive: true });
     await fsp.writeFile(path.join(ownedTmp, "owned.txt"), "owned\n", "utf8");
     await fsp.writeFile(stateFile, `${ownedTmp}\n`, "utf8");
 
-    const result = await cleanupOrphanRegisteredTempRepos({ maxKills: 10 });
+    const result = await withSyntheticOrphanScanUser(user, async () => {
+      return await cleanupOrphanRegisteredTempRepos({ maxKills: 10 });
+    });
 
     assert.ok(result.scanned >= 1);
     assert.ok(result.candidates >= 1);
     await assert.rejects(fsp.access(ownedTmp));
   } finally {
-    if (originalUser === undefined) {
-      delete process.env.USER;
-    } else {
-      process.env.USER = originalUser;
-    }
     await fsp.rm(stateFile, { force: true }).catch(() => {});
     await fsp.rm(scanRoot, { recursive: true, force: true }).catch(() => {});
     await fsp.rm(ownedTmp, { recursive: true, force: true }).catch(() => {});
@@ -495,7 +522,6 @@ test("verify cleanup: stale verify state files remove registered temp roots", as
 });
 
 test("verify cleanup: orphan registered temp repo cleanup caps root work", async () => {
-  const originalUser = process.env.USER;
   const user = `verify-stale-cap-${process.pid}-${Date.now()}`;
   const scanRoot = path.resolve("/tmp", `viberoots-verify-${user}.noindex`);
   const scanDir = path.join(scanRoot, "tmpdir");
@@ -508,22 +534,18 @@ test("verify cleanup: orphan registered temp repo cleanup caps root work", async
     }),
   );
   try {
-    process.env.USER = user;
     await fsp.mkdir(scanDir, { recursive: true });
     await fsp.writeFile(stateFile, `${roots.join("\n")}\n`, "utf8");
 
-    const result = await cleanupOrphanRegisteredTempRepos({ maxKills: 10, maxRoots: 1 });
+    const result = await withSyntheticOrphanScanUser(user, async () => {
+      return await cleanupOrphanRegisteredTempRepos({ maxKills: 10, maxRoots: 1 });
+    });
 
     assert.equal(result.candidates, 1);
     await assert.rejects(fsp.access(roots[0]));
     await fsp.access(roots[1]);
     await fsp.access(roots[2]);
   } finally {
-    if (originalUser === undefined) {
-      delete process.env.USER;
-    } else {
-      process.env.USER = originalUser;
-    }
     await fsp.rm(scanRoot, { recursive: true, force: true }).catch(() => {});
     await Promise.all(roots.map((root) => fsp.rm(root, { recursive: true, force: true }))).catch(
       () => {},
@@ -532,7 +554,6 @@ test("verify cleanup: orphan registered temp repo cleanup caps root work", async
 });
 
 test("verify cleanup: prunes dead-owner state files with missing roots despite pid fallback reuse", async () => {
-  const originalUser = process.env.USER;
   const user = `verify-stale-prune-${process.pid}-${Date.now()}`;
   const scanRoot = path.resolve("/tmp", `viberoots-verify-${user}.noindex`);
   const scanDir = path.join(scanRoot, "tmpdir");
@@ -546,7 +567,6 @@ test("verify cleanup: prunes dead-owner state files with missing roots despite p
     target: "root//:stale_pid_fallback",
   };
   try {
-    process.env.USER = user;
     await fsp.mkdir(scanDir, { recursive: true });
     await fsp.writeFile(
       stateFile,
@@ -554,17 +574,14 @@ test("verify cleanup: prunes dead-owner state files with missing roots despite p
       "utf8",
     );
 
-    const result = await cleanupOrphanRegisteredTempRepos({ maxKills: 0 });
+    const result = await withSyntheticOrphanScanUser(user, async () => {
+      return await cleanupOrphanRegisteredTempRepos({ maxKills: 0 });
+    });
 
     assert.ok(result.scanned >= 1);
     assert.equal(result.candidates, 0);
     await assert.rejects(fsp.access(stateFile));
   } finally {
-    if (originalUser === undefined) {
-      delete process.env.USER;
-    } else {
-      process.env.USER = originalUser;
-    }
     await fsp.rm(scanRoot, { recursive: true, force: true }).catch(() => {});
   }
 });

@@ -31,7 +31,7 @@ test("source snapshot includes declared source and excludes mutable local direct
   await write(path.join(root, "flake.nix"), "{}\n");
   await write(path.join(root, "flake.lock"), "{}\n");
   await write(path.join(root, "TARGETS"), "filegroup(name='all')\n");
-  await write(path.join(root, "build-tools", "lang", "defs.bzl"), "X = 1\n");
+  await write(path.join(root, "viberoots", "build-tools", "lang", "defs.bzl"), "X = 1\n");
   await write(path.join(root, DEFAULT_GRAPH_PATH), "[]\n");
   await write(path.join(root, "projects", "apps", "demo", "index.ts"), "export {}\n");
   for (const rel of [
@@ -46,13 +46,13 @@ test("source snapshot includes declared source and excludes mutable local direct
 
   await $({
     stdio: "pipe",
-  })`zx-wrapper build-tools/tools/dev/source-snapshot.ts --workspace-root ${root} --out ${out} --manifest ${manifest} --graph ${path.join(root, DEFAULT_GRAPH_PATH)}`;
+  })`zx-wrapper viberoots/build-tools/tools/dev/source-snapshot.ts --workspace-root ${root} --out ${out} --manifest ${manifest} --graph ${path.join(root, DEFAULT_GRAPH_PATH)}`;
 
   for (const rel of [
     "flake.nix",
     "flake.lock",
     "TARGETS",
-    "build-tools/lang/defs.bzl",
+    "viberoots/build-tools/lang/defs.bzl",
     DEFAULT_GRAPH_PATH,
   ]) {
     assert.equal(await fs.readFile(path.join(out, rel), "utf8").then(Boolean), true, rel);
@@ -81,7 +81,7 @@ test("source_snapshot rule builds a declared Buck snapshot artifact", async () =
     await write(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/lang:source_snapshot.bzl", "source_snapshot")',
+        'load("@viberoots//build-tools/lang:source_snapshot.bzl", "source_snapshot")',
         'source_snapshot(name = "tiny", srcs = ["fixture.txt", "TARGETS"], graph = "fixture.txt")',
       ].join("\n") + "\n",
     );
@@ -97,7 +97,7 @@ test("source_snapshot rule builds a declared Buck snapshot artifact", async () =
 
 test("source_snapshot action uses declared zx-wrapper runner without flake or hashbang invocation", async () => {
   const command = await sourceSnapshotActionCommand(
-    "//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_source_snapshot",
+    "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_source_snapshot",
   );
 
   assert.match(
@@ -110,17 +110,17 @@ test("source_snapshot action uses declared zx-wrapper runner without flake or ha
   assert.doesNotMatch(command, /\bnode\b|command -v node|\[zx-wrapper,/);
   assert.match(
     command,
-    /--graph, build-tools\/tools\/tests\/remote-exec\/wrapper-fixtures\/fixture\.txt/,
+    /--graph, \.viberoots\/current\/build-tools\/tools\/tests\/remote-exec\/wrapper-fixtures\/fixture\.txt/,
   );
   assert.match(
     command,
-    /--file, fixture\.txt, build-tools\/tools\/tests\/remote-exec\/wrapper-fixtures\/fixture\.txt/,
+    /--file, fixture\.txt, \.viberoots\/current\/build-tools\/tools\/tests\/remote-exec\/wrapper-fixtures\/fixture\.txt/,
   );
 });
 
 test("source_snapshot runtime is a declared Buck tool output", async () => {
   const actions = await sourceSnapshotActions(
-    "//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_source_snapshot",
+    "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_source_snapshot",
   );
 
   assert.match(actions, /identifier = source-snapshot-zx-wrapper,\s+kind = write,/);
@@ -138,7 +138,7 @@ test("source_snapshot rule rejects ambient workspace snapshots", async () => {
     await write(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/lang:source_snapshot.bzl", "source_snapshot")',
+        'load("@viberoots//build-tools/lang:source_snapshot.bzl", "source_snapshot")',
         'source_snapshot(name = "ambient", srcs = [], graph = "TARGETS")',
       ].join("\n") + "\n",
     );

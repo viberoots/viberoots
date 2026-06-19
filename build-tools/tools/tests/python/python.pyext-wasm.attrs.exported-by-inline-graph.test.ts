@@ -21,7 +21,7 @@ test("inline exporter: python pyext_wasm nodes include module attrs in inline gr
     await fs.writeFile(
       path.join(app, "TARGETS"),
       [
-        'load("//build-tools/python:defs.bzl", "nix_python_wasm_extension_module")',
+        'load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_extension_module")',
         "",
         "nix_python_wasm_extension_module(",
         '  name = "ext",',
@@ -47,7 +47,7 @@ test("inline exporter: python pyext_wasm nodes include module attrs in inline gr
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`node build-tools/tools/buck/export-inline.ts --out ${graphPath} --roots projects/apps --normalize`;
+    })`node viberoots/build-tools/tools/buck/export-inline.ts --out ${graphPath} --roots projects/apps --normalize`;
     if (res.exitCode !== 0) return;
 
     const nodes = await readGraph(graphPath);

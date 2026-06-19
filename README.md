@@ -1,9 +1,8 @@
 # viberoots
 
-viberoots is a Buck2 + Nix monorepo containing build infrastructure, deployment tooling,
-scaffolding, templates, repo-local automation, and shared libraries. Use it to develop repo
-projects, generate new project surfaces, manage reviewed deployment contexts, and run consistent
-local or CI verification.
+viberoots is reusable Buck2 + Nix workspace tooling. It provides the development shell, build
+macros, tool wrappers, scaffolding, templates, deployment helpers, and verification flow consumed by
+project repositories.
 
 ## Quick Start
 
@@ -41,10 +40,10 @@ automatically:
    The helper installs missing `direnv`/`nix-direnv` packages with `nix profile install`, wires
    `~/.config/direnv/direnvrc`, and adds the zsh hook to `~/.zshrc`.
 
-Then clone the repo and run the normal local verification path:
+To work on the viberoots tooling repository directly:
 
 ```bash
-git clone <repo-url> viberoots
+git clone git@github.com:viberoots/viberoots.git viberoots
 cd viberoots
 ```
 
@@ -69,6 +68,20 @@ Nothing else needs to be installed for normal repo work; Nix supplies the rest a
 No repo-specific `/etc/nix/nix.custom.conf` entries are required for normal local development. Keep
 private substituters, access tokens, and remote builders out of public setup instructions; configure
 them only when you own that infrastructure.
+
+To initialize a consumer workspace that keeps application code outside this repository:
+
+```bash
+git submodule add git@github.com:viberoots/viberoots.git viberoots
+./viberoots/init
+```
+
+The consumer root intentionally stays small: `README.md`, `viberoots/`, and `projects/` are the only
+visible long-term entries. Hidden workspace files such as `.envrc`, `.buckconfig`, `.buckroot`, and
+`.viberoots/` are generated support state. The delegating Nix workspace flake lives under
+`.viberoots/workspace/`, where it can pass the consumer root as `workspaceSrc` while `.envrc`
+overrides the `viberoots` input to the local submodule path so local viberoots edits are testable
+before commit.
 
 ## Topic Entrypoints
 
@@ -104,26 +117,20 @@ them only when you own that infrastructure.
 - `build-tools/deployments/`: reusable deployment package implementations and infrastructure
   foundations.
 - `build-tools/docs/`: build-system reference docs, active designs, and remote-build setup.
-- `config/`: repo-level control-plane configuration templates and supporting config roots.
-- `docs/`: repo-wide deployment, control-plane, secrets, ADR, handbook, and documentation-placement
-  guidance.
+- `config/`: viberoots control-plane configuration templates and supporting config roots.
+- `docs/`: viberoots deployment, control-plane, secrets, ADR, handbook, and
+  documentation-placement guidance.
 - `docs/history/`: archived plans, migrations, historical tasks, investigations, and old design
   notes.
 - `plugins/`: repo-local Codex skills and plugin metadata.
-- Root workspace files: `flake.nix`, `package.json`, `pnpm-workspace.yaml`, `TARGETS`, and CI files
-  define the repository-wide development shell, package workspace, Buck package root, and automation
-  entrypoints.
-- `projects/apps/` and `projects/libs/`: application and library roots, including package-local
-  docs. Current app roots include data-room services and Pleomino.
-- `projects/docs/`: product-specific planning artifacts.
-- `projects/deployments/`: deployment-family metadata and package-local deployment docs.
-- `projects/config/shared.json`: checked-in deployment contexts, control-plane profiles, and
-  non-secret shared project configuration.
-- `projects/config/local.json`: gitignored local overrides and operator-local config values.
-- `patches/`: repo-level patch overlays where a language contract supports global patches.
+- `patches/`: patch overlays where a language contract supports global patches.
 - `third_party/`: external provider metadata and generated provider glue.
 - `toolchains/`: Buck and Nix toolchain wiring.
 - `types/`: shared TypeScript declarations.
+
+Consumer repositories keep application source under their own `projects/` directory. They should not
+copy viberoots-owned `build-tools/`, `docs/`, `plugins/`, `patches/`, `toolchains/`, or dependency
+metadata into the parent root.
 
 ## Local Development Commands
 
@@ -135,11 +142,14 @@ b        # build the default repo scope
 v        # run impacted tests and verification checks
 ```
 
-Shell entry also prepares ignored viberoots workspace state. In this pre-extraction dogfood
-checkout, the root flake consumes `path:./viberoots` while `.viberoots/current` points at the live
-repository root so Buck cells and Nix-backed commands see local build-tool edits immediately. After
-the physical extraction, activation points `.viberoots/current` at the local `viberoots/` source.
-Generated provider and Buck graph state stays under `.viberoots/workspace/`.
+Shell entry also prepares ignored viberoots workspace state. In a consumer workspace, the hidden
+`.viberoots/workspace/flake.nix` uses `path:../../viberoots` as the local input while
+`.envrc` overrides that input to `path:$PWD/viberoots` for local development. Since the flake file
+itself lives under `.viberoots/workspace`, it resolves the consumer source from `WORKSPACE_ROOT`
+during Nix evaluation and falls back to `../..` only for local readability. Activation points
+`.viberoots/current` at the local `viberoots/` source, so Buck cells and Nix-backed commands see
+local build-tool edits immediately. Generated provider and Buck graph state stays under
+`.viberoots/workspace/`.
 
 Check the active source mode and split-readiness diagnostics with:
 
@@ -147,10 +157,9 @@ Check the active source mode and split-readiness diagnostics with:
 viberoots status
 ```
 
-During the flake split, the status output may list PR-9 blockers such as root `build-tools/`,
-`third_party/providers/`, `prelude/`, or `toolchains/`. Those diagnostics mean the checkout is still
-in the temporary pre-extraction shape; PR-9 owns moving or removing those root compatibility
-surfaces.
+In consumer repositories, status output that reports root `build-tools/`, `third_party/providers/`,
+`prelude/`, or `toolchains/` means the workspace still contains old combined-repo compatibility
+surfaces. Remove those from the parent root and keep the source under `viberoots/`.
 
 The usual local check is:
 
@@ -202,7 +211,7 @@ i && b && ALL_TESTS=1 v
 ```
 
 Coverage is opt-in (`v --coverage` or `ALL_TESTS=1 v --coverage`). Use `s`, `l --status`, or
-`build-tools/tools/bin/tail-log --status` to inspect active pass-group and total suite progress. The
+`tail-log --status` to inspect active pass-group and total suite progress. The
 local wrappers and Buck Nix actions use `VBR_NIX_CACHE_POLICY=auto` by default, so temporarily
 unreachable configured HTTP(S) Nix caches are removed from the current process instead of failing
 unrelated builds. Use

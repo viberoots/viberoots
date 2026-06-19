@@ -30,7 +30,7 @@ EOF'`;
       [
         "",
         "# test: node.macros.providers-realized.deps.test.ts",
-        'load("//build-tools/node:defs.bzl", "nix_node_test")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_test")',
         "",
         "nix_node_test(",
         '  name = "test",',

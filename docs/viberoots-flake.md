@@ -81,12 +81,10 @@ upstream contributions directly.
 ```text
 repo-root/
   .gitmodules
-  flake.nix
-  flake.lock
   .buckroot
   .buckconfig
-  TARGETS
-  pnpm-workspace.yaml
+  .envrc
+  README.md
   projects/
     apps/
     libs/
@@ -96,6 +94,8 @@ repo-root/
   .viberoots/
     current -> ../viberoots
     workspace/
+      flake.nix
+      flake.lock
       providers/
       go/
   viberoots/              # Git submodule
@@ -124,30 +124,38 @@ The parent repository records the viberoots dependency in two places:
 
 - `.gitmodules` and the submodule gitlink pin the checked-out revision used by Buck cell paths and
   local Nix evaluation;
-- `flake.lock` records that the root workspace consumes the local `path:./viberoots` flake input.
+- `.viberoots/workspace/flake.nix` records that the hidden workspace flake consumes the local
+  `path:../../viberoots` flake input. Because this flake is intentionally hidden below
+  `.viberoots/workspace`, it resolves the consumer source from `WORKSPACE_ROOT` during Nix
+  evaluation and uses `../..` only as the local fallback. External remote consumers can use a
+  locked Git reference in their own hidden workspace flake during PR-10 remote-mode work.
 
 During Stage 1 Buck and Nix should both read the same local submodule checkout:
 
 ```nix
-inputs.viberoots.url = "path:./viberoots";
+inputs.viberoots.url = "path:../../viberoots";
 ```
 
 That keeps Buck and Nix looking at the same source tree. A later external consumer can replace the
 path input with `github:OWNER/viberoots` while retaining the same workspace API.
 
-The root flake consumes the local viberoots flake:
+The hidden workspace flake consumes the local viberoots flake:
 
 ```nix
 {
   description = "project workspace";
 
   inputs = {
-    viberoots.url = "path:./viberoots";
+    viberoots.url = "path:../../viberoots";
   };
 
   outputs = inputs:
     inputs.viberoots.lib.mkWorkspace {
-      workspaceSrc = ./.;
+      workspaceSrc =
+        let
+          root = builtins.getEnv "WORKSPACE_ROOT";
+        in
+        if root != "" then builtins.toPath root else ../..;
       viberootsInput = inputs.viberoots;
     };
 }
@@ -211,30 +219,36 @@ vendoring the viberoots source:
 
 ```text
 my-project/
-  flake.nix
-  flake.lock
+  README.md
+  viberoots/
+    init
+    build-tools/
+    flake.nix
   .buckroot
   .buckconfig
-  TARGETS
-  pnpm-workspace.yaml
   projects/
     apps/
     libs/
     deployments/
   .viberoots/
-    current -> /nix/store/...-source
+    current -> ../viberoots
     workspace/
+      flake.nix
+      TARGETS
       providers/
-      buck/
-      go/
 ```
 
-Its flake pins viberoots as an upstream dependency:
+The visible consumer root stays intentionally small: `README.md`, `viberoots/`, and `projects/`.
+Workspace glue such as `.envrc`, `.buckroot`, `.buckconfig`, and `.viberoots/workspace/` is hidden
+or generated. The consumer does not keep visible root `flake.nix`, `flake.lock`, `TARGETS`, or
+`pnpm-workspace.yaml`; the hidden workspace flake delegates to the checked-out viberoots source.
+
+`./viberoots/init` writes the hidden workspace flake with a local path input:
 
 ```nix
 {
   inputs = {
-    viberoots.url = "github:OWNER/viberoots/v1.4.2";
+    viberoots.url = "path:../../viberoots";
   };
 
   outputs = inputs:
@@ -245,16 +259,17 @@ Its flake pins viberoots as an upstream dependency:
 }
 ```
 
-An external consumer may also choose to keep `viberoots/` as a submodule. That is still compatible
-with this design:
+An external consumer should keep `viberoots/` as a submodule during the private extraction phase:
 
-```nix
-inputs.viberoots.url = "path:./viberoots";
+```bash
+git submodule add git@github.com:viberoots/viberoots.git viberoots
+./viberoots/init
 ```
 
 Use the submodule form when contributors often patch viberoots and project code together locally.
-Use the Git flake input form when the project only needs to consume released or pinned upstream
-viberoots revisions. Both forms use the same `mkWorkspace` contract.
+Use the remote Git flake input form when the project only needs to consume released or pinned
+upstream viberoots revisions. In both cases, the flake input lives in `.viberoots/workspace/flake.nix`
+rather than in a visible root `flake.nix`.
 
 Its `.buckconfig` must point Buck cells at the resolved viberoots source. Buck config files cannot
 directly evaluate Nix expressions, so the workspace setup must materialize a stable local path, for
@@ -301,8 +316,8 @@ hooks. It is not project source and should be ignored by Git.
   repository.
 - Project-owned generated provider glue remains in the project workspace because it is derived from
   project lockfiles.
-- The same interface supports local dogfooding with `path:./viberoots` and external use with
-  `github:OWNER/viberoots`.
+- The same interface supports local dogfooding with a hidden `path:../../viberoots` input and
+  external use with `github:OWNER/viberoots`.
 
 ## Non-Goals
 
@@ -327,7 +342,9 @@ Parent commits may update:
 
 - product code under `projects/**`;
 - workspace-generated glue under `.viberoots/workspace/**`;
-- root workspace files such as `.buckconfig`, `flake.nix`, and `pnpm-workspace.yaml`;
+- hidden workspace activation files such as `.envrc`, `.buckroot`, `.buckconfig`, and
+  `.viberoots/workspace/**`;
+- the light root `README.md`;
 - the `viberoots` submodule gitlink when adopting a newer viberoots revision.
 
 Viberoots commits may update:
@@ -350,16 +367,24 @@ ownership while keeping a reproducible parent checkout.
 These files belong to the consuming workspace:
 
 - `.gitmodules`
+- `README.md`
 - `projects/**`
-- `pnpm-workspace.yaml`
-- root `TARGETS`
+- root `.envrc`
 - root `.buckroot`
 - root `.buckconfig`
-- root `flake.nix`
-- root `flake.lock`
+- `.viberoots/current`
+- `.viberoots/workspace/flake.nix`
+- `.viberoots/workspace/flake.lock`
+- `.viberoots/workspace/TARGETS`
 - `.viberoots/workspace/providers/**`
 - `.viberoots/workspace/go/**` if generated from project Go modules
 - project-level configuration under `projects/config/**`
+
+The visible root contract is strict: the long-lived visible root should contain only
+`README.md`, `viberoots/`, and `projects/`. Hidden activation and generated state is the
+workspace-owned exception. In particular, root `flake.nix`, root `flake.lock`,
+`pnpm-workspace.yaml`, root `TARGETS`, and root `build-tools/` must not be restored as long-lived
+top-level files.
 
 Generated provider files stay workspace-owned because they depend on lockfiles and project package
 discovery. Examples include:
@@ -477,9 +502,9 @@ The root workspace should not own copies of these directories.
 
 ### Root Cell Contents
 
-The root cell should contain only product and workspace glue:
+The root cell should contain only product and hidden workspace glue:
 
-- root `TARGETS`;
+- `.viberoots/workspace/TARGETS`;
 - `projects/**/TARGETS`;
 - optional workspace-local test fixtures.
 
@@ -487,8 +512,8 @@ Root `build-tools/`, root `third_party/providers/`, and root `prelude/` or `tool
 compatibility surfaces must not remain after the extraction boundary unless they are test-only
 fixtures explicitly modeling invalid legacy input.
 
-Root `TARGETS` should continue exporting workspace files that Buck actions need from the project
-root, such as `flake.lock`, if those remain part of the build graph.
+`.viberoots/workspace/TARGETS` should export workspace files that Buck actions need from the project
+root. Visible root `TARGETS` should not remain after PR-9.
 
 ## Nix Flake Architecture
 
@@ -560,24 +585,35 @@ The current top-level flake logic should move under viberoots and become paramet
 `workspaceSrc` or a derived `WORKSPACE_ROOT`, rather than assuming the flake root is also the
 product workspace root.
 
-### Root Workspace Flake
+### Hidden Workspace Flake
 
-The repository root flake becomes thin:
+The consuming workspace does not keep a visible root `flake.nix` or `flake.lock`. Instead,
+`./viberoots/init` creates a hidden delegating flake under `.viberoots/workspace/`:
 
 ```nix
 {
-  inputs.viberoots.url = "path:./viberoots";
+  inputs.viberoots.url = "path:../../viberoots";
 
   outputs = inputs:
     inputs.viberoots.lib.mkWorkspace {
-      workspaceSrc = ./.;
+      workspaceSrc =
+        let
+          root = builtins.getEnv "WORKSPACE_ROOT";
+        in
+        if root != "" then builtins.toPath root else ../..;
       viberootsInput = inputs.viberoots;
-      workspaceName = "viberoots-dogfood";
+      workspaceName = "viberoots-consumer";
     };
 }
 ```
 
-This dogfoods the external-consumer API while still allowing a single-repo workflow.
+The root `.envrc` loads this hidden flake with:
+
+```sh
+use flake "path:${PWD}/.viberoots/workspace#default" --override-input viberoots "path:${PWD}/viberoots"
+```
+
+This dogfoods the external-consumer API while preserving the strict visible-root contract.
 
 ### Tool Invocation Contract
 
@@ -623,10 +659,10 @@ For external consumers, `VIBEROOTS_ROOT` may be the materialized `.viberoots/cur
 Nix store source path.
 
 Switching from submodule-backed viberoots to remote viberoots should not require changing
-`.buckconfig`. The root flake input changes from:
+`.buckconfig`. The hidden workspace flake input changes from:
 
 ```nix
-inputs.viberoots.url = "path:./viberoots";
+inputs.viberoots.url = "path:../../viberoots";
 ```
 
 to:
@@ -651,10 +687,10 @@ viberoots dev shell should provide a workspace activation step that:
 6. leaves product source files untouched unless the user invoked a scaffold/update command.
 
 The activation step should be idempotent and should not rewrite tracked files during ordinary shell
-entry. Tracked bootstrap files should be created by an explicit command such as:
+entry. Tracked bootstrap files should be created by the canonical consumer bootstrap:
 
 ```sh
-viberoots init-workspace
+./viberoots/init
 ```
 
 `nix develop` may refresh ignored symlinks and caches, but it should not surprise users by changing
@@ -681,9 +717,10 @@ In local submodule mode, activation must preserve the live-edit path:
 .viberoots/current -> ../viberoots
 ```
 
-If activation finds that the root flake input is `path:./viberoots` but `.viberoots/current` points
-somewhere else, it should repair the symlink or fail with a targeted message. This keeps Buck,
-Nix-provided tools, and project workflows reading the same local viberoots checkout.
+If activation finds that the hidden workspace flake input is local `viberoots/` submodule mode but
+`.viberoots/current` points somewhere else, it should repair the symlink or fail with a targeted
+message. This keeps Buck, Nix-provided tools, and project workflows reading the same local
+viberoots checkout.
 
 Generated provider files under `.viberoots/workspace/` may be committed or ignored based on the
 workspace's reproducibility policy. The key point is that they are parent-workspace files, not
@@ -704,8 +741,8 @@ Recommended policies:
 
 - keep `viberoots/` on a detached, pinned commit for normal project work;
 - use a branch inside `viberoots/` only while actively developing viberoots;
-- keep the root flake input pointed at `path:./viberoots`, so Nix and Buck consume the same
-  submodule checkout;
+- keep the hidden workspace flake input pointed at `path:../../viberoots`, so Nix and Buck consume
+  the same submodule checkout;
 - CI must initialize submodules before running `nix develop`, Buck, or validation commands;
 - parent repository PRs that update the submodule pointer should include validation evidence from
   the project workspace.
@@ -725,10 +762,10 @@ Both modes should expose the active viberoots version clearly to humans and CI.
 
 ### Local Source Mode
 
-Local source mode is selected when the workspace flake uses a path input:
+Local source mode is selected when the workspace flake uses the local submodule input:
 
 ```nix
-inputs.viberoots.url = "path:./viberoots";
+inputs.viberoots.url = "path:../../viberoots";
 ```
 
 or another explicit local path during development. In this mode, the rule is simple: always use the
@@ -739,13 +776,13 @@ the submodule while working on viberoots.
 Consequences:
 
 - Buck reads viberoots through `.viberoots/current`, which points at the local checkout.
-- Nix evaluates the same local checkout through `path:./viberoots`.
+- Nix evaluates the same local checkout through the hidden workspace flake's local path input.
 - Edits made inside the local `viberoots/` checkout must be reflected immediately in project
   workflows after normal Buck/Nix cache invalidation. Local source mode must not copy viberoots into
   a separate generated directory or Nix store source for routine development.
 - The parent workspace should not try to interpret semantic versions for local source mode.
-- CI for the parent workspace should validate that the root flake input is local path mode when the
-  workspace is intended to dogfood a submodule.
+- CI for the parent workspace should validate that the hidden workspace flake input is local path
+  mode when the workspace is intended to dogfood a submodule.
 
 Recommended status command output:
 
@@ -777,20 +814,20 @@ inputs.viberoots = {
 };
 ```
 
-The recommended remote reference is an immutable release tag. The workspace `flake.lock` records the
-resolved revision and content hash. For production or shared project work, avoid floating branch
-inputs such as `github:OWNER/viberoots/main` unless the project intentionally wants rolling
-updates.
+The recommended remote reference is an immutable release tag. The hidden workspace `flake.lock`
+records the resolved revision and content hash. For production or shared project work, avoid
+floating branch inputs such as `github:OWNER/viberoots/main` unless the project intentionally wants
+rolling updates.
 
 Consequences:
 
-- `flake.nix` makes the intended version visible through the input URL or `ref`.
-- `flake.lock` pins the exact commit and nar hash.
+- `.viberoots/workspace/flake.nix` makes the intended version visible through the input URL or `ref`.
+- `.viberoots/workspace/flake.lock` pins the exact commit and nar hash.
 - Workspace activation points `.viberoots/current` at the resolved flake source path.
 - Updates are explicit: change the ref or run an intentional flake update for the `viberoots` input,
-  then run validation and commit the `flake.lock` change.
+  then run validation and commit the hidden `flake.lock` change if the workspace chooses to track it.
 - Activation must either refresh `.viberoots/current` on every `nix develop` or
-  `viberoots init-workspace`, or create an explicit GC root and refresh when `flake.lock` changes.
+  `./viberoots/init`, or create an explicit GC root and refresh when the hidden `flake.lock` changes.
 
 Recommended status command output:
 
@@ -887,8 +924,9 @@ documentation and should be treated as design constraints:
 - Buck target labels, target patterns, and command-line arguments use `cell//package:target`
   without `@`. Use `viberoots//...` and `workspace_providers//...` for targets, not
   `@viberoots//...`.
-- A parent flake can delegate to a nested flake with `inputs.viberoots.url = "path:./viberoots"` and
-  call `inputs.viberoots.lib.mkWorkspace { workspaceSrc = ./.; ... }`.
+- A hidden workspace flake can delegate to the viberoots submodule with
+  `inputs.viberoots.url = "path:../../viberoots"` and call
+  `inputs.viberoots.lib.mkWorkspace { workspaceSrc = ...; ... }`.
 - A viberoots flake output can receive `workspaceSrc` outside the viberoots source and still access
   its own source through `viberootsInput.outPath`.
 - Remote viberoots consumption is compatible with Buck's static-cell requirement because activation
@@ -913,9 +951,8 @@ Validated cleanup blockers:
   should refresh `.viberoots/current` on shell entry or create an explicit GC root/result link for
   remote-flake mode.
 - If the parent workspace itself is consumed as a Git flake while relying on a submodule-backed
-  `path:./viberoots` input, the parent source must include submodules. The implementation should
-  validate the active Nix version and required flake settings for this workflow before advertising
-  remote consumption of the parent workspace.
+  path input, the parent source must include submodules. Local submodule workspaces should use
+  the canonical `./viberoots/init` hidden-flake layout so Nix and Buck read the same checkout.
 
 ## Migration Plan
 
@@ -1031,9 +1068,9 @@ Replace the root flake implementation with a call to `inputs.viberoots.lib.mkWor
 Exit criteria:
 
 - root `nix develop` is powered by `./viberoots`;
-- root flake no longer imports build logic from root `build-tools`;
-- root `flake.lock` records the local `path:./viberoots` input and the submodule gitlink pins the
-  actual viberoots revision;
+- no visible root flake imports build logic from root `build-tools`;
+- `.viberoots/workspace/flake.nix` records the local `path:../../viberoots` input and the submodule
+  gitlink pins the actual viberoots revision;
 - `viberoots version` or an equivalent status command reports local source mode, checked-out
   revision, dirty state, and `.viberoots/current`;
 - startup/status checks report old-layout root paths and loads as PR-9 blockers before extraction;
@@ -1081,8 +1118,8 @@ that invalid legacy input fails clearly.
 
 ## Open Questions
 
-- Should `viberoots init-workspace` create missing committed bootstrap files, or only validate them
-  after project creation?
+- Should `./viberoots/init` create missing committed bootstrap files, or only validate them after
+  project creation?
 - Which root JavaScript/TypeScript package files are viberoots-tooling files versus workspace files?
 - Should generated provider files under `.viberoots/workspace/` be committed for reproducibility or
   ignored and regenerated by install/update commands?
@@ -1106,9 +1143,9 @@ that invalid legacy input fails clearly.
 - Submodule state may be stale or uninitialized in local checkouts and CI. Mitigation: document
   `git submodule update --init --recursive`, make CI initialize submodules, and make startup checks
   fail with a targeted message when `viberoots/flake.nix` is missing.
-- The root flake input may drift away from the checked-out submodule path. Mitigation: add a
-  validation check that requires `inputs.viberoots.url = "path:./viberoots"` in the dogfood
-  workspace.
+- The hidden workspace flake input may drift away from the checked-out submodule path. Mitigation:
+  add a validation check that requires `inputs.viberoots.url = "path:../../viberoots"` in the
+  dogfood workspace.
 - Remote consumers may accidentally use floating viberoots branches. Mitigation: recommend release
   tags for remote mode and make status output show both requested ref and locked revision.
 - External consumers may get stale `.viberoots/current` symlinks or GC-collected remote sources.

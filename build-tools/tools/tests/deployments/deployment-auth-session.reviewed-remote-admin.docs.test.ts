@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
+import { viberootsRepoPath } from "./deployment-command";
 
 async function read(rel: string) {
-  return await fsp.readFile(path.join(process.cwd(), rel), "utf8");
+  return await fsp.readFile(viberootsRepoPath(rel), "utf8");
 }
 
 function docHasAny(doc: string, patterns: RegExp[]) {

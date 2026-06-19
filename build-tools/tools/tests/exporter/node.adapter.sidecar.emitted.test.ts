@@ -30,9 +30,9 @@ test("glue/generator emits node-lock-index.json deterministically", async () => 
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
 
     // First run
-    await $({ cwd: tmp })`build-tools/tools/buck/export-graph.ts --simulate ${sim}`;
+    await $({ cwd: tmp })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${sim}`;
     // Generate sidecar via glue/generator
-    await $({ cwd: tmp })`node build-tools/tools/buck/gen-provider-index.ts`;
+    await $({ cwd: tmp })`node viberoots/build-tools/tools/buck/gen-provider-index.ts`;
     assert.ok(await fs.pathExists(sidecar), "node-lock-index.json should exist");
     const a = await fs.readFile(sidecar, "utf8");
     const parsed = JSON.parse(a);
@@ -44,8 +44,8 @@ test("glue/generator emits node-lock-index.json deterministically", async () => 
     );
 
     // Second run must be a no-op w.r.t. sidecar content
-    await $({ cwd: tmp })`build-tools/tools/buck/export-graph.ts --simulate ${sim}`;
-    await $({ cwd: tmp })`node build-tools/tools/buck/gen-provider-index.ts`;
+    await $({ cwd: tmp })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${sim}`;
+    await $({ cwd: tmp })`node viberoots/build-tools/tools/buck/gen-provider-index.ts`;
     const b = await fs.readFile(sidecar, "utf8");
     assert.equal(a, b, "sidecar should be deterministic across runs");
   });

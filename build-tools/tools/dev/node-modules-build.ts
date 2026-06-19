@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -6,7 +7,7 @@ import { nixBuilderPolicyShellArgs } from "../lib/nix-builder-policy";
 import { sharedExactPnpmStateRootPath } from "../lib/pnpm-state-paths";
 import { resolveToolPathSync } from "../lib/tool-paths";
 import { buildToolPath } from "./dev-build/paths";
-import { findNearestImporterLock, nodeModulesAttr } from "./install/common";
+import { findNearestImporterLock, nodeModulesAttr, normalizeImporter } from "./install/common";
 import {
   currentVerifiedMarkerFingerprint,
   readVerifiedMarker,
@@ -18,6 +19,10 @@ async function findFlakeRoot(start: string): Promise<string> {
   let dir = path.resolve(start);
   const root = path.parse(dir).root;
   while (true) {
+    try {
+      await fsp.access(path.join(dir, ".viberoots", "workspace", "flake.nix"));
+      return dir;
+    } catch {}
     try {
       await fsp.access(path.join(dir, "flake.nix"));
       return dir;
@@ -31,6 +36,16 @@ async function findFlakeRoot(start: string): Promise<string> {
 const cwd = process.cwd();
 const flakeRoot = await findFlakeRoot(cwd);
 const repoRoot = path.resolve(flakeRoot);
+
+function argValue(name: string): string {
+  const prefix = `${name}=`;
+  for (let i = 2; i < process.argv.length; i++) {
+    const arg = String(process.argv[i] || "");
+    if (arg === name) return String(process.argv[i + 1] || "");
+    if (arg.startsWith(prefix)) return arg.slice(prefix.length);
+  }
+  return "";
+}
 
 async function hasPnpmLock(dir: string): Promise<boolean> {
   try {
@@ -78,7 +93,11 @@ async function resolveImporterInRepo(
   );
 }
 
-const overrideImporterRaw = (process.env.ZX_TEST_NODE_MODULES_IMPORTER || "").trim();
+const overrideImporterRaw = (
+  process.env.ZX_TEST_NODE_MODULES_IMPORTER ||
+  argValue("--importer") ||
+  ""
+).trim();
 let importer = "";
 if (overrideImporterRaw) {
   try {
@@ -102,7 +121,8 @@ if (!importer) {
   }
 }
 const fullAttr = nodeModulesAttr(importer);
-const relLock = importer === "." ? "pnpm-lock.yaml" : `${importer}/pnpm-lock.yaml`;
+const lockfileRel = importer === "." ? "pnpm-lock.yaml" : `${importer}/pnpm-lock.yaml`;
+const hashKey = importer === "viberoots" ? "pnpm-lock.yaml" : lockfileRel;
 const placeholderDigest = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 try {
   const chk = await $({
@@ -118,31 +138,78 @@ try {
   );
   process.exit(2);
 }
-const flakeRef = flakeRoot;
-async function readHashForLock(lockfileRel: string): Promise<string> {
-  const hashFile = buildToolPath(flakeRoot, "tools/nix/node-modules.hashes.json");
-  try {
-    const raw = await fsp.readFile(hashFile, "utf8");
-    const parsed = JSON.parse(raw) as Record<string, string>;
-    return parsed[lockfileRel] || "";
-  } catch {
-    return "";
+const workspaceFlakeRoot = path.join(flakeRoot, ".viberoots", "workspace");
+const flakeRef = await fsp
+  .access(path.join(workspaceFlakeRoot, "flake.nix"))
+  .then(() => `path:${workspaceFlakeRoot}`)
+  .catch(() => flakeRoot);
+function activeViberootsRoot(): string {
+  const candidates = [
+    path.join(repoRoot, "viberoots"),
+    path.join(repoRoot, ".viberoots", "current"),
+    process.env.VIBEROOTS_SOURCE_ROOT || "",
+    process.env.VIBEROOTS_ROOT || "",
+  ]
+    .map((candidate) => String(candidate || "").trim())
+    .filter(Boolean);
+  for (const candidate of candidates) {
+    const abs = path.resolve(candidate);
+    try {
+      if (
+        fs.existsSync(path.join(abs, "flake.nix")) &&
+        fs.existsSync(path.join(abs, "build-tools", "tools", "dev", "zx-init.mjs"))
+      ) {
+        return abs;
+      }
+    } catch {}
   }
+  return "";
 }
-async function hasFreshVerifiedMarker(lockfileRel: string): Promise<boolean> {
+const activeViberootsSourceRoot = activeViberootsRoot();
+const viberootsOverrideArgs = activeViberootsSourceRoot
+  ? ["--override-input", "viberoots", `path:${activeViberootsSourceRoot}`]
+  : [];
+const nixWorkspaceEnv = {
+  ...process.env,
+  WORKSPACE_ROOT: repoRoot,
+  ...(activeViberootsSourceRoot ? { VIBEROOTS_SOURCE_ROOT: activeViberootsSourceRoot } : {}),
+};
+
+function liveMarkerRepoRoot(): string {
+  const liveRoot = String(process.env.REPO_ROOT || "").trim();
+  if (liveRoot && path.isAbsolute(liveRoot)) return path.resolve(liveRoot);
+  return repoRoot;
+}
+
+async function readHashForLock(lockfileRel: string): Promise<string> {
+  const hashFiles = [
+    buildToolPath(flakeRoot, "tools/nix/node-modules.hashes.json"),
+    path.join(flakeRoot, "projects", "node-modules.hashes.json"),
+  ];
+  let found = "";
+  for (const hashFile of hashFiles) {
+    try {
+      const raw = await fsp.readFile(hashFile, "utf8");
+      const parsed = JSON.parse(raw) as Record<string, string>;
+      found = parsed[lockfileRel] || found;
+    } catch {}
+  }
+  return found;
+}
+async function hasFreshVerifiedMarker(lockfileRel: string, hashKey: string): Promise<boolean> {
   const importer = lockfileRel.includes("/")
-    ? lockfileRel.slice(0, lockfileRel.lastIndexOf("/"))
+    ? normalizeImporter(lockfileRel.slice(0, lockfileRel.lastIndexOf("/")))
     : ".";
-  const marker = await readVerifiedMarker(verifiedMarkerPath(repoRoot, importer));
+  const marker = await readVerifiedMarker(verifiedMarkerPath(liveMarkerRepoRoot(), importer));
   if (!marker) return false;
   const lockHash = await sha256File(path.join(repoRoot, lockfileRel));
   if (!lockHash) return false;
   const builderFingerprint = await currentVerifiedMarkerFingerprint(repoRoot, importer);
   return (
     marker.importer === importer &&
-    marker.lockfile === lockfileRel &&
+    marker.lockfile === hashKey &&
     marker.lockHash === lockHash &&
-    marker.hashValue === (await readHashForLock(lockfileRel)) &&
+    marker.hashValue === (await readHashForLock(hashKey)) &&
     marker.builderFingerprint === builderFingerprint
   );
 }
@@ -154,13 +221,13 @@ function runInstallDiagnostic(lockfileRel: string, reason: string): string {
   ].join("\n");
 }
 
-async function requireFreshPnpmStoreState(lockfileRel: string): Promise<void> {
-  const current = await readHashForLock(lockfileRel);
+async function requireFreshPnpmStoreState(lockfileRel: string, hashKey: string): Promise<void> {
+  const current = await readHashForLock(hashKey);
   if (!current || current === placeholderDigest) {
     console.error(runInstallDiagnostic(lockfileRel, "missing or placeholder-hashed"));
     process.exit(2);
   }
-  if (!(await hasFreshVerifiedMarker(lockfileRel))) {
+  if (!(await hasFreshVerifiedMarker(lockfileRel, hashKey))) {
     console.error(runInstallDiagnostic(lockfileRel, "stale or unverified"));
     process.exit(2);
   }
@@ -191,9 +258,11 @@ async function preparedExactStoreEnv(lockfileRel: string): Promise<NodeJS.Proces
 }
 // Fast path: if output is already realized in the store, prefer path-info
 let outPath = "";
-await requireFreshPnpmStoreState(relLock);
+await requireFreshPnpmStoreState(lockfileRel, hashKey);
 try {
-  const pi = await $`nix path-info ${flakeRef}#${fullAttr} --accept-flake-config`;
+  const pi = await $({
+    env: nixWorkspaceEnv,
+  })`nix path-info ${flakeRef}#${fullAttr} --accept-flake-config ${viberootsOverrideArgs}`;
   const cand =
     String(pi.stdout || "")
       .trim()
@@ -209,6 +278,9 @@ try {
 } catch {}
 async function tryBuild(extraEnv: NodeJS.ProcessEnv): Promise<string> {
   const timeoutPath = resolveToolPathSync("timeout");
+  const overrideShellArgs = viberootsOverrideArgs
+    .map((arg) => `'${arg.replace(/'/g, "'\\''")}'`)
+    .join(" ");
   const cmd = [
     "set -euo pipefail;",
     'TIMEOUT_PATH="$1";',
@@ -219,10 +291,10 @@ async function tryBuild(extraEnv: NodeJS.ProcessEnv): Promise<string> {
     'TS="${NIX_PNPM_FETCH_TIMEOUT:-900}";',
     'JOBS_FLAG=""; if [ -n "$MJ" ] && [ "$MJ" != "0" ]; then JOBS_FLAG="--max-jobs $MJ"; fi;',
     'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
-    `"$TIMEOUT_PATH" -k 10s "\${TS}s" nix build "\${FLAKE_REF}#\${FULL_ATTR}" --no-link --accept-flake-config ${nixBuilderPolicyShellArgs("local_only")} --print-out-paths $JOBS_FLAG $CORES_FLAG`,
+    `"$TIMEOUT_PATH" -k 10s "\${TS}s" nix build "\${FLAKE_REF}#\${FULL_ATTR}" --impure --no-link --accept-flake-config ${overrideShellArgs} ${nixBuilderPolicyShellArgs("local_only")} --print-out-paths $JOBS_FLAG $CORES_FLAG`,
   ].join(" ");
   const built = await $({
-    env: extraEnv,
+    env: { ...nixWorkspaceEnv, ...extraEnv },
   })`bash --noprofile --norc -c ${cmd} -- ${timeoutPath} ${flakeRef} ${fullAttr}`.nothrow();
   const txt = String(built.stdout || "").trim();
   if (built.exitCode === 0 && txt) {
@@ -232,7 +304,7 @@ async function tryBuild(extraEnv: NodeJS.ProcessEnv): Promise<string> {
 }
 
 if (!outPath) {
-  const extraEnv = await preparedExactStoreEnv(relLock);
+  const extraEnv = await preparedExactStoreEnv(lockfileRel);
   if (!extraEnv) {
     console.error(runInstallDiagnostic(relLock, "missing prepared exact store"));
     process.exit(2);

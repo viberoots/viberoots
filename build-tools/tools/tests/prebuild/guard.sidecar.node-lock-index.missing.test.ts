@@ -9,12 +9,12 @@ test("prebuild-guard: fails when node-lock-index.json is missing (CI), warns loc
     // Minimal glue outputs (graph + auto_map) present, sidecar intentionally missing
     await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
       "{\n}\n",
       "utf8",
     );
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "invalidation-report.txt"),
       "# invalidation-report\n",
       "utf8",
     );
@@ -34,7 +34,7 @@ test("prebuild-guard: fails when node-lock-index.json is missing (CI), warns loc
       cwd: tmp,
       stdio: "inherit",
       env: { ...process.env, PREBUILD_GUARD_NO_FIX: "1" },
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
 
     // CI should fail on missing sidecar
     let failed = false;
@@ -43,7 +43,7 @@ test("prebuild-guard: fails when node-lock-index.json is missing (CI), warns loc
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, CI: "true" },
-      })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+      })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
     } catch {
       failed = true;
     }

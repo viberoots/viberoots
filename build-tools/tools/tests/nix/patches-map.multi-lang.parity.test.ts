@@ -30,7 +30,7 @@ test("lang-helpers: patch map parity across go and python modes", async () => {
       let
         pkgs = import <nixpkgs> {};
         lib = pkgs.lib;
-        H = import ./build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
+        H = import ./viberoots/build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
         d = builtins.toPath ${JSON.stringify(d)};
       in {
         go = H.patchesMapFromDirsWith { dirs = [ d ]; };

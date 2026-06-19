@@ -40,11 +40,11 @@ test("auto-map maps only lockfile providers when both module + lockfile labels p
     await $`git add projects/apps/hybrid/pnpm-lock.yaml`;
 
     // Generate Node providers
-    await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
 
     // Generate auto-map
     const autoMapPath = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${autoMapPath}`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${autoMapPath}`;
 
     const autoMapContent = await fsp.readFile(autoMapPath, "utf8");
 

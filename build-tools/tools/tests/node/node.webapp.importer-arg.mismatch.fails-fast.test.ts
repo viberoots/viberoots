@@ -14,7 +14,7 @@ test("node_webapp fails fast when importer argument disagrees with lockfile_labe
     await fsp.writeFile(
       path.join(importerDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "node_webapp")',
+        'load("@viberoots//build-tools/node:defs.bzl", "node_webapp")',
         "",
         "node_webapp(",
         '  name = "bundle",',

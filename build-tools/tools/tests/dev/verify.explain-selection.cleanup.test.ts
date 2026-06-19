@@ -11,7 +11,7 @@ function selectionFixture(): VerifyScopeDecision {
     requestedDeploymentMode: "auto",
     reason: "default",
     selectorMode: "default",
-    targets: ["//build-tools/tools/tests/dev:sample"],
+    targets: ["@viberoots//build-tools/tools/tests/dev:sample"],
     diagnostics: null,
     lintFilters: null,
   };
@@ -27,8 +27,8 @@ test("runExplainSelection kills the explain-selection isolation after printing",
     resolvePlan: (opts) => {
       calls.push(`policy:${opts.executionPolicy === executionPolicy}`);
       return {
-        targetLabels: [{ target: "//build-tools/tools/tests/dev:sample", labels: [] }],
-        passes: [{ name: "shared", targets: ["//build-tools/tools/tests/dev:sample"] }],
+        targetLabels: [{ target: "@viberoots//build-tools/tools/tests/dev:sample", labels: [] }],
+        passes: [{ name: "shared", targets: ["@viberoots//build-tools/tools/tests/dev:sample"] }],
       };
     },
     printSelection: () => {

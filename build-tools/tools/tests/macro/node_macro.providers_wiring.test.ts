@@ -25,7 +25,7 @@ test("node macro: providers are auto-wired from auto_map", async () => {
     await fs.writeJSON(path.join(tmp, DEFAULT_GRAPH_PATH), nodes, { spaces: 2 });
 
     // Run auto-map generation over the synthesized graph
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out ${DEFAULT_AUTO_MAP_PATH}`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out ${DEFAULT_AUTO_MAP_PATH}`;
 
     const autoMapPath = path.join(tmp, DEFAULT_AUTO_MAP_PATH);
     const content = await fs.readFile(autoMapPath, "utf8");

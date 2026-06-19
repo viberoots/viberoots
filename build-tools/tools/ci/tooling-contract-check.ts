@@ -5,7 +5,7 @@ import path from "node:path";
 type Finding = { file: string; line: number; text: string };
 
 function isAllowed(filePath: string): boolean {
-  const p = filePath.replace(/\\/g, "/");
+  const p = filePath.replace(/\\/g, "/").replace(/^viberoots\//, "");
   const allow = [
     /^build-tools\/tools\/buck\/exporter\//,
     /^build-tools\/tools\/buck\/export-graph\.ts$/,
@@ -18,7 +18,7 @@ function isAllowed(filePath: string): boolean {
 }
 
 function isExcluded(filePath: string): boolean {
-  const p = filePath.replace(/\\/g, "/");
+  const p = filePath.replace(/\\/g, "/").replace(/^viberoots\//, "");
   const exclude = [
     /^build-tools\/tools\/tests\//,
     /^docs\//,
@@ -36,17 +36,20 @@ function isExcluded(filePath: string): boolean {
 // Build the target path dynamically to avoid tripping lint rules in this checker itself.
 const GRAPH_SEP = "/";
 const GRAPH_LIT = ["build-tools", "tools", "buck", "graph.json"].join(GRAPH_SEP);
+const GRAPH_LIT_WITH_MODULE = ["viberoots", GRAPH_LIT].join(GRAPH_SEP);
 const ESC = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // Examples matched: readGraph(<graph.json>), fs.readFile/readJson/readFileSync(<graph.json>)
 const VIOLATION_RE = new RegExp(
-  `(readGraph|readFile|readJson|readFileSync)\\s*\\(\\s*["']${ESC(GRAPH_LIT)}["']`,
+  `(readGraph|readFile|readJson|readFileSync)\\s*\\(\\s*["'](?:${ESC(GRAPH_LIT)}|${ESC(
+    GRAPH_LIT_WITH_MODULE,
+  )})["']`,
 );
 
 async function scanFile(file: string): Promise<Finding[]> {
   if (isExcluded(file)) return [];
   if (isAllowed(file)) return [];
   const txt = await fsp.readFile(file, "utf8").catch(() => "");
-  if (!txt || !txt.includes(GRAPH_LIT)) return [];
+  if (!txt || (!txt.includes(GRAPH_LIT) && !txt.includes(GRAPH_LIT_WITH_MODULE))) return [];
   const findings: Finding[] = [];
   const lines = txt.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {

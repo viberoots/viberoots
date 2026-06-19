@@ -4,8 +4,8 @@ import path from "node:path";
 import { test } from "node:test";
 
 const BANNED_SUBSTRINGS = [
-  "build-tools/tools/buck/sync-providers-node.ts",
-  "build-tools/tools/buck/sync-providers-python.ts",
+  "viberoots/build-tools/tools/buck/sync-providers-node.ts",
+  "viberoots/build-tools/tools/buck/sync-providers-python.ts",
 ];
 
 const TEXT_EXTS = new Set([
@@ -92,7 +92,7 @@ async function listRepoRootMarkdownFiles(repoRoot: string): Promise<string[]> {
   return out;
 }
 
-test("provider sync wrappers are removed; use build-tools/tools/buck/sync-providers.ts only", async () => {
+test("provider sync wrappers are removed; use viberoots/build-tools/tools/buck/sync-providers.ts only", async () => {
   const repoRoot = process.cwd();
   const selfAbs = path.join(
     repoRoot,
@@ -129,8 +129,8 @@ test("provider sync wrappers are removed; use build-tools/tools/buck/sync-provid
     [
       "Found forbidden references to removed provider sync wrapper entrypoints.",
       "Use the unified orchestrator instead:",
-      "- Providers-only: node build-tools/tools/buck/sync-providers.ts --lang <lang> --no-glue",
-      "- Full orchestrator: node build-tools/tools/buck/sync-providers.ts",
+      "- Providers-only: node viberoots/build-tools/tools/buck/sync-providers.ts --lang <lang> --no-glue",
+      "- Full orchestrator: node viberoots/build-tools/tools/buck/sync-providers.ts",
       "",
       ...hits.slice(0, 25).map((h) => `- ${path.relative(repoRoot, h.file)}: ${h.needle}`),
       hits.length > 25 ? `... and ${hits.length - 25} more` : "",

@@ -30,7 +30,7 @@ test("nix_python_extension_module: deps := deps ∪ link_deps ∪ header_deps as
     await fsp.writeFile(
       path.join(app, "TARGETS"),
       [
-        'load("//build-tools/python:defs.bzl", "nix_python_extension_module")',
+        'load("@viberoots//build-tools/python:defs.bzl", "nix_python_extension_module")',
         "",
         "filegroup(",
         '  name = "a",',

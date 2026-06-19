@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -62,7 +63,7 @@ test("remote profile sync infers acting principal and admin groups from the revi
         cwd: tmp,
         env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)}`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)}`;
       await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
       const summary = JSON.parse(String((await resultPromise).stdout));
       assert.equal(summary.executionMode, "remote-profile");
@@ -136,7 +137,7 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
         cwd: tmp,
         env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${remoteConfigRoot} --action submit`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${remoteConfigRoot} --action submit`;
       await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
       const selfSummary = JSON.parse(String((await selfPromise).stdout));
       assert.equal(
@@ -153,7 +154,7 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
         cwd: tmp,
         env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${remoteConfigRoot} --action approve --user-email alice@example.com`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${remoteConfigRoot} --action approve --user-email alice@example.com`;
       await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
       const crossSummary = JSON.parse(String((await crossPromise).stdout));
       assert.equal(

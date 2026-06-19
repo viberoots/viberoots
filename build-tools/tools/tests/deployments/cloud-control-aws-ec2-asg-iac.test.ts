@@ -10,6 +10,7 @@ import { validateEc2AsgIacBundle } from "../../deployments/cloud-control-aws-ec2
 import { ec2HostProfileInput } from "./cloud-control-aws-ec2-host-profile.fixture";
 import { asgIac, asgTopology } from "./cloud-control-aws-ec2-asg.fixture";
 import { IMAGE_BUILD_IDENTITY } from "./cloud-control-aws-topology.fixture";
+import { viberootsRepoPath } from "./deployment-command";
 
 test("repo-owned ASG resources and runbook commands are explicit opt-in", () => {
   const defaultBundle = renderCloudControlSetupBundle(ec2HostProfileInput());
@@ -50,11 +51,13 @@ test("repo-owned ASG resources and runbook commands are explicit opt-in", () => 
 
 test("OpenTofu ASG module declares reviewed host controls behind ec2_host_mode", async () => {
   const ec2Host = await fsp.readFile(
-    "build-tools/deployments/aws-control-plane-foundation/opentofu/ec2-host.tf",
+    viberootsRepoPath("build-tools/deployments/aws-control-plane-foundation/opentofu/ec2-host.tf"),
     "utf8",
   );
   const vars = await fsp.readFile(
-    "build-tools/deployments/aws-control-plane-foundation/opentofu/variables-ec2-host.tf",
+    viberootsRepoPath(
+      "build-tools/deployments/aws-control-plane-foundation/opentofu/variables-ec2-host.tf",
+    ),
     "utf8",
   );
   assert.match(ec2Host, /local\.ec2_repo_owned_asg/);

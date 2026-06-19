@@ -18,7 +18,7 @@ test("gen-auto-map: mixed module+lockfile labels map only lockfile provider (Nod
     const outPath = path.join(tmp, ".viberoots", "workspace", "providers", "auto_map.bzl");
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
     await fsp.writeFile(graphPath, JSON.stringify([node]), "utf8");
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
     const out = await fsp.readFile(outPath, "utf8");
     const lf = `workspace_providers//:${providerNameForImporter(
       "projects/apps/web/pnpm-lock.yaml",

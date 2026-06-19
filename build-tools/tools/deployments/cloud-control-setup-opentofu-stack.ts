@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { repoRoot } from "../lib/repo";
+import { repoRoot, resolveWorkspaceRootsSync } from "../lib/repo";
 
 const OPENTOFU_SOURCE_DIR = "build-tools/deployments/aws-control-plane-foundation/opentofu";
 export const OPENTOFU_BUNDLE_DIR = "opentofu/aws-control-plane-foundation";
@@ -16,7 +16,7 @@ export function renderOpenTofuSourceFiles(
   return Object.fromEntries(
     opentofuSourceFilenames(sourceDir).map((name) => [
       `${bundleDir}/${name}`,
-      readFileSync(path.join(repoRoot(), sourceDir, name), "utf8"),
+      readFileSync(path.join(opentofuSourceDirPath(sourceDir), name), "utf8"),
     ]),
   );
 }
@@ -30,7 +30,14 @@ export function opentofuSourceInputs(sourceDir: string, bundleDir: string): stri
 }
 
 function opentofuSourceFilenames(sourceDir: string): string[] {
-  return readdirSync(path.join(repoRoot(), sourceDir))
+  return readdirSync(opentofuSourceDirPath(sourceDir))
     .filter((name) => name.endsWith(".tf") || name.endsWith(".hcl.example"))
     .sort();
+}
+
+function opentofuSourceDirPath(sourceDir: string): string {
+  if (path.isAbsolute(sourceDir)) return sourceDir;
+  const workspaceRoot = repoRoot();
+  const viberootsRoot = resolveWorkspaceRootsSync({ start: workspaceRoot }).viberootsRoot;
+  return path.join(viberootsRoot, sourceDir);
 }

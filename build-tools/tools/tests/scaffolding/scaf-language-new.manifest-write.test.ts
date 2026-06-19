@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsTool } from "./lib/viberoots-tools";
 
 test("scaf language new writes manifest and generates planner by default", async () => {
   await runInTemp("scaf-lang-new", async (tmp, $) => {
@@ -11,11 +12,11 @@ test("scaf language new writes manifest and generates planner by default", async
     // Create minimal language kit template source to avoid depending on repo templates
     const kitDir = path.join(
       tmp,
-      "build-tools/tools/scaffolding/templates/language/kit/{{ lang_id }}",
+      "viberoots/build-tools/tools/scaffolding/templates/language/kit/{{ lang_id }}",
     );
     await fs.mkdirp(kitDir);
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/scaffolding/templates/language/kit/meta.json"),
+      path.join(tmp, "viberoots/build-tools/tools/scaffolding/templates/language/kit/meta.json"),
       JSON.stringify({
         language: "language",
         template: "kit",
@@ -25,27 +26,38 @@ test("scaf language new writes manifest and generates planner by default", async
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/scaffolding/templates/language/kit/copier.yaml"),
+      path.join(tmp, "viberoots/build-tools/tools/scaffolding/templates/language/kit/copier.yaml"),
       "lang_id: toy\n",
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/scaffolding/templates/language/kit/README.md.jinja"),
+      path.join(
+        tmp,
+        "viberoots/build-tools/tools/scaffolding/templates/language/kit/README.md.jinja",
+      ),
       "# Kit\n",
       "utf8",
     );
     await fs.outputFile(
       path.join(
         tmp,
-        "build-tools/tools/scaffolding/templates/language/kit/build-tools/tools/nix/planner/{{ lang_id }}.nix.jinja",
+        "viberoots/build-tools/tools/scaffolding/templates/language/kit/viberoots/build-tools/tools/nix/planner/{{ lang_id }}.nix.jinja",
       ),
       "{ lib }: ctx: { isTarget = n: false; kindOf = n: null; modulesFileFor = name: ctx.modulesTomlFor name; mkApp = name: ctx.T.goApp { inherit name; modulesToml = ctx.modulesTomlFor name; repoRoot = ctx.repoRoot; subdir = (ctx.pkgPathOf name); }; mkLib = name: ctx.T.goLib { inherit name; modulesToml = ctx.modulesTomlFor name; repoRoot = ctx.repoRoot; subdir = (ctx.pkgPathOf name); }; }\n",
       "utf8",
     );
     // Run command
-    await $`node build-tools/tools/scaffolding/scaf.ts language new ${id}`;
-    const manifest = path.join(tmp, "build-tools/tools/nix/langs.json");
-    const planner = path.join(tmp, `build-tools/tools/nix/planner/${id}.nix`);
+    await $({
+      env: {
+        ...process.env,
+        VIBEROOTS_ROOT: tmp,
+        VIBEROOTS_SOURCE_ROOT: tmp,
+        WORKSPACE_ROOT: tmp,
+        BUCK_TEST_SRC: tmp,
+      },
+    })`node ${viberootsTool("viberoots/build-tools/tools/scaffolding/scaf.ts")} language new ${id}`;
+    const manifest = path.join(tmp, "viberoots/build-tools/tools/nix/langs.json");
+    const planner = path.join(tmp, `viberoots/build-tools/tools/nix/planner/${id}.nix`);
     assert.ok(await fs.pathExists(manifest), "manifest should be written");
     assert.ok(await fs.pathExists(planner), "planner should be generated or present");
     const doc = JSON.parse(await fs.readFile(manifest, "utf8"));

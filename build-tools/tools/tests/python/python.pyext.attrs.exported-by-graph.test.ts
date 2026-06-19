@@ -27,7 +27,7 @@ test("exporter: python pyext nodes include module + link intent attrs in .vibero
     await fs.writeFile(
       path.join(app, "TARGETS"),
       [
-        'load("//build-tools/python:defs.bzl", "nix_python_extension_module")',
+        'load("@viberoots//build-tools/python:defs.bzl", "nix_python_extension_module")',
         "",
         "filegroup(",
         '  name = "dep_link",',
@@ -58,7 +58,7 @@ test("exporter: python pyext nodes include module + link intent attrs in .vibero
       "utf8",
     );
 
-    const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fs.mkdirp(path.dirname(graphPath));
 
     const res = await $({
@@ -66,7 +66,7 @@ test("exporter: python pyext nodes include module + link intent attrs in .vibero
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`node build-tools/tools/buck/export-graph.ts --out ${graphPath}`;
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out ${graphPath}`;
     if (res.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
 
     const nodes = await readGraph(graphPath);

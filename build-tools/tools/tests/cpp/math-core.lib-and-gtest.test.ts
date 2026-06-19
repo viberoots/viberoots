@@ -61,22 +61,22 @@ TEST(MathCore, AddWorks) {
 
     // Ensure C++ macros and planner/templates are available in the temp repo
     await fs.outputFile(
-      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
-      await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
+      await fs.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
     );
     await fs.outputFile(
-      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
-      await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
+      await fs.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
     );
-    await fs.mkdirp(path.join(tmp, "build-tools/tools/nix/templates"));
+    await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/templates"));
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/templates/cpp.nix"),
-      path.join(tmp, "build-tools/tools/nix/templates/cpp.nix"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/nix/templates/cpp.nix"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/templates/cpp.nix"),
     );
-    await fs.mkdirp(path.join(tmp, "build-tools/tools/nix/planner"));
+    await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/planner"));
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/planner/cpp.nix"),
-      path.join(tmp, "build-tools/tools/nix/planner/cpp.nix"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/nix/planner/cpp.nix"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix"),
     );
     // Language manifest to enable planner adapter in the temp repo
     await fs.mkdirp(path.join(tmp, "build-tools/tools/nix"));
@@ -89,11 +89,11 @@ TEST(MathCore, AddWorks) {
               id: "cpp",
               displayName: "C++",
               requiredPaths: [
-                "build-tools/tools/nix/planner/cpp.nix",
-                "build-tools/tools/nix/templates/cpp.nix",
+                "viberoots/build-tools/tools/nix/planner/cpp.nix",
+                "viberoots/build-tools/tools/nix/templates/cpp.nix",
               ],
               kinds: ["bin", "lib", "test", "addon"],
-              templatesDir: "build-tools/tools/scaffolding/templates/cpp",
+              templatesDir: "viberoots/build-tools/tools/scaffolding/templates/cpp",
             },
           ],
         },
@@ -104,7 +104,7 @@ TEST(MathCore, AddWorks) {
     );
 
     // Local TARGETS for lib + gtest (use nixpkg_deps instead of provider deps in temp)
-    const targets = `load("//build-tools/cpp:defs.bzl", "nix_cpp_library", "nix_cpp_test")
+    const targets = `load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library", "nix_cpp_test")
 
 nix_cpp_library(
     name = "lib",
@@ -131,7 +131,7 @@ nix_cpp_test(
     await fs.outputFile(path.join(libDir, "TARGETS"), targets);
 
     // Pre-generate a graph.json for the temp repo so cpp_nix_build can find the new target
-    await $({ cwd: tmp })`node build-tools/tools/buck/export-graph.ts`;
+    await $({ cwd: tmp })`node viberoots/build-tools/tools/buck/export-graph.ts`;
 
     // Build and run the test inside the temp repo
     await $`buck2 build --target-platforms prelude//platforms:default //projects/libs/math-core:lib`;

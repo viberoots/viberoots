@@ -42,7 +42,7 @@ test("default-local policy allows inert remote profile and platform surfaces", a
     "toolchains/remote_execution_profiles.bzl": "REMOTE_PROFILES = {'linux-x86_64-default': {}}\n",
     "toolchains/remote_execution_platforms.bzl": "def remote_execution_platforms(): return []\n",
     "build-tools/tools/remote-exec/example-template.json": '{"endpoint":"re.example.invalid"}\n',
-    "build-tools/tools/nix/flake/packages/remote-worker-tools.nix": validRuntimeInventory,
+    "viberoots/build-tools/tools/nix/flake/packages/remote-worker-tools.nix": validRuntimeInventory,
   });
 
   const report = await evaluateDefaultLocalPolicy(root);
@@ -109,10 +109,11 @@ test("default-local policy rejects committed secrets and direct remote Buck conf
     "TESTING.md":
       "Do not run `buck2 test //... --config-file $VBR_REMOTE_BUCK_CONFIG` by default.\n",
     "docs/handbook/testing.md": "`buck2 test //... --config-file $VBR_REMOTE_BUCK_CONFIG`\n",
-    "build-tools/tools/bin/local-test": "buck2 test //... --config-file $VBR_REMOTE_BUCK_CONFIG\n",
-    "build-tools/tools/ci/run-stage.ts":
+    "viberoots/build-tools/tools/bin/local-test":
+      "buck2 test //... --config-file $VBR_REMOTE_BUCK_CONFIG\n",
+    "viberoots/build-tools/tools/ci/run-stage.ts":
       "await $`buck2 test //... --config-file $VBR_REMOTE_BUCK_CONFIG`;\n",
-    "build-tools/tools/dev/verify/buck2-test.ts": "await $`buck2 test //...`;\n",
+    "viberoots/build-tools/tools/dev/verify/buck2-test.ts": "await $`buck2 test //...`;\n",
     "build-tools/tools/remote-exec/generated-config.example.json":
       '{"endpoint":"grpc://re.prod.internal","token":"abcdefghijklmnop","cache_access_key":"AKIAIOSFODNN7EXAMPLE"}\n',
   });

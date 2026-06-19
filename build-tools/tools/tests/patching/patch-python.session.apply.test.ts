@@ -7,7 +7,14 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("patch-python session applies on Ctrl-D and clears session", async () => {
   await runInTemp("patch-python-session-apply", async (tmp, $) => {
-    const zxInit = path.join(process.cwd(), "build-tools", "tools", "dev", "zx-init.mjs");
+    const zxInit = path.join(
+      process.cwd(),
+      "viberoots",
+      "build-tools",
+      "tools",
+      "dev",
+      "zx-init.mjs",
+    );
     // Minimal importer with uv.lock and a resolvable distribution
     const importer = path.join(tmp, "apps", "pytool");
     await fs.mkdirp(importer);
@@ -26,7 +33,7 @@ test("patch-python session applies on Ctrl-D and clears session", async () => {
       cwd: tmp,
     })`NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
-    })} NIX_PY_DEV_OVERRIDE_JSON={} ${process.execPath} --experimental-strip-types --import ${zxInit} build-tools/tools/patch/patch-pkg.ts start python requests --importer ${importer}`;
+    })} NIX_PY_DEV_OVERRIDE_JSON={} ${process.execPath} --experimental-strip-types --import ${zxInit} viberoots/build-tools/tools/patch/patch-pkg.ts start python requests --importer ${importer}`;
     const ws = String(wsOut.stdout || "")
       .trim()
       .split(/\s+/)
@@ -47,7 +54,7 @@ test("patch-python session applies on Ctrl-D and clears session", async () => {
         NIX_PY_DEV_OVERRIDE_JSON: "{}",
         PATCH_SKIP_VERIFY: "1",
       },
-    })`${process.execPath} --experimental-strip-types --import ${zxInit} build-tools/tools/patch/patch-pkg.ts apply python requests --importer ${importer}`;
+    })`${process.execPath} --experimental-strip-types --import ${zxInit} viberoots/build-tools/tools/patch/patch-pkg.ts apply python requests --importer ${importer}`;
 
     // Patch file must be created under the importer-local patches directory
     const patch = path.join(importer, "patches", "python", "requests@2.32.3.patch");

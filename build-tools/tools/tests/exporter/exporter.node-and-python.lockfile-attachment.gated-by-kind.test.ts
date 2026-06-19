@@ -63,7 +63,7 @@ test("exporter attaches importer lockfile labels only for kind:* (node + python)
       cwd: tmp,
       stdio: "pipe",
       reject: false,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${simPath} --out ${outPath}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${simPath} --out ${outPath}`;
     if (res.exitCode !== 0) {
       console.error("exporter failed", String(res.stdout || "") + String(res.stderr || ""));
       process.exit(2);

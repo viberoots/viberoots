@@ -40,7 +40,7 @@ async function writePleominoFixture(tmp: string) {
     tmp,
     "projects/deployments/TARGETS",
     [
-      'load("//build-tools/deployments:defs.bzl", "deployment_defaults")',
+      'load("@viberoots//build-tools/deployments:defs.bzl", "deployment_defaults")',
       'deployment_defaults(name = "defaults", default_client_profile = "mini", visibility = ["PUBLIC"])',
     ].join("\n"),
   );

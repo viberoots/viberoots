@@ -12,7 +12,7 @@ test("sync-providers-cpp is a no-op (no provider files generated)", async () => 
     // Run the C++ providers sync scoped to tmp via the public CLI (should be a no-op)
     await $({
       cwd: tmp,
-    })`node ${path.join(process.cwd(), "build-tools/tools/buck/sync-providers.ts")} --lang=cpp`;
+    })`node ${path.join(process.cwd(), "viberoots/build-tools/tools/buck/sync-providers.ts")} --lang=cpp`;
     const exists = await fs.pathExists(out);
     if (exists) {
       console.error("C++ provider sync should not create TARGETS.cpp.auto");

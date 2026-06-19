@@ -5,7 +5,7 @@ import { writeIfChanged } from "./fs-helpers";
 import { DEFAULT_AUTO_MAP_PATH, DEFAULT_PROVIDER_TARGETS_PATH } from "./workspace-state-paths";
 
 const CXX_PROVIDER_TARGETS = [
-  'load("//:defs_cpp.bzl", "nix_cxx_library")',
+  'load("@workspace_providers//:defs_cpp.bzl", "nix_cxx_library")',
   "",
   'nix_cxx_library(name = "nix_pkgs_googletest", attr = "pkgs.googletest")',
   'nix_cxx_library(name = "nix_pkgs_zlib", attr = "pkgs.zlib")',
@@ -79,16 +79,16 @@ async function ensureCuratedTargets(workspaceRoot: string): Promise<void> {
     current = await fsp.readFile(targetsPath, "utf8");
   } catch {}
   current = current.replaceAll(
-    'load("@workspace_providers//:defs_cpp.bzl", "nix_cxx_library")',
     'load("//:defs_cpp.bzl", "nix_cxx_library")',
+    'load("@workspace_providers//:defs_cpp.bzl", "nix_cxx_library")',
   );
   current = current.replaceAll(
-    'load("@workspace_providers//:defs_node.bzl", "node_importer_deps")',
     'load("//:defs_node.bzl", "node_importer_deps")',
+    'load("@workspace_providers//:defs_node.bzl", "node_importer_deps")',
   );
   current = current.replaceAll(
-    'load("@workspace_providers//:defs_python.bzl", "python_importer_deps")',
     'load("//:defs_python.bzl", "python_importer_deps")',
+    'load("@workspace_providers//:defs_python.bzl", "python_importer_deps")',
   );
   if (!current.trim()) {
     await writeIfChanged(targetsPath, CXX_PROVIDER_TARGETS);

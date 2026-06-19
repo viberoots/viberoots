@@ -13,7 +13,7 @@ test("nix templates warn locally and fail in CI when dev overrides set", async (
     const cmdEval = `nix-instantiate --eval -E '
       let base = import <nixpkgs> {};
           pkgs = { lib = base.lib; buildGoApplication = args: args; };
-          T = import ./build-tools/tools/nix/lang-templates.nix { inherit pkgs; };
+          T = import ./viberoots/build-tools/tools/nix/lang-templates.nix { inherit pkgs; };
           drv = T.goLib { name = "//demo:lib"; modulesToml = ./gomod2nix.toml; };
           _ = drv.overrides "example@v1.0.0" {};
       in "ok"'

@@ -14,7 +14,14 @@ async function exists(p: string): Promise<boolean> {
 }
 
 function prewarmRecoveryHint(root: string): string {
-  const lockPath = path.join(root, "buck-out", ".unified-pnpm-store", "require.lock");
+  const lockPath = path.join(
+    root,
+    ".viberoots",
+    "workspace",
+    "buck",
+    "unified-pnpm-store",
+    "require.lock",
+  );
   return [
     "[verify] unified prewarm skipped (non-fatal).",
     `  - If verify appears blocked by lock contention, run: rm -f "${lockPath}"`,
@@ -24,7 +31,14 @@ function prewarmRecoveryHint(root: string): string {
 }
 
 export async function prewarmVerifyOnce(root: string, zxInitPath: string): Promise<void> {
-  const unifiedStamp = path.join(root, "buck-out", ".unified-pnpm-store", "path");
+  const unifiedStamp = path.join(
+    root,
+    ".viberoots",
+    "workspace",
+    "buck",
+    "unified-pnpm-store",
+    "path",
+  );
   const shouldPrewarmUnifiedInVerify = (process.env.VERIFY_PREWARM_UNIFIED || "0").trim() === "1";
   if (shouldPrewarmUnifiedInVerify && !(await exists(unifiedStamp))) {
     await runNodeWithZx({

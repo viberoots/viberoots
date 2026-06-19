@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import {
@@ -8,12 +9,30 @@ import {
 } from "./filtered-flake-diagnostics";
 import { filteredFlakeRsyncExcludeArgs } from "./nix-build-filtered-flake-lib";
 import { emitTimingDetail } from "../lib/timing-detail";
+import { resolveToolPathSync } from "../lib/tool-paths";
+
+function executablePath(filePath: string): string {
+  const candidate = filePath.trim();
+  if (!candidate || !path.isAbsolute(candidate)) return "";
+  try {
+    fs.accessSync(candidate, fs.constants.X_OK);
+    return candidate;
+  } catch {
+    return "";
+  }
+}
+
+function resolveNixBin(): string {
+  const fromEnv = executablePath(String(process.env.NIX_BIN || ""));
+  if (fromEnv) return fromEnv;
+  return resolveToolPathSync("nix");
+}
 
 export async function makeFilteredFlakeRef(opts: {
   workspaceRoot: string;
   attr: string;
   logPrefix: string;
-}): Promise<{ flakeRef: string; cleanup: () => Promise<void> }> {
+}): Promise<{ flakeRef: string; workspaceRoot: string; cleanup: () => Promise<void> }> {
   const tmpBase = process.env.TMPDIR || "/tmp";
   const workDirRaw = await fsp.mkdtemp(path.join(tmpBase, "vbr-flake-"));
   const workDir = await fsp.realpath(workDirRaw).catch(() => workDirRaw);
@@ -45,10 +64,115 @@ export async function makeFilteredFlakeRef(opts: {
       `${opts.logPrefix} snapshot ready in ${formatTimingDuration(elapsedMs)} files=${stats.fileCount} dirs=${stats.dirCount} kb=${stats.kb}`,
     );
   }
+  const hiddenFlake = path.join(snapDirReal, ".viberoots", "workspace", "flake.nix");
+  const rootFlake = path.join(snapDirReal, "flake.nix");
+  const flakeDir = (await fsp
+    .access(hiddenFlake)
+    .then(() => true)
+    .catch(() => false))
+    ? path.dirname(hiddenFlake)
+    : (await fsp
+          .access(rootFlake)
+          .then(() => true)
+          .catch(() => false))
+      ? snapDirReal
+      : "";
+  if (!flakeDir) {
+    await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    throw new Error(
+      `${opts.logPrefix} filtered source snapshot is missing .viberoots/workspace/flake.nix and flake.nix`,
+    );
+  }
+  await repairSnapshotViberootsInput({ snapDir: snapDirReal, flakeDir });
   return {
-    flakeRef: `path:${snapDirReal}#${opts.attr}`,
+    flakeRef: `path:${flakeDir}#${opts.attr}`,
+    workspaceRoot: snapDirReal,
     cleanup: async () => {
       await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
     },
+  };
+}
+
+async function repairSnapshotViberootsInput(opts: {
+  snapDir: string;
+  flakeDir: string;
+}): Promise<void> {
+  const snapshotViberootsRoot = path.join(opts.snapDir, "viberoots");
+  try {
+    await fsp.access(path.join(snapshotViberootsRoot, "flake.nix"));
+  } catch {
+    return;
+  }
+  const flakeLocalViberootsRoot = path.join(opts.flakeDir, "viberoots");
+  const liveViberootsRoot = await tempRepoLiveViberootsRoot();
+  if (liveViberootsRoot) {
+    await fsp.rm(flakeLocalViberootsRoot, { recursive: true, force: true }).catch(() => {});
+    await rewriteViberootsInput(opts.flakeDir, liveViberootsRoot);
+    return;
+  }
+  await fsp.rm(flakeLocalViberootsRoot, { recursive: true, force: true }).catch(() => {});
+  await $({
+    stdio: "pipe",
+  })`rsync -a --delete --exclude .git --exclude node_modules ${snapshotViberootsRoot}/ ${flakeLocalViberootsRoot}/`;
+  await rewriteViberootsInput(opts.flakeDir, "./viberoots");
+}
+
+async function tempRepoLiveViberootsRoot(): Promise<string> {
+  if (String(process.env.VBR_RUN_IN_TEMP_REPO || "").trim() !== "1") return "";
+  const raw = String(process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "").trim();
+  if (!raw) return "";
+  const root = path.resolve(raw);
+  try {
+    await fsp.access(path.join(root, "flake.nix"));
+    await fsp.access(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"));
+  } catch {
+    return "";
+  }
+  return await fsp.realpath(root).catch(() => root);
+}
+
+async function rewriteViberootsInput(flakeDir: string, inputPath: string): Promise<void> {
+  const resolvedInputPath = path.isAbsolute(inputPath)
+    ? inputPath
+    : path.resolve(flakeDir, inputPath);
+  const lockedInput = await lockPathInput(resolvedInputPath);
+  const flakePath = path.join(flakeDir, "flake.nix");
+  const text = await fsp.readFile(flakePath, "utf8").catch(() => "");
+  const next = text.replace(
+    /(\bviberoots\.url\s*=\s*)"[^"]*"/,
+    (_match, prefix: string) => `${prefix}"path:${inputPath}"`,
+  );
+  if (next !== text) await fsp.writeFile(flakePath, next, "utf8");
+  const lockPath = path.join(flakeDir, "flake.lock");
+  try {
+    const lock = JSON.parse(await fsp.readFile(lockPath, "utf8")) as {
+      nodes?: Record<string, Record<string, unknown>>;
+    };
+    const node = lock.nodes?.viberoots;
+    if (node) {
+      node.locked = lockedInput;
+      node.original = { type: "path", path: resolvedInputPath };
+      await fsp.writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8");
+    }
+  } catch {}
+}
+
+async function lockPathInput(inputPath: string): Promise<Record<string, unknown>> {
+  const nixBin = resolveNixBin();
+  const metadata = await $({
+    stdio: "pipe",
+  })`${nixBin} flake metadata --json ${`path:${inputPath}`} --no-write-lock-file`;
+  const parsed = JSON.parse(String(metadata.stdout || "{}")) as { url?: string };
+  const lockedUrl = new URL(parsed.url || "");
+  const narHash = lockedUrl.searchParams.get("narHash") || "";
+  const lastModified = Number(lockedUrl.searchParams.get("lastModified") || "0");
+  if (!narHash || !Number.isFinite(lastModified) || lastModified <= 0) {
+    throw new Error(`[filtered-flake] failed to lock path input ${inputPath}`);
+  }
+  return {
+    lastModified,
+    narHash,
+    path: inputPath,
+    type: "path",
   };
 }

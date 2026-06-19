@@ -14,51 +14,60 @@ test("cpp present: validator passes and diagnose enables cpp", async () => {
         {
           id: "go",
           displayName: "Go",
-          requiredPaths: ["build-tools/tools/nix/templates/go.nix", "build-tools/go/defs.bzl"],
+          requiredPaths: [
+            "viberoots/build-tools/tools/nix/templates/go.nix",
+            "viberoots/build-tools/go/defs.bzl",
+          ],
           kinds: ["cli", "lib"],
-          templatesDir: "build-tools/tools/scaffolding/templates/go",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/go",
         },
         {
           id: "cpp",
           displayName: "C++",
-          requiredPaths: ["build-tools/cpp/defs.bzl", "build-tools/tools/nix/templates/cpp.nix"],
+          requiredPaths: [
+            "viberoots/build-tools/cpp/defs.bzl",
+            "viberoots/build-tools/tools/nix/templates/cpp.nix",
+          ],
           kinds: ["bin", "lib", "test"],
-          templatesDir: "build-tools/tools/scaffolding/templates/cpp",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/cpp",
           capabilities: { patching: false },
         },
       ],
     } as any;
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/nix/langs.json"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/langs.json"),
       JSON.stringify(manifest, null, 2) + "\n",
     );
 
     // Create requiredPaths for cpp
-    await fs.outputFile(path.join(tmp, "build-tools/cpp/defs.bzl"), "# cpp defs\n");
-    await fs.outputFile(path.join(tmp, "build-tools/tools/nix/templates/cpp.nix"), "# nix\n");
+    await fs.outputFile(path.join(tmp, "viberoots/build-tools/cpp/defs.bzl"), "# cpp defs\n");
+    await fs.outputFile(
+      path.join(tmp, "viberoots/build-tools/tools/nix/templates/cpp.nix"),
+      "# nix\n",
+    );
 
     // Copy validator/diagnose scripts into temp
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/dev/langs.schema.json"),
-      path.join(tmp, "build-tools/tools/dev/langs.schema.json"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/dev/langs.schema.json"),
+      path.join(tmp, "viberoots/build-tools/tools/dev/langs.schema.json"),
     );
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/dev/validate-langs.ts"),
-      path.join(tmp, "build-tools/tools/dev/validate-langs.ts"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/dev/validate-langs.ts"),
+      path.join(tmp, "viberoots/build-tools/tools/dev/validate-langs.ts"),
     );
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/dev/langs-diagnose.ts"),
-      path.join(tmp, "build-tools/tools/dev/langs-diagnose.ts"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/dev/langs-diagnose.ts"),
+      path.join(tmp, "viberoots/build-tools/tools/dev/langs-diagnose.ts"),
     );
 
     // Validate manifest
-    const vres = await $({ cwd: tmp })`node build-tools/tools/dev/validate-langs.ts`;
+    const vres = await $({ cwd: tmp })`node viberoots/build-tools/tools/dev/validate-langs.ts`;
     assert.match(String(vres.stdout), /langs\.json: OK/);
 
     // Diagnose should enable cpp
     const dres = await $({
       cwd: tmp,
-    })`node build-tools/tools/dev/langs-diagnose.ts --json --lang cpp`;
+    })`node viberoots/build-tools/tools/dev/langs-diagnose.ts --json --lang cpp`;
     const obj = JSON.parse(String(dres.stdout || "{}"));
     assert.ok(Array.isArray(obj.enabled));
     assert.ok(obj.enabled.includes("cpp"));

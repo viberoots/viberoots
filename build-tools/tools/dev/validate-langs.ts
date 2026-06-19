@@ -17,10 +17,22 @@ try {
 
 type ManifestLike = any;
 
+async function sourceRoot(repo: string): Promise<string> {
+  const envRoot = String(
+    process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "",
+  ).trim();
+  if (envRoot) return path.resolve(envRoot);
+  if (await fs.pathExists(path.join(repo, "viberoots", "build-tools"))) {
+    return path.join(repo, "viberoots");
+  }
+  return repo;
+}
+
 async function main(): Promise<void> {
   const repo = process.cwd();
-  const manifestPath = path.join(repo, "build-tools/tools/nix/langs.json");
-  const schemaPath = path.join(repo, "build-tools/tools/dev/langs.schema.json");
+  const source = await sourceRoot(repo);
+  const manifestPath = path.join(source, "build-tools/tools/nix/langs.json");
+  const schemaPath = path.join(source, "build-tools/tools/dev/langs.schema.json");
   const exists = await fs.pathExists(manifestPath);
   if (!exists) {
     console.log("langs.json not found — OK (nothing to validate)");

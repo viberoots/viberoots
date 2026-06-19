@@ -20,7 +20,7 @@ test("TypeScript Nix builder policy renders explicit local-only builders", () =>
 });
 
 test("Starlark Nix builder policy constants and renderer stay available", () => {
-  const text = fs.readFileSync("build-tools/lang/nix_builder_policy.bzl", "utf8");
+  const text = fs.readFileSync("viberoots/build-tools/lang/nix_builder_policy.bzl", "utf8");
   assert.match(text, /NIX_BUILDER_LOCAL_ONLY = "local_only"/);
   assert.match(text, /NIX_BUILDER_INHERIT_CONFIG = "inherit_config"/);
   assert.match(text, /NIX_BUILDER_FORCE_BUILDERS_FILE = "force_builders_file"/);
@@ -30,18 +30,20 @@ test("Starlark Nix builder policy constants and renderer stay available", () => 
 
 test("production local-only --builders usage is classified through policy helpers", () => {
   const productionFiles = [
-    "build-tools/tools/buck/node-cli-bundle.ts",
-    "build-tools/tools/dev/node-modules-build.ts",
-    "build-tools/tools/dev/update-pnpm-hash/nix.ts",
+    "viberoots/build-tools/tools/buck/node-cli-bundle.ts",
+    "viberoots/build-tools/tools/dev/node-modules-build.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/nix.ts",
   ];
   for (const file of productionFiles) {
     const text = fs.readFileSync(file, "utf8");
     assert.match(text, /nix-builder-policy/);
   }
 
-  const searched = ["build-tools/tools", "build-tools/lang", "toolchains"].flatMap((dir) =>
-    fs.readdirSync(dir, { recursive: true }).map((entry) => `${dir}/${entry}`),
-  );
+  const searched = [
+    "viberoots/build-tools/tools",
+    "viberoots/build-tools/lang",
+    "viberoots/toolchains",
+  ].flatMap((dir) => fs.readdirSync(dir, { recursive: true }).map((entry) => `${dir}/${entry}`));
   const offenders = searched.filter((file) => {
     if (!file.match(/\.(ts|bzl|nix)$/)) return false;
     if (file.includes("/tests/")) return false;

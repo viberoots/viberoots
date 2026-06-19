@@ -59,7 +59,7 @@ test("graph-view CLI prints composite view with nodes and indexes", async () => 
       "utf8",
     );
 
-    const out = await $`node build-tools/tools/buck/graph-view.ts`;
+    const out = await $`node viberoots/build-tools/tools/buck/graph-view.ts`;
     const txt = String(out.stdout || "").trim();
     if (!txt) {
       console.error("graph-view produced no output");

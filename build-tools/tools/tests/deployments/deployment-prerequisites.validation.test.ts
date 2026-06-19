@@ -73,7 +73,7 @@ test("deployment extraction rejects cross-lane prerequisites", () => {
     staticWebappComponent("//projects/apps/pleomino:app"),
     nixosSharedHostLaneGovernanceNodeFixture(),
     cloudflarePagesLaneGovernanceNodeFixture({
-      name: "//build-tools/deployments/lanes:marketing_governance",
+      name: "@viberoots//build-tools/deployments/lanes:marketing_governance",
       source_ref_policies: [
         {
           stage: "staging",
@@ -84,16 +84,16 @@ test("deployment extraction rejects cross-lane prerequisites", () => {
     }),
     nixosSharedHostLanePolicyNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture({
-      name: "//build-tools/deployments/lanes:marketing",
+      name: "@viberoots//build-tools/deployments/lanes:marketing",
       stages: ["staging"],
       source_ref_policy: { staging: "main" },
       allowed_promotion_edges: [],
-      governance_policy: "//build-tools/deployments/lanes:marketing_governance",
+      governance_policy: "@viberoots//build-tools/deployments/lanes:marketing_governance",
     }),
     nixosSharedHostAdmissionPolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture({
-      name: "//build-tools/deployments/policies:marketing_staging_release",
+      name: "@viberoots//build-tools/deployments/policies:marketing_staging_release",
       allowed_refs: ["main"],
       required_checks: ["deploy/marketing-staging"],
     }),
@@ -121,9 +121,9 @@ test("deployment extraction rejects cross-lane prerequisites", () => {
       publisher: "wrangler-pages",
       publisher_config: "wrangler.jsonc",
       protection_class: "shared_nonprod",
-      lane_policy: "//build-tools/deployments/lanes:marketing",
+      lane_policy: "@viberoots//build-tools/deployments/lanes:marketing",
       environment_stage: "staging",
-      admission_policy: "//build-tools/deployments/policies:marketing_staging_release",
+      admission_policy: "@viberoots//build-tools/deployments/policies:marketing_staging_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       provider_target: { account: "acct", project: "marketing-staging-pages" },

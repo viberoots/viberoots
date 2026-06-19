@@ -24,7 +24,8 @@ test("exporter fails when Go-like node lacks rule_type and lang:go", async () =>
     const res = await $({
       cwd: tmp,
       reject: false,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`.exitCode;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`
+      .exitCode;
     if (res === 0) {
       console.error("expected exporter to fail but it succeeded");
       process.exit(2);

@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { test } from "node:test";
@@ -77,7 +78,7 @@ test("deploy --status --text summarizes hosted run phase, approval, and artifact
         cwd: tmp,
         env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --status --text --deploy-run-id deploy-run-hosted-ux --control-plane-url ${mock.url}`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --status --text --deploy-run-id deploy-run-hosted-ux --control-plane-url ${mock.url}`;
       const text = String(result.stdout);
       assert.match(text, /status: pending approval/);
       assert.match(text, /deployRunId: deploy-run-hosted-ux/);

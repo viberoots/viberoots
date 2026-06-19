@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 test(
-  "nix_node_cli_bin(bundle=True) bootstraps WORKSPACE_ROOT via build-tools/tools/buck/workspace-root.env in temp repos",
+  "nix_node_cli_bin(bundle=True) bootstraps WORKSPACE_ROOT via viberoots/build-tools/tools/buck/workspace-root.env in temp repos",
   { timeout: 420_000 },
   async () => {
     await runInTemp("node-cli-bundle-workspace-root-env-probe", async (tmp, $) => {
@@ -18,7 +18,7 @@ test(
       await fsp.writeFile(
         path.join(dir, "TARGETS"),
         [
-          'load("//build-tools/node:defs.bzl", "nix_node_cli_bin")',
+          'load("@viberoots//build-tools/node:defs.bzl", "nix_node_cli_bin")',
           "",
           "nix_node_cli_bin(",
           '  name = "tool",',
@@ -42,9 +42,12 @@ test(
       if (res.exitCode !== 0) return;
       const combined = String(res.stderr || "") + String(res.stdout || "");
       assert.ok(
-        combined.includes(". build-tools/tools/buck/workspace-root.env") ||
-          combined.includes(". build-tools/tools/buck/workspace-root.env 2>/dev/null || true;"),
-        "expected bundled CLI cmd to source build-tools/tools/buck/workspace-root.env (standardized temp-repo bootstrap)",
+        combined.includes(". .viberoots/workspace/buck/workspace-root.env") ||
+          combined.includes(". viberoots/build-tools/tools/buck/workspace-root.env") ||
+          combined.includes(
+            ". viberoots/build-tools/tools/buck/workspace-root.env 2>/dev/null || true;",
+          ),
+        "expected bundled CLI cmd to source the standardized workspace-root.env bootstrap",
       );
     });
   },

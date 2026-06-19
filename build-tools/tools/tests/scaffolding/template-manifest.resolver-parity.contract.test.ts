@@ -15,6 +15,6 @@ test("parity: resolver mappings are generated from canonical manifest", async ()
   assert.equal(
     current,
     expected,
-    "resolver.json is stale; run node build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts",
+    "resolver.json is stale; run node viberoots/build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts",
   );
 });

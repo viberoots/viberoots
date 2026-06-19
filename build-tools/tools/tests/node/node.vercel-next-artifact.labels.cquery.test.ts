@@ -40,7 +40,7 @@ test("node_vercel_next_artifact stamps deployable SSR component labels", async (
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "node_vercel_next_artifact")',
+        'load("@viberoots//build-tools/node:defs.bzl", "node_vercel_next_artifact")',
         "",
         "node_vercel_next_artifact(",
         '  name = "vercel_artifact",',

@@ -30,10 +30,10 @@ test("exporter caches go list results and second run is mostly cache hits", asyn
     await fs.outputFile(graph, JSON.stringify(nodes, null, 2));
 
     // First run: expect cache misses > 0
-    const metrics1 = path.join(tmp, "build-tools/tools/buck/metrics1.json");
+    const metrics1 = path.join(tmp, "viberoots/build-tools/tools/buck/metrics1.json");
     await $({
       cwd: tmp,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${metrics1}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${metrics1}`;
     const m1 = JSON.parse(await fs.readFile(metrics1, "utf8"));
     if (!(m1.cacheMisses >= 0)) {
       console.error("missing cacheMisses in metrics1");
@@ -41,10 +41,10 @@ test("exporter caches go list results and second run is mostly cache hits", asyn
     }
 
     // Second run: expect cacheHits >= previous misses (best effort)
-    const metrics2 = path.join(tmp, "build-tools/tools/buck/metrics2.json");
+    const metrics2 = path.join(tmp, "viberoots/build-tools/tools/buck/metrics2.json");
     await $({
       cwd: tmp,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${metrics2}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${metrics2}`;
     const m2 = JSON.parse(await fs.readFile(metrics2, "utf8"));
     if (!(m2.cacheHits >= m1.cacheMisses)) {
       console.error("expected cacheHits to be >= first-run cacheMisses", m2, m1);

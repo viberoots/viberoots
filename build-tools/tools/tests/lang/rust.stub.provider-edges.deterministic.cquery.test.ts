@@ -24,10 +24,10 @@ function parseCqueryOne(stdout: string): any | null {
 test("rust macros realize provider edges in deps deterministically (cquery)", async () => {
   await runInTemp("rust-provider-edges", async (tmp, $) => {
     const rustDefs = await fsp.readFile(
-      path.join(process.cwd(), "build-tools", "rust", "defs.bzl"),
+      path.join(process.cwd(), "viberoots", "build-tools", "rust", "defs.bzl"),
       "utf8",
     );
-    const rustDir = path.join(tmp, "build-tools", "rust");
+    const rustDir = path.join(tmp, "viberoots", "build-tools", "rust");
     await fsp.mkdir(rustDir, { recursive: true });
     await fsp.writeFile(path.join(rustDir, "defs.bzl"), rustDefs, "utf8");
 
@@ -56,7 +56,7 @@ test("rust macros realize provider edges in deps deterministically (cquery)", as
       [
         "# test: rust.stub.provider-edges.deterministic.cquery.test.ts",
         'load("@prelude//:rules.bzl", "genrule")',
-        'load("//build-tools/rust:defs.bzl", "rust_library")',
+        'load("@viberoots//build-tools/rust:defs.bzl", "rust_library")',
         "",
         'genrule(name = "prov_a", out = "prov_a.stamp", cmd = "echo a > $OUT", visibility = ["//visibility:public"])',
         'genrule(name = "prov_b", out = "prov_b.stamp", cmd = "echo b > $OUT", visibility = ["//visibility:public"])',

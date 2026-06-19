@@ -66,11 +66,11 @@ test("glue-pipeline: outputs identical to manual steps (with pnpm lockfile prese
     await fsp.writeFile(graphPath, JSON.stringify(nodes), "utf8");
 
     // Baseline: manual steps
-    await $`node build-tools/tools/buck/sync-providers.ts`;
-    await $`node build-tools/tools/buck/gen-provider-index.ts --out .viberoots/workspace/providers/provider_index.bzl`;
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out ${DEFAULT_AUTO_MAP_PATH}`;
-    await $`node build-tools/tools/node/gen-workspace-map.ts`;
-    await $`node build-tools/tools/buck/invalidation-report.ts --out ${DEFAULT_INVALIDATION_REPORT_PATH}`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts`;
+    await $`node viberoots/build-tools/tools/buck/gen-provider-index.ts --out .viberoots/workspace/providers/provider_index.bzl`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${DEFAULT_GRAPH_PATH} --out ${DEFAULT_AUTO_MAP_PATH}`;
+    await $`node viberoots/build-tools/tools/node/gen-workspace-map.ts`;
+    await $`node viberoots/build-tools/tools/buck/invalidation-report.ts --out ${DEFAULT_INVALIDATION_REPORT_PATH}`;
 
     const provDir = path.join(tmp, WORKSPACE_PROVIDER_DIR);
     const baseNodeTargets = await readOrEmpty(path.join(tmp, providerAutoTargetsPath("node")));
@@ -78,7 +78,7 @@ test("glue-pipeline: outputs identical to manual steps (with pnpm lockfile prese
     const baseIndex = await readOrEmpty(path.join(tmp, DEFAULT_PROVIDER_INDEX_PATH));
     const baseMap = await readOrEmpty(path.join(tmp, DEFAULT_AUTO_MAP_PATH));
     const baseWorkspaceMap = await readOrEmpty(
-      path.join(tmp, "build-tools", "tools", "node", "workspace-map.json"),
+      path.join(tmp, ".viberoots", "workspace", "node", "workspace-map.json"),
     );
     const baseReport = await readOrEmpty(path.join(tmp, DEFAULT_INVALIDATION_REPORT_PATH));
 
@@ -90,7 +90,7 @@ test("glue-pipeline: outputs identical to manual steps (with pnpm lockfile prese
       });
     } catch {}
     try {
-      await fsp.rm(path.join(tmp, "build-tools", "tools", "node", "workspace-map.json"), {
+      await fsp.rm(path.join(tmp, ".viberoots", "workspace", "node", "workspace-map.json"), {
         force: true,
       });
     } catch {}
@@ -99,14 +99,14 @@ test("glue-pipeline: outputs identical to manual steps (with pnpm lockfile prese
         force: true,
       });
     } catch {}
-    await $`node build-tools/tools/buck/glue-pipeline.ts`;
+    await $`node viberoots/build-tools/tools/buck/glue-pipeline.ts`;
 
     const pipeNodeTargets = await readOrEmpty(path.join(tmp, providerAutoTargetsPath("node")));
     const pipePyTargets = await readOrEmpty(path.join(tmp, providerAutoTargetsPath("python")));
     const pipeIndex = await readOrEmpty(path.join(tmp, DEFAULT_PROVIDER_INDEX_PATH));
     const pipeMap = await readOrEmpty(path.join(tmp, DEFAULT_AUTO_MAP_PATH));
     const pipeWorkspaceMap = await readOrEmpty(
-      path.join(tmp, "build-tools", "tools", "node", "workspace-map.json"),
+      path.join(tmp, ".viberoots", "workspace", "node", "workspace-map.json"),
     );
     const pipeReport = await readOrEmpty(path.join(tmp, DEFAULT_INVALIDATION_REPORT_PATH));
 
@@ -140,7 +140,7 @@ test("glue-pipeline: outputs identical to manual steps (with pnpm lockfile prese
       console.error("expected file missing: invalidation-report.txt");
       process.exit(2);
     }
-    if (!(await exists(path.join(tmp, "build-tools", "tools", "node", "workspace-map.json")))) {
+    if (!(await exists(path.join(tmp, ".viberoots", "workspace", "node", "workspace-map.json")))) {
       console.error("expected file missing: workspace-map.json");
       process.exit(2);
     }

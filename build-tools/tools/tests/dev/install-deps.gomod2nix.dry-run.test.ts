@@ -12,7 +12,7 @@ test("install-deps gomod2nix dry-run logs command and does not write file", asyn
       cwd: tmp,
       stdio: "pipe",
       env: { ...process.env },
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs ./build-tools/tools/dev/install-deps.ts --dry-run`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs ./viberoots/build-tools/tools/dev/install-deps.ts --dry-run`;
     const out = String(stdout);
     if (!out.includes("[gomod2nix] dry-run: ")) {
       console.error("expected dry-run log for gomod2nix");

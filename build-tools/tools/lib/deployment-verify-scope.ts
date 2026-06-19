@@ -55,8 +55,13 @@ function normalizeRepoPath(relPath: string): string {
     .replace(/^\.\/+/, "");
 }
 
-function matchesPrefix(relPath: string, prefixes: readonly string[]): boolean {
+function buildSystemPathForClassification(relPath: string): string {
   const p = normalizeRepoPath(relPath);
+  return p.startsWith("viberoots/build-tools/") ? p.slice("viberoots/".length) : p;
+}
+
+function matchesPrefix(relPath: string, prefixes: readonly string[]): boolean {
+  const p = buildSystemPathForClassification(relPath);
   return prefixes.some((prefix) => p.startsWith(prefix));
 }
 
@@ -65,7 +70,7 @@ export function isReviewedDeploymentOwnedTestPath(relPath: string): boolean {
 }
 
 export function isReviewedDeploymentOwnedBuildSystemPath(relPath: string): boolean {
-  const p = normalizeRepoPath(relPath);
+  const p = buildSystemPathForClassification(relPath);
   return (
     REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS.includes(
       p as (typeof REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS)[number],
@@ -74,7 +79,7 @@ export function isReviewedDeploymentOwnedBuildSystemPath(relPath: string): boole
 }
 
 export function isReviewedSharedBuildSystemPath(relPath: string): boolean {
-  const p = normalizeRepoPath(relPath);
+  const p = buildSystemPathForClassification(relPath);
   if (
     REVIEWED_SHARED_BUILD_SYSTEM_PATHS.includes(
       p as (typeof REVIEWED_SHARED_BUILD_SYSTEM_PATHS)[number],

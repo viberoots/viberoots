@@ -24,7 +24,7 @@ test("python binary carries importer-local patches as action inputs (cquery)", a
       path.join(appDir, "TARGETS"),
       [
         'load("@prelude//:rules.bzl", "python_library")',
-        'load("//build-tools/python:defs.bzl", "nix_python_binary")',
+        'load("@viberoots//build-tools/python:defs.bzl", "nix_python_binary")',
         "",
         "python_library(",
         '  name = "lib",',

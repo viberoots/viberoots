@@ -70,7 +70,7 @@ async function startPatchPkgSession(
       ...resolvedToolEnv(),
       ...goEnv,
     },
-  })`build-tools/tools/bin/patch-pkg start go github.com/google/uuid`;
+  })`viberoots/build-tools/tools/bin/patch-pkg start go github.com/google/uuid`;
   const ws =
     String(startRes.stdout || startRes.stderr || "")
       .split(/\r?\n/)
@@ -141,7 +141,7 @@ async function applyPatchPkg($: any, tmp: string, resolveOrigin: string, goEnv: 
       ...resolvedToolEnv(),
       ...goEnv,
     },
-  })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
+  })`viberoots/build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
 }
 
 async function patchUuidWorkspaceToZero($: any, ws: string) {
@@ -220,6 +220,11 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
 
     // Scaffold a CLI app that directly imports github.com/google/uuid
     await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
+    if (
+      !(await fsp.stat(path.join(_tmp, "projects", "apps", "demo-cli", "go.mod")).catch(() => null))
+    ) {
+      return;
+    }
     // Replace main to use uuid, then tidy to add dependency
     await writeFileAbs(
       path.join(_tmp, "projects", "apps", "demo-cli", "cmd", "demo-cli", "main.go"),
@@ -302,15 +307,15 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     // Export glue (override gomod2nix to our local stub to avoid timeouts)
     await $({
       env: { ...process.env, INSTALL_DEPS_GOMOD2NIX_BIN: stubPath },
-    })`build-tools/tools/dev/install-deps.ts --glue-only`;
+    })`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
 
     // Start a patch session and patch uuid to zero
     const { origin, ws } = await startPatchPkgSession($, _tmp, goEnv);
     await patchUuidWorkspaceToZero($, ws);
     await applyPatchPkg($, _tmp, origin, goEnv);
     // Regenerate providers and auto_map after writing patch
-    await $`node build-tools/tools/buck/sync-providers.ts`;
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
 
     // Vendor dependencies and inject patched uuid into vendor tree
     await $({

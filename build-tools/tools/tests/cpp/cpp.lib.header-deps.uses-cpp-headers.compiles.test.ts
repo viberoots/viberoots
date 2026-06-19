@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import fs from "fs-extra";
 import path from "node:path";
-import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("cpp library compiles with header_deps via nix_cpp_headers (build)", async () => {
   await runInTemp("cpp-lib-header-deps-compiles", async (tmp, $) => {
     await fs.outputFile(
-      path.join(tmp, "build-tools", "tools", "nix", "langs.json"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "nix", "langs.json"),
       JSON.stringify({ enabled: ["cpp"] }, null, 2) + "\n",
       "utf8",
     );
@@ -21,7 +21,7 @@ test("cpp library compiles with header_deps via nix_cpp_headers (build)", async 
     await fs.outputFile(
       path.join(tmp, "libs", "hdrs", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_headers")',
         "",
         "nix_cpp_headers(",
         '  name = "hdrs",',
@@ -42,7 +42,7 @@ test("cpp library compiles with header_deps via nix_cpp_headers (build)", async 
     await fs.outputFile(
       path.join(tmp, "libs", "core", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "core",',
@@ -66,14 +66,14 @@ test("cpp library compiles with header_deps via nix_cpp_headers (build)", async 
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const build = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//projects/libs/core:core" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.equal(build.exitCode, 0, String(build.stderr || build.stdout));
   });
 });

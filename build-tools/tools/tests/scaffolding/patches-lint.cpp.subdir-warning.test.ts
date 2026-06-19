@@ -11,7 +11,7 @@ test("patches-lint (cpp): subdirectory warns (non-strict) and fails (strict)", a
     // Non-strict should warn but not fail
     const resWarn = await $({
       nothrow: true,
-    })`node build-tools/tools/dev/patches-lint.ts --lang cpp`;
+    })`node viberoots/build-tools/tools/dev/patches-lint.ts --lang cpp`;
     if (resWarn.exitCode !== 0) {
       console.error("expected non-strict lint to succeed despite subdir");
       process.exit(2);
@@ -19,7 +19,7 @@ test("patches-lint (cpp): subdirectory warns (non-strict) and fails (strict)", a
     // Strict should fail
     const resStrict = await $({
       nothrow: true,
-    })`node build-tools/tools/dev/patches-lint.ts --lang cpp --strict`;
+    })`node viberoots/build-tools/tools/dev/patches-lint.ts --lang cpp --strict`;
     if (resStrict.exitCode === 0) {
       console.error("expected strict lint to fail due to subdir");
       process.exit(2);

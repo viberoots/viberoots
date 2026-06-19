@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
@@ -19,7 +20,7 @@ test("cloudflare-pages preview requires --source-run-id for shared/protected pre
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --preview`,
+        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deployment.label} --preview`,
       /--preview requires --source-run-id/,
     );
   });
@@ -36,7 +37,7 @@ test("cloudflare-pages preview cleanup requires explicit preview identity", asyn
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --preview-cleanup`,
+        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deployment.label} --preview-cleanup`,
       /--preview-cleanup requires --source-run-id/,
     );
   });
@@ -51,7 +52,7 @@ test("cloudflare-pages preview is rejected when deployment metadata does not opt
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --preview --source-run-id deploy-123`,
+        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deployment.label} --preview --source-run-id deploy-123`,
       /preview is not enabled/,
     );
   });

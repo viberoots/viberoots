@@ -13,6 +13,7 @@ import {
   withAwsCredentialFile,
 } from "./cloud-control-aws-ecr-registry.fixture";
 import { ec2HostProfileInput } from "./cloud-control-aws-ec2-host-profile.fixture";
+import { viberootsRepoPath } from "./deployment-command";
 
 test("ECR readiness and cutover require typed OpenTofu plan apply and read-only evidence", async () => {
   await withAwsCredentialFile(async () => {
@@ -178,7 +179,7 @@ test("generated ECR bundle carries OpenTofu evidence files and bundle-root comma
 
 test("AWS foundation OpenTofu declares ECR repository posture and import adoption surface", async () => {
   const root = path.join(
-    process.cwd(),
+    viberootsRepoPath("."),
     "build-tools/deployments/aws-control-plane-foundation/opentofu",
   );
   const combined = await Promise.all(

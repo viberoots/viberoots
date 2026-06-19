@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  binWrapper,
   escapeRegExp,
   makeFakeAgentTools,
   repoRoot,
@@ -11,7 +12,7 @@ import {
   scratchRoot,
 } from "./agent-wrapper-test-helpers.ts";
 
-const wrapper = path.join(repoRoot, "build-tools", "tools", "bin", "claude");
+const wrapper = binWrapper("claude");
 const makeFakeTools = (tmp: string, gitRoot: string) => makeFakeAgentTools(tmp, gitRoot, "claude");
 test("claude --worktree attaches to an existing named worktree", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });

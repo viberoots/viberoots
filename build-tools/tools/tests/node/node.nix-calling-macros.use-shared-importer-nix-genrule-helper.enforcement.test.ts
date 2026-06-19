@@ -7,8 +7,8 @@ function assert(condition: boolean, message: string) {
 }
 
 test("node Nix-calling macros route through unified wiring helper", async () => {
-  const file = "build-tools/node/defs_nix.bzl";
-  const helperFile = "build-tools/node/defs_nix_helpers.bzl";
+  const file = "viberoots/build-tools/node/defs_nix.bzl";
+  const helperFile = "viberoots/build-tools/node/defs_nix_helpers.bzl";
   const txt = await fsp.readFile(file, "utf8");
   const helperTxt = await fsp.readFile(helperFile, "utf8");
 

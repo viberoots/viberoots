@@ -167,7 +167,7 @@ depends on them.
     `@workspace_providers//:auto_map.bzl`.
   - Buck target labels use `viberoots//...` and `workspace_providers//...`, not `@cell//...`.
 - Add a disposable Nix fixture proving:
-  - a root flake can consume `inputs.viberoots.url = "path:./viberoots"`;
+  - a root flake can consume a local viberoots checkout;
   - `inputs.viberoots.lib.mkWorkspace { workspaceSrc = ./.; ... }` can receive a workspace source
     outside the viberoots source;
   - the viberoots flake can still access its own source through `viberootsInput.outPath`.
@@ -317,7 +317,7 @@ and future remote mode.
 - Implement `viberoots init-workspace` or equivalent activation command.
 - Create or repair `.viberoots/current`.
 - In local mode, ensure `.viberoots/current -> ../viberoots` and fail if the root flake points at
-  `path:./viberoots` but the symlink points elsewhere.
+  the local viberoots checkout but the symlink points elsewhere.
 - In remote-shaped fixtures, point `.viberoots/current` at a materialized flake source path.
 - Create `.viberoots/workspace/` subdirectories needed by later provider and Buck state relocation.
 - Add startup checks for missing `viberoots/flake.nix`, missing `.buckroot`, and stale/missing cell
@@ -745,7 +745,7 @@ using the local source.
 ### 2. Scope of changes
 
 - Replace root flake internals with:
-  - `inputs.viberoots.url = "path:./viberoots"` for local dogfood mode;
+  - `inputs.viberoots.url = "git+file:./viberoots"` for local dogfood mode;
   - `inputs.viberoots.lib.mkWorkspace { workspaceSrc = ./.; ... }`.
 - Ensure `nix develop` runs activation or validates activation state.
 - Ensure `viberoots version` reports local source mode, live checkout path, revision, and dirty
@@ -773,7 +773,7 @@ using the local source.
 - Version/status tests for local mode.
 - Status/startup tests proving old-layout root paths, `//build-tools` loads, and
   `//third_party/providers` labels are reported as PR-9 blockers before extraction.
-- Tests proving root flake delegation uses the local `path:./viberoots` viberoots source without
+- Tests proving root flake delegation uses the local `git+file:./viberoots` viberoots source without
   creating root-cell compatibility shims.
 
 ### 5. Docs to be added or updated
@@ -795,7 +795,7 @@ using the local source.
 
 ### 7. Risks
 
-- Nix lock behavior for `path:./viberoots` may differ across local and CI contexts.
+- Nix lock behavior for local submodule inputs may differ across local and CI contexts.
 
 ### 8. Mitigations
 
@@ -823,6 +823,12 @@ workspace as a submodule.
 - Preserve useful history where practical.
 - Add `.gitmodules`.
 - Add `viberoots/` as a submodule.
+- Enforce the visible parent-root contract after extraction:
+  - allowed visible root entries are only `README.md`, `viberoots/`, and `projects/`;
+  - hidden/transient workspace state may remain only when required, such as `.git/`, `.envrc`,
+    `.direnv/`, `.viberoots/`, `.buckconfig`, `.buckroot`, and generated hidden tool state;
+  - visible root `flake.nix` and `flake.lock` must not remain; the tiny delegating workspace flake,
+    when needed to load the viberoots devshell, lives under hidden `.viberoots/workspace/`.
 - Move reusable paths into the submodule:
   - `build-tools/**`
   - `toolchains/**`
@@ -830,17 +836,42 @@ workspace as a submodule.
   - `vendor/uv2nix/**`
   - reusable tool package metadata
   - viberoots docs/tests
+  - `AI-PREFERENCES.XML`, `METHODOLOGY.XML`, `TESTING.md`, viberoots-owned `docs/**`,
+    `config/**`, `patches/**`, `plugins/**`, `types/**`, viberoots pnpm package metadata,
+    lockfiles, and pnpm hashes
 - Keep parent-owned paths in the parent workspace:
   - `projects/**`
-  - root `.buckconfig`, `.buckroot`, `flake.nix`, `flake.lock`
+  - project-owned package manager hashes such as `projects/node-modules.hashes.json`
+  - root `README.md`
+  - root `.envrc`, `.buckconfig`, `.buckroot`, and other justified hidden workspace state
   - `.viberoots/workspace/**`
   - project docs/config
+- Keep parent-repo-specific files out of `viberoots/`. The viberoots repository is reusable
+  tooling consumed as a submodule or remote flake by many parent repositories, so it must not
+  commit state for a particular parent repo's `projects/` tree. This includes project lockfile
+  hashes, generated workspace maps, generated provider state, family-specific bootstrap targets,
+  project docs, and other artifacts whose meaning depends on the consumer repository. Tool-owned
+  defaults may live in `viberoots/`; consumer/project state belongs under `projects/` or hidden
+  parent workspace state such as `.viberoots/workspace/`.
+- Add the canonical local-consumer bootstrap entrypoint `./viberoots/init`. It must be
+  idempotent, detect the consumer root as the parent of `./viberoots`, create `projects/` when
+  missing, create or repair `.viberoots/current -> ../viberoots`, create `.viberoots/workspace/`,
+  write or update a minimal root `.envrc` that loads the viberoots devshell and exposes bare
+  commands, create light root and `projects/README.md` files when missing, run `direnv allow` when
+  available, and print exact next steps when `direnv` is missing or cannot allow the workspace.
+  It must preserve existing `projects/` content and avoid overwriting edited files unless the
+  behavior is explicitly safe.
 - Ensure `.viberoots/current -> ../viberoots`.
+- Ensure bare commands such as `s`, `v`, `i`, and `b` work from the parent root and from
+  `projects/` through devshell/PATH/tool activation, without recreating top-level `build-tools/`.
 - Delete or prove nonexistence of root compatibility surfaces:
   - root `build-tools/`;
   - root `third_party/providers/`;
   - root `prelude/`;
   - root `toolchains/`;
+  - root `docs/`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
+    `AI-PREFERENCES.XML`, `METHODOLOGY.XML`, `TESTING.md`, `TARGETS`, `config/`, `patches/`,
+    `plugins/`, and `types/`;
   - forwarding packages for `//build-tools` loads;
   - forwarding packages or generated outputs for `//third_party/providers`.
 - Enforce that active Buck files, templates, and generated outputs do not use
@@ -848,7 +879,7 @@ workspace as a submodule.
 - Replace any root `prelude` validation with `.viberoots/current/prelude` validation.
 - Add startup/status diagnostics for missing `viberoots/` submodule, uninitialized submodule, dirty
   submodule, checked-out submodule not matching the parent gitlink, root `flake.lock` not aligned
-  with `path:./viberoots`, and stale or wrong `.viberoots/current`.
+  with the local viberoots input, and stale or wrong `.viberoots/current`.
 
 ### 3. External prerequisites
 
@@ -859,6 +890,12 @@ workspace as a submodule.
 ### 4. Tests to be added
 
 - Submodule initialization test or CI bootstrap test.
+- `./viberoots/init` idempotence tests for a bare consumer root and for an existing root with
+  populated `projects/`.
+- Strict visible-root enforcement test proving the parent root contains no old combined-repo
+  source/config entries after PR-9, while justified hidden workspace state remains valid.
+- Bare-command smoke tests proving `s`, `v`, `i`, and `b` are discoverable from the root and from
+  `projects/` through the devshell, with no root `build-tools/`.
 - Live-edit test proving a change inside `viberoots/` affects project workflows immediately after
   normal Buck/Nix cache invalidation.
 - Root `nix develop` and representative Buck/project validation.
@@ -875,6 +912,11 @@ workspace as a submodule.
 
 - Update contributor docs with submodule workflow.
 - Update troubleshooting docs for missing or stale submodule state.
+- Document the canonical bootstrap flow:
+  `git submodule add git@github.com:viberoots/viberoots.git viberoots` followed by
+  `./viberoots/init`.
+- Keep root `README.md` intentionally light, pointing to `viberoots/README.md` and
+  `projects/README.md`.
 
 ### 5.5. Expected regression scope
 
@@ -885,12 +927,21 @@ workspace as a submodule.
 ### 6. Acceptance criteria
 
 - Parent workspace no longer tracks viberoots-owned implementation files outside the submodule.
+- Parent workspace visible root is limited to `README.md`, `viberoots/`, and `projects/`; the
+  delegating Nix workspace flake lives under hidden `.viberoots/workspace/`.
 - CI initializes submodules before validation.
 - Root workflows still pass.
+- `./viberoots/init` is the reproducible bootstrap for a bare consumer checkout and is idempotent.
+- Bare `s`, `v`, `i`, and `b` work from the parent root and `projects/` through devshell/PATH/tool
+  activation, without root `build-tools/`.
 - Active project/root Buck loads use `@viberoots//build-tools/...`.
 - Generated providers live only under `.viberoots/workspace/providers` and are addressed as
   `workspace_providers//...`.
 - Generated Buck state lives under `.viberoots/workspace/buck`.
+- Project-specific hashes and generated consumer state are not committed under `viberoots/`; for
+  example, parent project pnpm hashes live in `projects/node-modules.hashes.json`, while
+  `viberoots/build-tools/tools/nix/node-modules.hashes.json` contains only viberoots/tool-owned
+  defaults.
 - Root `build-tools/`, root `third_party/providers/`, and root `prelude/` or `toolchains/`
   compatibility surfaces do not remain, except test-only fixtures explicitly modeling invalid
   legacy input.
@@ -904,6 +955,14 @@ workspace as a submodule.
 - Remaining active `//build-tools` or `//third_party/providers` references are blockers for PR-9,
   not migration debt.
 - Root `prelude/` or `toolchains/` assumptions are blockers for PR-9.
+- Any old combined-repo visible root entry other than `README.md`, `viberoots/`, and `projects/` is
+  a PR-9 blocker.
+- Any parent-repo-specific file committed under `viberoots/` is a PR-9 blocker unless it is an
+  explicitly named reusable fixture; project-specific runtime defaults, generated maps, project
+  lockfile hashes, and family-specific bootstrap state must be moved to `projects/`, hidden
+  workspace state, or a generic viberoots template API.
+- Missing or non-idempotent `./viberoots/init` is a PR-9 blocker because external consumers need a
+  reproducible bootstrap before PR-10.
 
 ### 8. Mitigations
 
@@ -931,7 +990,11 @@ vendoring viberoots source.
 ### 2. Scope of changes
 
 - Add an external-consumer fixture or template with:
-  - root `flake.nix`;
+  - the same strict visible-root contract as PR-9: `README.md`, `viberoots/` only when testing
+    local/submodule mode, and `projects/`; for remote mode, no vendored `viberoots/` source is
+    allowed unless the fixture is explicitly modeling local bootstrap;
+  - no visible root `flake.nix` or `flake.lock`; any tiny delegating workspace flake lives under
+    hidden `.viberoots/workspace/`;
   - explicit remote viberoots version reference such as `github:OWNER/viberoots/v1.4.2`;
   - committed `flake.lock`;
   - `.buckconfig` using `.viberoots/current`;
@@ -942,6 +1005,10 @@ vendoring viberoots source.
   - provider targets with public visibility;
   - minimal `projects/apps/*` or `projects/libs/*` target.
 - Make activation materialize `.viberoots/current` from the locked flake source.
+- Ensure remote-consumer bootstrap has a canonical path equivalent to the local
+  `./viberoots/init` flow. If remote mode cannot use `./viberoots/init` because no local
+  `viberoots/` checkout exists, PR-10 must document and test the exact alternate command and keep
+  it idempotent.
 - Add `viberoots version` output for remote mode: requested ref, locked revision, effective source
   path, and whether `.viberoots/current` matches the locked source.
 - Define the remote activation contract: either refresh `.viberoots/current` on every
@@ -949,6 +1016,11 @@ vendoring viberoots source.
   changes.
 - Reject hidden copies of viberoots, dual provider layouts, and root-cell legacy shims in the
   external fixture.
+- Prove the parent-repo ownership boundary from PR-9 with a second consumer: viberoots must not
+  contain artifacts that are specific to this repository's `projects/` tree. Consumer lockfile
+  hashes, workspace maps, generated providers, project docs, and family-specific deployment
+  bootstrap state must be generated or committed in the consumer workspace, not in the reusable
+  viberoots source.
 - Close the integration debt ledger.
 
 ### 3. External prerequisites
@@ -960,11 +1032,20 @@ vendoring viberoots source.
 - External fixture `nix develop`/evaluation test.
 - External fixture Nix eval or `nix develop` smoke test.
 - External fixture Buck parse/cquery/build test for one representative `projects/` target.
+- External fixture strict-root test proving remote consumption does not introduce root
+  `build-tools/`, root `docs/`, root package manager metadata, root `config/`, root `patches/`,
+  root `plugins/`, root `types/`, or root-cell legacy shims.
+- External fixture bare-command smoke test proving `s`, `v`, `i`, and `b` work from root and
+  `projects/` through the chosen activation/devshell path.
 - Remote-mode activation and status tests.
 - Remote activation tests proving the chosen refresh or GC-root strategy keeps `.viberoots/current`
   aligned with `flake.lock`.
 - Tests proving generated providers exist only under `.viberoots/workspace/providers`, generated
   Buck state uses `.viberoots/workspace/buck`, and provider targets have public visibility.
+- Tests proving project-owned hash state is read from the consumer workspace, such as
+  `projects/node-modules.hashes.json`, and is not written into the viberoots source tree.
+- Tests or review checks proving viberoots runtime/tooling does not contain project-family
+  constants from this repository except in explicitly named reusable fixtures.
 - Targeted provider, Buck, Nix, and scaffolding selectors touched by the plan.
 - Full `i && b && ALL_TESTS=1 v` only if this PR changes shared Buck/Nix/build logic beyond the
   fixture/template surface.
@@ -972,6 +1053,8 @@ vendoring viberoots source.
 ### 5. Docs to be added or updated
 
 - Add or update external project setup docs.
+- Document the remote bootstrap command if it differs from local `./viberoots/init`, and explain
+  the PR-9 decision to keep the delegating flake hidden under `.viberoots/workspace/`.
 - Update [`docs/viberoots-flake.md`](viberoots-flake.md) if any remote-mode behavior changed.
 - Update this plan with final validation evidence.
 
@@ -984,12 +1067,19 @@ vendoring viberoots source.
 
 - External fixture consumes remote viberoots without vendoring `build-tools`, `prelude`, or
   `toolchains`.
+- External fixture preserves the strict visible-root contract and has no old combined-repo visible
+  root files.
 - External fixture has root `projects/`, `.viberoots/current`, `.viberoots/workspace/providers`,
   `.viberoots/workspace/buck`, required per-cell Buck config, public provider targets, and one
   representative `projects/` target that parses, cqueries, and builds.
+- Bare `s`, `v`, `i`, and `b` work from the external fixture root and from `projects/` through the
+  chosen activation/devshell path.
 - Remote status output shows requested ref, locked revision, effective source path, and whether
   `.viberoots/current` matches the locked source.
 - Remote activation has an explicit refresh or GC-root contract.
+- The remote fixture demonstrates that viberoots contains reusable tooling only: no hashes,
+  generated maps, provider state, project docs, or project-family bootstrap defaults from this
+  parent repository are required inside the viberoots checkout.
 - Targeted remote fixture validation and plan assessment pass.
 - The integration debt ledger is closed. If PR-10 touched shared build logic, a final full
   `i && b && ALL_TESTS=1 v` also passes.
@@ -1001,6 +1091,10 @@ vendoring viberoots source.
 - Missing `.viberoots/workspace/buck` in the external fixture is a PR-10 blocker.
 - Remaining active `//build-tools` or `//third_party/providers` references are blockers for PR-10,
   not migration debt.
+- Any remote fixture that passes by vendoring viberoots source, recreating root `build-tools/`, or
+  keeping old combined-repo visible root files is a PR-10 blocker.
+- Any PR-10 implementation that requires committing consumer-specific project state under
+  `viberoots/` is a design failure, not an acceptable fixture shortcut.
 
 ### 8. Mitigations
 
@@ -1015,3 +1109,66 @@ The design would only prove local submodule dogfooding, not the intended externa
 ### 10. Downsides for implementing this PR
 
 It adds ongoing fixture/template maintenance.
+
+## PR-11: Consumer-owned generated maps and hash state
+
+### 1. Intent
+
+Remove any remaining generated workspace maps and parent-project hash state from the reusable
+viberoots source tree.
+
+### 2. Scope of changes
+
+- Move generated workspace maps out of `viberoots/` and into hidden parent workspace state such as
+  `.viberoots/workspace/**`, or into `projects/**` when the data is project-owned.
+- Keep parent project lockfile hashes in `projects/node-modules.hashes.json` or another
+  parent-owned location.
+- Keep `viberoots/build-tools/tools/nix/node-modules.hashes.json` limited to reusable
+  viberoots/tooling-owned hashes.
+- Add checks that normal `i`, `b`, `v`, provider generation, and hash update flows do not write
+  parent-repo-specific generated state into `viberoots/`.
+
+### 3. Acceptance criteria
+
+- No generated workspace map or parent project lockfile hash is committed under `viberoots/`.
+- Local project workflows still read the parent-owned state.
+
+## PR-12: Remove Pleomino-specific runtime/bootstrap assumptions from viberoots
+
+### 1. Intent
+
+Make viberoots runtime and bootstrap tooling reusable across multiple parent repositories by
+removing assumptions tied to this repository's Pleomino project.
+
+### 2. Scope of changes
+
+- Move Pleomino-specific deployment target defaults, family-specific bootstrap state, and project
+  runtime configuration out of `viberoots/`.
+- Replace project-family constants in reusable tooling with generic extension points, templates, or
+  parent-owned configuration.
+- Keep Pleomino docs/config under `projects/` unless they are intentionally generic viberoots
+  examples.
+
+### 3. Acceptance criteria
+
+- A parent repository without Pleomino can consume viberoots without editing viberoots source.
+- Pleomino workflows still work from parent-owned project configuration.
+
+## PR-13: Ownership-boundary enforcement
+
+### 1. Intent
+
+Turn the viberoots/parent ownership boundary into durable tests and review checks.
+
+### 2. Scope of changes
+
+- Add tests or lint checks that reject parent-repo-specific hashes, generated maps, provider state,
+  project docs, deployment target state, and project-family bootstrap defaults under `viberoots/`.
+- Add a remote or second-consumer fixture that proves viberoots works without this repository's
+  parent-specific files.
+- Document allowed reusable fixtures so test examples do not become hidden runtime coupling.
+
+### 3. Acceptance criteria
+
+- Ownership-boundary checks fail on representative misplaced parent/project state.
+- Remote or second-consumer validation passes without parent-specific files inside `viberoots/`.

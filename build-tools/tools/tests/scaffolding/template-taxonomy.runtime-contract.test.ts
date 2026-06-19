@@ -34,6 +34,7 @@ test("negative path: missing canonical template root fails deterministically", a
     const missingId = "ts/lib";
     const missingRoot = path.join(
       tmp,
+      "viberoots",
       "build-tools",
       "tools",
       "scaffolding",
@@ -44,8 +45,12 @@ test("negative path: missing canonical template root fails deterministically", a
     await fsp.rm(missingRoot, { recursive: true, force: true });
 
     const prevCwd = process.cwd();
+    const prevSourceRoot = process.env.VIBEROOTS_SOURCE_ROOT;
+    const prevRoot = process.env.VIBEROOTS_ROOT;
     try {
       process.chdir(tmp);
+      process.env.VIBEROOTS_SOURCE_ROOT = path.join(tmp, "viberoots");
+      process.env.VIBEROOTS_ROOT = path.join(tmp, "viberoots");
       await assert.rejects(
         async () => await readTemplateMeta("ts"),
         new RegExp(`missing template root for canonical id '${missingId}'`),
@@ -53,6 +58,16 @@ test("negative path: missing canonical template root fails deterministically", a
       );
     } finally {
       process.chdir(prevCwd);
+      if (prevSourceRoot === undefined) {
+        delete process.env.VIBEROOTS_SOURCE_ROOT;
+      } else {
+        process.env.VIBEROOTS_SOURCE_ROOT = prevSourceRoot;
+      }
+      if (prevRoot === undefined) {
+        delete process.env.VIBEROOTS_ROOT;
+      } else {
+        process.env.VIBEROOTS_ROOT = prevRoot;
+      }
     }
   });
 });

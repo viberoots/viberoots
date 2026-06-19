@@ -6,7 +6,8 @@ import {
   validateRemoteConformance,
 } from "../../remote-exec/buck-event-log-remote-check";
 
-const readyTarget = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles";
+const readyTarget =
+  "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles";
 
 test("Buck what-ran parser classifies pinned executor variants", () => {
   const actions = parseWhatRanText(

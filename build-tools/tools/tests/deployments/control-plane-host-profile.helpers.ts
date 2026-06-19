@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { parseControlPlaneRuntimeConfig } from "../../deployments/control-plane-runtime-config";
 import { REVIEWED_IMAGE_DIGEST } from "./control-plane-nixos-container-module.helpers";
+import { viberootsRepoPath } from "./deployment-command";
 
 const execFileAsync = promisify(execFile);
 
@@ -16,7 +17,7 @@ export async function loadNixosDefaults(): Promise<NixosDefaults> {
       "--json",
       "--impure",
       "--expr",
-      "import ./build-tools/tools/nix/deployment-control-plane-container-defaults.nix",
+      `import ${viberootsRepoPath("viberoots/build-tools/tools/nix/deployment-control-plane-container-defaults.nix")}`,
     ],
     { cwd: process.cwd(), maxBuffer: 1024 * 1024 },
   );
@@ -31,7 +32,7 @@ export async function loadNixosRenderedConfig(): Promise<
       system = import <nixpkgs/nixos> {
         configuration = {
           nixpkgs.hostPlatform = "x86_64-linux";
-          imports = [ ./build-tools/tools/nix/deployment-control-plane-container-module.nix ];
+          imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/deployment-control-plane-container-module.nix")} ];
           system.stateVersion = "24.11";
           services.viberoots.deploymentControlPlaneContainer = {
             enable = true;

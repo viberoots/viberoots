@@ -10,47 +10,47 @@ function assert(condition: boolean, message: string) {
 type Finding = { file: string; hint: string };
 
 const CANONICAL_IMPLEMENTATION_FILES = new Set([
-  "build-tools/tools/patch/lib/importer-local-patch-dir.ts",
-  "build-tools/tools/patch/lib/workspace-workflow.ts",
+  "viberoots/build-tools/tools/patch/lib/importer-local-patch-dir.ts",
+  "viberoots/build-tools/tools/patch/lib/workspace-workflow.ts",
 ]);
 
-const PATCH_ENTRYPOINT_PREFIX = "build-tools/tools/patch/patch-";
+const PATCH_ENTRYPOINT_PREFIX = "viberoots/build-tools/tools/patch/patch-";
 
 const BANNED_IMPORTER_LOCAL_PATCH_DIR_PATTERNS: Array<{ re: RegExp; hint: string }> = [
   {
     re: /\bdefaultImporterPatchDir\s*\(/,
-    hint: "Do not call defaultImporterPatchDir(...) from patch tooling entrypoints. Use build-tools/tools/patch/lib/importer-local-patch-dir.ts:resolveImporterLocalPatchDir(...).",
+    hint: "Do not call defaultImporterPatchDir(...) from patch tooling entrypoints. Use viberoots/build-tools/tools/patch/lib/importer-local-patch-dir.ts:resolveImporterLocalPatchDir(...).",
   },
   {
     re: /\bpath\.join\s*\([^)]*\b(?:importerDir|importerDirAbs)\b[^)]*["']patches["'][^)]*["'](?:node|python)["'][^)]*\)/,
-    hint: "Do not assemble <importer>/patches/<lang> paths in entrypoints. Use build-tools/tools/patch/lib/importer-local-patch-dir.ts:resolveImporterLocalPatchDir(...).",
+    hint: "Do not assemble <importer>/patches/<lang> paths in entrypoints. Use viberoots/build-tools/tools/patch/lib/importer-local-patch-dir.ts:resolveImporterLocalPatchDir(...).",
   },
   {
     re: /\bpath\.resolve\s*\([^)]*\b(?:importerDir|importerDirAbs)\b[^)]*["']patches["'][^)]*["'](?:node|python)["'][^)]*\)/,
-    hint: "Do not assemble <importer>/patches/<lang> paths in entrypoints. Use build-tools/tools/patch/lib/importer-local-patch-dir.ts:resolveImporterLocalPatchDir(...).",
+    hint: "Do not assemble <importer>/patches/<lang> paths in entrypoints. Use viberoots/build-tools/tools/patch/lib/importer-local-patch-dir.ts:resolveImporterLocalPatchDir(...).",
   },
 ];
 
 const BANNED_WORKSPACE_SESSION_LOGIC_PATTERNS: Array<{ re: RegExp; hint: string }> = [
   {
     re: /from\s+["']\.\/state["']/,
-    hint: "Workspace-based patch entrypoints must not interact with build-tools/tools/patch/state.ts directly. Use build-tools/tools/patch/lib/workspace-workflow.ts (start/apply/reset) for Go and Python.",
+    hint: "Workspace-based patch entrypoints must not interact with viberoots/build-tools/tools/patch/state.ts directly. Use viberoots/build-tools/tools/patch/lib/workspace-workflow.ts (start/apply/reset) for Go and Python.",
   },
   {
     re: /from\s+["']\.\.\/state["']/,
-    hint: "Workspace-based patch entrypoints must not interact with build-tools/tools/patch/state.ts directly. Use build-tools/tools/patch/lib/workspace-workflow.ts (start/apply/reset) for Go and Python.",
+    hint: "Workspace-based patch entrypoints must not interact with viberoots/build-tools/tools/patch/state.ts directly. Use viberoots/build-tools/tools/patch/lib/workspace-workflow.ts (start/apply/reset) for Go and Python.",
   },
   {
     re: /\bgetSession\s*\(/,
-    hint: "Workspace-based patch entrypoints must not call getSession(...). Use build-tools/tools/patch/lib/workspace-workflow.ts for session reuse and no-op cleanup.",
+    hint: "Workspace-based patch entrypoints must not call getSession(...). Use viberoots/build-tools/tools/patch/lib/workspace-workflow.ts for session reuse and no-op cleanup.",
   },
   {
     re: /\bsetSession\s*\(/,
-    hint: "Workspace-based patch entrypoints must not call setSession(...). Use build-tools/tools/patch/lib/workspace-workflow.ts for session creation.",
+    hint: "Workspace-based patch entrypoints must not call setSession(...). Use viberoots/build-tools/tools/patch/lib/workspace-workflow.ts for session creation.",
   },
   {
     re: /\bdeleteSession\s*\(/,
-    hint: "Workspace-based patch entrypoints must not call deleteSession(...). Use build-tools/tools/patch/lib/workspace-workflow.ts for session cleanup.",
+    hint: "Workspace-based patch entrypoints must not call deleteSession(...). Use viberoots/build-tools/tools/patch/lib/workspace-workflow.ts for session cleanup.",
   },
 ];
 
@@ -59,11 +59,11 @@ function rel(p: string): string {
 }
 
 async function listPatchEntrypoints(repoRoot: string): Promise<string[]> {
-  const dir = path.join(repoRoot, "build-tools/tools/patch");
+  const dir = path.join(repoRoot, "viberoots/build-tools/tools/patch");
   const ents = await fsp.readdir(dir, { withFileTypes: true } as any);
   const files = ents
     .filter((e) => e.isFile() && e.name.startsWith("patch-") && e.name.endsWith(".ts"))
-    .map((e) => rel(path.join("build-tools/tools/patch", e.name)));
+    .map((e) => rel(path.join("viberoots/build-tools/tools/patch", e.name)));
   files.sort((a, b) => a.localeCompare(b));
   return files;
 }
@@ -92,7 +92,7 @@ test("patch tooling entrypoints stay on shared helper boundaries (importer-local
   const entrypoints = await listPatchEntrypoints(repoRoot);
   assert(
     entrypoints.length > 0,
-    "expected at least one patch-* entrypoint under build-tools/tools/patch/",
+    "expected at least one patch-* entrypoint under viberoots/build-tools/tools/patch/",
   );
 
   const hits: Finding[] = [];
@@ -103,8 +103,8 @@ test("patch tooling entrypoints stay on shared helper boundaries (importer-local
     hits.push(...scanFileForFindings({ relFile: f, txt }));
 
     if (
-      f === "build-tools/tools/patch/patch-go.ts" ||
-      f === "build-tools/tools/patch/patch-python.ts"
+      f === "viberoots/build-tools/tools/patch/patch-go.ts" ||
+      f === "viberoots/build-tools/tools/patch/patch-python.ts"
     ) {
       hits.push(...scanWorkspaceEntrypointForFindings({ relFile: f, txt }));
     }
@@ -119,7 +119,8 @@ test("patch tooling entrypoints stay on shared helper boundaries (importer-local
   }
 
   // Positive control: fixture with banned patterns must be flagged.
-  const fixture = "build-tools/tools/tests/fixtures/patching/patch-tooling-bespoke-patterns.ts";
+  const fixture =
+    "viberoots/build-tools/tools/tests/fixtures/patching/patch-tooling-bespoke-patterns.ts";
   const fixtureTxt = await fsp.readFile(path.join(repoRoot, fixture), "utf8");
   const fixtureHits = scanFileForFindings({ relFile: fixture, txt: fixtureTxt });
   assert(

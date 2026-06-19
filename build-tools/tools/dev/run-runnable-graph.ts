@@ -67,7 +67,7 @@ async function chooseFlakeRef(opts: {
   target?: string;
   sourceMode: "auto" | "git" | "path";
   attr: "graph-generator" | "graph-generator-selected";
-}): Promise<{ flakeRef: string; cleanup?: () => Promise<void> }> {
+}): Promise<{ flakeRef: string; workspaceRoot?: string; cleanup?: () => Promise<void> }> {
   if (opts.sourceMode === "path") return { flakeRef: `path:${opts.workspaceRoot}#${opts.attr}` };
   if (opts.sourceMode === "git") return { flakeRef: `${opts.workspaceRoot}#${opts.attr}` };
   if (isLikelyTempWorkspace(opts.workspaceRoot))
@@ -101,7 +101,11 @@ async function chooseFlakeRef(opts: {
       attr: opts.attr,
       logPrefix: "[run-runnable]",
     });
-    return { flakeRef: filtered.flakeRef, cleanup: filtered.cleanup };
+    return {
+      flakeRef: filtered.flakeRef,
+      workspaceRoot: filtered.workspaceRoot,
+      cleanup: filtered.cleanup,
+    };
   } catch {
     return { flakeRef: `${opts.workspaceRoot}#${opts.attr}` };
   }
@@ -121,7 +125,7 @@ export async function buildRunnableManifest(
   const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
   const baseEnv: Record<string, string> = {
     ...process.env,
-    WORKSPACE_ROOT: workspaceRoot,
+    WORKSPACE_ROOT: source.workspaceRoot || workspaceRoot,
     BUCK_TEST_SRC: workspaceRoot,
     BUCK_GRAPH_JSON: graphPath,
   };
@@ -177,7 +181,7 @@ export async function buildSelectedOutPath(
   const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
   const selectedEnv: Record<string, string> = {
     ...process.env,
-    WORKSPACE_ROOT: workspaceRoot,
+    WORKSPACE_ROOT: source.workspaceRoot || workspaceRoot,
     BUCK_TEST_SRC: workspaceRoot,
     BUCK_GRAPH_JSON: graphPath,
     BUCK_TARGET: target,

@@ -35,7 +35,7 @@ test("install node patch warning surfaces importer-specific remediation command"
       reject: false,
       nothrow: true,
       env: { ...process.env, WORKSPACE_ROOT: tmp },
-    })`node --input-type=module --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs -e "import { warnNodePatchRequirementsInLocal } from './build-tools/tools/lib/node-deps-enforcement'; await warnNodePatchRequirementsInLocal(process.cwd());"`;
+    })`node --input-type=module --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs -e "import { warnNodePatchRequirementsInLocal } from './build-tools/tools/lib/node-deps-enforcement'; await warnNodePatchRequirementsInLocal(process.cwd());"`;
     const all = String(out.stdout || "") + String(out.stderr || "");
     if (!all.includes("patch-pkg sync-required node --importer projects/apps/web")) {
       throw new Error("expected importer-specific remediation command in warning output");

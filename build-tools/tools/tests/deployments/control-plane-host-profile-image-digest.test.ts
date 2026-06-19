@@ -6,6 +6,7 @@ import { test } from "node:test";
 import YAML from "yaml";
 import { assertControlPlaneImageDigestReference } from "../../deployments/control-plane-image-publication";
 import { REVIEWED_IMAGE_DIGEST } from "./control-plane-nixos-container-module.helpers";
+import { viberootsRepoPath } from "./deployment-command";
 
 const PROFILE_DIR = "build-tools/tools/deployments/control-plane-host-profile";
 const COMPOSE_IMAGE_REF =
@@ -38,5 +39,5 @@ test("non-NixOS host profile requires digest-assembled image references", async 
 });
 
 async function readProfileFile(name: string): Promise<string> {
-  return await fsp.readFile(path.join(process.cwd(), PROFILE_DIR, name), "utf8");
+  return await fsp.readFile(viberootsRepoPath(path.join(PROFILE_DIR, name)), "utf8");
 }

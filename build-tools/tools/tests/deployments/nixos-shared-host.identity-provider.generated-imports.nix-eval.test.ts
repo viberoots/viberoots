@@ -1,17 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsRepoPath } from "./deployment-command";
 
 test("shared-host identity provider module bootstraps generated identity imports", async () => {
-  const modulePath = path.join(
-    process.cwd(),
-    "build-tools",
-    "tools",
-    "nix",
-    "shared-host-identity-provider-module.nix",
+  const modulePath = viberootsRepoPath(
+    "viberoots/build-tools/tools/nix/shared-host-identity-provider-module.nix",
   );
   const moduleText = await fsp.readFile(modulePath, "utf8");
   assert.match(moduleText, /generatedImportRoot/);
@@ -27,7 +23,7 @@ test("shared-host identity provider module bootstraps generated identity imports
       let
         system = import <nixpkgs/nixos> {
           configuration = {
-            imports = [ ./build-tools/tools/nix/shared-host-identity-provider-module.nix ];
+            imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-identity-provider-module.nix")} ];
             system.stateVersion = "24.11";
             deploymentHost.identityProvider = {
               enable = true;

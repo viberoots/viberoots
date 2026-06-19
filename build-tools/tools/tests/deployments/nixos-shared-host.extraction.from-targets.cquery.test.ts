@@ -30,7 +30,7 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
     await fsp.writeFile(
       deployTargetsPath,
       [
-        'load("//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
+        'load("@viberoots//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
         "",
         "nixos_shared_host_static_webapp_deployment(",
         '    name = "deploy",',
@@ -101,7 +101,7 @@ test("nixos-shared-host cquery extraction rejects incomplete external requiremen
     await fsp.writeFile(
       deployTargetsPath,
       [
-        'load("//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
+        'load("@viberoots//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
         "",
         "nixos_shared_host_static_webapp_deployment(",
         '    name = "deploy",',
@@ -167,7 +167,7 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
     await fsp.writeFile(
       deployTargetsPath,
       [
-        'load("//build-tools/deployments:defs.bzl", "nixos_shared_host_multi_static_webapp_deployment")',
+        'load("@viberoots//build-tools/deployments:defs.bzl", "nixos_shared_host_multi_static_webapp_deployment")',
         "",
         "nixos_shared_host_multi_static_webapp_deployment(",
         '    name = "deploy",',

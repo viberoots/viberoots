@@ -101,13 +101,14 @@ test(
       assert.match(serverTsHelper, /MODULE_CONTRACTS_DIR/);
       assert.doesNotMatch(serverTsHelper, /\.\.\/app\/ts-modules\.manifest\.json/);
       assert.match(buildSsrScript, /for \(const entry of wasmManifest\.modules \|\| \[\]\)/);
-      assert.match(buildSsrScript, /sync-module-contracts\.ts --cwd \. --print-json 1/);
+      assert.match(buildSsrScript, /viberootsTool\("sync-module-contracts\.ts"\)/);
+      assert.match(buildSsrScript, /"--cwd",\s*"\.",\s*"--print-json",\s*"1"/);
 
       const logs: string[] = [];
       const watcher = spawn(
         "zx-wrapper",
         [
-          "../../../build-tools/tools/dev/watch-wasm-coordinator.ts",
+          "../../../viberoots/build-tools/tools/dev/watch-wasm-coordinator.ts",
           "--cwd",
           appAbs,
           "--poll-ms",

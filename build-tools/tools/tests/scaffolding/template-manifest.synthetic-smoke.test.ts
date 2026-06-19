@@ -9,6 +9,7 @@ test("smoke: synthetic manifest template is exposed via generated surfaces", asy
   await runInTemp("template-manifest-synthetic", async (tmp, _$) => {
     const syntheticRoot = path.join(
       tmp,
+      "viberoots",
       "build-tools",
       "tools",
       "scaffolding",
@@ -39,16 +40,16 @@ test("smoke: synthetic manifest template is exposed via generated surfaces", asy
     await fsp.writeFile(path.join(syntheticRoot, "copier.yaml"), 'language: "ts"\n', "utf8");
 
     const $ = _$({ stdio: "pipe" });
-    await $`node build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts`;
+    await $`node viberoots/build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts`;
 
     const adapter = await fsp.readFile(
-      path.join(tmp, "build-tools", "tools", "tests", "template_taxonomy_adapter.bzl"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "tests", "template_taxonomy_adapter.bzl"),
       "utf8",
     );
     assert.match(adapter, /"ts\/synthetic"/);
 
     const resolverRaw = await fsp.readFile(
-      path.join(tmp, "build-tools", "tools", "scaffolding", "resolver.json"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "scaffolding", "resolver.json"),
       "utf8",
     );
     const resolver = JSON.parse(resolverRaw) as Record<string, Record<string, string>>;
@@ -57,6 +58,7 @@ test("smoke: synthetic manifest template is exposed via generated surfaces", asy
     const runtimeTaxonomy = await fsp.readFile(
       path.join(
         tmp,
+        "viberoots",
         "build-tools",
         "tools",
         "scaffolding",

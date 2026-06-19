@@ -25,14 +25,14 @@ test("patch-python remove drops patch and refreshes glue deterministically", asy
     const patch = path.join(patchDir, "requests@2.32.3.patch");
     await fs.writeFile(patch, "--- a/readme.txt\n+++ b/readme.txt\n", "utf8");
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
 
     // Remove should delete the patch and invoke glue (creating providers auto outputs)
     await $({
       cwd: tmp,
     })`WORKSPACE_ROOT=${tmp} NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
-    })} NIX_PY_DEV_OVERRIDE_JSON={} build-tools/tools/bin/patch-pkg remove python requests --importer ${importer}`;
+    })} NIX_PY_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg remove python requests --importer ${importer}`;
 
     if (await fs.pathExists(patch)) {
       console.error("expected python patch file to be removed:", patch);
@@ -66,7 +66,7 @@ test("patch-python remove drops patch and refreshes glue deterministically", asy
       cwd: tmp,
     })`WORKSPACE_ROOT=${tmp} NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
-    })} NIX_PY_DEV_OVERRIDE_JSON={} build-tools/tools/bin/patch-pkg remove python requests --importer ${importer}`;
+    })} NIX_PY_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg remove python requests --importer ${importer}`;
 
     const afterTargets = await fs.readFile(auto, "utf8");
     const afterMap = (await fs.pathExists(autoMap)) ? await fs.readFile(autoMap, "utf8") : "";

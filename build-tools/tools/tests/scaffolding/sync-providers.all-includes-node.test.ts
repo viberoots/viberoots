@@ -20,7 +20,7 @@ test("sync-providers without lang flag includes Node providers", async () => {
     await $`git add projects/apps/example/pnpm-lock.yaml`;
 
     // Run without --lang flag (sync all)
-    await $`node build-tools/tools/buck/sync-providers.ts`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts`;
 
     // All provider files should be created
     const nodeProviderPath = path.join(tmp, ".viberoots/workspace/providers/TARGETS.node.auto");

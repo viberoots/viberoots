@@ -25,7 +25,7 @@ test("merge_provider_edges attaches provider edges to dict-shaped inputs (probe)
       [
         "",
         "# test: provider-edges.merge.dict-safe.probe.test.ts",
-        'load("//build-tools/lang:defs_common.bzl", "merge_provider_edges_dict_safe_probe")',
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "merge_provider_edges_dict_safe_probe")',
         "",
         "merge_provider_edges_dict_safe_probe(",
         '  name = "dict_safe",',

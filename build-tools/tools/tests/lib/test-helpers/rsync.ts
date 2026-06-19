@@ -15,18 +15,31 @@ export async function rsyncRepoTo(tmp: string) {
         await $`bash --noprofile --norc -c ${`set -euo pipefail
           if [ -f flake.nix ]; then mkdir -p "${tmp}"; cp -f flake.nix "${tmp}/flake.nix"; fi
           if [ -f flake.lock ]; then mkdir -p "${tmp}"; cp -f flake.lock "${tmp}/flake.lock"; fi
+          if [ -f .viberoots/workspace/flake.nix ]; then mkdir -p "${tmp}/.viberoots/workspace"; cp -f .viberoots/workspace/flake.nix "${tmp}/.viberoots/workspace/flake.nix"; fi
+          if [ -f .viberoots/workspace/flake.lock ]; then mkdir -p "${tmp}/.viberoots/workspace"; cp -f .viberoots/workspace/flake.lock "${tmp}/.viberoots/workspace/flake.lock"; fi
         `}`;
       } catch {}
       const rootsToCopy = new Set<string>(roots);
-      if (
-        await fsp
-          .access("viberoots/flake.nix")
-          .then(() => true)
-          .catch(() => false)
-      ) {
+      const hasNestedViberoots = await fsp
+        .access("viberoots/flake.nix")
+        .then(() => true)
+        .catch(() => false);
+      if (hasNestedViberoots) {
         rootsToCopy.add("viberoots");
       }
+      const extractedToolRoots = new Set([
+        "build-tools",
+        "patches",
+        "prelude",
+        "third_party/providers",
+        "toolchains",
+      ]);
       for (const r of rootsToCopy) {
+        const exists = await fsp
+          .lstat(r)
+          .then(() => true)
+          .catch(() => false);
+        if (!exists && hasNestedViberoots && extractedToolRoots.has(r)) continue;
         try {
           await $`rsync -a --relative ${r} ${tmp}/`;
         } catch {}
@@ -37,6 +50,10 @@ export async function rsyncRepoTo(tmp: string) {
     const excludes = [
       "/buck-out",
       "buck-out",
+      "/.viberoots/buck",
+      "/.viberoots/cache",
+      "/.viberoots/workspace/.viberoots",
+      "/viberoots/.viberoots",
       "/.git",
       "/.claude/worktrees",
       "/.codex/worktrees",
@@ -56,11 +73,10 @@ export async function rsyncRepoTo(tmp: string) {
       "/.clinic",
       "/.direnv",
       "/result",
-      "/.viberoots/workspace",
-      "/build-tools/tools/buck/.export-cache",
-      "/build-tools/tools/buck/invalidation-report.txt",
-      "/build-tools/tools/buck/node-lock-index.json",
-      "/build-tools/tools/dev/toolchain-paths.json",
+      "/viberoots/build-tools/tools/buck/.export-cache",
+      "/viberoots/build-tools/tools/buck/invalidation-report.txt",
+      "/viberoots/build-tools/tools/buck/node-lock-index.json",
+      "/viberoots/build-tools/tools/dev/toolchain-paths.json",
       "/docs",
       "/lang-design-docs",
       "/quad-alignment-*.md",
@@ -73,15 +89,15 @@ export async function rsyncRepoTo(tmp: string) {
     if (goOnly) {
       excludes.push(
         "/cpp",
-        "/build-tools/tools/nix/templates",
-        "/build-tools/tools/scaffolding/templates",
+        "/viberoots/build-tools/tools/nix/templates",
+        "/viberoots/build-tools/tools/scaffolding/templates",
       );
     }
     if (process.env.TEST_EXCLUDE_CPP_REQS === "1") {
       excludes.push(
-        "/build-tools/cpp/defs.bzl",
-        "/build-tools/cpp/wasm_defs.bzl",
-        "/build-tools/tools/nix/templates/cpp.nix",
+        "/viberoots/build-tools/cpp/defs.bzl",
+        "/viberoots/build-tools/cpp/wasm_defs.bzl",
+        "/viberoots/build-tools/tools/nix/templates/cpp.nix",
       );
     }
     excludes.push("/third_party/providers/TARGETS.auto", "/third_party/providers/TARGETS.*.auto");

@@ -5,14 +5,14 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-const scriptPath = "build-tools/tools/dev/nix-gaps-inventory-check.ts";
+const scriptPath = "viberoots/build-tools/tools/dev/nix-gaps-inventory-check.ts";
 const exceptionsPath = "docs/handbook/nix-gaps-exceptions.json";
 
 const starlarkApi = `# Starlark API reference
 
 ## Index
 
-- \`//build-tools/node:defs.bzl\`
+- \`@viberoots//build-tools/node:defs.bzl\`
   - \`node_asset_stage\`
   - \`node_wasm_inline_module\`
 `;
@@ -121,7 +121,10 @@ test("nix-gaps checker accepts standalone stage/inline route when docs and imple
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), inventoryStandaloneRoute);
     await fs.outputFile(path.join(tmp, exceptionsPath), emptyExceptions);
-    await fs.outputFile(path.join(tmp, "build-tools/node/defs_core.bzl"), defsCoreMinimal);
+    await fs.outputFile(
+      path.join(tmp, "viberoots/build-tools/node/defs_core.bzl"),
+      defsCoreMinimal,
+    );
     await fs.outputFile(path.join(tmp, "build-tools/node/defs_stage.bzl"), defsStageStandalone);
     await $({
       cwd: tmp,
@@ -135,7 +138,10 @@ test("nix-gaps checker fails when docs claim wrapper route but stage/inline impl
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), inventoryWrapperRoute);
     await fs.outputFile(path.join(tmp, exceptionsPath), emptyExceptions);
-    await fs.outputFile(path.join(tmp, "build-tools/node/defs_core.bzl"), defsCoreMinimal);
+    await fs.outputFile(
+      path.join(tmp, "viberoots/build-tools/node/defs_core.bzl"),
+      defsCoreMinimal,
+    );
     await fs.outputFile(path.join(tmp, "build-tools/node/defs_stage.bzl"), defsStageStandalone);
     const res = await $({
       cwd: tmp,

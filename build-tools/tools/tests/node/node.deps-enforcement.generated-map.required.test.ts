@@ -24,9 +24,9 @@ test("node deps enforcement: generated map required", async () => {
       ),
       "utf8",
     );
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "node"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, ".viberoots", "workspace", "node"), { recursive: true });
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "node", "workspace-map.json"),
+      path.join(tmp, ".viberoots", "workspace", "node", "workspace-map.json"),
       "{}",
       "utf8",
     );
@@ -36,12 +36,12 @@ test("node deps enforcement: generated map required", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`node build-tools/tools/buck/enforce-node-deps.ts --check`;
+    })`node viberoots/build-tools/tools/buck/enforce-node-deps.ts --check`;
     assert.notEqual(res.exitCode, 0);
     const combined = `${res.stdout || ""}${res.stderr || ""}`;
     assert.ok(
       combined.includes("workspace:@repo/ui") &&
-        combined.includes("build-tools/tools/node/workspace-map.json"),
+        combined.includes(".viberoots/workspace/node/workspace-map.json"),
     );
   });
 });

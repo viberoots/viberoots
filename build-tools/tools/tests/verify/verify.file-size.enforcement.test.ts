@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 
 async function loc(p: string): Promise<number> {
@@ -8,10 +9,17 @@ async function loc(p: string): Promise<number> {
   return txt.split(/\r?\n/).length;
 }
 
-test("file-size compliance: flake entrypoint + test-helpers facade stay <= 250 LOC", async () => {
-  assert.ok((await loc("flake.nix")) <= 250, "expected flake.nix <= 250 LOC");
+function viberootsPath(rel: string): string {
+  return path.join(process.cwd(), "viberoots", rel);
+}
+
+test("file-size compliance: viberoots flake entrypoint + test-helpers facade stay <= 250 LOC", async () => {
   assert.ok(
-    (await loc("build-tools/tools/tests/lib/test-helpers.ts")) <= 250,
-    "expected build-tools/tools/tests/lib/test-helpers.ts <= 250 LOC",
+    (await loc(viberootsPath("flake.nix"))) <= 250,
+    "expected viberoots/flake.nix <= 250 LOC",
+  );
+  assert.ok(
+    (await loc(viberootsPath("build-tools/tools/tests/lib/test-helpers.ts"))) <= 250,
+    "expected viberoots/build-tools/tools/tests/lib/test-helpers.ts <= 250 LOC",
   );
 });

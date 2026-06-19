@@ -29,6 +29,7 @@ async function inner() {
   const repoRoot = process.cwd();
   const relLock = repoRelativeLockfilePath(repoRoot, lockfile);
   const importer = normalizeImporter(path.posix.dirname(relLock));
+  const hashKey = importer === "viberoots" ? "pnpm-lock.yaml" : relLock;
   const storeAttr = pnpmStoreAttrFromImporter(importer);
   const unfixedAttr = pnpmStoreUnfixedAttrFromImporter(importer);
   const flakeRef = flakeRefForImporter(repoRoot, importer);
@@ -40,7 +41,7 @@ async function inner() {
     repoRoot,
     importer,
   );
-  const key = relLock;
+  const key = hashKey;
   const placeholderHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   if (force) await hashesJson.updateNodeModulesHashesJson(key, placeholderHash);
   const existingHash = await hashesJson.readNodeModulesHashForLockfile(key);
@@ -48,17 +49,27 @@ async function inner() {
   await ensureImporterLockfileFreshIfAllowed({ repoRoot, importer });
   const existingLockHash = await verifiedMarker.sha256File(lockAbs);
   const existingMarker = await verifiedMarker.readVerifiedMarker(markerPath);
+  const marker = existingMarker;
+  const markerMatchesCurrentBuilder =
+    existingLockHash &&
+    marker &&
+    marker.importer === importer &&
+    marker.lockfile === key &&
+    marker.lockHash === existingLockHash &&
+    marker.hashValue === existingHash &&
+    marker.builderFingerprint === builderFingerprint;
   const runFixedBuild = async (phaseLabel: string) =>
     await withPnpmStoreBuildFlakeRef(
       { repoRoot, importer, baseFlakeRef: flakeRef },
-      async (buildFlakeRef) =>
+      async (buildFlakeRef, filteredEnv) =>
         await withResolvedExactPrefetchedStore(
           { repoRoot, importer, flakeRef: buildFlakeRef, attrPath: storeAttr },
           async (extraEnv) => {
+            const nixEnv = { ...extraEnv, ...filteredEnv };
             const activity = newManagedCommandActivity();
             return await withHeartbeat(
               phaseLabel,
-              buildStore(storeAttr, buildFlakeRef, activity, extraEnv),
+              buildStore(storeAttr, buildFlakeRef, activity, nixEnv),
               { activity },
             );
           },
@@ -67,12 +78,13 @@ async function inner() {
   const runUnfixedBuild = async (phaseLabel: string) =>
     await withPnpmStoreBuildFlakeRef(
       { repoRoot, importer, baseFlakeRef: flakeRef },
-      async (buildFlakeRef) =>
+      async (buildFlakeRef, filteredEnv) =>
         await withExactPrefetchedStore({ repoRoot, importer }, async (extraEnv) => {
+          const nixEnv = { ...extraEnv, ...filteredEnv };
           const activity = newManagedCommandActivity();
           return await withHeartbeat(
             phaseLabel,
-            buildUnfixedAndHash(unfixedAttr, buildFlakeRef, activity, extraEnv),
+            buildUnfixedAndHash(unfixedAttr, buildFlakeRef, activity, nixEnv),
             { activity },
           );
         }),
@@ -98,16 +110,7 @@ async function inner() {
     return;
   }
   if (!nonDefaultImporter && hasValidExistingHash) {
-    const marker = existingMarker;
-    if (
-      existingLockHash &&
-      marker &&
-      marker.importer === importer &&
-      marker.lockfile === key &&
-      marker.lockHash === existingLockHash &&
-      marker.hashValue === existingHash &&
-      marker.builderFingerprint === builderFingerprint
-    ) {
+    if (markerMatchesCurrentBuilder) {
       await verifiedMarker.persistVerifiedHash({
         repoRoot,
         markerPath,
@@ -124,6 +127,63 @@ async function inner() {
       );
       return;
     }
+  }
+  if (
+    !nonDefaultImporter &&
+    hasValidExistingHash &&
+    existingMarker &&
+    !markerMatchesCurrentBuilder
+  ) {
+    console.log(
+      `[update-pnpm-hash] importer=${importer} step=stale-builder-recompute attr=${unfixedAttr} timeout=${timeoutSec}s`,
+    );
+    let pre = await runUnfixedBuild(
+      `importer=${importer} step=stale-builder-recompute attr=${unfixedAttr}`,
+    );
+    if (!pre.ok) {
+      await generateImporterLockfile({ repoRoot, importer });
+      console.log(
+        `[update-pnpm-hash] importer=${importer} step=stale-builder-recompute-retry attr=${unfixedAttr} timeout=${timeoutSec}s`,
+      );
+      pre = await runUnfixedBuild(
+        `importer=${importer} step=stale-builder-recompute-retry attr=${unfixedAttr}`,
+      );
+    }
+    if (!pre.ok || !pre.sri) {
+      throw new Error(
+        "pnpm-store-unfixed failed during stale builder recompute\n\n" + String(pre.output || ""),
+      );
+    }
+    const nextHash = pre.sri;
+    await hashesJson.updateNodeModulesHashesJson(key, nextHash);
+    console.log(
+      `[update-pnpm-hash] importer=${importer} step=stale-builder-fixed-after-hash attr=${storeAttr} timeout=${timeoutSec}s`,
+    );
+    const verifyAfterHash = await runFixedBuild(
+      `importer=${importer} step=stale-builder-fixed-after-hash attr=${storeAttr}`,
+    );
+    if (!verifyAfterHash.ok) {
+      throw new Error(
+        "pnpm-store still failing after stale builder hash update\n\n" +
+          String(verifyAfterHash.output || ""),
+      );
+    }
+    const lockHash = existingLockHash;
+    if (lockHash) {
+      await verifiedMarker.persistVerifiedHash({
+        repoRoot,
+        markerPath,
+        marker: {
+          importer,
+          lockfile: key,
+          lockHash,
+          hashValue: nextHash,
+          builderFingerprint,
+        },
+      });
+    }
+    console.log("pnpm-store:", storeAttr, "hash updated and build succeeded");
+    return;
   }
   if (
     !nonDefaultImporter &&

@@ -11,7 +11,7 @@ await runInTemp("wasm-package-local-wiring-non-mutating-probe", async (tmp, $) =
   await fsp.writeFile(
     path.join(pkg, "TARGETS"),
     [
-      'load("//build-tools/lang:defs_common.bzl", "package_local_wasm_wiring_mutation_probe")',
+      'load("@viberoots//build-tools/lang:defs_common.bzl", "package_local_wasm_wiring_mutation_probe")',
       "",
       "package_local_wasm_wiring_mutation_probe(",
       '  name = "probe",',

@@ -16,7 +16,7 @@ test("wasm: link input ordering is deterministic (logged by template)", async ()
       await fs.outputFile(
         path.join(dir, "TARGETS"),
         [
-          'load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")',
+          'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")',
           "",
           "nix_cpp_wasm_static_lib(",
           `    name = "${name}",`,
@@ -42,7 +42,7 @@ test("wasm: link input ordering is deterministic (logged by template)", async ()
     await fs.outputFile(
       path.join(apiDir, "TARGETS"),
       [
-        'load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
+        'load("@viberoots//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
         "",
         "nix_go_tiny_wasm_lib(",
         '    name = "wasm",',

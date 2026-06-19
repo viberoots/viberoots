@@ -4,7 +4,7 @@ import { execFile, spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 const execFileAsync = promisify(execFile);
 
@@ -22,18 +22,18 @@ export type ControlPlaneRuntime = {
 };
 
 export async function buildImageContract() {
-  const outPath = await nixBuildOutput(".#deployment-control-plane-image-contract");
+  const outPath = await nixBuildOutput("deployment-control-plane-image-contract");
   const raw = await fsp.readFile(path.join(outPath, "contract.json"), "utf8");
   return { outPath, contract: JSON.parse(raw) as any };
 }
 
 export async function buildControlPlaneRuntime(): Promise<ControlPlaneRuntime> {
-  const outPath = await nixBuildOutput(".#deployment-control-plane-runtime");
+  const outPath = await nixBuildOutput("deployment-control-plane-runtime");
   return { outPath, commandPath: path.join(outPath, "bin", "control-plane") };
 }
 
 export async function buildImageTarball(): Promise<ControlPlaneImageTarball> {
-  const outPath = await nixBuildOutput(".#deployment-control-plane-image");
+  const outPath = await nixBuildOutput("deployment-control-plane-image");
   return await runInTemp("control-plane-oci-image", async (tmp) => {
     await execFileAsync("tar", ["-xf", outPath, "-C", tmp], { maxBuffer: 1024 * 1024 });
     const manifest = JSON.parse(await fsp.readFile(path.join(tmp, "manifest.json"), "utf8"))[0];
@@ -101,10 +101,25 @@ export function layerPathMatches(layerPath: string, prohibitedPath: string): boo
 
 async function nixBuildOutput(attr: string) {
   const repoRoot = process.env.WORKSPACE_ROOT || process.cwd();
-  const { stdout } = await execFileAsync("nix", ["build", attr, "--no-link", "--print-out-paths"], {
-    cwd: repoRoot,
-    maxBuffer: 1024 * 1024,
-  });
+  const flakeRef = await workspaceFlakeRef(repoRoot);
+  const viberootsInput = path.join(repoRoot, "viberoots");
+  const { stdout } = await execFileAsync(
+    "nix",
+    [
+      "build",
+      `path:${flakeRef}#${attr}`,
+      "--override-input",
+      "viberoots",
+      `path:${viberootsInput}`,
+      "--no-link",
+      "--print-out-paths",
+      "--accept-flake-config",
+    ],
+    {
+      cwd: repoRoot,
+      maxBuffer: 1024 * 1024,
+    },
+  );
   const outPath = stdout.trim().split(/\s+/).at(-1) || "";
   assert.ok(outPath, "nix build did not return an output path");
   return outPath;

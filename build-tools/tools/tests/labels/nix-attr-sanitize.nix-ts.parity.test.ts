@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("TS ↔ Nix sanitizeAttrNameFromTargetLabel parity", async () => {
   await runInTemp("nix-attr-sanitize-nix-ts-parity", async (tmp, $) => {
     const cases: string[] = [
-      "root//projects/apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
+      "root//projects/apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerviberoots/build-tools/lang/cxx)",
       "prelude//build-tools/cpp:lib (config//toolchains:xyz)",
       "//projects/apps/foo:my bin",
       "root//projects/apps/foo:my@target",
@@ -22,7 +22,7 @@ test("TS ↔ Nix sanitizeAttrNameFromTargetLabel parity", async () => {
     const expr = `
       let
         pkgs = import <nixpkgs> {};
-        H = import ./build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
+        H = import ./viberoots/build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
         cases = builtins.fromJSON ${JSON.stringify(JSON.stringify(cases))};
       in builtins.sort builtins.lessThan (map H.sanitizeAttrNameFromTargetLabel cases)
     `;

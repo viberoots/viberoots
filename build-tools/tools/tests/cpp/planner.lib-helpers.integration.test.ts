@@ -25,7 +25,7 @@ test("planner lib helpers normalize labels, deps, and srcs", async () => {
           }
         ];
         pkgPathOf = name: "projects/apps/demo";
-        L = import ./build-tools/tools/nix/planner/lib.nix { inherit lib get nodes pkgPathOf; };
+        L = import ./viberoots/build-tools/tools/nix/planner/lib.nix { inherit lib get nodes pkgPathOf; };
         n0 = builtins.elemAt nodes 0;
         out = {
           cleaned = L.cleanLabel n0.name;

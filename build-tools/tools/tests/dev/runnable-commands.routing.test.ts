@@ -43,7 +43,7 @@ test("p routes to run.prod", async () => {
         ...process.env,
         RUNNABLE_TEST_MANIFEST: manifestPath,
       },
-    })`build-tools/tools/bin/p //projects/apps/demo:demo`;
+    })`viberoots/build-tools/tools/bin/p //projects/apps/demo:demo`;
     assert.match(String(stdout || ""), /prod-ok/);
   });
 });
@@ -96,7 +96,7 @@ test("d routes to run.dev and fails clearly when unavailable", async () => {
         PATH: `${stubBin}:${process.env.PATH || ""}`,
         RUNNABLE_TEST_MANIFEST: manifestPath,
       },
-    })`build-tools/tools/bin/d //projects/apps/web:web`;
+    })`viberoots/build-tools/tools/bin/d //projects/apps/web:web`;
     assert.match(String(dev.stdout || ""), /dev-ok/);
 
     const noDevManifestPath = path.join(tmp, "buck-out", "tmp", "runnable.no-dev.manifest.json");
@@ -129,7 +129,7 @@ test("d routes to run.dev and fails clearly when unavailable", async () => {
         ...process.env,
         RUNNABLE_TEST_MANIFEST: noDevManifestPath,
       },
-    })`build-tools/tools/bin/d //projects/apps/demo:demo`;
+    })`viberoots/build-tools/tools/bin/d //projects/apps/demo:demo`;
     assert.notEqual(missing.exitCode, 0);
     assert.match(String(missing.stderr || ""), /run\.dev is not available/);
 
@@ -151,7 +151,7 @@ test("d routes to run.dev and fails clearly when unavailable", async () => {
         ...process.env,
         RUNNABLE_TEST_MANIFEST: libraryManifestPath,
       },
-    })`build-tools/tools/bin/p //projects/libs/core:core`;
+    })`viberoots/build-tools/tools/bin/p //projects/libs/core:core`;
     assert.notEqual(libraryRun.exitCode, 0);
     assert.match(String(libraryRun.stderr || ""), /library-only/);
   });
@@ -209,7 +209,7 @@ test("SSR runnable routes to canonical node prod and dev:ssr commands", async ()
         PATH: `${stubBin}:${process.env.PATH || ""}`,
         RUNNABLE_TEST_MANIFEST: manifestPath,
       },
-    })`build-tools/tools/bin/p //projects/apps/ssr:app`;
+    })`viberoots/build-tools/tools/bin/p //projects/apps/ssr:app`;
     assert.match(
       String(prod.stdout || ""),
       new RegExp(`node-ok:${serverEntry.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
@@ -223,7 +223,7 @@ test("SSR runnable routes to canonical node prod and dev:ssr commands", async ()
         PATH: `${stubBin}:${process.env.PATH || ""}`,
         RUNNABLE_TEST_MANIFEST: manifestPath,
       },
-    })`build-tools/tools/bin/d //projects/apps/ssr:app`;
+    })`viberoots/build-tools/tools/bin/d //projects/apps/ssr:app`;
     assert.match(String(dev.stdout || ""), /pnpm-ok:--dir projects\/apps\/ssr dev:ssr/);
   });
 });

@@ -13,7 +13,7 @@ test("attach_items_dict_safe attaches items with stable sanitized keys and deter
     await fsp.writeFile(
       path.join(pkgDir, "TARGETS"),
       [
-        'load("//build-tools/lang:defs_common.bzl", "dict_items_probe")',
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "dict_items_probe")',
         "",
         "dict_items_probe(",
         '  name = "probe_keys",',

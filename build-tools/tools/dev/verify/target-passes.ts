@@ -51,6 +51,7 @@ function cqueryLiteral(target: string): string {
 export function normalizeVerifyTargetLabel(label: string): string {
   const withoutConfig = dropConfigSuffix(label);
   if (withoutConfig.startsWith("root//")) return `//${withoutConfig.slice("root//".length)}`;
+  if (withoutConfig.startsWith("@")) return withoutConfig.slice(1);
   return withoutConfig;
 }
 
@@ -61,7 +62,10 @@ export function buildCqueryQuery(targets: readonly string[]): string {
 
 function isPatternVerifyTarget(target: string): boolean {
   const trimmed = String(target || "").trim();
-  return trimmed === "//..." || (trimmed.startsWith("//") && trimmed.endsWith("/..."));
+  if (trimmed === "//...") return true;
+  if (trimmed.startsWith("//") && trimmed.endsWith("/...")) return true;
+  if (/^@?[^/]+\/\/\.\.\.$/.test(trimmed)) return true;
+  return /^@?[^/]+\/\/.*\/\.\.\.$/.test(trimmed);
 }
 
 function isManualVerifyTarget(labels: readonly string[]): boolean {

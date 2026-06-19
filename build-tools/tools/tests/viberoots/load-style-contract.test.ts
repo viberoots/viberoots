@@ -41,7 +41,7 @@ test("viberoots-owned Starlark uses public self-loads and workspace provider map
 
 test("project targets and scaffold templates use public viberoots loads", async () => {
   const files = (
-    await trackedFiles(["projects", "build-tools/tools/scaffolding/templates"])
+    await trackedFiles(["projects", "viberoots/build-tools/tools/scaffolding/templates"])
   ).filter((file) => {
     const base = path.basename(file);
     return (

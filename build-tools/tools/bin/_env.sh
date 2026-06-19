@@ -34,18 +34,28 @@ env_init_paths() {
 			export REPO_ROOT="${git_root}"
 		fi
 	fi
-	export LIVE_ROOT="${WORKSPACE_ROOT:-$REPO_ROOT}"
+	local cwd_root=""
+	if command -v git >/dev/null 2>&1; then
+		cwd_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+	fi
+	if [[ -n "${WORKSPACE_ROOT:-}" ]]; then
+		export LIVE_ROOT="${WORKSPACE_ROOT}"
+	elif [[ -n "${cwd_root}" ]]; then
+		export LIVE_ROOT="${cwd_root}"
+	else
+		export LIVE_ROOT="${REPO_ROOT}"
+	fi
 	if [[ -n "${LIVE_ROOT}" ]]; then
 		LIVE_ROOT="$(cd "${LIVE_ROOT}" && pwd)"
 	fi
-	if [[ -z "${VIBEROOTS_ROOT:-}" ]]; then
-		if [[ -e "${LIVE_ROOT}/.viberoots/current" ]]; then
-			export VIBEROOTS_ROOT="$(cd "${LIVE_ROOT}/.viberoots/current" && pwd)"
-		else
-			export VIBEROOTS_ROOT="${REPO_ROOT}"
-		fi
-	elif [[ -n "${VIBEROOTS_ROOT}" ]]; then
-		export VIBEROOTS_ROOT="$(cd "${VIBEROOTS_ROOT}" && pwd)"
+	if [[ -n "${VIBEROOTS_SOURCE_ROOT:-}" ]]; then
+		export VIBEROOTS_ROOT="$(cd "${VIBEROOTS_SOURCE_ROOT}" && pwd)"
+	elif [[ -e "${LIVE_ROOT}/.viberoots/current" ]]; then
+		export VIBEROOTS_ROOT="$(cd "${LIVE_ROOT}/.viberoots/current" && pwd)"
+	elif [[ -f "${LIVE_ROOT}/viberoots/build-tools/tools/dev/zx-init.mjs" ]]; then
+		export VIBEROOTS_ROOT="$(cd "${LIVE_ROOT}/viberoots" && pwd)"
+	else
+		export VIBEROOTS_ROOT="${REPO_ROOT}"
 	fi
 	if [[ ! -f "${VIBEROOTS_ROOT}/build-tools/tools/dev/zx-init.mjs" ]]; then
 		export VIBEROOTS_ROOT="${REPO_ROOT}"
@@ -202,10 +212,18 @@ ensure_buck_prelude() {
 	local live_root="$1"
 	[[ -f "${live_root}/.buckconfig" ]] || return 0
 	env_apply_nix_cache_health || return 1
-	[[ -f "${live_root}/prelude/prelude.bzl" ]] && return 0
+	if [[ -L "${live_root}/.viberoots/current/prelude" && ! -e "${live_root}/.viberoots/current/prelude" ]]; then
+		rm -f "${live_root}/.viberoots/current/prelude"
+	fi
+	if [[ -f "${live_root}/.viberoots/current/prelude/prelude.bzl" ]]; then
+		if [[ -L "${live_root}/prelude" ]]; then
+			rm -f "${live_root}/prelude"
+		fi
+		return 0
+	fi
 	command -v nix >/dev/null 2>&1 || return 1
 
-	local cache_dir="${live_root}/buck-out/tmp/devshell-cache"
+	local cache_dir="${live_root}/.viberoots/workspace/buck/tmp/devshell-cache"
 	mkdir -p "${cache_dir}" 2>/dev/null || true
 	local lock_hash=""
 	if [[ -f "${live_root}/flake.lock" ]]; then
@@ -215,11 +233,33 @@ ensure_buck_prelude() {
 			lock_hash="$(sha256sum "${live_root}/flake.lock" 2>/dev/null | awk '{print $1}')"
 		fi
 	fi
+	local active_viberoots_root="${VIBEROOTS_SOURCE_ROOT:-${VIBEROOTS_ROOT:-}}"
+	if [[ -z "${active_viberoots_root}" || ! -f "${active_viberoots_root}/build-tools/tools/dev/zx-init.mjs" ]]; then
+		if [[ -f "${live_root}/viberoots/build-tools/tools/dev/zx-init.mjs" ]]; then
+			active_viberoots_root="${live_root}/viberoots"
+		elif [[ -f "${live_root}/.viberoots/current/build-tools/tools/dev/zx-init.mjs" ]]; then
+			active_viberoots_root="${live_root}/.viberoots/current"
+		else
+			active_viberoots_root=""
+		fi
+	fi
+	local active_viberoots_hash=""
+	if [[ -n "${active_viberoots_root}" ]]; then
+		if command -v shasum >/dev/null 2>&1; then
+			active_viberoots_hash="$(printf "%s" "${active_viberoots_root}" | shasum -a 256 2>/dev/null | awk '{print $1}')"
+		elif command -v sha256sum >/dev/null 2>&1; then
+			active_viberoots_hash="$(printf "%s" "${active_viberoots_root}" | sha256sum 2>/dev/null | awk '{print $1}')"
+		fi
+	fi
 	local lock_suffix=""
 	if [[ -n "${lock_hash}" ]]; then
 		lock_suffix="-${lock_hash}"
 	fi
+	if [[ -n "${active_viberoots_hash}" ]]; then
+		lock_suffix="${lock_suffix}-vbr-${active_viberoots_hash}"
+	fi
 	local pre_cache="${cache_dir}/prelude-path${lock_suffix}"
+	local pre_link="${cache_dir}/buck2-prelude${lock_suffix}"
 	local pre_cached=""
 	local pre_target=""
 	if [[ -f "${pre_cache}" ]]; then
@@ -227,11 +267,21 @@ ensure_buck_prelude() {
 	fi
 	if [[ -n "${pre_cached}" && -f "${pre_cached}/prelude/prelude.bzl" ]]; then
 		pre_target="${pre_cached}/prelude"
+	elif [[ -f "${pre_link}/prelude/prelude.bzl" ]]; then
+		pre_target="${pre_link}/prelude"
 	else
 		local pre_out=""
-		pre_out="$(nix build "${live_root}#buck2-prelude" --no-link --accept-flake-config --print-out-paths 2>/dev/null || true)"
+		local workspace_flake_ref="${live_root}"
+		if [[ -f "${live_root}/.viberoots/workspace/flake.nix" ]]; then
+			workspace_flake_ref="${live_root}/.viberoots/workspace"
+		fi
+			if [[ -n "${active_viberoots_root}" ]]; then
+				pre_out="$(VIBEROOTS_SOURCE_ROOT="${active_viberoots_root}" nix build --override-input viberoots "path:${active_viberoots_root}" "path:${workspace_flake_ref}#buck2-prelude" --out-link "${pre_link}" --accept-flake-config --print-out-paths 2>/dev/null || true)"
+			else
+				pre_out="$(nix build "path:${workspace_flake_ref}#buck2-prelude" --out-link "${pre_link}" --accept-flake-config --print-out-paths 2>/dev/null || true)"
+			fi
 		if [[ -z "${pre_out}" ]]; then
-			pre_out="$(nix eval --raw "${live_root}#inputs.buck2.outPath" 2>/dev/null || true)"
+			pre_out="$(nix eval --raw "path:${workspace_flake_ref}#inputs.buck2.outPath" 2>/dev/null || true)"
 		fi
 		if [[ -n "${pre_out}" && -f "${pre_out}/prelude/prelude.bzl" ]]; then
 			pre_target="${pre_out}/prelude"
@@ -239,15 +289,18 @@ ensure_buck_prelude() {
 		fi
 	fi
 	if [[ -n "${pre_target}" ]]; then
-		if [[ -L "${live_root}/prelude" || ! -e "${live_root}/prelude" ]]; then
-			rm -f "${live_root}/prelude"
-			ln -s "${pre_target}" "${live_root}/prelude"
+		if [[ -L "${live_root}/.viberoots/current/prelude" || ! -e "${live_root}/.viberoots/current/prelude" ]]; then
+			rm -f "${live_root}/.viberoots/current/prelude"
+			ln -s "${pre_target}" "${live_root}/.viberoots/current/prelude"
+			if [[ -L "${live_root}/prelude" ]]; then
+				rm -f "${live_root}/prelude"
+			fi
 		else
-			echo "error: ${live_root}/prelude exists but is not a valid symlink; expected prelude/prelude.bzl" 1>&2
+			echo "error: ${live_root}/.viberoots/current/prelude exists but is not a valid symlink; expected prelude/prelude.bzl" 1>&2
 			return 1
 		fi
 	fi
-	[[ -f "${live_root}/prelude/prelude.bzl" ]]
+	[[ -f "${live_root}/.viberoots/current/prelude/prelude.bzl" ]]
 }
 
 exec_in_dev_shell() {
@@ -288,7 +341,7 @@ exec_in_dev_shell() {
 		BUCK_CONFIG_LOCK=1 exec direnv exec "$live_root" "$@"
 	else
 		if ! ensure_buck_prelude "${live_root}"; then
-			echo "error: failed to materialize Buck prelude at ${live_root}/prelude/prelude.bzl" 1>&2
+			echo "error: failed to materialize Buck prelude at ${live_root}/.viberoots/current/prelude/prelude.bzl" 1>&2
 			exit 1
 		fi
 		exec "$@"
@@ -331,18 +384,27 @@ node_ts() {
 run_ts() {
 	# Usage: run_ts "../dev/dev-build.ts" [args...]
 	local rel_path="$1"; shift || true
-	local target_ts="${VIBEROOTS_ROOT}/build-tools/tools/bin/${rel_path}"
+	local target_ts
+	if [[ "${rel_path}" = /* ]]; then
+		target_ts="${rel_path}"
+	else
+		local live_target_ts="${LIVE_ROOT}/viberoots/build-tools/tools/bin/${rel_path}"
+		if [[ "${VBR_RUN_IN_TEMP_REPO:-}" == "1" && -f "${live_target_ts}" ]]; then
+			target_ts="${live_target_ts}"
+		else
+			target_ts="${VIBEROOTS_ROOT}/build-tools/tools/bin/${rel_path}"
+		fi
+	fi
 	node_ts "${LIVE_ROOT}" "${target_ts}" "$@"
 }
 
 env_reexec_from_cwd_repo "$@"
 
-# Auto-initialize paths on source if not already set, then ensure coverage dir when enabled
-if [[ -z "${SCRIPT_DIR:-}" || -z "${REPO_ROOT:-}" || -z "${LIVE_ROOT:-}" ]]; then
-	__ENV_INIT_CALLER="${BASH_SOURCE[1]:-$0}"
-	env_init_paths "${__ENV_INIT_CALLER}"
-	unset __ENV_INIT_CALLER
-fi
+# Initialize paths from the wrapper currently being invoked. Parent shells can legitimately
+# carry SCRIPT_DIR/REPO_ROOT/LIVE_ROOT for a different workspace.
+__ENV_INIT_CALLER="${BASH_SOURCE[1]:-$0}"
+env_init_paths "${__ENV_INIT_CALLER}"
+unset __ENV_INIT_CALLER
 
 if [[ "${COVERAGE:-}" == "1" ]]; then
 	ensure_coverage_dir "${REPO_ROOT}"

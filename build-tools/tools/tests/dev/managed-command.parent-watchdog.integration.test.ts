@@ -3,9 +3,9 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("managed-command starts parent-lifecycle watchdog for spawned process group", async () => {
-  const txt = await fsp.readFile("build-tools/tools/lib/managed-command.ts", "utf8");
+  const txt = await fsp.readFile("viberoots/build-tools/tools/lib/managed-command.ts", "utf8");
   const watchdogTxt = await fsp.readFile(
-    "build-tools/tools/lib/managed-command-watchdog.ts",
+    "viberoots/build-tools/tools/lib/managed-command-watchdog.ts",
     "utf8",
   );
   if (!txt.includes("startParentWatchdog")) {

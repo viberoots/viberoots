@@ -7,7 +7,7 @@ import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 test("nix_cpp_test follows transitive link_deps with link_closure=transitive", async () => {
   await runInTemp("cpp-test-link-closure-transitive", async (tmp, $) => {
     await fs.outputFile(
-      path.join(tmp, "build-tools", "tools", "nix", "langs.json"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "nix", "langs.json"),
       JSON.stringify({ enabled: ["cpp"] }, null, 2) + "\n",
       "utf8",
     );
@@ -25,7 +25,7 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
     await fs.outputFile(
       path.join(tmp, "libs", "support", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_headers", "nix_cpp_library")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_headers", "nix_cpp_library")',
         "",
         "nix_cpp_headers(",
         '  name = "headers",',
@@ -65,7 +65,7 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
     await fs.outputFile(
       path.join(tmp, "projects", "libs", "core", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "core",',
@@ -96,7 +96,7 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
     await fs.outputFile(
       path.join(tmp, "projects", "apps", "demo", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_test")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_test")',
         "",
         "nix_cpp_test(",
         '  name = "t",',
@@ -121,7 +121,7 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     await $({
       cwd: tmp,
     })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_test_link_closure")} test //projects/apps/demo:t`;

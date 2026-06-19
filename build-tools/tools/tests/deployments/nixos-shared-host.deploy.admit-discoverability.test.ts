@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -31,7 +32,7 @@ test("remote profile deploy surface keeps missing admission guidance discoverabl
       cwd: tmp,
       env: freshRemoteExecBuckEnv(tmp, remoteExecEnv(fixture.env)),
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --artifact-dir ${fixture.artifactDir} --admit-and-deploy`.nothrow();
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --artifact-dir ${fixture.artifactDir} --admit-and-deploy`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /deploy\/pleomino-dev/);
     assert.match(
@@ -49,11 +50,14 @@ test("jenkins wrapper preserves missing admission guidance from the deploy front
     await requirePleominoDevCheck(tmp);
     await writeArtifact(artifactDir, { "index.html": "<html>bootstrap</html>\n" });
     const auth = await writeJenkinsAuthFiles(tmp);
+    const jenkinsDeploy = viberootsToolScript(
+      "viberoots/build-tools/tools/bin/nixos-shared-host-jenkins-deploy",
+    );
     const result = await $({
       cwd: tmp,
       env: jenkinsExecEnv(env),
       stdio: "pipe",
-    })`build-tools/tools/bin/nixos-shared-host-jenkins-deploy --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --artifact-dir ${artifactDir} --admit-and-deploy --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile}`.nothrow();
+    })`${jenkinsDeploy} --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --artifact-dir ${artifactDir} --admit-and-deploy --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile}`.nothrow();
     assert.notEqual(result.exitCode, 0);
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.ok, false);

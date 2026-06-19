@@ -8,7 +8,7 @@ await runInTemp("cpp-encoding", async (tmp, $) => {
   // Ensure any pre-existing committed file in the temp repo is removed
   await fs.remove(out);
   // Run sync; expect no provider files to be produced for C++
-  await $({ cwd: tmp })`build-tools/tools/buck/sync-providers.ts --lang cpp`;
+  await $({ cwd: tmp })`viberoots/build-tools/tools/buck/sync-providers.ts --lang cpp`;
   const exists = await fs.pathExists(out);
   if (exists) {
     console.error("C++ provider sync should not create TARGETS.cpp.auto");

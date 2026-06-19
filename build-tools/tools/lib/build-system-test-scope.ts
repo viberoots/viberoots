@@ -13,7 +13,8 @@ type ScopeDecision = {
 const AUTO_TARGETS = ["//..."];
 const AUTO_SCOPE_IGNORED_BUILD_SYSTEM_PATHS = new Set([
   "build-tools/tools/nix/node-modules.hashes.json",
-  "build-tools/tools/node/workspace-map.json",
+  "viberoots/build-tools/tools/nix/node-modules.hashes.json",
+  ".viberoots/workspace/node/workspace-map.json",
 ]);
 
 function normalizePath(relPath: string): string {
@@ -24,13 +25,14 @@ function normalizePath(relPath: string): string {
 
 export function isBuildSystemPath(relPath: string): boolean {
   const p = normalizePath(relPath);
+  const sourcePath = p.startsWith("viberoots/") ? p.slice("viberoots/".length) : p;
   if (!p) {
     return false;
   }
   if (p.endsWith(".md") || p.endsWith(".rst")) {
     return false;
   }
-  if (p.startsWith("build-tools/docs/")) {
+  if (sourcePath.startsWith("build-tools/docs/")) {
     return false;
   }
   if (
@@ -42,13 +44,13 @@ export function isBuildSystemPath(relPath: string): boolean {
   ) {
     return true;
   }
-  if (p.startsWith("build-tools/")) {
+  if (sourcePath.startsWith("build-tools/")) {
     return true;
   }
-  if (p.startsWith("toolchains/")) {
+  if (sourcePath.startsWith("toolchains/")) {
     return true;
   }
-  if (p.startsWith("third_party/providers/")) {
+  if (sourcePath.startsWith("third_party/providers/")) {
     return true;
   }
   if (p.startsWith(".viberoots/workspace/buck/")) {

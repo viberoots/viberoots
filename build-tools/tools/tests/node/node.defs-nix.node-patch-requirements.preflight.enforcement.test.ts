@@ -7,7 +7,7 @@ function assert(condition: boolean, message: string) {
 }
 
 test("build-tools/node/defs_nix.bzl runs node patch requirement preflight for all entrypoints", async () => {
-  const file = "build-tools/node/defs_nix.bzl";
+  const file = "viberoots/build-tools/node/defs_nix.bzl";
   const txt = await fsp.readFile(file, "utf8");
 
   const preflightCalls = (txt.match(/nix_calling_node_patch_requirements_preflight\(/g) || [])

@@ -45,7 +45,7 @@ export async function installAppStoreConnectTargets(
       await fsp.writeFile(
         deployTargetsPath,
         [
-          'load("//build-tools/deployments:defs.bzl", "deployment_target")',
+          'load("@viberoots//build-tools/deployments:defs.bzl", "deployment_target")',
           "",
           "deployment_target(",
           `    name = ${JSON.stringify(labelName(deployment.label))},`,

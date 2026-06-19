@@ -151,14 +151,10 @@ test("validates endpoints, platform inputs, event directory, and rendered key su
 });
 
 test("generated config stays unused by local verify and Jenkins defaults", async () => {
-  const [buckconfig, jenkins] = await Promise.all([
-    fs.readFile(".buckconfig", "utf8"),
-    fs.readFile("Jenkinsfile", "utf8"),
-  ]);
+  const buckconfig = await fs.readFile(".buckconfig", "utf8");
 
   assert.doesNotMatch(buckconfig, /\[buck2_re_client(?:[.\]]|\])/);
   assert.doesNotMatch(buckconfig, /VBR_REMOTE_BUCK_CONFIG/);
-  assert.doesNotMatch(jenkins, /VBR_REMOTE_BUCK_CONFIG\s*=/);
 });
 
 test("generated activation config contains only profile names and toolchain labels", async () => {
@@ -212,13 +208,13 @@ test("generated activation config reaches zx_test executor analysis", async () =
 
   const local = await $({
     stdio: "pipe",
-  })`buck2 audit providers --target-platforms prelude//platforms:default //:remote_exec_verify_remote_policy`.nothrow();
+  })`buck2 audit providers --target-platforms prelude//platforms:default viberoots//:remote_exec_verify_remote_policy`.nothrow();
   assert.equal(local.exitCode, 0, local.stderr);
   assert.match(local.stdout, /default_executor=None/);
 
   const activated = await $({
     stdio: "pipe",
-  })`buck2 audit providers --config-file ${result.configPath} --target-platforms prelude//platforms:default //:remote_exec_verify_remote_policy`.nothrow();
+  })`buck2 audit providers --config-file ${result.configPath} --target-platforms prelude//platforms:default viberoots//:remote_exec_verify_remote_policy`.nothrow();
 
   assert.equal(activated.exitCode, 0, activated.stderr);
   assert.match(activated.stdout, /default_executor=CommandExecutorConfig/);

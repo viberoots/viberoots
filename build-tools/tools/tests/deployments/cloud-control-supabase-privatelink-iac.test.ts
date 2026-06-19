@@ -3,10 +3,11 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { viberootsRepoPath } from "./deployment-command";
 
 test("AWS foundation OpenTofu declares Supabase PrivateLink RAM and Lattice surface", async () => {
   const root = path.join(
-    process.cwd(),
+    viberootsRepoPath("."),
     "build-tools/deployments/aws-control-plane-foundation/opentofu",
   );
   const combined = await Promise.all(

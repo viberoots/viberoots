@@ -118,7 +118,7 @@ function findNixBuildCommandTemplates(src: string): string[] {
 }
 
 test("policy: tests must use `nix build --no-link` (no out-links / no accidental GC roots)", async () => {
-  const root = path.join(process.cwd(), "build-tools", "tools", "tests");
+  const root = path.join(process.cwd(), "viberoots", "build-tools", "tools", "tests");
   const files = await listTestFiles(root);
   const violations: Violation[] = [];
 

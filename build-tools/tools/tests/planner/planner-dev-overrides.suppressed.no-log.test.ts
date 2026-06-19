@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("planner suppresses dev override log when PLANNER_NO_DEV_OVERRIDE_LOG is set", async () => {
   await runInTemp("planner-dev-overrides-suppressed", async (tmp, $) => {
@@ -19,7 +19,7 @@ test("planner suppresses dev override log when PLANNER_NO_DEV_OVERRIDE_LOG is se
         PLANNER_NO_DEV_OVERRIDE_LOG: "1",
         BUCK_GRAPH_JSON: graph,
       },
-    })`nix build ${`path:${tmp}#graph-generator`} --print-out-paths --impure --accept-flake-config --no-link`;
+    })`nix build ${`path:${await workspaceFlakeRef(tmp)}#graph-generator`} --print-out-paths --impure --accept-flake-config --no-link`;
     const outPath =
       String(res.stdout || "")
         .trim()

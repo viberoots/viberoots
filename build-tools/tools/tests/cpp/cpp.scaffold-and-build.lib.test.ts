@@ -15,37 +15,37 @@ test("cpp lib scaffold builds via planner (archive exists)", async () => {
           id: "cpp",
           displayName: "C++",
           requiredPaths: [
-            "build-tools/tools/nix/planner/cpp.nix",
-            "build-tools/tools/nix/templates/cpp.nix",
+            "viberoots/build-tools/tools/nix/planner/cpp.nix",
+            "viberoots/build-tools/tools/nix/templates/cpp.nix",
           ],
           kinds: ["lib", "bin", "test"],
-          templatesDir: "build-tools/tools/scaffolding/templates/cpp",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/cpp",
         },
       ],
     } as any;
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/nix/langs.json"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/langs.json"),
       JSON.stringify(langs, null, 2) + "\n",
       "utf8",
     );
 
     // Copy planner plugin + template used by the planner into temp repo
-    await fs.mkdirp(path.join(tmp, "build-tools/tools/nix/planner"));
+    await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/planner"));
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/planner/cpp.nix"),
-      path.join(tmp, "build-tools/tools/nix/planner/cpp.nix"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/nix/planner/cpp.nix"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix"),
     );
-    await fs.mkdirp(path.join(tmp, "build-tools/tools/nix/templates"));
+    await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/templates"));
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/templates/cpp.nix"),
-      path.join(tmp, "build-tools/tools/nix/templates/cpp.nix"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/nix/templates/cpp.nix"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/templates/cpp.nix"),
     );
 
-    // Copy cpp macros so TARGETS can load //build-tools/cpp:defs.bzl
-    await fs.mkdirp(path.join(tmp, "build-tools", "cpp"));
+    // Copy cpp macros so TARGETS can load @viberoots//build-tools/cpp:defs.bzl
+    await fs.mkdirp(path.join(tmp, "viberoots", "build-tools", "cpp"));
     await fs.copy(
-      path.join(process.cwd(), "build-tools/cpp/defs.bzl"),
-      path.join(tmp, "build-tools/cpp/defs.bzl"),
+      path.join(process.cwd(), "viberoots/build-tools/cpp/defs.bzl"),
+      path.join(tmp, "viberoots/build-tools/cpp/defs.bzl"),
     );
 
     // Scaffold a minimal C++ library under libs/demo
@@ -59,7 +59,7 @@ test("cpp lib scaffold builds via planner (archive exists)", async () => {
       "utf8",
     );
     const targets = [
-      'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+      'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
       "",
       "nix_cpp_library(",
       '    name = "demo",',
@@ -84,10 +84,10 @@ test("cpp lib scaffold builds via planner (archive exists)", async () => {
     await fs.writeFile(graphPath, JSON.stringify(graphNodes, null, 2) + "\n", "utf8");
 
     // Run prebuild guard (should pass with generated graph and without providers)
-    await $({ cwd: tmp })`node build-tools/tools/buck/prebuild-guard.ts`.nothrow();
+    await $({ cwd: tmp })`node viberoots/build-tools/tools/buck/prebuild-guard.ts`.nothrow();
 
     // Build with planner via graph-generator.nix (function call, passing src and graph)
-    const flake = path.join(process.cwd(), "build-tools/tools/nix/graph-generator.nix");
+    const flake = path.join(process.cwd(), "viberoots/build-tools/tools/nix/graph-generator.nix");
     const system = process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux";
     const res = await $({
       cwd: tmp,

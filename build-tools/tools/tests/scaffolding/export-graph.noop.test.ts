@@ -9,7 +9,7 @@ import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
 test("export-graph writes .viberoots/workspace/buck/graph.json and parses", async () => {
   await runInTemp("export-graph", async (tmp, $) => {
     await ensureBuckConfigForTempRepo(tmp, $);
-    await $`node build-tools/tools/buck/export-graph.ts --out ${DEFAULT_GRAPH_PATH}`;
+    await $`node viberoots/build-tools/tools/buck/export-graph.ts --out ${DEFAULT_GRAPH_PATH}`;
     const p = path.join(tmp, DEFAULT_GRAPH_PATH);
     const nodes = await readGraph(p);
     if (!Array.isArray(nodes)) {

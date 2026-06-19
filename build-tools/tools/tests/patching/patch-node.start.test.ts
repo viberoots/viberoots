@@ -17,7 +17,7 @@ test("patch-node start creates session and workspace (idempotent)", async () => 
     await fs.outputFile(path.join(importer, ".npmrc"), "patches-dir=patches/node\n", "utf8");
 
     // Ensure CLI is executable
-    const cli = path.join(tmp, "build-tools", "tools", "bin", "patch-pkg");
+    const cli = path.join(tmp, "viberoots", "build-tools", "tools", "bin", "patch-pkg");
     await $`chmod +x ${cli}`;
 
     // Mock pnpm patch to print a temp dir path

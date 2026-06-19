@@ -18,7 +18,7 @@ test("sync-providers-node emits a metadata-only provider for workspace importers
     );
     await $`git add projects/apps/demo/package.json`;
 
-    await $`NODE_PROVIDER_SYNTHETIC_LOCKFILES=1 node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`NODE_PROVIDER_SYNTHETIC_LOCKFILES=1 node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
 
     const outPath = path.join(tmp, providerAutoTargetsPath("node"));
     const out = await fsp.readFile(outPath, "utf8");

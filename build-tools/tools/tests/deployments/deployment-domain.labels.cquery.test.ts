@@ -10,6 +10,7 @@ import {
 import { VERIFY_RESOURCE_LIMITED_LABEL } from "../../dev/verify/target-passes";
 import { resolveNestedBuckIsolation } from "../../lib/buck-command-env";
 import { normalizeTargetLabel } from "../../lib/labels";
+import { viberootsRepoPath } from "./deployment-command";
 
 const RESOURCE_LIMITED_EXEMPT_TEMP_REPO_SCRIPTS = new Set([
   "build-tools/tools/tests/deployments/app-store-connect.e2e.test.ts",
@@ -26,6 +27,9 @@ const RESOURCE_LIMITED_EXEMPT_TEMP_REPO_SCRIPTS = new Set([
 
 function autoZxTargetForScript(scriptPath: string): string {
   let name = scriptPath;
+  if (name.startsWith("viberoots/")) {
+    name = name.slice("viberoots/".length);
+  }
   if (name.startsWith("build-tools/tools/tests/")) {
     name = name.slice("build-tools/tools/tests/".length);
   }
@@ -112,7 +116,7 @@ async function runCqueryWithScopedIsolation(opts: {
 }
 
 test("deployment-domain label cquery resolves the reviewed deployment test suite", async () => {
-  const root = process.cwd();
+  const root = viberootsRepoPath(".");
   const expected = (await deploymentTestScripts(root)).map(autoZxTargetForScript).sort();
   const query = `attrfilter(labels, "${DEPLOYMENT_DOMAIN_LABEL}", //...)`;
   const stdout = await runCqueryWithScopedIsolation({
@@ -125,7 +129,7 @@ test("deployment-domain label cquery resolves the reviewed deployment test suite
 });
 
 test("resource-heavy deployment tests receive bounded verify scheduling labels", async () => {
-  const root = process.cwd();
+  const root = viberootsRepoPath(".");
   const scripts = [
     "build-tools/tools/tests/deployments/nixos-shared-host.reuse.e2e.test.ts",
     "build-tools/tools/tests/deployments/deployment-control-plane.bootstrap.test.ts",
@@ -149,7 +153,7 @@ test("resource-heavy deployment tests receive bounded verify scheduling labels",
 });
 
 test("deployment temp-repo tests receive measured bounded verify scheduling labels", async () => {
-  const root = process.cwd();
+  const root = viberootsRepoPath(".");
   const scripts = await deploymentTempRepoTestScripts(root);
   assert.ok(scripts.length > 100, "expected deployment temp-repo coverage to stay explicit");
   const query = `set(${scripts.map(autoZxTargetForScript).join(" ")})`;
@@ -181,7 +185,7 @@ test("deployment temp-repo tests receive measured bounded verify scheduling labe
 });
 
 test("reviewed non-deployment tests do not acquire the deployment-domain label", async () => {
-  const root = process.cwd();
+  const root = viberootsRepoPath(".");
   const sampleScripts = [
     "build-tools/tools/tests/dev/coverage-policy-doc-check.test.ts",
     "build-tools/tools/tests/lib/providers.patch-filename.policy.test.ts",

@@ -27,7 +27,7 @@ await runInTemp("cpp-include-pkg-local-patches", async (tmp, $) => {
   await fs.writeFile(
     path.join(pkg, "TARGETS"),
     [
-      'load("//build-tools/lang:defs_common.bzl", "package_local_patches_probe")',
+      'load("@viberoots//build-tools/lang:defs_common.bzl", "package_local_patches_probe")',
       "",
       "package_local_patches_probe(",
       '  name = "probe_cpp",',

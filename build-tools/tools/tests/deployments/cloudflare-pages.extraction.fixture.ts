@@ -31,7 +31,7 @@ export async function writeCloudflarePagesExtractionFixture(tmp: string): Promis
   await fsp.writeFile(
     sharedTargetsPath,
     [
-      'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
+      'load("@viberoots//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
       "",
       "deployment_defaults(",
       '    name = "defaults",',
@@ -77,7 +77,7 @@ export async function writeCloudflarePagesExtractionFixture(tmp: string): Promis
   await fsp.writeFile(
     deployTargetsPath,
     [
-      'load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
+      'load("@viberoots//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
       "",
       "cloudflare_pages_static_webapp_deployment(",
       '    name = "deploy",',

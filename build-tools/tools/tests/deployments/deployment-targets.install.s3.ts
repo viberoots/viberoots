@@ -28,7 +28,9 @@ export async function installS3StaticTargets(
   const fragments = sharedPolicyTargetsByDir(deployments);
   for (const deployment of deployments) {
     appendTargetsFragment(fragments, labelDir(deployment.label), {
-      loadLines: ['load("//build-tools/deployments:defs.bzl", "s3_static_webapp_deployment")'],
+      loadLines: [
+        'load("@viberoots//build-tools/deployments:defs.bzl", "s3_static_webapp_deployment")',
+      ],
       bodyLines: [
         "s3_static_webapp_deployment(",
         `    name = ${JSON.stringify(labelName(deployment.label))},`,

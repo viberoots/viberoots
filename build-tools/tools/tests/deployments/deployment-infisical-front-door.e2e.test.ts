@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -149,14 +150,14 @@ test("public deploy front door admits, runs, redacts, and replays Infisical via 
               cwd: tmp,
               stdio: "pipe",
               env,
-            })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --validate-only`;
+            })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --validate-only`;
             const validation = JSON.parse(String(validate.stdout));
             assert.equal(validation.schemaVersion, "deploy-validate@1");
             assert.equal(validation.valid, true);
             const deploy = await $({
               cwd: tmp,
               env,
-            })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+            })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
             const first = JSON.parse(String(deploy.stdout));
             assert.equal(first.finalOutcome, "succeeded");
             const firstRecord = await readRecord(harness.controlPlane.url, first.deployRunId);
@@ -176,7 +177,7 @@ test("public deploy front door admits, runs, redacts, and replays Infisical via 
             const current = await $({
               cwd: tmp,
               env,
-            })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+            })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
             const currentSummary = JSON.parse(String(current.stdout));
             const currentRecord = await readRecord(
               harness.controlPlane.url,
@@ -191,7 +192,7 @@ test("public deploy front door admits, runs, redacts, and replays Infisical via 
             const replay = await $({
               cwd: tmp,
               env,
-            })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --admission-evidence-json ${admissionEvidenceJson} --publish-only --rollback --source-run-id ${first.deployRunId} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+            })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --admission-evidence-json ${admissionEvidenceJson} --publish-only --rollback --source-run-id ${first.deployRunId} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
             const replaySummary = JSON.parse(String(replay.stdout));
             assert.equal(replaySummary.finalOutcome, "succeeded");
             assert.equal(replaySummary.parentRunId, first.deployRunId);

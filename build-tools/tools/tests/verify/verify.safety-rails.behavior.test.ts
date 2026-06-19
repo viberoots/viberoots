@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  decideVerifySafetyRailsTrigger,
   pollVerifySafetyRailsOnce,
   summarizeVerifySafetyRailsTelemetry,
   writeVerifySafetyRailsTriggerSnapshot,
@@ -47,9 +48,7 @@ test("verify safety rails: triggers write snapshot and signal only the intended 
   const d1 = await pollVerifySafetyRailsOnce({
     analysisDir,
     processGroupIdToKill: pgid,
-    baseFreeGiB: 50,
     lowSpaceGiB: 5,
-    dropBudgetGiB: 20,
     telemetryPath,
     deps,
   });
@@ -68,29 +67,61 @@ test("verify safety rails: triggers write snapshot and signal only the intended 
   const snap = await readText(snapPath);
   assert.ok(snap.includes("safety-rails trigger:"), "expected snapshot header");
   assert.ok(snap.includes("df-output"), "expected injected df output in snapshot");
+});
 
+test("verify safety rails: free-space drops are telemetry only", async () => {
+  const analysisDir = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-safety-rails-drop-"));
+  const telemetryPath = path.join(analysisDir, "telemetry.log");
+  await fsp.writeFile(telemetryPath, "", "utf8");
+
+  const signals: Array<{ pgid: number; signal: NodeJS.Signals }> = [];
+  const timers: number[] = [];
+  const pgid = 4242;
   signals.length = 0;
   timers.length = 0;
-  nextFreeGiB = 20;
-  const d2 = await pollVerifySafetyRailsOnce({
+  const decision = await pollVerifySafetyRailsOnce({
     analysisDir,
     processGroupIdToKill: pgid,
-    baseFreeGiB: 50,
     lowSpaceGiB: 0,
-    dropBudgetGiB: 20,
     telemetryPath,
-    deps,
+    deps: {
+      freeGiBForPath: async (_p: string) => 20,
+      activeNixGcProcesses: async () => [],
+      onTrigger: async (_reason: string) => {},
+      writeSnapshot: async () => {},
+      killProcessGroup: (pgid: number, signal: NodeJS.Signals) => {
+        signals.push({ pgid, signal });
+      },
+      setTimeoutFn: (fn: () => void, ms: number) => {
+        timers.push(ms);
+        fn();
+      },
+    },
   });
-  assert.ok(d2, "expected drop-budget trigger to fire");
-  assert.ok(d2.reason.includes("VERIFY_NIX_DROP_BUDGET_GB"), "expected drop-budget reason text");
-  assert.deepEqual(
-    signals.map((s) => [s.pgid, s.signal]),
-    [
-      [pgid, "SIGTERM"],
-      [pgid, "SIGKILL"],
-    ],
+  assert.equal(decision, null);
+  assert.deepEqual(signals, []);
+  assert.deepEqual(timers, []);
+  const telemetry = await readText(telemetryPath);
+  assert.match(telemetry, /freeGiB=20/);
+});
+
+test("verify safety rails: free-space drop alone does not stop verify", async () => {
+  assert.equal(
+    decideVerifySafetyRailsTrigger({
+      curFreeGiB: 58,
+      lowSpaceGiB: 5,
+    }),
+    null,
   );
-  assert.deepEqual(timers, [10_000]);
+});
+
+test("verify safety rails: low-space guard still uses raw free space", () => {
+  const decision = decideVerifySafetyRailsTrigger({
+    curFreeGiB: 4,
+    lowSpaceGiB: 5,
+  });
+  assert.ok(decision, "expected raw low free space to trigger");
+  assert.match(decision.reason, /VERIFY_LOW_SPACE_GB/);
 });
 
 test("verify safety rails: active nix gc is logged as notice and does not stop verify", async () => {
@@ -104,9 +135,7 @@ test("verify safety rails: active nix gc is logged as notice and does not stop v
   const decision = await pollVerifySafetyRailsOnce({
     analysisDir,
     processGroupIdToKill: 31337,
-    baseFreeGiB: 50,
     lowSpaceGiB: 0,
-    dropBudgetGiB: 20,
     telemetryPath,
     deps: {
       freeGiBForPath: async (_p: string) => 45,

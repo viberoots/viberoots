@@ -1,14 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
+import { viberootsRepoPath } from "./deployment-command";
 
 test("Vault bootstrap runbook uses reviewed shared-host IdP module and JWT helper", async () => {
-  const doc = await fsp.readFile(
-    path.join(process.cwd(), "docs", "vault-production-bootstrap.md"),
-    "utf8",
-  );
+  const doc = await fsp.readFile(viberootsRepoPath("docs/vault-production-bootstrap.md"), "utf8");
   assert.match(doc, /shared-host-identity-provider-module\.nix/);
   assert.match(doc, /deploymentHost\.identityProvider/);
   assert.match(doc, /deploymentHost\.vault/);

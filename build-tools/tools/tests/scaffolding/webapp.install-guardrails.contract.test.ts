@@ -205,8 +205,16 @@ const DEP_EDIT_EXPECTATIONS: InstallGuardrailExpectation[] = [
   },
 ];
 
+const TEMP_REPO_GIT_SCOPE_EXPECTATIONS: InstallGuardrailExpectation[] = [
+  {
+    file: "build-tools/tools/tests/scaffolding/node-service.scaffold-contract.test.ts",
+    required: ["git -C ${tmp} add -A projects/apps/demo-service"],
+    forbidden: ["git -C ${tmp} add -A;"],
+  },
+];
+
 async function assertContract(expectation: InstallGuardrailExpectation): Promise<void> {
-  const abs = path.join(process.cwd(), expectation.file);
+  const abs = path.join(process.cwd(), "viberoots", expectation.file);
   const text = await fsp.readFile(abs, "utf8");
   for (const requiredFragment of expectation.required) {
     assert.match(
@@ -238,6 +246,12 @@ test("install guardrails: heavy runtime tests own install via skip-lockfile-gen"
 
 test("install guardrails: dependency-edit HMR tests keep importer-scoped no-frozen installs", async () => {
   for (const expectation of DEP_EDIT_EXPECTATIONS) {
+    await assertContract(expectation);
+  }
+});
+
+test("install guardrails: temp repo commits avoid generated runtime state", async () => {
+  for (const expectation of TEMP_REPO_GIT_SCOPE_EXPECTATIONS) {
     await assertContract(expectation);
   }
 });

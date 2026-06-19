@@ -10,8 +10,8 @@ test("planner lib kindOf shared helper respects per-language configs", async () 
         pkgs = import <nixpkgs> {};
         lib = pkgs.lib;
         get = attrs: k: if builtins.hasAttr k attrs then attrs.\${k} else null;
-        L = import ./build-tools/tools/nix/planner/lib.nix { inherit lib get; nodes = []; };
-        kindConfigs = import ./build-tools/tools/nix/planner/kind-configs.nix;
+        L = import ./viberoots/build-tools/tools/nix/planner/lib.nix { inherit lib get; nodes = []; };
+        kindConfigs = import ./viberoots/build-tools/tools/nix/planner/kind-configs.nix;
         goCfg = kindConfigs.go;
         cppCfg = kindConfigs.cpp;
         pyCfg = kindConfigs.python;

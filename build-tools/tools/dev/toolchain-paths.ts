@@ -26,15 +26,62 @@ function toolchainBzlPath(root: string): string {
   return path.join(activeViberootsRoot(root), BZL_REL);
 }
 
+async function workspaceFlakeRef(root: string): Promise<{
+  flakeRef: string;
+  viberootsOverrideArgs: string[];
+}> {
+  const parentRoot = path.dirname(root);
+  if (path.basename(root) === "viberoots") {
+    const parentHidden = path.join(parentRoot, ".viberoots", "workspace", "flake.nix");
+    const localViberoots = path.join(parentRoot, "viberoots");
+    const hasParentWorkspace = await fsp
+      .access(parentHidden)
+      .then(() => true)
+      .catch(() => false);
+    const hasLocalViberoots = await fsp
+      .access(path.join(localViberoots, "flake.nix"))
+      .then(() => true)
+      .catch(() => false);
+    if (hasParentWorkspace && hasLocalViberoots) {
+      return {
+        flakeRef: `path:${path.dirname(parentHidden)}`,
+        viberootsOverrideArgs: ["--override-input", "viberoots", `path:${localViberoots}`],
+      };
+    }
+  }
+  try {
+    await fsp.access(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"));
+    await fsp.access(path.join(root, "flake.nix"));
+    return { flakeRef: `path:${root}`, viberootsOverrideArgs: [] };
+  } catch {}
+  const hidden = path.join(root, ".viberoots", "workspace", "flake.nix");
+  try {
+    await fsp.access(hidden);
+    const localViberoots = path.join(root, "viberoots");
+    const hasLocalViberoots = await fsp
+      .access(path.join(localViberoots, "flake.nix"))
+      .then(() => true)
+      .catch(() => false);
+    return {
+      flakeRef: `path:${path.dirname(hidden)}`,
+      viberootsOverrideArgs: hasLocalViberoots
+        ? ["--override-input", "viberoots", `path:${localViberoots}`]
+        : [],
+    };
+  } catch {}
+  return { flakeRef: ".", viberootsOverrideArgs: [] };
+}
+
 function isNixStorePath(p: string): boolean {
   return p === "/nix/store" || p.startsWith("/nix/store/");
 }
 
 async function nixPathInfo(root: string, attr: string): Promise<string> {
+  const { flakeRef, viberootsOverrideArgs } = await workspaceFlakeRef(root);
   const res = await $({
     cwd: root,
     stdio: "pipe",
-  })`nix path-info .#${attr} --json --accept-flake-config`.nothrow();
+  })`nix path-info --impure ${`${flakeRef}#${attr}`} ${viberootsOverrideArgs} --json --accept-flake-config`.nothrow();
   if (res.exitCode !== 0) return "";
   const txt = String(res.stdout || "").trim();
   if (!txt.startsWith("[")) return "";
@@ -56,10 +103,11 @@ async function nixPathInfo(root: string, attr: string): Promise<string> {
 }
 
 async function nixBuildOutPath(root: string, attr: string): Promise<string> {
+  const { flakeRef, viberootsOverrideArgs } = await workspaceFlakeRef(root);
   const res = await $({
     cwd: root,
     stdio: "pipe",
-  })`nix build .#${attr} --no-link --print-out-paths --accept-flake-config`;
+  })`nix build --impure ${`${flakeRef}#${attr}`} ${viberootsOverrideArgs} --no-link --print-out-paths --accept-flake-config`;
   const out =
     String(res.stdout || "")
       .trim()

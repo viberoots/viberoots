@@ -87,9 +87,13 @@ export async function repoBootstrapProfiles(opts: {
 
 async function workspaceRootForGraph(graphPath: string): Promise<string> {
   const abs = path.resolve(graphPath);
-  const suffix = path.join("build-tools", "tools", "buck", "graph.json");
-  if (abs.endsWith(suffix)) {
-    return abs.slice(0, -suffix.length).replace(new RegExp(`${path.sep}$`), "");
+  for (const suffix of [
+    path.join(".viberoots", "workspace", "buck", "graph.json"),
+    path.join("build-tools", "tools", "buck", "graph.json"),
+  ]) {
+    if (abs.endsWith(suffix)) {
+      return abs.slice(0, -suffix.length).replace(new RegExp(`${path.sep}$`), "");
+    }
   }
   return await findRepoRoot(process.cwd());
 }

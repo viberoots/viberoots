@@ -66,7 +66,7 @@ export async function installCloudflarePagesTargets(
   for (const deployment of deployments) {
     appendTargetsFragment(fragments, labelDir(deployment.label), {
       loadLines: [
-        'load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
+        'load("@viberoots//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
       ],
       bodyLines: [
         "cloudflare_pages_static_webapp_deployment(",

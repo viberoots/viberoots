@@ -3,9 +3,9 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("update-pnpm-hash skips non-default recompute when existing hash is present", async () => {
-  const mainTxt = await fsp.readFile("build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
+  const mainTxt = await fsp.readFile("viberoots/build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
   const nondefaultTxt = await fsp.readFile(
-    "build-tools/tools/dev/update-pnpm-hash/nondefault.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/nondefault.ts",
     "utf8",
   );
   if (!mainTxt.includes("readNodeModulesHashForLockfile")) {
@@ -31,6 +31,11 @@ test("update-pnpm-hash skips non-default recompute when existing hash is present
   }
   if (!nondefaultTxt.includes("step=skip-existing-hash")) {
     throw new Error("nondefault.ts must log skip-existing-hash for non-default importers");
+  }
+  if (!nondefaultTxt.includes("prepareExactPnpmStore({ repoRoot: opts.repoRoot")) {
+    throw new Error(
+      "nondefault.ts must prepare exact stores before accepting cached non-default hashes",
+    );
   }
   if (!mainTxt.includes("runUnfixedBuild")) {
     throw new Error(

@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -34,7 +35,7 @@ test("nixos-shared-host client install infers SSH auth from matching ~/.ssh/conf
     );
     const result = await $({
       env: { ...process.env, HOME: home },
-    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination deployer@mini --control-plane-url http://127.0.0.1:7780`;
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-install.ts")} client install --output-root ${outputRoot} --profile mini --destination deployer@mini --control-plane-url http://127.0.0.1:7780`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.sshAuth.identityFile, identityFile);
     assert.equal(summary.manifest.sshAuth.knownHostsFile, knownHostsFile);
@@ -52,7 +53,7 @@ test("nixos-shared-host client install infers SSH auth from a single standard ke
     await fsp.writeFile(knownHostsFile, "mini ssh-ed25519 AAAA\n", "utf8");
     const result = await $({
       env: { ...process.env, HOME: home },
-    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --control-plane-url http://127.0.0.1:7780`;
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-install.ts")} client install --output-root ${outputRoot} --profile mini --destination mini --control-plane-url http://127.0.0.1:7780`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.manifest.sshAuth.identityFile, identityFile);
     assert.equal(summary.manifest.sshAuth.knownHostsFile, knownHostsFile);
@@ -69,7 +70,7 @@ test("nixos-shared-host client install fails closed when multiple standard SSH i
     await fsp.writeFile(path.join(sshDir, "known_hosts"), "mini ssh-ed25519 AAAA\n", "utf8");
     const result = await $({
       env: { ...process.env, HOME: home },
-    })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${outputRoot} --profile mini --destination mini --control-plane-url http://127.0.0.1:7780`.nothrow();
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-install.ts")} client install --output-root ${outputRoot} --profile mini --destination mini --control-plane-url http://127.0.0.1:7780`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /multiple plausible SSH identity files/i);
   });

@@ -225,13 +225,25 @@ async function resolveRootZxTestLabel(opts: {
   const absPath = path.isAbsolute(raw)
     ? path.resolve(raw)
     : path.resolve(String(opts.baseDir || opts.workspaceRoot), raw);
-  const relPath = path.relative(path.resolve(opts.workspaceRoot), absPath);
-  if (!relPath || relPath.startsWith("..") || path.isAbsolute(relPath)) {
-    return null;
+  const workspaceRoot = path.resolve(opts.workspaceRoot);
+  const nestedViberootsRoot = path.join(workspaceRoot, "viberoots");
+  let relPath = path.relative(workspaceRoot, absPath);
+  let cellPrefix = "";
+  let statPath = absPath;
+  if (relPath.startsWith(ROOT_ZX_TEST_PREFIX) || ROOT_ZX_TEST_EXTRA_FILES.has(relPath)) {
+    const nestedPath = path.join(nestedViberootsRoot, relPath);
+    if (await pathExists(nestedPath)) {
+      statPath = nestedPath;
+      cellPrefix = "viberoots";
+    }
+  } else if (absPath.startsWith(nestedViberootsRoot + path.sep)) {
+    relPath = path.relative(nestedViberootsRoot, absPath);
+    cellPrefix = "viberoots";
   }
+  if (!relPath || relPath.startsWith("..") || path.isAbsolute(relPath)) return null;
   let stat;
   try {
-    stat = await fsp.stat(absPath);
+    stat = await fsp.stat(statPath);
   } catch {
     return null;
   }
@@ -244,5 +256,14 @@ async function resolveRootZxTestLabel(opts: {
   let name = relPosix.slice(ROOT_ZX_TEST_PREFIX.length);
   if (name.endsWith(".ts")) name = name.slice(0, -3);
   if (name.endsWith(".test")) name = name.slice(0, -5);
-  return `//:${name.replace(/[/.-]/g, "_")}`;
+  return `${cellPrefix}//:${name.replace(/[/.-]/g, "_")}`;
+}
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
 }

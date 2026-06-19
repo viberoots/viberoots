@@ -13,6 +13,7 @@ test("template vars infers missing importer from lockfilePath during update", as
     const answersFile = path.join(targetDir, ".copier-answers.yml");
     const templateDir = path.join(
       tmp,
+      "viberoots",
       "build-tools",
       "tools",
       "scaffolding",
@@ -49,6 +50,7 @@ test("template vars auto-fills importer in interactive mode without prompting", 
     const answersFile = path.join(targetDir, ".copier-answers.yml");
     const templateDir = path.join(
       tmp,
+      "viberoots",
       "build-tools",
       "tools",
       "scaffolding",
@@ -98,6 +100,7 @@ test("template vars writes YAML-safe quoted pkgScope when inferred", async () =>
     const answersFile = path.join(targetDir, ".copier-answers.yml");
     const templateDir = path.join(
       tmp,
+      "viberoots",
       "build-tools",
       "tools",
       "scaffolding",

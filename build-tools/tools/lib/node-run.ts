@@ -48,6 +48,16 @@ export function nodeOptionsWithoutZxInit(value: string | undefined): string {
   return kept.join(" ");
 }
 
+function childErrorDetails(stdout: string, stderr: string): string {
+  const details = [stderr, stdout]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join("\n");
+  if (!details) return "";
+  const max = 4096;
+  return `\n${details.length > max ? details.slice(details.length - max) : details}`;
+}
+
 export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
   stdout: string;
   stderr: string;
@@ -101,10 +111,10 @@ export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
         return;
       }
       if (timedOut) {
-        reject(
-          Object.assign(new Error(`${path.basename(opts.script)} timed out after ${timeoutMs}ms`), {
-            exitCode: 124,
-            stdout,
+      reject(
+        Object.assign(new Error(`${path.basename(opts.script)} timed out after ${timeoutMs}ms`), {
+          exitCode: 124,
+          stdout,
             stderr,
           }),
         );
@@ -113,7 +123,9 @@ export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
       const suffix = signal ? ` (signal ${signal})` : "";
       reject(
         Object.assign(
-          new Error(`${path.basename(opts.script)} exited with code ${code ?? "null"}${suffix}`),
+          new Error(
+            `${path.basename(opts.script)} exited with code ${code ?? "null"}${suffix}${childErrorDetails(stdout, stderr)}`,
+          ),
           { exitCode: code ?? 1, stdout, stderr },
         ),
       );

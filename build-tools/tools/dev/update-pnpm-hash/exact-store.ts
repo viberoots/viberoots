@@ -3,17 +3,52 @@ import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
-import { sharedExactPnpmStateRoot } from "../../lib/pnpm-state-paths";
+import {
+  sharedExactPnpmStateIndexPath,
+  sharedExactPnpmStateRoot,
+  sharedExactPnpmStateRootPath,
+} from "../../lib/pnpm-state-paths";
 import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard";
 import { runExactStoreCommand } from "./exact-store-command";
 import { importExactStoreIntoNixStore } from "./exact-store-import";
 import { cleanupLocalWorkspaceMarker, ensureLocalWorkspaceMarker } from "./lockfile-shared";
+import { syncSourcePnpmStoreIntoLocalPrefetch } from "./prefetched-store";
 
-const EXACT_STORE_CACHE_VERSION = 3;
+const EXACT_STORE_CACHE_VERSION = 5;
 
 async function sha256HexFile(absPath: string): Promise<string> {
   const buf = await fsp.readFile(absPath);
   return crypto.createHash("sha256").update(buf).digest("hex");
+}
+
+async function pruneSupersededExactStoreForImporter(
+  importer: string,
+  lockHash: string,
+): Promise<void> {
+  const indexPath = sharedExactPnpmStateIndexPath(importer);
+  try {
+    const raw = await fsp.readFile(indexPath, "utf8");
+    const parsed = JSON.parse(raw) as { lockHash?: string };
+    const previousLockHash = String(parsed.lockHash || "").trim();
+    if (previousLockHash && previousLockHash !== lockHash) {
+      await fsp.rm(sharedExactPnpmStateRootPath(previousLockHash), {
+        recursive: true,
+        force: true,
+      });
+    }
+  } catch {}
+  await fsp.mkdir(path.dirname(indexPath), { recursive: true });
+  const tmp = `${indexPath}.${process.pid}.${Date.now()}.tmp`;
+  await fsp.writeFile(
+    tmp,
+    JSON.stringify({ version: EXACT_STORE_CACHE_VERSION, importer, lockHash }, null, 2) + "\n",
+    "utf8",
+  );
+  await fsp.rename(tmp, indexPath);
+}
+
+async function removeExactStoreArchive(cacheDir: string): Promise<void> {
+  await fsp.rm(path.join(cacheDir, "archive"), { recursive: true, force: true }).catch(() => {});
 }
 
 async function withExactStoreLock<T>(lockPath: string, fn: () => Promise<T>): Promise<T> {
@@ -98,6 +133,7 @@ export async function prepareExactPnpmStore(opts: {
   const timeoutMs = (Number.parseInt(fetchTimeout, 10) || 600) * 1000 + 120_000;
   const lockHash = await sha256HexFile(lockfileAbs);
   const cacheDir = await sharedExactPnpmStateRoot(lockHash);
+  await pruneSupersededExactStoreForImporter(opts.importer, lockHash);
   const storeDir = path.join(cacheDir, "store");
   const homeDir = path.join(cacheDir, "home");
   const markerPath = path.join(cacheDir, "ready.json");
@@ -141,7 +177,10 @@ export async function prepareExactPnpmStore(opts: {
     const { workspaceFileAbs, hadLocalWorkspaceFile } =
       await ensureLocalWorkspaceMarker(importerAbs);
     try {
+      // These live under the per-lockfile exact-store cache root, not the user's HOME.
+      await removeExactStoreArchive(cacheDir);
       await fsp.rm(storeDir, { recursive: true, force: true }).catch(() => {});
+      await fsp.rm(homeDir, { recursive: true, force: true }).catch(() => {});
       await fsp.mkdir(homeDir, { recursive: true });
       await fsp.mkdir(storeDir, { recursive: true });
       const pnpmPath = ensureNixStoreToolPathSync("pnpm");
@@ -175,6 +214,7 @@ export async function prepareExactPnpmStore(opts: {
           ],
         });
       });
+      await syncSourcePnpmStoreIntoLocalPrefetch(storeDir);
       const nixStorePath = await importExactStoreIntoNixStore({
         repoRoot: opts.repoRoot,
         importer: opts.importer,
@@ -200,7 +240,6 @@ export async function prepareExactPnpmStore(opts: {
         nixStorePath,
       };
     } catch (error) {
-      await fsp.rm(storeDir, { recursive: true, force: true }).catch(() => {});
       await fsp.rm(markerPath, { force: true }).catch(() => {});
       throw error;
     } finally {

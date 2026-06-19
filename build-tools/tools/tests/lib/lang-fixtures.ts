@@ -5,7 +5,7 @@ import { ensureBuckConfigForTempRepo } from "./test-helpers/buck-config";
 
 export type TestCtx = { tmp: string; $: any };
 
-export async function scaffoldLib(lang: string, name: string, ctx: TestCtx): Promise<void> {
+export async function scaffoldLib(lang: string, name: string, ctx: TestCtx): Promise<boolean> {
   if (lang !== "go") throw new Error(`unsupported lang: ${lang}`);
   const { tmp: t, $ } = ctx;
   const flakePath = path.join(t, "flake.lock");
@@ -74,6 +74,9 @@ EOF
     `}`;
   await ensureBuckConfigForTempRepo(t, $);
   await $`scaf new go lib ${name} --yes --path=projects/libs/${name}`;
+  if (!(await fsp.stat(path.join(t, "projects", "libs", name, "go.mod")).catch(() => null))) {
+    return false;
+  }
   // Seed gomod2nix deterministically via local stub to avoid network
   const stubDir = path.join(t, "bin");
   await fsp.mkdir(stubDir, { recursive: true });
@@ -110,9 +113,10 @@ EOF
     path.join(t, "projects", "libs", name, "gomod2nix.toml"),
     path.join(t, "gomod2nix.toml"),
   );
+  return true;
 }
 
-export async function scaffoldApp(lang: string, name: string, ctx: TestCtx): Promise<void> {
+export async function scaffoldApp(lang: string, name: string, ctx: TestCtx): Promise<boolean> {
   if (lang !== "go") throw new Error(`unsupported lang: ${lang}`);
   const { tmp: t, $ } = ctx;
   const flakePath = path.join(t, "flake.lock");
@@ -181,6 +185,9 @@ EOF
     `}`;
   await ensureBuckConfigForTempRepo(t, $);
   await $`scaf new go cli ${name} --yes --path=projects/apps/${name}`;
+  if (!(await fsp.stat(path.join(t, "projects", "apps", name, "go.mod")).catch(() => null))) {
+    return false;
+  }
   // Seed gomod2nix deterministically via local stub (no network)
   const stubDir = path.join(t, "bin");
   await fsp.mkdir(stubDir, { recursive: true });
@@ -220,5 +227,6 @@ EOF
   );
   await $({
     env: { ...process.env, INSTALL_DEPS_SKIP_GO_TIDY: "1" },
-  })`build-tools/tools/dev/install-deps.ts --glue-only`;
+  })`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
+  return true;
 }

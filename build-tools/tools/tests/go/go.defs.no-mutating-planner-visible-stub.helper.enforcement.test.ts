@@ -7,7 +7,7 @@ function assert(condition: boolean, message: string) {
 }
 
 test("Go macros must not use removed mutating planner-visible stub helper", async () => {
-  const file = "build-tools/go/defs.bzl";
+  const file = "viberoots/build-tools/go/defs.bzl";
   const txt = await fsp.readFile(file, "utf8");
   assert(
     !txt.includes("wire_package_local_planner_visible_stub_legacy_mutating("),

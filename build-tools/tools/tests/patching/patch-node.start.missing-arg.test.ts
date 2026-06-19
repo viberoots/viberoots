@@ -4,11 +4,11 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("patch-node start fails with missing package arg", async () => {
   await runInTemp("patch-node-start-missing-arg", async (tmp, $) => {
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const out = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`build-tools/tools/bin/patch-pkg start node`.nothrow();
+    })`viberoots/build-tools/tools/bin/patch-pkg start node`.nothrow();
     const all = String(out.stdout || "") + String(out.stderr || "");
     if (out.exitCode === 0) {
       console.error("expected non-zero exit for missing arg");

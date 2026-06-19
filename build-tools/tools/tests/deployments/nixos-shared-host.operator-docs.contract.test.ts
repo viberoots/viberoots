@@ -1,13 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
+import { viberootsRepoPath } from "./deployment-command";
 
-const repoRoot = process.cwd();
-const usageDocPath = path.join(repoRoot, "docs", "nixos-shared-host-usage.md");
-const setupDocPath = path.join(repoRoot, "docs", "nixos-shared-host-setup.md");
-const checklistDocPath = path.join(repoRoot, "docs", "nixos-shared-host-technician-checklist.md");
+const usageDocPath = viberootsRepoPath("docs/nixos-shared-host-usage.md");
+const setupDocPath = viberootsRepoPath("docs/nixos-shared-host-setup.md");
+const checklistDocPath = viberootsRepoPath("docs/nixos-shared-host-technician-checklist.md");
 
 async function readDoc(filePath: string) {
   return await fsp.readFile(filePath, "utf8");

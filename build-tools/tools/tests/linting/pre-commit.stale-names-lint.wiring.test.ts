@@ -1,7 +1,17 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
+
+const viberootsRoot = path.resolve("viberoots");
+
+async function readViberootsPackage(): Promise<Record<string, unknown>> {
+  return JSON.parse(await fsp.readFile(path.join(viberootsRoot, "package.json"), "utf8")) as Record<
+    string,
+    unknown
+  >;
+}
 
 /**
  * Confirms that lint-staged (invoked from .husky/pre-commit) includes the
@@ -13,7 +23,7 @@ import { test } from "node:test";
  * visible test failure.
  */
 test("lint-staged config includes stale-names-lint for ts/tsx staged files", async () => {
-  const pkg = JSON.parse(await fsp.readFile("package.json", "utf8")) as Record<string, unknown>;
+  const pkg = await readViberootsPackage();
   const lintStaged = pkg["lint-staged"] as Record<string, string | string[]> | undefined;
   assert.ok(
     lintStaged != null && typeof lintStaged === "object",
@@ -35,7 +45,7 @@ test("lint-staged config includes stale-names-lint for ts/tsx staged files", asy
 });
 
 test("lint-staged config includes stale-names-lint for bzl/nix/md staged files", async () => {
-  const pkg = JSON.parse(await fsp.readFile("package.json", "utf8")) as Record<string, unknown>;
+  const pkg = await readViberootsPackage();
   const lintStaged = pkg["lint-staged"] as Record<string, string | string[]> | undefined;
   assert.ok(
     lintStaged != null && typeof lintStaged === "object",
@@ -57,7 +67,7 @@ test("lint-staged config includes stale-names-lint for bzl/nix/md staged files",
 });
 
 test("lint-staged config includes stale-names-lint for js/json/yaml staged files", async () => {
-  const pkg = JSON.parse(await fsp.readFile("package.json", "utf8")) as Record<string, unknown>;
+  const pkg = await readViberootsPackage();
   const lintStaged = pkg["lint-staged"] as Record<string, string | string[]> | undefined;
   assert.ok(lintStaged != null && typeof lintStaged === "object");
 
@@ -75,7 +85,7 @@ test("lint-staged config includes stale-names-lint for js/json/yaml staged files
 });
 
 test("lint-staged config includes stale-names-lint for extensionless TARGETS files", async () => {
-  const pkg = JSON.parse(await fsp.readFile("package.json", "utf8")) as Record<string, unknown>;
+  const pkg = await readViberootsPackage();
   const lintStaged = pkg["lint-staged"] as Record<string, string | string[]> | undefined;
   assert.ok(lintStaged != null && typeof lintStaged === "object");
 
@@ -88,7 +98,7 @@ test("lint-staged config includes stale-names-lint for extensionless TARGETS fil
 });
 
 test("pre-commit hook delegates to lint-staged", async () => {
-  const preCommit = await fsp.readFile(".husky/pre-commit", "utf8");
+  const preCommit = await fsp.readFile(path.join(viberootsRoot, ".husky", "pre-commit"), "utf8");
   assert.ok(
     preCommit.includes("lint-staged"),
     ".husky/pre-commit must delegate to lint-staged so staged-file enforcement runs before every commit",

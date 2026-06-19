@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("planner builds python binary via selected target when uv.lock present", async () => {
   await runInTemp("planner-python-selected", async (tmp, $) => {
@@ -14,7 +14,7 @@ test("planner builds python binary via selected target when uv.lock present", as
     await fs.writeFile(path.join(appDir, "src", "main.py"), 'print("ok")\n', "utf8");
 
     // Minimal Buck graph with a python_binary node
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fs.mkdirp(graphDir);
     const node = {
       name: "//projects/apps/pytool:cli",
@@ -38,7 +38,7 @@ test("planner builds python binary via selected target when uv.lock present", as
         BUCK_TEST_SRC: tmp,
         BUCK_TARGET: "//projects/apps/pytool:cli",
       },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
 
     if (exitCode !== 0) {
       console.error(stderr);

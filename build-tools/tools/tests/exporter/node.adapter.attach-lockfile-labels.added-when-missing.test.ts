@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node adapter attaches importer lockfile label when missing", async () => {
   await runInTemp("exp-node-attach-missing", async (tmp, $) => {
-    const out = path.join(tmp, "build-tools/tools/buck/.tmp.graph.json");
+    const out = path.join(tmp, "viberoots/build-tools/tools/buck/.tmp.graph.json");
     await fs.mkdirp(path.dirname(out));
     // Create a lockfile at the derived importer directory: projects/apps/web/pnpm-lock.yaml
     const lock = path.join(tmp, "projects/apps/web/pnpm-lock.yaml");
@@ -25,7 +25,7 @@ test("node adapter attaches importer lockfile label when missing", async () => {
         labels: ["lang:node", "kind:lib"],
       },
     ];
-    const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");
+    const sim = path.join(tmp, "viberoots/build-tools/tools/buck/simulated.json");
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
 
     // Attachment is deterministic when a pnpm lockfile is discoverable and a lockfile label is missing.
@@ -33,7 +33,7 @@ test("node adapter attaches importer lockfile label when missing", async () => {
       cwd: tmp,
       stdio: "pipe",
       env: { ...process.env, WORKSPACE_ROOT: tmp },
-    })`build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${out}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${out}`;
     if (res.exitCode !== 0) {
       console.error("exporter failed:", String(res.stdout || "") + String(res.stderr || ""));
       process.exit(2);

@@ -33,7 +33,8 @@ test(
   async () => {
     const prevRoots = process.env.TEST_RSYNC_ROOTS;
     if (!prevRoots) {
-      process.env.TEST_RSYNC_ROOTS = "build-tools toolchains third_party/providers prelude patches";
+      process.env.TEST_RSYNC_ROOTS =
+        "viberoots/build-tools toolchains third_party/providers prelude patches";
     }
     try {
       await runInTemp("node-asset-stage-webapp", async (tmp, _$) => {
@@ -61,7 +62,7 @@ func main() {}
         );
         await fs.outputFile(
           path.join(wasmDir, "TARGETS"),
-          `load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
+          `load("@viberoots//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
 
 nix_go_tiny_wasm_lib(
     name = "wasm",
@@ -76,7 +77,7 @@ nix_go_tiny_wasm_lib(
         await fs.outputFile(
           path.join(appDir, "TARGETS"),
           `load("@prelude//:rules.bzl", "genrule")
-load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module")
+load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module")
 
 genrule(
     name = "app_raw",
@@ -108,7 +109,7 @@ node_asset_stage(
           cwd: appDir,
           stdio: "inherit",
           env: { ...process.env },
-        })`zx-wrapper ../../../build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
+        })`zx-wrapper ../../../viberoots/build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
         // deps-main --glue-only already runs glue-pipeline (graph export + provider sync + auto-map).
         // Keep test setup single-pass to avoid avoidable verify-time contention.
         await stageTempRepoPaths({
@@ -127,7 +128,7 @@ node_asset_stage(
           cwd: tmp,
           stdio: "inherit",
           env: { ...envWithPrefetch },
-        })`zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
+        })`zx-wrapper viberoots/build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
         const baseEnv =
           typeof ($ as any).env === "object" && ($ as any).env
             ? { ...($ as any).env }

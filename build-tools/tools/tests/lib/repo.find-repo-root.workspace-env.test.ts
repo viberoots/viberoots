@@ -10,12 +10,25 @@ import { findRepoRoot, resolveWorkspaceRootsSync } from "../../lib/repo";
 import { runInTemp } from "./test-helpers";
 
 const execFileAsync = promisify(execFile);
-const VERSION_SCRIPT = "build-tools/tools/dev/viberoots.ts";
+const VERSION_SCRIPT = "viberoots/build-tools/tools/dev/viberoots.ts";
 
 async function workspace(prefix: string): Promise<string> {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), `${prefix}-`));
   await fsp.writeFile(path.join(tmp, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
   return await fsp.realpath(tmp);
+}
+
+async function extractedWorkspace(prefix: string): Promise<string> {
+  const tmp = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), `${prefix}-`)));
+  await fsp.mkdir(path.join(tmp, ".viberoots", "workspace"), { recursive: true });
+  await fsp.writeFile(
+    path.join(tmp, ".viberoots", "workspace", "flake.nix"),
+    "{ outputs = _: {}; }\n",
+    "utf8",
+  );
+  await fsp.mkdir(path.join(tmp, "viberoots"), { recursive: true });
+  await fsp.writeFile(path.join(tmp, "viberoots", "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
+  return tmp;
 }
 
 async function realTemp(prefix: string): Promise<string> {
@@ -65,6 +78,61 @@ test("findRepoRoot prefers WORKSPACE_ROOT when temp-workspace commands run under
       else delete process.env.WORKSPACE_ROOT;
     }
   });
+});
+
+test("workspace root detection prefers extracted parent workspace over nested viberoots flake", async () => {
+  const tmp = await extractedWorkspace("vbr-roots-extracted");
+  const previousWorkspaceRoot = process.env.WORKSPACE_ROOT;
+  const previousDevshellRoot = process.env._VIBEROOTS_DEVSHELL_ROOT;
+  const previousLiveRoot = process.env.LIVE_ROOT;
+  try {
+    delete process.env.WORKSPACE_ROOT;
+    delete process.env._VIBEROOTS_DEVSHELL_ROOT;
+    delete process.env.LIVE_ROOT;
+    const nested = path.join(tmp, "viberoots", "build-tools", "tools", "dev");
+    await fsp.mkdir(nested, { recursive: true });
+    assert.equal(await findRepoRoot(nested), tmp);
+    const roots = resolveWorkspaceRootsSync({ start: nested, env: {} });
+    assert.equal(roots.workspaceRoot, tmp);
+    assert.equal(roots.viberootsWorkspace, path.join(tmp, ".viberoots", "workspace"));
+  } finally {
+    if (typeof previousWorkspaceRoot === "string")
+      process.env.WORKSPACE_ROOT = previousWorkspaceRoot;
+    else delete process.env.WORKSPACE_ROOT;
+    if (typeof previousDevshellRoot === "string")
+      process.env._VIBEROOTS_DEVSHELL_ROOT = previousDevshellRoot;
+    else delete process.env._VIBEROOTS_DEVSHELL_ROOT;
+    if (typeof previousLiveRoot === "string") process.env.LIVE_ROOT = previousLiveRoot;
+    else delete process.env.LIVE_ROOT;
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("workspace root detection treats generated workspace flake as parent workspace state", async () => {
+  const tmp = await extractedWorkspace("vbr-roots-hidden-workspace");
+  const previousWorkspaceRoot = process.env.WORKSPACE_ROOT;
+  const previousDevshellRoot = process.env._VIBEROOTS_DEVSHELL_ROOT;
+  const previousLiveRoot = process.env.LIVE_ROOT;
+  try {
+    delete process.env.WORKSPACE_ROOT;
+    delete process.env._VIBEROOTS_DEVSHELL_ROOT;
+    delete process.env.LIVE_ROOT;
+    const generatedFlakeRoot = path.join(tmp, ".viberoots", "workspace");
+    assert.equal(await findRepoRoot(generatedFlakeRoot), tmp);
+    const roots = resolveWorkspaceRootsSync({ start: generatedFlakeRoot, env: {} });
+    assert.equal(roots.workspaceRoot, tmp);
+    assert.equal(roots.viberootsWorkspace, generatedFlakeRoot);
+  } finally {
+    if (typeof previousWorkspaceRoot === "string")
+      process.env.WORKSPACE_ROOT = previousWorkspaceRoot;
+    else delete process.env.WORKSPACE_ROOT;
+    if (typeof previousDevshellRoot === "string")
+      process.env._VIBEROOTS_DEVSHELL_ROOT = previousDevshellRoot;
+    else delete process.env._VIBEROOTS_DEVSHELL_ROOT;
+    if (typeof previousLiveRoot === "string") process.env.LIVE_ROOT = previousLiveRoot;
+    else delete process.env.LIVE_ROOT;
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
 });
 
 test("resolveWorkspaceRootsSync resolves local viberoots current symlink", async () => {
@@ -139,7 +207,7 @@ test("viberoots wrapper resolves command source from VIBEROOTS_ROOT", async () =
   const tmp = await workspace("vbr-version-command");
   try {
     const { stdout } = await execFileAsync(
-      "build-tools/tools/bin/viberoots",
+      "viberoots/build-tools/tools/bin/viberoots",
       ["version", "--json"],
       {
         cwd: process.cwd(),
@@ -147,14 +215,14 @@ test("viberoots wrapper resolves command source from VIBEROOTS_ROOT", async () =
           ...process.env,
           NO_DEV_SHELL: "1",
           WORKSPACE_ROOT: tmp,
-          VIBEROOTS_ROOT: process.cwd(),
+          VIBEROOTS_ROOT: path.join(process.cwd(), "viberoots"),
         },
       },
     );
     const status = JSON.parse(String(stdout));
     assert.equal(status.sourceMode, "local");
     assert.equal(status.workspaceRoot, tmp);
-    assert.equal(status.viberootsRoot, process.cwd());
+    assert.equal(status.viberootsRoot, path.join(process.cwd(), "viberoots"));
     assert.equal(status.revisionSource, "git");
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });

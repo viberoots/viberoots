@@ -8,7 +8,7 @@ import { exists, runInTemp } from "../lib/test-helpers";
 test("gen-provider-index: writes provider_index.bzl deterministically", async () => {
   await runInTemp("gen-provider-index", async (tmp, $) => {
     // Generate provider index directly (Node/CPP entries only if present)
-    await $`node build-tools/tools/buck/gen-provider-index.ts --out ${DEFAULT_PROVIDER_INDEX_PATH}`;
+    await $`node viberoots/build-tools/tools/buck/gen-provider-index.ts --out ${DEFAULT_PROVIDER_INDEX_PATH}`;
 
     const idx = path.join(tmp, DEFAULT_PROVIDER_INDEX_PATH);
     if (!(await exists(idx))) {
@@ -23,7 +23,7 @@ test("gen-provider-index: writes provider_index.bzl deterministically", async ()
 
     // Re-run to verify determinism (no-op write)
     const before = txt;
-    await $`node build-tools/tools/buck/gen-provider-index.ts --out ${DEFAULT_PROVIDER_INDEX_PATH}`;
+    await $`node viberoots/build-tools/tools/buck/gen-provider-index.ts --out ${DEFAULT_PROVIDER_INDEX_PATH}`;
     const after = await fsp.readFile(idx, "utf8");
     if (before !== after) {
       console.error("index not deterministic across runs");

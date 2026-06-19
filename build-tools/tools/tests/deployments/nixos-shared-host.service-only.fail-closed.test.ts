@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
@@ -47,7 +48,7 @@ async function runDeployCli(
     cwd: tmp,
     env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
     stdio: "pipe",
-  })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --admission-evidence-json ${admissionEvidenceJson} ${extraArgs}`.nothrow();
+  })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --admission-evidence-json ${admissionEvidenceJson} ${extraArgs}`.nothrow();
 }
 
 test("repo deploy CLI fails closed on missing same-host service endpoint for every reviewed mutation kind", async () => {

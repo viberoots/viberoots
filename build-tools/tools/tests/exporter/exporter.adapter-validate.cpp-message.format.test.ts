@@ -7,12 +7,16 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("cpp adapter validation message uses consistent classification wording (warn-only)", async () => {
   await runInTemp("exp-cpp-validate-message", async (tmp, $) => {
-    const pkg = path.join(tmp, "build-tools", "cpp", "app");
+    const pkg = path.join(tmp, "viberoots", "build-tools", "cpp", "app");
     await fs.mkdirp(pkg);
     await fs.outputFile(path.join(pkg, "main.cpp"), "int main(){return 0;}\n", "utf8");
 
     const nodes = [
-      { name: "//build-tools/cpp/app:bin", srcs: ["build-tools/cpp/app/main.cpp"], labels: [] },
+      {
+        name: "//viberoots/build-tools/cpp/app:bin",
+        srcs: ["viberoots/build-tools/cpp/app/main.cpp"],
+        labels: [],
+      },
     ];
     const graph = path.join(tmp, "build-tools/tools/buck", "graph.json");
     await fs.mkdirp(path.dirname(graph));
@@ -22,7 +26,7 @@ test("cpp adapter validation message uses consistent classification wording (war
       cwd: tmp,
       stdio: "pipe",
       reject: false,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --validation warn`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --validation warn`;
     const out = String(res.stdout || "") + String(res.stderr || "");
     const code = res.exitCode || 0;
     assert.equal(code, 0, "exporter should succeed in warn mode for cpp");
@@ -31,7 +35,7 @@ test("cpp adapter validation message uses consistent classification wording (war
       out,
       /\[exporter\]\[cpp\] targets include C\+\+-looking sources but lack both cxx_\* rule_type and 'lang:cpp' label:/,
     );
-    assert.match(out, /-\s*\/\/build-tools\/cpp\/app:bin/);
+    assert.match(out, /-\s*\/\/viberoots\/build-tools\/cpp\/app:bin/);
     assert.match(out, /Guidance: stamp 'lang:cpp' in macros or use cxx_\* rules/i);
   });
 });

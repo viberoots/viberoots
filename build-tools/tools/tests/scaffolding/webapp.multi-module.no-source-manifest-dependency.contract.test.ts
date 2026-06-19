@@ -31,7 +31,14 @@ test(
         appTargetLabel: contracts.appTargetLabel,
       });
 
-      const watcherAbs = path.join(tmp, "build-tools", "tools", "dev", "watch-wasm-coordinator.ts");
+      const watcherAbs = path.join(
+        tmp,
+        "viberoots",
+        "build-tools",
+        "tools",
+        "dev",
+        "watch-wasm-coordinator.ts",
+      );
       const logs: string[] = [];
       const watcher = spawn("zx-wrapper", [watcherAbs, "--cwd", appAbs, "--poll-ms", "120"], {
         cwd: appAbs,
@@ -76,8 +83,13 @@ test(
           );
         }
         assert.match(body, /wasm-producer:/);
-        const merged = logs.join("");
-        assert.match(merged, /\[wasm-watch\] coordinator:registered app_target=/);
+        const registered = await waitForValue(
+          async () => logs.join(""),
+          (txt) => /\[wasm-watch\] coordinator:registered app_target=/.test(txt),
+          10000,
+          150,
+        );
+        assert.match(registered, /\[wasm-watch\] coordinator:registered app_target=/);
       } finally {
         await stopServer(watcher);
       }

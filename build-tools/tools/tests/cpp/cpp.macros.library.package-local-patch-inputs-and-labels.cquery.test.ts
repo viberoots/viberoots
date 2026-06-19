@@ -33,7 +33,7 @@ EOF'`;
       [
         "",
         "# test: cpp.macros.library.package-local-patch-inputs-and-labels.cquery.test.ts",
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "core",',

@@ -63,7 +63,7 @@ test("cpp: link_closure=direct does not follow transitive link_deps (fails deter
         link_closure: "direct",
       },
     ];
-    const graphJsonPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphJsonPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fs.outputFile(graphJsonPath, JSON.stringify(graph, null, 2) + "\n", "utf8");
 
     const system = systemForHost();
@@ -73,7 +73,7 @@ test("cpp: link_closure=direct does not follow transitive link_deps (fails deter
       nothrow: true,
       reject: false,
       env: { ...process.env, BUCK_TARGET: "//projects/apps/demo:demo" },
-    })`nix build --impure --accept-flake-config --file build-tools/tools/nix/graph-generator.nix selected --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${system} --arg graphJsonPath ${graphJsonPath} --no-link --print-out-paths`;
+    })`nix build --impure --accept-flake-config --file viberoots/build-tools/tools/nix/graph-generator.nix selected --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${system} --arg graphJsonPath ${graphJsonPath} --no-link --print-out-paths`;
 
     if (build.exitCode === 0) {
       throw new Error(

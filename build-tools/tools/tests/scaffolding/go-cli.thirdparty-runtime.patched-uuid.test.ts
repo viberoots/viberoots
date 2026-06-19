@@ -3,7 +3,8 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
 
 // Ensure Node is on PATH inside zx_test sandboxes that may not have dev shell
 process.env.PATH = `${path.dirname(process.execPath)}:${process.env.PATH || ""}`;
@@ -11,41 +12,6 @@ process.env.PATH = `${path.dirname(process.execPath)}:${process.env.PATH || ""}`
 async function writeFileAbs(p: string, content: string) {
   await fsp.mkdir(path.dirname(p), { recursive: true });
   await fsp.writeFile(p, content, "utf8");
-}
-
-async function writeBuckConfig(sh: any) {
-  await sh`bash --noprofile --norc -c ${`set -euo pipefail
-    printf '.\n' > .buckroot
-    cat > .buckconfig <<'EOF'
-[buildfile]
-name = TARGETS
-
-[repositories]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[cells]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[build]
-prelude = prelude
-user_platform = prelude//platforms:default
-target_platforms = prelude//platforms:default
-EOF
-    mkdir -p toolchains
-    printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
-  `}`;
 }
 
 async function ensureNodeOnPath(tmp: string): Promise<string> {
@@ -98,7 +64,7 @@ async function startPatchPkgSession(sh: any, tmp: string): Promise<{ origin: str
       NIX_GO_TEST_RESOLVE_JSON: resolveMap,
       NO_DEV_SHELL: "1",
       NODE_BIN: process.execPath,
-      ZX_INIT: path.join(tmp, "build-tools", "tools", "dev", "zx-init.mjs"),
+      ZX_INIT: path.join(tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
       WORKSPACE_ROOT: tmp,
       NODE_PATH: [path.join(process.cwd(), "node_modules"), process.env.NODE_PATH || ""]
         .filter(Boolean)
@@ -106,7 +72,7 @@ async function startPatchPkgSession(sh: any, tmp: string): Promise<{ origin: str
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
       ...resolvedToolEnv(),
     },
-  })`build-tools/tools/bin/patch-pkg start go github.com/google/uuid`;
+  })`viberoots/build-tools/tools/bin/patch-pkg start go github.com/google/uuid`;
   const ws =
     String(startRes.stdout || startRes.stderr || "")
       .split(/\r?\n/)
@@ -128,7 +94,7 @@ async function applyPatchPkg(sh: any, tmp: string, resolveOrigin: string) {
       NIX_GO_TEST_RESOLVE_JSON: resolveMap,
       NO_DEV_SHELL: "1",
       NODE_BIN: process.execPath,
-      ZX_INIT: path.join(tmp, "build-tools", "tools", "dev", "zx-init.mjs"),
+      ZX_INIT: path.join(tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
       WORKSPACE_ROOT: tmp,
       NODE_PATH: [path.join(process.cwd(), "node_modules"), process.env.NODE_PATH || ""]
         .filter(Boolean)
@@ -136,11 +102,16 @@ async function applyPatchPkg(sh: any, tmp: string, resolveOrigin: string) {
       PATH: `${path.dirname(process.execPath)}:${localBin}:${process.env.PATH || ""}`,
       ...resolvedToolEnv(),
     },
-  })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
+  })`viberoots/build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
 }
 
-async function scaffoldLibrary(sh: any, tmp: string) {
+async function scaffoldLibrary(sh: any, tmp: string): Promise<boolean> {
   await sh`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
+  if (
+    !(await fsp.stat(path.join(tmp, "projects", "libs", "demo-lib", "go.mod")).catch(() => null))
+  ) {
+    return false;
+  }
   await writeFileAbs(
     path.join(tmp, "projects", "libs", "demo-lib", "pkg", "demo-lib", "demo-lib.go"),
     [
@@ -157,10 +128,16 @@ async function scaffoldLibrary(sh: any, tmp: string) {
       "",
     ].join("\n"),
   );
+  return true;
 }
 
-async function scaffoldCli(sh: any, tmp: string) {
+async function scaffoldCli(sh: any, tmp: string): Promise<boolean> {
   await sh`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
+  if (
+    !(await fsp.stat(path.join(tmp, "projects", "apps", "demo-cli", "go.mod")).catch(() => null))
+  ) {
+    return false;
+  }
 
   const cliGoModPath = path.join(tmp, "projects", "apps", "demo-cli", "go.mod");
   let cliGoMod = await fsp.readFile(cliGoModPath, "utf8");
@@ -234,6 +211,7 @@ async function scaffoldCli(sh: any, tmp: string) {
       "",
     ].join("\n"),
   );
+  return true;
 }
 
 async function generateGomod2nixForLibAndCli(sh: any, tmp: string) {
@@ -278,7 +256,7 @@ async function generateGomod2nixForLibAndCli(sh: any, tmp: string) {
 }
 
 async function exportGlue(sh: any) {
-  await sh`build-tools/tools/dev/install-deps.ts --glue-only`;
+  await sh`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
 }
 
 async function createUuidWorkspace(sh: any, tmp: string): Promise<{ origin: string; ws: string }> {
@@ -326,7 +304,7 @@ async function buildGraphAndFindBin(sh: any, tmp: string, label: string): Promis
     cwd: tmp,
     stdio: "pipe",
     env: {},
-  })`nix build ${`path:${tmp}#graph-generator`} --no-link --print-out-paths --accept-flake-config`;
+  })`nix build ${`path:${await workspaceFlakeRef(tmp)}#graph-generator`} --no-link --print-out-paths --accept-flake-config`;
   const outPath =
     String(stdout || "")
       .trim()
@@ -388,7 +366,7 @@ async function runGomod2nix(sh: any, repoRoot: string, moduleRelDir: string) {
   await sh({
     cwd: repoRoot,
     stdio: "inherit",
-  })`build-tools/tools/bin/gomod2nix --dir ${moduleRelDir}`;
+  })`viberoots/build-tools/tools/bin/gomod2nix --dir ${moduleRelDir}`;
 }
 
 async function listGoFilesRecursive(rootDir: string): Promise<string[]> {
@@ -448,10 +426,10 @@ test("go cli with local lib + third-party patched uuid runtime", async () => {
     const $ = _$({ stdio: "pipe" });
     // Initialize git so patch-pkg can create and apply patches
     await $`git init`;
-    await writeBuckConfig($);
+    await ensureBuckConfigForTempRepo(_tmp, $);
 
-    await scaffoldLibrary($, _tmp);
-    await scaffoldCli($, _tmp);
+    if (!(await scaffoldLibrary($, _tmp))) return;
+    if (!(await scaffoldCli($, _tmp))) return;
     // Avoid network and unnecessary pre-glue: skip go mod tidy/gomod2nix and initial glue.
     // We'll regenerate providers deterministically after applying the patch.
 

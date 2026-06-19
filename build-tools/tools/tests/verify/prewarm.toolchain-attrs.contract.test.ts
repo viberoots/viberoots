@@ -4,7 +4,10 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("toolchain package set exposes verify prewarm attrs", async () => {
-  const txt = await fsp.readFile("build-tools/tools/nix/flake/packages/toolchains.nix", "utf8");
+  const txt = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/flake/packages/toolchains.nix",
+    "utf8",
+  );
 
   for (const attr of ["go", "cxx", "emscripten", "tinygo"]) {
     assert.ok(

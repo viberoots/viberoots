@@ -8,6 +8,7 @@ import { test } from "node:test";
 import { validateAwsFoundationProfile } from "../../deployments/cloud-control-aws-foundation-profile";
 import { validateAwsTopologyEvidence } from "../../deployments/cloud-control-aws-topology-validate";
 import { foundationFromTopology, privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { viberootsRepoPath } from "./deployment-command";
 
 const opts = {
   expectedRegion: "us-east-1",
@@ -15,7 +16,9 @@ const opts = {
   maxAgeMinutes: 60,
 };
 
-const moduleDir = "build-tools/deployments/aws-control-plane-foundation/opentofu";
+const moduleDir = viberootsRepoPath(
+  "build-tools/deployments/aws-control-plane-foundation/opentofu",
+);
 const expectedVariableNames = `
   region name_prefix tags vpc_cidr existing_vpc_id existing_internet_gateway_id
   public_subnet_cidrs private_subnet_cidrs availability_zones outbound_https_cidrs
@@ -103,7 +106,7 @@ test("OpenTofu foundation hooks reject ambient AWS execution credentials", () =>
     "build-tools/tools/deployments/cloud-control-aws-foundation-hooks.ts",
     "build-tools/tools/deployments/cloud-control-aws-foundation-credentials.ts",
   ]
-    .map((file) => fs.readFileSync(file, "utf8"))
+    .map((file) => fs.readFileSync(viberootsRepoPath(file), "utf8"))
     .join("\n");
   assert.match(source, /AWS_SHARED_CREDENTIALS_FILE/);
   assert.match(source, /VBR_AWS_FOUNDATION_ASSUME_ROLE_ARN/);
@@ -117,7 +120,7 @@ test("live AWS inspection uses constrained credentials and verifies returned sta
     "build-tools/tools/deployments/cloud-control-aws-foundation-inspect.ts",
     "build-tools/tools/deployments/cloud-control-aws-foundation-live-inspect.ts",
   ]
-    .map((file) => fs.readFileSync(file, "utf8"))
+    .map((file) => fs.readFileSync(viberootsRepoPath(file), "utf8"))
     .join("\n");
   for (const expected of [
     "awsFoundationLiveEnv",
@@ -136,7 +139,7 @@ test("live AWS inspection uses constrained credentials and verifies returned sta
 test("OpenTofu foundation module and hooks wire encrypted locked backend state", () => {
   const moduleSourceText = moduleSource();
   const hookSource = fs.readFileSync(
-    "build-tools/tools/deployments/cloud-control-aws-foundation-hooks.ts",
+    viberootsRepoPath("build-tools/tools/deployments/cloud-control-aws-foundation-hooks.ts"),
     "utf8",
   );
   assert.match(moduleSourceText, /backend "s3"/);
@@ -145,7 +148,9 @@ test("OpenTofu foundation module and hooks wire encrypted locked backend state",
   assert.match(hookSource, /workspace", "select"/);
   assert.match(
     fs.readFileSync(
-      "build-tools/deployments/aws-control-plane-foundation/opentofu/backend.hcl.example",
+      viberootsRepoPath(
+        "build-tools/deployments/aws-control-plane-foundation/opentofu/backend.hcl.example",
+      ),
       "utf8",
     ),
     /dynamodb_table/,
@@ -154,7 +159,7 @@ test("OpenTofu foundation module and hooks wire encrypted locked backend state",
 
 test("OpenTofu foundation IAM policies avoid wildcard service actions", () => {
   const source = fs.readFileSync(
-    "build-tools/deployments/aws-control-plane-foundation/opentofu/iam.tf",
+    viberootsRepoPath("build-tools/deployments/aws-control-plane-foundation/opentofu/iam.tf"),
     "utf8",
   );
   for (const wildcard of ["ec2:Describe*", "iam:Get*", "iam:List*", "s3:Get*", "s3:List*"]) {
@@ -227,7 +232,9 @@ test("foundation profile carries and live inspection checks S3 VPC endpoint iden
   );
   assert.match(
     fs.readFileSync(
-      "build-tools/tools/deployments/cloud-control-aws-foundation-live-inspect.ts",
+      viberootsRepoPath(
+        "build-tools/tools/deployments/cloud-control-aws-foundation-live-inspect.ts",
+      ),
       "utf8",
     ),
     /describe-vpc-endpoints/,

@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import http from "node:http";
 import path from "node:path";
@@ -89,7 +90,7 @@ test("deploy --status and --print-run-lock-scope read service-backed run details
         cwd: tmp,
         env: { ...process.env, ...controlPlaneFixtureEnv },
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --status --submission-id submission-123 --control-plane-url ${mock.url}`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --status --submission-id submission-123 --control-plane-url ${mock.url}`;
       const status = JSON.parse(String(statusResult.stdout));
       assert.equal(status.submissionId, "submission-123");
       assert.equal(status.lockScope, "nixos-shared-host:default:demoapp");
@@ -98,7 +99,7 @@ test("deploy --status and --print-run-lock-scope read service-backed run details
         cwd: tmp,
         env: { ...process.env, ...controlPlaneFixtureEnv },
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --print-run-lock-scope --deploy-run-id deploy-run-123 --control-plane-url ${mock.url}`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --print-run-lock-scope --deploy-run-id deploy-run-123 --control-plane-url ${mock.url}`;
       assert.equal(String(lockScopeResult.stdout).trim(), "nixos-shared-host:default:demoapp");
       assert.equal(mock.requests[0]?.path, "/api/v1/status?submissionId=submission-123");
       assert.equal(mock.requests[1]?.path, "/api/v1/status?deployRunId=deploy-run-123");
@@ -123,7 +124,7 @@ test("deploy --record reads the finalized run record through the control-plane h
         cwd: tmp,
         env: { ...process.env, ...controlPlaneFixtureEnv },
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --record --deploy-run-id deploy-run-123 --control-plane-url ${mock.url}`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --record --deploy-run-id deploy-run-123 --control-plane-url ${mock.url}`;
       const record = JSON.parse(String(recordResult.stdout));
       assert.equal(record.deployRunId, "deploy-run-123");
       assert.equal(record.finalOutcome, "succeeded");
@@ -198,12 +199,12 @@ test("deploy --approve uses the installed profile and status bindings instead of
         cwd: tmp,
         env: { ...process.env, ...controlPlaneFixtureEnv },
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/viberoots --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url ${mock.url}`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-install.ts")} client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/viberoots --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ssh --control-plane-url ${mock.url}`;
       const approveResult = await $({
         cwd: tmp,
         env: { ...process.env, ...controlPlaneFixtureEnv },
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --approve --deploy-run-id deploy-run-approval-123 --approval-id ticket-123 --requested-by-principal user:reviewer`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --approve --deploy-run-id deploy-run-approval-123 --approval-id ticket-123 --requested-by-principal user:reviewer`;
       const approved = JSON.parse(String(approveResult.stdout));
       assert.equal(approved.deployRunId, "deploy-run-approval-123");
       assert.equal(approved.lifecycleState, "waiting_for_lock");

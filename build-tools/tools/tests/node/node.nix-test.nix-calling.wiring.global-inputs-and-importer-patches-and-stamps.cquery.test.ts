@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("nix_node_test (Nix-calling) wires global inputs + importer patches as action inputs and stamps build-tools/lang/kind/patch_scope (cquery)", async () => {
+test("nix_node_test (Nix-calling) wires global inputs + importer patches as action inputs and stamps viberoots/build-tools/lang/kind/patch_scope (cquery)", async () => {
   await runInTemp("node-nix-test-nix-calling-wiring-cquery", async (tmp, $) => {
     const appDir = path.join(tmp, "projects", "apps", "web");
     const patchDir = path.join(appDir, "patches", "node");
@@ -20,7 +20,7 @@ test("nix_node_test (Nix-calling) wires global inputs + importer patches as acti
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_test")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_test")',
         "",
         "nix_node_test(",
         '  name = "t",',
@@ -47,7 +47,7 @@ test("nix_node_test (Nix-calling) wires global inputs + importer patches as acti
     );
     assert.ok(
       srcsOut.includes(":flake.lock"),
-      "expected //:flake.lock to be present in srcs via global_nix_inputs()",
+      "expected //.viberoots/workspace:flake.lock to be present in srcs via global_nix_inputs()",
     );
 
     const labelsProbe = await $({

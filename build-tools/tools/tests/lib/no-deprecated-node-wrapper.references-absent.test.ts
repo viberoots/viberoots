@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("no references remain to append_node_patches_for_importer", async () => {
-  const txt = await fsp.readFile("build-tools/lang/defs_common.bzl", "utf8");
+  const txt = await fsp.readFile("viberoots/build-tools/lang/defs_common.bzl", "utf8");
   assert.ok(
     !txt.includes("append_node_patches_for_importer("),
     "deprecated helper append_node_patches_for_importer should be removed",

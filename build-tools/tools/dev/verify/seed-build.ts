@@ -5,7 +5,7 @@ export function verifySeedBuildArgs(opts: {
   mode: VerifySeedBuildMode;
   gcRootPath?: string;
 }): string[] {
-  const flakeRef = `${opts.root}#test-seed`;
+  const flakeRef = `path:${opts.root}/.viberoots/workspace#test-seed`;
   const base = [
     "build",
     "--option",
@@ -13,6 +13,9 @@ export function verifySeedBuildArgs(opts: {
     "false",
     "--impure",
     flakeRef,
+    "--override-input",
+    "viberoots",
+    `path:${opts.root}/viberoots`,
     "--accept-flake-config",
   ];
   if (opts.mode === "remote-ready") return [...base, "--no-link", "--print-out-paths"];

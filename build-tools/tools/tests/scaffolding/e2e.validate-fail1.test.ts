@@ -9,6 +9,7 @@ test("meta: missing help fails", async () => {
     const $ = _$({ stdio: "ignore" });
     const metaPath = path.join(
       tmp,
+      "viberoots",
       "build-tools",
       "tools",
       "scaffolding",
@@ -22,7 +23,7 @@ test("meta: missing help fails", async () => {
     await fsp.writeFile(metaPath, JSON.stringify(meta, null, 2) + "\n", "utf8");
     let failed = false;
     try {
-      await $`scaf validate build-tools/tools/scaffolding/templates/go/lib --quiet`;
+      await $`scaf validate viberoots/build-tools/tools/scaffolding/templates/go/lib --quiet`;
     } catch {
       failed = true;
     }

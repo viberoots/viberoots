@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import * as fsp from "node:fs/promises";
 
-test("third_party/providers/defs.bzl removed; node/python provider defs remain", async () => {
+test("legacy third_party/providers/defs.bzl removed; hidden node/python provider defs remain", async () => {
   await runInTemp("providers-defs", async () => {
     const hasGoDefs = await fsp
       .access("third_party/providers/defs.bzl")
@@ -14,11 +14,11 @@ test("third_party/providers/defs.bzl removed; node/python provider defs remain",
       process.exit(2);
     }
     const nodeDefs = await fsp
-      .access("third_party/providers/defs_node.bzl")
+      .access(".viberoots/workspace/providers/defs_node.bzl")
       .then(() => true)
       .catch(() => false);
     const pyDefs = await fsp
-      .access("third_party/providers/defs_python.bzl")
+      .access(".viberoots/workspace/providers/defs_python.bzl")
       .then(() => true)
       .catch(() => false);
     if (!nodeDefs || !pyDefs) {

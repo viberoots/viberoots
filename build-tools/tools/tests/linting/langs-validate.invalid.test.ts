@@ -17,20 +17,27 @@ test("langs.json invalid fails validator with message", async () => {
       ],
     } as any;
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/nix/langs.json"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/langs.json"),
       JSON.stringify(manifest, null, 2) + "\n",
     );
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/dev/langs.schema.json"),
-      path.join(tmp, "build-tools/tools/dev/langs.schema.json"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/dev/langs.schema.json"),
+      path.join(tmp, "viberoots/build-tools/tools/dev/langs.schema.json"),
     );
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/dev/validate-langs.ts"),
-      path.join(tmp, "build-tools/tools/dev/validate-langs.ts"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/dev/validate-langs.ts"),
+      path.join(tmp, "viberoots/build-tools/tools/dev/validate-langs.ts"),
     );
     let code = 0;
     try {
-      await $({ cwd: tmp })`node build-tools/tools/dev/validate-langs.ts`;
+      await $({
+        cwd: tmp,
+        env: {
+          ...process.env,
+          VIBEROOTS_ROOT: path.join(tmp, "viberoots"),
+          VIBEROOTS_SOURCE_ROOT: path.join(tmp, "viberoots"),
+        },
+      })`node viberoots/build-tools/tools/dev/validate-langs.ts`;
     } catch (e: any) {
       code = e.exitCode || 1;
       const out = String(e.stdout || "") + String(e.stderr || "");

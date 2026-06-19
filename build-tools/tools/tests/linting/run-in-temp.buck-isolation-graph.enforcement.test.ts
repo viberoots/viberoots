@@ -10,7 +10,9 @@ import {
 } from "./run-in-temp-buck-isolation-lint.ts";
 
 async function tempRepo(prefix: string): Promise<string> {
-  return fsp.mkdtemp(path.join(process.cwd(), `buck-out/tmp/${prefix}-`));
+  const base = path.join(process.cwd(), ".viberoots", "workspace", "buck", "tmp");
+  await fsp.mkdir(base, { recursive: true });
+  return fsp.mkdtemp(path.join(base, `${prefix}-`));
 }
 
 function rels(repo: string, files: string[]): string[] {

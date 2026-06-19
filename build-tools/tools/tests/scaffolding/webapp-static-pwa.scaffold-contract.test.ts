@@ -39,7 +39,7 @@ test("webapp-static-pwa scaffold includes pwa contract files and static labels",
     assert.match(viteConfig, /--client-dir/);
     assert.match(viteConfig, /--cache-version-prefix/);
     assert.match(viteConfig, /--extra-urls/);
-    assert.match(viteConfig, /parseWasmModuleManifest/);
+    assert.match(viteConfig, /readStaticPwaExtraUrls/);
     assert.deepEqual(
       manifest.icons?.map((icon) => icon.src),
       ["/icons/icon-192.svg", "/icons/icon-512.svg"],

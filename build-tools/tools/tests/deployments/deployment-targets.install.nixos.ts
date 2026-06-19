@@ -37,7 +37,9 @@ export async function installNixosSharedHostTargets(
         ? "nixos_shared_host_ssr_webapp_deployment"
         : "nixos_shared_host_static_webapp_deployment";
     appendTargetsFragment(fragments, labelDir(deployment.label), {
-      loadLines: [`load("//build-tools/deployments:defs.bzl", ${JSON.stringify(loadRule)})`],
+      loadLines: [
+        `load("@viberoots//build-tools/deployments:defs.bzl", ${JSON.stringify(loadRule)})`,
+      ],
       bodyLines: [
         `${loadRule}(`,
         `    name = ${JSON.stringify(labelName(deployment.label))},`,

@@ -192,7 +192,10 @@ test(
               "utf8",
             );
             assert.match(clientTsLoader, /export function listTsModules\(\)/);
-            assert.match(clientTsLoader, /export async function loadTsModule\(moduleKey: string\)/);
+            assert.match(
+              clientTsLoader,
+              /export async function loadTsModule\(\s*moduleKey: string,\s*\)/,
+            );
             if (app.serverTsLoaderRel) {
               const serverTsLoader = await fsp.readFile(
                 path.join(app.root, app.serverTsLoaderRel),
@@ -201,7 +204,7 @@ test(
               assert.match(serverTsLoader, /export function listTsModules\(\)/);
               assert.match(
                 serverTsLoader,
-                /export async function loadTsModule\(moduleKey: string\)/,
+                /export async function loadTsModule\(\s*moduleKey: string,\s*\)/,
               );
             }
           }

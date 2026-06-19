@@ -111,7 +111,7 @@ test("mixed build-system deployment impact keeps the existing selection", async 
     env: {},
     deps: {
       resolveTemplateScope: async () => baseDecision(),
-      collectChangedPaths: async () => ["build-tools/tools/dev/verify/run-verify.ts"],
+      collectChangedPaths: async () => ["viberoots/build-tools/tools/dev/verify/run-verify.ts"],
       listDeploymentTargets: async () => ["//projects/deployments/pleomino/dev:deploy"],
       queryDeploymentDomainTargets: async () => {
         throw new Error("deployment query should not run in mixed-build-system mode");

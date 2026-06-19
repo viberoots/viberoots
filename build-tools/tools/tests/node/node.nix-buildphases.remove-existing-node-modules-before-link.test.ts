@@ -3,7 +3,10 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("node nix build phases only relink node_modules when target differs", async () => {
-  const webapp = await fsp.readFile("build-tools/tools/nix/flake/packages/node-webapp.nix", "utf8");
+  const webapp = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/flake/packages/node-webapp.nix",
+    "utf8",
+  );
   if (
     !webapp.includes(
       'if [ -L node_modules ] && [ "$(readlink node_modules)" = "$NM_TARGET" ]; then',
@@ -23,7 +26,7 @@ test("node nix build phases only relink node_modules when target differs", async
   }
 
   const nodeTest = await fsp.readFile(
-    "build-tools/tools/nix/flake/packages/node-test-buildPhase.sh",
+    "viberoots/build-tools/tools/nix/flake/packages/node-test-buildPhase.sh",
     "utf8",
   );
   if (

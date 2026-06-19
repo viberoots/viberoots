@@ -21,7 +21,7 @@ test("patches-lint: invalid filename shapes fail in strict mode", async () => {
     );
     let failed = false;
     try {
-      await $({ stdio: "pipe" })`node build-tools/tools/dev/patches-lint.ts --strict`;
+      await $({ stdio: "pipe" })`node viberoots/build-tools/tools/dev/patches-lint.ts --strict`;
     } catch {
       failed = true;
     }

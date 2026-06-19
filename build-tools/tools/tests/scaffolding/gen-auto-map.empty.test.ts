@@ -13,7 +13,7 @@ test("gen-auto-map: empty labels produces empty MODULE_PROVIDERS", async () => {
       JSON.stringify(graph),
       "utf8",
     );
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
     const out = await fsp.readFile(
       path.join(tmp, ".viberoots", "workspace", "providers", "auto_map.bzl"),
       "utf8",

@@ -6,7 +6,7 @@ import {
 } from "../../lib/deployment-impact-selector";
 import { listDeploymentTargets } from "../../deployments/deployment-query";
 import {
-  DEPLOYMENT_SAFETY_FLOOR_TARGETS,
+  deploymentSafetyFloorTargets,
   queryDeploymentDomainTargets,
 } from "../../lib/deployment-test-targets";
 import {
@@ -90,10 +90,10 @@ export async function resolveDeploymentOverride(opts: {
   const deploymentDomainTargets = await resolveDeploymentTargets(opts.root);
   if (deploymentDomainTargets.length === 0)
     guardDeploymentSelection("zero resolved deployment-domain test targets", impact.diagnostics);
-  const deploymentSafetyFloorTargets = toSortedUnique(
-    opts.deps?.deploymentSafetyFloorTargets || DEPLOYMENT_SAFETY_FLOOR_TARGETS,
+  const safetyFloorTargets = toSortedUnique(
+    opts.deps?.deploymentSafetyFloorTargets || deploymentSafetyFloorTargets(opts.root),
   );
-  if (deploymentSafetyFloorTargets.length === 0)
+  if (safetyFloorTargets.length === 0)
     guardDeploymentSelection("zero deployment safety-floor targets", impact.diagnostics);
 
   let projectImpactDiagnostics: ProjectImpactSelectorDiagnostics | null = null;
@@ -113,7 +113,7 @@ export async function resolveDeploymentOverride(opts: {
 
   const selectedTargets = toSortedUnique([
     ...deploymentDomainTargets,
-    ...deploymentSafetyFloorTargets,
+    ...safetyFloorTargets,
     ...projectTargets,
   ]);
   return {
@@ -125,7 +125,7 @@ export async function resolveDeploymentOverride(opts: {
       requestedMode: opts.requestedDeploymentMode,
       ...impact.diagnostics,
       deploymentDomainTargets,
-      deploymentSafetyFloorTargets,
+      deploymentSafetyFloorTargets: safetyFloorTargets,
       projectTargets,
       projectImpactDiagnostics,
       selectedTargets,

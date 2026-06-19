@@ -3,9 +3,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
 
 test("prebuild-guard: flags missing MODULE_PROVIDERS mapping for nixpkg-labeled node", async () => {
   await runInTemp("prebuild-coverage-mapping-missing", async (tmp, $) => {
+    await ensureBuckConfigForTempRepo(tmp, $);
     // Providers directory with an existing nix provider stamp (simulates generated provider)
     const providersDir = path.join(tmp, ".viberoots", "workspace", "providers");
     const buckDir = path.join(tmp, ".viberoots", "workspace", "buck");
@@ -17,6 +19,12 @@ test("prebuild-guard: flags missing MODULE_PROVIDERS mapping for nixpkg-labeled 
     const graph = [{ name: "//projects/apps/a:bin", labels: ["nixpkg:pkgs.zlib"] }];
     await fsp.writeFile(path.join(buckDir, "graph.json"), JSON.stringify(graph), "utf8");
     await fsp.writeFile(path.join(buckDir, "node-lock-index.json"), "{}\n", "utf8");
+    await fsp.mkdir(path.join(tmp, ".viberoots", "workspace", "node"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, ".viberoots", "workspace", "node", "workspace-map.json"),
+      "{}\n",
+      "utf8",
+    );
     await fsp.writeFile(
       path.join(buckDir, "invalidation-report.txt"),
       "# invalidation-report\n",
@@ -30,42 +38,6 @@ test("prebuild-guard: flags missing MODULE_PROVIDERS mapping for nixpkg-labeled 
       "utf8",
     );
 
-    // Ensure Buck cell mapping exists in temp repo
-    await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
-      printf '.\n' > .buckroot
-      cat > .buckconfig <<'EOF'
-[buildfile]
-name = TARGETS
-
-[repositories]
-root = .
-workspace_providers = ./.viberoots/workspace/providers
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbsource_stub
-config = ./prelude
-
-[cells]
-root = .
-workspace_providers = ./.viberoots/workspace/providers
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbsource_stub
-config = ./prelude
-
-[build]
-prelude = prelude
-user_platform = prelude//platforms:default
-target_platforms = prelude//platforms:default
-EOF
-      mkdir -p toolchains
-      printf '[buildfile]\\nname = TARGETS\\n' > toolchains/.buckconfig
-    `}`;
-
     // CI should fail due to coverage check: provider exists but mapping is missing
     let failed = false;
     try {
@@ -73,7 +45,7 @@ EOF
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, CI: "true" },
-      })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+      })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
     } catch {
       failed = true;
     }
@@ -85,6 +57,7 @@ EOF
     }
 
     // Add the missing mapping and re-run; guard should pass in CI mode now
+    await fsp.symlink("/nix/store/viberoots-test-prelude/prelude", path.join(tmp, "prelude"));
     await fsp.writeFile(
       path.join(providersDir, "auto_map.bzl"),
       [
@@ -112,6 +85,6 @@ EOF
       cwd: tmp,
       stdio: "inherit",
       env: { ...process.env, CI: "true" },
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
   });
 });

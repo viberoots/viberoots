@@ -6,6 +6,7 @@ import {
   resolveNestedBuckIsolation,
 } from "./buck-command-env";
 import { DEPLOYMENT_DOMAIN_LABEL } from "./deployment-verify-scope";
+import { resolveWorkspaceRootsSync } from "./repo";
 import { targetLabelFromScript } from "./template-owned-tests";
 
 const CONFIG_SUFFIX = /\s+\([^)]*\)$/;
@@ -25,6 +26,25 @@ export const DEPLOYMENT_SAFETY_FLOOR_TARGETS = [
   ),
 ] as const;
 
+function viberootsTargetLabelFromScript(scriptPath: string): string {
+  return targetLabelFromScript(scriptPath).replace(/^\/\//, "viberoots//");
+}
+
+export const VIBEROOTS_DEPLOYMENT_SAFETY_FLOOR_TARGETS = [
+  viberootsTargetLabelFromScript(
+    "build-tools/tools/tests/deployments/deployment-domain.file-size-lint.test.ts",
+  ),
+  viberootsTargetLabelFromScript(
+    "build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts",
+  ),
+  viberootsTargetLabelFromScript(
+    "build-tools/tools/tests/deployments/deployment-domain.taxonomy-drift.test.ts",
+  ),
+  viberootsTargetLabelFromScript(
+    "build-tools/tools/tests/deployments/deployment-verify-scope.boundary.test.ts",
+  ),
+] as const;
+
 function normalizeTarget(target: string): string {
   const clean = String(target || "")
     .trim()
@@ -32,6 +52,18 @@ function normalizeTarget(target: string): string {
   if (!clean) return "";
   if (clean.startsWith("root//")) return clean.slice("root".length);
   return clean;
+}
+
+export function deploymentSafetyFloorTargets(root: string): readonly string[] {
+  const roots = resolveWorkspaceRootsSync({ start: root });
+  if (roots.workspaceRoot !== roots.viberootsRoot) return VIBEROOTS_DEPLOYMENT_SAFETY_FLOOR_TARGETS;
+  return DEPLOYMENT_SAFETY_FLOOR_TARGETS;
+}
+
+function deploymentQueryPattern(root: string): string {
+  const roots = resolveWorkspaceRootsSync({ start: root });
+  if (roots.workspaceRoot !== roots.viberootsRoot) return "viberoots//...";
+  return "//...";
 }
 
 function toSortedUnique(values: Iterable<string>): string[] {
@@ -43,7 +75,7 @@ export async function queryDeploymentDomainTargets(root: string): Promise<string
     root,
     prefix: "deployment-selector",
   });
-  const query = `attrfilter(labels, "${DEPLOYMENT_DOMAIN_LABEL}", //...)`;
+  const query = `attrfilter(labels, "${DEPLOYMENT_DOMAIN_LABEL}", ${deploymentQueryPattern(root)})`;
   const targetPlatform =
     String(process.env.BUCK_TARGET_PLATFORMS || process.env.BUCK_TARGET_PLATFORM || "").trim() ||
     "prelude//platforms:default";

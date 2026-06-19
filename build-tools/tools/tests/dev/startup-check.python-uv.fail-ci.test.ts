@@ -1,10 +1,16 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { runInTemp } from "../lib/test-helpers";
+
+const startupCheckScript = fileURLToPath(new URL("../../dev/startup-check.ts", import.meta.url));
 
 // In CI (CI=true), missing python3/uv should FAIL.
 await runInTemp("startup-check-python-uv-fail-ci", async (tmp, $) => {
+  await fsp.mkdir(path.join(tmp, "build-tools/python"), { recursive: true });
+  await fsp.writeFile(path.join(tmp, "build-tools/python/defs.bzl"), "# python fixture\n", "utf8");
+
   // Ensure zx init is loaded for TypeScript execution
   const here = new URL(import.meta.url).pathname;
   const zxInit = path.resolve(path.dirname(here), "../../dev/zx-init.mjs");
@@ -26,7 +32,7 @@ await runInTemp("startup-check-python-uv-fail-ci", async (tmp, $) => {
   const res = await $({
     stdio: "pipe",
     env,
-  })`${node} build-tools/tools/dev/startup-check.ts`.nothrow();
+  })`${node} ${startupCheckScript}`.nothrow();
   if (res.exitCode === 0) {
     console.error("expected startup-check to fail in CI when python3/uv are missing\n", res.stdout);
     process.exit(2);

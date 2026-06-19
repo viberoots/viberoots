@@ -40,7 +40,10 @@ test("providers registry: partial-clone with no enabled languages runs without e
     await fsp.rm(path.join(tmp, "uv.lock"), { force: true });
     await removeLockfilesRecursively(tmp);
     // Run without --lang so discovery uses manifest + requiredPaths gating.
-    await $({ cwd: tmp, stdio: "inherit" })`node build-tools/tools/buck/sync-providers.ts`;
+    await $({
+      cwd: tmp,
+      stdio: "inherit",
+    })`node viberoots/build-tools/tools/buck/sync-providers.ts`;
     // With no enabled languages present, provider files must be empty (header-only) if present.
     const provDir = path.join(tmp, "third_party", "providers");
     for (const [file, marker] of [

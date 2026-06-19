@@ -10,13 +10,13 @@ test("patch-go start fails in CI when attempting to set dev overrides", async ()
     await fs.mkdirp(origin);
     await fs.outputFile(path.join(origin, "README.md"), "hello\n", "utf8");
     const map = { "golang.org/x/net": { version: "v0.24.0", originPath: origin } };
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const r = await $({
       cwd: tmp,
       stdio: "pipe",
     })`CI=true NIX_GO_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} GOMODCACHE=${path.join(tmp, "gomodcache")} build-tools/tools/bin/patch-pkg start go golang.org/x/net`.nothrow();
+    )} GOMODCACHE=${path.join(tmp, "gomodcache")} viberoots/build-tools/tools/bin/patch-pkg start go golang.org/x/net`.nothrow();
     if ((r.exitCode || 0) === 0) {
       console.error("expected patch-go start to fail in CI when setting dev overrides");
       console.error("stdout:", String(r.stdout || ""));

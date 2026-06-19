@@ -89,7 +89,7 @@ test(
       const watcher = spawn(
         "zx-wrapper",
         [
-          "../../../build-tools/tools/dev/watch-wasm-coordinator.ts",
+          "../../../viberoots/build-tools/tools/dev/watch-wasm-coordinator.ts",
           "--cwd",
           appAbs,
           "--poll-ms",

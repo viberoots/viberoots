@@ -2,9 +2,10 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsRepoPath } from "./deployment-command";
 
 test("guide documents EC2 host adapter boundary and generated inputs", async () => {
-  const guide = await fsp.readFile("docs/control-plane-guide.md", "utf8");
+  const guide = await fsp.readFile(viberootsRepoPath("docs/control-plane-guide.md"), "utf8");
   assert.match(guide, /non-mutating structured EC2 host adapter/);
   assert.match(
     guide,
@@ -28,8 +29,8 @@ test("guide documents EC2 host adapter boundary and generated inputs", async () 
 });
 
 test("guide documents implemented instance-profile and reviewed-source mode credential contracts", async () => {
-  const guide = await fsp.readFile("docs/control-plane-guide.md", "utf8");
-  const setup = await fsp.readFile("docs/cloud-control-setup.md", "utf8");
+  const guide = await fsp.readFile(viberootsRepoPath("docs/control-plane-guide.md"), "utf8");
+  const setup = await fsp.readFile(viberootsRepoPath("docs/cloud-control-setup.md"), "utf8");
   assert.doesNotMatch(guide, /instance-profile\/IAM-role artifact access.*needs the code work/s);
   assert.match(guide, /aws-instance-profile.*omits artifact access-key and secret-key files/s);
   assert.match(
@@ -42,7 +43,7 @@ test("guide documents implemented instance-profile and reviewed-source mode cred
 });
 
 test("guide cutover example includes generated AWS-primary capabilities", async () => {
-  const guide = await fsp.readFile("docs/control-plane-guide.md", "utf8");
+  const guide = await fsp.readFile(viberootsRepoPath("docs/control-plane-guide.md"), "utf8");
   assert.match(guide, /generated `cutover-validate` command from\s+`commands\.json`/s);
   for (const capability of [
     "aws-ec2-control-plane-host",
@@ -57,7 +58,7 @@ test("guide cutover example includes generated AWS-primary capabilities", async 
 });
 
 test("cutover docs do not show a short AWS-primary capability list", async () => {
-  const cutover = await fsp.readFile("docs/cloud-control-cutover.md", "utf8");
+  const cutover = await fsp.readFile(viberootsRepoPath("docs/cloud-control-cutover.md"), "utf8");
   assert.doesNotMatch(
     cutover,
     /--selected-capability aws-ec2-control-plane-host,aws-s3-artifact-store\b/,

@@ -1,4 +1,4 @@
-{ nodeMods, importerDirs, haveRootLock }:
+{ nodeMods, importerDirs, haveRootLock, viberootsNodeMods ? null }:
 let
   localPnpmStore =
     let
@@ -37,7 +37,7 @@ in
         importerDir = ".";
         prefetchedStorePath = localPnpmStore;
       };
-    } else {}) // perImporterStore);
+    } else {}) // (if viberootsNodeMods != null then { viberoots = viberootsNodeMods.pnpm-store; } else {}) // perImporterStore);
 
   pnpm-store-unfixed =
     ({} // (if haveRootLock then {
@@ -46,9 +46,11 @@ in
         importerDir = ".";
         prefetchedStorePath = localPnpmStore;
       };
-    } else {}) // perImporterStoreUnfixed);
+    } else {}) // (if viberootsNodeMods != null then { viberoots = viberootsNodeMods.pnpm-store-unfixed; } else {}) // perImporterStoreUnfixed);
 
   node-modules =
-    ({} // (if haveRootLock then { default = nodeMods.node-modules; } else {}) // perImporterNM);
+    ({}
+      // (if haveRootLock then { default = nodeMods.node-modules; } else {})
+      // (if viberootsNodeMods != null then { viberoots = viberootsNodeMods.node-modules; } else {})
+      // perImporterNM);
 }
-

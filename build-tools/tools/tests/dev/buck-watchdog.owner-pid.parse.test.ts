@@ -22,10 +22,10 @@ test("ownerPidForIsolation parses only pid-owned isolations", () => {
 
 test("verify watchdog does not sweep verify-owned isolations while parent is alive", async () => {
   const processControl = await fsp.readFile(
-    "build-tools/tools/dev/verify/process-control.ts",
+    "viberoots/build-tools/tools/dev/verify/process-control.ts",
     "utf8",
   );
-  const watchdog = await fsp.readFile("build-tools/tools/dev/buck-watchdog.ts", "utf8");
+  const watchdog = await fsp.readFile("viberoots/build-tools/tools/dev/buck-watchdog.ts", "utf8");
 
   assert.match(processControl, /--patterns v-,verify-nested-/);
   assert.match(processControl, /--sweep-while-parent-alive 0/);

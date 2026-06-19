@@ -7,9 +7,9 @@ async function read(p: string): Promise<string> {
   return await fsp.readFile(p, "utf8");
 }
 
-test("go/cpp macros: local_patch_dirs and nixpkg_deps pop logic is centralized in //build-tools/lang helper", async () => {
-  const goDefs = await read("build-tools/go/defs.bzl");
-  const cppDefs = await read("build-tools/cpp/defs.bzl");
+test("go/cpp macros: local_patch_dirs and nixpkg_deps pop logic is centralized in @viberoots//build-tools/lang helper", async () => {
+  const goDefs = await read("viberoots/build-tools/go/defs.bzl");
+  const cppDefs = await read("viberoots/build-tools/cpp/defs.bzl");
 
   const forbidden = [
     'kwargs.pop("local_patch_dirs"',
@@ -22,20 +22,20 @@ test("go/cpp macros: local_patch_dirs and nixpkg_deps pop logic is centralized i
   for (const needle of forbidden) {
     assert.ok(
       !goDefs.includes(needle),
-      `expected build-tools/go/defs.bzl to avoid direct ${needle}; rely on prepare_language_wiring(...) to extract patch dirs + nixpkg deps`,
+      `expected viberoots/build-tools/go/defs.bzl to avoid direct ${needle}; rely on prepare_language_wiring(...) to extract patch dirs + nixpkg deps`,
     );
     assert.ok(
       !cppDefs.includes(needle),
-      `expected build-tools/cpp/defs.bzl to avoid direct ${needle}; rely on prepare_language_wiring(...) to extract patch dirs + nixpkg deps`,
+      `expected viberoots/build-tools/cpp/defs.bzl to avoid direct ${needle}; rely on prepare_language_wiring(...) to extract patch dirs + nixpkg deps`,
     );
   }
 
   assert.ok(
     goDefs.includes("prepare_language_wiring("),
-    "expected build-tools/go/defs.bzl to call prepare_language_wiring(...)",
+    "expected viberoots/build-tools/go/defs.bzl to call prepare_language_wiring(...)",
   );
   assert.ok(
     cppDefs.includes("prepare_language_wiring("),
-    "expected build-tools/cpp/defs.bzl to call prepare_language_wiring(...)",
+    "expected viberoots/build-tools/cpp/defs.bzl to call prepare_language_wiring(...)",
   );
 });

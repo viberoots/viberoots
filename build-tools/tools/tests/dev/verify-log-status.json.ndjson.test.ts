@@ -11,7 +11,7 @@ test("verify-log-status: --json emits exactly one NDJSON line", async () => {
   await fsp.writeFile(logPath, "[verify] buck2 test begin iso=v-1 start_s=100\n", "utf8");
 
   const res =
-    await $`${process.cwd()}/build-tools/tools/dev/verify-log-status.ts --log ${logPath} --pid 1 --json`.nothrow();
+    await $`${process.cwd()}/viberoots/build-tools/tools/dev/verify-log-status.ts --log ${logPath} --pid 1 --json`.nothrow();
   assert.equal(res.exitCode, 0);
   const lines = res.stdout.trimEnd().split("\n");
   assert.equal(lines.length, 1);

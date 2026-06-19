@@ -18,7 +18,7 @@ test("rust macros: rust_library and rust_binary use rust_nix_build", async () =>
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/rust:defs.bzl", "rust_binary", "rust_library")',
+        'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_library")',
         "",
         'rust_library(name = "lib", srcs = ["src/lib.rs"])',
         'rust_binary(name = "app", srcs = ["src/main.rs"], deps = [":lib"])',

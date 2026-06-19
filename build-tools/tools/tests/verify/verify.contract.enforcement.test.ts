@@ -7,12 +7,39 @@ import { test } from "node:test";
 import { ensureRepoLocalTmpRoot } from "../../dev/verify/tmp-root";
 
 test("verify contract: TMPDIR policy + coverage gating + disk gate strings present", async () => {
-  const tmpRoot = await fsp.readFile("build-tools/tools/dev/verify/tmp-root.ts", "utf8");
-  const coverage = await fsp.readFile("build-tools/tools/dev/verify/coverage.ts", "utf8");
-  const housekeeping = await fsp.readFile("build-tools/tools/dev/verify/housekeeping.ts", "utf8");
-  const runVerify = await fsp.readFile("build-tools/tools/dev/verify/run-verify.ts", "utf8");
+  const tmpRoot = await fsp.readFile("viberoots/build-tools/tools/dev/verify/tmp-root.ts", "utf8");
+  const coverage = await fsp.readFile("viberoots/build-tools/tools/dev/verify/coverage.ts", "utf8");
+  const housekeeping = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/verify/housekeeping.ts",
+    "utf8",
+  );
+  const runVerify = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/verify/run-verify.ts",
+    "utf8",
+  );
+  const vWrapper = await fsp.readFile("viberoots/build-tools/tools/bin/v", "utf8");
   const signalShutdown = await fsp.readFile(
-    "build-tools/tools/dev/verify/signal-shutdown.ts",
+    "viberoots/build-tools/tools/dev/verify/signal-shutdown.ts",
+    "utf8",
+  );
+  const runVerifyState = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/verify/run-verify-state.ts",
+    "utf8",
+  );
+  const finalOrphanCleanup = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/verify/final-orphan-cleanup.ts",
+    "utf8",
+  );
+  const startupWorkspaceState = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/startup-check/workspace-state.ts",
+    "utf8",
+  );
+  const registeredToolState = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/registered-tool-state.ts",
+    "utf8",
+  );
+  const devBuildRootCleanup = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/dev-build/root-buck-out-cleanup.ts",
     "utf8",
   );
 
@@ -31,6 +58,71 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
   assert.ok(
     tmpRoot.includes(".metadata_never_index"),
     "expected macOS repo-local verify temp roots to opt out of Spotlight indexing",
+  );
+  assert.ok(
+    runVerifyState.includes('".viberoots"') &&
+      runVerifyState.includes('"workspace"') &&
+      runVerifyState.includes('"buck"') &&
+      runVerifyState.includes('"tmp"'),
+    "expected verify reaper state to live under hidden workspace buck state",
+  );
+  assert.ok(
+    runVerify.includes('"verify-analysis"') &&
+      runVerify.includes('".viberoots"') &&
+      runVerify.includes('"workspace"') &&
+      runVerify.includes('"buck"'),
+    "expected verify analysis state to live under hidden workspace buck state",
+  );
+  assert.ok(
+    finalOrphanCleanup.includes("final-cleanup-root-buck-out") &&
+      finalOrphanCleanup.includes('name === "test-logs"') &&
+      finalOrphanCleanup.includes('name === "zx_shims"') &&
+      finalOrphanCleanup.includes('name === "v2"') &&
+      finalOrphanCleanup.includes("continue;") &&
+      !finalOrphanCleanup.includes('execFileAsync("buck2", ["kill"]') &&
+      finalOrphanCleanup.includes('name.startsWith("v-")') &&
+      finalOrphanCleanup.includes('name.startsWith("verify-nested-")') &&
+      finalOrphanCleanup.includes('name.startsWith("deployment-query-")') &&
+      finalOrphanCleanup.includes('name.startsWith("zxtest-shared-")'),
+    "expected final verify cleanup to leave default root v2 alone while killing isolated generated Buck daemons",
+  );
+  assert.ok(
+    vWrapper.includes("cleanup_verify_root_buck_out") &&
+      vWrapper.includes('"${SCRIPT_DIR}/verify" "$@"') &&
+      vWrapper.includes("cleanup_verify_root_buck_out 1") &&
+      vWrapper.includes("cleanup_verify_root_buck_out 0\nexit") &&
+      vWrapper.includes('allow_default_buck_kill="${1:-0}"') &&
+      vWrapper.includes("v2|v-*|verify-nested-*|deployment-query-*|zxtest-shared-*") &&
+      vWrapper.includes("buck2 kill") &&
+      vWrapper.includes("registered_isolation_owner_alive") &&
+      vWrapper.includes("VBR_VERIFY_PROCESS_STATE_FILE") &&
+      vWrapper.includes("ownerPid") &&
+      vWrapper.includes("repoRoot") &&
+      vWrapper.includes("LIVE_ROOT"),
+    "expected v wrapper to kill default Buck only before verify and to avoid deleting live registered isolations",
+  );
+  assert.ok(
+    startupWorkspaceState.includes("cleanupVerifyOwnedRootBuckOut") &&
+      startupWorkspaceState.includes('name === "v2"') &&
+      startupWorkspaceState.includes('execFileAsync("buck2", ["kill"]') &&
+      startupWorkspaceState.includes('name.startsWith("zxtest-shared-")') &&
+      startupWorkspaceState.includes("findExtractionBlockers(process.cwd())"),
+    "expected startup-check to kill Buck daemons before cleaning generated root buck-out entries",
+  );
+  assert.ok(
+    registeredToolState.includes('".viberoots"') &&
+      registeredToolState.includes('"workspace"') &&
+      registeredToolState.includes('"buck"') &&
+      registeredToolState.includes('"test-logs"') &&
+      !registeredToolState.includes('"buck-out"'),
+    "expected generic tool process state and cleanup logs to live under hidden workspace buck state",
+  );
+  assert.ok(
+    devBuildRootCleanup.includes('name === ".housekeeping"') &&
+      devBuildRootCleanup.includes('name.startsWith("devbuild-")') &&
+      devBuildRootCleanup.includes('name.startsWith("exporter-")') &&
+      devBuildRootCleanup.includes("buck2 --isolation-dir"),
+    "expected dev-build cleanup to remove dev-build-owned root buck-out entries and kill their daemons",
   );
 
   assert.ok(
@@ -59,7 +151,10 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
     "expected verify signal cleanup to terminate the parent process and release the verify lock",
   );
 
-  const verifyPasses = await fsp.readFile("build-tools/tools/dev/verify/verify-passes.ts", "utf8");
+  const verifyPasses = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/verify/verify-passes.ts",
+    "utf8",
+  );
   assert.ok(
     runVerify.includes("activeNestedIsos") &&
       runVerify.includes("onNestedIso:") &&

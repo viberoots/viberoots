@@ -1,17 +1,17 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { runInTemp } from "../lib/test-helpers";
 
 const startupCheckScript = new URL("../../dev/startup-check.ts", import.meta.url).pathname;
 
-test("startup-check enforces nix-store toolchain paths", async () => {
+await runInTemp("startup-check-toolchain-paths-nix-store", async (_tmp, $) => {
   const res = await $({
     stdio: "pipe",
     env: {
       ...process.env,
       STARTUP_CHECK_ALLOW_NON_NIX_STORE: "",
     },
-  })`zx-wrapper ${startupCheckScript}`.nothrow();
+  })`${process.execPath || "node"} ${startupCheckScript}`.nothrow();
   assert.equal(
     res.exitCode,
     0,

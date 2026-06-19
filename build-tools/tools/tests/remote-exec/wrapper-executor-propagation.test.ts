@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
-const fixtureRoot = "//build-tools/tools/tests/remote-exec/wrapper-fixtures";
+const fixtureRoot = "root//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures";
 const wrappers = ["zx", "node", "go", "python", "cpp"];
 const activationConfig = ["-c", "test.viberoots_remote_profile=linux-x86_64-default"];
 
@@ -184,10 +184,14 @@ test("remote-ready wrapper command providers carry declared input handles in gen
   await runInTemp("remote-ready-wrapper-handle-fixtures", async (tmp) => {
     const targetsPath = path.join(
       tmp,
-      "build-tools/tools/tests/remote-exec/wrapper-fixtures/TARGETS",
+      "viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures/TARGETS",
     );
     await fs.writeFile(path.join(tmp, ".viberoots/workspace/buck/graph.json"), "[]\n", "utf8");
-    await fs.writeFile(path.join(tmp, "build-tools/tools/buck/workspace-root.env"), "\n", "utf8");
+    await fs.writeFile(
+      path.join(tmp, "viberoots/build-tools/tools/buck/workspace-root.env"),
+      "\n",
+      "utf8",
+    );
     let text = await fs.readFile(targetsPath, "utf8");
     text = text.replaceAll(
       'labels = ["fixture:ready", "existing:label", "verify:manual"]',

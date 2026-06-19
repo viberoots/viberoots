@@ -49,8 +49,8 @@ test("importer-scoped wiring stamps patch_scope:importer-local exactly once (pro
       path.join(appDir, "TARGETS"),
       [
         'load("@prelude//:rules.bzl", "python_library")',
-        'load("//build-tools/lang:defs_common.bzl", "prepare_language_wiring")',
-        'load("//build-tools/lang:labels_file.bzl", "labels_file")',
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "prepare_language_wiring")',
+        'load("@viberoots//build-tools/lang:labels_file.bzl", "labels_file")',
         "",
         'kw = {"labels": ["patch_scope:package-local", "custom:tag"]}',
         "w = prepare_language_wiring(",

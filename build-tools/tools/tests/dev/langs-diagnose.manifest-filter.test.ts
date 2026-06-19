@@ -14,26 +14,26 @@ test("langs-diagnose respects --lang filter and reads manifest", async () => {
         {
           id: "go",
           displayName: "Go",
-          requiredPaths: ["build-tools/go/defs.bzl"],
+          requiredPaths: ["viberoots/build-tools/go/defs.bzl"],
           kinds: ["cli", "lib"],
-          templatesDir: "build-tools/tools/scaffolding/templates/go",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/go",
         },
         {
           id: "toy",
           displayName: "Toy",
-          requiredPaths: ["build-tools/tools/nix/planner/toy.nix"],
+          requiredPaths: ["viberoots/build-tools/tools/nix/planner/toy.nix"],
           kinds: ["lib"],
-          templatesDir: "build-tools/tools/scaffolding/templates/toy",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/toy",
         },
       ],
     };
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/nix/langs.json"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/langs.json"),
       JSON.stringify(manifest, null, 2) + "\n",
       "utf8",
     );
 
-    const p = path.join(tmp, "build-tools/tools/dev/langs-diagnose.ts");
+    const p = path.join(tmp, "viberoots/build-tools/tools/dev/langs-diagnose.ts");
     const res = await $`node ${p} --json --lang go`;
     const obj = JSON.parse(String(res.stdout || "{}"));
     assert.ok(Array.isArray(obj.enabled));

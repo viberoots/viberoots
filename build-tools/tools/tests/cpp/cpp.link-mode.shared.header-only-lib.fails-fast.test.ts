@@ -3,12 +3,12 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import fs from "fs-extra";
 import path from "node:path";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("cpp link_mode=shared rejects header-only targets", async () => {
   await runInTemp("cpp-link-mode-shared-headers", async (tmp, $) => {
     await fs.outputFile(
-      path.join(tmp, "build-tools", "tools", "nix", "langs.json"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "nix", "langs.json"),
       JSON.stringify({ enabled: ["cpp"] }, null, 2) + "\n",
       "utf8",
     );
@@ -21,7 +21,7 @@ test("cpp link_mode=shared rejects header-only targets", async () => {
     await fs.outputFile(
       path.join(tmp, "projects", "libs", "headers", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_headers")',
         "",
         "nix_cpp_headers(",
         '  name = "headers",',
@@ -40,7 +40,7 @@ test("cpp link_mode=shared rejects header-only targets", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     if (exportRes.exitCode !== 0) {
       const err = String(exportRes.stderr || exportRes.stdout || "");
       assert.ok(
@@ -56,7 +56,7 @@ test("cpp link_mode=shared rejects header-only targets", async () => {
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//projects/libs/headers:headers" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.notEqual(build.exitCode, 0, "expected header-only link_mode=shared to fail");
     const err = String(build.stderr || build.stdout || "");
     assert.ok(

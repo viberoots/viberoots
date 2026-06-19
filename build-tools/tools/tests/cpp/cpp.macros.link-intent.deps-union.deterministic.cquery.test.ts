@@ -34,7 +34,7 @@ test("nix_cpp_library: deps := deps ∪ link_deps ∪ header_deps as determinist
       path.join(app, "TARGETS"),
       [
         'load("@prelude//:rules.bzl", "cxx_library")',
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "cxx_library(",
         '  name = "a",',

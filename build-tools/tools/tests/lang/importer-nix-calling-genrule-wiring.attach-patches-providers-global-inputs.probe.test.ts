@@ -59,8 +59,8 @@ test("prepare_importer_nix_calling_genrule_wiring composes patches, provider edg
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/lang/internal:nix_calling_importer_genrule_wiring.bzl", "prepare_importer_nix_calling_genrule_wiring")',
-        'load("//build-tools/lang:labels_file.bzl", "labels_file")',
+        'load("//viberoots/build-tools/lang/internal:nix_calling_importer_genrule_wiring.bzl", "prepare_importer_nix_calling_genrule_wiring")',
+        'load("@viberoots//build-tools/lang:labels_file.bzl", "labels_file")',
         "",
         "# list-shaped srcs",
         'kw_list = {"labels": [], "srcs": []}',
@@ -118,7 +118,7 @@ test("prepare_importer_nix_calling_genrule_wiring composes patches, provider edg
       "expected provider edge present in list-shaped srcs",
     );
     assert.ok(
-      listLines.includes("//:flake.lock"),
+      listLines.includes("//.viberoots/workspace:flake.lock"),
       "expected global nix input present in list-shaped srcs",
     );
 

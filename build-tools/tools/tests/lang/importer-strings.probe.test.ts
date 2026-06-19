@@ -9,17 +9,18 @@ type Case = {
 };
 
 const cases: Case[] = [
-  { target: "//build-tools/tools/tests/lang/importer_strings:dot", importer: "." },
+  { target: "root//viberoots/build-tools/tools/tests/lang/importer_strings:dot", importer: "." },
   {
-    target: "//build-tools/tools/tests/lang/importer_strings:projects_apps_web",
+    target: "root//viberoots/build-tools/tools/tests/lang/importer_strings:projects_apps_web",
     importer: "projects/apps/web",
   },
   {
-    target: "//build-tools/tools/tests/lang/importer_strings:projects_libs_some_tool",
+    target: "root//viberoots/build-tools/tools/tests/lang/importer_strings:projects_libs_some_tool",
     importer: "projects/libs/some_tool",
   },
   {
-    target: "//build-tools/tools/tests/lang/importer_strings:repeated_slashes_trailing",
+    target:
+      "root//viberoots/build-tools/tools/tests/lang/importer_strings:repeated_slashes_trailing",
     importer: "projects/apps//web/",
   },
 ];

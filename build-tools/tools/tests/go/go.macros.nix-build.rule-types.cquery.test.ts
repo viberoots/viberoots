@@ -51,7 +51,7 @@ EOF'`;
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > tmp/pkg/TARGETS <<'\''EOF'\''
-load("//build-tools/go:defs.bzl", "nix_go_binary", "nix_go_library", "nix_go_test")
+load("@viberoots//build-tools/go:defs.bzl", "nix_go_binary", "nix_go_library", "nix_go_test")
 
 nix_go_library(
     name = "lib",

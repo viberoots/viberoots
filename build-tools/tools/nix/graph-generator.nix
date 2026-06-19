@@ -17,8 +17,26 @@ let
   keepAppsLibsPath = path: type:
     let
       p = builtins.toString path;
+      base = baseNameOf p;
       rootP = builtins.toString repoRootBase;
       isRoot = p == rootP;
+      isGeneratedDir =
+        type == "directory" && (
+          base == "node_modules" ||
+          base == "buck-out" ||
+          base == ".direnv" ||
+          base == ".pnpm-store" ||
+          base == ".pnpm-home" ||
+          base == "coverage" ||
+          base == ".clinic" ||
+          base == ".turbo" ||
+          base == ".cache" ||
+          base == "dist" ||
+          base == "build" ||
+          base == ".vite" ||
+          base == ".next" ||
+          base == ".wasm-producer"
+        );
       isProjects = lib.hasSuffix "/projects" p;
       isProjectsApps = lib.hasSuffix "/projects/apps" p;
       isProjectsLibs = lib.hasSuffix "/projects/libs" p;
@@ -32,9 +50,11 @@ let
       isViberootsBuildToolsTools = lib.hasSuffix "/viberoots/build-tools/tools" p;
       inViberootsBuildToolsTools = lib.hasInfix "/viberoots/build-tools/tools/" p;
     in
+      !isGeneratedDir && (
       isRoot || isProjects || isProjectsApps || isProjectsLibs || inProjectsApps || inProjectsLibs
       || isBuildTools || isBuildToolsTools || inBuildToolsTools
-      || isViberoots || isViberootsBuildTools || isViberootsBuildToolsTools || inViberootsBuildToolsTools;
+      || isViberoots || isViberootsBuildTools || isViberootsBuildToolsTools || inViberootsBuildToolsTools
+      );
   appsLibsSrc = if filteredFlakeSnapshot
     then src
     else if buckTestSrcEnv != ""

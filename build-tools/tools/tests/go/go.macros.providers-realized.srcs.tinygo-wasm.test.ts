@@ -28,7 +28,7 @@ EOF'`;
       [
         "",
         "# test: go.macros.providers-realized.srcs.tinygo-wasm.test.ts",
-        'load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
+        'load("@viberoots//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
         "",
         "nix_go_tiny_wasm_lib(",
         '  name = "mod",',

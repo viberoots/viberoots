@@ -3,10 +3,18 @@ import path from "node:path";
 import * as fsp from "node:fs/promises";
 
 import { exists } from "../fs";
+import { templateRootPath } from "../templates/paths";
+
+function repoRelativeIfPossible(inputPath: string): string {
+  const rel = path.relative(process.cwd(), inputPath);
+  const safeRel = rel.replace(/\\/g, "/");
+  if (safeRel && !safeRel.startsWith("..") && !path.isAbsolute(safeRel)) return safeRel;
+  return inputPath.replace(/\\/g, "/");
+}
 
 export async function recordSource(dest: string, language: string, template: string) {
   const answers = path.join(dest, ".copier-answers.yml");
-  const relSrc = path.join("build-tools", "tools", "scaffolding", "templates", language, template);
+  const relSrc = repoRelativeIfPossible(templateRootPath(language, template));
   const line = `scaf_src_path: ${relSrc}`;
   const existsAns = await exists(answers);
   if (!existsAns) {

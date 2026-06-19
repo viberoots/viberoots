@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -13,7 +14,7 @@ test("nixos-shared-host server uninstall removes only managed assets and support
       topology: "plain",
       withNginxConfig: true,
     });
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
+    await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-install.ts")} server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
     const sibling = path.join(fixture.hostRoot, "etc/nixos/unmanaged-sibling.txt");
     await fsp.mkdir(path.dirname(sibling), { recursive: true });
     await fsp.writeFile(sibling, "keep-me\n", "utf8");
@@ -31,7 +32,7 @@ test("nixos-shared-host server uninstall removes only managed assets and support
     await fsp.writeFile(runtimeSecret, "runtime-secret\n", "utf8");
     await fsp.mkdir(path.dirname(recordSecret), { recursive: true });
     await fsp.writeFile(recordSecret, "record-secret\n", "utf8");
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server uninstall --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
+    await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-install.ts")} server uninstall --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
     await fsp.access(sibling);
     assert.equal(await fsp.readFile(statePath, "utf8"), '{"valuable":true}\n');
     assert.equal(await fsp.readFile(runtimeSecret, "utf8"), "runtime-secret\n");
@@ -43,7 +44,7 @@ test("nixos-shared-host server uninstall removes only managed assets and support
     await assert.rejects(
       fsp.access(path.join(fixture.hostRoot, "etc/nixos/deployment-host/install-manifest.json")),
     );
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
+    await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-install.ts")} server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-dropin`;
     await fsp.access(
       path.join(fixture.hostRoot, "etc/nixos/deployment-host/install-manifest.json"),
     );
@@ -59,13 +60,13 @@ test("nixos-shared-host manual-wire uninstall leaves server config entry untouch
     });
     const operatorManagedConfig =
       "{ ... }:\n{\n  imports = [\n    /etc/nixos/deployment-host/default.nix\n  ];\n}\n";
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-manual-wire`;
+    await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-install.ts")} server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode managed-manual-wire`;
     await fsp.writeFile(
       path.join(fixture.hostRoot, "etc/nixos/configuration.nix"),
       operatorManagedConfig,
       "utf8",
     );
-    await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server uninstall --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
+    await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-install.ts")} server uninstall --server-root ${fixture.hostRoot} --config-root /etc/nixos`;
     assert.equal(
       await fsp.readFile(path.join(fixture.hostRoot, "etc/nixos/configuration.nix"), "utf8"),
       operatorManagedConfig,
@@ -103,7 +104,7 @@ test("nixos-shared-host manual-wire uninstall leaves server config entry untouch
       "utf8",
     );
     const unsafeUninstall =
-      await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server uninstall --server-root ${fixture.hostRoot} --config-root /etc/nixos`.nothrow();
+      await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-install.ts")} server uninstall --server-root ${fixture.hostRoot} --config-root /etc/nixos`.nothrow();
     assert.notEqual(unsafeUninstall.exitCode, 0);
     assert.match(
       String(unsafeUninstall.stderr),

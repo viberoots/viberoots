@@ -10,7 +10,7 @@ test("readGraph handles array shape", async () => {
       { name: "//app:bin", labels: ["module:example.org/mod@v1.0.0"] },
       { name: "//lib:core", labels: [] },
     ];
-    const dir = path.join(tmp, "build-tools", "tools", "buck");
+    const dir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(path.join(dir, "graph.json"), JSON.stringify(nodes), "utf8");
     const { readGraph } = await import("../../lib/graph");
@@ -35,7 +35,7 @@ test("readGraph handles object-map shape", async () => {
       },
       b: { name: "//lib:core", labels: ["nixpkg:pkgs.zlib"] },
     } as Record<string, any>;
-    const dir = path.join(tmp, "build-tools", "tools", "buck");
+    const dir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fsp.mkdir(dir, { recursive: true });
     await fsp.writeFile(path.join(dir, "graph.json"), JSON.stringify(nodes), "utf8");
     const { readGraph } = await import("../../lib/graph");

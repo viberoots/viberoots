@@ -6,10 +6,10 @@ import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("exporter-adapters-inactive", async (tmp, $) => {
-  const langDir = path.join(tmp, "build-tools/tools/buck/exporter/lang");
+  const langDir = path.join(tmp, "viberoots/build-tools/tools/buck/exporter/lang");
   await fs.mkdirp(langDir);
   // Only provide go adapter; omit cpp adapter to simulate inactive adapter scenario
-  const goSrc = await fs.readFile("build-tools/tools/buck/exporter/lang/go.ts", "utf8");
+  const goSrc = await fs.readFile("viberoots/build-tools/tools/buck/exporter/lang/go.ts", "utf8");
   await fs.writeFile(path.join(langDir, "go.ts"), goSrc, "utf8");
 
   const nodes = [
@@ -22,7 +22,7 @@ await runInTemp("exporter-adapters-inactive", async (tmp, $) => {
   // Run exporter in simulate mode from the temp repo
   await $({
     cwd: tmp,
-  })`EXPORTER_ADAPTERS=go node build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
+  })`EXPORTER_ADAPTERS=go node viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
 
   const out = (await readGraph(graph)) as any[];
   const by = new Map(out.map((n) => [n.name, n]));

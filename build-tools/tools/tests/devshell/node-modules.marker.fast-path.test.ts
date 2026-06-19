@@ -55,8 +55,8 @@ test("devshell marker avoids nix eval", async () => {
       ].join("\n"),
     );
 
-    const script = path.join(tmp, "build-tools/tools/dev/devshell-link-node-modules.ts");
-    const zxInitPath = path.join(tmp, "build-tools/tools/dev/zx-init.mjs");
+    const script = path.join(tmp, "viberoots/build-tools/tools/dev/devshell-link-node-modules.ts");
+    const zxInitPath = path.join(tmp, "viberoots/build-tools/tools/dev/zx-init.mjs");
     const baseEnv = {
       ...process.env,
       PATH: `${binDir}:${process.env.PATH || ""}`,
@@ -69,7 +69,14 @@ test("devshell marker avoids nix eval", async () => {
     assert.equal(await pathExists(path.join(tmp, "node_modules")), false);
 
     const lockHash = crypto.createHash("sha256").update(initialLockText).digest("hex");
-    const markerPath = path.join(tmp, "buck-out", "tmp", "node-modules-link.root.json");
+    const markerPath = path.join(
+      tmp,
+      ".viberoots",
+      "workspace",
+      "buck",
+      "tmp",
+      "node-modules-link.root.json",
+    );
     await fsp.mkdir(path.dirname(markerPath), { recursive: true });
     await fsp.writeFile(
       markerPath,

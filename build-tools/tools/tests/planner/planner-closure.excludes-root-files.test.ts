@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 // Ensure dev shell tools (gomod2nix, zx deps) are exported into temp repos
 process.env.TEST_NEED_DEV_ENV = "1";
 
@@ -60,13 +60,13 @@ test("planner: root-only files are excluded from materialized outputs", async ()
         GOPROXY: "off",
         GOSUMDB: "off",
       },
-    })`build-tools/tools/dev/install-deps.ts --glue-only`;
-    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    })`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
+    await $`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
       env: { ...process.env, BUCK_TARGET: "//projects/apps/demo-cli:demo-cli" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --no-link --accept-flake-config --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --no-link --accept-flake-config --print-out-paths`;
     const outPath =
       String(stdout || "")
         .trim()

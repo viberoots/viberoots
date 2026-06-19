@@ -16,7 +16,7 @@ function sliceDefBody(fileText: string, defName: string): string {
 }
 
 test("nix_cpp_wasm_emscripten_lib uses shared wasm package-local wiring", async () => {
-  const cppDefs = await fsp.readFile("build-tools/cpp/wasm_defs.bzl", "utf8");
+  const cppDefs = await fsp.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8");
   const body = sliceDefBody(cppDefs, "nix_cpp_wasm_emscripten_lib");
 
   assert.ok(

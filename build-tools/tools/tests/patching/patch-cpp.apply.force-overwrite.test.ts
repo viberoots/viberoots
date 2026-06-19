@@ -12,14 +12,14 @@ test("patch-cpp apply supports --force overwrite when patch exists with differen
     await fs.writeFile(path.join(storeSrc, "file.txt"), "A\n", "utf8");
     const resolveMap = { "pkgs.zlib": { version: "1.2.13", srcPath: storeSrc, pname: "zlib" } };
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     // Start session and capture workspace + originPath from session store
     const startOut = await $({
       cwd: tmp,
       stdio: "pipe",
     })`WORKSPACE_ROOT=${tmp} NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       resolveMap,
-    )} build-tools/tools/bin/patch-pkg start cpp pkgs.zlib`;
+    )} viberoots/build-tools/tools/bin/patch-pkg start cpp pkgs.zlib`;
     const ws = String(startOut.stdout || "")
       .trim()
       .split(/\s+/)
@@ -46,7 +46,7 @@ test("patch-cpp apply supports --force overwrite when patch exists with differen
       stdio: "pipe",
     })`WORKSPACE_ROOT=${tmp} NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       resolveMap,
-    )} build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib --patch-dir patches/cpp`;
+    )} viberoots/build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib --patch-dir patches/cpp`;
     if ((apply1.exitCode || 0) !== 0) {
       console.error("initial cpp apply failed:", String(apply1.stderr || ""));
       process.exit(2);
@@ -87,7 +87,7 @@ test("patch-cpp apply supports --force overwrite when patch exists with differen
       stdio: "pipe",
     })`WORKSPACE_ROOT=${tmp} NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       resolveMap,
-    )} build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib --patch-dir patches/cpp`.nothrow();
+    )} viberoots/build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib --patch-dir patches/cpp`.nothrow();
     if ((applyNoForce.exitCode || 0) === 0) {
       console.error("cpp apply without --force should have failed");
       process.exit(2);
@@ -104,7 +104,7 @@ test("patch-cpp apply supports --force overwrite when patch exists with differen
       stdio: "pipe",
     })`WORKSPACE_ROOT=${tmp} NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       resolveMap,
-    )} build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib --patch-dir patches/cpp --force`;
+    )} viberoots/build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib --patch-dir patches/cpp --force`;
     if ((applyForce.exitCode || 0) !== 0) {
       console.error("cpp apply with --force should have succeeded");
       console.error(String(applyForce.stderr || ""));

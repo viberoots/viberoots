@@ -4,16 +4,19 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
-const REPO_ROOT = process.cwd();
-
 async function readRepoFile(relativePath: string): Promise<string> {
-  return await fsp.readFile(path.join(REPO_ROOT, relativePath), "utf8");
+  for (const candidate of [relativePath, path.join("viberoots", relativePath)]) {
+    try {
+      return await fsp.readFile(candidate, "utf8");
+    } catch {}
+  }
+  return await fsp.readFile(relativePath, "utf8");
 }
 
 test("top.wasm compatibility bridge wiring removed from active dev paths", async () => {
-  const devWithWatch = await readRepoFile("build-tools/tools/dev/dev-with-wasm-watch.ts");
+  const devWithWatch = await readRepoFile("viberoots/build-tools/tools/dev/dev-with-wasm-watch.ts");
   const nextDevScript = await readRepoFile(
-    "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/scripts/dev.mjs.jinja",
+    "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/scripts/dev.mjs.jinja",
   );
   const nextDevHelper = await readRepoFile("build-tools/tools/tests/scaffolding/lib/next-dev.ts");
 
@@ -23,4 +26,17 @@ test("top.wasm compatibility bridge wiring removed from active dev paths", async
 
   assert.doesNotMatch(nextDevScript, /ensure-public-top-wasm/);
   assert.doesNotMatch(nextDevHelper, /app\/wasm-contract\/top\.wasm/);
+});
+
+test("wasm dev shell wrappers use bash for bash-only flags", async () => {
+  const devWithWatch = await readRepoFile("viberoots/build-tools/tools/dev/dev-with-wasm-watch.ts");
+  const ensureAssets = await readRepoFile(
+    "viberoots/build-tools/tools/dev/ensure-wasm-contract-assets.ts",
+  );
+
+  for (const source of [devWithWatch, ensureAssets]) {
+    assert.match(source, /env\.BASH \|\| "bash"/);
+    assert.doesNotMatch(source, /env\.SHELL \|\| "bash"/);
+    assert.doesNotMatch(source, /process\.env\.SHELL \|\| "bash"/);
+  }
 });

@@ -5,7 +5,18 @@ import "zx/globals";
 import { collectChangedPaths } from "../../lib/build-system-test-scope";
 import { runNodeWithZx } from "../../lib/node-run";
 import { resolveToolPath } from "../../lib/tool-paths";
-import { buildToolPath } from "../dev-build/paths";
+import { buildToolsRoot, buildToolPath } from "../dev-build/paths";
+
+async function firstExisting(root: string, relCandidates: string[]): Promise<string> {
+  for (const rel of relCandidates) {
+    const candidate = path.join(root, rel);
+    try {
+      await fsp.access(candidate);
+      return rel;
+    } catch {}
+  }
+  return relCandidates[0] || "";
+}
 
 async function runVerifyFileSizePreflight(root: string, zxInitPath: string): Promise<void> {
   const script = buildToolPath(root, "tools/dev/file-size-lint.ts");
@@ -36,14 +47,19 @@ async function runVerifyStaleNamesPreflight(root: string, zxInitPath: string): P
 
 async function runVerifyNixGapsPolicyPreflight(root: string, zxInitPath: string): Promise<void> {
   const script = buildToolPath(root, "tools/dev/nix-gaps-inventory-check.ts");
-  const args = [
-    "--starlark-api",
+  const starlarkApi = await firstExisting(root, [
     "docs/handbook/starlark-api.md",
-    "--nix-gaps",
+    "viberoots/docs/handbook/starlark-api.md",
+  ]);
+  const nixGaps = await firstExisting(root, [
     "docs/handbook/nix-gaps.md",
-    "--exceptions",
+    "viberoots/docs/handbook/nix-gaps.md",
+  ]);
+  const exceptions = await firstExisting(root, [
     "docs/handbook/nix-gaps-exceptions.json",
-  ];
+    "viberoots/docs/handbook/nix-gaps-exceptions.json",
+  ]);
+  const args = ["--starlark-api", starlarkApi, "--nix-gaps", nixGaps, "--exceptions", exceptions];
   process.stderr.write(
     "[verify] nix-gaps policy preflight: running inventory + exception checks\n",
   );
@@ -102,16 +118,28 @@ async function pathIsFile(root: string, relPath: string): Promise<boolean> {
 }
 
 async function resolveRepoNodeBin(root: string, name: string): Promise<string> {
-  const candidate = path.join(root, "node_modules", ".bin", name);
-  try {
-    await fsp.access(candidate);
-    return candidate;
-  } catch {
-    process.stderr.write(
-      `error: verify lint preflight requires ${name} at ${candidate}; run 'i' to provision repo dev tools before re-running 'v'\n`,
-    );
-    process.exit(2);
+  const candidates = [
+    path.join(root, "node_modules", ".bin", name),
+    path.join(path.dirname(buildToolsRoot(root)), "node_modules", ".bin", name),
+    path.join(root, "viberoots", "node_modules", ".bin", name),
+  ];
+  for (const candidate of candidates) {
+    try {
+      await fsp.access(candidate);
+      return candidate;
+    } catch {}
   }
+  process.stderr.write(
+    `error: verify lint preflight requires ${name}; checked ${candidates.join(", ")}. Run 'i' to provision repo dev tools before re-running 'v'\n`,
+  );
+  process.exit(2);
+}
+
+async function resolveEslintConfig(root: string): Promise<string> {
+  return path.join(
+    root,
+    await firstExisting(root, ["eslint.config.js", "viberoots/eslint.config.js"]),
+  );
 }
 
 async function resolveChangedLintPaths(root: string): Promise<string[]> {
@@ -163,8 +191,9 @@ export async function runVerifyLintPreflight(
   if (!scoped) {
     process.stderr.write("[verify] lint preflight: skipped (no changed lint/prettier files)\n");
   }
+  const eslintConfig = scoped && eslintTargets.length > 0 ? await resolveEslintConfig(root) : "";
   const lintCmd = scoped
-    ? `${eslintTargets.length > 0 ? `node_modules/.bin/eslint --no-warn-ignored ${eslintTargets.join(" ")} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern '**/.vite-cache/**' && ` : ""}node_modules/.bin/prettier -c ${prettierTargets.join(" ")}`
+    ? `${eslintTargets.length > 0 ? `eslint --config ${path.relative(root, eslintConfig) || "."} --no-warn-ignored ${eslintTargets.join(" ")} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern '**/.vite-cache/**' && ` : ""}prettier -c ${prettierTargets.join(" ")}`
     : "skip (no changed lint/prettier files)";
   process.stderr.write(`[verify] lint preflight: timeout -k 10s ${secs}s ${lintCmd}\n`);
   const timeoutPath = await resolveToolPath("timeout");
@@ -179,7 +208,7 @@ export async function runVerifyLintPreflight(
           stdio: "inherit",
           cwd: root,
           reject: false,
-        })`${timeoutPath} -k 10s ${secs}s ${eslintPath} --no-warn-ignored ${eslintTargets} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern "**/.vite-cache/**"`
+        })`${timeoutPath} -k 10s ${secs}s ${eslintPath} --config ${eslintConfig} --no-warn-ignored ${eslintTargets} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern "**/.vite-cache/**"`
       : { exitCode: 0 };
   if (eslintRes.exitCode !== 0) {
     process.stderr.write(

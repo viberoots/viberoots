@@ -8,14 +8,18 @@ test("prebuild-guard: CI fails when providers exist without nix_attr_map.bzl", a
   await runInTemp("prebuild-mapping-required", async (tmp, $) => {
     // Create required outputs except nix_attr_map.bzl
     await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
-    await fsp.writeFile(path.join(tmp, "build-tools", "tools", "buck", "graph.json"), "[]", "utf8");
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
+      "[]",
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(tmp, ".viberoots", "workspace", "buck", "node-lock-index.json"),
       "{}\n",
       "utf8",
     );
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "invalidation-report.txt"),
       "# invalidation-report\n",
       "utf8",
     );
@@ -71,7 +75,7 @@ EOF
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, CI: "true" },
-      })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+      })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
     } catch {
       failed = true;
     }

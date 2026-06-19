@@ -4,13 +4,13 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 const macroEntrypointFiles = [
-  "build-tools/go/defs.bzl",
-  "build-tools/cpp/defs.bzl",
-  "build-tools/node/defs_core.bzl",
-  "build-tools/node/defs_nix.bzl",
-  "build-tools/node/defs.bzl",
-  "build-tools/python/defs.bzl",
-  "build-tools/rust/defs.bzl",
+  "viberoots/build-tools/go/defs.bzl",
+  "viberoots/build-tools/cpp/defs.bzl",
+  "viberoots/build-tools/node/defs_core.bzl",
+  "viberoots/build-tools/node/defs_nix.bzl",
+  "viberoots/build-tools/node/defs.bzl",
+  "viberoots/build-tools/python/defs.bzl",
+  "viberoots/build-tools/rust/defs.bzl",
 ];
 
 async function readText(file: string): Promise<string> {

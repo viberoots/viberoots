@@ -74,7 +74,7 @@ test("cpp: link_closure=transitive follows link_deps closure (build + run)", asy
         link_closure: "transitive",
       },
     ];
-    const graphJsonPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphJsonPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fs.outputFile(graphJsonPath, JSON.stringify(graph, null, 2) + "\n", "utf8");
 
     const system = systemForHost();
@@ -84,7 +84,7 @@ test("cpp: link_closure=transitive follows link_deps closure (build + run)", asy
       nothrow: true,
       reject: false,
       env: { ...process.env, BUCK_TARGET: "//projects/apps/demo:demo" },
-    })`nix build --impure --accept-flake-config --file build-tools/tools/nix/graph-generator.nix selected --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${system} --arg graphJsonPath ${graphJsonPath} --no-link --print-out-paths`;
+    })`nix build --impure --accept-flake-config --file viberoots/build-tools/tools/nix/graph-generator.nix selected --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${system} --arg graphJsonPath ${graphJsonPath} --no-link --print-out-paths`;
     assert.equal(build.exitCode, 0, String(build.stderr || build.stdout));
 
     const outPath = parseOutPath(build.stdout);

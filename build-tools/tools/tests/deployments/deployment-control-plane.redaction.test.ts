@@ -27,9 +27,9 @@ test("record helpers redact secret-bearing error strings before durable persiste
     deployRunId: "deploy-secret-cf",
     finalOutcome: "publish_failed",
     admittedContext: {
-      lanePolicyRef: "//build-tools/deployments/lanes:prod",
+      lanePolicyRef: "@viberoots//build-tools/deployments/lanes:prod",
       lanePolicyFingerprint: "sha256:lane",
-      admissionPolicyRef: "//build-tools/deployments/policies:prod",
+      admissionPolicyRef: "@viberoots//build-tools/deployments/policies:prod",
       admissionPolicyFingerprint: "sha256:policy",
       environmentStage: "production",
       source: {
@@ -60,9 +60,9 @@ test("record helpers preserve known safe smoke diagnostics", () => {
     finalOutcome: "smoke_failed_after_publish",
     failedStep: "smoke",
     admittedContext: {
-      lanePolicyRef: "//build-tools/deployments/lanes:staging",
+      lanePolicyRef: "@viberoots//build-tools/deployments/lanes:staging",
       lanePolicyFingerprint: "sha256:lane",
-      admissionPolicyRef: "//build-tools/deployments/policies:staging",
+      admissionPolicyRef: "@viberoots//build-tools/deployments/policies:staging",
       admissionPolicyFingerprint: "sha256:policy",
       environmentStage: "staging",
       source: { mode: "reviewed_source_ref", sourceRef: "main", sourceRevision: "abc123" },
@@ -91,9 +91,9 @@ test("record helpers preserve known safe Cloudflare publish diagnostics", () => 
     finalOutcome: "publish_failed",
     failedStep: "publish",
     admittedContext: {
-      lanePolicyRef: "//build-tools/deployments/lanes:prod",
+      lanePolicyRef: "@viberoots//build-tools/deployments/lanes:prod",
       lanePolicyFingerprint: "sha256:lane",
-      admissionPolicyRef: "//build-tools/deployments/policies:prod",
+      admissionPolicyRef: "@viberoots//build-tools/deployments/policies:prod",
       admissionPolicyFingerprint: "sha256:policy",
       environmentStage: "production",
       source: {
@@ -124,9 +124,9 @@ test("record helpers still redact concrete token values in Cloudflare diagnostic
     finalOutcome: "publish_failed",
     failedStep: "publish",
     admittedContext: {
-      lanePolicyRef: "//build-tools/deployments/lanes:prod",
+      lanePolicyRef: "@viberoots//build-tools/deployments/lanes:prod",
       lanePolicyFingerprint: "sha256:lane",
-      admissionPolicyRef: "//build-tools/deployments/policies:prod",
+      admissionPolicyRef: "@viberoots//build-tools/deployments/policies:prod",
       admissionPolicyFingerprint: "sha256:policy",
       environmentStage: "production",
       source: {
@@ -155,9 +155,9 @@ test("record helpers preserve sanitized Wrangler Cloudflare API diagnostics", ()
     finalOutcome: "publish_failed",
     failedStep: "publish",
     admittedContext: {
-      lanePolicyRef: "//build-tools/deployments/lanes:staging",
+      lanePolicyRef: "@viberoots//build-tools/deployments/lanes:staging",
       lanePolicyFingerprint: "sha256:lane",
-      admissionPolicyRef: "//build-tools/deployments/policies:staging",
+      admissionPolicyRef: "@viberoots//build-tools/deployments/policies:staging",
       admissionPolicyFingerprint: "sha256:policy",
       environmentStage: "staging",
       source: { mode: "reviewed_source_ref", sourceRef: "main", sourceRevision: "abc123" },
@@ -184,9 +184,9 @@ test("record helpers sanitize noisy Wrangler diagnostics before display", () => 
     finalOutcome: "publish_failed",
     failedStep: "publish",
     admittedContext: {
-      lanePolicyRef: "//build-tools/deployments/lanes:staging",
+      lanePolicyRef: "@viberoots//build-tools/deployments/lanes:staging",
       lanePolicyFingerprint: "sha256:lane",
-      admissionPolicyRef: "//build-tools/deployments/policies:staging",
+      admissionPolicyRef: "@viberoots//build-tools/deployments/policies:staging",
       admissionPolicyFingerprint: "sha256:policy",
       environmentStage: "staging",
       source: { mode: "reviewed_source_ref", sourceRef: "main", sourceRevision: "abc123" },

@@ -30,7 +30,7 @@ const declaredExecutablePackagesPattern = /declaredRemoteExecutablePackages\s*=\
 const declaredExecutablePathsToken = "declaredRemoteExecutablePaths";
 
 export async function checkAllowedPrimitiveInventory(root: string): Promise<PolicyFinding[]> {
-  const rel = "build-tools/tools/nix/flake/packages/remote-worker-tools.nix";
+  const rel = await remoteWorkerToolsPath(root);
   const text = await readOptional(root, rel);
   const allowedBlock = /allowedPrimitives\s*=\s*\[([\s\S]*?)\]/.exec(text)?.[1] || "";
   const findings: PolicyFinding[] = [];
@@ -68,7 +68,7 @@ export async function checkRemoteReadyAmbientExecutables(root: string): Promise<
 }
 
 async function declaredRemoteExecutables(root: string): Promise<Set<string>> {
-  const rel = "build-tools/tools/nix/flake/packages/remote-worker-tools.nix";
+  const rel = await remoteWorkerToolsPath(root);
   const text = await readOptional(root, rel);
   const declaredBlock = declaredExecutablePackagesPattern.exec(text)?.[1] || "";
   const closureComposesDeclaredPackages =
@@ -96,8 +96,24 @@ function isRemoteReadyScriptSurface(rel: string): boolean {
   if (rel.endsWith("runtime-prerequisites.ts")) return false;
   if (rel.endsWith("default-local-policy-rules.ts")) return false;
   if (rel.endsWith("default-local-policy-model.ts")) return false;
+  return isToolPath(rel, "remote-exec") || isToolPath(rel, "ci");
+}
+
+async function remoteWorkerToolsPath(root: string): Promise<string> {
+  const candidates = [
+    "viberoots/build-tools/tools/nix/flake/packages/remote-worker-tools.nix",
+    "build-tools/tools/nix/flake/packages/remote-worker-tools.nix",
+  ];
+  for (const rel of candidates) {
+    if ((await readOptional(root, rel)) !== "") return rel;
+  }
+  return candidates[0];
+}
+
+function isToolPath(rel: string, dir: string): boolean {
   return (
-    rel.startsWith("build-tools/tools/remote-exec/") || rel.startsWith("build-tools/tools/ci/")
+    rel.startsWith(`viberoots/build-tools/tools/${dir}/`) ||
+    rel.startsWith(`build-tools/tools/${dir}/`)
   );
 }
 

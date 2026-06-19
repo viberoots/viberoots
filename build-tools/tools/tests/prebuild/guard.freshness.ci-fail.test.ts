@@ -7,14 +7,18 @@ import { runInTemp } from "../lib/test-helpers";
 test("prebuild-guard: CI fails when stale", async () => {
   await runInTemp("prebuild-fresh-ci", async (tmp, $) => {
     await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
-    await fsp.writeFile(path.join(tmp, "build-tools", "tools", "buck", "graph.json"), "[]", "utf8");
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
+      "[]",
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(tmp, ".viberoots", "workspace", "buck", "node-lock-index.json"),
       "{}\n",
       "utf8",
     );
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "invalidation-report.txt"),
       "# invalidation-report\n",
       "utf8",
     );
@@ -36,7 +40,7 @@ test("prebuild-guard: CI fails when stale", async () => {
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, CI: "true" },
-      })`node build-tools/tools/buck/prebuild-guard.ts`;
+      })`node viberoots/build-tools/tools/buck/prebuild-guard.ts`;
     } catch {
       failed = true;
     }

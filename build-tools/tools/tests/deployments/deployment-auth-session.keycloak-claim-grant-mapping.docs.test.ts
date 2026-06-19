@@ -1,11 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
+import { viberootsRepoPath } from "./deployment-command";
 
 async function read(relativePath: string) {
-  return await fsp.readFile(path.join(process.cwd(), relativePath), "utf8");
+  return await fsp.readFile(viberootsRepoPath(relativePath), "utf8");
 }
 
 test("deployment auth session docs stay aligned on Keycloak claim-to-grant mapping", async () => {

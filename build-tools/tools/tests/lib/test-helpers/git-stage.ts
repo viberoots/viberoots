@@ -5,6 +5,7 @@ import {
   DEFAULT_GRAPH_PATH,
   DEFAULT_INVALIDATION_REPORT_PATH,
   DEFAULT_NIX_ATTR_MAP_PATH,
+  DEFAULT_NODE_WORKSPACE_MAP_PATH,
   DEFAULT_NODE_LOCK_INDEX_PATH,
   DEFAULT_PROVIDER_INDEX_JSON_PATH,
   DEFAULT_PROVIDER_INDEX_PATH,
@@ -29,8 +30,8 @@ const EXCLUDED_DIR_NAMES = new Set([
 ]);
 
 export const DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS = [
-  "build-tools/lang/importer_roots.bzl",
-  "build-tools/lang/nix_attr_aliases.bzl",
+  "viberoots/build-tools/lang/importer_roots.bzl",
+  "viberoots/build-tools/lang/nix_attr_aliases.bzl",
   path.join(WORKSPACE_BUCK_STATE_DIR, ".buckconfig"),
   path.join(WORKSPACE_BUCK_STATE_DIR, "TARGETS"),
   path.join(WORKSPACE_BUCK_STATE_DIR, "workspace-root.env"),
@@ -47,11 +48,11 @@ export const DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS = [
   DEFAULT_NIX_ATTR_MAP_PATH,
   DEFAULT_PROVIDER_INDEX_PATH,
   DEFAULT_PROVIDER_INDEX_JSON_PATH,
-  "build-tools/tools/buck/invalidation-report.txt",
-  "build-tools/tools/buck/node-lock-index.json",
-  "build-tools/tools/node/workspace-map.json",
-  "build-tools/tools/nix/langs.nix",
-  "build-tools/tools/nix/node-modules.hashes.json",
+  "viberoots/build-tools/tools/buck/invalidation-report.txt",
+  "viberoots/build-tools/tools/buck/node-lock-index.json",
+  DEFAULT_NODE_WORKSPACE_MAP_PATH,
+  "viberoots/build-tools/tools/nix/langs.nix",
+  "projects/node-modules.hashes.json",
 ] as const;
 
 function normalizeRelPath(relPath: string): string {
@@ -68,11 +69,26 @@ function shouldSkipEntry(name: string): boolean {
   );
 }
 
-async function collectStageableFiles(absPath: string, relPath: string): Promise<string[]> {
+async function stageableRel(tmp: string, absPath: string, relPath: string): Promise<string> {
+  const normalized = normalizeRelPath(relPath);
+  const real = await fsp.realpath(absPath).catch(() => "");
+  if (!real) return normalized;
+  const relative = path.relative(tmp, real);
+  if (relative && !relative.startsWith("..") && !path.isAbsolute(relative)) {
+    return normalizeRelPath(relative);
+  }
+  return normalized;
+}
+
+async function collectStageableFiles(
+  tmp: string,
+  absPath: string,
+  relPath: string,
+): Promise<string[]> {
   const st = await fsp.lstat(absPath).catch(() => null);
   if (!st) return [];
   if (st.isSymbolicLink() || st.isFile()) {
-    return [normalizeRelPath(relPath)];
+    return [await stageableRel(tmp, absPath, relPath)];
   }
   if (!st.isDirectory()) return [];
 
@@ -83,11 +99,11 @@ async function collectStageableFiles(absPath: string, relPath: string): Promise<
     const childAbs = path.join(absPath, entry.name);
     const childRel = path.posix.join(normalizeRelPath(relPath), entry.name);
     if (entry.isDirectory()) {
-      files.push(...(await collectStageableFiles(childAbs, childRel)));
+      files.push(...(await collectStageableFiles(tmp, childAbs, childRel)));
       continue;
     }
     if (entry.isFile() || entry.isSymbolicLink()) {
-      files.push(normalizeRelPath(childRel));
+      files.push(await stageableRel(tmp, childAbs, childRel));
     }
   }
   return files.sort((a, b) => a.localeCompare(b));
@@ -103,7 +119,7 @@ export async function stageTempRepoPaths(opts: {
   for (const relRoot of opts.recursiveRoots || []) {
     const normalized = normalizeRelPath(relRoot);
     const absRoot = path.join(opts.tmp, normalized);
-    for (const file of await collectStageableFiles(absRoot, normalized)) {
+    for (const file of await collectStageableFiles(opts.tmp, absRoot, normalized)) {
       files.add(file);
     }
   }
@@ -113,12 +129,13 @@ export async function stageTempRepoPaths(opts: {
     const st = await fsp.lstat(absPath).catch(() => null);
     if (!st) continue;
     if (st.isDirectory()) {
-      for (const file of await collectStageableFiles(absPath, normalized)) {
+      for (const file of await collectStageableFiles(opts.tmp, absPath, normalized)) {
         files.add(file);
       }
       continue;
     }
-    if (st.isFile() || st.isSymbolicLink()) files.add(normalized);
+    if (st.isFile() || st.isSymbolicLink())
+      files.add(await stageableRel(opts.tmp, absPath, normalized));
   }
 
   const sorted = Array.from(files).sort((a, b) => a.localeCompare(b));

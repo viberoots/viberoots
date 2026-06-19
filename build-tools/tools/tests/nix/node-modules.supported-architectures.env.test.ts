@@ -34,9 +34,9 @@ async function expectSupportedArchitectureEnv(file: string): Promise<void> {
 }
 
 test("pnpm store derivation writes supported architecture config", async () => {
-  await expectSupportedArchitectureEnv("build-tools/tools/nix/node-modules/store.nix");
+  await expectSupportedArchitectureEnv("viberoots/build-tools/tools/nix/node-modules/store.nix");
 });
 
 test("node-modules derivation writes supported architecture config", async () => {
-  await expectSupportedArchitectureEnv("build-tools/tools/nix/node-modules/modules.nix");
+  await expectSupportedArchitectureEnv("viberoots/build-tools/tools/nix/node-modules/modules.nix");
 });

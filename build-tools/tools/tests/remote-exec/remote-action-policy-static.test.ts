@@ -4,38 +4,38 @@ import fs from "node:fs";
 import { test } from "node:test";
 
 const actionFiles = [
-  "build-tools/go/private/nix_build.bzl",
-  "build-tools/go/private/nix_build_carchive.bzl",
-  "build-tools/go/private/nix_build_wasm.bzl",
-  "build-tools/go/private/nix_test.bzl",
-  "build-tools/python/private/nix_build.bzl",
-  "build-tools/python/private/nix_test.bzl",
-  "build-tools/cpp/private/nix_build.bzl",
-  "build-tools/cpp/private/nix_test.bzl",
-  "build-tools/rust/private/nix_build.bzl",
-  "build-tools/node/private/nix_test.bzl",
-  "build-tools/tools/buck/zx_test.bzl",
+  "viberoots/build-tools/go/private/nix_build.bzl",
+  "viberoots/build-tools/go/private/nix_build_carchive.bzl",
+  "viberoots/build-tools/go/private/nix_build_wasm.bzl",
+  "viberoots/build-tools/go/private/nix_test.bzl",
+  "viberoots/build-tools/python/private/nix_build.bzl",
+  "viberoots/build-tools/python/private/nix_test.bzl",
+  "viberoots/build-tools/cpp/private/nix_build.bzl",
+  "viberoots/build-tools/cpp/private/nix_test.bzl",
+  "viberoots/build-tools/rust/private/nix_build.bzl",
+  "viberoots/build-tools/node/private/nix_test.bzl",
+  "viberoots/build-tools/tools/buck/zx_test.bzl",
 ];
 
 const nodeWrappers = [
-  "build-tools/node/defs_core.bzl",
-  "build-tools/node/defs_nix.bzl",
-  "build-tools/node/defs_stage.bzl",
-  "build-tools/node/defs_service.bzl",
-  "build-tools/node/defs_vercel.bzl",
+  "viberoots/build-tools/node/defs_core.bzl",
+  "viberoots/build-tools/node/defs_nix.bzl",
+  "viberoots/build-tools/node/defs_stage.bzl",
+  "viberoots/build-tools/node/defs_service.bzl",
+  "viberoots/build-tools/node/defs_vercel.bzl",
 ];
 
 const sharedNixHelpers = [
-  "build-tools/lang/nix_shell.bzl",
-  "build-tools/lang/nix_action_runner.bzl",
+  "viberoots/build-tools/lang/nix_shell.bzl",
+  "viberoots/build-tools/lang/nix_action_runner.bzl",
 ];
 
 const externalRunnerWrappers = [
-  "build-tools/go/private/nix_test.bzl",
-  "build-tools/python/private/nix_test.bzl",
-  "build-tools/cpp/private/nix_test.bzl",
-  "build-tools/node/private/nix_test.bzl",
-  "build-tools/tools/buck/zx_test.bzl",
+  "viberoots/build-tools/go/private/nix_test.bzl",
+  "viberoots/build-tools/python/private/nix_test.bzl",
+  "viberoots/build-tools/cpp/private/nix_test.bzl",
+  "viberoots/build-tools/node/private/nix_test.bzl",
+  "viberoots/build-tools/tools/buck/zx_test.bzl",
 ];
 
 function read(path: string): string {
@@ -56,7 +56,7 @@ test("Nix-backed action rules use the shared remote action policy helper", () =>
 });
 
 test("shared action policy stamps local-only, hybrid, and remote-ready metadata", () => {
-  const text = read("build-tools/lang/remote_action_policy.bzl");
+  const text = read("viberoots/build-tools/lang/remote_action_policy.bzl");
   assert.match(text, /uses_local_filesystem_abspaths/);
   assert.match(text, /remote-action-policy:local-only/);
   assert.match(text, /remote-action-policy:hybrid/);
@@ -74,7 +74,7 @@ test("shared action policy stamps local-only, hybrid, and remote-ready metadata"
 });
 
 test("remote-ready external-runner commands carry declared input handles", () => {
-  const policyText = read("build-tools/lang/remote_action_policy.bzl");
+  const policyText = read("viberoots/build-tools/lang/remote_action_policy.bzl");
   assert.match(policyText, /def external_runner_command/);
   assert.match(policyText, /REMOTE_READY/);
   assert.match(policyText, /requires declared inputs/);
@@ -114,5 +114,8 @@ test("shared Nix helpers do not own unscheduled Buck actions", () => {
     assert.doesNotMatch(text, /ctx\.actions\.run\(/, file);
     assert.doesNotMatch(text, /genrule\(/, file);
   }
-  assert.match(read("build-tools/lang/language_wiring.bzl"), /stamp_remote_readiness_labels/);
+  assert.match(
+    read("viberoots/build-tools/lang/language_wiring.bzl"),
+    /stamp_remote_readiness_labels/,
+  );
 });

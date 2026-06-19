@@ -10,6 +10,7 @@ import {
   isReviewedSharedBuildSystemPath,
   REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS,
 } from "../../lib/deployment-verify-scope";
+import { viberootsRepoPath } from "./deployment-command";
 
 test("deployment verify scope marks reviewed deployment-owned paths explicitly", () => {
   const deploymentOwned = [
@@ -34,12 +35,12 @@ test("deployment verify scope marks reviewed deployment-owned paths explicitly",
 
 test("deployment verify scope keeps reviewed shared paths out of the deployment domain", () => {
   const sharedPaths = [
-    "build-tools/tools/buck/zx_test.bzl",
+    "viberoots/build-tools/tools/buck/zx_test.bzl",
     "build-tools/tools/tests/deployment_conventions.bzl",
     "build-tools/tools/tests/defs.bzl",
-    "build-tools/tools/dev/verify/run-verify.ts",
-    "build-tools/tools/lib/build-system-test-scope.ts",
-    "build-tools/lang/defs_common.bzl",
+    "viberoots/build-tools/tools/dev/verify/run-verify.ts",
+    "viberoots/build-tools/tools/lib/build-system-test-scope.ts",
+    "viberoots/build-tools/lang/defs_common.bzl",
     "toolchains/TARGETS",
     "third_party/providers/TARGETS",
     "TARGETS",
@@ -55,7 +56,7 @@ test("deployment verify scope keeps reviewed shared paths out of the deployment 
 
 test("deployment verify scope leaves unrelated paths unclassified", () => {
   const unrelatedPaths = [
-    "build-tools/tools/nix/node-modules/store.nix",
+    "viberoots/build-tools/tools/nix/node-modules/store.nix",
     "build-tools/tools/tests/scaffolding/template-taxonomy.contract.test.ts",
     "docs/history/plans/deployment-plan.md",
     "projects/apps/pleomino/TARGETS",
@@ -76,7 +77,7 @@ test("deployment verify scope leaves unrelated paths unclassified", () => {
 
 test("deployment verify scope docs enumerate the reviewed support paths exactly", async () => {
   const doc = await fsp.readFile(
-    path.join(process.cwd(), "docs/history/migrations/deployment-verify-scope.md"),
+    viberootsRepoPath("docs/history/migrations/deployment-verify-scope.md"),
     "utf8",
   );
   for (const relPath of REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS) {

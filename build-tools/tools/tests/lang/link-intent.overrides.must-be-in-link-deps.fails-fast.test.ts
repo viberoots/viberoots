@@ -14,7 +14,7 @@ test("link intent: link_closure_overrides keys must be present in link_deps (fai
       path.join(appDir, "TARGETS"),
       [
         'load("@prelude//:rules.bzl", "genrule")',
-        'load("//build-tools/lang:link_intent_probe.bzl", "link_intent_probe")',
+        'load("@viberoots//build-tools/lang:link_intent_probe.bzl", "link_intent_probe")',
         "",
         'genrule(name = "b", out = "b.txt", cmd = "echo b > $OUT")',
         'genrule(name = "c", out = "c.txt", cmd = "echo c > $OUT")',

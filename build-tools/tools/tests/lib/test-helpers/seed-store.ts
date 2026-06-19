@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { isGeneratedRepoStateRelPath } from "../../../dev/verify/generated-state-excludes";
 import {
   assertRequiredSeedFiles,
   copySeedStoreToTempRepo,
@@ -37,9 +38,11 @@ function wantsFilteredRsync(): boolean {
 }
 
 function shouldOverlaySeedFile(rel: string): boolean {
+  if (isGeneratedRepoStateRelPath(rel)) return false;
   return (
     rel === "flake.nix" ||
     rel === "flake.lock" ||
+    rel.startsWith(".viberoots/") ||
     rel.startsWith("build-tools/") ||
     rel.startsWith("viberoots/")
   );
@@ -173,14 +176,11 @@ async function overlayActiveViberootsIntoTempRepo(tmpDir: string): Promise<void>
       .catch(() => false),
   ]).then(([hasFlake, hasTool]) => hasFlake && hasTool);
   if (!sourceExists) return;
-  const tmpHasToolRoot = await fsp
-    .access(path.join(tmpDir, "build-tools", "tools", "dev", "zx-init.mjs"))
-    .then(() => true)
-    .catch(() => false);
-  if (tmpHasToolRoot) return;
-  await fsp.rm(path.join(tmpDir, "viberoots"), { recursive: true, force: true });
+  const tmpViberoots = path.join(tmpDir, "viberoots");
+  await $`bash --noprofile --norc -c ${`chmod -R u+w ${JSON.stringify(tmpViberoots)} >/dev/null 2>&1 || true`}`.nothrow();
+  await fsp.rm(tmpViberoots, { recursive: true, force: true });
   await fsp.mkdir(path.join(tmpDir, "viberoots"), { recursive: true });
-  await $({ cwd })`rsync -a ${`${source}/`} ${path.join(tmpDir, "viberoots")}/`;
+  await $({ cwd })`rsync -a --delete ${`${source}/`} ${tmpViberoots}/`;
 }
 
 async function seedStoreCowCopySupportedOncePerWorker(args: {
@@ -191,7 +191,14 @@ async function seedStoreCowCopySupportedOncePerWorker(args: {
   if (seedStoreCowCopySupported) return seedStoreCowCopySupported;
   if (!seedStoreCowCopySupportedPromise) {
     seedStoreCowCopySupportedPromise = (async () => {
-      const srcFile = path.join(args.seedPath, "flake.nix");
+      const hiddenFlake = path.join(args.seedPath, ".viberoots", "workspace", "flake.nix");
+      const rootFlake = path.join(args.seedPath, "flake.nix");
+      const srcFile = (await fsp
+        .access(hiddenFlake)
+        .then(() => true)
+        .catch(() => false))
+        ? hiddenFlake
+        : rootFlake;
       const supported = await args.timeAsync(CLONE_PROBE_LABEL, async () => {
         return await probeSeedCowCopyFrom({
           srcFile,

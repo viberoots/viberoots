@@ -15,6 +15,7 @@ import {
   renderReleaseAction,
   renderTargetException,
 } from "./deployment-targets.install.policy-renderers";
+import type { DeploymentAdmissionPolicy } from "../../deployments/deployment-policy";
 
 export function synchronizeGovernanceChecks(deployments: ReviewedDeployment[]): void {
   for (const deployment of deployments) {
@@ -40,6 +41,50 @@ function effectiveSourceRefPolicyChecks(opts: {
   return deployment?.admissionPolicy.requiredChecks || opts.fallback;
 }
 
+function stageAdmissionPolicies(opts: {
+  deployments: ReviewedDeployment[];
+  lanePolicies: Array<{ ref: string; policy: ReviewedDeployment["lanePolicy"] }>;
+}): Array<{ ref: string; policy: DeploymentAdmissionPolicy }> {
+  const explicit = opts.deployments.map((deployment) => ({
+    ref: deployment.admissionPolicyRef,
+    policy: deployment.admissionPolicy,
+  }));
+  const refs = new Set(explicit.map(({ ref }) => ref));
+  const implied: Array<{ ref: string; policy: DeploymentAdmissionPolicy }> = [];
+  for (const { ref: laneRef, policy: lanePolicy } of opts.lanePolicies) {
+    const firstPolicy = opts.deployments.find(
+      (deployment) => deployment.lanePolicyRef === laneRef,
+    )?.admissionPolicy;
+    if (!firstPolicy) continue;
+    const sharedDir = labelDir(laneRef);
+    for (const stagePolicy of lanePolicy.governance.sourceRefPolicies) {
+      const policyRef = `//${sharedDir}:${stagePolicy.stage}_release`;
+      if (refs.has(policyRef)) continue;
+      const approvalBoundary = lanePolicy.governance.requiredApprovalBoundaries.find(
+        (entry) => entry.stage === stagePolicy.stage,
+      );
+      refs.add(policyRef);
+      implied.push({
+        ref: policyRef,
+        policy: {
+          ...firstPolicy,
+          ref: policyRef,
+          name: labelName(policyRef),
+          allowedRefs: stagePolicy.allowedRefs,
+          requiredChecks: effectiveSourceRefPolicyChecks({
+            deployments: opts.deployments,
+            governanceRef: lanePolicy.governanceRef,
+            stage: stagePolicy.stage,
+            fallback: stagePolicy.requiredChecks,
+          }),
+          requiredApprovals: approvalBoundary?.requiredApprovals || [],
+        },
+      });
+    }
+  }
+  return [...explicit, ...implied];
+}
+
 export function sharedPolicyTargetsByDir(
   deployments: ReviewedDeployment[],
 ): Map<string, TargetsFileFragment> {
@@ -58,10 +103,7 @@ export function sharedPolicyTargetsByDir(
     ({ ref }) => ref,
   );
   const admissionPolicies = uniqueBy(
-    deployments.map((deployment) => ({
-      ref: deployment.admissionPolicyRef,
-      policy: deployment.admissionPolicy,
-    })),
+    stageAdmissionPolicies({ deployments, lanePolicies }),
     ({ ref }) => ref,
   );
   const releaseActions = uniqueBy(
@@ -83,7 +125,7 @@ export function sharedPolicyTargetsByDir(
   for (const sharedDir of targetDirs) {
     appendTargetsFragment(fragments, sharedDir, {
       loadLines: [
-        'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_governance", "deployment_lane_policy", "deployment_release_action", "deployment_target_exception")',
+        'load("@viberoots//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_governance", "deployment_lane_policy", "deployment_release_action", "deployment_target_exception")',
       ],
       bodyLines: [
         ...governancePolicies

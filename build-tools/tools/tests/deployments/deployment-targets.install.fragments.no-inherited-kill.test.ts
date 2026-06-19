@@ -5,7 +5,7 @@ import { test } from "node:test";
 
 test("deployment install fragments do not kill inherited shared buck isolations", async () => {
   const source = await fsp.readFile(
-    "build-tools/tools/tests/deployments/deployment-targets.install.fragments.ts",
+    "viberoots/build-tools/tools/tests/deployments/deployment-targets.install.fragments.ts",
     "utf8",
   );
 

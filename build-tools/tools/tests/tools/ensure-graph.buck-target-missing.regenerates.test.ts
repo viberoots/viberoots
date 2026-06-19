@@ -8,7 +8,7 @@ import { ensureGraph } from "../../buck/glue-run";
 
 test("ensureGraph regenerates when BUCK_TARGET is missing from the existing graph", async () => {
   await runInTemp("ensure-graph-buck-target-missing", async (tmp) => {
-    const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
 
     await withScopedEnv(

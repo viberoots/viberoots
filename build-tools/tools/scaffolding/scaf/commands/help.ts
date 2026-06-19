@@ -136,7 +136,7 @@ async function helpForNewTemplate(language: string, templateRaw: string, flags: 
 }
 
 async function helpForNewLanguage(language: string, flags: ScafFlags) {
-  const metas = await readTemplateMeta(language);
+  const metas = await readTemplateMeta(language, { tolerateStaleTaxonomy: true });
   if (flags["json"] === "true") {
     console.log(
       JSON.stringify(
@@ -184,12 +184,12 @@ export async function cmdHelp(args: string[], flags: ScafFlags) {
   if (!language || !template) {
     usage();
     console.log("\nAvailable templates:");
-    const metas = await readTemplateMeta();
+    const metas = await readTemplateMeta(undefined, { tolerateStaleTaxonomy: true });
     metas.forEach((m) => console.log(`  ${m.language} ${m.template}\t${m.description}`));
     return;
   }
 
-  const metas = await readTemplateMeta(language);
+  const metas = await readTemplateMeta(language, { tolerateStaleTaxonomy: true });
   const meta = metas.find((m) => m.template === template);
   if (!meta) {
     if (language === "node" && isCanonicalTypeScriptTemplate(template)) {
@@ -201,14 +201,7 @@ export async function cmdHelp(args: string[], flags: ScafFlags) {
   }
   const h: any = (meta as any).help || {};
   if (flags["json"] === "true") {
-    const tmplDirPath = path.join(
-      "build-tools",
-      "tools",
-      "scaffolding",
-      "templates",
-      canonicalTemplateLanguage(language, template),
-      template,
-    );
+    const tmplDirPath = templateRootPath(canonicalTemplateLanguage(language, template), template);
     const variables = await readCopierVariables(tmplDirPath).catch(() => [] as string[]);
     console.log(
       JSON.stringify(

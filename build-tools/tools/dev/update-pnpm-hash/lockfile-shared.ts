@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { workspaceFlakeRef } from "../install/common";
 
 export function preferredPnpmStoreDir(defaultStoreDir: string): {
   storeDir: string;
@@ -38,7 +39,7 @@ function pnpmWorkspaceMarker(packages: string[]): string {
 
 export function pnpmFlakeRef(repoRoot: string): string {
   // Keep path: so newly scaffolded/untracked files are visible to flake evaluation.
-  return `path:${path.resolve(repoRoot)}#pnpm`;
+  return `${workspaceFlakeRef(repoRoot)}#pnpm`;
 }
 
 export async function ensureLocalWorkspaceMarker(

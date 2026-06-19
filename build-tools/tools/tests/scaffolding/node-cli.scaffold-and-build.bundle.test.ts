@@ -10,7 +10,7 @@ process.env.TEST_NEED_DEV_ENV = "1";
 test("node cli: build bundled single-file and run help", async () => {
   const prevRoots = process.env.TEST_RSYNC_ROOTS;
   if (!prevRoots) {
-    process.env.TEST_RSYNC_ROOTS = "build-tools toolchains third_party/providers prelude patches";
+    process.env.TEST_RSYNC_ROOTS = "viberoots";
   }
   try {
     await runInTemp("node-cli-bundle", async (tmp, $) => {
@@ -24,7 +24,7 @@ test("node cli: build bundled single-file and run help", async () => {
        t=t.replace('# importer = "{{ importer }}",', 'importer = "projects/apps/demo",');
        fs.writeFileSync(p,t,'utf8');`}`;
       // Glue
-      await $`build-tools/tools/dev/install-deps.ts --glue-only`;
+      await $`zx-wrapper ${viberootsDevTool("install-deps.ts")} --glue-only`;
       await $({
         cwd: tmp,
         stdio: "inherit",
@@ -32,7 +32,7 @@ test("node cli: build bundled single-file and run help", async () => {
       await $({
         cwd: tmp,
         stdio: "inherit",
-      })`git add build-tools/tools/nix/node-modules.hashes.json`;
+      })`git add projects/node-modules.hashes.json`;
       // Build bundled artifact via macro (nix build under the hood)
       await $`buck2 build --target-platforms prelude//platforms:default //projects/apps/demo:demo`;
       // Run the bundled artifact and assert help works

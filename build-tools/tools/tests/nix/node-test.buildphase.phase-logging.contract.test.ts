@@ -4,7 +4,7 @@ import { test } from "node:test";
 
 test("node-test build phase exposes env-gated phase timing diagnostics", async () => {
   const txt = await fsp.readFile(
-    "build-tools/tools/nix/flake/packages/node-test-buildPhase.sh",
+    "viberoots/build-tools/tools/nix/flake/packages/node-test-buildPhase.sh",
     "utf8",
   );
   if (!txt.includes("[node-test][phase]")) {

@@ -96,7 +96,7 @@ test(
         .then(() => true)
         .catch(() => false);
       if (!hasAutoMap || !hasNixAttrMap) {
-        await $`build-tools/tools/dev/install-deps.ts --glue-only`;
+        await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
       }
 
       // Assert wiring via cquery (fast, deterministic, and not sensitive to toolchain rebuild time).

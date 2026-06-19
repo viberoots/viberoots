@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("python runtime: BUILD-INFO includes uv2nix version/rev", async () => {
   await runInTemp("py-uv2nix-info", async (tmp, _$) => {
@@ -51,7 +51,7 @@ test("python runtime: BUILD-INFO includes uv2nix version/rev", async () => {
         }),
       },
       stdio: "pipe",
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     const outPath = String(build.stdout || "")
       .trim()
       .split(/\s+/)

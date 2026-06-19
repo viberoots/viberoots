@@ -4,18 +4,19 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import {
-  DEPLOYMENT_SAFETY_FLOOR_TARGETS,
+  deploymentSafetyFloorTargets,
   queryDeploymentDomainTargets,
 } from "../../lib/deployment-test-targets";
 import { REVIEWED_DEPLOYMENT_TEST_AREA } from "../../lib/deployment-verify-scope";
 import { targetLabelFromScript } from "../../lib/template-owned-tests";
 
 async function deploymentTestTargets(root: string): Promise<string[]> {
-  const dir = path.join(root, REVIEWED_DEPLOYMENT_TEST_AREA);
+  const dir = path.join(root, "viberoots", REVIEWED_DEPLOYMENT_TEST_AREA);
   const entries = await fsp.readdir(dir);
   return entries
     .filter((entry) => entry.endsWith(".test.ts"))
     .map((entry) => targetLabelFromScript(path.posix.join(REVIEWED_DEPLOYMENT_TEST_AREA, entry)))
+    .map((label) => label.replace(/^\/\//, "viberoots//"))
     .sort();
 }
 
@@ -28,8 +29,9 @@ test("deployment selector query resolves the reviewed deployment suite", async (
 
 test("deployment selector safety floor stays non-empty and inside the deployment suite", async () => {
   const targets = await queryDeploymentDomainTargets(process.cwd());
-  assert.ok(DEPLOYMENT_SAFETY_FLOOR_TARGETS.length > 0);
-  for (const target of DEPLOYMENT_SAFETY_FLOOR_TARGETS) {
+  const safetyFloorTargets = deploymentSafetyFloorTargets(process.cwd());
+  assert.ok(safetyFloorTargets.length > 0);
+  for (const target of safetyFloorTargets) {
     assert.ok(targets.includes(target), `expected deployment safety floor to include ${target}`);
   }
 });

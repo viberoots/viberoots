@@ -36,9 +36,9 @@ test("generator emits node-lock-index with sorted keys and no rewrite on second 
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
 
     // First run
-    await $({ cwd: tmp })`build-tools/tools/buck/export-graph.ts --simulate ${sim}`;
+    await $({ cwd: tmp })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${sim}`;
     // Generate sidecar via glue/generator
-    await $({ cwd: tmp })`node build-tools/tools/buck/gen-provider-index.ts`;
+    await $({ cwd: tmp })`node viberoots/build-tools/tools/buck/gen-provider-index.ts`;
     assert.ok(await fs.pathExists(sidecar), "node-lock-index.json should exist");
 
     // Validate sorted keys in sidecar index
@@ -54,8 +54,8 @@ test("generator emits node-lock-index with sorted keys and no rewrite on second 
     await new Promise((r) => setTimeout(r, 15));
 
     // Second run must be a no-op write (mtime unchanged)
-    await $({ cwd: tmp })`build-tools/tools/buck/export-graph.ts --simulate ${sim}`;
-    await $({ cwd: tmp })`node build-tools/tools/buck/gen-provider-index.ts`;
+    await $({ cwd: tmp })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${sim}`;
+    await $({ cwd: tmp })`node viberoots/build-tools/tools/buck/gen-provider-index.ts`;
     const statAfter = await fs.stat(sidecar);
     assert.equal(
       Number(statAfter.mtimeMs),

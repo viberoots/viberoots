@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("python adapter errors in CI when .py sources lack rule_type and lang:python", async () => {
   await runInTemp("exp-python-ci-error-missing-lang", async (tmp, $) => {
-    const out = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const out = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       {
@@ -15,7 +15,7 @@ test("python adapter errors in CI when .py sources lack rule_type and lang:pytho
         srcs: ["apps/pytool/main.py"],
       },
     ];
-    const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");
+    const sim = path.join(tmp, "viberoots/build-tools/tools/buck/simulated.json");
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
 
     let txt = "";
@@ -25,7 +25,7 @@ test("python adapter errors in CI when .py sources lack rule_type and lang:pytho
         cwd: tmp,
         stdio: "pipe",
         env: { ...process.env, CI: "true" },
-      })`build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${out} --validation warn`;
+      })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${out} --validation warn`;
       txt = String(res.stdout || "") + String(res.stderr || "");
       code = res.exitCode || 0;
     } catch (e: any) {

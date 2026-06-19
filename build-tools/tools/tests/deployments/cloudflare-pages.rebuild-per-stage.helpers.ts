@@ -16,6 +16,7 @@ import {
 import { seedCurrentStageState } from "./nixos-shared-host.promotion.stage-state.helpers";
 import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governance.fixture";
+import { viberootsToolScript } from "./deployment-command";
 
 let buckQueryNonce = 0;
 
@@ -92,8 +93,8 @@ export function freshRebuildCloudflareEnv(
     ...fakeCloudflareEnv(fake),
     BUCK_ISOLATION_DIR: isolation,
     BUCK_NESTED_ISO: isolation,
+    BUCK_ISOLATION_DIR_EXPORTER: isolation,
   };
-  delete env.BUCK_ISOLATION_DIR_EXPORTER;
   return env;
 }
 
@@ -130,10 +131,13 @@ export async function createSourceRun(
     tlsRoot: tmp,
   });
   try {
+    const deployInternalScript = viberootsToolScript(
+      "build-tools/tools/deployments/deploy-internal.ts",
+    );
     const run = await $({
       cwd: tmp,
       env: freshRebuildCloudflareEnv(tmp, fake),
-    })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+    })`zx-wrapper ${deployInternalScript} --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
     const summary = JSON.parse(String(run.stdout));
     const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
     const backendDatabaseUrl = await seedCurrentStageState({

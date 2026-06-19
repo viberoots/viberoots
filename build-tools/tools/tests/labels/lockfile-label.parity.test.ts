@@ -23,7 +23,10 @@ test("lockfile label parsing parity (TS ↔ Starlark): strict '#', ./ normalizat
     const targetsPath = path.join(tmp, "TARGETS");
     await fsp.appendFile(
       targetsPath,
-      ['load("//build-tools/lang:defs_common.bzl", "lockfile_label_parse_probe")', ""].join("\n"),
+      [
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "lockfile_label_parse_probe")',
+        "",
+      ].join("\n"),
       "utf8",
     );
 

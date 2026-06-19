@@ -32,7 +32,7 @@ test("exporter attaches test-only deps only to test targets", async () => {
     await fs.outputFile(nodesPath, JSON.stringify(nodesSim, null, 2), "utf8");
     await $({
       cwd: tmp,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${nodesPath} --out ${graphPath}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${nodesPath} --out ${graphPath}`;
     const nodes = await readGraph(graphPath);
     function labelsOf(n: any): string[] {
       return (n.labels || []).filter((x: string) => x.startsWith("module:"));

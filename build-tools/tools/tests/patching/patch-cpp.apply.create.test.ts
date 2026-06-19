@@ -11,18 +11,18 @@ test("patch-cpp apply writes encoded patch filename and auto-discovery note", as
     await fsp.writeFile(path.join(storeSrc, "file.txt"), "A\n", "utf8");
     const map = { "pkgs.zlib": { version: "1.2.13", srcPath: storeSrc, pname: "zlib" } };
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const wsOut = await $({
       cwd: tmp,
     })`PATCH_CPP_DEBUG=1 NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} build-tools/tools/bin/patch-pkg start cpp pkgs.zlib`;
+    )} viberoots/build-tools/tools/bin/patch-pkg start cpp pkgs.zlib`;
     const ws = String(wsOut.stdout).trim().split(/\s+/).pop() as string;
     await fsp.writeFile(path.join(ws, "file.txt"), "B\n", "utf8");
 
     const out = await $({ cwd: tmp })`PATCH_CPP_DEBUG=1 NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} build-tools/tools/bin/patch-pkg apply cpp --target //projects/libs/core:lib zlib`;
+    )} viberoots/build-tools/tools/bin/patch-pkg apply cpp --target //projects/libs/core:lib zlib`;
     const outTxtAll = String(out.stdout || out.stderr || "");
     const printed = outTxtAll
       .split(/\r?\n/)

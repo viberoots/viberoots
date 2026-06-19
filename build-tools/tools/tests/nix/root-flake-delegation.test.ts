@@ -13,20 +13,22 @@ async function activeBuildToolPath(rel: string): Promise<string> {
   return path.join("viberoots", "build-tools", rel);
 }
 
-test("root flake delegates workspace construction to local viberoots input", async () => {
-  const flake = await fsp.readFile("flake.nix", "utf8");
-  assert.match(flake, /viberoots\.url\s*=\s*"git\+file:\.\/viberoots"/);
+test("hidden workspace flake delegates workspace construction to local viberoots input", async () => {
+  const flake = await fsp.readFile(path.join(".viberoots", "workspace", "flake.nix"), "utf8");
+  assert.match(flake, /viberoots\.url\s*=\s*"path:\.\.\/\.\.\/viberoots"/);
   assert.match(flake, /inputs\.viberoots\.lib\.mkWorkspace/);
-  assert.match(flake, /workspaceSrc\s*=\s*\.\/\./);
+  assert.match(flake, /if root != "" then builtins\.toPath root else \//);
   assert.match(flake, /viberootsInput\s*=\s*inputs\.viberoots/);
   assert.doesNotMatch(flake, /import\s+\.\/build-tools\/tools\/nix\/flake\/outputs\.nix/);
 });
 
-test("root flake lock records local viberoots git input", async () => {
-  const lock = JSON.parse(await fsp.readFile("flake.lock", "utf8"));
+test("hidden workspace flake lock records local viberoots path input", async () => {
+  const lock = JSON.parse(
+    await fsp.readFile(path.join(".viberoots", "workspace", "flake.lock"), "utf8"),
+  );
   assert.equal(lock.nodes.root.inputs.viberoots, "viberoots");
-  assert.equal(lock.nodes.viberoots.locked.type, "git");
-  assert.equal(lock.nodes.viberoots.locked.url, "file:./viberoots");
+  assert.equal(lock.nodes.viberoots.locked.type, "path");
+  assert.match(lock.nodes.viberoots.locked.path, /viberoots$/);
 });
 
 test("graph planner packages use the workspace source under delegated flakes", async () => {
@@ -59,7 +61,7 @@ viberoots status --json | jq -e '.sourceMode == "local" and .currentPointsToLive
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`nix develop --accept-flake-config .#default -c bash --noprofile --norc -c ${script}`;
+    })`nix develop --impure --accept-flake-config --override-input viberoots ${`path:${path.resolve("viberoots")}`} ${`path:${path.resolve(".viberoots", "workspace")}#default`} -c bash --noprofile --norc -c ${script}`;
 
     assert.equal(
       result.exitCode,

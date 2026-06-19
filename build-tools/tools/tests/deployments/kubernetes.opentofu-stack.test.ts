@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -211,7 +212,7 @@ test("protected kubernetes provision-only records opentofu plan fingerprints", a
           const result = await $({
             cwd: tmp,
             stdio: "pipe",
-          })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --provision-only --admission-evidence-json ${evidence} --control-plane-url ${harness.controlPlane.url}`;
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment.label} --provision-only --admission-evidence-json ${evidence} --control-plane-url ${harness.controlPlane.url}`;
           const summary = JSON.parse(String(result.stdout));
           assert.equal(summary.finalOutcome, "succeeded");
           assert.equal(summary.provisionerType, OPENTOFU_STACK_PROVISIONER);

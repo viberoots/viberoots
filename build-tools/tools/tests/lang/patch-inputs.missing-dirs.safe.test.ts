@@ -28,7 +28,7 @@ test("patch input probes tolerate missing root and package patch dirs", async ()
     await fsp.writeFile(
       path.join(tmp, "TARGETS"),
       [
-        'load("//build-tools/lang:defs_common.bzl", "patch_inputs_probe")',
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "patch_inputs_probe")',
         "",
         "patch_inputs_probe(",
         '  name = "probe_root_missing",',
@@ -45,7 +45,7 @@ test("patch input probes tolerate missing root and package patch dirs", async ()
     await fsp.writeFile(
       path.join(pkg, "TARGETS"),
       [
-        'load("//build-tools/lang:defs_common.bzl", "package_local_patches_probe")',
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "package_local_patches_probe")',
         "",
         "package_local_patches_probe(",
         '  name = "probe_pkg_missing",',

@@ -112,11 +112,7 @@ async function parseNixProvidersFromTargetsFile(
 async function generateNixAttrMap(
   outFile = DEFAULT_NIX_ATTR_MAP_PATH,
 ): Promise<Record<string, string>> {
-  const sources = [
-    DEFAULT_PROVIDER_TARGETS_PATH,
-    "third_party/providers/TARGETS",
-    "third_party/providers/TARGETS.cpp.auto",
-  ];
+  const sources = [DEFAULT_PROVIDER_TARGETS_PATH];
   const entries: Array<{ provider: string; nixpkg: string }> = [];
   for (const src of sources) {
     for (const { name, attr } of await parseNixProvidersFromTargetsFile(src)) {

@@ -91,16 +91,16 @@ export async function cmdLanguage(args: string[], flags: ScafFlags) {
       id,
       displayName: display,
       requiredPaths: [
-        `build-tools/tools/nix/planner/${id}.nix`,
-        `build-tools/tools/buck/exporter/lang/${id}.ts`,
-        `build-tools/tools/buck/providers/${id}.ts`,
+        `viberoots/build-tools/tools/nix/planner/${id}.nix`,
+        `viberoots/build-tools/tools/buck/exporter/lang/${id}.ts`,
+        `viberoots/build-tools/tools/buck/providers/${id}.ts`,
       ],
       kinds,
-      templatesDir: `build-tools/tools/scaffolding/templates/${id}`,
+      templatesDir: `viberoots/build-tools/tools/scaffolding/templates/${id}`,
     } as const;
 
     async function writeManifestEntry(): Promise<void> {
-      const p = path.join("build-tools", "tools", "nix", "langs.json");
+      const p = path.join("viberoots", "build-tools", "tools", "nix", "langs.json");
       const existsFile = await exists(p);
       if (!existsFile) {
         const doc = { enabled: [id], languages: [fragment] } as any;

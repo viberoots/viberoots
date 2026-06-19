@@ -103,6 +103,15 @@ export async function ensureNodeModulesGcRoot(
   outPath: string,
 ): Promise<void> {
   try {
+    const workspaceRoot = String(process.env.WORKSPACE_ROOT || "").trim();
+    if (
+      String(process.env.VBR_RUN_IN_TEMP_REPO || "").trim() === "1" &&
+      workspaceRoot &&
+      path.resolve(workspaceRoot) !== path.resolve(root)
+    ) {
+      console.error("[link-node] skipping parent gc root pin for temp-repo importer", key);
+      return;
+    }
     if (!(await pathExists(outPath))) {
       console.error("[link-node] warning: skipping gc root pin; outPath does not exist:", outPath);
       return;

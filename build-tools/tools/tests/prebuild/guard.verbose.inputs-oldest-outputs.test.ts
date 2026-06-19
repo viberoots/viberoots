@@ -41,14 +41,18 @@ EOF
     `}`;
     // Outputs
     await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
-    await fsp.writeFile(path.join(tmp, "build-tools", "tools", "buck", "graph.json"), "[]", "utf8");
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
+      "[]",
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(tmp, ".viberoots", "workspace", "buck", "node-lock-index.json"),
       "{}\n",
       "utf8",
     );
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "invalidation-report.txt"),
       "# invalidation-report\n",
       "utf8",
     );
@@ -75,7 +79,7 @@ EOF
       cwd: tmp,
       stdio: "pipe",
       env: { ...process.env, PREBUILD_GUARD_VERBOSE: "1", PREBUILD_GUARD_LIST_LIMIT: "2" },
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts --verbose --verbose-limit 2`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts --verbose --verbose-limit 2`;
     const out = String(stdout || "") + String(stderr || "");
     if (
       !out.includes("newer input:") &&

@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsRepoPath } from "./deployment-command";
 
 test("shared-host deployment service module routes hosted HTTPS to a private service bind", async () => {
   await runInTemp("shared-host-deployment-service-module-eval", async (tmp, $) => {
@@ -10,7 +11,7 @@ test("shared-host deployment service module routes hosted HTTPS to a private ser
         targetMessage = "deploymentHost.deploymentService.localBindHost must be private.";
         system = import <nixpkgs/nixos> {
           configuration = {
-            imports = [ ./build-tools/tools/nix/shared-host-deployment-service-module.nix ];
+            imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-deployment-service-module.nix")} ];
             system.stateVersion = "24.11";
             deploymentHost.deploymentService = {
               enable = true;
@@ -83,7 +84,7 @@ test("shared-host deployment service module points the worker at repo-managed Wr
           nodejs_22 = "/nix/store/test-nodejs-22";
           writeShellScript = name: text: "/nix/store/test-\${name}";
         };
-        module = import ./build-tools/tools/nix/shared-host-deployment-service-module.nix {
+        module = import ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-deployment-service-module.nix")} {
           inherit lib pkgs;
           config = {
             deploymentHost.deploymentService = {
@@ -124,7 +125,7 @@ test("shared-host deployment service module rejects wildcard backend binds", asy
           nodejs_22 = "/nix/store/test-nodejs-22";
           writeShellScript = name: text: "/nix/store/test-\${name}";
         };
-        module = import ./build-tools/tools/nix/shared-host-deployment-service-module.nix {
+        module = import ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-deployment-service-module.nix")} {
           inherit lib pkgs;
           config = {
             deploymentHost.deploymentService = {

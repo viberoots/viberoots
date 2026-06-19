@@ -8,22 +8,22 @@ async function readUtf8(p: string): Promise<string> {
 }
 
 test("importer roots are not hardcoded in TS/Starlark implementations", async () => {
-  const ts = await readUtf8("build-tools/tools/lib/importers.ts");
-  const bzl = await readUtf8("build-tools/lang/lockfile_labels.bzl");
+  const ts = await readUtf8("viberoots/build-tools/tools/lib/importers.ts");
+  const bzl = await readUtf8("viberoots/build-tools/lang/lockfile_labels.bzl");
 
   // TS: previously hardcoded in a single regex; must now be derived from importer-roots contract.
   assert.ok(
     !ts.includes("/^(apps|libs)\\/[^/]+$/"),
-    "build-tools/tools/lib/importers.ts must not hardcode importer roots via regex",
+    "viberoots/build-tools/tools/lib/importers.ts must not hardcode importer roots via regex",
   );
 
   // Starlark: previously hardcoded via startswith checks.
   assert.ok(
     !bzl.includes('startswith("apps/")'),
-    "build-tools/lang/lockfile_labels.bzl must not hardcode apps/ importer roots",
+    "viberoots/build-tools/lang/lockfile_labels.bzl must not hardcode apps/ importer roots",
   );
   assert.ok(
     !bzl.includes('startswith("libs/")'),
-    "build-tools/lang/lockfile_labels.bzl must not hardcode libs/ importer roots",
+    "viberoots/build-tools/lang/lockfile_labels.bzl must not hardcode libs/ importer roots",
   );
 });

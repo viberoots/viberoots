@@ -1,6 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { runInTemp } from "../lib/test-helpers";
+
+const startupCheckScript = fileURLToPath(new URL("../../dev/startup-check.ts", import.meta.url));
 
 // Locally (CI not set), language toolchains are optional (sparse/partial clones).
 // Missing python3/uv should NOT fail and should NOT warn by default.
@@ -27,7 +30,7 @@ await runInTemp("startup-check-python-uv-warn-local", async (tmp, $) => {
     const { stdout, stderr } = await $({
       stdio: "pipe",
       env,
-    })`${node} build-tools/tools/dev/startup-check.ts`;
+    })`${node} ${startupCheckScript}`;
     out = String(stdout || "") + String(stderr || "");
   } catch (e: any) {
     code = e?.exitCode || 1;

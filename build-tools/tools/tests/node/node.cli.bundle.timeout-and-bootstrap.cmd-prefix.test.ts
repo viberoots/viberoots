@@ -13,7 +13,7 @@ test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout w
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_cli_bin")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_cli_bin")',
         "",
         "nix_node_cli_bin(",
         '  name = "tool",',
@@ -54,16 +54,16 @@ test("nix_node_cli_bin(bundle=True) cmd prefixes nix bootstrap env and timeout w
       "expected timeout wrapper to export NIX_PNPM_INSTALL_TIMEOUT",
     );
     const idxTimeout = out.indexOf("TIMEOUT");
-    const idxNix = out.indexOf("nix build");
+    const idxNix = out.indexOf("nix-build-filtered-flake.ts");
     assert.ok(
       idxTimeout >= 0 && idxNix > idxTimeout,
-      "expected TIMEOUT to precede nix build invocation",
+      "expected TIMEOUT to precede Nix build helper invocation",
     );
 
-    // Enforce "no out-links" policy and standard outPath capture flags (capture mechanism may evolve)
+    // Enforce "no out-links" policy through the filtered flake helper.
     assert.ok(
-      out.includes("--no-link --print-out-paths"),
-      "expected nix build to use --no-link --print-out-paths",
+      out.includes("nix-build-filtered-flake.ts"),
+      "expected bundled CLI to invoke filtered flake build helper",
     );
   });
 });

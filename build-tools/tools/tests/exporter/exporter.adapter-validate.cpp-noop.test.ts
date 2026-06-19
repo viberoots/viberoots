@@ -7,16 +7,16 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("cpp adapter validate is a no-op and export succeeds", async () => {
   await runInTemp("exp-cpp-validate-noop", async (tmp, $) => {
-    const pkg = path.join(tmp, "build-tools", "cpp", "app");
+    const pkg = path.join(tmp, "viberoots", "build-tools", "cpp", "app");
     await fs.mkdirp(pkg);
     await fs.outputFile(path.join(pkg, "main.cpp"), "int main(){return 0;}\n", "utf8");
 
     // Minimal node resembling a cxx_binary without labels; cpp validate should not fail
     const nodes = [
       {
-        name: "//build-tools/cpp/app:bin",
+        name: "//viberoots/build-tools/cpp/app:bin",
         rule_type: "cxx_binary",
-        srcs: ["build-tools/cpp/app/main.cpp"],
+        srcs: ["viberoots/build-tools/cpp/app/main.cpp"],
         labels: [],
       },
     ];
@@ -27,7 +27,7 @@ test("cpp adapter validate is a no-op and export succeeds", async () => {
     const res = await $({
       cwd: tmp,
       reject: false,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
     if (res.exitCode !== 0) {
       console.error(
         "expected exporter to succeed for C++ nodes but it failed:\n",
@@ -40,7 +40,7 @@ test("cpp adapter validate is a no-op and export succeeds", async () => {
     const out = await readGraph(graph);
     if (
       !Array.isArray(out) ||
-      !out.find((n: any) => (n as any).name === "//build-tools/cpp/app:bin")
+      !out.find((n: any) => (n as any).name === "//viberoots/build-tools/cpp/app:bin")
     ) {
       console.error("exporter did not write expected node list");
       process.exit(2);

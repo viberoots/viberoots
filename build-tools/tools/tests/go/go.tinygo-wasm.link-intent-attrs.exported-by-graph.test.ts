@@ -31,7 +31,7 @@ test("exporter: nix_go_tiny_wasm_lib preserves link intent attrs in .viberoots/w
     await fs.writeFile(
       path.join(app, "TARGETS"),
       [
-        'load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
+        'load("@viberoots//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
         "",
         "filegroup(",
         '  name = "dep_a",',
@@ -55,7 +55,7 @@ test("exporter: nix_go_tiny_wasm_lib preserves link intent attrs in .viberoots/w
       "utf8",
     );
 
-    const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fs.mkdirp(path.dirname(graphPath));
 
     const res = await $({
@@ -63,7 +63,7 @@ test("exporter: nix_go_tiny_wasm_lib preserves link intent attrs in .viberoots/w
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`node build-tools/tools/buck/export-graph.ts --out ${graphPath}`;
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out ${graphPath}`;
     if (res.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
 
     const nodes = await readGraph(graphPath);

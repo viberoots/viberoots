@@ -20,7 +20,7 @@ function templateIdFromRootPath(rootPath: string): string | null {
   const normalized = String(rootPath || "")
     .replace(/\\/g, "/")
     .replace(/\/+$/, "");
-  const prefix = "build-tools/tools/scaffolding/templates/";
+  const prefix = "viberoots/build-tools/tools/scaffolding/templates/";
   if (!normalized.startsWith(prefix)) return null;
   const rel = normalized.slice(prefix.length);
   const parts = rel.split("/");
@@ -96,7 +96,10 @@ test("taxonomy contract: canonical ids are unique and language-qualified", () =>
 });
 
 test("parity: resolver and metadata readers match canonical ts ids", async () => {
-  const resolverRaw = await fsp.readFile("build-tools/tools/scaffolding/resolver.json", "utf8");
+  const resolverRaw = await fsp.readFile(
+    "viberoots/build-tools/tools/scaffolding/resolver.json",
+    "utf8",
+  );
   const resolver = JSON.parse(resolverRaw) as Record<string, Record<string, string>>;
   const resolverTsIds = Object.keys(resolver.ts || {}).map((template) => `ts/${template}`);
   assert.deepEqual(sortedUnique(resolverTsIds), sortedUnique(CANONICAL_TS_TEMPLATE_IDS));
@@ -111,7 +114,10 @@ test("parity: resolver and metadata readers match canonical ts ids", async () =>
 });
 
 test("anti-drift: template conventions reference canonical taxonomy only", async () => {
-  const bzl = await fsp.readFile("build-tools/tools/tests/template_conventions.bzl", "utf8");
+  const bzl = await fsp.readFile(
+    "viberoots/build-tools/tools/tests/template_conventions.bzl",
+    "utf8",
+  );
   assert.equal(
     bzl.includes("template_keys"),
     false,
@@ -142,7 +148,7 @@ test("anti-drift: template conventions reference canonical taxonomy only", async
 
 test("parity: template taxonomy adapter ids match canonical taxonomy", async () => {
   const adapter = await fsp.readFile(
-    "build-tools/tools/tests/template_taxonomy_adapter.bzl",
+    "viberoots/build-tools/tools/tests/template_taxonomy_adapter.bzl",
     "utf8",
   );
   const adapterIds = parseCanonicalTemplateIdsFromAdapter(adapter);

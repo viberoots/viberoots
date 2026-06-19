@@ -26,7 +26,7 @@ async function writeTargets(tmp: string): Promise<void> {
   await fsp.writeFile(
     path.join(tmp, "projects/deployments/pleomino/shared/TARGETS"),
     [
-      'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
+      'load("@viberoots//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
       'deployment_defaults(name = "defaults", visibility = ["PUBLIC"])',
       'deployment_lane_governance(name = "lane_governance", scm_backend = "github", repository = "viberoots/viberoots", source_ref_policies = [{"stage": "prod", "allowed_refs": "refs/tags/release/*", "required_checks": "deploy/pleomino-prod"}], trusted_reporter_identities = ["app:deploy-bot"], required_approval_boundaries = [{"stage": "prod", "required_approvals": "release-owner"}], visibility = ["PUBLIC"])',
       'deployment_lane_policy(name = "lane", defaults = ":defaults", stages = ["prod"], source_ref_policy = {"prod": "refs/tags/release/*"}, allowed_promotion_edges = [], governance_policy = ":lane_governance", visibility = ["PUBLIC"])',
@@ -36,7 +36,7 @@ async function writeTargets(tmp: string): Promise<void> {
   await fsp.writeFile(
     path.join(tmp, "projects/deployments/api-prod/TARGETS"),
     [
-      'load("//build-tools/deployments:defs.bzl", "kubernetes_service_deployment")',
+      'load("@viberoots//build-tools/deployments:defs.bzl", "kubernetes_service_deployment")',
       "kubernetes_service_deployment(",
       '    name = "web",',
       '    component = "//projects/apps/api:image",',

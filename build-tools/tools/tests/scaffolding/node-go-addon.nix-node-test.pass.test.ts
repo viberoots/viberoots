@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { exists, runInTemp } from "../lib/test-helpers";
+import { exists, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 import { viberootsDevTool } from "./lib/viberoots-tools";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
@@ -19,7 +19,8 @@ test(
   async () => {
     const prevRoots = process.env.TEST_RSYNC_ROOTS;
     if (!prevRoots) {
-      process.env.TEST_RSYNC_ROOTS = "build-tools toolchains third_party/providers patches";
+      process.env.TEST_RSYNC_ROOTS =
+        "viberoots/build-tools toolchains third_party/providers patches";
     }
     try {
       await runInTemp("node-go-addon-nix-node-test", async (tmp, _$) => {
@@ -87,7 +88,8 @@ test(
           ]
             .filter(Boolean)
             .join(" ");
-          const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-test.${sanitized}" -L --impure --no-link --accept-flake-config --builders "" --print-out-paths ${flags}`;
+          const flakeRef = await workspaceFlakeRef(tmp);
+          const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "path:${flakeRef}#node-test.${sanitized}" -L --impure --no-link --accept-flake-config --builders "" --print-out-paths ${flags}`;
           return await $({
             stdio: "pipe",
             env,

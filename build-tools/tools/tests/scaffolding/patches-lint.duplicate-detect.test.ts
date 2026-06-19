@@ -23,7 +23,7 @@ test("patches-lint: duplicate module@version detected in strict mode", async () 
     ); // "____" -> "/"
     let failed = false;
     try {
-      await $({ stdio: "pipe" })`node build-tools/tools/dev/patches-lint.ts --strict`;
+      await $({ stdio: "pipe" })`node viberoots/build-tools/tools/dev/patches-lint.ts --strict`;
     } catch {
       failed = true;
     }

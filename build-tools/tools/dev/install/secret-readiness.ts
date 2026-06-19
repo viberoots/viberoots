@@ -6,6 +6,7 @@ import process from "node:process";
 import { runNodeWithZx } from "../../lib/node-run";
 import { PROJECT_SHARED_CONFIG_PATH } from "../../deployments/project-config";
 import { loadDeploymentReadinessModules, sinkFromSelection } from "./secret-readiness-modules";
+import { buildToolPath, zxInitPath } from "../dev-build/paths";
 
 export type SecretReadinessFlags = {
   withoutSecrets: boolean;
@@ -200,9 +201,9 @@ async function runRepoBootstrap(opts: {
 async function runBootstrap(repoRoot: string, args: string[]) {
   await runNodeWithZx({
     cwd: repoRoot,
-    script: `${repoRoot}/build-tools/tools/deployments/infisical-bootstrap.ts`,
+    script: buildToolPath(repoRoot, "tools/deployments/infisical-bootstrap.ts"),
     args,
-    zxInitPath: `${repoRoot}/build-tools/tools/dev/zx-init.mjs`,
+    zxInitPath: zxInitPath(repoRoot),
     stdio: "inherit",
   });
 }

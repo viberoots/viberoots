@@ -19,6 +19,7 @@ in
   isRootDir "buck-out" ||
   isRootDir ".buck" ||
   isRootDir "test-logs" ||
+  isRootDir ".nix-gcroots" ||
   isRootDir "build-tools/tools/tests" ||
   isRootDir ".clinic" ||
   isRootDir ".cache" ||

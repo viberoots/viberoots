@@ -13,7 +13,7 @@ test("python macros default lockfile label fails fast when missing", async () =>
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/python:defs.bzl", "nix_python_library")',
+        'load("@viberoots//build-tools/python:defs.bzl", "nix_python_library")',
         "",
         "nix_python_library(",
         '  name = "lib",',

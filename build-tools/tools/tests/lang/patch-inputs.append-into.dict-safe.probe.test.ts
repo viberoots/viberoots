@@ -16,7 +16,7 @@ test("append_patch_inputs_dict_safe attaches patch globs to dict-shaped inputs (
     await fsp.writeFile(
       path.join(pkgDir, "TARGETS"),
       [
-        'load("//build-tools/lang:defs_common.bzl", "patch_inputs_dict_safe_probe")',
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "patch_inputs_dict_safe_probe")',
         "",
         "patch_inputs_dict_safe_probe(",
         '  name = "probe_srcs_dict",',

@@ -17,18 +17,18 @@ test("patch-python apply is no-op when no changes", async () => {
     await fs.mkdirp(origin);
     await fs.writeFile(path.join(origin, "readme.txt"), "hello\n", "utf8");
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     await $({
       cwd: tmp,
     })`WORKSPACE_ROOT=${tmp} NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
-    })} NIX_PY_DEV_OVERRIDE_JSON={} build-tools/tools/bin/patch-pkg start python requests --importer ${importer}`;
+    })} NIX_PY_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg start python requests --importer ${importer}`;
 
     const out = await $({
       cwd: tmp,
     })`WORKSPACE_ROOT=${tmp} NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
-    })} NIX_PY_DEV_OVERRIDE_JSON={} build-tools/tools/bin/patch-pkg apply python requests --importer ${importer}`;
+    })} NIX_PY_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg apply python requests --importer ${importer}`;
     const all = String(out.stdout || "") + String(out.stderr || "");
     if (!all.includes("no changes; no-op (cleared dev overrides and ended session)")) {
       console.error("apply did not report no-op");

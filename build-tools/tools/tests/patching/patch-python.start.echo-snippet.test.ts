@@ -15,13 +15,13 @@ test("patch-python start --echo-snippet prints an export snippet", async () => {
     const origin = path.join(tmp, "pycache", "requests-2.32.3");
     await fs.mkdirp(origin);
     await fs.writeFile(path.join(origin, "readme.txt"), "A\n", "utf8");
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const out = await $({
       cwd: tmp,
       stdio: "pipe",
     })`NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
-    })} NIX_PY_DEV_OVERRIDE_JSON={} build-tools/tools/bin/patch-pkg start python requests --importer ${importer} --echo-snippet`;
+    })} NIX_PY_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg start python requests --importer ${importer} --echo-snippet`;
     const full = [String(out.stdout || ""), String(out.stderr || "")].join("\n");
     if (!full.includes("export NIX_PY_DEV_OVERRIDE_JSON=")) {
       console.error("expected export snippet in output");

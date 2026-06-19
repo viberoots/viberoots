@@ -7,7 +7,7 @@ function assert(condition: boolean, message: string) {
 }
 
 test("build-tools/node/defs_core.bzl routes nix_node_gen through graph-generator-selected wrapper", async () => {
-  const file = "build-tools/node/defs_core.bzl";
+  const file = "viberoots/build-tools/node/defs_core.bzl";
   const txt = await fsp.readFile(file, "utf8");
 
   assert(

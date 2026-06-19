@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -228,7 +229,7 @@ test("repo-level deploy submits shared-host mutation through the configured cont
         cwd: tmp,
         env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --artifact-dir ${artifactDir} --admission-evidence-json ${admissionEvidenceJson} --control-plane-url ${controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --artifact-dir ${artifactDir} --admission-evidence-json ${admissionEvidenceJson} --control-plane-url ${controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       const submissionId = summary.controlPlane?.submissionId || summary.submissionId;
       assert.equal(typeof submissionId, "string");

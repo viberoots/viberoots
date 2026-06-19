@@ -106,7 +106,7 @@ test("install secret readiness explicit skip flags run before probes", async () 
 });
 
 test("install deps glue-only exits before secret readiness", async () => {
-  const source = await fsp.readFile("build-tools/tools/dev/install/deps-main.ts", "utf8");
+  const source = await fsp.readFile("viberoots/build-tools/tools/dev/install/deps-main.ts", "utf8");
   const glueOnlyStart = source.indexOf("if (glueOnly) {");
   const glueOnlyExit = source.indexOf("process.exit(0);", glueOnlyStart);
   const readinessCall = source.indexOf("await ensureInstallSecretReadiness({");

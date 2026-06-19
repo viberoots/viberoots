@@ -13,6 +13,15 @@ process.env.NIX_PNPM_FETCH_TIMEOUT = process.env.NIX_PNPM_FETCH_TIMEOUT || "600"
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
+async function workspaceFlakeRef(root: string): Promise<string> {
+  const hidden = path.join(root, ".viberoots", "workspace", "flake.nix");
+  const hasHidden = await fsp
+    .access(hidden)
+    .then(() => true)
+    .catch(() => false);
+  return hasHidden ? path.dirname(hidden) : root;
+}
+
 test("ts service scaffold creates a deployable Node service shape", async () => {
   await runInTemp("node-service-scaffold-contract", async (tmp, $) => {
     await $({ cwd: tmp })`scaf new ts service demo-service --yes --skip-lockfile-gen`;
@@ -48,13 +57,16 @@ test(
       // auto-gc in this ephemeral repo keeps every blob loose for the duration of the build.
       await $`git config gc.auto 0`;
       await $`scaf new ts service demo-service --yes`;
-      await $`bash --noprofile --norc -c 'set -euo pipefail; git -C ${tmp} config user.email test@example.com; git -C ${tmp} config user.name test; git -C ${tmp} add -A; git -C ${tmp} commit -m scaffold'`;
+      await $`bash --noprofile --norc -c 'set -euo pipefail; git -C ${tmp} config user.email test@example.com; git -C ${tmp} config user.name test; git -C ${tmp} add -A projects/apps/demo-service; git -C ${tmp} commit -m scaffold'`;
       await $({
         stdio: "inherit",
       })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${importer}/pnpm-lock.yaml`;
+      await $`git add projects/node-modules.hashes.json`;
+      await $`git commit -m update-hashes`.nothrow();
+      const flakeRef = await workspaceFlakeRef(tmp);
 
       const buildAttr = async (name: string) => {
-        const cmd = `set -euo pipefail; timeout ${timeoutSecs}s nix build "${tmp}#${name}.${attr}" --impure --no-link --accept-flake-config --builders "" --print-out-paths`;
+        const cmd = `set -euo pipefail; timeout ${timeoutSecs}s nix build "path:${flakeRef}#${name}.${attr}" --impure --no-link --accept-flake-config --builders "" --print-out-paths`;
         const result = await $({ stdio: "pipe" })`bash --noprofile --norc -c ${cmd}`;
         const outPath = String(result.stdout || "")
           .trim()

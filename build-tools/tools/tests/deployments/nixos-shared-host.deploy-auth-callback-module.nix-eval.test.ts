@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsRepoPath } from "./deployment-command";
 
 test("shared-host deploy auth callback module routes public HTTPS to deployment service", async () => {
   await runInTemp("shared-host-deploy-auth-callback-module-eval", async (tmp, $) => {
@@ -9,7 +10,7 @@ test("shared-host deploy auth callback module routes public HTTPS to deployment 
       let
         system = import <nixpkgs/nixos> {
           configuration = {
-            imports = [ ./build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix ];
+            imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix")} ];
             system.stateVersion = "24.11";
             deploymentHost.deployAuthCallback = {
               enable = true;

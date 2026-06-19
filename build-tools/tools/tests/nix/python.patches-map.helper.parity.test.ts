@@ -21,7 +21,7 @@ test("lang-helpers: python patch map helper matches inline defaults", async () =
       let
         pkgs = import <nixpkgs> {};
         lib = pkgs.lib;
-        H = import ./build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
+        H = import ./viberoots/build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
         d = builtins.toPath ${JSON.stringify(d)};
       in {
         helper = H.pythonPatchesMapFromDirs { dirs = [ d ]; };

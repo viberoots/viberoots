@@ -4,7 +4,7 @@ import fs from "node:fs/promises";
 import { test } from "node:test";
 
 test("remote enablement checklist keeps future remote lanes explicit", async () => {
-  const doc = await fs.readFile("build-tools/docs/remote-build-setup.md", "utf8");
+  const doc = await fs.readFile("viberoots/build-tools/docs/remote-build-setup.md", "utf8");
   const section = doc.split("### Local Conformance Checklist")[1] || "";
 
   assert.match(section, /Provision RE, CAS, and action-cache endpoints/);

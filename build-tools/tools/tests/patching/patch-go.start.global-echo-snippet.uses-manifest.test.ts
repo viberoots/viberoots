@@ -6,7 +6,14 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("patch-go global echo snippet uses override env name from the manifest", async () => {
   await runInTemp("patch-go-start-global-echo-uses-manifest", async (tmp, $) => {
-    const manifestPath = path.join(tmp, "build-tools", "tools", "lib", "dev-override-envs.json");
+    const manifestPath = path.join(
+      tmp,
+      "viberoots",
+      "build-tools",
+      "tools",
+      "lib",
+      "dev-override-envs.json",
+    );
     const manifest = JSON.stringify(
       {
         go: "NIX_GO_DEV_OVERRIDE_JSON_FROM_MANIFEST",
@@ -25,13 +32,13 @@ test("patch-go global echo snippet uses override env name from the manifest", as
     const version = "v0.24.0";
     const map = { [importPath]: { version, originPath: origin } };
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
     })`PATCH_ECHO_SNIPPET=1 NIX_GO_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} NIX_GO_DEV_OVERRIDE_JSON_FROM_MANIFEST={} build-tools/tools/bin/patch-pkg start go ${importPath}`;
+    )} NIX_GO_DEV_OVERRIDE_JSON_FROM_MANIFEST={} viberoots/build-tools/tools/bin/patch-pkg start go ${importPath}`;
 
     const err = String(res.stderr || "");
     if (!err.includes("export NIX_GO_DEV_OVERRIDE_JSON_FROM_MANIFEST=")) {

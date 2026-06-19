@@ -21,7 +21,7 @@ test("stamping-lint accepts kind labels beyond bin|lib|test (fixture)", async ()
       cwd: tmp,
       quiet: true,
       env: { ...process.env },
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/dev/stamping-lint.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/dev/stamping-lint.ts`;
     const out = String(res.stdout || "") + String(res.stderr || "");
     assert.match(out, /stamping-lint: OK/);
   });

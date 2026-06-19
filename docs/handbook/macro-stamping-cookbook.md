@@ -69,7 +69,7 @@ wire_global_nix_inputs(kw, into = "srcs", stamp = False)
 - **Package-local WASM macros (Go, C++)**: do not hand-roll ordering-sensitive wiring.
   - Use `build-tools/lang/defs_common.bzl:prepare_language_wiring(...)` with `wasm_variant = "<variant>"` to compose WASM stamping, patch inputs, and provider edges.
   - For planner-visible package-local WASM stubs, use `build-tools/lang/defs_common.bzl:wire_package_local_wasm_planner_visible_stub(...)`.
-- **Lint**: run `node build-tools/tools/dev/stamping-lint.ts` to detect missing or invalid labels.
+- **Lint**: run `node viberoots/build-tools/tools/dev/stamping-lint.ts` to detect missing or invalid labels.
 - **Tests**: negative test should demonstrate a missing label is flagged with a clear message.
 
 #### C++ macro core

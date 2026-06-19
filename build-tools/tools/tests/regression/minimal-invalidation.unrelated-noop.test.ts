@@ -21,7 +21,7 @@ test("unrelated patch change does not alter provider mapping for target", async 
 
     await $({
       cwd: tmp,
-    })`build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
+    })`viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
     const before = await fs.readFile(outPath, "utf8");
 
     // Touch an unrelated patch path and re-run generator; since gen-auto-map is graph-driven, mapping should be unchanged
@@ -34,7 +34,7 @@ test("unrelated patch change does not alter provider mapping for target", async 
 
     await $({
       cwd: tmp,
-    })`build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
+    })`viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
     const after = await fs.readFile(outPath, "utf8");
 
     if (before !== after) {

@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { copySeedStoreToTempRepo, probeSeedCowCopyFrom } from "./test-helpers/seed-copy";
 
-const scratchRoot = path.join(process.cwd(), "buck-out", "tmp");
+const scratchRoot = path.join(process.cwd(), ".viberoots", "workspace", "buck", "tmp");
 
 async function mktemp(prefix = "seed-copy-"): Promise<string> {
   await fsp.mkdir(scratchRoot, { recursive: true });
@@ -16,10 +16,10 @@ async function writeRequiredSeedFiles(root: string): Promise<void> {
   const files = [
     "flake.nix",
     ".buckconfig",
-    path.join("build-tools", "deployments", "defs.bzl"),
-    path.join("build-tools", "tools", "buck", "export-graph.ts"),
-    path.join("build-tools", "tools", "dev", "zx-init.mjs"),
     path.join("viberoots", "flake.nix"),
+    path.join("viberoots", "build-tools", "deployments", "defs.bzl"),
+    path.join("viberoots", "build-tools", "tools", "buck", "export-graph.ts"),
+    path.join("viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
   ];
   for (const rel of files) {
     const abs = path.join(root, rel);
@@ -77,8 +77,11 @@ test("copySeedStoreToTempRepo publishes a complete forced-CoW seed copy atomical
     `${path.join("viberoots", "flake.nix")}\n`,
   );
   assert.equal(
-    await fsp.readFile(path.join(tmp, "build-tools", "tools", "dev", "zx-init.mjs"), "utf8"),
-    `${path.join("build-tools", "tools", "dev", "zx-init.mjs")}\n`,
+    await fsp.readFile(
+      path.join(tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
+      "utf8",
+    ),
+    `${path.join("viberoots", "build-tools", "tools", "dev", "zx-init.mjs")}\n`,
   );
   assert.ok((await fsp.stat(path.join(tmp, "docs"))).isDirectory());
   await assert.rejects(fsp.access(path.join(tmp, "stale.txt")));

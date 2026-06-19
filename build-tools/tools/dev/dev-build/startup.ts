@@ -2,8 +2,24 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 
-async function tryRootNodeModulesOutFromMarker(root: string): Promise<string> {
-  const markerPath = path.join(root, "buck-out", "tmp", "node-modules-link.root.json");
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await fsp.access(p);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function tryNodeModulesOutFromMarker(root: string): Promise<string> {
+  const markerPath = path.join(
+    root,
+    ".viberoots",
+    "workspace",
+    "buck",
+    "tmp",
+    "node-modules-link.root.json",
+  );
   const lockPath = path.join(root, "pnpm-lock.yaml");
   try {
     const [markerRaw, lockBuf] = await Promise.all([
@@ -33,8 +49,8 @@ async function tryRootNodeModulesOutFromMarker(root: string): Promise<string> {
   }
 }
 
-async function resolveRootNodeModulesOut(root: string): Promise<string> {
-  const markerOut = await tryRootNodeModulesOutFromMarker(root);
+async function resolveNodeModulesOut(root: string): Promise<string> {
+  const markerOut = await tryNodeModulesOutFromMarker(root);
   if (markerOut) return markerOut;
   try {
     const { stdout } = await $({
@@ -60,6 +76,23 @@ async function resolveRootNodeModulesOut(root: string): Promise<string> {
   return "";
 }
 
+async function resolveToolingNodeModulesRoot(root: string): Promise<string> {
+  if (await pathExists(path.join(root, "pnpm-lock.yaml"))) return root;
+  for (const candidate of [
+    path.join(root, ".viberoots", "current"),
+    path.join(root, "viberoots"),
+    root,
+  ]) {
+    if (
+      (await pathExists(path.join(candidate, "pnpm-lock.yaml"))) &&
+      (await pathExists(path.join(candidate, "build-tools", "tools", "dev", "zx-init.mjs")))
+    ) {
+      return candidate;
+    }
+  }
+  return root;
+}
+
 async function resolveStartupCheckEntrypoints(
   root: string,
 ): Promise<{ startupCheck: string; zxInit: string }> {
@@ -79,7 +112,8 @@ async function resolveStartupCheckEntrypoints(
 }
 
 export async function runStartupCheck(root: string): Promise<void> {
-  const rootNmOut = await resolveRootNodeModulesOut(root);
+  const toolingNodeModulesRoot = await resolveToolingNodeModulesRoot(root);
+  const rootNmOut = await resolveNodeModulesOut(toolingNodeModulesRoot);
   const { startupCheck, zxInit } = await resolveStartupCheckEntrypoints(root);
   const envStartup = {
     ...process.env,

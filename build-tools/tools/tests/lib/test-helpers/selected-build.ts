@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../../../lib/workspace-state-paths";
 import { timeAsync } from "./timing";
@@ -7,6 +8,27 @@ type ZxResult = any;
 
 function graphJsonPath(tmp: string): string {
   return path.join(tmp, DEFAULT_GRAPH_PATH);
+}
+
+function activeViberootsRoot(tmp: string): string {
+  const candidates = [
+    process.env.VIBEROOTS_SOURCE_ROOT || "",
+    process.env.VIBEROOTS_ROOT || "",
+    path.join(tmp, "viberoots"),
+    tmp,
+  ];
+  for (const candidate of candidates) {
+    if (!candidate) continue;
+    const root = path.resolve(candidate);
+    if (fs.existsSync(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"))) {
+      return root;
+    }
+    const nested = path.join(root, "viberoots");
+    if (fs.existsSync(path.join(nested, "build-tools", "tools", "dev", "zx-init.mjs"))) {
+      return nested;
+    }
+  }
+  return path.resolve(tmp);
 }
 
 function selectedBuildEnv(args: {
@@ -32,12 +54,13 @@ export async function exportGraphInTemp(args: {
   stdio?: "inherit" | "pipe";
 }): Promise<ZxResult> {
   const { tmp, $, env, stdio = "inherit" } = args;
+  const root = activeViberootsRoot(tmp);
   return await timeAsync("selectedBuild exportGraphInTemp", async () => {
     return await $({
       cwd: tmp,
       stdio,
       env: selectedBuildEnv({ tmp, env }),
-    })`${process.execPath} --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/export-graph.ts --out ${DEFAULT_GRAPH_PATH}`;
+    })`${process.execPath} --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import ${path.join(root, "build-tools", "tools", "dev", "zx-init.mjs")} ${path.join(root, "build-tools", "tools", "buck", "export-graph.ts")} --out ${DEFAULT_GRAPH_PATH}`;
   });
 }
 
@@ -51,6 +74,7 @@ export async function runBuildSelected(args: {
   nothrow?: boolean;
 }): Promise<ZxResult> {
   const { tmp, $, target, env, stdio = "pipe", reject = false, nothrow = true } = args;
+  const root = activeViberootsRoot(tmp);
   return await timeAsync("selectedBuild runBuildSelected", async () => {
     return await $({
       cwd: tmp,
@@ -58,7 +82,7 @@ export async function runBuildSelected(args: {
       reject,
       nothrow,
       env: selectedBuildEnv({ tmp, target, env }),
-    })`${process.execPath} --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/dev/build-selected.ts`;
+    })`${process.execPath} --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import ${path.join(root, "build-tools", "tools", "dev", "zx-init.mjs")} ${path.join(root, "build-tools", "tools", "dev", "build-selected.ts")}`;
   });
 }
 

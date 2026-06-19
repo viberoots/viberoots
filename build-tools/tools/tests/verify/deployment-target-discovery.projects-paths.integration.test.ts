@@ -51,7 +51,7 @@ test("deployment target discovery resolves projects/deployments labels from an i
       await fsp.writeFile(
         sharedTargetsPath,
         [
-          'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_governance", "deployment_lane_policy")',
+          'load("@viberoots//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_governance", "deployment_lane_policy")',
           "",
           "deployment_lane_governance(",
           '    name = "lane_governance",',
@@ -87,7 +87,7 @@ test("deployment target discovery resolves projects/deployments labels from an i
       await fsp.writeFile(
         deployTargetsPath,
         [
-          'load("//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
+          'load("@viberoots//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
           "",
           "nixos_shared_host_static_webapp_deployment(",
           '    name = "deploy",',

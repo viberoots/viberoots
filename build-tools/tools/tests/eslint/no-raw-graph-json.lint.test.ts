@@ -10,6 +10,7 @@ import { runInTemp } from "../lib/test-helpers";
 async function importPluginFromWorkspace() {
   const pluginPath = path.join(
     process.cwd(),
+    "viberoots",
     "build-tools",
     "tools",
     "eslint-plugin-viberoots",
@@ -68,10 +69,18 @@ test("viberoots/no-raw-graph-json flags direct reads and allows allowlisted path
     }
 
     // Case 2: allowed location (exporter path) with only a comment mention should not error
-    const allowedPath = path.join(tmp, "build-tools", "tools", "buck", "exporter", "ok.ts");
+    const allowedPath = path.join(
+      tmp,
+      "viberoots",
+      "build-tools",
+      "tools",
+      "buck",
+      "exporter",
+      "ok.ts",
+    );
     await fs.outputFile(
       allowedPath,
-      "// build-tools/tools/buck/graph.json\nexport const ok = true;\n",
+      "// viberoots/build-tools/tools/buck/graph.json\nexport const ok = true;\n",
       "utf8",
     );
     const resOk = await eslint.lintText(await fs.readFile(allowedPath, "utf8"), {

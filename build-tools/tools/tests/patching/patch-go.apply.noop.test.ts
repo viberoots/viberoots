@@ -11,7 +11,7 @@ test("patch-go apply is no-op when no changes", async () => {
     await fs.outputFile(path.join(origin, "README.md"), "hello\n", "utf8");
     const map = { "golang.org/x/net": { version: "v0.24.0", originPath: origin } };
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     await $({
       cwd: tmp,
     })`WORKSPACE_ROOT=${tmp} PATCH_GO_DEBUG=1 NIX_GO_TEST_RESOLVE_JSON=${JSON.stringify(
@@ -19,7 +19,7 @@ test("patch-go apply is no-op when no changes", async () => {
     )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(
       tmp,
       "gomodcache",
-    )} build-tools/tools/bin/patch-pkg start go golang.org/x/net`;
+    )} viberoots/build-tools/tools/bin/patch-pkg start go golang.org/x/net`;
 
     const out = await $({
       cwd: tmp,
@@ -28,7 +28,7 @@ test("patch-go apply is no-op when no changes", async () => {
     )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(
       tmp,
       "gomodcache",
-    )} build-tools/tools/bin/patch-pkg apply go --target //pkg/alpha:lib golang.org/x/net`;
+    )} viberoots/build-tools/tools/bin/patch-pkg apply go --target //pkg/alpha:lib golang.org/x/net`;
     const outTxtAll = String(out.stdout || "") + String(out.stderr || "");
     if (!outTxtAll.includes("no changes; no-op")) {
       console.error("apply did not report no-op");

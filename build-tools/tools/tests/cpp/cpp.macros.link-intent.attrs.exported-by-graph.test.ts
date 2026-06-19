@@ -32,7 +32,7 @@ test("exporter: C++ macros preserve link intent attrs in .viberoots/workspace/bu
     await fs.writeFile(
       path.join(app, "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_headers", "nix_cpp_library", "nix_cpp_node_addon", "nix_cpp_test")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_headers", "nix_cpp_library", "nix_cpp_node_addon", "nix_cpp_test")',
         "",
         "filegroup(",
         '  name = "dep_link",',
@@ -99,7 +99,7 @@ test("exporter: C++ macros preserve link intent attrs in .viberoots/workspace/bu
       "utf8",
     );
 
-    const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fs.mkdirp(path.dirname(graphPath));
 
     const res = await $({
@@ -107,7 +107,7 @@ test("exporter: C++ macros preserve link intent attrs in .viberoots/workspace/bu
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`node build-tools/tools/buck/export-graph.ts --out ${graphPath}`;
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out ${graphPath}`;
     if (res.exitCode !== 0) return; // skip when Buck/prelude/toolchains unavailable
 
     const nodes = await readGraph(graphPath);

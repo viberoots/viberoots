@@ -1,10 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import "zx/globals";
 import { runInTemp } from "../lib/test-helpers";
+import { buildToolPath } from "../../dev/dev-build/paths";
 
 void (async function main() {
   console.log("TAP version 13");
   const res = await runInTemp("dev-build-no-staging", async (tmp, $tmp) => {
+    const devBuild = buildToolPath(process.cwd(), "tools/dev/dev-build.ts");
     // Initialize a git repo to observe index changes
     await $tmp`git init -q`;
     await $tmp`git config user.email test@example.com`;
@@ -17,7 +19,7 @@ void (async function main() {
         ...process.env,
         DEV_BUILD_LOW_SPACE_GB: "0",
       },
-    })`build-tools/tools/dev/dev-build.ts build //:flake.lock --no-materialize`;
+    })`${devBuild} build //.viberoots/workspace:flake.lock --no-materialize`;
 
     // Ensure no index changes occurred
     const { stdout } = await $tmp`git status --porcelain`;

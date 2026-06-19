@@ -7,6 +7,8 @@ export type ExtractionBlocker = {
   detail: string;
 };
 
+const ALLOWED_VISIBLE_ROOT_ENTRIES = new Set(["README.md", "projects", "viberoots"]);
+
 const ROOT_LEGACY_PATHS = [
   "build-tools",
   "third_party/providers",
@@ -30,7 +32,8 @@ function exists(root: string, rel: string): boolean {
 function walkBuckFiles(root: string, rel: string, out: string[]): void {
   const full = path.join(root, rel);
   if (!fs.existsSync(full)) return;
-  const stat = fs.statSync(full);
+  const stat = fs.lstatSync(full);
+  if (stat.isSymbolicLink()) return;
   if (stat.isFile()) {
     const name = path.basename(rel);
     if (name.startsWith("TARGETS") || rel.endsWith(".bzl") || rel.endsWith(".jinja")) out.push(rel);
@@ -46,6 +49,20 @@ function buckFiles(root: string): string[] {
   const files: string[] = [];
   for (const rel of ACTIVE_BUCK_ROOTS) walkBuckFiles(root, rel, files);
   return files;
+}
+
+function visibleRootBlockers(root: string): ExtractionBlocker[] {
+  return fs
+    .readdirSync(root, { withFileTypes: true })
+    .map((entry) => entry.name)
+    .filter((name) => !name.startsWith(".") && !ALLOWED_VISIBLE_ROOT_ENTRIES.has(name))
+    .sort()
+    .map((name) => ({
+      kind: "path" as const,
+      path: name,
+      detail:
+        "visible parent root entry is outside the PR-9 contract; only README.md, projects, and viberoots are allowed",
+    }));
 }
 
 function scanBuckFile(root: string, rel: string): ExtractionBlocker[] {
@@ -75,7 +92,16 @@ export function findExtractionBlockers(workspaceRoot: string): ExtractionBlocker
     path: rel,
     detail: `root ${rel} exists; the extraction must move or remove this old-layout surface`,
   }));
-  return pathBlockers.concat(buckFiles(root).flatMap((rel) => scanBuckFile(root, rel)));
+  const blockers = visibleRootBlockers(root)
+    .concat(pathBlockers)
+    .concat(buckFiles(root).flatMap((rel) => scanBuckFile(root, rel)));
+  const seen = new Set<string>();
+  return blockers.filter((blocker) => {
+    const key = `${blocker.kind}\0${blocker.path}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 export function formatExtractionBlockers(blockers: ExtractionBlocker[]): string {

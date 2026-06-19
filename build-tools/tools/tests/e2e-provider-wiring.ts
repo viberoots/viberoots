@@ -44,7 +44,7 @@ test("provider wiring: Go module labels do not map to providers (Node-only mappi
     await fs.outputFile(graphPath, JSON.stringify(nodes, null, 2), "utf8");
     await $({
       cwd: tmp,
-    })`build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out .viberoots/workspace/providers/auto_map.bzl`;
+    })`viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out .viberoots/workspace/providers/auto_map.bzl`;
 
     // Inspect auto_map: expect no providers for Go module labels on any target
     const amap = await fs.readFile(

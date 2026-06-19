@@ -17,7 +17,7 @@ test("patches-lint (python): duplicate name@version detected per importer in str
     await fsp.writeFile(path.join(dir, "acme____widget@1.2.3.patch"), "# two\n", "utf8");
     const res = await $({
       nothrow: true,
-    })`node build-tools/tools/dev/patches-lint.ts --lang python --strict`;
+    })`node viberoots/build-tools/tools/dev/patches-lint.ts --lang python --strict`;
     if (res.exitCode === 0) {
       console.error("expected strict lint to fail due to duplicate module key (python)");
       process.exit(2);

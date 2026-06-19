@@ -171,9 +171,9 @@ test("auth action summary and realm export stay aligned on reviewed group names"
 test("auth docs advertise the same diagnostic command and Jenkins source names", async () => {
   const docs = await Promise.all(
     [
-      "docs/secrets-usage.md",
-      "docs/deployment-secrets-api.md",
-      "docs/vault-production-bootstrap.md",
+      "viberoots/docs/secrets-usage.md",
+      "viberoots/docs/deployment-secrets-api.md",
+      "viberoots/docs/vault-production-bootstrap.md",
     ].map((file) => fsp.readFile(file, "utf8")),
   );
   const combined = docs.join("\n");

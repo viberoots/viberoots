@@ -3,14 +3,21 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("python runtime e2e: app output changes after patch apply", async () => {
   await runInTemp("py-runtime-e2e", async (tmp, _$) => {
     const $ = _$
       ? _$
       : (cmd: TemplateStringsArray, ...args: any[]) => (global as any).$`${cmd}${args}`;
-    const zxInit = path.join(process.cwd(), "build-tools", "tools", "dev", "zx-init.mjs");
+    const zxInit = path.join(
+      process.cwd(),
+      "viberoots",
+      "build-tools",
+      "tools",
+      "dev",
+      "zx-init.mjs",
+    );
 
     // 1) Scaffold a minimal python app
     const appName = "demo_pyapp";
@@ -89,7 +96,7 @@ test("python runtime e2e: app output changes after patch apply", async () => {
           ...extraEnv,
         },
         stdio: "pipe",
-      })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+      })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
       const outPath = String(buildOut.stdout || "")
         .trim()
         .split(/\s+/)
@@ -123,7 +130,7 @@ test("python runtime e2e: app output changes after patch apply", async () => {
         }),
         NIX_PY_DEV_OVERRIDE_JSON: "{}",
       },
-    })`${process.execPath} --experimental-strip-types --import ${zxInit} build-tools/tools/patch/patch-pkg.ts start python mydep --importer ${app}`;
+    })`${process.execPath} --experimental-strip-types --import ${zxInit} viberoots/build-tools/tools/patch/patch-pkg.ts start python mydep --importer ${app}`;
     const ws = String(wsOut.stdout || "")
       .trim()
       .split(/\s+/)
@@ -145,7 +152,7 @@ test("python runtime e2e: app output changes after patch apply", async () => {
         NIX_PY_DEV_OVERRIDE_JSON: "{}",
         PATCH_SKIP_VERIFY: "1",
       },
-    })`${process.execPath} --experimental-strip-types --import ${zxInit} build-tools/tools/patch/patch-pkg.ts apply python mydep --importer ${app}`;
+    })`${process.execPath} --experimental-strip-types --import ${zxInit} viberoots/build-tools/tools/patch/patch-pkg.ts apply python mydep --importer ${app}`;
     // Debug: list importer-local patches dir
     try {
       const patchesDir = path.join(app, "patches", "python");

@@ -3,9 +3,12 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("node test buildPhase decodes and forwards explicit vitest patterns", async () => {
-  const nixExpr = await fsp.readFile("build-tools/tools/nix/flake/packages/node-test.nix", "utf8");
+  const nixExpr = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/flake/packages/node-test.nix",
+    "utf8",
+  );
   const script = await fsp.readFile(
-    "build-tools/tools/nix/flake/packages/node-test-buildPhase.sh",
+    "viberoots/build-tools/tools/nix/flake/packages/node-test-buildPhase.sh",
     "utf8",
   );
 

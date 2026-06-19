@@ -11,7 +11,7 @@ test("buck cleanup: uninterrupted runInTemp does not leave buck2 daemons behind"
   // If runInTemp fails to terminate buck2 daemons before deleting the temp repo,
   // it now throws from its cleanup block and this test will fail.
   await runInTemp("buck-cleanup-uninterrupted", async (_tmp, $) => {
-    await $`buck2 build //:flake.lock`;
+    await $`buck2 build //.viberoots/workspace:flake.lock`;
   });
 });
 
@@ -31,7 +31,7 @@ test("buck cleanup: explicit inherited isolation is registered and cleaned", asy
     await runInTemp("buck-cleanup-inherited-explicit", async (tmp, $) => {
       tmpRoot = tmp;
       explicitIso = inheritedBuckIsolation("buck_cleanup_inherited_explicit");
-      await $`buck2 --isolation-dir ${inheritedBuckIsolation("buck_cleanup_inherited_explicit")} build //:flake.lock`;
+      await $`buck2 --isolation-dir ${inheritedBuckIsolation("buck_cleanup_inherited_explicit")} build //.viberoots/workspace:flake.lock`;
 
       const parsed = parseVerifyOwnedState(await fsp.readFile(stateFile, "utf8"));
       const registered = parsed.isolations.find(

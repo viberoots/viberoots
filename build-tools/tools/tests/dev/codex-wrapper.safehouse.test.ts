@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  binWrapper,
   escapeRegExp,
   externalScratchRoot,
   makeFakeAgentTools,
@@ -12,7 +13,7 @@ import {
   scratchRoot,
 } from "./agent-wrapper-test-helpers.ts";
 
-const wrapper = path.join(repoRoot, "build-tools", "tools", "bin", "codex");
+const wrapper = binWrapper("codex");
 const makeFakeTools = (tmp: string, gitRoot: string) => makeFakeAgentTools(tmp, gitRoot, "codex");
 test("codex --worktree creates through the CoW git wrapper and launches the worker in safehouse", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });

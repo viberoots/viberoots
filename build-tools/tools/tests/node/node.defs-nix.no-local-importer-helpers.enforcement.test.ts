@@ -7,16 +7,16 @@ function assert(condition: boolean, message: string) {
 }
 
 test("build-tools/node/defs_nix.bzl must not reintroduce local importer normalization helpers", async () => {
-  const file = "build-tools/node/defs_nix.bzl";
+  const file = "viberoots/build-tools/node/defs_nix.bzl";
   const txt = await fsp.readFile(file, "utf8");
 
   assert(
     !txt.includes("def _sanitize_importer_attr("),
-    `${file} must not define _sanitize_importer_attr(...); use //build-tools/lang:importer_strings.bzl`,
+    `${file} must not define _sanitize_importer_attr(...); use @viberoots//build-tools/lang:importer_strings.bzl`,
   );
   assert(
     !txt.includes("def _basename_importer("),
-    `${file} must not define _basename_importer(...); use //build-tools/lang:importer_strings.bzl`,
+    `${file} must not define _basename_importer(...); use @viberoots//build-tools/lang:importer_strings.bzl`,
   );
 
   assert(

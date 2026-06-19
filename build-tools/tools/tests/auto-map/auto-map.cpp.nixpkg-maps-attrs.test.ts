@@ -22,7 +22,7 @@ test("auto-map: C++ nixpkg labels map to providers", async () => {
     const outPath = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
+    })`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
     const txt = await fs.readFile(outPath, "utf8");
 
     // Expect provider entries for both nixpkgs attrs

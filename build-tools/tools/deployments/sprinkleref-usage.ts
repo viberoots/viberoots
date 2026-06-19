@@ -1,5 +1,8 @@
 export function sprinklerefUsage() {
   return `Usage:
+  sprinkleref help
+  sprinkleref list [--scheme secret|config|runtime] [--format json]
+  sprinkleref check [--scheme secret|config|runtime] [--format json]
   sprinkleref --init <dir>
   sprinkleref --init-local
   sprinkleref --resolver-entry --add <category> --backend <kind> [backend options]

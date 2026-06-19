@@ -35,7 +35,7 @@ test("sync-providers-python: deterministic generation and idempotency with patch
     await fsp.writeFile(path.join(importerPatches, "unused@1.0.0.patch"), "# patch\n", "utf8");
 
     // Run orchestrator for python
-    await $`node build-tools/tools/buck/sync-providers.ts --lang python`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang python`;
     const outPath = path.join(tmp, providerAutoTargetsPath("python"));
     const text1 = await fsp.readFile(outPath, "utf8");
 
@@ -63,7 +63,7 @@ test("sync-providers-python: deterministic generation and idempotency with patch
     }
 
     // Idempotency: rerun and file content should remain identical
-    await $`node build-tools/tools/buck/sync-providers.ts --lang python`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang python`;
     const text2 = await fsp.readFile(outPath, "utf8");
     if (text1 !== text2) {
       console.error("file changed on second run (should be no-op)");

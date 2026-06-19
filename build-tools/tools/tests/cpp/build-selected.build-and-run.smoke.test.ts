@@ -9,27 +9,27 @@ import { runInTemp } from "../lib/test-helpers";
 
 async function main() {
   await runInTemp("build-selected-smoke", async (tmp, $) => {
-    const repo = process.cwd();
+    const repo = path.join(process.cwd(), "viberoots");
 
     // Ensure required structure and copy only what's needed to avoid ENOSPC
-    await fs.ensureDir(path.join(tmp, "build-tools", "tools", "dev"));
-    await fs.ensureDir(path.join(tmp, "build-tools", "tools", "buck"));
+    await fs.ensureDir(path.join(tmp, "viberoots", "build-tools", "tools", "dev"));
+    await fs.ensureDir(path.join(tmp, ".viberoots", "workspace", "buck"));
     await fs.ensureDir(path.join(tmp, "third_party", "providers"));
 
     const pairs: Array<[string, string]> = [
       [path.join(repo, "flake.nix"), path.join(tmp, "flake.nix")],
       [
         path.join(repo, "build-tools", "tools", "nix"),
-        path.join(tmp, "build-tools", "tools", "nix"),
+        path.join(tmp, "viberoots", "build-tools", "tools", "nix"),
       ],
       [path.join(repo, "toolchains"), path.join(tmp, "toolchains")],
       [
         path.join(repo, "build-tools", "tools", "dev", "build-selected.ts"),
-        path.join(tmp, "build-tools", "tools", "dev", "build-selected.ts"),
+        path.join(tmp, "viberoots", "build-tools", "tools", "dev", "build-selected.ts"),
       ],
       [
         path.join(repo, "build-tools", "tools", "buck", "export-graph.ts"),
-        path.join(tmp, "build-tools", "tools", "buck", "export-graph.ts"),
+        path.join(tmp, "viberoots", "build-tools", "tools", "buck", "export-graph.ts"),
       ],
       [path.join(repo, "third_party", "providers"), path.join(tmp, "third_party", "providers")],
     ];
@@ -46,9 +46,9 @@ async function main() {
     }
 
     // Ensure languages manifest enables C++ so export-graph includes cpp labels
-    await fs.ensureDir(path.join(tmp, "build-tools", "tools", "nix"));
+    await fs.ensureDir(path.join(tmp, "viberoots", "build-tools", "tools", "nix"));
     await fs.writeFile(
-      path.join(tmp, "build-tools", "tools", "nix", "langs.json"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "nix", "langs.json"),
       JSON.stringify({ enabled: ["cpp"] }, null, 2) + "\n",
       "utf8",
     );
@@ -58,22 +58,22 @@ async function main() {
     await fs.ensureDir(path.join(appDir, "src"));
     await fs.writeFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n", "utf8");
     // Provide cpp macro defs
-    await fs.ensureDir(path.join(tmp, "build-tools", "cpp"));
+    await fs.ensureDir(path.join(tmp, "viberoots", "build-tools", "cpp"));
     await fs.copy(
       path.join(repo, "build-tools", "cpp", "defs.bzl"),
-      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
     );
     await fs.copy(
       path.join(repo, "build-tools", "cpp", "wasm_defs.bzl"),
-      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
     );
     // Also copy cpp/private so defs.bzl loads resolve (planner_stub, nix_build, etc.)
     await fs.copy(
       path.join(repo, "build-tools", "cpp", "private"),
-      path.join(tmp, "build-tools", "cpp", "private"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "private"),
     );
     const targets = [
-      'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
+      'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
       "",
       "nix_cpp_binary(",
       '    name = "demo",',
@@ -85,7 +85,7 @@ async function main() {
     await fs.writeFile(path.join(appDir, "TARGETS"), targets, "utf8");
 
     // Ensure executable bit and run via zx-wrapper shebang
-    await $({ cwd: tmp })`chmod +x build-tools/tools/dev/build-selected.ts`;
+    await $({ cwd: tmp })`chmod +x viberoots/build-tools/tools/dev/build-selected.ts`;
     const label = "//projects/apps/demo:demo";
     const cppTargetAttrSuffix = sanitizeAttrNameFromLabel(label);
     const env = {
@@ -99,7 +99,7 @@ async function main() {
       env,
       reject: false,
       nothrow: true,
-    })`build-tools/tools/dev/build-selected.ts`;
+    })`viberoots/build-tools/tools/dev/build-selected.ts`;
     const { stdout, stderr, exitCode } = await cmd;
     if (exitCode !== 0) {
       console.error("build-selected failed", stderr);

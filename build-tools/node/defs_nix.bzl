@@ -62,7 +62,7 @@ def node_webapp(
         + "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
         + (
             "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
-            + "\"$WORKSPACE_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
+            + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
             + ("\"node-webapp.%s\" > \"$OUT_PATHS_FILE\"; " % sanitize_importer_for_nix_attr(_importer))
         )
         + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
@@ -136,7 +136,7 @@ def nix_node_cli_bin(
             + nix_calling_env_export_buck_graph_json()
             + nix_calling_node_patch_requirements_preflight(wiring.importer)
             + nix_build_out_path_cmd(
-                "\"path:$WORKSPACE_ROOT#graph-generator-selected\"",
+                "\"path:$FLK_ROOT#graph-generator-selected\"",
                 timeout_var = "TIMEOUT",
                 impure = True,
                 build_prefix = ("env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" " % impl_label),
@@ -196,11 +196,16 @@ def nix_node_cli_bin(
         + nix_calling_node_patch_requirements_preflight(_importer)
         + nix_calling_env_export_nix_pnpm_fetch_timeout(default_sec = 600)
         + "export NIX_PNPM_ALLOW_GENERATE=1; "
-        + nix_build_out_path_cmd(
-            "\"path:$WORKSPACE_ROOT#node-cli.%s\"" % sanitize_importer_for_nix_attr(_importer),
-            timeout_var = "TIMEOUT",
-            impure = True,
+        + "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
+        + (
+            "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
+            + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
+            + ("\"node-cli.%s\" > \"$OUT_PATHS_FILE\"; " % sanitize_importer_for_nix_attr(_importer))
         )
+        + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
+        + "tail -n1 \"$OUT_PATHS_FILE\" > \"$OUT_LAST_FILE\"; "
+        + "outPath=\"\"; read -r outPath < \"$OUT_LAST_FILE\" 2>/dev/null || true; "
+        + "test -n \"$outPath\"; "
         + ("EXPECTED=\"$outPath/%s.bundle.js\"; " % bundle_name)
         + "if [ ! -f \"$EXPECTED\" ]; then "
         + "  echo \"nix_node_cli_bin(bundle=True): expected bundle missing: $EXPECTED\" >&2; "

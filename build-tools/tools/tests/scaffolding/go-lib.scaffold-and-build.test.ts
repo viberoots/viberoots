@@ -11,7 +11,7 @@ test("go lib: scaffold and build+test", { timeout: 600_000 }, async () => {
   // Ensure minimal roots are available in the temp repo for Buck macros.
   const prevRoots = process.env.TEST_RSYNC_ROOTS;
   if (!prevRoots) {
-    process.env.TEST_RSYNC_ROOTS = "build-tools toolchains third_party/providers prelude";
+    process.env.TEST_RSYNC_ROOTS = "viberoots/build-tools toolchains third_party/providers prelude";
   }
   try {
     await runInTemp("lib-scaffold-and-build", async (_tmp, _$) => {

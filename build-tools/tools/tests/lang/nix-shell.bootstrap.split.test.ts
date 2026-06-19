@@ -12,7 +12,7 @@ test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/lang:nix_shell.bzl", "escape_buck_cmd_subst", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store")',
+        'load("@viberoots//build-tools/lang:nix_shell.bzl", "escape_buck_cmd_subst", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store")',
         "",
         "genrule(",
         '  name = "core",',
@@ -57,6 +57,15 @@ test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in
     assert.ok(
       outCore.includes("export WORKSPACE_ROOT=") || outCore.includes("FLK_ROOT="),
       "expected core bootstrap to include WORKSPACE_ROOT/FLK_ROOT logic",
+    );
+    assert.ok(
+      outCore.indexOf("$WORKSPACE_ROOT/viberoots/build-tools/tools/dev/zx-init.mjs") >= 0,
+      "expected core bootstrap to prefer a nested viberoots source root",
+    );
+    assert.ok(
+      outCore.indexOf("$WORKSPACE_ROOT/viberoots/build-tools/tools/dev/zx-init.mjs") <
+        outCore.indexOf("$WORKSPACE_ROOT/.viberoots/current/build-tools/tools/dev/zx-init.mjs"),
+      "expected nested viberoots source root before .viberoots/current fallback",
     );
     assert.ok(
       !outCore.includes("require-unified-pnpm-store.ts") &&

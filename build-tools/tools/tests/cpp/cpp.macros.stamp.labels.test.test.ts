@@ -10,17 +10,17 @@ await runInTemp("cpp-macro-stamp-test", async (tmp, $) => {
   await fs.mkdirp(path.join(app, "src"));
   await fs.outputFile(path.join(app, "src", "main.cpp"), "int main(){return 0;}\n");
   await fs.outputFile(
-    path.join(tmp, "build-tools", "cpp", "defs.bzl"),
-    await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
+    path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
+    await fs.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
   );
   await fs.outputFile(
-    path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
-    await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
+    path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
+    await fs.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
   );
   await fs.outputFile(
     path.join(app, "TARGETS"),
     [
-      'load("//build-tools/cpp:defs.bzl", "nix_cpp_test")',
+      'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_test")',
       "",
       "nix_cpp_test(",
       '  name = "demo_test",',
@@ -35,7 +35,9 @@ await runInTemp("cpp-macro-stamp-test", async (tmp, $) => {
   const nodesSim = [{ name: "//projects/apps/demo:demo_test", rule_type: "cxx_test", labels: [] }];
   await fs.mkdirp(path.dirname(graph));
   await fs.outputFile(graph, JSON.stringify(nodesSim) + "\n", "utf8");
-  await $({ cwd: tmp })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
+  await $({
+    cwd: tmp,
+  })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
 
   const after = (await readGraph(graph)) as any[];
   const node = after.find((n) => n.name === "//projects/apps/demo:demo_test");

@@ -52,12 +52,9 @@ export async function ensureBuckReaperStarted(tmp: string, $: any): Promise<void
     buckReaperStarted = true;
 
     const repoRoot = process.cwd();
-    const reaper = path.join(
-      repoRoot,
-      "build-tools",
-      "tools",
-      "tests",
-      "lib",
+    const reaper = path.resolve(
+      path.dirname(new URL(import.meta.url).pathname),
+      "..",
       "buck-daemon-reaper.ts",
     );
     const parentPid = String(process.pid);

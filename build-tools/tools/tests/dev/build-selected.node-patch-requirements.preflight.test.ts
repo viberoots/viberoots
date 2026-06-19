@@ -1,14 +1,24 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import assert from "node:assert/strict";
+import path from "node:path";
 import { test } from "node:test";
 import {
   parseSelectedBuildOutPath,
   selectedNixBuildArgs,
 } from "../../dev/build-selected-nix-command";
+import { buildToolsRoot, buildToolPath } from "../../dev/dev-build/paths";
+
+function sourceFile(rel: string): string {
+  return buildToolPath(process.cwd(), rel);
+}
+
+function sourceRootFile(rel: string): string {
+  return path.join(path.resolve(buildToolsRoot(process.cwd()), ".."), rel);
+}
 
 test("build-selected runs node patch requirement preflight", async () => {
-  const file = "build-tools/tools/dev/build-selected.ts";
+  const file = sourceFile("tools/dev/build-selected.ts");
   const txt = await fsp.readFile(file, "utf8");
   if (!txt.includes("enforce-node-patch-requirements.ts")) {
     throw new Error(`${file} must run enforce-node-patch-requirements.ts before nix build`);
@@ -34,6 +44,12 @@ test("build-selected runs node patch requirement preflight", async () => {
     )
   ) {
     throw new Error(`${file} should treat repo-local buck-out/tmp/tmpdir workspaces as temp`);
+  }
+  if (!txt.includes('".viberoots", "workspace"')) {
+    throw new Error(`${file} should resolve hidden .viberoots/workspace flake files`);
+  }
+  if (txt.includes('if (!(await pathExists(path.join(workspaceRoot, "flake.nix"))))')) {
+    throw new Error(`${file} must not require a visible root flake.nix`);
   }
 });
 
@@ -84,9 +100,9 @@ test("build-selected consumes exactly one printed store path", () => {
 
 test("node entrypoint macros use shared node patch preflight helper", async () => {
   const files = [
-    "build-tools/node/defs_core.bzl",
-    "build-tools/node/defs_nix.bzl",
-    "build-tools/node/defs_stage.bzl",
+    sourceRootFile("build-tools/node/defs_core.bzl"),
+    sourceRootFile("build-tools/node/defs_nix.bzl"),
+    sourceRootFile("build-tools/node/defs_stage.bzl"),
   ];
   for (const file of files) {
     const txt = await fsp.readFile(file, "utf8");

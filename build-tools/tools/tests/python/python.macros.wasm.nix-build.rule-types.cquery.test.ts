@@ -16,7 +16,7 @@ test("python macros: nix_python_wasm_* targets use Nix-backed rules", async () =
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_lib")',
+        'load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_lib")',
         "",
         'nix_python_wasm_lib(name = "pywasm_lib", srcs = glob(["src/**/*.py"]))',
         'nix_python_wasm_app(name = "pywasm_app", srcs = glob(["src/**/*.py", "bin/**/*.py"]), deps = [":pywasm_lib"])',

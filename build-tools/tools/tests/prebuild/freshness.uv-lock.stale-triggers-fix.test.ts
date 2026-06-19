@@ -46,7 +46,7 @@ test("prebuild-guard: touching uv.lock marks stale and auto-fixes locally", asyn
     // First run: allow auto-fix to generate python providers from uv.lock
     await $({
       cwd: tmp,
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
     if (!(await exists(targetsPy))) {
       throw new Error("expected TARGETS.python.auto to exist after initial auto-fix");
     }
@@ -56,7 +56,7 @@ test("prebuild-guard: touching uv.lock marks stale and auto-fixes locally", asyn
     await fsp.appendFile(uvLockPath, "# touch\n", "utf8");
     await $({
       cwd: tmp,
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
 
     // After auto-fix, providers should still be present
     if (!(await exists(targetsPy))) throw new Error("TARGETS.python.auto missing after auto-fix");

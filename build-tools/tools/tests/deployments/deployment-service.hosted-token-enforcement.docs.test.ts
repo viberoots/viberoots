@@ -3,10 +3,14 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { viberootsRepoPath } from "./deployment-command";
 
 const repoRoot = process.cwd();
 
 async function read(relativePath: string) {
+  if (relativePath.startsWith("docs/")) {
+    return await fsp.readFile(viberootsRepoPath(relativePath), "utf8");
+  }
   return await fsp.readFile(path.join(repoRoot, relativePath), "utf8");
 }
 

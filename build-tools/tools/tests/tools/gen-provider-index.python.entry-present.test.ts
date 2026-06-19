@@ -17,7 +17,7 @@ test("gen-provider-index: includes python entries (BZL and JSON)", async () => {
     await fsp.mkdir(importerDir, { recursive: true });
     await fsp.writeFile(lockfile, "", "utf8"); // content not required for index
 
-    await $`node build-tools/tools/buck/gen-provider-index.ts --out .viberoots/workspace/providers/provider_index.bzl`;
+    await $`node viberoots/build-tools/tools/buck/gen-provider-index.ts --out .viberoots/workspace/providers/provider_index.bzl`;
 
     const relLf = "projects/apps/pytool/uv.lock";
     const importer = "projects/apps/pytool";

@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
+import { DEFAULT_NODE_WORKSPACE_MAP_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 test("workspace map generation matches providers", async () => {
@@ -45,15 +46,19 @@ test("workspace map generation matches providers", async () => {
     ];
     const sim = path.join(tmp, "build-tools", "tools", "buck", "simulated.json");
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
-    await $({ cwd: tmp })`build-tools/tools/buck/export-graph.ts --simulate ${sim}`;
-    await $({ cwd: tmp })`node build-tools/tools/buck/gen-provider-index.ts`;
-    await $({ cwd: tmp })`node build-tools/tools/node/gen-workspace-map.ts`;
+    await $({ cwd: tmp })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${sim}`;
+    await $({ cwd: tmp })`node viberoots/build-tools/tools/buck/gen-provider-index.ts`;
+    await $({ cwd: tmp })`node viberoots/build-tools/tools/node/gen-workspace-map.ts`;
 
-    const outPath = path.join(tmp, "build-tools", "tools", "node", "workspace-map.json");
+    assert.equal(DEFAULT_NODE_WORKSPACE_MAP_PATH, ".viberoots/workspace/node/workspace-map.json");
+    const outPath = path.join(tmp, DEFAULT_NODE_WORKSPACE_MAP_PATH);
     const got = await fs.readJson(outPath);
     assert.deepEqual(got, {
       "@repo/ui": "//projects/libs/ui:ui",
       "@repo/web": "//projects/apps/web:web",
     });
+    await assert.rejects(
+      fs.lstat(path.join(tmp, "build-tools", "tools", "node", "workspace-map.json")),
+    );
   });
 });

@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
+import path from "node:path";
 import { getFlagStr } from "../lib/cli";
 import {
   hasExceptionPolicySection,
@@ -21,10 +22,35 @@ import { enforceNodeImplementationRouteChecks } from "./nix-gaps-inventory-node-
 
 const defaultExceptionsPath = "docs/handbook/nix-gaps-exceptions.json";
 
+async function sourceRoot(): Promise<string> {
+  const envRoot = String(
+    process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "",
+  ).trim();
+  if (envRoot) return envRoot;
+  if (await fs.pathExists(path.join("viberoots", "build-tools"))) return path.resolve("viberoots");
+  return process.cwd();
+}
+
+async function sourceOwnedPath(source: string, relOrAbs: string): Promise<string> {
+  if (path.isAbsolute(relOrAbs)) return relOrAbs;
+  if (await fs.pathExists(relOrAbs)) return relOrAbs;
+  return path.join(source, relOrAbs);
+}
+
 async function main() {
-  const starlarkPath = getFlagStr("starlark-api", "docs/handbook/starlark-api.md");
-  const inventoryPath = getFlagStr("nix-gaps", "docs/handbook/nix-gaps.md");
-  const exceptionsPath = getFlagStr("exceptions", defaultExceptionsPath);
+  const source = await sourceRoot();
+  const starlarkPath = await sourceOwnedPath(
+    source,
+    getFlagStr("starlark-api", "docs/handbook/starlark-api.md"),
+  );
+  const inventoryPath = await sourceOwnedPath(
+    source,
+    getFlagStr("nix-gaps", "docs/handbook/nix-gaps.md"),
+  );
+  const exceptionsPath = await sourceOwnedPath(
+    source,
+    getFlagStr("exceptions", defaultExceptionsPath),
+  );
 
   const starlarkTxt = await fs.readFile(starlarkPath, "utf8");
   const inventoryTxt = await fs.readFile(inventoryPath, "utf8");
@@ -48,8 +74,8 @@ async function main() {
   const artifactRouteGaps = parseArtifactRouteGaps(inventoryTxt);
   const nixRouteDetailsByMacro = parseInventoryNixRouteDetails(inventoryTxt);
   const hasNodeImplementationFiles =
-    (await fs.pathExists("build-tools/node/defs_core.bzl")) &&
-    (await fs.pathExists("build-tools/node/defs_stage.bzl"));
+    (await fs.pathExists(path.join(source, "build-tools", "node", "defs_core.bzl"))) &&
+    (await fs.pathExists(path.join(source, "build-tools", "node", "defs_stage.bzl")));
 
   const malformedExceptionEntries = exceptionList.filter(
     (e) =>

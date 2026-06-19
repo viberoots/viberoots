@@ -38,7 +38,7 @@ test("module_deps infers __surface labels and preserves explicit overrides", asy
     await writeTargets(
       path.join(tmp, "projects", "apps", "web"),
       [
-        'load("//build-tools/node:defs.bzl", "node_asset_stage")',
+        'load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage")',
         "",
         "node_asset_stage(",
         '  name = "app",',
@@ -80,7 +80,7 @@ test("module_deps missing inferred surface fails with inferred label in diagnost
     await writeTargets(
       path.join(tmp, "projects", "apps", "web"),
       [
-        'load("//build-tools/node:defs.bzl", "node_asset_stage")',
+        'load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage")',
         "",
         "node_asset_stage(",
         '  name = "app",',

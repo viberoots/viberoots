@@ -28,7 +28,7 @@ test("exporter tuple includes -tags from GOFLAGS and metrics shows tupleKeys", a
       cwd: tmp,
       stdio: "inherit",
       env,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${metrics}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${metrics}`;
     const m = JSON.parse(await fs.readFile(metrics, "utf8"));
     const keys: string[] = m.tupleKeys || [];
     if (!Array.isArray(keys) || keys.length === 0) {

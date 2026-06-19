@@ -3,8 +3,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { evalModule, REVIEWED_IMAGE_DIGEST } from "./control-plane-nixos-container-module.helpers";
+import { viberootsRepoPath } from "./deployment-command";
 
-const miniProfileImport = "./build-tools/tools/nix/deployment-control-plane-mini-cloud-profile.nix";
+const miniProfileImport = viberootsRepoPath(
+  "viberoots/build-tools/tools/nix/deployment-control-plane-mini-cloud-profile.nix",
+);
 const profileCredentials = `
           control-plane-database-url.source = "/run/secrets/db";
           control-plane-token.source = "/run/secrets/control-plane-token";

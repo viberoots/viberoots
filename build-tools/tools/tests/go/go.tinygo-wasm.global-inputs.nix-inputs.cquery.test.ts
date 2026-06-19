@@ -12,7 +12,7 @@ test("nix_go_tiny_wasm_lib passes global Nix inputs through go_nix_build_wasm(ni
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
+        'load("@viberoots//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
         "",
         "nix_go_tiny_wasm_lib(",
         '  name = "mod",',
@@ -32,7 +32,7 @@ test("nix_go_tiny_wasm_lib passes global Nix inputs through go_nix_build_wasm(ni
     const out = String(probe.stdout || "");
     assert.ok(
       out.includes(":flake.lock"),
-      "expected //:flake.lock to be present in nix_inputs via global_nix_inputs()",
+      "expected //.viberoots/workspace:flake.lock to be present in nix_inputs via global_nix_inputs()",
     );
   });
 });

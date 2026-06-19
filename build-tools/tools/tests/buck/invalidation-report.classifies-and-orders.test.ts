@@ -40,10 +40,10 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
             "kind:bundle",
             "patch_scope:importer-local",
             "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
-            "//:flake.lock",
+            "//.viberoots/workspace:flake.lock",
           ],
           srcs: {
-            "__global_nix_inputs__/flake_lock": "//:flake.lock",
+            "__global_nix_inputs__/flake_lock": "//.viberoots/workspace:flake.lock",
             "__patch_inputs__/projects_apps_web_patches_node":
               "root//projects/apps/web/patches/node/demo.patch",
           },
@@ -128,7 +128,7 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/invalidation-report.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/invalidation-report.ts`;
 
     const reportPath = path.join(tmp, DEFAULT_INVALIDATION_REPORT_PATH);
     const txt = await fsp.readFile(reportPath, "utf8");

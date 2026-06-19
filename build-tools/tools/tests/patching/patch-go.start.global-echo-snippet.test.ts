@@ -12,13 +12,13 @@ test("patch-go start with PATCH_ECHO_SNIPPET prints unified export snippet", asy
     const importPath = "golang.org/x/net";
     const version = "v0.24.0";
     const map = { [importPath]: { version, originPath: origin } };
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
     })`PATCH_ECHO_SNIPPET=1 NIX_GO_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} NIX_GO_DEV_OVERRIDE_JSON={} build-tools/tools/bin/patch-pkg start go ${importPath}`;
+    )} NIX_GO_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg start go ${importPath}`;
     const ws = String(res.stdout || "")
       .trim()
       .split(/\s+/)

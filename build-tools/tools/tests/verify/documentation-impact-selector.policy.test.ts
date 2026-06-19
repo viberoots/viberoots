@@ -28,7 +28,10 @@ test("documentation-impact: markdown is documentation, not a build-system trigge
     false,
   );
   assert.equal(isBuildSystemPath("build-tools/tools/deployments/deploy.ts"), true);
-  assert.equal(isDocumentationPath("build-tools/tools/scaffolding/scaf/ARCHITECTURE.md"), true);
+  assert.equal(
+    isDocumentationPath("viberoots/build-tools/tools/scaffolding/scaf/ARCHITECTURE.md"),
+    true,
+  );
 });
 
 test("documentation-impact: reviewed deployment docs select documentation contract targets", () => {

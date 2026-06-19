@@ -13,7 +13,7 @@ test("patches-lint (go): json output preserves filename_shape message", async ()
     const res = await $({
       stdio: "pipe",
       nothrow: true,
-    })`node build-tools/tools/dev/patches-lint.ts --lang go --strict --format json`;
+    })`node viberoots/build-tools/tools/dev/patches-lint.ts --lang go --strict --format json`;
 
     const txt = String(res.stdout || "").trim();
     const json = JSON.parse(txt) as Array<any>;

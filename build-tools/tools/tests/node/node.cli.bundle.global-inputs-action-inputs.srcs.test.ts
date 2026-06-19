@@ -13,7 +13,7 @@ test("nix_node_cli_bin(bundle=True) includes global Nix inputs as genrule srcs (
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_cli_bin")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_cli_bin")',
         "",
         "nix_node_cli_bin(",
         '  name = "tool",',
@@ -35,7 +35,7 @@ test("nix_node_cli_bin(bundle=True) includes global Nix inputs as genrule srcs (
     const raw = String(probe.stdout || "");
     assert.ok(
       raw.includes(":flake.lock"),
-      "expected //:flake.lock to be present in srcs via global_nix_inputs()",
+      "expected //.viberoots/workspace:flake.lock to be present in srcs via global_nix_inputs()",
     );
     assert.ok(
       raw.includes("__global_nix_inputs__"),
@@ -55,7 +55,7 @@ test("nix_node_cli_bin(bundle=True) includes global Nix inputs as genrule srcs (
     const labelsOut = String(labelsProbe.stdout || "");
     assert.ok(
       labelsOut.includes(":flake.lock"),
-      "expected nix_node_cli_bin(bundle=True) to stamp //:flake.lock when stamp=True",
+      "expected nix_node_cli_bin(bundle=True) to stamp //.viberoots/workspace:flake.lock when stamp=True",
     );
   });
 });

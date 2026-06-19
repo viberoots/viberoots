@@ -15,6 +15,7 @@ import {
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
 import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { deploymentSourceRef } from "./nixos-shared-host.fixture";
+import { viberootsToolScript } from "./deployment-command";
 
 const CONTROL_PLANE_TOKEN = "test-control-plane-token";
 
@@ -67,10 +68,11 @@ test("remote deploy surfaces reviewed-source mismatch guidance when the local ch
         remoteRecordsRoot,
         controlPlane.url,
       );
+      const deployScript = viberootsToolScript("build-tools/tools/deployments/deploy.ts");
       const result = await $({
         cwd: tmp,
         env: remoteExecEnv(env),
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --admit-and-deploy deploy/pleomino-dev`.nothrow();
+      })`zx-wrapper ${deployScript} --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --admit-and-deploy deploy/pleomino-dev`.nothrow();
       assert.notEqual(result.exitCode, 0);
       assert.match(String(result.stderr), new RegExp(`reviewed source mismatch for ${sourceRef}`));
       assert.match(

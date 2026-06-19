@@ -8,7 +8,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("verify normalizes path-like targets from invocation directory", async () => {
   await runInTemp("verify-target-args-normalize", async (tmp) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.writeFile(
       path.join(graphDir, "graph.json"),
@@ -39,9 +39,9 @@ test("verify normalizes path-like targets from invocation directory", async () =
   });
 });
 
-test("verify normalizes root zx test file paths to generated root labels", async () => {
+test("verify normalizes root zx test file paths to active viberoots labels", async () => {
   await runInTemp("verify-target-args-root-zx-file", async (tmp) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.writeFile(path.join(graphDir, "graph.json"), "[]\n", "utf8");
 
@@ -61,13 +61,47 @@ test("verify normalizes root zx test file paths to generated root labels", async
       baseDir: tmp,
       targets: ["build-tools/tools/tests/deployments/nixos-shared-host.deploy.remote-exec.test.ts"],
     });
-    assert.deepEqual(normalized, ["//:deployments_nixos_shared_host_deploy_remote_exec"]);
+    assert.deepEqual(normalized, ["viberoots//:deployments_nixos_shared_host_deploy_remote_exec"]);
+  });
+});
+
+test("verify normalizes nested viberoots zx test file paths to viberoots cell labels", async () => {
+  await runInTemp("verify-target-args-nested-viberoots-zx-file", async (tmp) => {
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
+    await fsp.mkdir(graphDir, { recursive: true });
+    await fsp.writeFile(path.join(graphDir, "graph.json"), "[]\n", "utf8");
+
+    const testFile = path.join(
+      tmp,
+      "viberoots",
+      "build-tools",
+      "tools",
+      "tests",
+      "dev",
+      "status-watch-alias.s.test.ts",
+    );
+    await fsp.mkdir(path.dirname(testFile), { recursive: true });
+    await fsp.writeFile(testFile, "// test fixture\n", "utf8");
+
+    const fromRootRelative = await normalizeVerifyTargets({
+      workspaceRoot: tmp,
+      baseDir: tmp,
+      targets: ["build-tools/tools/tests/dev/status-watch-alias.s.test.ts"],
+    });
+    assert.deepEqual(fromRootRelative, ["viberoots//:dev_status_watch_alias_s"]);
+
+    const fromNestedRelative = await normalizeVerifyTargets({
+      workspaceRoot: tmp,
+      baseDir: path.join(tmp, "viberoots"),
+      targets: ["build-tools/tools/tests/dev/status-watch-alias.s.test.ts"],
+    });
+    assert.deepEqual(fromNestedRelative, ["viberoots//:dev_status_watch_alias_s"]);
   });
 });
 
 test("verify keeps explicit labels and query expressions untouched", async () => {
   await runInTemp("verify-target-args-safe", async (tmp) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.writeFile(path.join(graphDir, "graph.json"), "[]\n", "utf8");
 
@@ -89,7 +123,7 @@ test("verify keeps explicit labels and query expressions untouched", async () =>
 
 test("verify normalizes root '.' target to full-suite wildcard", async () => {
   await runInTemp("verify-target-args-root-dot", async (tmp) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.writeFile(path.join(graphDir, "graph.json"), "[]\n", "utf8");
 

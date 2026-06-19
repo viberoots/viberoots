@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("python runtime: offline build (no network) succeeds via uv2nix adapter", async () => {
   await runInTemp("py-offline", async (tmp, _$) => {
@@ -62,7 +62,7 @@ test("python runtime: offline build (no network) succeeds via uv2nix adapter", a
         }),
       },
       stdio: "pipe",
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths --offline`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths --offline`;
     const outPath = String(build.stdout || "")
       .trim()
       .split(/\s+/)

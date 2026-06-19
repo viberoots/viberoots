@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
@@ -41,7 +42,7 @@ test("deploy admission requirements for listed deployments", async (t) => {
       const result = await $({
         cwd: tmp,
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-dev:deploy --validate-only`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-dev:deploy --validate-only`;
       const payload = JSON.parse(String(result.stdout));
       assert.deepEqual(payload.admissionRequirements, {
         admission_policy: "//sandbox/deployments/shared:dev_release",
@@ -72,7 +73,7 @@ test("deploy admission requirements for listed deployments", async (t) => {
       const result = await $({
         cwd: tmp,
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-dev:deploy --admit-and-deploy`.nothrow();
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-dev:deploy --admit-and-deploy`.nothrow();
       assert.notEqual(result.exitCode, 0);
       assert.match(
         String(result.stderr),
@@ -102,7 +103,7 @@ test("deploy admission requirements for listed deployments", async (t) => {
       const result = await $({
         cwd: tmp,
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-dev:deploy --admit-and-deploy deploy/demo-dev`.nothrow();
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-dev:deploy --admit-and-deploy deploy/demo-dev`.nothrow();
       assert.notEqual(result.exitCode, 0);
       assert.match(String(result.stderr), /defaulted to local HEAD:/);
       assert.match(String(result.stderr), new RegExp(`requires checks for: ${fixtureRevision}`));
@@ -124,7 +125,7 @@ test("deploy admission requirements for listed deployments", async (t) => {
       const result = await $({
         cwd: tmp,
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-dev:deploy --admit-and-deploy deploy/demo-dev`.nothrow();
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-dev:deploy --admit-and-deploy deploy/demo-dev`.nothrow();
       assert.notEqual(result.exitCode, 0);
       assert.match(
         String(result.stderr),
@@ -210,7 +211,7 @@ test("deploy admission requirements for deployments with no required checks", as
       const result = await $({
         cwd: tmp,
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --validate-only`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-staging:deploy --validate-only`;
       const payload = JSON.parse(String(result.stdout));
       assert.deepEqual(payload.admissionRequirements, {
         admission_policy: "//sandbox/deployments/shared:staging_release",
@@ -236,7 +237,7 @@ test("deploy admission requirements for deployments with no required checks", as
       const result = await $({
         cwd: tmp,
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --admit-and-deploy`.nothrow();
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-staging:deploy --admit-and-deploy`.nothrow();
       assert.notEqual(result.exitCode, 0);
       assert.match(String(result.stderr), /required_checks: none/);
       assert.match(

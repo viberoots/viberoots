@@ -3,27 +3,27 @@ name = TARGETS
 
 [repositories]
 root = .
-viberoots = ./.viberoots/current
-prelude = ./.viberoots/current/prelude
-toolchains = ./.viberoots/current/toolchains
-repo_toolchains = ./.viberoots/current/toolchains
-fbsource = ./.viberoots/current/config/fbsource_stub
-fbcode = ./.viberoots/current/config/fbcode_stub
-config = ./.viberoots/current/prelude
-workspace_providers = ./.viberoots/workspace/providers
-workspace_buck = ./.viberoots/workspace/buck
+viberoots = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./config/fbsource_stub
+fbcode = ./config/fbcode_stub
+config = ./config
+workspace_providers = ./config/workspace_providers
+workspace_buck = ./config/workspace_buck
 
 [cells]
 root = .
-viberoots = ./.viberoots/current
-prelude = ./.viberoots/current/prelude
-toolchains = ./.viberoots/current/toolchains
-repo_toolchains = ./.viberoots/current/toolchains
-fbsource = ./.viberoots/current/config/fbsource_stub
-fbcode = ./.viberoots/current/config/fbcode_stub
-config = ./.viberoots/current/prelude
-workspace_providers = ./.viberoots/workspace/providers
-workspace_buck = ./.viberoots/workspace/buck
+viberoots = .
+prelude = ./prelude
+toolchains = ./toolchains
+repo_toolchains = ./toolchains
+fbsource = ./config/fbsource_stub
+fbcode = ./config/fbcode_stub
+config = ./config
+workspace_providers = ./config/workspace_providers
+workspace_buck = ./config/workspace_buck
 
 [build]
 prelude = prelude
@@ -31,4 +31,4 @@ user_platform = prelude//platforms:default
 target_platforms = prelude//platforms:default
 
 [project]
-ignore = buck-out/tmp/tmpdir,.claude/worktrees,.codex/worktrees
+ignore = buck-out/tmp,.viberoots/buck/tmp,.viberoots/workspace/buck/tmp,.claude/worktrees,.codex/worktrees

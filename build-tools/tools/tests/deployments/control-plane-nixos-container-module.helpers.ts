@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsRepoPath } from "./deployment-command";
 
 export type EvalOut = Record<string, unknown>;
 
@@ -36,7 +37,9 @@ export async function evalModule(
   const includeBucket = base.bucket ?? true;
   const credentials = base.credentials ?? credentialConfig;
   const imports = base.imports ?? [
-    "./build-tools/tools/nix/deployment-control-plane-container-module.nix",
+    viberootsRepoPath(
+      "viberoots/build-tools/tools/nix/deployment-control-plane-container-module.nix",
+    ),
   ];
   const expr = `
     let

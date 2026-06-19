@@ -47,7 +47,7 @@ let
   # (which produces an empty snap — harmless when copied into the output tree).
   # Note: `prelude` is intentionally omitted — it is a symlink and is handled via
   # rootFilesSnap above (see comment there for why mkSubSnap cannot handle symlinks).
-  subDirs = [".husky" "build-tools" "cpp" "go" "lang" "node" "patches" "python" "tools" "third_party" "toolchains" "types" "viberoots"];
+  subDirs = [".husky" ".viberoots" "build-tools" "cpp" "go" "lang" "node" "patches" "python" "tools" "third_party" "toolchains" "types" "viberoots"];
 
   mkSubSnap = d:
     let
@@ -83,6 +83,11 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
   # restore write permission so subsequent mkdir calls into $out succeed.
   chmod u+w "$out"
   ${copySubDirScript}
+  rm -rf \
+    "$out/.viberoots/buck" \
+    "$out/.viberoots/cache" \
+    "$out/.viberoots/workspace/.viberoots" \
+    "$out/viberoots/.viberoots"
   chmod -R u+w "$out"
   export GIT_AUTHOR_NAME=seed
   export GIT_AUTHOR_EMAIL=seed@example.com

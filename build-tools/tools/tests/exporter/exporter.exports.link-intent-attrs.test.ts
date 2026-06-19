@@ -75,7 +75,7 @@ test("exporter exports link intent attrs when present on a target", async () => 
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`build-tools/tools/buck/export-graph.ts --out ${graphPath}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --out ${graphPath}`;
     if (res.exitCode !== 0) {
       console.error("exporter failed:", String(res.stderr || ""));
       process.exit(2);

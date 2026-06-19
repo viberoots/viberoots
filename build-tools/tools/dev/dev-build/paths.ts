@@ -29,11 +29,11 @@ export function nodeBin(): string {
 }
 
 export function buildToolsRoot(root: string): string {
-  const direct = path.resolve(root, "build-tools");
-  if (fs.existsSync(path.join(direct, "tools", "dev", "zx-init.mjs"))) return direct;
   const extracted = path.resolve(root, "viberoots", "build-tools");
   if (fs.existsSync(path.join(extracted, "tools", "dev", "zx-init.mjs"))) return extracted;
-  return path.resolve(root, ".viberoots/current/build-tools");
+  const current = path.resolve(root, ".viberoots/current/build-tools");
+  if (fs.existsSync(path.join(current, "tools", "dev", "zx-init.mjs"))) return current;
+  return path.resolve(root, "build-tools");
 }
 
 export function buildToolPath(root: string, rel: string): string {

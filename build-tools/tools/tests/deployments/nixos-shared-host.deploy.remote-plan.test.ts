@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
@@ -20,7 +21,7 @@ async function installClientProfile(
   process.env[LOCAL_FIXTURE_SERVICE_ENV] = "1";
   await $({
     env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
-  })`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/viberoots --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ${sshMode} ${sshIdentityFile ? ["--ssh-identity-file", sshIdentityFile] : []} ${sshKnownHostsFile ? ["--ssh-known-hosts", sshKnownHostsFile] : []} --control-plane-url ${controlPlaneUrl}`;
+  })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-install.ts")} client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path /srv/viberoots --remote-state-path /etc/nixos/deployment-host/platform-state.json --remote-runtime-root /var/lib/deployment-host/runtime --remote-records-root /var/lib/deployment-host/records --ssh-mode ${sshMode} ${sshIdentityFile ? ["--ssh-identity-file", sshIdentityFile] : []} ${sshKnownHostsFile ? ["--ssh-known-hosts", sshKnownHostsFile] : []} --control-plane-url ${controlPlaneUrl}`;
 }
 
 async function installReviewedDeployment(workspaceRoot: string): Promise<string> {
@@ -35,7 +36,7 @@ test("deploy plan reads the reviewed remote profile deterministically", async ()
     const profileRoot = `${tmp}/profiles`;
     await installClientProfile($, profileRoot);
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --dry-run`;
+      await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --dry-run`;
     assert.deepEqual(JSON.parse(String(result.stdout)), {
       planMode: true,
       remoteExecutionImplemented: true,
@@ -93,7 +94,7 @@ test("deploy plan surfaces reviewed SSH defaults stored in the client profile", 
       sshKnownHostsFile,
     );
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan`;
+      await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan`;
     const summary = JSON.parse(String(result.stdout));
     assert.deepEqual(summary.reviewedRemoteSshAuth, {
       identityFile: sshIdentityFile,
@@ -109,7 +110,7 @@ test("deploy plan lets explicit remote overrides win over profile metadata", asy
     const artifactDir = `${tmp}/artifact`;
     await installClientProfile($, profileRoot);
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --destination staging-mini --remote-repo-path /srv/staging --remote-state-path /var/lib/staging/state.json --remote-runtime-root /srv/runtime --remote-records-root /srv/records --artifact-dir ${artifactDir}`;
+      await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --destination staging-mini --remote-repo-path /srv/staging --remote-state-path /var/lib/staging/state.json --remote-runtime-root /srv/runtime --remote-records-root /srv/records --artifact-dir ${artifactDir}`;
     const summary = JSON.parse(String(result.stdout));
     assert.equal(summary.destination, "staging-mini");
     assert.equal(summary.remoteRepoPath, "/srv/staging");
@@ -130,7 +131,7 @@ test("deploy plan renders reviewed host-apply selection when remote apply is req
     const profileRoot = `${tmp}/profiles`;
     await installClientProfile($, profileRoot);
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --apply-host --remote-config-root /srv/nixos --remote-managed-root /srv/nixos/nixos-shared-host`.nothrow();
+      await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --apply-host --remote-config-root /srv/nixos --remote-managed-root /srv/nixos/nixos-shared-host`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /service-only remote profiles do not support/);
   });
@@ -142,7 +143,7 @@ test("deploy plan keeps host apply explicit and dry-runnable", async () => {
     const profileRoot = `${tmp}/profiles`;
     await installClientProfile($, profileRoot);
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --apply-host-dry-run`.nothrow();
+      await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --apply-host-dry-run`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /service-only remote profiles do not support/);
   });
@@ -154,7 +155,7 @@ test("deploy plan rejects profile mode mixed with local mutation flags", async (
     const profileRoot = `${tmp}/profiles`;
     await installClientProfile($, profileRoot);
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --state /tmp/platform-state.json`.nothrow();
+      await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --state /tmp/platform-state.json`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /--profile cannot be combined with local execution flags/);
     assert.match(String(result.stderr), /--state/);
@@ -167,7 +168,7 @@ test("deploy plan rejects local control-plane service flags in remote profile mo
     const profileRoot = `${tmp}/profiles`;
     await installClientProfile($, profileRoot);
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --control-plane-url http://127.0.0.1:7780`.nothrow();
+      await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --control-plane-url http://127.0.0.1:7780`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /--profile cannot be combined with local execution flags/);
     assert.match(String(result.stderr), /--control-plane-url/);
@@ -180,7 +181,7 @@ test("deploy plan rejects host-apply path overrides unless host apply is selecte
     const profileRoot = `${tmp}/profiles`;
     await installClientProfile($, profileRoot);
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --remote-config-root /srv/nixos`.nothrow();
+      await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan --remote-config-root /srv/nixos`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /service-only remote profiles do not support/);
   });
@@ -191,7 +192,7 @@ test("deploy plan fails closed when the requested profile is missing", async () 
     const deploymentLabel = await installReviewedDeployment(tmp);
     const profileRoot = `${tmp}/profiles`;
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan`.nothrow();
+      await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /missing reviewed remote profile "mini"/);
   });
@@ -221,7 +222,7 @@ test("deploy plan fails closed on malformed client manifests", async () => {
       "utf8",
     );
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan`.nothrow();
+      await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /invalid nixos-shared-host client manifest/);
   });
@@ -233,7 +234,7 @@ test("deploy plan fails closed on unsupported reviewed transport modes", async (
     const profileRoot = `${tmp}/profiles`;
     await installClientProfile($, profileRoot, "local");
     const result =
-      await $`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan`.nothrow();
+      await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deploymentLabel} --profile mini --profile-root ${profileRoot} --plan`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /unsupported reviewed transport mode "local"/);
   });

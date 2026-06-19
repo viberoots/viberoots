@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsDevTool, viberootsTool } from "../scaffolding/lib/viberoots-tools";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -44,8 +45,7 @@ test(
   async () => {
     const prevRoots = process.env.TEST_RSYNC_ROOTS;
     if (!prevRoots) {
-      process.env.TEST_RSYNC_ROOTS =
-        "build-tools toolchains third_party/providers prelude patches flake.nix flake.lock";
+      process.env.TEST_RSYNC_ROOTS = "viberoots";
     }
     try {
       await runInTemp("node-wasm-inline-module", async (tmp, _$) => {
@@ -78,7 +78,7 @@ func main() {}
         );
         await fs.outputFile(
           path.join(wasmDir, "TARGETS"),
-          `load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
+          `load("@viberoots//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")
 
 nix_go_tiny_wasm_lib(
     name = "wasm",
@@ -117,7 +117,7 @@ packages: {}
         );
         await fs.outputFile(
           path.join(inlineDir, "TARGETS"),
-          `load("//build-tools/node:defs.bzl", "node_wasm_inline_module")
+          `load("@viberoots//build-tools/node:defs.bzl", "node_wasm_inline_module")
 
 node_wasm_inline_module(
     name = "wasm_inline",
@@ -129,7 +129,7 @@ node_wasm_inline_module(
         await $({
           cwd: tmp,
           stdio: "inherit",
-        })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+        })`node ${viberootsTool("viberoots/build-tools/tools/buck/export-graph.ts")} --out .viberoots/workspace/buck/graph.json`;
 
         const build = await $({
           cwd: tmp,
@@ -228,7 +228,7 @@ console.log("add=" + cliExports.add(2, 3));
         );
         await fs.outputFile(
           path.join(cliDir, "TARGETS"),
-          `load("//build-tools/node:defs.bzl", "nix_node_cli_bin")
+          `load("@viberoots//build-tools/node:defs.bzl", "nix_node_cli_bin")
 
 nix_node_cli_bin(
     name = "demo_cli",
@@ -244,11 +244,11 @@ nix_node_cli_bin(
         await $({
           cwd: tmp,
           stdio: "inherit",
-        })`node build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/apps/demo-cli/pnpm-lock.yaml`;
+        })`node ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile projects/apps/demo-cli/pnpm-lock.yaml`;
         await $({
           cwd: tmp,
           stdio: "inherit",
-        })`git add build-tools/tools/nix/node-modules.hashes.json`;
+        })`git add projects/node-modules.hashes.json`;
 
         const cliBuild = await $({
           cwd: tmp,

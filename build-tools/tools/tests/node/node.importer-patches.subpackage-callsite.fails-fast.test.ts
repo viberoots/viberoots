@@ -23,7 +23,7 @@ test("node macros fail fast when importer-local patches would cross a Buck packa
     await fsp.writeFile(
       path.join(subpkgDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "node_webapp")',
+        'load("@viberoots//build-tools/node:defs.bzl", "node_webapp")',
         "",
         "node_webapp(",
         '  name = "bundle",',

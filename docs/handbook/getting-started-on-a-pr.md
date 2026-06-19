@@ -13,25 +13,27 @@ This guide helps a new contributor land any PR in this plan successfully, follow
   - `python3 --version`, `uv --version` ← required for Python enablement
   - `nix show-config` includes experimental features (`nix-command`, `flakes`)
 - Optional shell-cache health check:
-  - `build-tools/tools/bin/shell-cache-check`
+  - `viberoots/build-tools/tools/bin/shell-cache-check`
 - Cache recovery (only when cache state is stale or broken):
   - `rm -rf .direnv && direnv allow && direnv reload`
 - Optional: run our startup check if present (prints clear hints):
-  - `node build-tools/tools/dev/startup-check.ts`
+  - `node --import ./viberoots/build-tools/tools/dev/zx-init.mjs --experimental-strip-types viberoots/build-tools/tools/dev/startup-check.ts`
 - Prepare ignored viberoots workspace state before Buck-cell dogfood or external workspace runs:
-  - `viberoots init-workspace`
-  - This creates or repairs `.viberoots/current`, `.viberoots/workspace/`, and `.viberoots/cache/`
-    without rewriting tracked product files.
-  - In the current in-repo dogfood layout, `.viberoots/current` points at the live repository root
-    (`..` from `.viberoots/`) so Buck and Nix workflows observe local build-tool edits immediately.
-    In external or remote-source workspaces it points at the resolved viberoots source instead.
+  - `git submodule update --init viberoots`
+  - `./viberoots/init`
+  - This creates or repairs `.viberoots/current`, `.viberoots/workspace/`, `.envrc`,
+    `.buckconfig`, `.buckroot`, and the light workspace README files without rewriting edited
+    project files.
+  - In the current in-repo dogfood layout, `.viberoots/current` points at the local `viberoots/`
+    submodule so Buck and Nix workflows observe local build-tool edits immediately. In external or
+    remote-source workspaces it points at the resolved viberoots source instead.
 
-Note on Python lockfiles: The initial Python rollout is uv‑only. Poetry/pip‑tools are out of scope unless/until a future PR adds them. See `build-tools/docs/lang/python-design.md` (PR‑17) for details.
+Note on Python lockfiles: The initial Python rollout is uv‑only. Poetry/pip‑tools are out of scope unless/until a future PR adds them. See `viberoots/build-tools/docs/lang/python-design.md` (PR‑17) for details.
 Python provider sync activation in sparse/partial clones is lockfile‑driven: the presence of an `uv.lock` under `projects/apps/*` or `projects/libs/*` enables Python providers.
 
 ### 2. Project rules you must follow
 
-- Follow `@METHODOLOGY.XML` and `@build-tools/docs/build-system-design.md` at all times.
+- Follow `@METHODOLOGY.XML` and `@viberoots/build-tools/docs/build-system-design.md` at all times.
 - Never commit without verifying that all tests are wired and passing:
   - default PR loop: `i && b && v` (coverage-off and scope-aware by default)
   - full pre-merge command: `i && b && ALL_TESTS=1 v` (coverage-off by default)
@@ -45,20 +47,20 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
 - Keep touched test modules decomposed and below the methodology limit by splitting helpers into focused files, and keep the strict repo-owned file-size gate (`--scope=source`) green.
 - Maintain determinism and low cyclomatic complexity; prefer small, well-named functions.
 - Follow the tooling rules in `docs/handbook/tooling.md`:
-  - Use `build-tools/tools/lib/cli.ts` for CLI parsing (no bespoke `process.argv` parsing).
-  - Use `build-tools/tools/lib/node-run.ts` (`runNodeWithZx`) when one tool invokes another zx script.
-  - Keep zx bootstrap paths consistent: use `build-tools/tools/dev/zx-init.mjs` for Node-invoked zx scripts, and only use `build-tools/tools/lib/ensure-zx-globals.ts` inside shared modules that may be imported from temp repos or other workspaces where bare `import "zx/globals"` is not resolvable.
-- Nix attr alias source of truth: `build-tools/tools/lib/nix-attr-aliases.json`. Starlark mirror is generated (dev/test-time) via:
-  - `node build-tools/tools/dev/gen-nix-attr-aliases-bzl.ts` → writes `build-tools/lang/nix_attr_aliases.bzl`. A stub exists and runtime does not depend on generation; behavior is unchanged for current aliases.
+  - Use `viberoots/build-tools/tools/lib/cli.ts` for CLI parsing (no bespoke `process.argv` parsing).
+  - Use `viberoots/build-tools/tools/lib/node-run.ts` (`runNodeWithZx`) when one tool invokes another zx script.
+  - Keep zx bootstrap paths consistent: use `viberoots/build-tools/tools/dev/zx-init.mjs` for Node-invoked zx scripts, and only use `viberoots/build-tools/tools/lib/ensure-zx-globals.ts` inside shared modules that may be imported from temp repos or other workspaces where bare `import "zx/globals"` is not resolvable.
+- Nix attr alias source of truth: `viberoots/build-tools/tools/lib/nix-attr-aliases.json`. Starlark mirror is generated (dev/test-time) via:
+  - `node viberoots/build-tools/tools/dev/gen-nix-attr-aliases-bzl.ts` → writes `.viberoots/current/build-tools/lang/nix_attr_aliases.bzl`. A stub exists and runtime does not depend on generation; behavior is unchanged for current aliases.
 
 ### 2.1 Active-doc command contract scope (PR-6)
 
 I maintain an explicit inventory for docs that contain scaffold command guidance:
 
-- Inventory source: `build-tools/tools/tests/scaffolding/doc-command-contract.inventory.ts`
+- Inventory source: `viberoots/build-tools/tools/tests/scaffolding/doc-command-contract.inventory.ts`
 - Classification is required for scaffold-command docs under these areas:
   - `docs/handbook`
-  - `build-tools/docs`
+  - `viberoots/build-tools/docs`
   - `docs/history/designs/legacy`
   - `docs/history/build-system/pnpm`
 - Active docs are implementation guidance and must keep canonical TypeScript commands (`scaf new ts ...`) for canonical TypeScript templates.
@@ -80,21 +82,21 @@ When adding or materially editing scaffold command guidance:
   - Full verify run with coverage (opt-in): `ALL_TESTS=1 v --coverage`
   - Buck direct full test with coverage (opt-in): `buck2 test //... -- --env COVERAGE=1`
   - Single target build/test: `buck2 build //<pkg>:<name>`, `buck2 test //<pkg>:<name>`
-  - Policy gate (inventory + exceptions): `node build-tools/tools/dev/nix-gaps-inventory-check.ts --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions docs/handbook/nix-gaps-exceptions.json`
+  - Policy gate (inventory + exceptions): `node viberoots/build-tools/tools/dev/nix-gaps-inventory-check.ts --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions docs/handbook/nix-gaps-exceptions.json`
 - Glue generation (when working on providers/labels mappings):
-  - Run full glue pipeline (preferred): `node build-tools/tools/buck/glue-pipeline.ts`
-  - Export graph: `node build-tools/tools/buck/export-graph.ts`
-  - Sync providers: `node build-tools/tools/buck/sync-providers.ts`
-  - Sync Node providers only (no graph/auto_map): `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`
-  - Sync Python providers only (no graph/auto_map): `node build-tools/tools/buck/sync-providers.ts --lang python --no-glue`
-  - Sync specific language: `node build-tools/tools/buck/sync-providers.ts --lang node`
-  - Generate auto_map (building block; prefer the pipeline): `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
-  - Prebuild guard (freshness/presence): `node build-tools/tools/buck/prebuild-guard.ts [--verbose|--json]`
+  - Run full glue pipeline (preferred): `node viberoots/build-tools/tools/buck/glue-pipeline.ts`
+  - Export graph: `node viberoots/build-tools/tools/buck/export-graph.ts`
+  - Sync providers: `node viberoots/build-tools/tools/buck/sync-providers.ts`
+  - Sync Node providers only (no graph/auto_map): `node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`
+  - Sync Python providers only (no graph/auto_map): `node viberoots/build-tools/tools/buck/sync-providers.ts --lang python --no-glue`
+  - Sync specific language: `node viberoots/build-tools/tools/buck/sync-providers.ts --lang node`
+  - Generate auto_map (building block; prefer the pipeline): `node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
+  - Prebuild guard (freshness/presence): `node viberoots/build-tools/tools/buck/prebuild-guard.ts [--verbose|--json]`
   - Note: touching any `pnpm-lock.yaml` requires re-running provider sync + auto_map; the guard will fail in CI if importer entries are missing and auto-fix locally unless `PREBUILD_GUARD_NO_FIX=1`.
 - Template test selection (PR-2):
-  - Auto-detect from git changes: `node build-tools/tools/dev/select-template-tests.ts`
-  - Provide explicit changed paths: `node build-tools/tools/dev/select-template-tests.ts --changed build-tools/tools/scaffolding/templates/go/lib/copier.yaml`
-  - Targets-only output: `node build-tools/tools/dev/select-template-tests.ts --targets-only`
+  - Auto-detect from git changes: `node viberoots/build-tools/tools/dev/select-template-tests.ts`
+  - Provide explicit changed paths: `node viberoots/build-tools/tools/dev/select-template-tests.ts --changed viberoots/build-tools/tools/scaffolding/templates/go/lib/copier.yaml`
+  - Targets-only output: `node viberoots/build-tools/tools/dev/select-template-tests.ts --targets-only`
 - Verify template-scope controls (PR-3):
   - `VBR_TEMPLATE_TEST_SCOPE=auto|always|never v`
   - `auto`: when changes are template-only, `v` runs only label-selected template tests + safety floor
@@ -108,7 +110,7 @@ When adding or materially editing scaffold command guidance:
   - selected test scope = changed projects + full recursive downstream dependents
   - project-local methodology exception edits (for example `projects/apps/<name>/methodology-exceptions.json`) stay on this project-impact path
   - build-system code/tooling edits keep the broad build-system scope; Markdown and reStructuredText
-    docs do not count as build-system edits just because they live under `build-tools/**`
+    docs do not count as build-system edits just because they live under `viberoots/build-tools/**`
   - default change detection uses merge-base refs (`GITHUB_BASE_REF`, then `github/main`,
     `origin/main`, `main`) plus dirty worktree status
 - Verify deployment-aware build-system scope (PR-4.5.3):
@@ -132,7 +134,7 @@ When adding or materially editing scaffold command guidance:
     selection; use `ALL_TESTS=1 v` for the full suite)
   - `v` lint/prettier preflight is changed-file scoped by default; `VERIFY_SKIP_LINT=1` still skips
     the preflight when explicitly requested
-  - status helpers (`l --status`, `s`, or `build-tools/tools/bin/tail-log --status`) can show both
+  - status helpers (`l --status`, `s`, or `tail-log --status`) can show both
     active pass-group counts and total suite counts; JSON status exposes `pass_index`,
     `pass_total`, `group_completed`, and `group_total`
 - `runInTemp` Buck isolation contract:
@@ -142,7 +144,7 @@ When adding or materially editing scaffold command guidance:
   - use `inheritedBuckIsolation(...)` or `BUCK_NESTED_ISO` only when an explicit inherited isolation
     is required; those forms approve only the command that contains them, not neighboring commands
   - rare independent nested daemons need `lint: allow-hardcoded-buck-isolation: <specific reason>`
-  - helper files outside `build-tools/tools/tests` are part of this lint when a `runInTemp` test
+  - helper files outside `viberoots/build-tools/tools/tests` are part of this lint when a `runInTemp` test
     imports them into the Buck command-generation graph; unrelated helpers stay outside the scan
 - `p` (run runnable target in `run.prod` mode), `d` (run runnable target in `run.dev` mode when available)
   - `v` includes a preflight run of the nix-gaps inventory/exception policy checker and fails fast on drift.
@@ -174,13 +176,13 @@ When this PR touches `ts/webapp-ssr-vite` paths, validate these deterministic fa
 
 Practical workflow:
 
-- **Find slow targets**: `v` writes a full log at `buck-out/tmp/verify-logs/latest.log`.
+- **Find slow targets**: `v` writes a full log at `.viberoots/workspace/buck/verify-logs/latest.log`.
   - The verify runner also appends a “slowest targets” list at the end of that log.
 - **Get structured timing** (optional but recommended): run with timing summaries enabled and then aggregate:
 
 ```bash
 TEST_TIMING=summary v
-node build-tools/tools/dev/analyze-verify-timing.ts --log buck-out/tmp/verify-logs/latest.log
+node viberoots/build-tools/tools/dev/analyze-verify-timing.ts --log .viberoots/workspace/buck/verify-logs/latest.log
 ```
 
 Common causes we’ve seen:
@@ -254,11 +256,11 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Prevent env leakage between tests**: restore `TEST_*` env vars in `finally` blocks or shared helpers.
 - **Reset dev override envs**: tests that set `NIX_*_DEV_OVERRIDE_JSON` must restore it, or later tests will run with overrides and can force slow local builds.
 - **Keep lint-staged scoped**: lint-staged commands should honor file arguments (avoid `eslint .` in hooks) so pre-commit and test runs do not lint the entire repo.
-- **Do not remove required files**: excluding `build-tools/tools/tests`, `*.md`, or patch session files causes missing inputs and expensive retries.
+- **Do not remove required files**: excluding `viberoots/build-tools/tools/tests`, `*.md`, or patch session files causes missing inputs and expensive retries.
 - **Target invalidation explicitly**: include patch files in graph-visible inputs so Nix can track them without extra runtime work.
 - **Measure before optimizing**: identify the dominant cost first, then optimize only that path.
 - **Keep per-test timing summaries opt-in**: Buck stores test stdout/stderr in its event stream, so forcing `TEST_TIMING_SUMMARY=1` across full-suite `v` can turn instrumentation into event-bus/log amplification. Use `TEST_TIMING=summary v //:target` or an intentional profiling run, not the default verify path.
-- **Stage updated pnpm-store hashes in temp repos**: when a test updates `build-tools/tools/nix/node-modules.hashes.json`, `git add` it before any Nix builds so the flake snapshot sees the new hash instead of the placeholder. If a test generates a new `pnpm-lock.yaml`, always regenerate its hash even if an older entry exists in the map.
+- **Stage updated pnpm-store hashes in temp repos**: when a test updates `viberoots/build-tools/tools/nix/node-modules.hashes.json`, `git add` it before any Nix builds so the flake snapshot sees the new hash instead of the placeholder. If a test generates a new `pnpm-lock.yaml`, always regenerate its hash even if an older entry exists in the map.
 - **Watch pacing checkpoints, not just final duration**: if pass/min drops sharply between 5-minute and 10-minute checkpoints, treat that as a systemic contention signal and investigate immediately.
 - **Compare like-for-like verify evidence**: use completed full-suite runs (`[verify] buck2 test exit ... status=0`) and timing summaries; partial/failed runs can under-report throughput and mislead regression analysis.
 - **Confirm `verify:isolated` targets are truly isolated under wildcard/package verify scopes**: if timing-sensitive targets rely on `verify:isolated`, check the verify log for a dedicated `target pass begin name=isolated` entry. If a broad selector such as `//...` or `//project/...` stays in a single `shared` pass, the isolated label is not being materialized and suite concurrency can create false timing regressions.
@@ -268,11 +270,11 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Give concurrent verify passes distinct Buck isolations and a staged start**: after the serial `verify:isolated` pass, `verify:resource-limited` may overlap with the normal shared pass only from a distinct top-level Buck isolation and after the broad shared startup surge has passed. Reusing the same `--isolation-dir` makes the delayed `buck2 test` wait behind the shared command instead of overlapping; starting the bounded lane too early recreates load amplification. Current full-suite evidence supports the default 900s broad-run delay.
 - **Mark temp-repo dev-server tests as `verify:isolated` when startup latency matters**: scaffolding tests that run `runInTemp`, refresh lockfiles/hashes, build `node_modules`, and wait for a live dev server should not share the main verify pass with hundreds of other actions. If a saved log shows steps like `pnpm --lockfile-only`, `node-modules-build`, or server readiness suddenly inflating only under broad verify, treat missing isolation labels as a systemic execution regression.
 - **Keep heavy template-owned runtime tests registered in `template_conventions.bzl`**: template tests only get `verify:isolated` if the convention layer actually assigns labels. A temp-repo dev-server test with no convention entry silently falls into the shared pass, so add or update the convention metadata in the same PR as the test.
-- **Classify new deployment-owned Nix support files explicitly**: when adding reviewed deployment support modules under `build-tools/tools/nix/`, add them to `build-tools/tools/lib/deployment-verify-scope.ts` and the corresponding boundary docs/tests in the same PR. Leaving them unclassified makes deployment-aware verify fail closed to full `//...` scope and turns a small deployment/docs change into a suite-wide timing regression.
+- **Classify new deployment-owned Nix support files explicitly**: when adding reviewed deployment support modules under `viberoots/build-tools/tools/nix/`, add them to `viberoots/build-tools/tools/lib/deployment-verify-scope.ts` and the corresponding boundary docs/tests in the same PR. Leaving them unclassified makes deployment-aware verify fail closed to full `//...` scope and turns a small deployment/docs change into a suite-wide timing regression.
 - **Keep temp deployment fixtures internally consistent across all referenced targets**: if a temp repo rewrites shared deployment policy files (for example `projects/deployments/*-shared/TARGETS`), preserve every target that other seeded deployments still reference. Missing sibling policies can force `resolveAllDeployments()`/Buck fallback scans into hard failures or long retry loops that appear in verify logs as “stuck” deployment tests rather than a clear configuration error.
 - **Avoid eager deployment-wide discovery in no-op admission paths**: admission/prerequisite helpers should not call `resolveAllDeployments()` when the deployment has no prerequisites, or when all prerequisite providers are already explicit. Eager discovery starts nested Buck daemons in otherwise pure tests and can inflate full-suite resource fan-out.
-- **Keep template-selector scope narrow for template PRs**: for template updates, ensure changed template-owned tests are registered in `build-tools/tools/tests/template_conventions.bzl`; otherwise selector mode can drift to `mixed` and trigger full build-system verify scope.
-- **Do not treat `build-tools/tools/scaffolding/templates/<lang>/README.md.jinja` as a template id**: this file is shared template guidance, not a concrete template directory. If selector output shows ids like `ts/README.md.jinja`, fix selector/template-id parsing first, because this causes avoidable mixed-mode scope expansion.
+- **Keep template-selector scope narrow for template PRs**: for template updates, ensure changed template-owned tests are registered in `viberoots/build-tools/tools/tests/template_conventions.bzl`; otherwise selector mode can drift to `mixed` and trigger full build-system verify scope.
+- **Do not treat `viberoots/build-tools/tools/scaffolding/templates/<lang>/README.md.jinja` as a template id**: this file is shared template guidance, not a concrete template directory. If selector output shows ids like `ts/README.md.jinja`, fix selector/template-id parsing first, because this causes avoidable mixed-mode scope expansion.
 - **Keep locked Node installs off the shared prefetched-store evaluation path**: when `mkNodeModules` already has a lockfile-specific fixed pnpm store, treat that as the primary source. Do not snapshot the shared unified prefetched store with `builtins.path` just to seed a locked install; it makes every locked Node derivation sensitive to unrelated cache corruption and adds large per-target copy cost.
 - **Re-profile top offenders in isolation before broad tuning**: run `TEST_TIMING=summary v //:slow_target` for the top entries from `latest.log` to separate true per-target cost from suite fan-out contention.
 - **Treat empty numeric env vars as unset**: parsing `""` with `Number(...)` yields `0`. For polling/time-budget envs (for example `VERIFY_SAFETY_RAILS_POLL_SECS`), this can silently force aggressive loops (for example 1s polling) and add suite-wide process churn. Parse empty strings as unset and apply explicit defaults first.
@@ -284,7 +286,7 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Treat invalid store-path errors during verify as GC-corruption signals for that run**: if logs include `error: path '/nix/store/... .drv' is not valid` together with verify GC warning/notice lines, treat the run as tainted by concurrent store mutation. Stop GC and re-run the affected targets first; do not use that run for regression attribution.
 - **Keep Nix store optimisation out of the default verify path**: `v` skips `nix store optimise` unless `VERIFY_NIX_OPTIMISE=1` or `VERIFY_NIX_OPTIMIZE=1` is set. Treat optimisation as explicit recovery/maintenance work, not normal test setup.
 - **Do not pre-block lockfile generation on GC process presence alone**: lockfile paths should attempt work first and only wait/retry when an actual lockfile-generation failure occurs with active GC. Process-presence gating can create deterministic multi-minute stalls/failures even when lockfile generation would have succeeded immediately.
-- **Do not add bare `import "zx/globals"` to modules imported from temp repos**: that works only when `zx` is resolvable from the current workspace. Shared modules used by `runInTemp`, scaffolding temp repos, or patch workflows must load zx via `zx-init.mjs` or `build-tools/tools/lib/ensure-zx-globals.ts`; otherwise Linux temp-repo runs can fail with `ERR_MODULE_NOT_FOUND` even though repo-local runs pass.
+- **Do not add bare `import "zx/globals"` to modules imported from temp repos**: that works only when `zx` is resolvable from the current workspace. Shared modules used by `runInTemp`, scaffolding temp repos, or patch workflows must load zx via `zx-init.mjs` or `viberoots/build-tools/tools/lib/ensure-zx-globals.ts`; otherwise Linux temp-repo runs can fail with `ERR_MODULE_NOT_FOUND` even though repo-local runs pass.
 - **Avoid redundant filtered-flake snapshots in scaffold/hash-refresh paths**: when a workflow already uses a `path:` flake rooted at the temp/workspace repo, do not `rsync` a second filtered snapshot just to make untracked scaffold outputs visible. That duplicate copy becomes a suite-wide tax across scaffolding tests and hides the real cost profile.
 - **Try fixed-output mismatch paths before unfixed rebuilds**: for pnpm-store hash refresh, let the fixed-output derivation fail first and harvest the suggested hash when possible. Jumping straight to unfixed builds turns every fresh scaffold/importer into a full expensive rebuild even when Nix would have provided the answer immediately.
 - **Deduplicate immutable cache syncs**: if a pnpm/Nix workflow copies a built immutable store back into a shared prefetched cache, key that sync by immutable source path so repeated scaffolds of the same importer do not recopy identical store contents.

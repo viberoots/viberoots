@@ -85,12 +85,18 @@ test("missing local-link helper reports deterministic recovery guidance", async 
 });
 
 test("historical SSR plan docs mark express scaffold as removed", async () => {
-  const webappSsrPlan = await fsp.readFile("docs/history/build-system/logs/webapp-ssr.md", "utf8");
+  const webappSsrPlan = await fsp.readFile(
+    path.join("viberoots", "docs", "history", "build-system", "logs", "webapp-ssr.md"),
+    "utf8",
+  );
   assert.match(webappSsrPlan, /historical plan record/i);
   assert.match(webappSsrPlan, /does not include `webapp-ssr-express`/);
   assert.match(webappSsrPlan, /Use `webapp-ssr-vite` or `webapp-ssr-next`/);
 
-  const viteSsrPlan = await fsp.readFile("docs/history/build-system/logs/vite-ssr.md", "utf8");
+  const viteSsrPlan = await fsp.readFile(
+    path.join("viberoots", "docs", "history", "build-system", "logs", "vite-ssr.md"),
+    "utf8",
+  );
   assert.match(viteSsrPlan, /historical plan record/i);
   assert.match(viteSsrPlan, /does not include `webapp-ssr-express`/);
   assert.match(viteSsrPlan, /Use `webapp-ssr-vite` or `webapp-ssr-next`/);

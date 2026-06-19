@@ -37,14 +37,14 @@ test("prebuild-guard: prints patch invalidation one-liners with canonical vocabu
     })`git add apps/web/pnpm-lock.yaml apps/pytool/uv.lock libs/demo/patches/go/example.com__x@1.0.0.patch libs/demo/patches/cpp/pkgs__zlib@1.0.0.patch`;
 
     // Provide minimal outputs so the guard doesn't need to auto-fix to reach the notes.
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, ".viberoots", "workspace", "buck"), { recursive: true });
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
       "[]\n",
       "utf8",
     );
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "node-lock-index.json"),
       "{}\n",
       "utf8",
     );
@@ -64,7 +64,7 @@ test("prebuild-guard: prints patch invalidation one-liners with canonical vocabu
       cwd: tmp,
       stdio: "pipe",
       env: { ...process.env, PREBUILD_GUARD_NO_FIX: "1" },
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`.nothrow();
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`.nothrow();
 
     const stderr = String((res as any).stderr || "");
     const expectLines = [

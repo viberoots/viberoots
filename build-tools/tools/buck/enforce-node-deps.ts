@@ -15,6 +15,7 @@ import {
 } from "../lib/node-deps-enforcement-core";
 import { uniqSorted } from "../lib/posix-path";
 import { repoRoot } from "../lib/repo";
+import { DEFAULT_NODE_WORKSPACE_MAP_PATH } from "../lib/workspace-state-paths";
 
 async function readJsonFile<T>(filePath: string): Promise<T> {
   const txt = await fsp.readFile(filePath, "utf8");
@@ -106,7 +107,7 @@ async function main(): Promise<void> {
   if (missingMaps.length > 0) {
     for (const miss of missingMaps) {
       console.error(
-        `ERROR: ${miss.importer}/package.json uses workspace:${miss.name} without mapping in build-tools/tools/node/workspace-map.json`,
+        `ERROR: ${miss.importer}/package.json uses workspace:${miss.name} without mapping in ${DEFAULT_NODE_WORKSPACE_MAP_PATH}`,
       );
     }
     process.exit(1);

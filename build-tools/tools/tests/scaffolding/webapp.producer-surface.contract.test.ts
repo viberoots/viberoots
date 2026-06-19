@@ -15,7 +15,7 @@ test("producer surfaces expose deterministic contract attrs", async () => {
     await writeTarget(
       path.join(tmp, "projects", "libs", "go-wasm"),
       [
-        'load("//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
+        'load("@viberoots//build-tools/go:defs.bzl", "nix_go_tiny_wasm_lib")',
         "",
         'nix_go_tiny_wasm_lib(name = "wasm", go_source_roots = ["src/producer"])',
         "",
@@ -24,7 +24,7 @@ test("producer surfaces expose deterministic contract attrs", async () => {
     await writeTarget(
       path.join(tmp, "projects", "libs", "cpp-wasm"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")',
         "",
         'nix_cpp_wasm_static_lib(name = "core", cpp_source_roots = ["src/producer"])',
         "",
@@ -39,7 +39,7 @@ test("producer surfaces expose deterministic contract attrs", async () => {
     await writeTarget(
       path.join(tmp, "projects", "libs", "py-wasm"),
       [
-        'load("//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_lib")',
+        'load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_lib")',
         "",
         "nix_python_wasm_app(",
         '  name = "app",',
@@ -62,7 +62,7 @@ test("producer surfaces expose deterministic contract attrs", async () => {
     await writeTarget(
       path.join(tmp, "projects", "libs", "ts-lib"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_lib")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_lib")',
         "",
         'nix_node_lib(name = "lib", cmd = "echo hi > $OUT", out = "lib.stamp", ts_module_roots = ["src/modules"])',
         "",
@@ -77,7 +77,7 @@ test("producer surfaces expose deterministic contract attrs", async () => {
     await writeTarget(
       path.join(tmp, "projects", "apps", "web"),
       [
-        'load("//build-tools/node:defs.bzl", "node_webapp", "node_asset_stage")',
+        'load("@viberoots//build-tools/node:defs.bzl", "node_webapp", "node_asset_stage")',
         "",
         'node_webapp(name = "app_raw", ts_module_roots = ["src/ts-modules"])',
         "node_asset_stage(",

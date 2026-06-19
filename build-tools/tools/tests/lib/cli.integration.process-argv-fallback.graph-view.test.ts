@@ -8,7 +8,7 @@ import { runNodeWithZx } from "../../lib/node-run";
 
 test("graph-view: works when zx global argv is absent (process.argv fallback)", async () => {
   await runInTemp("graph-view-cli", async (tmp) => {
-    const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
     await fsp.writeFile(
       graphPath,
@@ -21,15 +21,21 @@ test("graph-view: works when zx global argv is absent (process.argv fallback)", 
     );
 
     const repoRoot = process.cwd();
-    const script = path.join(repoRoot, "build-tools", "tools", "buck", "graph-view.ts");
-    const zxInitPath = path.join(repoRoot, "build-tools", "tools", "dev", "zx-init.mjs");
+    const viberootsRoot = path.join(repoRoot, "viberoots");
+    const script = path.join(viberootsRoot, "build-tools", "tools", "buck", "graph-view.ts");
+    const zxInitPath = path.join(viberootsRoot, "build-tools", "tools", "dev", "zx-init.mjs");
     const res = await runNodeWithZx({
       cwd: tmp,
       zxInitPath,
       script,
       args: ["--graph", graphPath],
       stdio: "pipe",
-      env: { ...process.env, WORKSPACE_ROOT: tmp },
+      env: {
+        ...process.env,
+        WORKSPACE_ROOT: tmp,
+        VIBEROOTS_ROOT: viberootsRoot,
+        VIBEROOTS_SOURCE_ROOT: viberootsRoot,
+      },
     });
     const parsed = JSON.parse(String(res.stdout || "")) as any;
     assert.ok(parsed && typeof parsed === "object");

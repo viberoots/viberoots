@@ -7,8 +7,8 @@ test("target-aware untracked policy ignores unrelated docs/tests paths", () => {
   const r = untrackedRequiresImpureForTargets({
     untracked: [
       "docs/notes.md",
-      "build-tools/tools/tests/dev/foo.test.ts",
-      "build-tools/docs/guide.md",
+      "viberoots/build-tools/tools/tests/dev/foo.test.ts",
+      "viberoots/build-tools/docs/guide.md",
     ],
     targetPackages: ["projects/apps/myapp"],
   });
@@ -28,7 +28,7 @@ test("target-aware untracked policy marks target package files relevant", () => 
 
 test("target-aware untracked policy marks global build inputs relevant", () => {
   const r = untrackedRequiresImpureForTargets({
-    untracked: ["flake.lock", "build-tools/node/defs_nix.bzl"],
+    untracked: ["flake.lock", "viberoots/build-tools/node/defs_nix.bzl"],
     targetPackages: ["projects/apps/myapp"],
   });
   assert.equal(r.requiresImpure, true);

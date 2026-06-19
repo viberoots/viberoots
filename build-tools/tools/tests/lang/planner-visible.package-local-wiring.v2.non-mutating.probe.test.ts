@@ -13,7 +13,7 @@ await runInTemp("planner-visible-package-local-wiring-non-mutating-probe", async
     path.join(appDir, "TARGETS"),
     [
       'load("@prelude//:rules.bzl", "genrule")',
-      'load("//build-tools/lang:defs_common.bzl", "wire_package_local_planner_visible_stub")',
+      'load("@viberoots//build-tools/lang:defs_common.bzl", "wire_package_local_planner_visible_stub")',
       "",
       'kw = {"labels": ["probe:v2"], "local_patch_dirs": ["patches/cpp"], "nixpkg_deps": ["zlib"]}',
       'pre_local = "local_patch_dirs" in kw',

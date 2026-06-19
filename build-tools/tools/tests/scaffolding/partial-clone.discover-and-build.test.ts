@@ -38,27 +38,27 @@ name = TARGETS
 
 [repositories]
 root = .
-prelude = ./prelude
+prelude = ./.viberoots/current/prelude
 viberoots = ./.viberoots/current
 workspace_buck = ./.viberoots/workspace/buck
 workspace_providers = ./.viberoots/workspace/providers
 toolchains = ./toolchains
 repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
+fbsource = ./.viberoots/current/prelude/third-party/fbsource_stub
+fbcode = ./.viberoots/current/prelude/third-party/fbcode_stub
+config = ./.viberoots/current/prelude
 
 [cells]
 root = .
-prelude = ./prelude
+prelude = ./.viberoots/current/prelude
 viberoots = ./.viberoots/current
 workspace_buck = ./.viberoots/workspace/buck
 workspace_providers = ./.viberoots/workspace/providers
 toolchains = ./toolchains
 repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
+fbsource = ./.viberoots/current/prelude/third-party/fbsource_stub
+fbcode = ./.viberoots/current/prelude/third-party/fbcode_stub
+config = ./.viberoots/current/prelude
 
 [build]
 prelude = prelude
@@ -67,7 +67,7 @@ user_platform = //:no_cgo
 target_platforms = //:no_cgo
 EOF
       mkdir -p toolchains .viberoots/workspace/buck .viberoots/workspace/providers
-      ln -sfn .. .viberoots/current
+      ln -sfn ../viberoots .viberoots/current
       printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
       printf '[buildfile]\nname = TARGETS\n' > .viberoots/workspace/buck/.buckconfig
       printf '[buildfile]\nname = TARGETS\n' > .viberoots/workspace/providers/.buckconfig
@@ -87,17 +87,18 @@ EOF
       await $`mkdir -p ${rel}`;
     }
 
-    await ensureFile("build-tools/go/defs.bzl");
-    await ensureFile("build-tools/tools/buck/export-graph.ts");
-    await ensureFile("build-tools/tools/buck/sync-providers.ts");
-    await ensureFile("build-tools/tools/buck/gen-auto-map.ts");
-    await ensureFile("build-tools/tools/buck/prebuild-guard.ts");
-    await ensureFile("build-tools/tools/dev/install-deps.ts");
-    await ensureFile("build-tools/tools/dev/zx-init.mjs");
-    await ensureFile("build-tools/tools/lib/providers.ts");
-    await ensureFile("build-tools/tools/lib/fs-helpers.ts");
+    await ensureFile("viberoots/build-tools/go/defs.bzl");
+    await ensureFile("viberoots/build-tools/tools/buck/export-graph.ts");
+    await ensureFile("viberoots/build-tools/tools/buck/sync-providers.ts");
+    await ensureFile("viberoots/build-tools/tools/buck/gen-auto-map.ts");
+    await ensureFile("viberoots/build-tools/tools/buck/prebuild-guard.ts");
+    await ensureFile("viberoots/build-tools/tools/dev/install-deps.ts");
+    await ensureFile("viberoots/build-tools/tools/dev/zx-init.mjs");
+    await ensureFile("viberoots/build-tools/tools/lib/providers.ts");
+    await ensureFile("viberoots/build-tools/tools/lib/fs-helpers.ts");
     await ensureFile("TARGETS");
     await ensureFile("flake.lock");
+    await $`bash --noprofile --norc -lc ${`cp -R ${path.join(repoRoot, "viberoots/toolchains")}/. toolchains/`}`;
 
     // Scaffold a new Go lib into the sparse repo
     await $`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
@@ -138,11 +139,11 @@ chmod +x ${stubPath}
     )}`;
 
     // Run glue explicitly to ensure discovery works in sparse context
-    await $`build-tools/tools/dev/install-deps.ts --glue-only`;
+    await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
     // Keep the explicit export and mapping to mirror user flow closely
-    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
-    await $`node build-tools/tools/buck/sync-providers.ts`;
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
 
     // Smoke assertions
     await $`test -f .viberoots/workspace/providers/auto_map.bzl`;

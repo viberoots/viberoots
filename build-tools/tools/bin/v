@@ -1,4 +1,69 @@
 #!/usr/bin/env bash
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-exec "${SCRIPT_DIR}/verify" "$@"
+
+# shell helpers
+# shellcheck source=/dev/null
+. "${SCRIPT_DIR}/_env.sh"
+
+cleanup_verify_root_buck_out() {
+	local allow_default_buck_kill="${1:-0}"
+	local buck_out="${LIVE_ROOT}/buck-out"
+	[[ -d "${buck_out}" ]] || return 0
+	local entry base owner_pid
+	for entry in "${buck_out}"/* "${buck_out}"/.[!.]* "${buck_out}"/..?*; do
+		[[ -e "${entry}" ]] || continue
+		base="$(basename "${entry}")"
+		case "${base}" in
+			.metadata_never_index|test-logs|tmp|zx_shims|v2|v-*|verify-nested-*|deployment-query-*|zxtest-shared-*)
+				owner_pid=""
+				case "${base}" in
+					v-*-*) owner_pid="${base#v-}"; owner_pid="${owner_pid%%-*}" ;;
+					verify-nested-*-*) owner_pid="${base#verify-nested-}"; owner_pid="${owner_pid%%-*}" ;;
+				esac
+				if [[ "${owner_pid}" =~ ^[0-9]+$ ]] && kill -0 "${owner_pid}" >/dev/null 2>&1; then
+					continue
+				fi
+				if registered_isolation_owner_alive "${base}"; then
+					continue
+				fi
+					if [[ "${base}" == "v2" && "${allow_default_buck_kill}" != "1" ]]; then
+						continue
+					fi
+					if command -v buck2 >/dev/null 2>&1; then
+						if [[ "${base}" == "v2" ]]; then
+							timeout 10s buck2 kill >/dev/null 2>&1 || true
+						else
+						timeout 10s buck2 --isolation-dir "${base}" kill >/dev/null 2>&1 || true
+					fi
+				fi
+				rm -rf "${entry}" 2>/dev/null || true
+				;;
+		esac
+	done
+	rmdir "${buck_out}" 2>/dev/null || true
+}
+
+registered_isolation_owner_alive() {
+	local iso="$1"
+	local state_file="${VBR_VERIFY_PROCESS_STATE_FILE:-${VBR_BUCK_REAPER_STATE_FILE:-}}"
+	[[ -n "${state_file}" && -f "${state_file}" ]] || return 1
+	local line owner_pid
+	while IFS= read -r line; do
+		[[ "${line}" == isolation$'\t'* ]] || continue
+		[[ "${line}" == *"\"iso\":\"${iso}\""* ]] || continue
+		[[ "${line}" == *"\"repoRoot\":\"${LIVE_ROOT}\""* ]] || continue
+		owner_pid="${line#*\"ownerPid\":}"
+		owner_pid="${owner_pid%%,*}"
+		if [[ "${owner_pid}" =~ ^[0-9]+$ ]] && kill -0 "${owner_pid}" >/dev/null 2>&1; then
+			return 0
+		fi
+	done <"${state_file}"
+	return 1
+}
+
+status=0
+cleanup_verify_root_buck_out 1
+"${SCRIPT_DIR}/verify" "$@" || status="$?"
+cleanup_verify_root_buck_out 0
+exit "${status}"

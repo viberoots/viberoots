@@ -151,6 +151,18 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
       ).trim()
     : "";
   const selectorArgs = ["--deployment", opts.deploymentLabel || opts.deployment.label];
+  const viberootsRoot = String(
+    process.env.VIBEROOTS_ROOT || process.env.VIBEROOTS_SOURCE_ROOT || "",
+  ).trim();
+  const governanceVerifyScript = viberootsRoot
+    ? path.join(
+        viberootsRoot,
+        "build-tools",
+        "tools",
+        "deployments",
+        "deployment-lane-governance-verify.ts",
+      )
+    : "build-tools/tools/deployments/deployment-lane-governance-verify.ts";
   await fsp.writeFile(
     snapshotPath,
     JSON.stringify(
@@ -172,7 +184,7 @@ export async function writeReviewedLaneAdmissionEvidenceJson(opts: {
     cwd: opts.tmp,
     stdio: "pipe",
     env: freshBuckQueryEnv(opts.tmp),
-  })`zx-wrapper build-tools/tools/deployments/deployment-lane-governance-verify.ts ${selectorArgs} --scm-policy-json ${snapshotPath}`;
+  })`zx-wrapper ${governanceVerifyScript} ${selectorArgs} --scm-policy-json ${snapshotPath}`;
   await fsp.writeFile(
     evidencePath,
     JSON.stringify(

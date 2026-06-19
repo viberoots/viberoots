@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("ci run-stage wires nix-gaps policy gate with canonical docs paths", async () => {
-  const txt = await fsp.readFile("build-tools/tools/ci/run-stage.ts", "utf8");
+  const txt = await fsp.readFile("viberoots/build-tools/tools/ci/run-stage.ts", "utf8");
   assert.ok(
     txt.includes('"nix-gaps-policy"'),
     "expected run-stage to expose a nix-gaps-policy stage",

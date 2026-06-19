@@ -160,8 +160,8 @@ export async function synchronizeInstalledDeployments(
     // reuse a stale package view from an earlier install in the same temp workspace.
     BUCK_ISOLATION_DIR: syncIsolation,
     BUCK_NESTED_ISO: syncIsolation,
+    BUCK_ISOLATION_DIR_EXPORTER: syncIsolation,
   };
-  delete queryEnv.BUCK_ISOLATION_DIR_EXPORTER;
   const resolved = await Promise.all(
     deployments.map((deployment) =>
       resolveDeploymentFromTarget(workspaceRoot, deployment.label, { env: queryEnv }),

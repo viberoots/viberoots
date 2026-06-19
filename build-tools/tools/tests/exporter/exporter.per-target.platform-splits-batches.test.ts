@@ -40,7 +40,7 @@ test("per-target GOOS/GOARCH split batches via labels", async () => {
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${metrics}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${metrics}`;
 
     const m = JSON.parse(await fs.readFile(metrics, "utf8"));
     const keys: string[] = m.tupleKeys || [];

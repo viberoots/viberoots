@@ -66,7 +66,7 @@ test("p resolves package label to runnable target label", async () => {
         ...process.env,
         PATH: `${stubBin}:${process.env.PATH || ""}`,
       },
-    })`build-tools/tools/bin/p //projects/apps/demo`;
+    })`viberoots/build-tools/tools/bin/p //projects/apps/demo`;
     assert.match(String(run.stdout || ""), /package-resolution-ok/);
 
     const loggedTarget = String(await fsp.readFile(targetLog, "utf8")).trim();
@@ -135,14 +135,14 @@ test("p resolves relative and absolute directory paths to runnable target label"
       cwd: tmp,
       stdio: "pipe",
       env: commonEnv,
-    })`build-tools/tools/bin/p projects/apps/demo`;
+    })`viberoots/build-tools/tools/bin/p projects/apps/demo`;
     assert.match(String(relativeRun.stdout || ""), /path-resolution-ok/);
 
     const absoluteRun = await $({
       cwd: tmp,
       stdio: "pipe",
       env: commonEnv,
-    })`build-tools/tools/bin/p ${path.join(tmp, "projects", "apps", "demo")}`;
+    })`viberoots/build-tools/tools/bin/p ${path.join(tmp, "projects", "apps", "demo")}`;
     assert.match(String(absoluteRun.stdout || ""), /path-resolution-ok/);
 
     const loggedTargets = String(await fsp.readFile(targetLog, "utf8"))
@@ -229,7 +229,7 @@ test("d resolves current directory path (.) from package cwd", async () => {
         ...process.env,
         PATH: `${stubBin}:${process.env.PATH || ""}`,
       },
-    })`${path.join(tmp, "build-tools", "tools", "bin", "d")} .`;
+    })`${path.join(tmp, "viberoots", "build-tools", "tools", "bin", "d")} .`;
     assert.match(String(run.stdout || ""), /dev-dot-ok/);
     const loggedTarget = String(await fsp.readFile(targetLog, "utf8")).trim();
     assert.equal(loggedTarget, "//projects/apps/demo:app");

@@ -38,6 +38,8 @@ test("remote SSH transport assembles reviewed preflight, staging, deploy, and cl
     assert.equal(preflight.at(-2), "mini");
     assert.match(preflight.at(-1) || "", /^bash -lc '/);
     assert.match(preflight.at(-1) || "", /missing reviewed remote repo checkout/);
+    assert.match(preflight.at(-1) || "", /\.viberoots\/workspace\/flake\.nix/);
+    assert.match(preflight.at(-1) || "", /missing workspace flake/);
     const stagePrepare = buildRemoteSshArgv(
       plan.destination,
       buildRemoteStagePrepareScript(remoteArtifactPath),
@@ -69,7 +71,9 @@ test("remote SSH transport assembles reviewed preflight, staging, deploy, and cl
         },
       }),
     );
-    assert.match(deploy.at(-1) || "", /direnv exec \. build-tools\/tools\/bin\/deploy/);
+    assert.match(deploy.at(-1) || "", /deploy_bin=""/);
+    assert.match(deploy.at(-1) || "", /build-tools\/tools\/bin\/deploy/);
+    assert.match(deploy.at(-1) || "", /direnv exec \. "\$deploy_bin"/);
     assert.match(
       deploy.at(-1) || "",
       /--artifact-dir '"'"'\/var\/lib\/deployment-host\/runtime\/\.deploy-artifacts/,
@@ -98,7 +102,9 @@ test("remote SSH transport assembles reviewed host-apply commands for switch and
       switchPlan.destination,
       buildRemoteHostApplyScript(switchPlan),
     );
+    assert.match(switchApply.at(-1) || "", /host_apply_bin=""/);
     assert.match(switchApply.at(-1) || "", /nixos-shared-host-host-apply\.ts/);
+    assert.match(switchApply.at(-1) || "", /direnv exec \. zx-wrapper "\$host_apply_bin"/);
     assert.match(switchApply.at(-1) || "", /--config-root '"'"'\/etc\/nixos'"'"'/);
     assert.match(
       switchApply.at(-1) || "",

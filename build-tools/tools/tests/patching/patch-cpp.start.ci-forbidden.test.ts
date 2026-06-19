@@ -10,13 +10,13 @@ test("patch-cpp start fails in CI when attempting to set dev overrides", async (
     await fsp.mkdir(storeSrc, { recursive: true });
     await fsp.writeFile(path.join(storeSrc, "README"), "zlib\n", "utf8");
     const map = { "pkgs.zlib": { version: "1.2.13", srcPath: storeSrc, pname: "zlib" } };
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const r = await $({
       cwd: tmp,
       stdio: "pipe",
     })`CI=true NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} build-tools/tools/bin/patch-pkg start cpp pkgs.zlib`.nothrow();
+    )} viberoots/build-tools/tools/bin/patch-pkg start cpp pkgs.zlib`.nothrow();
     if ((r.exitCode || 0) === 0) {
       console.error("expected patch-cpp start to fail in CI when setting dev overrides");
       console.error("stdout:", String(r.stdout || ""));

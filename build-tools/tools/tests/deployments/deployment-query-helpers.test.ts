@@ -28,6 +28,16 @@ test("deployment cquery env preserves inherited isolation controls", () => {
   assert.deepEqual(deploymentIsolationArgs(env), ["--isolation-dir", "already-owned"]);
 });
 
+test("deployment cquery env preserves caller-owned nested isolation", () => {
+  const env = deploymentBuckEnv("/tmp/viberoots-deployment-query", {
+    HOME: "/tmp/home",
+    BUCK_NESTED_ISO: "caller-owned",
+  });
+
+  assert.equal(env.BUCK_NESTED_ISO, "caller-owned");
+  assert.deepEqual(deploymentIsolationArgs(env), ["--isolation-dir", "caller-owned"]);
+});
+
 test("deployment cquery env respects explicit no-isolation mode", () => {
   const env = deploymentBuckEnv("/tmp/viberoots-deployment-query", {
     HOME: "/tmp/home",

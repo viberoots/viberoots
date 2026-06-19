@@ -13,7 +13,7 @@ test("gen-auto-map: Go module labels do not map to providers (Node-only)", async
       JSON.stringify([node]),
       "utf8",
     );
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
     const out = await fsp.readFile(
       path.join(tmp, ".viberoots", "workspace", "providers", "auto_map.bzl"),
       "utf8",

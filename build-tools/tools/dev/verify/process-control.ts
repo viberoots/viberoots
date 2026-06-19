@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { processStartSignature } from "../../lib/process-inspection";
+import { buildToolPath } from "../dev-build/paths";
 
 export async function killBuckIsolation(root: string, iso: string): Promise<void> {
   await new Promise<void>((resolve) => {
@@ -67,14 +68,7 @@ export async function startBuckDaemonReaper(opts: {
   const parentSig = await processStartSignature(process.pid);
   if (!parentSig) return;
 
-  const script = path.join(
-    opts.root,
-    "build-tools",
-    "tools",
-    "tests",
-    "lib",
-    "buck-daemon-reaper.ts",
-  );
+  const script = buildToolPath(opts.root, "tools/tests/lib/buck-daemon-reaper.ts");
 
   const child = spawn(
     process.execPath,
@@ -109,7 +103,7 @@ export async function startBuckWatchdog(opts: {
   iso: string;
   logFile?: string | null;
 }): Promise<void> {
-  const watchdog = path.join(opts.root, "build-tools", "tools", "dev", "buck-watchdog.ts");
+  const watchdog = buildToolPath(opts.root, "tools/dev/buck-watchdog.ts");
   const quote = (value: string) => JSON.stringify(value);
   const logFileArg = opts.logFile ? `--log-file ${quote(opts.logFile)}` : "";
   await $({

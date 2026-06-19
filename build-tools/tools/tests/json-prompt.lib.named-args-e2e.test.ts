@@ -8,7 +8,7 @@ const execFile = promisify(execFileCallback);
 
 async function jsonPromptNamedArgs(input: string, extraArgs: string[] = []): Promise<string[]> {
   const { stdout } = await execFile(
-    "build-tools/tools/bin/json-prompt",
+    "viberoots/build-tools/tools/bin/json-prompt",
     [input, "--output=named-args", ...extraArgs],
     {
       cwd: process.cwd(),

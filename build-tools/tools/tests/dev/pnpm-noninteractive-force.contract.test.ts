@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 
 const EXPECTATIONS: Array<{
@@ -9,7 +10,7 @@ const EXPECTATIONS: Array<{
   checks?: Array<(source: string, file: string) => void>;
 }> = [
   {
-    path: "build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts",
+    path: "viberoots/build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts",
     fragments: ["withHiddenNodeModules(importerAbs"],
     checks: [
       (source, file) => {
@@ -27,7 +28,7 @@ const EXPECTATIONS: Array<{
     ],
   },
   {
-    path: "build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
+    path: "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
     fragments: ["withHiddenNodeModules(importerAbs", "NIX_PNPM_INSTALL_TIMEOUT: fetchTimeout"],
     checks: [
       (source, file) => {
@@ -40,7 +41,7 @@ const EXPECTATIONS: Array<{
     ],
   },
   {
-    path: "build-tools/tools/lib/pnpm-importer-lockfile.ts",
+    path: "viberoots/build-tools/tools/lib/pnpm-importer-lockfile.ts",
     fragments: [
       "withHiddenNodeModules(importerAbs",
       "install --force --filter",
@@ -48,14 +49,14 @@ const EXPECTATIONS: Array<{
     ],
   },
   {
-    path: "build-tools/tools/nix/node-modules/modules.nix",
+    path: "viberoots/build-tools/tools/nix/node-modules/modules.nix",
     fragments: [
       "pnpm install --offline --force --no-frozen-lockfile",
       "pnpm install --offline --force --frozen-lockfile",
     ],
   },
   {
-    path: "build-tools/tools/nix/node-modules/store.nix",
+    path: "viberoots/build-tools/tools/nix/node-modules/store.nix",
     fragments: [
       "pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false",
       "mkPnpmStoreUnfixed: pnpm install (offline exact-store)",
@@ -75,7 +76,8 @@ const EXPECTATIONS: Array<{
 
 test("non-interactive pnpm install paths force through modules-dir purges", async () => {
   for (const expectation of EXPECTATIONS) {
-    const source = await fsp.readFile(expectation.path, "utf8");
+    const file = path.join(process.cwd(), expectation.path);
+    const source = await fsp.readFile(file, "utf8");
     for (const fragment of expectation.fragments) {
       if (!source.includes(fragment)) {
         throw new Error(

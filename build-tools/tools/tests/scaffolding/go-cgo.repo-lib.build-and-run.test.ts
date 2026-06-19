@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
-import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("repo_cgo_deps wires local cpp lib and runs", async () => {
   await runInTemp("go-cgo-repo-lib", async (tmp, $) => {
@@ -17,7 +17,7 @@ test("repo_cgo_deps wires local cpp lib and runs", async () => {
 
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > projects/libs/greeter/TARGETS <<"EOF"\nload("//build-tools/cpp:defs.bzl", "nix_cpp_library")\n\n# Build the C++ static lib via Nix\nnix_cpp_library(\n    name = "greeter",\n    srcs = ["src/greeter.cpp"],\n    headers = ["include/greeter.h"],\n    labels = ["lang:cpp", "kind:lib"],\n)\nEOF'`;
+    })`bash --noprofile --norc -c 'cat > projects/libs/greeter/TARGETS <<"EOF"\nload("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")\n\n# Build the C++ static lib via Nix\nnix_cpp_library(\n    name = "greeter",\n    srcs = ["src/greeter.cpp"],\n    headers = ["include/greeter.h"],\n    labels = ["lang:cpp", "kind:lib"],\n)\nEOF'`;
 
     await $({
       cwd: tmp,
@@ -25,7 +25,7 @@ test("repo_cgo_deps wires local cpp lib and runs", async () => {
 
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > projects/apps/demo-cli/TARGETS <<"EOF"\nload("//build-tools/go:defs.bzl", "nix_go_binary")\n\n# Consume the local C++ lib via repo_cgo_deps\nnix_go_binary(\n    name = "demo",\n    srcs = ["cmd/demo/main.go"],\n    repo_cgo_deps = ["//projects/libs/greeter:greeter"],\n)\nEOF'`;
+    })`bash --noprofile --norc -c 'cat > projects/apps/demo-cli/TARGETS <<"EOF"\nload("@viberoots//build-tools/go:defs.bzl", "nix_go_binary")\n\n# Consume the local C++ lib via repo_cgo_deps\nnix_go_binary(\n    name = "demo",\n    srcs = ["cmd/demo/main.go"],\n    repo_cgo_deps = ["//projects/libs/greeter:greeter"],\n)\nEOF'`;
 
     // Export a graph and attempt a planner build of the selected target
     const probe = await $({
@@ -41,14 +41,14 @@ test("repo_cgo_deps wires local cpp lib and runs", async () => {
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const build = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//projects/apps/demo-cli:demo" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     if (build.exitCode !== 0) {
       console.error(build.stdout + "\n" + build.stderr);
       throw new Error("nix build failed");

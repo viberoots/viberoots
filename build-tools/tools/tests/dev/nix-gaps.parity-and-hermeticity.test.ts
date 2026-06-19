@@ -4,7 +4,7 @@ import crypto from "node:crypto";
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -49,8 +49,9 @@ async function selectedBuildOutPath(
       ...env,
       BUCK_TARGET: target,
       BUCK_TEST_SRC: tmp,
+      BUCK_GRAPH_JSON: path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
     },
-  })`${nixBin} build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+  })`${nixBin} build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
   const outPath = parseLastOutPath(res.stdout);
   assert.ok(outPath, `expected nix output path for ${target}`);
   return outPath;
@@ -85,7 +86,7 @@ test(
       );
 
       await fs.outputFile(
-        path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
+        path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
         JSON.stringify(
           [
             {

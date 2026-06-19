@@ -19,7 +19,7 @@ test("patches-lint (cpp): invalid filename shapes fail in strict mode", async ()
 
     const res = await $({
       nothrow: true,
-    })`node build-tools/tools/dev/patches-lint.ts --lang cpp --strict`;
+    })`node viberoots/build-tools/tools/dev/patches-lint.ts --lang cpp --strict`;
     if (res.exitCode === 0) {
       console.error("expected strict lint to fail due to filename shape errors");
       process.exit(2);

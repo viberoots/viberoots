@@ -100,7 +100,7 @@ function renderAppTargets(opts: {
 
 function renderSharedTargets(primary: MobileDeployment, deployments: MobileDeployment[]): string {
   return [
-    'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_governance", "deployment_lane_policy")',
+    'load("@viberoots//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_governance", "deployment_lane_policy")',
     "",
     "deployment_lane_governance(",
     `    name = ${JSON.stringify(labelName(primary.lanePolicy.governanceRef))},`,

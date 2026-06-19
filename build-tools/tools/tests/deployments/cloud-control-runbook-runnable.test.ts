@@ -13,6 +13,7 @@ import { privateLinkAwsTopology, topologyForPublishedImage } from "./cloud-contr
 import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
+import { viberootsRepoPath } from "./deployment-command";
 import { runInScratchTemp } from "../lib/test-helpers";
 const sh = promisify(exec);
 const DIGEST = `sha256:${"e".repeat(64)}`;
@@ -89,7 +90,7 @@ test("HTTP runbook commands write outputs from repo root and bundle root", async
 });
 
 test("guide command flow stays in generated runbook phase order", async () => {
-  const guide = await fsp.readFile("docs/control-plane-guide.md", "utf8");
+  const guide = await fsp.readFile(viberootsRepoPath("docs/control-plane-guide.md"), "utf8");
   const commands = JSON.parse(
     renderCloudControlSetupBundle(input("unused", "https://deploy.example.test")).files[
       "commands.json"

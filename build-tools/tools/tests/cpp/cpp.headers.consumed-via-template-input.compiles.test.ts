@@ -14,7 +14,7 @@ function parseOutPath(stdout: unknown): string {
 }
 
 await runInTemp("cpp-headers-consumed-by-template-input", async (tmp, $) => {
-  const repo = process.cwd();
+  const repo = path.join(process.cwd(), "viberoots");
 
   await fsp.mkdir(path.join(tmp, "projects", "libs", "hdrs", "include"), { recursive: true });
   await fsp.writeFile(

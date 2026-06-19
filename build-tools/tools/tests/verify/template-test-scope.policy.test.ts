@@ -22,7 +22,7 @@ test("auto mode uses template-selected targets for template-only changes", async
         targets: ["//:a_template_test", "//:scaffolding_smoke_lib_readme"],
         diagnostics: {
           mode: "template-only",
-          changedPaths: ["build-tools/tools/scaffolding/templates/go/lib/copier.yaml"],
+          changedPaths: ["viberoots/build-tools/tools/scaffolding/templates/go/lib/copier.yaml"],
           changedTemplateIds: ["go/lib"],
           ownedChangedTestPaths: [],
           ownedChangedTestTargets: [],
@@ -58,13 +58,13 @@ test("auto mode falls back to build-system scope when selector reports mixed", a
         diagnostics: {
           mode: "mixed",
           changedPaths: [
-            "build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
-            "build-tools/tools/dev/verify.ts",
+            "viberoots/build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
+            "viberoots/build-tools/tools/dev/verify.ts",
           ],
           changedTemplateIds: ["go/lib"],
           ownedChangedTestPaths: [],
           ownedChangedTestTargets: [],
-          nonTemplateBuildSystemPaths: ["build-tools/tools/dev/verify.ts"],
+          nonTemplateBuildSystemPaths: ["viberoots/build-tools/tools/dev/verify.ts"],
           safetyFloorTargets: ["//:scaffolding_smoke_lib_readme"],
           templateTargetsById: { "go/lib": [] },
           selectedTargets: [],
@@ -202,7 +202,9 @@ test("template-only mode fails when a changed template id has no label-selected 
             targets: ["//:scaffolding_smoke_lib_readme"],
             diagnostics: {
               mode: "template-only",
-              changedPaths: ["build-tools/tools/scaffolding/templates/go/lib/copier.yaml"],
+              changedPaths: [
+                "viberoots/build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
+              ],
               changedTemplateIds: ["go/lib"],
               ownedChangedTestPaths: [],
               ownedChangedTestTargets: [],

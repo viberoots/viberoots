@@ -51,12 +51,12 @@ test("prebuild-guard: flags missing Node importer providers and auto-fixes local
     await $({
       cwd: tmp,
       env,
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
 
     // Now allow auto-fix and re-run; guard should regenerate providers via autoFixGlue
     await $({
       cwd: tmp,
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
     const txt = await fsp.readFile(targetsNode, "utf8");
     if (
       !txt.includes("node_importer_deps(") ||
@@ -70,7 +70,7 @@ test("prebuild-guard: flags missing Node importer providers and auto-fixes local
     await fsp.appendFile(lockPath, "# touch\n", "utf8");
     await $({
       cwd: tmp,
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
     // After auto-fix, TARGETS.node.auto should still be present
     if (!(await exists(targetsNode))) throw new Error("TARGETS.node.auto missing after auto-fix");
   });

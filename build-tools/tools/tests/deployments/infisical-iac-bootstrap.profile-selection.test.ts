@@ -45,18 +45,18 @@ test("repo dry-run reports active category profile outside graph requirements", 
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-profile-selection-"));
   await withRepoEnv(dir, async () => {
     await writeResolverConfig(inlineInfisicalProfile());
-    await writeJson(path.join(dir, "build-tools", "tools", "buck", "graph.json"), {
+    await writeJson(path.join(dir, ".viberoots", "workspace", "buck", "graph.json"), {
       nodes: [{ name: "//deployments/vault:deploy", secret_backend: "vault/default" }],
     });
     const plan = await buildRepoDryRunMaterializationPlan({
       configPath: "projects/config/shared.json",
-      graphPath: path.join("build-tools", "tools", "buck", "graph.json"),
+      graphPath: path.join(".viberoots", "workspace", "buck", "graph.json"),
       sink: { kind: "local-file", backend: "local-file", description: "local" },
     });
     const resolver = await ensureRepoResolverConfig({
       dryRun: false,
       configPath: "projects/config/shared.json",
-      graphPath: path.join("build-tools", "tools", "buck", "graph.json"),
+      graphPath: path.join(".viberoots", "workspace", "buck", "graph.json"),
     });
     assert.deepEqual(
       plan.profiles.map((profile) => profile.name),
@@ -81,11 +81,11 @@ test("category projectIdEnv blockers appear in dry-run and fail confirmed materi
     const resolver = await ensureRepoResolverConfig({
       dryRun: false,
       configPath: "projects/config/shared.json",
-      graphPath: path.join("build-tools", "tools", "buck", "graph.json"),
+      graphPath: path.join(".viberoots", "workspace", "buck", "graph.json"),
     });
     const plan = await buildRepoDryRunMaterializationPlan({
       configPath: "projects/config/shared.json",
-      graphPath: path.join("build-tools", "tools", "buck", "graph.json"),
+      graphPath: path.join(".viberoots", "workspace", "buck", "graph.json"),
       env: {},
       sink: { kind: "local-file", backend: "local-file", description: "local" },
     });
@@ -125,7 +125,7 @@ test("repo dry-run materialization applies root local overrides from nested cwd"
     const plan = await buildRepoDryRunMaterializationPlan({
       workspaceRoot: dir,
       configPath: path.join(dir, sharedConfigPath()),
-      graphPath: path.join(dir, "build-tools", "tools", "buck", "graph.json"),
+      graphPath: path.join(dir, ".viberoots", "workspace", "buck", "graph.json"),
       env: {},
       sink: { kind: "local-file", backend: "local-file", description: "local" },
     });
@@ -163,9 +163,9 @@ function sharedConfigPath() {
 }
 
 async function writeGraph(nodes: unknown[]) {
-  await fs.mkdir(path.join("build-tools", "tools", "buck"), { recursive: true });
+  await fs.mkdir(path.join(".viberoots", "workspace", "buck"), { recursive: true });
   await fs.writeFile(
-    path.join("build-tools", "tools", "buck", "graph.json"),
+    path.join(".viberoots", "workspace", "buck", "graph.json"),
     `${JSON.stringify({ nodes }, null, 2)}\n`,
   );
 }

@@ -12,7 +12,7 @@ await runInTemp("package-local-wiring-probe", async (tmp, $) => {
   await fsp.writeFile(
     path.join(pkg, "TARGETS"),
     [
-      'load("//build-tools/lang/internal:package_local_wiring.bzl", "package_local_wiring_probe")',
+      'load("//viberoots/build-tools/lang/internal:package_local_wiring.bzl", "package_local_wiring_probe")',
       "",
       "package_local_wiring_probe(",
       '  name = "probe",',

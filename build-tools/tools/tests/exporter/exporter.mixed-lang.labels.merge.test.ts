@@ -14,7 +14,9 @@ await runInTemp("exporter-mixed-lang-merge", async (tmp, $) => {
   const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
   await fs.outputFile(graph, JSON.stringify(nodes) + "\n", "utf8");
 
-  await $({ cwd: tmp })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
+  await $({
+    cwd: tmp,
+  })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`;
 
   const after = (await readGraph(graph)) as any[];
   const by = new Map(after.map((n) => [n.name, n]));

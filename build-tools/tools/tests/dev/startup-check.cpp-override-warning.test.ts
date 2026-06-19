@@ -1,8 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { test } from "node:test";
+import { fileURLToPath } from "node:url";
+import { runInTemp } from "../lib/test-helpers";
 
-test("startup-check warns for C++ overrides locally", async () => {
+const startupCheckScript = fileURLToPath(new URL("../../dev/startup-check.ts", import.meta.url));
+
+await runInTemp("startup-check-cpp-override-warning", async (_tmp, $) => {
   const here = new URL(import.meta.url).pathname;
   const zxInit = path.resolve(path.dirname(here), "../../dev/zx-init.mjs");
   const nodeFlags = [
@@ -16,11 +19,12 @@ test("startup-check warns for C++ overrides locally", async () => {
     NODE_OPTIONS: [nodeFlags, process.env.NODE_OPTIONS || ""].filter(Boolean).join(" "),
   } as Record<string, string>;
   let out = "";
+  const node = process.execPath || "node";
   try {
     const { stdout, stderr } = await $({
       stdio: "pipe",
       env,
-    })`node build-tools/tools/dev/startup-check.ts`;
+    })`${node} ${startupCheckScript}`;
     out = String(stdout || "") + String(stderr || "");
   } catch (e: any) {
     out = String(e?.stdout || "") + String(e?.stderr || "");

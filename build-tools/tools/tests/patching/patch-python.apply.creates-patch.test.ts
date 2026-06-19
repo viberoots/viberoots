@@ -20,12 +20,12 @@ test("patch-python apply writes canonical patch and refreshes glue", async () =>
     await fs.writeFile(path.join(origin, "readme.txt"), "A\n", "utf8");
 
     // Start a Python patch session
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const wsOut = await $({
       cwd: tmp,
     })`NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
-    })} NIX_PY_DEV_OVERRIDE_JSON={} build-tools/tools/bin/patch-pkg start python requests --importer ${importer}`;
+    })} NIX_PY_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg start python requests --importer ${importer}`;
     const ws = String(wsOut.stdout || "")
       .trim()
       .split(/\s+/)
@@ -38,7 +38,7 @@ test("patch-python apply writes canonical patch and refreshes glue", async () =>
       cwd: tmp,
     })`NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
-    })} NIX_PY_DEV_OVERRIDE_JSON={} build-tools/tools/bin/patch-pkg apply python requests --importer ${importer}`;
+    })} NIX_PY_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg apply python requests --importer ${importer}`;
 
     const patch = path.join(importer, "patches", "python", "requests@2.32.3.patch");
     if (!(await fs.pathExists(patch))) {

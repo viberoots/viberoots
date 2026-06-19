@@ -3,9 +3,12 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("verify forwards a minimum 20 minute pnpm and test timeout budget", async () => {
-  const buck2TestTxt = await fsp.readFile("build-tools/tools/dev/verify/buck2-test.ts", "utf8");
+  const buck2TestTxt = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/verify/buck2-test.ts",
+    "utf8",
+  );
   const buck2TestEnvTxt = await fsp.readFile(
-    "build-tools/tools/dev/verify/buck2-test-env.ts",
+    "viberoots/build-tools/tools/dev/verify/buck2-test-env.ts",
     "utf8",
   );
   if (!buck2TestTxt.includes("const minPerTestTimeoutSecs = 20 * 60;")) {

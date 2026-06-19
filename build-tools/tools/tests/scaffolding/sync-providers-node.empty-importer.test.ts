@@ -26,7 +26,7 @@ packages: {}
     await $`git add projects/apps/empty/pnpm-lock.yaml`;
 
     // Run sync
-    await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
 
     const outPath = path.join(tmp, providerAutoTargetsPath("node"));
     const output = await fsp.readFile(outPath, "utf8");
@@ -49,7 +49,7 @@ packages: {}
     }
 
     // Verify idempotency
-    await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
     const output2 = await fsp.readFile(outPath, "utf8");
 
     if (output !== output2) {

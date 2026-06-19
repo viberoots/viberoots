@@ -1,4 +1,6 @@
 import process from "node:process";
+import fs from "node:fs";
+import path from "node:path";
 import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
 import { localOnlyNixBuilderArgs } from "../../lib/nix-builder-policy";
@@ -34,6 +36,28 @@ function exactStoreSandboxArgs(extraEnv?: NodeJS.ProcessEnv): string[] {
   return [];
 }
 
+function activeViberootsOverride(): string[] {
+  const workspaceRoot = String(process.env.WORKSPACE_ROOT || process.cwd()).trim();
+  const candidates = [
+    workspaceRoot ? path.join(workspaceRoot, "viberoots") : "",
+    workspaceRoot ? path.join(workspaceRoot, ".viberoots", "current") : "",
+    process.env.VIBEROOTS_SOURCE_ROOT || "",
+    process.env.VIBEROOTS_ROOT || "",
+  ]
+    .map((candidate) => String(candidate || "").trim())
+    .filter(Boolean);
+  for (const candidate of candidates) {
+    const abs = path.resolve(candidate);
+    if (
+      fs.existsSync(path.join(abs, "flake.nix")) &&
+      fs.existsSync(path.join(abs, "build-tools", "tools", "dev", "zx-init.mjs"))
+    ) {
+      return ["--override-input", "viberoots", `path:${abs}`];
+    }
+  }
+  return [];
+}
+
 function nixBuildArgs(opts: {
   flakeRef: string;
   attrPath: string;
@@ -48,6 +72,7 @@ function nixBuildArgs(opts: {
     "--impure",
     "--no-link",
     "--accept-flake-config",
+    ...activeViberootsOverride(),
     ...localOnlyNixBuilderArgs(),
     "--print-build-logs",
     "--option",

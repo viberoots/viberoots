@@ -42,7 +42,7 @@ test("gen-auto-map: Python two importers map to distinct providers", async () =>
     await fsp.writeFile(graphPath, JSON.stringify([t1, t2], null, 2), "utf8");
 
     const outPath = path.join(tmp, DEFAULT_AUTO_MAP_PATH);
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
     const out = await fsp.readFile(outPath, "utf8");
 
     // Keys present (allow optional Buck config suffix)

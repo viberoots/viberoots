@@ -12,7 +12,7 @@ test("node_webapp includes global Nix inputs as genrule srcs (action inputs)", a
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "node_webapp")',
+        'load("@viberoots//build-tools/node:defs.bzl", "node_webapp")',
         "",
         "node_webapp(",
         '  name = "bundle",',
@@ -33,7 +33,7 @@ test("node_webapp includes global Nix inputs as genrule srcs (action inputs)", a
     const out = String(probe.stdout || "");
     assert.ok(
       out.includes(":flake.lock"),
-      "expected //:flake.lock to be present in srcs via global_nix_inputs()",
+      "expected //.viberoots/workspace:flake.lock to be present in srcs via global_nix_inputs()",
     );
 
     const labelsProbe = await $({
@@ -49,7 +49,7 @@ test("node_webapp includes global Nix inputs as genrule srcs (action inputs)", a
     const labelsOut = String(labelsProbe.stdout || "");
     assert.ok(
       labelsOut.includes(":flake.lock"),
-      "expected node_webapp to stamp //:flake.lock when stamp=True",
+      "expected node_webapp to stamp //.viberoots/workspace:flake.lock when stamp=True",
     );
   });
 });

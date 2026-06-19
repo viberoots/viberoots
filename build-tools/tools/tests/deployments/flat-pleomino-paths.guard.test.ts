@@ -3,9 +3,14 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { viberootsRepoPath } from "./deployment-command";
 
 const repoRoot = process.cwd();
-const scanRoots = ["build-tools", "docs", "projects"] as const;
+const scanRoots = [
+  { rel: "build-tools", root: viberootsRepoPath("build-tools") },
+  { rel: "docs", root: viberootsRepoPath("docs") },
+  { rel: "projects", root: path.join(repoRoot, "projects") },
+] as const;
 const allowedHistoricalFiles = new Set([
   "docs/history/plans/infisical-plan.md",
   "docs/history/migrations/pleomino-deployment-directory-migration.md",
@@ -18,20 +23,26 @@ const stalePatterns = [
 ] as const;
 const stalePleominoPackageName = /["']pleomino-(?:dev|staging|prod|shared|infisical)["']/;
 
-async function* walk(rel: string): AsyncGenerator<string> {
-  const abs = path.join(repoRoot, rel);
+async function* walk(
+  scanRoot: (typeof scanRoots)[number],
+  rel = "",
+): AsyncGenerator<{
+  rel: string;
+  abs: string;
+}> {
+  const abs = path.join(scanRoot.root, rel);
   const stat = await fsp.stat(abs);
   if (stat.isFile()) {
-    yield rel;
+    yield { rel: path.posix.join(scanRoot.rel, rel), abs };
     return;
   }
   for (const entry of await fsp.readdir(abs, { withFileTypes: true })) {
     if (entry.name === "buck-out" || entry.name === "node_modules") continue;
     const child = path.join(rel, entry.name);
     if (entry.isDirectory()) {
-      yield* walk(child);
+      yield* walk(scanRoot, child);
     } else if (entry.isFile()) {
-      yield child;
+      yield { rel: path.posix.join(scanRoot.rel, child), abs: path.join(scanRoot.root, child) };
     }
   }
 }
@@ -87,9 +98,9 @@ function stalePathJoinVariables(source: string): string[] {
 test("active sources do not reference old flat Pleomino deployment package paths", async () => {
   const stale: string[] = [];
   for (const root of scanRoots) {
-    for await (const rel of walk(root)) {
+    for await (const { rel, abs } of walk(root)) {
       if (allowedHistoricalFiles.has(rel)) continue;
-      const source = await fsp.readFile(path.join(repoRoot, rel), "utf8");
+      const source = await fsp.readFile(abs, "utf8");
       for (const pattern of stalePatterns) {
         for (const match of source.matchAll(pattern)) {
           stale.push(`${rel}: ${match[0]}`);

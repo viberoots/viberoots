@@ -8,7 +8,7 @@ test("planner link-closure: resolves direct vs transitive deterministically", as
     const expr = `
       let
         pkgs = import <nixpkgs> {};
-        LC = import ./build-tools/tools/nix/planner/link-closure.nix { lib = pkgs.lib; };
+        LC = import ./viberoots/build-tools/tools/nix/planner/link-closure.nix { lib = pkgs.lib; };
 
         byName = { A = {}; B = {}; C = {}; D = {}; };
         edges = {

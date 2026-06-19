@@ -4,10 +4,13 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("verify includes a bounded lint preflight (enforcement)", async () => {
-  const txt = await fsp.readFile("build-tools/tools/dev/verify/lint-preflight.ts", "utf8");
+  const txt = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/verify/lint-preflight.ts",
+    "utf8",
+  );
   assert.ok(
     txt.includes("lint preflight"),
-    "expected build-tools/tools/bin/verify to include a lint preflight to avoid wasting time on verify when formatting/lint is dirty",
+    "expected viberoots/build-tools/tools/bin/verify to include a lint preflight to avoid wasting time on verify when formatting/lint is dirty",
   );
   assert.ok(
     txt.includes("collectChangedPaths"),
@@ -23,11 +26,11 @@ test("verify includes a bounded lint preflight (enforcement)", async () => {
   );
   assert.ok(
     txt.includes("VERIFY_LINT_TIMEOUT_SECS"),
-    "expected build-tools/tools/bin/verify to bound lint preflight runtime via VERIFY_LINT_TIMEOUT_SECS",
+    "expected viberoots/build-tools/tools/bin/verify to bound lint preflight runtime via VERIFY_LINT_TIMEOUT_SECS",
   );
   assert.ok(
     txt.includes("timeout -k 10s"),
-    "expected build-tools/tools/bin/verify lint preflight to use timeout -k 10s to avoid indefinite hangs",
+    "expected viberoots/build-tools/tools/bin/verify lint preflight to use timeout -k 10s to avoid indefinite hangs",
   );
   assert.ok(
     txt.includes("nix-gaps-inventory-check.ts"),
@@ -58,7 +61,10 @@ test("verify includes a bounded lint preflight (enforcement)", async () => {
 });
 
 test("verify lint-preflight invokes stale-names-lint for full active-source scan (enforcement)", async () => {
-  const txt = await fsp.readFile("build-tools/tools/dev/verify/lint-preflight.ts", "utf8");
+  const txt = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/verify/lint-preflight.ts",
+    "utf8",
+  );
 
   // The preflight module must call the stale-names-lint step.
   assert.ok(

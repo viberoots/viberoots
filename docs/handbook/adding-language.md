@@ -44,7 +44,7 @@ When you add or change a macro, keep the wiring table-driven through shared help
 - Templates: `build-tools/tools/nix/templates/<lang>.nix` consumed by `build-tools/tools/nix/lang-templates.nix`
 - Planner registry entry: `LANGS.<lang>` inside the planner (dispatch predicates + mkApp/mkLib)
 - Macros: thin Starlark wrappers using `build-tools/lang/defs_common.bzl` helpers
-- Provider sync (optional): implement your generator under `build-tools/tools/buck/providers/<lang>.ts` (scans `patches/<lang>` and writes `TARGETS.<lang>.auto` deterministically). Provider sync is invoked through the unified orchestrator `build-tools/tools/buck/sync-providers.ts` (for example `node build-tools/tools/buck/sync-providers.ts --lang <lang> --no-glue`).
+- Provider sync (optional): implement your generator under `build-tools/tools/buck/providers/<lang>.ts` (scans `patches/<lang>` and writes `.viberoots/workspace/providers/TARGETS.<lang>.auto` deterministically). Provider sync is invoked through the unified orchestrator `build-tools/tools/buck/sync-providers.ts` (for example `node viberoots/build-tools/tools/buck/sync-providers.ts --lang <lang> --no-glue`).
 - Scaffolding templates: `build-tools/tools/scaffolding/templates/<lang>/...` + language registry entry
 - Tests: zx tests using `build-tools/tools/tests/lib/lang-fixtures.ts`
 
@@ -142,7 +142,7 @@ Rule: new package-local planner-visible stub call sites must use the non-mutatin
   - `scaf new python lib <name>` → `projects/libs/<name>` with `pyproject.toml`, `uv.lock`, `TARGETS` using `nix_python_library` and a sample test via `nix_python_test`.
   - `scaf new python app <name>` → `projects/apps/<name>` with a small library and binary (`nix_python_binary`) and importer‑scoped `lockfile_label`.
 - Glue:
-  - Provider sync reads all `**/uv.lock` and writes `third_party/providers/TARGETS.python.auto` deterministically.
+  - Provider sync reads all `**/uv.lock` and writes `.viberoots/workspace/providers/TARGETS.python.auto` deterministically.
   - Python provider sync does **not** accept a global `patchDir` input; patch discovery is always importer-local under `<importer>/patches/python`.
   - `gen-auto-map.ts` already maps generic `lockfile:` labels to importer providers; no Python‑specific code required.
   - Reuse `build-tools/tools/lib/importers.ts` to compute the importer string and list importer‑local patches deterministically.
@@ -155,7 +155,7 @@ Use the shared helpers from `build-tools/lang/defs_common.bzl` so call sites do 
   - defined by `build-tools/tools/lib/importer-roots.json` (single source of truth)
   - rendered to Starlark as `build-tools/lang/importer_roots.bzl`
 
-If you need to change supported importer roots, update `build-tools/tools/lib/importer-roots.json` and re-run glue generation (for example via `i` or `node build-tools/tools/buck/glue-pipeline.ts`). The parity/enforcement tests will fail if the generated Starlark view is stale.
+If you need to change supported importer roots, update `build-tools/tools/lib/importer-roots.json` and re-run glue generation (for example via `i` or `node viberoots/build-tools/tools/buck/glue-pipeline.ts`). The parity/enforcement tests will fail if the generated Starlark view is stale.
 
 - `ensure_single_lockfile_label(kwargs, lockfile_label)` enforces exactly one importer-scoped label (`lockfile:<path>#<importer>`) with stable dedupe and canonical error text.
 - `include_importer_patches_from_labels(kwargs, lang, into = "srcs")` derives the importer and includes importer-local patches deterministically into a supported input attribute (commonly `srcs` or `resources` depending on the rule shape).
@@ -211,7 +211,7 @@ Importer-local patch attachment uses `native.glob(...)`, which cannot reach acro
   into an effective-set-gated repo-root `patches/<lang>/` directory when the contract supports it.
 - Nix templates live under `build-tools/tools/nix/templates/<lang>.nix` and are imported by `build-tools/tools/nix/lang-templates.nix`.
 - Language macros live under `<lang>/defs.bzl` and load provider mappings via the workspace provider cell `@workspace_providers//:auto_map.bzl`.
-- Provider rules live under `//third_party/providers/**` and are generated, not hand-edited.
+- Provider rules live under the generated `workspace_providers` cell backed by `.viberoots/workspace/providers/` and are not hand-edited.
 
 ## Step-by-step
 
@@ -240,12 +240,12 @@ Importer-local patch attachment uses `native.glob(...)`, which cannot reach acro
 4. Provider sync (optional/when patches exist)
 
 - Add a provider sync driver under `build-tools/tools/buck/providers/<lang>.ts` which:
-  - Scans `patches/<lang>/*.patch` (flat), validates shapes, and writes `third_party/providers/TARGETS.<lang>.auto` deterministically
+  - Scans `patches/<lang>/*.patch` (flat), validates shapes, and writes `.viberoots/workspace/providers/TARGETS.<lang>.auto` deterministically
   - Uses helpers from `build-tools/tools/lib/providers.ts` for naming (stable, hashed suffix)
   - Enforces one-patch-per-key and no subdirectories (warn in non-strict, fail in strict)
 - Wire the driver into the unified orchestrator `build-tools/tools/buck/sync-providers.ts` so users run:
-  - Providers only: `node build-tools/tools/buck/sync-providers.ts --lang <lang> --no-glue`
-  - Full glue (when appropriate): `node build-tools/tools/buck/sync-providers.ts --lang <lang>`
+  - Providers only: `node viberoots/build-tools/tools/buck/sync-providers.ts --lang <lang> --no-glue`
+  - Full glue (when appropriate): `node viberoots/build-tools/tools/buck/sync-providers.ts --lang <lang>`
 
 5. Auto-map integration
 

@@ -51,7 +51,7 @@ test("viberoots status reports local live checkout and extraction blockers", asy
     assert.equal(status.currentPointsToLiveCheckout, true);
     assert.deepEqual(
       status.extractionBlockers.map((b: { kind: string; path: string }) => `${b.kind}:${b.path}`),
-      ["path:build-tools"],
+      ["path:build-tools", "path:flake.nix"],
     );
   } finally {
     await fsp.rm(root, { recursive: true, force: true });

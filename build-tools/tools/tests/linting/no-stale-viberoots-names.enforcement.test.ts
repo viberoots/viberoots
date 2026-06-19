@@ -19,8 +19,8 @@ const EXCLUDED_DIRS = new Set([
 
 const ALLOWED_PATHS = new Set([
   ".git",
-  "build-tools/tools/dev/stale-names-lint-allowlists.ts",
-  "build-tools/tools/dev/stale-names-lint.ts",
+  "viberoots/build-tools/tools/dev/stale-names-lint-allowlists.ts",
+  "viberoots/build-tools/tools/dev/stale-names-lint.ts",
   "build-tools/tools/tests/deployments/nixos-shared-host.control-plane-service-env.test.ts",
   "build-tools/tools/tests/linting/no-stale-viberoots-names.enforcement.test.ts",
   "docs/contributor-naming-conventions.md",

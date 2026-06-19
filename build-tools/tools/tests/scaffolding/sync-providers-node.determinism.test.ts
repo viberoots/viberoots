@@ -33,13 +33,13 @@ packages:
     await $`git add projects/apps/example/pnpm-lock.yaml`;
 
     // First run
-    await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
     const outPath = path.join(tmp, providerAutoTargetsPath("node"));
     const output1 = await fsp.readFile(outPath, "utf8");
     const hash1 = crypto.createHash("sha256").update(output1).digest("hex");
 
     // Second run
-    await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
     const output2 = await fsp.readFile(outPath, "utf8");
     const hash2 = crypto.createHash("sha256").update(output2).digest("hex");
 

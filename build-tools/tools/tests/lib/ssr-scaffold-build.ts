@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { once } from "node:events";
+import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import http from "node:http";
 import net from "node:net";
@@ -51,7 +52,13 @@ function sanitizeImporterForNixAttr(importer: string): string {
 
 function viberootsDevTool(name: string): string {
   const root = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || process.cwd();
-  return path.join(root, "build-tools", "tools", "dev", name);
+  const resolvedRoot = path.resolve(root);
+  const viberootsRoot = fs.existsSync(
+    path.join(resolvedRoot, "build-tools", "tools", "dev", "zx-init.mjs"),
+  )
+    ? resolvedRoot
+    : path.join(resolvedRoot, "viberoots");
+  return path.join(viberootsRoot, "build-tools", "tools", "dev", name);
 }
 
 async function readCanonicalServerWasmArtifact(outPath: string): Promise<string | null> {
@@ -82,6 +89,15 @@ async function installNodeModules(appAbs: string, _$: any): Promise<void> {
   })`pnpm install --prod --frozen-lockfile --ignore-scripts --ignore-workspace --reporter=append-only`;
 }
 
+async function workspaceFlakeRef(root: string): Promise<string> {
+  const hidden = path.join(root, ".viberoots", "workspace", "flake.nix");
+  const hasHidden = await fsp
+    .access(hidden)
+    .then(() => true)
+    .catch(() => false);
+  return hasHidden ? path.dirname(hidden) : root;
+}
+
 async function buildSsrWebappOutPath(
   tmp: string,
   importer: string,
@@ -100,14 +116,15 @@ async function buildSsrWebappOutPath(
   await stageTempRepoPaths({
     tmp,
     _$,
-    explicitPaths: ["build-tools/tools/nix/node-modules.hashes.json"],
+    explicitPaths: ["projects/node-modules.hashes.json"],
   });
   const attr = sanitizeImporterForNixAttr(importer);
+  const flakeRef = await workspaceFlakeRef(tmp);
   const built = await _$({
     cwd: tmp,
     stdio: "pipe",
     env,
-  })`bash --noprofile --norc -c ${`set -euo pipefail; nix build "${tmp}#node-webapp.${attr}" --impure --no-link --accept-flake-config --builders "" --print-build-logs --print-out-paths`}`;
+  })`bash --noprofile --norc -c ${`set -euo pipefail; nix build "path:${flakeRef}#node-webapp.${attr}" --impure --no-link --accept-flake-config --builders "" --print-build-logs --print-out-paths`}`;
   return (
     String(built.stdout || "")
       .trim()

@@ -2,6 +2,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { nodeFlagsWithZx } from "../../lib/node-run";
 import { buckProcessTableLines } from "../../lib/process-inspection";
+import { buildToolPath, zxInitPath } from "./paths";
 
 export type Isolation = {
   buckIsolation: string;
@@ -65,7 +66,6 @@ export function createIsolation(opts: CreateIsolationOptions = {}): Isolation {
   const createdOwnIsolation = !inheritedIso && process.env.BUCK_NO_ISOLATION !== "1";
   const isolationFlags: string[] =
     process.env.BUCK_NO_ISOLATION === "1" ? [] : ["--isolation-dir", buckIsolation];
-
   async function killIsolationIfOwned() {
     if (!createdOwnIsolation) return;
     try {
@@ -108,17 +108,14 @@ export function createIsolation(opts: CreateIsolationOptions = {}): Isolation {
   async function startWatchdog(repoRoot: string): Promise<void> {
     try {
       const parentPid = String(process.pid);
-      const nodeBase = nodeFlagsWithZx(
-        path.resolve(repoRoot, "build-tools/tools/dev/zx-init.mjs"),
-      ).join(" ");
+      const nodeBase = nodeFlagsWithZx(zxInitPath(repoRoot)).join(" ");
       const node = process.execPath || "node";
       const watchdogIso = killOnExit ? `--iso ${buckIsolation}` : "";
       const watchdogPatterns = killOnExit ? "zxtest-,exporter-,devbuild-" : "zxtest-,exporter-";
       await $({
         stdio: "ignore",
       })`bash --noprofile --norc -c ${`${node} ${nodeBase} ${path.join(
-        repoRoot,
-        "build-tools/tools/dev/buck-watchdog.ts",
+        buildToolPath(repoRoot, "tools/dev/buck-watchdog.ts"),
       )} --parent ${parentPid} ${watchdogIso} --patterns ${watchdogPatterns} & disown`}`.nothrow();
     } catch {}
   }

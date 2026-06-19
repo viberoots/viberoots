@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { ensureToolchainPathsFiles } from "../../../dev/toolchain-paths";
 import { setTimeout as sleep } from "node:timers/promises";
 import { repoRoot, pathExists } from "../../../lib/repo";
 
@@ -17,17 +18,31 @@ function resolveSourceRoot(): string {
 }
 
 async function resolveToolSourceRoot(root: string): Promise<string> {
-  const localTool = path.join(root, "build-tools", "tools", "dev", "gen-toolchain-paths.ts");
-  if (await pathExists(localTool)) return root;
+  const isNixStorePath = (candidate: string): boolean =>
+    candidate === "/nix/store" || candidate.startsWith("/nix/store/");
+  const hasToolchainSources = async (candidate: string): Promise<boolean> => {
+    const resolved = path.resolve(candidate || "");
+    if (!resolved) return false;
+    return (
+      (await pathExists(
+        path.join(resolved, "build-tools", "tools", "dev", "gen-toolchain-paths.ts"),
+      )) && (await pathExists(path.join(resolved, "toolchains", "toolchain_paths.bzl")))
+    );
+  };
   const submoduleRoot = path.join(root, "viberoots");
-  const submoduleTool = path.join(
-    submoduleRoot,
-    "build-tools",
-    "tools",
-    "dev",
-    "gen-toolchain-paths.ts",
-  );
-  if (await pathExists(submoduleTool)) return submoduleRoot;
+  if (await hasToolchainSources(submoduleRoot)) return submoduleRoot;
+  if (await hasToolchainSources(root)) return root;
+  const envCandidates = [process.env.VIBEROOTS_SOURCE_ROOT || "", process.env.VIBEROOTS_ROOT || ""];
+  for (const candidate of envCandidates) {
+    const resolved = path.resolve(candidate || "");
+    if (!resolved || isNixStorePath(resolved)) continue;
+    if (await hasToolchainSources(resolved)) return resolved;
+  }
+  for (const candidate of envCandidates) {
+    const resolved = path.resolve(candidate || "");
+    if (!resolved) continue;
+    if (await hasToolchainSources(resolved)) return resolved;
+  }
   return root;
 }
 
@@ -140,13 +155,6 @@ async function ensureSourceFiles($: any): Promise<{ bzl: string; json: string }>
       const toolSourceRoot = await resolveToolSourceRoot(root);
       const bzl = path.join(toolSourceRoot, "toolchains", "toolchain_paths.bzl");
       const json = path.join(toolSourceRoot, "build-tools", "tools", "dev", "toolchain-paths.json");
-      const generator = path.join(
-        toolSourceRoot,
-        "build-tools",
-        "tools",
-        "dev",
-        "gen-toolchain-paths.ts",
-      );
 
       if (await hasValidGeneratedToolchainPaths(bzl, json)) return { bzl, json };
 
@@ -155,10 +163,7 @@ async function ensureSourceFiles($: any): Promise<{ bzl: string; json: string }>
         isReady: async () => await hasValidGeneratedToolchainPaths(bzl, json),
         fn: async () => {
           if (await hasValidGeneratedToolchainPaths(bzl, json)) return;
-          await $({
-            cwd: toolSourceRoot,
-            stdio: "pipe",
-          })`zx-wrapper ${generator}`;
+          await ensureToolchainPathsFiles(toolSourceRoot);
         },
       });
 
@@ -182,7 +187,14 @@ async function copyIfMissing(src: string, dst: string): Promise<void> {
 export async function ensureToolchainPathsForTempRepo(tmp: string, $: any): Promise<void> {
   const src = await ensureSourceFiles($);
   const bzlDst = path.join(tmp, "toolchains", "toolchain_paths.bzl");
-  const jsonDst = path.join(tmp, "build-tools", "tools", "dev", "toolchain-paths.json");
+  const jsonDst = path.join(
+    tmp,
+    "viberoots",
+    "build-tools",
+    "tools",
+    "dev",
+    "toolchain-paths.json",
+  );
   await copyIfMissing(src.bzl, bzlDst);
   await copyIfMissing(src.json, jsonDst);
 }

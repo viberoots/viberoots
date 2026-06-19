@@ -28,7 +28,7 @@ test("link intent: deterministic union merges deps/link_deps/header_deps", async
       path.join(appDir, "TARGETS"),
       [
         'load("@prelude//:rules.bzl", "genrule")',
-        'load("//build-tools/lang:link_intent_probe.bzl", "link_intent_probe")',
+        'load("@viberoots//build-tools/lang:link_intent_probe.bzl", "link_intent_probe")',
         "",
         'genrule(name = "a", out = "a.txt", cmd = "echo a > $OUT")',
         'genrule(name = "b", out = "b.txt", cmd = "echo b > $OUT")',

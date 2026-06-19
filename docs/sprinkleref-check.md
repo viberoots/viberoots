@@ -43,15 +43,15 @@ If no resolver config exists yet, initialize the repo-wide backend profile regis
 configured secret presence:
 
 ```bash
-build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
-build-tools/tools/deployments/infisical-bootstrap.ts repo
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo
 sprinkleref --check
 ```
 
 The repo-wide path sets up resolver profiles and categories first, then offers a second prompt to
 fan out to reviewed deployment bootstrap targets. Use `repo --without-deployments` when you only
 want resolver/profile setup. Retry a failed or skipped deployment scope with
-`build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target>`.
+`viberoots/build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target>`.
 
 `--check` should default to all supported deployment contract schemes. Scheme filters narrow the
 report without changing validation semantics. `--all` is accepted as an explicit alias for the

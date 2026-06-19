@@ -15,7 +15,7 @@ async function writeGraph(root: string, nodes: unknown[]) {
   const text = JSON.stringify({ version: 1, nodes }, null, 2) + "\n";
   for (const rel of [
     path.join(".viberoots", "workspace", "buck", "graph.json"),
-    path.join("build-tools", "tools", "buck", "graph.json"),
+    path.join(".viberoots", "workspace", "buck", "graph.json"),
   ]) {
     const graphPath = path.join(root, rel);
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });

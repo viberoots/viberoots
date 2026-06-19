@@ -5,6 +5,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 import { exportGraphInTemp, runInTemp } from "../lib/test-helpers";
+import { viberootsTool } from "../scaffolding/lib/viberoots-tools";
 
 const bashProbe = spawnSync("/bin/bash", ["-lc", "echo ok"], { stdio: "ignore" });
 const SKIP_PR8 = !!bashProbe.error || !existsSync("/bin/bash");
@@ -14,33 +15,33 @@ test("scaffold ts go-cpp-lib; build addon + wasm; both return 5", { skip: SKIP_P
     const sh = $({ cwd: tmp, stdio: "inherit" });
 
     // 1) Scaffold the library
-    await sh`node build-tools/tools/scaffolding/scaf.ts new ts go-cpp-lib demo --yes`;
+    await sh`node ${viberootsTool("viberoots/build-tools/tools/scaffolding/scaf.ts")} new ts go-cpp-lib demo --yes`;
 
     // 2) Ensure planner + templates are available in the temp repo (copy entire dirs for completeness)
     await fs.mkdirp(path.join(tmp, "build-tools/tools/nix"));
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/templates"),
-      path.join(tmp, "build-tools/tools/nix/templates"),
+      viberootsTool("viberoots/build-tools/tools/nix/templates"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/templates"),
     );
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/lang-templates.nix"),
-      path.join(tmp, "build-tools/tools/nix/lang-templates.nix"),
+      viberootsTool("viberoots/build-tools/tools/nix/lang-templates.nix"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/lang-templates.nix"),
     );
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/planner"),
-      path.join(tmp, "build-tools/tools/nix/planner"),
+      viberootsTool("viberoots/build-tools/tools/nix/planner"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/planner"),
     );
     await fs.outputFile(
-      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
-      await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
+      await fs.readFile(viberootsTool("viberoots/build-tools/cpp/defs.bzl"), "utf8"),
     );
     await fs.outputFile(
-      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
-      await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
+      await fs.readFile(viberootsTool("viberoots/build-tools/cpp/wasm_defs.bzl"), "utf8"),
     );
     await fs.outputFile(
       path.join(tmp, "build-tools", "go", "defs.bzl"),
-      await fs.readFile("build-tools/go/defs.bzl", "utf8"),
+      await fs.readFile(viberootsTool("viberoots/build-tools/go/defs.bzl"), "utf8"),
     );
 
     // 3) Export Buck graph for the temp repo (avoid broader glue to keep scope minimal)

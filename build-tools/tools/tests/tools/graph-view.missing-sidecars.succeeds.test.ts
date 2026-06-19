@@ -6,12 +6,12 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("graph-view CLI tolerates missing sidecars (empty indexes)", async () => {
   await runInTemp("graph-view-missing", async (tmp, $) => {
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fsp.mkdir(graphDir, { recursive: true });
     const nodes = [{ name: "//x:y", rule_type: "phony", labels: [] }];
     await fsp.writeFile(path.join(graphDir, "graph.json"), JSON.stringify(nodes, null, 2));
 
-    const out = await $`node build-tools/tools/buck/graph-view.ts`;
+    const out = await $`node viberoots/build-tools/tools/buck/graph-view.ts`;
     const txt = String(out.stdout || "").trim();
     if (!txt) {
       console.error("graph-view produced no output");

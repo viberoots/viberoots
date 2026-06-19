@@ -14,7 +14,7 @@ test("nix_node_test fails deterministically when lockfile label is malformed", a
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_test")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_test")',
         "",
         "nix_node_test(",
         '  name = "t",',

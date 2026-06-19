@@ -33,10 +33,7 @@ await writeImporterProvidersByLang(lang, providers, { outFile });
     const txt1 = await fsp.readFile(path.join(tmp, outFile), "utf8");
     const curated = await fsp.readFile(path.join(tmp, DEFAULT_PROVIDER_TARGETS_PATH), "utf8");
     assert.match(txt1, /# GENERATED FILE — DO NOT EDIT\./);
-    assert.match(
-      txt1,
-      /load\("@workspace_providers\/\/:defs_python\.bzl", "python_importer_deps"\)/,
-    );
+    assert.match(txt1, /load\("\/\/:defs_python\.bzl", "python_importer_deps"\)/);
     assert.match(txt1, /python_importer_deps\(name="/);
     assert.match(curated, /# BEGIN AUTO_PYTHON/);
     assert.match(curated, /# END AUTO_PYTHON/);

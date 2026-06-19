@@ -41,7 +41,7 @@ EOF
 }
 
 async function seedMinimalGraph(tmp: string) {
-  const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+  const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
   await fsp.mkdir(graphDir, { recursive: true });
   const content = JSON.stringify({ $schema: "x", version: 1, nodes: [] }, null, 2) + "\n";
   await fsp.writeFile(path.join(graphDir, "graph.json"), content, "utf8");
@@ -93,7 +93,7 @@ test("glue stages run without node_modules and are idempotent", async () => {
         cwd: tmp,
         stdio: "inherit",
         env: { ...process.env, ...(extraEnv || {}) },
-      })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/ci/run-stage.ts --stage ${name}`;
+      })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/ci/run-stage.ts --stage ${name}`;
     };
 
     // Run the canonical glue pipeline once (export graph + sync providers + auto-map).
@@ -101,7 +101,7 @@ test("glue stages run without node_modules and are idempotent", async () => {
     await runStage("prebuild-guard");
 
     // Verify outputs exist
-    const providersDir = path.join(tmp, "third_party", "providers");
+    const providersDir = path.join(tmp, ".viberoots", "workspace", "providers");
     const autoMap = path.join(providersDir, "auto_map.bzl");
     const autoMapTxt = await fsp.readFile(autoMap, "utf8").catch(() => "");
     if (!autoMapTxt.includes("MODULE_PROVIDERS")) {

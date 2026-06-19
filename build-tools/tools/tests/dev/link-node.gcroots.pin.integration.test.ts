@@ -3,9 +3,12 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("link-node pins resolved node_modules outPath as a gc root", async () => {
-  const mainTxt = await fsp.readFile("build-tools/tools/dev/install/link-node.ts", "utf8");
+  const mainTxt = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/install/link-node.ts",
+    "utf8",
+  );
   const helperTxt = await fsp.readFile(
-    "build-tools/tools/dev/install/link-node-helpers.ts",
+    "viberoots/build-tools/tools/dev/install/link-node-helpers.ts",
     "utf8",
   );
   if (!mainTxt.includes("ensureNodeModulesGcRoot")) {
@@ -19,5 +22,11 @@ test("link-node pins resolved node_modules outPath as a gc root", async () => {
   }
   if (!helperTxt.includes("--realise") || !helperTxt.includes("--add-root")) {
     throw new Error("link-node helper must pin gc root by realising the resolved derivation");
+  }
+  if (
+    !helperTxt.includes("VBR_RUN_IN_TEMP_REPO") ||
+    !helperTxt.includes("skipping parent gc root pin for temp-repo importer")
+  ) {
+    throw new Error("link-node helper must not pin temp-repo importers in a parent workspace");
   }
 });

@@ -59,13 +59,13 @@ EOF
       }
     } catch {}
     try {
-      await fsp.rm(path.join(tmp, "build-tools", "tools", "buck", "graph.json"));
+      await fsp.rm(path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"));
     } catch {}
     const { stdout, stderr } = await $({
       cwd: tmp,
       stdio: "pipe",
       env: { ...process.env, PREBUILD_GUARD_VERBOSE: "1", PREBUILD_GUARD_NO_FIX: "1" },
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts --verbose`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts --verbose`;
     const out = String(stdout || "") + String(stderr || "");
     if (!out.includes("missing output:")) {
       console.error(out);

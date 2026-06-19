@@ -14,7 +14,7 @@ async function runGomod2nix($: any, repoRoot: string, moduleRelDir: string) {
   await $({
     cwd: repoRoot,
     stdio: "inherit",
-  })`build-tools/tools/bin/gomod2nix --dir ${moduleRelDir}`;
+  })`viberoots/build-tools/tools/bin/gomod2nix --dir ${moduleRelDir}`;
 }
 
 async function findFirstExecutable(dir: string): Promise<string> {
@@ -190,7 +190,7 @@ test("go cli with local lib + third-party runtime", async () => {
     // Skip install-deps to avoid gomod2nix in this test; we'll synthesize the graph directly
 
     // 5) Validate provider wiring only; skip export-graph to avoid invoking Go tooling
-    await $`node build-tools/tools/buck/sync-providers.ts`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts`;
     // Synthesize a minimal graph for auto-map to consume
     const graphPath = path.join(_tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
@@ -204,7 +204,7 @@ test("go cli with local lib + third-party runtime", async () => {
       ]),
       "utf8",
     );
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out .viberoots/workspace/providers/auto_map.bzl`;
     const providersTargetsPath = path.join(
       _tmp,
       ".viberoots",

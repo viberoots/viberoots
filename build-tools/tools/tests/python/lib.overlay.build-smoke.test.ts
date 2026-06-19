@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("python lib overlay build smoke: site exists and contains resolved dist", async () => {
   await runInTemp("py-lib-overlay-smoke", async (tmp, _$) => {
@@ -26,7 +26,7 @@ test("python lib overlay build smoke: site exists and contains resolved dist", a
     await fs.writeFile(path.join(libDir, "uv.lock"), uvLock, "utf8");
 
     // 3) Minimal Buck graph node for the library
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fs.mkdirp(graphDir);
     const node = {
       name: `//projects/libs/${name}:${name}`,
@@ -52,7 +52,7 @@ test("python lib overlay build smoke: site exists and contains resolved dist", a
         }),
       },
       stdio: "pipe",
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`.nothrow();
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`.nothrow();
     if (buildOut.exitCode !== 0) {
       throw new Error(`nix build failed: ${buildOut.stderr || buildOut.stdout || ""}`);
     }

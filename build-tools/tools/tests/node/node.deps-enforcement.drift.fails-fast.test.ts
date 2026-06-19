@@ -27,7 +27,7 @@ test("node deps enforcement: drift fails fast", async () => {
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs_core.bzl", "nix_node_lib")',
+        'load("@viberoots//build-tools/node:defs_core.bzl", "nix_node_lib")',
         "",
         "nix_node_lib(",
         '  name = "api",',
@@ -36,9 +36,9 @@ test("node deps enforcement: drift fails fast", async () => {
       ].join("\n"),
       "utf8",
     );
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "node"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, ".viberoots", "workspace", "node"), { recursive: true });
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "node", "workspace-map.json"),
+      path.join(tmp, ".viberoots", "workspace", "node", "workspace-map.json"),
       JSON.stringify({ "@repo/ui": "//projects/libs/ui:ui" }, null, 2),
       "utf8",
     );
@@ -48,7 +48,7 @@ test("node deps enforcement: drift fails fast", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`node build-tools/tools/buck/enforce-node-deps.ts --check`;
+    })`node viberoots/build-tools/tools/buck/enforce-node-deps.ts --check`;
     assert.notEqual(res.exitCode, 0);
     const combined = String(res.stdout || "") + String(res.stderr || "");
     assert.ok(combined.includes("node deps drift in //projects/apps/api:api"));

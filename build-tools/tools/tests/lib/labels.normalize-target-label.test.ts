@@ -5,7 +5,7 @@ import { normalizeTargetLabel } from "../../lib/labels";
 test("normalizeTargetLabel drops (config//...) and cell prefixes", async () => {
   const samples: Array<{ in: string; out: string }> = [
     {
-      in: "root//projects/apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
+      in: "root//projects/apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerviberoots/build-tools/lang/cxx)",
       out: "//projects/apps/foo:svc",
     },
     {

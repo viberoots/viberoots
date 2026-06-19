@@ -57,8 +57,9 @@ export async function acquireVerifyLock(opts: {
   const isCI = process.env.CI === "true";
   if (isCI || opts.allowConcurrent) return { lockDir: null, logFile: null };
 
-  const lockDir = path.join(opts.root, "buck-out", "tmp", "verify-lock");
-  await mkdirIfMissing(path.join(opts.root, "buck-out", "tmp"));
+  const workspaceBuckDir = path.join(opts.root, ".viberoots", "workspace", "buck");
+  const lockDir = path.join(workspaceBuckDir, "verify-lock");
+  await mkdirIfMissing(workspaceBuckDir);
 
   const pidFile = path.join(lockDir, "pid");
   const sigFile = path.join(lockDir, "lstart");
@@ -108,13 +109,14 @@ export async function acquireVerifyLock(opts: {
   await writeText(pidFile, String(process.pid));
   await writeText(sigFile, sig);
 
-  const logDir = path.join(opts.root, "buck-out", "tmp", "verify-logs");
+  const logDir = path.join(workspaceBuckDir, "verify-logs");
   const existing = await readText(logFileRef);
   const logFile = existing || (await mkUniqueLogFile(logDir));
   await writeText(logFileRef, logFile);
 
   const byPid = path.join(logDir, "by-pid");
   await mkdirIfMissing(byPid);
+  await mkdirIfMissing(logDir);
   await fsp.symlink(logFile, path.join(byPid, `${process.pid}.log`)).catch(async () => {
     await fsp.unlink(path.join(byPid, `${process.pid}.log`)).catch(() => {});
     await fsp.symlink(logFile, path.join(byPid, `${process.pid}.log`)).catch(() => {});

@@ -41,7 +41,7 @@ export function shouldPrepareVerifySeedForRequestedTargets(
 }
 
 function seedRootDir(root: string): string {
-  return path.join(root, "buck-out", "tmp", "verify-seed");
+  return path.join(root, ".viberoots", "workspace", "buck", "verify-seed");
 }
 
 function pinRootDir(root: string): string {
@@ -77,7 +77,12 @@ async function gitOutput(root: string, cmd: string[]): Promise<string> {
   return String(res.stdout || "").trimEnd();
 }
 
-async function computeSeedKey(root: string): Promise<string> {
+async function computeGitState(root: string): Promise<{
+  head: string;
+  statusEntries: string[];
+  diffHash: string;
+  diffCachedHash: string;
+}> {
   const head = await gitOutput(root, ["git", "rev-parse", "HEAD"]);
   const statusRaw = await $({
     cwd: root,
@@ -108,13 +113,21 @@ async function computeSeedKey(root: string): Promise<string> {
       diffCachedHash = crypto.createHash("sha256").update(diffCached).digest("hex");
     } catch {}
   }
+  return { head, statusEntries, diffHash, diffCachedHash };
+}
+
+async function computeSeedKey(root: string): Promise<string> {
+  const rootGit = await computeGitState(root);
+  const viberootsRoot = path.join(root, "viberoots");
+  const viberootsGit = await fsp
+    .access(path.join(viberootsRoot, ".git"))
+    .then(async () => await computeGitState(viberootsRoot))
+    .catch(() => null);
 
   const payload = {
     workspaceRoot: root,
-    head,
-    statusEntries,
-    diffHash,
-    diffCachedHash,
+    rootGit,
+    viberootsGit,
     seedConfig: {
       TEST_RSYNC_ROOTS: String(process.env.TEST_RSYNC_ROOTS || ""),
       TEST_PARTIAL_CLONE_GO_ONLY: String(process.env.TEST_PARTIAL_CLONE_GO_ONLY || ""),
@@ -142,13 +155,18 @@ async function buildSeedStorePath(
   const gcRootPath = path.join(seedRootDir(root), "nix-root");
   await fsp.mkdir(seedRootDir(root), { recursive: true }).catch(() => {});
   process.stderr.write(
-    `[verify] seed build: nix build ${root}#test-seed (timeout=${timeoutSec}s)\n`,
+    `[verify] seed build: nix build path:${root}/.viberoots/workspace#test-seed (timeout=${timeoutSec}s)\n`,
   );
   const cmd = await runManagedCommand({
     command: "nix",
     args: verifySeedBuildArgs({ root, mode, gcRootPath }),
     cwd: root,
-    env: { ...process.env, IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1" },
+    env: {
+      ...process.env,
+      IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1",
+      WORKSPACE_ROOT: root,
+      BUCK_TEST_SRC: root,
+    },
     timeoutMs: timeoutSec * 1000,
     killGraceMs: 5000,
   });
@@ -156,11 +174,11 @@ async function buildSeedStorePath(
     const detail = String(cmd.stderr || cmd.stdout || "").trim();
     if (cmd.timedOut) {
       throw new Error(
-        `verify seed: nix build .#test-seed timed out after ${timeoutSec}s${detail ? `\n${detail}` : ""}`,
+        `verify seed: nix build .viberoots/workspace#test-seed timed out after ${timeoutSec}s${detail ? `\n${detail}` : ""}`,
       );
     }
     throw new Error(
-      `verify seed: nix build .#test-seed failed (exit ${String(cmd.code)})${detail ? `\n${detail}` : ""}`,
+      `verify seed: nix build .viberoots/workspace#test-seed failed (exit ${String(cmd.code)})${detail ? `\n${detail}` : ""}`,
     );
   }
   const out = String(cmd.stdout || "")
@@ -168,7 +186,8 @@ async function buildSeedStorePath(
     .split("\n")
     .filter(Boolean)
     .pop();
-  if (!out) throw new Error("verify seed: nix build .#test-seed returned no store path");
+  if (!out)
+    throw new Error("verify seed: nix build .viberoots/workspace#test-seed returned no store path");
   process.stderr.write("[verify] seed build: complete\n");
   return out;
 }
@@ -178,6 +197,21 @@ async function writeCurrentSeed(root: string, seedPath: string, seedKey: string)
   await fsp.mkdir(dir, { recursive: true }).catch(() => {});
   await writeIfChanged(path.join(dir, "current"), seedPath + "\n");
   await writeIfChanged(path.join(dir, "current.key"), seedKey + "\n");
+}
+
+async function readCurrentSeed(root: string, seedKey: string): Promise<string | null> {
+  const dir = seedRootDir(root);
+  const existingKey = (
+    await fsp.readFile(path.join(dir, "current.key"), "utf8").catch(() => "")
+  ).trim();
+  if (existingKey !== seedKey) return null;
+  const seedPath = (await fsp.readFile(path.join(dir, "current"), "utf8").catch(() => "")).trim();
+  if (!seedPath) return null;
+  const exists = await fsp
+    .access(seedPath)
+    .then(() => true)
+    .catch(() => false);
+  return exists ? seedPath : null;
 }
 
 async function createPin(
@@ -207,7 +241,8 @@ export async function prepareVerifySeed(opts: {
   await sweepStalePins(opts.root);
   const mode = opts.mode || "local";
   const seedKey = await computeSeedKey(opts.root);
-  const seedPath = await buildSeedStorePath(opts.root, mode);
+  const currentSeedPath = mode === "local" ? await readCurrentSeed(opts.root, seedKey) : null;
+  const seedPath = currentSeedPath || (await buildSeedStorePath(opts.root, mode));
   if (mode === "remote-ready") {
     const remoteManifestPath = await writeVerifySeedRemoteManifest({
       root: opts.root,

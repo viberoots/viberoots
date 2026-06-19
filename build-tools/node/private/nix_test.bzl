@@ -43,7 +43,9 @@ def _node_nix_test_impl(ctx):
     run_cmd = (
         # Skip unified pnpm prewarm at bootstrap; we'll do it only if tests exist
         "export VBR_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
-        + nix_calling_env_export_source_snapshot()
+        + "WORKSPACE_ROOT_ENV_ARG=\"${1:-}\"; "
+        + "if [ -n \"$WORKSPACE_ROOT_ENV_ARG\" ] && [ -f \"$WORKSPACE_ROOT_ENV_ARG\" ]; then . \"$WORKSPACE_ROOT_ENV_ARG\" 2>/dev/null || true; fi; "
+        + nix_calling_env_export_source_snapshot(snapshot_root = "${2:-}", manifest_path = "${3:-}")
         + nix_bootstrap_env_core()
         + ("".join(env_pairs))
         + ("export TEST_NIX_TIMEOUT_SECS=\"%d\"; " % (tout if tout > 0 else 1800))
@@ -61,7 +63,7 @@ def _node_nix_test_impl(ctx):
         + "export VBR_STREAM_NIX_BUILD_LOGS=\"${VBR_STREAM_NIX_BUILD_LOGS:-1}\"; "
         + nix_bootstrap_env_pnpm_store()
         + ("echo '[node_nix_test] phase=prepare-exact-store target=%s importer=%s' >&2; " % (target_label, imp))
-        + ("EXACT_PNPM_STORE_RAW=$(cd \"$FLK_ROOT\" && node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$FLK_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$FLK_ROOT/build-tools/tools/dev/prepare-exact-pnpm-store.ts\" --importer \"%s\"); " % imp)
+        + ("EXACT_PNPM_STORE_RAW=$(cd \"$WORKSPACE_ROOT\" && node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$VIBEROOTS_ROOT/build-tools/tools/dev/prepare-exact-pnpm-store.ts\" --importer \"%s\"); " % imp)
         + "EXACT_PNPM_STORE=$(printf '%s\\n' \"$EXACT_PNPM_STORE_RAW\" | awk '/^\\/nix\\/store\\// { found=$0 } END { print found }'); "
         + "export NIX_PNPM_EXACT_STORE=\"$EXACT_PNPM_STORE\"; "
         + "echo '[node_nix_test] exact-store='$NIX_PNPM_EXACT_STORE >&2; "
@@ -70,7 +72,7 @@ def _node_nix_test_impl(ctx):
         + "JOBS_FLAG=\"\"; if [ -n \"$NIX_MAXJ\" ] && [ \"$NIX_MAXJ\" != \"0\" ]; then JOBS_FLAG=\"--max-jobs $NIX_MAXJ\"; fi; "
         + "CORES_FLAG=\"\"; if [ -n \"$NIX_CORES\" ] && [ \"$NIX_CORES\" != \"0\" ]; then CORES_FLAG=\"--option cores $NIX_CORES\"; fi; "
         + ("echo '[node_nix_test] phase=nix-build target=%s importer=%s attr=%s timeout='$TOUT's' >&2; " % (target_label, imp, imp_attr))
-        + ("node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$FLK_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$FLK_ROOT/build-tools/tools/dev/command-heartbeat.ts\" --prefix \"[node_nix_test]\" --label \"target=%s importer=%s step=nix-build attr=%s\" --cwd \"$FLK_ROOT\" --timeout-ms $(( TOUT * 1000 )) --no-output-warn-sec 60 -- node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$FLK_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$FLK_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr \"node-test.%s\"; " % (target_label, imp, imp_attr, imp_attr))
+        + ("node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$VIBEROOTS_ROOT/build-tools/tools/dev/command-heartbeat.ts\" --prefix \"[node_nix_test]\" --label \"target=%s importer=%s step=nix-build attr=%s\" --cwd \"$FLK_ROOT\" --timeout-ms $(( TOUT * 1000 )) --no-output-warn-sec 60 -- node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr \"node-test.%s\"; " % (target_label, imp, imp_attr, imp_attr))
     )
 
     # Declare a tiny deterministic output so builds have an artifact
@@ -103,7 +105,7 @@ def _node_nix_test_impl(ctx):
     ]
     command = external_runner_command(
         labels,
-        ["bash", "-c", run_cmd, "node_nix_test"] + snapshot_inputs,
+        ["bash", "-c", run_cmd, "node_nix_test", ctx.attrs._workspace_root_env] + snapshot_inputs,
         remote_command = remote_command,
         declared_inputs = declared_inputs,
         required_inputs = [

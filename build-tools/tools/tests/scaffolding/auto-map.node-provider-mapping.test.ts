@@ -60,11 +60,11 @@ test("gen-auto-map correctly maps lockfile labels to Node providers", async () =
     await $`git add projects/apps/web/pnpm-lock.yaml projects/apps/api/pnpm-lock.yaml`;
 
     // Generate providers
-    await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
 
     // Generate auto-map
     const autoMapPath = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${autoMapPath}`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${autoMapPath}`;
 
     const autoMapContent = await fsp.readFile(autoMapPath, "utf8");
 
@@ -92,7 +92,7 @@ test("gen-auto-map correctly maps lockfile labels to Node providers", async () =
     }
 
     // Verify determinism
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${autoMapPath}`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${autoMapPath}`;
     const autoMapContent2 = await fsp.readFile(autoMapPath, "utf8");
 
     if (autoMapContent !== autoMapContent2) {

@@ -26,11 +26,15 @@ import { runPnpmCommandWithRetry } from "./pnpm-command-retry";
 async function runLockfileCommandsWithGcRetry(opts: {
   importerAbs: string;
   flakeRef: string;
+  viberootsOverride: string;
   timeoutMs: number;
   fetchTimeout: string;
   homeDir: string;
   storeDir: string;
 }): Promise<void> {
+  const nixRunPrefix = opts.viberootsOverride
+    ? ["run", "--accept-flake-config", "--override-input", "viberoots", opts.viberootsOverride]
+    : ["run", "--accept-flake-config"];
   const runPnpm = async (...args: string[]) =>
     await $({
       cwd: opts.importerAbs,
@@ -42,7 +46,7 @@ async function runLockfileCommandsWithGcRetry(opts: {
         NIX_PNPM_FETCH_TIMEOUT: opts.fetchTimeout,
         PNPM_HOME: opts.homeDir,
       },
-    })`nix run --accept-flake-config ${opts.flakeRef} -- ${args}`;
+    })`nix ${nixRunPrefix} ${opts.flakeRef} -- ${args}`;
 
   const runCommands = async () => {
     const cfg = gcWaitConfig();
@@ -118,6 +122,30 @@ async function runLockfileCommandsWithGcRetry(opts: {
   }
 }
 
+async function activeViberootsOverride(repoRoot: string): Promise<string> {
+  const candidates = [
+    path.join(repoRoot, "viberoots"),
+    path.join(repoRoot, ".viberoots", "current"),
+    process.env.VIBEROOTS_SOURCE_ROOT || "",
+    process.env.VIBEROOTS_ROOT || "",
+  ]
+    .map((candidate) => String(candidate || "").trim())
+    .filter(Boolean);
+  for (const candidate of candidates) {
+    const abs = path.resolve(candidate);
+    try {
+      if (
+        fs.existsSync(path.join(abs, "flake.nix")) &&
+        fs.existsSync(path.join(abs, "build-tools", "tools", "dev", "zx-init.mjs"))
+      ) {
+        const real = await fsp.realpath(abs).catch(() => abs);
+        return `path:${real}`;
+      }
+    } catch {}
+  }
+  return "";
+}
+
 async function seedImporterLockfileFromRootIfNeeded(opts: {
   repoRoot: string;
   importerAbs: string;
@@ -149,11 +177,13 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   const { storeDir, usesSharedPrefetch } = preferredPnpmStoreDir(externalStoreDir);
   if (!usesSharedPrefetch) await syncLocalPrefetchIntoPnpmStore(storeDir);
   const flakeRef = pnpmFlakeRef(opts.repoRoot);
+  const viberootsOverride = await activeViberootsOverride(opts.repoRoot);
   console.log(`[lockfile] generating importer lockfile: ${opts.importer}`);
   await withHiddenNodeModules(importerAbs, async () => {
     await runLockfileCommandsWithGcRetry({
       importerAbs,
       flakeRef,
+      viberootsOverride,
       timeoutMs,
       fetchTimeout,
       homeDir,

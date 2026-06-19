@@ -18,7 +18,7 @@ test("runInTemp skips toolchain probing when CGO is disabled (default)", async (
 
     assert.equal(
       getTimingCountForLabel(
-        "toolchain probe (command -v cbuild-tools/lang/clang++/xcrun/llvm-ar/ar)",
+        "toolchain probe (command -v cviberoots/build-tools/lang/clang++/xcrun/llvm-ar/ar)",
       ),
       0,
     );

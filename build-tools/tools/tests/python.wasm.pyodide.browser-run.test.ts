@@ -4,7 +4,7 @@ import * as fs from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { runNixBuildWithTransientRetry } from "../dev/build-selected-nix-retry";
-import { runInTemp } from "./lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "./lib/test-helpers";
 
 test("python wasm (pyodide): build-and-run prints pyodide banner", async () => {
   await runInTemp("py-wasm-pyodide-build-run", async (tmp, $) => {
@@ -38,7 +38,7 @@ test("python wasm (pyodide): build-and-run prints pyodide banner", async () => {
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       `
-load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
+load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_app")
 
 nix_python_wasm_app(
     name = "pyapp",
@@ -50,7 +50,7 @@ nix_python_wasm_app(
       "utf8",
     );
     // Export graph then build selected nix target
-    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    await $`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const env = {
       ...process.env,
       BUCK_TARGET: "//projects/apps/pywasm:pyapp",
@@ -71,7 +71,7 @@ nix_python_wasm_app(
           env,
           reject: false,
           nothrow: true,
-        })`nix build --impure -L --accept-flake-config ${`path:${tmp}#graph-generator-selected`} --no-link --print-out-paths`,
+        })`nix build --impure -L --accept-flake-config ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --no-link --print-out-paths`,
     });
     if (Number(out.exitCode || 0) !== 0) {
       throw new Error(String(out.stderr || out.stdout || "nix build failed"));

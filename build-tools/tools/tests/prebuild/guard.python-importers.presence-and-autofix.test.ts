@@ -52,12 +52,12 @@ test("prebuild-guard: flags missing Python importer providers and auto-fixes loc
     await $({
       cwd: tmp,
       env,
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
 
     // Now allow auto-fix and re-run; guard should regenerate Python providers
     await $({
       cwd: tmp,
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
     const txt = await fsp.readFile(targetsPy, "utf8");
     if (
       !txt.includes("python_importer_deps(") ||
@@ -72,7 +72,7 @@ test("prebuild-guard: flags missing Python importer providers and auto-fixes loc
     await fsp.appendFile(uvLockPath, "# touch\n", "utf8");
     await $({
       cwd: tmp,
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
     if (!(await exists(targetsPy))) throw new Error("TARGETS.python.auto missing after auto-fix");
   });
 });

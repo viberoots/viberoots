@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsRepoPath } from "./deployment-command";
 
 function buckEnv(): NodeJS.ProcessEnv {
   return {
@@ -14,7 +15,6 @@ function buckEnv(): NodeJS.ProcessEnv {
 }
 
 async function copyCurrentBuckClassificationFiles(tmp: string): Promise<void> {
-  const repoRoot = process.cwd();
   const relPaths = [
     "build-tools/tools/tests/defs.bzl",
     "build-tools/tools/tests/deployment_conventions.bzl",
@@ -25,7 +25,7 @@ async function copyCurrentBuckClassificationFiles(tmp: string): Promise<void> {
     "build-tools/tools/tests/deployments/deployment_resource_limited_taxonomy.bzl",
   ];
   for (const relPath of relPaths) {
-    const src = path.join(repoRoot, relPath);
+    const src = viberootsRepoPath(relPath);
     const dst = path.join(tmp, relPath);
     await fsp.mkdir(path.dirname(dst), { recursive: true });
     await fsp.copyFile(src, dst);
@@ -36,7 +36,7 @@ async function writeTempWorkspaceRootTargets(tmp: string): Promise<void> {
   await fsp.writeFile(
     path.join(tmp, "TARGETS"),
     [
-      'load("//build-tools/tools/tests:defs.bzl", "auto_zx_tests")',
+      'load("@viberoots//build-tools/tools/tests:defs.bzl", "auto_zx_tests")',
       'load("@prelude//:rules.bzl", "export_file")',
       "",
       "platform(",
@@ -106,7 +106,7 @@ test("resource-limited deployment taxonomy stays data-only", async () => {
   const executablePatterns = [/\bload\s*\(/, /^\s*if\s+/m, /^\s*for\s+/m, /\bfor\b.*\bin\b/];
 
   for (const relPath of relPaths) {
-    const text = await fsp.readFile(path.join(process.cwd(), relPath), "utf8");
+    const text = await fsp.readFile(viberootsRepoPath(relPath), "utf8");
     const codeOnly = text
       .split("\n")
       .map((line) => line.replace(/#.*/, ""))

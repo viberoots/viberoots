@@ -16,7 +16,7 @@ test("node wasm source resolver contract is wired into stage and inline macros",
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module")',
+        'load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module")',
         "",
         "node_asset_stage(",
         '  name = "staged",',

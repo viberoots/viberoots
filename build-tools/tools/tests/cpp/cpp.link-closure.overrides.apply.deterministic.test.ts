@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { sanitizeName } from "../../lib/sanitize";
-import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 function extractBuildLogLine(buildLog: string, key: string): string {
   const prefix = `${key}=`;
@@ -25,7 +25,7 @@ function parseOutPath(stdout: unknown): string {
 test("cpp: link_closure_overrides apply deterministically (ordering locked by build.log)", async () => {
   await runInTemp("cpp-link-closure-overrides", async (tmp, $) => {
     await fs.outputFile(
-      path.join(tmp, "build-tools", "tools", "nix", "langs.json"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "nix", "langs.json"),
       JSON.stringify({ enabled: ["cpp"] }, null, 2) + "\n",
       "utf8",
     );
@@ -67,7 +67,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
     await fs.outputFile(
       path.join(tmp, "libs", "support", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "support",',
@@ -82,7 +82,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
     await fs.outputFile(
       path.join(tmp, "libs", "core", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "core",',
@@ -98,7 +98,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
     await fs.outputFile(
       path.join(tmp, "libs", "alpha", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "alpha",',
@@ -113,7 +113,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
     await fs.outputFile(
       path.join(tmp, "apps", "demo", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',
@@ -141,14 +141,14 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const build1 = await $({
       cwd: tmp,
       stdio: "pipe",
       nothrow: true,
       reject: false,
       env: { ...process.env, BUCK_TARGET: "//projects/apps/demo:demo" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     if (build1.exitCode !== 0) {
       throw new Error(String(build1.stderr || build1.stdout));
     }
@@ -176,7 +176,7 @@ test("cpp: link_closure_overrides apply deterministically (ordering locked by bu
       nothrow: true,
       reject: false,
       env: { ...process.env, BUCK_TARGET: "//projects/apps/demo:demo" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     if (build2.exitCode !== 0) {
       throw new Error(String(build2.stderr || build2.stdout));
     }

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 /**
  * lint-global-stamping.ts — PR‑5 guard
- * Fails if any .bzl macro files directly stamp //:flake.lock
+ * Fails if any .bzl macro files directly stamp //.viberoots/workspace:flake.lock
  * outside the centralized helper allowlist.
  */
 import * as fsp from "node:fs/promises";
@@ -39,7 +39,7 @@ async function fileContainsDirectStamp(file: string): Promise<Violation[]> {
   const viols: Violation[] = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (line.includes("//:flake.lock")) {
+    if (line.includes("//.viberoots/workspace:flake.lock")) {
       viols.push({ file, line: i + 1, text: line.trim() });
     }
   }
@@ -63,7 +63,9 @@ async function main() {
     }
   }
   if (viols.length > 0) {
-    console.error("[lint-global-stamping] Direct //:flake.lock stamping found in:");
+    console.error(
+      "[lint-global-stamping] Direct //.viberoots/workspace:flake.lock stamping found in:",
+    );
     for (const v of viols) {
       console.error(`  ${v.file}:${v.line}: ${v.text}`);
     }

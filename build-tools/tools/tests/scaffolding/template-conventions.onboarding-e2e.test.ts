@@ -9,6 +9,7 @@ test("e2e: canonical path onboarding wires conventions without template_keys", a
   await runInTemp("template-conventions-onboarding", async (tmp, _$) => {
     const templateRoot = path.join(
       tmp,
+      "viberoots",
       "build-tools",
       "tools",
       "scaffolding",
@@ -34,25 +35,25 @@ test("e2e: canonical path onboarding wires conventions without template_keys", a
     );
 
     const manifestBefore = await fsp.readFile(
-      path.join(tmp, "build-tools", "tools", "scaffolding", "template-manifest.json"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "scaffolding", "template-manifest.json"),
       "utf8",
     );
 
     const $ = _$({ stdio: "pipe" });
-    await $`node build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts`;
+    await $`node viberoots/build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts`;
     const resolverRaw = await fsp.readFile(
-      path.join(tmp, "build-tools", "tools", "scaffolding", "resolver.json"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "scaffolding", "resolver.json"),
       "utf8",
     );
     const resolver = JSON.parse(resolverRaw) as Record<string, Record<string, string>>;
     assert.equal(resolver.ts?.["synthetic"], "projects/apps/{name}");
 
     const manifestAfter = await fsp.readFile(
-      path.join(tmp, "build-tools", "tools", "scaffolding", "template-manifest.json"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "scaffolding", "template-manifest.json"),
       "utf8",
     );
     assert.equal(manifestBefore, manifestAfter);
 
-    await $`zx-wrapper build-tools/tools/tests/scaffolding/template-taxonomy.parity-contract.test.ts`;
+    await $`zx-wrapper viberoots/build-tools/tools/tests/scaffolding/template-taxonomy.parity-contract.test.ts`;
   });
 });

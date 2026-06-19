@@ -20,7 +20,7 @@ test("Go related module labels do not map to providers (Node-only)", async () =>
 
     await $({
       cwd: tmp,
-    })`build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
+    })`viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
     const data = await fs.readFile(outPath, "utf8");
     if (data.includes("//third_party/providers:mod_")) {
       console.error("did not expect Go module provider mapping after related change", data);

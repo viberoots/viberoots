@@ -65,7 +65,7 @@ async function nixNormalize(attr: string): Promise<string> {
   const nixStringLiteral = JSON.stringify(String(attr ?? ""));
   const expr =
     "let pkgs = import <nixpkgs> {}; " +
-    `H = import ./build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; }; ` +
+    `H = import ./viberoots/build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; }; ` +
     `in H.normalizeNixAttr ${nixStringLiteral}`;
   const { stdout } = await $`nix eval --impure --raw --expr ${expr}`;
   return stdout.trim();
@@ -73,7 +73,7 @@ async function nixNormalize(attr: string): Promise<string> {
 
 try {
   for (const c of cases) {
-    const target = `//build-tools/tools/tests/normalization:${c.name}`;
+    const target = `viberoots//build-tools/tools/tests/normalization:${c.name}`;
     const want = normalizeNixAttr(c.attr);
     const got = await starlarkProbeOutput(target);
     if (got !== want) {

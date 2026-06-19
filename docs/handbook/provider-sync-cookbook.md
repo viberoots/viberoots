@@ -6,10 +6,10 @@ Provider sync writes deterministic Buck provider glue from lockfiles and patch i
   - Decoding policy (parity): `__` decodes to `/` only (lossless). Examples:
     - `@scope__pkg@1.2.3.patch` → `@scope/pkg@1.2.3`
     - `lodash___core@4.17.21.patch` → `lodash/_core@4.17.21`
-- **Unified sync command (orchestrator)**: `node build-tools/tools/buck/sync-providers.ts` writes all language-specific provider files deterministically:
-  - Node (PNPM): `third_party/providers/TARGETS.node.auto` (when lockfiles present)
+- **Unified sync command (orchestrator)**: `node viberoots/build-tools/tools/buck/sync-providers.ts` writes all language-specific provider files deterministically:
+  - Node (PNPM): `.viberoots/workspace/providers/TARGETS.node.auto` (when lockfiles present)
   - Python (uv): generated provider files when Python lockfiles/importers are present
-  - Optional provider index: `third_party/providers/provider_index.bzl` when invoked with
+  - Optional provider index: `.viberoots/workspace/providers/provider_index.bzl` when invoked with
     `--emit-index`
 - Go and C++ provider sync are **no-ops/removed** by design. Go and C++ macros use labels,
   package-local patch inputs, and provider-edge helpers rather than generated language-specific
@@ -19,13 +19,13 @@ Provider sync writes deterministic Buck provider glue from lockfiles and patch i
 
 Node generator (canonical):
 
-- The canonical generator implementation is `build-tools/tools/buck/providers/node.ts` (`syncNodeProviders`). The canonical entrypoint is the orchestrator: `node build-tools/tools/buck/sync-providers.ts`.
-  - For Node only (full glue): `node build-tools/tools/buck/sync-providers.ts --lang node`
-  - Providers only (no graph/auto_map): `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`
+- The canonical generator implementation is `build-tools/tools/buck/providers/node.ts` (`syncNodeProviders`). The canonical entrypoint is the orchestrator: `node viberoots/build-tools/tools/buck/sync-providers.ts`.
+  - For Node only (full glue): `node viberoots/build-tools/tools/buck/sync-providers.ts --lang node`
+  - Providers only (no graph/auto_map): `node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`
 
 Node‑specific note (clarity):
 
-- The Node provider rule accepts `patch_paths` for diagnostics and visibility only. These paths are not used as Buck `srcs` to avoid cross‑package references from `third_party/providers/`. Invalidation for Node patches is achieved by macros adding importer‑local patch files to target `srcs` (see Patching Handbook).
+- The Node provider rule accepts `patch_paths` for diagnostics and visibility only. These paths are not used as Buck `srcs` to avoid cross-package references from `.viberoots/workspace/providers/`. Invalidation for Node patches is achieved by macros adding importer-local patch files to target `srcs` (see Patching Handbook).
 
 Importer‑scoped patch inclusion policy (Node vs Python):
 
@@ -56,7 +56,7 @@ Canonical naming and helpers:
 - **Go nixpkgs providers (CGO)**: Go macros attach `nixpkg:<attr>` labels and package-local patch
   files to target inputs. They do not rely on generated Go provider files for patch invalidation.
 - **Stamp‑time normalization (Go)**: Go macros stamp `nixpkg:` labels using the shared helper at stamp‑time (via `append_nixpkg_labels`). This only changes where normalization occurs; behavior and mappings are unchanged because the mapper already normalizes.
-- **nixpkgs attr map**: The unified orchestrator generates `third_party/providers/nix_attr_map.bzl` deterministically; Starlark macros should load from this mapping instead of deriving attrs heuristically.
+- **nixpkgs attr map**: The unified orchestrator generates `.viberoots/workspace/providers/nix_attr_map.bzl` deterministically; Starlark macros should load from this mapping instead of deriving attrs heuristically.
 - **Patch fixtures**: `build-tools/tools/tests/lib/fixtures/go.ts: ensurePatch()` creates a correctly named patch file for tests.
 - **Starlark nixpkgs stamping (canonical)**: use `build-tools/lang/defs_common.bzl: append_nixpkg_labels(kwargs, attrs)` to append `nixpkg:<normalized>` labels. Normalization trims, lowercases, ensures the `pkgs.` prefix, and maps `pkgs.gtest` → `pkgs.googletest`. Do not re‑implement label loops in language macros.
 
@@ -84,7 +84,7 @@ Regression guard:
 - C++ macros (`nix_cpp_library`, `nix_cpp_binary`) may realize provider edges for diagnostics and cquery introspection by merging `providers_for(MODULE_PROVIDERS, name)` into their `deps`.
 - This aligns the exported graph’s shape with Go/Node without changing build artifacts or invalidation semantics.
 - How to read it in `buck2 cquery`:
-  - `deps(//pkg:target)` will include provider nodes like `//third_party/providers:nix_pkgs_openssl` when the target carries matching `nixpkg:<attr>` labels.
+  - `deps(//pkg:target)` will include provider nodes like `workspace_providers//:nix_pkgs_openssl` when the target carries matching `nixpkg:<attr>` labels.
   - These edges are graph‑only; rule keys are unchanged unless provider files themselves change.
 
 #### Planner-visible stubs (exclude provider deps)
@@ -98,7 +98,7 @@ Some macros create planner-visible stub targets for exporter and planner discove
   - attach package-local patch inputs via `planner_stub_with_package_local_patches(...)` (opt-in, when `lang` is provided)
 - **When to include `srcs`**: include `srcs` only when the planner must observe package-local files for discovery or invalidation (for example, a planner-only node that represents a package directory or needs patch file inputs). Prefer `deps` for graph edges; use `srcs` for file-like inputs and the few cases where edges must be realized via `srcs`.
 - **Rule of thumb**: when a macro emits a planner-visible stub, pass planner-visible deps through the shared helper `strip_provider_targets(...)` from `//build-tools/lang:provider_edges.bzl`.
-- **Canonical helper**: `strip_provider_targets(deps, provider_prefix = "//third_party/providers:")` preserves order, removes only provider targets, and does not try to interpret non-string entries.
+- **Canonical helper**: `strip_provider_targets(deps, provider_prefix = "workspace_providers//:")` preserves order, removes only provider targets, and does not try to interpret non-string entries.
 
 ### Shared Nix helpers (lang-helpers)
 
@@ -140,10 +140,13 @@ Example usage in a generator:
 import { writeIfChanged, writeStamp, stableUnique } from "../lib/fs-helpers";
 
 // … compute entries: string[] deterministically …
-await writeIfChanged("third_party/providers/TARGETS.auto", header + entries.join("\n") + "\n");
+await writeIfChanged(
+  ".viberoots/workspace/providers/TARGETS.auto",
+  header + entries.join("\n") + "\n",
+);
 
-await writeStamp("third_party/providers/TARGETS.auto.stamp", [
+await writeStamp(".viberoots/workspace/providers/TARGETS.auto.stamp", [
   { path: "patches/go/example@v1.2.3.patch" },
-  { path: "third_party/providers/TARGETS.auto", content: header },
+  { path: ".viberoots/workspace/providers/TARGETS.auto", content: header },
 ]);
 ```

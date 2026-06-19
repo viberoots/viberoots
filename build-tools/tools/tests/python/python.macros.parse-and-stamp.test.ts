@@ -21,7 +21,7 @@ test("python macros: wasm app/lib parse and stamp labels", async () => {
     await fs.outputFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_lib")',
+        'load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_lib")',
         "",
         "nix_python_wasm_app(",
         '  name = "wasm_app",',

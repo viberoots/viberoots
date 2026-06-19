@@ -82,7 +82,7 @@ test("SSR runnable commands fail fast on invalid contract shapes", async () => {
         stdio: "pipe",
         nothrow: true,
         env: { ...process.env, RUNNABLE_TEST_MANIFEST: manifestPath },
-      })`build-tools/tools/bin/${opts.cmd} //projects/apps/ssr:app`;
+      })`viberoots/build-tools/tools/bin/${opts.cmd} //projects/apps/ssr:app`;
       assert.notEqual(result.exitCode, 0, `${opts.name}: expected non-zero exit`);
       assert.match(String(result.stderr || ""), opts.expected, `${opts.name}: expected error`);
     };

@@ -4,7 +4,7 @@ import process from "node:process";
 import "zx/globals";
 import { isRemoteVerifyPolicy, shouldComputeLocalZxTestNodeModules } from "./remote-policy";
 import { defaultRunVerifyDeps, type RunVerifyDeps } from "./run-verify-deps";
-import { zxInitPath } from "../dev-build/paths";
+import { buildToolsRoot, zxInitPath } from "../dev-build/paths";
 
 export async function runVerify(): Promise<void> {
   await runVerifyWithDeps(defaultRunVerifyDeps);
@@ -86,7 +86,9 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
   }
   const analysisDir = path.join(
     root,
-    "buck-out",
+    ".viberoots",
+    "workspace",
+    "buck",
     "tmp",
     "verify-analysis",
     `run-${process.pid}-${Date.now()}`,
@@ -97,7 +99,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     "ensure-buck-prelude-config",
     async () => await deps.ensureBuckPreludeConfig(root),
   );
-  process.env.VBR_SHARED_PRELUDE_PATH = path.join(root, "prelude");
+  process.env.VBR_SHARED_PRELUDE_PATH = path.resolve(buildToolsRoot(root), "..", "prelude");
   const cov = remoteVerify
     ? { rawDir: null }
     : await timedPhase("setup-local-workspace", async () => {
@@ -217,7 +219,8 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
         async () => await deps.computeZxTestNodeModulesOut(root, zxInit),
       )
     : null;
-  const status = await timedPhase(
+  let status = 1;
+  status = await timedPhase(
     "buck-test-passes",
     async () =>
       await deps.runVerifyBuckPasses({
@@ -247,6 +250,6 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     "kill-verify-buck-isolation",
     async () => await deps.killBuckIsolation(root, iso),
   );
-  await deps.runFinalOrphanBuckCleanup({ logFile: lock.logFile, stateFile, timedPhase });
+  await deps.runFinalOrphanBuckCleanup({ root, logFile: lock.logFile, stateFile, timedPhase });
   deps.exit(requestedExitCode ?? status);
 }

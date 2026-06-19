@@ -4,7 +4,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { sanitizeName } from "../../lib/sanitize";
-import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 function parseOutPath(stdout: unknown): string {
   return String(stdout || "")
@@ -26,7 +26,7 @@ function extractBuildLogLine(buildLog: string, key: string): string {
 test("cpp: header_deps on a library does not add link inputs", async () => {
   await runInTemp("cpp-header-deps-library-no-link", async (tmp, $) => {
     await fs.outputFile(
-      path.join(tmp, "build-tools", "tools", "nix", "langs.json"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "nix", "langs.json"),
       JSON.stringify({ enabled: ["cpp"] }, null, 2) + "\n",
       "utf8",
     );
@@ -49,7 +49,7 @@ test("cpp: header_deps on a library does not add link inputs", async () => {
     await fs.outputFile(
       path.join(tmp, "libs", "dep", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "dep",',
@@ -76,7 +76,7 @@ test("cpp: header_deps on a library does not add link inputs", async () => {
     await fs.outputFile(
       path.join(tmp, "apps", "demo", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',
@@ -100,14 +100,14 @@ test("cpp: header_deps on a library does not add link inputs", async () => {
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const build = await $({
       cwd: tmp,
       stdio: "pipe",
       nothrow: true,
       reject: false,
       env: { ...process.env, BUCK_TARGET: "//projects/apps/demo:demo" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.equal(build.exitCode, 0, String(build.stderr || build.stdout));
 
     const out = parseOutPath(build.stdout);

@@ -6,6 +6,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 import { SprinkleRefInfisicalStore } from "../../deployments/sprinkleref-infisical";
 import { SprinkleRefLocalFileStore } from "../../deployments/sprinkleref-local-file";
+import { viberootsRepoPath } from "./deployment-command";
 import { startFakeInfisicalServer } from "./infisical.test-server";
 
 const auth = {
@@ -111,7 +112,7 @@ test("Infisical docs keep UI keys scheme-free and document cleanup only", async 
   const docs = await Promise.all(
     ["docs/sprinkleref.md", "docs/local-sprinkleref.md"].map(async (name) => ({
       name,
-      text: await fs.readFile(name, "utf8"),
+      text: await fs.readFile(viberootsRepoPath(name), "utf8"),
     })),
   );
   const joined = docs.map((doc) => doc.text).join("\n");

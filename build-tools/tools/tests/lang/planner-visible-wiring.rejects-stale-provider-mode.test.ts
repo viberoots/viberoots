@@ -15,7 +15,7 @@ test("planner-visible wiring rejects stale provider realization vocabulary", asy
     await fsp.writeFile(
       path.join(srcsCase, "TARGETS"),
       [
-        'load("//build-tools/lang:planner_visible_wiring_probe.bzl", "planner_visible_inputs_probe")',
+        'load("@viberoots//build-tools/lang:planner_visible_wiring_probe.bzl", "planner_visible_inputs_probe")',
         "",
         "planner_visible_inputs_probe(",
         '  name = "stale_provider_mode",',
@@ -40,7 +40,7 @@ test("planner-visible wiring rejects stale provider realization vocabulary", asy
     await fsp.writeFile(
       path.join(aliasCase, "TARGETS"),
       [
-        'load("//build-tools/lang:planner_visible_wiring_probe.bzl", "planner_visible_inputs_probe")',
+        'load("@viberoots//build-tools/lang:planner_visible_wiring_probe.bzl", "planner_visible_inputs_probe")',
         "",
         "planner_visible_inputs_probe(",
         '  name = "stale_alias",',

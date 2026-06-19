@@ -23,7 +23,7 @@ test("gen-auto-map: skips provider-package nodes (no self-entries)", async () =>
     await fsp.writeFile(graphPath, JSON.stringify([providerNode, normalNode]), "utf8");
 
     const outPath = path.join(tmp, ".viberoots", "workspace", "providers", "auto_map.bzl");
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graphPath} --out ${outPath}`;
     const out = await fsp.readFile(outPath, "utf8");
 
     // Assert no keys for provider-package nodes

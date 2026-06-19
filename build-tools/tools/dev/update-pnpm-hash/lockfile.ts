@@ -9,6 +9,7 @@ import { withResolvedExactPrefetchedStore } from "./realized-store";
 
 export async function makeFilteredFlakeRef(repoRoot: string): Promise<{
   flakeRef: string;
+  workspaceRoot: string;
   cleanup: () => Promise<void>;
 }> {
   return await makeScopedFilteredFlakeRef({

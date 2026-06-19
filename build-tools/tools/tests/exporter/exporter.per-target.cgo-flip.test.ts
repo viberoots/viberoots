@@ -33,7 +33,7 @@ test("per-target cgo_enabled flips only the tuple cgo segment", async () => {
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${m1}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${m1}`;
     const keys1: string[] = JSON.parse(await fs.readFile(m1, "utf8")).tupleKeys || [];
 
     const t2 = [
@@ -53,7 +53,7 @@ test("per-target cgo_enabled flips only the tuple cgo segment", async () => {
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${m2}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${m2}`;
     const keys2: string[] = JSON.parse(await fs.readFile(m2, "utf8")).tupleKeys || [];
 
     if (JSON.stringify(keys1) === JSON.stringify(keys2)) {

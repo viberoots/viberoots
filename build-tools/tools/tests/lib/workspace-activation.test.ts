@@ -64,9 +64,10 @@ test("init-workspace keeps current on workspace root before local tool extractio
     assert.equal(result.sourcePath, path.join(root, "viberoots"));
     assert.equal(await readlink(root), "..");
     assert.equal(await fsp.realpath(path.join(root, ".viberoots/current")), root);
-    for (const rel of [".viberoots/workspace/providers", ".viberoots/workspace/buck"]) {
+    for (const rel of [".viberoots/workspace/providers", ".viberoots/buck"]) {
       assert.equal((await fsp.stat(path.join(root, rel))).isDirectory(), true);
     }
+    assert.equal(await fsp.readlink(path.join(root, ".viberoots/workspace/buck")), "../buck");
     assert.equal(await fsp.readFile(path.join(root, "flake.nix"), "utf8"), flakeBefore);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
@@ -93,6 +94,9 @@ test("activateWorkspace is idempotent on an already activated workspace", async 
   const root = await workspace("vbr-activate-idempotent");
   try {
     await makeSource(root);
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace", ".viberoots"), {
+      recursive: true,
+    });
 
     const first = await activateWorkspace({ start: root, env: { WORKSPACE_ROOT: root } });
     const firstLink = await readlink(root);
@@ -102,6 +106,7 @@ test("activateWorkspace is idempotent on an already activated workspace", async 
     assert.deepEqual(second, first);
     assert.equal(await readlink(root), firstLink);
     assert.equal(await fsp.realpath(path.join(root, ".viberoots/current")), firstReal);
+    await assert.rejects(fsp.lstat(path.join(root, ".viberoots", "workspace", ".viberoots")));
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }
@@ -227,6 +232,34 @@ test("activateWorkspace reports stale buck cell paths", async () => {
       "[cells]\nviberoots = ./.viberoots/current\nprelude = ./.viberoots/current/prelude\n",
       "utf8",
     );
+    await assert.rejects(
+      activateWorkspace({ start: root, env: { WORKSPACE_ROOT: root } }),
+      /missing viberoots cell path/,
+    );
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("shell-entry activation tolerates a stale hidden prelude cell", async () => {
+  const root = await workspace("vbr-activate-shell-prelude");
+  try {
+    await makeSource(root);
+    await fsp.writeFile(
+      path.join(root, ".buckconfig"),
+      [
+        "[cells]",
+        "viberoots = ./.viberoots/current",
+        "prelude = ./.viberoots/current/prelude",
+        "[repositories]",
+        "viberoots = ./.viberoots/current",
+        "prelude = ./.viberoots/current/prelude",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    await activateWorkspace({ start: root, env: { WORKSPACE_ROOT: root }, shellEntry: true });
     await assert.rejects(
       activateWorkspace({ start: root, env: { WORKSPACE_ROOT: root } }),
       /missing viberoots cell path/,

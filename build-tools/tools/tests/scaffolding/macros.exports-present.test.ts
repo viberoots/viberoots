@@ -3,9 +3,9 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("build-tools/go/defs.bzl exports nix_go_* macros and uses shared realize_provider_edges", async () => {
+test("viberoots/build-tools/go/defs.bzl exports nix_go_* macros and uses shared realize_provider_edges", async () => {
   await runInTemp("macros-exports", async (tmp, $) => {
-    const txt = await fsp.readFile("build-tools/go/defs.bzl", "utf8");
+    const txt = await fsp.readFile("viberoots/build-tools/go/defs.bzl", "utf8");
     const need = [
       "def nix_go_library(",
       "def nix_go_binary(",
@@ -28,7 +28,10 @@ test("build-tools/go/defs.bzl exports nix_go_* macros and uses shared realize_pr
     }
 
     // Policy lives in go/private; ensure that helper is present and uses shared provider-edge wiring.
-    const privateTxt = await fsp.readFile("build-tools/go/private/cgo_wiring.bzl", "utf8");
+    const privateTxt = await fsp.readFile(
+      "viberoots/build-tools/go/private/cgo_wiring.bzl",
+      "utf8",
+    );
     const privateNeed = [
       'load("@viberoots//build-tools/go/private:labels.bzl", "append_tuple_labels")',
       "def configure_cgo_kwargs(",

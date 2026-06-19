@@ -13,25 +13,28 @@ test("langs.json valid passes validator", async () => {
         {
           id: "go",
           displayName: "Go",
-          requiredPaths: ["build-tools/tools/nix/templates/go.nix", "build-tools/go/defs.bzl"],
+          requiredPaths: [
+            "viberoots/build-tools/tools/nix/templates/go.nix",
+            "viberoots/build-tools/go/defs.bzl",
+          ],
           kinds: ["cli", "lib"],
-          templatesDir: "build-tools/tools/scaffolding/templates/go",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/go",
         },
       ],
     } as any;
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/nix/langs.json"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/langs.json"),
       JSON.stringify(manifest, null, 2) + "\n",
     );
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/dev/langs.schema.json"),
-      path.join(tmp, "build-tools/tools/dev/langs.schema.json"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/dev/langs.schema.json"),
+      path.join(tmp, "viberoots/build-tools/tools/dev/langs.schema.json"),
     );
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/dev/validate-langs.ts"),
-      path.join(tmp, "build-tools/tools/dev/validate-langs.ts"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/dev/validate-langs.ts"),
+      path.join(tmp, "viberoots/build-tools/tools/dev/validate-langs.ts"),
     );
-    const res = await $({ cwd: tmp })`node build-tools/tools/dev/validate-langs.ts`;
+    const res = await $({ cwd: tmp })`node viberoots/build-tools/tools/dev/validate-langs.ts`;
     assert.match(String(res.stdout), /langs\.json: OK/);
   });
 });

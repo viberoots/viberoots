@@ -15,47 +15,60 @@ pipeline {
         }
         agent { label "${SYSTEM}" }
         stages {
+          stage('Bootstrap workspace') {
+            steps {
+              sh '''
+                set -eu
+                if [ -f .gitmodules ]; then
+                  git submodule update --init --recursive
+                fi
+                if [ -x ./viberoots/init ]; then
+                  ./viberoots/init
+                fi
+              '''
+            }
+          }
           stage('Codegen') {
-            steps { sh 'node build-tools/tools/ci/run-stage.ts --stage codegen' }
+            steps { sh 'node "$(if [ -d viberoots/build-tools ]; then printf %s viberoots/build-tools; else printf %s build-tools; fi)/tools/ci/run-stage.ts" --stage codegen' }
           }
           stage('Export Graph') {
-            steps { sh 'node build-tools/tools/ci/run-stage.ts --stage export-graph' }
+            steps { sh 'node "$(if [ -d viberoots/build-tools ]; then printf %s viberoots/build-tools; else printf %s build-tools; fi)/tools/ci/run-stage.ts" --stage export-graph' }
           }
           stage('Sync Providers') {
-            steps { sh 'node build-tools/tools/ci/run-stage.ts --stage sync-providers' }
+            steps { sh 'node "$(if [ -d viberoots/build-tools ]; then printf %s viberoots/build-tools; else printf %s build-tools; fi)/tools/ci/run-stage.ts" --stage sync-providers' }
           }
           stage('Generate auto_map') {
-            steps { sh 'node build-tools/tools/ci/run-stage.ts --stage gen-auto-map' }
+            steps { sh 'node "$(if [ -d viberoots/build-tools ]; then printf %s viberoots/build-tools; else printf %s build-tools; fi)/tools/ci/run-stage.ts" --stage gen-auto-map' }
           }
           stage('Pre-build guard') {
-            steps { sh 'node build-tools/tools/ci/run-stage.ts --stage prebuild-guard' }
+            steps { sh 'node "$(if [ -d viberoots/build-tools ]; then printf %s viberoots/build-tools; else printf %s build-tools; fi)/tools/ci/run-stage.ts" --stage prebuild-guard' }
           }
           stage('Nix-gaps policy gate') {
-            steps { sh 'node build-tools/tools/ci/run-stage.ts --stage nix-gaps-policy' }
+            steps { sh 'node "$(if [ -d viberoots/build-tools ]; then printf %s viberoots/build-tools; else printf %s build-tools; fi)/tools/ci/run-stage.ts" --stage nix-gaps-policy' }
           }
           stage('CPP Addon Smoke') {
-            steps { sh 'node build-tools/tools/ci/run-stage.ts --stage cpp-addon-smoke' }
+            steps { sh 'node "$(if [ -d viberoots/build-tools ]; then printf %s viberoots/build-tools; else printf %s build-tools; fi)/tools/ci/run-stage.ts" --stage cpp-addon-smoke' }
           }
           stage('File size lint') {
-            steps { sh 'node build-tools/tools/ci/run-stage.ts --stage file-size-lint' }
+            steps { sh 'node "$(if [ -d viberoots/build-tools ]; then printf %s viberoots/build-tools; else printf %s build-tools; fi)/tools/ci/run-stage.ts" --stage file-size-lint' }
           }
           stage('Patches Lint (strict)') {
-            steps { sh 'node build-tools/tools/ci/run-stage.ts --stage patches-lint' }
+            steps { sh 'node "$(if [ -d viberoots/build-tools ]; then printf %s viberoots/build-tools; else printf %s build-tools; fi)/tools/ci/run-stage.ts" --stage patches-lint' }
           }
           stage('Build graph-generator (Nix)') {
-            steps { sh 'node build-tools/tools/ci/run-stage.ts --stage nix-build-graph-generator' }
+            steps { sh 'node "$(if [ -d viberoots/build-tools ]; then printf %s viberoots/build-tools; else printf %s build-tools; fi)/tools/ci/run-stage.ts" --stage nix-build-graph-generator' }
           }
           stage('Wheelhouse Preload (Python)') {
-            steps { sh 'node build-tools/tools/ci/run-stage.ts --stage wheelhouse-preload' }
+            steps { sh 'node "$(if [ -d viberoots/build-tools ]; then printf %s viberoots/build-tools; else printf %s build-tools; fi)/tools/ci/run-stage.ts" --stage wheelhouse-preload' }
           }
           stage('Buck Tests') {
-            steps { sh 'node build-tools/tools/ci/run-stage.ts --stage buck-test' }
+            steps { sh 'node "$(if [ -d viberoots/build-tools ]; then printf %s viberoots/build-tools; else printf %s build-tools; fi)/tools/ci/run-stage.ts" --stage buck-test' }
           }
           stage('Coverage (merged)') {
             steps {
-              sh 'COVERAGE=1 node build-tools/tools/ci/run-stage.ts --stage buck-test'
-              sh 'pnpm coverage:build'
-              archiveArtifacts artifacts: 'coverage/**', fingerprint: true, allowEmptyArchive: true
+              sh 'COVERAGE=1 node "$(if [ -d viberoots/build-tools ]; then printf %s viberoots/build-tools; else printf %s build-tools; fi)/tools/ci/run-stage.ts" --stage buck-test'
+              sh 'pnpm --dir "$(if [ -d viberoots/build-tools ]; then printf %s viberoots; else printf %s .; fi)" coverage:build'
+              archiveArtifacts artifacts: 'coverage/**, viberoots/coverage/**', fingerprint: true, allowEmptyArchive: true
             }
           }
         }
@@ -63,5 +76,3 @@ pipeline {
     }
   }
 }
-
-

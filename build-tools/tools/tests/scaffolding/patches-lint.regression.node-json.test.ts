@@ -13,7 +13,7 @@ test("patches-lint (node): json output preserves nonpatch message", async () => 
     const res = await $({
       stdio: "pipe",
       nothrow: true,
-    })`node build-tools/tools/dev/patches-lint.ts --lang node --strict --format json`;
+    })`node viberoots/build-tools/tools/dev/patches-lint.ts --lang node --strict --format json`;
 
     const txt = String(res.stdout || "").trim();
     const json = JSON.parse(txt) as Array<any>;

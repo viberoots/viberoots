@@ -15,7 +15,7 @@ test("node_asset_stage and node_wasm_inline_module stamp lang:node and kind:gen"
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_gen", "node_asset_stage", "node_wasm_inline_module")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_gen", "node_asset_stage", "node_wasm_inline_module")',
         "",
         "nix_node_gen(",
         '  name = "app_raw",',

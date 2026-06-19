@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-const scriptPath = "build-tools/tools/dev/coverage-policy-doc-check.ts";
+const scriptPath = "viberoots/build-tools/tools/dev/coverage-policy-doc-check.ts";
 
 const testingDoc = `# Testing
 

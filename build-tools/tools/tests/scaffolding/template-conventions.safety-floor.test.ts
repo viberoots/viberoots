@@ -7,9 +7,9 @@ import {
 } from "../../lib/buck-command-env";
 
 const SAFETY_FLOOR_TARGETS = [
-  "//:scaffolding_smoke_lib_readme",
-  "//:scaffolding_smoke_cli_readme",
-  "//:scaffolding_python_wasm_app_scaffold_smoke",
+  "root//viberoots:scaffolding_smoke_lib_readme",
+  "root//viberoots:scaffolding_smoke_cli_readme",
+  "root//viberoots:scaffolding_python_wasm_app_scaffold_smoke",
 ];
 const TARGET_PLATFORM = "prelude//platforms:default";
 
@@ -40,8 +40,7 @@ test("template safety-floor targets are resolvable", async () => {
     const raw = JSON.parse(out.stdout) as Record<string, { name?: string }>;
     const resolved = Object.keys(raw).map((k) => k.replace(/\s+\([^)]*\)$/, ""));
     for (const target of SAFETY_FLOOR_TARGETS) {
-      const absolute = `root${target}`;
-      if (!resolved.includes(absolute)) {
+      if (!resolved.includes(target)) {
         throw new Error(`safety-floor target did not resolve: ${target}`);
       }
     }

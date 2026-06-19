@@ -41,7 +41,7 @@ EOF'`;
     await fsp.writeFile(
       path.join(libDir, "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_headers")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_headers")',
         "",
         "nix_cpp_headers(",
         '  name = "demo_headers",',

@@ -35,7 +35,7 @@ test("node_service_artifact stamps deployable service component labels", async (
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "node_service_artifact")',
+        'load("@viberoots//build-tools/node:defs.bzl", "node_service_artifact")',
         "node_service_artifact(",
         '  name = "artifact",',
         '  lockfile_label = "lockfile:projects/apps/service/pnpm-lock.yaml#projects/apps/service",',

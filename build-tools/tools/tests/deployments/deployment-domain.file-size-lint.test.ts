@@ -13,6 +13,7 @@ import {
   isReviewedDeploymentOwnedBuildSystemPath,
   REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS,
 } from "../../lib/deployment-verify-scope";
+import { viberootsRepoPath } from "./deployment-command";
 
 async function withTempRoot<T>(fn: (root: string) => Promise<T>): Promise<T> {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "deployment-file-size-"));
@@ -39,8 +40,14 @@ async function initTrackedFixture(root: string): Promise<void> {
   await execFileAsync("git", ["add", "."], { cwd: root });
 }
 
-async function runFileSizeLint(root: string): Promise<{ code: number | null; stderr: string }> {
-  const scriptPath = path.join(process.cwd(), "build-tools/tools/dev/file-size-lint.ts");
+async function runFileSizeLint(root: string): Promise<{
+  code: number | null;
+  stdout: string;
+  stderr: string;
+}> {
+  const scriptPath = viberootsRepoPath("viberoots/build-tools/tools/dev/file-size-lint.ts");
+  const importPath = viberootsRepoPath("viberoots/build-tools/tools/dev/zx-init.mjs");
+  const packageRoot = path.dirname(viberootsRepoPath("viberoots/package.json"));
   return await new Promise((resolve, reject) => {
     const child = spawn(
       "pnpm",
@@ -48,7 +55,7 @@ async function runFileSizeLint(root: string): Promise<{ code: number | null; std
         "exec",
         "tsx",
         "--import",
-        "./build-tools/tools/dev/zx-init.mjs",
+        importPath,
         scriptPath,
         "--root",
         root,
@@ -57,16 +64,20 @@ async function runFileSizeLint(root: string): Promise<{ code: number | null; std
         "--fail=true",
       ],
       {
-        cwd: process.cwd(),
+        cwd: packageRoot,
         stdio: ["ignore", "pipe", "pipe"],
       },
     );
+    let stdout = "";
     let stderr = "";
+    child.stdout.on("data", (chunk) => {
+      stdout += String(chunk);
+    });
     child.stderr.on("data", (chunk) => {
       stderr += String(chunk);
     });
     child.on("error", reject);
-    child.on("close", (code) => resolve({ code, stderr }));
+    child.on("close", (code) => resolve({ code, stdout, stderr }));
   });
 }
 
@@ -89,7 +100,7 @@ test("repo-owned file-size lint reports deployment-owned offenders with line cou
   await withTempRoot(async (root) => {
     const offenderPath = REVIEWED_DEPLOYMENT_OWNED_SUPPORT_PATHS[0];
     await writeLines(root, offenderPath, 251);
-    await writeLines(root, "build-tools/tools/nix/unrelated.nix", 400);
+    await writeLines(root, "viberoots/build-tools/tools/nix/unrelated.nix", 400);
     await initTrackedFixture(root);
 
     const offenders = await findFileSizeOffenders({
@@ -107,7 +118,11 @@ test("repo-owned file-size lint reports deployment-owned offenders with line cou
     );
 
     const result = await runFileSizeLint(root);
-    assert.notEqual(result.code, 0);
+    assert.notEqual(
+      result.code,
+      0,
+      `expected file-size-lint CLI to fail\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+    );
     assert.match(result.stderr, new RegExp(offenderPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.match(result.stderr, /251 lines/);
   });

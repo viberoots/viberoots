@@ -1,13 +1,26 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { externalPnpmStateDirs } from "../../lib/pnpm-state-paths";
 import { getTimingCountForLabel, runInScratchTemp, runInTemp } from "./test-helpers";
 
 test("runInTemp emits setup timing buckets in summary mode", async () => {
   const prevTiming = process.env.TEST_TIMING;
   try {
     process.env.TEST_TIMING = "summary";
-    await runInTemp("setup-timing-smoke", async () => {});
+    let tempPnpmStateRoot = "";
+    await runInTemp("setup-timing-smoke", async (tmp) => {
+      tempPnpmStateRoot = (await externalPnpmStateDirs(tmp)).rootDir;
+    });
+    assert.equal(
+      await fsp
+        .stat(tempPnpmStateRoot)
+        .then(() => true)
+        .catch(() => false),
+      false,
+      "runInTemp must remove temp-repo-specific pnpm state on cleanup",
+    );
 
     assert.equal(getTimingCountForLabel("runInTemp resolveTestHome"), 1);
     assert.equal(getTimingCountForLabel("runInTemp initTempRepoFromSeedStore"), 1);

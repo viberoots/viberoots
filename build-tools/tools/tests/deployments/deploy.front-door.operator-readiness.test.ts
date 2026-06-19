@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -39,7 +40,7 @@ test("deploy --operator-readiness summarizes selected context and existing setup
       cwd: tmp,
       env: { ...process.env, DEPLOY_CONTROL_PLANE_TOKEN: "super-secret-runtime-token" },
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --operator-readiness`;
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-staging:deploy --operator-readiness`;
     const text = String(result.stdout);
     assert.match(text, /Deployment Operator Readiness/);
     assert.match(text, /context: demo-staging/);
@@ -76,7 +77,7 @@ test("deploy --operator-readiness does not require resolving selected secret tok
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-staging:deploy --operator-readiness`;
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-staging:deploy --operator-readiness`;
     const text = String(result.stdout);
     assert.match(text, /control-plane token: selected secret backend credential ref/);
     assert.match(

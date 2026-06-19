@@ -10,7 +10,7 @@ function assert(condition: boolean, message: string) {
 test("preferred importer wiring surfaces do not use v2 filenames/import paths", async () => {
   const files = await fg(
     [
-      "build-tools/lang/**/*.bzl",
+      "viberoots/build-tools/lang/**/*.bzl",
       "docs/handbook/**/*.md",
       "abstractions.md",
       "getting-started-on-a-pr.md",

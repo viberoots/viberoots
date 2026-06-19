@@ -8,10 +8,10 @@ test("lang-kit: scaffold skeleton files", async () => {
     const name = "rust";
     await $`scaf language new ${name} --yes --display_name=Rust`;
     const expectPaths = [
-      path.join(tmp, `build-tools/tools/nix/templates/${name}.nix`),
-      path.join(tmp, `build-tools/tools/nix/planner/${name}.nix`),
+      path.join(tmp, `viberoots/build-tools/tools/nix/templates/${name}.nix`),
+      path.join(tmp, `viberoots/build-tools/tools/nix/planner/${name}.nix`),
       path.join(tmp, `${name}/defs.bzl`),
-      path.join(tmp, `build-tools/tools/buck/providers/${name}.ts`),
+      path.join(tmp, `viberoots/build-tools/tools/buck/providers/${name}.ts`),
       path.join(tmp, `patches/${name}/.gitkeep`),
       path.join(tmp, `build-tools/tools/tests/${name}/contract/basic.test.ts`),
     ];

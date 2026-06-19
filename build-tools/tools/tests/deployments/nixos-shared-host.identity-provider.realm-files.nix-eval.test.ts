@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsRepoPath } from "./deployment-command";
 
 test("shared-host identity provider module forwards reviewed realm files to Keycloak", async () => {
   await runInTemp("shared-host-identity-provider-realm-files-eval", async (tmp, $) => {
@@ -13,7 +14,7 @@ test("shared-host identity provider module forwards reviewed realm files to Keyc
       let
         system = import <nixpkgs/nixos> {
           configuration = {
-            imports = [ ./build-tools/tools/nix/shared-host-identity-provider-module.nix ];
+            imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-identity-provider-module.nix")} ];
             system.stateVersion = "24.11";
             deploymentHost.identityProvider = {
               enable = true;

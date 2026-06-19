@@ -5,6 +5,14 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
+function includesAny(haystack: string, needles: string[]): boolean {
+  return needles.some((needle) => haystack.includes(needle));
+}
+
+function outputMessage(kind: string, out: string): string {
+  return `expected ${kind} in nix_inputs; output was:\n${out.slice(0, 4000)}`;
+}
+
 test("nix_cpp_wasm_emscripten_lib: routes through cpp_nix_build with wasm labels", async () => {
   await runInTemp("cpp-wasm-emscripten-stub", async (tmp, $) => {
     // Minimal provider target and auto_map mapping to verify provider-edge realization.
@@ -51,7 +59,7 @@ EOF'`;
       [
         "",
         "# test: cpp.macros.wasm-emscripten.planner-stub.test.ts",
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_emscripten_lib")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_wasm_emscripten_lib")',
         "",
         "nix_cpp_wasm_emscripten_lib(",
         '  name = "core_emscripten",',
@@ -116,16 +124,28 @@ EOF'`;
     );
     const nixInputsOut = String(probeNixInputs.stdout || "");
     assert.ok(
-      nixInputsOut.includes("//build-tools/tools/buck:runtime_ts"),
-      "expected exporter runtime filegroup in nix_inputs for emscripten target",
+      includesAny(nixInputsOut, [
+        "@viberoots//build-tools/tools/buck:runtime_ts",
+        "viberoots//build-tools/tools/buck:runtime_ts",
+        "root//viberoots/build-tools/tools/buck:runtime_ts",
+      ]),
+      outputMessage("exporter runtime filegroup for emscripten target", nixInputsOut),
     );
     assert.ok(
-      nixInputsOut.includes("//build-tools/tools/dev:runtime_ts"),
-      "expected selected-build runtime filegroup in nix_inputs for emscripten target",
+      includesAny(nixInputsOut, [
+        "@viberoots//build-tools/tools/dev:runtime_ts",
+        "viberoots//build-tools/tools/dev:runtime_ts",
+        "root//viberoots/build-tools/tools/dev:runtime_ts",
+      ]),
+      outputMessage("selected-build runtime filegroup for emscripten target", nixInputsOut),
     );
     assert.ok(
-      nixInputsOut.includes("//build-tools/tools/nix:runtime_nix"),
-      "expected planner runtime filegroup in nix_inputs for emscripten target",
+      includesAny(nixInputsOut, [
+        "@viberoots//build-tools/tools/nix:runtime_nix",
+        "viberoots//build-tools/tools/nix:runtime_nix",
+        "root//viberoots/build-tools/tools/nix:runtime_nix",
+      ]),
+      outputMessage("planner runtime filegroup for emscripten target", nixInputsOut),
     );
 
     const build = await $({

@@ -25,7 +25,7 @@ async function scaffoldAll($: any, tmp: string): Promise<void> {
   await $`scaf new deployment opentofu-provisioner demo-attached --yes`;
   await fsp.writeFile(
     path.join(tmp, "projects/deployments/TARGETS"),
-    'load("//build-tools/deployments:defs.bzl", "deployment_defaults")\ndeployment_defaults(name = "defaults", visibility = ["PUBLIC"])\n',
+    'load("@viberoots//build-tools/deployments:defs.bzl", "deployment_defaults")\ndeployment_defaults(name = "defaults", visibility = ["PUBLIC"])\n',
   );
 }
 

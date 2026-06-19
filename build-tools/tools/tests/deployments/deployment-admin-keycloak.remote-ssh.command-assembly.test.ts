@@ -24,7 +24,10 @@ test("remote SSH transport assembles reviewed deploy admin identity sync command
         automationPrincipalIds: ["app:deploy-bot"],
       }),
     );
-    assert.match(sync.at(-1) || "", /build-tools\/tools\/bin\/deploy admin identity sync/);
+    assert.match(
+      sync.at(-1) || "",
+      /\$deploy_bin" admin identity sync|build-tools\/tools\/bin\/deploy.*admin identity sync/,
+    );
     assert.match(
       sync.at(-1) || "",
       /--realm-file '"'"'\/etc\/nixos\/deployment-host\/identity-provider\/deployment-auth-realm\.json'"'"'/,
@@ -50,7 +53,10 @@ test("remote SSH transport assembles reviewed deploy admin identity grant-user c
         automationPrincipalIds: ["app:deploy-bot"],
       }),
     );
-    assert.match(grant.at(-1) || "", /build-tools\/tools\/bin\/deploy admin identity grant-user/);
+    assert.match(
+      grant.at(-1) || "",
+      /\$deploy_bin" admin identity grant-user|build-tools\/tools\/bin\/deploy.*admin identity grant-user/,
+    );
     assert.match(grant.at(-1) || "", /--user-email .*alice@example\.com/);
     assert.match(grant.at(-1) || "", /--membership-file .*deployment-auth-memberships\.json/);
     assert.match(grant.at(-1) || "", /--realm-file .*deployment-auth-realm\.json/);

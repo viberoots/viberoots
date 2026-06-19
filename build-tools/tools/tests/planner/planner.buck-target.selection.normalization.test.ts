@@ -7,10 +7,10 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("planner BUCK_TARGET selection accepts cell-prefixed and config-suffixed labels", async () => {
   await runInTemp("planner-buck-target-selection-normalization", async (tmp, $) => {
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, ".viberoots", "workspace", "buck"), { recursive: true });
     const graph = [
       {
-        name: "root//projects/apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
+        name: "root//projects/apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerviberoots/build-tools/lang/cxx)",
         rule_type: "cxx_binary",
         labels: ["lang:cpp"],
       },
@@ -24,7 +24,7 @@ test("planner BUCK_TARGET selection accepts cell-prefixed and config-suffixed la
     const expr = `
       let
         pkgs = import <nixpkgs> {};
-        G = import ./build-tools/tools/nix/graph-generator.nix {
+        G = import ./viberoots/build-tools/tools/nix/graph-generator.nix {
           inherit pkgs;
           src = ./.;
           graphJsonPath = ./.viberoots/workspace/buck/graph.json;
@@ -35,8 +35,8 @@ test("planner BUCK_TARGET selection accepts cell-prefixed and config-suffixed la
     const variants = [
       "//projects/apps/foo:svc",
       "root//projects/apps/foo:svc",
-      "//projects/apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
-      "root//projects/apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
+      "//projects/apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerviberoots/build-tools/lang/cxx)",
+      "root//projects/apps/foo:svc (config//toolchains:default#buck2/default//:default#linkerviberoots/build-tools/lang/cxx)",
     ];
 
     for (const BUCK_TARGET of variants) {

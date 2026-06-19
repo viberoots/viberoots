@@ -1,12 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsRepoPath } from "./deployment-command";
 
 test("shared-host service modules do not hardcode a public deployment domain", async () => {
-  const moduleDir = path.join(process.cwd(), "build-tools", "tools", "nix");
+  const moduleDir = viberootsRepoPath("build-tools/tools/nix");
   const moduleTexts = await Promise.all(
     [
       "shared-host-vault-module.nix",
@@ -29,7 +29,7 @@ test("shared-host postgres module evaluates as an importable reviewed host modul
       let
         system = import <nixpkgs/nixos> {
           configuration = {
-            imports = [ ./build-tools/tools/nix/shared-host-postgres-module.nix ];
+            imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-postgres-module.nix")} ];
             system.stateVersion = "24.11";
           };
         };
@@ -69,7 +69,7 @@ test("shared-host vault module evaluates as an importable reviewed host module",
       let
         system = import <nixpkgs/nixos> {
           configuration = {
-            imports = [ ./build-tools/tools/nix/shared-host-vault-module.nix ];
+            imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-vault-module.nix")} ];
             system.stateVersion = "24.11";
             deploymentHost.vault.enable = true;
           };
@@ -104,7 +104,7 @@ test("shared-host vault module can augment an existing apps ACME host config", a
       let
         system = import <nixpkgs/nixos> {
           configuration = {
-            imports = [ ./build-tools/tools/nix/shared-host-vault-module.nix ];
+            imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-vault-module.nix")} ];
             system.stateVersion = "24.11";
             security.acme.certs."wildcard.example.test" = {
               domain = "*.example.test";

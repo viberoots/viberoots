@@ -26,7 +26,9 @@ def _cpp_nix_test_impl(ctx):
     expected_bin = sanitize_name(raw)
     attr = sanitize_nix_attr_from_target_label(raw)
     run_and_exec = (
-        nix_calling_env_export_source_snapshot()
+        "WORKSPACE_ROOT_ENV_ARG=\"${1:-}\"; "
+        + "if [ -n \"$WORKSPACE_ROOT_ENV_ARG\" ] && [ -f \"$WORKSPACE_ROOT_ENV_ARG\" ]; then . \"$WORKSPACE_ROOT_ENV_ARG\" 2>/dev/null || true; fi; "
+        + nix_calling_env_export_source_snapshot(snapshot_root = "${2:-}", manifest_path = "${3:-}")
         + nix_bootstrap_env_core()
         + ("echo '[cpp_nix_test] planner_label=%s' >&2; " % raw)
         + ("echo '[cpp_nix_test] target_attr=%s' >&2; " % attr)
@@ -83,7 +85,7 @@ def _cpp_nix_test_impl(ctx):
     ]
     command = external_runner_command(
         labels,
-        ["bash", "-c", run_and_exec, "cpp_nix_test"] + snapshot_inputs,
+        ["bash", "-c", run_and_exec, "cpp_nix_test", ctx.attrs._workspace_root_env] + snapshot_inputs,
         remote_command = remote_command,
         declared_inputs = declared_inputs,
         required_inputs = [

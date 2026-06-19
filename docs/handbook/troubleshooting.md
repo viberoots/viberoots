@@ -3,28 +3,44 @@
 ## Bootstrap-safe glue
 
 - Glue and CI entrypoints are bootstrap-safe and do not depend on `fs-extra`. They can run before `node_modules` exists.
-- If you see early failures related to missing Node deps, ensure you’re invoking the documented glue stages directly (or `build-tools/tools/dev/install-deps.ts --glue-only`) in the dev shell. The scripts use only built-in Node `fs` APIs and zx.
+- If you see early failures related to missing Node deps, ensure you’re invoking the documented glue stages directly (or `viberoots/build-tools/tools/dev/install-deps.ts --glue-only`) in the dev shell. The scripts use only built-in Node `fs` APIs and zx.
+
+## Viberoots submodule state
+
+- Missing or uninitialized submodule:
+  - Run `git submodule update --init viberoots`.
+  - Then run `./viberoots/init` so `.viberoots/current` points at `../viberoots` and the hidden
+    workspace/devshell files are repaired.
+- Dirty submodule:
+  - Inspect `git -C viberoots status --short`.
+  - Commit or discard intentional viberoots-source edits in the submodule before parent validation.
+- Gitlink mismatch:
+  - Inspect `git submodule status viberoots`.
+  - Either check out the parent-pinned revision with `git submodule update viberoots` or intentionally update the parent gitlink after the submodule commit exists.
+- Old-layout blocker:
+  - Root `build-tools/`, `third_party/providers/`, `prelude/`, and `toolchains/` should not exist in the parent workspace.
+  - Generated provider and graph state belongs under `.viberoots/workspace/`.
 
 ## Missing auto_map or graph
 
 - The planner has no fallback discovery; you must regenerate glue locally or in CI.
 - Run locally:
-  - `node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`
-  - `node build-tools/tools/buck/sync-providers.ts` (unified orchestrator; Node sync runs automatically when PNPM lockfiles are present)
-  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
-  - Or: `node build-tools/tools/dev/install-deps.ts --glue-only`
+  - `node --import ./viberoots/build-tools/tools/dev/zx-init.mjs --experimental-strip-types viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`
+  - `node --import ./viberoots/build-tools/tools/dev/zx-init.mjs --experimental-strip-types viberoots/build-tools/tools/buck/sync-providers.ts` (unified orchestrator; Node sync runs automatically when PNPM lockfiles are present)
+  - `node --import ./viberoots/build-tools/tools/dev/zx-init.mjs --experimental-strip-types viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
+  - Or: `node --import ./viberoots/build-tools/tools/dev/zx-init.mjs --experimental-strip-types viberoots/build-tools/tools/dev/install-deps.ts --glue-only`
 - In CI, run dedicated stages before build/test:
-  - `build-tools/tools/ci/run-stage.ts --stage export-graph`
-  - `build-tools/tools/ci/run-stage.ts --stage sync-providers`
-  - `build-tools/tools/ci/run-stage.ts --stage gen-auto-map`
-  - `build-tools/tools/ci/run-stage.ts --stage prebuild-guard`
+  - `viberoots/build-tools/tools/ci/run-stage.ts --stage export-graph`
+  - `viberoots/build-tools/tools/ci/run-stage.ts --stage sync-providers`
+  - `viberoots/build-tools/tools/ci/run-stage.ts --stage gen-auto-map`
+  - `viberoots/build-tools/tools/ci/run-stage.ts --stage prebuild-guard`
 
 ## Missing importer provider (Node)
 
 - Symptom: prebuild guard or Buck errors referencing a missing `node_importer_deps(...)` for a given `pnpm-lock.yaml#importer`.
 - Fix (local):
-  - `node build-tools/tools/buck/sync-providers.ts` (unified orchestrator regenerates `third_party/providers/TARGETS.node.auto`)
-  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
+  - `node --import ./viberoots/build-tools/tools/dev/zx-init.mjs --experimental-strip-types viberoots/build-tools/tools/buck/sync-providers.ts` (unified orchestrator regenerates `.viberoots/workspace/providers/TARGETS.node.auto`)
+  - `node --import ./viberoots/build-tools/tools/dev/zx-init.mjs --experimental-strip-types viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
   - Ensure the Node target carries a lockfile label like `lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web`.
 - Fix (CI): run the dedicated stages before build/test as above.
 
@@ -40,14 +56,14 @@
   - Add or modify patches under `<importer>/patches/node/*.patch` (importer‑local) or `patches/node/*.patch` (global), then re-run sync.
   - Re-run auto_map after sync.
 
-## Stale sidecar (build-tools/tools/buck/node-lock-index.json)
+## Stale sidecar (.viberoots/workspace/buck/node-lock-index.json)
 
 - Symptom: graph consumers (Composite Graph API) warn about a missing or stale Node sidecar.
 - Fix:
-  - Regenerate exporter outputs: `node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`
-  - Re-run prebuild guard: `node build-tools/tools/buck/prebuild-guard.ts`
+  - Regenerate exporter outputs: `node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`
+  - Re-run prebuild guard: `node viberoots/build-tools/tools/buck/prebuild-guard.ts`
 - Notes:
-  - Downstream tools MUST use the Composite Graph API (`build-tools/tools/lib/graph-view.ts` or `build-tools/tools/buck/graph-view.ts`) rather than reading `graph.json` directly.
+  - Downstream tools MUST use the Composite Graph API (`viberoots/build-tools/tools/lib/graph-view.ts` or `viberoots/build-tools/tools/buck/graph-view.ts`) rather than reading `graph.json` directly.
 
 ## Cloudflare Containers Deployments
 
@@ -113,8 +129,8 @@
 
 ## Overrides in CI
 
-- Ensure `NIX_GO_DEV_OVERRIDE_JSON` and `NIX_CPP_DEV_OVERRIDE_JSON` are unset. Locally, use `build-tools/tools/dev/clear-overrides.ts`.
-- Shared helper: `build-tools/tools/nix/lib/lang-helpers.nix` centralizes override parsing and CI guard (`readDevOverrides`, `guardNoDevOverridesInCI`). Templates import it to emit a local warning (trace) when overrides are set and to throw in CI if overrides are present.
+- Ensure `NIX_GO_DEV_OVERRIDE_JSON` and `NIX_CPP_DEV_OVERRIDE_JSON` are unset. Locally, use `viberoots/build-tools/tools/dev/clear-overrides.ts`.
+- Shared helper: `viberoots/build-tools/tools/nix/lib/lang-helpers.nix` centralizes override parsing and CI guard (`readDevOverrides`, `guardNoDevOverridesInCI`). Templates import it to emit a local warning (trace) when overrides are set and to throw in CI if overrides are present.
 
 ## Remote build/cache readiness
 
@@ -144,7 +160,7 @@
 
 ## Verify scope or status looks surprising
 
-- Symptom: a docs-only change below `build-tools/**` did not trigger full build-system scope.
+- Symptom: a docs-only change below `viberoots/build-tools/**` did not trigger full build-system scope.
   - Meaning: Markdown and reStructuredText files are scoped as documentation, not build-system
     tooling. Reviewed deployment/operator docs still run their documentation contract bucket.
   - Fix: use `ALL_TESTS=1 v` when you intentionally need full `//...` coverage.
@@ -172,14 +188,14 @@
 - Symptom: `import lookup disabled by -mod=vendor` or `go.mod not found`.
 - Cause: builder working directory not at module root, or vendor mode assumptions.
 - Fix:
-  - Ensure `build-tools/tools/nix/lang-templates.nix` sets `pwd`/`modRoot` to the module root and `subPackages` as documented (apps: `cmd/<name>`, libs: `.`).
+  - Ensure `viberoots/build-tools/tools/nix/lang-templates.nix` sets `pwd`/`modRoot` to the module root and `subPackages` as documented (apps: `cmd/<name>`, libs: `.`).
   - Regenerate glue and rebuild via Nix (`nix build .#graph-generator`).
 
 ## Manifest missing or empty
 
 - Symptom: tests cannot find binaries or `manifest.json` is empty.
 - Fix:
-  - Run glue: `node build-tools/tools/buck/glue-pipeline.ts` (or `node build-tools/tools/buck/prebuild-guard.ts` in local mode).
+  - Run glue: `node viberoots/build-tools/tools/buck/glue-pipeline.ts` (or `node viberoots/build-tools/tools/buck/prebuild-guard.ts` in local mode).
   - Ensure `gomod2nix.toml` exists at repo root (copy from the authoritative module lock).
   - Inspect `$out/build.log` for target keys and bin discovery.
 
@@ -200,10 +216,10 @@
 
 When I’m debugging “why did this rebuild?” or “why didn’t this rebuild?”, I start with the invalidation report. It’s a deterministic, line-oriented view of each target’s patch scope, importer/lockfile metadata, whether global Nix inputs are expected as real action inputs, and the realized provider edges (as a debugging aid).
 
-- **Where it lives**: `build-tools/tools/buck/invalidation-report.txt` (generated; do not hand-edit)
+- **Where it lives**: `.viberoots/workspace/buck/invalidation-report.txt` (generated; do not hand-edit)
 - **How to regenerate**:
-  - `node build-tools/tools/buck/glue-pipeline.ts` (preferred; refreshes all glue, then emits the report)
-  - Or: `node build-tools/tools/buck/invalidation-report.ts` (report-only; expects existing `graph.json` and `auto_map.bzl`)
+  - `node viberoots/build-tools/tools/buck/glue-pipeline.ts` (preferred; refreshes all glue, then emits the report)
+  - Or: `node viberoots/build-tools/tools/buck/invalidation-report.ts` (report-only; expects existing `graph.json` and `auto_map.bzl`)
 
 ## Exporter simulate vs authoritative
 
@@ -214,7 +230,7 @@ When I’m debugging “why did this rebuild?” or “why didn’t this rebuild
 The prebuild guard verifies that generated glue files exist and are fresh relative to their inputs.
 
 - What it checks
-  - Presence: `build-tools/tools/buck/graph.json`, `.viberoots/workspace/providers/auto_map.bzl`, and any `third_party/providers/TARGETS*.auto` files (when patches or lockfiles exist).
+  - Presence: `.viberoots/workspace/buck/graph.json`, `.viberoots/workspace/providers/auto_map.bzl`, and any `.viberoots/workspace/providers/TARGETS*.auto` files (when patches or lockfiles exist).
   - Freshness: compares newest input (any `TARGETS`, `*.bzl`, `patches/**/*.patch`, or `**/pnpm-lock.yaml`) against the oldest glue output, with an allowed skew.
 
 - Local behavior
@@ -231,11 +247,11 @@ The prebuild guard verifies that generated glue files exist and are fresh relati
   - `PREBUILD_GUARD_LIST_LIMIT=5`: number of files listed when verbose; can be overridden by `--verbose-limit`.
 
 - CLI diagnostics
-  - Verbose: `node build-tools/tools/buck/prebuild-guard.ts --verbose --verbose-limit 10`
-  - JSON: `node build-tools/tools/buck/prebuild-guard.ts --json > guard.json`
+  - Verbose: `node viberoots/build-tools/tools/buck/prebuild-guard.ts --verbose --verbose-limit 10`
+  - JSON: `node viberoots/build-tools/tools/buck/prebuild-guard.ts --json > guard.json`
 
 - Typical commands
-  - Local auto-fix: `node build-tools/tools/buck/prebuild-guard.ts`
+  - Local auto-fix: `node viberoots/build-tools/tools/buck/prebuild-guard.ts`
   - CI sequencing: run the three glue steps explicitly before building or testing.
 
 ### Patches lint
@@ -249,10 +265,10 @@ Validate patch filenames and directory shape to prevent cache/key churn and misa
   - Non-`.patch` files under `patches/go/` are violations (e.g., `.gitkeep`).
 
 - Usage
-  - Advisory (default): `node build-tools/tools/dev/patches-lint.ts`
-  - Strict (CI/hooks): `node build-tools/tools/dev/patches-lint.ts --strict`
-  - JSON output: `node build-tools/tools/dev/patches-lint.ts --format json`
-  - Scope language: `node build-tools/tools/dev/patches-lint.ts --lang go`
+  - Advisory (default): `node viberoots/build-tools/tools/dev/patches-lint.ts`
+  - Strict (CI/hooks): `node viberoots/build-tools/tools/dev/patches-lint.ts --strict`
+  - JSON output: `node viberoots/build-tools/tools/dev/patches-lint.ts --format json`
+  - Scope language: `node viberoots/build-tools/tools/dev/patches-lint.ts --lang go`
 
 - Exit policy
   - Advisory: prints diagnostics and exits 0.
@@ -261,10 +277,10 @@ Validate patch filenames and directory shape to prevent cache/key churn and misa
 ### Glue regeneration (quick reference)
 
 - Local sequence (not committed): export-graph → sync-providers → gen-auto-map.
-  - Run `node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`
-  - Run `node build-tools/tools/buck/sync-providers.ts`
-  - Run `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
-  - Or run `node build-tools/tools/dev/install-deps.ts` (dev shell) which chains them for you.
+  - Run `node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`
+  - Run `node viberoots/build-tools/tools/buck/sync-providers.ts`
+  - Run `node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
+  - Or run `node viberoots/build-tools/tools/dev/install-deps.ts` (dev shell) which chains them for you.
 - CI sequence: the same steps as separate stages before build/test.
 
 ### Prelude-gated tests (dev shell)
@@ -276,7 +292,7 @@ Validate patch filenames and directory shape to prevent cache/key churn and misa
 ### Exporter metrics (optional)
 
 - You can ask the exporter to write a small JSON metrics file for observability.
-- Usage: `node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json --metrics-out build-tools/tools/buck/export-metrics.json`
+- Usage: `node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json --metrics-out .viberoots/workspace/buck/export-metrics.json`
 - The metrics write is best-effort and does not change export behavior.
 
 ## Vercel control-plane deployments

@@ -24,12 +24,21 @@ async function pathExists(p: string): Promise<boolean> {
 test("link-node writes marker at repo root", async () => {
   await runInTemp("link-node-marker", async (tmp) => {
     const lockfile = path.join(tmp, "pnpm-lock.yaml");
-    await fsp.writeFile(lockfile, "lockfileVersion: 1\n", "utf8");
-    const lockHash = crypto
-      .createHash("sha256")
-      .update(await fsp.readFile(lockfile))
-      .digest("hex");
-
+    await fsp.writeFile(
+      lockfile,
+      [
+        "lockfileVersion: '9.0'",
+        "",
+        "settings:",
+        "  autoInstallPeers: true",
+        "  excludeLinksFromLockfile: false",
+        "",
+        "importers:",
+        "  .: {}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
     const fakeOut = path.join(tmp, "fake-out");
     await fsp.mkdir(path.join(fakeOut, "node_modules"), { recursive: true });
     const nixArgsLog = path.join(tmp, "nix-args.log");
@@ -42,12 +51,16 @@ test("link-node writes marker at repo root", async () => {
         "#!/usr/bin/env bash",
         "set -euo pipefail",
         `echo "$*" >> "${nixArgsLog}"`,
+        'if [[ "$*" == store\\ add-path* ]]; then',
+        '  echo "/nix/store/fixture-pnpm-exact-store"',
+        "  exit 0",
+        "fi",
         `echo "${fakeOut}"`,
       ].join("\n"),
     );
 
-    const script = path.join(tmp, "build-tools/tools/dev/install/link-node.ts");
-    const zxInitPath = path.join(tmp, "build-tools/tools/dev/zx-init.mjs");
+    const script = path.join(tmp, "viberoots/build-tools/tools/dev/install/link-node.ts");
+    const zxInitPath = path.join(tmp, "viberoots/build-tools/tools/dev/zx-init.mjs");
     const env = {
       ...process.env,
       VBR_LINK_NODE_FAKE_NIX: "1",
@@ -76,8 +89,19 @@ test("link-node writes marker at repo root", async () => {
     assert.ok(st.isSymbolicLink());
     assert.equal(await fsp.readlink(nm), path.join(fakeOut, "node_modules"));
 
-    const markerPath = path.join(tmp, "buck-out", "tmp", "node-modules-link.root.json");
+    const markerPath = path.join(
+      tmp,
+      ".viberoots",
+      "workspace",
+      "buck",
+      "tmp",
+      "node-modules-link.root.json",
+    );
     const marker = JSON.parse(await fsp.readFile(markerPath, "utf8"));
+    const lockHash = crypto
+      .createHash("sha256")
+      .update(await fsp.readFile(lockfile))
+      .digest("hex");
     assert.equal(marker.importer, ".");
     assert.equal(marker.lockfile, "pnpm-lock.yaml");
     assert.equal(marker.lockHash, lockHash);
@@ -85,8 +109,8 @@ test("link-node writes marker at repo root", async () => {
 
     const logged = await fsp.readFile(nixArgsLog, "utf8");
     assert.ok(
-      logged.includes(`${tmp}#node-modules.default`),
-      "expected root importer to use bare workspace flake ref for fast git-backed resolution",
+      logged.includes(`${path.join(tmp, ".viberoots", "workspace")}#node-modules.default`),
+      "expected root importer to use hidden workspace flake ref in strict consumer layout",
     );
   });
 });

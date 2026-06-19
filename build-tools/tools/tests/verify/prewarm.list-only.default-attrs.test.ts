@@ -10,7 +10,7 @@ test("prewarm-toolchains: default attr list (LIST_ONLY)", async () => {
   const res = await $({
     env,
     stdio: "pipe",
-  })`zx-wrapper build-tools/tools/dev/prewarm-toolchains.ts`.nothrow();
+  })`zx-wrapper viberoots/build-tools/tools/dev/prewarm-toolchains.ts`.nothrow();
   assert.equal(res.exitCode, 0);
   const txt = String(res.stdout || "").trim();
   assert.ok(txt.startsWith("["), "expected JSON array output");

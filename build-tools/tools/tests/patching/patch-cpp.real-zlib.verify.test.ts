@@ -7,7 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVersion()", async () => {
   await runInTemp("patch-cpp-real-zlib", async (tmp, $) => {
     // Ensure CLI is executable
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
 
     // Provide a deterministic test resolver mapping to avoid network variance under suite load.
     // Create a minimal zlib-like source tree containing zlib.h so start/apply work without fetching.
@@ -112,7 +112,7 @@ test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVer
     }
 
     // Write overlay to apply the patch (relative path from overlay file)
-    const overlaysDir = path.join(tmp, "build-tools", "tools", "nix", "overlays");
+    const overlaysDir = path.join(tmp, "viberoots", "build-tools", "tools", "nix", "overlays");
     await fsp.mkdir(overlaysDir, { recursive: true });
     const overlayPath = path.join(overlaysDir, "cpp-patches.nix");
     // Overlay is already committed in the repo and auto-discovers patches; ensure the path exists

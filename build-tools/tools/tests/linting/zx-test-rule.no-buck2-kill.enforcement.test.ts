@@ -4,7 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 test("linting: zx_test runner must not call `buck2 kill` (daemon reuse policy)", async () => {
-  const p = path.join(process.cwd(), "build-tools", "tools", "buck", "zx_test.bzl");
+  const p = path.join(process.cwd(), "viberoots", "build-tools", "tools", "buck", "zx_test.bzl");
   const content = await fsp.readFile(p, "utf8");
   if (content.includes('buck2" kill') || content.includes("buck2 kill")) {
     throw new Error(`unexpected buck2 kill usage in ${p}`);

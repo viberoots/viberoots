@@ -20,7 +20,7 @@ async function listNixFilesUnder(dir: string): Promise<string[]> {
 }
 
 test("nix templates do not hardcode NIX_*_DEV_OVERRIDE_JSON literals", async () => {
-  const root = path.join(process.cwd(), "build-tools", "tools", "nix", "templates");
+  const root = path.join(process.cwd(), "viberoots", "build-tools", "tools", "nix", "templates");
   const files = (await listNixFilesUnder(root)).sort();
   const offenders: Array<{ file: string; matches: string[] }> = [];
   for (const f of files) {
@@ -30,7 +30,9 @@ test("nix templates do not hardcode NIX_*_DEV_OVERRIDE_JSON literals", async () 
       offenders.push({ file: f, matches: Array.from(new Set(matches)).sort() });
   }
   if (offenders.length > 0) {
-    console.error("found dev override env literals in build-tools/tools/nix/templates/**:");
+    console.error(
+      "found dev override env literals in viberoots/build-tools/tools/nix/templates/**:",
+    );
     for (const o of offenders) {
       console.error(`- ${o.file}: ${o.matches.join(", ")}`);
     }

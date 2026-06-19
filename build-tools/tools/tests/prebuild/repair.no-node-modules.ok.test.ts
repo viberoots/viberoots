@@ -77,7 +77,7 @@ EOF
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild/repair.ts`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild/repair.ts`;
 
     // Verify glue outputs were generated
     const autoMap = path.join(tmp, DEFAULT_AUTO_MAP_PATH);

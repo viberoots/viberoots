@@ -48,7 +48,7 @@ EOF'`;
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > projects/apps/demo-cli/TARGETS <<'\''EOF'\''
-load("//build-tools/go:defs.bzl", "nix_go_binary")
+load("@viberoots//build-tools/go:defs.bzl", "nix_go_binary")
 
 nix_go_binary(
     name = "demo",

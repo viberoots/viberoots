@@ -42,7 +42,7 @@ test("remote target policy accepts WORKSPACE_ROOT lookups with declared source s
         : {
             status: 0,
             stdout:
-              'ExternalRunnerTestInfo(command=[cmd_args("runner", hidden=[<source helper.ts>]), "$WORKSPACE_ROOT/build-tools/tools/dev/build-selected.ts"], env=None, labels=["source-snapshot:declared-root", "source-snapshot:manifest", "source-snapshot:graph"], run_from_project_root=True, use_project_relative_paths=True, local_resources={}, required_local_resources=[])',
+              'ExternalRunnerTestInfo(command=[cmd_args("runner", hidden=[<source helper.ts>]), "$WORKSPACE_ROOT/viberoots/build-tools/tools/dev/build-selected.ts"], env=None, labels=["source-snapshot:declared-root", "source-snapshot:manifest", "source-snapshot:graph"], run_from_project_root=True, use_project_relative_paths=True, local_resources={}, required_local_resources=[])',
             stderr: "",
           },
   };

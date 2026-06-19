@@ -1,13 +1,16 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { Capabilities, LangEntry, Manifest } from "./types";
+import { sourcePath } from "./fs";
 
 export async function readManifest(manifestRelPath = "build-tools/tools/nix/langs.json"): Promise<{
   enabled: Set<string>;
   caps: Map<string, Capabilities>;
   langs: Map<string, LangEntry>;
 }> {
-  const manifestPath = path.resolve(manifestRelPath);
+  const manifestPath = path.isAbsolute(manifestRelPath)
+    ? manifestRelPath
+    : await sourcePath(manifestRelPath);
   const enabled = new Set<string>();
   const caps = new Map<string, Capabilities>();
   const langs = new Map<string, LangEntry>();

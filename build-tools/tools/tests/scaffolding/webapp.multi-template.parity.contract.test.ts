@@ -12,28 +12,28 @@ async function readTemplate(relativePath: string): Promise<string> {
 
 test("multi-template parity: ts/wasm module-key helpers align across static, SSR vite, SSR next", async () => {
   const staticAppWasm = await readTemplate(
-    "build-tools/tools/scaffolding/templates/ts/webapp-static/src/wasm-contract.ts.jinja",
+    "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/src/wasm-contract.ts.jinja",
   );
   const viteAppWasm = await readTemplate(
-    "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/src/wasm-contract.ts.jinja",
+    "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/src/wasm-contract.ts.jinja",
   );
   const nextAppWasm = await readTemplate(
-    "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/app/wasm-contract.ts.jinja",
+    "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/app/wasm-contract.ts.jinja",
   );
   const viteServerWasm = await readTemplate(
-    "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/server/wasm-contract.ts.jinja",
+    "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/server/wasm-contract.ts.jinja",
   );
   const nextServerWasm = await readTemplate(
-    "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/server/wasm-contract.ts.jinja",
+    "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/server/wasm-contract.ts.jinja",
   );
   const viteServerTs = await readTemplate(
-    "build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/server/ts-modules.ts.jinja",
+    "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/server/ts-modules.ts.jinja",
   );
   const nextServerTs = await readTemplate(
-    "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/server/ts-modules.ts.jinja",
+    "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/server/ts-modules.ts.jinja",
   );
   const nextBuildScript = await readTemplate(
-    "build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/scripts/build-ssr.mjs.jinja",
+    "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/scripts/build-ssr.mjs.jinja",
   );
 
   for (const src of [staticAppWasm, viteAppWasm, nextAppWasm]) {

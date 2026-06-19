@@ -15,7 +15,7 @@ function normalizeLabelList(xs: unknown): string[] {
 test("cpp wasm static lib stamps wasm:wasi when wasm_abi is wasi", async () => {
   await runInTemp("cpp-wasm-static-lib-wasi-stamping", async (tmp, $) => {
     await fs.outputFile(
-      path.join(tmp, "build-tools", "tools", "nix", "langs.json"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "nix", "langs.json"),
       JSON.stringify({ enabled: ["cpp"] }, null, 2) + "\n",
       "utf8",
     );
@@ -28,7 +28,7 @@ test("cpp wasm static lib stamps wasm:wasi when wasm_abi is wasi", async () => {
     await fs.outputFile(
       path.join(tmp, "libs", "core", "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_wasm_static_lib")',
         "",
         "nix_cpp_wasm_static_lib(",
         '  name = "core_wasm",',
@@ -51,8 +51,8 @@ test("cpp wasm static lib stamps wasm:wasi when wasm_abi is wasi", async () => {
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
-    const nodes = await readGraph(path.join(tmp, "build-tools", "tools", "buck", "graph.json"));
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    const nodes = await readGraph(path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"));
     const node = nodes.find(
       (x) => normalizeTargetLabel(String(x.name || "")) === "//projects/libs/core:core_wasm",
     );

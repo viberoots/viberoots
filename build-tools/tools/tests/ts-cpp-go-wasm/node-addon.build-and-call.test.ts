@@ -8,7 +8,7 @@ test("Node N-API addon builds and returns add(2,3)=5 (temp repo)", async () => {
     const sh = $({ cwd: tmp, stdio: "inherit" });
 
     // Enable C++ (and Go implicitly via planner) in this temp workspace for the planner path
-    await sh`bash --noprofile --norc -c 'mkdir -p build-tools/tools/nix && printf %s \'{"enabled":["cpp"]}\' > build-tools/tools/nix/langs.json'`;
+    await sh`bash --noprofile --norc -c 'mkdir -p build-tools/tools/nix && printf %s \'{"enabled":["cpp"]}\' > viberoots/build-tools/tools/nix/langs.json'`;
 
     // projects/libs/math-core — minimal C++ core (not strictly required by the binding, but present per plan)
     await sh`bash --noprofile --norc -c 'mkdir -p projects/libs/math-core/include/core projects/libs/math-core/src/core'`;
@@ -23,7 +23,7 @@ int add_ints(int a, int b) {
 }
 EOF'`;
     await sh`bash --noprofile --norc -c 'cat > projects/libs/math-core/TARGETS <<"EOF"
-load("//build-tools/cpp:defs.bzl", "nix_cpp_library")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")
 
 nix_cpp_library(
     name = "lib",
@@ -64,7 +64,7 @@ prune = { go-tests = true, unused-packages = true }
 EOF'`;
     // TARGETS declaring a Go c-archive
     await sh`bash --noprofile --norc -c 'cat > projects/libs/math-api/TARGETS <<"EOF"
-load("//build-tools/go:defs.bzl", "nix_go_carchive")
+load("@viberoots//build-tools/go:defs.bzl", "nix_go_carchive")
 
 nix_go_carchive(
     name = "carchive",
@@ -113,7 +113,7 @@ static napi_value Init(napi_env env, napi_value exports) {
 NAPI_MODULE(NODE_GYP_MODULE_NAME, Init);
 EOF'`;
     await sh`bash --noprofile --norc -c 'cat > projects/libs/math-native/TARGETS <<"EOF"
-load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_node_addon")
 
 nix_cpp_node_addon(
     name = "napi_addon",
@@ -132,7 +132,7 @@ EOF'`;
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`${process.execPath} build-tools/tools/dev/install/deps-main.ts --glue-only`;
+    })`${process.execPath} viberoots/build-tools/tools/dev/install/deps-main.ts --glue-only`;
 
     // Build the addon via the flake-selected builder (same path used by cpp_nix_build)
     const outPath = await buildSelectedOutPath({

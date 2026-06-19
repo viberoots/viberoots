@@ -99,7 +99,7 @@ export async function writeSharedLaneTargets(filePath: string): Promise<void> {
   await fsp.writeFile(
     filePath,
     [
-      'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
+      'load("@viberoots//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
       "",
       "deployment_defaults(",
       '    name = "defaults",',

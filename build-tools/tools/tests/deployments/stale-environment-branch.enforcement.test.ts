@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { viberootsRepoPath } from "./deployment-command";
 
 const repoRoot = process.cwd();
 const activeDocs = [
@@ -21,7 +22,7 @@ const activeDocs = [
 const sourceRoots = [
   "build-tools/deployments",
   "build-tools/tools/deployments",
-  "build-tools/tools/scaffolding/templates/deployment",
+  "viberoots/build-tools/tools/scaffolding/templates/deployment",
   "projects/deployments",
 ];
 const sourceFileExts = new Set([".bzl", ".ts", ".tsx", ".js", ".json", ".jsonc", ".jinja"]);
@@ -32,8 +33,13 @@ const staleBranchRequirement =
 const releasePointerAuthority =
   /\brelease[- ]pointer[^\n]*(?:authoritative|source of truth|runtime deployment input)\b/i;
 
+function ownedPath(relPath: string): string {
+  if (relPath.startsWith("projects/")) return path.join(repoRoot, relPath);
+  return viberootsRepoPath(relPath);
+}
+
 async function walkFiles(root: string): Promise<string[]> {
-  const abs = path.join(repoRoot, root);
+  const abs = ownedPath(root);
   const entries = await fsp.readdir(abs, { withFileTypes: true }).catch(() => []);
   const files: string[] = [];
   for (const entry of entries) {
@@ -45,7 +51,7 @@ async function walkFiles(root: string): Promise<string[]> {
 }
 
 async function scanFile(relPath: string): Promise<string[]> {
-  const text = await fsp.readFile(path.join(repoRoot, relPath), "utf8");
+  const text = await fsp.readFile(ownedPath(relPath), "utf8");
   const errors: string[] = [];
   if (/\bstage_branches(?:_required)?\b/.test(text)) {
     errors.push(`${relPath}: must not expose stage_branches in active deployment files`);
@@ -82,7 +88,7 @@ test("stale branch enforcement catches full Git ref authority examples", () => {
 
 test("deployment plan records the adjusted protected/shared model", async () => {
   const plan = await fsp.readFile(
-    path.join(repoRoot, "docs/history/plans/deployment-plan.md"),
+    viberootsRepoPath("docs/history/plans/deployment-plan.md"),
     "utf8",
   );
   assert.match(

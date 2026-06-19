@@ -30,7 +30,7 @@ test("auto-map includes importer-scoped provider for a temp projects/apps/exampl
       "YAML",
       // Define a simple node gen target with the importer-scoped lockfile label, so auto-map has a node to attach mapping to
       "cat > projects/apps/example/TARGETS <<'ST'",
-      'load("//build-tools/node:defs.bzl", "nix_node_gen")',
+      'load("@viberoots//build-tools/node:defs.bzl", "nix_node_gen")',
       "",
       "nix_node_gen(",
       '    name = "smoke_test",',
@@ -56,7 +56,7 @@ test("auto-map includes importer-scoped provider for a temp projects/apps/exampl
 
     const graph = ".viberoots/workspace/buck/graph.json";
     const NODE = "node";
-    const ZX = path.resolve("build-tools/tools/dev/zx-init.mjs");
+    const ZX = path.resolve("viberoots/build-tools/tools/dev/zx-init.mjs");
     const nodeFlags = [
       "--experimental-strip-types",
       "--disable-warning=ExperimentalWarning",
@@ -83,9 +83,9 @@ test("auto-map includes importer-scoped provider for a temp projects/apps/exampl
       { spaces: 2 },
     );
     // Generate Node providers from the lockfile
-    await $`${NODE} ${nodeFlags} build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`${NODE} ${nodeFlags} viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
     // Generate auto_map mapping lockfile label -> provider
-    await $`${NODE} ${nodeFlags} build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`${NODE} ${nodeFlags} viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out .viberoots/workspace/providers/auto_map.bzl`;
 
     const expected = workspaceProviderLabel(
       providerNameForImporter("projects/apps/example/pnpm-lock.yaml", "projects/apps/example"),

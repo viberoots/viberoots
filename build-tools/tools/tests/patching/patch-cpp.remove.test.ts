@@ -19,12 +19,12 @@ test("patch-cpp remove drops patch and refreshes glue deterministically", async 
     const fakeSrc = path.join(tmp, "_nix_src", `zlib-${version}`);
     await fs.mkdirp(fakeSrc);
 
-    const cli = path.join(tmp, "build-tools", "tools", "bin", "patch-pkg");
+    const cli = path.join(tmp, "viberoots", "build-tools", "tools", "bin", "patch-pkg");
     await $`chmod +x ${cli}`;
 
     const env = {
       ...process.env,
-      ZX_INIT: path.join(tmp, "build-tools", "tools", "dev", "zx-init.mjs"),
+      ZX_INIT: path.join(tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
       WORKSPACE_ROOT: tmp,
       NO_DEV_SHELL: "1",
       NIX_CPP_TEST_RESOLVE_JSON: JSON.stringify({

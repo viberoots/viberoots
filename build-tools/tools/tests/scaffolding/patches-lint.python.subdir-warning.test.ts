@@ -16,7 +16,7 @@ test("patches-lint (python): importer subdirectory warns (non-strict) and fails 
     // Non-strict: should warn but exit 0
     const resWarn = await $({
       nothrow: true,
-    })`node build-tools/tools/dev/patches-lint.ts --lang python`;
+    })`node viberoots/build-tools/tools/dev/patches-lint.ts --lang python`;
     if (resWarn.exitCode !== 0) {
       console.error("expected non-strict lint to succeed despite subdir (python)");
       process.exit(2);
@@ -24,7 +24,7 @@ test("patches-lint (python): importer subdirectory warns (non-strict) and fails 
     // Strict: should fail due to subdir
     const resStrict = await $({
       nothrow: true,
-    })`node build-tools/tools/dev/patches-lint.ts --lang python --strict`;
+    })`node viberoots/build-tools/tools/dev/patches-lint.ts --lang python --strict`;
     if (resStrict.exitCode === 0) {
       console.error("expected strict lint to fail due to subdir (python)");
       process.exit(2);

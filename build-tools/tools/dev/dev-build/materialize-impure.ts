@@ -2,7 +2,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 import { inferRunnableFromOutPath } from "../../lib/runnables";
-import { nodeBin, zxNodeBase } from "./paths";
+import { buildToolPath, nodeBin, zxNodeBase } from "./paths";
 import { runNixBuildWithProgress } from "../run-runnable-nix";
 
 function materializeTimeoutSec(): number {
@@ -83,9 +83,9 @@ export async function exportGraphImpure(root: string): Promise<void> {
     stdio: "inherit",
     cwd: root,
     env: runEnvImp,
-  })`bash --noprofile --norc -c ${`${node} ${base} ${path.join(
+  })`bash --noprofile --norc -c ${`${node} ${base} ${buildToolPath(
     root,
-    "build-tools/tools/buck/export-graph.ts",
+    "tools/buck/export-graph.ts",
   )} --out ${path.join(root, DEFAULT_GRAPH_PATH)}`}`;
 }
 

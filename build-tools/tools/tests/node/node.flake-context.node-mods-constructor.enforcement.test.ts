@@ -3,9 +3,9 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("flake package callsites resolve nodeMods from nodeMods or mkNodeMods", async () => {
-  const defaultFile = "build-tools/tools/nix/flake/packages/default.nix";
-  const graphFile = "build-tools/tools/nix/flake/packages/graph.nix";
-  const checksFile = "build-tools/tools/nix/flake/outputs-checks.nix";
+  const defaultFile = "viberoots/build-tools/tools/nix/flake/packages/default.nix";
+  const graphFile = "viberoots/build-tools/tools/nix/flake/packages/graph.nix";
+  const checksFile = "viberoots/build-tools/tools/nix/flake/outputs-checks.nix";
 
   const [defaultTxt, graphTxt, checksTxt] = await Promise.all([
     fsp.readFile(defaultFile, "utf8"),

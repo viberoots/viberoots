@@ -19,12 +19,18 @@ type ActivationOptions = {
 };
 
 function flakeUsesLocalViberoots(workspaceRoot: string): boolean {
-  try {
-    const text = fs.readFileSync(path.join(workspaceRoot, "flake.nix"), "utf8");
-    return /viberoots\.url\s*=\s*"(?:path|git\+file):\.\/viberoots"/.test(text);
-  } catch {
-    return false;
+  for (const flakePath of [
+    path.join(workspaceRoot, ".viberoots", "workspace", "flake.nix"),
+    path.join(workspaceRoot, "flake.nix"),
+  ]) {
+    try {
+      const text = fs.readFileSync(flakePath, "utf8");
+      if (/viberoots\.url\s*=\s*"(?:path|git\+file):(?:\.\.\/\.\.\/|\.\/)viberoots"/.test(text)) {
+        return true;
+      }
+    } catch {}
   }
+  return false;
 }
 
 function requireFile(filePath: string, message: string): void {
@@ -45,11 +51,22 @@ function chooseSource(workspaceRoot: string, opts: ActivationOptions): string {
 }
 
 function localSourceHasExtractedToolTree(workspaceRoot: string, sourcePath: string): boolean {
+  const hasExtractedCells = (root: string): boolean => {
+    return (
+      fs.existsSync(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs")) &&
+      fs.existsSync(path.join(root, "prelude")) &&
+      fs.existsSync(path.join(root, "toolchains"))
+    );
+  };
+  if (fs.existsSync(path.join(sourcePath, "build-tools", "tools", "dev", "zx-init.mjs"))) {
+    return true;
+  }
   try {
     const flakeText = fs.readFileSync(path.join(sourcePath, "flake.nix"), "utf8");
     if (
       flakeText.includes("viberoots local dogfood flake") &&
-      flakeText.includes("import ./build-tools/tools/nix/flake/outputs.nix")
+      flakeText.includes("import ./build-tools/tools/nix/flake/outputs.nix") &&
+      !hasExtractedCells(sourcePath)
     ) {
       return false;
     }
@@ -71,7 +88,10 @@ function validateSource(workspaceRoot: string, sourcePath: string): void {
   );
 }
 
-function validateBuckconfigCells(workspaceRoot: string): void {
+function validateBuckconfigCells(
+  workspaceRoot: string,
+  opts: { allowMissingPrelude?: boolean } = {},
+): void {
   const buckconfig = path.join(workspaceRoot, ".buckconfig");
   if (!fs.existsSync(buckconfig)) return;
   const text = fs.readFileSync(buckconfig, "utf8");
@@ -81,6 +101,7 @@ function validateBuckconfigCells(workspaceRoot: string): void {
     .filter((line) => line && !line.startsWith("#"))
     .filter((line) => line.includes(".viberoots/current"))
     .map((line) => line.split("=", 2)[1]?.trim() || "")
+    .filter((value) => !(opts.allowMissingPrelude && value.includes(".viberoots/current/prelude")))
     .map((value) => path.resolve(workspaceRoot, value))
     .filter((candidate) => !fs.existsSync(candidate));
   if (missing.length > 0) {
@@ -119,6 +140,39 @@ async function replaceCurrentSymlink(currentPath: string, target: string): Promi
   } finally {
     await fsp.unlink(tmpPath).catch(() => {});
   }
+}
+
+async function ensureWorkspaceBuckStateLink(workspaceRoot: string): Promise<void> {
+  const realDir = path.join(workspaceRoot, ".viberoots", "buck");
+  const linkPath = path.join(workspaceRoot, VIBEROOTS_WORKSPACE_REL, "buck");
+  const linkTarget = "../buck";
+  await fsp.mkdir(realDir, { recursive: true });
+  await fsp.mkdir(path.dirname(linkPath), { recursive: true });
+  try {
+    const stat = await fsp.lstat(linkPath);
+    if (stat.isSymbolicLink()) {
+      if ((await fsp.readlink(linkPath)) === linkTarget) return;
+      await fsp.unlink(linkPath);
+    } else {
+      await fsp.rm(linkPath, { recursive: true, force: true });
+    }
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+  }
+  try {
+    await fsp.symlink(linkTarget, linkPath);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
+    const stat = await fsp.lstat(linkPath);
+    if (!stat.isSymbolicLink() || (await fsp.readlink(linkPath)) !== linkTarget) throw e;
+  }
+}
+
+async function removeNestedWorkspaceActivationState(workspaceRoot: string): Promise<void> {
+  await fsp.rm(path.join(workspaceRoot, VIBEROOTS_WORKSPACE_REL, ".viberoots"), {
+    recursive: true,
+    force: true,
+  });
 }
 
 async function rejectStaleLocalCurrent(
@@ -171,15 +225,19 @@ export async function activateWorkspace(opts: ActivationOptions = {}): Promise<A
     : [
         path.join(workspaceRoot, VIBEROOTS_WORKSPACE_REL),
         path.join(workspaceRoot, VIBEROOTS_WORKSPACE_REL, "providers"),
-        path.join(workspaceRoot, VIBEROOTS_WORKSPACE_REL, "buck"),
+        path.join(workspaceRoot, ".viberoots", "buck"),
         path.join(workspaceRoot, ".viberoots", "cache"),
       ];
 
   await fsp.mkdir(viberootsDir, { recursive: true });
   for (const dir of workspaceDirs) await fsp.mkdir(dir, { recursive: true });
+  if (!opts.shellEntry) {
+    await ensureWorkspaceBuckStateLink(workspaceRoot);
+    await removeNestedWorkspaceActivationState(workspaceRoot);
+  }
   if (sourceIsLocalViberoots) await rejectStaleLocalCurrent(currentPath, sourcePath, workspaceRoot);
   await replaceCurrentSymlink(currentPath, currentTarget);
-  validateBuckconfigCells(workspaceRoot);
+  validateBuckconfigCells(workspaceRoot, { allowMissingPrelude: opts.shellEntry });
 
   return { workspaceRoot, sourcePath, currentPath, currentTarget, workspaceDirs };
 }

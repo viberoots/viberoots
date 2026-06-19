@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -153,14 +154,14 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
       await $({
         cwd: tmp,
         env,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${target.label} --admission-evidence-json ${targetEvidenceJson} --artifact-dir ${bootstrapArtifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(targetServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${target.label} --admission-evidence-json ${targetEvidenceJson} --artifact-dir ${bootstrapArtifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(targetServer.port)} --smoke-connect-protocol https:`;
       await installCloudflarePagesTargets(tmp, [source]);
       const sourceEnv = freshRemoteExecBuckEnv(tmp, fakeCloudflareEnv(fake));
       Object.assign(process.env, sourceEnv);
       const sourceRun = await $({
         cwd: tmp,
         env: sourceEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${source.label} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${source.label} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
       const sourceSummary = JSON.parse(String(sourceRun.stdout));
       const backendDatabaseUrl = await seedCurrentStageState({
         recordsRoot,
@@ -220,7 +221,7 @@ test("nixos-shared-host promotion keeps retained source-run eligibility independ
       const sourceRun = await $({
         cwd: tmp,
         env: sourceEnv,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${source.label} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${source.label} --admission-evidence-json ${sourceEvidenceJson} --artifact-dir ${artifactDir} --records-root ${recordsRoot} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(sourceServer.port)} --smoke-connect-protocol https:`;
       const sourceSummary = JSON.parse(String(sourceRun.stdout));
       const backendDatabaseUrl = await seedCurrentStageState({
         recordsRoot,

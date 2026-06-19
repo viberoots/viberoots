@@ -16,7 +16,7 @@ import { ensureToolchainPathsForTempRepo } from "./toolchain-paths";
 import { mktemp } from "./tmp";
 import { ensureSharedNixTarballCacheRepo } from "./xdg-cache";
 import "./worker-init";
-import { ensureZxInitProbedOnce, zxInitPathFromWorkspace } from "./zx-init-probe";
+import { ensureZxInitProbedOnce } from "./zx-init-probe";
 import {
   pinnedCacertBundleExpr,
   nixEvalTempDirOutsideWorkspace,
@@ -81,16 +81,19 @@ async function exportDevEnvOncePerWorker($: any): Promise<string> {
 }
 
 async function exportDevEnvWithRetry($: any): Promise<string> {
+  const devEnvRoot = await activeViberootsRootFromWorkspace();
   const runOnce = async () => {
     // Avoid direnv here: it can be slow and re-run per temp repo, while nix develop is deterministic.
     return await $({
-      cwd: process.cwd(),
+      cwd: devEnvRoot,
       stdio: "pipe",
       reject: false,
       nothrow: true,
       env: {
         ...process.env,
         IN_NIX_SHELL: "1",
+        VIBEROOTS_ROOT: devEnvRoot,
+        VIBEROOTS_SOURCE_ROOT: devEnvRoot,
       },
     })`bash --noprofile --norc -c 'if command -v nix >/dev/null 2>&1; then NO_NODE_MODULES_LINK=1 nix develop --accept-flake-config -c env -0; elif command -v direnv >/dev/null 2>&1; then eval "$(direnv export bash)"; env -0; else printf ""; fi'`;
   };
@@ -132,6 +135,7 @@ async function pinnedNixpkgsPathOncePerWorker($: any): Promise<string> {
     const repoRoot = process.cwd();
     const nixEvalTmp = nixEvalTempDirOutsideWorkspace(repoRoot);
     await fsp.mkdir(nixEvalTmp, { recursive: true }).catch(() => {});
+    const lockPath = await workspaceFlakeLockPath(repoRoot);
     const out = await $({
       cwd: repoRoot,
       stdio: "pipe",
@@ -142,7 +146,7 @@ async function pinnedNixpkgsPathOncePerWorker($: any): Promise<string> {
         IN_NIX_SHELL: "1",
         TMPDIR: nixEvalTmp,
       },
-    })`nix eval --impure --accept-flake-config --raw --expr ${pinnedNixpkgsOutPathExpr(path.join(repoRoot, "flake.lock"))}`;
+    })`nix eval --impure --accept-flake-config --raw --expr ${pinnedNixpkgsOutPathExpr(lockPath)}`;
     return String((out as any).stdout || "").trim();
   })();
   return await cachedPinnedNixpkgsPath;
@@ -154,6 +158,7 @@ async function pinnedCacertPathOncePerWorker($: any): Promise<string> {
     const repoRoot = process.cwd();
     const nixEvalTmp = nixEvalTempDirOutsideWorkspace(repoRoot);
     await fsp.mkdir(nixEvalTmp, { recursive: true }).catch(() => {});
+    const lockPath = await workspaceFlakeLockPath(repoRoot);
     const out = await $({
       cwd: repoRoot,
       stdio: "pipe",
@@ -164,10 +169,27 @@ async function pinnedCacertPathOncePerWorker($: any): Promise<string> {
         IN_NIX_SHELL: "1",
         TMPDIR: nixEvalTmp,
       },
-    })`nix eval --impure --accept-flake-config --raw --expr ${pinnedCacertBundleExpr(path.join(repoRoot, "flake.lock"))}`;
+    })`nix eval --impure --accept-flake-config --raw --expr ${pinnedCacertBundleExpr(lockPath)}`;
     return String((out as any).stdout || "").trim();
   })();
   return await cachedPinnedCacertPath;
+}
+
+async function workspaceFlakePath(root: string): Promise<string> {
+  const hidden = path.join(root, ".viberoots", "workspace", "flake.nix");
+  if (await pathExists(hidden)) return hidden;
+  return path.join(root, "flake.nix");
+}
+
+export async function workspaceFlakeRef(root: string): Promise<string> {
+  const flakePath = await workspaceFlakePath(root);
+  return path.basename(flakePath) === "flake.nix" ? path.dirname(flakePath) : flakePath;
+}
+
+async function workspaceFlakeLockPath(root: string): Promise<string> {
+  const hidden = path.join(root, ".viberoots", "workspace", "flake.lock");
+  if (await pathExists(hidden)) return hidden;
+  return path.join(root, "flake.lock");
 }
 
 async function stableTestHomeRoot(): Promise<string> {
@@ -211,12 +233,62 @@ async function stableXdgCacheRoot(): Promise<string> {
   return root;
 }
 
+async function activeViberootsRootFromWorkspace(): Promise<string> {
+  const repoRoot = process.cwd();
+  const moduleRoot = path.resolve(
+    path.dirname(new URL(import.meta.url).pathname),
+    "../../../../..",
+  );
+  const candidates = [
+    moduleRoot,
+    path.join(repoRoot, "viberoots"),
+    path.join(repoRoot, ".viberoots", "current"),
+    process.env.VIBEROOTS_SOURCE_ROOT || "",
+    process.env.VIBEROOTS_ROOT || "",
+    repoRoot,
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    const root = path.resolve(candidate);
+    const consumerViberoots = path.join(root, "viberoots");
+    if (
+      (await pathExists(path.join(consumerViberoots, "flake.nix"))) &&
+      (await pathExists(path.join(consumerViberoots, "build-tools", "tools", "dev", "zx-init.mjs")))
+    ) {
+      return consumerViberoots;
+    }
+    if (
+      (await pathExists(path.join(root, "flake.nix"))) &&
+      (await pathExists(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs")))
+    ) {
+      return root;
+    }
+  }
+  return repoRoot;
+}
+
+async function rewriteTempViberootsInput(tmp: string, activeViberootsRoot: string): Promise<void> {
+  const flakePath = await workspaceFlakePath(tmp);
+  const text = await fsp.readFile(flakePath, "utf8").catch(() => "");
+  if (!text) return;
+  const next = text.replace(
+    /(\bviberoots\.url\s*=\s*)"[^"]*"/,
+    (_match, prefix: string) => `${prefix}"path:${activeViberootsRoot}"`,
+  );
+  if (next !== text) await fsp.writeFile(flakePath, next, "utf8");
+}
+
+async function removeInheritedBuildToolsSymlink(tmp: string): Promise<void> {
+  const buildTools = path.join(tmp, "build-tools");
+  const st = await fsp.lstat(buildTools).catch(() => null);
+  if (st?.isSymbolicLink()) await fsp.rm(buildTools, { force: true });
+}
+
 async function removeCppReqsIfRequested(tmp: string): Promise<void> {
   if (String(process.env.TEST_EXCLUDE_CPP_REQS || "").trim() !== "1") return;
   const rels = [
-    "build-tools/cpp/defs.bzl",
-    "build-tools/cpp/wasm_defs.bzl",
-    "build-tools/tools/nix/templates/cpp.nix",
+    "viberoots/build-tools/cpp/defs.bzl",
+    "viberoots/build-tools/cpp/wasm_defs.bzl",
+    "viberoots/build-tools/tools/nix/templates/cpp.nix",
   ];
   for (const rel of rels) {
     try {
@@ -226,7 +298,14 @@ async function removeCppReqsIfRequested(tmp: string): Promise<void> {
 }
 
 async function unifiedPnpmStoreFromRepoRoot(repoRoot: string): Promise<string> {
-  const pathFile = path.join(repoRoot, "buck-out", ".unified-pnpm-store", "path");
+  const pathFile = path.join(
+    repoRoot,
+    ".viberoots",
+    "workspace",
+    "buck",
+    "unified-pnpm-store",
+    "path",
+  );
   try {
     const txt = await fsp.readFile(pathFile, "utf8");
     const p = String(txt || "").trim();
@@ -328,20 +407,28 @@ async function createTempNixShim(shimDir: string): Promise<void> {
   const shimPath = path.join(shimDir, "nix");
   const repoRoot = process.cwd();
   const viberootsCandidates = [
-    process.env.VIBEROOTS_SOURCE_ROOT || "",
-    process.env.VIBEROOTS_ROOT || "",
     path.join(repoRoot, "viberoots"),
     path.join(repoRoot, ".viberoots", "current"),
+    process.env.VIBEROOTS_SOURCE_ROOT || "",
+    process.env.VIBEROOTS_ROOT || "",
     repoRoot,
   ].filter(Boolean);
   let viberootsRoot = repoRoot;
   for (const candidate of viberootsCandidates) {
+    const root = path.resolve(candidate);
+    const consumerViberoots = path.join(root, "viberoots");
+    const toolRoot = (await fsp
+      .access(path.join(consumerViberoots, "build-tools", "tools", "dev", "zx-init.mjs"))
+      .then(() => true)
+      .catch(() => false))
+      ? consumerViberoots
+      : root;
     const hasTool = await fsp
-      .access(path.join(candidate, "build-tools", "tools", "dev", "zx-init.mjs"))
+      .access(path.join(toolRoot, "build-tools", "tools", "dev", "zx-init.mjs"))
       .then(() => true)
       .catch(() => false);
     if (hasTool) {
-      viberootsRoot = candidate;
+      viberootsRoot = toolRoot;
       break;
     }
   }
@@ -385,14 +472,39 @@ async function createTempNixShim(shimDir: string): Promise<void> {
   await fsp.chmod(shimPath, 0o755);
 }
 
+async function createTempZxWrapperShim(shimDir: string): Promise<void> {
+  const realZxWrapper = resolveToolPathSync("zx-wrapper");
+  const shimPath = path.join(shimDir, "zx-wrapper");
+  await fsp.writeFile(
+    shimPath,
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      `real_zx_wrapper=${JSON.stringify(realZxWrapper)}`,
+      'if [[ "${1:-}" == build-tools/* && ! -e "${1:-}" && -n "${VIBEROOTS_ROOT:-}" && -e "$VIBEROOTS_ROOT/${1:-}" ]]; then',
+      '  set -- "$VIBEROOTS_ROOT/$1" "${@:2}"',
+      "fi",
+      'exec "$real_zx_wrapper" "$@"',
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+  await fsp.chmod(shimPath, 0o755);
+}
+
 function prependPath(env: Record<string, string>, dir: string): void {
   env.PATH = [dir, env.PATH || process.env.PATH || ""].filter(Boolean).join(path.delimiter);
 }
 
 async function prependTempRepoBin(env: Record<string, string>, tmp: string): Promise<void> {
-  const binDir = path.join(tmp, "build-tools", "tools", "bin");
-  const st = await fsp.stat(binDir).catch(() => null);
-  if (st?.isDirectory()) prependPath(env, binDir);
+  const candidates = [
+    path.join(tmp, "viberoots", "build-tools", "tools", "bin"),
+    env.VIBEROOTS_ROOT ? path.join(env.VIBEROOTS_ROOT, "build-tools", "tools", "bin") : "",
+  ].filter(Boolean);
+  for (const binDir of candidates.reverse()) {
+    const st = await fsp.stat(binDir).catch(() => null);
+    if (st?.isDirectory()) prependPath(env, binDir);
+  }
 }
 
 export async function runInTemp<T>(
@@ -418,6 +530,10 @@ export async function runInTemp<T>(
       "runInTemp stableXdgCacheRoot",
       async () => await stableXdgCacheRoot(),
     );
+    const activeViberootsRoot = await timeAsync(
+      "runInTemp activeViberootsRoot",
+      async () => await activeViberootsRootFromWorkspace(),
+    );
     const exportEnv: Record<string, string> = {};
     for (const [k, v] of Object.entries(process.env)) {
       if (typeof v === "string") exportEnv[k] = v;
@@ -427,6 +543,8 @@ export async function runInTemp<T>(
     exportEnv.REPO_ROOT = tmp;
     exportEnv.VBR_RUN_IN_TEMP_REPO = "1";
     exportEnv.SCAF_ALLOW_LIVE_REPO = "1";
+    exportEnv.VIBEROOTS_ROOT = activeViberootsRoot;
+    exportEnv.VIBEROOTS_SOURCE_ROOT = activeViberootsRoot;
     exportEnv.TEST_NO_BROWSER = exportEnv.TEST_NO_BROWSER || "1";
     exportEnv[LOCAL_FIXTURE_SERVICE_ENV] = exportEnv[LOCAL_FIXTURE_SERVICE_ENV] || "1";
     exportEnv.HOME = home;
@@ -437,7 +555,14 @@ export async function runInTemp<T>(
     if (!exportEnv.XDG_CONFIG_HOME) {
       exportEnv.XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
     }
-    exportEnv.ZX_INIT = zxInitPathFromWorkspace();
+    exportEnv.ZX_INIT = path.join(
+      activeViberootsRoot,
+      "build-tools",
+      "tools",
+      "dev",
+      "zx-init.mjs",
+    );
+    await rewriteTempViberootsInput(tmp, activeViberootsRoot);
     await prependTempRepoBin(exportEnv, tmp);
     const nodeOpts = ["--experimental-strip-types", `--import ${exportEnv.ZX_INIT}`];
     exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
@@ -479,6 +604,10 @@ export async function runInTemp<T>(
     async () => await createTempBuck2Shim(tmp, tempNestedIso),
   );
   await timeAsync("runInTemp createTempNixShim", async () => await createTempNixShim(buck2ShimDir));
+  await timeAsync(
+    "runInTemp createTempZxWrapperShim",
+    async () => await createTempZxWrapperShim(buck2ShimDir),
+  );
   const tempSetupEnv = {
     ...process.env,
     WORKSPACE_ROOT: tmp,
@@ -507,6 +636,25 @@ export async function runInTemp<T>(
       tmpDir: tmp,
       deps: { rsyncRepoTo, timeAsync },
     });
+  });
+  const activeViberootsRoot = await timeAsync(
+    "runInTemp activeViberootsRoot",
+    async () => await activeViberootsRootFromWorkspace(),
+  );
+  tempSetupEnv.VIBEROOTS_ROOT = activeViberootsRoot;
+  tempSetupEnv.VIBEROOTS_SOURCE_ROOT = activeViberootsRoot;
+  tempSetupEnv.ZX_INIT = path.join(
+    activeViberootsRoot,
+    "build-tools",
+    "tools",
+    "dev",
+    "zx-init.mjs",
+  );
+  await timeAsync("runInTemp rewriteTempViberootsInput", async () => {
+    await rewriteTempViberootsInput(tmp, activeViberootsRoot);
+  });
+  await timeAsync("runInTemp removeInheritedBuildToolsSymlink", async () => {
+    await removeInheritedBuildToolsSymlink(tmp);
   });
   await timeAsync("runInTemp removeCppReqsIfRequested", async () => {
     await removeCppReqsIfRequested(tmp);
@@ -547,17 +695,18 @@ export async function runInTemp<T>(
     await ensureBuckConfigForTempRepo(tmp, $setup);
   });
   await timeAsync("runInTemp ensureWorkspaceRootEnvFile", async () => {
-    await ensureWorkspaceRootEnvFile(tmp);
+    await ensureWorkspaceRootEnvFile(tmp, activeViberootsRoot);
   });
   await timeAsync("runInTemp ensureToolchainPathsForTempRepo", async () => {
     await ensureToolchainPathsForTempRepo(tmp, $setup);
   });
 
   if ((process.env.TEST_NEED_DEV_ENV || "") === "1") {
+    const flakeRef = await workspaceFlakeRef(tmp);
     const chk = await retryTransientNixStoreFailure(
       "checking temp repo buck2-prelude",
       async () =>
-        await $setup`nix build ${`path:${tmp}#buck2-prelude`} --no-link --accept-flake-config --print-build-logs`.nothrow(),
+        await $setup`nix build ${`path:${flakeRef}#buck2-prelude`} --no-link --accept-flake-config --print-build-logs`.nothrow(),
       (out) => `${(out as any).stdout || ""}\n${(out as any).stderr || ""}`,
       (out) => Number((out as any).exitCode || 0) !== 0,
     );
@@ -615,6 +764,8 @@ export async function runInTemp<T>(
   } catch {}
   exportEnv.WORKSPACE_ROOT = tmp;
   exportEnv.BUCK_TEST_SRC = tmp;
+  exportEnv.VIBEROOTS_ROOT = activeViberootsRoot;
+  exportEnv.VIBEROOTS_SOURCE_ROOT = activeViberootsRoot;
   exportEnv.VBR_RUN_IN_TEMP_REPO = "1";
   exportEnv.SCAF_ALLOW_LIVE_REPO = "1";
   exportEnv.BUCK_ISOLATION_DIR = tempNestedIso;
@@ -678,24 +829,13 @@ export async function runInTemp<T>(
     exportEnv.SSL_CERT_DIR = exportEnv.NIX_SSL_CERT_DIR;
   }
   exportEnv.DIRENV_LOG_FORMAT = "";
-  const tempZxInit = path.join(tmp, "build-tools", "tools", "dev", "zx-init.mjs");
-  const tempViberootsZxInit = path.join(
-    tmp,
-    "viberoots",
-    "build-tools",
-    "tools",
-    "dev",
-    "zx-init.mjs",
-  );
-  exportEnv.ZX_INIT = (await pathExists(tempZxInit))
-    ? tempZxInit
-    : (await pathExists(tempViberootsZxInit))
-      ? tempViberootsZxInit
-      : zxInitPathFromWorkspace();
+  exportEnv.ZX_INIT = path.join(activeViberootsRoot, "build-tools", "tools", "dev", "zx-init.mjs");
   prependPath(exportEnv, buck2ShimDir);
   await prependTempRepoBin(exportEnv, tmp);
+  prependPath(exportEnv, buck2ShimDir);
   const wantsUnifiedPnpmStore =
     String(process.env.TEST_DISABLE_UNIFIED_PNPM_STORE || "").trim() !== "1";
+  let tempPnpmStateRoot: string | null = null;
   if (wantsUnifiedPnpmStore) {
     const unified = await timeAsync("runInTemp ensureUnifiedPnpmStore", async () => {
       return await ensureUnifiedPnpmStoreOncePerWorker($);
@@ -703,6 +843,7 @@ export async function runInTemp<T>(
     const pnpmState = await timeAsync("runInTemp externalPnpmStateDirs", async () => {
       return await externalPnpmStateDirs(tmp);
     });
+    tempPnpmStateRoot = pnpmState.rootDir;
     exportEnv.PNPM_HOME = exportEnv.PNPM_HOME || pnpmState.homeDir;
     if (unified) {
       exportEnv.LOCAL_PNPM_STORE = exportEnv.LOCAL_PNPM_STORE || unified;
@@ -785,6 +926,9 @@ export async function runInTemp<T>(
       } catch {}
     } else {
       await removeTreeWithWritableFallback(tmp, $);
+      if (tempPnpmStateRoot) {
+        await removeTreeWithWritableFallback(tempPnpmStateRoot, $);
+      }
     }
     if (removeHome) {
       await removeTreeWithWritableFallback(home, $);

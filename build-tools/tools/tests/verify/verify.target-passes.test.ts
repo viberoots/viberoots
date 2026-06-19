@@ -117,7 +117,7 @@ test("verify target passes can preserve per-target isolated pass mode for debugg
   ]);
 });
 
-test("verify target pass execution serializes isolated, resource-limited, and shared work", () => {
+test("verify target pass execution serializes isolated work, then overlaps bounded and shared lanes", () => {
   const passes = planVerifyTargetPasses([
     { target: "//:startup_sensitive", labels: [VERIFY_ISOLATED_LABEL] },
     { target: "//:resource_heavy", labels: [VERIFY_RESOURCE_LIMITED_LABEL] },
@@ -126,7 +126,7 @@ test("verify target pass execution serializes isolated, resource-limited, and sh
 
   assert.deepEqual(
     groupVerifyPassesForExecution(passes).map((group) => group.map((pass) => pass.name)),
-    [["isolated"], ["resource-limited"], ["shared"]],
+    [["isolated"], ["resource-limited", "shared"]],
   );
 });
 

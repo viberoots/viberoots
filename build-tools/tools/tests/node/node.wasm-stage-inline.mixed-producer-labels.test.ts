@@ -60,7 +60,7 @@ test("node wasm stage/inline works with mixed producer labels", async () => {
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module")',
+        'load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_wasm_inline_module")',
         "",
         "node_wasm_inline_module(",
         '  name = "go_inline",',

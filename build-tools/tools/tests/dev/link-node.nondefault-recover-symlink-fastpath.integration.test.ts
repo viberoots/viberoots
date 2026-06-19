@@ -3,8 +3,8 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("link-node can recover outPath from existing symlink when marker is missing", async () => {
-  const mainFile = "build-tools/tools/dev/install/link-node.ts";
-  const helperFile = "build-tools/tools/dev/install/link-node-helpers.ts";
+  const mainFile = "viberoots/build-tools/tools/dev/install/link-node.ts";
+  const helperFile = "viberoots/build-tools/tools/dev/install/link-node-helpers.ts";
   const main = await fsp.readFile(mainFile, "utf8");
   const helper = await fsp.readFile(helperFile, "utf8");
   if (!main.includes("recoverOutPathFromExistingSymlink")) {

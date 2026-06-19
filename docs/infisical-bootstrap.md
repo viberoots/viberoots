@@ -26,13 +26,13 @@ readiness automatically and do not require `--without-secrets`; full checkouts c
 Deep bootstrap commands remain available for advanced recovery and debugging:
 
 ```bash
-build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
-build-tools/tools/deployments/infisical-bootstrap.ts repo
-build-tools/tools/deployments/infisical-bootstrap.ts repo --yes
-build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --apply-metadata-patch
-build-tools/tools/deployments/infisical-bootstrap.ts repo --without-deployments
-build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --dry-run
-build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --yes
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --apply-metadata-patch
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --without-deployments
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --dry-run
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --yes
 ```
 
 Fresh Pleomino Infisical bootstrap is a reviewed metadata handoff into
@@ -58,7 +58,7 @@ Repo bootstrap materializes backend profile credentials under repo-scoped refs s
 continues to report only stage-specific managed workload refs under
 `secret://deployments/pleomino/<stage>/...`. If `projects/config/local.json` overrides profile auth
 to an old Pleomino bootstrap namespace, remove that local override and rerun
-`build-tools/tools/deployments/infisical-bootstrap.ts repo`.
+`viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo`.
 Universal Auth client-secret records are per operator machine. Existing local credentials are reused
 by default; a fresh machine creates its own labeled client-secret record and stores it only in the
 selected local sink. Use `--machine-label <label>` when the hostname is not a useful revocation

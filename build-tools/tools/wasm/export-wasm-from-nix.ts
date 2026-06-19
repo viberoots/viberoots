@@ -11,14 +11,72 @@ function sleep(ms) {
 }
 
 async function findRepoRoot(start) {
+  const buckOutRoot = await findBuckOutWorkspaceRoot(start);
+  if (buckOutRoot) return buckOutRoot;
+  for (const envName of ["WORKSPACE_ROOT", "BUCK_TEST_SRC", "REPO_ROOT"]) {
+    const envRoot = readEnv(envName);
+    if (!envRoot) continue;
+    const root = path.resolve(envRoot);
+    const parent = path.dirname(root);
+    if (path.basename(root) === "viberoots" && (await isConsumerWorkspaceRoot(parent))) {
+      return parent;
+    }
+    if (await isConsumerWorkspaceRoot(root)) return root;
+    if (await isWorkspaceRoot(root)) return root;
+  }
   let dir = path.resolve(start);
   for (;;) {
-    if (await pathExists(path.join(dir, "flake.nix"))) return dir;
+    if (await isConsumerWorkspaceRoot(dir)) return dir;
+    if (await isWorkspaceRoot(dir)) return dir;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
-  throw new Error(`flake.nix not found from ${start}`);
+  throw new Error(`workspace root not found from ${start}`);
+}
+
+async function findBuckOutWorkspaceRoot(start) {
+  const dir = path.resolve(start);
+  const parts = dir.split(path.sep);
+  const buckOutIdx = parts.lastIndexOf("buck-out");
+  if (buckOutIdx <= 0) return "";
+  const candidate = parts.slice(0, buckOutIdx).join(path.sep) || path.sep;
+  if (await isConsumerWorkspaceRoot(candidate)) return path.resolve(candidate);
+  if (await isWorkspaceRoot(candidate)) return path.resolve(candidate);
+  return "";
+}
+
+async function isConsumerWorkspaceRoot(dir) {
+  return (
+    (await pathExists(path.join(dir, ".viberoots", "workspace", "flake.nix"))) &&
+    (await pathExists(path.join(dir, "viberoots", "flake.nix")))
+  );
+}
+
+async function isWorkspaceRoot(dir) {
+  return (
+    (await pathExists(path.join(dir, ".viberoots", "workspace", "flake.nix"))) ||
+    (await pathExists(path.join(dir, "viberoots", "flake.nix"))) ||
+    (await pathExists(path.join(dir, "flake.nix"))) ||
+    (await pathExists(path.join(dir, ".buckroot")))
+  );
+}
+
+async function findViberootsRoot(repoRoot) {
+  const envRoot = readEnv("VIBEROOTS_ROOT");
+  const candidates = [
+    envRoot,
+    path.join(repoRoot, "viberoots"),
+    path.join(repoRoot, ".viberoots", "current"),
+    repoRoot,
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    const root = path.resolve(candidate);
+    if (await pathExists(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"))) {
+      return root;
+    }
+  }
+  return repoRoot;
 }
 
 async function acquireGraphLock(lockPath, graphPath) {
@@ -39,6 +97,8 @@ async function acquireGraphLock(lockPath, graphPath) {
 
 async function ensureGraph(repoRoot, graphPath) {
   if (await pathExists(graphPath)) return;
+  const viberootsRoot = await findViberootsRoot(repoRoot);
+  await fs.mkdir(path.dirname(graphPath), { recursive: true });
   const lockPath = `${graphPath}.lock`;
   const lockHandle = await acquireGraphLock(lockPath, graphPath);
   if (!lockHandle) return;
@@ -49,9 +109,16 @@ async function ensureGraph(repoRoot, graphPath) {
       env: {
         ...process.env,
         BUCK_TEST_SRC: repoRoot,
+        VIBEROOTS_ROOT: viberootsRoot,
         WORKSPACE_ROOT: repoRoot,
       },
-    })`nix run --accept-flake-config ${repoRoot}#zx-wrapper -- build-tools/tools/buck/export-graph.ts --out ${graphPath}`;
+    })`nix run --accept-flake-config ${`path:${viberootsRoot}#zx-wrapper`} -- ${path.join(
+      viberootsRoot,
+      "build-tools",
+      "tools",
+      "buck",
+      "export-graph.ts",
+    )} --out ${graphPath}`;
     if (!(await pathExists(graphPath))) {
       throw new Error(`graph.json not found at ${graphPath}`);
     }
@@ -72,21 +139,74 @@ async function pathExists(p) {
   }
 }
 
+function normalizeTargetLabel(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^root\/\//, "//")
+    .replace(/\s+\(.*\)$/, "")
+    .replace(/^\/\//, "");
+}
+
+async function readGraphNodes(graphPath) {
+  const raw = JSON.parse(await fs.readFile(graphPath, "utf8"));
+  if (Array.isArray(raw)) return raw;
+  if (raw && typeof raw === "object" && Array.isArray(raw.nodes)) return raw.nodes;
+  if (!raw || typeof raw !== "object") return [];
+  return Object.entries(raw).map(([name, value]) =>
+    value && typeof value === "object" && !Array.isArray(value) ? { ...value, name } : { name },
+  );
+}
+
+async function isCppTarget(graphPath, target) {
+  const want = normalizeTargetLabel(target);
+  const nodes = await readGraphNodes(graphPath);
+  const node = nodes.find((candidate) => normalizeTargetLabel(candidate?.name) === want);
+  if (!node) {
+    throw new Error(`graph ${graphPath} is missing WASM_TARGET ${target}`);
+  }
+  return Array.isArray(node.labels) && node.labels.includes("lang:cpp");
+}
+
 async function buildTarget(target) {
   const repoRoot = await findRepoRoot(process.cwd());
-  const graphPath = path.join(repoRoot, "build-tools", "tools", "buck", "graph.json");
+  const viberootsRoot = await findViberootsRoot(repoRoot);
+  const filteredFlakeBuilder = path.join(
+    viberootsRoot,
+    "build-tools",
+    "tools",
+    "dev",
+    "nix-build-filtered-flake.ts",
+  );
+  const graphPath =
+    readEnv("BUCK_GRAPH_JSON") ||
+    path.join(repoRoot, ".viberoots", "workspace", "buck", "graph.json");
   await ensureGraph(repoRoot, graphPath);
+  const plannerOnlyCpp = await isCppTarget(graphPath, target);
+  const buildEnv = {
+    ...process.env,
+    BUCK_TARGET: target,
+    BUCK_GRAPH_JSON: graphPath,
+    BUCK_TEST_SRC: repoRoot,
+    ...(plannerOnlyCpp ? { PLANNER_ONLY_CPP: "1" } : {}),
+    VIBEROOTS_ROOT: viberootsRoot,
+    VIBEROOTS_SOURCE_ROOT: viberootsRoot,
+    WORKSPACE_ROOT: repoRoot,
+    EXPORTER_VALIDATION: readEnv("EXPORTER_VALIDATION") || "warn",
+  };
+  if (!plannerOnlyCpp) {
+    delete buildEnv.PLANNER_ONLY_CPP;
+  }
   const res = await $({
     stdio: "pipe",
-    env: {
-      ...process.env,
-      BUCK_TARGET: target,
-      BUCK_GRAPH_JSON: graphPath,
-      BUCK_TEST_SRC: repoRoot,
-      WORKSPACE_ROOT: repoRoot,
-      EXPORTER_VALIDATION: readEnv("EXPORTER_VALIDATION") || "warn",
-    },
-  })`nix build --impure ${repoRoot}#graph-generator-selected --accept-flake-config --no-link --print-out-paths`;
+    cwd: repoRoot,
+    env: buildEnv,
+  })`node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import ${path.join(
+    viberootsRoot,
+    "build-tools",
+    "tools",
+    "dev",
+    "zx-init.mjs",
+  )} ${filteredFlakeBuilder} --attr graph-generator-selected`;
   const outText = String(res.stdout || "").trim();
   const line = outText.split(/\n+/).pop() || "";
   if (!line) {

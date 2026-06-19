@@ -4,9 +4,9 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("rsync: copies only specified roots when TEST_RSYNC_ROOTS=build-tools", async () => {
+test("rsync: copies only specified roots when TEST_RSYNC_ROOTS=viberoots/build-tools", async () => {
   const prevRoots = process.env.TEST_RSYNC_ROOTS;
-  process.env.TEST_RSYNC_ROOTS = "build-tools";
+  process.env.TEST_RSYNC_ROOTS = "viberoots/build-tools";
   try {
     await runInTemp("rsync-roots-tools", async (tmp, $) => {
       async function dirExists(rel: string): Promise<boolean> {
@@ -17,17 +17,21 @@ test("rsync: copies only specified roots when TEST_RSYNC_ROOTS=build-tools", asy
           return false;
         }
       }
-      const toolsPresent = await dirExists("build-tools");
+      const toolsPresent = await dirExists("viberoots/build-tools");
       const localViberootsPresent = await dirExists("viberoots");
+      const localViberootsDevToolPresent = await fsp
+        .access(path.join(tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"))
+        .then(() => true)
+        .catch(() => false);
       const docsPresent = await dirExists("docs");
       const goPresent = await dirExists("go");
       if (!toolsPresent) {
-        console.error("expected 'build-tools' to be present in temp copy");
+        console.error("expected 'viberoots/build-tools' to be present in temp copy");
         process.exit(2);
       }
       if (docsPresent || goPresent) {
         console.error(
-          "expected 'docs' and 'go' to be absent when TEST_RSYNC_ROOTS=build-tools, got:",
+          "expected 'docs' and 'go' to be absent when TEST_RSYNC_ROOTS=viberoots/build-tools, got:",
           {
             docsPresent,
             goPresent,
@@ -39,6 +43,10 @@ test("rsync: copies only specified roots when TEST_RSYNC_ROOTS=build-tools", asy
         console.error(
           "expected local viberoots flake input to be present with delegated root flake",
         );
+        process.exit(2);
+      }
+      if (!localViberootsDevToolPresent) {
+        console.error("expected local viberoots dev tools to be present in temp copy");
         process.exit(2);
       }
     });

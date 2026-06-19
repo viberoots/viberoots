@@ -23,7 +23,7 @@ EOF
           mkdir -p "$out/lib"
           echo "ok" > "$out/lib/lib.txt"
         '';
-        M = import ./build-tools/tools/nix/planner/manifest.nix {
+        M = import ./viberoots/build-tools/tools/nix/planner/manifest.nix {
           inherit pkgs lib;
           repoRootStr = builtins.toString ./.;
           devOverrideJSON = "";

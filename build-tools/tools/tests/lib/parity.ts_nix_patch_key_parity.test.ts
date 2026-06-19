@@ -46,7 +46,7 @@ test("TS<->Nix patch key parity for patchesMapFromDir", async () => {
     const expr = `
       let
         pkgs = import <nixpkgs> {};
-        lib = import ./build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
+        lib = import ./viberoots/build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
       in builtins.attrNames (lib.patchesMapFromDir (builtins.toPath ${JSON.stringify(dir)}))
     `;
     const { stdout } = await $`nix eval --impure --json --expr ${expr}`;

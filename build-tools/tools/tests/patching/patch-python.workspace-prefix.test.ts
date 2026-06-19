@@ -19,12 +19,12 @@ test("patch-python: workspace parent dir is viberoots-patch-python", async () =>
     await fsp.mkdir(origin, { recursive: true });
     await fsp.writeFile(path.join(origin, "readme.txt"), "A\n", "utf8");
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const out = await $({
       cwd: tmp,
     })`NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
-    })} NIX_PY_DEV_OVERRIDE_JSON={} build-tools/tools/bin/patch-pkg start python requests --importer ${importer}`;
+    })} NIX_PY_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg start python requests --importer ${importer}`;
     const ws = String(out.stdout || "")
       .trim()
       .split(/\s+/)

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { workspaceFlakeRef } from "../lib/test-helpers";
 
 async function writeFile(file: string, text: string): Promise<void> {
   await fsp.mkdir(path.dirname(file), { recursive: true });
@@ -61,7 +62,7 @@ test("viberoots Nix fixture receives workspaceSrc outside viberoots source", asy
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`nix eval --json --accept-flake-config ${`path:${tmp}#probe`}`;
+    })`nix eval --json --accept-flake-config ${`path:${await workspaceFlakeRef(tmp)}#probe`}`;
     const probe = JSON.parse(String(result.stdout || "{}"));
     assert.equal(probe.splitRoots, true);
     assert.equal(probe.workspaceHasMarker, true);
@@ -73,13 +74,13 @@ test("viberoots Nix fixture receives workspaceSrc outside viberoots source", asy
 
 test("real viberoots mkWorkspace exposes metadata for external workspace source", async () => {
   await runInNixTemp("viberoots-real-mkworkspace", async (tmp) => {
-    const repoRoot = process.cwd();
+    const viberootsRoot = path.join(process.cwd(), "viberoots");
     await writeFile(path.join(tmp, "workspace-marker"), "workspace\n");
 
     const result = await $({
-      cwd: repoRoot,
+      cwd: viberootsRoot,
       stdio: "pipe",
-    })`nix eval --json --accept-flake-config .#lib.mkWorkspace --apply ${`mk: (mk { workspaceSrc = ${tmp}; viberootsInput = { outPath = ./.; }; workspaceName = "external-probe"; }).lib`}`;
+    })`nix eval --json --accept-flake-config ${`path:${viberootsRoot}#lib.mkWorkspace`} --apply ${`mk: (mk { workspaceSrc = ${tmp}; viberootsInput = { outPath = ./.; }; workspaceName = "external-probe"; }).lib`}`;
     const probe = JSON.parse(String(result.stdout || "{}"));
     assert.equal(probe.workspaceName, "external-probe");
     assert.equal(probe.version, "0.0.0-dev");

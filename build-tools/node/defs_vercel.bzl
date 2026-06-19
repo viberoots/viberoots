@@ -112,17 +112,18 @@ def node_vercel_next_artifact(
         + "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
         + (
             "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
-            + "\"$WORKSPACE_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
+            + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
             + ("\"node-vercel-next.%s\" > \"$OUT_PATHS_FILE\"; " % sanitize_importer_for_nix_attr(_importer))
         )
         + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
         + "tail -n1 \"$OUT_PATHS_FILE\" > \"$OUT_LAST_FILE\"; "
         + "outPath=\"\"; read -r outPath < \"$OUT_LAST_FILE\" 2>/dev/null || true; "
-        + "test -n \"$outPath\"; "
+        + "test -n \"$outPath\" || { echo \"node_vercel_next_artifact: nix build produced no output path\" >&2; cat \"$OUT_PATHS_FILE\" >&2 || true; exit 2; }; "
+        + "test -d \"$outPath\" || { echo \"node_vercel_next_artifact: nix output path is not a directory: $outPath\" >&2; exit 2; }; "
         + "rm -rf \"$OUT_ABS\"; mkdir -p \"$OUT_ABS\"; "
         + "cp -R \"$outPath\"/. \"$OUT_ABS\"/; "
-        + "test -d \"$OUT_ABS/.vercel/output\"; "
-        + "test -f \"$OUT_ABS/artifact-identity.json\""
+        + "test -d \"$OUT_ABS/.vercel/output\" || { echo \"node_vercel_next_artifact: missing copied .vercel/output from $outPath\" >&2; find \"$OUT_ABS\" -maxdepth 4 -print >&2 || true; exit 2; }; "
+        + "test -f \"$OUT_ABS/artifact-identity.json\" || { echo \"node_vercel_next_artifact: missing copied artifact-identity.json from $outPath\" >&2; find \"$OUT_ABS\" -maxdepth 4 -print >&2 || true; exit 2; }"
     )
     kw["out"] = out if out != None else "vercel-prebuilt"
     kw["cmd"] = cmd

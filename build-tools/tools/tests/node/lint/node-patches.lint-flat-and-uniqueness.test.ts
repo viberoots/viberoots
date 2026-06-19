@@ -18,7 +18,7 @@ test("node patches lint warns in non-strict and fails in strict mode", async () 
     // Non-strict: should emit warnings but exit 0
     const resWarn = await $({
       nothrow: true,
-    })`node build-tools/tools/dev/patches-lint.ts --lang node`;
+    })`node viberoots/build-tools/tools/dev/patches-lint.ts --lang node`;
     if (resWarn.exitCode !== 0) {
       console.error("Expected exit code 0 in non-strict mode, got:", resWarn.exitCode);
       process.exit(2);
@@ -27,7 +27,7 @@ test("node patches lint warns in non-strict and fails in strict mode", async () 
     // Strict: should exit non-zero due to subdir and bad filename
     const resStrict = await $({
       nothrow: true,
-    })`node build-tools/tools/dev/patches-lint.ts --lang node --strict`;
+    })`node viberoots/build-tools/tools/dev/patches-lint.ts --lang node --strict`;
     if (resStrict.exitCode === 0) {
       console.error("Expected non-zero exit code in strict mode");
       process.exit(2);

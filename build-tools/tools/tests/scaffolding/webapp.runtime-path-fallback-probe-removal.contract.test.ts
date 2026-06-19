@@ -4,10 +4,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
-const REPO_ROOT = process.cwd();
+const VIBEROOTS_ROOT = path.join(process.cwd(), "viberoots");
 
 async function readRepoFile(relativePath: string): Promise<string> {
-  return await fsp.readFile(path.join(REPO_ROOT, relativePath), "utf8");
+  return await fsp.readFile(path.join(VIBEROOTS_ROOT, relativePath), "utf8");
 }
 
 test("fallback-probe removal: active helper/runtime surfaces use single canonical server wasm path", async () => {

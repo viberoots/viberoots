@@ -13,7 +13,7 @@ test("regen staging restores original on failure", async () => {
     let txt = await fsp.readFile(answers, "utf8").catch(() => "");
     txt = txt.replace(
       /^scaf_src_path:.*/m,
-      "scaf_src_path: build-tools/tools/scaffolding/templates/does/not/exist",
+      "scaf_src_path: viberoots/build-tools/tools/scaffolding/templates/does/not/exist",
     );
     await fsp.writeFile(answers, txt, "utf8");
     const readme = path.join(tmp, "projects", "libs", "demo-lib", "README.md");

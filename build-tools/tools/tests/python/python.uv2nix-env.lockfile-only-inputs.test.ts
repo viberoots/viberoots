@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("uv2nix env drvPath depends only on uv.lock (not importer source files)", async () => {
   await runInTemp("py-uv2nix-env-src", async (tmp, _$) => {
@@ -32,7 +32,7 @@ test("uv2nix env drvPath depends only on uv.lock (not importer source files)", a
     await $`git ls-files --error-unmatch projects/apps/demo_pyapp/uv.lock`;
     await $`git -c user.name=tmp -c user.email=tmp@example.com commit -m "test: pyapp setup"`;
 
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fs.mkdirp(graphDir);
     const graph = [
       {
@@ -71,7 +71,7 @@ test("uv2nix env drvPath depends only on uv.lock (not importer source files)", a
           cwd: tmp,
           env: baseEnv,
           stdio: "pipe",
-        })`nix eval --impure --accept-flake-config --raw ${`path:${tmp}#${flakeAttr}`}`
+        })`nix eval --impure --accept-flake-config --raw ${`path:${await workspaceFlakeRef(tmp)}#${flakeAttr}`}`
       ).stdout,
     ).trim();
     assert.ok(
@@ -90,7 +90,7 @@ test("uv2nix env drvPath depends only on uv.lock (not importer source files)", a
           cwd: tmp,
           env: baseEnv,
           stdio: "pipe",
-        })`nix eval --impure --accept-flake-config --raw ${`path:${tmp}#${flakeAttr}`}`
+        })`nix eval --impure --accept-flake-config --raw ${`path:${await workspaceFlakeRef(tmp)}#${flakeAttr}`}`
       ).stdout,
     ).trim();
     assert.equal(
@@ -109,7 +109,7 @@ test("uv2nix env drvPath depends only on uv.lock (not importer source files)", a
           cwd: tmp,
           env: baseEnv,
           stdio: "pipe",
-        })`nix eval --impure --accept-flake-config --raw ${`path:${tmp}#${flakeAttr}`}`
+        })`nix eval --impure --accept-flake-config --raw ${`path:${await workspaceFlakeRef(tmp)}#${flakeAttr}`}`
       ).stdout,
     ).trim();
     assert.notEqual(drv3, drv1, "expected uv2nix env drvPath to change when uv.lock changes");

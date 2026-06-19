@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getPositionals } from "../lib/cli";
+import { templateRootPath } from "./scaf/templates/paths";
 
 async function exists(p: string) {
   try {
@@ -15,7 +16,7 @@ async function exists(p: string) {
 export async function validateTemplates(targets: string[], quiet: boolean = false): Promise<void> {
   const roots: string[] = [];
   if (targets.length === 0 || targets[0] === "all") {
-    roots.push(path.join("build-tools", "tools", "scaffolding", "templates"));
+    roots.push(templateRootPath());
   } else {
     for (const t of targets) {
       roots.push(t);
@@ -32,8 +33,9 @@ export async function validateTemplates(targets: string[], quiet: boolean = fals
       process.exit(2);
     }
     if (st.isDirectory()) {
-      const parts = root.split(path.sep);
+      const parts = path.normalize(root).split(path.sep);
       const isRoot =
+        parts.slice(-4).join("/") === "viberoots/build-tools/tools/scaffolding/templates" ||
         parts.slice(-3).join("/") === "build-tools/tools/scaffolding/templates" ||
         parts.slice(-1)[0] === "templates";
       if (isRoot) {

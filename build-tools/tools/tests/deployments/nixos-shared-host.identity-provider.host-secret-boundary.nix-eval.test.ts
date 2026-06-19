@@ -4,14 +4,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsRepoPath } from "./deployment-command";
 
 test("identity-provider migration reads restricted host secrets through startup boundary", async () => {
-  const modulePath = path.join(
-    process.cwd(),
-    "build-tools",
-    "tools",
-    "nix",
-    "shared-host-identity-provider-module.nix",
+  const modulePath = viberootsRepoPath(
+    "viberoots/build-tools/tools/nix/shared-host-identity-provider-module.nix",
   );
   const moduleText = await fsp.readFile(modulePath, "utf8");
   assert.match(moduleText, /PermissionsStartOnly = true/);
@@ -25,7 +22,7 @@ test("identity-provider migration reads restricted host secrets through startup 
       let
         system = import <nixpkgs/nixos> {
           configuration = {
-            imports = [ ./build-tools/tools/nix/shared-host-identity-provider-module.nix ];
+            imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-identity-provider-module.nix")} ];
             system.stateVersion = "24.11";
             deploymentHost.identityProvider = {
               enable = true;
@@ -96,7 +93,7 @@ test("identity-provider migration reads restricted host secrets through startup 
 test("identity-provider docs use portable host secret reconciliation guidance", async () => {
   const docs = await Promise.all(
     ["docs/nixos-shared-host-setup.md", "docs/vault-production-bootstrap.md"].map(
-      async (doc) => await fsp.readFile(path.join(process.cwd(), doc), "utf8"),
+      async (doc) => await fsp.readFile(viberootsRepoPath(doc), "utf8"),
     ),
   );
   const combined = docs.join("\n");

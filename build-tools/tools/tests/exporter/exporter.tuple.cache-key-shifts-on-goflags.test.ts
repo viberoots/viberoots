@@ -26,7 +26,7 @@ test("exporter tuple differs when GOFLAGS -tags changes", async () => {
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${m1}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${m1}`;
     const t1: string[] = JSON.parse(await fs.readFile(m1, "utf8")).tupleKeys || [];
 
     const m2 = path.join(tmp, "m2.json");
@@ -35,7 +35,7 @@ test("exporter tuple differs when GOFLAGS -tags changes", async () => {
       cwd: tmp,
       stdio: "inherit",
       env,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${m2}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${m2}`;
     const t2: string[] = JSON.parse(await fs.readFile(m2, "utf8")).tupleKeys || [];
 
     if (JSON.stringify(t1) === JSON.stringify(t2)) {

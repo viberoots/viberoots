@@ -58,6 +58,7 @@ def _cpp_nix_build_impl(ctx):
         + "export VBR_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
         + nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
         + "SECONDS=0; "
+        + "BUCK_EXEC_ROOT=\"$PWD\"; "
         + "cd \"$FLK_ROOT\"; "
         + "graph_export_start=$SECONDS; "
         + nix_action_export_graph_cmd(
@@ -103,14 +104,14 @@ def _cpp_nix_build_impl(ctx):
             + "  echo 'cpp_nix_build (%s): headers output contains no header files under include/' >&2; "
             + "  exit 2; "
             + "fi; "
-            + "DEST=\"$0\"; "
+            + "DEST=\"$0\"; case \"$DEST\" in /*) ;; *) DEST=\"$BUCK_EXEC_ROOT/$DEST\" ;; esac; mkdir -p \"$(dirname \"$DEST\")\"; "
             + "if [ -f \"$outPath/build.log\" ]; then cp -f \"$outPath/build.log\" \"$DEST\"; else printf 'kind=headers\\nlabel=%s\\nout=%s\\n' > \"$DEST\"; fi; "
             + "elif [ \"%s\" = \"emscripten\" ]; then "
             + "if [ ! -f \"$outPath/%s\" ]; then "
             + "  echo 'cpp_nix_build (%s): expected Emscripten WASM artifact missing: %s' >&2; "
             + "  exit 2; "
             + "fi; "
-            + "DEST=\"$0\"; "
+            + "DEST=\"$0\"; case \"$DEST\" in /*) ;; *) DEST=\"$BUCK_EXEC_ROOT/$DEST\" ;; esac; mkdir -p \"$(dirname \"$DEST\")\"; "
             + "printf '%%s\\n' "
             + "  'kind=emscripten' "
             + "  'label=%s' "
@@ -125,7 +126,7 @@ def _cpp_nix_build_impl(ctx):
             + "  \"js=$outPath/%s\" "
             + "  \"wasm=$outPath/%s\" > \"$DEST\"; "
             + "else "
-            + "DEST=\"$0\"; cp -f \"$outPath/%s\" \"$DEST\"; "
+            + "DEST=\"$0\"; case \"$DEST\" in /*) ;; *) DEST=\"$BUCK_EXEC_ROOT/$DEST\" ;; esac; mkdir -p \"$(dirname \"$DEST\")\"; cp -f \"$outPath/%s\" \"$DEST\"; "
             + "fi; "
         ) % (kind, raw, raw, expected, kind, expected_ems_wasm, raw, expected_ems_wasm, raw, expected_ems_js, expected_ems_wasm, expected)
     )

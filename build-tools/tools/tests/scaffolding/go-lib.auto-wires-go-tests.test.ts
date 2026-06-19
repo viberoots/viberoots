@@ -60,7 +60,7 @@ test("go lib: adding *_test.go auto-wires nix_go_test and runs", async () => {
     );
 
     // Glue and build prerequisites
-    await $`build-tools/tools/dev/install-deps.ts --glue-only`;
+    await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
 
     // Run the test via Buck; platform is set by runInTemp's .buckconfig
     await $`buck2 test //projects/libs/demo-lib:demo-lib_test --target-platforms //:no_cgo`;

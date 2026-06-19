@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -42,8 +43,8 @@ test("nixos-shared-host apply preserves preexisting out-of-scope apps during par
       "utf8",
     );
 
-    await $`node build-tools/tools/deployments/nixos-shared-host-platform-state.ts --mode scoped-apply --state ${statePath} --deployments ${scopedDeploymentsPath}`;
-    await $`node build-tools/tools/deployments/nixos-shared-host-apply.ts --state ${statePath} --out ${renderedPath}`;
+    await $`node ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-platform-state.ts")} --mode scoped-apply --state ${statePath} --deployments ${scopedDeploymentsPath}`;
+    await $`node ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-apply.ts")} --state ${statePath} --out ${renderedPath}`;
 
     const rendered = JSON.parse(await fsp.readFile(renderedPath, "utf8")) as {
       containers: Record<string, unknown>;

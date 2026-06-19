@@ -1,14 +1,17 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { runInTemp } from "../lib/test-helpers";
+
+const startupCheckScript = fileURLToPath(new URL("../../dev/startup-check.ts", import.meta.url));
 
 await runInTemp("startup-check-buck-prelude", async (tmp, $) => {
   // Case 1: Missing .buckconfig → should fail
   await fs.remove(path.join(tmp, ".buckconfig")).catch(() => {});
   let failed = false;
   try {
-    await $({ cwd: tmp })`zx-wrapper build-tools/tools/dev/startup-check.ts`;
+    await $({ cwd: tmp })`zx-wrapper ${startupCheckScript}`;
   } catch {
     failed = true;
   }
@@ -32,7 +35,7 @@ await runInTemp("startup-check-buck-prelude", async (tmp, $) => {
   );
   failed = false;
   try {
-    await $({ cwd: tmp })`zx-wrapper build-tools/tools/dev/startup-check.ts`;
+    await $({ cwd: tmp })`zx-wrapper ${startupCheckScript}`;
   } catch {
     failed = true;
   }
@@ -66,12 +69,25 @@ await runInTemp("startup-check-buck-prelude", async (tmp, $) => {
     ].join("\n"),
     "utf8",
   );
+  await fs.outputFile(path.join(tmp, ".viberoots/workspace/flake.nix"), "{ outputs = _: {}; }\n");
+  await fs.remove(path.join(tmp, ".viberoots/current"));
   await fs.remove(path.join(tmp, "prelude"));
   failed = false;
   try {
-    await $({ cwd: tmp })`zx-wrapper build-tools/tools/dev/startup-check.ts`;
+    await $({ cwd: tmp })`zx-wrapper ${startupCheckScript}`;
   } catch {
     failed = true;
   }
   if (!failed) throw new Error("startup-check should fail when prelude/prelude.bzl is missing");
+
+  await fs.outputFile(path.join(tmp, "prelude/prelude.bzl"), "# legacy prelude\n", "utf8");
+  failed = false;
+  try {
+    await $({ cwd: tmp })`zx-wrapper ${startupCheckScript}`;
+  } catch {
+    failed = true;
+  }
+  if (!failed) {
+    throw new Error("startup-check should ignore legacy root prelude/prelude.bzl");
+  }
 });

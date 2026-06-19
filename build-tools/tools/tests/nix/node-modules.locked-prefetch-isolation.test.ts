@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("node-modules locked derivation ignores broken shared prefetched store inputs", async () => {
   await runInTemp("node-modules-locked-prefetch-isolation", async (tmp, _$) => {
@@ -61,8 +61,13 @@ test("node-modules locked derivation ignores broken shared prefetched store inpu
       },
     });
 
-    const flakeRef = `path:${tmp}`;
-    const drvCmd = `nix eval --raw "${flakeRef}#node-modules.${attr}.drvPath" --accept-flake-config`;
+    const flakeRoot = await workspaceFlakeRef(tmp);
+    const flakeRef = `path:${flakeRoot}`;
+    const viberootsRoot = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "";
+    const override = viberootsRoot
+      ? ` --override-input viberoots ${JSON.stringify(`path:${viberootsRoot}`)}`
+      : "";
+    const drvCmd = `nix eval --impure --raw "${flakeRef}#node-modules.${attr}.drvPath"${override} --accept-flake-config`;
     const out = await $`bash --noprofile --norc -c ${drvCmd}`;
     const drvPath = String(out.stdout || "").trim();
     assert.ok(drvPath.endsWith(".drv"), `expected drvPath, got: ${drvPath}`);

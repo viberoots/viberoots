@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
-const script = "build-tools/tools/dev/stale-names-lint.ts";
+const script = "viberoots/build-tools/tools/dev/stale-names-lint.ts";
 const retiredInputContractTerm = ["secret", "spec"].join("");
 
 async function writeFixture(name: string, text: string): Promise<string> {
@@ -59,7 +59,7 @@ test("stale-names-lint keeps external version strings out of migration-label che
 test("stale-names-lint rejects active doc command examples with stale labels", async () => {
   const file = await writeFixture(
     "fixture.md",
-    "Run this:\n\n```bash\nnode build-tools/tools/dev/PR-7-helper.ts\n```\n",
+    "Run this:\n\n```bash\nnode viberoots/build-tools/tools/dev/PR-7-helper.ts\n```\n",
   );
   await assert.rejects(
     execFileAsync("zx-wrapper", [script, file], { cwd: process.cwd() }),

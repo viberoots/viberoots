@@ -26,7 +26,9 @@ def _python_nix_test_impl(ctx):
         + "mkdir -p \"$(dirname \"$BUILD_SELECTED_LOG\")\"; "
     )
     run_and_exec = (
-        nix_calling_env_export_source_snapshot()
+        "WORKSPACE_ROOT_ENV_ARG=\"${1:-}\"; "
+        + "if [ -n \"$WORKSPACE_ROOT_ENV_ARG\" ] && [ -f \"$WORKSPACE_ROOT_ENV_ARG\" ]; then . \"$WORKSPACE_ROOT_ENV_ARG\" 2>/dev/null || true; fi; "
+        + nix_calling_env_export_source_snapshot(snapshot_root = "${2:-}", manifest_path = "${3:-}")
         + nix_bootstrap_env_core()
         + safe_log_path_prefix
         + ("echo '[python_nix_test] planner_label=%s' >&2; " % raw)
@@ -79,7 +81,7 @@ def _python_nix_test_impl(ctx):
     ]
     command = external_runner_command(
         labels,
-        ["bash", "-c", run_and_exec, "python_nix_test"] + snapshot_inputs,
+        ["bash", "-c", run_and_exec, "python_nix_test", ctx.attrs._workspace_root_env] + snapshot_inputs,
         remote_command = remote_command,
         declared_inputs = declared_inputs,
         required_inputs = [

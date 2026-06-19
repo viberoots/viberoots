@@ -57,7 +57,7 @@ test("patch-node sync-required enforces required transitive patches and can writ
       "utf8",
     );
 
-    const cli = path.join(tmp, "build-tools", "tools", "bin", "patch-pkg");
+    const cli = path.join(tmp, "viberoots", "build-tools", "tools", "bin", "patch-pkg");
     await $`chmod +x ${cli}`;
 
     const failRun = await $({

@@ -4,8 +4,9 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { exists } from "../lib/test-helpers";
+import { viberootsRoot } from "./lib/viberoots-tools";
 
-const REPO_ROOT = process.cwd();
+const VIBEROOTS_ROOT = viberootsRoot();
 
 type Phase2TemplateContract = {
   id: string;
@@ -18,6 +19,7 @@ const CONTRACTS: Phase2TemplateContract[] = [
   {
     id: "ts/webapp-static",
     templateRoot: path.join(
+      VIBEROOTS_ROOT,
       "build-tools",
       "tools",
       "scaffolding",
@@ -31,6 +33,7 @@ const CONTRACTS: Phase2TemplateContract[] = [
   {
     id: "ts/webapp-ssr-vite",
     templateRoot: path.join(
+      VIBEROOTS_ROOT,
       "build-tools",
       "tools",
       "scaffolding",
@@ -44,6 +47,7 @@ const CONTRACTS: Phase2TemplateContract[] = [
   {
     id: "ts/webapp-ssr-next",
     templateRoot: path.join(
+      VIBEROOTS_ROOT,
       "build-tools",
       "tools",
       "scaffolding",
@@ -58,7 +62,7 @@ const CONTRACTS: Phase2TemplateContract[] = [
 
 test("wasm producer policy: wasm producer contract keys exist across templates", async () => {
   for (const contract of CONTRACTS) {
-    const root = path.join(REPO_ROOT, contract.templateRoot);
+    const root = contract.templateRoot;
     const packageJsonPath = path.join(root, "package.json.jinja");
     const packageJson = await fsp.readFile(packageJsonPath, "utf8");
 
@@ -115,7 +119,7 @@ test("wasm producer policy: wasm producer contract keys exist across templates",
 test("wasm producer policy docs: troubleshooting and template parity text are present", async () => {
   const templateReadme = await fsp.readFile(
     path.join(
-      REPO_ROOT,
+      VIBEROOTS_ROOT,
       "build-tools",
       "tools",
       "scaffolding",
@@ -131,7 +135,7 @@ test("wasm producer policy docs: troubleshooting and template parity text are pr
   assert.match(templateReadme, /\[wasm-watch\] sync:ok/);
 
   const scaffoldingDoc = await fsp.readFile(
-    path.join(REPO_ROOT, "build-tools", "docs", "scaffolding.md"),
+    path.join(VIBEROOTS_ROOT, "build-tools", "docs", "scaffolding.md"),
     "utf8",
   );
   assert.match(scaffoldingDoc, /webapp-static <name>/);

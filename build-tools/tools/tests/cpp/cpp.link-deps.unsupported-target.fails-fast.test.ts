@@ -16,7 +16,7 @@ test("cpp: link_deps rejects unsupported target kinds with actionable error", as
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',
@@ -44,7 +44,7 @@ test("cpp: link_deps rejects unsupported target kinds with actionable error", as
         link_deps: ["//projects/libs/notcpp:notcpp"],
       },
     ];
-    const graphJsonPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphJsonPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fsp.mkdir(path.dirname(graphJsonPath), { recursive: true });
     await fsp.writeFile(graphJsonPath, JSON.stringify(graph, null, 2) + "\n", "utf8");
 
@@ -55,7 +55,7 @@ test("cpp: link_deps rejects unsupported target kinds with actionable error", as
       nothrow: true,
       reject: false,
       env: { ...process.env, BUCK_TARGET: "//projects/apps/demo:demo" },
-    })`nix build --impure --accept-flake-config --file build-tools/tools/nix/graph-generator.nix selected --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${system} --arg graphJsonPath ${graphJsonPath} --no-link --print-out-paths`;
+    })`nix build --impure --accept-flake-config --file viberoots/build-tools/tools/nix/graph-generator.nix selected --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${system} --arg graphJsonPath ${graphJsonPath} --no-link --print-out-paths`;
 
     if (res.exitCode === 0) {
       throw new Error("expected nix build to fail for unsupported link_deps target");

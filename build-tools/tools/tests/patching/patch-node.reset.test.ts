@@ -15,7 +15,7 @@ test("patch-node reset removes session and workspace", async () => {
     );
     await fs.outputFile(path.join(importer, ".npmrc"), "patches-dir=patches/node\n", "utf8");
 
-    const cli = path.join(tmp, "build-tools", "tools", "bin", "patch-pkg");
+    const cli = path.join(tmp, "viberoots", "build-tools", "tools", "bin", "patch-pkg");
     await $`chmod +x ${cli}`;
 
     const fakeWs = path.join(tmp, "_pnpm_patch_ws");
@@ -34,7 +34,7 @@ test("patch-node reset removes session and workspace", async () => {
       ...process.env,
       PATH: `${mockBin}:${process.env.PATH || ""}`,
       PNPM_BIN: mockPnpm,
-      ZX_INIT: path.join(tmp, "build-tools", "tools", "dev", "zx-init.mjs"),
+      ZX_INIT: path.join(tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
       WORKSPACE_ROOT: tmp,
       NO_DEV_SHELL: "1",
     } as any;

@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsRepoPath } from "./deployment-command";
 import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shared-host-platform";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
@@ -26,7 +27,7 @@ test("nixos-shared-host Nix module derives containers and nginx routes from auth
       let
         system = import <nixpkgs/nixos> {
           configuration = {
-            imports = [ ./build-tools/tools/nix/nixos-shared-host-module.nix ];
+            imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/nixos-shared-host-module.nix")} ];
             nixosSharedHost.enable = true;
             nixosSharedHost.statePath = ./. + "/nixos-shared-host-platform-state.json";
             system.stateVersion = "24.11";
@@ -120,7 +121,7 @@ test("nixos-shared-host Nix module renders the reviewed SSR host runtime contrac
       let
         system = import <nixpkgs/nixos> {
           configuration = {
-            imports = [ ./build-tools/tools/nix/nixos-shared-host-module.nix ];
+            imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/nixos-shared-host-module.nix")} ];
             nixosSharedHost.enable = true;
             nixosSharedHost.statePath = ./. + "/nixos-shared-host-platform-state.json";
             system.stateVersion = "24.11";

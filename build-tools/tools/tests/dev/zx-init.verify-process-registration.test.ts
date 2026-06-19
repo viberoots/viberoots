@@ -7,9 +7,10 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { test } from "node:test";
+import { buildToolPath } from "../../dev/dev-build/paths";
 
 async function runNodeWithVerifyEnv(env: NodeJS.ProcessEnv): Promise<number> {
-  const zxInit = path.join(process.cwd(), "build-tools", "tools", "dev", "zx-init.mjs");
+  const zxInit = buildToolPath(process.cwd(), "tools/dev/zx-init.mjs");
   const child = spawn(
     process.execPath,
     ["--experimental-strip-types", "--import", zxInit, "-e", ""],
@@ -29,7 +30,7 @@ async function runNodeScript(
   script: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<number> {
-  const zxInit = path.join(process.cwd(), "build-tools", "tools", "dev", "zx-init.mjs");
+  const zxInit = buildToolPath(process.cwd(), "tools/dev/zx-init.mjs");
   const child = spawn(
     process.execPath,
     ["--experimental-strip-types", "--import", zxInit, script],
@@ -50,7 +51,7 @@ async function runNodeScriptWithOutput(
   env: NodeJS.ProcessEnv = process.env,
   opts: { cwd?: string; eval?: boolean } = {},
 ): Promise<{ code: number; stdout: string; stderr: string }> {
-  const zxInit = path.join(process.cwd(), "build-tools", "tools", "dev", "zx-init.mjs");
+  const zxInit = buildToolPath(process.cwd(), "tools/dev/zx-init.mjs");
   const child = spawn(
     process.execPath,
     opts.eval

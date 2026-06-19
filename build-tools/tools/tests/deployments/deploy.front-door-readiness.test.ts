@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
@@ -100,7 +101,7 @@ test("deploy --validate-only rejects cross-app dependencies from queried compone
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${DEPLOYMENT_LABEL} --validate-only`.nothrow();
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${DEPLOYMENT_LABEL} --validate-only`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(
       String(result.stderr),

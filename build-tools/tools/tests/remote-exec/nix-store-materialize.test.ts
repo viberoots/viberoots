@@ -229,8 +229,8 @@ test("remote policy rejects undeclared Nix store references in remote-ready comm
 });
 
 test("Starlark materialization helpers emit path labels consumed by policy parser", () => {
-  const helper = fs.readFileSync("build-tools/lang/nix_store_materialize.bzl", "utf8");
-  const policy = fs.readFileSync("build-tools/lang/remote_action_policy.bzl", "utf8");
+  const helper = fs.readFileSync("viberoots/build-tools/lang/nix_store_materialize.bzl", "utf8");
+  const policy = fs.readFileSync("viberoots/build-tools/lang/remote_action_policy.bzl", "utf8");
   assert.match(helper, /materialization-manifest:path=%s/);
   assert.match(helper, /storePaths/);
   assert.match(policy, /materialization-manifest:path=%s/);
@@ -243,7 +243,7 @@ test("materialization helper CLI reads manifest files for dry-run", async () => 
   fs.writeFileSync(file, JSON.stringify(manifest), "utf8");
   const result = await $({
     stdio: "pipe",
-  })`zx-wrapper build-tools/tools/remote-exec/nix-store-materialize.ts --manifest ${file} --dry-run`;
+  })`zx-wrapper viberoots/build-tools/tools/remote-exec/nix-store-materialize.ts --manifest ${file} --dry-run`;
   assert.match(String(result.stdout), /remote-worker-tools/);
   assert.doesNotMatch(String(result.stdout), /token@/);
 });

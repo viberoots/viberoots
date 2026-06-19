@@ -31,7 +31,7 @@ test("deployment TARGETS emit Infisical secret backend metadata", async () => {
     await fsp.writeFile(
       deployTargetsPath,
       [
-        'load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
+        'load("@viberoots//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
         "cloudflare_pages_static_webapp_deployment(",
         '    name = "deploy",',
         `    component = "${CUTOVER_APP}",`,

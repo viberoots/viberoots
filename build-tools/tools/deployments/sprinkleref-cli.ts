@@ -74,6 +74,18 @@ export type SprinkleRefCliDeps = {
 export async function runSprinkleRefCli(deps: SprinkleRefCliDeps) {
   validateKnownFlags(deps.argv, readFlagBoolFromTokens("check", deps.argv));
   const out = deps.stdout || console.log;
+  const positional = positionalCommand(deps.argv);
+  if (positional.command === "help") return out(sprinklerefUsage());
+  if (positional.command === "check") {
+    const exitCode = await runSprinkleRefCheck({ ...deps, argv: positional.argv });
+    process.exitCode = exitCode;
+    return;
+  }
+  if (positional.command === "list") {
+    await runSprinkleRefCheck({ ...deps, argv: positional.argv });
+    return;
+  }
+  if (positional.command) throw new Error(`unknown command: ${positional.command}`);
   if (readFlagBoolFromTokens("help", deps.argv)) return out(sprinklerefUsage());
   if (readFlagBoolFromTokens("init-local", deps.argv)) {
     const written = await initLocalSprinkleRefValues(process.cwd());
@@ -241,4 +253,32 @@ function validateKnownFlags(argv: string[], usageExit = false) {
       throw error;
     }
   }
+}
+
+function positionalCommand(argv: string[]): { command: string; argv: string[] } {
+  const positionals: Array<{ value: string; index: number }> = [];
+  for (let i = 0; i < argv.length; i++) {
+    const token = argv[i] || "";
+    if (token.startsWith("--")) {
+      if (token.includes("=")) continue;
+      const name = token.slice(2);
+      if (VALUE_FLAGS.includes(name)) {
+        const value = argv[i + 1] || "";
+        if (value && !value.startsWith("--")) i++;
+      }
+      continue;
+    }
+    positionals.push({ value: token, index: i });
+  }
+  if (positionals.length === 0) return { command: "", argv };
+  if (positionals.length > 1) {
+    throw new Error(
+      `unexpected positional arguments: ${positionals.map((p) => p.value).join(" ")}`,
+    );
+  }
+  const command = positionals[0];
+  return {
+    command: command?.value || "",
+    argv: argv.filter((_, index) => index !== command?.index),
+  };
 }

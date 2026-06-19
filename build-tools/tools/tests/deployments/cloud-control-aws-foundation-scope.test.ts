@@ -20,6 +20,7 @@ import {
 import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
+import { viberootsRepoPath } from "./deployment-command";
 const opts = { expectedRegion: "us-east-1", maxAgeMinutes: 60 };
 const digest = `sha256:${"e".repeat(64)}`;
 const image = `registry.example.com/platform/deployment-control-plane@${digest}`;
@@ -27,7 +28,7 @@ const identity = `nix-source-${"f".repeat(64)}`;
 
 test("repo-owned AWS foundation OpenTofu module covers network IAM S3 state and drift outputs", () => {
   const moduleDir = path.join(
-    process.cwd(),
+    viberootsRepoPath("."),
     "build-tools/deployments/aws-control-plane-foundation/opentofu",
   );
   const files = fs.readdirSync(moduleDir).filter((file) => file.endsWith(".tf"));

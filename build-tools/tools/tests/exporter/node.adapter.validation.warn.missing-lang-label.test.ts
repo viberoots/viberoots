@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node adapter warns when macro-stamped target lacks lang:node (warn mode)", async () => {
   await runInTemp("exp-node-warn-missing-lang", async (tmp, $) => {
-    const out = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const out = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fs.mkdirp(path.dirname(out));
     // Macro-stamped pattern: has importer-scoped lockfile and kind label,
     // but is missing the lang:node label.
@@ -17,14 +17,14 @@ test("node adapter warns when macro-stamped target lacks lang:node (warn mode)",
         labels: ["kind:bundle", "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],
       },
     ];
-    const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");
+    const sim = path.join(tmp, "viberoots/build-tools/tools/buck/simulated.json");
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
 
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${out} --validation warn`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${out} --validation warn`;
     const txt = String(res.stdout || "") + String(res.stderr || "");
     if (res.exitCode !== 0) {
       console.error("exporter should succeed in warn mode", txt);

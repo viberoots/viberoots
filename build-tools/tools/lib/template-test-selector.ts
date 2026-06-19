@@ -24,7 +24,8 @@ export type TemplateTestSelectorResult = {
 };
 
 const TEMPLATE_ROOT = "build-tools/tools/scaffolding/templates/";
-const TEMPLATE_PATH = /^build-tools\/tools\/scaffolding\/templates\/([^/]+)\/([^/]+)(?:\/|$)/;
+const TEMPLATE_PATH =
+  /^(?:viberoots\/)?build-tools\/tools\/scaffolding\/templates\/([^/]+)\/([^/]+)(?:\/|$)/;
 const TEMPLATE_SUPPORT_EXACT = new Set([
   "build-tools/tools/tests/template_conventions.bzl",
   "build-tools/tools/tests/scaffolding/template-conventions.metadata.cquery.test.ts",
@@ -44,6 +45,10 @@ function normalizePath(relPath: string): string {
     .trim();
 }
 
+function stripViberootsPrefix(relPath: string): string {
+  return relPath.startsWith("viberoots/") ? relPath.slice("viberoots/".length) : relPath;
+}
+
 function toSortedUnique(values: Iterable<string>): string[] {
   return Array.from(new Set(Array.from(values).filter(Boolean))).sort();
 }
@@ -54,8 +59,9 @@ function isCanonicalTemplateId(language: string, template: string): boolean {
 }
 
 function isTemplateSupportBuildSystemPath(relPath: string): boolean {
-  if (TEMPLATE_SUPPORT_EXACT.has(relPath)) return true;
-  return TEMPLATE_SUPPORT_PREFIXES.some((prefix) => relPath.startsWith(prefix));
+  const p = stripViberootsPrefix(relPath);
+  if (TEMPLATE_SUPPORT_EXACT.has(p)) return true;
+  return TEMPLATE_SUPPORT_PREFIXES.some((prefix) => p.startsWith(prefix));
 }
 
 export function templateIdFromPath(relPath: string): string | null {
@@ -106,7 +112,7 @@ export async function classifyTemplateSelectorMode(
   const nonTemplateBuildSystemPaths: string[] = [];
   for (const p of normalized) {
     if (!isBuildSystemPath(p)) continue;
-    if (p.startsWith(TEMPLATE_ROOT)) continue;
+    if (stripViberootsPrefix(p).startsWith(TEMPLATE_ROOT)) continue;
     if (isTemplateSupportBuildSystemPath(p)) continue;
     const ownerTemplateIds = ownedIndex.scriptToTemplateIds.get(p) || [];
     const isOwnedChangedTest =

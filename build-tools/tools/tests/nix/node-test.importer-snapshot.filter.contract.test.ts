@@ -4,7 +4,10 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("node-test importer snapshots exclude generated and cache directories", async () => {
-  const file = await fsp.readFile("build-tools/tools/nix/flake/packages/node-test.nix", "utf8");
+  const file = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/flake/packages/node-test.nix",
+    "utf8",
+  );
   for (const dir of [
     "node_modules",
     "dist",

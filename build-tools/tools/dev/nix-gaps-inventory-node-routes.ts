@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
+import path from "node:path";
 import { bzlDefBody } from "./nix-gaps-inventory-check-lib";
 
 type NodeRouteCheckInput = {
@@ -7,14 +8,30 @@ type NodeRouteCheckInput = {
   nixRouteDetailsByMacro: Record<string, string>;
 };
 
+async function sourceRoot(): Promise<string> {
+  const envRoot = String(
+    process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "",
+  ).trim();
+  if (envRoot) return envRoot;
+  if (await fs.pathExists(path.join("viberoots", "build-tools"))) return path.resolve("viberoots");
+  return process.cwd();
+}
+
 export async function enforceNodeImplementationRouteChecks({
   hasNodeImplementationFiles,
   nixRouteDetailsByMacro,
 }: NodeRouteCheckInput): Promise<void> {
   if (!hasNodeImplementationFiles) return;
 
-  const nodeDefsCoreTxt = await fs.readFile("build-tools/node/defs_core.bzl", "utf8");
-  const nodeDefsStageTxt = await fs.readFile("build-tools/node/defs_stage.bzl", "utf8");
+  const source = await sourceRoot();
+  const nodeDefsCoreTxt = await fs.readFile(
+    path.join(source, "build-tools", "node", "defs_core.bzl"),
+    "utf8",
+  );
+  const nodeDefsStageTxt = await fs.readFile(
+    path.join(source, "build-tools", "node", "defs_stage.bzl"),
+    "utf8",
+  );
   const coreNixClaimed = ["nix_node_gen", "nix_node_lib", "nix_node_bin"].some(
     (macro) => !!nixRouteDetailsByMacro[macro],
   );

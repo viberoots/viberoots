@@ -1,11 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { runInTemp } from "../lib/test-helpers";
+
+const startupCheckScript = fileURLToPath(new URL("../../dev/startup-check.ts", import.meta.url));
 
 async function writeBuckState(root: string, extraCells: string[] = []): Promise<void> {
   await fs.remove(path.join(root, "prelude"));
-  await fs.outputFile(path.join(root, "prelude/prelude.bzl"), "# prelude\n", "utf8");
+  await fs.remove(path.join(root, "viberoots"));
+  await fs.outputFile(path.join(root, "viberoots/prelude/prelude.bzl"), "# prelude\n", "utf8");
+  await fs.outputFile(path.join(root, "viberoots/flake.nix"), "{ outputs = _: {}; }\n", "utf8");
+  await fs.ensureDir(path.join(root, ".viberoots"));
+  await fs.remove(path.join(root, ".viberoots/current"));
+  await fs.symlink("../viberoots", path.join(root, ".viberoots/current"));
   await fs.writeFile(path.join(root, ".buckroot"), ".\n", "utf8");
   await fs.writeFile(
     path.join(root, ".buckconfig"),
@@ -15,12 +23,12 @@ async function writeBuckState(root: string, extraCells: string[] = []): Promise<
       "",
       "[repositories]",
       "root = .",
-      "prelude = ./prelude",
+      "prelude = ./.viberoots/current/prelude",
       ...extraCells,
       "",
       "[cells]",
       "root = .",
-      "prelude = ./prelude",
+      "prelude = ./.viberoots/current/prelude",
       ...extraCells,
       "",
       "[build]",
@@ -40,7 +48,7 @@ async function runStartup(root: string) {
     reject: false,
     nothrow: true,
     env: { ...process.env, STARTUP_CHECK_ALLOW_NON_NIX_STORE: "1" },
-  })`zx-wrapper build-tools/tools/dev/startup-check.ts`;
+  })`zx-wrapper ${startupCheckScript}`;
 }
 
 function assertFailed(res: { exitCode: number; stderr: string }, pattern: RegExp): void {
@@ -61,9 +69,10 @@ await runInTemp("startup-check-viberoots-activation", async (tmp) => {
     "utf8",
   );
   await fs.remove(path.join(tmp, "viberoots"));
-  assertFailed(await runStartup(tmp), /missing viberoots\/flake\.nix/);
+  assertFailed(await runStartup(tmp), /viberoots submodule is missing or uninitialized/);
 
   await fs.outputFile(path.join(tmp, "viberoots/flake.nix"), "{ outputs = _: {}; }\n", "utf8");
+  await fs.outputFile(path.join(tmp, "viberoots/prelude/prelude.bzl"), "# prelude\n", "utf8");
   await fs.outputFile(
     path.join(tmp, "stale-viberoots/flake.nix"),
     "{ outputs = _: {}; }\n",
@@ -76,17 +85,16 @@ await runInTemp("startup-check-viberoots-activation", async (tmp) => {
 
   await fs.remove(path.join(tmp, ".viberoots/current"));
   await fs.symlink("..", path.join(tmp, ".viberoots/current"));
-  let res = await runStartup(tmp);
-  if (res.exitCode !== 0) throw new Error(`expected pre-extraction current to pass\n${res.stderr}`);
+  assertFailed(await runStartup(tmp), /\.viberoots\/current points at/);
 
   await fs.ensureDir(path.join(tmp, "viberoots/build-tools"));
-  await fs.remove(path.join(tmp, ".viberoots/current"));
-  await fs.symlink("../viberoots", path.join(tmp, ".viberoots/current"));
-  res = await runStartup(tmp);
-  if (res.exitCode !== 0) throw new Error(`expected extracted current to pass\n${res.stderr}`);
-
-  await writeBuckState(tmp, ["viberoots = ./.viberoots/current"]);
   await fs.writeFile(path.join(tmp, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
   await fs.remove(path.join(tmp, ".viberoots/current"));
+  await fs.symlink("../viberoots", path.join(tmp, ".viberoots/current"));
+  let res = await runStartup(tmp);
+  if (res.exitCode !== 0) throw new Error(`expected extracted current to pass\n${res.stderr}`);
+
+  await writeBuckState(tmp, ["viberoots = ./.viberoots/current/missing-viberoots-cell"]);
+  await fs.writeFile(path.join(tmp, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
   assertFailed(await runStartup(tmp), /references missing cell path/);
 });

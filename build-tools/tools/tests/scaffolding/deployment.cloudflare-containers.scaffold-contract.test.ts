@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "../deployments/deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -14,7 +15,7 @@ const accountId = "0123456789abcdef0123456789abcdef";
 async function writeDefaults(tmp: string): Promise<void> {
   await fsp.writeFile(
     path.join(tmp, "projects/deployments/TARGETS"),
-    'load("//build-tools/deployments:defs.bzl", "deployment_defaults")\ndeployment_defaults(name = "defaults", visibility = ["PUBLIC"])\n',
+    'load("@viberoots//build-tools/deployments:defs.bzl", "deployment_defaults")\ndeployment_defaults(name = "defaults", visibility = ["PUBLIC"])\n',
     "utf8",
   );
 }
@@ -132,7 +133,9 @@ cloudflare_containers_deployment(
 )
 `,
     );
-    await $`pnpm prettier --check ${wranglerPath} ${workerPath}`;
+    await $({
+      cwd: path.dirname(viberootsToolScript("package.json")),
+    })`pnpm prettier --check ${wranglerPath} ${workerPath}`;
     const attrFlags = DEPLOYMENT_CQUERY_ATTRS.flatMap((attr) => ["--output-attribute", attr]);
     const query =
       "set(//projects/deployments/api-staging:deploy //projects/apps/api:service_artifact //projects/deployments:defaults //projects/deployments/demo-shared:lane_governance //projects/deployments/demo-shared:lane //projects/deployments/demo-shared:dev_release)";
@@ -168,7 +171,7 @@ test("deployment/cloudflare-containers default private scaffold validates throug
       cwd: tmp,
       stdio: "pipe",
       env: deployValidateEnv(tmp),
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //projects/deployments/api-default:deploy --validate-only`;
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //projects/deployments/api-default:deploy --validate-only`;
     const payload = JSON.parse(String(result.stdout));
     assert.equal(payload.schemaVersion, "deploy-validate@1");
     assert.equal(payload.valid, true);

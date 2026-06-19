@@ -3,8 +3,8 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("node-modules-build reuses verified markers even when temp lockfiles are git-dirty", async () => {
-  const txt = await fsp.readFile("build-tools/tools/dev/node-modules-build.ts", "utf8");
-  if (!txt.includes("await requireFreshPnpmStoreState(relLock)")) {
+  const txt = await fsp.readFile("viberoots/build-tools/tools/dev/node-modules-build.ts", "utf8");
+  if (!txt.includes("await requireFreshPnpmStoreState(lockfileRel, hashKey)")) {
     throw new Error("node-modules-build.ts must require verified pnpm-store state before building");
   }
   if (txt.includes("if (!dirty && (await hasFreshVerifiedMarker(lockfileRel))) return;")) {
@@ -18,7 +18,7 @@ test("node-modules-build reuses verified markers even when temp lockfiles are gi
   if (!txt.includes("run `i` to refresh pnpm hashes and prewarm exact pnpm stores")) {
     throw new Error("node-modules-build.ts must tell operators to run `i` for stale state");
   }
-  if (!txt.includes("preparedExactStoreEnv(relLock)")) {
+  if (!txt.includes("preparedExactStoreEnv(lockfileRel)")) {
     throw new Error("node-modules-build.ts must consume exact stores prewarmed by `i`");
   }
 });

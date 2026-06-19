@@ -57,7 +57,8 @@ test("bootstrap main help prints usage before required mode parsing", async () =
 });
 
 test("bootstrap entrypoint is executable as documented", async () => {
-  const mode = (await fs.stat("build-tools/tools/deployments/infisical-bootstrap.ts")).mode;
+  const mode = (await fs.stat("viberoots/build-tools/tools/deployments/infisical-bootstrap.ts"))
+    .mode;
   assert.notEqual(mode & 0o111, 0);
 });
 

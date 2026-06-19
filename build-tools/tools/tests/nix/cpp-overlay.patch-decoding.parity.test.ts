@@ -30,6 +30,7 @@ test("cpp overlay patch decoding matches canonical decoder", async () => {
     const repoRoot = process.env.REPO_ROOT || process.cwd();
     const overlaySource = path.join(
       repoRoot,
+      "viberoots",
       "build-tools",
       "tools",
       "nix",
@@ -38,6 +39,7 @@ test("cpp overlay patch decoding matches canonical decoder", async () => {
     );
     const overlayDest = path.join(
       tmp,
+      "viberoots",
       "build-tools",
       "tools",
       "nix",
@@ -47,7 +49,7 @@ test("cpp overlay patch decoding matches canonical decoder", async () => {
     await fsp.mkdir(path.dirname(overlayDest), { recursive: true });
     await fsp.copyFile(overlaySource, overlayDest);
 
-    const patchDir = path.join(tmp, "patches", "cpp");
+    const patchDir = path.join(tmp, "viberoots", "patches", "cpp");
     await fsp.mkdir(patchDir, { recursive: true });
 
     const filenames = [
@@ -69,7 +71,7 @@ test("cpp overlay patch decoding matches canonical decoder", async () => {
     const expr = `
       let
         pkgs = import <nixpkgs> {};
-        overlay = import ./build-tools/tools/nix/overlays/cpp-patches.nix;
+        overlay = import ./viberoots/build-tools/tools/nix/overlays/cpp-patches.nix;
         final = pkgs // {
           applyPatches = { name, src, patches }: "patched-" + name;
         };

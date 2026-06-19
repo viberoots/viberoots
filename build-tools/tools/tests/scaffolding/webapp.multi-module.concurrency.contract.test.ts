@@ -16,13 +16,15 @@ async function waitFor(
   condition: () => Promise<boolean>,
   timeoutMs: number,
   pollMs: number,
+  describe?: () => string,
 ): Promise<void> {
   const startedAt = Date.now();
   while (Date.now() - startedAt < timeoutMs) {
     if (await condition()) return;
     await sleep(pollMs);
   }
-  throw new Error(`timed out after ${timeoutMs}ms`);
+  const detail = describe ? `\n${describe()}` : "";
+  throw new Error(`timed out after ${timeoutMs}ms${detail}`);
 }
 
 async function writeAndTouch(filePath: string, text: string): Promise<void> {
@@ -59,7 +61,7 @@ test(
       const watcher = spawn(
         "zx-wrapper",
         [
-          "../../../build-tools/tools/dev/watch-wasm-coordinator.ts",
+          "../../../viberoots/build-tools/tools/dev/watch-wasm-coordinator.ts",
           "--cwd",
           appAbs,
           "--poll-ms",
@@ -87,13 +89,19 @@ test(
           },
           60000,
           150,
+          () => logs.join(""),
         );
 
         for (const key of moduleKeys) {
           const payloadPath = payloadByKey.get(key);
           if (!payloadPath) throw new Error(`missing payload path for key ${key}`);
-          await writeAndTouch(payloadPath, `${key}-1`);
+          await writeAndTouch(payloadPath, `${key}-1-updated-payload`);
         }
+        await fsp.utimes(
+          path.join(appAbs, "src", "wasm-producer"),
+          new Date(Date.now() + 1500),
+          new Date(Date.now() + 1500),
+        );
 
         await waitFor(
           async () => {
@@ -111,6 +119,7 @@ test(
           },
           90000,
           150,
+          () => logs.join(""),
         );
 
         const mergedLogs = logs.join("");

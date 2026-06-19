@@ -49,7 +49,7 @@ def _selected_route_build_cmd(selected_route_target):
         ("VBR_NODE_ROUTE_TARGET=%s; " % sh_quote(selected_route_target))
         + "if [ -n \"$VBR_NODE_ROUTE_TARGET\" ]; then "
         + nix_build_out_path_cmd(
-            "\"path:$WORKSPACE_ROOT#graph-generator-selected\"",
+            "\"path:$FLK_ROOT#graph-generator-selected\"",
             timeout_var = "TIMEOUT",
             impure = True,
             build_prefix = "env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"$VBR_NODE_ROUTE_TARGET\" ",

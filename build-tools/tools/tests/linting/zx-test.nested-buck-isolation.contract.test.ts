@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 test("linting: zx_test exports a stable nested buck isolation for child buck commands", async () => {
-  const p = path.join(process.cwd(), "build-tools", "tools", "buck", "zx_test.bzl");
+  const p = path.join(process.cwd(), "viberoots", "build-tools", "tools", "buck", "zx_test.bzl");
   const txt = await fsp.readFile(p, "utf8");
   assert.match(
     txt,

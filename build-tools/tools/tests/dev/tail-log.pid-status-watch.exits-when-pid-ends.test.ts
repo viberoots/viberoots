@@ -6,6 +6,7 @@ import { once } from "node:events";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { buildToolPath } from "../../dev/dev-build/paths";
 
 test("tail-log: explicit PID --status -w exits after the PID ends (no switching)", async () => {
   const ws = await fsp.mkdtemp(path.join(os.tmpdir(), "tail-log-pid-watch-exit-"));
@@ -24,7 +25,7 @@ test("tail-log: explicit PID --status -w exits after the PID ends (no switching)
   await fsp.symlink(logFile, path.join(byPidDir, `${pid}.log`));
 
   const tailLog = spawn(
-    path.join(process.cwd(), "build-tools", "tools", "bin", "tail-log"),
+    buildToolPath(process.cwd(), "tools/bin/tail-log"),
     ["--status", "-w", "0.05", "--json", String(pid)],
     {
       cwd: process.cwd(),
@@ -34,7 +35,7 @@ test("tail-log: explicit PID --status -w exits after the PID ends (no switching)
         NO_DEV_SHELL: "1",
         // In temp-workspace tests, WORKSPACE_ROOT points at the temp tree, but zx-init must come
         // from the real checkout so TypeScript tooling can run.
-        ZX_INIT: path.join(process.cwd(), "build-tools", "tools", "dev", "zx-init.mjs"),
+        ZX_INIT: buildToolPath(process.cwd(), "tools/dev/zx-init.mjs"),
       },
       stdio: ["ignore", "pipe", "pipe"],
     },

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 function selectDerivationMap(
   parsed:
@@ -144,6 +144,13 @@ async function recursiveImporterFileCandidates(
   return matches;
 }
 
+function localViberootsOverrideArgs(): string {
+  const viberootsRoot = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "";
+  return viberootsRoot
+    ? ` --override-input viberoots ${JSON.stringify(`path:${viberootsRoot}`)}`
+    : "";
+}
+
 test("nix packages expose per-importer node-modules attr for untracked importer under WORKSPACE_ROOT", async () => {
   await runInTemp("node-modules-per-importer-attr", async (tmp, _$) => {
     const importer = "projects/apps/demo-untracked";
@@ -171,8 +178,9 @@ test("nix packages expose per-importer node-modules attr for untracked importer 
     );
 
     const $ = _$({ cwd: tmp, stdio: "pipe" });
-    const flakeRef = `path:${tmp}`;
-    const cmd = `nix eval --raw "${flakeRef}#node-modules.${attr}.outPath" --accept-flake-config`;
+    const flakeRoot = await workspaceFlakeRef(tmp);
+    const flakeRef = `path:${flakeRoot}`;
+    const cmd = `nix eval --impure --raw "${flakeRef}#node-modules.${attr}.outPath"${localViberootsOverrideArgs()} --accept-flake-config`;
     const out = await $`bash --noprofile --norc -c ${cmd}`;
     const outPath = String(out.stdout || "").trim();
 
@@ -207,8 +215,9 @@ test("node-modules derivation snapshots untracked importer files", async () => {
     );
 
     const $ = _$({ cwd: tmp, stdio: "pipe" });
-    const flakeRef = `path:${tmp}`;
-    const drvCmd = `nix eval --raw "${flakeRef}#node-modules.${attr}.drvPath" --accept-flake-config`;
+    const flakeRoot = await workspaceFlakeRef(tmp);
+    const flakeRef = `path:${flakeRoot}`;
+    const drvCmd = `nix eval --impure --raw "${flakeRef}#node-modules.${attr}.drvPath"${localViberootsOverrideArgs()} --accept-flake-config`;
     const drvRes = await $`bash --noprofile --norc -c ${drvCmd}`;
     const drvPath = String(drvRes.stdout || "").trim();
     assert.ok(drvPath.endsWith(".drv"), `expected drvPath, got: ${drvPath}`);

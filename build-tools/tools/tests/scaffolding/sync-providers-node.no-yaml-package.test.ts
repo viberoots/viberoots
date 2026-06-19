@@ -47,7 +47,7 @@ packages:
       // Run sync - should write empty header and exit gracefully
       const result = await $({
         nothrow: true,
-      })`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+      })`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
 
       if (result.exitCode !== 0 && yamlExists) {
         console.error("Expected exit code 0 when yaml unavailable, got:", result.exitCode);

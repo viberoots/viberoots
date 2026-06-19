@@ -51,8 +51,8 @@ test("workspace provider auto-map: realize_provider_edges uses MODULE_PROVIDERS 
       path.join(appDir, "TARGETS"),
       [
         'load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")',
-        'load("//build-tools/lang:defs_common.bzl", "realize_provider_edges")',
-        'load("//build-tools/lang:labels_file.bzl", "labels_file")',
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "realize_provider_edges")',
+        'load("@viberoots//build-tools/lang:labels_file.bzl", "labels_file")',
         "",
         'merged = realize_provider_edges(MODULE_PROVIDERS, "bin", base = [',
         '  "//third_party/providers:prov_a",',

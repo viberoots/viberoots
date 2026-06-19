@@ -3,26 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-
-const repoRoot = process.cwd();
-const wrapper = path.join(repoRoot, "build-tools", "tools", "bin", "git");
-const scratchRoot = path.join(repoRoot, "buck-out", "tmp");
-
-async function realGit(): Promise<string> {
-  const filteredPath = String(process.env.PATH || "")
-    .split(path.delimiter)
-    .filter((entry) => path.resolve(entry || ".") !== path.dirname(wrapper))
-    .join(path.delimiter);
-  const out = await $({
-    stdio: "pipe",
-    env: { ...process.env, PATH: filteredPath },
-  })`bash --noprofile --norc -c 'type -a -p git'`;
-  const candidates = String(out.stdout || "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean);
-  return candidates.find((candidate) => candidate.startsWith("/nix/store/")) || candidates[0] || "";
-}
+import { realGit, repoRoot, scratchRoot, wrapper } from "./git-wrapper-test-helpers.ts";
 
 async function initRepo(root: string, gitPath: string): Promise<void> {
   await $({ cwd: root, stdio: "pipe" })`${gitPath} init -q`;

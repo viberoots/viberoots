@@ -56,7 +56,7 @@ test("python macros: nix_python_test runs via Nix-backed runner", async () => {
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/python:defs.bzl", "nix_python_library", "nix_python_test")',
+        'load("@viberoots//build-tools/python:defs.bzl", "nix_python_library", "nix_python_test")',
         "",
         'nix_python_library(name = "pytester_lib", srcs = glob(["src/**/*.py"]))',
         'nix_python_test(name = "pytester_test", srcs = glob(["tests/**/*.py", "bin/__main__.py"]), deps = [":pytester_lib"])',

@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import Ajv from "ajv";
+import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged as writeIfChangedDeterministic } from "../lib/fs-helpers";
@@ -28,8 +29,23 @@ type PlannerConfig = {
   };
 };
 
-function repoPath(...parts: string[]): string {
-  return path.join(process.cwd(), ...parts);
+function buildToolsRoot(): string {
+  const root = process.cwd();
+  const candidates = [
+    path.join(root, "viberoots", "build-tools"),
+    path.join(root, ".viberoots", "current", "build-tools"),
+    path.join(root, "build-tools"),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(path.join(candidate, "tools", "dev", "planner.config.schema.json"))) {
+      return candidate;
+    }
+  }
+  return path.join(root, "build-tools");
+}
+
+function toolPath(...parts: string[]): string {
+  return path.join(buildToolsRoot(), ...parts);
 }
 
 async function pathExists(p: string): Promise<boolean> {
@@ -42,14 +58,14 @@ async function pathExists(p: string): Promise<boolean> {
 }
 
 async function readSchema(): Promise<any> {
-  const p = repoPath("build-tools/tools/dev/planner.config.schema.json");
+  const p = toolPath("tools/dev/planner.config.schema.json");
   return JSON.parse(await fsp.readFile(p, "utf8"));
 }
 
 async function loadConfig(lang: string): Promise<PlannerConfig> {
-  const cfgPath = repoPath("build-tools/tools/nix/planner", `${lang}.config.ts`);
+  const cfgPath = toolPath("tools/nix/planner", `${lang}.config.ts`);
   if (!(await pathExists(cfgPath))) {
-    throw new Error(`Missing planner config: build-tools/tools/nix/planner/${lang}.config.ts`);
+    throw new Error(`Missing planner config: ${cfgPath}`);
   }
   const mod = await import(pathToFileUrlLike(cfgPath));
   const cfg: PlannerConfig = (mod.default ?? mod) as PlannerConfig;
@@ -158,7 +174,7 @@ async function main() {
   const changed: string[] = [];
   const langs: string[] = [];
   if (all) {
-    const dir = repoPath("build-tools/tools/nix/planner");
+    const dir = toolPath("tools/nix/planner");
     if (await pathExists(dir)) {
       for (const e of await fsp.readdir(dir)) {
         if (e.endsWith(".config.ts")) langs.push(e.slice(0, -".config.ts".length));
@@ -174,7 +190,7 @@ async function main() {
     const cfg = await loadConfig(id);
     await validateConfig(cfg);
     const out = generateNix(cfg);
-    const outPath = repoPath("build-tools/tools/nix/planner", `${id}.nix`);
+    const outPath = toolPath("tools/nix/planner", `${id}.nix`);
     const did = await writePlannerOutput(outPath, out, check);
     if (did) changed.push(outPath);
   }

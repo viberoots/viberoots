@@ -37,15 +37,29 @@ function isAlwaysRelevantUntrackedPath(p: string): boolean {
     "build-tools/tools/buck/",
     "build-tools/tools/nix/",
     "build-tools/tools/dev/",
+    "viberoots/build-tools/lang/",
+    "viberoots/build-tools/node/",
+    "viberoots/build-tools/tools/buck/",
+    "viberoots/build-tools/tools/nix/",
+    "viberoots/build-tools/tools/dev/",
     "third_party/",
     "toolchains/",
+    "viberoots/third_party/",
+    "viberoots/toolchains/",
   ];
   return criticalPrefixes.some((pre) => x.startsWith(pre));
 }
 
 function isIgnorableForExplicitTargetBuild(p: string): boolean {
   const x = String(p || "").replace(/\\/g, "/");
-  const ignorablePrefixes = ["docs/", "build-tools/docs/", "build-tools/tools/tests/", ".cursor/"];
+  const ignorablePrefixes = [
+    "docs/",
+    "build-tools/docs/",
+    "build-tools/tools/tests/",
+    "viberoots/build-tools/docs/",
+    "viberoots/build-tools/tools/tests/",
+    ".cursor/",
+  ];
   return ignorablePrefixes.some((pre) => x.startsWith(pre));
 }
 

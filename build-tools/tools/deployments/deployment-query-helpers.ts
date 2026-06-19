@@ -15,9 +15,9 @@ export function deploymentBuckEnv(
     SSL_CERT_FILE: env.SSL_CERT_FILE || env.NIX_SSL_CERT_FILE,
   };
   const inheritedIsolation = String(
-    buckEnv.BUCK_ISOLATION_DIR ||
-      buckEnv.BUCK_ISOLATION_DIR_EXPORTER ||
+    buckEnv.BUCK_ISOLATION_DIR_EXPORTER ||
       buckEnv.BUCK_NESTED_ISO ||
+      buckEnv.BUCK_ISOLATION_DIR ||
       "",
   ).trim();
   if (buckEnv.BUCK_NO_ISOLATION !== "1" && !inheritedIsolation && workspaceRoot) {
@@ -52,7 +52,7 @@ function registerVerifySharedIsolation(
 export function deploymentIsolationArgs(env: NodeJS.ProcessEnv = process.env): string[] {
   if (env.BUCK_NO_ISOLATION === "1") return [];
   const isolationDir = String(
-    env.BUCK_ISOLATION_DIR || env.BUCK_ISOLATION_DIR_EXPORTER || env.BUCK_NESTED_ISO || "",
+    env.BUCK_ISOLATION_DIR_EXPORTER || env.BUCK_NESTED_ISO || env.BUCK_ISOLATION_DIR || "",
   ).trim();
   return isolationDir ? ["--isolation-dir", isolationDir] : [];
 }

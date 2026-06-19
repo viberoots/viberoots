@@ -58,7 +58,7 @@ EOF'`;
       [
         "",
         "# test: go.macros.binary-auto-pkg.standard-wiring.test.ts",
-        'load("//build-tools/go:defs.bzl", "nix_go_binary")',
+        'load("@viberoots//build-tools/go:defs.bzl", "nix_go_binary")',
         "",
         "nix_go_binary(",
         '  name = "demo",',

@@ -82,7 +82,7 @@ def node_service_artifact(
         + (
             "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning "
             + "--experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
-            + "\"$WORKSPACE_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
+            + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
             + ("\"node-service.%s\" > \"$OUT_PATHS_FILE\"; " % sanitize_importer_for_nix_attr(_importer))
         )
         + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "

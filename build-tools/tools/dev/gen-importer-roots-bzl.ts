@@ -60,10 +60,39 @@ async function writeIfChanged(dst: string, data: string) {
   await fsp.rename(tmp, dst);
 }
 
+async function firstExistingFile(paths: string[]): Promise<string> {
+  for (const candidate of paths) {
+    if (!candidate) continue;
+    try {
+      await fsp.access(candidate);
+      return candidate;
+    } catch {}
+  }
+  return paths[0];
+}
+
+async function outputImporterRootsPath(root: string): Promise<string> {
+  return buildToolPath(root, "lang/importer_roots.bzl");
+}
+
 async function main() {
   const root = process.cwd();
-  const jsonPath = buildToolPath(root, "tools/lib/importer-roots.json");
-  const bzlPath = buildToolPath(root, "lang/importer_roots.bzl");
+  const jsonPath = await firstExistingFile([
+    buildToolPath(root, "tools/lib/importer-roots.json"),
+    process.env.VIBEROOTS_SOURCE_ROOT
+      ? path.join(
+          process.env.VIBEROOTS_SOURCE_ROOT,
+          "build-tools",
+          "tools",
+          "lib",
+          "importer-roots.json",
+        )
+      : "",
+    process.env.VIBEROOTS_ROOT
+      ? path.join(process.env.VIBEROOTS_ROOT, "build-tools", "tools", "lib", "importer-roots.json")
+      : "",
+  ]);
+  const bzlPath = await outputImporterRootsPath(root);
   const txt = await fsp.readFile(jsonPath, "utf8");
   const raw = JSON.parse(txt) as RawContract;
   const allowDotImporter = raw.allowDotImporter === false ? false : true;

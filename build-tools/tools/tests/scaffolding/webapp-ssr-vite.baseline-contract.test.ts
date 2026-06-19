@@ -4,14 +4,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { exists, runInTemp } from "../lib/test-helpers";
+import { viberootsRoot, viberootsTool } from "./lib/viberoots-tools";
 
-const TEMPLATE_ROOT = path.join(
-  "build-tools",
-  "tools",
-  "scaffolding",
-  "templates",
-  "ts",
-  "webapp-ssr-vite",
+const TEMPLATE_ROOT = viberootsTool(
+  path.join("build-tools", "tools", "scaffolding", "templates", "ts", "webapp-ssr-vite"),
 );
 
 test("Vite SSR template appears in templates listing and help", async () => {
@@ -124,9 +120,11 @@ test("Vite SSR template metadata and scaffold baseline are present", async () =>
     assert.match(buildSsrScript, /execFileSync\(viteBin, \["build", "--outDir", "dist\/client"\]/);
     assert.match(
       buildSsrScript,
-      /execFileSync\(viteBin, \["build", "--ssr", "src\/entry-server\.ts", "--outDir", "dist\/server"\]/,
+      /execFileSync\(\s*viteBin,\s*\[\s*"build",\s*"--ssr",\s*"src\/entry-server\.ts",\s*"--outDir",\s*"dist\/server",?\s*\]/,
     );
 
-    await $`pnpm prettier --check ${path.join(appRoot, "pnpm-lock.yaml")} ${path.join(appRoot, "scripts", "build-ssr.mjs")} ${path.join(appRoot, "scripts", "dev-wasm-watch.mjs")} ${path.join(appRoot, "server", "dev.mjs")} ${path.join(appRoot, "server", "index.ts")} ${path.join(appRoot, "server", "ts-modules.ts")} ${path.join(appRoot, "src", "home.tsx")} ${path.join(appRoot, "src", "ts-modules.ts")} ${path.join(appRoot, "src", "wasm-contract.ts")} ${path.join(appRoot, "test", "entry-server.test.ts")} ${path.join(appRoot, "vite.config.ts")}`;
+    await $({
+      cwd: viberootsRoot(),
+    })`pnpm prettier --check ${path.join(appRoot, "pnpm-lock.yaml")} ${path.join(appRoot, "scripts", "build-ssr.mjs")} ${path.join(appRoot, "scripts", "dev-wasm-watch.mjs")} ${path.join(appRoot, "server", "dev.mjs")} ${path.join(appRoot, "server", "index.ts")} ${path.join(appRoot, "server", "ts-modules.ts")} ${path.join(appRoot, "src", "home.tsx")} ${path.join(appRoot, "src", "ts-modules.ts")} ${path.join(appRoot, "src", "wasm-contract.ts")} ${path.join(appRoot, "test", "entry-server.test.ts")} ${path.join(appRoot, "vite.config.ts")}`;
   });
 });

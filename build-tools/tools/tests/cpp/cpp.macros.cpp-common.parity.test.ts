@@ -96,7 +96,7 @@ EOF'`;
     );
     await fsp.writeFile(
       path.join(libDir, "TARGETS"),
-      `load("//build-tools/cpp:defs.bzl", "nix_cpp_library", "cpp_sanitize_probe")
+      `load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library", "cpp_sanitize_probe")
 
 genrule(name="localprov", out="localprov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 
@@ -122,7 +122,7 @@ nix_cpp_library(
     await fsp.writeFile(path.join(binDir, "main.cpp"), "int main(){return 0;}\n", "utf8");
     await fsp.writeFile(
       path.join(binDir, "TARGETS"),
-      `load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "cpp_sanitize_probe")
+      `load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary", "cpp_sanitize_probe")
 
 genrule(name="localprov", out="localprov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 
@@ -148,7 +148,7 @@ nix_cpp_binary(
     await fsp.writeFile(path.join(addonDir, "addon.cpp"), "int x(){return 1;}\n", "utf8");
     await fsp.writeFile(
       path.join(addonDir, "TARGETS"),
-      `load("//build-tools/cpp:defs.bzl", "nix_cpp_node_addon", "cpp_sanitize_probe")
+      `load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_node_addon", "cpp_sanitize_probe")
 
 genrule(name="localprov", out="localprov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
 

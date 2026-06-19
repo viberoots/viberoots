@@ -15,7 +15,7 @@ test("cli-wrap treats SkipError as exit 0 and prints [skip]", async () => {
       "});",
       "",
     ].join("\n");
-    const p = path.join(tmp, "build-tools/tools/dev/demo-skip.ts");
+    const p = path.join(tmp, "viberoots/build-tools/tools/dev/demo-skip.ts");
     await fs.outputFile(p, script, "utf8");
     const res = await $({ cwd: tmp, stdio: "pipe" })`node ${p}`;
     const out = String(res.stderr || res.stdout || "");

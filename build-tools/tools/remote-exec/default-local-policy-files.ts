@@ -40,6 +40,11 @@ export async function candidatePolicyFiles(root: string): Promise<string[]> {
     "toolchains/TARGETS",
   ]);
   for (const base of [
+    "viberoots/build-tools/tools/ci",
+    "viberoots/build-tools/tools/bin",
+    "viberoots/build-tools/tools/dev",
+    "viberoots/build-tools/tools/dev/verify",
+    "viberoots/build-tools/tools/remote-exec",
     "build-tools/tools/ci",
     "build-tools/tools/bin",
     "build-tools/tools/dev",

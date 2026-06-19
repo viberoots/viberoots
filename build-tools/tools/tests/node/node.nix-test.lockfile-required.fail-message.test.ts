@@ -12,7 +12,7 @@ test("nix_node_test fails fast when default lockfile is missing", async () => {
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_test")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_test")',
         "",
         "nix_node_test(",
         '  name = "t",',

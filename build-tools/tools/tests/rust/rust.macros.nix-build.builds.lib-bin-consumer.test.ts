@@ -19,7 +19,7 @@ test("rust macros: library, binary, and downstream consumer build via Nix-backed
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/rust:defs.bzl", "rust_binary", "rust_library")',
+        'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_library")',
         "",
         'rust_library(name = "lib", srcs = ["src/lib.rs"])',
         'rust_binary(name = "app", srcs = ["src/main.rs"], deps = [":lib"])',

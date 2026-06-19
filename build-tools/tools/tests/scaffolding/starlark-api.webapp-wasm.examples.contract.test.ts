@@ -14,7 +14,7 @@ test(
   async () => {
     const repoRoot = process.cwd();
     const starlarkApi = await fsp.readFile(
-      path.join(repoRoot, "docs", "handbook", "starlark-api.md"),
+      path.join(repoRoot, "viberoots", "docs", "handbook", "starlark-api.md"),
       "utf8",
     );
     assert.match(starlarkApi, /Vite webapp \+ Python wasm library/);

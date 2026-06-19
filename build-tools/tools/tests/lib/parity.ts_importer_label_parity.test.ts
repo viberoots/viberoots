@@ -12,7 +12,10 @@ test("Starlark importer_from_labels ↔ TS computeImporterLabel parity", async (
     const targetsPath = path.join(tmp, "TARGETS");
     await fsp.appendFile(
       targetsPath,
-      ['load("//build-tools/lang:defs_common.bzl", "importer_from_labels_probe")', ""].join("\n"),
+      [
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "importer_from_labels_probe")',
+        "",
+      ].join("\n"),
       "utf8",
     );
 

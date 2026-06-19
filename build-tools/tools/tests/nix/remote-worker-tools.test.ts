@@ -4,17 +4,18 @@ import { execFile } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 process.env.TEST_RSYNC_ROOTS =
   process.env.TEST_RSYNC_ROOTS ||
-  "flake.nix flake.lock build-tools/tools/nix build-tools/tools/lib build-tools/tools/remote-exec";
+  "viberoots/build-tools/tools/nix viberoots/build-tools/tools/lib viberoots/build-tools/tools/remote-exec";
 
 async function build(root: string, $: any, attr: string): Promise<string> {
+  const flakeRoot = await workspaceFlakeRef(root);
   const res = await $({
     cwd: root,
     stdio: "pipe",
-  })`nix build .#${attr} --no-link --print-out-paths --accept-flake-config`;
+  })`nix build ${`path:${flakeRoot}#${attr}`} --impure --no-link --print-out-paths --accept-flake-config`;
   const out = String(res.stdout || "")
     .trim()
     .split("\n")
@@ -85,14 +86,17 @@ test("remote worker bootstrap uses closure PATH and avoids scheduler registratio
 });
 
 test("remote worker bootstrap app is a thin zx-wrapper launcher", async () => {
-  const app = await fs.readFile("build-tools/tools/nix/flake/outputs-apps.nix", "utf8");
-  const packages = await fs.readFile("build-tools/tools/nix/flake/packages/default.nix", "utf8");
+  const app = await fs.readFile("viberoots/build-tools/tools/nix/flake/outputs-apps.nix", "utf8");
+  const packages = await fs.readFile(
+    "viberoots/build-tools/tools/nix/flake/packages/default.nix",
+    "utf8",
+  );
   const launcher = await fs.readFile(
-    "build-tools/tools/nix/flake/packages/remote-worker-bootstrap.nix",
+    "viberoots/build-tools/tools/nix/flake/packages/remote-worker-bootstrap.nix",
     "utf8",
   );
   const helper = await fs.readFile(
-    "build-tools/tools/remote-exec/remote-worker-bootstrap.ts",
+    "viberoots/build-tools/tools/remote-exec/remote-worker-bootstrap.ts",
     "utf8",
   );
 
@@ -113,7 +117,7 @@ test("remote worker bootstrap rejects non-store tools before PATH construction",
     const res = await execFileResult(
       "zx-wrapper",
       [
-        "build-tools/tools/remote-exec/remote-worker-bootstrap.ts",
+        "viberoots/build-tools/tools/remote-exec/remote-worker-bootstrap.ts",
         "--remote-worker-tools",
         path.join(tmp, "not-store"),
         "--check-only",

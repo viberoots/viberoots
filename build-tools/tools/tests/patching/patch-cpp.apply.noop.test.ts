@@ -11,14 +11,14 @@ test("patch-cpp apply is no-op when no changes", async () => {
     await fs.outputFile(path.join(storeSrc, "README"), "zlib\n", "utf8");
     const map = { "pkgs.zlib": { version: "1.2.13", srcPath: storeSrc, pname: "zlib" } };
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     await $({ cwd: tmp })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} build-tools/tools/bin/patch-pkg start cpp zlib`;
+    )} viberoots/build-tools/tools/bin/patch-pkg start cpp zlib`;
 
     const out = await $({ cwd: tmp })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib`;
+    )} viberoots/build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib`;
     if (!String(out.stdout).includes("no changes; no-op")) {
       console.error("apply did not report no-op");
       process.exit(2);

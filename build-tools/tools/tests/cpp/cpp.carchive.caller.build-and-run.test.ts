@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 // This test scaffolds a minimal Go c-archive and a C++ caller in a temp repo,
 // exports the graph, and builds the selected target via graph-generator-selected.
@@ -34,7 +34,7 @@ test("cpp calls go c-archive (temp repo)", async () => {
     );
     await $({
       cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > libs/greetgo/TARGETS <<"EOF"\nload("//build-tools/go:defs.bzl", "nix_go_carchive")\n\nnix_go_carchive(\n    name = "greetgo",\n    srcs = [\n        "export.go",\n    ],\n    labels = ["lang:go", "kind:carchive"],\n    visibility = ["PUBLIC"],\n)\nEOF'`;
+    })`bash --noprofile --norc -c 'cat > libs/greetgo/TARGETS <<"EOF"\nload("@viberoots//build-tools/go:defs.bzl", "nix_go_carchive")\n\nnix_go_carchive(\n    name = "greetgo",\n    srcs = [\n        "export.go",\n    ],\n    labels = ["lang:go", "kind:carchive"],\n    visibility = ["PUBLIC"],\n)\nEOF'`;
 
     // Create a C++ caller that uses the exported Go symbol
     await $({ cwd: tmp })`bash --noprofile --norc -c 'mkdir -p apps/caller/src apps/caller/tests'`;
@@ -47,7 +47,7 @@ test("cpp calls go c-archive (temp repo)", async () => {
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > apps/caller/TARGETS <<"EOF"
-load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 
 nix_cpp_binary(
     name = "caller",
@@ -85,14 +85,14 @@ EOF'`;
 
     await $({
       cwd: tmp,
-    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const build = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//projects/apps/caller:caller" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     if (build.exitCode !== 0) {
       console.error(build.stdout + "\n" + build.stderr);
       throw new Error("nix build failed");

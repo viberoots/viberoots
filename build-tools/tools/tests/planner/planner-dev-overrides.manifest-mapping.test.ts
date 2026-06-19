@@ -2,7 +2,8 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { buildToolPath } from "../../dev/dev-build/paths";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 function readLastOutPath(stdout: unknown): string {
   return String(stdout || "")
@@ -18,7 +19,7 @@ test("planner detects overrides via manifest mapping and respects PLANNER_NO_DEV
     const graph = path.join(tmp, "graph.json");
     await fs.writeFile(graph, "[]\n", "utf8");
 
-    const manifestPath = path.join(tmp, "build-tools", "tools", "lib", "dev-override-envs.json");
+    const manifestPath = buildToolPath(process.cwd(), "tools/lib/dev-override-envs.json");
     const manifest = (await fs.readJSON(manifestPath)) as Record<string, string>;
     const envName = String(manifest.python || "").trim();
     if (!envName) {
@@ -35,7 +36,7 @@ test("planner detects overrides via manifest mapping and respects PLANNER_NO_DEV
         BUCK_GRAPH_JSON: graph,
         [envName]: "{}",
       },
-    })`nix build ${`path:${tmp}#graph-generator`} --print-out-paths --impure --accept-flake-config --no-link`;
+    })`nix build ${`path:${await workspaceFlakeRef(tmp)}#graph-generator`} --print-out-paths --impure --accept-flake-config --no-link`;
     const out1 = readLastOutPath(res1.stdout);
     const log1 = await fs.readFile(path.join(out1, "build.log"), "utf8").catch(() => "");
     if (!log1.includes("[planner] dev overrides present: py")) {
@@ -53,7 +54,7 @@ test("planner detects overrides via manifest mapping and respects PLANNER_NO_DEV
         [envName]: "{}",
         PLANNER_NO_DEV_OVERRIDE_LOG: "1",
       },
-    })`nix build ${`path:${tmp}#graph-generator`} --print-out-paths --impure --accept-flake-config --no-link`;
+    })`nix build ${`path:${await workspaceFlakeRef(tmp)}#graph-generator`} --print-out-paths --impure --accept-flake-config --no-link`;
     const out2 = readLastOutPath(res2.stdout);
     const log2 = await fs.readFile(path.join(out2, "build.log"), "utf8").catch(() => "");
     if (log2.includes("[planner] dev overrides present:")) {

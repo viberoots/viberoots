@@ -4,13 +4,14 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  binWrapper,
   escapeRegExp,
   makeFakeAgentTools,
   repoRoot,
   scratchRoot,
 } from "./agent-wrapper-test-helpers.ts";
 
-const wrapper = path.join(repoRoot, "build-tools", "tools", "bin", "claude");
+const wrapper = binWrapper("claude");
 const makeFakeTools = (tmp: string, gitRoot: string) => makeFakeAgentTools(tmp, gitRoot, "claude");
 test("claude --remove-all-worktrees removes every valid named worktree", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });

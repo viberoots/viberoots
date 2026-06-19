@@ -16,7 +16,7 @@ test("append_patch_inputs appends patch globs into requested field (probe)", asy
     await fsp.writeFile(
       path.join(pkgDir, "TARGETS"),
       [
-        'load("//build-tools/lang:defs_common.bzl", "patch_inputs_probe")',
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "patch_inputs_probe")',
         "",
         "patch_inputs_probe(",
         '  name = "probe_srcs",',

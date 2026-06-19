@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import { test } from "node:test";
 import { extractCloudflarePagesDeployments } from "../../deployments/contract";
+import { viberootsRepoPath } from "./deployment-command";
 import {
   cloudflareDeployment,
   cloudflareNodes,
@@ -17,7 +18,7 @@ test("deployment authoring macros forward deployment_context across provider fam
     "build-tools/deployments/s3_defs.bzl",
     "build-tools/deployments/vercel_defs.bzl",
   ]) {
-    const text = await fs.readFile(file, "utf8");
+    const text = await fs.readFile(viberootsRepoPath(file), "utf8");
     assert.match(text, /deployment_context = ""/);
     assert.match(text, /deployment_context = deployment_context/);
   }

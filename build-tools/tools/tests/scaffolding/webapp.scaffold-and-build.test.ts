@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { exists, runInTemp } from "../lib/test-helpers";
+import { exists, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
@@ -16,7 +16,8 @@ const TEST_TIMEOUT_MS =
 test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }, async () => {
   const prevRoots = process.env.TEST_RSYNC_ROOTS;
   if (!prevRoots) {
-    process.env.TEST_RSYNC_ROOTS = "build-tools toolchains third_party/providers prelude patches";
+    process.env.TEST_RSYNC_ROOTS =
+      "viberoots/build-tools toolchains third_party/providers prelude patches";
   }
   try {
     await runInTemp("node-webapp-scaffold-build", async (tmp, _$) => {
@@ -26,7 +27,7 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
       await $({
         cwd: path.join(tmp, "projects", "apps", "demo-web"),
         env: { ...process.env },
-      })`zx-wrapper ../../../build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
+      })`zx-wrapper ../../../viberoots/build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
       // Stage scaffold outputs and the exact glue files used by flake evaluation, while
       // avoiding node_modules and other large transient trees under the importer.
       await stageTempRepoPaths({
@@ -68,7 +69,7 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
         const cmd = [
           "set -euo pipefail;",
           "nix build",
-          `"${tmp}#node-webapp.${sanitized}"`,
+          `"path:${await workspaceFlakeRef(tmp)}#node-webapp.${sanitized}"`,
           '--impure --no-link --accept-flake-config --builders "" --print-build-logs',
           mj && mj !== "0" ? `--max-jobs ${mj}` : "",
           cr && cr !== "0" ? `--option cores ${cr}` : "",

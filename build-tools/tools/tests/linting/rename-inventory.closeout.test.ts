@@ -59,7 +59,7 @@ test("docs/rename-inventory.md is deleted at rename closeout", async () => {
     !exists,
     "docs/rename-inventory.md must be deleted at rename closeout. " +
       "Resolve all inventory entries: either rename/remove the stale identifier " +
-      "or add a narrow allowlist entry to build-tools/tools/dev/stale-names-lint.ts " +
+      "or add a narrow allowlist entry to viberoots/build-tools/tools/dev/stale-names-lint.ts " +
       "(ALLOWED_PATHS / PLAN_NUMBER_SKIP_PATHS / ALLOWED_PREFIXES) with a reviewed reason. " +
       "Long-term exceptions belong in enforcement allowlists, not a migration database.",
   );
@@ -77,7 +77,7 @@ test("docs/rename-inventory.json is deleted at rename closeout", async () => {
     !exists,
     "docs/rename-inventory.json must be deleted at rename closeout. " +
       "Resolve all inventory entries: either rename/remove the stale identifier " +
-      "or add a narrow allowlist entry to build-tools/tools/dev/stale-names-lint.ts " +
+      "or add a narrow allowlist entry to viberoots/build-tools/tools/dev/stale-names-lint.ts " +
       "(ALLOWED_PATHS / PLAN_NUMBER_SKIP_PATHS / ALLOWED_PREFIXES) with a reviewed reason.",
   );
 });

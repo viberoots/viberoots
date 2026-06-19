@@ -41,14 +41,18 @@ EOF
     `}`;
     // Outputs
     await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
-    await fsp.writeFile(path.join(tmp, "build-tools", "tools", "buck", "graph.json"), "[]", "utf8");
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "node-lock-index.json"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
+      "[]",
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(tmp, ".viberoots", "workspace", "buck", "node-lock-index.json"),
       "{}\n",
       "utf8",
     );
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "invalidation-report.txt"),
+      path.join(tmp, ".viberoots", "workspace", "buck", "invalidation-report.txt"),
       "# invalidation-report\n",
       "utf8",
     );
@@ -68,7 +72,7 @@ EOF
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts --json --verbose-limit 1`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts --json --verbose-limit 1`;
     const txt = String(stdout || "");
     const first = txt.indexOf("{");
     const last = txt.lastIndexOf("}");

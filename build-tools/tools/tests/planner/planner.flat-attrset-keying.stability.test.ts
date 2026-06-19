@@ -10,7 +10,7 @@ test("planner flat attrset keying (cppTargetsFlat) stays stable", async () => {
   await runInTemp("planner-flat-attrset-keying", async (tmp, $) => {
     const graph = [
       {
-        name: "root//projects/apps/foo:My Bin (config//toolchains:default#buck2/default//:default#linkerbuild-tools/lang/cxx)",
+        name: "root//projects/apps/foo:My Bin (config//toolchains:default#buck2/default//:default#linkerviberoots/build-tools/lang/cxx)",
         rule_type: "cxx_binary",
         labels: ["lang:cpp"],
       },
@@ -25,7 +25,7 @@ test("planner flat attrset keying (cppTargetsFlat) stays stable", async () => {
         labels: ["lang:cpp"],
       },
     ];
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, ".viberoots", "workspace", "buck"), { recursive: true });
     await fsp.writeFile(
       path.join(tmp, ".viberoots/workspace/buck/graph.json"),
       JSON.stringify(graph) + "\n",
@@ -37,7 +37,7 @@ test("planner flat attrset keying (cppTargetsFlat) stays stable", async () => {
     const expr = `
       let
         pkgs = import <nixpkgs> {};
-        G = import ./build-tools/tools/nix/graph-generator.nix {
+        G = import ./viberoots/build-tools/tools/nix/graph-generator.nix {
           inherit pkgs;
           src = ./.;
           graphJsonPath = ./.viberoots/workspace/buck/graph.json;

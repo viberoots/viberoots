@@ -17,13 +17,13 @@ test("stamping-lint flags go_* targets missing lang:go", async () => {
     await fs.outputFile(path.join(tmp, "pkg/demo/demo.go"), "package demo\n\nfunc X(){}\n");
     // Copy lint script
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/dev/stamping-lint.ts"),
-      path.join(tmp, "build-tools/tools/dev/stamping-lint.ts"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/dev/stamping-lint.ts"),
+      path.join(tmp, "viberoots/build-tools/tools/dev/stamping-lint.ts"),
     );
     const res = await $({
       cwd: tmp,
       env: { ...process.env },
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/dev/stamping-lint.ts`.nothrow();
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/dev/stamping-lint.ts`.nothrow();
     const out = String(res.stdout || "") + String(res.stderr || "");
     assert.notEqual(res.exitCode, 0);
     assert.match(out, /missing label lang:go/);

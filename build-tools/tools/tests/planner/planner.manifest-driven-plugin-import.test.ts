@@ -15,21 +15,24 @@ test("planner imports plugins listed in langs.json when present", async () => {
         {
           id: "go",
           displayName: "Go",
-          requiredPaths: ["build-tools/tools/nix/templates/go.nix", "build-tools/go/defs.bzl"],
+          requiredPaths: [
+            "viberoots/build-tools/tools/nix/templates/go.nix",
+            "viberoots/build-tools/go/defs.bzl",
+          ],
           kinds: ["cli", "lib", "test"],
-          templatesDir: "build-tools/tools/scaffolding/templates/go",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/go",
         },
         {
           id: "toy",
           displayName: "Toy",
-          requiredPaths: ["build-tools/tools/nix/planner/toy.nix"],
+          requiredPaths: ["viberoots/build-tools/tools/nix/planner/toy.nix"],
           kinds: ["lib"],
-          templatesDir: "build-tools/tools/scaffolding/templates/toy",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/toy",
         },
       ],
     } as any;
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/nix/langs.json"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/langs.json"),
       JSON.stringify(langs, null, 2) + "\n",
     );
 
@@ -49,17 +52,20 @@ test("planner imports plugins listed in langs.json when present", async () => {
       "}",
       "",
     ].join("\n");
-    await fs.outputFile(path.join(tmp, "build-tools/tools/nix/planner/toy.nix"), toyPlugin);
+    await fs.outputFile(
+      path.join(tmp, "viberoots/build-tools/tools/nix/planner/toy.nix"),
+      toyPlugin,
+    );
 
     // Minimal graph.json (empty) so planner evaluates without needing Buck
     await fs.outputFile(path.join(tmp, DEFAULT_GRAPH_PATH), "[]\n");
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`git add build-tools/tools/nix/langs.json build-tools/tools/nix/planner/toy.nix .viberoots/workspace/buck/graph.json`;
+    })`git add viberoots/build-tools/tools/nix/langs.json viberoots/build-tools/tools/nix/planner/toy.nix .viberoots/workspace/buck/graph.json`;
 
     // Eval-only check against planner/langs.nix so we avoid graph-generator/full-flake work.
-    const manifestBase = JSON.stringify(path.join(tmp, "build-tools/tools/nix"));
+    const manifestBase = JSON.stringify(path.join(tmp, "viberoots/build-tools/tools/nix"));
     const expr = `
 let
   pkgs = import <nixpkgs> {};

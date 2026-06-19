@@ -12,24 +12,24 @@ test("cpp gtest include via nixpkg_deps at call site", async () => {
     await fs.outputFile(path.join(appDir, "src", "main.cpp"), "int main(){return 0;}\n");
     // Ensure C++ macros are available in the temp repo
     await fs.outputFile(
-      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
-      await fs.readFile("build-tools/cpp/defs.bzl", "utf8"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
+      await fs.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
     );
     await fs.outputFile(
-      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
-      await fs.readFile("build-tools/cpp/wasm_defs.bzl", "utf8"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
+      await fs.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
     );
     // Provide the Nix template used by the external runner
-    await fs.mkdirp(path.join(tmp, "build-tools/tools/nix/templates"));
+    await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/templates"));
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/templates/cpp.nix"),
-      path.join(tmp, "build-tools/tools/nix/templates/cpp.nix"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/nix/templates/cpp.nix"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/templates/cpp.nix"),
     );
     // Provide the cpp planner plugin so graph-generator sees C++ targets
-    await fs.mkdirp(path.join(tmp, "build-tools/tools/nix/planner"));
+    await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/planner"));
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/planner/cpp.nix"),
-      path.join(tmp, "build-tools/tools/nix/planner/cpp.nix"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/nix/planner/cpp.nix"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix"),
     );
     // Enable cpp via manifest so planner picks it deterministically
     await fs.mkdirp(path.join(tmp, "build-tools/tools/nix"));
@@ -39,16 +39,16 @@ test("cpp gtest include via nixpkg_deps at call site", async () => {
           id: "cpp",
           displayName: "C++",
           requiredPaths: [
-            "build-tools/tools/nix/planner/cpp.nix",
-            "build-tools/tools/nix/templates/cpp.nix",
+            "viberoots/build-tools/tools/nix/planner/cpp.nix",
+            "viberoots/build-tools/tools/nix/templates/cpp.nix",
           ],
           kinds: ["bin", "lib", "test"],
-          templatesDir: "build-tools/tools/scaffolding/templates/cpp",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/cpp",
         },
       ],
     } as any;
     await fs.writeFile(
-      path.join(tmp, "build-tools/tools/nix/langs.json"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/langs.json"),
       JSON.stringify(langs, null, 2) + "\n",
       "utf8",
     );
@@ -56,7 +56,7 @@ test("cpp gtest include via nixpkg_deps at call site", async () => {
       path.join(appDir, "tests", "demo_gtest.cpp"),
       `#include <gtest/gtest.h>\n\nTEST(Demo, Smoke) { EXPECT_EQ(1,1); }\n`,
     );
-    const targets = `load("//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
+    const targets = `load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary", "nix_cpp_test")
 
 nix_cpp_binary(
     name = "demo",

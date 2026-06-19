@@ -7,7 +7,7 @@ import { promisify } from "node:util";
 const execFile = promisify(execFileCallback);
 
 test("json-prompt-lib: help subcommand prints usage without requiring stdin", async () => {
-  const { stdout } = await execFile("build-tools/tools/bin/json-prompt", ["help"], {
+  const { stdout } = await execFile("viberoots/build-tools/tools/bin/json-prompt", ["help"], {
     cwd: process.cwd(),
     env: process.env,
   });
@@ -20,7 +20,7 @@ test("json-prompt-lib: help subcommand prints usage without requiring stdin", as
 
 test("json-prompt-lib: reserved help flags do not trigger usage output at the CLI", async () => {
   const { stdout } = await execFile(
-    "build-tools/tools/bin/json-prompt",
+    "viberoots/build-tools/tools/bin/json-prompt",
     [
       '{"help":"Detailed help text","h":"Short help text"}',
       "--rules",

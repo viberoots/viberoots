@@ -4,7 +4,10 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("cpp emscripten template seeds EM_CACHE from a reusable derivation", async () => {
-  const txt = await fsp.readFile("build-tools/tools/nix/templates/cpp-emscripten-lib.nix", "utf8");
+  const txt = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/templates/cpp-emscripten-lib.nix",
+    "utf8",
+  );
 
   assert.ok(
     txt.includes('emscriptenCacheSeed = pkgs.runCommand "emscripten-cache-seed-'),

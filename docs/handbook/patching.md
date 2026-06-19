@@ -24,7 +24,7 @@ This section is a quick index of “don’t re-implement this” utilities. Most
     - `#.` is allowed only for repo-root lockfiles (example: `lockfile:pnpm-lock.yaml#.`).
     - For non-root lockfiles, `<importer>` must equal the directory that contains `<path>` (example: `lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web`).
   - Supported importer labels: defined by the single contract artifact `build-tools/tools/lib/importer-roots.json` (rendered to Starlark as `build-tools/lang/importer_roots.bzl`). Any other importer label fails early during macro evaluation with deterministic error text.
-  - To support additional importer roots, update **only** `build-tools/tools/lib/importer-roots.json`, then run glue generation (for example `i` or `node build-tools/tools/buck/glue-pipeline.ts`) so `build-tools/lang/importer_roots.bzl` is regenerated. The parity/enforcement tests will fail if the generated view is stale.
+  - To support additional importer roots, update **only** `build-tools/tools/lib/importer-roots.json`, then run glue generation (for example `i` or `node viberoots/build-tools/tools/buck/glue-pipeline.ts`) so `build-tools/lang/importer_roots.bzl` is regenerated. The parity/enforcement tests will fail if the generated view is stale.
 - Patch inputs are attached through `//build-tools/lang:patch_inputs.bzl` helpers. When a rule does not support `srcs`, call sites must choose a supported input attribute explicitly using `into = "<attr>"` or carry patch inputs via a small helper target.
   - For importer-scoped ecosystems (Node, Python), macro wiring is standardized via the unified helper surface re-exported from `//build-tools/lang:defs_common.bzl`:
     - `prepare_language_wiring(...)` with `wiring = "genrule"` for genrule-style wrappers (handles list vs dict `srcs`)
@@ -35,24 +35,24 @@ This section is a quick index of “don’t re-implement this” utilities. Most
 
 ## Workflow
 
-- Start: `build-tools/tools/bin/patch-pkg start go <importPath>`
+- Start: `patch-pkg start go <importPath>`
   - Creates a writable workspace over the Nix store source for the module.
   - macOS uses APFS CoW (`cp -cR`) when available; otherwise falls back to `cp -a`. Other platforms use `cp -a`.
   - Writes/updates the Go dev override env var (as defined by `build-tools/tools/lib/dev-override-envs.json`; currently `NIX_GO_DEV_OVERRIDE_JSON`) for the current `module@version` key (local-only dev override).
   - Optional: pass `--echo-snippet` to print `export NIX_GO_DEV_OVERRIDE_JSON='{\"<module@version>\":\"<abs/path>\"}'` to stderr (parity with C++), instead of setting the env var in-process. Tooling derives the env var name from the manifest.
   - If `PATCH_EDITOR` is set, launches it with the workspace.
 
-- Apply: `build-tools/tools/bin/patch-pkg apply go <importPath> [--target //<pkg>:name | --patch-dir <dir>]`
+- Apply: `patch-pkg apply go <importPath> [--target //<pkg>:name | --patch-dir <dir>]`
   - Produces a unified diff into the canonical filename under the target’s package‑local `patches/go/` directory (or into the directory passed via `--patch-dir`).
   - Clears dev overrides and ends the session. The workspace is left on disk for inspection; use `reset` to delete it.
   - No glue steps are required for Go; Buck invalidates via patch files in `srcs`. (Node still runs glue; see below.)
 
-- Reset: `build-tools/tools/bin/patch-pkg reset go <importPath>`
+- Reset: `patch-pkg reset go <importPath>`
   - Abandons changes, clears dev overrides, deletes the workspace.
 
-- Session: `build-tools/tools/bin/patch-pkg session go <importPath>` (Ctrl-D=apply, Ctrl-C=reset)
+- Session: `patch-pkg session go <importPath>` (Ctrl-D=apply, Ctrl-C=reset)
   - Interactive session that ends by applying or resetting.
-  - Node parity: `build-tools/tools/bin/patch-pkg session node <pkg>` uses identical Ctrl‑D/Ctrl‑C semantics.
+  - Node parity: `patch-pkg session node <pkg>` uses identical Ctrl‑D/Ctrl‑C semantics.
 
 ## Canonical filenames
 
@@ -121,26 +121,26 @@ Provider patch inclusion policy (Node vs Python):
 
 If you are unsure why a patch edit did or did not invalidate something, start with the two canonical diagnostics:
 
-- `node build-tools/tools/buck/prebuild-guard.ts` prints one-liners that explain the invalidation surface using the contract vocabulary:
+- `node viberoots/build-tools/tools/buck/prebuild-guard.ts` prints one-liners that explain the invalidation surface using the contract vocabulary:
   - `patch_scope:importer-local`: invalidation is driven by macro action inputs under `<importer>/patches/<lang>`.
   - `patch_scope:package-local`: invalidation is driven by `<pkg>/patches/<lang>` included as action inputs.
-- `node build-tools/tools/buck/gen-provider-index.ts` emits `third_party/providers/provider_index.json`, which maps provider targets to origin keys and includes additive patch-model metadata (`patch_scope`, `languages`, and where patch inputs are expected).
+- `node viberoots/build-tools/tools/buck/gen-provider-index.ts` emits `.viberoots/workspace/providers/provider_index.json`, which maps provider targets to origin keys and includes additive patch-model metadata (`patch_scope`, `languages`, and where patch inputs are expected).
 
 ## Glue regeneration
 
 Node and Python only (Go/C++ don’t require glue for patch invalidation). Local glue is not committed. Regenerate after apply or on-demand:
 
-- Export graph: `node build-tools/tools/buck/export-graph.ts --out build-tools/tools/buck/graph.json`
-- Sync providers: `node build-tools/tools/buck/sync-providers.ts`
-- Generate provider index (and Node lockfile sidecar for Node): `node build-tools/tools/buck/gen-provider-index.ts`
-  - Emits `third_party/providers/provider_index.bzl` and `build-tools/tools/buck/node-lock-index.json` (Node only)
-- Generate auto_map: `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
+- Export graph: `node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`
+- Sync providers: `node viberoots/build-tools/tools/buck/sync-providers.ts`
+- Generate provider index (and Node lockfile sidecar for Node): `node viberoots/build-tools/tools/buck/gen-provider-index.ts`
+  - Emits `.viberoots/workspace/providers/provider_index.bzl` and `.viberoots/workspace/buck/node-lock-index.json` (Node only)
+- Generate auto_map: `node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
 
-Running `node build-tools/tools/dev/install-deps.ts` in the dev shell runs the full sequence automatically. CI runs the same as separate stages.
+Running `i` in the dev shell runs the full sequence automatically. CI runs the same as separate stages.
 
 ### `BUCK_TARGET` behavior in `ensureGraph()`
 
-Some tooling flows set `BUCK_TARGET` (for example `build-tools/tools/dev/build-selected.ts` and the `graph-generator-selected` Nix entrypoint). When `BUCK_TARGET` is set, `ensureGraph()` treats `build-tools/tools/buck/graph.json` as valid only if the exported graph already contains that target after normalization (drop cell prefixes and config suffixes).
+Some tooling flows set `BUCK_TARGET` (for example `viberoots/build-tools/tools/dev/build-selected.ts` and the `graph-generator-selected` Nix entrypoint). When `BUCK_TARGET` is set, `ensureGraph()` treats `.viberoots/workspace/buck/graph.json` as valid only if the exported graph already contains that target after normalization (drop cell prefixes and config suffixes).
 
 If the existing graph is missing the requested target, `ensureGraph()` regenerates the graph before continuing. This keeps target-scoped tooling reliable in temp workspaces and partial clones where the graph may have been generated with a narrower query.
 
@@ -152,15 +152,15 @@ For Node only, `readNodeProviderIndexEntries()` returns an empty list when the Y
 
 ## Composite Graph API (tools reference)
 
-When building glue or diagnostics, consume the Composite Graph rather than reading `build-tools/tools/buck/graph.json` directly. This keeps behavior consistent and lets tools benefit from sidecar indexes when present.
+When building glue or diagnostics, consume the Composite Graph rather than reading `.viberoots/workspace/buck/graph.json` directly. This keeps behavior consistent and lets tools benefit from sidecar indexes when present.
 
 - Library: `build-tools/tools/lib/graph-view.ts` provides `readCompositeGraph({ graphPath?, providerIndexPath?, nodeLockIndexPath? })`.
-- CLI: `node build-tools/tools/buck/graph-view.ts` prints the composite view as JSON for quick inspection.
+- CLI: `node viberoots/build-tools/tools/buck/graph-view.ts` prints the composite view as JSON for quick inspection.
 
 Example:
 
 ```bash
-node build-tools/tools/buck/graph-view.ts --graph build-tools/tools/buck/graph.json
+node viberoots/build-tools/tools/buck/graph-view.ts --graph .viberoots/workspace/buck/graph.json
 ```
 
 If a sidecar is missing, the Composite Graph API returns an empty object for that index and continues.
@@ -183,19 +183,19 @@ In addition, CI enforces patch directory invariants for Go/C++ local patch direc
 Locally, run advisory mode:
 
 ```
-node build-tools/tools/dev/patches-lint.ts --lang go
+node viberoots/build-tools/tools/dev/patches-lint.ts --lang go
 ```
 
 In CI, strict mode runs and exits nonzero on violations:
 
 ```
-node build-tools/tools/ci/run-stage.ts --stage patches-lint
+node viberoots/build-tools/tools/ci/run-stage.ts --stage patches-lint
 ```
 
 Python (uv) importer‑local patches use the same linter. To scope checks locally:
 
 ```
-node build-tools/tools/dev/patches-lint.ts --lang python
+node viberoots/build-tools/tools/dev/patches-lint.ts --lang python
 ```
 
 ## Python (uv) — importer‑local patches and invalidation
@@ -264,7 +264,7 @@ This example patches `golang.org/x/net` for a Go library target and places the p
 1. Start a patch session
 
 ```bash
-build-tools/tools/bin/patch-pkg start go golang.org/x/net
+patch-pkg start go golang.org/x/net
 # prints a writable workspace path; open it in your editor
 ```
 
@@ -274,10 +274,10 @@ build-tools/tools/bin/patch-pkg start go golang.org/x/net
 
 ```bash
 # Option A (recommended): point to the Buck target to derive <pkg>/patches/go
-build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //projects/libs/helper-lib:helper-lib
+patch-pkg apply go golang.org/x/net --target //projects/libs/helper-lib:helper-lib
 
 # Option B: specify the destination directory explicitly
-build-tools/tools/bin/patch-pkg apply go golang.org/x/net --patch-dir projects/libs/helper-lib/patches/go
+patch-pkg apply go golang.org/x/net --patch-dir projects/libs/helper-lib/patches/go
 ```
 
 The command writes a file like:
@@ -301,7 +301,7 @@ IMP=$(buck2 cquery 'testsof(rdeps(//..., //projects/libs/helper-lib:helper-lib))
 
 ```bash
 # Remove the patch file and rebuild; no glue required
-build-tools/tools/bin/patch-pkg remove go golang.org/x/net --target //projects/libs/helper-lib:helper-lib
+patch-pkg remove go golang.org/x/net --target //projects/libs/helper-lib:helper-lib
 ```
 
 Tips:
@@ -316,14 +316,14 @@ This example patches `lodash` for the `projects/apps/web` importer.
 1. Start a patch session
 
 ```bash
-build-tools/tools/bin/patch-pkg start node lodash --importer projects/apps/web
+patch-pkg start node lodash --importer projects/apps/web
 # prints the pnpm patch workspace; open and edit
 ```
 
 2. Apply the patch and refresh glue
 
 ```bash
-build-tools/tools/bin/patch-pkg apply node lodash --importer projects/apps/web
+patch-pkg apply node lodash --importer projects/apps/web
 # This runs pnpm patch-commit, then:
 #   - build-tools/tools/buck/sync-providers.ts
 #   - build-tools/tools/buck/gen-auto-map.ts
@@ -332,7 +332,7 @@ build-tools/tools/bin/patch-pkg apply node lodash --importer projects/apps/web
 2b. Check transitive required patch coverage (read-only by default)
 
 ```bash
-build-tools/tools/bin/patch-pkg sync-required node --importer projects/apps/web
+patch-pkg sync-required node --importer projects/apps/web
 ```
 
 - The check resolves transitive Node patch requirements from local library deps.
@@ -344,7 +344,7 @@ build-tools/tools/bin/patch-pkg sync-required node --importer projects/apps/web
 - Optional placeholder generation is explicit only:
 
 ```bash
-build-tools/tools/bin/patch-pkg sync-required node --importer projects/apps/web --write-placeholders
+patch-pkg sync-required node --importer projects/apps/web --write-placeholders
 ```
 
 A patch file appears under:
@@ -363,7 +363,7 @@ buck2 test  //projects/apps/web:tests   # or your repo’s Node test targets
 4. Remove or iterate
 
 ```bash
-build-tools/tools/bin/patch-pkg remove node lodash --importer projects/apps/web
+patch-pkg remove node lodash --importer projects/apps/web
 # Provider sync and auto_map will regenerate automatically
 ```
 
@@ -390,13 +390,13 @@ Example:
 
 ```bash
 # Start a patch session (pick importer by locating the nearest uv.lock)
-build-tools/tools/bin/patch-pkg start python requests --importer projects/apps/api
+patch-pkg start python requests --importer projects/apps/api
 
 # Apply with default destination (<importer>/patches/python)
-build-tools/tools/bin/patch-pkg apply python requests --importer projects/apps/api
+patch-pkg apply python requests --importer projects/apps/api
 
 # Or, override the destination directory explicitly
-build-tools/tools/bin/patch-pkg apply python requests --importer projects/apps/api --patch-dir projects/apps/api/patches/python
+patch-pkg apply python requests --importer projects/apps/api --patch-dir projects/apps/api/patches/python
 ```
 
 ### C++ — patching a nixpkgs dependency
@@ -406,7 +406,7 @@ This example patches a nixpkgs package (e.g., `pkgs.zlib`) and writes a package�
 1. Start a patch session
 
 ```bash
-build-tools/tools/bin/patch-pkg start cpp pkgs.zlib
+patch-pkg start cpp pkgs.zlib
 # prints a writable workspace containing the zlib sources; open and edit
 # By default this sets a process-local C++ dev override env var (as defined by `build-tools/tools/lib/dev-override-envs.json`; currently `NIX_CPP_DEV_OVERRIDE_JSON`) for the selected attr.
 # Pass --echo-snippet if you prefer to export the override in your shell manually.
@@ -416,10 +416,10 @@ build-tools/tools/bin/patch-pkg start cpp pkgs.zlib
 
 ```bash
 # Option A: derive destination from a Buck target’s package
-build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib --target //projects/libs/cppdemo:lib
+patch-pkg apply cpp pkgs.zlib --target //projects/libs/cppdemo:lib
 
 # Option B: specify the destination directory explicitly
-build-tools/tools/bin/patch-pkg apply cpp pkgs.zlib --patch-dir projects/libs/cppdemo/patches/cpp
+patch-pkg apply cpp pkgs.zlib --patch-dir projects/libs/cppdemo/patches/cpp
 ```
 
 3. Build and verify
@@ -431,7 +431,7 @@ buck2 build //projects/libs/cppdemo:lib
 4. Remove or iterate
 
 ```bash
-build-tools/tools/bin/patch-pkg remove cpp pkgs.zlib --target //projects/libs/cppdemo:lib
+patch-pkg remove cpp pkgs.zlib --target //projects/libs/cppdemo:lib
 ```
 
 Notes:

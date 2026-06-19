@@ -15,6 +15,6 @@ test("providers.ts is the canonical API surface for provider naming helpers", as
 });
 
 test("provider-names.ts does not import providers.ts (no providers.ts ↔ provider-names.ts cycle)", async () => {
-  const src = await readFile("build-tools/tools/lib/provider-names.ts", "utf8");
+  const src = await readFile("viberoots/build-tools/tools/lib/provider-names.ts", "utf8");
   assert.ok(!/from\s+["']\.\/providers\.ts["']/.test(src));
 });

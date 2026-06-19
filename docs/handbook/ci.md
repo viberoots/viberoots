@@ -2,7 +2,7 @@
 
 CI runs zx-backed stages and does not commit generated glue.
 
-## Stages (via build-tools/tools/ci/run-stage.ts)
+## Stages (via viberoots/build-tools/tools/ci/run-stage.ts)
 
 1. `export-graph`
 2. `sync-providers` (unified orchestrator; per-language drivers run conditionally)
@@ -13,7 +13,7 @@ CI runs zx-backed stages and does not commit generated glue.
 7. `buck-test`
 8. `cpp-addon-smoke`
 
-Run locally with `CI=true build-tools/tools/ci/run-stage.ts --stage <name>`.
+Run locally with `CI=true node viberoots/build-tools/tools/ci/run-stage.ts --stage <name>`.
 
 CI and local wrappers use the same default Nix cache policy as developer commands:
 `VBR_NIX_CACHE_POLICY=auto` probes configured HTTP(S) substituters, disables unreachable configured
@@ -23,8 +23,8 @@ behavior; use `VBR_NIX_CACHE_POLICY=off` only to skip the dynamic probe.
 
 ## What each stage does (simple)
 
-- **export-graph**: Freeze the configured Buck graph to `build-tools/tools/buck/graph.json` so other steps read a stable view.
-- **sync-providers**: Unified orchestrator regenerates language providers and `third_party/providers/nix_attr_map.bzl` deterministically (Node is skipped when no PNPM lockfiles are present).
+- **export-graph**: Freeze the configured Buck graph to `.viberoots/workspace/buck/graph.json` so other steps read a stable view.
+- **sync-providers**: Unified orchestrator regenerates language providers and `.viberoots/workspace/providers/nix_attr_map.bzl` deterministically (Node is skipped when no PNPM lockfiles are present).
   - Provider naming is canonical and shared across languages via `build-tools/tools/lib/providers.ts`. Do not handcraft provider labels in docs or examples; prefer helpers: `providerNameForModuleKey`, `providerNameForImporter`.
 - **gen-auto-map**: Map targets → providers based on labels in the exported graph; keeps invalidation tight.
 - **prebuild-guard**: Ensure glue exists and is fresh. Locally it can auto‑fix; CI fails fast with clear errors.

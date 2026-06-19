@@ -26,6 +26,37 @@ function remoteBashCommand(script: string): string {
   return `bash -lc ${shSingleQuote(script)}`;
 }
 
+function remoteToolBinSetup(opts: {
+  repoExpr: string;
+  varName: string;
+  relativePath: string;
+  description: string;
+}): string[] {
+  return [
+    `${opts.varName}=""`,
+    `for candidate in ${opts.repoExpr}/${opts.relativePath} ${opts.repoExpr}/viberoots/${opts.relativePath} ${opts.repoExpr}/.viberoots/current/${opts.relativePath}; do if [ -e "$candidate" ]; then ${opts.varName}="$candidate"; break; fi; done`,
+    `if [ -z "$${opts.varName}" ]; then echo "reviewed remote repo checkout is unusable (missing active viberoots ${opts.description}): $repo" >&2; exit 1; fi`,
+  ];
+}
+
+function remoteDeployBinSetup(repoExpr: string): string[] {
+  return remoteToolBinSetup({
+    repoExpr,
+    varName: "deploy_bin",
+    relativePath: "build-tools/tools/bin/deploy",
+    description: "deploy tool",
+  });
+}
+
+function remoteHostApplyBinSetup(repoExpr: string): string[] {
+  return remoteToolBinSetup({
+    repoExpr,
+    varName: "host_apply_bin",
+    relativePath: "build-tools/tools/deployments/nixos-shared-host-host-apply.ts",
+    description: "host apply tool",
+  });
+}
+
 export function buildRemoteSshArgv(destination: string, script: string): string[] {
   return [...buildReviewedRemoteSshArgvPrefix(process.env), destination, remoteBashCommand(script)];
 }
@@ -82,8 +113,8 @@ export function buildRemoteRepoPreflightScript(plan: NixosSharedHostRemotePlan):
     "set -euo pipefail",
     `repo=${repo}`,
     'if [ ! -d "$repo" ]; then echo "missing reviewed remote repo checkout: $repo" >&2; exit 1; fi',
-    'if [ ! -f "$repo/flake.nix" ]; then echo "reviewed remote repo checkout is unusable (missing flake.nix): $repo" >&2; exit 1; fi',
-    'if [ ! -x "$repo/build-tools/tools/bin/deploy" ]; then echo "reviewed remote repo checkout is unusable (missing build-tools/tools/bin/deploy): $repo" >&2; exit 1; fi',
+    'if [ ! -f "$repo/.viberoots/workspace/flake.nix" ] && [ ! -f "$repo/flake.nix" ]; then echo "reviewed remote repo checkout is unusable (missing workspace flake): $repo" >&2; exit 1; fi',
+    ...remoteDeployBinSetup('"$repo"'),
   ].join("; ");
 }
 
@@ -153,9 +184,11 @@ export function buildRemoteDeployScript(opts: {
     : "";
   return [
     "set -euo pipefail",
+    `repo=${shSingleQuote(opts.plan.remoteRepoPath)}`,
+    ...remoteDeployBinSetup('"$repo"'),
     `cd ${shSingleQuote(opts.plan.remoteRepoPath)}`,
     ...admissionEvidenceSetup,
-    `exec direnv exec . build-tools/tools/bin/deploy ${commandArgs(args)}${admissionEvidenceArg}`,
+    `exec direnv exec . "$deploy_bin" ${commandArgs(args)}${admissionEvidenceArg}`,
   ].join("; ");
 }
 
@@ -180,8 +213,10 @@ export function buildRemoteHostApplyScriptWithOptions(
     .join(" ");
   return [
     "set -euo pipefail",
+    `repo=${shSingleQuote(plan.remoteRepoPath)}`,
+    ...remoteHostApplyBinSetup('"$repo"'),
     `cd ${shSingleQuote(plan.remoteRepoPath)}`,
-    `exec direnv exec . zx-wrapper build-tools/tools/deployments/nixos-shared-host-host-apply.ts ${suffix}`,
+    `exec direnv exec . zx-wrapper "$host_apply_bin" ${suffix}`,
   ].join("; ");
 }
 
@@ -209,8 +244,10 @@ export function buildRemoteDeployAdminKeycloakSyncScript(opts: {
     .join(" ");
   return [
     "set -euo pipefail",
+    `repo=${shSingleQuote(opts.plan.remoteRepoPath)}`,
+    ...remoteDeployBinSetup('"$repo"'),
     `cd ${shSingleQuote(opts.plan.remoteRepoPath)}`,
-    `exec direnv exec . build-tools/tools/bin/deploy admin identity sync ${suffix}`,
+    `exec direnv exec . "$deploy_bin" admin identity sync ${suffix}`,
   ].join("; ");
 }
 
@@ -242,7 +279,9 @@ export function buildRemoteDeployAdminKeycloakGrantUserScript(opts: {
     .join(" ");
   return [
     "set -euo pipefail",
+    `repo=${shSingleQuote(opts.plan.remoteRepoPath)}`,
+    ...remoteDeployBinSetup('"$repo"'),
     `cd ${shSingleQuote(opts.plan.remoteRepoPath)}`,
-    `exec direnv exec . build-tools/tools/bin/deploy admin identity grant-user ${suffix}`,
+    `exec direnv exec . "$deploy_bin" admin identity grant-user ${suffix}`,
   ].join("; ");
 }

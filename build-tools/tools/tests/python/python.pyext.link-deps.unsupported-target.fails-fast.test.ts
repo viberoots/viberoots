@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("python: pyext link_deps rejects unsupported targets with a targeted error", async () => {
   await runInTemp("python-pyext-link-deps-unsupported", async (tmp, $) => {
@@ -61,7 +61,7 @@ test("python: pyext link_deps rejects unsupported targets with a targeted error"
     const binLabel = `//${relPosix}:app`;
     const badDep = `//${relPosix}:not_cpp`;
 
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fs.mkdirp(graphDir);
     await fs.writeFile(
       path.join(graphDir, "graph.json"),
@@ -113,7 +113,7 @@ test("python: pyext link_deps rejects unsupported targets with a targeted error"
         BUCK_TEST_SRC: tmp,
         BUCK_TARGET: binLabel,
       },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
 
     assert.notEqual(res.exitCode, 0, "expected nix build to fail");
     const stderr = String(res.stderr || "");

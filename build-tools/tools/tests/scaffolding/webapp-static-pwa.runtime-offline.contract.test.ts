@@ -28,7 +28,8 @@ test(
   async () => {
     const prevRoots = process.env.TEST_RSYNC_ROOTS;
     if (!prevRoots) {
-      process.env.TEST_RSYNC_ROOTS = "build-tools toolchains third_party/providers prelude patches";
+      process.env.TEST_RSYNC_ROOTS =
+        "viberoots/build-tools toolchains third_party/providers prelude patches";
     }
     try {
       await runInTemp("webapp-static-pwa-runtime-offline", async (tmp, _$) => {

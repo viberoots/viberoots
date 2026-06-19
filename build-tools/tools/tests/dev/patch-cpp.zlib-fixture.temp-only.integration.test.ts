@@ -4,6 +4,8 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 
+const VIBEROOTS_ROOT = path.join(process.cwd(), "viberoots");
+
 async function walk(dir: string, out: string[]): Promise<void> {
   const entries = await fsp.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
@@ -18,7 +20,7 @@ async function walk(dir: string, out: string[]): Promise<void> {
 }
 
 test("pkgs__zlib cpp patch references remain temp-scoped in tests", async () => {
-  const testsRoot = path.join("build-tools", "tools", "tests");
+  const testsRoot = path.join(VIBEROOTS_ROOT, "build-tools", "tools", "tests");
   const files: string[] = [];
   await walk(testsRoot, files);
 

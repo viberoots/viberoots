@@ -53,7 +53,7 @@ EOF'`;
       [
         "",
         "# test: go.macros.binary-auto-wired.pkg.includes-patch-scope.test.ts",
-        'load("//build-tools/go:defs.bzl", "nix_go_binary")',
+        'load("@viberoots//build-tools/go:defs.bzl", "nix_go_binary")',
         "",
         "nix_go_binary(",
         '  name = "demo",',

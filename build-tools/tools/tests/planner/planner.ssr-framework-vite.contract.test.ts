@@ -7,15 +7,15 @@ import { test } from "node:test";
 test("planner and runnable wiring include framework:vite for SSR", async () => {
   const root = process.cwd();
   const graphGenerator = await fsp.readFile(
-    path.join(root, "build-tools", "tools", "nix", "graph-generator.nix"),
+    path.join(root, "viberoots", "build-tools", "tools", "nix", "graph-generator.nix"),
     "utf8",
   );
   const nodePlanner = await fsp.readFile(
-    path.join(root, "build-tools", "tools", "nix", "planner", "node.nix"),
+    path.join(root, "viberoots", "build-tools", "tools", "nix", "planner", "node.nix"),
     "utf8",
   );
   const runnableHints = await fsp.readFile(
-    path.join(root, "build-tools", "tools", "dev", "run-runnable-core.ts"),
+    path.join(root, "viberoots", "build-tools", "tools", "dev", "run-runnable-core.ts"),
     "utf8",
   );
 

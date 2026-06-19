@@ -1,9 +1,8 @@
-import path from "node:path";
-import { pathExists, toFileUrl } from "./fs";
+import { pathExists, sourcePath, toFileUrl } from "./fs";
 
 export async function detectExporterAdapters(): Promise<string[]> {
   const adapters: string[] = [];
-  const contractPath = path.resolve("build-tools/tools/buck/exporter/lang/contract.ts");
+  const contractPath = await sourcePath("build-tools/tools/buck/exporter/lang/contract.ts");
 
   if (await pathExists(contractPath)) {
     try {

@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { LangEntry } from "./types";
-import { pathExists } from "./fs";
+import { pathExists, sourceRoot } from "./fs";
 import { findImporterLockfiles } from "../../lib/importers";
 
 export async function detectEnabledAndMissing(
@@ -15,7 +15,14 @@ export async function detectEnabledAndMissing(
   const disabled: Array<{ id: string; missingPaths: string[] }> = [];
 
   const prefer = (id: string) => (enabledPref.size === 0 ? true : enabledPref.has(id));
-  const existsAbs = async (rel: string) => pathExists(path.resolve(rel));
+  const root = await sourceRoot();
+  const existsAbs = async (rel: string) => {
+    if (path.isAbsolute(rel)) return pathExists(rel);
+    if (rel.startsWith("viberoots/")) {
+      return pathExists(path.join(path.dirname(root), rel));
+    }
+    return pathExists(path.join(root, rel));
+  };
 
   const requiredPathLooksLikeLockfileGlob = (r: string): "pnpm" | "uv" | null => {
     const s = String(r || "");

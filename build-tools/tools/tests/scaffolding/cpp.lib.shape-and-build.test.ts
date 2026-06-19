@@ -4,11 +4,12 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsTool } from "./lib/viberoots-tools";
 
 async function activeBuildToolsRoot(): Promise<string> {
-  const direct = path.join(process.cwd(), "build-tools");
+  const direct = path.join(process.cwd(), "viberoots", "build-tools");
   if (await fs.pathExists(direct)) return direct;
-  return path.join(process.cwd(), "viberoots", "build-tools");
+  return viberootsTool("build-tools");
 }
 
 test("cpp lib scaffold: files render and TARGETS wires gtest deps", async () => {
@@ -17,18 +18,18 @@ test("cpp lib scaffold: files render and TARGETS wires gtest deps", async () => 
     const buildTools = await activeBuildToolsRoot();
 
     // Ensure language is enabled by presence
-    await fs.ensureFile(path.join(tmp, "build-tools", "cpp", "defs.bzl"));
+    await fs.ensureFile(path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"));
     await fs.copy(
       path.join(buildTools, "cpp", "defs.bzl"),
-      path.join(tmp, "build-tools", "cpp", "defs.bzl"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
     );
     await fs.copy(
       path.join(buildTools, "cpp", "wasm_defs.bzl"),
-      path.join(tmp, "build-tools", "cpp", "wasm_defs.bzl"),
+      path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
     );
     await fs.copy(
       path.join(buildTools, "tools", "nix", "templates", "cpp.nix"),
-      path.join(tmp, "build-tools", "tools", "nix", "templates", "cpp.nix"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "nix", "templates", "cpp.nix"),
     );
     await fs.copy(
       path.join(buildTools, "tools", "scaffolding", "templates", "cpp", "lib"),

@@ -5,7 +5,7 @@ import { test } from "node:test";
 
 test("build consumers do not repair pnpm provisioning state", async () => {
   const nodeModulesBuild = await fsp.readFile(
-    "build-tools/tools/dev/node-modules-build.ts",
+    "viberoots/build-tools/tools/dev/node-modules-build.ts",
     "utf8",
   );
 
@@ -21,13 +21,26 @@ test("build consumers do not repair pnpm provisioning state", async () => {
   );
   assert.match(
     nodeModulesBuild,
-    /preparedExactStoreEnv\(relLock\)/,
+    /preparedExactStoreEnv\(lockfileRel\)/,
     "node-modules-build.ts must consume exact stores already warmed by provisioning",
+  );
+  assert.match(
+    nodeModulesBuild,
+    /verifiedMarkerPath\(liveMarkerRepoRoot\(\), importer\)/,
+    "node-modules-build.ts must read verified markers from live repo state when running from a seed",
+  );
+  assert.match(
+    nodeModulesBuild,
+    /nix build .*--impure/,
+    "node-modules-build.ts must pass --impure so NIX_PNPM_EXACT_STORE reaches Nix",
   );
 });
 
 test("locked Nix pnpm build paths are offline-only", async () => {
-  const storeNix = await fsp.readFile("build-tools/tools/nix/node-modules/store.nix", "utf8");
+  const storeNix = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/node-modules/store.nix",
+    "utf8",
+  );
 
   assert.match(
     storeNix,
@@ -48,15 +61,15 @@ test("locked Nix pnpm build paths are offline-only", async () => {
 
 test("pnpm retry remains scoped to explicit provisioning code", async () => {
   const retrySource = await fsp.readFile(
-    "build-tools/tools/dev/update-pnpm-hash/pnpm-command-retry.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/pnpm-command-retry.ts",
     "utf8",
   );
   const importerLockfile = await fsp.readFile(
-    "build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts",
     "utf8",
   );
   const nodeModulesBuild = await fsp.readFile(
-    "build-tools/tools/dev/node-modules-build.ts",
+    "viberoots/build-tools/tools/dev/node-modules-build.ts",
     "utf8",
   );
 

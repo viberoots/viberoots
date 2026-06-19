@@ -18,7 +18,7 @@ test("sync-providers: ignores non-Node patches; generates Node header without er
     await fsp.writeFile(path.join(dir, "github.com__acme__widget@v1.2.3.patch"), "# two\n", "utf8");
     await $({
       stdio: "pipe",
-    })`node build-tools/tools/buck/sync-providers.ts --lang node`;
+    })`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node`;
     const txt = await fsp.readFile(path.join(tmp, providerAutoTargetsPath("node")), "utf8");
     if (!txt.includes("node_importer_deps")) {
       console.error("expected Node provider header in TARGETS.node.auto");

@@ -18,7 +18,7 @@ test("node macros: nix_node_gen stamps lang:node and kind:gen", async () => {
       [
         "",
         "# test: node.macros.stamp.labels.gen.test.ts",
-        'load("//build-tools/node:defs.bzl", "nix_node_gen")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_gen")',
         "",
         "nix_node_gen(",
         '  name = "stamp_probe",',

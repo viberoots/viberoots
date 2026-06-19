@@ -13,12 +13,12 @@ test("gen-auto-map: second run is a no-op when graph unchanged", async () => {
       JSON.stringify(nodes),
       "utf8",
     );
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
     const before = await fsp.readFile(
       path.join(tmp, ".viberoots", "workspace", "providers", "auto_map.bzl"),
       "utf8",
     );
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
     const after = await fsp.readFile(
       path.join(tmp, ".viberoots", "workspace", "providers", "auto_map.bzl"),
       "utf8",

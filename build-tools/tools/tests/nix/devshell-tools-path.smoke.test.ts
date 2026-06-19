@@ -1,24 +1,63 @@
 #!/usr/bin/env zx-wrapper
-import assert from "node:assert/strict";
+import fs from "node:fs";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
+import assert from "node:assert/strict";
+
+function consumerRoot(): string {
+  const candidates = [
+    process.env.WORKSPACE_ROOT || "",
+    process.cwd(),
+    path.dirname(process.cwd()),
+  ].filter(Boolean);
+  for (const candidate of candidates) {
+    const root = path.resolve(candidate);
+    if (fs.existsSync(path.join(root, "viberoots", "flake.nix"))) return root;
+  }
+  return process.cwd();
+}
 
 test("devshell exposes user-facing tools from Nix on PATH", async () => {
-  const script = `
-set -euo pipefail
-for bin in nix buck2 node pnpm go python3 uv jq rsync copier yq gomod2nix viberoots zx-wrapper; do
-  path="$(command -v "$bin")"
-  case "$path" in
-    /nix/store/*|"$PWD"/build-tools/tools/bin/*|"$PWD"/.direnv/bin/*|"$PWD"/node_modules/.bin/*) ;;
-    *) echo "$bin resolved outside Nix/devshell paths: $path" >&2; exit 1 ;;
-  esac
-done
-viberoots version --json >/dev/null
-`;
+  const root = consumerRoot();
+  const currentTarget = await fsp.readlink(path.join(root, ".viberoots", "current"));
+  assert.equal(currentTarget, "../viberoots");
+  assert.equal(
+    fs.existsSync(path.join(root, ".viberoots", "current", "prelude", "prelude.bzl")),
+    true,
+  );
+
   const result = await $({
+    cwd: root,
+    env: {
+      ...process.env,
+      WORKSPACE_ROOT: root,
+      VIBEROOTS_ROOT: "",
+      VIBEROOTS_SOURCE_ROOT: "",
+    },
     stdio: "pipe",
     reject: false,
     nothrow: true,
-  })`nix develop --accept-flake-config .#default -c bash --noprofile --norc -c ${script}`;
+  })`bash --noprofile --norc -c ${`
+set -euo pipefail
+ROOT="$PWD"
+for bin in nix buck2 node pnpm go python3 uv jq rsync copier yq gomod2nix viberoots zx-wrapper s v i b; do
+  path="$(command -v "$bin")"
+  case "$path" in
+    */buck-out/zx_shims/*/bin/buck2) if [ "$bin" = buck2 ]; then continue; fi ;;
+    /nix/store/*|"$PWD"/viberoots/build-tools/tools/bin/*|"$PWD"/.viberoots/current/build-tools/tools/bin/*|"$PWD"/.direnv/bin/*|"$PWD"/node_modules/.bin/*) ;;
+    *) echo "$bin resolved outside Nix/devshell paths: $path" >&2; exit 1 ;;
+  esac
+done
+cd projects
+for bin in s v i b; do
+  case "$(command -v "$bin")" in
+    "$ROOT"/viberoots/build-tools/tools/bin/"$bin"|"$ROOT"/.viberoots/current/build-tools/tools/bin/"$bin"|"$ROOT"/.direnv/bin/"$bin"|/nix/store/*/bin/"$bin") ;;
+    *) echo "$bin not available from projects via devshell path: $(command -v "$bin")" >&2; exit 1 ;;
+  esac
+done
+viberoots version --json >/dev/null
+`}`;
 
   assert.equal(
     result.exitCode,

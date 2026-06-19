@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -39,7 +40,7 @@ test("lane-governance verify command rejects source-ref drift and emits verified
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deployment-lane-governance-verify.ts --deployment ${deployment.label} --scm-policy-json ${validSnapshot}`;
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deployment-lane-governance-verify.ts")} --deployment ${deployment.label} --scm-policy-json ${validSnapshot}`;
     const verified = JSON.parse(String(result.stdout));
     assert.equal(verified.governanceRef, deployment.lanePolicy.governanceRef);
     assert.equal(verified.sourceRefPolicies[2].stage, "prod");
@@ -48,7 +49,7 @@ test("lane-governance verify command rejects source-ref drift and emits verified
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deployment-lane-governance-verify.ts --deployment ${deployment.label} --scm-policy-json ${invalidSnapshot}`,
+        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deployment-lane-governance-verify.ts")} --deployment ${deployment.label} --scm-policy-json ${invalidSnapshot}`,
       /missing required source-ref policy/,
     );
   });

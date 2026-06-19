@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-const scriptPath = "build-tools/tools/dev/nix-gaps-baseline.ts";
+const scriptPath = "viberoots/build-tools/tools/dev/nix-gaps-baseline.ts";
 
 test("nix-gaps baseline generator writes required sections", async () => {
   await runInTemp("nix-gaps-baseline", async (tmp, $) => {
@@ -14,7 +14,7 @@ test("nix-gaps baseline generator writes required sections", async () => {
     const outPath = path.join(tmp, "docs/handbook/nix-gaps-baseline.md");
     await $({
       cwd: tmp,
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs ${scriptPath} --mode fixture --out ${outPath}`;
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs ${scriptPath} --mode fixture --out ${outPath}`;
 
     const txt = await fs.readFile(outPath, "utf8");
     assert.match(txt, /# Nix gaps baseline/);

@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 // base-contract invalidation test: touching a non-app/lib file at repo root should NOT
 // change the app binary derivation (cache hit expected; store path unchanged).
@@ -47,12 +47,12 @@ test("planner: touching root-only file does not change app bin store path", asyn
     // Use app-local gomod2nix.toml (nearest ancestor resolution) to avoid broad root invalidations
 
     // Generate glue, then build graph-generator bundle
-    await $`build-tools/tools/dev/install-deps.ts --glue-only`;
+    await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
     const t1 = Date.now();
     const { stdout: outStd1 } = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`nix build --impure -L ${`path:${tmp}#graph-generator`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator`} --accept-flake-config --no-link --print-out-paths`;
     const outPath1 =
       String(outStd1 || "")
         .trim()
@@ -86,7 +86,7 @@ test("planner: touching root-only file does not change app bin store path", asyn
     const { stdout: outStd2 } = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`nix build --impure -L ${`path:${tmp}#graph-generator`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator`} --accept-flake-config --no-link --print-out-paths`;
     const outPath2 =
       String(outStd2 || "")
         .trim()

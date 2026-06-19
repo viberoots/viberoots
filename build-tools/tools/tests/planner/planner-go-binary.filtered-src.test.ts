@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 // This test verifies base-contract: planner uses filtered apps/libs source and still builds a bin
 // It creates a tiny Go app under apps/ in a temp repo, generates a simple gomod2nix.toml,
@@ -29,7 +29,7 @@ test("planner builds go_binary with filtered srcRoot", async () => {
     await fs.writeFile(path.join(appDir, "gomod2nix.toml"), "schema = 3\n\n[mod]\n", "utf8");
 
     // Minimal Buck graph with a go_binary target
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fs.mkdirp(graphDir);
     const node = {
       name: "//projects/apps/tcli:tcli",
@@ -55,7 +55,7 @@ test("planner builds go_binary with filtered srcRoot", async () => {
         BUCK_TEST_SRC: tmp,
         BUCK_GRAPH_JSON: path.join(graphDir, "graph.json"),
       },
-    })`nix build --impure ${`path:${tmp}#graph-generator`} --no-link --accept-flake-config --print-out-paths`;
+    })`nix build --impure ${`path:${await workspaceFlakeRef(tmp)}#graph-generator`} --no-link --accept-flake-config --print-out-paths`;
     const outPath =
       String(stdout || "")
         .trim()

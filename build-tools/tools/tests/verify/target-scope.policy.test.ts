@@ -10,5 +10,8 @@ test("non-build-system scope detection", () => {
     true,
   );
   assert.equal(isNonBuildSystemOnlyVerifyTargets(["//..."]), false);
-  assert.equal(isNonBuildSystemOnlyVerifyTargets(["//build-tools/tools/tests/..."]), false);
+  assert.equal(
+    isNonBuildSystemOnlyVerifyTargets(["@viberoots//build-tools/tools/tests/..."]),
+    false,
+  );
 });

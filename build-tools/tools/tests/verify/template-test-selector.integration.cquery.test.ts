@@ -36,8 +36,8 @@ async function queryTemplateLabelTargets(templateId: string): Promise<string[]> 
 test("selector output matches Buck template label query results", async () => {
   try {
     const changedPaths = [
-      "build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
-      "build-tools/tools/scaffolding/templates/ts/lib/copier.yaml",
+      "viberoots/build-tools/tools/scaffolding/templates/go/lib/copier.yaml",
+      "viberoots/build-tools/tools/scaffolding/templates/ts/lib/copier.yaml",
     ];
     const result = await resolveTemplateTestSelection({
       root: process.cwd(),

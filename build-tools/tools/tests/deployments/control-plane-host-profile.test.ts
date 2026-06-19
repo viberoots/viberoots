@@ -17,6 +17,7 @@ import {
 } from "./control-plane-container-smoke.helpers";
 import { buildImageTarball } from "./control-plane-oci-image.helpers";
 import { loadNixosDefaults, loadNixosRenderedConfig } from "./control-plane-host-profile.helpers";
+import { viberootsRepoPath } from "./deployment-command";
 import { runInTemp } from "../lib/test-helpers";
 const PROFILE_DIR = "build-tools/tools/deployments/control-plane-host-profile";
 const CONFIG_PATH = "/etc/deployment-control-plane/config.yaml";
@@ -40,7 +41,7 @@ type ComposeService = {
 };
 
 async function readProfileFile(name: string): Promise<string> {
-  return await fsp.readFile(path.join(process.cwd(), PROFILE_DIR, name), "utf8");
+  return await fsp.readFile(viberootsRepoPath(path.join(PROFILE_DIR, name)), "utf8");
 }
 
 async function readCompose(): Promise<Record<string, ComposeService>> {
@@ -163,7 +164,7 @@ test("direct Podman example preserves the same runtime contract", async () => {
 
 test("non-NixOS host profile docs preserve Docker and Podman boundaries", async () => {
   const doc = await fsp.readFile(
-    path.join(process.cwd(), "docs/control-plane-non-nixos-host-profile.md"),
+    viberootsRepoPath("docs/control-plane-non-nixos-host-profile.md"),
     "utf8",
   );
   assert.match(doc, /not a separate deployment authority/i);

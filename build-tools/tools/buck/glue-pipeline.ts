@@ -60,7 +60,10 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
   if (verbose) console.error(`[glue-pipeline] ensureGraph → ${graphPath}`);
   {
     const mod = await import("../patch/glue");
-    await mod.ensureGraph();
+    await mod.ensureGraph({
+      workspaceRoot: repoRoot,
+      target: process.env.BUCK_TARGET || "",
+    });
   }
 
   // Step 2: sync providers (all languages; language drivers are no-ops when inactive)

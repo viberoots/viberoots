@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { binWrapper } from "./agent-wrapper-test-helpers.ts";
 
 const repoRoot = process.cwd();
-const wrapper = path.join(repoRoot, "build-tools", "tools", "bin", "cd-worktree");
+const wrapper = binWrapper("cd-worktree");
 const scratchRoot = path.join(repoRoot, "buck-out", "tmp");
 
 async function writeExecutable(file: string, text: string): Promise<void> {

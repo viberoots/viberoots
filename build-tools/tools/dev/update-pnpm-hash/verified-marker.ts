@@ -19,21 +19,41 @@ export type SharedPnpmStoreHashCacheEntry = {
 };
 
 const pnpmStoreBuilderFingerprintFiles = [
-  "flake.lock",
-  "build-tools/tools/nix/flake/for-all-systems.nix",
-  "build-tools/tools/nix/flake/per-system-context.nix",
-  "build-tools/tools/nix/flake/packages/default.nix",
-  "build-tools/tools/nix/flake/packages/node-mods.nix",
-  "build-tools/tools/nix/node-modules.nix",
-  "build-tools/tools/nix/node-modules/common.nix",
-  "build-tools/tools/nix/node-modules/store.nix",
-  "build-tools/tools/nix/node-modules/modules.nix",
+  ".viberoots/workspace/flake.lock",
+  "viberoots/build-tools/tools/nix/flake/for-all-systems.nix",
+  "viberoots/build-tools/tools/nix/flake/per-system-context.nix",
+  "viberoots/build-tools/tools/nix/flake/packages/default.nix",
+  "viberoots/build-tools/tools/nix/flake/packages/node-mods.nix",
+  "viberoots/build-tools/tools/nix/node-modules.nix",
+  "viberoots/build-tools/tools/nix/node-modules/common.nix",
+  "viberoots/build-tools/tools/nix/node-modules/store.nix",
+  "viberoots/build-tools/tools/nix/node-modules/modules.nix",
 ] as const;
+
+async function readFingerprintFile(repoRoot: string, rel: string): Promise<string> {
+  const primary = path.join(repoRoot, rel);
+  try {
+    return await fsp.readFile(primary, "utf8");
+  } catch {}
+  if (rel.startsWith("viberoots/")) {
+    try {
+      return await fsp.readFile(path.join(repoRoot, rel.slice("viberoots/".length)), "utf8");
+    } catch {}
+  }
+  return "<missing>";
+}
 
 export function verifiedMarkerPath(repoRoot: string, importer: string): string {
   const key =
     importer === "." ? "root" : importer.replace(/[\\/]+/g, "-").replace(/[^A-Za-z0-9._-]/g, "-");
-  return path.join(repoRoot, "buck-out", "tmp", `pnpm-store-verified.${key}.json`);
+  return path.join(
+    repoRoot,
+    ".viberoots",
+    "workspace",
+    "buck",
+    "tmp",
+    `pnpm-store-verified.${key}.json`,
+  );
 }
 
 function sharedCacheRepoRoot(repoRoot: string): string {
@@ -51,8 +71,10 @@ function sharedHashCachePath(
 ): string {
   return path.join(
     sharedCacheRepoRoot(repoRoot),
-    "buck-out",
-    ".pnpm-store-hash-cache",
+    ".viberoots",
+    "workspace",
+    "buck",
+    "pnpm-store-hash-cache",
     builderFingerprint,
     `${lockHash}.json`,
   );
@@ -121,11 +143,7 @@ export async function currentVerifiedMarkerFingerprint(
   hash.update(`arch=${process.arch}\n`);
   for (const rel of pnpmStoreBuilderFingerprintFiles) {
     hash.update(`file=${rel}\n`);
-    try {
-      hash.update(await fsp.readFile(path.join(repoRoot, rel), "utf8"));
-    } catch {
-      hash.update("<missing>");
-    }
+    hash.update(await readFingerprintFile(repoRoot, rel));
     hash.update("\n");
   }
   const importerRoot = importer === "." ? "" : importer.replace(/\\/g, "/").replace(/\/+$/g, "");

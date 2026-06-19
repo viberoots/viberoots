@@ -11,6 +11,15 @@ process.env.TEST_NEED_DEV_ENV = "1";
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
+async function workspaceFlakeRef(root: string): Promise<string> {
+  const hidden = path.join(root, ".viberoots", "workspace", "flake.nix");
+  try {
+    await fsp.access(hidden);
+    return path.dirname(hidden);
+  } catch {}
+  return root;
+}
+
 test(
   "node cpp-addon: scaffold, build addon, and pass nix_node_test",
   { timeout: TEST_TIMEOUT_MS },
@@ -36,6 +45,7 @@ test(
         .replace(/:/g, "-")
         .replace(/[\/\s]+/g, "-");
       const lockfile = path.join(importer, "pnpm-lock.yaml");
+      const flakeRef = await workspaceFlakeRef(tmp);
 
       // Commit scaffold so pure flake snapshots see new importers
       await $({
@@ -47,7 +57,7 @@ test(
         stdio: "inherit",
         env,
       })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${lockfile}`;
-      await $`git add build-tools/tools/nix/node-modules.hashes.json`;
+      await $`git add projects/node-modules.hashes.json`;
       await $`git commit -m update-hashes`.nothrow();
 
       // Build the node-test derivation; vitest should pass calling through the native addon
@@ -60,7 +70,7 @@ test(
         ]
           .filter(Boolean)
           .join(" ");
-        const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "${tmp}#node-test.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-out-paths ${flags}`;
+        const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "path:${flakeRef}#node-test.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-out-paths ${flags}`;
         return await $({ stdio: "pipe", env })`bash --noprofile --norc -c ${cmd}`;
       })();
       const outPath =

@@ -2,6 +2,50 @@
 set -euo pipefail
 
 ROOT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+FLAKE_REF="${ROOT_DIR}"
+if [ ! -f "${ROOT_DIR}/flake.nix" ] && [ -f "${ROOT_DIR}/.viberoots/workspace/flake.nix" ]; then
+  FLAKE_REF="${ROOT_DIR}/.viberoots/workspace"
+fi
+PNPM_DIR="${ROOT_DIR}"
+if [ ! -f "${PNPM_DIR}/package.json" ] && [ -f "${ROOT_DIR}/viberoots/package.json" ]; then
+  PNPM_DIR="${ROOT_DIR}/viberoots"
+fi
+LINT_STAGED_CONFIG="$(mktemp "${TMPDIR:-/tmp}/lint-staged.XXXXXX.json")"
+trap 'rm -f "${LINT_STAGED_CONFIG}"' EXIT
+node -e '
+const fs = require("node:fs");
+const pkgPath = process.argv[1];
+const outPath = process.argv[2];
+const pnpmDir = process.argv[3];
+const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+const cfg = pkg["lint-staged"] || {};
+const eslintBin = `${pnpmDir}/node_modules/.bin/eslint`;
+const prettierBin = `${pnpmDir}/node_modules/.bin/prettier`;
+const staleNamesLint = `zx-wrapper ${pnpmDir}/build-tools/tools/dev/stale-names-lint.ts`;
+function rewriteTask(task) {
+  if (typeof task !== "string") {
+    return task;
+  }
+  if (task.startsWith("pnpm exec eslint ")) {
+    return task.replace(
+      /^pnpm exec eslint /,
+      `${JSON.stringify(eslintBin)} --config ${JSON.stringify(`${pnpmDir}/eslint.config.js`)} `
+    );
+  }
+  if (task === "pnpm -s fmt:write --") {
+    return `${JSON.stringify(prettierBin)} -w --`;
+  }
+  if (task === "zx-wrapper build-tools/tools/dev/stale-names-lint.ts") {
+    return staleNamesLint;
+  }
+  return task;
+}
+for (const [glob, tasks] of Object.entries(cfg)) {
+  const list = Array.isArray(tasks) ? tasks : [tasks];
+  cfg[glob] = list.map(rewriteTask);
+}
+fs.writeFileSync(outPath, JSON.stringify(cfg), "utf8");
+' "${PNPM_DIR}/package.json" "${LINT_STAGED_CONFIG}" "${PNPM_DIR}"
 
 if ! command -v nix >/dev/null 2>&1; then
   echo "error: Nix is required for pre-commit. Install Nix and try again." 1>&2
@@ -13,9 +57,11 @@ fi
 # Disable node_modules linking and skip node install to avoid spawning many node processes.
 # Avoid mutating flake.lock during hooks with --no-write-lock-file
 if [ "${IN_NIX_SHELL:-}" = "1" ]; then
-  BUCK_CONFIG_LOCK=1 NO_NODE_MODULES_LINK=1 SKIP_NODE_INSTALL=1 timeout 9m pnpm exec lint-staged --relative --allow-empty
+  cd "${ROOT_DIR}"
+  BUCK_CONFIG_LOCK=1 NO_NODE_MODULES_LINK=1 SKIP_NODE_INSTALL=1 timeout 9m pnpm --dir "${PNPM_DIR}" exec lint-staged --cwd "${ROOT_DIR}" --config "${LINT_STAGED_CONFIG}" --relative --allow-empty
 else
-  BUCK_CONFIG_LOCK=1 NO_NODE_MODULES_LINK=1 SKIP_NODE_INSTALL=1 timeout 9m nix develop "${ROOT_DIR}" --accept-flake-config --no-write-lock-file -c pnpm exec lint-staged --relative --allow-empty
+  cd "${ROOT_DIR}"
+  BUCK_CONFIG_LOCK=1 NO_NODE_MODULES_LINK=1 SKIP_NODE_INSTALL=1 WORKSPACE_ROOT="${ROOT_DIR}" timeout 9m nix develop "${FLAKE_REF}" --accept-flake-config --no-write-lock-file -c pnpm --dir "${PNPM_DIR}" exec lint-staged --cwd "${ROOT_DIR}" --config "${LINT_STAGED_CONFIG}" --relative --allow-empty
 fi
 
 # Do not force-clean tree here; lint-staged already restages intended fixes and preserves partial commits.

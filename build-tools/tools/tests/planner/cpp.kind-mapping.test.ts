@@ -14,19 +14,19 @@ test("cpp kindOf maps binary/lib/test correctly", async () => {
         {
           id: "cpp",
           displayName: "C++",
-          requiredPaths: ["build-tools/tools/nix/planner/cpp.nix"],
+          requiredPaths: ["viberoots/build-tools/tools/nix/planner/cpp.nix"],
           kinds: ["bin", "lib", "test"],
-          templatesDir: "build-tools/tools/scaffolding/templates/cpp",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/cpp",
         },
       ],
     } as any;
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/nix/langs.json"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/langs.json"),
       JSON.stringify(manifest, null, 2) + "\n",
     );
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/planner/cpp.nix"),
-      path.join(tmp, "build-tools/tools/nix/planner/cpp.nix"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/nix/planner/cpp.nix"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix"),
     );
 
     // Directly import the plugin via Nix eval and test kindOf on mock nodes
@@ -41,7 +41,7 @@ test("cpp kindOf maps binary/lib/test correctly", async () => {
           T = {};
           repoRoot = ./.;
         };
-        plugin = (import ./build-tools/tools/nix/planner/cpp.nix { inherit lib; }) ctx;
+        plugin = (import ./viberoots/build-tools/tools/nix/planner/cpp.nix { inherit lib; }) ctx;
         k1 = plugin.kindOf { rule_type = "cxx_binary"; };
         k2 = plugin.kindOf { rule_type = "cxx_library"; };
         k3 = plugin.kindOf { rule_type = "cxx_test"; };

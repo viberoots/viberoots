@@ -50,7 +50,7 @@ async function writeAppAndDeployment(tmp: string): Promise<void> {
   await fs.writeFile(
     path.join(deployDir, "TARGETS"),
     [
-      'load("//build-tools/deployments:metadata_rules.bzl", "deployment_target")',
+      'load("@viberoots//build-tools/deployments:metadata_rules.bzl", "deployment_target")',
       "",
       "deployment_target(",
       '    name = "deploy",',

@@ -23,7 +23,7 @@ async function nixBuildSelected(args: {
     nothrow: true,
     reject: false,
     env: { ...process.env, BUCK_TARGET: target },
-  })`nix build --impure --accept-flake-config --file build-tools/tools/nix/graph-generator.nix selected --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${system} --arg graphJsonPath ${graphJsonPath} --no-link --print-out-paths`;
+  })`nix build --impure --accept-flake-config --file viberoots/build-tools/tools/nix/graph-generator.nix selected --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${system} --arg graphJsonPath ${graphJsonPath} --no-link --print-out-paths`;
   if (res.exitCode !== 0) return "";
   const outPath =
     String(res.stdout || "")
@@ -65,7 +65,7 @@ test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () =
     await fsp.writeFile(
       path.join(libDir, "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "greeter",',
@@ -95,7 +95,7 @@ test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () =
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',
@@ -126,7 +126,7 @@ test("cpp: patch change in repo lib via link_deps rebuilds consumer", async () =
         link_deps: ["//projects/libs/greeter:greeter"],
       },
     ];
-    const graphJsonPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphJsonPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fsp.mkdir(path.dirname(graphJsonPath), { recursive: true });
     await fsp.writeFile(graphJsonPath, JSON.stringify(graph, null, 2) + "\n", "utf8");
 

@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("cpp registry-first path equals onlyCpp fast-path", async () => {
   await runInTemp("cpp-registry-first-cohesion", async (tmp, $) => {
@@ -32,7 +32,7 @@ test("cpp registry-first path equals onlyCpp fast-path", async () => {
         srcs: ["apps/demo/src/main.cpp"],
       },
     ];
-    const toolsBuck = path.join(tmp, "build-tools", "tools", "buck");
+    const toolsBuck = path.join(tmp, ".viberoots", "workspace", "buck");
     await fs.mkdirp(toolsBuck);
     await fs.writeFile(
       path.join(toolsBuck, "graph.json"),
@@ -46,7 +46,7 @@ test("cpp registry-first path equals onlyCpp fast-path", async () => {
       cwd: tmp,
       env: envBase,
       stdio: "pipe",
-    })`nix build ${`path:${tmp}#graph-generator-selected`} --print-out-paths --accept-flake-config --no-link`;
+    })`nix build ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --print-out-paths --accept-flake-config --no-link`;
     const pathDefault = String(a.stdout || "")
       .trim()
       .split("\n")
@@ -57,7 +57,7 @@ test("cpp registry-first path equals onlyCpp fast-path", async () => {
       cwd: tmp,
       env: { ...envBase, PLANNER_ONLY_CPP: "1" },
       stdio: "pipe",
-    })`nix build ${`path:${tmp}#graph-generator-selected`} --print-out-paths --accept-flake-config --no-link`;
+    })`nix build ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --print-out-paths --accept-flake-config --no-link`;
     const pathOnlyCpp = String(b.stdout || "")
       .trim()
       .split("\n")

@@ -4,14 +4,17 @@ import { test } from "node:test";
 
 test("fixed pnpm-store builds use exact prefetched stores for offline validation", async () => {
   const exactStore = await fsp.readFile(
-    "build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
     "utf8",
   );
   const exactStoreCommand = await fsp.readFile(
-    "build-tools/tools/dev/update-pnpm-hash/exact-store-command.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-command.ts",
     "utf8",
   );
-  const lockfile = await fsp.readFile("build-tools/tools/dev/update-pnpm-hash/lockfile.ts", "utf8");
+  const lockfile = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/lockfile.ts",
+    "utf8",
+  );
   if (!exactStore.includes("export async function withExactPrefetchedStore")) {
     throw new Error("lockfile.ts must expose an exact-store helper for fixed pnpm-store builds");
   }
@@ -37,14 +40,17 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (!exactStoreCommand.includes('command: opts.command || "nix"')) {
     throw new Error("exact-store command helpers must support direct command execution");
   }
-  const toolPaths = await fsp.readFile("build-tools/tools/lib/tool-paths.ts", "utf8");
+  const toolPaths = await fsp.readFile("viberoots/build-tools/tools/lib/tool-paths.ts", "utf8");
   if (!toolPaths.includes("required tool must resolve to /nix/store")) {
     throw new Error("tool-paths.ts must fail when a required tool resolves outside /nix/store");
   }
   if (!lockfile.includes("withExactPrefetchedStore")) {
     throw new Error("lockfile.ts must continue exporting the exact-store helper");
   }
-  const pnpmStatePaths = await fsp.readFile("build-tools/tools/lib/pnpm-state-paths.ts", "utf8");
+  const pnpmStatePaths = await fsp.readFile(
+    "viberoots/build-tools/tools/lib/pnpm-state-paths.ts",
+    "utf8",
+  );
   if (
     !pnpmStatePaths.includes("sharedExactPnpmStateRootPath") ||
     !pnpmStatePaths.includes("export async function sharedExactPnpmStateRoot")
@@ -62,7 +68,7 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     );
   }
   const exactStoreImport = await fsp.readFile(
-    "build-tools/tools/dev/update-pnpm-hash/exact-store-import.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-import.ts",
     "utf8",
   );
   if (!exactStoreImport.includes('"store", "add-path"')) {
@@ -73,8 +79,20 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
       "exact-store helpers must archive prepared stores before importing them into /nix/store",
     );
   }
+  if (!exactStoreImport.includes("await fsp.rm(archiveDir, { recursive: true, force: true })")) {
+    throw new Error("exact-store helpers must remove transient archive dirs after Nix import");
+  }
+  if (
+    !exactStore.includes("pruneSupersededExactStoreForImporter") ||
+    !exactStore.includes("sharedExactPnpmStateIndexPath")
+  ) {
+    throw new Error("exact-store prep must prune superseded per-importer lock-hash caches");
+  }
 
-  const store = await fsp.readFile("build-tools/tools/nix/node-modules/store.nix", "utf8");
+  const store = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/node-modules/store.nix",
+    "utf8",
+  );
   if (!store.includes('builtins.getEnv "NIX_PNPM_EXACT_STORE"')) {
     throw new Error("store.nix must read the exact-store env for fixed pnpm-store builds");
   }
@@ -96,7 +114,7 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   }
 
   const nixBuildHelpers = await fsp.readFile(
-    "build-tools/tools/dev/update-pnpm-hash/nix.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/nix.ts",
     "utf8",
   );
   if (!nixBuildHelpers.includes("must be a /nix/store path")) {
@@ -110,8 +128,48 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
       "update-pnpm-hash nix helpers must support explicit streaming of nix builder logs",
     );
   }
+  if (nixBuildHelpers.includes('"substituters"')) {
+    throw new Error(
+      "update-pnpm-hash fixed-store builds must not disable substituters; local builders are controlled separately",
+    );
+  }
+  const verifiedMarker = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/verified-marker.ts",
+    "utf8",
+  );
+  for (const updaterHelper of [
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-import.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/prefetched-store.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/realized-store.ts",
+  ]) {
+    if (verifiedMarker.includes(updaterHelper)) {
+      throw new Error(
+        `pnpm-store builder fingerprint must not include updater helper ${updaterHelper}`,
+      );
+    }
+  }
+  const updatePnpmHash = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/update-pnpm-hash.ts",
+    "utf8",
+  );
+  const nondefault = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/nondefault.ts",
+    "utf8",
+  );
+  if (
+    !updatePnpmHash.includes("step=stale-builder-recompute") ||
+    !nondefault.includes("step=stale-builder-recompute")
+  ) {
+    throw new Error(
+      "update-pnpm-hash must recompute unfixed hashes when builder markers are stale",
+    );
+  }
 
-  const unified = await fsp.readFile("build-tools/tools/dev/require-unified-pnpm-store.ts", "utf8");
+  const unified = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/require-unified-pnpm-store.ts",
+    "utf8",
+  );
   if (!unified.includes("prepareExactPnpmStore")) {
     throw new Error(
       "require-unified-pnpm-store.ts must prepare exact stores before unified prewarm",
@@ -123,7 +181,7 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     );
   }
   const installPrewarm = await fsp.readFile(
-    "build-tools/tools/dev/install/unified-pnpm-prewarm.ts",
+    "viberoots/build-tools/tools/dev/install/unified-pnpm-prewarm.ts",
     "utf8",
   );
   if (!installPrewarm.includes("[install-deps] unified pnpm prewarm failed")) {
@@ -133,7 +191,10 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     throw new Error("install-deps must not silently skip failed unified pnpm prewarm");
   }
 
-  const nixConfig = await fsp.readFile("build-tools/tools/nix/flake/nix-config.nix", "utf8");
+  const nixConfig = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/flake/nix-config.nix",
+    "utf8",
+  );
   if (!nixConfig.includes('"NIX_PNPM_EXACT_STORE"')) {
     throw new Error(
       "nix-config.nix must allow the exact-store env through impure flake evaluation",

@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { buildToolPath } from "../../dev/dev-build/paths";
 import { parseVerifyOwnedState } from "../../dev/verify/owned-process-state";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 
@@ -146,7 +147,7 @@ export async function spawnOrphanedVerifyProcess(opts: {
     "console.log(String(child.pid || ''));",
     "child.unref();",
   ].join("\n");
-  const zxInit = path.join(process.cwd(), "build-tools", "tools", "dev", "zx-init.mjs");
+  const zxInit = buildToolPath(process.cwd(), "tools/dev/zx-init.mjs");
   const args = opts.registered
     ? ["-e", launcher, zxInit, opts.files.stateFile, opts.files.logFile]
     : ["-e", launcher, opts.files.stateFile, opts.files.logFile];
@@ -163,7 +164,7 @@ export async function spawnOrphanedVerifyProcess(opts: {
 }
 
 export function spawnCurrentVerifyEnvProcess(files: ProcessFiles, target: string): ChildProcess {
-  const zxInit = path.join(process.cwd(), "build-tools", "tools", "dev", "zx-init.mjs");
+  const zxInit = buildToolPath(process.cwd(), "tools/dev/zx-init.mjs");
   return spawn(
     process.execPath,
     ["--experimental-strip-types", "--import", zxInit, "-e", "setInterval(() => {}, 1000)"],

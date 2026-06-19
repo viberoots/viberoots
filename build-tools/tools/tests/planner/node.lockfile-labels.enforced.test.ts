@@ -34,7 +34,7 @@ test("node planner: lockfile label parsing is strict and deterministic (single o
           pkgPathOf = name: "projects/apps/web";
           modulesTomlFor = name: null;
         };
-        plugin = (import ./build-tools/tools/nix/planner/node.nix { inherit lib; }) ctx;
+        plugin = (import ./viberoots/build-tools/tools/nix/planner/node.nix { inherit lib; }) ctx;
         drv = plugin.mkApp "//projects/apps/web:cli";
       in drv.version
     `;
@@ -65,7 +65,7 @@ test("node planner: lockfile label parsing is strict and deterministic (single o
           pkgPathOf = name: "projects/apps/web";
           modulesTomlFor = name: null;
         };
-        plugin = (import ./build-tools/tools/nix/planner/node.nix { inherit lib; }) ctx;
+        plugin = (import ./viberoots/build-tools/tools/nix/planner/node.nix { inherit lib; }) ctx;
       in (plugin.mkApp "//projects/apps/web:cli").version
     `;
     const bad = await $({

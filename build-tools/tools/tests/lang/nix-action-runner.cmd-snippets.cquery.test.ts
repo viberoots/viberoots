@@ -12,8 +12,8 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/lang:nix_shell.bzl", "escape_buck_cmd_subst")',
-        'load("//build-tools/lang:nix_action_runner.bzl", "nix_action_shell_prefix_core", "nix_action_export_graph_cmd", "nix_action_build_selected_out_path_cmd")',
+        'load("@viberoots//build-tools/lang:nix_shell.bzl", "escape_buck_cmd_subst")',
+        'load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_shell_prefix_core", "nix_action_export_graph_cmd", "nix_action_build_selected_out_path_cmd")',
         "",
         "genrule(",
         '  name = "probe",',
@@ -99,15 +99,15 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
     assert.equal(
       out.includes("$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs"),
       false,
-      "expected zx-init source lookup to avoid WORKSPACE_ROOT",
+      "expected zx-init source execution to avoid legacy root build-tools",
     );
     assert.equal(
       out.includes("$WORKSPACE_ROOT/build-tools/tools/buck/export-graph.ts"),
       false,
-      "expected export-graph source lookup to avoid WORKSPACE_ROOT",
+      "expected export-graph source execution to avoid legacy root build-tools",
     );
     assert.equal(
-      out.includes("$FLK_ROOT/build-tools/tools/dev/build-selected.ts"),
+      out.includes("$FLK_ROOT/viberoots/build-tools/tools/dev/build-selected.ts"),
       false,
       "expected build-selected source lookup to avoid FLK_ROOT",
     );

@@ -12,14 +12,14 @@ test("patch-go apply supports --force overwrite when patch exists with different
     await fs.outputFile(path.join(origin, "file.txt"), "A\n", "utf8");
     const resolveMap = { "golang.org/x/net": { version: "v0.24.0", originPath: origin } };
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     // Start a session and capture the workspace + session store to read originPath
     const startOut = await $({
       cwd: tmp,
       stdio: "pipe",
     })`WORKSPACE_ROOT=${tmp} NIX_GO_TEST_RESOLVE_JSON=${JSON.stringify(
       resolveMap,
-    )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(tmp, "gomodcache")} build-tools/tools/bin/patch-pkg start go golang.org/x/net`;
+    )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(tmp, "gomodcache")} viberoots/build-tools/tools/bin/patch-pkg start go golang.org/x/net`;
     const ws = String(startOut.stdout || "")
       .trim()
       .split(/\s+/)
@@ -49,7 +49,7 @@ test("patch-go apply supports --force overwrite when patch exists with different
     )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(
       tmp,
       "gomodcache",
-    )} build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //projects/libs/core:lib`;
+    )} viberoots/build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //projects/libs/core:lib`;
     if ((apply1.exitCode || 0) !== 0) {
       console.error("initial apply failed:", String(apply1.stderr || ""));
       process.exit(2);
@@ -101,7 +101,7 @@ test("patch-go apply supports --force overwrite when patch exists with different
     )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(
       tmp,
       "gomodcache",
-    )} build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //projects/libs/core:lib`.nothrow();
+    )} viberoots/build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //projects/libs/core:lib`.nothrow();
     if ((applyNoForce.exitCode || 0) === 0) {
       console.error(
         "apply without --force should have failed due to different existing patch content",
@@ -123,7 +123,7 @@ test("patch-go apply supports --force overwrite when patch exists with different
     )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(
       tmp,
       "gomodcache",
-    )} build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //projects/libs/core:lib --force`;
+    )} viberoots/build-tools/tools/bin/patch-pkg apply go golang.org/x/net --target //projects/libs/core:lib --force`;
     if ((applyForce.exitCode || 0) !== 0) {
       console.error("apply with --force should have succeeded");
       console.error(String(applyForce.stderr || ""));

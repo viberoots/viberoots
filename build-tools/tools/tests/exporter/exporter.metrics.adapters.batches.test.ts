@@ -5,11 +5,17 @@ import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
 
 await runInTemp("exporter-metrics-adapters", async (tmp, $) => {
-  const langDir = path.join(tmp, "build-tools/tools/buck/exporter/lang");
+  const langDir = path.join(tmp, "viberoots/build-tools/tools/buck/exporter/lang");
   await fs.mkdirp(langDir);
   // Provide both adapters (go + cpp)
-  await fs.copy("build-tools/tools/buck/exporter/lang/go.ts", path.join(langDir, "go.ts"));
-  await fs.copy("build-tools/tools/buck/exporter/lang/cpp.ts", path.join(langDir, "cpp.ts"));
+  await fs.copy(
+    "viberoots/build-tools/tools/buck/exporter/lang/go.ts",
+    path.join(langDir, "go.ts"),
+  );
+  await fs.copy(
+    "viberoots/build-tools/tools/buck/exporter/lang/cpp.ts",
+    path.join(langDir, "cpp.ts"),
+  );
 
   const nodes = [
     { name: "//projects/apps/go:svc", rule_type: "go_binary", labels: ["lang:go"] },
@@ -19,10 +25,10 @@ await runInTemp("exporter-metrics-adapters", async (tmp, $) => {
   const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
   await fs.outputFile(graph, JSON.stringify(nodes) + "\n", "utf8");
 
-  const metrics = path.join(tmp, "build-tools/tools/buck/export-metrics.json");
+  const metrics = path.join(tmp, "viberoots/build-tools/tools/buck/export-metrics.json");
   await $({
     cwd: tmp,
-  })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${metrics}`;
+  })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --metrics-out ${metrics}`;
 
   const m = JSON.parse(await fs.readFile(metrics, "utf8"));
   assert.equal(typeof m.totalBatches, "number");

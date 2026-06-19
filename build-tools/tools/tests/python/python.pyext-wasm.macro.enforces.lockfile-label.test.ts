@@ -32,7 +32,7 @@ test("python pyext_wasm macro fails with deterministic error text when lockfile 
       await fsp.writeFile(
         path.join(appDir, "TARGETS"),
         [
-          'load("//build-tools/python:defs.bzl", "nix_python_wasm_extension_module")',
+          'load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_extension_module")',
           "",
           "nix_python_wasm_extension_module(",
           '  name = "ext",',

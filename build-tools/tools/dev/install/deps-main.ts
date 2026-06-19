@@ -148,7 +148,9 @@ if (dryRun) {
         console.log("[install-deps] lock acquired");
       }
       try {
-        const activeLockfiles = importers.map((imp) => path.join(imp, "pnpm-lock.yaml"));
+        const activeLockfiles = importers.map((imp) =>
+          imp === "viberoots" ? "pnpm-lock.yaml" : path.join(imp, "pnpm-lock.yaml"),
+        );
         const removedHashEntries = await pruneNodeModulesHashesJson(activeLockfiles);
         if (verbose && removedHashEntries.length > 0) {
           console.log(
@@ -158,6 +160,9 @@ if (dryRun) {
         const absUpdate = buildToolPath(repoRoot, "tools/dev/update-pnpm-hash.ts");
         const activeZxInit = zxInitPath(repoRoot);
         for (const imp of importers) {
+          const isViberootsImporter = imp === "viberoots";
+          const commandCwd = repoRoot;
+          const commandEnv = process.env;
           const relLock = path.join(imp, "pnpm-lock.yaml");
           if (verbose) {
             console.log(`[install-deps] importer ${imp}: updating pnpm-store hash (${relLock})`);
@@ -165,9 +170,9 @@ if (dryRun) {
           // Update the FOD hash for this importer lockfile
           await $({
             stdio: "inherit",
-            cwd: repoRoot,
+            cwd: commandCwd,
             env: {
-              ...process.env,
+              ...commandEnv,
               ZX_INIT: activeZxInit,
               // First-time/cold fixed-store builds can legitimately exceed 180s.
               // Keep a bounded timeout, but avoid prematurely killing healthy runs.
@@ -179,14 +184,14 @@ if (dryRun) {
             console.log(`[install-deps] importer ${imp}: realizing+linking node_modules`);
           }
           await $({
-            cwd: path.join(repoRoot, imp),
+            cwd: commandCwd,
             stdio: "inherit",
             env: {
-              ...process.env,
+              ...commandEnv,
               ZX_INIT: activeZxInit,
               NIX_PNPM_FETCH_TIMEOUT: String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"),
             },
-          })`zx-wrapper ${buildToolPath(repoRoot, "tools/dev/install/link-node.ts")} ${force ? "--force" : ""}`;
+          })`zx-wrapper ${buildToolPath(repoRoot, "tools/dev/install/link-node.ts")} --importer ${imp} ${force ? "--force" : ""}`;
         }
       } finally {
         if (prevInstallLockSkip === undefined) {

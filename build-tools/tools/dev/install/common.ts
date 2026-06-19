@@ -1,6 +1,7 @@
 import { getImporterRootsContract } from "../../lib/importer-roots";
 import { resolveImporterDir } from "../../lib/lockfiles";
 import { sanitizeName as sanitizeNameContract } from "../../lib/sanitize";
+import fs from "node:fs";
 import path from "node:path";
 
 // Must mirror build-tools/tools/nix/templates-common.nix sanitizeName
@@ -15,6 +16,7 @@ export function normalizeImporter(input: string | null | undefined): string {
   const { workspaceRoots } = getImporterRootsContract();
   const isSegment = (s: string) => /^[A-Za-z0-9._-]+$/.test(s);
   const parts = raw.replace(/\\/g, "/").split("/").filter(Boolean);
+  if (parts[0] === "viberoots") return "viberoots";
   const rootPartsList = workspaceRoots
     .map((root) => root.split("/").filter(Boolean))
     .filter((rootParts) => rootParts.length > 0);
@@ -68,10 +70,23 @@ export function pnpmStoreAttr(importer: string): string {
   return !imp || imp === "." ? "pnpm-store.default" : `pnpm-store.${sanitizeName(imp)}`;
 }
 
-export function flakeRefForImporter(repoOrWorkspaceRoot: string, importer: string): string {
+export function workspaceFlakeRoot(repoOrWorkspaceRoot: string): string {
   const root = path.resolve(repoOrWorkspaceRoot);
-  const imp = normalizeImporter(importer);
-  // Keep git-backed flake resolution for root importer to avoid expensive full path copies.
-  // Use path: for non-root importers so freshly scaffolded/untracked importers are visible.
-  return !imp || imp === "." ? root : `path:${root}`;
+  const hiddenWorkspace = path.join(root, ".viberoots", "workspace");
+  if (fs.existsSync(path.join(hiddenWorkspace, "flake.nix"))) return hiddenWorkspace;
+
+  if (fs.existsSync(path.join(root, "flake.nix"))) return root;
+
+  return root;
+}
+
+export function workspaceFlakeRef(repoOrWorkspaceRoot: string): string {
+  return `path:${workspaceFlakeRoot(repoOrWorkspaceRoot)}`;
+}
+
+export function flakeRefForImporter(repoOrWorkspaceRoot: string, _importer: string): string {
+  // Keep path: so newly scaffolded/untracked files are visible to flake evaluation.
+  // In strict consumer workspaces, the visible root intentionally has no flake.nix;
+  // use the generated hidden workspace flake instead.
+  return workspaceFlakeRef(repoOrWorkspaceRoot);
 }

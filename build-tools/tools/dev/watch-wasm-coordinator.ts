@@ -2,6 +2,7 @@
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { getFlagStr } from "../lib/cli";
 import { resolveModuleContractsPaths } from "./module-contract-paths";
 import { syncModuleContractsForApp } from "./sync-module-contracts-core";
@@ -30,17 +31,12 @@ async function ensureDaemon(root: string, pollMs: number): Promise<void> {
   const pidPath = path.join(baseDir, "daemon.pid");
   const lockDir = path.join(baseDir, "daemon.start.lock");
   await fsp.mkdir(baseDir, { recursive: true });
-  const daemonScript = path.join(
-    root,
-    "build-tools",
-    "tools",
-    "dev",
-    "wasm-watch-coordinator-daemon.ts",
-  );
+  const toolDir = path.dirname(fileURLToPath(import.meta.url));
+  const daemonScript = path.join(toolDir, "wasm-watch-coordinator-daemon.ts");
   const daemonDeps = [
     daemonScript,
-    path.join(root, "build-tools", "tools", "dev", "watch-wasm-producer-ops.ts"),
-    path.join(root, "build-tools", "tools", "dev", "wasm-watch-coordinator-types.ts"),
+    path.join(toolDir, "watch-wasm-producer-ops.ts"),
+    path.join(toolDir, "wasm-watch-coordinator-types.ts"),
   ];
   let daemonCodeMtime = 0;
   for (const dep of daemonDeps) {
@@ -199,11 +195,11 @@ async function main() {
   ]);
   let refreshState = await computeFingerprintMap(refreshTriggerPaths(baseRefreshPaths, specs));
   let lastRefreshAt = 0;
-  let buildSeq = await runInitialBuilds(cwd, specs);
   const prevByModule = new Map<string, Map<string, Fingerprint>>();
   for (const spec of specs) {
     prevByModule.set(spec.moduleKey, await computeFingerprintMap(spec.watchPaths));
   }
+  let buildSeq = await runInitialBuilds(cwd, specs);
   await ensureDaemon(resolved.repoRoot, pollMs);
   await writeLease(specs);
   console.error(
@@ -248,20 +244,23 @@ async function main() {
       }
       lastRefreshAt = Date.now();
     }
-    await ensureDaemon(resolved.repoRoot, pollMs);
-    const prev = await fsp.readFile(leasePath, "utf8").catch(() => "");
-    const parsed = prev ? (JSON.parse(prev) as CoordinatorLease) : null;
-    if (!parsed || parsed.updatedAtMs + refreshThrottleMs < Date.now()) {
-      await writeLease(specs);
-    }
     for (const spec of specs) {
       const prev = prevByModule.get(spec.moduleKey) || new Map<string, Fingerprint>();
       const next = await computeFingerprintMap(spec.watchPaths);
       if (!mapsEqual(prev, next)) {
         prevByModule.set(spec.moduleKey, next);
         buildSeq += 1;
+        console.error(
+          `[wasm-watch] source-change module_type=${spec.moduleType} module_key=${spec.moduleKey}`,
+        );
         await runCoordinatorBuild({ cwd, spec, seq: buildSeq, reason: "source-change" });
       }
+    }
+    await ensureDaemon(resolved.repoRoot, pollMs);
+    const prev = await fsp.readFile(leasePath, "utf8").catch(() => "");
+    const parsed = prev ? (JSON.parse(prev) as CoordinatorLease) : null;
+    if (!parsed || parsed.updatedAtMs + refreshThrottleMs < Date.now()) {
+      await writeLease(specs);
     }
   }
 }

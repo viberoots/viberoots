@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("ci run-stage wires strict file-size lint args without allow-known bypass", async () => {
-  const txt = await fsp.readFile("build-tools/tools/ci/run-stage.ts", "utf8");
+  const txt = await fsp.readFile("viberoots/build-tools/tools/ci/run-stage.ts", "utf8");
   assert.ok(
     txt.includes('case "file-size-lint"'),
     "expected run-stage to expose a file-size-lint stage",

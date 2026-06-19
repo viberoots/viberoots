@@ -42,7 +42,7 @@ test("auto-map includes importer-scoped provider for a repo-root pnpm-lock.yaml 
     );
 
     const NODE = "node";
-    const ZX = path.resolve("build-tools/tools/dev/zx-init.mjs");
+    const ZX = path.resolve("viberoots/build-tools/tools/dev/zx-init.mjs");
     const nodeFlags = [
       "--experimental-strip-types",
       "--disable-warning=ExperimentalWarning",
@@ -50,8 +50,8 @@ test("auto-map includes importer-scoped provider for a repo-root pnpm-lock.yaml 
       ZX,
     ];
 
-    await $`${NODE} ${nodeFlags} build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
-    await $`${NODE} ${nodeFlags} build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`${NODE} ${nodeFlags} viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`${NODE} ${nodeFlags} viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out .viberoots/workspace/providers/auto_map.bzl`;
 
     const expected = workspaceProviderLabel(providerNameForImporter("pnpm-lock.yaml", "."));
 

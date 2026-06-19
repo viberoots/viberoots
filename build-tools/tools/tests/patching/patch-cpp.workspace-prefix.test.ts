@@ -11,10 +11,10 @@ test("patch-cpp: workspace parent dir is viberoots-patch-cpp", async () => {
     await fsp.writeFile(path.join(storeSrc, "README"), "zlib\n", "utf8");
     const map = { "pkgs.zlib": { version: "1.2.13", srcPath: storeSrc, pname: "zlib" } };
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const r = await $({
       cwd: tmp,
-    })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(map)} build-tools/tools/bin/patch-pkg start cpp pkgs.zlib`;
+    })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(map)} viberoots/build-tools/tools/bin/patch-pkg start cpp pkgs.zlib`;
     const ws = String(r.stdout || "")
       .trim()
       .split(/\s+/)

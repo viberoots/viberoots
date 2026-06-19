@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 const REPO_ROOT = process.cwd();
+const VIBEROOTS_ROOT = path.join(REPO_ROOT, "viberoots");
 
 type TemplateWatcherExpectation = {
   id: string;
@@ -55,14 +56,14 @@ const TEMPLATE_WATCHERS: TemplateWatcherExpectation[] = [
 
 test("multi-module watcher emits module-scoped deterministic markers", async () => {
   const watcherPath = path.join(
-    REPO_ROOT,
+    VIBEROOTS_ROOT,
     "build-tools",
     "tools",
     "dev",
     "watch-wasm-coordinator.ts",
   );
   const daemonPath = path.join(
-    REPO_ROOT,
+    VIBEROOTS_ROOT,
     "build-tools",
     "tools",
     "dev",
@@ -70,7 +71,13 @@ test("multi-module watcher emits module-scoped deterministic markers", async () 
   );
   const source = await fsp.readFile(watcherPath, "utf8");
   const daemonSource = await fsp.readFile(daemonPath, "utf8");
-  const opsPath = path.join(REPO_ROOT, "build-tools", "tools", "dev", "watch-wasm-producer-ops.ts");
+  const opsPath = path.join(
+    VIBEROOTS_ROOT,
+    "build-tools",
+    "tools",
+    "dev",
+    "watch-wasm-producer-ops.ts",
+  );
   const opsSource = await fsp.readFile(opsPath, "utf8");
   assert.match(daemonSource, /\[wasm-watchd\] rebuild:start seq=/);
   assert.match(daemonSource, /\[wasm-watchd\] sync:ok seq=/);
@@ -84,7 +91,7 @@ test("multi-module watcher emits module-scoped deterministic markers", async () 
 
 test("multi-module watcher: template watchers rely on generated contract paths", async () => {
   for (const item of TEMPLATE_WATCHERS) {
-    const abs = path.join(REPO_ROOT, item.scriptPath);
+    const abs = path.join(VIBEROOTS_ROOT, item.scriptPath);
     const source = await fsp.readFile(abs, "utf8");
     assert.match(
       source,

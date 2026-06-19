@@ -18,6 +18,7 @@ import {
 } from "./cloud-control-cutover-fixture";
 import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
+import { viberootsRepoPath } from "./deployment-command";
 
 test("setup and cutover entrypoints enforce generated ingress command evidence", () => {
   assert.match(
@@ -162,7 +163,7 @@ function badCallback() {
 
 function tfSource() {
   const moduleDir = path.join(
-    process.cwd(),
+    viberootsRepoPath("."),
     "build-tools/deployments/aws-control-plane-foundation/opentofu",
   );
   return fs

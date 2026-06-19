@@ -84,7 +84,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
         + nix_calling_env_export_buck_graph_json()
         + nix_calling_node_patch_requirements_preflight(wiring.importer)
         + nix_build_out_path_cmd(
-            "\"path:$WORKSPACE_ROOT#graph-generator-selected\"",
+            "\"path:$FLK_ROOT#graph-generator-selected\"",
             timeout_var = "TIMEOUT",
             impure = True,
             build_prefix = ("env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" " % raw),

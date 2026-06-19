@@ -8,6 +8,7 @@ import { getFlagStr } from "../lib/cli";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { DEFAULT_AUTO_MAP_PATH } from "../lib/workspace-state-paths";
 import { runNodeWithZx } from "../lib/node-run";
+import { buildToolPath, buildToolsRoot } from "../dev/dev-build/paths";
 import { runCiBuckTestStage } from "./buck-test-stage";
 import { runWheelhousePreload } from "./wheelhouse-preload";
 
@@ -29,7 +30,18 @@ type Stage =
 
 const stage = getFlagStr("stage", "");
 assert(stage, "missing --stage=<name>");
-const zxInit = path.resolve("build-tools/tools/dev/zx-init.mjs");
+const workspaceRoot = process.cwd();
+const viberootsBuildToolsRoot = buildToolsRoot(workspaceRoot);
+const viberootsRoot = path.resolve(viberootsBuildToolsRoot, "..");
+const zxInit = buildToolPath(workspaceRoot, "tools/dev/zx-init.mjs");
+
+function toolPath(rel: string): string {
+  return buildToolPath(workspaceRoot, rel);
+}
+
+function viberootsPath(rel: string): string {
+  return path.join(viberootsRoot, rel);
+}
 
 async function runTool(script: string, args: string[] = []) {
   await runNodeWithZx({ zxInitPath: zxInit, script, args });
@@ -56,7 +68,7 @@ async function main() {
   let enabled = new Set<string>();
   let caps = new Map<string, Record<string, boolean>>();
   try {
-    const txt = await fsp.readFile(path.resolve("build-tools/tools/nix/langs.json"), "utf8");
+    const txt = await fsp.readFile(toolPath("tools/nix/langs.json"), "utf8");
     const norm = normalize(JSON.parse(txt) as Manifest);
     enabled = norm.enabled;
     caps = norm.caps;
@@ -64,7 +76,7 @@ async function main() {
 
   switch (stage as Stage) {
     case "codegen": {
-      const target = path.resolve("build-tools/tools/codegen.ts");
+      const target = toolPath("tools/codegen.ts");
       try {
         await $`test -f ${target} || exit 0`;
         await runTool(target);
@@ -72,7 +84,7 @@ async function main() {
       break;
     }
     case "langs-validate": {
-      const target = path.resolve("build-tools/tools/dev/validate-langs.ts");
+      const target = toolPath("tools/dev/validate-langs.ts");
       await runTool(target);
       break;
     }
@@ -86,7 +98,7 @@ async function main() {
     }
     case "sync-providers": {
       // Unified orchestrator: always run for enabled languages; drivers are no-ops if inactive
-      const target = path.resolve("build-tools/tools/buck/sync-providers.ts");
+      const target = toolPath("tools/buck/sync-providers.ts");
       await runTool(target);
       break;
     }
@@ -103,40 +115,37 @@ async function main() {
         }
         if (!any) break;
       }
-      const target = path.resolve("build-tools/tools/buck/gen-auto-map.ts");
+      const target = toolPath("tools/buck/gen-auto-map.ts");
       await runTool(target, ["--graph", DEFAULT_GRAPH_PATH, "--out", DEFAULT_AUTO_MAP_PATH]);
       break;
     }
     case "nix-gaps-policy": {
-      const target = path.resolve("build-tools/tools/dev/nix-gaps-inventory-check.ts");
+      const target = toolPath("tools/dev/nix-gaps-inventory-check.ts");
       await runTool(target, [
         "--starlark-api",
-        "docs/handbook/starlark-api.md",
+        viberootsPath("docs/handbook/starlark-api.md"),
         "--nix-gaps",
-        "docs/handbook/nix-gaps.md",
+        viberootsPath("docs/handbook/nix-gaps.md"),
         "--exceptions",
-        "docs/handbook/nix-gaps-exceptions.json",
+        viberootsPath("docs/handbook/nix-gaps-exceptions.json"),
       ]);
       break;
     }
     case "prebuild-guard": {
-      const target = path.resolve("build-tools/tools/buck/prebuild-guard.ts");
+      const target = toolPath("tools/buck/prebuild-guard.ts");
       await runTool(target);
-      await runTool(
-        path.resolve("build-tools/tools/scaffolding/gen-template-manifest-artifacts.ts"),
-        ["--check"],
-      );
+      await runTool(toolPath("tools/scaffolding/gen-template-manifest-artifacts.ts"), ["--check"]);
       break;
     }
     case "patches-lint": {
-      const target = path.resolve("build-tools/tools/dev/patches-lint.ts");
+      const target = toolPath("tools/dev/patches-lint.ts");
       // Strict mode in CI; run for Go and Python (importer-local) to enforce parity
       await runTool(target, ["--strict", "--lang", "go"]);
       await runTool(target, ["--strict", "--lang", "python"]);
       break;
     }
     case "file-size-lint": {
-      const target = path.resolve("build-tools/tools/dev/file-size-lint.ts");
+      const target = toolPath("tools/dev/file-size-lint.ts");
       await runTool(target, ["--scope=source", "--fail=true"]);
       break;
     }
@@ -152,7 +161,7 @@ async function main() {
       await runCiBuckTestStage();
       break;
     case "cpp-addon-smoke": {
-      const target = path.resolve("build-tools/tools/ci/cpp-addon-smoke.ts");
+      const target = toolPath("tools/ci/cpp-addon-smoke.ts");
       await runTool(target);
       break;
     }
@@ -165,7 +174,7 @@ async function main() {
   }
   // Post-stage housekeeping: best-effort cleanup of ephemeral temp outs
   try {
-    await runTool(path.resolve("build-tools/tools/dev/clean-temp-outs.ts"));
+    await runTool(toolPath("tools/dev/clean-temp-outs.ts"));
   } catch {}
 }
 

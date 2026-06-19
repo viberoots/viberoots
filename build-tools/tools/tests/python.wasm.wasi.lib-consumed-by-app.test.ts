@@ -3,7 +3,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import path from "node:path";
-import { runInTemp } from "./lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "./lib/test-helpers";
 
 test("python wasm (wasi): app consumes wasm lib overlay", async () => {
   await runInTemp("py-wasm-wasi-lib-overlay", async (tmp, $) => {
@@ -21,7 +21,7 @@ test("python wasm (wasi): app consumes wasm lib overlay", async () => {
     await fs.writeFile(
       path.join(libDir, "TARGETS"),
       `
-load("//build-tools/python:defs.bzl", "nix_python_wasm_lib")
+load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_lib")
 nix_python_wasm_lib(
   name = "pylib",
   lockfile_label = "lockfile:projects/libs/pylib/uv.lock#projects/libs/pylib",
@@ -46,7 +46,7 @@ nix_python_wasm_lib(
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       `
-load("//build-tools/python:defs.bzl", "nix_python_wasm_app")
+load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_app")
 nix_python_wasm_app(
   name = "pyapp",
   lockfile_label = "lockfile:projects/apps/pywasm/uv.lock#projects/apps/pywasm",
@@ -57,7 +57,7 @@ nix_python_wasm_app(
 `,
       "utf8",
     );
-    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    await $`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const env = {
       ...process.env,
       BUCK_TARGET: "//projects/apps/pywasm:pyapp",
@@ -71,7 +71,7 @@ nix_python_wasm_app(
     const out = await $({
       cwd: tmp,
       env,
-    })`nix build --impure -L --accept-flake-config ${`path:${tmp}#graph-generator-selected`} --no-link --print-out-paths`;
+    })`nix build --impure -L --accept-flake-config ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --no-link --print-out-paths`;
     const outPath = String(out.stdout || "")
       .trim()
       .split("\n")

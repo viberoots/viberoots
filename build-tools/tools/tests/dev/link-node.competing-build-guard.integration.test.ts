@@ -3,9 +3,12 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("link-node detects competing node-modules builds and fails fast", async () => {
-  const mainTxt = await fsp.readFile("build-tools/tools/dev/install/link-node.ts", "utf8");
+  const mainTxt = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/install/link-node.ts",
+    "utf8",
+  );
   const helperTxt = await fsp.readFile(
-    "build-tools/tools/dev/install/link-node-helpers.ts",
+    "viberoots/build-tools/tools/dev/install/link-node-helpers.ts",
     "utf8",
   );
   if (!helperTxt.includes("findCompetingNodeModulesBuilds")) {

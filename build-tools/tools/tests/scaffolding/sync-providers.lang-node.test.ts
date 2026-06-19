@@ -20,7 +20,7 @@ test("sync-providers with --lang node syncs only Node providers", async () => {
     await $`git add apps/example/pnpm-lock.yaml`;
 
     // Run with --lang node
-    await $`node build-tools/tools/buck/sync-providers.ts --lang node`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node`;
 
     // Node provider file should exist
     const nodeProviderPath = path.join(tmp, ".viberoots/workspace/providers/TARGETS.node.auto");

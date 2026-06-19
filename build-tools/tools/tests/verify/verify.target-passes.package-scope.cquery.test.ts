@@ -65,18 +65,18 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
   const targets = loadVerifyTargetLabels({
     root: process.cwd(),
     iso: inheritedBuckIsolation("verify-target-passes-wildcard-scope"),
-    targets: ["//..."],
+    targets: ["//...", "viberoots//..."],
     executionPolicy: localExecutionPolicy,
   });
 
   const targetSet = new Set(targets.map((entry) => entry.target));
   assert.ok(
-    targetSet.has("//:verify_template_test_scope_policy"),
+    targetSet.has("viberoots//:verify_template_test_scope_policy"),
     "expected wildcard expansion to retain build-system zx tests",
   );
   assert.equal(
     [...targetSet].some((target) =>
-      target.startsWith("//build-tools/tools/tests/remote-exec/wrapper-fixtures:"),
+      target.startsWith("viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:"),
     ),
     false,
     "expected wildcard expansion to skip provider-only wrapper fixture tests",
@@ -94,31 +94,35 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
     "expected isolated project test to remain in the isolated batch",
   );
   assert.ok(
-    isolatedPass.targets.includes("//:dev_verify_orphan_owned_process_cleanup"),
+    isolatedPass.targets.includes("viberoots//:dev_verify_orphan_owned_process_cleanup"),
     "expected process cleanup probes to run outside concurrent verify passes",
   );
   assert.ok(
-    isolatedPass.targets.includes("//:dev_verify_temp_repo_buck_cleanup_scoped"),
+    isolatedPass.targets.includes("viberoots//:dev_verify_temp_repo_buck_cleanup_scoped"),
     "expected temp-repo cleanup probes to run outside concurrent verify passes",
   );
   assert.equal(isolatedPass.threadsOverride, 1);
   const sharedPass = passes.find((pass) => pass.name === "shared");
   assert.ok(sharedPass, "expected wildcard expansion to keep a shared verify pass");
   assert.ok(
-    sharedPass?.targets.includes("//:verify_template_test_scope_policy"),
+    sharedPass?.targets.includes("viberoots//:verify_template_test_scope_policy"),
     "expected build-system zx tests to remain in the shared pass",
   );
   const resourceLimitedPass = passes.find((pass) => pass.name === "resource-limited");
   assert.ok(
-    resourceLimitedPass?.targets.includes("//:deployments_nixos_shared_host_reuse_e2e"),
+    resourceLimitedPass?.targets.includes("viberoots//:deployments_nixos_shared_host_reuse_e2e"),
     "expected resource-heavy deployment tests to run outside the shared pass",
   );
   assert.ok(
-    resourceLimitedPass?.targets.includes("//:scaffolding_node_cli_scaffold_lockfile_present"),
+    resourceLimitedPass?.targets.includes(
+      "viberoots//:scaffolding_node_cli_scaffold_lockfile_present",
+    ),
     "expected resource-heavy scaffold tests to run outside the shared pass",
   );
   assert.ok(
-    resourceLimitedPass?.targets.includes("//:planner_planner_dev_overrides_go_log_present"),
+    resourceLimitedPass?.targets.includes(
+      "viberoots//:planner_planner_dev_overrides_go_log_present",
+    ),
     "expected resource-heavy planner tests to run outside the shared pass",
   );
   assert.ok(
@@ -127,7 +131,7 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
   );
   assert.equal(resourceLimitedPass?.threadsOverride, VERIFY_BROAD_RESOURCE_LIMITED_THREADS);
   const resourceLimitedLabels = targets.find(
-    (entry) => entry.target === "//:deployments_nixos_shared_host_reuse_e2e",
+    (entry) => entry.target === "viberoots//:deployments_nixos_shared_host_reuse_e2e",
   )?.labels;
   assert.ok(
     resourceLimitedLabels?.includes(VERIFY_RESOURCE_LIMITED_LABEL),
@@ -147,7 +151,7 @@ test("verify target pass loading keeps manual targets explicit-only", () => {
   const wildcardTargets = loadVerifyTargetLabels({
     root: process.cwd(),
     iso: inheritedBuckIsolation("verify-target-passes-manual-wildcard"),
-    targets: ["//build-tools/tools/tests/remote-exec/wrapper-fixtures/..."],
+    targets: ["viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures/..."],
     executionPolicy: localExecutionPolicy,
   });
   assert.deepEqual(
@@ -159,12 +163,12 @@ test("verify target pass loading keeps manual targets explicit-only", () => {
   const explicitTargets = loadVerifyTargetLabels({
     root: process.cwd(),
     iso: inheritedBuckIsolation("verify-target-passes-manual-explicit"),
-    targets: ["//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_remote"],
+    targets: ["viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_remote"],
     executionPolicy: localExecutionPolicy,
   });
   assert.deepEqual(
     explicitTargets.map((entry) => entry.target),
-    ["//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_remote"],
+    ["viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_remote"],
   );
   assert.ok(
     explicitTargets[0]?.labels.includes(VERIFY_MANUAL_LABEL),

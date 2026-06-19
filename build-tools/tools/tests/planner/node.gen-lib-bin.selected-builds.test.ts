@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("planner builds selected node gen/lib/bin targets with expected output paths", async () => {
   await runInTemp("planner-node-gen-lib-bin", async (tmp, $) => {
@@ -66,7 +66,7 @@ test("planner builds selected node gen/lib/bin targets with expected output path
       const { stdout } = await $({
         cwd: tmp,
         env: { ...process.env, BUCK_TARGET: c.target, BUCK_TEST_SRC: tmp },
-      })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+      })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
       const outPath =
         String(stdout || "")
           .trim()

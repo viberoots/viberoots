@@ -18,7 +18,7 @@ test("cpp: duplicate normalized link_closure_overrides keys fail fast", async ()
           else if builtins.isList xs && builtins.all builtins.isString xs then xs
           else builtins.throw "expected list of strings";
         nodeOfName = _nm: null;
-        H = import ./build-tools/tools/nix/planner/cpp-link-helpers.nix {
+        H = import ./viberoots/build-tools/tools/nix/planner/cpp-link-helpers.nix {
           inherit lib get cleanLabel ensureStringList nodeOfName;
         };
         overrides = {

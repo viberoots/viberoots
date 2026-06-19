@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 async function main() {
   await runInTemp("defs-python-exists", async (tmp, $) => {
-    const filePath = path.join(tmp, "third_party", "providers", "defs_python.bzl");
+    const filePath = path.join(tmp, ".viberoots", "workspace", "providers", "defs_python.bzl");
     if (!(await fs.pathExists(filePath))) {
       console.error("defs_python.bzl missing at", filePath);
       process.exit(2);

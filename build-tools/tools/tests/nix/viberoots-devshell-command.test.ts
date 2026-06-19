@@ -5,11 +5,13 @@ import path from "node:path";
 import { test } from "node:test";
 
 test("devshell wires viberoots as a Nix-provided PATH command", async () => {
-  const devshell = await fsp.readFile("build-tools/tools/nix/devshell.nix", "utf8");
+  const devshell = await fsp.readFile("viberoots/build-tools/tools/nix/devshell.nix", "utf8");
   assert.match(devshell, /viberootsCommand = import \.\/packages\/viberoots-command\.nix/);
   assert.match(devshell, /buildInputs = \[[^\]]*\bviberootsCommand\b/s);
   assert.match(devshell, /export PATH="\$vbr_nix_bin:\$repo_prefix/);
-  assert.match(devshell, /export PATH="\$vbr_nix_bin:\$d\/build-tools\/tools\/bin/);
+  assert.match(devshell, /local vbr_tools_bin="\$PWD\/build-tools\/tools\/bin"/);
+  assert.match(devshell, /vbr_tools_bin="\$PWD\/viberoots\/build-tools\/tools\/bin"/);
+  assert.match(devshell, /local repo_prefix="\$vbr_tools_bin:\$PWD\/\.direnv\/bin:\$vbr_node_bin"/);
   assert.match(devshell, /vbr_source="\$\{viberootsRoot\}"/);
   assert.match(devshell, /vbr_source="\$PWD\/viberoots"/);
   assert.match(devshell, /vbr_source="\$PWD"/);
@@ -20,12 +22,12 @@ test("devshell wires viberoots as a Nix-provided PATH command", async () => {
     stdio: "pipe",
     reject: false,
     nothrow: true,
-  })`nix build --accept-flake-config .#viberoots --no-link --print-out-paths`;
+  })`nix build --accept-flake-config path:${path.resolve("viberoots")}#viberoots --no-link --print-out-paths`;
 
   assert.equal(
     built.exitCode,
     0,
-    `expected nix build .#viberoots to succeed\nstdout:\n${built.stdout}\nstderr:\n${built.stderr}`,
+    `expected nix build ./viberoots#viberoots to succeed\nstdout:\n${built.stdout}\nstderr:\n${built.stderr}`,
   );
   const outPath =
     String(built.stdout || "")

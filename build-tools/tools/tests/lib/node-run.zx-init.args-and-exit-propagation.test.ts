@@ -29,7 +29,7 @@ test("node-run loads zx-init, forwards args, and propagates exit codes", async (
 
     await runNodeWithZx({
       cwd: tmp,
-      zxInitPath: path.join(tmp, "build-tools/tools/dev/zx-init.mjs"),
+      zxInitPath: path.join(tmp, "viberoots/build-tools/tools/dev/zx-init.mjs"),
       script: okScript,
       args: ["a", "b"],
       env: {
@@ -37,7 +37,7 @@ test("node-run loads zx-init, forwards args, and propagates exit codes", async (
         NODE_RUN_OUT: outPath,
         NODE_OPTIONS: [
           "--max-old-space-size=128",
-          `--import ${path.join(tmp, "missing/build-tools/tools/dev/zx-init.mjs")}`,
+          `--import ${path.join(tmp, "missing/viberoots/build-tools/tools/dev/zx-init.mjs")}`,
           process.env.NODE_OPTIONS || "",
         ]
           .filter(Boolean)
@@ -55,7 +55,7 @@ test("node-run loads zx-init, forwards args, and propagates exit codes", async (
     try {
       await runNodeWithZx({
         cwd: tmp,
-        zxInitPath: path.join(tmp, "build-tools/tools/dev/zx-init.mjs"),
+        zxInitPath: path.join(tmp, "viberoots/build-tools/tools/dev/zx-init.mjs"),
         script: failScript,
         stdio: "pipe",
       });

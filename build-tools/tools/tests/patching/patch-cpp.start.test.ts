@@ -12,11 +12,11 @@ test("patch-cpp start creates session and workspace (idempotent)", async () => {
 
     const map = { "pkgs.zlib": { version: "1.2.13", srcPath: storeSrc, pname: "zlib" } };
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
 
     const r1 = await $({ cwd: tmp })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} build-tools/tools/bin/patch-pkg start cpp pkgs.zlib`;
+    )} viberoots/build-tools/tools/bin/patch-pkg start cpp pkgs.zlib`;
     const ws1 = String(r1.stdout || "")
       .trim()
       .split(/\s+/)
@@ -37,7 +37,7 @@ test("patch-cpp start creates session and workspace (idempotent)", async () => {
     // Idempotent start returns same workspace
     const r2 = await $({ cwd: tmp })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} build-tools/tools/bin/patch-pkg start cpp zlib`;
+    )} viberoots/build-tools/tools/bin/patch-pkg start cpp zlib`;
     const ws2 = String(r2.stdout || "")
       .trim()
       .split(/\s+/)

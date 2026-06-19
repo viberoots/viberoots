@@ -30,7 +30,7 @@ test("github_app_requirements emits profile, secrets, and runtime config", async
     await fsp.writeFile(
       deployTargetsPath,
       [
-        'load("//build-tools/deployments:defs.bzl", "github_app_requirements", "nixos_shared_host_static_webapp_deployment")',
+        'load("@viberoots//build-tools/deployments:defs.bzl", "github_app_requirements", "nixos_shared_host_static_webapp_deployment")',
         "",
         "nixos_shared_host_static_webapp_deployment(",
         '    name = "deploy",',

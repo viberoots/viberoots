@@ -91,7 +91,7 @@ function validatePatchScopeLabels(name: string, labels: string[], problems: stri
 
 function labelTokensFromText(content: string): string[] {
   const labelLiterals = content.match(/\b(?:lang|kind|patch_scope):[A-Za-z0-9._/-]+\b/g) || [];
-  return [...new Set(labelLiterals)];
+  return [...new Set(labelLiterals.filter((label) => !label.endsWith(".bzl")))];
 }
 
 async function main() {
@@ -111,7 +111,9 @@ async function main() {
         : (n as any)["buck.labels"];
       const labs = Array.isArray(labsRaw) ? (labsRaw as unknown[]).map(String) : [];
       const buckPkg = normalizeTargetLabel(String((n as any)["buck.package"] || ""));
-      const isProviderPkg = buckPkg.startsWith("//third_party/providers:");
+      const targetName = String(n.name || "");
+      const isProviderPkg =
+        buckPkg.includes("third_party/providers") || /\bnix_pkgs_[A-Za-z0-9_]+\b/.test(targetName);
       const ruleType = String((n as any)["buck.type"] || (n as any).rule_type || "");
       // Go
       const looksGo = ruleType.startsWith("go_");
@@ -148,8 +150,24 @@ async function main() {
 
       // kind label vocabulary validation (best-effort)
       validateKindLabels(f, kindLabelsOf(labels), problems);
-      validatePatchScopeLabels(f, labels, problems);
     }
+  }
+  async function* walkTargets(dir: string): AsyncGenerator<string> {
+    const entries = await fsp.readdir(dir, { withFileTypes: true }).catch(() => []);
+    for (const e of entries) {
+      if (e.name === "node_modules" || e.name === ".direnv" || e.name === "buck-out") continue;
+      const p = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        yield* walkTargets(p);
+      } else if (e.isFile() && e.name === "TARGETS") {
+        yield p;
+      }
+    }
+  }
+  for await (const f of walkTargets(process.cwd())) {
+    const content = await fsp.readFile(f, "utf8");
+    const labels = labelTokensFromText(content);
+    validatePatchScopeLabels(f, labels, problems);
   }
   if (problems.length) {
     console.error("stamping-lint errors:\n" + problems.map((s) => `- ${s}`).join("\n"));

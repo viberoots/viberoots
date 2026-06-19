@@ -8,6 +8,7 @@ export type CopyFileCloneMode = "none" | "try" | "force";
 
 type CopyTreeOptions = {
   cloneMode?: CopyFileCloneMode;
+  exclude?: (relPath: string) => boolean;
   force?: boolean;
   maxInFlight?: number;
 };
@@ -98,6 +99,9 @@ export async function copyTree(
     for (const ent of entries) {
       const src = path.join(cur.src, ent.name);
       const dst = path.join(cur.dst, ent.name);
+      const rel = path.relative(srcRoot, src);
+
+      if (opts?.exclude?.(rel)) continue;
 
       if (ent.isDirectory()) {
         await fsp.mkdir(dst, { recursive: true });

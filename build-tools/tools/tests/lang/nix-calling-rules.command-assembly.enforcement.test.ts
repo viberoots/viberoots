@@ -20,12 +20,12 @@ function assertNoLineMatches(haystack: string, re: RegExp, msg: string) {
 }
 
 test("Nix-calling rule implementations use shared nix out-path capture helpers and do not mask failures", async () => {
-  const cpp = await read("build-tools/cpp/private/nix_build.bzl");
-  const wasm = await read("build-tools/go/private/nix_build_wasm.bzl");
+  const cpp = await read("viberoots/build-tools/cpp/private/nix_build.bzl");
+  const wasm = await read("viberoots/build-tools/go/private/nix_build_wasm.bzl");
 
   for (const [label, src] of [
-    ["build-tools/cpp/private/nix_build.bzl", cpp],
-    ["build-tools/go/private/nix_build_wasm.bzl", wasm],
+    ["viberoots/build-tools/cpp/private/nix_build.bzl", cpp],
+    ["viberoots/build-tools/go/private/nix_build_wasm.bzl", wasm],
   ] as const) {
     assertNoLineMatches(
       src,
@@ -52,17 +52,17 @@ test("Nix-calling rule implementations use shared nix out-path capture helpers a
   assertContains(
     wasm,
     "nix_build_out_path_cmd(",
-    "build-tools/go/private/nix_build_wasm.bzl: expected nix build out path capture to route through nix_build_out_path_cmd(...)",
+    "viberoots/build-tools/go/private/nix_build_wasm.bzl: expected nix build out path capture to route through nix_build_out_path_cmd(...)",
   );
   assertContains(
     cpp,
     "nix-build-filtered-flake.ts",
-    "build-tools/cpp/private/nix_build.bzl: expected C++ builds to route through the filtered flake helper",
+    "viberoots/build-tools/cpp/private/nix_build.bzl: expected C++ builds to route through the filtered flake helper",
   );
 
   assertDoesNotContain(
     wasm,
     "|| true",
-    "build-tools/go/private/nix_build_wasm.bzl: expected no failure-masking '|| true' patterns; use conditional diagnostics instead",
+    "viberoots/build-tools/go/private/nix_build_wasm.bzl: expected no failure-masking '|| true' patterns; use conditional diagnostics instead",
   );
 });

@@ -10,4 +10,3 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 export TAIL_LOG_EXTRA_STATUS=1
 command -v "${SCRIPT_DIR}/c" >/dev/null 2>&1 && "${SCRIPT_DIR}/c"
 exec "${SCRIPT_DIR}/tail-log" --status -w "${VBR_TAIL_LOG_STATUS_INTERVAL:-2}" "$@"
-

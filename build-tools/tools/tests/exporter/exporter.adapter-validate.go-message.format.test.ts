@@ -20,7 +20,7 @@ test("go adapter validation message uses consistent classification wording", asy
       cwd: tmp,
       stdio: "pipe",
       reject: false,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --validation warn`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --validation warn`;
     const out = String(res.stdout || "") + String(res.stderr || "");
     const code = res.exitCode || 0;
     assert.equal(code, 0, "exporter should succeed in warn mode");

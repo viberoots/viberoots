@@ -5,18 +5,19 @@ import path from "node:path";
 import { test } from "node:test";
 
 const allowedWorkspaceRootUsers = new Set([
-  "build-tools/tools/nix/flake/packages/importers.nix",
-  "build-tools/tools/nix/flake/packages/node-cli.nix",
-  "build-tools/tools/nix/flake/packages/node-service.nix",
-  "build-tools/tools/nix/flake/packages/node-vercel-next.nix",
-  "build-tools/tools/nix/flake/packages/node-webapp.nix",
-  "build-tools/tools/nix/flake/packages/python.nix",
-  "build-tools/tools/nix/flake/per-system-context.nix",
-  "build-tools/tools/nix/templates/python.nix",
-  "build-tools/tools/nix/templates/python/wasm-site.nix",
-  "build-tools/tools/nix/templates/python/wasm.nix",
-  "build-tools/tools/nix/uv2nix-env.nix",
-  "build-tools/tools/nix/uv2nix-inputs.nix",
+  "viberoots/build-tools/tools/nix/flake/packages/importers.nix",
+  "viberoots/build-tools/tools/nix/flake/packages/node-cli.nix",
+  "viberoots/build-tools/tools/nix/flake/packages/node-service.nix",
+  "viberoots/build-tools/tools/nix/flake/packages/node-vercel-next.nix",
+  "viberoots/build-tools/tools/nix/flake/packages/node-webapp.nix",
+  "viberoots/build-tools/tools/nix/flake/packages/python.nix",
+  "viberoots/build-tools/tools/nix/flake/per-system-context.nix",
+  "viberoots/build-tools/tools/nix/node-modules/common.nix",
+  "viberoots/build-tools/tools/nix/templates/python.nix",
+  "viberoots/build-tools/tools/nix/templates/python/wasm-site.nix",
+  "viberoots/build-tools/tools/nix/templates/python/wasm.nix",
+  "viberoots/build-tools/tools/nix/uv2nix-env.nix",
+  "viberoots/build-tools/tools/nix/uv2nix-inputs.nix",
 ]);
 
 async function nixFiles(dir: string): Promise<string[]> {
@@ -30,7 +31,7 @@ async function nixFiles(dir: string): Promise<string[]> {
 }
 
 test("WORKSPACE_ROOT Nix env reads stay explicitly classified", async () => {
-  const files = await nixFiles("build-tools/tools/nix");
+  const files = await nixFiles("viberoots/build-tools/tools/nix");
   const users: string[] = [];
   for (const file of files) {
     const text = await fs.readFile(file, "utf8");

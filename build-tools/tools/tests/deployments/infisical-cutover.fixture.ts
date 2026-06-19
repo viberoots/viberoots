@@ -49,7 +49,7 @@ async function writeSharedTargets(tmp: string): Promise<void> {
   await fsp.writeFile(
     filePath,
     [
-      'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
+      'load("@viberoots//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_defaults", "deployment_lane_governance", "deployment_lane_policy")',
       'deployment_defaults(name = "defaults", default_client_profile = "mini", visibility = ["PUBLIC"])',
       'deployment_lane_governance(name = "lane_governance", scm_backend = "github", repository = "viberoots/viberoots", source_ref_policies = [{"stage": "dev", "allowed_refs": "main", "required_checks": "deploy/cutover-dev"}, {"stage": "staging", "allowed_refs": "main", "required_checks": "deploy/cutover-staging"}, {"stage": "prod", "allowed_refs": "refs/tags/release/*", "required_checks": "deploy/cutover-prod"}], trusted_reporter_identities = ["app:deploy-bot"], required_approval_boundaries = [{"stage": "prod", "required_approvals": "release-owner"}], visibility = ["PUBLIC"])',
       'deployment_lane_policy(name = "lane", defaults = ":defaults", stages = ["dev", "staging", "prod"], source_ref_policy = {"dev": "main", "staging": "main", "prod": "refs/tags/release/*"}, allowed_promotion_edges = ["dev->staging", "staging->prod"], governance_policy = ":lane_governance", visibility = ["PUBLIC"])',
@@ -68,7 +68,7 @@ async function writeDevTarget(tmp: string): Promise<void> {
   await fsp.writeFile(
     filePath,
     [
-      'load("//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
+      'load("@viberoots//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
       'nixos_shared_host_static_webapp_deployment(name = "deploy", component = "' +
         CUTOVER_APP +
         '", lane_policy = "' +
@@ -112,7 +112,7 @@ function cloudflareTarget(
   const identity = CUTOVER_INFISICAL_IDENTITIES[stage];
   const admission = `${CUTOVER_SHARED}:${stage}_release`;
   return [
-    'load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
+    'load("@viberoots//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deployment")',
     'cloudflare_pages_static_webapp_deployment(name = "deploy", component = "' +
       CUTOVER_APP +
       '", account = "web-platform", account_id = "11111111111111111111111111111111", project = "' +

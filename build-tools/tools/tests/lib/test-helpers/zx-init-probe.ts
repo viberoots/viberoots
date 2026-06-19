@@ -1,6 +1,6 @@
 import "./worker-init";
-import path from "node:path";
 import { timeAsync } from "./timing";
+import { buildToolPath } from "../../../dev/dev-build/paths";
 
 const ZX_INIT_PROBE_LABEL = "zx-init probe (node --import zx-init)";
 let zxInitProbeDone = false;
@@ -38,5 +38,5 @@ export async function ensureZxInitProbedOnce(opts: {
 }
 
 export function zxInitPathFromWorkspace(): string {
-  return path.join(process.cwd(), "build-tools", "tools", "dev", "zx-init.mjs");
+  return buildToolPath(process.cwd(), "tools/dev/zx-init.mjs");
 }

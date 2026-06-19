@@ -62,7 +62,7 @@ test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
     );
 
     // Glue and then run the auto-wired test target
-    await $`build-tools/tools/dev/install-deps.ts --glue-only`;
+    await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
     // Add a short, actionable external timeout message if the test stalls on stdlib
     try {
       await $`buck2 test //projects/apps/demo-cli:demo-cli_test --target-platforms //:no_cgo`;

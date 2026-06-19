@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 // build-tools/tools/dev/startup-check.ts — verifies required tools and Nix features; prints fallbacks
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { isNixStorePath, resolvePreferredCmdPath } from "./startup-check/cmd-paths";
 import { validateStartupWorkspaceState } from "./startup-check/workspace-state";
 import { DEV_OVERRIDE_LANGS, devOverrideEnvNameForLang } from "../lib/dev-override-envs";
@@ -21,6 +22,19 @@ async function pathExists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function sourceRoot(): Promise<string> {
+  const envRoot = String(
+    process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "",
+  ).trim();
+  if (envRoot) return envRoot;
+  if (await pathExists(path.join("viberoots", "build-tools"))) return path.resolve("viberoots");
+  return process.cwd();
+}
+
+function sourcePath(root: string, ...parts: string[]): string {
+  return path.join(root, ...parts);
 }
 
 async function requireImpureEnvPassthrough() {
@@ -48,6 +62,8 @@ async function requireImpureEnvPassthrough() {
 }
 
 async function main() {
+  const source = await sourceRoot();
+
   // Only require the glue/orchestrator tools that the repo workflows depend on.
   // Language-specific toolchains (go/python/etc) are optional: if present they must
   // be nix-provided, but missing tools should not break sparse/partial clones.
@@ -68,10 +84,10 @@ async function main() {
   // Do NOT require developers to edit configs (e.g. langs.json) for sparse/partial clones.
   const isCI = (process.env.CI || "").toLowerCase() === "true";
   const pythonPresent =
-    (await pathExists("build-tools/python/defs.bzl")) ||
-    (await pathExists("build-tools/tools/nix/templates/python.nix")) ||
-    (await pathExists("build-tools/tools/buck/exporter/lang/python.ts")) ||
-    (await pathExists("build-tools/tools/buck/providers/python.ts"));
+    (await pathExists(sourcePath(source, "build-tools/python/defs.bzl"))) ||
+    (await pathExists(sourcePath(source, "build-tools/tools/nix/templates/python.nix"))) ||
+    (await pathExists(sourcePath(source, "build-tools/tools/buck/exporter/lang/python.ts"))) ||
+    (await pathExists(sourcePath(source, "build-tools/tools/buck/providers/python.ts")));
 
   const fakeMissing = String(process.env.STARTUP_CHECK_FAKE_MISSING || "")
     .split(/[,\s]+/)
@@ -138,7 +154,7 @@ async function main() {
 
   // Minimal engines.node check without external deps (supports only ">=x.y.z")
   try {
-    const pkgTxt = await fsp.readFile("package.json", "utf8");
+    const pkgTxt = await fsp.readFile(sourcePath(source, "package.json"), "utf8");
     const pkg = JSON.parse(pkgTxt) as any;
     const required = String(pkg?.engines?.node || "").trim();
     if (required.startsWith(">=")) {

@@ -17,7 +17,7 @@ test("auto-map: Go module labels do not map to providers (even with local patche
     );
 
     // Synthesize a graph with two nodes: one labeled by the module, one unrelated
-    const graph = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graph = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fs.outputFile(
       graph,
       JSON.stringify([
@@ -36,7 +36,7 @@ test("auto-map: Go module labels do not map to providers (even with local patche
     );
 
     const out = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out ${out}`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out ${out}`;
     const txt = await fs.readFile(out, "utf8");
 
     assert.ok(!/:mod_/m.test(txt), "no Go module providers should be mapped");

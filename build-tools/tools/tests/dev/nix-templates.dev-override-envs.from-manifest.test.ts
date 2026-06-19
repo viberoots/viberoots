@@ -18,7 +18,14 @@ test("nix templates resolve dev override env names from build-tools/tools/lib/de
   await runInTemp("nix-templates-dev-override-envs-from-manifest", async (tmp, $) => {
     await fs.writeFile(path.join(tmp, "gomod2nix.toml"), "# empty\n", "utf8");
 
-    const manifestPath = path.join(tmp, "build-tools", "tools", "lib", "dev-override-envs.json");
+    const manifestPath = path.join(
+      tmp,
+      "viberoots",
+      "build-tools",
+      "tools",
+      "lib",
+      "dev-override-envs.json",
+    );
     const manifest = (await fs.readJSON(manifestPath)) as Record<string, string>;
     manifest.go = "NIX_FAKE_GO_DEV_OVERRIDE_JSON";
     manifest.python = "NIX_FAKE_PY_DEV_OVERRIDE_JSON";
@@ -27,7 +34,7 @@ test("nix templates resolve dev override env names from build-tools/tools/lib/de
 
     const uv2nixAdapterStub = `{ pkgs, uv2nixLib ? null }:\nargs: args\n`;
     await fs.writeFile(
-      path.join(tmp, "build-tools", "tools", "nix", "uv2nix-adapter.nix"),
+      path.join(tmp, "viberoots", "build-tools", "tools", "nix", "uv2nix-adapter.nix"),
       uv2nixAdapterStub,
       "utf8",
     );
@@ -45,7 +52,7 @@ test("nix templates resolve dev override env names from build-tools/tools/lib/de
             lib = base.lib;
             buildGoApplication = { overrides ? null, ... }@args: args;
           };
-          T = import ./build-tools/tools/nix/lang-templates.nix { inherit pkgs; };
+          T = import ./viberoots/build-tools/tools/nix/lang-templates.nix { inherit pkgs; };
           drv = T.goLib { name = "//demo:lib"; modulesToml = ./gomod2nix.toml; patchDirs = []; };
           out = (drv.overrides "example@v1.0.0" { src = "ORIG"; version = "v1.0.0"; }).src;
         in out
@@ -70,7 +77,7 @@ test("nix templates resolve dev override env names from build-tools/tools/lib/de
       const cmd = `nix-instantiate --eval --strict --json -E '
         let
           pkgs = import <nixpkgs> {};
-          T = import ./build-tools/tools/nix/templates/python.nix { inherit pkgs; uv2nixLib = {}; };
+          T = import ./viberoots/build-tools/tools/nix/templates/python.nix { inherit pkgs; uv2nixLib = {}; };
           drv = T.pyLib { name = "//demo:py"; lockfile = "uv.lock"; };
         in drv.devOverrides."example@v1.0.0"
       '`;
@@ -100,7 +107,7 @@ test("nix templates resolve dev override env names from build-tools/tools/lib/de
             nodejs = "/fake";
             nodejs_22 = "/fake";
           };
-          C = import ./build-tools/tools/nix/templates/cpp-common.nix { inherit pkgs; };
+          C = import ./viberoots/build-tools/tools/nix/templates/cpp-common.nix { inherit pkgs; };
         in builtins.hasAttr "pkgs.zlib" C.devMap
       '`;
       const res = await $({ cwd: tmp, stdio: "pipe", env })`bash --noprofile --norc -c ${cmd}`;

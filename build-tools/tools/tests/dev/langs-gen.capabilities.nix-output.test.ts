@@ -14,51 +14,57 @@ test("gen-langs: generates langs.nix from manifest capabilities deterministicall
           displayName: "Node",
           requiredPaths: ["**/pnpm-lock.yaml"],
           kinds: ["app", "lib", "workspace"],
-          templatesDir: "build-tools/tools/scaffolding/templates/node",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/node",
           capabilities: { patching: true, lockfileLabels: true, testAutoWire: false },
         },
         {
           id: "go",
           displayName: "Go",
-          requiredPaths: ["build-tools/tools/nix/templates/go.nix", "build-tools/go/defs.bzl"],
+          requiredPaths: [
+            "viberoots/build-tools/tools/nix/templates/go.nix",
+            "viberoots/build-tools/go/defs.bzl",
+          ],
           kinds: ["cli", "lib", "test"],
-          templatesDir: "build-tools/tools/scaffolding/templates/go",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/go",
           capabilities: { patching: true, lockfileLabels: false, testAutoWire: true },
         },
         {
           id: "cpp",
           displayName: "C++",
-          requiredPaths: ["build-tools/tools/nix/templates/cpp.nix", "build-tools/cpp/defs.bzl"],
+          requiredPaths: [
+            "viberoots/build-tools/tools/nix/templates/cpp.nix",
+            "viberoots/build-tools/cpp/defs.bzl",
+          ],
           kinds: ["bin", "lib", "test"],
-          templatesDir: "build-tools/tools/scaffolding/templates/cpp",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/cpp",
           capabilities: { patching: false },
         },
         {
           id: "rust",
           displayName: "Rust",
-          requiredPaths: ["build-tools/tools/nix/planner/rust.nix"],
+          requiredPaths: ["viberoots/build-tools/tools/nix/planner/rust.nix"],
           kinds: ["bin", "lib"],
-          templatesDir: "build-tools/tools/scaffolding/templates/rust",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/rust",
           // no capabilities → empty attr set
         },
       ],
     } as any;
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/nix/langs.json"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/langs.json"),
       JSON.stringify(manifest, null, 2) + "\n",
     );
 
     // Copy generator script
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/dev/gen-langs.ts"),
-      path.join(tmp, "build-tools/tools/dev/gen-langs.ts"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/dev/gen-langs.ts"),
+      path.join(tmp, "viberoots/build-tools/tools/dev/gen-langs.ts"),
     );
 
     // Run generator
-    await $({ cwd: tmp })`node build-tools/tools/dev/gen-langs.ts`;
+    await $({ cwd: tmp })`node viberoots/build-tools/tools/dev/gen-langs.ts`;
 
     // Verify output
-    const outPath = path.join(tmp, "build-tools/tools/nix/langs.nix");
+    const outPath = path.join(tmp, "viberoots/build-tools/tools/nix/langs.nix");
     const txt = await fs.readFile(outPath, "utf8");
     assert.match(txt, /# build-tools\/tools\/nix\/langs\.nix — GENERATED FILE — DO NOT EDIT\./);
     // Sorted by id: cpp, go, node, rust

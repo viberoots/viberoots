@@ -27,7 +27,7 @@ test("python macros fail fast when importer-local patches would cross a Buck pac
     await fsp.writeFile(
       path.join(subpkgDir, "TARGETS"),
       [
-        'load("//build-tools/python:defs.bzl", "nix_python_library")',
+        'load("@viberoots//build-tools/python:defs.bzl", "nix_python_library")',
         "",
         "nix_python_library(",
         '  name = "lib",',

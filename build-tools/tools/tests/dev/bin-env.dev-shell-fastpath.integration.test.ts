@@ -1,9 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
 
+async function readRepoFile(rel: string): Promise<string> {
+  for (const candidate of [rel, path.join("viberoots", rel)]) {
+    try {
+      return await fsp.readFile(candidate, "utf8");
+    } catch {}
+  }
+  return await fsp.readFile(rel, "utf8");
+}
+
 test("_env.sh supports safe direnv bypass fast-path", async () => {
-  const txt = await fsp.readFile("build-tools/tools/bin/_env.sh", "utf8");
+  const txt = await readRepoFile("viberoots/build-tools/tools/bin/_env.sh");
   if (!txt.includes("BUCK_DEV_SHELL_FASTPATH")) {
     throw new Error("_env.sh must expose BUCK_DEV_SHELL_FASTPATH toggle");
   }
@@ -18,5 +28,21 @@ test("_env.sh supports safe direnv bypass fast-path", async () => {
   }
   if (!txt.includes('BUCK_CONFIG_LOCK=1 exec "$@"')) {
     throw new Error("_env.sh fast-path must preserve BUCK_CONFIG_LOCK on direct exec");
+  }
+  if (
+    !txt.includes('[[ -f "${live_root}/.viberoots/current/prelude/prelude.bzl" ]]') ||
+    !txt.includes('rm -f "${live_root}/prelude"') ||
+    txt.includes('[[ -f "${live_root}/prelude/prelude.bzl" ]]')
+  ) {
+    throw new Error("_env.sh must not materialize root prelude in extracted workspaces");
+  }
+  if (
+    !txt.includes('VIBEROOTS_SOURCE_ROOT="${active_viberoots_root}" nix build') ||
+    !txt.includes('--override-input viberoots "path:${active_viberoots_root}"') ||
+    !txt.includes("active_viberoots_hash")
+  ) {
+    throw new Error(
+      "_env.sh prelude materialization must override the viberoots input to the active tooling root",
+    );
   }
 });

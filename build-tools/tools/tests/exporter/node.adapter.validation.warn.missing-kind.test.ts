@@ -6,7 +6,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 test("node adapter warns when kind:* label is missing (warn mode)", async () => {
   await runInTemp("exp-node-warn-missing-kind", async (tmp, $) => {
-    const out = path.join(tmp, "build-tools/tools/buck/.tmp.graph.json");
+    const out = path.join(tmp, "viberoots/build-tools/tools/buck/.tmp.graph.json");
     await fs.mkdirp(path.dirname(out));
     const nodes = [
       // Detected as Node (js_ rule family) and stamped with importer label but missing kind:*
@@ -16,14 +16,14 @@ test("node adapter warns when kind:* label is missing (warn mode)", async () => 
         labels: ["lang:node", "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web"],
       },
     ];
-    const sim = path.join(tmp, "build-tools/tools/buck/simulated.json");
+    const sim = path.join(tmp, "viberoots/build-tools/tools/buck/simulated.json");
     await fs.outputFile(sim, JSON.stringify(nodes) + "\n");
 
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${out} --validation warn`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${out} --validation warn`;
     const txt = String(res.stdout || "") + String(res.stderr || "");
     if (res.exitCode !== 0) {
       console.error("exporter should succeed in warn mode", txt);

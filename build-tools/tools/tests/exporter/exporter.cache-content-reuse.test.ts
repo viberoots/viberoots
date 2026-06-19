@@ -36,7 +36,7 @@ test("exporter: identical batch reuses cached go-list JSON without rewrite", asy
     await $({
       cwd: tmp,
       env: { ...process.env, FORCE_AUTHORITATIVE: "1" },
-    })`build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${graph} --metrics-out ${metrics1} --cache-dir ${cacheDir}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${graph} --metrics-out ${metrics1} --cache-dir ${cacheDir}`;
     const m1 = JSON.parse(await fs.readFile(metrics1, "utf8"));
     const files1 = (await fs.pathExists(cacheDir)) ? await fs.readdir(cacheDir) : [];
     if (!(files1.length === 1 && m1.cacheMisses >= 1)) {
@@ -50,7 +50,7 @@ test("exporter: identical batch reuses cached go-list JSON without rewrite", asy
     await $({
       cwd: tmp,
       env: { ...process.env, FORCE_AUTHORITATIVE: "1" },
-    })`build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${graph} --metrics-out ${metrics2} --cache-dir ${cacheDir}`;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${sim} --out ${graph} --metrics-out ${metrics2} --cache-dir ${cacheDir}`;
     const m2 = JSON.parse(await fs.readFile(metrics2, "utf8"));
     const files2 = await fs.readdir(cacheDir);
     const st2 = await fs.stat(cacheFile);

@@ -516,7 +516,7 @@ Some rules and macros call Nix. Those actions must be invalidated by a small set
 ### Contract
 
 - The canonical list is returned by `global_nix_inputs()`.
-- Call sites do not hardcode `//:flake.lock`.
+- Call sites do not hardcode `//.viberoots/workspace:flake.lock`.
 - If a macro or rule calls Nix, it should attach global inputs as real action inputs, and may also stamp a label for observability.
 
 ### Canonical implementations
@@ -525,18 +525,18 @@ Some rules and macros call Nix. Those actions must be invalidated by a small set
   - `global_nix_inputs`
   - `attach_global_nix_inputs`
 - **Starlark label stamp**: `build-tools/lang/label_stamping.bzl:stamp_global_nix_inputs` (used only when justified)
-- **Lint**: `build-tools/tools/dev/lint-global-stamping.ts` (fails on direct `//:flake.lock` stamping)
+- **Lint**: `build-tools/tools/dev/lint-global-stamping.ts` (fails on direct `//.viberoots/workspace:flake.lock` stamping)
 
 ### Regression guards
 
-There are targeted tests for Node and rule-level shims that assert `//:flake.lock` is present via the helper surface.
+There are targeted tests for Node and rule-level shims that assert `//.viberoots/workspace:flake.lock` is present via the helper surface.
 
 ### Common leak patterns
 
 These are the usual ways this leaks:
 
 - A macro shells out to Nix but only stamps labels, and forgets to attach `global_nix_inputs()` into action inputs.
-- A macro hardcodes `//:flake.lock`, and then drifts when the policy changes.
+- A macro hardcodes `//.viberoots/workspace:flake.lock`, and then drifts when the policy changes.
 
 ---
 
@@ -684,5 +684,5 @@ When I review a change that touches cross-language wiring, I check these items:
 - Does it use `build-tools/lang/defs_common.bzl` helpers instead of re-implementing logic?
 - If it is importer-scoped, does it enforce exactly one `lockfile:<path>#<importer>` label?
 - Are patch inputs attached in a way that matches the rule shape (list vs dict, `srcs` vs `resources`)?
-- If the macro or rule calls Nix, does it attach `global_nix_inputs()` as real action inputs and avoid hardcoding `//:flake.lock`?
+- If the macro or rule calls Nix, does it attach `global_nix_inputs()` as real action inputs and avoid hardcoding `//.viberoots/workspace:flake.lock`?
 - If it introduces a new normalization or naming rule, is there a parity test across Starlark and TS (and Nix when applicable)?

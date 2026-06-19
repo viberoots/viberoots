@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("nix_cpp_binary: defaults build unchanged when no link intent attrs are provided", async () => {
   await runInTemp("cpp-macros-link-intent-defaults-build", async (tmp, $) => {
@@ -13,7 +13,7 @@ test("nix_cpp_binary: defaults build unchanged when no link intent attrs are pro
     await fs.writeFile(
       path.join(app, "TARGETS"),
       [
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")',
         "",
         "nix_cpp_binary(",
         '  name = "demo",',
@@ -37,14 +37,14 @@ test("nix_cpp_binary: defaults build unchanged when no link intent attrs are pro
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     const build = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
       env: { ...process.env, BUCK_TARGET: "//projects/apps/link_intent_defaults:demo" },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     if (build.exitCode !== 0) {
       throw new Error(String(build.stdout || "") + "\n" + String(build.stderr || ""));
     }

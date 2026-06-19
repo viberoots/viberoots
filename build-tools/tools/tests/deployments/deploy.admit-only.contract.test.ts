@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { writeTempListedDeploymentWorkspace } from "./deploy.front-door.fixture";
@@ -11,7 +12,7 @@ test("deploy --admit-only prints scoped admission evidence without deploying", a
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment //sandbox/deployments/demo-dev:deploy --admit-only deploy/demo-dev`;
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //sandbox/deployments/demo-dev:deploy --admit-only deploy/demo-dev`;
     const payload = JSON.parse(String(result.stdout));
     assert.deepEqual(
       payload.checks?.map((entry: { name: string }) => entry.name),

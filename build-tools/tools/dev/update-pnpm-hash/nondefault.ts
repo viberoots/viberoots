@@ -1,5 +1,5 @@
 import { updateNodeModulesHashesJson } from "./hashes-json";
-import { generateImporterLockfile } from "./lockfile";
+import { generateImporterLockfile, prepareExactPnpmStore } from "./lockfile";
 import { extractHash } from "./nix";
 import {
   type PnpmStoreVerifiedMarker,
@@ -42,7 +42,7 @@ export async function handleNonDefaultImporter(opts: {
   };
   const restoreSharedHash = async () => {
     if (!opts.existingLockHash) return false;
-    return await restoreHashFromSharedCache({
+    const restored = await restoreHashFromSharedCache({
       repoRoot: opts.repoRoot,
       key: opts.key,
       markerPath: opts.markerPath,
@@ -53,7 +53,19 @@ export async function handleNonDefaultImporter(opts: {
       existingHash: opts.existingHash,
       hasValidExistingHash: opts.hasValidExistingHash,
     });
+    if (restored) {
+      await prepareExactPnpmStore({ repoRoot: opts.repoRoot, importer: opts.importer });
+    }
+    return restored;
   };
+  const markerMatchesCurrentBuilder =
+    opts.existingLockHash &&
+    opts.existingMarker &&
+    opts.existingMarker.importer === opts.importer &&
+    opts.existingMarker.lockfile === opts.key &&
+    opts.existingMarker.lockHash === opts.existingLockHash &&
+    opts.existingMarker.hashValue === opts.existingHash &&
+    opts.existingMarker.builderFingerprint === opts.builderFingerprint;
   const withSharedHashComputation = async (compute: () => Promise<boolean>) => {
     if (!opts.existingLockHash) return await compute();
     return await withSharedHashCacheLock(
@@ -63,22 +75,17 @@ export async function handleNonDefaultImporter(opts: {
         lockHash: opts.existingLockHash,
       },
       async () => {
-        await restoreSharedHash();
+        if (await restoreSharedHash()) {
+          return true;
+        }
         return await compute();
       },
     );
   };
   if (opts.hasValidExistingHash) {
-    if (
-      opts.existingLockHash &&
-      opts.existingMarker &&
-      opts.existingMarker.importer === opts.importer &&
-      opts.existingMarker.lockfile === opts.key &&
-      opts.existingMarker.lockHash === opts.existingLockHash &&
-      opts.existingMarker.hashValue === opts.existingHash &&
-      opts.existingMarker.builderFingerprint === opts.builderFingerprint
-    ) {
+    if (markerMatchesCurrentBuilder) {
       await persistHash(opts.existingHash);
+      await prepareExactPnpmStore({ repoRoot: opts.repoRoot, importer: opts.importer });
       console.log(
         `[update-pnpm-hash] importer=${opts.importer} step=skip-existing-hash attr=${opts.storeAttr} lockfile=${opts.key}`,
       );
@@ -87,6 +94,45 @@ export async function handleNonDefaultImporter(opts: {
     console.log(
       `[update-pnpm-hash] importer=${opts.importer} step=stale-existing-hash attr=${opts.storeAttr} lockfile=${opts.key}`,
     );
+    if (opts.existingMarker && !markerMatchesCurrentBuilder) {
+      console.log(
+        `[update-pnpm-hash] importer=${opts.importer} step=stale-builder-recompute attr=${opts.unfixedAttr} timeout=${opts.timeoutSec}s`,
+      );
+      return await withSharedHashComputation(async () => {
+        let pre = await opts.runUnfixedBuild(
+          `importer=${opts.importer} step=stale-builder-recompute attr=${opts.unfixedAttr}`,
+        );
+        if (!pre.ok) {
+          await generateImporterLockfile({ repoRoot: opts.repoRoot, importer: opts.importer });
+          pre = await opts.runUnfixedBuild(
+            `importer=${opts.importer} step=stale-builder-recompute-retry attr=${opts.unfixedAttr}`,
+          );
+        }
+        if (!pre.ok || !pre.sri) {
+          console.error(
+            "pnpm-store-unfixed failed during stale builder recompute\n\n" +
+              String(pre.output || ""),
+          );
+          process.exit(1);
+          return true;
+        }
+        await updateNodeModulesHashesJson(opts.key, pre.sri);
+        const verifyAfterHash = await opts.runFixedBuild(
+          `importer=${opts.importer} step=stale-builder-fixed-after-hash attr=${opts.storeAttr}`,
+        );
+        if (!verifyAfterHash.ok) {
+          console.error(
+            "pnpm-store still failing after stale builder hash update\n\n" +
+              String(verifyAfterHash.output || ""),
+          );
+          process.exit(1);
+          return true;
+        }
+        await persistHash(pre.sri);
+        console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");
+        return true;
+      });
+    }
     if (
       await withSharedHashComputation(async () => {
         const verifyExisting = await opts.runFixedBuild(

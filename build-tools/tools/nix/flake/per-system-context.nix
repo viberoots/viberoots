@@ -9,8 +9,12 @@
 , includeNodeMods ? false
 }:
 let
-  repoRoot = workspaceSrc;
-  viberootsRoot = viberootsInput.outPath or workspaceSrc;
+  workspaceRootPath =
+    if builtins.isAttrs workspaceSrc then workspaceSrc.outPath else workspaceSrc;
+  viberootsRootPath =
+    if builtins.isAttrs viberootsInput then viberootsInput.outPath else viberootsInput;
+  repoRoot = workspaceRootPath;
+  viberootsRoot = viberootsRootPath;
   pkgs = import nixpkgs {
     inherit system;
     overlays =
@@ -50,6 +54,18 @@ let
         if s != "" then (builtins.toPath s) else null;
     };
 
+  viberootsNodeMods = import ../node-modules.nix {
+    inherit pkgs;
+    repoRoot = viberootsRoot;
+    repoFsRoot = viberootsRoot;
+    hashesPath = ../node-modules.hashes.json;
+    prefetchedStorePathGlobal =
+      let
+        s = builtins.getEnv "LOCAL_PNPM_STORE";
+      in
+      if s != "" then (builtins.toPath s) else null;
+  };
+
   prelude = import ../buck-prelude.nix { inherit pkgs; buck2Input = buck2; };
 
   uv2nixLib =
@@ -70,6 +86,6 @@ let
     };
 in
 {
-  inherit pkgs system zx-wrapper devshell prelude uv2nixLib liveFsRoot mkNodeMods repoRoot viberootsRoot version releaseTag;
+  inherit pkgs system zx-wrapper devshell prelude uv2nixLib liveFsRoot mkNodeMods repoRoot viberootsRoot viberootsNodeMods version releaseTag;
   buck2Input = buck2;
 } // (if includeNodeMods then { nodeMods = mkNodeMods { }; } else { })

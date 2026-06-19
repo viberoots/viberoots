@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 async function nixBuildSelected(tmp: string, $: any, target: string) {
   const res = await $({
@@ -16,7 +16,7 @@ async function nixBuildSelected(tmp: string, $: any, target: string) {
       BUCK_TEST_SRC: tmp,
       BUCK_TARGET: target,
     },
-  })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+  })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
   if (res.exitCode !== 0) {
     console.error(String(res.stderr || res.stdout || ""));
     throw new Error(`nix build failed (exit=${res.exitCode})`);
@@ -105,7 +105,7 @@ test("go cgo link_closure=transitive follows C++ link_deps", async () => {
         link_closure_overrides: {},
       },
     ];
-    const graphJsonPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+    const graphJsonPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fs.mkdirp(path.dirname(graphJsonPath));
     await fs.writeFile(graphJsonPath, JSON.stringify(graph, null, 2) + "\n", "utf8");
 

@@ -15,23 +15,23 @@ test("cpp mkApp/mkLib delegate to T.cpp* via stub template", async () => {
           id: "cpp",
           displayName: "C++",
           requiredPaths: [
-            "build-tools/tools/nix/planner/cpp.nix",
-            "build-tools/tools/nix/templates/cpp.nix",
+            "viberoots/build-tools/tools/nix/planner/cpp.nix",
+            "viberoots/build-tools/tools/nix/templates/cpp.nix",
           ],
           kinds: ["bin", "lib"],
-          templatesDir: "build-tools/tools/scaffolding/templates/cpp",
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/cpp",
         },
       ],
     } as any;
     await fs.outputFile(
-      path.join(tmp, "build-tools/tools/nix/langs.json"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/langs.json"),
       JSON.stringify(manifest, null, 2) + "\n",
     );
 
     // Copy planner plugin and provide a stub template implementing cppApp/cppLib
     await fs.copy(
-      path.join(process.cwd(), "build-tools/tools/nix/planner/cpp.nix"),
-      path.join(tmp, "build-tools/tools/nix/planner/cpp.nix"),
+      path.join(process.cwd(), "viberoots/build-tools/tools/nix/planner/cpp.nix"),
+      path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix"),
     );
     const stub = `
       { pkgs }:
@@ -49,7 +49,7 @@ test("cpp mkApp/mkLib delegate to T.cpp* via stub template", async () => {
             echo lib:${"${name}"} > $out/lib.txt
           '';
       }`;
-    await fs.outputFile(path.join(tmp, "build-tools/tools/nix/templates/cpp.nix"), stub);
+    await fs.outputFile(path.join(tmp, "viberoots/build-tools/tools/nix/templates/cpp.nix"), stub);
 
     // Minimal Buck graph including one bin and one lib (rule types drive kind)
     const graph = [
@@ -62,7 +62,7 @@ test("cpp mkApp/mkLib delegate to T.cpp* via stub template", async () => {
     );
 
     // Build outputs via graph-generator; use repo’s graph-generator.nix with overridden src
-    const flake = path.join(process.cwd(), "build-tools/tools/nix/graph-generator.nix");
+    const flake = path.join(process.cwd(), "viberoots/build-tools/tools/nix/graph-generator.nix");
     const res = await $({
       cwd: tmp,
     })`nix build --accept-flake-config -f ${flake} --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux"} --arg graphJsonPath ./.viberoots/workspace/buck/graph.json --no-link --print-out-paths`.nothrow();

@@ -47,7 +47,7 @@ async function starlarkProbeOutput(target: string): Promise<string> {
 
 try {
   for (const c of cases) {
-    const target = `//build-tools/tools/tests/cpp/sanitize:${c.name}`;
+    const target = `viberoots//build-tools/tools/tests/cpp/sanitize:${c.name}`;
     const want = sanitizeName(c.label);
     const got = await starlarkProbeOutput(target);
     if (got !== want) {

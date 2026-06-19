@@ -10,13 +10,13 @@ test("patch-cpp start --echo-snippet prints an export snippet", async () => {
     await fsp.mkdir(storeSrc, { recursive: true });
     await fsp.writeFile(path.join(storeSrc, "file.txt"), "A\n", "utf8");
     const map = { "pkgs.zlib": { version: "1.2.13", srcPath: storeSrc, pname: "zlib" } };
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const out = await $({
       cwd: tmp,
       stdio: "pipe",
     })`NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} build-tools/tools/bin/patch-pkg start cpp pkgs.zlib --echo-snippet`;
+    )} viberoots/build-tools/tools/bin/patch-pkg start cpp pkgs.zlib --echo-snippet`;
     const full = [String(out.stdout || ""), String(out.stderr || "")].join("\n");
     if (!full.includes("export NIX_CPP_DEV_OVERRIDE_JSON=")) {
       console.error("expected export snippet in output");

@@ -48,7 +48,7 @@ await runInTemp("buck-cleanup-interrupted", async (tmp, $) => {
       certFile = fallback;
     } catch {}
   }
-  const buck = spawn("buck2", ["build", "//:flake.lock"], {
+  const buck = spawn("buck2", ["build", "//.viberoots/workspace:flake.lock"], {
     cwd: tmp,
     env: {
       ...process.env,

@@ -48,6 +48,12 @@ function packageParentPrefix(packagePath: string): string {
   return lastSlash > 0 ? normalized.slice(0, lastSlash) : "";
 }
 
+function buildSystemClassificationPath(relPath: string): string {
+  return relPath.startsWith("viberoots/build-tools/")
+    ? relPath.slice("viberoots/".length)
+    : relPath;
+}
+
 export function deploymentProjectPrefixesFromLabels(labels: string[]): string[] {
   return toSortedUnique(
     labels.map((label) => packageParentPrefix(packagePathFromLabel(label))).filter(Boolean),
@@ -99,13 +105,14 @@ export function resolveDeploymentImpactSelection(
   const unknownBuildSystemPaths: string[] = [];
 
   for (const relPath of normalizedChangedPaths) {
-    if (isIgnoredBuildSystemScopePath(relPath)) {
+    const buildSystemPath = buildSystemClassificationPath(relPath);
+    if (isIgnoredBuildSystemScopePath(buildSystemPath)) {
       continue;
     }
     if (isDocumentationPath(relPath)) {
       continue;
     }
-    if (classifyReviewedBuildSystemVerifyPath(relPath) === "deployment-owned") {
+    if (classifyReviewedBuildSystemVerifyPath(buildSystemPath) === "deployment-owned") {
       deploymentOwnedPaths.push(relPath);
       continue;
     }
@@ -113,10 +120,10 @@ export function resolveDeploymentImpactSelection(
       deploymentProjectPaths.push(relPath);
       continue;
     }
-    if (!isBuildSystemPath(relPath)) {
+    if (!isBuildSystemPath(buildSystemPath)) {
       continue;
     }
-    if (classifyReviewedBuildSystemVerifyPath(relPath) === "shared") {
+    if (classifyReviewedBuildSystemVerifyPath(buildSystemPath) === "shared") {
       sharedBuildSystemPaths.push(relPath);
       continue;
     }

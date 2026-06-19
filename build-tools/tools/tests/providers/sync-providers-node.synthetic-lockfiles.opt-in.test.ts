@@ -23,7 +23,7 @@ test("sync-providers-node: synthetic lockfile providers are opt-in", async () =>
     await $`git add projects/apps/demo/package.json`;
 
     // Default behavior: no provider for non-existent lockfiles
-    await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
     const outPath = path.join(tmp, ".viberoots", "workspace", "providers", "TARGETS.node.auto");
     const outDefault = await fsp.readFile(outPath, "utf8");
     assert.ok(!outDefault.includes("node_importer_deps("), "expected no node providers by default");
@@ -33,7 +33,7 @@ test("sync-providers-node: synthetic lockfile providers are opt-in", async () =>
     );
 
     // Opt-in behavior: metadata-only provider keyed by synthetic lockfile path
-    await $`NODE_PROVIDER_SYNTHETIC_LOCKFILES=1 node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`NODE_PROVIDER_SYNTHETIC_LOCKFILES=1 node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
     const outSynth = await fsp.readFile(outPath, "utf8");
     assert.ok(outSynth.includes("node_importer_deps("), "expected node provider in synthetic mode");
     assert.ok(

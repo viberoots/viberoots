@@ -5,6 +5,14 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
+function includesAny(haystack: string, needles: string[]): boolean {
+  return needles.some((needle) => haystack.includes(needle));
+}
+
+function outputMessage(kind: string, out: string): string {
+  return `expected ${kind} in nix_inputs; output was:\n${out.slice(0, 4000)}`;
+}
+
 test("cpp macros do not couple to overlay in nix_inputs (cquery)", async () => {
   await runInTemp("cpp-nix-inputs-no-overlay", async (tmp, $) => {
     // Define a minimal C++ macro target at repo root
@@ -13,7 +21,7 @@ test("cpp macros do not couple to overlay in nix_inputs (cquery)", async () => {
       [
         "",
         "# test: cpp.macros.nix_inputs.no-overlay.test.ts",
-        'load("//build-tools/cpp:defs.bzl", "nix_cpp_library")',
+        'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
         "nix_cpp_library(",
         '  name = "probe_lib",',
@@ -37,23 +45,39 @@ test("cpp macros do not couple to overlay in nix_inputs (cquery)", async () => {
     const out = String(probe.stdout || "");
     assert.ok(out.includes(":flake.lock"), "expected flake.lock to be present in nix_inputs");
     assert.ok(
-      out.includes("//build-tools/tools/buck:runtime_ts"),
-      "expected Buck exporter runtime filegroup to be present in nix_inputs",
+      includesAny(out, [
+        "@viberoots//build-tools/tools/buck:runtime_ts",
+        "viberoots//build-tools/tools/buck:runtime_ts",
+        "root//viberoots/build-tools/tools/buck:runtime_ts",
+      ]),
+      outputMessage("Buck exporter runtime filegroup", out),
     );
     assert.ok(
-      out.includes("//build-tools/tools/dev:runtime_ts"),
-      "expected selected-build helper runtime filegroup to be present in nix_inputs",
+      includesAny(out, [
+        "@viberoots//build-tools/tools/dev:runtime_ts",
+        "viberoots//build-tools/tools/dev:runtime_ts",
+        "root//viberoots/build-tools/tools/dev:runtime_ts",
+      ]),
+      outputMessage("selected-build helper runtime filegroup", out),
     );
     assert.ok(
-      out.includes("//build-tools/tools/lib:runtime_ts"),
-      "expected shared TypeScript helper runtime filegroup to be present in nix_inputs",
+      includesAny(out, [
+        "@viberoots//build-tools/tools/lib:runtime_ts",
+        "viberoots//build-tools/tools/lib:runtime_ts",
+        "root//viberoots/build-tools/tools/lib:runtime_ts",
+      ]),
+      outputMessage("shared TypeScript helper runtime filegroup", out),
     );
     assert.ok(
-      out.includes("//build-tools/tools/nix:runtime_nix"),
-      "expected planner runtime filegroup to be present in nix_inputs",
+      includesAny(out, [
+        "@viberoots//build-tools/tools/nix:runtime_nix",
+        "viberoots//build-tools/tools/nix:runtime_nix",
+        "root//viberoots/build-tools/tools/nix:runtime_nix",
+      ]),
+      outputMessage("planner runtime filegroup", out),
     );
     assert.ok(
-      !out.includes("build-tools/tools/nix/overlays:cpp-patches.nix"),
+      !out.includes("viberoots/build-tools/tools/nix/overlays:cpp-patches.nix"),
       "overlay cpp-patches.nix must not be present in nix_inputs",
     );
   });

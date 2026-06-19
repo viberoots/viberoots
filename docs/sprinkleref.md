@@ -90,8 +90,8 @@ sprinkleref --init-local
 Repo-wide bootstrap also uses this resolver shape:
 
 ```bash
-build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
-build-tools/tools/deployments/infisical-bootstrap.ts repo
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo
 sprinkleref --check
 ```
 

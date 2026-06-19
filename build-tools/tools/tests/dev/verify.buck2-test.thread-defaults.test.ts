@@ -113,7 +113,7 @@ test("verify buck2 thread defaults keep small local target sets responsive", () 
 
 test("verify failure diagnostics summarize process snapshots", () => {
   const summary = summarizeVerifyProcessSnapshot([
-    "101 1 00:01:00 /nix/store/node/bin/node build-tools/tools/tests/foo.test.ts",
+    "101 1 00:01:00 /nix/store/node/bin/node viberoots/build-tools/tools/tests/foo.test.ts",
     "102 1 00:02:00 buck2d[verify-nested-123-abcdefabcdef] --isolation-dir verify-nested-123-abcdefabcdef",
     "103 1 00:03:00 /nix/store/bin/nix build .#check",
   ]);

@@ -1,4 +1,5 @@
 import path from "node:path";
+import fs from "node:fs";
 
 import type { ScafContext } from "./types";
 
@@ -12,7 +13,31 @@ import { validateTemplates } from "../validate";
 
 function repoRootFromScafModuleUrl(): string {
   const here = path.dirname(new URL(import.meta.url).pathname);
-  return path.resolve(here, "..", "..", "..", "..");
+  const fromModule = path.resolve(here, "..", "..", "..", "..", "..");
+  const workspaceRoot = String(
+    process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || "",
+  ).trim();
+  if (workspaceRoot) {
+    const workspaceViberoots = path.join(path.resolve(workspaceRoot), "viberoots");
+    if (path.relative(workspaceViberoots, fromModule).startsWith("..") === false) {
+      return fromModule;
+    }
+  }
+  for (const envRoot of [
+    process.env.VIBEROOTS_SOURCE_ROOT || "",
+    process.env.VIBEROOTS_ROOT || "",
+  ]) {
+    const root = envRoot.trim();
+    if (!root) continue;
+    const nested = path.join(root, "viberoots");
+    if (fs.existsSync(path.join(nested, "build-tools", "tools", "dev", "zx-init.mjs"))) {
+      return nested;
+    }
+    if (fs.existsSync(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"))) {
+      return root;
+    }
+  }
+  return fromModule;
 }
 
 function normalizeCwd(repoRoot: string) {
@@ -39,6 +64,10 @@ function guardBuckTests(repoRoot: string) {
       process.exit(2);
     }
   } catch {}
+}
+
+function commandMayMutateWorkspace(cmd: string | undefined): boolean {
+  return ["new", "language", "update", "regen", "delete", "move"].includes(String(cmd || ""));
 }
 
 function requiresTemplateManifestPreflight(cmd: string | undefined, rest: string[]): boolean {
@@ -70,10 +99,12 @@ export async function runScafCli() {
   process.env.VIBEROOTS_ROOT = process.env.VIBEROOTS_ROOT || ctx.repoRoot;
 
   normalizeCwd(ctx.repoRoot);
-  guardBuckTests(ctx.repoRoot);
 
   const { positionals, flags } = parseScafArgv(getArgvTokens());
   const [cmd, ...rest] = positionals;
+  if (commandMayMutateWorkspace(cmd)) {
+    guardBuckTests(ctx.repoRoot);
+  }
   if (requiresTemplateManifestPreflight(cmd, rest)) {
     await runTemplateManifestPreflight(ctx.repoRoot);
   }

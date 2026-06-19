@@ -1,13 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
-
-const repoRoot = process.cwd();
+import { viberootsRepoPath } from "./deployment-command";
 
 async function read(rel: string) {
-  return await fsp.readFile(path.join(repoRoot, rel), "utf8");
+  return await fsp.readFile(viberootsRepoPath(rel), "utf8");
 }
 
 test("deployment control plane docs keep admission_reporter as the submit-time evidence boundary", async () => {

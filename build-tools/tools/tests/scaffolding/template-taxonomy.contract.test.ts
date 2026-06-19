@@ -46,7 +46,7 @@ test("taxonomy canonical TypeScript id set stays stable", () => {
 });
 
 test("taxonomy matches templates/ts filesystem roots", async () => {
-  const tsRoot = path.join("build-tools", "tools", "scaffolding", "templates", "ts");
+  const tsRoot = path.join("viberoots", "build-tools", "tools", "scaffolding", "templates", "ts");
   const entries = await fsp.readdir(tsRoot, { withFileTypes: true });
   const idsFromFilesystem = entries
     .filter((entry) => entry.isDirectory())
@@ -56,6 +56,7 @@ test("taxonomy matches templates/ts filesystem roots", async () => {
 
 test("taxonomy includes deployment scaffold family", async () => {
   const deploymentRoot = path.join(
+    "viberoots",
     "build-tools",
     "tools",
     "scaffolding",
@@ -70,7 +71,14 @@ test("taxonomy includes deployment scaffold family", async () => {
 });
 
 test("filesystem contract: no canonical TypeScript templates remain under templates/node", async () => {
-  const nodeRoot = path.join("build-tools", "tools", "scaffolding", "templates", "node");
+  const nodeRoot = path.join(
+    "viberoots",
+    "build-tools",
+    "tools",
+    "scaffolding",
+    "templates",
+    "node",
+  );
   const canonicalTsTemplateNames = new Set(
     CANONICAL_TS_TEMPLATE_IDS.map((id) => id.split("/")[1]).filter(Boolean),
   );

@@ -32,7 +32,7 @@ test("patch filename decoding parity (TypeScript <-> Nix)", async () => {
     let
       pkgs = import <nixpkgs> {};
       lib = pkgs.lib;
-      H = import ./build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
+      H = import ./viberoots/build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
       files = builtins.fromJSON ${JSON.stringify(JSON.stringify(filenames))};
       decode = n:
         let d = H.decodePatchFilename { name = n; }; in if d == null then null else d.key;

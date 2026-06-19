@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -43,8 +44,8 @@ function freshPromotionEnv(tmp: string, overrides: NodeJS.ProcessEnv = {}): Node
     ...overrides,
     BUCK_ISOLATION_DIR: isolation,
     BUCK_NESTED_ISO: isolation,
+    BUCK_ISOLATION_DIR_EXPORTER: isolation,
   };
-  delete env.BUCK_ISOLATION_DIR_EXPORTER;
   return env;
 }
 
@@ -116,7 +117,7 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
       const devRun = await $({
         cwd: tmp,
         env,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${dev.label} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${dev.label} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
       await seedSyntheticTargetStageState({ recordsRoot, deployment: staging });
       const stagingPromotion = await resolveCloudflarePagesPromotionSelection({
@@ -197,7 +198,7 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
       const devRun = await $({
         cwd: tmp,
         env,
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${dev.label} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${dev.label} --admission-evidence-json ${devEvidenceJson} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(devServer.port)} --smoke-connect-protocol https:`;
       const devSummary = JSON.parse(String(devRun.stdout));
       await seedSyntheticTargetStageState({ recordsRoot, deployment: staging });
       const promotion = await resolveCloudflarePagesPromotionSelection({

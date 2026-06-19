@@ -12,11 +12,11 @@ test("patch-cpp start with PATCH_ECHO_SNIPPET prints unified export snippet", as
     const attr = "pkgs.zlib";
     const version = "1.2.13";
     const map = { [attr]: { version, srcPath: storeSrc, pname: "zlib" } };
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const out = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`PATCH_ECHO_SNIPPET=1 NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(map)} build-tools/tools/bin/patch-pkg start cpp ${attr}`;
+    })`PATCH_ECHO_SNIPPET=1 NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(map)} viberoots/build-tools/tools/bin/patch-pkg start cpp ${attr}`;
     const ws = String(out.stdout || "")
       .trim()
       .split(/\s+/)

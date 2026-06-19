@@ -5,14 +5,14 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-const scriptPath = "build-tools/tools/dev/nix-gaps-inventory-check.ts";
+const scriptPath = "viberoots/build-tools/tools/dev/nix-gaps-inventory-check.ts";
 const exceptionsPath = "docs/handbook/nix-gaps-exceptions.json";
 
 const starlarkApi = `# Starlark API reference
 
 ## Index
 
-- \`//build-tools/node:defs.bzl\`
+- \`@viberoots//build-tools/node:defs.bzl\`
   - \`nix_node_cli_bin\`
 
 ## Node macros

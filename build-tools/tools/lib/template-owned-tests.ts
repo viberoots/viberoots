@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { resolveWorkspaceRootsSync } from "./repo";
 
 const TEMPLATE_CONVENTIONS_PATH = "build-tools/tools/tests/template_conventions.bzl";
 
@@ -7,7 +8,7 @@ type TemplateOwnedTestIndex = {
   scriptToTemplateIds: Map<string, string[]>;
 };
 
-let cachedOwnedTestIndex: TemplateOwnedTestIndex | null = null;
+const cachedOwnedTestIndexes = new Map<string, TemplateOwnedTestIndex>();
 
 function normalizePath(relPath: string): string {
   return String(relPath || "")
@@ -46,8 +47,25 @@ function templateIdFromTemplateRoot(rootPath: string): string | null {
 }
 
 export async function readTemplateOwnedTestIndex(root: string): Promise<TemplateOwnedTestIndex> {
-  if (cachedOwnedTestIndex) return cachedOwnedTestIndex;
-  const filePath = path.join(root, TEMPLATE_CONVENTIONS_PATH);
+  const roots = resolveWorkspaceRootsSync({ start: root });
+  const candidates = [
+    roots.viberootsRoot,
+    path.join(roots.workspaceRoot, "viberoots"),
+    roots.workspaceRoot,
+  ];
+  let filePath = "";
+  for (const candidate of candidates) {
+    const p = path.join(candidate, TEMPLATE_CONVENTIONS_PATH);
+    try {
+      await fsp.access(p);
+      filePath = p;
+      break;
+    } catch {}
+  }
+  if (!filePath) {
+    filePath = path.join(roots.viberootsRoot, TEMPLATE_CONVENTIONS_PATH);
+  }
+  if (cachedOwnedTestIndexes.has(filePath)) return cachedOwnedTestIndexes.get(filePath)!;
   const text = await fsp.readFile(filePath, "utf8");
   const scriptToTemplateIds = new Map<string, string[]>();
   const lines = text.split(/\r?\n/);
@@ -94,6 +112,7 @@ export async function readTemplateOwnedTestIndex(root: string): Promise<Template
       inTemplateRoots = false;
     }
   }
-  cachedOwnedTestIndex = { scriptToTemplateIds };
-  return cachedOwnedTestIndex;
+  const index = { scriptToTemplateIds };
+  cachedOwnedTestIndexes.set(filePath, index);
+  return index;
 }

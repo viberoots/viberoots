@@ -665,7 +665,7 @@ step instead of editing Keycloak by hand.
   organization ids:
 
 ```bash
-build-tools/tools/deployments/infisical-bootstrap.ts \
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts \
   deployment \
   --target //projects/deployments/pleomino/staging:deploy \
   --org-name viberoots \
@@ -680,7 +680,7 @@ short-lived admin token and an explicit organization selector:
 
 ```bash
 INFISICAL_ACCESS_TOKEN='<redacted>' \
-  build-tools/tools/deployments/infisical-bootstrap.ts \
+  viberoots/build-tools/tools/deployments/infisical-bootstrap.ts \
   deployment \
   --target //projects/deployments/pleomino/staging:deploy \
   --no-login \

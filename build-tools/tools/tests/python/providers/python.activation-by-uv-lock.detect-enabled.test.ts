@@ -27,7 +27,7 @@ version = "23.2.0"
 
     // Runner: call syncAllProviders() without narrowing so detection must enable Python
     const runner = `#!/usr/bin/env zx-wrapper
-import { syncAllProviders } from "./build-tools/tools/buck/providers/index";
+import { syncAllProviders } from "./viberoots/build-tools/tools/buck/providers/index";
 await syncAllProviders();
 `;
     const runnerPath = path.join(tmp, "run-sync.mjs");
@@ -39,10 +39,7 @@ await syncAllProviders();
     const txt = await fsp.readFile(outFile, "utf8");
     // Header + load line present
     assert.match(txt, /# GENERATED FILE — DO NOT EDIT\./);
-    assert.match(
-      txt,
-      /load\("@root\/\/third_party\/providers:defs_python\.bzl", "python_importer_deps"\)/,
-    );
+    assert.match(txt, /load\("\/\/:defs_python\.bzl", "python_importer_deps"\)/);
     // Provider entry present for projects/libs/api importer
     assert.match(txt, /python_importer_deps\(name="/);
     assert.match(txt, /lockfile="projects\/libs\/api\/uv\.lock"/);

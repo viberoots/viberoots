@@ -25,7 +25,7 @@ test("python binary wiring includes importer-local patches in srcs (cquery)", as
       path.join(appDir, "TARGETS"),
       [
         'load("@prelude//:rules.bzl", "python_library")',
-        'load("//build-tools/python:defs.bzl", "nix_python_binary")',
+        'load("@viberoots//build-tools/python:defs.bzl", "nix_python_binary")',
         "",
         "python_library(",
         '  name = "lib",',

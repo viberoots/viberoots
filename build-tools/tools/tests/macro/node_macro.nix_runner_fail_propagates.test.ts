@@ -30,7 +30,7 @@ test(
       const importer = "projects/libs/demo";
       // Overwrite TARGETS to enforce allow-generate semantics in the runner
       const targets = [
-        'load("//build-tools/node:defs.bzl", "nix_node_lib", "nix_node_test")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_lib", "nix_node_test")',
         "",
         "nix_node_lib(",
         '    name = "demo",',
@@ -60,7 +60,7 @@ test(
       await $`bash --noprofile --norc -c 'test -f pnpm-lock.yaml && [ ! -f projects/libs/demo/pnpm-lock.yaml ] && cp pnpm-lock.yaml projects/libs/demo/pnpm-lock.yaml || true'`;
       await $({
         stdio: "inherit",
-      })`bash --noprofile --norc -c 'set -euo pipefail; NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT=300 zx-wrapper build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/libs/demo/pnpm-lock.yaml'`;
+      })`bash --noprofile --norc -c 'set -euo pipefail; NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT=300 zx-wrapper viberoots/build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/libs/demo/pnpm-lock.yaml'`;
 
       // Add an explicitly failing test file
       const failingTest = [

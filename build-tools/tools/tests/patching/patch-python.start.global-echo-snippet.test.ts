@@ -17,13 +17,13 @@ test("patch-python start with PATCH_ECHO_SNIPPET prints unified export snippet",
     const origin = path.join(tmp, "pycache", "requests-2.32.3");
     await fs.mkdirp(origin);
     await fs.writeFile(path.join(origin, "readme.txt"), "A\n", "utf8");
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
     })`PATCH_ECHO_SNIPPET=1 NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
-    })} NIX_PY_DEV_OVERRIDE_JSON={} build-tools/tools/bin/patch-pkg start python requests --importer ${importer}`;
+    })} NIX_PY_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg start python requests --importer ${importer}`;
     const ws = String(res.stdout || "")
       .trim()
       .split(/\s+/)

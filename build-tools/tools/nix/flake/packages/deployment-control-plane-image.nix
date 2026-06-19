@@ -1,8 +1,17 @@
-{ pkgs, nodeMods, repoSnapshot }:
+{ pkgs, filterRepo, nodeMods, repoRoot, repoSnapshot, viberootsRoot }:
 let
   version = "0.1.0";
   runtimePackagingRevision = "cjs-bundle-3-real-wrangler-ca";
-  sourceRevision = "source-${builtins.substring 0 12 (builtins.hashString "sha256" "${builtins.toString repoSnapshot}:${runtimePackagingRevision}")}";
+  viberootsSnapshot = builtins.path {
+    path = viberootsRoot;
+    name = "viberoots-control-plane-source";
+    filter = filterRepo viberootsRoot;
+  };
+  controlPlaneSourceRoot =
+    if builtins.pathExists (repoRoot + "/build-tools/tools/deployments/deployment-control-plane.ts")
+    then repoSnapshot
+    else viberootsSnapshot;
+  sourceRevision = "source-${builtins.substring 0 12 (builtins.hashString "sha256" "${builtins.toString controlPlaneSourceRoot}:${runtimePackagingRevision}")}";
   imageBuildIdentity = "nix-source-${builtins.hashString "sha256" "${sourceRevision}:${runtimePackagingRevision}"}";
   rootNodeModules = nodeMods.node-modules;
   wranglerCli = "${rootNodeModules}/node_modules/wrangler/bin/wrangler.js";
@@ -20,7 +29,7 @@ let
   runtime = pkgs.stdenvNoCC.mkDerivation {
     pname = "deployment-control-plane-runtime";
     inherit version;
-    src = repoSnapshot;
+    src = controlPlaneSourceRoot;
     nativeBuildInputs = [ pkgs.esbuild pkgs.nodejs_22 ];
     buildPhase = ''
       set -euo pipefail

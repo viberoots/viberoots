@@ -64,7 +64,7 @@ export async function installKubernetesTargets(
   const fragments = sharedPolicyTargetsByDir(deployments);
   for (const deployment of deployments) {
     appendTargetsFragment(fragments, labelDir(deployment.label), {
-      loadLines: ['load("//build-tools/deployments:defs.bzl", "deployment_target")'],
+      loadLines: ['load("@viberoots//build-tools/deployments:defs.bzl", "deployment_target")'],
       bodyLines: [
         "deployment_target(",
         `    name = ${JSON.stringify(labelName(deployment.label))},`,

@@ -12,12 +12,12 @@ test("patch-go: workspace parent dir is viberoots-patch-go", async () => {
     await fsp.writeFile(path.join(origin, "README.md"), "hello\n", "utf8");
     const map = { "golang.org/x/net": { version: "v0.24.0", originPath: origin } };
 
-    await $`chmod +x build-tools/tools/bin/patch-pkg`;
+    await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const out = await $({
       cwd: tmp,
     })`NIX_GO_TEST_RESOLVE_JSON=${JSON.stringify(
       map,
-    )} NIX_GO_DEV_OVERRIDE_JSON={} build-tools/tools/bin/patch-pkg start go golang.org/x/net`;
+    )} NIX_GO_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg start go golang.org/x/net`;
     const ws = String(out.stdout || "")
       .trim()
       .split(/\s+/)

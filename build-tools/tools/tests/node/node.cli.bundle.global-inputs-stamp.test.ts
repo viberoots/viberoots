@@ -15,7 +15,7 @@ test("nix_node_cli_bin(bundle=True) stamps global Nix inputs via labels", async 
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_cli_bin")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_cli_bin")',
         "",
         "nix_node_cli_bin(",
         '  name = "tool",',
@@ -45,7 +45,7 @@ test("nix_node_cli_bin(bundle=True) stamps global Nix inputs via labels", async 
     );
     assert.ok(
       out.includes(":flake.lock"),
-      "expected //:flake.lock to be present via global_nix_inputs()",
+      "expected //.viberoots/workspace:flake.lock to be present via global_nix_inputs()",
     );
 
     const srcsProbe = await $({
@@ -58,7 +58,7 @@ test("nix_node_cli_bin(bundle=True) stamps global Nix inputs via labels", async 
     const srcsOut = String(srcsProbe.stdout || "");
     assert.ok(
       srcsOut.includes(":flake.lock"),
-      "expected stamping to be backed by real action inputs (srcs includes //:flake.lock)",
+      "expected stamping to be backed by real action inputs (srcs includes //.viberoots/workspace:flake.lock)",
     );
   });
 });

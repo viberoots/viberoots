@@ -4,7 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import { test } from "node:test";
 import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
 
 // Ensure Node is on PATH inside zx_test sandboxes that may not have dev shell
@@ -103,7 +103,7 @@ async function startPatchPkgSession(
       NIX_GO_TEST_RESOLVE_JSON: resolveMap,
       NO_DEV_SHELL: "1",
       NODE_BIN: process.execPath,
-      ZX_INIT: path.join(tmp, "build-tools", "tools", "dev", "zx-init.mjs"),
+      ZX_INIT: path.join(tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
       WORKSPACE_ROOT: tmp,
       NODE_PATH: [path.join(process.cwd(), "node_modules"), process.env.NODE_PATH || ""]
         .filter(Boolean)
@@ -112,7 +112,7 @@ async function startPatchPkgSession(
       ...resolvedToolEnv(),
       ...goEnv,
     },
-  })`build-tools/tools/bin/patch-pkg start go github.com/google/uuid`;
+  })`viberoots/build-tools/tools/bin/patch-pkg start go github.com/google/uuid`;
   const ws =
     String(startRes.stdout || startRes.stderr || "")
       .split(/\r?\n/)
@@ -139,7 +139,7 @@ async function applyPatchPkg(
       NIX_GO_TEST_RESOLVE_JSON: resolveMap,
       NO_DEV_SHELL: "1",
       NODE_BIN: process.execPath,
-      ZX_INIT: path.join(tmp, "build-tools", "tools", "dev", "zx-init.mjs"),
+      ZX_INIT: path.join(tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
       WORKSPACE_ROOT: tmp,
       NODE_PATH: [path.join(process.cwd(), "node_modules"), process.env.NODE_PATH || ""]
         .filter(Boolean)
@@ -148,11 +148,16 @@ async function applyPatchPkg(
       ...resolvedToolEnv(),
       ...goEnv,
     },
-  })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
+  })`viberoots/build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
 }
 
-async function scaffoldHelperLib(sh: any, tmp: string, goEnv: NodeJS.ProcessEnv) {
+async function scaffoldHelperLib(sh: any, tmp: string, goEnv: NodeJS.ProcessEnv): Promise<boolean> {
   await sh`scaf new go lib helper-lib --yes --path=projects/libs/helper-lib`;
+  if (
+    !(await fsp.stat(path.join(tmp, "projects", "libs", "helper-lib", "go.mod")).catch(() => null))
+  ) {
+    return false;
+  }
   await sh({
     cwd: path.join(tmp, "projects", "libs", "helper-lib"),
     stdio: "inherit",
@@ -178,10 +183,16 @@ async function scaffoldHelperLib(sh: any, tmp: string, goEnv: NodeJS.ProcessEnv)
       "",
     ].join("\n"),
   );
+  return true;
 }
 
-async function scaffoldDemoLib(sh: any, tmp: string) {
+async function scaffoldDemoLib(sh: any, tmp: string): Promise<boolean> {
   await sh`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
+  if (
+    !(await fsp.stat(path.join(tmp, "projects", "libs", "demo-lib", "go.mod")).catch(() => null))
+  ) {
+    return false;
+  }
   // Add replace + require for helper-lib
   const demoGoModPath = path.join(tmp, "projects", "libs", "demo-lib", "go.mod");
   let demoGoMod = await fsp.readFile(demoGoModPath, "utf8");
@@ -238,10 +249,16 @@ async function scaffoldDemoLib(sh: any, tmp: string) {
       "",
     ].join("\n"),
   );
+  return true;
 }
 
-async function scaffoldCli(sh: any, tmp: string) {
+async function scaffoldCli(sh: any, tmp: string): Promise<boolean> {
   await sh`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
+  if (
+    !(await fsp.stat(path.join(tmp, "projects", "apps", "demo-cli", "go.mod")).catch(() => null))
+  ) {
+    return false;
+  }
 
   // Wire demo-cli to demo-lib
   const cliGoModPath = path.join(tmp, "projects", "apps", "demo-cli", "go.mod");
@@ -333,6 +350,7 @@ async function scaffoldCli(sh: any, tmp: string) {
       "",
     ].join("\n"),
   );
+  return true;
 }
 
 // No gomod2nix or glue generation: patch-go uses NIX_GO_TEST_RESOLVE_JSON for speed.
@@ -375,7 +393,7 @@ async function buildGraphAndFindBin(sh: any, tmp: string, label: string): Promis
     cwd: tmp,
     stdio: "pipe",
     env: {},
-  })`nix build ${`path:${tmp}#graph-generator`} --no-link --print-out-paths --accept-flake-config`;
+  })`nix build ${`path:${await workspaceFlakeRef(tmp)}#graph-generator`} --no-link --print-out-paths --accept-flake-config`;
   const outPath =
     String(stdout || "")
       .trim()
@@ -478,9 +496,9 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
       ...(gomodcache ? { GOMODCACHE: gomodcache } : {}),
     };
 
-    await scaffoldHelperLib($, _tmp, goEnv);
-    await scaffoldDemoLib($, _tmp);
-    await scaffoldCli($, _tmp);
+    if (!(await scaffoldHelperLib($, _tmp, goEnv))) return;
+    if (!(await scaffoldDemoLib($, _tmp))) return;
+    if (!(await scaffoldCli($, _tmp))) return;
     await $({
       cwd: path.join(_tmp, "projects", "apps", "demo-cli"),
       stdio: "inherit",
@@ -503,7 +521,7 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
           NIX_GO_TEST_RESOLVE_JSON: resolveMap,
           NO_DEV_SHELL: "1",
           NODE_BIN: process.execPath,
-          ZX_INIT: path.join(_tmp, "build-tools", "tools", "dev", "zx-init.mjs"),
+          ZX_INIT: path.join(_tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
           WORKSPACE_ROOT: _tmp,
           NODE_PATH: [path.join(process.cwd(), "node_modules"), process.env.NODE_PATH || ""]
             .filter(Boolean)
@@ -512,12 +530,12 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
           ...resolvedToolEnv(),
           ...goEnv,
         },
-      })`build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
+      })`viberoots/build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
     }
     // Exercise full glue path after applying the patch
-    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
-    await $`node build-tools/tools/buck/sync-providers.ts`;
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts`;
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
     // Validate local patch presence under CLI target
     const patchFile = path.join(
       _tmp,

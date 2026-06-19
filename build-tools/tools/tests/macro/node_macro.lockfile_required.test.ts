@@ -9,14 +9,7 @@ test("node macro: lockfile label is required (exactly one)", async () => {
   await runInTemp("node-macro-lockfile-required", async (tmp, $) => {
     // minimal TARGETS missing lockfile label
     const targets = [
-      'load("@prelude//:rules.bzl", "export_file")',
-      'load("//build-tools/node:defs.bzl", "nix_node_test")',
-      "",
-      "export_file(",
-      '  name = "flake.lock",',
-      '  src = "flake.lock",',
-      '  visibility = ["PUBLIC"],',
-      ")",
+      'load("@viberoots//build-tools/node:defs.bzl", "nix_node_test")',
       "",
       'nix_node_test(name="t", out="o.stamp", cmd="echo ok > $OUT")',
       "",

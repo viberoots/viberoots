@@ -41,7 +41,7 @@ test("materialize pure does not run redundant .#buck-graph build", async () => {
 
     const txt = await fsp.readFile(argsLog, "utf8");
     assert.ok(
-      txt.includes(".#graph-generator-pure"),
+      txt.includes("graph-generator-pure"),
       `expected pure graph generator build in nix args, got: ${txt}`,
     );
     assert.ok(

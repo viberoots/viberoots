@@ -2,6 +2,7 @@ import "zx/globals";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { buildToolPath } from "../dev-build/paths";
 
 async function pathExists(p: string): Promise<boolean> {
   try {
@@ -75,7 +76,7 @@ export async function runMergedCoverageReport(opts: {
   await $({
     stdio: "ignore",
     cwd: opts.root,
-  })`${nodeBin} ${path.join(opts.root, "build-tools/tools/dev/coverage-raw-normalize.mjs")}`.nothrow();
+  })`${nodeBin} ${buildToolPath(opts.root, "tools/dev/coverage-raw-normalize.mjs")}`.nothrow();
 
   await $({
     stdio: "inherit",
@@ -89,5 +90,5 @@ export async function runMergedCoverageReport(opts: {
   await $({
     stdio: "ignore",
     cwd: opts.root,
-  })`${nodeBin} ${path.join(opts.root, "build-tools/tools/dev/coverage-normalize.mjs")}`.nothrow();
+  })`${nodeBin} ${buildToolPath(opts.root, "tools/dev/coverage-normalize.mjs")}`.nothrow();
 }

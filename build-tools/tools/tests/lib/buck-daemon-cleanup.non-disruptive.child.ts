@@ -36,7 +36,7 @@ if (!Object.prototype.hasOwnProperty.call(process.env, "TEST_EARLY_TMP_STDOUT"))
 
 await runInTemp("buck-cleanup-nondisruptive-child", async (tmp, $) => {
   console.log(`TMP ${tmp}`);
-  const buck = spawn("buck2", ["build", "//:flake.lock"], {
+  const buck = spawn("buck2", ["build", "//.viberoots/workspace:flake.lock"], {
     cwd: tmp,
     env: {
       ...process.env,
@@ -101,7 +101,7 @@ await runInTemp("buck-cleanup-nondisruptive-child", async (tmp, $) => {
   }
 
   // If cleanup from other runs is too broad, this build can fail (repo broken / daemon killed mid-flight).
-  await $`buck2 build //:flake.lock`;
+  await $`buck2 build //.viberoots/workspace:flake.lock`;
   console.log("PING_OK");
 
   await new Promise(() => {});

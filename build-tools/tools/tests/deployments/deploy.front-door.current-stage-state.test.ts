@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import http from "node:http";
 import { test } from "node:test";
@@ -59,26 +60,26 @@ test("deploy current-stage helpers read and render service-backed stage state", 
         cwd: tmp,
         env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --current-stage-state --text --control-plane-url ${mock.url}`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --current-stage-state --text --control-plane-url ${mock.url}`;
       assert.match(String(current.stdout), /currentRunId: deploy-current/);
       assert.match(String(current.stdout), /sourceRevision: abc123/);
       const history = await $({
         cwd: tmp,
         env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --stage-history --control-plane-url ${mock.url}`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --stage-history --control-plane-url ${mock.url}`;
       assert.equal(JSON.parse(String(history.stdout))[0].currentRunId, "deploy-current");
       const byDeployment = await $({
         cwd: tmp,
         env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --current-stage-state --by-deployment --text --control-plane-url ${mock.url}`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --current-stage-state --by-deployment --text --control-plane-url ${mock.url}`;
       assert.match(String(byDeployment.stdout), /currentRunId: deploy-current/);
       const byStage = await $({
         cwd: tmp,
         env: { ...process.env, [LOCAL_FIXTURE_SERVICE_ENV]: "1" },
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deploymentLabel} --current-stage-state --by-stage --text --control-plane-url ${mock.url}`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deploymentLabel} --current-stage-state --by-stage --text --control-plane-url ${mock.url}`;
       assert.match(String(byStage.stdout), /currentRunId: deploy-current/);
       assert.deepEqual(mock.requests, [
         "GET /api/v1/current-stage-state?deploymentId=demo-dev&environmentStage=dev",

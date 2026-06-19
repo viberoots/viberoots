@@ -15,8 +15,28 @@ import { untrackedRequiresImpureForTargets } from "./dev-build/untracked";
 import { targetPackageFromLabel } from "./build-selected-helpers";
 import { parseSelectedBuildOutPath, selectedNixBuildArgs } from "./build-selected-nix-command";
 import { makeFilteredFlakeRef } from "./filtered-flake";
+import { prepareExactPnpmStore } from "./update-pnpm-hash/exact-store";
 import { resolveSelectedTargetLabel } from "./target-label-resolver";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
+import { buildToolPath, zxInitPath } from "./dev-build/paths";
+
+async function workspaceFlakeDir(workspaceRoot: string): Promise<string> {
+  const hidden = path.join(workspaceRoot, ".viberoots", "workspace");
+  if (await pathExists(path.join(hidden, "flake.nix"))) return hidden;
+  if (await pathExists(path.join(workspaceRoot, "flake.nix"))) return workspaceRoot;
+  return "";
+}
+
+async function workspaceFlakeRef(workspaceRoot: string, attr: string): Promise<string> {
+  const flakeDir = await workspaceFlakeDir(workspaceRoot);
+  if (!flakeDir) {
+    throw new Error(
+      `workspace flake not found at ${workspaceRoot}/.viberoots/workspace/flake.nix or ${workspaceRoot}/flake.nix`,
+    );
+  }
+  return `path:${flakeDir}#${attr}`;
+}
+
 function parseSourceMode(argv: string[]): {
   sourceMode: "auto" | "git" | "path";
   sourceError?: string;
@@ -45,7 +65,7 @@ async function chooseFlakeRef(opts: {
   workspaceRoot: string;
   target: string;
   sourceMode: "auto" | "git" | "path";
-}): Promise<{ flakeRef: string; cleanup?: () => Promise<void> }> {
+}): Promise<{ flakeRef: string; workspaceRoot?: string; cleanup?: () => Promise<void> }> {
   const repoRootEnv = String(process.env.REPO_ROOT || "").trim();
   const workspaceAbs = path.resolve(opts.workspaceRoot);
   const isLikelyTempWorkspace =
@@ -65,13 +85,13 @@ async function chooseFlakeRef(opts: {
   if (opts.sourceMode === "auto" && repoRootEnv) {
     const repoRootAbs = path.resolve(repoRootEnv);
     if (repoRootAbs !== workspaceAbs) {
-      return { flakeRef: `path:${workspaceAbs}#graph-generator-selected` };
+      return { flakeRef: await workspaceFlakeRef(workspaceAbs, "graph-generator-selected") };
     }
   }
   if (opts.sourceMode === "path")
-    return { flakeRef: `path:${opts.workspaceRoot}#graph-generator-selected` };
+    return { flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected") };
   if (opts.sourceMode === "git")
-    return { flakeRef: `${opts.workspaceRoot}#graph-generator-selected` };
+    return { flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected") };
   try {
     const { stdout } = await $({
       stdio: "pipe",
@@ -83,11 +103,11 @@ async function chooseFlakeRef(opts: {
       .map((x) => x.trim())
       .filter(Boolean);
     if (untracked.length === 0)
-      return { flakeRef: `${opts.workspaceRoot}#graph-generator-selected` };
+      return { flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected") };
     const targetPackages = [targetPackageFromLabel(opts.target)].filter(Boolean);
     const decision = untrackedRequiresImpureForTargets({ untracked, targetPackages });
     if (!decision.requiresImpure)
-      return { flakeRef: `${opts.workspaceRoot}#graph-generator-selected` };
+      return { flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected") };
     console.error(
       "[build-selected] Falling back to path flake source due to relevant untracked files:",
     );
@@ -100,9 +120,13 @@ async function chooseFlakeRef(opts: {
       attr: "graph-generator-selected",
       logPrefix: "[build-selected]",
     });
-    return { flakeRef: filtered.flakeRef, cleanup: filtered.cleanup };
+    return {
+      flakeRef: filtered.flakeRef,
+      workspaceRoot: filtered.workspaceRoot,
+      cleanup: filtered.cleanup,
+    };
   } catch {
-    return { flakeRef: `${opts.workspaceRoot}#graph-generator-selected` };
+    return { flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected") };
   }
 }
 async function main() {
@@ -120,11 +144,13 @@ async function main() {
   const cwd = path.resolve(process.cwd());
   const envWorkspace = String(process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || "").trim();
   const workspaceRoot =
-    envWorkspace && (await pathExists(path.join(envWorkspace, "flake.nix")))
+    envWorkspace && (await workspaceFlakeDir(envWorkspace))
       ? path.resolve(envWorkspace)
       : await findRepoRoot(cwd);
-  if (!(await pathExists(path.join(workspaceRoot, "flake.nix")))) {
-    console.error(`flake.nix not found at workspace root: ${workspaceRoot}`);
+  if (!(await workspaceFlakeDir(workspaceRoot))) {
+    console.error(
+      `workspace flake not found at ${workspaceRoot}/.viberoots/workspace/flake.nix or ${workspaceRoot}/flake.nix`,
+    );
     process.exit(2);
   }
   const target = await resolveSelectedTargetLabel(workspaceRoot, targetRaw, { baseDir: cwd });
@@ -162,14 +188,8 @@ async function main() {
   );
   await runNodeWithZx({
     cwd: workspaceRoot,
-    zxInitPath: path.join(workspaceRoot, "build-tools", "tools", "dev", "zx-init.mjs"),
-    script: path.join(
-      workspaceRoot,
-      "build-tools",
-      "tools",
-      "buck",
-      "enforce-node-patch-requirements.ts",
-    ),
+    zxInitPath: zxInitPath(workspaceRoot),
+    script: buildToolPath(workspaceRoot, "tools/buck/enforce-node-patch-requirements.ts"),
     args: ["--check"],
     stdio: "inherit",
   });
@@ -197,6 +217,17 @@ async function main() {
   for (const envName of allDevOverrideEnvNames()) {
     sanitizedEnv[envName] = "";
   }
+  const targetImporter = targetPackageFromLabel(target);
+  if (
+    targetImporter &&
+    (await pathExists(path.join(workspaceRoot, targetImporter, "pnpm-lock.yaml")))
+  ) {
+    const prepared = await prepareExactPnpmStore({
+      repoRoot: workspaceRoot,
+      importer: targetImporter,
+    });
+    sanitizedEnv.NIX_PNPM_EXACT_STORE = prepared.exactStorePath;
+  }
 
   const flakeSource = await chooseFlakeRef({
     workspaceRoot,
@@ -206,7 +237,9 @@ async function main() {
   const nixTrace = exporterDebug === "1" ? "--show-trace" : "";
   const runOnce = async () => {
     return await $({
-      env: sanitizedEnv,
+      env: flakeSource.workspaceRoot
+        ? { ...sanitizedEnv, WORKSPACE_ROOT: flakeSource.workspaceRoot }
+        : sanitizedEnv,
       reject: false,
       nothrow: true,
     })`${selectedNixBuildArgs({ flakeRef: flakeSource.flakeRef, showTrace: Boolean(nixTrace) })}`;

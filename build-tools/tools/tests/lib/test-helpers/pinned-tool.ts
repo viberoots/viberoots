@@ -29,6 +29,13 @@ export async function resolvePinnedTestToolPath(tool: string, $: any): Promise<s
     const repoRoot = process.cwd();
     const nixEvalTmp = nixEvalTempDirOutsideWorkspace(repoRoot);
     await fsp.mkdir(nixEvalTmp, { recursive: true }).catch(() => {});
+    const hiddenLock = path.join(repoRoot, ".viberoots", "workspace", "flake.lock");
+    const lockPath = (await fsp
+      .access(hiddenLock)
+      .then(() => true)
+      .catch(() => false))
+      ? hiddenLock
+      : path.join(repoRoot, "flake.lock");
     const { packageExpr, binRel } = packageExprForTool(tool);
     const out = await $({
       cwd: repoRoot,
@@ -40,7 +47,7 @@ export async function resolvePinnedTestToolPath(tool: string, $: any): Promise<s
         IN_NIX_SHELL: "1",
         TMPDIR: nixEvalTmp,
       },
-    })`nix build --impure --accept-flake-config --expr ${pinnedNixpkgsPackageExpr(path.join(repoRoot, "flake.lock"), packageExpr)} --no-link --print-out-paths`;
+    })`nix build --impure --accept-flake-config --expr ${pinnedNixpkgsPackageExpr(lockPath, packageExpr)} --no-link --print-out-paths`;
     const outPath = String((out as any).stdout || "")
       .trim()
       .split(/\r?\n/)

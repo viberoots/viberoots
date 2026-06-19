@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { viberootsRepoPath } from "./deployment-command";
 
 const repoRoot = process.cwd();
 const providerPrefixes = [
@@ -61,7 +62,11 @@ async function walkFiles(
 }
 
 async function readRelative(relPath: string): Promise<string> {
-  return await fsp.readFile(path.join(repoRoot, relPath), "utf8");
+  const filePath =
+    relPath.startsWith("build-tools/") || relPath.startsWith("docs/")
+      ? viberootsRepoPath(relPath)
+      : path.join(repoRoot, relPath);
+  return await fsp.readFile(filePath, "utf8");
 }
 
 function relative(filePath: string): string {
@@ -69,7 +74,7 @@ function relative(filePath: string): string {
 }
 
 test("provider source does not import Infisical backend internals directly", async () => {
-  const files = await walkFiles(path.join(repoRoot, "build-tools/tools/deployments"), (filePath) =>
+  const files = await walkFiles(viberootsRepoPath("build-tools/tools/deployments"), (filePath) =>
     filePath.endsWith(".ts"),
   );
   const violations: string[] = [];
@@ -87,8 +92,9 @@ test("checked-in deployment metadata keeps Infisical secret material out of repo
   const files = (
     await Promise.all(
       checkedInMetadataRoots.map((root) =>
-        walkFiles(path.join(repoRoot, root), (filePath) =>
-          /\.(bzl|json|md|nix|tf)$/.test(filePath),
+        walkFiles(
+          root.startsWith("build-tools/") ? viberootsRepoPath(root) : path.join(repoRoot, root),
+          (filePath) => /\.(bzl|json|md|nix|tf)$/.test(filePath),
         ),
       ),
     )

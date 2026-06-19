@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("planner builds python library via selected target when uv.lock present", async () => {
   await runInTemp("planner-python-lib-selected", async (tmp, $) => {
@@ -33,7 +33,7 @@ test("planner builds python library via selected target when uv.lock present", a
         BUCK_GRAPH_JSON: graphPath,
         BUCK_TARGET: "//projects/apps/pylib:pylib",
       },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
 
     if (exitCode !== 0) {
       console.error(stderr);

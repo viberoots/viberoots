@@ -21,7 +21,10 @@ const EXCLUDED_FILES = new Set([
   "build-tools/tools/tests/lib/buck-daemon-reaper.ts",
 ]);
 
-const EXCLUDED_PREFIXES = ["build-tools/tools/tests/", "build-tools/tools/scaffolding/templates/"];
+const EXCLUDED_PREFIXES = [
+  "build-tools/tools/tests/",
+  "viberoots/build-tools/tools/scaffolding/templates/",
+];
 
 const BANNED_PATTERNS: Array<{ re: RegExp; hint: string }> = [
   {

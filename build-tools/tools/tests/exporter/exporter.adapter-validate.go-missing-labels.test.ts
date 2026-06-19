@@ -24,7 +24,8 @@ test("go adapter validate fails when .go sources lack rule_type and lang:go", as
     const code = await $({
       cwd: tmp,
       reject: false,
-    })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`.exitCode;
+    })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph}`
+      .exitCode;
     if (code === 0) {
       console.error("expected exporter to fail but it succeeded");
       process.exit(2);

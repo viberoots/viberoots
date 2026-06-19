@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { viberootsToolScript } from "./deployment-command";
 
 export async function installClientProfile(
   $: any,
@@ -11,7 +12,10 @@ export async function installClientProfile(
   remoteRecordsRoot: string,
   controlPlaneUrl: string = "http://127.0.0.1:65535",
 ): Promise<void> {
-  await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path ${remoteRepoPath} --remote-state-path ${remoteStatePath} --remote-runtime-root ${remoteRuntimeRoot} --remote-records-root ${remoteRecordsRoot} --ssh-mode ssh --control-plane-url ${controlPlaneUrl}`;
+  const installScript = viberootsToolScript(
+    "build-tools/tools/deployments/nixos-shared-host-install.ts",
+  );
+  await $`zx-wrapper ${installScript} client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path ${remoteRepoPath} --remote-state-path ${remoteStatePath} --remote-runtime-root ${remoteRuntimeRoot} --remote-records-root ${remoteRecordsRoot} --ssh-mode ssh --control-plane-url ${controlPlaneUrl}`;
 }
 
 export async function installHarnessClientProfile(
@@ -65,7 +69,7 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
   await fsp.writeFile(
     sharedTargetsPath,
     [
-      'load("//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_governance", "deployment_lane_policy")',
+      'load("@viberoots//build-tools/deployments:defs.bzl", "deployment_admission_policy", "deployment_lane_governance", "deployment_lane_policy")',
       "",
       "deployment_lane_governance(",
       '    name = "lane_governance",',
@@ -121,7 +125,7 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
   await fsp.writeFile(
     deployTargetsPath,
     [
-      'load("//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
+      'load("@viberoots//build-tools/deployments:defs.bzl", "nixos_shared_host_static_webapp_deployment")',
       "",
       "nixos_shared_host_static_webapp_deployment(",
       '    name = "deploy",',

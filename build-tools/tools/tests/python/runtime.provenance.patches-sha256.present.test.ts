@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("python runtime: BUILD-INFO patches include sha256 and deterministic order", async () => {
   await runInTemp("py-provenance-sha256", async (tmp, _$) => {
@@ -45,7 +45,7 @@ test("python runtime: BUILD-INFO patches include sha256 and deterministic order"
     await fs.writeFile(path.join(pdir, "mydep@1.0.0-a.patch"), patchA, "utf8");
     await fs.writeFile(path.join(pdir, "mydep@1.0.0-b.patch"), patchB, "utf8");
     // Graph
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fs.mkdirp(graphDir);
     const node = {
       name: "//projects/apps/demo_pyapp:demo_pyapp",
@@ -73,7 +73,7 @@ test("python runtime: BUILD-INFO patches include sha256 and deterministic order"
         }),
       },
       stdio: "pipe",
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     const outPath = String(build.stdout || "")
       .trim()
       .split(/\s+/)

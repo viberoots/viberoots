@@ -101,6 +101,6 @@ Coverage artifacts are emitted under the derivation output.
 - No tests matched: the runner passes (useful during bootstrap).
 - Tests matched, Vitest missing: add `vitest` to devDependencies for the importer.
 - Lockfile/provider glue: re-run glue stages if lockfiles change:
-  - `node build-tools/tools/buck/export-graph.ts`
-  - `node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`
-  - `node build-tools/tools/buck/gen-auto-map.ts --graph build-tools/tools/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
+  - `node viberoots/build-tools/tools/buck/export-graph.ts`
+  - `node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`
+  - `node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`

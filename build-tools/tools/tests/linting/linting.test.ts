@@ -41,9 +41,9 @@ describe("pre-commit hook (lint-staged with Prettier + ESLint)", () => {
       // exercises the hook on the targeted commit(s) below.
       await $`git add .buckroot .buckconfig .viberoots viberoots config toolchains`;
       await $`git commit --allow-empty -m "chore: init"`;
-      await $`git config core.hooksPath .husky`;
+      await $`git config core.hooksPath viberoots/.husky`;
 
-      const badFile = path.join(tmp, "build-tools", "tools", "dev", "bad.ts");
+      const badFile = path.join(tmp, "viberoots", "build-tools", "tools", "dev", "bad.ts");
       await fsp.mkdir(path.dirname(badFile), { recursive: true });
       await fsp.writeFile(badFile, `const x = ;\n`, "utf8");
       await $`git add ${path.relative(tmp, badFile)}`;

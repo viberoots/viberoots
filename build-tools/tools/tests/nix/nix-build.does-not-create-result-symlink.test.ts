@@ -2,21 +2,19 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("nix build --no-link does not create ./result symlink in temp repos", async () => {
   await runInTemp("nix-build-no-result-symlink", async (tmp, $) => {
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "buck"), { recursive: true });
-    await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "buck", "graph.json"),
-      "[]\n",
-      "utf8",
-    );
+    const graph = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
+    await fsp.mkdir(path.dirname(graph), { recursive: true });
+    await fsp.writeFile(graph, "[]\n", "utf8");
 
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`nix build ${`path:${tmp}#graph-generator`} --accept-flake-config --no-link --print-out-paths`;
+      env: { ...process.env, BUCK_GRAPH_JSON: graph },
+    })`nix build --impure ${`path:${await workspaceFlakeRef(tmp)}#graph-generator`} --accept-flake-config --no-link --print-out-paths`;
 
     try {
       await fsp.lstat(path.join(tmp, "result"));

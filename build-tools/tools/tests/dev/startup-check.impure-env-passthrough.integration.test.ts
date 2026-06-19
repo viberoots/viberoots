@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("startup-check verifies impure env passthrough for BUCK_TARGET", async () => {
-  const txt = await fsp.readFile("build-tools/tools/dev/startup-check.ts", "utf8");
+  const txt = await fsp.readFile("viberoots/build-tools/tools/dev/startup-check.ts", "utf8");
   if (!txt.includes('builtins.getEnv "BUCK_TARGET"')) {
     throw new Error("startup-check.ts must probe BUCK_TARGET passthrough via nix eval --impure");
   }

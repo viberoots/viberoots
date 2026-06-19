@@ -8,10 +8,12 @@ test("patches-lint (node): subdirectory warns (non-strict) and fails (strict)", 
   await runInTemp("patches-lint-node-subdir", async (tmp, $) => {
     const sub = path.join(tmp, "patches", "node", "foo");
     await fsp.mkdir(sub, { recursive: true });
-    await $`node build-tools/tools/dev/patches-lint.ts --lang node`;
+    await $`node viberoots/build-tools/tools/dev/patches-lint.ts --lang node`;
     let failed = false;
     try {
-      await $({ stdio: "pipe" })`node build-tools/tools/dev/patches-lint.ts --lang node --strict`;
+      await $({
+        stdio: "pipe",
+      })`node viberoots/build-tools/tools/dev/patches-lint.ts --lang node --strict`;
     } catch {
       failed = true;
     }

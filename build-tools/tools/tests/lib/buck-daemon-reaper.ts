@@ -190,7 +190,7 @@ async function killBuckIsoInRepo(
   // Guard against PID reuse by verifying the command line includes the expected isolation dir.
   if (Number.isFinite(buck2dPid) && buck2dPid > 1 && isPidAlive(buck2dPid)) {
     const cmd = await buckCommandForPid(buck2dPid, 1500);
-    if (cmd.includes("buck2d[") && cmd.includes(`--isolation-dir ${iso} `)) {
+    if (cmd.includes("buck2d[") && isolationDirFromCmd(cmd) === iso) {
       try {
         process.kill(buck2dPid, "SIGKILL");
       } catch {}
@@ -241,7 +241,7 @@ async function reapBuckDaemonsForTempRepo(tmpRepoRoot: string): Promise<void> {
     // command line contains both buck2d and the expected isolation dir.
     if (iso && Number.isFinite(f.ppid) && f.ppid > 1 && isPidAlive(f.ppid)) {
       const parentCmd = await buckCommandForPid(f.ppid, 1500);
-      if (parentCmd.includes("buck2d[") && parentCmd.includes(`--isolation-dir ${iso} `)) {
+      if (parentCmd.includes("buck2d[") && isolationDirFromCmd(parentCmd) === iso) {
         try {
           process.kill(f.ppid, "SIGKILL");
         } catch {}

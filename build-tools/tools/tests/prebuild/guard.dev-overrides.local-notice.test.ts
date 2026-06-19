@@ -44,7 +44,7 @@ test("prebuild-guard: prints local dev-override notice and exits 0", async () =>
         ...envWithoutCi,
         NIX_GO_DEV_OVERRIDE_JSON: '{"example.com/mod@v1.2.3":"/tmp/dev"}',
       },
-    })`node --experimental-strip-types --import ./build-tools/tools/dev/zx-init.mjs build-tools/tools/buck/prebuild-guard.ts`.nothrow();
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`.nothrow();
 
     if (res.exitCode !== 0) {
       throw new Error(`expected exit 0, got ${res.exitCode}\n${res.stderr || ""}`);
@@ -52,7 +52,7 @@ test("prebuild-guard: prints local dev-override notice and exits 0", async () =>
     const out = String(res.stderr || "");
     if (
       !out.includes("dev overrides active") ||
-      !out.includes("clear with: node build-tools/tools/dev/clear-overrides.ts")
+      !out.includes("clear with: node viberoots/build-tools/tools/dev/clear-overrides.ts")
     ) {
       throw new Error(`expected dev-override notice in stderr; got:\n${out}`);
     }

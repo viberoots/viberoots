@@ -18,7 +18,7 @@ test("planner_stub_with_package_local_patches: includes patch files in srcs (cqu
       [
         "",
         "# test: planner-stub.with-package-local-patches.probe.test.ts",
-        'load("//build-tools/lang:planner_stub.bzl", "planner_stub_with_package_local_patches")',
+        'load("@viberoots//build-tools/lang:planner_stub.bzl", "planner_stub_with_package_local_patches")',
         "",
         "planner_stub_with_package_local_patches(",
         '  name = "stub",',

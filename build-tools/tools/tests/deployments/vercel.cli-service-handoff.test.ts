@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -78,7 +79,9 @@ async function installVercelTargets(tmp: string, deployment: VercelDeployment) {
     ],
   });
   appendTargetsFragment(fragments, labelDir(deployment.label), {
-    loadLines: ['load("//build-tools/deployments:defs.bzl", "vercel_next_webapp_deployment")'],
+    loadLines: [
+      'load("@viberoots//build-tools/deployments:defs.bzl", "vercel_next_webapp_deployment")',
+    ],
     bodyLines: [
       "vercel_next_webapp_deployment(",
       `    name = ${JSON.stringify(deployment.name)},`,
@@ -221,7 +224,7 @@ test("protected Vercel CLI queues deploy preview cleanup retry and rollback thro
           cwd: tmp,
           env: clientEnv(),
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --admission-evidence-json ${evidence} --source-run-id ${sourceRunId} --profile-root ${profileRoot} ${flags}`;
+        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment.label} --admission-evidence-json ${evidence} --source-run-id ${sourceRunId} --profile-root ${profileRoot} ${flags}`;
         const summary = JSON.parse(String(run.stdout));
         assert.equal(summary.lifecycleState, "finished");
         assert.equal(summary.operationKind, operationKind);

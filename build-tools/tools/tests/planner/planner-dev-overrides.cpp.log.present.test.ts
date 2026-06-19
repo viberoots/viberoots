@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 const TIMEOUT_SECS = Number(
   process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200",
@@ -12,7 +12,7 @@ test("planner logs dev override presence for C++ (non-CI)", async () => {
   await runInTemp("planner-dev-overrides-cpp", async (tmp, $) => {
     const graph = path.join(tmp, "graph.json");
     await fs.writeFile(graph, "[]\n", "utf8");
-    const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build ${`path:${tmp}#graph-generator`} --print-out-paths --impure --accept-flake-config --no-link`;
+    const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build ${`path:${await workspaceFlakeRef(tmp)}#graph-generator`} --print-out-paths --impure --accept-flake-config --no-link`;
     const res = await $({
       cwd: tmp,
       stdio: "pipe",

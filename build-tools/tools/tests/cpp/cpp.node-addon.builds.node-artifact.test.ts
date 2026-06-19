@@ -31,9 +31,9 @@ EOF'`;
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > addon.nix <<"EOF"
-{ pkgs ? (import ((builtins.getFlake (toString ./.)).inputs.nixpkgs) { system = builtins.currentSystem; }) }:
+{ pkgs ? import <nixpkgs> {} }:
 let
-  T = import ./build-tools/tools/nix/templates/cpp-node-addon.nix { inherit pkgs; };
+  T = import ./viberoots/build-tools/tools/nix/templates/cpp-node-addon.nix { inherit pkgs; };
 in
 T.cppNodeAddon {
   name = "demo";

@@ -16,7 +16,7 @@ function sliceDefBody(fileText: string, defName: string): string {
 }
 
 test("nix_cpp_headers uses cpp_nix_build route", async () => {
-  const cppDefs = await fsp.readFile("build-tools/cpp/defs.bzl", "utf8");
+  const cppDefs = await fsp.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8");
   const body = sliceDefBody(cppDefs, "nix_cpp_headers");
 
   assert.ok(

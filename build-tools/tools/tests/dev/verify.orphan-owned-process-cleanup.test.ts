@@ -12,6 +12,27 @@ import {
   waitForPidGone,
 } from "./verify.orphan-owned-process-cleanup.helpers";
 
+async function withSyntheticOrphanScanEnv<T>(fn: () => Promise<T>): Promise<T> {
+  const originalVerifyStateFile = process.env.VBR_VERIFY_PROCESS_STATE_FILE;
+  const originalBuckReaperStateFile = process.env.VBR_BUCK_REAPER_STATE_FILE;
+  try {
+    delete process.env.VBR_VERIFY_PROCESS_STATE_FILE;
+    delete process.env.VBR_BUCK_REAPER_STATE_FILE;
+    return await fn();
+  } finally {
+    if (originalVerifyStateFile === undefined) {
+      delete process.env.VBR_VERIFY_PROCESS_STATE_FILE;
+    } else {
+      process.env.VBR_VERIFY_PROCESS_STATE_FILE = originalVerifyStateFile;
+    }
+    if (originalBuckReaperStateFile === undefined) {
+      delete process.env.VBR_BUCK_REAPER_STATE_FILE;
+    } else {
+      process.env.VBR_BUCK_REAPER_STATE_FILE = originalBuckReaperStateFile;
+    }
+  }
+}
+
 test("verify orphan cleanup: kills orphaned verify-owned node processes only", async () => {
   const files = await createProcessFiles({ kind: "orphan-owned", ownerPid: 999999 });
   const orphanPid = await spawnOrphanedVerifyProcess({
@@ -23,7 +44,9 @@ test("verify orphan cleanup: kills orphaned verify-owned node processes only", a
   const prevGrace = process.env.VBR_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS;
   process.env.VBR_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS = "0";
   try {
-    const result = await cleanupOrphanBuckDaemons({ maxKills: 20 });
+    const result = await withSyntheticOrphanScanEnv(() =>
+      cleanupOrphanBuckDaemons({ maxKills: 20 }),
+    );
     assert.ok(
       result.killed >= 1,
       `expected orphan cleanup to kill at least one process, got ${JSON.stringify(result)}`,
@@ -50,7 +73,9 @@ test("verify orphan cleanup: kills orphaned registered verify-env test processes
   const prevGrace = process.env.VBR_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS;
   process.env.VBR_VERIFY_PROCESS_ORPHAN_STALE_GRACE_SECS = "0";
   try {
-    const result = await cleanupOrphanBuckDaemons({ maxKills: 20 });
+    const result = await withSyntheticOrphanScanEnv(() =>
+      cleanupOrphanBuckDaemons({ maxKills: 20 }),
+    );
     assert.ok(
       result.killed >= 1,
       `expected orphan cleanup to kill at least one process, got ${JSON.stringify(result)}`,

@@ -13,7 +13,7 @@ type GraphNode = {
 };
 
 async function writeGraph(tmp: string, nodes: GraphNode[]): Promise<string> {
-  const graphPath = path.join(tmp, "build-tools", "tools", "buck", "graph.json");
+  const graphPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
   await fsp.mkdir(path.dirname(graphPath), { recursive: true });
   await fsp.writeFile(graphPath, JSON.stringify({ version: 1, nodes }, null, 2), "utf8");
   return graphPath;

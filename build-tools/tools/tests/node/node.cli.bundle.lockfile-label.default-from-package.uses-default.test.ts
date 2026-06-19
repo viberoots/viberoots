@@ -14,7 +14,7 @@ test("nix_node_cli_bin(bundle=True) defaults lockfile label from package path", 
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_cli_bin")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_cli_bin")',
         "",
         "nix_node_cli_bin(",
         '  name = "tool",',

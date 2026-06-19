@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -44,7 +45,7 @@ test("nixos-shared-host --provision-only writes state and records without publis
       const result = await $({
         cwd: tmp,
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy-internal.ts --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --control-plane-url ${harness.controlPlane.url} --provision-only`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy-internal.ts")} --deployment ${deployment.label} --admission-evidence-json ${admissionEvidenceJson} --control-plane-url ${harness.controlPlane.url} --provision-only`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.operationKind, "provision_only");
       assert.equal(summary.runClassification, "provision_only");

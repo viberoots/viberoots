@@ -39,7 +39,7 @@ packages:
     await $`git add projects/apps/example/pnpm-lock.yaml`;
 
     // Run sync (without patches to simplify test)
-    await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
 
     const outPath = path.join(tmp, providerAutoTargetsPath("node"));
     const output = await fsp.readFile(outPath, "utf8");

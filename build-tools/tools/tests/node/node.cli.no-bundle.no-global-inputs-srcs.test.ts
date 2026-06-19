@@ -15,7 +15,7 @@ test("nix_node_cli_bin(bundle=False) includes global Nix inputs as action inputs
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_cli_bin")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_cli_bin")',
         "",
         "nix_node_cli_bin(",
         '  name = "tool_copy",',
@@ -38,7 +38,7 @@ test("nix_node_cli_bin(bundle=False) includes global Nix inputs as action inputs
     const out = String(probe.stdout || "");
     assert.ok(
       out.includes(":flake.lock"),
-      "expected //:flake.lock to be present in srcs when bundle=False is Nix-calling",
+      "expected //.viberoots/workspace:flake.lock to be present in srcs when bundle=False is Nix-calling",
     );
   });
 });

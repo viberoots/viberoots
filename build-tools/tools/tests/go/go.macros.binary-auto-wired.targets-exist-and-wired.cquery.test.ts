@@ -65,7 +65,7 @@ EOF'`;
       [
         "",
         "# test: go.macros.binary-auto-wired.targets-exist-and-wired.cquery.test.ts",
-        'load("//build-tools/go:defs.bzl", "nix_go_binary")',
+        'load("@viberoots//build-tools/go:defs.bzl", "nix_go_binary")',
         "",
         "nix_go_binary(",
         '  name = "demo",',

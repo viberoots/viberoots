@@ -13,7 +13,7 @@ async function nixEvalPyExtAndControlDrvPaths(
   const expr = `
     let
       pkgs = import <nixpkgs> {};
-      pyExt = import ./build-tools/tools/nix/templates/python/pyext.nix { inherit pkgs; };
+      pyExt = import ./viberoots/build-tools/tools/nix/templates/python/pyext.nix { inherit pkgs; };
       py = pyExt {
         name = "//${appPosix}:ext";
         module = "demo._native";

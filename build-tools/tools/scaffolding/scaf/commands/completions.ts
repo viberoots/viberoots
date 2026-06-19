@@ -92,13 +92,13 @@ export async function cmdCompletions(args: string[]) {
 }
 
 export async function completeLanguages(): Promise<void> {
-  const metas = await readTemplateMeta();
+  const metas = await readTemplateMeta(undefined, { tolerateStaleTaxonomy: true });
   const langs = Array.from(new Set(metas.map((m) => m.language))).sort();
   console.log(langs.join("\n"));
 }
 
 export async function completeTemplatesFor(lang: string): Promise<void> {
-  const metas = await readTemplateMeta(lang);
+  const metas = await readTemplateMeta(lang, { tolerateStaleTaxonomy: true });
   const tmpls = metas.filter((m) => m.language === lang).map((m) => m.template);
   console.log(Array.from(new Set(tmpls)).sort().join("\n"));
 }

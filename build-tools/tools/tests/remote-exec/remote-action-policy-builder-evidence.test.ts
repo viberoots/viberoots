@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 const probeDefs = `
-load("//build-tools/lang:remote_action_policy.bzl", "remote_action_policy")
+load("@viberoots//build-tools/lang:remote_action_policy.bzl", "remote_action_policy")
 
 def policy_probe(name, evidence):
     remote_action_policy(mode = "remote-ready", evidence = evidence)

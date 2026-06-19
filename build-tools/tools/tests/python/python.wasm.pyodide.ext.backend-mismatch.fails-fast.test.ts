@@ -4,7 +4,7 @@ import * as fs from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("python wasm (pyodide): backend mismatch fails fast", async () => {
   await runInTemp("py-wasm-pyodide-ext-mismatch", async (tmp, $) => {
@@ -51,7 +51,7 @@ test("python wasm (pyodide): backend mismatch fails fast", async () => {
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       `
-load("//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_extension_module")
+load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_app", "nix_python_wasm_extension_module")
 
 nix_python_wasm_extension_module(
   name = "ext",
@@ -73,7 +73,7 @@ nix_python_wasm_app(
     );
 
     const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
-    await $`node build-tools/tools/buck/export-graph.ts --out ${DEFAULT_GRAPH_PATH}`;
+    await $`node viberoots/build-tools/tools/buck/export-graph.ts --out ${DEFAULT_GRAPH_PATH}`;
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -90,7 +90,7 @@ nix_python_wasm_app(
           hello: { version: "1.0.0", originPath: "projects/apps/pywasm/vendor/hello" },
         }),
       },
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
     assert.notEqual(res.exitCode, 0, "expected nix build to fail");
     const stderr = String(res.stderr || "");
     assert.match(stderr, /kind:pyext_wasm/);

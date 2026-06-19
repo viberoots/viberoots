@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("startup-check enforces implementation-required nix feature floor only", async () => {
-  const txt = await fsp.readFile("build-tools/tools/dev/startup-check.ts", "utf8");
+  const txt = await fsp.readFile("viberoots/build-tools/tools/dev/startup-check.ts", "utf8");
   if (!txt.includes('if (!features.has("nix-command"))')) {
     throw new Error("startup-check.ts must require nix-command");
   }

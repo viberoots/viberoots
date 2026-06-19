@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("python runtime: patch with path traversal is rejected (strict mode)", async () => {
   await runInTemp("py-strict-traversal", async (tmp, _$) => {
@@ -28,7 +28,7 @@ test("python runtime: patch with path traversal is rejected (strict mode)", asyn
       "\n",
     );
     await fs.writeFile(path.join(pdir, "mydep@1.0.0-bad.patch"), bad, "utf8");
-    const graphDir = path.join(tmp, "build-tools", "tools", "buck");
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fs.mkdirp(graphDir);
     const node = {
       name: "//projects/apps/demo_pyapp:demo_pyapp",
@@ -56,7 +56,7 @@ test("python runtime: patch with path traversal is rejected (strict mode)", asyn
         }),
       },
       stdio: "pipe",
-    })`nix build --impure -L ${`path:${tmp}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`.catch(
+    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`.catch(
       (e: any) => e,
     );
     const stderr = String(build?.stderr || "");

@@ -66,10 +66,31 @@ test("non-default pnpm-store hash refresh verifies shared-cache hits", async () 
   process.env.REPO_ROOT = repoRoot;
   process.chdir(repoRoot);
   try {
-    await fsp.mkdir(path.join(repoRoot, "build-tools", "tools", "nix"), { recursive: true });
+    await fsp.mkdir(path.join(repoRoot, "projects"), { recursive: true });
+    await fsp.mkdir(path.join(repoRoot, "projects", "libs", "demo"), { recursive: true });
     await fsp.writeFile(
-      path.join(repoRoot, "build-tools", "tools", "nix", "node-modules.hashes.json"),
+      path.join(repoRoot, "projects", "node-modules.hashes.json"),
       "{}\n",
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(repoRoot, "projects", "libs", "demo", "package.json"),
+      '{"scripts":{}}\n',
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(repoRoot, key),
+      [
+        "lockfileVersion: '9.0'",
+        "",
+        "settings:",
+        "  autoInstallPeers: true",
+        "  excludeLinksFromLockfile: false",
+        "",
+        "importers:",
+        "  .: {}",
+        "",
+      ].join("\n"),
       "utf8",
     );
 
@@ -91,7 +112,7 @@ test("non-default pnpm-store hash refresh verifies shared-cache hits", async () 
           fixedPhases.push(phaseLabel);
           await new Promise((resolve) => setTimeout(resolve, 50));
           const rawHashes = await fsp.readFile(
-            path.join(repoRoot, "build-tools", "tools", "nix", "node-modules.hashes.json"),
+            path.join(repoRoot, "projects", "node-modules.hashes.json"),
             "utf8",
           );
           const currentHash = (JSON.parse(rawHashes) as Record<string, string>)[key] || "";
@@ -109,7 +130,6 @@ test("non-default pnpm-store hash refresh verifies shared-cache hits", async () 
     assert.deepEqual(fixedPhases, [
       "importer=projects/libs/demo step=fixed-build attr=pnpm-store.projects-libs-demo",
       "importer=projects/libs/demo step=fixed-build-after-hash attr=pnpm-store.projects-libs-demo",
-      "importer=projects/libs/demo step=fixed-build attr=pnpm-store.projects-libs-demo",
     ]);
     assert.equal(await readSharedHashCache({ repoRoot, builderFingerprint, lockHash }), hashValue);
   } finally {

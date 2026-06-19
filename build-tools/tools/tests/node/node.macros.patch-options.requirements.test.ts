@@ -16,7 +16,7 @@ test("node macros infer patch requirements and honor patch_options optional over
     await fsp.writeFile(
       path.join(libDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_lib")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_lib")',
         "",
         "nix_node_lib(",
         '  name = "foo",',
@@ -54,7 +54,7 @@ test("node macros fail on unknown patch_options ids", async () => {
     await fsp.writeFile(
       path.join(libDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_lib")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_lib")',
         "",
         "nix_node_lib(",
         '  name = "foo",',
@@ -91,7 +91,7 @@ test("node macros warn on stale optional patch_options ids", async () => {
     await fsp.writeFile(
       path.join(libDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_lib")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_lib")',
         "",
         "nix_node_lib(",
         '  name = "foo",',
@@ -134,7 +134,7 @@ test("node macros keep deterministic ordering and dedupe normalized patch ids", 
     await fsp.writeFile(
       path.join(libDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_lib")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_lib")',
         "",
         "nix_node_lib(",
         '  name = "foo",',
@@ -177,7 +177,7 @@ test("node macros fail on unknown patch_options keys", async () => {
     await fsp.writeFile(
       path.join(libDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_lib")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_lib")',
         "",
         "nix_node_lib(",
         '  name = "foo",',
@@ -212,7 +212,7 @@ test("node macros tolerate missing importer patches/node directory", async () =>
     await fsp.writeFile(
       path.join(libDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs.bzl", "nix_node_lib")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_lib")',
         "",
         "nix_node_lib(",
         '  name = "foo",',

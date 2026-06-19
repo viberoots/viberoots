@@ -104,7 +104,7 @@ test("buck-daemon-reaper: reaps registered verify-owned node processes after par
   assert(parentSig, "expected non-empty parent lstart signature");
 
   const repoRoot = process.cwd();
-  const zxInit = path.join(repoRoot, "build-tools", "tools", "dev", "zx-init.mjs");
+  const zxInit = path.join(repoRoot, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs");
   const helper = spawn(
     process.execPath,
     ["--experimental-strip-types", "--import", zxInit, "-e", "setInterval(() => {}, 1000)"],
@@ -131,6 +131,7 @@ test("buck-daemon-reaper: reaps registered verify-owned node processes after par
 
   const reaperPath = path.join(
     repoRoot,
+    "viberoots",
     "build-tools",
     "tools",
     "tests",

@@ -1,14 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
 import { DEPLOYMENT_SECRET_FIXTURE_SCHEMA } from "../../deployments/deployment-secret-fixture";
+import { viberootsRepoPath } from "./deployment-command";
 
-const repoRoot = process.cwd();
-const secretsUsageDocPath = path.join(repoRoot, "docs", "secrets-usage.md");
-const apiDocPath = path.join(repoRoot, "docs", "deployment-secrets-api.md");
-const vaultRunbookDocPath = path.join(repoRoot, "docs", "vault-production-bootstrap.md");
+const secretsUsageDocPath = viberootsRepoPath("docs/secrets-usage.md");
+const apiDocPath = viberootsRepoPath("docs/deployment-secrets-api.md");
+const vaultRunbookDocPath = viberootsRepoPath("docs/vault-production-bootstrap.md");
 
 async function read(filePath: string): Promise<string> {
   return await fsp.readFile(filePath, "utf8");

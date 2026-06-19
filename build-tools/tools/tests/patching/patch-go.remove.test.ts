@@ -19,12 +19,12 @@ test("patch-go remove drops patch and refreshes glue deterministically", async (
     const fakeOrigin = path.join(tmp, "_gomodcache", `golang.org/x/net@${version}`);
     await fs.mkdirp(fakeOrigin);
 
-    const cli = path.join(tmp, "build-tools", "tools", "bin", "patch-pkg");
+    const cli = path.join(tmp, "viberoots", "build-tools", "tools", "bin", "patch-pkg");
     await $`chmod +x ${cli}`;
 
     const env = {
       ...process.env,
-      ZX_INIT: path.join(tmp, "build-tools", "tools", "dev", "zx-init.mjs"),
+      ZX_INIT: path.join(tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
       WORKSPACE_ROOT: tmp,
       NO_DEV_SHELL: "1",
       NIX_GO_TEST_RESOLVE_JSON: JSON.stringify({

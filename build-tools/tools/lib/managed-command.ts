@@ -205,6 +205,12 @@ export async function runManagedCommand(opts: {
   });
 
   const result = await new Promise<ManagedCommandResult>((resolve) => {
+    let resolved = false;
+    const finish = (result: ManagedCommandResult): void => {
+      if (resolved) return;
+      resolved = true;
+      resolve(result);
+    };
     child.once("error", (err) => {
       ended = true;
       const message = String(err && (err.stack || err.message) ? err.stack || err.message : err);
@@ -215,7 +221,7 @@ export async function runManagedCommand(opts: {
       ]
         .filter(Boolean)
         .join("\n");
-      resolve({
+      finish({
         ok: false,
         code: null,
         signal: null,
@@ -224,9 +230,9 @@ export async function runManagedCommand(opts: {
         timedOut,
       });
     });
-    child.once("close", (code, signal) => {
+    const finishProcess = (code: number | null, signal: NodeJS.Signals | null): void => {
       ended = true;
-      resolve({
+      finish({
         ok: !timedOut && code === 0,
         code,
         signal,
@@ -234,7 +240,9 @@ export async function runManagedCommand(opts: {
         stderr,
         timedOut,
       });
-    });
+    };
+    child.once("exit", finishProcess);
+    child.once("close", finishProcess);
   });
 
   if (timeoutTimer) clearTimeout(timeoutTimer);

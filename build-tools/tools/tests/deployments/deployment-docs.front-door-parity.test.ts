@@ -1,19 +1,18 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
+import { viberootsRepoPath } from "./deployment-command";
 
-const repoRoot = process.cwd();
-const usageDocPath = path.join(repoRoot, "docs", "deployments-usage.md");
-const secretsUsageDocPath = path.join(repoRoot, "docs", "secrets-usage.md");
-const apiDocPath = path.join(repoRoot, "docs", "deployment-secrets-api.md");
-const vaultRunbookDocPath = path.join(repoRoot, "docs", "vault-production-bootstrap.md");
-const designDocPath = path.join(repoRoot, "docs", "history", "designs", "deployments-design.md");
-const scenariosDocPath = path.join(repoRoot, "docs", "deployment-scenarios.md");
-const contractDocPath = path.join(repoRoot, "docs", "deployments-contract.md");
-const providerCapabilitiesDocPath = path.join(repoRoot, "docs/deployment-provider-capabilities.md");
-const defsPath = path.join(repoRoot, "build-tools", "deployments", "defs.bzl");
+const usageDocPath = viberootsRepoPath("docs/deployments-usage.md");
+const secretsUsageDocPath = viberootsRepoPath("docs/secrets-usage.md");
+const apiDocPath = viberootsRepoPath("docs/deployment-secrets-api.md");
+const vaultRunbookDocPath = viberootsRepoPath("docs/vault-production-bootstrap.md");
+const designDocPath = viberootsRepoPath("docs/history/designs/deployments-design.md");
+const scenariosDocPath = viberootsRepoPath("docs/deployment-scenarios.md");
+const contractDocPath = viberootsRepoPath("docs/deployments-contract.md");
+const providerCapabilitiesDocPath = viberootsRepoPath("docs/deployment-provider-capabilities.md");
+const defsPath = viberootsRepoPath("build-tools/deployments/defs.bzl");
 
 const bannedDocFragments = [
   "deploy <deployment-id>",
@@ -21,8 +20,8 @@ const bannedDocFragments = [
   "`deployment(...)`",
   "cloudflare_static_pwa_deployment(",
   "single_component_deployment(",
-  'load("//build-tools/deploy:',
-  "//build-tools/deploy/",
+  'load("@viberoots//build-tools/deploy:',
+  "@viberoots//build-tools/deploy/",
 ] as const;
 
 async function read(filePath: string): Promise<string> {

@@ -7,7 +7,7 @@ import { CANONICAL_TS_TEMPLATE_IDS } from "../../scaffolding/scaf/templates/taxo
 type ResolverConfig = Record<string, Record<string, string>>;
 
 test("resolver keeps canonical TypeScript templates under ts only", async () => {
-  const raw = await fsp.readFile("build-tools/tools/scaffolding/resolver.json", "utf8");
+  const raw = await fsp.readFile("viberoots/build-tools/tools/scaffolding/resolver.json", "utf8");
   const cfg = JSON.parse(raw) as ResolverConfig;
 
   const ts = cfg.ts || {};

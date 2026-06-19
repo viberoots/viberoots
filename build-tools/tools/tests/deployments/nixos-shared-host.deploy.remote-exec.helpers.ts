@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { NixosSharedHostDeployment } from "../../deployments/contract";
@@ -39,8 +40,8 @@ export function freshRemoteExecBuckEnv(
     ...base,
     BUCK_ISOLATION_DIR: isolation,
     BUCK_NESTED_ISO: isolation,
+    BUCK_ISOLATION_DIR_EXPORTER: isolation,
   };
-  delete env.BUCK_ISOLATION_DIR_EXPORTER;
   return env;
 }
 
@@ -88,6 +89,7 @@ export function pleominoDeploymentFixture(): NixosSharedHostDeployment {
 
 export function remoteExecEnv(env: Record<string, string>, extra: Record<string, string> = {}) {
   return {
+    ...process.env,
     ...env,
     VBR_DEPLOY_CONTROL_PLANE_TOKEN: "test-control-plane-token",
     VBR_DEPLOY_LOCAL_FIXTURE_SERVICE: "1",
@@ -226,6 +228,6 @@ export async function installManagedRemoteHost(
     topology: "plain",
     withExtraImports: true,
   });
-  await $`zx-wrapper build-tools/tools/deployments/nixos-shared-host-install.ts server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode ${mode}`;
+  await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-install.ts")} server install --server-root ${fixture.hostRoot} --config-root /etc/nixos --config-entry-path /etc/nixos/configuration.nix --install-mode ${mode}`;
   return fixture;
 }

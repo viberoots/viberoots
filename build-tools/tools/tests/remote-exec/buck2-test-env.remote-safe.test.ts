@@ -106,6 +106,7 @@ test("remote Buck process env omits local-only ambient inputs", () => {
     "NIX_PY_TEST_RESOLVE_JSON",
     "NIX_PNPM_ALLOW_GENERATE",
     "NIX_PNPM_EXACT_STORE",
+    "NIX_PNPM_EXACT_STORE_MAP",
     "TEST_RSYNC_ROOTS",
   ]) {
     const env = withEnv({ [name]: "set" }, () => buildBuckProcessEnvForPolicy(remotePolicy));
@@ -148,12 +149,13 @@ test("remote Buck process env keeps only approved process env values", () => {
 
 test("Nix impure env allowlists classify every value for remote verify policy", () => {
   const all = new Set([
-    ...readImpureEnvVars("flake.nix"),
-    ...readImpureEnvVars("build-tools/tools/nix/flake/nix-config.nix"),
+    ...readImpureEnvVars(".viberoots/workspace/flake.nix"),
+    ...readImpureEnvVars("viberoots/build-tools/tools/nix/flake/nix-config.nix"),
   ]);
   for (const name of all) assert.doesNotThrow(() => assertClassifiedNixImpureEnv(name));
   assert.equal(REMOTE_SAFE_NIX_IMPURE_ENV_VARS.has("NIX_PNPM_FETCH_TIMEOUT"), true);
   assert.equal(LOCAL_ONLY_NIX_IMPURE_ENV_VARS.has("NIX_PNPM_EXACT_STORE"), true);
+  assert.equal(LOCAL_ONLY_NIX_IMPURE_ENV_VARS.has("NIX_PNPM_EXACT_STORE_MAP"), true);
   assert.equal(LOCAL_ONLY_NIX_IMPURE_ENV_VARS.has("NIX_GO_DEV_OVERRIDE_JSON"), true);
   assert.equal(LOCAL_ONLY_NIX_IMPURE_ENV_VARS.has("WORKSPACE_ROOT"), true);
 });

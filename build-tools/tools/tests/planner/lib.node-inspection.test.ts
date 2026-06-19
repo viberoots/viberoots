@@ -14,7 +14,7 @@ test("planner lib node inspection helpers handle rule types and labels", async (
           { name = "//projects/apps/goapp:goapp"; rule_type = "go_binary"; labels = [ "lang:go" "kind:bin" ]; }
           { name = "//projects/apps/cppapp:cppapp"; rule_type = "my_cpp_nix_build_rule"; labels = []; }
         ];
-        L = import ./build-tools/tools/nix/planner/lib.nix { inherit lib get nodes; };
+        L = import ./viberoots/build-tools/tools/nix/planner/lib.nix { inherit lib get nodes; };
         nGo = builtins.elemAt nodes 0;
         nCpp = builtins.elemAt nodes 1;
         isGo = (L.isTargetByRuleTypeOrLabel { ruleTypePrefixes = [ "go_" ]; label = "lang:go"; }) nGo;

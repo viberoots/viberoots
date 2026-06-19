@@ -7,6 +7,7 @@ import { test } from "node:test";
 test("planner manifest script retains runnable contract shapes for bin and webapp", async () => {
   const manifestNix = path.join(
     process.cwd(),
+    "viberoots",
     "build-tools",
     "tools",
     "nix",

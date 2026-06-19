@@ -24,11 +24,15 @@ export async function ensureBuckPreludeConfig(root: string): Promise<void> {
       const workspaceBuckCfgExists = await pathExists(
         path.join(root, ".viberoots", "workspace", "buck", ".buckconfig"),
       );
+      const workspaceTargetsExists = await pathExists(
+        path.join(root, ".viberoots", "workspace", "TARGETS"),
+      );
       if (
         preludeFileExists &&
         rootCfgExists &&
         workspaceProvidersCfgExists &&
-        workspaceBuckCfgExists
+        workspaceBuckCfgExists &&
+        workspaceTargetsExists
       ) {
         return;
       }
@@ -73,7 +77,7 @@ user_platform = prelude//platforms:default
 target_platforms = prelude//platforms:default
 
 [project]
-ignore = buck-out/tmp/tmpdir,.claude/worktrees,.codex/worktrees
+ignore = .viberoots/buck/tmp,.viberoots/workspace/buck/tmp,.claude/worktrees,.codex/worktrees
 EOF
     `}`;
 
@@ -85,6 +89,13 @@ EOF
       cat > .viberoots/workspace/buck/.buckconfig <<'EOF'
 [buildfile]
 name = TARGETS
+EOF
+      cat > .viberoots/workspace/TARGETS <<'EOF'
+filegroup(
+    name = "flake.lock",
+    srcs = ["flake.lock"],
+    visibility = ["PUBLIC"],
+)
 EOF
     `}`;
   } catch (e) {

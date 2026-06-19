@@ -3,8 +3,11 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("update-pnpm-hash nondefault importer verifies fixed build before unfixed rebuild", async () => {
-  const mainTxt = await fsp.readFile("build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
-  const txt = await fsp.readFile("build-tools/tools/dev/update-pnpm-hash/nondefault.ts", "utf8");
+  const mainTxt = await fsp.readFile("viberoots/build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
+  const txt = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/nondefault.ts",
+    "utf8",
+  );
   if (!txt.includes("step=fixed-build attr=${opts.storeAttr}")) {
     throw new Error("nondefault importer path must verify fixed build before unfixed rebuild");
   }
@@ -23,7 +26,10 @@ test("update-pnpm-hash nondefault importer verifies fixed build before unfixed r
       "root updater must reuse realized pnpm-store outputs before exact prefetch on fixed builds",
     );
   }
-  if (!mainTxt.includes("buildStore(storeAttr, buildFlakeRef, activity, extraEnv)")) {
+  if (!mainTxt.includes("const nixEnv = { ...extraEnv, ...filteredEnv };")) {
+    throw new Error("root updater must merge exact-store env into the filtered nix environment");
+  }
+  if (!mainTxt.includes("buildStore(storeAttr, buildFlakeRef, activity, nixEnv)")) {
     throw new Error(
       "root updater fixed-build verification must pass exact-store env into buildStore",
     );

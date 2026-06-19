@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { viberootsRepoPath } from "./deployment-command";
 
 async function read(relativePath: string) {
-  return await fsp.readFile(path.join(process.cwd(), relativePath), "utf8");
+  return await fsp.readFile(viberootsRepoPath(relativePath), "utf8");
 }
 
 test("deployment control plane docs stay aligned on separated roles and composable scopes", async () => {

@@ -5,7 +5,15 @@ import path from "node:path";
 import { test } from "node:test";
 
 test("python wheelhouse: contract keys wheelhouse identity to lockfile+patches only", async () => {
-  const file = path.join(process.cwd(), "build-tools", "tools", "nix", "templates", "python.nix");
+  const file = path.join(
+    process.cwd(),
+    "viberoots",
+    "build-tools",
+    "tools",
+    "nix",
+    "templates",
+    "python.nix",
+  );
   const txt = await fsp.readFile(file, "utf8");
   assert.ok(txt.includes("pyWheelhouse = {"), "expected pyWheelhouse definition in python.nix");
   assert.ok(txt.includes('pname = "py-wheelhouse";'));

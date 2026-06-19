@@ -15,19 +15,30 @@ const STALE_TAXONOMY_TS = [
   "",
 ].join("\n");
 
-test("scaf preflight refreshes taxonomy artifacts for templates command", async () => {
+function generatedTaxonomyPath(tmp: string): string {
+  return path.join(
+    tmp,
+    "viberoots",
+    "build-tools",
+    "tools",
+    "scaffolding",
+    "scaf",
+    "templates",
+    "generated",
+    "template-taxonomy.generated.ts",
+  );
+}
+
+async function writeStaleTaxonomy(tmp: string): Promise<string> {
+  const generatedPath = generatedTaxonomyPath(tmp);
+  await fsp.mkdir(path.dirname(generatedPath), { recursive: true });
+  await fsp.writeFile(generatedPath, STALE_TAXONOMY_TS, "utf8");
+  return generatedPath;
+}
+
+test("scaf templates command ignores stale taxonomy artifacts", async () => {
   await runInTemp("scaf-template-preflight-templates", async (tmp, _$) => {
-    const generatedPath = path.join(
-      tmp,
-      "build-tools",
-      "tools",
-      "scaffolding",
-      "scaf",
-      "templates",
-      "generated",
-      "template-taxonomy.generated.ts",
-    );
-    await fsp.writeFile(generatedPath, STALE_TAXONOMY_TS, "utf8");
+    const generatedPath = await writeStaleTaxonomy(tmp);
 
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     const out = await $`scaf templates ts`;
@@ -36,24 +47,13 @@ test("scaf preflight refreshes taxonomy artifacts for templates command", async 
     assert.doesNotMatch(stdout, /bogus-only/);
 
     const refreshed = await fsp.readFile(generatedPath, "utf8");
-    assert.match(refreshed, /"cli"/);
-    assert.doesNotMatch(refreshed, /bogus-only/);
+    assert.match(refreshed, /bogus-only/);
   });
 });
 
 test("scaf preflight keeps templates --json machine-readable", async () => {
   await runInTemp("scaf-template-preflight-json", async (tmp, _$) => {
-    const generatedPath = path.join(
-      tmp,
-      "build-tools",
-      "tools",
-      "scaffolding",
-      "scaf",
-      "templates",
-      "generated",
-      "template-taxonomy.generated.ts",
-    );
-    await fsp.writeFile(generatedPath, STALE_TAXONOMY_TS, "utf8");
+    await writeStaleTaxonomy(tmp);
 
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     const out = await $`scaf templates ts --json`;
@@ -67,17 +67,7 @@ test("scaf preflight keeps templates --json machine-readable", async () => {
 
 test("scaf preflight refreshes taxonomy artifacts for template completion", async () => {
   await runInTemp("scaf-template-preflight-complete", async (tmp, _$) => {
-    const generatedPath = path.join(
-      tmp,
-      "build-tools",
-      "tools",
-      "scaffolding",
-      "scaf",
-      "templates",
-      "generated",
-      "template-taxonomy.generated.ts",
-    );
-    await fsp.writeFile(generatedPath, STALE_TAXONOMY_TS, "utf8");
+    await writeStaleTaxonomy(tmp);
 
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     const out = await $`scaf __complete templates ts`;

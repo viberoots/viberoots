@@ -16,6 +16,7 @@ def nix_action_workspace_setup_from_args(
         + "  if [ \"$WR\" = \"$GRAPH\" ]; then WR=\"${GRAPH%/build-tools/tools/buck/graph.json}\"; fi; "
         + "  export WORKSPACE_ROOT=\"$WR\"; "
         + "fi; "
+        + "if [ -n \"${0:-}\" ]; then case \"$0\" in /*) mkdir -p \"$(dirname \"$0\")\" ;; *) mkdir -p \"$(dirname \"${WORKSPACE_ROOT:-$PWD}/$0\")\" ;; esac; fi; "
         + "export REPO_ROOT=\"${REPO_ROOT:-$WORKSPACE_ROOT}\"; "
         + "if [ -z \"${FLK_ROOT:-}\" ] && [ -n \"$FLAKE_FILE\" ] && [ -f \"$FLAKE_FILE\" ]; then "
         + "  FLK_DIR=\"$(dirname \"$FLAKE_FILE\")\"; "

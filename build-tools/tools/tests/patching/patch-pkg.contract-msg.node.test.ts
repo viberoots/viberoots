@@ -15,7 +15,7 @@ test("patch-pkg prints patch model one-liner for importer-local languages (node)
     );
     await fs.outputFile(path.join(importer, ".npmrc"), "patches-dir=patches/node\n", "utf8");
 
-    const cli = path.join(tmp, "build-tools", "tools", "bin", "patch-pkg");
+    const cli = path.join(tmp, "viberoots", "build-tools", "tools", "bin", "patch-pkg");
     await $`chmod +x ${cli}`;
 
     const fakeWs = path.join(tmp, "_pnpm_patch_ws");
@@ -35,7 +35,7 @@ test("patch-pkg prints patch model one-liner for importer-local languages (node)
       ...process.env,
       PATH: `${mockBin}:${process.env.PATH || ""}`,
       PNPM_BIN: mockPnpm,
-      ZX_INIT: path.join(tmp, "build-tools", "tools", "dev", "zx-init.mjs"),
+      ZX_INIT: path.join(tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
       WORKSPACE_ROOT: tmp,
       NO_DEV_SHELL: "1",
     } as any;

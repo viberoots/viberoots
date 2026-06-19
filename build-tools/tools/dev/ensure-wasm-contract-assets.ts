@@ -15,7 +15,7 @@ async function exists(absPath: string): Promise<boolean> {
 }
 
 async function runBuildStep(buildCommand: string, cwd: string): Promise<void> {
-  const shell = String(process.env.BASH || process.env.SHELL || "bash").trim() || "bash";
+  const shell = String(process.env.BASH || "bash").trim() || "bash";
   const result = await runManagedCommand({
     command: shell,
     args: ["--noprofile", "--norc", "-lc", buildCommand],

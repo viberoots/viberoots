@@ -11,7 +11,11 @@ test("CI forces error severity regardless of --validation=warn", async () => {
     await fs.outputFile(path.join(pkg, "main.go"), "package main\nfunc main(){}\n", "utf8");
 
     const nodes = [
-      { name: "//build-tools/go/app:bin", srcs: ["build-tools/go/app/main.go"], labels: [] },
+      {
+        name: "//viberoots/build-tools/go/app:bin",
+        srcs: ["viberoots/build-tools/go/app/main.go"],
+        labels: [],
+      },
     ];
     const graph = path.join(tmp, ".viberoots/workspace/buck/graph.json");
     await fs.mkdirp(path.dirname(graph));
@@ -24,7 +28,7 @@ test("CI forces error severity regardless of --validation=warn", async () => {
         cwd: tmp,
         stdio: "pipe",
         env: { ...process.env, CI: "true" },
-      })`build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --validation warn`;
+      })`viberoots/build-tools/tools/buck/export-graph.ts --simulate ${graph} --out ${graph} --validation warn`;
       out = String(res.stdout || "") + String(res.stderr || "");
       code = res.exitCode || 0;
     } catch (e: any) {

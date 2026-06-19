@@ -3,8 +3,11 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { test } from "node:test";
 import { foundationFromTopology, privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
+import { viberootsRepoPath } from "./deployment-command";
 
-const moduleDir = "build-tools/deployments/aws-control-plane-foundation/opentofu";
+const moduleDir = viberootsRepoPath(
+  "build-tools/deployments/aws-control-plane-foundation/opentofu",
+);
 
 test("OpenTofu foundation attaches artifact policy to EC2 instance-profile role", () => {
   const iam = fs.readFileSync(`${moduleDir}/iam.tf`, "utf8");

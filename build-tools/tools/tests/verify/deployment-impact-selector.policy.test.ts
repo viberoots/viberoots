@@ -48,18 +48,18 @@ test("deployment-impact: deployment taxonomy-only edits stay deployment-only", (
 test("deployment-impact: reviewed shared-host service modules stay deployment-only", () => {
   const result = resolveDeploymentImpactSelection(
     [
-      "build-tools/tools/nix/shared-host-identity-provider-migration.nix",
-      "build-tools/tools/nix/shared-host-postgres-module.nix",
-      "build-tools/tools/nix/shared-host-vault-module.nix",
+      "viberoots/build-tools/tools/nix/shared-host-identity-provider-migration.nix",
+      "viberoots/build-tools/tools/nix/shared-host-postgres-module.nix",
+      "viberoots/build-tools/tools/nix/shared-host-vault-module.nix",
     ],
     { deploymentTargetLabels },
   );
 
   assert.equal(result.mode, "deployment-only");
   assert.deepEqual(result.diagnostics.deploymentOwnedPaths, [
-    "build-tools/tools/nix/shared-host-identity-provider-migration.nix",
-    "build-tools/tools/nix/shared-host-postgres-module.nix",
-    "build-tools/tools/nix/shared-host-vault-module.nix",
+    "viberoots/build-tools/tools/nix/shared-host-identity-provider-migration.nix",
+    "viberoots/build-tools/tools/nix/shared-host-postgres-module.nix",
+    "viberoots/build-tools/tools/nix/shared-host-vault-module.nix",
   ]);
   assert.deepEqual(result.diagnostics.fullBuildSystemTriggerPaths, []);
   assert.equal(result.diagnostics.reason, "deployment-owned-build-system-path-changed");
@@ -89,7 +89,7 @@ test("deployment-impact: shared helpers and reviewed loader/root paths broaden t
       "build-tools/tools/tests/deployment_conventions.bzl",
       "build-tools/tools/tests/defs.bzl",
       "toolchains/TARGETS",
-      "build-tools/tools/dev/verify/run-verify.ts",
+      "viberoots/build-tools/tools/dev/verify/run-verify.ts",
       ".viberoots/workspace/providers/auto_map.bzl",
       "flake.nix",
     ],
@@ -99,11 +99,11 @@ test("deployment-impact: shared helpers and reviewed loader/root paths broaden t
   assert.equal(result.mode, "mixed-build-system");
   assert.deepEqual(result.diagnostics.sharedBuildSystemPaths, [
     ".viberoots/workspace/providers/auto_map.bzl",
-    "build-tools/tools/dev/verify/run-verify.ts",
     "build-tools/tools/tests/defs.bzl",
     "build-tools/tools/tests/deployment_conventions.bzl",
     "flake.nix",
     "toolchains/TARGETS",
+    "viberoots/build-tools/tools/dev/verify/run-verify.ts",
   ]);
   assert.deepEqual(result.diagnostics.unknownBuildSystemPaths, []);
   assert.equal(result.diagnostics.reason, "shared-build-system-path-changed");

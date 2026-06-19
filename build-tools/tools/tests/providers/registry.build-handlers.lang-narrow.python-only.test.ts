@@ -24,7 +24,7 @@ test("providers: buildHandlers(--lang python) yields only Python", async () => {
     );
 
     const runner = `#!/usr/bin/env zx-wrapper
-import { buildHandlers } from "./build-tools/tools/buck/providers/index";
+import { buildHandlers } from "./viberoots/build-tools/tools/buck/providers/index";
 const hs = await buildHandlers("python");
 console.log(JSON.stringify(hs.map(h => h.lang)));
 `;

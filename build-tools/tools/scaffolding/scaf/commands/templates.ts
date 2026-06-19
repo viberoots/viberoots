@@ -11,6 +11,6 @@ export async function cmdTemplates(args: string[], flags: ScafFlags) {
     printSkip("missing-language", `${lang}`);
     return;
   }
-  const metas = await readTemplateMeta(lang);
+  const metas = await readTemplateMeta(lang, { tolerateStaleTaxonomy: true });
   printTemplateList(metas, flags["json"] === "true");
 }

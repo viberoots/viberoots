@@ -39,7 +39,15 @@ test("metadata contract: canonical ts templates have ts language and help fields
   for (const id of CANONICAL_TS_TEMPLATE_IDS) {
     const template = id.split("/")[1] || "";
     assert.ok(template.length > 0, `invalid canonical template id: ${id}`);
-    const root = path.join("build-tools", "tools", "scaffolding", "templates", "ts", template);
+    const root = path.join(
+      "viberoots",
+      "build-tools",
+      "tools",
+      "scaffolding",
+      "templates",
+      "ts",
+      template,
+    );
     const metaPath = path.join(root, "meta.json");
     const copierPath = path.join(root, "copier.yaml");
 

@@ -5,9 +5,13 @@ import { test } from "node:test";
 import { collectRemoteExecTargetMetadata } from "../../dev/verify/remote-target-policy";
 import { parseVerifyExecutionPolicy } from "../../dev/verify/remote-policy";
 import { validateRemoteExecTargets } from "../../dev/remote-exec-policy-check";
+import { normalizeTargetLabel } from "../../lib/labels";
 import { inheritedBuckIsolation } from "../lib/test-helpers";
 
-const tinyTarget = "//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles";
+const tinyTarget =
+  "root//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles";
+const tinyTargetCanonical =
+  "//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles";
 const localPolicy = parseVerifyExecutionPolicy({ env: {} });
 
 test("first local conformance target has target-derived readiness evidence", async () => {
@@ -69,20 +73,18 @@ test("only the tiny target is remote-ready in the Buck graph", async () => {
   const attrs = JSON.parse(String(res.stdout || "{}")) as Record<string, { labels?: string[] }>;
   const readyTargets = Object.entries(attrs)
     .filter(([, info]) => (info.labels || []).includes("remote:ready"))
-    .map(([target]) =>
-      target.replace(/^root/, "").replace(/ \(config\/\/platforms:default#[^)]+\)$/, ""),
-    )
+    .map(([target]) => normalizeTargetLabel(target))
     .sort();
 
   assert.deepEqual(
     readyTargets,
-    [tinyTarget],
+    [tinyTargetCanonical],
     `unexpected remote-ready targets: ${readyTargets.join(", ")}`,
   );
 });
 
 test("only the tiny target is documented as initially remote-ready", async () => {
-  const doc = await fs.readFile("build-tools/docs/remote-build-setup.md", "utf8");
+  const doc = await fs.readFile("viberoots/build-tools/docs/remote-build-setup.md", "utf8");
   const matches = [...doc.matchAll(/`([^`]+)` is the only initial `remote:ready` target/g)];
 
   assert.equal(matches.length, 1);

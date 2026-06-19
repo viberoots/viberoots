@@ -22,7 +22,7 @@ test("lang-helpers: patchesMapFromDirs merges per-dir maps preserving order", as
     const expr = `
       let
         pkgs = import <nixpkgs> {};
-        H = import ./build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
+        H = import ./viberoots/build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
       in H.patchesMapFromDirsWith {
         dirs = map builtins.toPath [ ${JSON.stringify(d1)} ${JSON.stringify(d2)} ];
       }

@@ -18,7 +18,7 @@ test("runInTemp caches toolchain probing when CGO is enabled", async () => {
 
     assert.equal(
       getTimingCountForLabel(
-        "toolchain probe (command -v cbuild-tools/lang/clang++/xcrun/llvm-ar/ar)",
+        "toolchain probe (command -v cviberoots/build-tools/lang/clang++/xcrun/llvm-ar/ar)",
       ),
       1,
     );

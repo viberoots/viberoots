@@ -4,6 +4,7 @@
 , viberootsRoot
 , nodeMods ? null
 , mkNodeMods ? null
+, viberootsNodeMods ? null
 , prelude
 , uv2nixLib
 , version
@@ -24,6 +25,7 @@ let
 
   nodeModsPkgs = import ./node-mods.nix {
     nodeMods = resolvedNodeMods;
+    inherit viberootsNodeMods;
     importerDirs = importers.importerDirs;
     haveRootLock = importers.haveRootLock;
   };
@@ -42,7 +44,7 @@ let
   };
 
   nodeVercelNext = import ./node-vercel-next.nix {
-    inherit pkgs filterRepo repoSnapshot repoRoot nodeWebapp;
+    inherit pkgs filterRepo repoSnapshot repoRoot viberootsRoot nodeWebapp;
     importerDirs = importers.importerDirs;
   };
 
@@ -64,8 +66,8 @@ let
   pyWasiToolchain = import ../../toolchains/python-wasi.nix { inherit pkgs; };
   testSeed = import ./test-seed.nix { inherit pkgs repoRoot; };
   controlPlaneImage = import ./deployment-control-plane-image.nix {
-    inherit pkgs repoSnapshot;
-    nodeMods = resolvedNodeMods;
+    inherit pkgs filterRepo repoRoot repoSnapshot viberootsRoot;
+    nodeMods = if viberootsNodeMods != null then viberootsNodeMods else resolvedNodeMods;
   };
   remoteTools = import ./remote-worker-tools.nix { inherit pkgs zx-wrapper; };
   remoteWorkerBootstrap = import ./remote-worker-bootstrap.nix {

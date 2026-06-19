@@ -46,6 +46,24 @@ async function freeGiBForPath(p: string): Promise<number | null> {
   }
 }
 
+async function dirGiBForPath(p: string): Promise<number> {
+  const root = String(p || "").trim();
+  if (!root) return 0;
+  try {
+    const { stdout } = await $({
+      stdio: "pipe",
+      reject: false,
+    })`bash --noprofile --norc -c ${'du -sk "$1" 2>/dev/null || true'} _ ${root}`;
+    const line = String(stdout || "").trim();
+    const toks = line.split(/\s+/);
+    const usedKB = Number(toks[0] || "0");
+    if (!Number.isFinite(usedKB) || usedKB <= 0) return 0;
+    return Math.max(0, Math.floor(usedKB / 1024 / 1024));
+  } catch {
+    return 0;
+  }
+}
+
 async function appendLine(p: string, line: string): Promise<void> {
   await fsp.appendFile(p, line.endsWith("\n") ? line : line + "\n", "utf8").catch(() => {});
 }
@@ -56,10 +74,8 @@ export type VerifySafetyRailsDecision = {
 };
 
 export function decideVerifySafetyRailsTrigger(opts: {
-  baseFreeGiB: number;
   curFreeGiB: number;
   lowSpaceGiB: number;
-  dropBudgetGiB: number;
 }): VerifySafetyRailsDecision | null {
   if (opts.lowSpaceGiB > 0 && opts.curFreeGiB < opts.lowSpaceGiB) {
     return {
@@ -67,18 +83,12 @@ export function decideVerifySafetyRailsTrigger(opts: {
       reason: `/nix/store free dropped below VERIFY_LOW_SPACE_GB (${opts.curFreeGiB} < ${opts.lowSpaceGiB})`,
     };
   }
-  const dropGiB = opts.baseFreeGiB - opts.curFreeGiB;
-  if (opts.dropBudgetGiB > 0 && dropGiB > opts.dropBudgetGiB) {
-    return {
-      shouldStop: true,
-      reason: `/nix/store free drop exceeded budget VERIFY_NIX_DROP_BUDGET_GB (drop=${dropGiB}GiB > ${opts.dropBudgetGiB}GiB)`,
-    };
-  }
   return null;
 }
 
 export type VerifySafetyRailsPollDeps = {
   freeGiBForPath: (p: string) => Promise<number | null>;
+  transientGiBForPath?: (p: string) => Promise<number>;
   sampleProcessCounts?: () => Promise<ProcessCounts | null>;
   writeSnapshot: (dir: string, reason: string) => Promise<void>;
   onTrigger: (reason: string) => Promise<void>;
@@ -90,20 +100,23 @@ export type VerifySafetyRailsPollDeps = {
 export async function pollVerifySafetyRailsOnce(opts: {
   analysisDir: string;
   processGroupIdToKill: number;
-  baseFreeGiB: number;
+  transientRoot?: string;
   lowSpaceGiB: number;
-  dropBudgetGiB: number;
   telemetryPath: string;
   deps: VerifySafetyRailsPollDeps;
 }): Promise<VerifySafetyRailsDecision | null> {
   const cur = await opts.deps.freeGiBForPath("/nix/store");
   if (cur == null) return null;
+  const curTransientGiB =
+    opts.transientRoot && opts.deps.transientGiBForPath
+      ? await opts.deps.transientGiBForPath(opts.transientRoot).catch(() => 0)
+      : 0;
   const processCounts = opts.deps.sampleProcessCounts
     ? await opts.deps.sampleProcessCounts().catch(() => null)
     : null;
   await appendLine(
     opts.telemetryPath,
-    `${Date.now()} freeGiB=${cur} ${formatLoadAvg()} ${formatProcessCounts(processCounts)}`,
+    `${Date.now()} freeGiB=${cur} transientGiB=${curTransientGiB} reclaimableFreeGiB=${cur + curTransientGiB} ${formatLoadAvg()} ${formatProcessCounts(processCounts)}`,
   );
 
   const activeGc = await opts.deps.activeNixGcProcesses();
@@ -118,10 +131,8 @@ export async function pollVerifySafetyRailsOnce(opts: {
   }
 
   const decision = decideVerifySafetyRailsTrigger({
-    baseFreeGiB: opts.baseFreeGiB,
     curFreeGiB: cur,
     lowSpaceGiB: opts.lowSpaceGiB,
-    dropBudgetGiB: opts.dropBudgetGiB,
   });
   if (!decision) return null;
 
@@ -145,7 +156,6 @@ export async function startVerifySafetyRails(opts: {
   onTrigger?: (reason: string) => Promise<void>;
 }): Promise<{ stop: () => void; telemetryPath: string | null }> {
   const lowSpace = defaultOrNonNegative(parseNum(process.env.VERIFY_LOW_SPACE_GB), 5);
-  const dropBudget = defaultOrNonNegative(parseNum(process.env.VERIFY_NIX_DROP_BUDGET_GB), 40);
   const intervalSec = defaultOrAtLeast(parseNum(process.env.VERIFY_SAFETY_RAILS_POLL_SECS), 5, 1);
   const processSampleSec = defaultOrAtLeast(
     parseNum(process.env.VERIFY_SAFETY_RAILS_PROCESS_SAMPLE_SECS),
@@ -157,13 +167,19 @@ export async function startVerifySafetyRails(opts: {
   if (base == null) {
     return { stop: () => {}, telemetryPath: null };
   }
+  const transientRoot = String(process.env.TMPDIR || "").trim();
+  const baseTransientGiB = transientRoot ? await dirGiBForPath(transientRoot) : 0;
 
   await fsp.mkdir(opts.analysisDir, { recursive: true }).catch(() => {});
   const telemetry = path.join(opts.analysisDir, "nix-store-telemetry.log");
   await appendLine(telemetry, `[verify] safety-rails baseline /nix/store free ~${base}GiB`);
   await appendLine(
     telemetry,
-    `${Date.now()} freeGiB=${base} ${formatLoadAvg()} ${formatProcessCounts(null)}`,
+    `[verify] safety-rails baseline transient root ${transientRoot || "<none>"} ~${baseTransientGiB}GiB`,
+  );
+  await appendLine(
+    telemetry,
+    `${Date.now()} freeGiB=${base} transientGiB=${baseTransientGiB} reclaimableFreeGiB=${base + baseTransientGiB} ${formatLoadAvg()} ${formatProcessCounts(null)}`,
   );
 
   if ((process.env.VERIFY_ANALYSIS_STORE_TOTALS || "").trim() === "1") {
@@ -190,12 +206,12 @@ export async function startVerifySafetyRails(opts: {
         const decision = await pollVerifySafetyRailsOnce({
           analysisDir: opts.analysisDir,
           processGroupIdToKill: opts.processGroupIdToKill,
-          baseFreeGiB: base,
+          transientRoot,
           lowSpaceGiB: lowSpace,
-          dropBudgetGiB: dropBudget,
           telemetryPath: telemetry,
           deps: {
             freeGiBForPath,
+            transientGiBForPath: dirGiBForPath,
             writeSnapshot: async (dir, reason) =>
               writeVerifySafetyRailsTriggerSnapshot(dir, reason),
             onTrigger: async (reason) => {

@@ -7,6 +7,17 @@ function isWorkspaceImporter(importer: string, workspaceRoots: readonly string[]
   return workspaceRoots.some((base) => importer.startsWith(`${base}/`));
 }
 
+async function hasLock(root: string, importer: string): Promise<boolean> {
+  try {
+    await fsp.access(
+      path.join(root, importer === "." ? "pnpm-lock.yaml" : importer, "pnpm-lock.yaml"),
+    );
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function nearestImporterFromCwd(root: string, cwd: string): Promise<string | null> {
   const rootAbs = path.resolve(root);
   let current = path.resolve(cwd);
@@ -62,7 +73,11 @@ export async function discoverImportersWithLock(
   if (tracked) {
     for (const importer of tracked) {
       if (importer === "." && !allowDotImporter) continue;
+      if (!(await hasLock(root, importer))) continue;
       out.add(importer);
+    }
+    if (!out.has(".") && (await hasLock(root, "viberoots"))) {
+      out.add("viberoots");
     }
   } else {
     if (allowDotImporter) {
@@ -113,7 +128,7 @@ export async function discoverImportersWithLock(
 
 export async function sharedUnifiedStorePath(root: string): Promise<string> {
   try {
-    const marker = path.join(root, "buck-out", ".unified-pnpm-store", "path");
+    const marker = path.join(root, ".viberoots", "workspace", "buck", "unified-pnpm-store", "path");
     const p = String(await fsp.readFile(marker, "utf8")).trim();
     if (!p) return "";
     await fsp.access(p);

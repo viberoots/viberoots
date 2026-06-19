@@ -17,7 +17,7 @@ test("patches-lint (python): json output preserves filename_shape message", asyn
     const res = await $({
       stdio: "pipe",
       nothrow: true,
-    })`node build-tools/tools/dev/patches-lint.ts --lang python --strict --format json`;
+    })`node viberoots/build-tools/tools/dev/patches-lint.ts --lang python --strict --format json`;
 
     const txt = String(res.stdout || "").trim();
     const json = JSON.parse(txt) as Array<any>;

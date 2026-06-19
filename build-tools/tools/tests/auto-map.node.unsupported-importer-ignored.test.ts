@@ -42,7 +42,7 @@ test("unsupported importer labels do not generate Node providers or auto-map ent
     );
 
     const NODE = "node";
-    const ZX = path.resolve("build-tools/tools/dev/zx-init.mjs");
+    const ZX = path.resolve("viberoots/build-tools/tools/dev/zx-init.mjs");
     const nodeFlags = [
       "--experimental-strip-types",
       "--disable-warning=ExperimentalWarning",
@@ -50,8 +50,8 @@ test("unsupported importer labels do not generate Node providers or auto-map ent
       ZX,
     ];
 
-    await $`${NODE} ${nodeFlags} build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
-    await $`${NODE} ${nodeFlags} build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`${NODE} ${nodeFlags} viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
+    await $`${NODE} ${nodeFlags} viberoots/build-tools/tools/buck/gen-auto-map.ts --graph ${graph} --out .viberoots/workspace/providers/auto_map.bzl`;
 
     const forbiddenProvider = workspaceProviderLabel(
       providerNameForImporter("third_party/pnpm-lock.yaml", "third_party"),

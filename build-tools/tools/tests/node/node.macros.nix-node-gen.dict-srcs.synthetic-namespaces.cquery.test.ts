@@ -34,7 +34,7 @@ EOF'`;
       [
         "",
         "# test: node.macros.nix-node-gen.dict-srcs.synthetic-namespaces.cquery.test.ts",
-        'load("//build-tools/node:defs.bzl", "nix_node_gen")',
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_gen")',
         "",
         "nix_node_gen(",
         '  name = "gen_dict_ns",',

@@ -5,16 +5,20 @@ import path from "node:path";
 import process from "node:process";
 import { setTimeout as sleep } from "node:timers/promises";
 import { copyTree } from "../../lib/copy-tree";
+import {
+  GENERATED_REPO_STATE_PATHS,
+  isGeneratedRepoStateRelPath,
+} from "./generated-state-excludes";
 import { pidAlive } from "./seed-utils";
 
 const REQUIRED_STAGE_FILES = [
-  "flake.nix",
+  path.join(".viberoots", "workspace", "flake.nix"),
   ".buckconfig",
-  "eslint.config.js",
-  path.join("build-tools", "deployments", "defs.bzl"),
-  path.join("build-tools", "tools", "buck", "export-graph.ts"),
-  path.join("build-tools", "tools", "dev", "zx-init.mjs"),
-  path.join("build-tools", "tools", "node", "gen-wasm-inline-module.ts"),
+  path.join("viberoots", "eslint.config.js"),
+  path.join("viberoots", "build-tools", "deployments", "defs.bzl"),
+  path.join("viberoots", "build-tools", "tools", "buck", "export-graph.ts"),
+  path.join("viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
+  path.join("viberoots", "build-tools", "tools", "node", "gen-wasm-inline-module.ts"),
   path.join("viberoots", "flake.nix"),
 ];
 
@@ -45,6 +49,8 @@ function seedStageLockDir(seedKey: string): string {
 }
 
 async function ensureWritableTree(root: string): Promise<void> {
+  const rootSt = await fsp.stat(root).catch(() => null);
+  if (rootSt) await fsp.chmod(root, rootSt.mode | 0o700).catch(() => {});
   const stack: string[] = [root];
   while (stack.length) {
     const dir = stack.pop() as string;
@@ -110,6 +116,17 @@ async function missingRequiredStageFiles(root: string): Promise<string[]> {
   return missing;
 }
 
+async function hasGeneratedRepoState(root: string): Promise<boolean> {
+  for (const rel of GENERATED_REPO_STATE_PATHS) {
+    const exists = await fsp
+      .access(path.join(root, rel))
+      .then(() => true)
+      .catch(() => false);
+    if (exists) return true;
+  }
+  return false;
+}
+
 async function stageReady(stageDir: string, seedKey: string): Promise<boolean> {
   const keyFile = path.join(stageDir, "seed.key");
   const readyFile = path.join(stageDir, ".seed-store-ready");
@@ -120,6 +137,7 @@ async function stageReady(stageDir: string, seedKey: string): Promise<boolean> {
     .then(() => true)
     .catch(() => false);
   if (!hasReady) return false;
+  if (await hasGeneratedRepoState(stageDir)) return false;
   return (await missingRequiredStageFiles(stageDir)).length === 0;
 }
 
@@ -214,9 +232,16 @@ export async function stageSeedStore(
       return stageDir;
     }
     await ensureWritableTree(stageDir).catch(() => {});
-    await fsp.rm(stageDir, { recursive: true, force: true }).catch(() => {});
+    await fsp.rm(stageDir, { recursive: true, force: true }).catch(async () => {
+      await ensureWritableTree(stageDir).catch(() => {});
+      await fsp.rm(stageDir, { recursive: true, force: true });
+    });
     await fsp.mkdir(path.dirname(stageDir), { recursive: true }).catch(() => {});
-    await copyTree(seedPath, stageDir, { cloneMode: "none", force: true });
+    await copyTree(seedPath, stageDir, {
+      cloneMode: "none",
+      exclude: isGeneratedRepoStateRelPath,
+      force: true,
+    });
     await fsp.writeFile(keyFile, seedKey + "\n", "utf8");
     await fsp.writeFile(readyFile, "ok\n", "utf8");
     await makeReadOnlyTree(stageDir);

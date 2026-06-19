@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsRepoPath, viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
 import {
   assertVaultBootstrapExecutableDocument,
@@ -13,8 +13,6 @@ import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import { installCloudflarePagesTargets } from "./deployment-targets.install.helpers";
 import { deploymentRequirementFixture } from "./deployment-metadata.fixture";
 import { runInTemp } from "../lib/test-helpers";
-
-const repoRoot = process.cwd();
 
 function deploymentWithSecrets() {
   return cloudflarePagesDeploymentFixture({
@@ -41,7 +39,7 @@ test("deploy --print-vault-bootstrap emits deployment-derived JSON", async () =>
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`zx-wrapper build-tools/tools/deployments/deploy.ts \
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} \
       --deployment ${deployment.label} \
       --print-vault-bootstrap \
       --issuer-url https://identity.apps.kilty.io/realms/deployments \
@@ -71,20 +69,12 @@ test("deploy --print-vault-bootstrap emits deployment-derived JSON", async () =>
 });
 
 test("deploy read-only bootstrap path does not eagerly import provider front doors", async () => {
-  const deployCliPath = path.join(repoRoot, "build-tools", "tools", "deployments", "deploy-cli.ts");
-  const deployFrontDoorPath = path.join(
-    repoRoot,
-    "build-tools",
-    "tools",
-    "deployments",
-    "deploy-front-door.ts",
+  const deployCliPath = viberootsRepoPath("build-tools/tools/deployments/deploy-cli.ts");
+  const deployFrontDoorPath = viberootsRepoPath(
+    "build-tools/tools/deployments/deploy-front-door.ts",
   );
-  const deployCliReadonlyPath = path.join(
-    repoRoot,
-    "build-tools",
-    "tools",
-    "deployments",
-    "deploy-cli-readonly.ts",
+  const deployCliReadonlyPath = viberootsRepoPath(
+    "build-tools/tools/deployments/deploy-cli-readonly.ts",
   );
   const source = [
     await fsp.readFile(deployCliPath, "utf8"),

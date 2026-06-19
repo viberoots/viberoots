@@ -32,9 +32,9 @@ test("node go-addon: scaffold and run glue in temp repo", async () => {
     }
 
     // Glue: export graph → sync providers (node) → generate auto_map
-    await $`node build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
-    await $`node build-tools/tools/buck/sync-providers.ts --lang node --no-glue`.nothrow();
-    await $`node build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+    await $`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`.nothrow();
+    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
     // Guard presence of generated files
     if (!(await exists(path.join(tmp, ".viberoots", "workspace", "buck", "graph.json")))) {
       throw new Error("graph.json missing after export-graph");

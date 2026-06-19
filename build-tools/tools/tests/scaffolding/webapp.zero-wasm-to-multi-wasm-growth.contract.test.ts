@@ -12,6 +12,7 @@ import {
 } from "../../scaffolding/webapp-module-manifests";
 import { runInTemp } from "../lib/test-helpers";
 import { waitForValue, writeAndBumpMtime } from "./lib/wasm-watch";
+import { viberootsTool } from "./lib/viberoots-tools";
 import { stopServer } from "./lib/webapp-static-hmr";
 import { removeDefaultWasmFiles, toZeroWasmTargets } from "./lib/zero-wasm";
 
@@ -73,7 +74,7 @@ test(
       const watcher = spawn(
         "zx-wrapper",
         [
-          path.join(process.cwd(), "build-tools", "tools", "dev", "watch-wasm-coordinator.ts"),
+          viberootsTool("viberoots/build-tools/tools/dev/watch-wasm-coordinator.ts"),
           "--cwd",
           appAbs,
         ],

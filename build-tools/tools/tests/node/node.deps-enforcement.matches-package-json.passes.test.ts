@@ -27,7 +27,7 @@ test("node deps enforcement: matches package.json passes", async () => {
     await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("//build-tools/node:defs_core.bzl", "nix_node_lib")',
+        'load("@viberoots//build-tools/node:defs_core.bzl", "nix_node_lib")',
         "",
         "nix_node_lib(",
         '  name = "web",',
@@ -37,9 +37,11 @@ test("node deps enforcement: matches package.json passes", async () => {
       ].join("\n"),
       "utf8",
     );
-    await fsp.mkdir(path.join(tmp, "build-tools", "tools", "node"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, ".viberoots", "workspace", "node"), {
+      recursive: true,
+    });
     await fsp.writeFile(
-      path.join(tmp, "build-tools", "tools", "node", "workspace-map.json"),
+      path.join(tmp, ".viberoots", "workspace", "node", "workspace-map.json"),
       JSON.stringify({ "@repo/ui": "//projects/libs/ui:ui" }, null, 2),
       "utf8",
     );
@@ -49,7 +51,7 @@ test("node deps enforcement: matches package.json passes", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`node build-tools/tools/buck/enforce-node-deps.ts --check`;
+    })`node viberoots/build-tools/tools/buck/enforce-node-deps.ts --check`;
     assert.equal(res.exitCode, 0);
   });
 });

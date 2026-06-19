@@ -17,7 +17,7 @@ test("lang-helpers: patchesMapFromDir decodes patch keys strictly (__ -> /)", as
     const expr = `
       let
         pkgs = import <nixpkgs> {};
-        H = import ./build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
+        H = import ./viberoots/build-tools/tools/nix/lib/lang-helpers.nix { inherit pkgs; };
       in builtins.attrNames (H.patchesMapFromDir (builtins.toPath ${JSON.stringify(d)}))
     `;
     const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;

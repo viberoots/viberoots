@@ -8,8 +8,8 @@ import { runInTemp } from "../lib/test-helpers";
 test("langs-diagnose works without langs.json and prints empty sets", async () => {
   await runInTemp("langs-diagnose-no-manifest", async (tmp, $) => {
     // Ensure no manifest exists
-    await fs.remove(path.join(tmp, "build-tools/tools/nix/langs.json")).catch(() => {});
-    const p = path.join(tmp, "build-tools/tools/dev/langs-diagnose.ts");
+    await fs.remove(path.join(tmp, "viberoots/build-tools/tools/nix/langs.json")).catch(() => {});
+    const p = path.join(tmp, "viberoots/build-tools/tools/dev/langs-diagnose.ts");
     const res = await $`node ${p} --json`;
     const obj = JSON.parse(String(res.stdout || "{}"));
     assert.ok(obj);

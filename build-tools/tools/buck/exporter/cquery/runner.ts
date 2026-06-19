@@ -76,10 +76,7 @@ function computeIsolationFlags(cwd: string): { iso: string; flags: string[]; own
   const reuse = reuseRaw ? reuseRaw === "1" : true;
   if (reuse) {
     const shared = String(
-      process.env.BUCK_ISOLATION_DIR_EXPORTER ||
-        process.env.BUCK_ISOLATION_DIR ||
-        process.env.BUCK_NESTED_ISO ||
-        stableExporterIsolation(cwd),
+      process.env.BUCK_ISOLATION_DIR_EXPORTER || stableExporterIsolation(cwd),
     ).trim();
     registerVerifySharedIsolation(shared, cwd, "exporter-shared");
     return { iso: shared, flags: ["--isolation-dir", shared], ownsIso: false };

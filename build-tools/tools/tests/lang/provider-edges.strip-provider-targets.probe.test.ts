@@ -13,7 +13,7 @@ test("strip_provider_targets preserves order and removes only provider targets",
       [
         "",
         "# test: provider-edges.strip-provider-targets.probe.test.ts",
-        'load("//build-tools/lang:defs_common.bzl", "strip_provider_targets_probe")',
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "strip_provider_targets_probe")',
         "",
         "strip_provider_targets_probe(",
         '  name = "strip",',

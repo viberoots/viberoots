@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { viberootsToolScript } from "./deployment-command";
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -52,7 +53,7 @@ test("public cloudflare-pages deploy requires a control-plane URL for protected/
       $({
         cwd: tmp,
         stdio: "pipe",
-      })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactDir} --admission-evidence-json ${admissionEvidenceJson}`,
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment.label} --artifact-dir ${artifactDir} --admission-evidence-json ${admissionEvidenceJson}`,
       /cloudflare-pages (shared_nonprod|production_facing) mutation requires --control-plane-url or VBR_DEPLOY_CONTROL_PLANE_URL/,
     );
   });
@@ -86,7 +87,7 @@ test("public cloudflare-pages deploy rejects mixed service and local records fla
         $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactDir} --admission-evidence-json ${admissionEvidenceJson} --control-plane-url ${harness.controlPlane.url} --records-root ${recordsRoot}`,
+        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment.label} --artifact-dir ${artifactDir} --admission-evidence-json ${admissionEvidenceJson} --control-plane-url ${harness.controlPlane.url} --records-root ${recordsRoot}`,
         /service-only cloudflare-pages deploy does not support --records-root/,
       );
     } finally {
@@ -118,7 +119,7 @@ test("service-backed cloudflare-pages deploy fails closed when client source dif
         $({
           cwd: tmp,
           stdio: "pipe",
-        })`zx-wrapper build-tools/tools/deployments/deploy.ts --deployment ${deployment.label} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url}`,
+        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment.label} --artifact-dir ${artifactDir} --control-plane-url ${harness.controlPlane.url}`,
         new RegExp(
           [
             `reviewed source mismatch for ${sourceRef}`,

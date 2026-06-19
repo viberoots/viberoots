@@ -7,6 +7,25 @@ import { test } from "node:test";
 import { buckProcessTableLines } from "../../lib/process-inspection";
 import { runInTemp } from "./test-helpers";
 
+async function killAndWait(child: ReturnType<typeof spawn>, timeoutMs = 2000): Promise<void> {
+  const done =
+    child.exitCode !== null || child.signalCode !== null
+      ? Promise.resolve()
+      : new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, timeoutMs);
+          child.once("close", () => {
+            clearTimeout(timer);
+            resolve();
+          });
+        });
+  try {
+    child.kill("SIGKILL");
+  } catch {}
+  await done;
+  child.stdout?.destroy();
+  child.stderr?.destroy();
+}
+
 async function psForkserversForToken(token: string): Promise<string[]> {
   const lines = await buckProcessTableLines(2000);
   return lines.filter(
@@ -76,7 +95,7 @@ test("buck cleanup: does not kill buck2 daemons belonging to other running temp 
   // Run an unrelated temp-repo test. Its cleanup must not kill the child's forkserver,
   // because the child's repo still exists and is not under the other temp root.
   await runInTemp("buck-cleanup-nondisruptive-other", async (_tmp2, $) => {
-    await $`buck2 build //:flake.lock`;
+    await $`buck2 build //.viberoots/workspace:flake.lock`;
   });
 
   // Signal the child to run another buck2 build while it is still running.
@@ -91,8 +110,5 @@ test("buck cleanup: does not kill buck2 daemons belonging to other running temp 
     `expected child to complete second build; stdout:\n${stdout}`,
   );
 
-  // Clean up the child.
-  try {
-    child.kill("SIGKILL");
-  } catch {}
+  await killAndWait(child);
 });

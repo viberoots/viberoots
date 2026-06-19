@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-const scriptPath = "build-tools/tools/dev/node-route-doc-contract-check.ts";
+const scriptPath = "viberoots/build-tools/tools/dev/node-route-doc-contract-check.ts";
 
 const prPlanDoc = `## Close Node gen/lib/bin/stage/inline gaps and enforce route parity (superseded in part by another plan update)
 
@@ -34,11 +34,14 @@ test("node-route-doc-contract-check passes when docs contract is aligned", async
     await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps-prs.md"), prPlanDoc);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsDoc);
-    await fs.outputFile(path.join(tmp, "build-tools/docs/build-system-design.md"), designDoc);
+    await fs.outputFile(
+      path.join(tmp, "viberoots/build-tools/docs/build-system-design.md"),
+      designDoc,
+    );
 
     await $({
       cwd: tmp,
-    })`node ${scriptPath} --pr-plan docs/handbook/nix-gaps-prs.md --nix-gaps docs/handbook/nix-gaps.md --build-system-design build-tools/docs/build-system-design.md`;
+    })`node ${scriptPath} --pr-plan docs/handbook/nix-gaps-prs.md --nix-gaps docs/handbook/nix-gaps.md --build-system-design viberoots/build-tools/docs/build-system-design.md`;
   });
 });
 
@@ -50,12 +53,15 @@ test("node-route-doc-contract-check fails when supersession marker drifts", asyn
       prPlanDoc.replace("(superseded in part by another plan update)", ""),
     );
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsDoc);
-    await fs.outputFile(path.join(tmp, "build-tools/docs/build-system-design.md"), designDoc);
+    await fs.outputFile(
+      path.join(tmp, "viberoots/build-tools/docs/build-system-design.md"),
+      designDoc,
+    );
 
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`node ${scriptPath} --pr-plan docs/handbook/nix-gaps-prs.md --nix-gaps docs/handbook/nix-gaps.md --build-system-design build-tools/docs/build-system-design.md`.nothrow();
+    })`node ${scriptPath} --pr-plan docs/handbook/nix-gaps-prs.md --nix-gaps docs/handbook/nix-gaps.md --build-system-design viberoots/build-tools/docs/build-system-design.md`.nothrow();
     assert.notEqual(res.exitCode, 0);
     assert.match(String(res.stderr || ""), /missing required contract fragment/);
   });
