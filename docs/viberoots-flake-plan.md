@@ -37,6 +37,13 @@ Non-goals:
 - This does not remove supported viberoots source modes. The clean design must keep supporting a
   local top-level `viberoots/` directory, `viberoots/` as a Git submodule, and a remote
   flake/source-store viberoots source for external consumers.
+- Consumer workflows must treat `VIBEROOTS_ROOT` as read-only reusable source. This is required for
+  remote flake/source-store mode, where the resolved source may live in the immutable Nix store, and
+  it keeps local submodule mode honest. Normal `i`, `b`, `v`, provider generation, graph export,
+  hash update, and status flows must write generated state under `WORKSPACE_ROOT`, primarily
+  `.viberoots/workspace/**`, root `buck-out/`, or `projects/**` according to ownership. They must
+  not rely on creating or cleaning generated workspace state inside the reusable viberoots source
+  checkout.
 - The unsupported legacy layout is root `build-tools/`, root `prelude/`, root `toolchains/`, root
   `third_party/providers/`, `//build-tools` loads, `//third_party/providers` labels, shims that
   forward old paths or labels to the new cells, and provider generation that writes both old and new
@@ -76,6 +83,11 @@ Turbo-mode policy for this plan:
   `@viberoots//build-tools/...`; generated providers must live only under
   `.viberoots/workspace/providers` and be addressed as `workspace_providers//...`; generated Buck
   state under `.viberoots/workspace/buck` is part of the clean external workspace contract.
+- Scope review for consumer workflows must distinguish required hidden workspace state from
+  source-checkout pollution. Parent `.viberoots/` is required; `viberoots/.viberoots/`,
+  `viberoots/buck-out/`, root `build-tools/`, and root `build-tools/tmp` created by a consumer
+  `v`/`i`/`b` run are failures to investigate at the creation path, not artifacts to accept because
+  a final cleanup step deletes them.
 - Root `build-tools/`, root `third_party/providers/`, and root `prelude/` or `toolchains/`
   compatibility surfaces must not remain after the extraction boundary unless they are test-only
   fixtures explicitly modeling invalid legacy input.
@@ -1016,6 +1028,11 @@ vendoring viberoots source.
   changes.
 - Reject hidden copies of viberoots, dual provider layouts, and root-cell legacy shims in the
   external fixture.
+- Prove that consumer workflows do not depend on writable viberoots source paths. Remote mode must
+  run with `VIBEROOTS_ROOT` resolved to a source path that is treated as read-only, and local
+  submodule mode must use the same ownership model even though the checkout is physically writable.
+  Generated workspace state must be created directly under the consumer workspace, not created under
+  `viberoots/` and removed later.
 - Prove the parent-repo ownership boundary from PR-9 with a second consumer: viberoots must not
   contain artifacts that are specific to this repository's `projects/` tree. Consumer lockfile
   hashes, workspace maps, generated providers, project docs, and family-specific deployment
@@ -1042,6 +1059,10 @@ vendoring viberoots source.
   aligned with `flake.lock`.
 - Tests proving generated providers exist only under `.viberoots/workspace/providers`, generated
   Buck state uses `.viberoots/workspace/buck`, and provider targets have public visibility.
+- Tests or instrumentation proving normal consumer `v`/`i`/`b` runs do not create
+  `viberoots/.viberoots/`, `viberoots/buck-out/`, root `build-tools/`, or root `build-tools/tmp`.
+  The check must observe filesystem state before any final cleanup phase or otherwise prove the
+  creation path cannot target the reusable source checkout.
 - Tests proving project-owned hash state is read from the consumer workspace, such as
   `projects/node-modules.hashes.json`, and is not written into the viberoots source tree.
 - Tests or review checks proving viberoots runtime/tooling does not contain project-family
@@ -1069,6 +1090,8 @@ vendoring viberoots source.
   `toolchains`.
 - External fixture preserves the strict visible-root contract and has no old combined-repo visible
   root files.
+- Consumer workflows pass with `VIBEROOTS_ROOT` treated as read-only source and without creating
+  generated workspace state inside that source.
 - External fixture has root `projects/`, `.viberoots/current`, `.viberoots/workspace/providers`,
   `.viberoots/workspace/buck`, required per-cell Buck config, public provider targets, and one
   representative `projects/` target that parses, cqueries, and builds.
@@ -1127,11 +1150,18 @@ viberoots source tree.
   viberoots/tooling-owned hashes.
 - Add checks that normal `i`, `b`, `v`, provider generation, and hash update flows do not write
   parent-repo-specific generated state into `viberoots/`.
+- Audit workspace-root resolution in those flows so generated state is created directly under the
+  consumer `WORKSPACE_ROOT`. Fix call sites that accidentally run activation, Buck, graph export, or
+  hash generation with `VIBEROOTS_ROOT` as the workspace root. Do not satisfy this by adding a
+  cleanup pass that removes `viberoots/.viberoots/`, `viberoots/buck-out/`, root `build-tools/`, or
+  other misplaced state after the fact.
 
 ### 3. Acceptance criteria
 
 - No generated workspace map or parent project lockfile hash is committed under `viberoots/`.
 - Local project workflows still read the parent-owned state.
+- Normal consumer workflows create generated state in the consumer workspace and do not create
+  misplaced workspace state under the reusable viberoots source checkout.
 
 ## PR-12: Remove Pleomino-specific runtime/bootstrap assumptions from viberoots
 
@@ -1164,6 +1194,9 @@ Turn the viberoots/parent ownership boundary into durable tests and review check
 
 - Add tests or lint checks that reject parent-repo-specific hashes, generated maps, provider state,
   project docs, deployment target state, and project-family bootstrap defaults under `viberoots/`.
+- Add a consumer-workflow root pollution check that fails if `v`, `i`, `b`, provider generation,
+  graph export, or hash update creates generated workspace state under `viberoots/` or recreates
+  visible root compatibility paths such as `build-tools/`.
 - Add a remote or second-consumer fixture that proves viberoots works without this repository's
   parent-specific files.
 - Document allowed reusable fixtures so test examples do not become hidden runtime coupling.
@@ -1171,4 +1204,6 @@ Turn the viberoots/parent ownership boundary into durable tests and review check
 ### 3. Acceptance criteria
 
 - Ownership-boundary checks fail on representative misplaced parent/project state.
+- Root-pollution checks fail on representative source-root writes and cannot pass merely because a
+  final cleanup phase deletes the misplaced state.
 - Remote or second-consumer validation passes without parent-specific files inside `viberoots/`.
