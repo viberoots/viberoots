@@ -1,0 +1,11 @@
+load("@prelude//:rules.bzl", "export_file", "sh_test")
+
+export_file(
+    name = "smoke_script",
+    src = "smoke.sh",
+)
+
+sh_test(
+    name = "smoke_test",
+    test = ":smoke_script",
+)

@@ -4,6 +4,7 @@ node_modules/
 
 # Buck2
 buck-out/
+.codex-logs/
 .buckd/
 
 # Nix

@@ -79,7 +79,7 @@ async function resolveTemplateSource(targetDir: string, answersFile: string): Pr
   }
   const inferred = toRepoRelativeIfPossible(templateRootPath(language, template));
   if (await templateSourceExists(inferred)) return inferred;
-  const legacyInferred = path.join(
+  const fallbackInferred = path.join(
     "build-tools",
     "tools",
     "scaffolding",
@@ -87,10 +87,10 @@ async function resolveTemplateSource(targetDir: string, answersFile: string): Pr
     language,
     template,
   );
-  if (await templateSourceExists(legacyInferred)) return legacyInferred;
+  if (await templateSourceExists(fallbackInferred)) return fallbackInferred;
 
   throw new Error(
-    `cannot resolve scaffold template source for ${targetDir}; tried '${fromRecorded || "(none)"}', '${inferred}', and '${legacyInferred}'`,
+    `cannot resolve scaffold template source for ${targetDir}; tried '${fromRecorded || "(none)"}', '${inferred}', and '${fallbackInferred}'`,
   );
 }
 

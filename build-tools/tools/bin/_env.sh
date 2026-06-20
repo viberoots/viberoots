@@ -208,15 +208,44 @@ env_apply_nix_cache_health() {
 	echo "[env] nix cache health: using optional substituter(s): ${optional_kept_joined:-<none>}" 1>&2
 }
 
+ensure_viberoots_current() {
+	local live_root="$1"
+	local current="${live_root}/.viberoots/current"
+	if [[ -e "${current}/build-tools/tools/dev/zx-init.mjs" ]]; then
+		return 0
+	fi
+	mkdir -p "${live_root}/.viberoots" 2>/dev/null || return 1
+	if [[ -L "${current}" && ! -e "${current}" ]]; then
+		rm -f "${current}"
+	fi
+	if [[ ! -e "${current}" && ! -L "${current}" ]]; then
+		local target=".."
+		if [[ -f "${live_root}/viberoots/build-tools/tools/dev/zx-init.mjs" ]]; then
+			target="../viberoots"
+		fi
+		ln -s "${target}" "${current}" 2>/dev/null || return 1
+	fi
+	[[ -e "${current}/build-tools/tools/dev/zx-init.mjs" ]]
+}
+
 ensure_buck_prelude() {
 	local live_root="$1"
 	[[ -f "${live_root}/.buckconfig" ]] || return 0
 	env_apply_nix_cache_health || return 1
+	ensure_viberoots_current "${live_root}" || return 1
+	local live_root_real=""
+	local current_root_real=""
+	live_root_real="$(cd "${live_root}" && pwd -P 2>/dev/null || true)"
+	current_root_real="$(cd "${live_root}/.viberoots/current" && pwd -P 2>/dev/null || true)"
+	local current_is_live_root="0"
+	if [[ -n "${live_root_real}" && "${current_root_real}" == "${live_root_real}" ]]; then
+		current_is_live_root="1"
+	fi
 	if [[ -L "${live_root}/.viberoots/current/prelude" && ! -e "${live_root}/.viberoots/current/prelude" ]]; then
 		rm -f "${live_root}/.viberoots/current/prelude"
 	fi
 	if [[ -f "${live_root}/.viberoots/current/prelude/prelude.bzl" ]]; then
-		if [[ -L "${live_root}/prelude" ]]; then
+		if [[ "${current_is_live_root}" != "1" && -L "${live_root}/prelude" ]]; then
 			rm -f "${live_root}/prelude"
 		fi
 		return 0
@@ -292,7 +321,7 @@ ensure_buck_prelude() {
 		if [[ -L "${live_root}/.viberoots/current/prelude" || ! -e "${live_root}/.viberoots/current/prelude" ]]; then
 			rm -f "${live_root}/.viberoots/current/prelude"
 			ln -s "${pre_target}" "${live_root}/.viberoots/current/prelude"
-			if [[ -L "${live_root}/prelude" ]]; then
+			if [[ "${current_is_live_root}" != "1" && -L "${live_root}/prelude" ]]; then
 				rm -f "${live_root}/prelude"
 			fi
 		else

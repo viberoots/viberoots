@@ -1,5 +1,6 @@
 { pkgs, zx-wrapper, viberootsRoot, version, releaseTag, ... }:
 let
+  zxPackage = if pkgs ? zx then pkgs.zx else pkgs.nodePackages.zx;
   remoteTools = import ./packages/remote-worker-tools.nix { inherit pkgs zx-wrapper; };
   viberoots = import ../packages/viberoots-command.nix {
     inherit pkgs zx-wrapper version releaseTag;
@@ -32,7 +33,7 @@ in
         --experimental-strip-types \
         --experimental-top-level-await \
         --disable-warning=ExperimentalWarning \
-        --import="${pkgs.nodePackages.zx}/lib/node_modules/zx/build/globals.js" \
+        --import="${zxPackage}/lib/node_modules/zx/build/globals.js" \
         --import="${viberootsRoot}/build-tools/tools/dev/zx-init.mjs" \
         "$helper" "$@"
     ''}/bin/bulk-move";

@@ -108,7 +108,7 @@ test("updateNodeModulesHashesJson writes project hashes to projects ownership", 
       JSON.stringify(
         {
           "pnpm-lock.yaml": "sha256-root",
-          "projects/apps/demo/pnpm-lock.yaml": "sha256-legacy-project",
+          "projects/apps/demo/pnpm-lock.yaml": "sha256-non-owner-project",
         },
         null,
         2,

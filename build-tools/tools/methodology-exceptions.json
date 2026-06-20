@@ -1,0 +1,104 @@
+{
+  "sourceFileSizeExceptions": [
+    {
+      "path": "buck/zx_test.bzl",
+      "justification": "Pre-existing oversized Buck test macro pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/build-selected.ts",
+      "justification": "Pre-existing oversized selected-build entrypoint pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/install/deps-main.ts",
+      "justification": "Pre-existing oversized install orchestration entrypoint pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/install/link-node.ts",
+      "justification": "Pre-existing oversized node_modules linker pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/nix-build-filtered-flake.ts",
+      "justification": "Pre-existing oversized filtered-flake builder pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/node-modules-build.ts",
+      "justification": "Pre-existing oversized node_modules build helper pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/update-pnpm-hash.ts",
+      "justification": "Pre-existing oversized pnpm hash update entrypoint pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/update-pnpm-hash/exact-store.ts",
+      "justification": "Pre-existing oversized exact-store helper pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/update-pnpm-hash/nondefault.ts",
+      "justification": "Pre-existing oversized non-default importer hash helper pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/verify/args.ts",
+      "justification": "Pre-existing oversized verify argument parser pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/verify/run-verify.ts",
+      "justification": "Pre-existing oversized verify runner pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/verify/seed-staging.ts",
+      "justification": "Pre-existing oversized verify seed staging helper pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/verify/seed.ts",
+      "justification": "Pre-existing oversized verify seed helper pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/verify/target-passes.ts",
+      "justification": "Pre-existing oversized verify target-pass helper pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/watch-wasm-coordinator.ts",
+      "justification": "Pre-existing oversized wasm watch coordinator pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "lib/managed-command.ts",
+      "justification": "Pre-existing oversized managed-command helper pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "tests/dev/nix-cache-health.test.ts",
+      "justification": "Pre-existing oversized dev test pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "tests/dev/startup-check.extraction-blockers.test.ts",
+      "justification": "Pre-existing oversized startup-check test pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "tests/lib/repo.find-repo-root.workspace-env.test.ts",
+      "justification": "Pre-existing oversized repository-root test pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "tests/lib/test-helpers/buck-config.ts",
+      "justification": "Pre-existing oversized Buck config test helper pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "tests/lib/test-helpers/seed-copy.ts",
+      "justification": "Pre-existing oversized seed-copy test helper pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "tests/lib/test-helpers/seed-store.ts",
+      "justification": "Pre-existing oversized seed-store test helper pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "tests/lib/workspace-activation.test.ts",
+      "justification": "Pre-existing oversized workspace activation test pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "tests/scaffolding/webapp.install-guardrails.contract.test.ts",
+      "justification": "Pre-existing oversized scaffolding guardrail test pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "wasm/export-wasm-from-nix.ts",
+      "justification": "Pre-existing oversized wasm export helper pending focused decomposition outside the remote-consumer final checkpoint."
+    }
+  ]
+}

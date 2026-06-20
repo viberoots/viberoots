@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
+import { activateWorkspace } from "../../lib/workspace-activation";
 async function pathExists(p: string): Promise<boolean> {
   try {
     await fsp.access(p);
@@ -40,8 +41,6 @@ export async function ensureBuckPreludeConfig(root: string): Promise<void> {
 
     await $({ cwd: root })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
-      mkdir -p .viberoots
-      [ -e .viberoots/current ] || ln -s ../viberoots .viberoots/current
       mkdir -p .viberoots/workspace/providers .viberoots/workspace/buck
       cat > .buckconfig <<'EOF'
 [buildfile]
@@ -52,7 +51,7 @@ root = .
 viberoots = ./.viberoots/current
 prelude = ./.viberoots/current/prelude
 toolchains = ./.viberoots/current/toolchains
-repo_toolchains = ./.viberoots/current/toolchains
+repo_toolchains = ./.viberoots/workspace/toolchains
 fbsource = ./.viberoots/current/config/fbsource_stub
 fbcode = ./.viberoots/current/config/fbcode_stub
 config = ./.viberoots/current/prelude
@@ -64,7 +63,7 @@ root = .
 viberoots = ./.viberoots/current
 prelude = ./.viberoots/current/prelude
 toolchains = ./.viberoots/current/toolchains
-repo_toolchains = ./.viberoots/current/toolchains
+repo_toolchains = ./.viberoots/workspace/toolchains
 fbsource = ./.viberoots/current/config/fbsource_stub
 fbcode = ./.viberoots/current/config/fbcode_stub
 config = ./.viberoots/current/prelude
@@ -80,6 +79,7 @@ target_platforms = prelude//platforms:default
 ignore = .viberoots/buck/tmp,.viberoots/workspace/buck/tmp,.claude/worktrees,.codex/worktrees
 EOF
     `}`;
+    await activateWorkspace({ start: root });
 
     await $({ cwd: root })`bash --noprofile --norc -c ${`set -euo pipefail
       cat > .viberoots/workspace/providers/.buckconfig <<'EOF'

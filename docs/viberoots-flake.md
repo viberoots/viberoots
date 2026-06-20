@@ -173,7 +173,7 @@ viberoots = ./.viberoots/current
 prelude = ./.viberoots/current/prelude
 config = ./.viberoots/current/prelude
 toolchains = ./.viberoots/current/toolchains
-repo_toolchains = ./.viberoots/current/toolchains
+repo_toolchains = ./.viberoots/workspace/toolchains
 workspace_providers = ./.viberoots/workspace/providers
 fbsource = ./.viberoots/current/config/fbsource_stub
 fbcode = ./.viberoots/current/config/fbcode_stub
@@ -184,7 +184,7 @@ viberoots = ./.viberoots/current
 prelude = ./.viberoots/current/prelude
 config = ./.viberoots/current/prelude
 toolchains = ./.viberoots/current/toolchains
-repo_toolchains = ./.viberoots/current/toolchains
+repo_toolchains = ./.viberoots/workspace/toolchains
 workspace_providers = ./.viberoots/workspace/providers
 fbsource = ./.viberoots/current/config/fbsource_stub
 fbcode = ./.viberoots/current/config/fbcode_stub
@@ -220,10 +220,6 @@ vendoring the viberoots source:
 ```text
 my-project/
   README.md
-  viberoots/
-    init
-    build-tools/
-    flake.nix
   .buckroot
   .buckconfig
   projects/
@@ -231,17 +227,20 @@ my-project/
     libs/
     deployments/
   .viberoots/
-    current -> ../viberoots
+    current -> /nix/store/...-source
     workspace/
       flake.nix
+      flake.lock
       TARGETS
+      buck/
       providers/
 ```
 
-The visible consumer root stays intentionally small: `README.md`, `viberoots/`, and `projects/`.
+The visible consumer root stays intentionally small: `README.md` and `projects/` for remote mode,
+or `README.md`, `viberoots/`, and `projects/` when explicitly testing local/submodule mode.
 Workspace glue such as `.envrc`, `.buckroot`, `.buckconfig`, and `.viberoots/workspace/` is hidden
 or generated. The consumer does not keep visible root `flake.nix`, `flake.lock`, `TARGETS`, or
-`pnpm-workspace.yaml`; the hidden workspace flake delegates to the checked-out viberoots source.
+`pnpm-workspace.yaml`; the hidden workspace flake delegates to the locked viberoots source.
 
 `./viberoots/init` writes the hidden workspace flake with a local path input:
 
@@ -271,6 +270,31 @@ Use the remote Git flake input form when the project only needs to consume relea
 upstream viberoots revisions. In both cases, the flake input lives in `.viberoots/workspace/flake.nix`
 rather than in a visible root `flake.nix`.
 
+Remote mode bootstraps through the hidden workspace flake because there is no local
+`./viberoots/init` checkout:
+
+```bash
+nix flake lock --accept-flake-config path:"$PWD/.viberoots/workspace"
+nix run --accept-flake-config path:"$PWD/.viberoots/workspace#viberoots" -- init-workspace
+```
+
+The activation command evaluates `lib.viberootsSourcePath` from the hidden workspace flake,
+refreshes `.viberoots/current` to the locked source path on each run, and creates workspace-owned
+state under `.viberoots/workspace/**` and `.viberoots/buck`. It does not create generated state
+inside the reusable viberoots source.
+
+The default automated fixture rewrites the remote input to a temporary `git+file` ref so PR changes
+can be validated before they are published. To prove the real-world GitHub flake import path, run
+the opt-in smoke with a published ref:
+
+```bash
+VIBEROOTS_REAL_REMOTE_REF=github:OWNER/viberoots/REF \
+  v viberoots//:viberoots_remote_consumer_fixture
+```
+
+That gated path preserves the `github:` input, locks it through Nix, activates the resolved store
+source, and runs the same root and `projects/` `i`/`b`/`v`/`s` consumer workflow checks.
+
 Its `.buckconfig` must point Buck cells at the resolved viberoots source. Buck config files cannot
 directly evaluate Nix expressions, so the workspace setup must materialize a stable local path, for
 example:
@@ -280,6 +304,7 @@ my-project/
   .viberoots/current -> /nix/store/...-source
   .viberoots/workspace/providers/
   .viberoots/workspace/buck/
+  .viberoots/workspace/toolchains/
 ```
 
 Then `.buckconfig` can remain static:
@@ -291,7 +316,7 @@ viberoots = ./.viberoots/current
 prelude = ./.viberoots/current/prelude
 config = ./.viberoots/current/prelude
 toolchains = ./.viberoots/current/toolchains
-repo_toolchains = ./.viberoots/current/toolchains
+repo_toolchains = ./.viberoots/workspace/toolchains
 workspace_providers = ./.viberoots/workspace/providers
 fbsource = ./.viberoots/current/config/fbsource_stub
 fbcode = ./.viberoots/current/config/fbcode_stub
@@ -475,13 +500,14 @@ part of the supported design after PR-9.
 ### Toolchain Cells
 
 `prelude`, `toolchains`, `repo_toolchains`, `config`, `fbsource`, and `fbcode` remain named cells
-because the current prelude and rule definitions expect those names. Their cell paths should go
-through the same `.viberoots/current` indirection as the main `viberoots` cell:
+because the current prelude and rule definitions expect those names. Reusable source definitions
+go through the same `.viberoots/current` indirection as the main `viberoots` cell, while
+`repo_toolchains` points at workspace-owned generated toolchain paths:
 
 ```text
 prelude = ./.viberoots/current/prelude
 toolchains = ./.viberoots/current/toolchains
-repo_toolchains = ./.viberoots/current/toolchains
+repo_toolchains = ./.viberoots/workspace/toolchains
 config = ./.viberoots/current/prelude
 fbsource = ./.viberoots/current/config/fbsource_stub
 fbcode = ./.viberoots/current/config/fbcode_stub
@@ -492,7 +518,7 @@ For an external consumer, these point at the materialized viberoots source path:
 ```text
 prelude = ./.viberoots/current/prelude
 toolchains = ./.viberoots/current/toolchains
-repo_toolchains = ./.viberoots/current/toolchains
+repo_toolchains = ./.viberoots/workspace/toolchains
 config = ./.viberoots/current/prelude
 fbsource = ./.viberoots/current/config/fbsource_stub
 fbcode = ./.viberoots/current/config/fbcode_stub
@@ -826,8 +852,8 @@ Consequences:
 - Workspace activation points `.viberoots/current` at the resolved flake source path.
 - Updates are explicit: change the ref or run an intentional flake update for the `viberoots` input,
   then run validation and commit the hidden `flake.lock` change if the workspace chooses to track it.
-- Activation must either refresh `.viberoots/current` on every `nix develop` or
-  `./viberoots/init`, or create an explicit GC root and refresh when the hidden `flake.lock` changes.
+- Activation refreshes `.viberoots/current` on every `nix develop` or `init-workspace` by evaluating
+  the hidden workspace flake's locked viberoots source path.
 
 Recommended status command output:
 
@@ -868,6 +894,8 @@ that reports:
 - local vs remote source mode;
 - declared version from viberoots metadata;
 - locked or checked-out Git revision;
+- in remote source mode, requested ref, locked revision, effective source path, and whether
+  `.viberoots/current` matches the locked source;
 - whether the viberoots checkout is dirty;
 - the effective `.viberoots/current` path;
 - in local source mode, whether `.viberoots/current` points at the live `viberoots/` checkout.

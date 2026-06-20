@@ -4,6 +4,12 @@ import fs from "node:fs";
 import { nodeFlagsWithZx } from "../../lib/node-run";
 
 export function repoRoot(): string {
+  const envRoot = String(process.env.WORKSPACE_ROOT || "").trim();
+  if (envRoot) {
+    const root = path.resolve(envRoot);
+    if (fs.existsSync(root)) return root;
+  }
+
   // Resolve from git so commands work when invoked from subdirectories.
   try {
     const out = execSync("git rev-parse --show-toplevel", {

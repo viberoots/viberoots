@@ -25,7 +25,7 @@ export const FILTERED_FLAKE_RSYNC_EXCLUDES = [
   ".git",
   "node_modules",
   "buck-out",
-  ".viberoots/buck",
+  ".viberoots/buck/tmp",
   ".viberoots/cache",
   ".viberoots/workspace/.viberoots",
   "viberoots/.viberoots",

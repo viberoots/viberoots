@@ -15,6 +15,7 @@ in
 {
   lib = {
     inherit version releaseTag workspaceName;
+    viberootsSourcePath = builtins.toString viberootsInput.outPath;
   };
   apps = sys.forAllSystemsLight (ctx: import ./outputs-apps.nix ctx);
   devShells = sys.forAllSystemsLight (ctx: import ./outputs-devshells.nix ctx);

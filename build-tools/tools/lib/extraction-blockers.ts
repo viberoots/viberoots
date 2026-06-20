@@ -61,7 +61,7 @@ function visibleRootBlockers(root: string): ExtractionBlocker[] {
       kind: "path" as const,
       path: name,
       detail:
-        "visible parent root entry is outside the PR-9 contract; only README.md, projects, and viberoots are allowed",
+        "visible parent root entry is outside the extracted workspace contract; only README.md, projects, and viberoots are allowed",
     }));
 }
 

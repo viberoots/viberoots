@@ -85,5 +85,6 @@ test("real viberoots mkWorkspace exposes metadata for external workspace source"
     assert.equal(probe.workspaceName, "external-probe");
     assert.equal(probe.version, "0.0.0-dev");
     assert.equal(probe.releaseTag, "v0.0.0-dev");
+    assert.equal(probe.viberootsSourcePath, viberootsRoot);
   });
 });

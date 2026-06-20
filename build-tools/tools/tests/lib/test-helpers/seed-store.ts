@@ -1,6 +1,9 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { isGeneratedRepoStateRelPath } from "../../../dev/verify/generated-state-excludes";
+import {
+  GENERATED_REPO_STATE_PATHS,
+  isGeneratedRepoStateRelPath,
+} from "../../../dev/verify/generated-state-excludes";
 import {
   assertRequiredSeedFiles,
   copySeedStoreToTempRepo,
@@ -180,7 +183,8 @@ async function overlayActiveViberootsIntoTempRepo(tmpDir: string): Promise<void>
   await $`bash --noprofile --norc -c ${`chmod -R u+w ${JSON.stringify(tmpViberoots)} >/dev/null 2>&1 || true`}`.nothrow();
   await fsp.rm(tmpViberoots, { recursive: true, force: true });
   await fsp.mkdir(path.join(tmpDir, "viberoots"), { recursive: true });
-  await $({ cwd })`rsync -a --delete ${`${source}/`} ${tmpViberoots}/`;
+  const excludes = GENERATED_REPO_STATE_PATHS.map((rel) => ["--exclude", rel]).flat();
+  await $({ cwd })`rsync -a --delete ${excludes} ${`${source}/`} ${tmpViberoots}/`;
 }
 
 async function seedStoreCowCopySupportedOncePerWorker(args: {

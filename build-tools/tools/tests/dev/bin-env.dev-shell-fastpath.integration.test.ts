@@ -13,7 +13,7 @@ async function readRepoFile(rel: string): Promise<string> {
 }
 
 test("_env.sh supports safe direnv bypass fast-path", async () => {
-  const txt = await readRepoFile("viberoots/build-tools/tools/bin/_env.sh");
+  const txt = await readRepoFile("build-tools/tools/bin/_env.sh");
   if (!txt.includes("BUCK_DEV_SHELL_FASTPATH")) {
     throw new Error("_env.sh must expose BUCK_DEV_SHELL_FASTPATH toggle");
   }
@@ -31,10 +31,16 @@ test("_env.sh supports safe direnv bypass fast-path", async () => {
   }
   if (
     !txt.includes('[[ -f "${live_root}/.viberoots/current/prelude/prelude.bzl" ]]') ||
+    !txt.includes("ensure_viberoots_current") ||
+    !txt.includes('target=".."') ||
+    !txt.includes('current_is_live_root="1"') ||
+    !txt.includes('[[ "${current_is_live_root}" != "1" && -L "${live_root}/prelude" ]]') ||
     !txt.includes('rm -f "${live_root}/prelude"') ||
     txt.includes('[[ -f "${live_root}/prelude/prelude.bzl" ]]')
   ) {
-    throw new Error("_env.sh must not materialize root prelude in extracted workspaces");
+    throw new Error(
+      "_env.sh must activate .viberoots/current and not materialize root prelude in extracted workspaces",
+    );
   }
   if (
     !txt.includes('VIBEROOTS_SOURCE_ROOT="${active_viberoots_root}" nix build') ||

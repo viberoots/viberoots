@@ -3,7 +3,8 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged } from "../lib/fs-helpers";
 import { repoRoot } from "../lib/repo";
-import { buildToolPath, buildToolsRoot } from "./dev-build/paths";
+import { buildToolPath } from "./dev-build/paths";
+import { toolchainBzlPaths } from "./workspace-toolchains";
 
 type ToolchainPaths = {
   go: { bin: string; root: string };
@@ -12,18 +13,9 @@ type ToolchainPaths = {
 };
 
 const JSON_REL = path.join("build-tools", "tools", "dev", "toolchain-paths.json");
-const BZL_REL = path.join("toolchains", "toolchain_paths.bzl");
-
-function activeViberootsRoot(root: string): string {
-  return path.dirname(buildToolsRoot(root));
-}
 
 function toolchainJsonPath(root: string): string {
   return buildToolPath(root, "tools/dev/toolchain-paths.json");
-}
-
-function toolchainBzlPath(root: string): string {
-  return path.join(activeViberootsRoot(root), BZL_REL);
 }
 
 async function workspaceFlakeRef(root: string): Promise<{
@@ -148,6 +140,16 @@ function renderBzl(paths: ToolchainPaths): string {
   ].join("\n");
 }
 
+async function writeGeneratedIfWritable(file: string, data: string): Promise<void> {
+  try {
+    await writeIfChanged(file, data);
+  } catch (e) {
+    const code = (e as NodeJS.ErrnoException)?.code || "";
+    if (code === "EACCES" || code === "EROFS") return;
+    throw e;
+  }
+}
+
 async function readExistingToolchainPaths(repo: string): Promise<ToolchainPaths | null> {
   const jsonPath = toolchainJsonPath(repo);
   let raw = "";
@@ -187,9 +189,10 @@ async function readExistingToolchainPaths(repo: string): Promise<ToolchainPaths 
       python: { bin: pyBin },
       zxWrapper: { bin: zxWrapperBin },
     };
-    const bzlPath = toolchainBzlPath(repo);
-    await writeIfChanged(jsonPath, JSON.stringify(out, null, 2) + "\n");
-    await writeIfChanged(bzlPath, renderBzl(out));
+    await writeGeneratedIfWritable(jsonPath, JSON.stringify(out, null, 2) + "\n");
+    for (const bzlPath of await toolchainBzlPaths(repo)) {
+      await writeGeneratedIfWritable(bzlPath, renderBzl(out));
+    }
     return out;
   } catch {
     return null;
@@ -220,10 +223,9 @@ export async function ensureToolchainPathsFiles(root?: string): Promise<Toolchai
     zxWrapper: { bin: zxWrapperBin },
   };
   const jsonPath = toolchainJsonPath(repo);
-  const bzlPath = toolchainBzlPath(repo);
-  await writeIfChanged(jsonPath, JSON.stringify(pathsObj, null, 2) + "\n");
-  await writeIfChanged(bzlPath, renderBzl(pathsObj));
-  await fsp.access(jsonPath);
-  await fsp.access(bzlPath);
+  await writeGeneratedIfWritable(jsonPath, JSON.stringify(pathsObj, null, 2) + "\n");
+  for (const bzlPath of await toolchainBzlPaths(repo)) {
+    await writeGeneratedIfWritable(bzlPath, renderBzl(pathsObj));
+  }
   return pathsObj;
 }

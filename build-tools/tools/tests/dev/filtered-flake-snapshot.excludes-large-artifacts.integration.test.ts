@@ -17,7 +17,7 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
   const helper = await readTool("tools/dev/nix-build-filtered-flake.ts");
   const required = [
     "coverage",
-    ".viberoots/buck",
+    ".viberoots/buck/tmp",
     ".viberoots/cache",
     ".viberoots/workspace/.viberoots",
     "viberoots/.viberoots",
