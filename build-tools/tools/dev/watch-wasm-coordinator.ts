@@ -200,6 +200,39 @@ async function main() {
     prevByModule.set(spec.moduleKey, await computeFingerprintMap(spec.watchPaths));
   }
   let buildSeq = await runInitialBuilds(cwd, specs);
+  const refreshCoordinatorState = async () => {
+    await syncModuleContractsForApp({
+      appCwd: cwd,
+      appTargetLabel: resolved.appTargetLabel,
+      root: resolved.repoRoot,
+    });
+    const prevKeys = new Set(prevByModule.keys());
+    specs = await specsFromWasmManifest(cwd, resolved.wasmManifestPath);
+    const nextKeys = new Set(specs.map((spec) => spec.moduleKey));
+    const removed = Array.from(prevKeys).filter((key) => !nextKeys.has(key));
+    for (const key of removed) {
+      prevByModule.delete(key);
+    }
+    const nextProbe = await validateTsManifestProbes(cwd, resolved.tsManifestPath);
+    for (const line of nextProbe) console.error(line);
+    baseRefreshPaths = uniqueSorted([
+      resolved.wasmManifestPath,
+      resolved.tsManifestPath,
+      path.join(cwd, "TARGETS"),
+      path.join(cwd, "package.json"),
+      path.join(resolved.repoRoot, "build-tools", "tools", "buck", "graph.json"),
+    ]);
+    refreshState = await computeFingerprintMap(refreshTriggerPaths(baseRefreshPaths, specs));
+    for (const spec of specs) {
+      if (prevByModule.has(spec.moduleKey)) continue;
+      prevByModule.set(spec.moduleKey, await computeFingerprintMap(spec.watchPaths));
+      buildSeq += 1;
+      await runCoordinatorBuild({ cwd, spec, seq: buildSeq, reason: "refresh:add" });
+    }
+    await writeLease(specs);
+    console.error(`[wasm-watch] coordinator:refresh modules=${specs.length}`);
+    return { removed };
+  };
   await ensureDaemon(resolved.repoRoot, pollMs);
   await writeLease(specs);
   console.error(
@@ -210,35 +243,7 @@ async function main() {
     if (Date.now() - lastRefreshAt >= refreshThrottleMs) {
       const nextRefresh = await computeFingerprintMap(refreshTriggerPaths(baseRefreshPaths, specs));
       if (!mapsEqual(refreshState, nextRefresh)) {
-        await syncModuleContractsForApp({
-          appCwd: cwd,
-          appTargetLabel: resolved.appTargetLabel,
-          root: resolved.repoRoot,
-        });
-        const prevKeys = new Set(prevByModule.keys());
-        specs = await specsFromWasmManifest(cwd, resolved.wasmManifestPath);
-        const nextKeys = new Set(specs.map((spec) => spec.moduleKey));
-        for (const removed of Array.from(prevKeys).filter((key) => !nextKeys.has(key))) {
-          prevByModule.delete(removed);
-        }
-        const nextProbe = await validateTsManifestProbes(cwd, resolved.tsManifestPath);
-        for (const line of nextProbe) console.error(line);
-        baseRefreshPaths = uniqueSorted([
-          resolved.wasmManifestPath,
-          resolved.tsManifestPath,
-          path.join(cwd, "TARGETS"),
-          path.join(cwd, "package.json"),
-          path.join(resolved.repoRoot, "build-tools", "tools", "buck", "graph.json"),
-        ]);
-        refreshState = await computeFingerprintMap(refreshTriggerPaths(baseRefreshPaths, specs));
-        for (const spec of specs) {
-          if (prevByModule.has(spec.moduleKey)) continue;
-          prevByModule.set(spec.moduleKey, await computeFingerprintMap(spec.watchPaths));
-          buildSeq += 1;
-          await runCoordinatorBuild({ cwd, spec, seq: buildSeq, reason: "refresh:add" });
-        }
-        await writeLease(specs);
-        console.error(`[wasm-watch] coordinator:refresh modules=${specs.length}`);
+        await refreshCoordinatorState();
       } else {
         await fsp.utimes(leasePath, new Date(), new Date()).catch(() => {});
       }
@@ -248,6 +253,16 @@ async function main() {
       const prev = prevByModule.get(spec.moduleKey) || new Map<string, Fingerprint>();
       const next = await computeFingerprintMap(spec.watchPaths);
       if (!mapsEqual(prev, next)) {
+        if (Array.from(next.values()).some((fingerprint) => fingerprint.size < 0)) {
+          const nextRefresh = await computeFingerprintMap(
+            refreshTriggerPaths(baseRefreshPaths, specs),
+          );
+          if (!mapsEqual(refreshState, nextRefresh)) {
+            const { removed } = await refreshCoordinatorState();
+            lastRefreshAt = Date.now();
+            if (removed.includes(spec.moduleKey)) continue;
+          }
+        }
         prevByModule.set(spec.moduleKey, next);
         buildSeq += 1;
         console.error(

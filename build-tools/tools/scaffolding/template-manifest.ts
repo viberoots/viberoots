@@ -42,6 +42,10 @@ function stableUniqueSorted(values: readonly string[]): string[] {
   return stableSorted(Array.from(new Set(values)));
 }
 
+function renderTsKey(key: string): string {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(key) ? key : JSON.stringify(key);
+}
+
 function assertValidEntry(entry: TemplateManifestEntry): void {
   if (!entry.language || !entry.template || !entry.templateRoot) {
     throw new Error("template manifest entry must define language, template, and templateRoot");
@@ -151,7 +155,7 @@ export function resolverFromManifest(
 function renderTsObject(map: Record<string, string>): string {
   const keys = stableSorted(Object.keys(map));
   if (keys.length === 0) return "{}";
-  return `{\n${keys.map((k) => `  ${JSON.stringify(k)}: ${JSON.stringify(map[k])},`).join("\n")}\n}`;
+  return `{\n${keys.map((k) => `  ${renderTsKey(k)}: ${JSON.stringify(map[k])},`).join("\n")}\n}`;
 }
 
 export function renderGeneratedTaxonomyTs(manifest: TemplateManifest): string {
@@ -162,11 +166,13 @@ export function renderGeneratedTaxonomyTs(manifest: TemplateManifest): string {
     taxonomyKeys
       .map((lang) => {
         const names = taxonomy[lang] || [];
+        const key = renderTsKey(lang);
+        const inline = `[${names.map((name) => JSON.stringify(name)).join(", ")}]`;
         const list =
-          names.length <= 3
-            ? `[${names.map((name) => JSON.stringify(name)).join(", ")}]`
+          `  ${key}: ${inline},`.length <= 100
+            ? inline
             : `[\n${names.map((name) => `    ${JSON.stringify(name)},`).join("\n")}\n  ]`;
-        return `  ${JSON.stringify(lang)}: ${list},`;
+        return `  ${key}: ${list},`;
       })
       .join("\n") +
     "\n} as const";

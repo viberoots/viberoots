@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { pnpmInstallForDevTest, spawnViteSsrDevServer } from "./dev-node-modules";
 import { writeLibSource } from "./next-dev";
 import { evaluateRenderedAppText, httpGet, pickFreePort, stopServer } from "./webapp-static-hmr";
 import {
@@ -86,25 +87,17 @@ export async function runSsrViteLocalTsDepTest(tmp: string, _$: any): Promise<vo
     stdio: "pipe",
   })`git add -A projects/apps/demo-vite-ssr projects/libs/demo-lib`;
 
-  await _$({
-    cwd: tmp,
-    stdio: "inherit",
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-  })`pnpm --dir ${tmp} install --filter ./projects/apps/demo-vite-ssr... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+  await pnpmInstallForDevTest({
+    tmp,
+    _$,
+    filter: "./projects/apps/demo-vite-ssr...",
+    installMode: "raw-pnpm",
+  });
 
   const port = await pickFreePort();
   const serverStdout: string[] = [];
   const serverStderr: string[] = [];
-  const devServer: ChildProcess = spawn("pnpm", ["run", "dev:ssr"], {
-    cwd: appAbs,
-    stdio: "pipe",
-    env: {
-      ...process.env,
-      PORT: String(port),
-      NODE_OPTIONS: "",
-      NEXT_TELEMETRY_DISABLED: "1",
-    },
-  });
+  const devServer: ChildProcess = spawnViteSsrDevServer(appAbs, port);
   devServer.stdout?.on("data", (chunk) => {
     serverStdout.push(String(chunk || ""));
     if (serverStdout.length > 100) serverStdout.shift();

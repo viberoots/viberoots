@@ -159,42 +159,45 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
         stdoutBytes: 0,
         stderrBytes: 0,
       };
-      const built = await withResolvedExactPrefetchedStore(
-        {
-          repoRoot: root,
-          importer,
-          flakeRef: buildFlakeRefBase,
-          attrPath: `pnpm-store.${attr}`,
-        },
-        async (exactStoreEnv) =>
-          await withHeartbeat(
-            `importer=${importer} step=build attr=node-modules.${attr}`,
-            runManagedCommand({
-              command: "nix",
-              args: [
-                "build",
-                `${buildFlakeRefBase}#node-modules.${attr}`,
-                "--no-link",
-                "--accept-flake-config",
-                "--impure",
-                "--option",
-                "min-free",
-                "0",
-                "--option",
-                "max-free",
-                "0",
-                "--print-out-paths",
-              ],
-              cwd: root,
-              env: tempFlake
-                ? { ...exactStoreEnv, WORKSPACE_ROOT: tempFlake.workspaceRoot }
-                : exactStoreEnv,
-              timeoutMs: nixBuildTimeoutMs,
-              activity,
-            }),
-            { activity },
-          ),
-      );
+      const buildWithEnv = async (exactStoreEnv: NodeJS.ProcessEnv) =>
+        await withHeartbeat(
+          `importer=${importer} step=build attr=node-modules.${attr}`,
+          runManagedCommand({
+            command: "nix",
+            args: [
+              "build",
+              `${buildFlakeRefBase}#node-modules.${attr}`,
+              "--no-link",
+              "--accept-flake-config",
+              "--impure",
+              "--option",
+              "min-free",
+              "0",
+              "--option",
+              "max-free",
+              "0",
+              "--print-out-paths",
+            ],
+            cwd: root,
+            env: tempFlake
+              ? { ...exactStoreEnv, WORKSPACE_ROOT: tempFlake.workspaceRoot }
+              : exactStoreEnv,
+            timeoutMs: nixBuildTimeoutMs,
+            activity,
+          }),
+          { activity },
+        );
+      const built = usesTempRepoFakeNix(root)
+        ? await buildWithEnv(process.env)
+        : await withResolvedExactPrefetchedStore(
+            {
+              repoRoot: root,
+              importer,
+              flakeRef: buildFlakeRefBase,
+              attrPath: `pnpm-store.${attr}`,
+            },
+            buildWithEnv,
+          );
       if (!built.ok) {
         const output = String(built.stdout || "") + String(built.stderr || "");
         throw new Error(

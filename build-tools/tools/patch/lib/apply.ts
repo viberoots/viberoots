@@ -7,6 +7,7 @@ import crypto from "node:crypto";
 import { debugEnabled } from "./util";
 import { repoRoot as _repoRoot } from "../../lib/repo";
 import { copyFileCloneAware, copyTree } from "../../lib/copy-tree";
+import { markMacosMetadataNeverIndex } from "../../lib/macos-metadata";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { runPatchCommand } from "./command-runner";
 import {
@@ -146,6 +147,7 @@ export async function verifyPatchDryRun(
   mode: "go" | "cpp" | "python",
 ): Promise<void> {
   const tmpRoot = await fsp.mkdtemp(path.join(os.tmpdir(), `viberoots-patch-verify-${mode}-`));
+  await markMacosMetadataNeverIndex(tmpRoot);
   const tmpCopy = path.join(tmpRoot, path.basename(originPath));
   const patchBin = resolvePatchBin();
   await cpRecursive(originPath, tmpCopy);

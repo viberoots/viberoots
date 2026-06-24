@@ -99,7 +99,7 @@ may override the non-secret Infisical selector:
 
 When no mapping is present, the default secret name is the final path segment of
 the contract id. For
-`secret://deployments/pleomino/cloudflare_api_token`, the default name is
+`secret://deployments/example-app/cloudflare_api_token`, the default name is
 `cloudflare_api_token`.
 
 ### `provider_target`
@@ -255,7 +255,7 @@ vault_runtime = {
     "deployment_client_id": "deployment-runner",
     "cli_public_client_id": "deployment-cli",
     "deployment_environment": "mini",
-    "jwt_role": "deploy-pleomino-read",
+    "jwt_role": "deploy-example-app-read",
     "pkce_callback_mode": "public_host",
     "pkce_callback_external_scheme": "https",
     "pkce_callback_external_host": "deploy-auth.apps.kilty.io",

@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import * as crypto from "node:crypto";
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -7,8 +8,14 @@ import { nixBuilderPolicyShellArgs } from "../lib/nix-builder-policy";
 import { sharedExactPnpmStateRootPath } from "../lib/pnpm-state-paths";
 import { resolveToolPathSync } from "../lib/tool-paths";
 import { buildToolPath } from "./dev-build/paths";
-import { findNearestImporterLock, nodeModulesAttr, normalizeImporter } from "./install/common";
 import {
+  findNearestImporterLock,
+  nodeModulesAttr,
+  normalizeImporter,
+  sanitizeName,
+} from "./install/common";
+import {
+  currentVerifiedMarkerFingerprintCandidates,
   currentVerifiedMarkerFingerprint,
   readVerifiedMarker,
   sha256File,
@@ -145,6 +152,7 @@ const flakeRef = await fsp
   .catch(() => flakeRoot);
 function activeViberootsRoot(): string {
   const candidates = [
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
     path.join(repoRoot, "viberoots"),
     path.join(repoRoot, ".viberoots", "current"),
     process.env.VIBEROOTS_SOURCE_ROOT || "",
@@ -205,13 +213,67 @@ async function hasFreshVerifiedMarker(lockfileRel: string, hashKey: string): Pro
   const lockHash = await sha256File(path.join(repoRoot, lockfileRel));
   if (!lockHash) return false;
   const builderFingerprint = await currentVerifiedMarkerFingerprint(repoRoot, importer);
+  const acceptedBuilderFingerprints = await currentVerifiedMarkerFingerprintCandidates(
+    repoRoot,
+    importer,
+  );
   return (
     marker.importer === importer &&
     marker.lockfile === hashKey &&
     marker.lockHash === lockHash &&
     marker.hashValue === (await readHashForLock(hashKey)) &&
-    marker.builderFingerprint === builderFingerprint
+    (marker.builderFingerprint === builderFingerprint ||
+      acceptedBuilderFingerprints.includes(marker.builderFingerprint))
   );
+}
+
+async function recoverOutPathFromLinkMarker(
+  importer: string,
+  lockfileRel: string,
+): Promise<string> {
+  const markerKey = importer === "." ? "root" : sanitizeName(importer);
+  const markerRoots = Array.from(
+    new Set(
+      [liveMarkerRepoRoot(), repoRoot, process.env.WORKSPACE_ROOT || ""]
+        .map((root) => String(root || "").trim())
+        .filter(Boolean)
+        .map((root) => path.resolve(root)),
+    ),
+  );
+  try {
+    const lockBuf = await fsp.readFile(path.join(repoRoot, lockfileRel));
+    const lockHash = crypto.createHash("sha256").update(lockBuf).digest("hex");
+    for (const markerRoot of markerRoots) {
+      const markerPath = path.join(
+        markerRoot,
+        ".viberoots",
+        "workspace",
+        "buck",
+        "tmp",
+        `node-modules-link.${markerKey}.json`,
+      );
+      try {
+        const marker = JSON.parse(await fsp.readFile(markerPath, "utf8")) as {
+          importer?: string;
+          lockfile?: string;
+          lockHash?: string;
+          outPath?: string;
+        };
+        const outPath = String(marker.outPath || "").trim();
+        if (
+          marker.importer !== importer ||
+          marker.lockfile !== lockfileRel ||
+          marker.lockHash !== lockHash ||
+          !outPath.startsWith("/nix/store/")
+        ) {
+          continue;
+        }
+        await fsp.access(path.join(outPath, "node_modules"));
+        return outPath;
+      } catch {}
+    }
+  } catch {}
+  return "";
 }
 
 function runInstallDiagnostic(lockfileRel: string, reason: string): string {
@@ -259,21 +321,24 @@ async function preparedExactStoreEnv(lockfileRel: string): Promise<NodeJS.Proces
 // Fast path: if output is already realized in the store, prefer path-info
 let outPath = "";
 await requireFreshPnpmStoreState(lockfileRel, hashKey);
+outPath = await recoverOutPathFromLinkMarker(importer, lockfileRel);
 try {
-  const pi = await $({
-    env: nixWorkspaceEnv,
-  })`nix path-info ${flakeRef}#${fullAttr} --accept-flake-config ${viberootsOverrideArgs}`;
-  const cand =
-    String(pi.stdout || "")
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .pop() || "";
-  if (cand) {
-    try {
-      await fsp.access(cand);
-      outPath = cand;
-    } catch {}
+  if (!outPath) {
+    const pi = await $({
+      env: nixWorkspaceEnv,
+    })`nix path-info ${flakeRef}#${fullAttr} --accept-flake-config ${viberootsOverrideArgs}`;
+    const cand =
+      String(pi.stdout || "")
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .pop() || "";
+    if (cand) {
+      try {
+        await fsp.access(cand);
+        outPath = cand;
+      } catch {}
+    }
   }
 } catch {}
 async function tryBuild(extraEnv: NodeJS.ProcessEnv): Promise<string> {
@@ -306,7 +371,7 @@ async function tryBuild(extraEnv: NodeJS.ProcessEnv): Promise<string> {
 if (!outPath) {
   const extraEnv = await preparedExactStoreEnv(lockfileRel);
   if (!extraEnv) {
-    console.error(runInstallDiagnostic(relLock, "missing prepared exact store"));
+    console.error(runInstallDiagnostic(lockfileRel, "missing prepared exact store"));
     process.exit(2);
   }
   outPath = await tryBuild(extraEnv);

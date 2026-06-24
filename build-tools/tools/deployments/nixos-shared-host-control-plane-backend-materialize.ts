@@ -9,6 +9,7 @@ import {
   writeBackendSubmissionDoc,
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend";
+import { markMacosMetadataNeverIndex } from "../lib/macos-metadata";
 import type {
   NixosSharedHostControlPlaneSnapshot,
   NixosSharedHostControlPlaneSubmission,
@@ -33,6 +34,7 @@ export async function materializeBackendControlPlaneFiles(
     throw new Error(`backend state missing submission or snapshot for ${submissionId}`);
   }
   const tempDir = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-control-plane-"));
+  await markMacosMetadataNeverIndex(tempDir);
   const executionSnapshotPath = path.join(tempDir, "snapshot.json");
   const submissionPath = path.join(tempDir, "submission.json");
   await writeControlPlaneJson(

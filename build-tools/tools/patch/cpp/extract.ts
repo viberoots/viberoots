@@ -4,6 +4,10 @@ import path from "node:path";
 import { createDbg } from "../lib/util";
 import { encodeNixAttrForPatchPrefix, normalizeNixAttr } from "../../lib/providers";
 import { copyTree } from "../../lib/copy-tree";
+import {
+  markMacosMetadataNeverIndex,
+  mkdirWithMacosMetadataExclusion,
+} from "../../lib/macos-metadata";
 import { resolveNixpkg } from "./resolve";
 import { chmodRecursive } from "../cross-platform";
 
@@ -57,9 +61,10 @@ export async function ensureOriginAndWorkspace(
   const key = `${attrNorm}@${version}`.toLowerCase();
   const safeKey = encodeNixAttrForPatchPrefix(key);
   const base = path.join(os.tmpdir(), "viberoots-patch-cpp");
-  await fsp.mkdir(base, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(base);
   const originRoot = await fsp.mkdtemp(path.join(base, `origin-${safeKey}-`));
   const wsRoot = await fsp.mkdtemp(path.join(base, `ws-${safeKey}-`));
+  await Promise.all([markMacosMetadataNeverIndex(originRoot), markMacosMetadataNeverIndex(wsRoot)]);
   const originPath = await extractOrCopySrc(srcPath, originRoot);
   // Create workspace by cloning originPath
   await copyTree(originPath, wsRoot, { cloneMode: "try", force: true });

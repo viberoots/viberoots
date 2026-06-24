@@ -3,7 +3,7 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { buckProcessTableLines } from "../../lib/process-inspection";
-import { cwdIsInsideTempRepo } from "./buck-daemon-reaper-utils";
+import { cwdIsInsideTempRepo, tempRootsForScopedReap } from "./buck-daemon-reaper-utils";
 import { cleanupRegisteredVerifyProcesses } from "../../dev/verify/owned-process-cleanup";
 import { parseVerifyOwnedState } from "../../dev/verify/owned-process-state";
 import { cleanupRegisteredBuckIsolations } from "../../dev/verify/registered-buck-cleanup";
@@ -250,37 +250,42 @@ async function reapBuckDaemonsForTempRepo(tmpRepoRoot: string): Promise<void> {
   }
 
   // Secondary path: sometimes the forkserver exits but buck2d remains idle.
-  // If we have a temp repo root, kill any remaining buck2d tagged with this repo basename.
+  // Kill any remaining buck2d we can still prove belongs to this temp repo. Nested consumer
+  // workspaces may name the daemon after the nested repo (for example consumer-a) rather than
+  // the outer temp repo basename, so also check cwd when the command tag is not enough.
   try {
     const base = path.basename(path.resolve(tmpRepoRoot));
-    if (base) {
-      const lines = await buckProcessTableLines(2000);
-      for (const l of lines) {
-        const m = l.match(/^(\d+)\s+\d+\s+\S+\s+(.*)$/) || l.match(/^(\d+)\s+\d+\s+(.*)$/);
-        if (!m) continue;
-        const pid = Number(m[1]);
-        const cmd = m[2] || "";
-        if (!Number.isFinite(pid) || pid <= 1) continue;
-        if (!cmd.includes(`buck2d[${base}]`)) continue;
-        try {
-          process.kill(pid, "SIGKILL");
-        } catch {}
-      }
+    const lines = await buckProcessTableLines(2000);
+    for (const l of lines) {
+      const m = l.match(/^(\d+)\s+\d+\s+\S+\s+(.*)$/) || l.match(/^(\d+)\s+\d+\s+(.*)$/);
+      if (!m) continue;
+      const pid = Number(m[1]);
+      const cmd = m[2] || "";
+      if (!Number.isFinite(pid) || pid <= 1) continue;
+      if (!cmd.includes("buck2d[")) continue;
+      if (!base || !cmd.includes(`buck2d[${base}]`)) continue;
+      const cwdOwnedByRepo = cwdIsInsideTempRepo(await cwdForPid(pid), tmpRepoRoot);
+      if (!cwdOwnedByRepo) continue;
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {}
     }
   } catch {}
 }
 
 async function reapRegisteredRoots(tmpRepoRoot: string, stateFile: string): Promise<void> {
-  const tmpRoots: string[] = [];
-  if (tmpRepoRoot) tmpRoots.push(tmpRepoRoot);
+  let registeredRoots: string[] = [];
   if (stateFile) {
     try {
       const txt = await (await import("node:fs/promises")).readFile(stateFile, "utf8");
-      tmpRoots.push(...parseVerifyOwnedState(txt).roots);
+      registeredRoots = parseVerifyOwnedState(txt).roots;
     } catch {}
   }
-  await cleanupRegisteredVerifyProcesses({ stateFile, maxKills: 200 }).catch(() => {});
-  await cleanupRegisteredBuckIsolations({ stateFile, maxKills: 200 }).catch(() => {});
+  if (!tmpRepoRoot) {
+    await cleanupRegisteredVerifyProcesses({ stateFile, maxKills: 200 }).catch(() => {});
+    await cleanupRegisteredBuckIsolations({ stateFile, maxKills: 200 }).catch(() => {});
+  }
+  const tmpRoots = tempRootsForScopedReap(tmpRepoRoot, registeredRoots);
   const seen = new Set<string>();
   for (const r of tmpRoots) {
     const abs = path.resolve(r);

@@ -2,17 +2,13 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { markMacosMetadataNeverIndex } from "../../lib/macos-metadata";
 
 type TmpRootOptions = {
   env?: NodeJS.ProcessEnv;
   platform?: NodeJS.Platform;
   systemTmpRoot?: string;
 };
-
-async function writeMacosMetadataNeverIndexMarker(dir: string): Promise<void> {
-  await fsp.mkdir(dir, { recursive: true }).catch(() => {});
-  await fsp.writeFile(path.join(dir, ".metadata_never_index"), "", "utf8").catch(() => {});
-}
 
 export async function ensureRepoLocalTmpRoot(
   root: string,
@@ -61,10 +57,16 @@ export async function ensureRepoLocalTmpRoot(
   env.TMPDIR = await fsp.realpath(tmpdir).catch(() => tmpdir);
   if (platform === "darwin") {
     await Promise.all([
-      writeMacosMetadataNeverIndexMarker(path.join(liveRoot, "buck-out")),
-      writeMacosMetadataNeverIndexMarker(path.join(liveRoot, "buck-out", "tmp")),
-      writeMacosMetadataNeverIndexMarker(path.dirname(env.TMPDIR)),
-      writeMacosMetadataNeverIndexMarker(env.TMPDIR),
+      markMacosMetadataNeverIndex(liveRoot, platform),
+      markMacosMetadataNeverIndex(path.join(liveRoot, ".viberoots"), platform),
+      markMacosMetadataNeverIndex(path.join(liveRoot, ".viberoots", "buck"), platform),
+      markMacosMetadataNeverIndex(path.join(liveRoot, ".viberoots", "cache"), platform),
+      markMacosMetadataNeverIndex(path.join(liveRoot, ".viberoots", "workspace"), platform),
+      markMacosMetadataNeverIndex(path.join(liveRoot, ".direnv"), platform),
+      markMacosMetadataNeverIndex(path.join(liveRoot, "buck-out"), platform),
+      markMacosMetadataNeverIndex(path.join(liveRoot, "buck-out", "tmp"), platform),
+      markMacosMetadataNeverIndex(path.dirname(env.TMPDIR), platform),
+      markMacosMetadataNeverIndex(env.TMPDIR, platform),
     ]);
   }
 }

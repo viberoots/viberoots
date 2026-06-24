@@ -195,7 +195,7 @@ def nix_calling_genrule_nix_build_out_path_prefix(
     ) + nix_build_out_path_cmd(flake_attr, timeout_var = timeout_var, impure = impure)
 
 
-def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT", impure = False, build_prefix = ""):
+def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT", impure = False, build_prefix = "", graph_target = ""):
     tout = ""
     if isinstance(timeout_var, str) and timeout_var != "":
         tout = "$%s " % timeout_var
@@ -205,7 +205,20 @@ def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT", impure = False, 
         if not prefix.endswith(" "):
             prefix = prefix + " "
     imp = "--impure " if impure else ""
+    ensure_graph = ""
+    if isinstance(graph_target, str) and graph_target != "":
+        ensure_graph = (
+            "export BUCK_GRAPH_JSON=\"${BUCK_GRAPH_JSON:-$WORKSPACE_ROOT/.viberoots/workspace/buck/graph.json}\"; "
+            + (
+                "env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" WORKSPACE_ROOT=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" BUCK_GRAPH_JSON=\"$BUCK_GRAPH_JSON\" "
+                % graph_target
+            )
+            + "node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types "
+            + "--import \"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\" "
+            + "\"$VIBEROOTS_ROOT/build-tools/tools/buck/export-graph.ts\" --out \"$BUCK_GRAPH_JSON\"; "
+        )
     return (
+        ensure_graph +
         "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
         + (
             tout +

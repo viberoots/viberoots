@@ -13,6 +13,7 @@ import {
   scaffoldAndPrepareWorkspace,
   withTempRoots,
 } from "./lib/webapp-ssr";
+import { pnpmInstallForDevTest } from "./lib/dev-node-modules";
 
 async function expectMissingArtifactFailure(
   scratchRoot: string,
@@ -55,11 +56,11 @@ test(
         await assertSsrAdapterConformance({ label, outPath, importer, framework: "vite" });
 
         const appAbs = path.join(tmp, importer);
-        await _$({
-          cwd: appAbs,
-          stdio: "inherit",
-          env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-        })`pnpm --dir ${appAbs} install --prod --frozen-lockfile --ignore-scripts --ignore-workspace --reporter=append-only`;
+        await pnpmInstallForDevTest({
+          tmp,
+          _$,
+          filter: `./${importer}...`,
+        });
 
         const runtimeRoot = path.join(tmp, "docker-runtime-vite");
         await fsp.rm(runtimeRoot, { recursive: true, force: true });

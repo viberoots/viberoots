@@ -8,8 +8,10 @@ import {
   readSnapshotStats,
 } from "./filtered-flake-diagnostics";
 import { filteredFlakeRsyncExcludeArgs } from "./nix-build-filtered-flake-lib";
+import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 import { emitTimingDetail } from "../lib/timing-detail";
 import { resolveToolPathSync } from "../lib/tool-paths";
+import { markMacosMetadataNeverIndex } from "../lib/macos-metadata";
 
 function executablePath(filePath: string): string {
   const candidate = filePath.trim();
@@ -32,12 +34,15 @@ export async function makeFilteredFlakeRef(opts: {
   workspaceRoot: string;
   attr: string;
   logPrefix: string;
+  graphPath?: string;
 }): Promise<{ flakeRef: string; workspaceRoot: string; cleanup: () => Promise<void> }> {
   const tmpBase = process.env.TMPDIR || "/tmp";
   const workDirRaw = await fsp.mkdtemp(path.join(tmpBase, "vbr-flake-"));
+  await markMacosMetadataNeverIndex(workDirRaw);
   const workDir = await fsp.realpath(workDirRaw).catch(() => workDirRaw);
   const snapDir = path.join(workDir, "src");
   await fsp.mkdir(snapDir, { recursive: true });
+  await markMacosMetadataNeverIndex(snapDir);
   const snapDirReal = await fsp.realpath(snapDir).catch(() => snapDir);
   const src = path.resolve(opts.workspaceRoot);
   console.warn(
@@ -56,6 +61,7 @@ export async function makeFilteredFlakeRef(opts: {
   await $({
     stdio: "pipe",
   })`rsync -a --delete ${rsyncExcludes} ${src}/ ${snapDirReal}/`;
+  await copyWorkspaceGraphIntoSnapshot(src, snapDirReal, opts.graphPath);
   if (filteredFlakeDiagnosticsEnabled()) {
     const stats = await readSnapshotStats(snapDirReal);
     const elapsedMs = Date.now() - snapshotStart;
@@ -93,6 +99,24 @@ export async function makeFilteredFlakeRef(opts: {
   };
 }
 
+async function copyWorkspaceGraphIntoSnapshot(
+  root: string,
+  snapDir: string,
+  explicitGraphPath?: string,
+): Promise<void> {
+  const graphPath = path.resolve(
+    String(explicitGraphPath || process.env.BUCK_GRAPH_JSON || path.join(root, DEFAULT_GRAPH_PATH)),
+  );
+  try {
+    await fsp.access(graphPath);
+  } catch {
+    return;
+  }
+  const snapshotGraphPath = path.join(snapDir, DEFAULT_GRAPH_PATH);
+  await fsp.mkdir(path.dirname(snapshotGraphPath), { recursive: true });
+  await fsp.copyFile(graphPath, snapshotGraphPath);
+}
+
 async function repairSnapshotViberootsInput(opts: {
   snapDir: string;
   flakeDir: string;
@@ -119,7 +143,12 @@ async function repairSnapshotViberootsInput(opts: {
 
 async function tempRepoLiveViberootsRoot(): Promise<string> {
   if (String(process.env.VBR_RUN_IN_TEMP_REPO || "").trim() !== "1") return "";
-  const raw = String(process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "").trim();
+  const raw = String(
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
+      process.env.VIBEROOTS_SOURCE_ROOT ||
+      process.env.VIBEROOTS_ROOT ||
+      "",
+  ).trim();
   if (!raw) return "";
   const root = path.resolve(raw);
   try {

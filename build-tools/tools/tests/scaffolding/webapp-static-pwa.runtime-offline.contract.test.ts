@@ -7,6 +7,7 @@ import { resolveModuleContractsPaths } from "../../dev/module-contract-paths";
 import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core";
 import { assertStaticPwaServiceWorkerReady } from "../../lib/static-pwa-precache";
 import { runInTemp } from "../lib/test-helpers/run-in-temp";
+import { pnpmInstallForDevTest } from "./lib/dev-node-modules";
 import { createStaticPwaServiceWorkerHarness } from "./lib/static-pwa-service-worker";
 
 const TEST_TIMEOUT_MS =
@@ -42,16 +43,12 @@ test(
           appTargetLabel: contracts.appTargetLabel,
           root: tmp,
         });
-        await fsp.rm(path.join(appAbs, "node_modules"), {
-          recursive: true,
-          force: true,
+        await pnpmInstallForDevTest({
+          tmp,
+          _$,
+          filter: "./projects/apps/demo-pwa...",
         });
-        await _$({
-          cwd: appAbs,
-          stdio: "inherit",
-          env: { ...process.env, CI: "1" },
-        })`pnpm --dir ${appAbs} install --ignore-workspace --frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
-        await _$({ cwd: appAbs, stdio: "inherit" })`pnpm --dir ${appAbs} run build`;
+        await _$({ cwd: appAbs, stdio: "inherit" })`node scripts/build.mjs`;
         const distDir = path.join(appAbs, "dist");
         assertStaticPwaServiceWorkerReady(`${distDir}/service-worker.js`);
         const serviceWorkerSource = await fsp.readFile(

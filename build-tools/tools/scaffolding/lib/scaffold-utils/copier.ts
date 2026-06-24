@@ -4,6 +4,7 @@ import path from "node:path";
 import { execSync } from "node:child_process";
 
 import { ensureTemplateVariables } from "./template-vars";
+import { markMacosMetadataNeverIndex } from "../../../lib/macos-metadata";
 import { pathExists } from "../../../lib/repo";
 import { templateRootPath } from "../../scaf/templates/paths";
 
@@ -152,6 +153,7 @@ export async function recopyUsingRecordedSource(targetDir: string) {
   await ensureTemplateVariables(targetAbs, answersFile, src, data);
 
   const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), "scaf-"));
+  await markMacosMetadataNeverIndex(tmpDir);
   try {
     const answersJson = path.join(tmpDir, "answers.json");
     await fsp.writeFile(answersJson, JSON.stringify(data, null, 2), "utf8");
@@ -185,6 +187,7 @@ export async function scaffoldOrUpdate(
 
 async function writeTempJson(obj: any): Promise<string> {
   const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), "scaf-"));
+  await markMacosMetadataNeverIndex(tmpDir);
   const p = path.join(tmpDir, "answers.json");
   await fsp.writeFile(p, JSON.stringify(obj, null, 2), "utf8");
   return p;

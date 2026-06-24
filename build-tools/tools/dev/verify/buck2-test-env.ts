@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import process from "node:process";
+import { gitAutoMaintenanceDisabledTestEnvArgs } from "../../lib/git-auto-maintenance-env";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { buildRemoteVerifyTestEnvArgs } from "./buck2-test-remote-env";
 import type { VerifyExecutionPolicy } from "./remote-policy";
@@ -73,6 +74,7 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     `NIX_PNPM_FETCH_TIMEOUT=${opts.testNixTimeoutSecs}`,
     "--env",
     `NIX_PNPM_INSTALL_TIMEOUT=${opts.testNixTimeoutSecs}`,
+    ...gitAutoMaintenanceDisabledTestEnvArgs(),
     ...maybeEnvArg("NIX_CONFIG", process.env.NIX_CONFIG),
     ...maybeEnvArg("VBR_NIX_CACHE_POLICY", process.env.VBR_NIX_CACHE_POLICY),
     ...maybeEnvArg("VBR_NIX_CACHE_HEALTH_APPLIED", process.env.VBR_NIX_CACHE_HEALTH_APPLIED),

@@ -30,6 +30,14 @@ const pnpmStoreBuilderFingerprintFiles = [
   "viberoots/build-tools/tools/nix/node-modules/modules.nix",
 ] as const;
 
+const legacyExactStoreProvisioningFingerprintFiles = [
+  ...pnpmStoreBuilderFingerprintFiles,
+  "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
+  "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-fetch.ts",
+  "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-import.ts",
+  "viberoots/build-tools/tools/dev/update-pnpm-hash/prefetched-store.ts",
+] as const;
+
 async function readFingerprintFile(repoRoot: string, rel: string): Promise<string> {
   const primary = path.join(repoRoot, rel);
   try {
@@ -134,25 +142,37 @@ export async function readSharedHashCache(opts: {
   }
 }
 
-export async function currentVerifiedMarkerFingerprint(
+async function verifiedMarkerFingerprintForFiles(
   repoRoot: string,
-  importer = ".",
+  importer: string,
+  files: readonly string[],
+  opts: { includeImporterInputs?: boolean; includeImporterIdentity?: boolean } = {},
 ): Promise<string> {
   const hash = crypto.createHash("sha256");
   hash.update(`platform=${process.platform}\n`);
   hash.update(`arch=${process.arch}\n`);
-  for (const rel of pnpmStoreBuilderFingerprintFiles) {
+  for (const rel of files) {
     hash.update(`file=${rel}\n`);
     hash.update(await readFingerprintFile(repoRoot, rel));
     hash.update("\n");
   }
+  if (opts.includeImporterInputs === false) {
+    return hash.digest("hex");
+  }
   const importerRoot = importer === "." ? "" : importer.replace(/\\/g, "/").replace(/\/+$/g, "");
-  hash.update(`importer=${importerRoot || "."}\n`);
+  if (opts.includeImporterIdentity !== false) {
+    hash.update(`importer=${importerRoot || "."}\n`);
+  }
   for (const rel of [
     importerRoot ? `${importerRoot}/package.json` : "package.json",
     importerRoot ? `${importerRoot}/.npmrc` : ".npmrc",
+    importerRoot ? `${importerRoot}/pnpm-workspace.yaml` : "pnpm-workspace.yaml",
   ]) {
-    hash.update(`importer-file=${rel}\n`);
+    hash.update(
+      opts.includeImporterIdentity === false
+        ? `importer-file=${path.basename(rel)}\n`
+        : `importer-file=${rel}\n`,
+    );
     try {
       hash.update(await fsp.readFile(path.join(repoRoot, rel), "utf8"));
     } catch {
@@ -161,6 +181,46 @@ export async function currentVerifiedMarkerFingerprint(
     hash.update("\n");
   }
   return hash.digest("hex");
+}
+
+export async function currentVerifiedMarkerFingerprint(
+  repoRoot: string,
+  importer = ".",
+): Promise<string> {
+  return await verifiedMarkerFingerprintForFiles(
+    repoRoot,
+    importer,
+    pnpmStoreBuilderFingerprintFiles,
+    { includeImporterInputs: true },
+  );
+}
+
+export async function currentSharedPnpmStoreHashCacheFingerprint(
+  repoRoot: string,
+  importer = ".",
+): Promise<string> {
+  return await verifiedMarkerFingerprintForFiles(
+    repoRoot,
+    importer,
+    pnpmStoreBuilderFingerprintFiles,
+    {
+      includeImporterIdentity: false,
+    },
+  );
+}
+
+export async function currentVerifiedMarkerFingerprintCandidates(
+  repoRoot: string,
+  importer = ".",
+): Promise<string[]> {
+  const current = await currentVerifiedMarkerFingerprint(repoRoot, importer);
+  const legacyExactStoreProvisioning = await verifiedMarkerFingerprintForFiles(
+    repoRoot,
+    importer,
+    legacyExactStoreProvisioningFingerprintFiles,
+    { includeImporterInputs: true },
+  );
+  return Array.from(new Set([current, legacyExactStoreProvisioning]));
 }
 
 export async function writeVerifiedMarker(
@@ -186,12 +246,13 @@ export async function persistVerifiedHash(opts: {
   repoRoot: string;
   markerPath: string;
   marker: PnpmStoreVerifiedMarker;
+  sharedCacheBuilderFingerprint?: string;
 }): Promise<void> {
   await writeVerifiedMarker(opts.markerPath, opts.marker);
   await writeSharedHashCache(opts.repoRoot, {
     lockHash: opts.marker.lockHash,
     hashValue: opts.marker.hashValue,
-    builderFingerprint: opts.marker.builderFingerprint,
+    builderFingerprint: opts.sharedCacheBuilderFingerprint || opts.marker.builderFingerprint,
   });
 }
 
@@ -216,13 +277,14 @@ export async function restoreHashFromSharedCache(opts: {
   importer: string;
   storeAttr: string;
   builderFingerprint: string;
+  sharedCacheBuilderFingerprint?: string;
   existingLockHash: string;
   existingHash: string;
   hasValidExistingHash: boolean;
 }): Promise<boolean> {
   const sharedHash = await readSharedHashCache({
     repoRoot: opts.repoRoot,
-    builderFingerprint: opts.builderFingerprint,
+    builderFingerprint: opts.sharedCacheBuilderFingerprint || opts.builderFingerprint,
     lockHash: opts.existingLockHash,
   });
   if (!sharedHash) return false;
@@ -239,6 +301,7 @@ export async function restoreHashFromSharedCache(opts: {
       hashValue: sharedHash,
       builderFingerprint: opts.builderFingerprint,
     },
+    sharedCacheBuilderFingerprint: opts.sharedCacheBuilderFingerprint,
   });
   console.log(
     `[update-pnpm-hash] importer=${opts.importer} step=shared-hash-cache attr=${opts.storeAttr} lockfile=${opts.key}`,

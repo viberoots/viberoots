@@ -60,7 +60,7 @@ These are the public surfaces you can rely on:
 The main command-line entry point is:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy
+deploy --deployment //projects/deployments/example-app/prod:deploy
 ```
 
 ### Stable Selectors And Flags
@@ -68,15 +68,15 @@ deploy --deployment //projects/deployments/pleomino/prod:deploy
 Required selector:
 
 - `--deployment <label>`: choose one deployment target, such as
-  `//projects/deployments/pleomino/prod:deploy`
+  `//projects/deployments/example-app/prod:deploy`
 
 Common example values:
 
-- `//projects/deployments/pleomino/dev:deploy`
+- `//projects/deployments/example-app/dev:deploy`
   A shared dev deployment.
-- `//projects/deployments/pleomino/staging:deploy`
+- `//projects/deployments/example-app/staging:deploy`
   A staging deployment.
-- `//projects/deployments/pleomino/prod:deploy`
+- `//projects/deployments/example-app/prod:deploy`
   A production deployment.
 
 Discovery and validation:
@@ -102,7 +102,7 @@ Common example values and when to use them:
 
 - `--artifact-dir ./dist`
   Typical local static-site build output.
-- `--artifact-dir "$WORKSPACE/projects/apps/pleomino/dist"`
+- `--artifact-dir "$WORKSPACE/projects/apps/example-app/dist"`
   Typical CI build output.
 - `--source-run-id deploy-run-2026-04-16-abc123`
   Typical example of an earlier run ID returned by the service.
@@ -262,7 +262,7 @@ Validate one deployment target:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/prod:deploy \
+  --deployment //projects/deployments/example-app/prod:deploy \
   --validate-only
 ```
 
@@ -270,7 +270,7 @@ Submit a normal deploy:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/prod:deploy
+  --deployment //projects/deployments/example-app/prod:deploy
 ```
 
 For a normal deploy, the CLI can usually build and resolve the artifact from
@@ -283,7 +283,7 @@ Submit a preview from an admitted run:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/prod:deploy \
+  --deployment //projects/deployments/example-app/prod:deploy \
   --preview \
   --source-run-id deploy-run-123
 ```
@@ -292,7 +292,7 @@ Replay an exact-artifact rollback:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/prod:deploy \
+  --deployment //projects/deployments/example-app/prod:deploy \
   --publish-only \
   --rollback \
   --source-run-id deploy-run-123
@@ -302,10 +302,10 @@ Use the deployment service path:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/prod:deploy
+  --deployment //projects/deployments/example-app/prod:deploy
 ```
 
-Checked-in Pleomino protected/shared deploy targets carry a
+Checked-in ExampleApp protected/shared deploy targets carry a
 `deployment_context` selector. That context selects a named
 `projects/config/shared.json` `controlPlanes.<name>` profile, where the
 service URL is shared config and the service-token reference remains a
@@ -321,7 +321,7 @@ Read the current status for one service-backed run:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/prod:deploy \
+  --deployment //projects/deployments/example-app/prod:deploy \
   --status \
   --deploy-run-id deploy-run-123
 ```
@@ -330,7 +330,7 @@ Print only the exact admitted target scope string:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/prod:deploy \
+  --deployment //projects/deployments/example-app/prod:deploy \
   --print-run-lock-scope \
   --deploy-run-id deploy-run-123
 ```
@@ -339,7 +339,7 @@ Approve an existing waiting run without building the JSON payload yourself:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/prod:deploy \
+  --deployment //projects/deployments/example-app/prod:deploy \
   --approve \
   --deploy-run-id deploy-run-123 \
   --approval-id ticket-123
@@ -521,10 +521,10 @@ What they mean, with example values:
   `deploy-run-2026-04-16-abc123`
 - `deploymentId`
   The logical deployment name. Example:
-  `pleomino-prod`
+  `example-prod`
 - `deploymentLabel`
   The repo label for the deployment. Example:
-  `//projects/deployments/pleomino/prod:deploy`
+  `//projects/deployments/example-app/prod:deploy`
 - `operationKind`
   The kind of run. Examples:
   `deploy`, `promotion`, `retry`, `rollback`, `preview_cleanup`
@@ -583,8 +583,8 @@ curl \
     "submissionId": "submission-2026-04-16T12:00:00Z",
     "submittedAt": "2026-04-16T12:00:00Z",
     "deployment": {
-      "deploymentId": "pleomino-staging",
-      "label": "//projects/deployments/pleomino/staging:deploy",
+      "deploymentId": "example-staging",
+      "label": "//projects/deployments/example-app/staging:deploy",
       "provider": "cloudflare-pages"
     },
     "operationKind": "deploy",
@@ -592,8 +592,8 @@ curl \
       "kind": "client_upload",
       "uploadSessionId": "upload-2026-04-16T12:00:00Z",
       "sourceRevision": "7d3f2c1",
-      "deploymentLabel": "//projects/deployments/pleomino/staging:deploy",
-      "buildTarget": "//projects/apps/pleomino:app"
+      "deploymentLabel": "//projects/deployments/example-app/staging:deploy",
+      "buildTarget": "//projects/apps/example-app:app"
     }
   }'
 ```
@@ -794,7 +794,7 @@ const requirements = [
   {
     name: "cloudflare_api_token",
     step: "publish",
-    contractId: "secret://deployments/pleomino/cloudflare_api_token",
+    contractId: "secret://deployments/example-app/cloudflare_api_token",
     required: true,
   },
 ];
@@ -815,7 +815,7 @@ Field meanings with example values:
   Use `smoke` when the secret is needed only for post-deploy verification.
 - `step: "release_actions.pre_publish"`
   Use this when a custom pre-publish action needs the secret.
-- `contractId: "secret://deployments/pleomino/cloudflare_api_token"`
+- `contractId: "secret://deployments/example-app/cloudflare_api_token"`
   The stable repo-level secret name; keep this stable even when the value
   rotates.
 - `required: true`
@@ -863,7 +863,7 @@ sends `projectId`, `environment`, `secretPath`, `type=shared`,
 for runtime acquire, the admitted `version` query parameter.
 
 For
-`secret://deployments/pleomino/cloudflare_api_token`, the default Infisical
+`secret://deployments/example-app/cloudflare_api_token`, the default Infisical
 secret name is `cloudflare_api_token`. A reviewed
 `infisical_secret_mappings` entry may override the non-secret `secret_path` and
 `secret_name`. It may also declare `approved_placeholder = "true"` with a
@@ -908,7 +908,7 @@ import { createDeploymentVaultSecretBackend } from "./build-tools/tools/deployme
 const runtime = createDeploymentSecretRuntime({
   backend: createDeploymentVaultSecretBackend(secretContext),
   requirements,
-  targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+  targetScope: "cloudflare-pages:web-platform-staging/example-staging-pages",
 });
 
 const publishSecrets = await runtime.enterStep("publish");
@@ -917,7 +917,7 @@ console.log(publishSecrets.cloudflare_api_token);
 
 What the example values mean:
 
-- `targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages"`
+- `targetScope: "cloudflare-pages:web-platform-staging/example-staging-pages"`
   The specific deployment target that is allowed to use the secret. In normal
   deploy flows, this should be the admitted `targetEnvironment.lockScope`
   value.
@@ -936,7 +936,7 @@ const runtime = createDeploymentSecretRuntimeForAdmittedContext({
   admittedContext: {
     secretRequirements: requirements,
     targetEnvironment: {
-      lockScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      lockScope: "cloudflare-pages:web-platform-staging/example-staging-pages",
     },
   },
 });
@@ -956,9 +956,9 @@ An Infisical-admitted reference freezes non-secret replay data, for example:
 ```json
 {
   "backend": "infisical",
-  "backendRef": "proj_123:prod:/deployments/pleomino:cloudflare_api_token#sec_1",
-  "selectorRef": "proj_123:prod:/deployments/pleomino:cloudflare_api_token@3",
-  "referenceId": "infisical:proj_123:prod:/deployments/pleomino:cloudflare_api_token#sec_1@3",
+  "backendRef": "proj_123:prod:/deployments/example-app:cloudflare_api_token#sec_1",
+  "selectorRef": "proj_123:prod:/deployments/example-app:cloudflare_api_token@3",
+  "referenceId": "infisical:proj_123:prod:/deployments/example-app:cloudflare_api_token#sec_1@3",
   "resolvedVersion": "3",
   "refreshMode": "none",
   "credentialClass": "routine"
@@ -1063,10 +1063,10 @@ Example fixture:
 {
   "schemaVersion": "deployment-secret-fixture@1",
   "contracts": {
-    "secret://deployments/pleomino/cloudflare_api_token": {
+    "secret://deployments/example-app/cloudflare_api_token": {
       "value": "super-secret-token",
       "allowedSteps": ["publish"],
-      "targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+      "targetScopes": ["cloudflare-pages:web-platform-staging/example-staging-pages"],
       "refreshMode": "renew",
       "credentialClass": "routine"
     }
@@ -1086,7 +1086,7 @@ What the common fixture fields mean:
   deleting preview resources.
 - `"allowedSteps": ["smoke"]`
   Use this for a credential that should be available only during smoke checks.
-- `"targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"]`
+- `"targetScopes": ["cloudflare-pages:web-platform-staging/example-staging-pages"]`
   The exact deployment target allowed to use this contract. This should match
   the deployment's admitted `lockScope`.
 - `"refreshMode": "renew"`
@@ -1104,7 +1104,7 @@ How to get the right `targetScopes` value:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --print-target-identity
 ```
 
@@ -1114,7 +1114,7 @@ For normal deploys, that value is the right starting point for `targetScopes`.
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --print-run-lock-scope \
   --deploy-run-id "$DEPLOY_RUN_ID"
 ```
@@ -1147,7 +1147,7 @@ Common admitted shapes by backend:
 Copyable example:
 
 ```json
-"targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"]
+"targetScopes": ["cloudflare-pages:web-platform-staging/example-staging-pages"]
 ```
 
 ### External Deployment Secret And Readiness Contracts
@@ -1242,7 +1242,7 @@ Infisical auth diagnostic example fields:
     "siteUrl": "https://app.infisical.com",
     "projectId": "proj_123",
     "environment": "prod",
-    "secretPath": "/deployments/pleomino",
+    "secretPath": "/deployments/example-app",
     "machineIdentityId": "identity_123",
     "machineIdentityClientIdEnv": "INFISICAL_CLIENT_ID",
     "machineIdentityClientSecretEnv": "INFISICAL_CLIENT_SECRET"
@@ -1282,7 +1282,7 @@ Example output fields:
     "siteUrl": "https://app.infisical.com",
     "projectId": "proj_123",
     "environment": "prod",
-    "secretPath": "/deployments/pleomino"
+    "secretPath": "/deployments/example-app"
   },
   "credentialSource": {
     "name": "infisical_machine_identity_universal_auth",
@@ -1293,11 +1293,11 @@ Example output fields:
   },
   "desiredSecrets": [
     {
-      "contractId": "secret://deployments/pleomino/cloudflare_api_token",
+      "contractId": "secret://deployments/example-app/cloudflare_api_token",
       "selector": {
         "projectId": "proj_123",
         "environment": "prod",
-        "secretPath": "/deployments/pleomino",
+        "secretPath": "/deployments/example-app",
         "secretName": "cloudflare_api_token"
       },
       "approvedPlaceholder": false

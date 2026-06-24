@@ -2,10 +2,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { buildMetadataHandoffPatch } from "../../deployments/infisical-iac-bootstrap-metadata-handoff";
-import { parsePleominoReviewedMetadata } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
+import { parseDeploymentReviewedMetadata } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
 
 test("metadata handoff rejects non-contract credential file names", () => {
-  const reviewed = parsePleominoReviewedMetadata(SOURCE);
+  const reviewed = parseDeploymentReviewedMetadata(SOURCE);
   assert.throws(
     () => buildMetadataHandoffPatch(LIVE_METADATA, reviewed, SOURCE),
     /metadata handoff staging client_id file name must be exactly pleomino-staging-infisical-client-id/,

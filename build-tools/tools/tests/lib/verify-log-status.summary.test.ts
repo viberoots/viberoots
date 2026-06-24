@@ -28,6 +28,35 @@ test("verify-log-status: prefers final summary when present (verify window, afte
   assert.equal(st.elapsed, "1:02.3s");
 });
 
+test("verify-log-status: modern final summary clears stale waiting remaining", () => {
+  const log = [
+    "[verify] begin iso=v-1 start_s=100",
+    "[verify] target pass begin name=resource-limited index=1/1 target_count=6 targets=//:a //:b //:c //:d //:e //:f",
+    "Waiting on Test a -- [local_execute], and 3 other actions",
+    "✓ Pass: root//:a (1.0s)",
+    "✓ Pass: root//:b (1.0s)",
+    "✓ Pass: root//:c (1.0s)",
+    "✓ Pass: root//:d (1.0s)",
+    "✓ Pass: root//:e (1.0s)",
+    "✓ Pass: root//:f (1.0s)",
+    "Tests finished: Pass 6. Fail 0. Timeout 0. Fatal 0. Skip 0. Omit 0. Infra Failure 0. Build failure 0",
+    "[verify] buck2 test exit iso=v-1 pass=resource-limited status=0 end_s=162 duration_s=62 pass_count=6 fail_count=0 completions=6 threads=4",
+    "[verify] target pass end name=resource-limited index=1/1 status=0",
+  ].join("\n");
+
+  const st = computeVerifyStatusFromLogText({
+    logPath: "/repo/buck-out/tmp/verify-logs/verify-123.log",
+    pid: 123,
+    text: log,
+  });
+
+  assert.equal(st.done, true);
+  assert.equal(st.source, "summary");
+  assert.equal(st.pass, 6);
+  assert.equal(st.fail, 0);
+  assert.equal(st.remaining, 0);
+});
+
 test("verify-log-status: ignores comment-prefixed 'Tests finished' lines", () => {
   const log = [
     "[2025-12-26T14:35:06.370-08:00] # Tests finished: Pass 1. Fail 0. Fatal 0. Skip 0. Build failure 0",

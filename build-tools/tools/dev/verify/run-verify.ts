@@ -6,6 +6,9 @@ import { isRemoteVerifyPolicy, shouldComputeLocalZxTestNodeModules } from "./rem
 import { defaultRunVerifyDeps, type RunVerifyDeps } from "./run-verify-deps";
 import { buildToolsRoot, zxInitPath } from "../dev-build/paths";
 
+export const SCOPED_VERIFY_RSYNC_ROOTS =
+  "viberoots build-tools toolchains third_party/providers prelude";
+
 export async function runVerify(): Promise<void> {
   await runVerifyWithDeps(defaultRunVerifyDeps);
 }
@@ -172,6 +175,12 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     delete process.env.VBR_TEST_SEED_KEY;
     delete process.env.VBR_TEST_SEED_PIN_DIR;
     delete process.env.VBR_TEST_SEED_REMOTE_MANIFEST;
+    if (!remoteVerify && !String(process.env.TEST_RSYNC_ROOTS || "").trim()) {
+      process.env.TEST_RSYNC_ROOTS = SCOPED_VERIFY_RSYNC_ROOTS;
+      process.stderr.write(
+        `[verify] scoped temp repos: TEST_RSYNC_ROOTS=${SCOPED_VERIFY_RSYNC_ROOTS}\n`,
+      );
+    }
   }
   if (!remoteVerify) {
     await timedPhase(

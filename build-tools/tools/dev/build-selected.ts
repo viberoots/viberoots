@@ -65,6 +65,7 @@ async function chooseFlakeRef(opts: {
   workspaceRoot: string;
   target: string;
   sourceMode: "auto" | "git" | "path";
+  graphPath: string;
 }): Promise<{ flakeRef: string; workspaceRoot?: string; cleanup?: () => Promise<void> }> {
   const repoRootEnv = String(process.env.REPO_ROOT || "").trim();
   const workspaceAbs = path.resolve(opts.workspaceRoot);
@@ -79,6 +80,7 @@ async function chooseFlakeRef(opts: {
       workspaceRoot: opts.workspaceRoot,
       attr: "graph-generator-selected",
       logPrefix: "[build-selected]",
+      graphPath: opts.graphPath,
     });
     return filtered;
   }
@@ -119,6 +121,7 @@ async function chooseFlakeRef(opts: {
       workspaceRoot: opts.workspaceRoot,
       attr: "graph-generator-selected",
       logPrefix: "[build-selected]",
+      graphPath: opts.graphPath,
     });
     return {
       flakeRef: filtered.flakeRef,
@@ -154,7 +157,14 @@ async function main() {
     process.exit(2);
   }
   const target = await resolveSelectedTargetLabel(workspaceRoot, targetRaw, { baseDir: cwd });
-  const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
+  const graphPath = path.join(
+    workspaceRoot,
+    ".viberoots",
+    "workspace",
+    "buck",
+    "selected",
+    `${sanitizeAttrNameFromLabel(target)}.graph.json`,
+  );
   const importerRoots = getImporterRootsContract().workspaceRoots;
   const defaultRoots = Array.from(new Set([...importerRoots, "go", "cpp", "third_party"])).join(
     ",",
@@ -183,7 +193,7 @@ async function main() {
       } catch {
         console.error(`[build-selected] exporting graph to ${graphPath}`);
       }
-      await ensureGraph();
+      await ensureGraph({ workspaceRoot, target, graphPath });
     },
   );
   await runNodeWithZx({
@@ -233,13 +243,19 @@ async function main() {
     workspaceRoot,
     target,
     sourceMode: parsedSource.sourceMode,
+    graphPath,
   });
   const nixTrace = exporterDebug === "1" ? "--show-trace" : "";
   const runOnce = async () => {
+    const env = flakeSource.workspaceRoot
+      ? {
+          ...sanitizedEnv,
+          WORKSPACE_ROOT: flakeSource.workspaceRoot,
+          BUCK_GRAPH_JSON: path.join(flakeSource.workspaceRoot, DEFAULT_GRAPH_PATH),
+        }
+      : sanitizedEnv;
     return await $({
-      env: flakeSource.workspaceRoot
-        ? { ...sanitizedEnv, WORKSPACE_ROOT: flakeSource.workspaceRoot }
-        : sanitizedEnv,
+      env,
       reject: false,
       nothrow: true,
     })`${selectedNixBuildArgs({ flakeRef: flakeSource.flakeRef, showTrace: Boolean(nixTrace) })}`;
@@ -254,7 +270,7 @@ async function main() {
   if (exitCode !== 0) {
     console.error(
       "[build-selected] nix build failed.\n" +
-        `Ensure ${DEFAULT_GRAPH_PATH} includes the requested target and re-run glue export.`,
+        `Ensure ${graphPath} includes the requested target and re-run glue export.`,
     );
     process.exit(exitCode || 1);
   }

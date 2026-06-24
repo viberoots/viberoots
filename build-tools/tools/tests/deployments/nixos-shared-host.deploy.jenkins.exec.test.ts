@@ -29,14 +29,12 @@ import { viberootsToolScript } from "./deployment-command";
 import { writeAuthSession } from "./nixos-shared-host.service-auth-boundary.helpers";
 
 const CONTROL_PLANE_TOKEN = "test-control-plane-token";
-
 type RemoteControlPlaneRuntime = {
   tmp: string;
   remoteStatePath: string;
   remoteRuntimeRoot: string;
   remoteRecordsRoot: string;
 };
-
 async function startObjectBackedControlPlaneWorker(opts: RemoteControlPlaneRuntime) {
   const objectStore = memoryControlPlaneArtifactStore();
   const controlPlane = await startNixosSharedHostControlPlaneServer({
@@ -58,7 +56,6 @@ async function startObjectBackedControlPlaneWorker(opts: RemoteControlPlaneRunti
   });
   return { controlPlane, worker };
 }
-
 async function writeJenkinsSubmitterAuthSession(recordsRoot: string, deployment: any) {
   return await writeAuthSession({
     recordsRoot,
@@ -182,7 +179,6 @@ test("jenkins wrapper stages the Pleomino artifact, submits through the control 
     }
   });
 });
-
 test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid hand-written evidence", async () => {
   await runInTemp("nixos-shared-host-jenkins-exec-admit-and-deploy", async (tmp, $) => {
     const deployment = pleominoDeploymentFixture();

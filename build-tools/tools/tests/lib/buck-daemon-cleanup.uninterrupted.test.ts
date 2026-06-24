@@ -7,11 +7,26 @@ import { parseVerifyOwnedState } from "../../dev/verify/owned-process-state";
 import { forkserversUnderRepo } from "./test-helpers/buck-procs";
 import { inheritedBuckIsolation, runInTemp } from "./test-helpers";
 
+const BUCK_CLEANUP_RSYNC_ROOTS = "viberoots build-tools toolchains third_party/providers prelude";
+
+async function withBuckCleanupRsyncRoots<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = process.env.TEST_RSYNC_ROOTS;
+  try {
+    process.env.TEST_RSYNC_ROOTS = prev || BUCK_CLEANUP_RSYNC_ROOTS;
+    return await fn();
+  } finally {
+    if (prev === undefined) delete process.env.TEST_RSYNC_ROOTS;
+    else process.env.TEST_RSYNC_ROOTS = prev;
+  }
+}
+
 test("buck cleanup: uninterrupted runInTemp does not leave buck2 daemons behind", async () => {
   // If runInTemp fails to terminate buck2 daemons before deleting the temp repo,
   // it now throws from its cleanup block and this test will fail.
-  await runInTemp("buck-cleanup-uninterrupted", async (_tmp, $) => {
-    await $`buck2 build //.viberoots/workspace:flake.lock`;
+  await withBuckCleanupRsyncRoots(async () => {
+    await runInTemp("buck-cleanup-uninterrupted", async (_tmp, $) => {
+      await $`buck2 build //.viberoots/workspace:flake.lock`;
+    });
   });
 });
 
@@ -28,21 +43,23 @@ test("buck cleanup: explicit inherited isolation is registered and cleaned", asy
     process.env.VBR_VERIFY_PROCESS_STATE_FILE = stateFile;
     await fsp.writeFile(stateFile, "", "utf8");
 
-    await runInTemp("buck-cleanup-inherited-explicit", async (tmp, $) => {
-      tmpRoot = tmp;
-      explicitIso = inheritedBuckIsolation("buck_cleanup_inherited_explicit");
-      await $`buck2 --isolation-dir ${inheritedBuckIsolation("buck_cleanup_inherited_explicit")} build //.viberoots/workspace:flake.lock`;
+    await withBuckCleanupRsyncRoots(async () => {
+      await runInTemp("buck-cleanup-inherited-explicit", async (tmp, $) => {
+        tmpRoot = tmp;
+        explicitIso = inheritedBuckIsolation("buck_cleanup_inherited_explicit");
+        await $`buck2 --isolation-dir ${inheritedBuckIsolation("buck_cleanup_inherited_explicit")} build //.viberoots/workspace:flake.lock`;
 
-      const parsed = parseVerifyOwnedState(await fsp.readFile(stateFile, "utf8"));
-      const registered = parsed.isolations.find(
-        (entry) =>
-          entry.kind === "run-in-temp-zxtest" &&
-          entry.repoRoot === path.resolve(tmp) &&
-          entry.iso === explicitIso,
-      );
-      if (!registered) {
-        throw new Error(`expected inherited isolation to be registered: ${explicitIso}`);
-      }
+        const parsed = parseVerifyOwnedState(await fsp.readFile(stateFile, "utf8"));
+        const registered = parsed.isolations.find(
+          (entry) =>
+            entry.kind === "run-in-temp-zxtest" &&
+            entry.repoRoot === path.resolve(tmp) &&
+            entry.iso === explicitIso,
+        );
+        if (!registered) {
+          throw new Error(`expected inherited isolation to be registered: ${explicitIso}`);
+        }
+      });
     });
 
     const offenders = await forkserversUnderRepo(tmpRoot, $);

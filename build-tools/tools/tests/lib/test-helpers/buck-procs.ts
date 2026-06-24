@@ -1,13 +1,16 @@
 import "./worker-init";
+import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { pgrepProcessLines, processTableLines } from "../../../lib/process-inspection";
 import { resolveToolPath } from "../../../lib/tool-paths";
+import { cwdIsInsideTempRepo } from "../buck-daemon-reaper-utils";
 
 type ProcessListDeps = {
   psLines?: (args: string[]) => Promise<{ exitCode: number; lines: string[] }>;
   pgrepLines?: (pattern: string) => Promise<string[]>;
+  cwdForPid?: (pid: number) => Promise<string>;
 };
 
 export async function buckIsolationDirsForRepo(repoRoot: string): Promise<string[]> {
@@ -84,6 +87,21 @@ export async function pidCmdline(pid: number, $: any): Promise<string> {
 
 export type Buck2dProc = { pid: number; iso: string; cmd: string };
 
+type ParsedProcLine = { pid: number; ppid: number; cmd: string };
+
+function parseProcLine(line: string): ParsedProcLine | null {
+  const twoColumn = line.match(/^(\d+)\s+(.*)$/);
+  if (!twoColumn) return null;
+  const pid = Number(twoColumn[1]);
+  if (!Number.isFinite(pid) || pid <= 1) return null;
+  const rest = twoColumn[2] || "";
+  const withPpid = rest.match(/^(\d+)\s+(.*)$/);
+  if (withPpid) {
+    return { pid, ppid: Number(withPpid[1]) || 0, cmd: withPpid[2] || "" };
+  }
+  return { pid, ppid: 0, cmd: rest };
+}
+
 export function isolationDirFromCmd(cmd: string): string {
   const m = String(cmd || "").match(/--isolation-dir\s+([^\s]+)/);
   return m && m[1] ? String(m[1]).trim() : "";
@@ -96,11 +114,21 @@ export async function buck2dProcsForRepo(
 ): Promise<Buck2dProc[]> {
   const base = path.basename(path.resolve(repoRoot));
   if (!base) return [];
-  const res = await psCommandLines($, ["-A", "-o", "pid=,command="], deps);
+  const res = await psCommandLines($, ["-A", "-o", "pid=,ppid=,command="], deps);
   const lines = res.lines;
-  const parsed = parseBuck2dLinesForRepo(base, lines);
+  const forkserverParentPids = new Set(
+    parseForkserverLinesForRepo(repoRoot, lines).map((p) => p.ppid),
+  );
+  const parsed = await parseBuck2dLinesForRepo(
+    repoRoot,
+    base,
+    lines,
+    forkserverParentPids,
+    $,
+    deps,
+  );
   if (parsed.length > 0 || res.exitCode === 0) return parsed;
-  return await pgrepBuck2dProcsForRepo(base, deps);
+  return await pgrepBuck2dProcsForRepo(repoRoot, base, deps);
 }
 
 async function psCommandLines(
@@ -117,15 +145,76 @@ async function psCommandLines(
   return { exitCode: lines.length > 0 ? 0 : 1, lines };
 }
 
-function parseBuck2dLinesForRepo(base: string, lines: string[]): Buck2dProc[] {
+async function cwdForPid(pid: number, $: any, deps: ProcessListDeps): Promise<string> {
+  if (deps.cwdForPid) return await deps.cwdForPid(pid);
+  const lsofPath = await resolveToolPath("lsof").catch(() => "");
+  if (!lsofPath) return "";
+  if (typeof $ !== "function") {
+    const stdout = await new Promise<string>((resolve) => {
+      let child;
+      try {
+        child = spawn(lsofPath, ["-a", "-p", String(pid), "-d", "cwd", "-Fn"], {
+          stdio: ["ignore", "pipe", "ignore"],
+        });
+      } catch {
+        resolve("");
+        return;
+      }
+      let settled = false;
+      let buf = "";
+      const finish = (text: string) => {
+        if (settled) return;
+        settled = true;
+        resolve(text);
+      };
+      child.stdout.setEncoding("utf8");
+      child.stdout.on("data", (chunk) => {
+        buf += String(chunk || "");
+      });
+      child.on("error", () => finish(""));
+      child.on("close", () => finish(buf));
+      const timer = setTimeout(() => {
+        try {
+          child.kill("SIGKILL");
+        } catch {}
+        finish("");
+      }, 1500);
+      child.on("close", () => clearTimeout(timer));
+    });
+    const line = stdout.split(/\r?\n/).find((l) => l.startsWith("n"));
+    return line ? line.slice(1).trim() : "";
+  }
+  const res = await $({
+    stdio: "pipe",
+    reject: false,
+    nothrow: true,
+    timeout: 1500,
+  })`${lsofPath} -a -p ${pid} -d cwd -Fn`;
+  const line = String(res.stdout || "")
+    .split(/\r?\n/)
+    .find((l) => l.startsWith("n"));
+  return line ? line.slice(1).trim() : "";
+}
+
+async function parseBuck2dLinesForRepo(
+  repoRoot: string,
+  base: string,
+  lines: string[],
+  forkserverParentPids: ReadonlySet<number>,
+  $: any,
+  deps: ProcessListDeps,
+): Promise<Buck2dProc[]> {
   const out: Buck2dProc[] = [];
   for (const l of lines) {
-    const m = l.match(/^(\d+)\s+(.*)$/);
-    if (!m) continue;
-    const pid = Number(m[1]);
-    const cmd = m[2] || "";
-    if (!Number.isFinite(pid) || pid <= 1) continue;
-    if (!cmd.includes(`buck2d[${base}]`)) continue;
+    const parsed = parseProcLine(l);
+    if (!parsed) continue;
+    const { pid, cmd } = parsed;
+    if (!cmd.includes("buck2d[")) continue;
+    const directNameMatch = cmd.includes(`buck2d[${base}]`);
+    const nestedForkserverParent = forkserverParentPids.has(pid);
+    if (!directNameMatch && !nestedForkserverParent) continue;
+    const cwd = await cwdForPid(pid, $, deps);
+    if (!cwdIsInsideTempRepo(cwd, repoRoot)) continue;
     const iso = isolationDirFromCmd(cmd);
     out.push({ pid, iso, cmd });
   }
@@ -158,10 +247,11 @@ async function pgrepForkserversUnderRepo(
 }
 
 async function pgrepBuck2dProcsForRepo(
+  repoRoot: string,
   base: string,
   deps: ProcessListDeps = {},
 ): Promise<Buck2dProc[]> {
   const escapedBase = base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const lines = await pgrepLines(`buck2d\\[${escapedBase}\\]`, deps);
-  return parseBuck2dLinesForRepo(base, lines);
+  return await parseBuck2dLinesForRepo(repoRoot, base, lines, new Set(), undefined, deps);
 }

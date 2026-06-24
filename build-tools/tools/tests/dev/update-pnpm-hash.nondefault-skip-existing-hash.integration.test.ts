@@ -24,6 +24,9 @@ test("update-pnpm-hash skips non-default recompute when existing hash is present
       "nondefault.ts must not run speculative verify-existing-hash when marker validation fails",
     );
   }
+  if (nondefaultTxt.includes("step=skip-existing-hash-verify")) {
+    throw new Error("nondefault.ts must not rebuild on a matching marker fast-path");
+  }
   if (nondefaultTxt.includes("step=skip-verified-existing-hash")) {
     throw new Error(
       "nondefault.ts must not log skip-verified-existing-hash for stale non-default markers",
@@ -32,7 +35,7 @@ test("update-pnpm-hash skips non-default recompute when existing hash is present
   if (!nondefaultTxt.includes("step=skip-existing-hash")) {
     throw new Error("nondefault.ts must log skip-existing-hash for non-default importers");
   }
-  if (!nondefaultTxt.includes("prepareExactPnpmStore({ repoRoot: opts.repoRoot")) {
+  if (!nondefaultTxt.includes("opts.prepareExactStore || prepareExactPnpmStore")) {
     throw new Error(
       "nondefault.ts must prepare exact stores before accepting cached non-default hashes",
     );

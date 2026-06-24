@@ -56,7 +56,7 @@ function tofuStateManagesProject(runner: CommandRunner, tofuDir: string) {
     return stdout
       .split(/\r?\n/)
       .map((line) => line.trim())
-      .includes("infisical_project.pleomino");
+      .some((line) => /^infisical_project\.[A-Za-z0-9_-]+$/.test(line));
   } catch {
     return false;
   }

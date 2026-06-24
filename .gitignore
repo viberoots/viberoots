@@ -13,11 +13,14 @@ result
 .direnv/
 
 # Local temp artifacts
+.metadata_never_index
 .tmp/
 .local/
 /.viberoots/current
 /.viberoots/workspace/
 /.viberoots/cache/
+/.viberoots/.metadata_never_index
+/.viberoots/buck/
 # Canonical project config keeps shared values tracked and individual-user
 # values in one clone-local file.
 projects/config/local.json

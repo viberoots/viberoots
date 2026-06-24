@@ -9,6 +9,7 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
 import { exists, runInTemp } from "../lib/test-helpers";
+import { pnpmInstallForDevTest } from "./lib/dev-node-modules";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -62,14 +63,6 @@ async function pickFreePort(): Promise<number> {
   return addr.port;
 }
 
-async function installNodeModules(appAbs: string, _$: any): Promise<void> {
-  await _$({
-    cwd: appAbs,
-    stdio: "inherit",
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-  })`pnpm --dir ${appAbs} install --ignore-scripts --ignore-workspace --prefer-offline --reporter=append-only`;
-}
-
 async function assertNextContractFiles(tmp: string, appName: string): Promise<void> {
   const appAbs = path.join(tmp, "projects", "apps", appName);
   const expected = [
@@ -120,12 +113,12 @@ async function runNextRuntimeSmoke(
   appName: string,
 ): Promise<void> {
   const appAbs = path.join(tmp, "projects", "apps", appName);
-  await installNodeModules(appAbs, _$);
-  await _$({
-    cwd: appAbs,
-    stdio: "inherit",
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1" },
-  })`pnpm --dir ${appAbs} run build:ssr`;
+  await pnpmInstallForDevTest({
+    tmp,
+    _$,
+    filter: `./projects/apps/${appName}...`,
+  });
+  await _$({ cwd: appAbs, stdio: "inherit" })`node scripts/build-ssr.mjs`;
   const port = await pickFreePort();
   const child = spawn("node", ["dist/server/index.js"], {
     cwd: appAbs,

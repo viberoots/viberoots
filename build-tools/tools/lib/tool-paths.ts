@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -62,6 +63,51 @@ export function ensureNixStoreToolPathSync(
     throw new Error(`required tool must resolve to /nix/store: ${tool} -> ${resolved}`);
   }
   return resolved;
+}
+
+function parseSemver(version: string): [number, number, number] | null {
+  const match = version.trim().match(/^(\d+)\.(\d+)\.(\d+)(?:\D.*)?$/);
+  if (!match) return null;
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function compareSemverDesc(a: [number, number, number], b: [number, number, number]): number {
+  for (let idx = 0; idx < 3; idx++) {
+    const diff = b[idx] - a[idx];
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+export function ensureNixStorePnpm11PathSync(env: NodeJS.ProcessEnv = process.env): string {
+  const candidates = candidateToolPaths("pnpm", env).filter(
+    (candidate) => isNixStorePath(candidate) && isExecutable(candidate),
+  );
+  const versions = candidates
+    .map((candidate) => {
+      const result = spawnSync(candidate, ["--version"], {
+        encoding: "utf8",
+        env,
+        timeout: 10_000,
+      });
+      if (result.status !== 0) return null;
+      const version = parseSemver(String(result.stdout || ""));
+      return version ? { candidate, version } : null;
+    })
+    .filter((entry): entry is { candidate: string; version: [number, number, number] } =>
+      Boolean(entry),
+    )
+    .sort((a, b) => compareSemverDesc(a.version, b.version));
+  const selected = versions[0];
+  if (!selected) {
+    throw new Error("required tool must resolve to /nix/store: pnpm");
+  }
+  if (selected.version[0] < 11) {
+    throw new Error(
+      `exact pnpm store population requires pnpm >= 11; resolved ${selected.version.join(".")} at ${selected.candidate}`,
+    );
+  }
+  return selected.candidate;
 }
 
 export async function resolveToolPath(

@@ -291,52 +291,52 @@ Local values are an implicit local-first resolution surface. They do not need to
 should still report when a value came from `projects/config/local.json`.
 
 Shared deployment topology also belongs in `projects/config/shared.json`. A deployment selects one
-context, for example `deployment_context = "pleomino-prod"`, and the context fills omitted
+context, for example `deployment_context = "example-prod"`, and the context fills omitted
 non-secret provider metadata:
 
 ```json
 {
   "controlPlanes": {
-    "pleomino-prod": {
+    "example-prod": {
       "serviceClient": {
-        "controlPlaneUrl": "https://deploy.pleomino.example.com",
-        "controlPlaneTokenRef": "secret://control-planes/pleomino-prod/service-token"
+        "controlPlaneUrl": "https://deploy.example-app.example.com",
+        "controlPlaneTokenRef": "secret://control-planes/example-prod/service-token"
       },
       "records": { "backend": "service" }
     }
   },
   "deploymentContexts": {
-    "pleomino-prod": {
-      "controlPlane": "pleomino-prod",
+    "example-prod": {
+      "controlPlane": "example-prod",
       "secretBackend": "infisical/default",
       "aws": { "accountId": "111122223333", "defaultRegion": "us-west-2" },
       "infisical": {
         "host": "https://app.infisical.com",
         "projectId": "5a927a1a-e78d-433e-affc-17cc051780c0",
-        "projectName": "pleomino-deployments",
-        "projectSlug": "pleomino-deployments",
+        "projectName": "example-deployments",
+        "projectSlug": "example-deployments",
         "environment": "prod",
         "defaultPath": "/",
-        "clientIdEnv": "PLEOMINO_PROD_INFISICAL_CLIENT_ID",
-        "clientSecretEnv": "PLEOMINO_PROD_INFISICAL_CLIENT_SECRET",
-        "clientIdRef": "secret://deployments/pleomino/prod/infisical-client-id",
-        "clientSecretRef": "secret://deployments/pleomino/prod/infisical-client-secret",
-        "clientIdFileName": "pleomino-prod-infisical-client-id",
-        "clientSecretFileName": "pleomino-prod-infisical-client-secret",
+        "clientIdEnv": "EXAMPLE_APP_PROD_INFISICAL_CLIENT_ID",
+        "clientSecretEnv": "EXAMPLE_APP_PROD_INFISICAL_CLIENT_SECRET",
+        "clientIdRef": "secret://deployments/example-app/prod/infisical-client-id",
+        "clientSecretRef": "secret://deployments/example-app/prod/infisical-client-secret",
+        "clientIdFileName": "example-prod-infisical-client-id",
+        "clientSecretFileName": "example-prod-infisical-client-secret",
         "machineIdentityId": "ceca24df-0e8b-457e-a5a8-cf20a122d2da",
-        "machineIdentityName": "pleomino-prod-deploy"
+        "machineIdentityName": "example-prod-deploy"
       },
       "cloudflare": {
         "account": "web-platform-prod",
         "accountId": "1b911846f80a89272c0dbaf44f5c810f",
-        "projectName": "pleomino-prod-pages",
-        "customDomain": "pleomino.com",
+        "projectName": "example-prod-pages",
+        "customDomain": "example-app.example.com",
         "zoneId": "9411ac5903acb1c2e29b3d4c04ef7e6f",
-        "apiTokenRef": "secret://deployments/pleomino/cloudflare_api_token"
+        "apiTokenRef": "secret://deployments/example-app/cloudflare_api_token"
       }
     },
     "admin-prod": {
-      "controlPlane": "pleomino-prod",
+      "controlPlane": "example-prod",
       "secretBackend": "infisical/admin",
       "aws": { "accountId": "444455556666", "defaultRegion": "us-east-1" },
       "infisical": { "projectId": "admin-project-id", "environment": "prod" },

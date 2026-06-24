@@ -2,7 +2,11 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { ensureBuckConfigForTempRepo, ensureWorkspaceRootEnvFile } from "./buck-config";
-import { killBuckDaemonsForRepo } from "./buck-kill";
+import {
+  buckCleanupRootsForRepo,
+  killBuckDaemonsForRepo,
+  killBuckDaemonsForRoots,
+} from "./buck-kill";
 import { ensureBuckReaperStarted } from "./buck-reaper";
 import { getCgoToolchainPathsOncePerWorker, getDarwinSdkPathOncePerWorker } from "./cgo-toolchain";
 import { rewriteCoverageUrls } from "./coverage";
@@ -23,14 +27,22 @@ import {
   pinnedNixpkgsPackageExpr,
   pinnedNixpkgsOutPathExpr,
 } from "../../../lib/pinned-nixpkgs";
+import { withGitAutoMaintenanceDisabledEnv } from "../../../lib/git-auto-maintenance-env";
 import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths";
 import { stableBuckIsolation } from "../../../lib/buck-command-env";
 import { resolveToolPathSync } from "../../../lib/tool-paths";
 import { pathExists } from "../../../lib/repo";
+import { mkdirWithMacosMetadataExclusion } from "../../../lib/macos-metadata";
 
 const LOCAL_FIXTURE_SERVICE_ENV = "VBR_DEPLOY_LOCAL_FIXTURE_SERVICE";
+const PREPARED_SEED_MARKER = ".seed-store-prepared-v4";
 
 let cachedDevEnvExport: Promise<string> | null = null;
+type PathFlakeMetadata = {
+  lastModified?: number;
+  narHash?: string;
+};
+const pathFlakeMetadataCache = new Map<string, Promise<PathFlakeMetadata>>();
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
 let cachedPinnedCacertPath: Promise<string> | null = null;
 let cachedUnifiedPnpmStorePath: Promise<string> | null = null;
@@ -134,7 +146,7 @@ async function pinnedNixpkgsPathOncePerWorker($: any): Promise<string> {
   cachedPinnedNixpkgsPath = (async () => {
     const repoRoot = process.cwd();
     const nixEvalTmp = nixEvalTempDirOutsideWorkspace(repoRoot);
-    await fsp.mkdir(nixEvalTmp, { recursive: true }).catch(() => {});
+    await mkdirWithMacosMetadataExclusion(nixEvalTmp).catch(() => {});
     const lockPath = await workspaceFlakeLockPath(repoRoot);
     const out = await $({
       cwd: repoRoot,
@@ -157,7 +169,7 @@ async function pinnedCacertPathOncePerWorker($: any): Promise<string> {
   cachedPinnedCacertPath = (async () => {
     const repoRoot = process.cwd();
     const nixEvalTmp = nixEvalTempDirOutsideWorkspace(repoRoot);
-    await fsp.mkdir(nixEvalTmp, { recursive: true }).catch(() => {});
+    await mkdirWithMacosMetadataExclusion(nixEvalTmp).catch(() => {});
     const lockPath = await workspaceFlakeLockPath(repoRoot);
     const out = await $({
       cwd: repoRoot,
@@ -203,7 +215,7 @@ async function stableTestHomeRoot(): Promise<string> {
   } catch {}
   const suffix = user ? `-${user}` : "";
   const root = path.join(base, `viberoots-test-home${suffix}`);
-  await fsp.mkdir(root, { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(root).catch(() => {});
   return root;
 }
 
@@ -216,7 +228,7 @@ async function stableGoModCacheRoot(): Promise<string> {
   } catch {}
   const suffix = user ? `-${user}` : "";
   const root = path.join(base, `viberoots-go-modcache${suffix}`);
-  await fsp.mkdir(root, { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(root).catch(() => {});
   return root;
 }
 
@@ -229,7 +241,7 @@ async function stableXdgCacheRoot(): Promise<string> {
   } catch {}
   const suffix = user ? `-${user}` : "";
   const root = path.join(base, `viberoots-xdg-cache${suffix}`);
-  await fsp.mkdir(root, { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(root).catch(() => {});
   return root;
 }
 
@@ -266,35 +278,237 @@ async function activeViberootsRootFromWorkspace(): Promise<string> {
   return repoRoot;
 }
 
-async function rewriteTempViberootsInput(tmp: string, activeViberootsRoot: string): Promise<void> {
+function relFromTempRoot(tmp: string, absPath: string): string {
+  return path.relative(tmp, absPath).split(path.sep).join("/");
+}
+
+function uniqueRelPaths(paths: string[]): string[] {
+  return Array.from(
+    new Set(
+      paths
+        .map((p) => p.split(path.sep).join("/"))
+        .map((p) => p.replace(/^\/+/, ""))
+        .filter((p) => p && p !== "." && !p.startsWith("../") && !path.isAbsolute(p)),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+}
+
+async function gitStageRelPaths($tmp: typeof $, tmp: string, relPaths: string[]): Promise<void> {
+  const paths = uniqueRelPaths(relPaths);
+  if (paths.length === 0) return;
+
+  const existing: string[] = [];
+  const forceExisting: string[] = [];
+  const missing: string[] = [];
+  for (const relPath of paths) {
+    if (await pathExists(path.join(tmp, relPath))) {
+      if (
+        relPath === ".viberoots/workspace/flake.nix" ||
+        relPath === ".viberoots/workspace/flake.lock"
+      ) {
+        forceExisting.push(relPath);
+      } else if (!relPath.startsWith(".viberoots/")) {
+        existing.push(relPath);
+      }
+    } else {
+      missing.push(relPath);
+    }
+  }
+
+  if (existing.length > 0) {
+    await $tmp`git add -- ${existing}`;
+  }
+  if (forceExisting.length > 0) {
+    await $tmp`git add -f -- ${forceExisting}`;
+  }
+  if (missing.length > 0) {
+    await $tmp`git rm -q --ignore-unmatch -- ${missing}`;
+  }
+}
+
+async function rewriteTempViberootsInput(
+  tmp: string,
+  activeViberootsRoot: string,
+): Promise<string[]> {
+  const touched: string[] = [];
   const flakePath = await workspaceFlakePath(tmp);
   const text = await fsp.readFile(flakePath, "utf8").catch(() => "");
-  if (!text) return;
+  if (!text) return [];
   const next = text.replace(
     /(\bviberoots\.url\s*=\s*)"[^"]*"/,
     (_match, prefix: string) => `${prefix}"path:${activeViberootsRoot}"`,
   );
-  if (next !== text) await fsp.writeFile(flakePath, next, "utf8");
+  if (next !== text) {
+    await fsp.writeFile(flakePath, next, "utf8");
+    touched.push(relFromTempRoot(tmp, flakePath));
+  }
+  touched.push(...(await rewriteTempViberootsLockInput(tmp, activeViberootsRoot)));
+  return uniqueRelPaths(touched);
 }
 
-async function removeInheritedBuildToolsSymlink(tmp: string): Promise<void> {
+async function readPathFlakeMetadata(inputPath: string): Promise<PathFlakeMetadata> {
+  const canonicalInputPath = await fsp.realpath(inputPath).catch(() => inputPath);
+  const cached = pathFlakeMetadataCache.get(canonicalInputPath);
+  if (cached) return await cached;
+  const promise = (async () => {
+    const out = await $({
+      stdio: "pipe",
+    })`nix flake metadata --json ${`path:${canonicalInputPath}`} --no-write-lock-file`;
+    const parsed = JSON.parse(String(out.stdout || "{}"));
+    const locked = parsed?.locked || {};
+    return {
+      lastModified: typeof locked.lastModified === "number" ? locked.lastModified : undefined,
+      narHash: typeof locked.narHash === "string" ? locked.narHash : undefined,
+    };
+  })();
+  pathFlakeMetadataCache.set(canonicalInputPath, promise);
+  return await promise;
+}
+
+function rewriteLocalPathLockEntry(
+  entry: unknown,
+  activeViberootsRoot: string,
+  metadata?: PathFlakeMetadata,
+): boolean {
+  if (!entry || typeof entry !== "object") return false;
+  const node = entry as { type?: unknown; path?: unknown; url?: unknown };
+  const rawPath =
+    node.type === "path"
+      ? String(node.path || "")
+      : node.type === "git" && String(node.url || "").startsWith("file:")
+        ? String(node.url || "").replace(/^file:/, "")
+        : "";
+  if (!rawPath) return false;
+  const base = path.basename(rawPath);
+  if (base !== "viberoots") return false;
+  const mutableNode = node as {
+    lastModified?: number;
+    lastModifiedDate?: string;
+    narHash?: string;
+    path: unknown;
+    rev?: string;
+    revCount?: number;
+    type: unknown;
+    url?: string;
+  };
+  mutableNode.type = "path";
+  mutableNode.path = activeViberootsRoot;
+  if (metadata?.lastModified) mutableNode.lastModified = metadata.lastModified;
+  if (metadata?.narHash) mutableNode.narHash = metadata.narHash;
+  delete mutableNode.lastModifiedDate;
+  delete mutableNode.rev;
+  delete mutableNode.revCount;
+  delete mutableNode.url;
+  return true;
+}
+
+async function rewriteTempViberootsLockInput(
+  tmp: string,
+  activeViberootsRoot: string,
+): Promise<string[]> {
+  const lockPath = await workspaceFlakeLockPath(tmp);
+  const text = await fsp.readFile(lockPath, "utf8").catch(() => "");
+  if (!text) return [];
+  let lock: any;
+  try {
+    lock = JSON.parse(text);
+  } catch {
+    return [];
+  }
+  const inputName = lock?.nodes?.root?.inputs?.viberoots || "viberoots";
+  const node = lock?.nodes?.[inputName] || lock?.nodes?.viberoots || lock?.nodes?.viberootsInput;
+  if (!node || typeof node !== "object") return [];
+  const metadata = await readPathFlakeMetadata(activeViberootsRoot);
+  const lockedChanged = rewriteLocalPathLockEntry(node.locked, activeViberootsRoot, metadata);
+  const originalChanged = rewriteLocalPathLockEntry(node.original, activeViberootsRoot);
+  const changed = lockedChanged || originalChanged;
+  if (!changed) return [];
+  await fsp.writeFile(lockPath, JSON.stringify(lock, null, 2) + "\n", "utf8");
+  return [relFromTempRoot(tmp, lockPath)];
+}
+
+async function tempViberootsRootIfPresent(tmp: string): Promise<string | null> {
+  const candidate = path.join(tmp, "viberoots");
+  if (
+    (await pathExists(path.join(candidate, "flake.nix"))) &&
+    (await pathExists(path.join(candidate, "build-tools", "tools", "dev", "zx-init.mjs")))
+  ) {
+    return candidate;
+  }
+  return null;
+}
+
+async function seedStoreViberootsRootIfPresent(): Promise<string | null> {
+  const seedPath = String(process.env.VBR_TEST_SEED_STORE_PATH || "").trim();
+  if (!seedPath) return null;
+  const candidate = path.join(seedPath, "viberoots");
+  if (
+    (await pathExists(path.join(seedPath, PREPARED_SEED_MARKER))) &&
+    (await pathExists(path.join(candidate, "flake.nix"))) &&
+    (await pathExists(path.join(candidate, "build-tools", "tools", "dev", "zx-init.mjs")))
+  ) {
+    return await fsp.realpath(candidate).catch(() => candidate);
+  }
+  return null;
+}
+
+async function removeInheritedBuildToolsSymlink(tmp: string): Promise<string[]> {
   const buildTools = path.join(tmp, "build-tools");
   const st = await fsp.lstat(buildTools).catch(() => null);
-  if (st?.isSymbolicLink()) await fsp.rm(buildTools, { force: true });
+  if (st?.isSymbolicLink()) {
+    await fsp.rm(buildTools, { force: true });
+    return ["build-tools"];
+  }
+  return [];
 }
 
-async function removeCppReqsIfRequested(tmp: string): Promise<void> {
-  if (String(process.env.TEST_EXCLUDE_CPP_REQS || "").trim() !== "1") return;
+async function removeCppReqsIfRequested(tmp: string): Promise<string[]> {
+  if (String(process.env.TEST_EXCLUDE_CPP_REQS || "").trim() !== "1") return [];
   const rels = [
     "viberoots/build-tools/cpp/defs.bzl",
     "viberoots/build-tools/cpp/wasm_defs.bzl",
     "viberoots/build-tools/tools/nix/templates/cpp.nix",
   ];
+  const touched: string[] = [];
   for (const rel of rels) {
     try {
       await fsp.rm(path.join(tmp, rel), { force: true });
+      touched.push(rel);
     } catch {}
   }
+  return touched;
+}
+
+async function trackedNpmrcDirs(tmp: string): Promise<string[]> {
+  const out = await $({ cwd: tmp, stdio: "pipe" })`git ls-files -- "**/.npmrc"`.nothrow();
+  if (out.exitCode !== 0) return [];
+  return String(out.stdout || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((rel) => path.join(tmp, path.dirname(rel)));
+}
+
+async function ensurePnpmfilePlaceholders(tmp: string): Promise<string[]> {
+  if (await pathExists(path.join(tmp, PREPARED_SEED_MARKER))) return [];
+  const dirs = new Set<string>([
+    tmp,
+    path.join(tmp, "viberoots"),
+    ...(await trackedNpmrcDirs(tmp)),
+  ]);
+  const placeholder = "export default {};\n";
+  const touched: string[] = [];
+  for (const dir of dirs) {
+    try {
+      await fsp.mkdir(dir, { recursive: true });
+      const file = path.join(dir, ".pnpmfile.mjs");
+      await fsp.writeFile(file, placeholder, { flag: "wx" });
+      touched.push(relFromTempRoot(tmp, file));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== "EEXIST") throw err;
+    }
+  }
+  return uniqueRelPaths(touched);
 }
 
 async function unifiedPnpmStoreFromRepoRoot(repoRoot: string): Promise<string> {
@@ -534,7 +748,7 @@ export async function runInTemp<T>(
       "runInTemp activeViberootsRoot",
       async () => await activeViberootsRootFromWorkspace(),
     );
-    const exportEnv: Record<string, string> = {};
+    let exportEnv: Record<string, string> = {};
     for (const [k, v] of Object.entries(process.env)) {
       if (typeof v === "string") exportEnv[k] = v;
     }
@@ -568,6 +782,7 @@ export async function runInTemp<T>(
     exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
       .filter(Boolean)
       .join(" ");
+    exportEnv = withGitAutoMaintenanceDisabledEnv(exportEnv);
     const _$ = $({ cwd: tmp, env: exportEnv });
     try {
       return await timeAsync("runInTemp testBody", async () => {
@@ -608,7 +823,7 @@ export async function runInTemp<T>(
     "runInTemp createTempZxWrapperShim",
     async () => await createTempZxWrapperShim(buck2ShimDir),
   );
-  const tempSetupEnv = {
+  const tempSetupEnv = withGitAutoMaintenanceDisabledEnv({
     ...process.env,
     WORKSPACE_ROOT: tmp,
     BUCK_TEST_SRC: tmp,
@@ -625,39 +840,54 @@ export async function runInTemp<T>(
     REPO_ROOT: process.cwd(),
     HOME: home,
     XDG_CACHE_HOME: activeXdgCacheHome,
-  };
+  });
   prependPath(tempSetupEnv, buck2ShimDir);
   const goModCacheRoot = await timeAsync(
     "runInTemp stableGoModCacheRoot",
     async () => await stableGoModCacheRoot(),
   );
-  const initMode = await timeAsync("runInTemp initTempRepoFromSeedStore", async () => {
+  const initResult = await timeAsync("runInTemp initTempRepoFromSeedStore", async () => {
     return await initTempRepoFromSeedStore({
       tmpDir: tmp,
       deps: { rsyncRepoTo, timeAsync },
     });
   });
+  const seedTouchedRelPaths = [...initResult.touchedRelPaths];
   const activeViberootsRoot = await timeAsync(
     "runInTemp activeViberootsRoot",
     async () => await activeViberootsRootFromWorkspace(),
   );
-  tempSetupEnv.VIBEROOTS_ROOT = activeViberootsRoot;
-  tempSetupEnv.VIBEROOTS_SOURCE_ROOT = activeViberootsRoot;
+  const tempViberootsRoot = await timeAsync(
+    "runInTemp tempViberootsRoot",
+    async () => await tempViberootsRootIfPresent(tmp),
+  );
+  const seedStoreViberootsRoot = await timeAsync(
+    "runInTemp seedStoreViberootsRoot",
+    async () => await seedStoreViberootsRootIfPresent(),
+  );
+  const viberootsSourceRoot = tempViberootsRoot || activeViberootsRoot;
+  const viberootsInputPath = seedStoreViberootsRoot || tempViberootsRoot || activeViberootsRoot;
+  tempSetupEnv.VIBEROOTS_ROOT = viberootsSourceRoot;
+  tempSetupEnv.VIBEROOTS_SOURCE_ROOT = viberootsSourceRoot;
+  tempSetupEnv.VIBEROOTS_FLAKE_INPUT_ROOT = viberootsInputPath;
   tempSetupEnv.ZX_INIT = path.join(
-    activeViberootsRoot,
+    viberootsSourceRoot,
     "build-tools",
     "tools",
     "dev",
     "zx-init.mjs",
   );
   await timeAsync("runInTemp rewriteTempViberootsInput", async () => {
-    await rewriteTempViberootsInput(tmp, activeViberootsRoot);
+    seedTouchedRelPaths.push(...(await rewriteTempViberootsInput(tmp, viberootsInputPath)));
   });
   await timeAsync("runInTemp removeInheritedBuildToolsSymlink", async () => {
-    await removeInheritedBuildToolsSymlink(tmp);
+    seedTouchedRelPaths.push(...(await removeInheritedBuildToolsSymlink(tmp)));
   });
   await timeAsync("runInTemp removeCppReqsIfRequested", async () => {
-    await removeCppReqsIfRequested(tmp);
+    seedTouchedRelPaths.push(...(await removeCppReqsIfRequested(tmp)));
+  });
+  await timeAsync("runInTemp ensurePnpmfilePlaceholders", async () => {
+    seedTouchedRelPaths.push(...(await ensurePnpmfilePlaceholders(tmp)));
   });
 
   const wantGit = opts?.git !== false && process.env.TEST_TEMP_GIT !== "0";
@@ -665,23 +895,57 @@ export async function runInTemp<T>(
     const $tmp = $({ cwd: tmp, stdio: "pipe", env: tempSetupEnv });
     await timeAsync("runInTemp gitBootstrap", async () => {
       try {
-        if (initMode === "rsync") {
-          await $tmp`git -c init.defaultBranch=main -c advice.defaultBranchName=false init -q`;
-          await $tmp`git add -A`;
-          await $tmp`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m init --allow-empty`.nothrow();
+        if (initResult.mode === "rsync") {
+          await timeAsync(
+            "runInTemp gitBootstrap init",
+            async () =>
+              await $tmp`git -c init.defaultBranch=main -c advice.defaultBranchName=false init -q`,
+          );
+          await timeAsync("runInTemp gitBootstrap addAll", async () => await $tmp`git add -A`);
+          await timeAsync(
+            "runInTemp gitBootstrap commit",
+            async () =>
+              await $tmp`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m init --allow-empty`.nothrow(),
+          );
         } else {
-          const ok = await $tmp`git rev-parse --is-inside-work-tree`.nothrow();
+          const ok = await timeAsync(
+            "runInTemp gitBootstrap revParseInside",
+            async () => await $tmp`git rev-parse --is-inside-work-tree`.nothrow(),
+          );
           const inside = String(ok.stdout || "").trim();
           if (inside !== "true") {
             throw new Error(
-              `runInTemp: expected seeded temp repo to be a git worktree (mode=${initMode})`,
+              `runInTemp: expected seeded temp repo to be a git worktree (mode=${initResult.mode})`,
             );
           }
-          const head = await $tmp`git rev-parse HEAD`.nothrow();
+          const head = await timeAsync(
+            "runInTemp gitBootstrap revParseHead",
+            async () => await $tmp`git rev-parse HEAD`.nothrow(),
+          );
           if (head.exitCode !== 0) {
             throw new Error(
-              `runInTemp: expected seeded temp repo to have an initial commit (mode=${initMode})`,
+              `runInTemp: expected seeded temp repo to have an initial commit (mode=${initResult.mode})`,
             );
+          }
+          const relPaths = uniqueRelPaths(seedTouchedRelPaths);
+          if (relPaths.length > 0) {
+            await timeAsync(
+              "runInTemp gitBootstrap stageOverlay",
+              async () => await gitStageRelPaths($tmp, tmp, relPaths),
+            );
+            const diff = await timeAsync(
+              "runInTemp gitBootstrap stagedDiff",
+              async () => await $tmp`git diff --cached --quiet --exit-code`.nothrow(),
+            );
+            if (diff.exitCode === 1) {
+              await timeAsync(
+                "runInTemp gitBootstrap commit",
+                async () =>
+                  await $tmp`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m seed-overlay --allow-empty`.nothrow(),
+              );
+            } else if (diff.exitCode !== 0) {
+              throw new Error(String(diff.stderr || "git diff --cached failed"));
+            }
           }
         }
       } catch {
@@ -695,7 +959,7 @@ export async function runInTemp<T>(
     await ensureBuckConfigForTempRepo(tmp, $setup);
   });
   await timeAsync("runInTemp ensureWorkspaceRootEnvFile", async () => {
-    await ensureWorkspaceRootEnvFile(tmp, activeViberootsRoot);
+    await ensureWorkspaceRootEnvFile(tmp, viberootsSourceRoot);
   });
   await timeAsync("runInTemp ensureToolchainPathsForTempRepo", async () => {
     await ensureToolchainPathsForTempRepo(tmp, $setup);
@@ -730,7 +994,7 @@ export async function runInTemp<T>(
     });
   }
 
-  const exportEnv: Record<string, string> = {};
+  let exportEnv: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) {
     if (typeof v === "string") exportEnv[k] = v;
   }
@@ -764,8 +1028,9 @@ export async function runInTemp<T>(
   } catch {}
   exportEnv.WORKSPACE_ROOT = tmp;
   exportEnv.BUCK_TEST_SRC = tmp;
-  exportEnv.VIBEROOTS_ROOT = activeViberootsRoot;
-  exportEnv.VIBEROOTS_SOURCE_ROOT = activeViberootsRoot;
+  exportEnv.VIBEROOTS_ROOT = viberootsSourceRoot;
+  exportEnv.VIBEROOTS_SOURCE_ROOT = viberootsSourceRoot;
+  exportEnv.VIBEROOTS_FLAKE_INPUT_ROOT = viberootsInputPath;
   exportEnv.VBR_RUN_IN_TEMP_REPO = "1";
   exportEnv.SCAF_ALLOW_LIVE_REPO = "1";
   exportEnv.BUCK_ISOLATION_DIR = tempNestedIso;
@@ -829,7 +1094,7 @@ export async function runInTemp<T>(
     exportEnv.SSL_CERT_DIR = exportEnv.NIX_SSL_CERT_DIR;
   }
   exportEnv.DIRENV_LOG_FORMAT = "";
-  exportEnv.ZX_INIT = path.join(activeViberootsRoot, "build-tools", "tools", "dev", "zx-init.mjs");
+  exportEnv.ZX_INIT = path.join(viberootsSourceRoot, "build-tools", "tools", "dev", "zx-init.mjs");
   prependPath(exportEnv, buck2ShimDir);
   await prependTempRepoBin(exportEnv, tmp);
   prependPath(exportEnv, buck2ShimDir);
@@ -850,6 +1115,8 @@ export async function runInTemp<T>(
       exportEnv.NIX_USE_PREFETCHED_PNPM_STORE = "1";
       exportEnv.npm_config_store_dir = exportEnv.npm_config_store_dir || unified;
       exportEnv.NPM_CONFIG_STORE_DIR = exportEnv.NPM_CONFIG_STORE_DIR || unified;
+      exportEnv.npm_config_ignore_pnpmfile = exportEnv.npm_config_ignore_pnpmfile || "true";
+      exportEnv.NPM_CONFIG_IGNORE_PNPMFILE = exportEnv.NPM_CONFIG_IGNORE_PNPMFILE || "true";
     }
   }
 
@@ -857,6 +1124,7 @@ export async function runInTemp<T>(
   exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
     .filter(Boolean)
     .join(" ");
+  exportEnv = withGitAutoMaintenanceDisabledEnv(exportEnv);
 
   const needCgo =
     exportEnv.CGO_ENABLED === "1" || String(process.env.TEST_ENABLE_CGO || "").trim() === "1";
@@ -925,10 +1193,14 @@ export async function runInTemp<T>(
           .catch(() => {});
       } catch {}
     } else {
+      const postRemoveBuckCleanupRoots = await buckCleanupRootsForRepo(tmp);
       await removeTreeWithWritableFallback(tmp, $);
       if (tempPnpmStateRoot) {
         await removeTreeWithWritableFallback(tempPnpmStateRoot, $);
       }
+      await timeAsync("post-remove buck-daemon cleanup", async () => {
+        await killBuckDaemonsForRoots(postRemoveBuckCleanupRoots, _$);
+      });
     }
     if (removeHome) {
       await removeTreeWithWritableFallback(home, $);

@@ -1,4 +1,5 @@
 import path from "node:path";
+import type { DeploymentBootstrapScope } from "../../deployments/infisical-iac-bootstrap-config";
 import { PROJECT_SHARED_CONFIG_PATH } from "../../deployments/project-config";
 
 export type BootstrapArgs = Record<string, unknown> & {
@@ -28,6 +29,13 @@ export type CredentialSinkSelection = {
 type ReadinessModules = {
   LocalFileCredentialSink: new (file: string) => CredentialSink;
   createSprinkleRefStore: (backend: { backend: string; file?: string }) => MutableCredentialStore;
+  readDeploymentReviewedMetadata: (
+    scope: DeploymentBootstrapScope,
+    file?: string,
+    workspaceRoot?: string,
+  ) => Promise<{
+    deploymentCredentials: Array<{ clientIdRef: string; clientSecretRef: string }>;
+  }>;
   readSprinkleRefConfig: (configPath: string, cwd?: string) => Promise<unknown>;
   resolveBootstrapAccessCredentialSinkBackend: (
     config: unknown,
@@ -57,7 +65,7 @@ export async function loadDeploymentReadinessModules() {
     DEFAULT_BOOTSTRAP_ARGS: config.DEFAULT_BOOTSTRAP_ARGS as BootstrapArgs,
     LocalFileCredentialSink: sink.LocalFileCredentialSink,
     createSprinkleRefStore: sprinkleRefStore.createSprinkleRefStore,
-    readPleominoReviewedMetadata: reviewedMetadata.readPleominoReviewedMetadata,
+    readDeploymentReviewedMetadata: reviewedMetadata.readDeploymentReviewedMetadata,
     readSprinkleRefConfig: sprinkleRefConfig.readSprinkleRefConfig,
     repoBootstrapCredentialRefs: identity.repoBootstrapCredentialRefs,
     resolveBootstrapAccessCredentialSinkBackend:

@@ -15,7 +15,6 @@ const opts = {
   expectedAccountId: "123456789012",
   maxAgeMinutes: 60,
 };
-
 const moduleDir = viberootsRepoPath(
   "build-tools/deployments/aws-control-plane-foundation/opentofu",
 );

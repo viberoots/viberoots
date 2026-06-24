@@ -47,7 +47,8 @@ test("scaf templates command ignores stale taxonomy artifacts", async () => {
     assert.doesNotMatch(stdout, /bogus-only/);
 
     const refreshed = await fsp.readFile(generatedPath, "utf8");
-    assert.match(refreshed, /bogus-only/);
+    assert.match(refreshed, /\bcli\b/);
+    assert.doesNotMatch(refreshed, /bogus-only/);
   });
 });
 

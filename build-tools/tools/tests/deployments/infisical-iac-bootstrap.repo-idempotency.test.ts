@@ -6,7 +6,7 @@ import * as path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_BOOTSTRAP_ARGS } from "../../deployments/infisical-iac-bootstrap-config";
 import { ensureBootstrapCredential } from "../../deployments/infisical-iac-bootstrap-identity";
-import { parsePleominoReviewedMetadata } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
+import { parseDeploymentReviewedMetadata } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
 import { runRepoBootstrap } from "../../deployments/infisical-iac-bootstrap-repo";
 import type { SharedInfisicalSession } from "../../deployments/infisical-iac-bootstrap-repo-credential";
 import type { CredentialSink } from "../../deployments/infisical-iac-bootstrap-types";
@@ -97,7 +97,7 @@ function node(stage: string) {
 
 function metadataForTarget(target: string) {
   const stage = target.includes("/prod:") ? "prod" : "staging";
-  const parsed = parsePleominoReviewedMetadata(metadata);
+  const parsed = parseDeploymentReviewedMetadata(metadata);
   return {
     ...parsed,
     deploymentCredentials: parsed.deploymentCredentials.filter((item) => item.stage === stage),

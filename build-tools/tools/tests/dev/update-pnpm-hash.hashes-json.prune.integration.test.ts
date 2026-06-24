@@ -49,7 +49,75 @@ test("pruneNodeModulesHashesJson removes stale lockfile keys", async () => {
   }
 });
 
-test("updateNodeModulesHashesJson writes extracted viberoots hash without recreating root build-tools", async () => {
+test("pruneNodeModulesHashesJson does not mutate extracted viberoots source hashes", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "hashes-prune-extracted-"));
+  const prevCwd = process.cwd();
+  try {
+    process.chdir(tmp);
+    const sourceHashesPath = path.join(
+      "viberoots",
+      "build-tools",
+      "tools",
+      "nix",
+      "node-modules.hashes.json",
+    );
+    await fsp.mkdir(path.dirname(sourceHashesPath), { recursive: true });
+    await fsp.mkdir(path.join("viberoots", "build-tools", "tools", "dev"), { recursive: true });
+    await fsp.writeFile(
+      path.join("viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
+      "",
+      "utf8",
+    );
+    await fsp.writeFile(
+      sourceHashesPath,
+      JSON.stringify(
+        {
+          "pnpm-lock.yaml": "sha256-source-root",
+          "projects/apps/deleted/pnpm-lock.yaml": "sha256-source-deleted",
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
+    const consumerHashesPath = path.join("projects", "node-modules.hashes.json");
+    await fsp.mkdir(path.dirname(consumerHashesPath), { recursive: true });
+    await fsp.writeFile(
+      consumerHashesPath,
+      JSON.stringify(
+        {
+          "projects/apps/alive/pnpm-lock.yaml": "sha256-alive",
+          "projects/apps/deleted/pnpm-lock.yaml": "sha256-consumer-deleted",
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
+
+    const removed = await pruneNodeModulesHashesJson([
+      "pnpm-lock.yaml",
+      "projects/apps/alive/pnpm-lock.yaml",
+    ]);
+    assert.deepEqual(removed, ["projects/apps/deleted/pnpm-lock.yaml"]);
+
+    const sourceHashes = JSON.parse(await fsp.readFile(sourceHashesPath, "utf8")) as Record<
+      string,
+      string
+    >;
+    const consumerHashes = JSON.parse(await fsp.readFile(consumerHashesPath, "utf8")) as Record<
+      string,
+      string
+    >;
+    assert.equal(sourceHashes["projects/apps/deleted/pnpm-lock.yaml"], "sha256-source-deleted");
+    assert.equal(consumerHashes["projects/apps/deleted/pnpm-lock.yaml"], undefined);
+  } finally {
+    process.chdir(prevCwd);
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("updateNodeModulesHashesJson writes consumer root hashes to projects ownership", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "hashes-extracted-"));
   const prevCwd = process.cwd();
   try {
@@ -72,12 +140,95 @@ test("updateNodeModulesHashesJson writes extracted viberoots hash without recrea
 
     await updateNodeModulesHashesJson("pnpm-lock.yaml", "sha256-root");
 
-    const next = JSON.parse(await fsp.readFile(extractedHashesPath, "utf8")) as Record<
+    const next = JSON.parse(
+      await fsp.readFile(path.join("projects", "node-modules.hashes.json"), "utf8"),
+    ) as Record<string, string>;
+    const sourceHashes = JSON.parse(await fsp.readFile(extractedHashesPath, "utf8")) as Record<
       string,
       string
     >;
     assert.equal(next["pnpm-lock.yaml"], "sha256-root");
+    assert.equal(sourceHashes["pnpm-lock.yaml"], undefined);
     await assert.rejects(fsp.stat(path.join("build-tools")));
+  } finally {
+    process.chdir(prevCwd);
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("updateNodeModulesHashesJson does not write through activated remote source", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "hashes-remote-current-"));
+  const prevCwd = process.cwd();
+  try {
+    const consumer = path.join(tmp, "consumer");
+    const source = path.join(tmp, "remote-source");
+    const sourceHashesPath = path.join(
+      source,
+      "build-tools",
+      "tools",
+      "nix",
+      "node-modules.hashes.json",
+    );
+    await fsp.mkdir(path.join(consumer, ".viberoots"), { recursive: true });
+    await fsp.mkdir(path.join(consumer, ".viberoots", "workspace"), { recursive: true });
+    await fsp.writeFile(path.join(consumer, ".viberoots", "workspace", "flake.nix"), "{}\n");
+    await fsp.symlink(source, path.join(consumer, ".viberoots", "current"));
+    await fsp.mkdir(path.join(source, "build-tools", "tools", "dev"), { recursive: true });
+    await fsp.writeFile(
+      path.join(source, "build-tools", "tools", "dev", "zx-init.mjs"),
+      "",
+      "utf8",
+    );
+    await fsp.mkdir(path.dirname(sourceHashesPath), { recursive: true });
+    await fsp.writeFile(
+      sourceHashesPath,
+      JSON.stringify({ "pnpm-lock.yaml": "sha256-source" }, null, 2) + "\n",
+      "utf8",
+    );
+
+    process.chdir(consumer);
+    await updateNodeModulesHashesJson("pnpm-lock.yaml", "sha256-consumer");
+
+    const consumerHashes = JSON.parse(
+      await fsp.readFile(path.join(consumer, "projects", "node-modules.hashes.json"), "utf8"),
+    ) as Record<string, string>;
+    const sourceHashes = JSON.parse(await fsp.readFile(sourceHashesPath, "utf8")) as Record<
+      string,
+      string
+    >;
+    assert.equal(consumerHashes["pnpm-lock.yaml"], "sha256-consumer");
+    assert.equal(sourceHashes["pnpm-lock.yaml"], "sha256-source");
+    await assert.rejects(fsp.stat(path.join(source, "projects", "node-modules.hashes.json")));
+  } finally {
+    process.chdir(prevCwd);
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("updateNodeModulesHashesJson keeps standalone viberoots hashes in tooling ownership", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "hashes-standalone-viberoots-"));
+  const prevCwd = process.cwd();
+  try {
+    process.chdir(tmp);
+    const viberootsHashesPath = path.join(
+      "build-tools",
+      "tools",
+      "nix",
+      "node-modules.hashes.json",
+    );
+    await fsp.mkdir(path.join("build-tools", "tools", "dev"), { recursive: true });
+    await fsp.writeFile(path.join("build-tools", "tools", "dev", "zx-init.mjs"), "", "utf8");
+    await fsp.mkdir(path.dirname(viberootsHashesPath), { recursive: true });
+    await fsp.writeFile(viberootsHashesPath, "{}\n", "utf8");
+
+    await updateNodeModulesHashesJson("pnpm-lock.yaml", "sha256-tooling");
+
+    const toolingHashes = JSON.parse(await fsp.readFile(viberootsHashesPath, "utf8")) as Record<
+      string,
+      string
+    >;
+    assert.equal(toolingHashes["pnpm-lock.yaml"], "sha256-tooling");
+    await assert.rejects(fsp.stat(path.join("projects", "node-modules.hashes.json")));
   } finally {
     process.chdir(prevCwd);
     await fsp.rm(tmp, { recursive: true, force: true });
@@ -129,7 +280,7 @@ test("updateNodeModulesHashesJson writes project hashes to projects ownership", 
     >;
     assert.equal(projectHashes["projects/apps/demo/pnpm-lock.yaml"], "sha256-project");
     assert.equal(viberootsHashes["pnpm-lock.yaml"], "sha256-root");
-    assert.equal(viberootsHashes["projects/apps/demo/pnpm-lock.yaml"], undefined);
+    assert.equal(viberootsHashes["projects/apps/demo/pnpm-lock.yaml"], "sha256-non-owner-project");
     await assert.rejects(fsp.stat(path.join("build-tools")));
   } finally {
     process.chdir(prevCwd);

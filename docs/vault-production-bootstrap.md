@@ -85,9 +85,11 @@ Example values used in this runbook:
 - Vault listener:
   direct TLS on TCP `8200`, not an nginx HTTP reverse proxy
 - contract ID:
-  `secret://deployments/pleomino/cloudflare_api_token`
+  `secret://deployments/example-app/cloudflare_api_token`
+- reviewed example production contract ID:
+  `secret://deployments/example-app/cloudflare_api_token`
 - deployment target scope:
-  `cloudflare-pages:web-platform-staging/pleomino-staging-pages`
+  `cloudflare-pages:web-platform-staging/example-staging-pages`
 - optional exported secret fixture path:
   `.local/deploy-secrets/secret-fixture.json`
 
@@ -102,13 +104,13 @@ Generate the machine-readable bootstrap bundle:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --print-vault-bootstrap \
   --vault-bootstrap-format=json \
   --issuer-url https://identity.apps.kilty.io/realms/deployments \
   --vault-audience deployments-vault \
   --deployment-client-id deployment-runner \
-  --vault-jwt-role deploy-pleomino-read \
+  --vault-jwt-role deploy-example-app-read \
   > vault-bootstrap.json
 ```
 
@@ -116,7 +118,7 @@ Generate the fill-in secret templates:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --print-vault-secret-templates \
   --vault-secret-template-format=files \
   > vault-secret-templates.txt
@@ -127,13 +129,13 @@ policy HCL:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --print-vault-bootstrap \
   --vault-bootstrap-format=shell \
   --issuer-url https://identity.apps.kilty.io/realms/deployments \
   --vault-audience deployments-vault \
   --deployment-client-id deployment-runner \
-  --vault-jwt-role deploy-pleomino-read
+  --vault-jwt-role deploy-example-app-read
 ```
 
 The helper is read-only. It does not initialize Vault, unseal Vault, write
@@ -197,7 +199,7 @@ Practical operator workflow:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --print-vault-secret-templates
 ```
 
@@ -209,7 +211,7 @@ identity in `targetScopes`.
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --print-vault-secret-templates \
   --deploy-run-id "$DEPLOY_RUN_ID"
 ```
@@ -232,11 +234,11 @@ Common shapes:
 - Cloudflare Pages:
   `cloudflare-pages:<account>/<project>`
   Example:
-  `cloudflare-pages:web-platform-staging/pleomino-staging-pages`
+  `cloudflare-pages:web-platform-staging/example-staging-pages`
 - `nixos-shared-host`:
   `nixos-shared-host:<target-group>:<app>`
   Example:
-  `nixos-shared-host:shared-dev:pleomino`
+  `nixos-shared-host:shared-dev:example-app`
 - S3 static:
   `s3-static:<account>/<bucket>`
 - Kubernetes:
@@ -251,7 +253,7 @@ Common shapes:
 The deployment system uses four layers:
 
 1. the repo stores a stable contract ID such as
-   `secret://deployments/pleomino/cloudflare_api_token`
+   `secret://deployments/example-app/cloudflare_api_token`
 2. admission freezes admitted secret references that capture the non-secret
    replay/runtime details for one run
 3. Vault stores the real secret value and the metadata that says where it may
@@ -272,14 +274,14 @@ uses one recommended convention to keep operator workflows predictable.
 Map each contract ID to a KV v2 path under `secret/`:
 
 - contract ID:
-  `secret://deployments/pleomino/cloudflare_api_token`
+  `secret://deployments/example-app/cloudflare_api_token`
 - Vault KV path:
-  `secret/deployments/pleomino/cloudflare_api_token`
+  `secret/deployments/example-app/cloudflare_api_token`
 
 Use the same pattern for other secrets:
 
-- `secret://deployments/pleomino/preview_basic_auth_password`
-  becomes `secret/deployments/pleomino/preview_basic_auth_password`
+- `secret://deployments/example-app/preview_basic_auth_password`
+  becomes `secret/deployments/example-app/preview_basic_auth_password`
 - `secret://deployments/demoapp/database_url`
   becomes `secret/deployments/demoapp/database_url`
 
@@ -779,7 +781,7 @@ both Vault and deployment runners can reach. The reviewed shape is:
 - Vault URL: `https://secrets.apps.kilty.io:8200`
 - deployment audience: `deployments-vault`
 - deployment client id: `deployment-runner`
-- deployment role: `deploy-pleomino-read`
+- deployment role: `deploy-example-app-read`
 
 Run the identity provider on the shared host as an OIDC issuer. Keycloak is the
 most practical default when the host itself needs to mint non-interactive
@@ -1018,23 +1020,23 @@ Before you create or troubleshoot groups by hand, inspect the reviewed shape
 derived from deployment metadata:
 
 ```bash
-deploy auth print-groups --deployment //projects/deployments/pleomino/dev:deploy
+deploy auth print-groups --deployment //projects/deployments/example-app/dev:deploy
 deploy auth explain-groups \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --action submit
-deploy admin identity plan --deployment //projects/deployments/pleomino/dev:deploy
+deploy admin identity plan --deployment //projects/deployments/example-app/dev:deploy
 deploy admin identity sync \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --realm-file ./deployment-host/identity-provider/deployment-auth-realm.json \
   --acting-principal <principal> \
-  --admin-group deploy-admin-identity-shape-admin-project-pleomino
+  --admin-group deploy-admin-identity-shape-admin-project-example-app
 deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --action submit \
   --user-email alice@example.com \
   --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json \
   --acting-principal <principal> \
-  --admin-group deploy-admin-identity-membership-admin-project-pleomino
+  --admin-group deploy-admin-identity-membership-admin-project-example-app
 ```
 
 Those helpers keep group shape separate from membership. Ordinary read-only
@@ -1052,16 +1054,16 @@ can update those same config-root artifacts and optionally apply them:
 
 ```bash
 deploy admin identity sync \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --profile mini \
   --apply-host-dry-run
 deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --profile mini \
   --action submit \
   --apply-host
 deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --profile mini \
   --action submit \
   --user-email alice@example.com \
@@ -1079,9 +1081,9 @@ reviewed identity mapper before retrying.
 Deploy-admin identity grants are intentionally distinct from ordinary deploy
 grants. Typical reviewed examples are:
 
-- `deploy-admin-identity-read-project-pleomino`
-- `deploy-admin-identity-shape-admin-project-pleomino`
-- `deploy-admin-identity-membership-admin-project-pleomino`
+- `deploy-admin-identity-read-project-example-app`
+- `deploy-admin-identity-shape-admin-project-example-app`
+- `deploy-admin-identity-membership-admin-project-example-app`
 - `deploy-admin-identity-read-environment-dev`
 
 After creating the realm, verify the issuer metadata:
@@ -1158,20 +1160,20 @@ only that reviewed HCL:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --print-vault-bootstrap \
   --vault-bootstrap-format=hcl \
   --issuer-url https://identity.apps.kilty.io/realms/deployments \
   --vault-audience deployments-vault \
   --deployment-client-id deployment-runner \
-  --vault-jwt-role deploy-pleomino-read \
-  > deploy-pleomino-read.hcl
+  --vault-jwt-role deploy-example-app-read \
+  > deploy-example-app-read.hcl
 ```
 
 For the example deployment, the generated file is equivalent to:
 
 ```hcl
-path "secret/data/deployments/pleomino/cloudflare_api_token" {
+path "secret/data/deployments/example-app/cloudflare_api_token" {
   capabilities = ["read"]
 }
 ```
@@ -1179,12 +1181,12 @@ path "secret/data/deployments/pleomino/cloudflare_api_token" {
 Then upload it:
 
 ```bash
-vault policy write deploy-pleomino-read deploy-pleomino-read.hcl
+vault policy write deploy-example-app-read deploy-example-app-read.hcl
 ```
 
 Use narrower paths when possible:
 
-- `path "secret/data/deployments/pleomino/*"`
+- `path "secret/data/deployments/example-app/*"`
   Use this when one app family should read only its own deployment secrets.
 - `path "secret/data/deployments/*"`
   Broader and usually less desirable. Use only when one trusted machine really
@@ -1200,19 +1202,19 @@ aligned with the deployment contract.
 The generated role command has this shape:
 
 ```bash
-vault write auth/jwt/role/deploy-pleomino-read \
+vault write auth/jwt/role/deploy-example-app-read \
   role_type="jwt" \
   bound_audiences="deployments-vault" \
   bound_claims='{"azp":"deployment-runner","deployment_environment":"mini","repository":"viberoots/viberoots"}' \
   user_claim="sub" \
-  token_policies="deploy-pleomino-read" \
+  token_policies="deploy-example-app-read" \
   token_ttl="30m" \
   token_max_ttl="2h"
 ```
 
 Example values and when to use them:
 
-- `token_policies="deploy-pleomino-read"`
+- `token_policies="deploy-example-app-read"`
   Attach only the read policy created above.
 - `bound_audiences="deployments-vault"`
   Require the workload JWT audience expected by deployment jobs.
@@ -1242,7 +1244,7 @@ Generate or refresh the templates:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --print-vault-secret-templates \
   --vault-secret-template-format=files \
   > vault-secret-templates.txt
@@ -1254,7 +1256,7 @@ Create `cloudflare_api_token.json`:
 {
   "value": "<fill-me>",
   "allowedSteps": ["publish"],
-  "targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+  "targetScopes": ["cloudflare-pages:web-platform-staging/example-staging-pages"],
   "refreshMode": "renew",
   "credentialClass": "routine"
 }
@@ -1264,7 +1266,7 @@ Write it to Vault:
 
 ```bash
 vault kv put -mount=secret \
-  deployments/pleomino/cloudflare_api_token \
+  deployments/example-app/cloudflare_api_token \
   @cloudflare_api_token.json
 ```
 
@@ -1275,7 +1277,7 @@ smoke-check credential:
 {
   "value": "<fill-me>",
   "allowedSteps": ["smoke"],
-  "targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+  "targetScopes": ["cloudflare-pages:web-platform-staging/example-staging-pages"],
   "refreshMode": "none",
   "credentialClass": "routine"
 }
@@ -1283,7 +1285,7 @@ smoke-check credential:
 
 ```bash
 vault kv put -mount=secret \
-  deployments/pleomino/preview_basic_auth_password \
+  deployments/example-app/preview_basic_auth_password \
   @preview_basic_auth_password.json
 ```
 
@@ -1296,7 +1298,7 @@ What these fields mean:
   Use `publish` for provider credentials needed only while publishing.
 - `"allowedSteps": ["smoke"]`
   Use `smoke` for credentials needed only during smoke checks.
-- `"targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"]`
+- `"targetScopes": ["cloudflare-pages:web-platform-staging/example-staging-pages"]`
   Restrict the secret to the exact deployment target that should use it. This
   should match the deployment's admitted `lockScope`.
 - `"refreshMode": "renew"`
@@ -1330,7 +1332,7 @@ vault_runtime = {
     "cli_public_client_id": "deployment-cli",
     "service_account_client_id": "deployment-runner",
     "deployment_environment": "mini",
-    "jwt_role": "deploy-pleomino-read",
+    "jwt_role": "deploy-example-app-read",
     "pkce_callback_mode": "public_host",
     "pkce_callback_external_scheme": "https",
     "pkce_callback_external_host": "deploy-auth.apps.kilty.io",
@@ -1343,8 +1345,8 @@ vault_runtime = {
 ```
 
 The deploy auth session may derive multiple reviewed grants from the same
-token, for example `deploy-submitters-pleomino-dev` plus
-`deploy-admission-reporters-pleomino-dev`, or automation groups such as
+token, for example `deploy-submitters-example-dev` plus
+`deploy-admission-reporters-example-dev`, or automation groups such as
 `deploy-automation-jenkins-submitters-dev` and
 `deploy-automation-jenkins-admission-reporters-all-deployments`.
 
@@ -1453,13 +1455,13 @@ differs for a run:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --vault-audience deployments-vault \
   --deployment-client-id deployment-runner \
   --deployment-environment mini \
   --credential-source jenkins_client_secret \
   --deployment-client-secret-env VBR_DEPLOYER_CLIENT_SECRET \
-  --vault-jwt-role deploy-pleomino-read
+  --vault-jwt-role deploy-example-app-read
 ```
 
 `deploy-vault-jwt` remains available for low-level smoke tests and debugging,
@@ -1493,7 +1495,7 @@ withCredentials([string(credentialsId: 'deployment-runner-client-secret', variab
   sh '''
     set +x
     deploy \
-      --deployment //projects/deployments/pleomino/prod:deploy \
+      --deployment //projects/deployments/example-app/prod:deploy \
       --credential-source jenkins_client_secret \
       --deployment-client-secret-env JENKINS_DEPLOYMENT_CLIENT_SECRET
   '''
@@ -1508,7 +1510,7 @@ withCredentials([string(credentialsId: 'jenkins-deployment-oidc-token', variable
   sh '''
     set +x
     deploy \
-      --deployment //projects/deployments/pleomino/prod:deploy \
+      --deployment //projects/deployments/example-app/prod:deploy \
       --credential-source external_oidc_token \
       --external-oidc-token-env JENKINS_OIDC_TOKEN
   '''
@@ -1543,18 +1545,18 @@ mkdir -p .local/deploy-secrets
 
 jq -n \
   --argjson cloudflare_api_token "$(
-    vault kv get -format=json -mount=secret deployments/pleomino/cloudflare_api_token \
+    vault kv get -format=json -mount=secret deployments/example-app/cloudflare_api_token \
       | jq '.data.data'
   )" \
   --argjson preview_basic_auth_password "$(
-    vault kv get -format=json -mount=secret deployments/pleomino/preview_basic_auth_password \
+    vault kv get -format=json -mount=secret deployments/example-app/preview_basic_auth_password \
       | jq '.data.data'
   )" \
   '{
     schemaVersion: "deployment-secret-fixture@1",
     contracts: {
-      "secret://deployments/pleomino/cloudflare_api_token": $cloudflare_api_token,
-      "secret://deployments/pleomino/preview_basic_auth_password": $preview_basic_auth_password
+      "secret://deployments/example-app/cloudflare_api_token": $cloudflare_api_token,
+      "secret://deployments/example-app/preview_basic_auth_password": $preview_basic_auth_password
     }
   }' > .local/deploy-secrets/secret-fixture.json
 ```
@@ -1600,7 +1602,7 @@ unset VBR_VAULT_JWT_FILE
 unset VBR_VAULT_AUTH_METHOD
 
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --login-browser auto
 ```
 
@@ -1616,7 +1618,7 @@ unset VBR_VAULT_JWT_FILE
 unset VBR_VAULT_AUTH_METHOD
 
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --profile mini
 ```
 
@@ -1625,7 +1627,7 @@ run, pass it only as an artifact source for the service-backed workflow:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --profile mini \
   --artifact-dir ./dist
 ```
@@ -1645,9 +1647,9 @@ unset VBR_VAULT_JWT_FILE
 unset VBR_VAULT_AUTH_METHOD
 
 nixos-shared-host-jenkins-deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --profile mini \
-  --artifact-dir "$WORKSPACE/projects/apps/pleomino/dist" \
+  --artifact-dir "$WORKSPACE/projects/apps/example-app/dist" \
   --ssh-identity-file "$JENKINS_SSH_IDENTITY" \
   --ssh-known-hosts "$JENKINS_KNOWN_HOSTS"
 ```
@@ -1664,7 +1666,7 @@ unset VBR_VAULT_JWT_FILE
 unset VBR_VAULT_AUTH_METHOD
 
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --credential-source jenkins_client_secret \
   --deployment-client-secret-env VBR_DEPLOYER_CLIENT_SECRET
 ```
@@ -1685,7 +1687,7 @@ A healthy end-to-end result looks like this:
 - the runtime can resolve the required contract IDs for the active lifecycle
   step
 - the durable deployment record stores
-  `secret://deployments/pleomino/cloudflare_api_token`
+  `secret://deployments/example-app/cloudflare_api_token`
   rather than the raw token value
 - `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH` is unset for normal production runs
 - any exported fixture file exists only where a reviewed local/test or bootstrap
@@ -1705,7 +1707,7 @@ Example rotation write:
 
 ```bash
 vault kv put -mount=secret \
-  deployments/pleomino/cloudflare_api_token \
+  deployments/example-app/cloudflare_api_token \
   @cloudflare_api_token.json
 ```
 
@@ -1717,7 +1719,7 @@ repo-level contract name should not.
 Start with the read-only doctor:
 
 ```bash
-deploy auth doctor --deployment //projects/deployments/pleomino/staging:deploy
+deploy auth doctor --deployment //projects/deployments/example-app/staging:deploy
 ```
 
 Use the reported category to choose the next fix:

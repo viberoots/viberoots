@@ -1,10 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { pnpmInstallForDevTest, spawnNextDevServer } from "./lib/dev-node-modules";
 import { readClientProbeText, writeLibSource } from "./lib/next-dev";
 import {
   assertNoProcessRestart,
@@ -132,29 +132,17 @@ test(
         cwd: tmp,
         stdio: "pipe",
       })`git add -A projects/apps/demo-next-ssr projects/libs/demo-lib`;
-      await _$({
-        cwd: tmp,
-        stdio: "inherit",
-        env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm --dir ${tmp} install --filter ./projects/apps/demo-next-ssr... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+      await pnpmInstallForDevTest({
+        tmp,
+        _$,
+        filter: "./projects/apps/demo-next-ssr...",
+        installMode: "raw-pnpm",
+      });
 
       const port = await pickFreePort();
       const serverStdout: string[] = [];
       const serverStderr: string[] = [];
-      const devServer: ChildProcess = spawn(
-        "pnpm",
-        ["exec", "next", "dev", "-H", "127.0.0.1", "-p", String(port)],
-        {
-          cwd: appAbs,
-          stdio: "pipe",
-          env: {
-            ...process.env,
-            PORT: String(port),
-            NODE_OPTIONS: "",
-            NEXT_TELEMETRY_DISABLED: "1",
-          },
-        },
-      );
+      const devServer = spawnNextDevServer(appAbs, port);
       devServer.stdout?.on("data", (chunk) => {
         serverStdout.push(String(chunk || ""));
         if (serverStdout.length > 100) serverStdout.shift();

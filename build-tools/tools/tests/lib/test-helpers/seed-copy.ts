@@ -248,6 +248,9 @@ export async function copySeedStoreToTempRepo(args: {
     let copyError: unknown = null;
     try {
       await copyTreeCow(args.seedPath, stagingDir);
+      if (process.platform !== "darwin") {
+        await makeTreeWritable(stagingDir);
+      }
       await removeGeneratedRepoState(stagingDir);
     } catch (e) {
       copyError = e;

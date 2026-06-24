@@ -123,11 +123,19 @@ async function computeSeedKey(root: string): Promise<string> {
     .access(path.join(viberootsRoot, ".git"))
     .then(async () => await computeGitState(viberootsRoot))
     .catch(() => null);
+  const hiddenWorkspaceState: Record<string, string> = {};
+  for (const rel of [
+    path.join(".viberoots", "workspace", "flake.nix"),
+    path.join(".viberoots", "workspace", "flake.lock"),
+  ]) {
+    hiddenWorkspaceState[rel] = await fsp.readFile(path.join(root, rel), "utf8").catch(() => "");
+  }
 
   const payload = {
     workspaceRoot: root,
     rootGit,
     viberootsGit,
+    hiddenWorkspaceState,
     seedConfig: {
       TEST_RSYNC_ROOTS: String(process.env.TEST_RSYNC_ROOTS || ""),
       TEST_PARTIAL_CLONE_GO_ONLY: String(process.env.TEST_PARTIAL_CLONE_GO_ONLY || ""),
@@ -258,7 +266,7 @@ export async function prepareVerifySeed(opts: {
     };
   }
   const seedPathForRun = (await shouldStageSeed(seedPath))
-    ? await stageSeedStore(seedPath, seedKey, seedTtlMs)
+    ? await stageSeedStore(seedPath, seedKey, seedTtlMs, { workspaceRoot: opts.root })
     : seedPath;
   await writeCurrentSeed(opts.root, seedPathForRun, seedKey);
   const pinDir = await createPin(opts.root, opts.iso, seedPathForRun, seedKey);

@@ -5,6 +5,8 @@ import {
   buildCqueryQuery,
   normalizeVerifyTargetLabel,
   planVerifyTargetPasses,
+  VERIFY_BOUNDED_ISOLATED_LABEL,
+  VERIFY_BOUNDED_ISOLATED_THREADS,
   VERIFY_BROAD_RESOURCE_LIMITED_TARGET_MIN,
   VERIFY_BROAD_RESOURCE_LIMITED_THREADS,
   VERIFY_ISOLATED_LABEL,
@@ -14,6 +16,7 @@ import {
 import {
   groupVerifyPassesForExecution,
   resourceLimitedStartDelaySeconds,
+  splitVerifyPassGroupForStagedStart,
   verifyPassIsolationDir,
 } from "../../dev/verify/verify-pass-scheduling";
 
@@ -39,7 +42,47 @@ test("verify target labels preserve non-root Buck cells", () => {
   assert.equal(normalizeVerifyTargetLabel("//:root_test (root//:platform)"), "//:root_test");
 });
 
-test("verify target passes batch isolated targets ahead of the shared batch", () => {
+test("verify target passes can batch isolated targets when explicitly requested", () => {
+  const passes = planVerifyTargetPasses(
+    [
+      { target: "//projects/apps/pleomino:latency-guardrail", labels: [VERIFY_ISOLATED_LABEL] },
+      { target: "//projects/apps/pleomino:unit", labels: ["kind:test"] },
+      {
+        target: "//:deployments_nixos_shared_host_reuse_e2e",
+        labels: ["kind:test", VERIFY_RESOURCE_LIMITED_LABEL],
+      },
+      {
+        target: "//:scaffolding_webapp_ssr_next_contracts",
+        labels: ["kind:test", VERIFY_BOUNDED_ISOLATED_LABEL],
+      },
+    ],
+    { isolatedMode: "batch" },
+  );
+
+  assert.deepEqual(passes, [
+    {
+      name: "isolated",
+      targets: ["//projects/apps/pleomino:latency-guardrail"],
+      threadsOverride: 1,
+    },
+    {
+      name: "isolated-bounded",
+      targets: ["//:scaffolding_webapp_ssr_next_contracts"],
+      threadsOverride: VERIFY_BOUNDED_ISOLATED_THREADS,
+    },
+    {
+      name: "resource-limited",
+      targets: ["//:deployments_nixos_shared_host_reuse_e2e"],
+      threadsOverride: VERIFY_RESOURCE_LIMITED_THREADS,
+    },
+    {
+      name: "shared",
+      targets: ["//projects/apps/pleomino:unit"],
+    },
+  ]);
+});
+
+test("verify target passes batch isolated targets by default", () => {
   const passes = planVerifyTargetPasses([
     { target: "//projects/apps/pleomino:latency-guardrail", labels: [VERIFY_ISOLATED_LABEL] },
     { target: "//projects/apps/pleomino:unit", labels: ["kind:test"] },
@@ -49,18 +92,20 @@ test("verify target passes batch isolated targets ahead of the shared batch", ()
     },
     {
       target: "//:scaffolding_webapp_ssr_next_contracts",
-      labels: ["kind:test", VERIFY_ISOLATED_LABEL],
+      labels: ["kind:test", VERIFY_BOUNDED_ISOLATED_LABEL],
     },
   ]);
 
   assert.deepEqual(passes, [
     {
       name: "isolated",
-      targets: [
-        "//projects/apps/pleomino:latency-guardrail",
-        "//:scaffolding_webapp_ssr_next_contracts",
-      ],
+      targets: ["//projects/apps/pleomino:latency-guardrail"],
       threadsOverride: 1,
+    },
+    {
+      name: "isolated-bounded",
+      targets: ["//:scaffolding_webapp_ssr_next_contracts"],
+      threadsOverride: VERIFY_BOUNDED_ISOLATED_THREADS,
     },
     {
       name: "resource-limited",
@@ -78,7 +123,7 @@ test("verify target passes keep isolated labels stricter than resource-limited l
   const passes = planVerifyTargetPasses([
     {
       target: "//:startup_sensitive",
-      labels: [VERIFY_ISOLATED_LABEL, VERIFY_RESOURCE_LIMITED_LABEL],
+      labels: [VERIFY_ISOLATED_LABEL, VERIFY_BOUNDED_ISOLATED_LABEL, VERIFY_RESOURCE_LIMITED_LABEL],
     },
   ]);
 
@@ -97,7 +142,7 @@ test("verify target passes can preserve per-target isolated pass mode for debugg
       { target: "//projects/apps/pleomino:latency-guardrail", labels: [VERIFY_ISOLATED_LABEL] },
       {
         target: "//:scaffolding_webapp_ssr_next_contracts",
-        labels: ["kind:test", VERIFY_ISOLATED_LABEL],
+        labels: ["kind:test", VERIFY_BOUNDED_ISOLATED_LABEL],
       },
     ],
     { isolatedMode: "per-target" },
@@ -110,23 +155,24 @@ test("verify target passes can preserve per-target isolated pass mode for debugg
       threadsOverride: 1,
     },
     {
-      name: "isolated://:scaffolding_webapp_ssr_next_contracts",
+      name: "isolated-bounded",
       targets: ["//:scaffolding_webapp_ssr_next_contracts"],
-      threadsOverride: 1,
+      threadsOverride: VERIFY_BOUNDED_ISOLATED_THREADS,
     },
   ]);
 });
 
-test("verify target pass execution serializes isolated work, then overlaps bounded and shared lanes", () => {
+test("verify target pass execution serializes isolated fixture-heavy lanes before shared work", () => {
   const passes = planVerifyTargetPasses([
     { target: "//:startup_sensitive", labels: [VERIFY_ISOLATED_LABEL] },
+    { target: "//:fixture_heavy", labels: [VERIFY_BOUNDED_ISOLATED_LABEL] },
     { target: "//:resource_heavy", labels: [VERIFY_RESOURCE_LIMITED_LABEL] },
     { target: "//:ordinary", labels: ["kind:test"] },
   ]);
 
   assert.deepEqual(
     groupVerifyPassesForExecution(passes).map((group) => group.map((pass) => pass.name)),
-    [["isolated"], ["resource-limited", "shared"]],
+    [["isolated"], ["isolated-bounded"], ["resource-limited", "shared"]],
   );
 });
 
@@ -145,7 +191,7 @@ test("broad resource-limited passes lower concurrency for deployment fanout", ()
   );
 });
 
-test("resource-limited pass start delay only applies to broad shared runs", () => {
+test("resource-limited pass start delay only applies to broad resource-limited runs", () => {
   assert.equal(
     resourceLimitedStartDelaySeconds(
       [
@@ -189,6 +235,26 @@ test("resource-limited pass start delay honors explicit overrides", () => {
   );
 });
 
+test("broad staged verify groups start shared before delayed resource-limited lane", () => {
+  const staged = splitVerifyPassGroupForStagedStart(
+    [
+      { name: "resource-limited", targets: Array.from({ length: 50 }, (_, i) => `//:r${i}`) },
+      { name: "shared", targets: Array.from({ length: 500 }, (_, i) => `//:s${i}`) },
+    ],
+    {},
+  );
+
+  assert.equal(staged.delaySeconds, 900);
+  assert.deepEqual(
+    staged.immediatePasses.map((pass) => pass.name),
+    ["shared"],
+  );
+  assert.deepEqual(
+    staged.delayedPasses.map((pass) => pass.name),
+    ["resource-limited"],
+  );
+});
+
 test("concurrent verify passes use dedicated Buck isolations", () => {
   assert.equal(
     verifyPassIsolationDir({
@@ -206,6 +272,17 @@ test("concurrent verify passes use dedicated Buck isolations", () => {
     }),
     "v-123-456-resource-limited",
   );
+  assert.equal(
+    verifyPassIsolationDir({
+      baseIso: "v-123-456",
+      passName: "isolated://:startup_sensitive",
+      dedicated: true,
+    }),
+    "v-123-456-isolated-startup-sensitive",
+  );
+});
+
+test("serial isolated verify passes use dedicated Buck isolations", () => {
   assert.equal(
     verifyPassIsolationDir({
       baseIso: "v-123-456",

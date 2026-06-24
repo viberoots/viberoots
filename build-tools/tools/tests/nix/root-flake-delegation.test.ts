@@ -15,7 +15,7 @@ async function activeBuildToolPath(rel: string): Promise<string> {
 
 test("hidden workspace flake delegates workspace construction to local viberoots input", async () => {
   const flake = await fsp.readFile(path.join(".viberoots", "workspace", "flake.nix"), "utf8");
-  assert.match(flake, /viberoots\.url\s*=\s*"path:\.\.\/\.\.\/viberoots"/);
+  assert.match(flake, /viberoots\.url\s*=\s*"path:.*\/viberoots"/);
   assert.match(flake, /inputs\.viberoots\.lib\.mkWorkspace/);
   assert.match(flake, /if root != "" then builtins\.toPath root else \//);
   assert.match(flake, /viberootsInput\s*=\s*inputs\.viberoots/);

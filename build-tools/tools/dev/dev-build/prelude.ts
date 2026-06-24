@@ -76,7 +76,7 @@ user_platform = prelude//platforms:default
 target_platforms = prelude//platforms:default
 
 [project]
-ignore = .viberoots/buck/tmp,.viberoots/workspace/buck/tmp,.claude/worktrees,.codex/worktrees
+ignore = .viberoots/buck,.viberoots/workspace/buck/tmp,.claude/worktrees,.codex/worktrees
 EOF
     `}`;
     await activateWorkspace({ start: root });

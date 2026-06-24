@@ -21,7 +21,7 @@ def _apply_wasm_abi(kw):
         fail("nix_cpp_wasm_static_lib: wasm_abi must be \"bare\" or \"wasi\"")
     wasm_target = _wasm_target_for_abi(wasm_abi)
     labels = kw.get("labels", []) or []
-    extra = ["wasm_target:%s" % wasm_target]
+    extra = ["kind:wasm", "wasm:static", "wasm_target:%s" % wasm_target]
     if wasm_abi == "wasi":
         extra.append("wasm:wasi")
     kw["labels"] = dedupe_preserve(labels + extra)

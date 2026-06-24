@@ -8,6 +8,7 @@ import { parseUpdatePnpmHashArgs } from "./update-pnpm-hash/args";
 import { withPnpmStoreBuildFlakeRef } from "./update-pnpm-hash/build-flake";
 import * as hashesJson from "./update-pnpm-hash/hashes-json";
 import {
+  ensureImporterLockfileFresh,
   ensureImporterLockfileFreshIfAllowed,
   generateImporterLockfile,
   withExactPrefetchedStore,
@@ -41,12 +42,20 @@ async function inner() {
     repoRoot,
     importer,
   );
+  const sharedCacheBuilderFingerprint =
+    await verifiedMarker.currentSharedPnpmStoreHashCacheFingerprint(repoRoot, importer);
+  const acceptedBuilderFingerprints =
+    await verifiedMarker.currentVerifiedMarkerFingerprintCandidates(repoRoot, importer);
   const key = hashKey;
   const placeholderHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   if (force) await hashesJson.updateNodeModulesHashesJson(key, placeholderHash);
   const existingHash = await hashesJson.readNodeModulesHashForLockfile(key);
   const hasValidExistingHash = !force && !!existingHash && existingHash !== placeholderHash;
-  await ensureImporterLockfileFreshIfAllowed({ repoRoot, importer });
+  if (nonDefaultImporter) {
+    await ensureImporterLockfileFresh({ repoRoot, importer });
+  } else {
+    await ensureImporterLockfileFreshIfAllowed({ repoRoot, importer });
+  }
   const existingLockHash = await verifiedMarker.sha256File(lockAbs);
   const existingMarker = await verifiedMarker.readVerifiedMarker(markerPath);
   const marker = existingMarker;
@@ -57,7 +66,7 @@ async function inner() {
     marker.lockfile === key &&
     marker.lockHash === existingLockHash &&
     marker.hashValue === existingHash &&
-    marker.builderFingerprint === builderFingerprint;
+    acceptedBuilderFingerprints.includes(marker.builderFingerprint);
   const runFixedBuild = async (phaseLabel: string) =>
     await withPnpmStoreBuildFlakeRef(
       { repoRoot, importer, baseFlakeRef: flakeRef },
@@ -95,14 +104,17 @@ async function inner() {
       key,
       repoRoot,
       builderFingerprint,
+      sharedCacheBuilderFingerprint,
       storeAttr,
       unfixedAttr,
       timeoutSec,
+      force,
       markerPath,
       hasValidExistingHash,
       existingHash,
       existingLockHash,
       existingMarker,
+      acceptedBuilderFingerprints,
       runFixedBuild,
       runUnfixedBuild,
     })

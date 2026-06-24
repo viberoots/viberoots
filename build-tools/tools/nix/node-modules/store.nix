@@ -3,7 +3,8 @@ let
   common = import ./common.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal; };
   lib = common.lib;
   node = pkgs.nodejs_22;
-  pnpm = pkgs.pnpm;
+  pnpm = import ../pnpm-11.nix { inherit pkgs; };
+  pnpm10 = pkgs.pnpm_10 or pkgs.pnpm;
   certs = pkgs.cacert;
   dirnameOf = common.dirnameOf;
   importerOnlySrc = common.importerOnlySrc;
@@ -22,6 +23,55 @@ let
       libc:
         - glibc
         - musl
+  '';
+  pnpmWorkspaceMarkerScript = ''
+    write_pnpm_workspace_marker() {
+      local existing="$TMPDIR/pnpm-workspace.source.yaml"
+      local workspace_config=""
+      local search_dir="$PWD"
+      while [ -n "$search_dir" ] && [ "$search_dir" != "/" ]; do
+        if [ -f "$search_dir/pnpm-workspace.yaml" ]; then
+          workspace_config="$search_dir/pnpm-workspace.yaml"
+          break
+        fi
+        search_dir="$(dirname "$search_dir")"
+      done
+      if [ -n "$workspace_config" ]; then
+        cp "$workspace_config" "$existing"
+      else
+        : > "$existing"
+      fi
+      node - "$existing" <<'NODE' > pnpm-workspace.yaml
+const fs = require("fs");
+const input = process.argv[2];
+const lines = fs.existsSync(input) ? fs.readFileSync(input, "utf8").split(/\r?\n/) : [];
+const out = ["packages:", "  - ./"];
+const skipKeys = new Set(["packages", "supportedArchitectures"]);
+for (let i = 0; i < lines.length;) {
+  const line = lines[i];
+  if (line.trim() === "" || line.trimStart().startsWith("#")) {
+    i += 1;
+    continue;
+  }
+  const match = line.match(/^([A-Za-z0-9_.-]+):(?:\s|$)/);
+  if (!match) {
+    i += 1;
+    continue;
+  }
+  const key = match[1];
+  const start = i;
+  i += 1;
+  while (i < lines.length && !/^[A-Za-z0-9_.-]+:(?:\s|$)/.test(lines[i])) {
+    i += 1;
+  }
+  if (!skipKeys.has(key)) {
+    out.push(...lines.slice(start, i));
+  }
+}
+process.stdout.write(out.join("\n") + "\n");
+NODE
+      printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
+    }
   '';
   inherit repoRoot repoFsRoot prefetchedStorePathGlobal;
 in {
@@ -82,7 +132,7 @@ in {
       pname = "pnpm-store";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
-      nativeBuildInputs = [ node pnpm pkgs.coreutils ];
+      nativeBuildInputs = [ node pnpm pnpm10 pkgs.coreutils ];
       # These outputs are package-cache snapshots, not runtime executables, so generic
       # fixup spends time scanning vendored payloads without improving correctness.
       dontFixup = true;
@@ -140,12 +190,10 @@ in {
           echo "[nix] mkPnpmStore: no lockfile present; seed a lockfile first using build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${relLock} (set NIX_PNPM_ALLOW_GENERATE=1 for generation)" >&2
           exit 4
         fi
-        pnpm config set store-dir "$out/store"
         # Force workspace root to current directory and pin platform selection so
         # pnpm materializes a platform-invariant set of optional binary packages in hermetic builds.
-        printf '%s\n' "packages:" > pnpm-workspace.yaml
-        printf '%s\n' "  - ./" >> pnpm-workspace.yaml
-        printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
+        ${pnpmWorkspaceMarkerScript}
+        write_pnpm_workspace_marker
         IT="${installTimeoutVal}"
         EXACT_STORE_ROOT=${lib.escapeShellArg (if exactPrefetchedInput != null then exactPrefetchedInput else "/nonexistent")}
         EXACT_STORE_INPUT="$EXACT_STORE_ROOT"
@@ -156,16 +204,39 @@ in {
         if [ -f "$EXACT_STORE_ROOT/store.tar" ]; then
           EXACT_STORE_ARCHIVE="$EXACT_STORE_ROOT/store.tar"
         fi
+        PNPM_BIN="${pnpm}/bin/pnpm"
+        if { [ -n "$EXACT_STORE_ARCHIVE" ] && tar -tf "$EXACT_STORE_ARCHIVE" | grep -q '^./v10/'; } || { [ -z "$EXACT_STORE_ARCHIVE" ] && [ -d "$EXACT_STORE_INPUT/v10" ]; }; then
+          PNPM_BIN="${pnpm10}/bin/pnpm"
+        fi
+        PNPM_TRUST_LOCKFILE_ARG=""
+        if "$PNPM_BIN" install --help 2>/dev/null | grep -q -- "--trust-lockfile"; then
+          PNPM_TRUST_LOCKFILE_ARG="--trust-lockfile"
+        fi
+        validate_exact_store_shape() {
+          local root="$1"
+          local found=""
+          for ver_dir in "$root"/v*; do
+            [ -d "$ver_dir" ] || continue
+            [ -d "$ver_dir/files" ] || continue
+            if [ -f "$ver_dir/index.db" ] || [ -d "$ver_dir/index" ]; then
+              found="1"
+              break
+            fi
+          done
+          if [ -z "$found" ]; then
+            echo "[nix] mkPnpmStore: exact prefetched store is missing pnpm package metadata under $root" >&2
+            exit 6
+          fi
+        }
+        "$PNPM_BIN" config set store-dir "$out/store"
         if [ -n "$EXACT_STORE_ARCHIVE" ]; then
           echo "[nix] mkPnpmStore: validating exact prefetched store archive from $EXACT_STORE_ARCHIVE" >&2
           rm -rf "$out/store"
           mkdir -p "$out/store"
           tar -xf "$EXACT_STORE_ARCHIVE" -C "$out/store"
           chmod -R u+rwX "$out/store"
-          pnpm config set store-dir "$out/store"
-          pnpm config set package-import-method copy
-          echo "[nix] pnpm install (offline exact-store) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (IT=${installTimeoutVal}s, FT=${ftVal}s)"
-          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          echo "[nix] mkPnpmStore: validating exact prefetched store shape after prior pnpm install (offline exact-store)"
+          validate_exact_store_shape "$out/store"
           echo "[nix] mkPnpmStore: exact prefetched store archive validated"
         elif [ -d "$EXACT_STORE_INPUT" ]; then
           echo "[nix] mkPnpmStore: validating exact prefetched store from $EXACT_STORE_INPUT" >&2
@@ -173,10 +244,8 @@ in {
           mkdir -p "$out/store"
           cp -R "$EXACT_STORE_INPUT/." "$out/store/"
           chmod -R u+rwX "$out/store"
-          pnpm config set store-dir "$out/store"
-          pnpm config set package-import-method copy
-          echo "[nix] pnpm install (offline exact-store) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir . (IT=${installTimeoutVal}s, FT=${ftVal}s)"
-          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          echo "[nix] mkPnpmStore: validating exact prefetched store shape after prior pnpm install (offline exact-store)"
+          validate_exact_store_shape "$out/store"
           echo "[nix] mkPnpmStore: exact prefetched store validated"
         else
           echo "[nix] mkPnpmStore: missing exact prefetched store for locked offline build. Run 'i' to refresh pnpm hashes and prewarm exact pnpm stores." >&2
@@ -271,7 +340,7 @@ in {
       pname = "pnpm-store-unfixed";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
-      nativeBuildInputs = [ node pnpm pkgs.coreutils ];
+      nativeBuildInputs = [ node pnpm pnpm10 pkgs.coreutils ];
       # This unfixed cache output has the same package-store shape as mkPnpmStore above.
       dontFixup = true;
       preferLocalBuild = true;
@@ -329,9 +398,8 @@ in {
         fi
         # Force workspace root to current directory and pin platform selection so
         # pnpm materializes a platform-invariant set of optional binary packages in hermetic builds.
-        printf '%s\n' "packages:" > pnpm-workspace.yaml
-        printf '%s\n' "  - ./" >> pnpm-workspace.yaml
-        printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
+        ${pnpmWorkspaceMarkerScript}
+        write_pnpm_workspace_marker
         IT="''${NIX_PNPM_INSTALL_TIMEOUT:-1800}"
         EXACT_STORE_ROOT=${lib.escapeShellArg (if exactPrefetchedInput != null then exactPrefetchedInput else "/nonexistent")}
         EXACT_STORE_INPUT="$EXACT_STORE_ROOT"
@@ -342,6 +410,30 @@ in {
         if [ -f "$EXACT_STORE_ROOT/store.tar" ]; then
           EXACT_STORE_ARCHIVE="$EXACT_STORE_ROOT/store.tar"
         fi
+        PNPM_BIN="${pnpm}/bin/pnpm"
+        if { [ -n "$EXACT_STORE_ARCHIVE" ] && tar -tf "$EXACT_STORE_ARCHIVE" | grep -q '^./v10/'; } || { [ -z "$EXACT_STORE_ARCHIVE" ] && [ -d "$EXACT_STORE_INPUT/v10" ]; }; then
+          PNPM_BIN="${pnpm10}/bin/pnpm"
+        fi
+        PNPM_TRUST_LOCKFILE_ARG=""
+        if "$PNPM_BIN" install --help 2>/dev/null | grep -q -- "--trust-lockfile"; then
+          PNPM_TRUST_LOCKFILE_ARG="--trust-lockfile"
+        fi
+        validate_exact_store_shape() {
+          local root="$1"
+          local found=""
+          for ver_dir in "$root"/v*; do
+            [ -d "$ver_dir" ] || continue
+            [ -d "$ver_dir/files" ] || continue
+            if [ -f "$ver_dir/index.db" ] || [ -d "$ver_dir/index" ]; then
+              found="1"
+              break
+            fi
+          done
+          if [ -z "$found" ]; then
+            echo "[nix] mkPnpmStoreUnfixed: exact prefetched store is missing pnpm package metadata under $root" >&2
+            exit 6
+          fi
+        }
         if [ -n "$EXACT_STORE_ARCHIVE" ]; then
           echo "[nix] mkPnpmStoreUnfixed: validating exact prefetched store archive from $EXACT_STORE_ARCHIVE" >&2
           LOCAL_STORE="$(pwd)/.pnpm-exact-store"
@@ -349,10 +441,8 @@ in {
           mkdir -p "$LOCAL_STORE" "$out/store"
           tar -xf "$EXACT_STORE_ARCHIVE" -C "$LOCAL_STORE"
           chmod -R u+rwX "$LOCAL_STORE"
-          pnpm config set store-dir "$LOCAL_STORE"
-          pnpm config set package-import-method copy
-          echo "[nix] mkPnpmStoreUnfixed: pnpm install (offline exact-store) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
-          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          echo "[nix] mkPnpmStoreUnfixed: validating exact prefetched store shape after prior pnpm install (offline exact-store)"
+          validate_exact_store_shape "$LOCAL_STORE"
           cp -R "$LOCAL_STORE/." "$out/store/"
           chmod -R u+rwX "$out/store" || true
           echo "[nix] mkPnpmStoreUnfixed: exact prefetched store archive validated"
@@ -363,10 +453,8 @@ in {
           mkdir -p "$LOCAL_STORE" "$out/store"
           cp -R "$EXACT_STORE_INPUT/." "$LOCAL_STORE/"
           chmod -R u+rwX "$LOCAL_STORE"
-          pnpm config set store-dir "$LOCAL_STORE"
-          pnpm config set package-import-method copy
-          echo "[nix] mkPnpmStoreUnfixed: pnpm install (offline exact-store) --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir . --dir ."
-          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          echo "[nix] mkPnpmStoreUnfixed: validating exact prefetched store shape after prior pnpm install (offline exact-store)"
+          validate_exact_store_shape "$LOCAL_STORE"
           cp -R "$LOCAL_STORE/." "$out/store/"
           chmod -R u+rwX "$out/store" || true
           echo "[nix] mkPnpmStoreUnfixed: exact prefetched store validated"

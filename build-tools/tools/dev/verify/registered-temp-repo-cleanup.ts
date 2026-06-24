@@ -9,12 +9,13 @@ import {
   parsePsLine,
   pathStartsWithRootVariant,
   pathExists,
-  pathsEquivalent,
   psLines,
   tryRepoRootFromStateDir,
 } from "./buck-orphan-cleanup-lib";
 import type { ForkserverProc } from "./buck-orphan-cleanup-lib";
 import { parseVerifyOwnedState } from "./owned-process-state";
+import type { RegisteredVerifyProcess } from "./owned-process-state";
+import { readProcessIdentity } from "./owned-process-state";
 import { registeredIsolationProcessPidsFromLines } from "./registered-buck-cleanup";
 import { uniqueRegisteredRoots } from "./registered-temp-repo-roots";
 import { cleanupTempRepoProcesses } from "./temp-repo-process-cleanup";
@@ -46,11 +47,50 @@ function rootHasLiveForkserver(root: string, lines: string[]): boolean {
   return false;
 }
 
+export function registeredTempRootOwnsBuckRepoRoot(
+  buckRepoRoot: string,
+  registeredTempRoot: string,
+): boolean {
+  return pathStartsWithRootVariant(path.resolve(buckRepoRoot), path.resolve(registeredTempRoot));
+}
+
 async function anyPathExists(paths: string[]): Promise<boolean> {
   for (const p of paths) {
     if (await pathExists(p)) return true;
   }
   return false;
+}
+
+async function chmodTreeWritable(root: string): Promise<void> {
+  const st = await fsp.lstat(root).catch(() => null);
+  if (!st) return;
+  if (st.isSymbolicLink()) return;
+  if (st.isDirectory()) {
+    await fsp.chmod(root, 0o700).catch(() => {});
+    const entries = await fsp.readdir(root, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      await chmodTreeWritable(path.join(root, entry.name));
+    }
+    await fsp.chmod(root, 0o700).catch(() => {});
+    return;
+  }
+  await fsp.chmod(root, 0o600).catch(() => {});
+}
+
+async function removeRegisteredTempRoot(root: string): Promise<void> {
+  try {
+    await fsp.rm(root, { recursive: true, force: true });
+    return;
+  } catch {
+    await chmodTreeWritable(root).catch(() => {});
+    await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
+async function registeredVerifyProcessIsAlive(entry: RegisteredVerifyProcess): Promise<boolean> {
+  if (entry.startSig.startsWith("pid:")) return false;
+  const current = await readProcessIdentity(entry.pid, 500, { allowPidFallback: false });
+  return current?.startSig === entry.startSig && current.pgid === entry.pgid;
 }
 
 async function pruneDefinitelyStaleRegisteredStateFiles(
@@ -75,9 +115,9 @@ async function pruneDefinitelyStaleRegisteredStateFiles(
       continue;
     }
     const anyRootExists = await anyPathExists(uniqueRoots);
-    const anyRegisteredProcessAlive = parsed.processes.some(
-      (entry) => !entry.startSig.startsWith("pid:") && isPidAlive(entry.pid),
-    );
+    const anyRegisteredProcessAlive = (
+      await Promise.all(parsed.processes.map((entry) => registeredVerifyProcessIsAlive(entry)))
+    ).some(Boolean);
     const anyVerifyEnvProcessAlive = envProcs.some(
       (entry) => path.resolve(entry.stateFile) === path.resolve(stateFile) && isPidAlive(entry.pid),
     );
@@ -152,7 +192,13 @@ export async function cleanupRegisteredTempRepos(opts: {
   const allRoots = uniqueRegisteredRoots(parseVerifyOwnedState(txt).roots);
   if (allRoots.length === 0) return { roots: 0, killed: 0, skippedRoots: 0 };
   const maxRoots = Math.max(0, opts.maxRoots ?? allRoots.length);
-  const uniqueRoots = allRoots.slice(0, maxRoots);
+  const uniqueRoots: string[] = [];
+  for (const root of allRoots) {
+    const existingRoot = await existingPathVariant(root);
+    if (!existingRoot) continue;
+    uniqueRoots.push(existingRoot);
+    if (uniqueRoots.length >= maxRoots) break;
+  }
   if (uniqueRoots.length === 0) {
     return { roots: 0, killed: 0, skippedRoots: allRoots.length };
   }
@@ -180,7 +226,7 @@ export async function cleanupRegisteredTempRepos(opts: {
       if (!mapped) continue;
       const { repoRoot, iso } = mapped;
       const absRepo = path.resolve(repoRoot);
-      if (!uniqueRoots.some((root) => pathsEquivalent(absRepo, root))) continue;
+      if (!uniqueRoots.some((root) => registeredTempRootOwnsBuckRepoRoot(absRepo, root))) continue;
       matchedThisPass++;
       const existingRoot = await existingPathVariant(absRepo);
       if (existingRoot) {
@@ -208,32 +254,6 @@ export async function cleanupRegisteredTempRepos(opts: {
     forks = parseForkservers(processLines);
   }
 
-  const lines2 = await psLines(2000);
-  for (const root of uniqueRoots) {
-    if (killed >= maxKills) break;
-    const base = path.basename(path.resolve(root));
-    if (!base) continue;
-    const prefix = `buck2d[${base}]`;
-    for (const ln of lines2) {
-      if (killed >= maxKills) break;
-      if (!ln.includes(prefix)) continue;
-      const m = ln.match(/^(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/);
-      if (!m) continue;
-      const pid = Number(m[1]);
-      const etime = m[3] || "";
-      if (!Number.isFinite(pid) || pid <= 1) continue;
-      if (!isPidAlive(pid)) continue;
-      try {
-        process.kill(pid, "SIGKILL");
-      } catch {}
-      killed++;
-      if (opts.log) {
-        await opts.log(
-          `[verify] temp-repo buck cleanup: killed buck2d pid=${pid} etime=${etime} repo=${root}`,
-        );
-      }
-    }
-  }
   const procRes = await cleanupTempRepoProcesses({
     roots: uniqueRoots,
     log: opts.log,
@@ -242,7 +262,7 @@ export async function cleanupRegisteredTempRepos(opts: {
   killed += procRes.killed;
   if (opts.removeRoots) {
     for (const root of uniqueRoots) {
-      await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
+      await removeRegisteredTempRoot(root);
     }
   }
   return { roots: uniqueRoots.length, killed, skippedRoots };

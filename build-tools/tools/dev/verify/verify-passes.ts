@@ -3,7 +3,8 @@ import path from "node:path";
 import { spawnVerifyBuck2Tests } from "./buck2-test";
 import {
   groupVerifyPassesForExecution,
-  resourceLimitedStartDelaySeconds,
+  isSerialVerifyPass,
+  splitVerifyPassGroupForStagedStart,
   verifyPassIsolationDir,
 } from "./verify-pass-scheduling";
 import { killBuckIsolation } from "./process-control";
@@ -133,8 +134,14 @@ export async function runVerifyBuckPasses(opts: {
               value == null ? "?" : Number.isInteger(value) ? String(value) : value.toFixed(2);
             await appendVerifyPassLog(
               opts.logFile,
-              `[verify] resource summary pass=${pass.name} samples=${summary.samples} max_load1=${fmt(summary.maxLoad1)} max_load5=${fmt(summary.maxLoad5)} max_processes=${fmt(summary.maxProcessCount)} max_node=${fmt(summary.maxNodeCount)} max_buck=${fmt(summary.maxBuckCount)} max_nix=${fmt(summary.maxNixCount)} max_verify_env=${fmt(summary.maxVerifyEnvCount)}`,
+              `[verify] resource summary pass=${pass.name} samples=${summary.samples} max_load1=${fmt(summary.maxLoad1)} max_load5=${fmt(summary.maxLoad5)} max_processes=${fmt(summary.maxProcessCount)} max_node=${fmt(summary.maxNodeCount)} max_buck=${fmt(summary.maxBuckCount)} max_nix=${fmt(summary.maxNixCount)} max_verify_env=${fmt(summary.maxVerifyEnvCount)} high_load_top_process_samples=${summary.highLoadTopProcessSamples}`,
             );
+            for (const line of summary.highLoadTopProcessLines) {
+              await appendVerifyPassLog(
+                opts.logFile,
+                `[verify] high-load top-process summary pass=${pass.name} ${line}`,
+              );
+            }
           }
         }
         await appendVerifyPassLog(
@@ -150,21 +157,20 @@ export async function runVerifyBuckPasses(opts: {
   for (const group of groupVerifyPassesForExecution(passes)) {
     const groupStartMs = Date.now();
     const useDedicatedPassIsolation = group.length > 1;
+    const dedicatedIsolationFor = (passName: string) =>
+      useDedicatedPassIsolation || passes.length > 1 || isSerialVerifyPass(passName);
     if (group.length > 1) {
       await appendVerifyPassLog(
         opts.logFile,
         `[verify] target pass group begin mode=concurrent isolation=per-pass passes=${group.map((pass) => pass.name).join(",")}`,
       );
     }
-    const resourceLimitedDelayS = resourceLimitedStartDelaySeconds(group);
-    const immediatePasses =
-      resourceLimitedDelayS > 0 ? group.filter((pass) => pass.name !== "resource-limited") : group;
-    const delayedPasses =
-      resourceLimitedDelayS > 0 ? group.filter((pass) => pass.name === "resource-limited") : [];
+    const { delaySeconds, immediatePasses, delayedPasses } =
+      splitVerifyPassGroupForStagedStart(group);
     if (delayedPasses.length > 0) {
       await appendVerifyPassLog(
         opts.logFile,
-        `[verify] target pass group staged start delay_s=${resourceLimitedDelayS} immediate=${immediatePasses.map((pass) => pass.name).join(",")} delayed=${delayedPasses.map((pass) => pass.name).join(",")}`,
+        `[verify] target pass group staged start delay_s=${delaySeconds} immediate=${immediatePasses.map((pass) => pass.name).join(",")} delayed=${delayedPasses.map((pass) => pass.name).join(",")}`,
       );
     }
     let firstFailure = 0;
@@ -185,7 +191,7 @@ export async function runVerifyBuckPasses(opts: {
           verifyPassIsolationDir({
             baseIso: opts.iso,
             passName: pass.name,
-            dedicated: useDedicatedPassIsolation,
+            dedicated: dedicatedIsolationFor(pass.name),
           }),
         ),
       ),
@@ -193,7 +199,7 @@ export async function runVerifyBuckPasses(opts: {
       trackRun(run);
     }
     if (delayedPasses.length > 0) {
-      await new Promise((resolve) => setTimeout(resolve, resourceLimitedDelayS * 1000));
+      await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
       for (const run of await Promise.all(
         delayedPasses.map((pass) =>
           startPass(
@@ -201,7 +207,7 @@ export async function runVerifyBuckPasses(opts: {
             verifyPassIsolationDir({
               baseIso: opts.iso,
               passName: pass.name,
-              dedicated: useDedicatedPassIsolation,
+              dedicated: dedicatedIsolationFor(pass.name),
             }),
           ),
         ),

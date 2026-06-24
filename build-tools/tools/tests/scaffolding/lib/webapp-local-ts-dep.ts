@@ -1,9 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "../../lib/test-helpers/run-in-temp";
+import {
+  pnpmInstallForDevTest,
+  resolveEsbuildBinForDevTest,
+  spawnStaticViteDevServer,
+} from "./dev-node-modules";
 import {
   evaluateRenderedAppText,
   extractImportedUrl,
@@ -18,10 +22,18 @@ import {
 import {
   assertNoProcessRestart,
   assertWorkspaceLinkedDependency,
-  esbuildPackageName,
   waitForValue,
   writeAndBumpMtime,
 } from "./wasm-watch";
+
+function stripAnsi(input: string): string {
+  return input.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
+}
+
+function viteReadyLogSeen(logs: string): boolean {
+  const clean = stripAnsi(logs);
+  return /\bready\s+in\b|Local\s*:/i.test(clean);
+}
 
 export async function runWebappLocalTsDependencyTest(options: {
   appName: string;
@@ -98,53 +110,19 @@ export async function runWebappLocalTsDependencyTest(options: {
       cwd: tmp,
       stdio: "pipe",
     })`git add -A projects/apps/${options.appName} projects/libs/demo-lib`;
-    await _$({
-      cwd: tmp,
-      stdio: "inherit",
-      env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-    })`pnpm --dir ${tmp} install --filter ./projects/apps/${options.appName}... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+    await pnpmInstallForDevTest({
+      tmp,
+      _$,
+      filter: `./projects/apps/${options.appName}...`,
+      installMode: "raw-pnpm",
+    });
 
-    const esbuildPkg = esbuildPackageName();
-    const esbuildBin = esbuildPkg
-      ? path.join(
-          appAbs,
-          "node_modules",
-          esbuildPkg,
-          "bin",
-          process.platform === "win32" ? "esbuild.exe" : "esbuild",
-        )
-      : "";
+    const esbuildBin = await resolveEsbuildBinForDevTest(appAbs);
 
     const port = await pickFreePort();
     const serverStdout: string[] = [];
     const serverStderr: string[] = [];
-    const devServer = spawn(
-      "pnpm",
-      [
-        "exec",
-        "vite",
-        "dev",
-        "--host",
-        "127.0.0.1",
-        "--port",
-        String(port),
-        "--strictPort",
-        "--clearScreen",
-        "false",
-        "--logLevel",
-        "info",
-      ],
-      {
-        cwd: appAbs,
-        stdio: "pipe",
-        env: {
-          ...process.env,
-          NODE_ENV: "development",
-          NODE_OPTIONS: "",
-          ESBUILD_BINARY_PATH: esbuildBin,
-        },
-      },
-    );
+    const devServer = spawnStaticViteDevServer(appAbs, port, { ESBUILD_BINARY_PATH: esbuildBin });
     devServer.stdout?.on("data", (chunk) => {
       serverStdout.push(String(chunk || ""));
       if (serverStdout.length > 100) serverStdout.shift();
@@ -161,7 +139,7 @@ export async function runWebappLocalTsDependencyTest(options: {
           assertNoProcessRestart(devServer, devServer.pid);
           return serverLogs();
         },
-        (logs) => /\bready in\b|Local:/i.test(logs),
+        viteReadyLogSeen,
         GENERATED_DEV_READY_TIMEOUT_MS,
       );
       await waitForHttpOk(`http://127.0.0.1:${port}/`);

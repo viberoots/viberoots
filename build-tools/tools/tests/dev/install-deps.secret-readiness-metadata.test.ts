@@ -18,7 +18,7 @@ const baseFlags = {
   forceOverwriteLocalCredentials: false,
 };
 
-test("install secret readiness propagates malformed Pleomino metadata", async () => {
+test("install secret readiness propagates malformed deployment metadata", async () => {
   await withRepo(async (repoRoot) => {
     await writeResolver(repoRoot);
     await writeFamily(repoRoot, '_INFISICAL_SITE_URL = "https://app.infisical.com"\n');
@@ -40,7 +40,7 @@ test("install secret readiness propagates malformed Pleomino metadata", async ()
           },
         },
       }),
-      /missing _INFISICAL_PROJECT_ID in checked-in Pleomino metadata/,
+      /missing _INFISICAL_PROJECT_ID in checked-in deployment metadata/,
     );
     assert.equal(bootstrapCalls, 0);
   });

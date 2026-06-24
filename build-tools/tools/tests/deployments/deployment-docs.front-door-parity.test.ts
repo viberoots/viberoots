@@ -90,11 +90,11 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
   );
   assert.match(
     scenariosDoc,
-    /deploy --deployment \/\/projects\/deployments\/pleomino\/prod:deploy/,
+    /deploy --deployment \/\/projects\/deployments\/example-app\/prod:deploy/,
     "deployment scenarios must use the reviewed --deployment <label> front door",
   );
   for (const command of [
-    /deploy --deployment \/\/projects\/deployments\/pleomino\/prod:deploy/,
+    /deploy --deployment \/\/projects\/deployments\/example-app\/prod:deploy/,
     /--preview\s+\\?\s*--source-run-id <deploy-run-id>/,
     /--preview-cleanup\s+\\?\s*--source-run-id <deploy-run-id>/,
     /--publish-only\s+\\?\s*--source-run-id <deploy-run-id>/,
@@ -160,7 +160,7 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
   }
   for (const fragment of [
     /deploy --list/,
-    /deploy --deployment \/\/projects\/deployments\/pleomino\/prod:deploy/,
+    /deploy --deployment \/\/projects\/deployments\/example-app\/prod:deploy/,
     /\/api\/v1\/submissions/,
     /\/api\/v1\/status/,
     /\/api\/v1\/records/,
@@ -202,7 +202,7 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
     /vault auth enable jwt/,
     /--print-vault-bootstrap[\s\S]*deployment-vault-bootstrap@1/,
     /--print-vault-secret-templates[\s\S]*deployment-vault-secret-templates@1/,
-    /secret:\/\/deployments\/pleomino\/cloudflare_api_token/,
+    /secret:\/\/deployments\/example-app\/cloudflare_api_token/,
   ]) {
     assert.match(
       vaultRunbookDoc,

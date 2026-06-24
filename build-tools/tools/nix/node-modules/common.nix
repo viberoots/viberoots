@@ -15,8 +15,6 @@ let
       candidates =
         if wr == "" then []
         else [
-          (builtins.toPath (wr + "/viberoots/build-tools/tools/nix/node-modules.hashes.json"))
-          (builtins.toPath (wr + "/.viberoots/current/build-tools/tools/nix/node-modules.hashes.json"))
           (builtins.toPath (wr + "/projects/node-modules.hashes.json"))
         ];
     in
@@ -58,12 +56,14 @@ let
       ignoreImporterLock = genAllowed && (!haveImporterLock);
       impPkgJsonPath = srcBaseStr + "/" + importerDir + "/package.json";
       impNpmrcPath = srcBaseStr + "/" + importerDir + "/.npmrc";
+      impPnpmWsPath = srcBaseStr + "/" + importerDir + "/pnpm-workspace.yaml";
       impLockPath = srcBaseStr + "/" + importerDir + "/pnpm-lock.yaml";
       wantedLockPath = srcBaseStr + "/" + lockfilePath;
       wsNpmrcPath = srcBaseStr + "/.npmrc";
       wsPnpmWsPath = srcBaseStr + "/pnpm-workspace.yaml";
       impPkgJson = if builtins.pathExists impPkgJsonPath then (builtins.path { path = impPkgJsonPath; name = "importer-package.json"; }) else null;
       impNpmrc = if builtins.pathExists impNpmrcPath then (builtins.path { path = impNpmrcPath; name = "importer.npmrc"; }) else null;
+      impPnpmWs = if builtins.pathExists impPnpmWsPath then (builtins.path { path = impPnpmWsPath; name = "importer-pnpm-workspace.yaml"; }) else null;
       impLock = if builtins.pathExists impLockPath then (builtins.path { path = impLockPath; name = "importer-pnpm-lock.yaml"; }) else null;
       wantedLock = if builtins.pathExists wantedLockPath then (builtins.path { path = wantedLockPath; name = "requested-pnpm-lock.yaml"; }) else null;
       wsNpmrc = if builtins.pathExists wsNpmrcPath then (builtins.path { path = wsNpmrcPath; name = "workspace.npmrc"; }) else null;
@@ -90,6 +90,9 @@ let
       fi
       if [ -f ${if impNpmrc != null then builtins.toJSON (builtins.toString impNpmrc) else "\"/nonexistent\""} ]; then
         copy_file ${if impNpmrc != null then builtins.toJSON (builtins.toString impNpmrc) else "\"/nonexistent\""} "$imp_out_dir/.npmrc"
+      fi
+      if [ -f ${if impPnpmWs != null then builtins.toJSON (builtins.toString impPnpmWs) else "\"/nonexistent\""} ]; then
+        copy_file ${if impPnpmWs != null then builtins.toJSON (builtins.toString impPnpmWs) else "\"/nonexistent\""} "$imp_out_dir/pnpm-workspace.yaml"
       fi
 
       # Include only the requested lockfile path, unless generation mode intentionally

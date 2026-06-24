@@ -32,17 +32,17 @@ test("cpp: overlap between link_deps and header_deps is allowed", async () => {
     );
 
     await fs.outputFile(
-      path.join(tmp, "libs", "overlap", "src", "overlap.cpp"),
+      path.join(tmp, "projects", "libs", "overlap", "src", "overlap.cpp"),
       ['#include "overlap.h"', "int overlap_answer() { return 42; }", ""].join("\n"),
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "libs", "overlap", "src", "overlap.h"),
+      path.join(tmp, "projects", "libs", "overlap", "src", "overlap.h"),
       ["#pragma once", "int overlap_answer();", ""].join("\n"),
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "libs", "overlap", "TARGETS"),
+      path.join(tmp, "projects", "libs", "overlap", "TARGETS"),
       [
         'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
@@ -58,7 +58,7 @@ test("cpp: overlap between link_deps and header_deps is allowed", async () => {
     );
 
     await fs.outputFile(
-      path.join(tmp, "apps", "demo", "src", "main.cpp"),
+      path.join(tmp, "projects", "apps", "demo", "src", "main.cpp"),
       [
         "#include <src/overlap.h>",
         "int main() {",

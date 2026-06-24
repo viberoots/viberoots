@@ -71,12 +71,12 @@ selected ref is missing, the command fails before provider mutation and reports 
 diagnostics. `runtime://...` token refs stay on the runtime-host binding path and do not enter
 SprinkleRef secret resolution.
 
-Pleomino is the checked-in context example. Staging selects
-`deployment_context = "pleomino-staging"` and production selects
-`deployment_context = "pleomino-prod"`. The shared config entries hold the selected control-plane
+ExampleApp is the checked-in context example. Staging selects
+`deployment_context = "example-staging"` and production selects
+`deployment_context = "example-prod"`. The shared config entries hold the selected control-plane
 profile, Cloudflare account, Pages project, custom domain, zone id, Infisical project id/name/slug,
 environment, secret path, and Universal Auth machine identity metadata. The app and deployment
-family keep logical refs such as `secret://deployments/pleomino/cloudflare_api_token`; admission
+family keep logical refs such as `secret://deployments/example-app/cloudflare_api_token`; admission
 records store the resolved Infisical project/environment/path/name/version evidence needed for exact
 replay.
 
@@ -268,27 +268,27 @@ Add, update, or remove ordinary secrets:
 
 ```bash
 sprinkleref \
-  --add secret://deployments/pleomino/staging/cloudflare_api_token \
+  --add secret://deployments/example-app/staging/cloudflare_api_token \
   --category main
 
 sprinkleref \
-  --add secret://deployments/pleomino/staging/cloudflare_api_token \
+  --add secret://deployments/example-app/staging/cloudflare_api_token \
   --category main \
   --overwrite-existing
 
 sprinkleref \
-  --update secret://deployments/pleomino/prod/cloudflare_api_token \
+  --update secret://deployments/example-app/prod/cloudflare_api_token \
   --category main \
   --value-file .local/secrets/cloudflare-prod-token
 
 sprinkleref \
-  --update secret://deployments/pleomino/prod/new_runtime_secret \
+  --update secret://deployments/example-app/prod/new_runtime_secret \
   --category main \
   --create-missing \
   --value-file .local/secrets/new-runtime-secret
 
 sprinkleref \
-  --remove secret://deployments/pleomino/staging/cloudflare_api_token \
+  --remove secret://deployments/example-app/staging/cloudflare_api_token \
   --category main
 ```
 
@@ -312,7 +312,7 @@ For bootstrap credentials:
 
 ```bash
 sprinkleref \
-  --add secret://deployments/pleomino/staging/infisical-client-secret \
+  --add secret://deployments/example-app/staging/infisical-client-secret \
   --category bootstrap
 ```
 
@@ -325,8 +325,8 @@ validation:
 ```bash
 sprinkleref --check
 sprinkleref --check --scheme secret
-sprinkleref --check --target //projects/deployments/pleomino/staging:deploy
-sprinkleref --check --target //projects/deployments/pleomino/staging:deploy --no-deps
+sprinkleref --check --target //projects/deployments/example-app/staging:deploy
+sprinkleref --check --target //projects/deployments/example-app/staging:deploy --no-deps
 sprinkleref --check --format json
 ```
 

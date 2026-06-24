@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
@@ -8,6 +8,7 @@ import { resolveModuleContractsPaths } from "../../dev/module-contract-paths";
 import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core";
 import { parseWasmModuleManifest } from "../../scaffolding/webapp-module-manifests";
 import { runInTemp } from "../lib/test-helpers";
+import { pnpmInstallForDevTest, spawnStaticViteDevServer } from "./lib/dev-node-modules";
 import { pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
 import { removeDefaultWasmFiles, toZeroWasmTargets } from "./lib/zero-wasm";
 
@@ -55,19 +56,15 @@ test(
         await fsp.readFile(contracts.tsManifestPath, "utf8"),
         "utf8",
       );
-      await _$({
-        cwd: tmp,
-        stdio: "inherit",
-        env: { ...process.env, CI: "1", NEXT_TELEMETRY_DISABLED: "1" },
-      })`pnpm --dir ${tmp} install --filter ./projects/apps/demo-web... --frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
-      await _$({ cwd: appAbs, stdio: "inherit" })`pnpm --dir ${appAbs} run build`;
+      await pnpmInstallForDevTest({
+        tmp,
+        _$,
+        filter: "./projects/apps/demo-web...",
+      });
+      await _$({ cwd: appAbs, stdio: "inherit" })`node scripts/build.mjs`;
 
       const port = await pickFreePort();
-      const devServer: ChildProcess = spawn("pnpm", ["run", "dev"], {
-        cwd: appAbs,
-        stdio: "pipe",
-        env: { ...process.env, PORT: String(port), NODE_OPTIONS: "" },
-      });
+      const devServer: ChildProcess = spawnStaticViteDevServer(appAbs, port);
       try {
         await waitForHttpOk(`http://127.0.0.1:${port}/`);
       } finally {

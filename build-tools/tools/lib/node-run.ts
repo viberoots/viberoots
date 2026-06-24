@@ -111,10 +111,10 @@ export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
         return;
       }
       if (timedOut) {
-      reject(
-        Object.assign(new Error(`${path.basename(opts.script)} timed out after ${timeoutMs}ms`), {
-          exitCode: 124,
-          stdout,
+        reject(
+          Object.assign(new Error(`${path.basename(opts.script)} timed out after ${timeoutMs}ms`), {
+            exitCode: 124,
+            stdout,
             stderr,
           }),
         );

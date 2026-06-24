@@ -31,6 +31,11 @@ test("build consumers do not repair pnpm provisioning state", async () => {
   );
   assert.match(
     nodeModulesBuild,
+    /recoverOutPathFromLinkMarker\(importer, lockfileRel\)/,
+    "node-modules-build.ts must reuse already-provisioned node_modules outputs before Nix builds",
+  );
+  assert.match(
+    nodeModulesBuild,
     /nix build .*--impure/,
     "node-modules-build.ts must pass --impure so NIX_PNPM_EXACT_STORE reaches Nix",
   );
@@ -44,13 +49,18 @@ test("locked Nix pnpm build paths are offline-only", async () => {
 
   assert.match(
     storeNix,
-    /pnpm install --offline --force --frozen-lockfile/,
-    "locked Nix pnpm install paths must include --offline",
+    /validating exact prefetched store shape after prior pnpm install \(offline exact-store\)/,
+    "locked Nix pnpm paths must validate prewarmed exact stores instead of fetching packages",
   );
-  assert.doesNotMatch(
-    storeNix,
-    /pnpm install --force --frozen-lockfile/,
-    "locked Nix pnpm install paths must not fall through to the live npm registry",
+  const pnpmInstallCommands = storeNix
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => /\$PNPM_BIN"? install\b/.test(line))
+    .filter((line) => !line.includes("install --help"));
+  assert.deepEqual(
+    pnpmInstallCommands,
+    [],
+    "locked Nix pnpm paths must not run pnpm install; exact stores must already be provisioned",
   );
   assert.match(
     storeNix,

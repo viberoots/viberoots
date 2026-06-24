@@ -58,43 +58,51 @@ function assertFailed(res: { exitCode: number; stderr: string }, pattern: RegExp
 }
 
 await runInTemp("startup-check-viberoots-activation", async (tmp) => {
-  await writeBuckState(tmp);
-  await fs.remove(path.join(tmp, ".buckroot"));
-  assertFailed(await runStartup(tmp), /\.buckroot not found/);
+  const workspace = path.join(tmp, "workspace");
+  await fs.ensureDir(workspace);
 
-  await writeBuckState(tmp);
+  await writeBuckState(workspace);
+  await fs.remove(path.join(workspace, ".buckroot"));
+  assertFailed(await runStartup(workspace), /\.buckroot not found/);
+
+  await writeBuckState(workspace);
   await fs.writeFile(
-    path.join(tmp, "flake.nix"),
+    path.join(workspace, "flake.nix"),
     '{ inputs.viberoots.url = "path:./viberoots"; outputs = _: {}; }\n',
     "utf8",
   );
-  await fs.remove(path.join(tmp, "viberoots"));
-  assertFailed(await runStartup(tmp), /viberoots submodule is missing or uninitialized/);
+  await fs.remove(path.join(workspace, "viberoots"));
+  assertFailed(await runStartup(workspace), /viberoots submodule is missing or uninitialized/);
 
-  await fs.outputFile(path.join(tmp, "viberoots/flake.nix"), "{ outputs = _: {}; }\n", "utf8");
-  await fs.outputFile(path.join(tmp, "viberoots/prelude/prelude.bzl"), "# prelude\n", "utf8");
   await fs.outputFile(
-    path.join(tmp, "stale-viberoots/flake.nix"),
+    path.join(workspace, "viberoots/flake.nix"),
     "{ outputs = _: {}; }\n",
     "utf8",
   );
-  await fs.ensureDir(path.join(tmp, ".viberoots"));
-  await fs.remove(path.join(tmp, ".viberoots/current"));
-  await fs.symlink("../stale-viberoots", path.join(tmp, ".viberoots/current"));
-  assertFailed(await runStartup(tmp), /\.viberoots\/current points at/);
+  await fs.outputFile(path.join(workspace, "viberoots/prelude/prelude.bzl"), "# prelude\n", "utf8");
+  await fs.outputFile(
+    path.join(workspace, "stale-viberoots/flake.nix"),
+    "{ outputs = _: {}; }\n",
+    "utf8",
+  );
+  await fs.ensureDir(path.join(workspace, ".viberoots"));
+  await fs.remove(path.join(workspace, ".viberoots/current"));
+  await fs.symlink("../stale-viberoots", path.join(workspace, ".viberoots/current"));
+  assertFailed(await runStartup(workspace), /\.viberoots\/current points at/);
 
-  await fs.remove(path.join(tmp, ".viberoots/current"));
-  await fs.symlink("..", path.join(tmp, ".viberoots/current"));
-  assertFailed(await runStartup(tmp), /\.viberoots\/current points at/);
+  await fs.remove(path.join(workspace, ".viberoots/current"));
+  await fs.symlink("..", path.join(workspace, ".viberoots/current"));
+  assertFailed(await runStartup(workspace), /\.viberoots\/current points at/);
 
-  await fs.ensureDir(path.join(tmp, "viberoots/build-tools"));
-  await fs.writeFile(path.join(tmp, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
-  await fs.remove(path.join(tmp, ".viberoots/current"));
-  await fs.symlink("../viberoots", path.join(tmp, ".viberoots/current"));
-  let res = await runStartup(tmp);
+  await fs.remove(path.join(workspace, "viberoots"));
+  await fs.symlink("../viberoots", path.join(workspace, "viberoots"));
+  await fs.writeFile(path.join(workspace, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
+  await fs.remove(path.join(workspace, ".viberoots/current"));
+  await fs.symlink("../viberoots", path.join(workspace, ".viberoots/current"));
+  let res = await runStartup(workspace);
   if (res.exitCode !== 0) throw new Error(`expected extracted current to pass\n${res.stderr}`);
 
-  await writeBuckState(tmp, ["viberoots = ./.viberoots/current/missing-viberoots-cell"]);
-  await fs.writeFile(path.join(tmp, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
-  assertFailed(await runStartup(tmp), /references missing cell path/);
+  await writeBuckState(workspace, ["viberoots = ./.viberoots/current/missing-viberoots-cell"]);
+  await fs.writeFile(path.join(workspace, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
+  assertFailed(await runStartup(workspace), /references missing cell path/);
 });

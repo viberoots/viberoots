@@ -3,6 +3,7 @@ import type { Dirent } from "node:fs";
 import * as readline from "node:readline/promises";
 import path from "node:path";
 import process from "node:process";
+import type { DeploymentBootstrapScope } from "../../deployments/infisical-iac-bootstrap-config";
 import { runNodeWithZx } from "../../lib/node-run";
 import { PROJECT_SHARED_CONFIG_PATH } from "../../deployments/project-config";
 import { loadDeploymentReadinessModules, sinkFromSelection } from "./secret-readiness-modules";
@@ -83,7 +84,7 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
     DEFAULT_BOOTSTRAP_ARGS,
     LocalFileCredentialSink,
     createSprinkleRefStore,
-    readPleominoReviewedMetadata,
+    readDeploymentReviewedMetadata,
     readSprinkleRefConfig,
     repoBootstrapCredentialRefs,
     resolveBootstrapAccessCredentialSinkBackend,
@@ -117,7 +118,11 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
   const repoRefs = repoBootstrapCredentialRefs({ name: args.identityName });
   const requiredRefs = [repoRefs.clientIdRef, repoRefs.clientSecretRef];
   for (const metadataPath of metadataPaths) {
-    const metadata = await readPleominoReviewedMetadata(metadataPath);
+    const metadata = await readDeploymentReviewedMetadata(
+      deploymentScopeFromMetadataPath(repoRoot, metadataPath),
+      metadataPath,
+      repoRoot,
+    );
     for (const item of metadata.deploymentCredentials) {
       requiredRefs.push(item.clientIdRef, item.clientSecretRef);
     }
@@ -138,6 +143,28 @@ async function discoverDeploymentFamilyMetadataPaths(repoRoot: string) {
   const found: string[] = [];
   await walkDeployments(deploymentsRoot, found);
   return found.sort();
+}
+
+function deploymentScopeFromMetadataPath(
+  repoRoot: string,
+  metadataPath: string,
+): DeploymentBootstrapScope {
+  const relative = path.relative(repoRoot, metadataPath).split(path.sep).join("/");
+  const match = relative.match(/^projects\/deployments\/([^/]+)\/shared\/family\.bzl$/);
+  if (!match?.[1]) {
+    throw new Error(
+      `deployment metadata path ${relative} is not supported; expected projects/deployments/<family>/shared/family.bzl`,
+    );
+  }
+  const family = match[1];
+  return {
+    target: `//projects/deployments/${family}/shared:family`,
+    family,
+    stage: "shared",
+    reviewedMetadataPath: relative,
+    reviewedContextConfigPath: PROJECT_SHARED_CONFIG_PATH,
+    tofuDir: `projects/deployments/${family}/infisical/opentofu`,
+  };
 }
 
 async function walkDeployments(dir: string, found: string[]) {

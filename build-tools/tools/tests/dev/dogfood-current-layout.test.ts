@@ -47,12 +47,12 @@ async function assertCommandOnPath(command: string): Promise<string> {
 }
 
 test("dogfood buckconfig routes viberoots-owned cells through current", async () => {
-  const disallowedRootEntries = [
+  const disallowedOldLayoutPaths = [
     "AI-PREFERENCES.XML",
     "METHODOLOGY.XML",
     "TESTING.md",
     "TARGETS",
-    "build-tools",
+    "build-tools/tools",
     "config",
     "docs",
     "eslint.config.js",
@@ -70,7 +70,7 @@ test("dogfood buckconfig routes viberoots-owned cells through current", async ()
     "tsconfig.json",
     "types",
   ];
-  for (const entry of disallowedRootEntries) {
+  for (const entry of disallowedOldLayoutPaths) {
     await assert.rejects(
       fsp.lstat(path.join(process.cwd(), entry)),
       undefined,

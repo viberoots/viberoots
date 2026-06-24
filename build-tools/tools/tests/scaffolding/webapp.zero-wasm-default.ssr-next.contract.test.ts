@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
@@ -8,6 +8,7 @@ import { resolveModuleContractsPaths } from "../../dev/module-contract-paths";
 import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core";
 import { parseWasmModuleManifest } from "../../scaffolding/webapp-module-manifests";
 import { runInTemp } from "../lib/test-helpers";
+import { pnpmInstallForDevTest, spawnNextSsrDevServer } from "./lib/dev-node-modules";
 import { pickFreePort, stopServer, waitForChildHttpOk } from "./lib/webapp-static-hmr";
 import { removeDefaultWasmFiles, toZeroWasmTargets } from "./lib/zero-wasm";
 
@@ -48,21 +49,17 @@ test(
       );
       assert.equal(wasmManifest.modules.length, 0);
       assert.equal(wasmManifest.defaultModuleKey, "");
-      await _$({
-        cwd: tmp,
-        stdio: "inherit",
-        env: { ...process.env, CI: "1", NEXT_TELEMETRY_DISABLED: "1" },
-      })`pnpm --dir ${tmp} install --filter ./projects/apps/demo-next... --frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
-      await _$({ cwd: appAbs, stdio: "inherit" })`pnpm --dir ${appAbs} run build:ssr`;
+      await pnpmInstallForDevTest({
+        tmp,
+        _$,
+        filter: "./projects/apps/demo-next...",
+      });
+      await _$({ cwd: appAbs, stdio: "inherit" })`node scripts/build-ssr.mjs`;
 
       const port = await pickFreePort();
       const serverStdout: string[] = [];
       const serverStderr: string[] = [];
-      const devServer: ChildProcess = spawn("pnpm", ["run", "dev:ssr"], {
-        cwd: appAbs,
-        stdio: "pipe",
-        env: { ...process.env, PORT: String(port), NODE_OPTIONS: "", NEXT_TELEMETRY_DISABLED: "1" },
-      });
+      const devServer: ChildProcess = spawnNextSsrDevServer(appAbs, port);
       devServer.stdout?.on("data", (chunk) => {
         serverStdout.push(String(chunk || ""));
         if (serverStdout.length > 200) serverStdout.shift();

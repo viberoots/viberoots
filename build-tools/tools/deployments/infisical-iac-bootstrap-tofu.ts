@@ -2,7 +2,10 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import * as readline from "node:readline/promises";
-import { canonicalInfisicalApiUrl } from "./infisical-iac-bootstrap-config";
+import {
+  canonicalInfisicalApiUrl,
+  deploymentScopeFromTarget,
+} from "./infisical-iac-bootstrap-config";
 import type { InfisicalApi } from "./infisical-iac-bootstrap-api";
 import { ensureProjectIdentityMembership } from "./infisical-iac-bootstrap-identity";
 import {
@@ -22,7 +25,7 @@ import type {
 export async function planFilePath(args: BootstrapArgs) {
   if (args.tofuPlanFile) return path.resolve(args.tofuPlanFile);
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-iac-bootstrap-plan-"));
-  return path.join(dir, "pleomino-infisical.tfplan");
+  return path.join(dir, "deployment-infisical.tfplan");
 }
 
 export async function runOpenTofu(opts: {
@@ -131,10 +134,15 @@ export function readDeploymentRuntimeMetadata(args: BootstrapArgs, runner: Comma
     cwd: path.resolve(args.tofuDir),
     capture: true,
   });
-  return normalizeDeploymentRuntimeMetadata(JSON.parse(stdout || "{}"));
+  return normalizeDeploymentRuntimeMetadata(JSON.parse(stdout || "{}"), {
+    family: deploymentScopeFromTarget(args).family,
+  });
 }
 
-export function normalizeDeploymentRuntimeMetadata(raw: unknown): DeploymentRuntimeMetadata {
+export function normalizeDeploymentRuntimeMetadata(
+  raw: unknown,
+  opts: { family: string },
+): DeploymentRuntimeMetadata {
   const byStage = raw as TofuDeploymentRuntimeMetadata;
   const entries = Object.entries(byStage).filter(([, value]) => value && typeof value === "object");
   const projectId = entries.find(([, value]) => value.project_id)?.[1].project_id;
@@ -153,8 +161,8 @@ export function normalizeDeploymentRuntimeMetadata(raw: unknown): DeploymentRunt
       stage,
       identityId: value.machine_identity_id ?? "",
       identityName: value.machine_identity_name ?? "",
-      clientIdRef: `secret://deployments/pleomino/${stage}/infisical-client-id`,
-      clientSecretRef: `secret://deployments/pleomino/${stage}/infisical-client-secret`,
+      clientIdRef: `secret://deployments/${opts.family}/${stage}/infisical-client-id`,
+      clientSecretRef: `secret://deployments/${opts.family}/${stage}/infisical-client-secret`,
       clientIdFileName: value.client_id_file_name,
       clientSecretFileName: value.client_secret_file_name,
     })),

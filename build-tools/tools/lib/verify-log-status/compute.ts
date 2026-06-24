@@ -1,10 +1,11 @@
 import path from "node:path";
 import { stripAnsiAndCrs } from "./types";
-import type { VerifyStatus } from "./types";
+import type { VerifyPassGroupStatus, VerifyStatus } from "./types";
 import { countRecentCompletions, RECENT_COMPLETION_WINDOW_SECONDS } from "./completion-rate";
 import {
   findLastFullSuiteWindowStart,
   formatElapsed,
+  collectFailedLabels,
   parseBuck2ExitMarker,
   parseGcDetected,
   parseVerifyBeginEpochSec,
@@ -24,6 +25,22 @@ function formatProjectedEndTime(epochSec: number): string {
     hour: "numeric",
     minute: "2-digit",
   });
+}
+
+const MIN_GROUP_ELAPSED_SECONDS_FOR_AVG_PROJECTION = 30;
+
+function passExitCompletedForProgress(
+  exit: { status: number; pass: number; fail: number; completions?: number },
+  targetCount: number | undefined,
+): number {
+  if (targetCount !== undefined && passExitRanToCompletion(exit)) {
+    return targetCount;
+  }
+  return exit.completions ?? exit.pass + exit.fail;
+}
+
+function passExitRanToCompletion(exit: { status: number; fail: number }): boolean {
+  return exit.status === 0 || (exit.status === 32 && exit.fail > 0);
 }
 
 function aggregateVerifyPassStatus(
@@ -51,19 +68,46 @@ function aggregateVerifyPassStatus(
     ? begins.reduce((sum, begin) => sum + (begin.targetCount || 0), 0)
     : undefined;
   const totalTargets = expandedTargetCount ?? totalFromBegins;
+  const failedAcrossPasses = collectFailedLabels(lines);
+  const passGroups: VerifyPassGroupStatus[] = [];
 
   for (const begin of begins) {
     const exit = passExitForBegin(begin, exits);
     if (exit) {
+      const exitCompleted = passExitCompletedForProgress(exit, begin.targetCount);
       pass += exit.pass;
       fail += exit.fail;
-      completed += exit.pass + exit.fail;
-      if (exit.status !== 0) buildFailure++;
+      completed += exitCompleted;
+      passGroups.push({
+        name: begin.name,
+        index: begin.index,
+        total: begin.total,
+        completed: exitCompleted,
+        targetCount: begin.targetCount,
+        pass: exit.pass,
+        fail: exit.fail,
+        fatal: 0,
+        skip: 0,
+        buildFailure: passExitRanToCompletion(exit) ? 0 : 1,
+        completionRateAvgPerMinute: completionRatePerMinute(
+          exitCompleted,
+          begin.startSec,
+          exit.endSec,
+        ),
+        done: true,
+        active: false,
+      });
       continue;
     }
     const canFilterBegin = begin.targetLabels !== undefined && begin.targetLabels.size > 0;
-    if (!canFilterBegin && activeBegins.length > 1 && begin !== latestBegin) continue;
-    if (!canFilterBegin && activeBegins.length <= 1 && begin !== activeBegins[0]) continue;
+    if (!canFilterBegin && activeBegins.length > 1 && begin !== latestBegin) {
+      passGroups.push(unknownActivePassGroup(begin));
+      continue;
+    }
+    if (!canFilterBegin && activeBegins.length <= 1 && begin !== activeBegins[0]) {
+      passGroups.push(unknownActivePassGroup(begin));
+      continue;
+    }
     const current = deriveInProgressCounts(lines.slice(begin.idx), {
       targetLabels: canFilterBegin ? begin.targetLabels : undefined,
     });
@@ -75,13 +119,37 @@ function aggregateVerifyPassStatus(
     completed += current.pass + current.fail + current.fatal + current.skip;
     failed = current.failed;
     remaining = current.remaining;
+    passGroups.push({
+      name: begin.name,
+      index: begin.index,
+      total: begin.total,
+      completed: current.pass + current.fail + current.fatal + current.skip,
+      targetCount: begin.targetCount,
+      pass: current.pass,
+      fail: current.fail,
+      fatal: current.fatal,
+      skip: current.skip,
+      buildFailure: current.buildFailure,
+      completionRateAvgPerMinute: completionRatePerMinute(
+        current.pass + current.fail + current.fatal + current.skip,
+        begin.startSec,
+        Date.now() / 1000,
+      ),
+      done: false,
+      active: true,
+    });
   }
 
   const expectedPassTotal = Math.max(...begins.map((begin) => begin.total));
   const begunPassIndexes = new Set(begins.map((begin) => begin.index));
-  const done =
+  const allPassesExited =
     begunPassIndexes.size >= expectedPassTotal &&
     begins.every((begin) => passExitForBegin(begin, exits) !== undefined);
+  const interruptedExits = begins
+    .map((begin) => passExitForBegin(begin, exits))
+    .filter((exit): exit is NonNullable<typeof exit> => exit !== undefined)
+    .filter((exit) => !passExitRanToCompletion(exit));
+  const done = allPassesExited && interruptedExits.length === 0;
   const aggregateRemaining =
     totalTargets === undefined ? remaining : Math.max(0, totalTargets - completed);
   const groupProgress = (() => {
@@ -91,7 +159,7 @@ function aggregateVerifyPassStatus(
         : undefined;
     if (latestExit) {
       return {
-        groupCompleted: latestExit.pass + latestExit.fail,
+        groupCompleted: passExitCompletedForProgress(latestExit, latestBegin.targetCount),
         groupTotal: latestBegin.targetCount,
       };
     }
@@ -110,16 +178,48 @@ function aggregateVerifyPassStatus(
     fail,
     fatal,
     skip,
-    buildFailure,
-    remaining: done && latestExit?.status === 0 ? 0 : aggregateRemaining,
-    failed: failed.length > 0 ? failed : base.failed,
+    buildFailure: buildFailure + interruptedExits.length,
+    remaining: done ? 0 : aggregateRemaining,
+    failed:
+      failedAcrossPasses.length > 0 ? failedAcrossPasses : failed.length > 0 ? failed : base.failed,
     done,
+    stopped: base.stopped || (!done && allPassesExited && interruptedExits.length > 0),
+    stopReason:
+      base.stopReason ||
+      (!done && allPassesExited && interruptedExits.length > 0
+        ? `pass exited before completing all targets: ${interruptedExits
+            .map((exit) => `${exit.name} status=${exit.status}`)
+            .join(", ")}`
+        : undefined),
     source: "derived",
     passName: latestBegin.name || undefined,
     passIndex: latestBegin.index,
     passTotal: latestBegin.total,
     groupCompleted: groupProgress.groupCompleted,
     groupTotal: groupProgress.groupTotal,
+    passGroups,
+  };
+}
+
+function unknownActivePassGroup(begin: {
+  name: string;
+  index: number;
+  total: number;
+  targetCount?: number;
+}): VerifyPassGroupStatus {
+  return {
+    name: begin.name,
+    index: begin.index,
+    total: begin.total,
+    completed: undefined,
+    targetCount: begin.targetCount,
+    pass: 0,
+    fail: 0,
+    fatal: 0,
+    skip: 0,
+    buildFailure: 0,
+    done: false,
+    active: true,
   };
 }
 
@@ -154,8 +254,11 @@ export function computeVerifyStatusFromLogText(opts: {
   // - When done: freeze using end_s if available; otherwise treat as unknown ("?").
   const done =
     base.passTotal && base.passTotal > 1 ? base.done : exitMarker.done ? true : base.done;
-  const stoppedAtSec = stoppedMarker.endSec ?? opts.stoppedAtSec;
-  const stopped = !done && (stoppedMarker.stopped || stoppedAtSec !== undefined);
+  const stoppedAtSec =
+    stoppedMarker.endSec ??
+    opts.stoppedAtSec ??
+    (!base.done && base.stopped ? exitMarker.endSec : undefined);
+  const stopped = !done && (base.stopped || stoppedMarker.stopped || stoppedAtSec !== undefined);
   const elapsedSeconds = (() => {
     if (beginSec === undefined) return undefined;
     if (done) {
@@ -198,25 +301,50 @@ export function computeVerifyStatusFromLogText(opts: {
   const projection = (() => {
     const begins = parsePassBegins(window);
     const exits = parsePassExits(window);
-    const lastPass = begins
-      .filter(
-        (begin) =>
-          begin.index === begin.total &&
-          begin.startSec !== undefined &&
-          passExitForBegin(begin, exits) === undefined,
-      )
-      .at(-1);
-    if (!lastPass || done || stopped) return {};
-    if (nowSec - (lastPass.startSec || 0) < RECENT_COMPLETION_WINDOW_SECONDS) return {};
-    if (base.remaining === undefined || base.remaining <= 0) return {};
+    const expectedPassTotal =
+      begins.length > 0 ? Math.max(...begins.map((begin) => begin.total)) : 0;
+    const begunPassIndexes = new Set(begins.map((begin) => begin.index));
+    const activeBegins = begins.filter((begin) => passExitForBegin(begin, exits) === undefined);
     if (
-      completionRateRecentPerMinute === undefined ||
-      !Number.isFinite(completionRateRecentPerMinute) ||
-      completionRateRecentPerMinute <= 0
+      done ||
+      stopped ||
+      expectedPassTotal <= 0 ||
+      begunPassIndexes.size < expectedPassTotal ||
+      activeBegins.length === 0
     ) {
       return {};
     }
-    const remainingSeconds = (base.remaining / completionRateRecentPerMinute) * 60;
+
+    let remainingSeconds = 0;
+    for (const begin of activeBegins) {
+      if (begin.startSec === undefined) return {};
+      if (nowSec - begin.startSec < MIN_GROUP_ELAPSED_SECONDS_FOR_AVG_PROJECTION) return {};
+
+      const targetLabels =
+        begin.targetLabels && begin.targetLabels.size > 0 ? begin.targetLabels : undefined;
+      const current = deriveInProgressCounts(lines.slice(begin.idx), { targetLabels });
+      const groupRemaining =
+        begin.targetCount === undefined
+          ? current.remaining
+          : Math.max(
+              0,
+              begin.targetCount - current.pass - current.fail - current.fatal - current.skip,
+            );
+      if (groupRemaining === undefined) return {};
+      if (groupRemaining <= 0) continue;
+      const groupCompleted = current.pass + current.fail + current.fatal + current.skip;
+      const averageRateForGroup = completionRatePerMinute(groupCompleted, begin.startSec, nowSec);
+      if (
+        averageRateForGroup === undefined ||
+        !Number.isFinite(averageRateForGroup) ||
+        averageRateForGroup <= 0
+      ) {
+        return {};
+      }
+      remainingSeconds = Math.max(remainingSeconds, (groupRemaining / averageRateForGroup) * 60);
+    }
+
+    if (remainingSeconds <= 0) return {};
     const projectedTotalSeconds =
       beginSec === undefined ? undefined : nowSec + remainingSeconds - beginSec;
     return {
@@ -228,7 +356,12 @@ export function computeVerifyStatusFromLogText(opts: {
   // If the buck2 test exited non-zero but we didn't see an explicit build failure count,
   // treat it as a build failure for status coloring.
   const buildFailure =
-    exitMarker.done && exitMarker.exitCode !== undefined && exitMarker.exitCode !== 0
+    exitMarker.done &&
+    exitMarker.exitCode !== undefined &&
+    exitMarker.exitCode !== 0 &&
+    base.fail === 0 &&
+    base.fatal === 0 &&
+    base.buildFailure === 0
       ? Math.max(1, base.buildFailure)
       : base.buildFailure;
 
@@ -240,6 +373,7 @@ export function computeVerifyStatusFromLogText(opts: {
     stopped,
     stopReason: stopped ? (stoppedMarker.reason ?? opts.stopReason) : undefined,
     buildFailure,
+    remaining: done ? 0 : base.remaining,
     elapsed,
     completionRateAvgPerMinute,
     completionRateRecentPerMinute,
@@ -247,4 +381,16 @@ export function computeVerifyStatusFromLogText(opts: {
     projectedEndTime: projection.projectedEndTime,
     gcDetected,
   };
+}
+
+function completionRatePerMinute(
+  completed: number,
+  startSec: number | undefined,
+  endSec: number | undefined,
+): number | undefined {
+  if (startSec === undefined || endSec === undefined) return undefined;
+  const elapsedSeconds = endSec - startSec;
+  if (!Number.isFinite(elapsedSeconds) || elapsedSeconds <= 0) return undefined;
+  if (!Number.isFinite(completed) || completed <= 0) return undefined;
+  return completed / (elapsedSeconds / 60);
 }

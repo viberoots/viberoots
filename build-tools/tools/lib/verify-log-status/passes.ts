@@ -15,8 +15,10 @@ export type PassExit = {
   idx: number;
   name: string;
   status: number;
+  endSec?: number;
   pass: number;
   fail: number;
+  completions?: number;
 };
 
 function countTargetsFromPassBeginLine(line: string): number | undefined {
@@ -89,8 +91,10 @@ export function parsePassExits(lines: string[]): PassExit[] {
       idx,
       name: m[1] || "",
       status: Number(m[2]),
+      endSec: parseNumberField(normalized, "end_s"),
       pass: Number(m[3]),
       fail: Number(m[4]),
+      completions: parseNumberField(normalized, "completions"),
     });
   }
   return out;

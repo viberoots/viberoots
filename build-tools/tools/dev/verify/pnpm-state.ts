@@ -1,6 +1,9 @@
 import path from "node:path";
 import { computeImporterLabel, findImporterLockfiles } from "../../lib/importers";
-import { removeLegacyImporterPnpmState } from "../../lib/pnpm-state-paths";
+import {
+  pruneOrphanExternalPnpmStateDirs,
+  removeLegacyImporterPnpmState,
+} from "../../lib/pnpm-state-paths";
 
 export async function cleanupVerifyLegacyPnpmState(root: string): Promise<void> {
   const lockfiles = await findImporterLockfiles(["pnpm-lock.yaml"]);
@@ -9,4 +12,5 @@ export async function cleanupVerifyLegacyPnpmState(root: string): Promise<void> 
     const importerAbs = importer === "." ? root : path.join(root, importer);
     await removeLegacyImporterPnpmState(importerAbs);
   }
+  await pruneOrphanExternalPnpmStateDirs();
 }

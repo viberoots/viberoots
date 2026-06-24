@@ -40,7 +40,10 @@ function computePlatformLabel(cwd: string): string {
   return env || platformFromBuckconfig(cwd) || "prelude//platforms:default";
 }
 
-function computeRootsExpr(cwd: string): string {
+export function computeRootsExpr(cwd: string): string {
+  const target = String(process.env.BUCK_TARGET || "").trim();
+  if (target) return `set(${target})`;
+
   const importerRoots = getImporterRootsContract().workspaceRoots;
   const defaultRoots = Array.from(new Set([...importerRoots, "third_party", "go", "cpp"]));
   const rootsFromEnv = parseCsvish(process.env.BUCK_QUERY_ROOTS || "");
@@ -53,9 +56,11 @@ function computeRootsExpr(cwd: string): string {
       return false;
     }
   });
-  // If none of the conventional roots exist in this workspace (common in temp-repo tests),
-  // fall back to scanning the whole repo with //... rather than referencing a non-existent dir.
-  if (existing.length === 0) return "//...";
+  // Sparse temp repos may not contain the conventional roots. Do not broaden
+  // to //... here: metadata directories such as .git can mutate under Buck
+  // while tests create commits, producing nondeterministic recursive-spec
+  // failures. Callers that need sparse-package targets must pass BUCK_TARGET.
+  if (existing.length === 0) return "set()";
   const roots = existing;
   const patterns = roots.map((r) => {
     const root = r.startsWith("//") ? r : `//${r}`;
@@ -184,7 +189,9 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
 
   return await withBuckCleanup(iso, ownsIso, async () => {
     const runQueriesOnce = async (): Promise<Record<string, any>> => {
+      const hasSelectedTarget = String(process.env.BUCK_TARGET || "").trim() !== "";
       const base = `deps(//..., 1, exec_deps())`;
+      const selectedBase = `deps(//...)`;
       const allKind = `kind(".*", //...)`;
       const kindCxxTest = `kind("cxx_test", //...)`;
       const attrCxxTest = `attrfilter(rule_type, "cxx_test", //...)`;
@@ -195,6 +202,7 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
       const kindNixCxxLib = `attrfilter(rule_type, "nix_cxx_library", //...)`;
       const obj0 = await runQuery(allKind);
       const obj1 = await runQuery(base);
+      const objSelected = hasSelectedTarget ? await runQuery(selectedBase) : {};
       const obj2 = await runQuery(kindCxxTest);
       const obj3 = await runQuery(attrCxxTest);
       const obj4 = await runQuery(kindCxxBin);
@@ -205,6 +213,7 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
       return {
         ...obj0,
         ...obj1,
+        ...objSelected,
         ...obj2,
         ...obj3,
         ...obj4,

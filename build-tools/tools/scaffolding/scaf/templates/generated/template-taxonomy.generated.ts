@@ -3,13 +3,13 @@
 
 export const TEMPLATE_NAME_ALIASES: Record<string, string> = {
   "cli-app": "cli",
-  "library": "lib",
+  library: "lib",
   "ts-go-cpp-lib": "go-cpp-lib",
 };
 
 export const TEMPLATE_TAXONOMY = {
-  "cpp": ["cli", "lib"],
-  "deployment": [
+  cpp: ["cli", "lib"],
+  deployment: [
     "cloudflare-containers",
     "cloudflare-pages",
     "opentofu-foundation",
@@ -18,15 +18,10 @@ export const TEMPLATE_TAXONOMY = {
     "shared",
     "vercel-next",
   ],
-  "go": ["cli", "lib"],
-  "language": ["kit"],
-  "python": [
-    "app",
-    "lib",
-    "wasm-app",
-    "wasm-lib",
-  ],
-  "ts": [
+  go: ["cli", "lib"],
+  language: ["kit"],
+  python: ["app", "lib", "wasm-app", "wasm-lib"],
+  ts: [
     "cli",
     "cpp-addon",
     "go-addon",

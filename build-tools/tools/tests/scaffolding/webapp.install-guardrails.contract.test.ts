@@ -15,27 +15,31 @@ const LIGHTWEIGHT_LOCAL_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
     file: "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.static.contract.test.ts",
     required: [
       "--skip-store-hash-refresh",
-      "pnpm --dir ${tmp} install",
-      "--filter ./projects/apps/demo-web...",
-      "--frozen-lockfile",
-      "--prefer-offline",
-      "--ignore-scripts",
+      'import { pnpmInstallForDevTest, spawnStaticViteDevServer } from "./lib/dev-node-modules";',
+      "pnpmInstallForDevTest({",
+      'filter: "./projects/apps/demo-web...",',
     ],
-    forbidden: ["--skip-lockfile-gen", "--no-frozen-lockfile", "git add -A projects/apps/demo-web"],
+    forbidden: [
+      "--skip-lockfile-gen",
+      "--no-frozen-lockfile",
+      "pnpm --dir ${appAbs} install",
+      "pnpm --dir ${tmp} install",
+      "git add -A projects/apps/demo-web",
+    ],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.ssr-next.contract.test.ts",
     required: [
       "--skip-store-hash-refresh",
-      "pnpm --dir ${tmp} install",
-      "--filter ./projects/apps/demo-next...",
-      "--frozen-lockfile",
-      "--prefer-offline",
-      "--ignore-scripts",
+      'import { pnpmInstallForDevTest, spawnNextSsrDevServer } from "./lib/dev-node-modules";',
+      "pnpmInstallForDevTest({",
+      'filter: "./projects/apps/demo-next...",',
     ],
     forbidden: [
       "--skip-lockfile-gen",
       "--no-frozen-lockfile",
+      "pnpm --dir ${appAbs} install",
+      "pnpm --dir ${tmp} install",
       "git add -A projects/apps/demo-next",
     ],
   },
@@ -43,16 +47,15 @@ const LIGHTWEIGHT_LOCAL_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
     file: "build-tools/tools/tests/scaffolding/webapp.zero-wasm-default.ssr-vite.contract.test.ts",
     required: [
       "--skip-store-hash-refresh",
-      "pnpm --dir ${appAbs} install",
-      "--ignore-workspace",
-      "--frozen-lockfile",
-      "--prefer-offline",
-      "--ignore-scripts",
+      'import { pnpmInstallForDevTest, spawnViteSsrDevServer } from "./lib/dev-node-modules";',
+      "pnpmInstallForDevTest({",
+      'filter: "./projects/apps/demo-vite...",',
     ],
     forbidden: [
       "--skip-lockfile-gen",
       "--no-frozen-lockfile",
-      "--filter ./projects/apps/demo-vite...",
+      "pnpm --dir ${appAbs} install",
+      "pnpm --dir ${tmp} install",
       "git add -A projects/apps/demo-vite",
     ],
   },
@@ -60,20 +63,19 @@ const LIGHTWEIGHT_LOCAL_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
     file: "build-tools/tools/tests/scaffolding/webapp-static-pwa.runtime-offline.contract.test.ts",
     required: [
       "--skip-store-hash-refresh",
-      "pnpm --dir ${appAbs} install",
-      "--ignore-workspace",
-      "--frozen-lockfile",
-      "--prefer-offline",
-      "--ignore-scripts",
-      "pnpm --dir ${appAbs} run build",
+      'import { pnpmInstallForDevTest } from "./lib/dev-node-modules";',
+      "pnpmInstallForDevTest({",
+      'filter: "./projects/apps/demo-pwa...",',
+      "node scripts/build.mjs",
     ],
     forbidden: [
       "--skip-lockfile-gen",
       "--no-frozen-lockfile",
+      "pnpm --dir ${appAbs} install",
+      "pnpm --dir ${tmp} install",
+      "pnpm --dir ${appAbs} run build",
       "deps-main.ts --verbose --glue-only",
-      "update-pnpm-hash.ts --lockfile",
       "nix build",
-      "--filter ./projects/apps/demo-pwa...",
       "git add -A projects/apps/demo-pwa",
     ],
   },
@@ -87,38 +89,81 @@ const HEAVY_RUNTIME_EXPECTATIONS: InstallGuardrailExpectation[] = [
       'import { ensureNodeModulesForDevApp } from "./lib/dev-node-modules";',
       "ensureNodeModulesForDevApp({",
     ],
-    forbidden: ["--frozen-lockfile"],
+    forbidden: ["--frozen-lockfile", "pnpmInstallForDevTest({"],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts",
     required: [
       "--skip-lockfile-gen",
-      'import { ensureNodeModulesForDevApp } from "./lib/dev-node-modules";',
+      'import { ensureNodeModulesForDevApp, spawnViteSsrDevServer } from "./lib/dev-node-modules";',
       "ensureNodeModulesForDevApp({",
     ],
-    forbidden: ["--frozen-lockfile"],
+    forbidden: ["--frozen-lockfile", "pnpmInstallForDevTest({", 'spawn("pnpm", ["run", "dev"]'],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-consistency.test.ts",
     required: [
       "--skip-lockfile-gen",
-      "pnpm --dir ${tmp} install",
-      "--filter ./projects/apps/demo-vite-ssr...",
-      "--no-frozen-lockfile",
-      "--prefer-offline",
-      "--ignore-scripts",
+      'import { pnpmInstallForDevTest, spawnViteSsrDevServer } from "./lib/dev-node-modules";',
+      "pnpmInstallForDevTest({",
+      'filter: "./projects/apps/demo-vite-ssr...",',
+      'installMode: "raw-pnpm",',
     ],
-    forbidden: ["--frozen-lockfile"],
+    forbidden: ["--frozen-lockfile", "update-pnpm-hash.ts", "install/link-node.ts"],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-contract.test.ts",
     required: [
       "--skip-lockfile-gen",
-      "pnpm --dir ${appAbs} install",
-      "--prefer-offline",
-      "--ignore-workspace",
+      'import { pnpmInstallForDevTest, spawnViteSsrDevServer } from "./lib/dev-node-modules";',
+      "pnpmInstallForDevTest({",
+      'filter: "./projects/apps/demo-vite-ssr...",',
+      'installMode: "raw-pnpm",',
     ],
-    forbidden: ["--frozen-lockfile"],
+    forbidden: ["--frozen-lockfile", "update-pnpm-hash.ts", "install/link-node.ts"],
+  },
+];
+
+const RAW_PNPM_COMPATIBILITY_EXPECTATIONS: InstallGuardrailExpectation[] = [
+  {
+    file: "build-tools/tools/tests/scaffolding/lib/dev-node-modules.ts",
+    required: [
+      'installMode?: "nix" | "raw-pnpm";',
+      'const node = resolveToolPathSync("node", env);',
+      'const pnpm = resolveToolPathSync("pnpm", env);',
+      'path.join(opts.tmp, "pnpm-workspace.yaml")',
+      "await base`${node} ${pnpm} install ${sharedArgs} --lockfile-only --prefer-offline`;",
+      "await base`${node} ${pnpm} install ${sharedArgs} --frozen-lockfile --prefer-offline`;",
+      'opts.installMode === "raw-pnpm"',
+      'opts.installMode === "raw-pnpm" && localPnpmStore',
+      "...localPnpmStoreEnv,",
+    ],
+    forbidden: [
+      "await base`${pnpm} install ${sharedArgs}",
+      'update-pnpm-hash.ts")} --lockfile ${lockfile}`;\n  }\n  if (opts.installMode === "raw-pnpm")',
+    ],
+  },
+  {
+    file: "build-tools/tools/tests/scaffolding/webapp.raw-pnpm-install.compat.contract.test.ts",
+    required: [
+      "--skip-store-hash-refresh",
+      "pnpm --dir ${tmp} fetch",
+      "--filter ./projects/apps/demo-web...",
+      "--frozen-lockfile",
+      "--prefer-offline",
+      "--ignore-scripts",
+      "--ignore-pnpmfile",
+      "--reporter=append-only",
+      "--network-concurrency 1",
+      "--child-concurrency 1",
+    ],
+    forbidden: [
+      "pnpm --dir ${tmp} install",
+      "node scripts/build.mjs`",
+      "spawn",
+      "run build",
+      "run dev",
+    ],
   },
 ];
 
@@ -137,71 +182,51 @@ const DEP_EDIT_EXPECTATIONS: InstallGuardrailExpectation[] = [
     file: "build-tools/tools/tests/scaffolding/lib/webapp-local-ts-dep.ts",
     required: [
       "--skip-lockfile-gen",
-      "pnpm --dir ${tmp} install",
-      "--filter ./projects/apps/${options.appName}...",
-      "--no-frozen-lockfile",
-      "--ignore-scripts",
+      "pnpmInstallForDevTest({",
+      "filter: `./projects/apps/${options.appName}...`,",
+      'installMode: "raw-pnpm",',
     ],
-    forbidden: [
-      "pnpm install --ignore-scripts --reporter=append-only",
-      "--filter ./projects/libs/demo-lib",
-    ],
+    forbidden: ["update-pnpm-hash.ts", "install/link-node.ts", "--filter ./projects/libs/demo-lib"],
   },
   {
     file: "build-tools/tools/tests/scaffolding/lib/webapp-ssr-vite-local-ts-dep.ts",
     required: [
       "--skip-lockfile-gen",
-      "pnpm --dir ${tmp} install",
-      "--filter ./projects/apps/demo-vite-ssr...",
-      "--no-frozen-lockfile",
-      "--ignore-scripts",
+      "pnpmInstallForDevTest({",
+      'filter: "./projects/apps/demo-vite-ssr...",',
+      'installMode: "raw-pnpm",',
     ],
-    forbidden: [
-      "pnpm install --ignore-scripts --reporter=append-only",
-      "--filter ./projects/libs/demo-lib",
-    ],
+    forbidden: ["update-pnpm-hash.ts", "install/link-node.ts", "--filter ./projects/libs/demo-lib"],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-hmr.local-ts-dep.test.ts",
     required: [
       "--skip-lockfile-gen",
-      "pnpm --dir ${tmp} install",
-      "--filter ./projects/apps/demo-next-ssr...",
-      "--no-frozen-lockfile",
-      "--ignore-scripts",
+      "pnpmInstallForDevTest({",
+      'filter: "./projects/apps/demo-next-ssr...",',
+      'installMode: "raw-pnpm",',
     ],
-    forbidden: [
-      "pnpm install --ignore-scripts --reporter=append-only",
-      "--filter ./projects/libs/demo-lib",
-    ],
+    forbidden: ["update-pnpm-hash.ts", "install/link-node.ts", "--filter ./projects/libs/demo-lib"],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-reload.wasm-producer.test.ts",
     required: [
       "--skip-lockfile-gen",
-      "pnpm --dir ${tmp} install",
-      "--filter ./projects/apps/demo-next-ssr...",
-      "--no-frozen-lockfile",
-      "--ignore-scripts",
+      "pnpmInstallForDevTest({",
+      'filter: "./projects/apps/demo-next-ssr...",',
+      'installMode: "raw-pnpm",',
     ],
-    forbidden: [
-      "pnpm install --ignore-scripts --reporter=append-only",
-      "--filter ./projects/libs/demo-lib",
-    ],
+    forbidden: ["update-pnpm-hash.ts", "install/link-node.ts", "--filter ./projects/libs/demo-lib"],
   },
   {
     file: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-runtime-consistency.test.ts",
     required: [
       "--skip-lockfile-gen",
-      "pnpm --dir ${tmp} install",
-      "--filter ./projects/apps/demo-next-ssr...",
-      "--no-frozen-lockfile",
-      "--ignore-scripts",
+      "pnpmInstallForDevTest({",
+      'filter: "./projects/apps/demo-next-ssr...",',
+      'installMode: "raw-pnpm",',
     ],
-    forbidden: [
-      "pnpm install --ignore-scripts --reporter=append-only",
-      "--filter ./projects/libs/demo-lib",
-    ],
+    forbidden: ["update-pnpm-hash.ts", "install/link-node.ts", "--filter ./projects/libs/demo-lib"],
   },
 ];
 
@@ -240,6 +265,12 @@ test("install guardrails: lightweight local-runtime tests keep scaffold lockfile
 
 test("install guardrails: heavy runtime tests own install via skip-lockfile-gen", async () => {
   for (const expectation of HEAVY_RUNTIME_EXPECTATIONS) {
+    await assertContract(expectation);
+  }
+});
+
+test("install guardrails: raw pnpm compatibility is isolated from runtime smoke", async () => {
+  for (const expectation of RAW_PNPM_COMPATIBILITY_EXPECTATIONS) {
     await assertContract(expectation);
   }
 });

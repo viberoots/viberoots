@@ -17,6 +17,7 @@ import { prepareExactPnpmStore } from "./update-pnpm-hash/exact-store";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 import { getImporterRootsContract } from "../lib/importer-roots";
 import { sanitizeName } from "../lib/sanitize";
+import { markMacosMetadataNeverIndex } from "../lib/macos-metadata";
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -89,7 +90,12 @@ async function repairSnapshotViberootsInput(snapDir: string): Promise<string> {
 
 async function tempRepoLiveViberootsRoot(): Promise<string> {
   if (String(process.env.VBR_RUN_IN_TEMP_REPO || "").trim() !== "1") return "";
-  const raw = String(process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "").trim();
+  const raw = String(
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
+      process.env.VIBEROOTS_SOURCE_ROOT ||
+      process.env.VIBEROOTS_ROOT ||
+      "",
+  ).trim();
   if (!raw) return "";
   const root = path.resolve(raw);
   if (
@@ -166,6 +172,23 @@ async function resolveSnapshotFlakeDir(snapDir: string): Promise<string> {
     );
   }
   return path.dirname(flakePath);
+}
+
+async function copyWorkspaceGraphIntoSnapshot(root: string, snapDir: string): Promise<void> {
+  const graphPath = path.resolve(
+    String(process.env.BUCK_GRAPH_JSON || path.join(root, DEFAULT_GRAPH_PATH)),
+  );
+  if (!(await pathExists(graphPath))) return;
+  const snapshotGraphPath = path.join(snapDir, DEFAULT_GRAPH_PATH);
+  const snapshotBuckRoot = path.join(snapDir, ".viberoots", "buck");
+  await fsp.mkdir(snapshotBuckRoot, { recursive: true });
+  await fsp.copyFile(graphPath, path.join(snapshotBuckRoot, "graph.json"));
+  const snapshotWorkspaceBuck = path.dirname(snapshotGraphPath);
+  const workspaceBuckStat = await fsp.lstat(snapshotWorkspaceBuck).catch(() => null);
+  if (!workspaceBuckStat?.isSymbolicLink()) {
+    await fsp.mkdir(snapshotWorkspaceBuck, { recursive: true });
+    await fsp.copyFile(graphPath, snapshotGraphPath);
+  }
 }
 
 async function readSelectedCppSnapshotSources(
@@ -267,6 +290,7 @@ async function main(): Promise<void> {
   const root = path.resolve(String(process.env.WORKSPACE_ROOT || process.cwd()).trim());
   const tmpBase = process.env.TMPDIR || "/tmp";
   const workDir = await fsp.mkdtemp(path.join(tmpBase, "vbr-flake-"));
+  await markMacosMetadataNeverIndex(workDir);
   const snapDir = path.join(workDir, "src");
   let keepSnapshot = snapshotOnly;
   const withHeartbeat = async <T>(label: string, p: Promise<T>): Promise<T> => {
@@ -283,6 +307,7 @@ async function main(): Promise<void> {
   };
   try {
     await fsp.mkdir(snapDir, { recursive: true });
+    await markMacosMetadataNeverIndex(snapDir);
     const rsyncExcludes = filteredFlakeRsyncExcludeArgs();
     const selectedCppSources = await readSelectedCppSnapshotSources(root);
     const snapshotStart = Date.now();
@@ -311,6 +336,7 @@ async function main(): Promise<void> {
         })`rsync -a --delete ${rsyncExcludes} ${root}/ ${snapDir}/`,
       );
     }
+    await copyWorkspaceGraphIntoSnapshot(root, snapDir);
     const snapshotStats = await readSnapshotStats(snapDir);
     console.error(
       `[nix-build-filtered-flake] snapshot ready in ${formatDuration(Date.now() - snapshotStart)} files=${snapshotStats.fileCount} dirs=${snapshotStats.dirCount} kb=${snapshotStats.kb}`,

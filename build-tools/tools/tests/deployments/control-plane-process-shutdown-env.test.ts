@@ -26,6 +26,8 @@ type WorkerOnceOpts = Parameters<typeof runNixosSharedHostControlPlaneWorkerOnce
 test("worker close aborts in-flight claim renewal and replacement claims after expiry", async () => {
   await runInTemp("control-plane-worker-close-inflight-lease", async (tmp) => {
     const backend = { recordsRoot: tmp, databaseUrl: localHarnessControlPlaneDatabaseUrl(tmp) };
+    const claimMs = 5_000;
+    const heartbeatMs = 100;
     await writeBackendSnapshotDoc(backend, { submissionId: "cp-inflight" }, `${tmp}/snapshot.json`);
     await writeBackendSubmissionDoc(
       backend,
@@ -48,15 +50,15 @@ test("worker close aborts in-flight claim renewal and replacement claims after e
       markInFlight = resolve;
     });
     const runOnce = async (opts: WorkerOnceOpts) => {
-      const claimed = await claimBackendQueuedSubmission(backend, opts.workerId, 250);
+      const claimed = await claimBackendQueuedSubmission(backend, opts.workerId, claimMs);
       assert.ok(claimed);
       const lease = startBackendSubmissionClaimLease({
         backend,
         submissionId: claimed.submissionId,
         workerId: opts.workerId,
         claimToken: claimed.claimToken,
-        claimMs: 250,
-        heartbeatMs: 25,
+        claimMs,
+        heartbeatMs,
         ...(opts.abortSignal ? { abortSignal: opts.abortSignal } : {}),
       });
       renewedExpiry = await waitForClaimRenewal(
@@ -81,7 +83,9 @@ test("worker close aborts in-flight claim renewal and replacement claims after e
 
     await inFlight;
     await worker.close();
-    await new Promise((resolve) => setTimeout(resolve, 350));
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.max(0, renewedExpiry - Date.now() + 150)),
+    );
     assert.ok((await readQueueClaimExpiry(backend, "cp-inflight")) >= renewedExpiry);
     const replacement = await claimBackendQueuedSubmission(backend, "worker-replacement", 250);
     assert.equal(replacement?.submissionId, "cp-inflight");

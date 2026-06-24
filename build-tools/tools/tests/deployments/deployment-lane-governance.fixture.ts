@@ -30,7 +30,6 @@ import {
   defaultApprovalBoundaries,
   defaultSourceRefPolicies,
 } from "./deployment-lane-governance-defaults.fixture";
-
 let buckQueryNonce = 0;
 
 function freshBuckQueryEnv(tmp: string): NodeJS.ProcessEnv {
@@ -42,7 +41,6 @@ function freshBuckQueryEnv(tmp: string): NodeJS.ProcessEnv {
   delete env.BUCK_ISOLATION_DIR_EXPORTER;
   return env;
 }
-
 export function nixosSharedHostLaneGovernanceFixture(
   overrides: Partial<DeploymentLaneGovernance> = {},
 ): DeploymentLaneGovernance {
@@ -57,7 +55,6 @@ export function nixosSharedHostLaneGovernanceFixture(
     fingerprint: overrides.fingerprint || "sha256:lane-governance-pleomino",
   };
 }
-
 export function nixosSharedHostLaneGovernanceNodeFixture(
   overrides: Partial<GraphNode> = {},
 ): GraphNode {

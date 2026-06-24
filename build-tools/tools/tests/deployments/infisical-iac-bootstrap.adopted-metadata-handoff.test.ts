@@ -2,14 +2,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { reconcileDeploymentMetadata } from "../../deployments/infisical-iac-bootstrap-reconcile";
-import { parsePleominoReviewedContextConfig } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
+import { parseDeploymentReviewedContextConfig } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
 
 test("adopted project metadata drift becomes a reviewed handoff patch", () => {
   const source = SOURCE.replaceAll("proj_old", "reviewed-live-project").replace(
     "identity_old_staging",
     "reviewed-live-staging-identity",
   );
-  const reviewed = parsePleominoReviewedContextConfig(source);
+  const reviewed = parseDeploymentReviewedContextConfig(source, "fixture");
   const result = reconcileDeploymentMetadata(LIVE_METADATA, reviewed, source, {
     allowReviewedIdHandoff: true,
   });
@@ -20,7 +20,7 @@ test("adopted project metadata drift becomes a reviewed handoff patch", () => {
 
 test("adopted project metadata handoff still requires live ids", () => {
   const source = SOURCE.replace("proj_old", "reviewed-live-project");
-  const reviewed = parsePleominoReviewedContextConfig(source);
+  const reviewed = parseDeploymentReviewedContextConfig(source, "fixture");
   assert.throws(
     () =>
       reconcileDeploymentMetadata({ ...LIVE_METADATA, projectId: undefined }, reviewed, source, {
@@ -31,7 +31,7 @@ test("adopted project metadata handoff still requires live ids", () => {
 });
 
 test("adopted project metadata handoff does not relax reviewed file-name drift", () => {
-  const reviewed = parsePleominoReviewedContextConfig(SOURCE);
+  const reviewed = parseDeploymentReviewedContextConfig(SOURCE, "fixture");
   assert.throws(
     () =>
       reconcileDeploymentMetadata(
@@ -85,7 +85,7 @@ const LIVE_METADATA = {
 const SOURCE = `${JSON.stringify(
   {
     deploymentContexts: {
-      "pleomino-staging": {
+      "fixture-staging": {
         infisical: {
           host: "https://app.infisical.com",
           projectId: "proj_old",
@@ -102,7 +102,7 @@ const SOURCE = `${JSON.stringify(
         },
         cloudflare: { apiTokenRef: "secret://deployments/fixture/cloudflare_api_token" },
       },
-      "pleomino-prod": {
+      "fixture-prod": {
         infisical: {
           host: "https://app.infisical.com",
           projectId: "proj_old",

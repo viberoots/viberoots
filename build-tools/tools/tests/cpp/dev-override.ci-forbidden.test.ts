@@ -6,21 +6,26 @@ async function main() {
     CI: "true",
     NIX_CPP_DEV_OVERRIDE_JSON: '{"pkgs.zlib":"/tmp/does-not-matter"}',
   };
-  let failed = false;
-  try {
-    await $({
-      env,
-    })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
-    // Attempt a trivial build to force template evaluation
-    await $({ env })`node viberoots/build-tools/tools/buck/sync-providers.ts --lang=cpp`;
-    await $({
-      env,
-    })`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
-  } catch {
-    failed = true;
-  }
-  if (!failed) {
+  const expr = `
+    let
+      base = import <nixpkgs> {};
+      pkgs = {
+        lib = base.lib;
+        llvmPackages = { clang = "/fake"; llvm = "/fake"; };
+        nodejs = "/fake";
+        nodejs_22 = "/fake";
+      };
+      C = import ./viberoots/build-tools/tools/nix/templates/cpp-common.nix { inherit pkgs; };
+    in C._ci_guard
+  `;
+  const evalResult = await $({ env })`nix-instantiate --eval --strict -E ${expr}`.nothrow();
+  const output = `${evalResult.stdout || ""}\n${evalResult.stderr || ""}`;
+  if (evalResult.exitCode === 0) {
     console.error("expected CI guard to fail but it passed");
+    process.exit(2);
+  }
+  if (!output.includes("Dev overrides are forbidden in CI")) {
+    console.error(`expected CI guard failure, got:\n${output}`);
     process.exit(2);
   }
   console.log("OK: CI guard failed as expected");

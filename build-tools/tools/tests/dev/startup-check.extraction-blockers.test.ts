@@ -133,6 +133,37 @@ test("startup-check accepts a clean local viberoots submodule gitlink", async ()
   }
 });
 
+test("startup-check accepts workspace lock resolved through VIBEROOTS_SOURCE_ROOT", async () => {
+  const { root, submodule } = await submoduleWorkspace("vbr-startup-source-root-lock");
+  const oldCwd = process.cwd();
+  const oldSourceRoot = process.env.VIBEROOTS_SOURCE_ROOT;
+  try {
+    await writeFile(
+      path.join(root, ".viberoots", "workspace", "flake.nix"),
+      `{ inputs.viberoots.url = "path:${submodule}"; outputs = _: {}; }\n`,
+    );
+    await writeFile(
+      path.join(root, ".viberoots", "workspace", "flake.lock"),
+      JSON.stringify({
+        nodes: {
+          viberoots: {
+            locked: { type: "path", path: submodule },
+            original: { type: "path", path: submodule },
+          },
+        },
+      }),
+    );
+    process.chdir(root);
+    process.env.VIBEROOTS_SOURCE_ROOT = submodule;
+    await validateStartupWorkspaceState();
+  } finally {
+    if (oldSourceRoot === undefined) delete process.env.VIBEROOTS_SOURCE_ROOT;
+    else process.env.VIBEROOTS_SOURCE_ROOT = oldSourceRoot;
+    process.chdir(oldCwd);
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("startup-check warns but allows dirty local viberoots submodule", async () => {
   const { root, submodule } = await submoduleWorkspace("vbr-startup-submodule-dirty");
   const oldCwd = process.cwd();

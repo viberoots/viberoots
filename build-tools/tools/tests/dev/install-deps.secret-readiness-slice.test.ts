@@ -18,7 +18,7 @@ const baseFlags = {
   forceOverwriteLocalCredentials: false,
 };
 
-test("install secret readiness is quiet when Pleomino metadata is absent", async () => {
+test("install secret readiness is quiet when deployment metadata is absent", async () => {
   await withRepo(async (repoRoot) => {
     let probeCalls = 0;
     const output = await captureOutput(async () => {

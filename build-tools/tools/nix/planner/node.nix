@@ -14,6 +14,7 @@ let
   repoRoot = ctx.repoRoot;
   repoSnapshot = ctx.repoSnapshot or repoRoot;
   repoStoreRoot = ctx.repoStoreRoot or repoSnapshot;
+  repoFsRoot = ctx.repoFsRoot or repoStoreRoot;
   sharedNodeMods = ctx.nodeMods or null;
   labelsOf = L.labelsOf;
   nameOf = L.nameOf;
@@ -73,13 +74,13 @@ in {
       if k == "app" && isWebappLike n then "webapp" else k;
   modulesFileFor = name: ctx.modulesTomlFor name;
   mkApp = name: import ./node-app.nix {
-    inherit pkgs H repoStoreRoot sharedNodeMods lockInfoOfName targetNameOf name;
+    inherit pkgs H repoStoreRoot repoFsRoot sharedNodeMods lockInfoOfName targetNameOf name;
   };
   mkGen = name: mkGenLike { inherit name; kind = "gen"; };
   mkLib = name: mkGenLike { inherit name; kind = "lib"; };
   mkBin = name: mkGenLike { inherit name; kind = "bin"; };
   mkWebapp = name: import ./node-webapp.nix {
-    inherit pkgs H repoStoreRoot sharedNodeMods lockInfoOfName nodeOfName labelsOf name;
+    inherit pkgs H repoStoreRoot repoFsRoot sharedNodeMods lockInfoOfName nodeOfName labelsOf name;
     frameworkMissingError =
       "node planner: SSR webapp target ${name} missing framework label (framework:express|framework:next|framework:vite)";
   };

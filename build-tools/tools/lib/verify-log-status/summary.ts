@@ -6,10 +6,12 @@ import {
 } from "./parsing";
 
 export function parseFinalSummary(lines: string[]): Omit<VerifyStatus, "logPath"> | null {
-  // Example:
+  // Examples:
   // Tests finished: Pass 581. Fail 0. Fatal 0. Skip 0. Build failure 0
+  // Tests finished: Pass 6. Fail 0. Timeout 0. Fatal 0. Skip 0. Omit 0.
+  //   Infra Failure 0. Build failure 0
   const summaryRe =
-    /^Tests finished:\s+Pass\s+(\d+)\.\s+Fail\s+(\d+)\.\s+Fatal\s+(\d+)\.\s+Skip\s+(\d+)\.\s+Build failure\s+(\d+)/;
+    /^Tests finished:\s+Pass\s+(\d+)\.\s+Fail\s+(\d+)\.(?:\s+Timeout\s+\d+\.)?\s+Fatal\s+(\d+)\.\s+Skip\s+(\d+)\.(?:\s+Omit\s+\d+\.)?(?:\s+Infra Failure\s+\d+\.)?\s+Build failure\s+(\d+)/;
 
   // Only treat the run as "done" if a non-comment summary appears very near the end of the log window.
   // This avoids incorrectly reporting completion when the log contains older full-suite summaries.

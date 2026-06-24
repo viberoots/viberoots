@@ -23,17 +23,17 @@ test("cpp shared lib links into binary and exports symbol", async () => {
     );
 
     await fs.outputFile(
-      path.join(tmp, "libs", "shared", "include", "shared.h"),
+      path.join(tmp, "projects", "libs", "shared", "include", "shared.h"),
       ["#pragma once", "int shared_answer();", ""].join("\n"),
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "libs", "shared", "src", "shared.cpp"),
+      path.join(tmp, "projects", "libs", "shared", "src", "shared.cpp"),
       ['#include "../include/shared.h"', "int shared_answer() { return 42; }", ""].join("\n"),
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "libs", "shared", "TARGETS"),
+      path.join(tmp, "projects", "libs", "shared", "TARGETS"),
       [
         'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
@@ -50,7 +50,7 @@ test("cpp shared lib links into binary and exports symbol", async () => {
     );
 
     await fs.outputFile(
-      path.join(tmp, "apps", "demo", "src", "main.cpp"),
+      path.join(tmp, "projects", "apps", "demo", "src", "main.cpp"),
       [
         "#include <shared.h>",
         "#include <cstdio>",
@@ -84,8 +84,8 @@ test("cpp shared lib links into binary and exports symbol", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_link_mode_shared")} cquery "deps(//projects/apps/demo:demo)" --json --output-attribute name`;
-    if (probe.exitCode !== 0) return;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_link_mode_shared")} cquery --target-platforms prelude//platforms:default "deps(//projects/apps/demo:demo)" --json --output-attribute name`;
+    assert.equal(probe.exitCode, 0, String(probe.stderr || probe.stdout));
 
     await $({
       cwd: tmp,

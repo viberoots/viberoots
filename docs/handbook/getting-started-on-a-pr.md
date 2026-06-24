@@ -122,9 +122,9 @@ When adding or materially editing scaffold command guidance:
   - `never`: bypass deployment-aware narrowing and keep the prior selector behavior
 - Verify project-closure opt-in (PR-1.6):
   - use this only for compliance/release-gate runs that must verify one or more projects plus their full recursive dependency closure
-  - invocation: `v --selector project-closure --project projects/apps/pleomino`
-  - multiple projects: `v --selector project-closure --projects projects/apps/pleomino,projects/libs/shared-ui`
-  - preview only: `v --selector project-closure --project projects/apps/pleomino --explain-selection`
+  - invocation: `v --selector project-closure --project projects/apps/example-app`
+  - multiple projects: `v --selector project-closure --projects projects/apps/example-app,projects/libs/shared-ui`
+  - preview only: `v --selector project-closure --project projects/apps/example-app --explain-selection`
   - `VERIFY_SELECTOR=project-closure` and `VERIFY_PROJECTS=<csv>` are equivalent to the CLI flags; CLI flags win when both are set
   - this mode is intentionally slower than default project-impact because it walks full dependency closure instead of changed-project downstreams
 - Nix builds (planner outputs):
@@ -169,6 +169,23 @@ When this PR touches `ts/webapp-ssr-vite` paths, validate these deterministic fa
 - Broken dev SSR entry wiring:
   - `SSR contract error: failed to load /src/entry-server.ts:`
   - `SSR contract error: /src/entry-server.ts must export a render(url) function`
+
+### 3.2 Reusable viberoots fixture boundaries
+
+Reusable fixtures under `viberoots/` may model generic applications, libraries, deployment
+families, providers, and secret contracts, but they must stay reusable examples. Do not place
+parent-repository project docs, live deployment target state, family-specific bootstrap defaults, or
+project-owned hash/generated state under the viberoots source tree.
+
+Use names such as `example-app`, `console`, or `api` for reusable examples. Real project families,
+including their deployment contexts, checked-in runtime names, SprinkleRef contracts, and operator
+runbooks, belong under the consuming workspace, normally `projects/**`.
+
+When a test needs a second consumer, create the consumer workspace with its own `projects/**`,
+`.viberoots/workspace/**`, and parent-owned hash state. The test should fail if the reusable
+viberoots source gains `.viberoots/`, `buck-out/`, `config/workspace_*`, `projects/**`, or other
+consumer-owned generated state, and it should make that assertion before fixture cleanup can remove
+the misplaced files.
 
 ### 4. When `v` is slow (performance regression workflow)
 
@@ -260,7 +277,7 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Target invalidation explicitly**: include patch files in graph-visible inputs so Nix can track them without extra runtime work.
 - **Measure before optimizing**: identify the dominant cost first, then optimize only that path.
 - **Keep per-test timing summaries opt-in**: Buck stores test stdout/stderr in its event stream, so forcing `TEST_TIMING_SUMMARY=1` across full-suite `v` can turn instrumentation into event-bus/log amplification. Use `TEST_TIMING=summary v //:target` or an intentional profiling run, not the default verify path.
-- **Stage updated pnpm-store hashes in temp repos**: when a test updates `viberoots/build-tools/tools/nix/node-modules.hashes.json`, `git add` it before any Nix builds so the flake snapshot sees the new hash instead of the placeholder. If a test generates a new `pnpm-lock.yaml`, always regenerate its hash even if an older entry exists in the map.
+- **Stage updated pnpm-store hashes in temp repos**: when a consumer test updates `projects/node-modules.hashes.json`, `git add` it before any Nix builds so the flake snapshot sees the new hash instead of the placeholder. Standalone viberoots tooling hashes stay in `build-tools/tools/nix/node-modules.hashes.json`. If a test generates a new `pnpm-lock.yaml`, always regenerate its hash even if an older entry exists in the map.
 - **Watch pacing checkpoints, not just final duration**: if pass/min drops sharply between 5-minute and 10-minute checkpoints, treat that as a systemic contention signal and investigate immediately.
 - **Compare like-for-like verify evidence**: use completed full-suite runs (`[verify] buck2 test exit ... status=0`) and timing summaries; partial/failed runs can under-report throughput and mislead regression analysis.
 - **Confirm `verify:isolated` targets are truly isolated under wildcard/package verify scopes**: if timing-sensitive targets rely on `verify:isolated`, check the verify log for a dedicated `target pass begin name=isolated` entry. If a broad selector such as `//...` or `//project/...` stays in a single `shared` pass, the isolated label is not being materialized and suite concurrency can create false timing regressions.
@@ -283,6 +300,7 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Avoid parallel `direnv exec` for profiling**: concurrent `direnv`/Nix eval can block on `.direnv/flake-profile` and distort timing; collect timing baselines with serialized runs.
 - **Keep Nix GC idle during verify**: active `nix store gc`/`nix-store --gc` can contend on `/nix/var/nix/db/db.sqlite` and can invalidate just-realized store paths during temp-repo tests. Verify waits briefly for active GC and fails before Buck starts if GC remains active. Stop GC jobs and re-run before diagnosing target-level regressions. `l --status` / `s` will show `GC detected: yes` when the log contains a GC preflight warning.
 - **Keep macOS metadata indexing out of verify temp trees**: on Darwin, verify keeps high-churn temp repos under `/tmp/viberoots-verify-$USER.noindex/tmpdir` instead of the watched checkout or per-user `/var/folders` temp area, clears stale current and legacy repo-local `buck-out/tmp/tmpdir*` contents at startup when not in explicit concurrent-verify mode, and writes `.metadata_never_index` markers under generated output/temp roots. If `fseventsd`, `mds`, or `mds_stores` stays near the top of `ps` or pass/min drops sharply, treat that as run-level contention and investigate the temp-root policy before accepting full-suite timing evidence.
+- **Preserve metadata exclusion markers during cleanup**: cleanup may remove verify-owned `buck-out` children such as `v-*`, `verify-nested-*`, `tmp`, and `test-logs`, but it must not delete `.metadata_never_index`. Removing the marker after every verify can make the next broad run pay Spotlight/FSEvents contention even when temp repos themselves live under `.noindex`.
 - **Treat invalid store-path errors during verify as GC-corruption signals for that run**: if logs include `error: path '/nix/store/... .drv' is not valid` together with verify GC warning/notice lines, treat the run as tainted by concurrent store mutation. Stop GC and re-run the affected targets first; do not use that run for regression attribution.
 - **Keep Nix store optimisation out of the default verify path**: `v` skips `nix store optimise` unless `VERIFY_NIX_OPTIMISE=1` or `VERIFY_NIX_OPTIMIZE=1` is set. Treat optimisation as explicit recovery/maintenance work, not normal test setup.
 - **Do not pre-block lockfile generation on GC process presence alone**: lockfile paths should attempt work first and only wait/retry when an actual lockfile-generation failure occurs with active GC. Process-presence gating can create deterministic multi-minute stalls/failures even when lockfile generation would have succeeded immediately.
@@ -294,3 +312,5 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Use canonical module-contract paths in tests**: when validating TS/WASM manifests, resolve paths via `resolveModuleContractsPaths(...)` (buck-out contracts) instead of polling source-tree manifest files. Polling removed source paths creates deterministic `ENOENT` retry loops that look like contention but are systemic test/runtime regressions.
 - **Keep derivation build phases daemon-free**: avoid `nix-store`/`nix` introspection inside `runCommand` phases used by planner/test paths. Those calls can stall in sandboxed builds and create suite-wide timeout cascades.
 - **Keep repo-local Buck isolation cleanup ownership-aware**: stale `buck-out/v-*` and `buck-out/verify-nested-*` directories should be pruned only when their encoded owner PID is no longer alive; never delete shared isolation dirs such as `exporter-shared-*` or `devbuild-shared-*` as part of automatic verify cleanup.
+- **Keep missing-temp Buck daemon cleanup evidence-based**: do not rely on `buck2d[basename]` matching alone after a temp root is removed. Ownerless `zxtest-*`/verify daemons may be killed only when their cwd or forkserver state proves they belong to a missing verify temp repo; this preserves concurrent `v` runs while still reaping orphaned daemons.
+- **Reap temp-repo Buck forkservers explicitly and narrowly**: successful Buck commands can still leave `buck2-forkserver` processes under a temp repo's `buck-out` state dir. Cleanup should detect and terminate only forkservers whose `--state-dir` or cwd is inside the owned temp repo, then assert none remain. Do not broaden cleanup to unrelated Buck clients, shared exporter/devbuild isolations, or live concurrent `v` runs.

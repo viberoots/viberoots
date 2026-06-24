@@ -1,8 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { runVerifyWithDeps } from "../../dev/verify/run-verify";
+import { runVerifyWithDeps, SCOPED_VERIFY_RSYNC_ROOTS } from "../../dev/verify/run-verify";
 import { defaultRunVerifyDeps, type RunVerifyDeps } from "../../dev/verify/run-verify-deps";
+import { shouldPrepareVerifySeedForRequestedTargets } from "../../dev/verify/seed";
 
 const remoteEnv = {
   VBR_REMOTE_ARTIFACT_DIR: "/tmp/vbr-remote/artifacts",
@@ -201,6 +202,61 @@ test("runVerify accepted remote mode prepares remote-ready seed and skips local 
   assert.ok(calls.includes("should-seed"));
   assert.ok(calls.includes("prepare-seed:remote-ready"));
   assert.ok(calls.includes("buck-passes-zx:<null>"));
+});
+
+test("local scoped verify without seed gives runInTemp an explicit rsync repo setup", async () => {
+  const calls: string[] = [];
+  await assert.rejects(
+    async () =>
+      await withEnv({ TEST_RSYNC_ROOTS: "" }, async () => {
+        const deps = fakeRunVerifyDeps(calls);
+        deps.shouldPrepareVerifySeedForRequestedTargets = () => {
+          calls.push("should-seed");
+          return false;
+        };
+        deps.runVerifyBuckPasses = async () => {
+          calls.push(`rsync-roots:${process.env.TEST_RSYNC_ROOTS || ""}`);
+          return 0;
+        };
+        await runVerifyWithDeps(deps);
+      }),
+    (error) => error instanceof VerifyExit && error.code === 0,
+  );
+
+  assert.ok(calls.includes("should-seed"));
+  assert.equal(calls.includes("prepare-seed:local"), false);
+  assert.ok(calls.includes(`rsync-roots:${SCOPED_VERIFY_RSYNC_ROOTS}`));
+});
+
+test("local broad scoped verify prepares seed instead of falling back to rsync roots", async () => {
+  const calls: string[] = [];
+  await assert.rejects(
+    async () =>
+      await withEnv({ TEST_RSYNC_ROOTS: "" }, async () => {
+        const deps = fakeRunVerifyDeps(calls);
+        deps.parseVerifyArgs = () => ({
+          coverage: false,
+          console: "simple",
+          explainSelection: false,
+          requestedProjects: [],
+          selector: "default",
+          targets: ["//projects/...", "//viberoots/..."],
+        });
+        deps.shouldPrepareVerifySeedForRequestedTargets =
+          shouldPrepareVerifySeedForRequestedTargets;
+        deps.runVerifyBuckPasses = async () => {
+          calls.push(`seed-path:${process.env.VBR_TEST_SEED_STORE_PATH || ""}`);
+          calls.push(`rsync-roots:${process.env.TEST_RSYNC_ROOTS || ""}`);
+          return 0;
+        };
+        await runVerifyWithDeps(deps);
+      }),
+    (error) => error instanceof VerifyExit && error.code === 0,
+  );
+
+  assert.ok(calls.includes("prepare-seed:local"));
+  assert.ok(calls.includes("seed-path:/tmp/seed"));
+  assert.ok(calls.includes("rsync-roots:"));
 });
 
 test("runVerify rejects remote mode without activation before Buck", async () => {

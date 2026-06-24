@@ -50,10 +50,11 @@ async function runFileSizeLint(root: string): Promise<{
   const packageRoot = path.dirname(viberootsRepoPath("viberoots/package.json"));
   return await new Promise((resolve, reject) => {
     const child = spawn(
-      "pnpm",
+      process.execPath,
       [
-        "exec",
-        "tsx",
+        "--experimental-strip-types",
+        "--experimental-top-level-await",
+        "--disable-warning=ExperimentalWarning",
         "--import",
         importPath,
         scriptPath,
@@ -65,6 +66,9 @@ async function runFileSizeLint(root: string): Promise<{
       ],
       {
         cwd: packageRoot,
+        env: {
+          ...process.env,
+        },
         stdio: ["ignore", "pipe", "pipe"],
       },
     );
@@ -123,8 +127,9 @@ test("repo-owned file-size lint reports deployment-owned offenders with line cou
       0,
       `expected file-size-lint CLI to fail\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
     );
-    assert.match(result.stderr, new RegExp(offenderPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    assert.match(result.stderr, /251 lines/);
+    const output = `${result.stdout}\n${result.stderr}`;
+    assert.match(output, new RegExp(offenderPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.match(output, /251 lines/);
   });
 });
 

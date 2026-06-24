@@ -34,9 +34,9 @@ sprinkleref --check --scheme runtime
 sprinkleref --check --all
 sprinkleref --check --format json
 sprinkleref --check --category bootstrap
-sprinkleref --check --target //projects/deployments/pleomino/staging:deploy
-sprinkleref --check --target //projects/deployments/pleomino/staging:deploy --no-deps
-sprinkleref --check --target //projects/apps/pleomino:app --deps transitive
+sprinkleref --check --target //projects/deployments/example-app/staging:deploy
+sprinkleref --check --target //projects/deployments/example-app/staging:deploy --no-deps
+sprinkleref --check --target //projects/apps/example-app:app --deps transitive
 ```
 
 If no resolver config exists yet, initialize the repo-wide backend profile registry before checking
@@ -103,27 +103,27 @@ target-scoped checks, it should distinguish direct requirements from dependency-
 requirements with separate `Direct refs` and `From dependencies` sections:
 
 ```text
-SprinkleRef check for //projects/deployments/pleomino/staging:deploy
+SprinkleRef check for //projects/deployments/example-app/staging:deploy
 Deps: transitive
 Refs found: 2
 Summary: present 1, declared 0, missing 1, unmapped 0, invalid 0, unchecked 0
 
 From dependencies
   Action required
-    missing config://deployments/supabase/public_url/prod (required by //projects/apps/pleomino:server)
+    missing config://deployments/supabase/public_url/prod (required by //projects/apps/example-app:server)
 ```
 
 JSON output should preserve the same distinction:
 
 ```json
 {
-  "target": "//projects/deployments/pleomino/staging:deploy",
+  "target": "//projects/deployments/example-app/staging:deploy",
   "deps": "transitive",
   "refs": [
     {
-      "ref": "secret://deployments/pleomino/cloudflare_api_token",
+      "ref": "secret://deployments/example-app/cloudflare_api_token",
       "scope": "direct",
-      "requiredBy": ["//projects/deployments/pleomino/staging:deploy"],
+      "requiredBy": ["//projects/deployments/example-app/staging:deploy"],
       "scheme": "secret",
       "sensitive": true,
       "status": "present"
@@ -131,7 +131,7 @@ JSON output should preserve the same distinction:
     {
       "ref": "config://deployments/supabase/public_url/prod",
       "scope": "dependency",
-      "requiredBy": ["//projects/apps/pleomino:server"],
+      "requiredBy": ["//projects/apps/example-app:server"],
       "scheme": "config",
       "sensitive": false,
       "status": "missing"
@@ -206,13 +206,13 @@ JSON output should use the same model:
   },
   "refs": [
     {
-      "ref": "secret://deployments/pleomino/prod/cloudflare_api_token",
+      "ref": "secret://deployments/example-app/prod/cloudflare_api_token",
       "scheme": "secret",
       "sensitive": true,
       "status": "missing",
       "category": "bootstrap",
       "backend": "local-file",
-      "locations": ["projects/deployments/pleomino/shared/family.bzl:12"]
+      "locations": ["projects/deployments/example-app/shared/family.bzl:12"]
     }
   ]
 }

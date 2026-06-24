@@ -18,10 +18,15 @@ type SeedDeps = {
   timeAsync: TimeAsync;
 };
 
-type RepoInitMode = "rsync" | "seed-store";
+export type RepoInitMode = "rsync" | "seed-store";
+
+export type RepoInitResult = {
+  mode: RepoInitMode;
+  touchedRelPaths: string[];
+};
 
 const CLONE_PROBE_LABEL = "seedStore clone probe (copyFileCloneSupport)";
-const WRITABLE_MARKER = ".seed-store-writable";
+const PREPARED_MARKER = ".seed-store-prepared-v3";
 
 let seedStoreCowCopySupported: true | null = null;
 let seedStoreCowCopySupportedPromise: Promise<true> | null = null;
@@ -57,13 +62,6 @@ async function requireSeedPath(seedPath: string, seedKey: string): Promise<void>
     const hint = seedKey ? `seed key: ${seedKey}` : "seed key: <missing>";
     throw new Error(`runInTemp: seed store path missing: ${seedPath}\n${hint}\nrerun v`);
   }
-}
-
-async function isSeedStoreWritable(seedPath: string): Promise<boolean> {
-  return await fsp
-    .access(path.join(seedPath, WRITABLE_MARKER))
-    .then(() => true)
-    .catch(() => false);
 }
 
 async function listUntrackedFilesOncePerWorker(): Promise<string[]> {
@@ -112,7 +110,11 @@ async function listTrackedChangedFilesOncePerWorker(): Promise<string[]> {
   return await trackedOverlayOncePerWorker;
 }
 
-async function overlayUntrackedFilesIntoTempRepo(tmpDir: string): Promise<void> {
+async function overlayUntrackedFilesIntoTempRepo(tmpDir: string): Promise<string[]> {
+  const prepared = await fsp
+    .access(path.join(tmpDir, PREPARED_MARKER))
+    .then(() => true)
+    .catch(() => false);
   const listOverlayFilesOncePerWorker = async (): Promise<string[]> => {
     if (!overlayFilesOncePerWorker) {
       overlayFilesOncePerWorker = (async () => {
@@ -136,9 +138,10 @@ async function overlayUntrackedFilesIntoTempRepo(tmpDir: string): Promise<void> 
     return await overlayFilesOncePerWorker;
   };
   const cached = await listOverlayFilesOncePerWorker();
-  if (cached.length === 0) return;
+  if (cached.length === 0) return [];
   const valid: string[] = [];
   for (const rel of cached) {
+    if (prepared && rel.startsWith("viberoots/")) continue;
     const st = await fsp.lstat(rel).catch(() => null);
     if (!st || st.isDirectory()) continue;
     valid.push(rel);
@@ -146,7 +149,7 @@ async function overlayUntrackedFilesIntoTempRepo(tmpDir: string): Promise<void> 
   if (valid.length !== cached.length) {
     overlayFilesOncePerWorker = Promise.resolve(valid);
   }
-  if (valid.length === 0) return;
+  if (valid.length === 0) return [];
   const fileList = await fsp.mkdtemp(path.join(tmpDir, ".seed-overlay-"));
   const listPath = path.join(fileList, "files.txt");
   await fsp.writeFile(listPath, valid.join("\n") + "\n", "utf8");
@@ -155,36 +158,106 @@ async function overlayUntrackedFilesIntoTempRepo(tmpDir: string): Promise<void> 
   } finally {
     await fsp.rm(fileList, { recursive: true, force: true }).catch(() => {});
   }
+  return valid;
 }
 
-async function overlayActiveViberootsIntoTempRepo(tmpDir: string): Promise<void> {
-  const cwd = process.cwd();
-  const nestedSource = path.join(cwd, "viberoots");
-  const source = (await fsp
-    .access(path.join(nestedSource, "flake.nix"))
+function parseGitStatusRel(line: string): { rel: string; deleted: boolean } | null {
+  if (line.length < 4) return null;
+  const status = line.slice(0, 2);
+  const raw = line.slice(3).trim();
+  if (!raw) return null;
+  const renameSep = raw.indexOf(" -> ");
+  const rel = (renameSep >= 0 ? raw.slice(renameSep + 4) : raw).trim();
+  if (!rel || rel.startsWith(".git/") || rel === ".git") return null;
+  return {
+    rel,
+    deleted: status.includes("D"),
+  };
+}
+
+async function listActiveSourceOverlayFiles(source: string): Promise<{
+  changed: string[];
+  deleted: string[];
+}> {
+  const out = await $({
+    stdio: "pipe",
+    cwd: source,
+  })`git status --porcelain=v1 --untracked-files=all`.nothrow();
+  if (out.exitCode !== 0) return { changed: [], deleted: [] };
+  const changed: string[] = [];
+  const deleted: string[] = [];
+  for (const line of String(out.stdout || "").split(/\r?\n/)) {
+    const entry = parseGitStatusRel(line);
+    if (!entry) continue;
+    if (isGeneratedRepoStateRelPath(entry.rel)) continue;
+    if (entry.deleted) {
+      deleted.push(entry.rel);
+      continue;
+    }
+    const abs = path.join(source, entry.rel);
+    const st = await fsp.lstat(abs).catch(() => null);
+    if (!st || st.isDirectory()) continue;
+    changed.push(entry.rel);
+  }
+  return {
+    changed: Array.from(new Set(changed)).sort((a, b) => a.localeCompare(b)),
+    deleted: Array.from(new Set(deleted)).sort((a, b) => a.localeCompare(b)),
+  };
+}
+
+async function overlayActiveViberootsIntoTempRepo(tmpDir: string): Promise<string[]> {
+  const prepared = await fsp
+    .access(path.join(tmpDir, PREPARED_MARKER))
     .then(() => true)
-    .catch(() => false))
-    ? nestedSource
-    : cwd;
-  const sourceFlake = path.join(source, "flake.nix");
-  const sourceTool = path.join(source, "build-tools", "tools", "dev", "zx-init.mjs");
-  const sourceExists = await Promise.all([
-    fsp
-      .access(sourceFlake)
-      .then(() => true)
-      .catch(() => false),
-    fsp
-      .access(sourceTool)
-      .then(() => true)
-      .catch(() => false),
-  ]).then(([hasFlake, hasTool]) => hasFlake && hasTool);
-  if (!sourceExists) return;
+    .catch(() => false);
+  if (prepared) return [];
+
+  const cwd = process.cwd();
+  const candidates = [
+    process.env.VIBEROOTS_SOURCE_ROOT || "",
+    process.env.VIBEROOTS_ROOT || "",
+    path.join(cwd, "viberoots"),
+    cwd,
+  ].filter(Boolean);
+  let source = "";
+  for (const candidate of candidates) {
+    const root = path.resolve(candidate);
+    const sourceFlake = path.join(root, "flake.nix");
+    const sourceTool = path.join(root, "build-tools", "tools", "dev", "zx-init.mjs");
+    const sourceExists = await Promise.all([
+      fsp
+        .access(sourceFlake)
+        .then(() => true)
+        .catch(() => false),
+      fsp
+        .access(sourceTool)
+        .then(() => true)
+        .catch(() => false),
+    ]).then(([hasFlake, hasTool]) => hasFlake && hasTool);
+    if (sourceExists) {
+      source = root;
+      break;
+    }
+  }
+  if (!source) return [];
   const tmpViberoots = path.join(tmpDir, "viberoots");
-  await $`bash --noprofile --norc -c ${`chmod -R u+w ${JSON.stringify(tmpViberoots)} >/dev/null 2>&1 || true`}`.nothrow();
-  await fsp.rm(tmpViberoots, { recursive: true, force: true });
-  await fsp.mkdir(path.join(tmpDir, "viberoots"), { recursive: true });
-  const excludes = GENERATED_REPO_STATE_PATHS.map((rel) => ["--exclude", rel]).flat();
-  await $({ cwd })`rsync -a --delete ${excludes} ${`${source}/`} ${tmpViberoots}/`;
+  const overlay = await listActiveSourceOverlayFiles(source);
+  const touchedRelPaths = [...overlay.changed, ...overlay.deleted].map((rel) =>
+    path.join("viberoots", rel),
+  );
+  for (const rel of overlay.deleted) {
+    await fsp.rm(path.join(tmpViberoots, rel), { recursive: true, force: true });
+  }
+  if (overlay.changed.length === 0) return touchedRelPaths;
+  const fileList = await fsp.mkdtemp(path.join(tmpDir, ".seed-viberoots-overlay-"));
+  const listPath = path.join(fileList, "files.txt");
+  await fsp.writeFile(listPath, overlay.changed.join("\n") + "\n", "utf8");
+  try {
+    await $({ cwd: source })`rsync -a --relative --files-from ${listPath} ./ ${tmpViberoots}/`;
+  } finally {
+    await fsp.rm(fileList, { recursive: true, force: true }).catch(() => {});
+  }
+  return touchedRelPaths;
 }
 
 async function seedStoreCowCopySupportedOncePerWorker(args: {
@@ -224,20 +297,20 @@ async function seedStoreCowCopySupportedOncePerWorker(args: {
 export async function initTempRepoFromSeedStore(args: {
   tmpDir: string;
   deps: SeedDeps;
-}): Promise<RepoInitMode> {
+}): Promise<RepoInitResult> {
   const { tmpDir, deps } = args;
   const seedPath = String(process.env.VBR_TEST_SEED_STORE_PATH || "").trim();
   const seedKey = String(process.env.VBR_TEST_SEED_KEY || "").trim();
   if (wantsFilteredRsync()) {
     await deps.rsyncRepoTo(tmpDir);
-    return "rsync";
+    return { mode: "rsync", touchedRelPaths: [] };
   }
   if (!seedPath) {
     if (isVerifyMode()) {
       throw new Error("runInTemp: missing VBR_TEST_SEED_STORE_PATH; rerun v");
     }
     await deps.rsyncRepoTo(tmpDir);
-    return "rsync";
+    return { mode: "rsync", touchedRelPaths: [] };
   }
   await requireSeedPath(seedPath, seedKey);
   await assertRequiredSeedFiles(seedPath, "seed store", { allowMissingToolRoot: true });
@@ -246,20 +319,19 @@ export async function initTempRepoFromSeedStore(args: {
     seedPath,
     tmpDir,
   });
+  const touchedRelPaths: string[] = [];
   await deps.timeAsync(`seedStoreCopy(${path.basename(tmpDir)})`, async () => {
     await copySeedStoreToTempRepo({ seedPath, tmpDir });
   });
   await deps.timeAsync(`seedOverlayUntracked(${path.basename(tmpDir)})`, async () => {
-    await overlayUntrackedFilesIntoTempRepo(tmpDir);
+    touchedRelPaths.push(...(await overlayUntrackedFilesIntoTempRepo(tmpDir)));
   });
   await deps.timeAsync(`seedOverlayViberoots(${path.basename(tmpDir)})`, async () => {
-    await overlayActiveViberootsIntoTempRepo(tmpDir);
+    touchedRelPaths.push(...(await overlayActiveViberootsIntoTempRepo(tmpDir)));
   });
-  if (!(await isSeedStoreWritable(seedPath))) {
-    try {
-      await $`bash --noprofile --norc -c ${`chmod -R u+w ${tmpDir} >/dev/null 2>&1 || true`}`;
-    } catch {}
-  }
   await assertRequiredSeedFiles(tmpDir, "seed copy");
-  return "seed-store";
+  return {
+    mode: "seed-store",
+    touchedRelPaths: Array.from(new Set(touchedRelPaths)).sort((a, b) => a.localeCompare(b)),
+  };
 }

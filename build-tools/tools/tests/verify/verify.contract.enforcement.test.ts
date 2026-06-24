@@ -56,8 +56,8 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
     "expected non-Linux/non-Darwin verify runs to keep using workspace-local temp repos",
   );
   assert.ok(
-    tmpRoot.includes(".metadata_never_index"),
-    "expected macOS repo-local verify temp roots to opt out of Spotlight indexing",
+    tmpRoot.includes("markMacosMetadataNeverIndex") && tmpRoot.includes("../../lib/macos-metadata"),
+    "expected macOS repo-local verify temp roots to opt out of Spotlight indexing through the shared helper",
   );
   assert.ok(
     runVerifyState.includes('".viberoots"') &&
@@ -75,34 +75,46 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
   );
   assert.ok(
     finalOrphanCleanup.includes("final-cleanup-root-buck-out") &&
+      !finalOrphanCleanup.includes('name === ".metadata_never_index"') &&
+      finalOrphanCleanup.includes("markMacosMetadataNeverIndex(buckOut)") &&
       finalOrphanCleanup.includes('name === "test-logs"') &&
       finalOrphanCleanup.includes('name === "zx_shims"') &&
       finalOrphanCleanup.includes('name === "v2"') &&
-      finalOrphanCleanup.includes("continue;") &&
-      !finalOrphanCleanup.includes('execFileAsync("buck2", ["kill"]') &&
+      finalOrphanCleanup.includes('execFileAsync("buck2", ["kill"]') &&
+      finalOrphanCleanup.includes('execFileAsync("buck2", ["--isolation-dir", name, "kill"]') &&
       finalOrphanCleanup.includes('name.startsWith("v-")') &&
       finalOrphanCleanup.includes('name.startsWith("verify-nested-")') &&
       finalOrphanCleanup.includes('name.startsWith("deployment-query-")') &&
-      finalOrphanCleanup.includes('name.startsWith("zxtest-shared-")'),
-    "expected final verify cleanup to leave default root v2 alone while killing isolated generated Buck daemons",
+      finalOrphanCleanup.includes('name.startsWith("zxtest-shared-")') &&
+      finalOrphanCleanup.includes('name.startsWith("exporter-shared-")') &&
+      finalOrphanCleanup.includes("activeSourceCleanupRoots") &&
+      finalOrphanCleanup.includes('path.join(root, "viberoots")') &&
+      finalOrphanCleanup.includes('".viberoots", "current"'),
+    "expected final verify cleanup to kill generated Buck daemons, including default v2, under exact workspace/source roots without removing macOS metadata exclusion markers",
   );
   assert.ok(
-    vWrapper.includes("cleanup_verify_root_buck_out") &&
+    vWrapper.includes("cleanup_verify_owned_buck_out_roots") &&
+      !vWrapper.includes(".metadata_never_index|") &&
       vWrapper.includes('"${SCRIPT_DIR}/verify" "$@"') &&
-      vWrapper.includes("cleanup_verify_root_buck_out 1") &&
-      vWrapper.includes("cleanup_verify_root_buck_out 0\nexit") &&
+      vWrapper.includes("cleanup_verify_owned_buck_out_roots 1") &&
+      vWrapper.includes("cleanup_verify_owned_buck_out_roots 1\nexit") &&
       vWrapper.includes('allow_default_buck_kill="${1:-0}"') &&
-      vWrapper.includes("v2|v-*|verify-nested-*|deployment-query-*|zxtest-shared-*") &&
+      vWrapper.includes(
+        "v2|v-*|verify-nested-*|deployment-query-*|zxtest-shared-*|exporter-shared-*",
+      ) &&
       vWrapper.includes("buck2 kill") &&
       vWrapper.includes("registered_isolation_owner_alive") &&
       vWrapper.includes("VBR_VERIFY_PROCESS_STATE_FILE") &&
       vWrapper.includes("ownerPid") &&
       vWrapper.includes("repoRoot") &&
-      vWrapper.includes("LIVE_ROOT"),
-    "expected v wrapper to kill default Buck only before verify and to avoid deleting live registered isolations",
+      vWrapper.includes("LIVE_ROOT") &&
+      vWrapper.includes("VIBEROOTS_ROOT") &&
+      vWrapper.includes("cleanup_root"),
+    "expected v wrapper to kill default Buck before and after verify and to avoid deleting live registered isolations under exact workspace/source roots",
   );
   assert.ok(
     startupWorkspaceState.includes("cleanupVerifyOwnedRootBuckOut") &&
+      !startupWorkspaceState.includes('name === ".metadata_never_index"') &&
       startupWorkspaceState.includes('name === "v2"') &&
       startupWorkspaceState.includes('execFileAsync("buck2", ["kill"]') &&
       startupWorkspaceState.includes('name.startsWith("zxtest-shared-")') &&
@@ -230,6 +242,12 @@ test("verify macOS temp roots opt generated output trees out of metadata indexin
     );
     await Promise.all(
       [
+        path.join(root, ".metadata_never_index"),
+        path.join(root, ".viberoots", ".metadata_never_index"),
+        path.join(root, ".viberoots", "buck", ".metadata_never_index"),
+        path.join(root, ".viberoots", "cache", ".metadata_never_index"),
+        path.join(root, ".viberoots", "workspace", ".metadata_never_index"),
+        path.join(root, ".direnv", ".metadata_never_index"),
         path.join(root, "buck-out", ".metadata_never_index"),
         path.join(root, "buck-out", "tmp", ".metadata_never_index"),
         path.join(path.dirname(expectedTmpdir), ".metadata_never_index"),

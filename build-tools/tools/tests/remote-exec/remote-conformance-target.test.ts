@@ -12,6 +12,13 @@ const tinyTarget =
   "root//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles";
 const tinyTargetCanonical =
   "//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles";
+const expectedRemoteReadyFixtureTargets = [
+  "//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_ready_handles",
+  "//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:go_ready_handles",
+  "//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:node_ready_handles",
+  "//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:python_ready_handles",
+  tinyTargetCanonical,
+];
 const localPolicy = parseVerifyExecutionPolicy({ env: {} });
 
 test("first local conformance target has target-derived readiness evidence", async () => {
@@ -66,7 +73,7 @@ test("first local conformance target executes the dry-run runner", async () => {
   assert.match(String(res.stdout || "") + String(res.stderr || ""), /remote-ready-runner: ok/);
 });
 
-test("only the tiny target is remote-ready in the Buck graph", async () => {
+test("only declared wrapper fixtures are remote-ready in the Buck graph", async () => {
   const res =
     await $`buck2 --isolation-dir ${inheritedBuckIsolation("remote_conformance_only_ready")} cquery --target-platforms prelude//platforms:default --json --output-attribute labels //...`.nothrow();
   assert.equal(res.exitCode, 0, String(res.stderr || ""));
@@ -78,7 +85,7 @@ test("only the tiny target is remote-ready in the Buck graph", async () => {
 
   assert.deepEqual(
     readyTargets,
-    [tinyTargetCanonical],
+    expectedRemoteReadyFixtureTargets,
     `unexpected remote-ready targets: ${readyTargets.join(", ")}`,
   );
 });

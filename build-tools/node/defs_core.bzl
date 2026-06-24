@@ -88,6 +88,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
             timeout_var = "TIMEOUT",
             impure = True,
             build_prefix = ("env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" " % raw),
+            graph_target = raw,
         )
         + ("EXPECTED=\"$outPath/%s\"; " % effective_out)
         + "if [ ! -e \"$EXPECTED\" ]; then "

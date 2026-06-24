@@ -84,6 +84,24 @@ export async function processStartSignature(pid: number, timeoutMs = 1500): Prom
   return lines[0] || null;
 }
 
+export async function processCwd(pid: number, timeoutMs = 1500): Promise<string | null> {
+  if (!Number.isFinite(pid) || pid <= 1) return null;
+  if (processInspectionPrefersPgrep()) return null;
+  let lsofPath = "";
+  try {
+    lsofPath = resolveToolPathSync("lsof");
+  } catch {
+    return null;
+  }
+  const lines = splitLines(
+    await spawnOutput(lsofPath, ["-a", "-p", String(pid), "-d", "cwd", "-Fn"], timeoutMs),
+  );
+  for (const line of lines) {
+    if (line.startsWith("n") && line.length > 1) return line.slice(1);
+  }
+  return null;
+}
+
 export async function pgrepProcessLines(
   pattern: string,
   timeoutMs = 2000,

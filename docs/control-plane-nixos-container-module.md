@@ -15,7 +15,7 @@ NixOS hosts can import the repo-owned module and provide a small host-local conf
     publicUrl = "https://deploy.example.test";
     publicHostName = "deploy.example.test";
     manageNginx = true;
-    infisicalDeploymentIds = [ "pleomino-staging" ];
+    infisicalDeploymentIds = [ "example-staging" ];
 
     artifactStore.bucket = "deployment-control-plane-artifacts";
 
@@ -29,10 +29,10 @@ NixOS hosts can import the repo-owned module and provide a small host-local conf
         "/run/secrets/deploy-artifact-store-access-key-id";
       artifact-store-secret-access-key.source =
         "/run/secrets/deploy-artifact-store-secret-access-key";
-      pleomino-staging-infisical-client-id.source =
-        "/run/secrets/pleomino-staging-infisical-client-id";
-      pleomino-staging-infisical-client-secret.source =
-        "/run/secrets/pleomino-staging-infisical-client-secret";
+      example-staging-infisical-client-id.source =
+        "/run/secrets/example-staging-infisical-client-id";
+      example-staging-infisical-client-secret.source =
+        "/run/secrets/example-staging-infisical-client-secret";
     };
   };
 }
@@ -100,7 +100,7 @@ moving authoritative state to external Postgres and S3-compatible storage:
     publicUrl = "https://mini.example.test";
     publicHostName = "mini.example.test";
     artifactBucket = "mini-control-plane-artifacts";
-    infisicalDeploymentIds = [ "pleomino-staging" ];
+    infisicalDeploymentIds = [ "example-staging" ];
     credentials = {
       control-plane-database-url.source = "/run/secrets/external-postgres-url";
       control-plane-token.source = "/run/secrets/deploy-control-plane-token";

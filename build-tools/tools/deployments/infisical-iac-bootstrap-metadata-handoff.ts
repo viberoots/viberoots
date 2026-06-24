@@ -1,6 +1,9 @@
 import * as fs from "node:fs/promises";
 import { exactInfisicalCredentialFileName } from "./infisical-credential-file-contract";
-import { PLEOMINO_REVIEWED_CONTEXT_CONFIG_PATH } from "./infisical-iac-bootstrap-reviewed-metadata";
+import {
+  REVIEWED_CONTEXT_CONFIG_PATH,
+  type DeploymentBootstrapScope,
+} from "./infisical-iac-bootstrap-config";
 import type { DeploymentRuntimeMetadata } from "./infisical-iac-bootstrap-types";
 import { stripJsonComments } from "./json-comments";
 
@@ -20,24 +23,28 @@ export function buildMetadataHandoffPatch(
   live: DeploymentRuntimeMetadata,
   reviewed: Required<DeploymentRuntimeMetadata>,
   source: string,
+  scope?: DeploymentBootstrapScope,
 ): MetadataHandoffPatch {
-  const replacements = reviewedMetadataReplacements(live, reviewed);
+  const family = scope?.family || inferFamily(reviewed);
+  const replacements = reviewedMetadataReplacements(live, reviewed, family);
+  const metadataPath = scope?.reviewedContextConfigPath || REVIEWED_CONTEXT_CONFIG_PATH;
   return {
     schemaVersion: "infisical-iac-bootstrap-metadata-patch@1",
-    path: PLEOMINO_REVIEWED_CONTEXT_CONFIG_PATH,
+    path: metadataPath,
     replacements,
-    unifiedDiff: diffLines(source, applyReplacements(source, replacements)),
+    unifiedDiff: diffLines(source, applyReplacements(source, replacements), metadataPath),
   };
 }
 
 export function reviewedMetadataReplacements(
   live: DeploymentRuntimeMetadata,
   reviewed: Required<DeploymentRuntimeMetadata>,
+  family = inferFamily(reviewed),
 ) {
   return reviewed.deploymentCredentials
     .flatMap((expected) => {
       const actual = live.deploymentCredentials?.find((item) => item.stage === expected.stage);
-      const prefix = `deploymentContexts.pleomino-${expected.stage}.infisical`;
+      const prefix = `deploymentContexts.${family}-${expected.stage}.infisical`;
       return [
         replacement(`${prefix}.host`, reviewed.siteUrl ?? "", live.siteUrl),
         replacement(`${prefix}.projectId`, reviewed.projectId, live.projectId),
@@ -58,7 +65,9 @@ export function reviewedMetadataReplacements(
 }
 
 export function isFirstBootstrapPlaceholder(value: string) {
-  return value === "" || /^(proj_pleomino_deployments|identity_pleomino_.*_deploy)$/.test(value);
+  return (
+    value === "" || /^(proj_[a-z0-9_]+_deployments|identity_[a-z0-9_]+_.*_deploy)$/.test(value)
+  );
 }
 
 function replacement(label: string, before: string, after?: string) {
@@ -111,13 +120,18 @@ function scopedError(label: string, detail: string) {
   return new Error(`metadata patch cannot safely rewrite ${label}: ${detail}`);
 }
 
-function diffLines(before: string, after: string) {
+function inferFamily(reviewed: Required<DeploymentRuntimeMetadata>) {
+  for (const credential of reviewed.deploymentCredentials) {
+    const match = credential.clientIdRef.match(/^secret:\/\/deployments\/([^/]+)\//);
+    if (match?.[1]) return match[1];
+  }
+  throw new Error("metadata patch cannot infer deployment family from reviewed credential refs");
+}
+
+function diffLines(before: string, after: string, metadataPath: string) {
   const left = before.split("\n");
   const right = after.split("\n");
-  const lines = [
-    `--- a/${PLEOMINO_REVIEWED_CONTEXT_CONFIG_PATH}`,
-    `+++ b/${PLEOMINO_REVIEWED_CONTEXT_CONFIG_PATH}`,
-  ];
+  const lines = [`--- a/${metadataPath}`, `+++ b/${metadataPath}`];
   for (let index = 0; index < Math.max(left.length, right.length); index += 1) {
     if (left[index] === right[index]) continue;
     if (left[index] !== undefined) lines.push(`-${left[index]}`);

@@ -140,6 +140,7 @@ def nix_node_cli_bin(
                 timeout_var = "TIMEOUT",
                 impure = True,
                 build_prefix = ("env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" " % impl_label),
+                graph_target = impl_label,
             )
             + ("EXPECTED=\"$outPath/%s\"; " % out)
             + "if [ ! -f \"$EXPECTED\" ]; then "

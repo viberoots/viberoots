@@ -77,13 +77,13 @@ test("viberoots/init bootstraps a bare consumer workspace", async () => {
     );
     assert.match(
       await fsp.readFile(path.join(workspace, ".envrc"), "utf8"),
-      /use flake "path:\$\{PWD\}\/\.viberoots\/workspace#default" --override-input viberoots "path:\$\{PWD\}\/viberoots"/,
+      /use flake "path:\$\{PWD\}\/\.viberoots\/workspace#default" --override-input viberoots "path:\$\{VIBEROOTS_SOURCE_ROOT:-\$\{PWD\}\/viberoots\}"/,
     );
     await assert.rejects(fsp.lstat(path.join(workspace, "flake.nix")));
     await assert.rejects(fsp.lstat(path.join(workspace, "buck-out")));
     assert.match(
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
-      /path:\.\.\/\.\.\/viberoots/,
+      /path:.*\/viberoots/,
     );
     assert.match(
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
@@ -172,7 +172,7 @@ test("viberoots/init repairs stale generated workspace files", async () => {
     );
     assert.match(
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
-      /path:\.\.\/\.\.\/viberoots/,
+      /path:.*\/viberoots/,
     );
     assert.match(
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "TARGETS"), "utf8"),

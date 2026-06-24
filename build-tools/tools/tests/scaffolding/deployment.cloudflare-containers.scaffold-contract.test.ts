@@ -9,6 +9,7 @@ import { extractDeployments } from "../../deployments/contract";
 import { DEPLOYMENT_CQUERY_ATTRS } from "../../deployments/deployment-query-attrs";
 import { stableBuckIsolation } from "../../lib/buck-command-env";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool";
 
 const accountId = "0123456789abcdef0123456789abcdef";
 
@@ -79,7 +80,8 @@ test("deployment/cloudflare-containers scaffold renders Worker config and metada
     assert.match(targets, /sleep_after = "20m"/);
     assert.match(targets, /max_instances = "3"/);
     assert.match(targets, /external_requirement_profiles = \["cloudflare_provider"\]/);
-    await $`nix shell nixpkgs#buildifier -c buildifier --mode=check ${targetsPath}`;
+    const buildifier = await resolvePinnedTestToolPath("buildifier", $);
+    await $`${buildifier} --mode=check ${targetsPath}`;
     assert.equal(
       targets,
       `load("@viberoots//build-tools/deployments:defs.bzl", "cloudflare_containers_deployment")
@@ -133,9 +135,11 @@ cloudflare_containers_deployment(
 )
 `,
     );
+    const viberootsPackageRoot = path.dirname(viberootsToolScript("package.json"));
+    const prettier = path.join(viberootsPackageRoot, "node_modules", ".bin", "prettier");
     await $({
-      cwd: path.dirname(viberootsToolScript("package.json")),
-    })`pnpm prettier --check ${wranglerPath} ${workerPath}`;
+      cwd: viberootsPackageRoot,
+    })`${prettier} --check ${wranglerPath} ${workerPath}`;
     const attrFlags = DEPLOYMENT_CQUERY_ATTRS.flatMap((attr) => ["--output-attribute", attr]);
     const query =
       "set(//projects/deployments/api-staging:deploy //projects/apps/api:service_artifact //projects/deployments:defaults //projects/deployments/demo-shared:lane_governance //projects/deployments/demo-shared:lane //projects/deployments/demo-shared:dev_release)";

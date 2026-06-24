@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { buckProcessTableLines } from "../../lib/process-inspection";
+import { buckProcessTableLines, processCwd } from "../../lib/process-inspection";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 
 export type ForkserverProc = {
@@ -27,6 +27,10 @@ export async function psLines(timeoutMs: number): Promise<string[]> {
   return await buckProcessTableLines(timeoutMs);
 }
 
+export async function buckDaemonCwd(pid: number, timeoutMs: number): Promise<string | null> {
+  return await processCwd(pid, timeoutMs);
+}
+
 export function tryRepoRootFromStateDir(
   stateDir: string,
 ): { repoRoot: string; iso: string } | null {
@@ -39,6 +43,23 @@ export function tryRepoRootFromStateDir(
   const iso = parts[idx + 1] || "";
   if (!repoRoot || !iso) return null;
   return { repoRoot, iso };
+}
+
+export function tryTempRepoRootFromBuckDaemonCwd(
+  cwd: string,
+): { repoRoot: string; iso: string } | null {
+  const mapped = tryRepoRootFromStateDir(cwd);
+  if (!mapped) return null;
+  if (!isVerifyTempRepoRootFromDaemonCwd(mapped.repoRoot)) return null;
+  return mapped;
+}
+
+function isVerifyTempRepoRootFromDaemonCwd(repoRoot: string): boolean {
+  const r = path.resolve(repoRoot);
+  const localTmpdirSegment = `${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`;
+  if (r.includes(localTmpdirSegment)) return true;
+
+  return /^\/(?:private\/)?tmp\/viberoots-verify-[^/]+\.noindex\/tmpdir\/[^/]+/.test(r);
 }
 
 export function macosPathVariants(p: string): string[] {

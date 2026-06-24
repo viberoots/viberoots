@@ -53,6 +53,7 @@ def _selected_route_build_cmd(selected_route_target):
             timeout_var = "TIMEOUT",
             impure = True,
             build_prefix = "env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"$VBR_NODE_ROUTE_TARGET\" ",
+            graph_target = "$VBR_NODE_ROUTE_TARGET",
         )
         + "fi; "
     )

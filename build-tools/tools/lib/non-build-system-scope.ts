@@ -22,6 +22,7 @@ const NON_BUILD_SYSTEM_SCOPE_IGNORED_ROOTS = new Set([
   "prelude",
   "third_party",
   "toolchains",
+  "viberoots",
   ".codex",
   ".direnv",
   ".git",

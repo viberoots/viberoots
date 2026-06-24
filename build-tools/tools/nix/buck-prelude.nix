@@ -9,9 +9,14 @@
       runHook preInstall
       mkdir -p "$out"
       cp -r "$src/prelude" "$out/prelude"
+      substituteInPlace "$out/prelude/http_file.bzl" \
+        --replace-fail "        is_deferrable = True," ""
+      substituteInPlace "$out/prelude/http_archive/http_archive.bzl" \
+        --replace-fail "        is_deferrable = True," ""
+      substituteInPlace "$out/prelude/toolchains/cxx/zig/defs.bzl" \
+        --replace-fail ", is_deferrable = True" ""
       runHook postInstall
     '';
   };
 }
-
 

@@ -170,15 +170,15 @@ i && b && v
 Run dev servers and other dev runnables with `d`:
 
 ```bash
-d //projects/apps/pleomino:app
+d //projects/apps/example-app:app
 ```
 
 `d` uses the target's declared `run.dev` command and reports a clear error when the target is not a
 dev runnable. For targeted work, pass Buck labels through the wrappers:
 
 ```bash
-b //projects/apps/pleomino:app
-v //projects/apps/pleomino:latency-guardrail
+b //projects/apps/example-app:app
+v //projects/apps/example-app:latency-guardrail
 ```
 
 Refresh generated glue without running a build:

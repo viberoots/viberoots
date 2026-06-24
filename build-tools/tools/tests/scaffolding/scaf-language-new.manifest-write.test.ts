@@ -50,8 +50,8 @@ test("scaf language new writes manifest and generates planner by default", async
     await $({
       env: {
         ...process.env,
-        VIBEROOTS_ROOT: tmp,
-        VIBEROOTS_SOURCE_ROOT: tmp,
+        VIBEROOTS_ROOT: path.join(tmp, "viberoots"),
+        VIBEROOTS_SOURCE_ROOT: path.join(tmp, "viberoots"),
         WORKSPACE_ROOT: tmp,
         BUCK_TEST_SRC: tmp,
       },

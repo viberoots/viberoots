@@ -112,9 +112,9 @@ credentials:
     infisicalClientIdFilePattern: "{deploymentId}-infisical-client-id"
     infisicalClientSecretFilePattern: "{deploymentId}-infisical-client-secret"
   infisicalDeployments:
-    - deploymentId: pleomino-staging
+    - deploymentId: example-staging
       siteUrl: https://app.infisical.com
-      projectId: pleomino-staging-infisical-project
+      projectId: example-staging-infisical-project
       environment: production
 
 reviewedSource:

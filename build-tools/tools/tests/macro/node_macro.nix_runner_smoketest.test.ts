@@ -15,6 +15,7 @@ test("node nix runner: minimal importer with no tests passes", async () => {
       JSON.stringify({ name: "mini", version: "0.0.1", type: "module" }, null, 2),
       "utf8",
     );
+    await fsp.writeFile(path.join(app, ".pnpmfile.mjs"), "export default {};\n", "utf8");
     // Seed a minimal lockfile so mkPnpmStore can proceed deterministically
     const lock = [
       "lockfileVersion: '9.0'",

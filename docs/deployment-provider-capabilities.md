@@ -583,11 +583,11 @@ Secret backend note:
 - protected/shared execution must stay inside vetted built-in publisher, preview, and smoke-runner code
 - package-local executable hooks, deployment-owned provisioners, and unreviewed `release_actions` remain out of policy for the normal shared-control-plane path
 
-### Initial Pleomino Topology
+### Example Topology
 
-- `pleomino-dev` stays on `nixos-shared-host` as the shared-dev path
-- `pleomino-staging` uses `cloudflare-pages` with protection class `shared_nonprod`
-- `pleomino-prod` uses `cloudflare-pages` with protection class `production_facing`
+- `example-dev` stays on `nixos-shared-host` as the shared-dev path
+- `example-staging` uses `cloudflare-pages` with protection class `shared_nonprod`
+- `example-prod` uses `cloudflare-pages` with protection class `production_facing`
 
 ## Capability Entry: `cloudflare-containers`
 

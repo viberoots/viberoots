@@ -1,5 +1,21 @@
 export type VerifyStatusSource = "summary" | "derived";
 
+export type VerifyPassGroupStatus = {
+  name: string;
+  index: number;
+  total: number;
+  completed?: number;
+  targetCount?: number;
+  pass: number;
+  fail: number;
+  fatal: number;
+  skip: number;
+  buildFailure: number;
+  completionRateAvgPerMinute?: number;
+  done: boolean;
+  active: boolean;
+};
+
 export type VerifyStatus = {
   pid?: number;
   logPath: string;
@@ -25,6 +41,7 @@ export type VerifyStatus = {
   passTotal?: number;
   groupCompleted?: number;
   groupTotal?: number;
+  passGroups?: VerifyPassGroupStatus[];
 };
 
 const ANSI_RE = /\x1b\[[0-9;?]*[A-Za-z]/g;

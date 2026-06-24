@@ -39,7 +39,7 @@ Use the deeper docs when needed:
 The public repo-level entrypoint is:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy
+deploy --deployment //projects/deployments/example-app/prod:deploy
 ```
 
 Use `--deployment <label>` to choose what you want to deploy.
@@ -47,7 +47,7 @@ Use `--deployment <label>` to choose what you want to deploy.
 If you are new to this repo, you can think of the label as the deployment's
 unique name inside the repo. Example:
 
-- `//projects/deployments/pleomino/prod:deploy`
+- `//projects/deployments/example-app/prod:deploy`
 
 ## Plain-Language Glossary
 
@@ -70,7 +70,7 @@ unique name inside the repo. Example:
 Normal deploy:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy
+deploy --deployment //projects/deployments/example-app/prod:deploy
 ```
 
 For a normal deploy, this is usually enough. The deployment definition tells
@@ -138,7 +138,7 @@ Use this when:
 Preview from an earlier accepted run:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --preview \
   --source-run-id <deploy-run-id>
 ```
@@ -152,7 +152,7 @@ Use this when:
 Preview cleanup:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --preview-cleanup \
   --source-run-id <deploy-run-id>
 ```
@@ -165,7 +165,7 @@ Use this when:
 Retry a previous run without rebuilding:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --publish-only \
   --source-run-id <deploy-run-id>
 ```
@@ -179,7 +179,7 @@ Use this when:
 Rollback one deployment to an earlier run:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --publish-only \
   --source-run-id <deploy-run-id> \
   --rollback
@@ -193,7 +193,7 @@ Use this when:
 Promote an earlier run to a different deployment:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --publish-only \
   --source-run-id <deploy-run-id>
 ```
@@ -206,14 +206,14 @@ Use this when:
 
 Example:
 
-- run the command on `//projects/deployments/pleomino/prod:deploy`
+- run the command on `//projects/deployments/example-app/prod:deploy`
   with a `--source-run-id` that came from an earlier successful
-  `//projects/deployments/pleomino/staging:deploy` run
+  `//projects/deployments/example-app/staging:deploy` run
 
 Provision infrastructure only:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --provision-only \
   --source-run-id <deploy-run-id>
 ```
@@ -226,13 +226,13 @@ Use this when:
 Target-transition workflows:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --retire-target \
   --target-exception-ref <label>
 ```
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --migrate-target \
   --target-exception-ref <label>
 ```
@@ -256,13 +256,13 @@ promotion authority.
 Common example values:
 
 - deployment label:
-  `//projects/deployments/pleomino/prod:deploy`
+  `//projects/deployments/example-app/prod:deploy`
 - source run id:
   `deploy-run-2026-04-16-abc123`
 - target exception ref:
   `//projects/deployments/<package>:<target-exception>`
 
-No default Pleomino target-transition exception is checked in today. Use a
+No default ExampleApp target-transition exception is checked in today. Use a
 reviewed `deployment_target_exception(...)` label that matches the ownership
 change you are making.
 
@@ -319,19 +319,19 @@ stale malformed refs or plaintext token-shaped fields even when no deployment
 currently selects that profile.
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --status \
   --deploy-run-id <deploy-run-id>
 ```
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --print-run-lock-scope \
   --deploy-run-id <deploy-run-id>
 ```
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --approve \
   --deploy-run-id <deploy-run-id> \
   --approval-id <ticket-or-review-ref>
@@ -345,13 +345,13 @@ To answer what is currently deployed in a protected/shared stage, use the
 control-plane current-stage helpers rather than Git release-pointer files:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --current-stage-state \
   --text
 ```
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --stage-history
 ```
 
@@ -395,11 +395,11 @@ stable idempotency key:
 
 ```bash
 build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --profile mini \
   --artifact-dir "$WORKSPACE/dist" \
   --admission-evidence-json "$WORKSPACE/deploy-admission.json" \
-  --idempotency-key "jenkins:${JOB_NAME}:${BUILD_TAG}:pleomino-dev" \
+  --idempotency-key "jenkins:${JOB_NAME}:${BUILD_TAG}:example-dev" \
   --ssh-identity-file "$JENKINS_SSH_KEY" \
   --ssh-known-hosts "$JENKINS_KNOWN_HOSTS"
 ```
@@ -416,14 +416,14 @@ to the protected service control plane and keep the idempotency key stable for
 the Jenkins build or promotion attempt:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/staging:deploy \
+deploy --deployment //projects/deployments/example-app/staging:deploy \
   --publish-only \
   --source-run-id "$DEV_DEPLOY_RUN_ID" \
   --idempotency-key "jenkins:${JOB_NAME}:${BUILD_TAG}:promote-staging"
 ```
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/example-app/prod:deploy \
   --publish-only \
   --source-run-id "$STAGING_DEPLOY_RUN_ID" \
   --idempotency-key "jenkins:${JOB_NAME}:${BUILD_TAG}:promote-prod"
@@ -650,27 +650,27 @@ step instead of editing Keycloak by hand.
   source run, while promotion selects the reviewed source artifact and then
   admits fresh target-deployment secret references from the target's current
   metadata.
-- Pleomino staging and production now use the Infisical backend for the existing
-  `secret://deployments/pleomino/cloudflare_api_token` contract. The secret is a
+- ExampleApp staging and production now use the Infisical backend for the existing
+  `secret://deployments/example-app/cloudflare_api_token` contract. The secret is a
   shared Infisical secret named `cloudflare_api_token` at `/` in the
-  `pleomino-deployments` project, with `staging` and `prod` environments.
-- Pleomino staging and production select `pleomino-staging` and `pleomino-prod`
+  `example-deployments` project, with `staging` and `prod` environments.
+- ExampleApp staging and production select `example-staging` and `example-prod`
   deployment contexts. The contexts in `projects/config/shared.json` own the
   shared Cloudflare Pages and Infisical topology; the deployment family keeps
   only logical refs and stage policy.
-- Pleomino dev stays on the Vault-backed shared-host path so old dev workflows
+- ExampleApp dev stays on the Vault-backed shared-host path so old dev workflows
   and old Vault-admitted replay records remain interpretable.
-- Before the first live Pleomino Infisical rollout, run the reviewed one-command
+- Before the first live ExampleApp Infisical rollout, run the reviewed one-command
   bootstrap flow instead of manually applying the OpenTofu module or hunting for
   organization ids:
 
 ```bash
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts \
   deployment \
-  --target //projects/deployments/pleomino/staging:deploy \
+  --target //projects/deployments/example-app/staging:deploy \
   --org-name viberoots \
   --yes \
-  --tofu-plan-file .local/pleomino-infisical.tfplan
+  --tofu-plan-file .local/example-app-infisical.tfplan
 ```
 
 The `--yes` flag is non-interactive pre-confirmation for mutation-capable bootstrap. Local
@@ -682,11 +682,11 @@ short-lived admin token and an explicit organization selector:
 INFISICAL_ACCESS_TOKEN='<redacted>' \
   viberoots/build-tools/tools/deployments/infisical-bootstrap.ts \
   deployment \
-  --target //projects/deployments/pleomino/staging:deploy \
+  --target //projects/deployments/example-app/staging:deploy \
   --no-login \
   --org-name viberoots \
   --yes \
-  --tofu-plan-file .local/pleomino-infisical.tfplan
+  --tofu-plan-file .local/example-app-infisical.tfplan
 ```
 
 The bootstrap command creates or preserves the bootstrap IaC identity, runs
@@ -699,15 +699,15 @@ plan path when available, and exact retry command without printing credential va
 read-only `deploy admin infisical plan` and `deploy admin infisical check` for staging before
 repeating the same check for production.
 
-- The reviewed Pleomino Universal Auth runtime names are
-  `PLEOMINO_STAGING_INFISICAL_CLIENT_ID`,
-  `PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET`,
-  `PLEOMINO_PROD_INFISICAL_CLIENT_ID`, and
-  `PLEOMINO_PROD_INFISICAL_CLIENT_SECRET`. They are runtime bindings derived
+- The reviewed ExampleApp Universal Auth runtime names are
+  `EXAMPLE_APP_STAGING_INFISICAL_CLIENT_ID`,
+  `EXAMPLE_APP_STAGING_INFISICAL_CLIENT_SECRET`,
+  `EXAMPLE_APP_PROD_INFISICAL_CLIENT_ID`, and
+  `EXAMPLE_APP_PROD_INFISICAL_CLIENT_SECRET`. They are runtime bindings derived
   from service credential files, not values to commit, paste into local shells,
   or install in CI.
 - If Infisical access is unavailable during rollout, restore Vault for new
-  admissions by changing only Pleomino staging and production metadata to select
+  admissions by changing only ExampleApp staging and production metadata to select
   the reviewed Vault runtime and backend; keep the `secret_requirements` contract ids unchanged.
   Do not edit recorded admitted
   contexts: old Vault-admitted runs continue replaying with Vault references,
@@ -734,14 +734,14 @@ scaf new deployment opentofu-provisioner api-dev --path=projects/deployments/api
 The generated packages include placeholder secret/runtime config contract IDs and provider config
 files. Replace those placeholders with reviewed provider/account/domain values before admission.
 
-Checked-in live deployment packages are currently limited to Pleomino:
+The reusable examples below use an illustrative ExampleApp family:
 
-- `//projects/deployments/pleomino/dev:deploy`
-- `//projects/deployments/pleomino/staging:deploy`
-- `//projects/deployments/pleomino/prod:deploy`
+- `//projects/deployments/example-app/dev:deploy`
+- `//projects/deployments/example-app/staging:deploy`
+- `//projects/deployments/example-app/prod:deploy`
 
 Speculative deployment families should not be committed under
-`projects/deployments`. Keep capability coverage for new providers,
+`projects/deployments` in a consuming workspace. Keep capability coverage for new providers,
 foundation-migration behavior, prerequisite admission, and smoke metadata in
 temp-repo fixtures or purpose-built hermetic test workspaces until the product
 deployment family is approved. When a future family is approved, add its shared

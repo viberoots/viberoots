@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
@@ -11,6 +10,7 @@ import {
 import { resolveModuleContractsPaths } from "../../dev/module-contract-paths";
 import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core";
 import { runInTemp } from "../lib/test-helpers";
+import { pnpmInstallForDevTest, spawnStaticViteDevServer } from "./lib/dev-node-modules";
 import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
 
 const TEST_TIMEOUT_MS =
@@ -223,18 +223,14 @@ test(
         });
 
         await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-web`;
-        await _$({
-          cwd: tmp,
-          stdio: "inherit",
-          env: { ...process.env, CI: "1", NEXT_TELEMETRY_DISABLED: "1" },
-        })`pnpm --dir ${tmp} install --filter ./projects/apps/demo-web... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+        await pnpmInstallForDevTest({
+          tmp,
+          _$,
+          filter: "./projects/apps/demo-web...",
+        });
 
         const port = await pickFreePort();
-        const devServer = spawn(
-          "pnpm",
-          ["exec", "vite", "dev", "--host", "127.0.0.1", "--port", String(port), "--strictPort"],
-          { cwd: appAbs, stdio: "pipe", env: { ...process.env, NODE_ENV: "development" } },
-        );
+        const devServer = spawnStaticViteDevServer(appAbs, port);
         try {
           await waitForHttpOk(`http://127.0.0.1:${port}/`);
           const generatedWasmManifest = parseWasmModuleManifest(

@@ -1,6 +1,7 @@
 { pkgs
 , H
 , repoStoreRoot
+, repoFsRoot
 , sharedNodeMods
 , lockInfoOfName
 , nodeOfName
@@ -27,6 +28,7 @@ let
       (import ../node-modules.nix {
         inherit pkgs;
         repoRoot = repoStoreRoot;
+        repoFsRoot = repoFsRoot;
       });
   sanitize = H.sanitizeName;
   nm = nodeMods.mkNodeModules { lockfilePath = info.lockfilePath; inherit importerDir; };

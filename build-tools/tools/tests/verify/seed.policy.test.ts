@@ -26,6 +26,10 @@ test("verify seed build policy defaults to full-suite only", () => {
     false,
   );
   assert.equal(
+    shouldPrepareVerifySeedForRequestedTargets(["//projects/...", "//viberoots/..."], {}),
+    true,
+  );
+  assert.equal(
     shouldPrepareVerifySeedForRequestedTargets(["@viberoots//build-tools/tools/tests/..."], {}),
     true,
   );
@@ -130,6 +134,12 @@ test("verify seed staging stays outside volatile verify TMPDIR", () => {
     assert.equal(root, path.join(os.tmpdir(), "viberoots-test-seed"));
     return;
   }
+  if (process.platform === "darwin") {
+    assert.ok(root.startsWith("/tmp/viberoots-test-seed"));
+    assert.ok(root.endsWith(".noindex"));
+    assert.ok(!root.includes("/viberoots-verify"));
+    return;
+  }
   assert.ok(root.startsWith("/tmp/viberoots-test-seed"));
   assert.ok(!root.includes("/viberoots-verify"));
 });
@@ -188,6 +198,9 @@ test("verify seed staging publishes read-only shared stages", async () => {
 
   assert.equal(rootMode & 0o222, 0);
   assert.equal(flakeMode & 0o222, 0);
+  if (process.platform === "darwin") {
+    await fsp.stat(path.join(staged, ".metadata_never_index"));
+  }
   await assert.rejects(fsp.access(path.join(staged, ".seed-store-writable")));
 });
 
@@ -197,12 +210,29 @@ test("runInTemp seed overlay refreshes active viberoots source", async () => {
     "build-tools/tools/tests/lib/test-helpers/run-in-temp.ts",
   );
   assert.match(source, /const tmpViberoots = path\.join\(tmpDir, "viberoots"\)/);
-  assert.match(source, /fsp\.rm\(tmpViberoots, \{ recursive: true, force: true \}\)/);
-  assert.match(source, /rsync -a --delete/);
+  assert.match(source, /listActiveSourceOverlayFiles/);
+  assert.match(source, /rsync -a --relative --files-from/);
+  assert.doesNotMatch(source, /fsp\.rm\(tmpViberoots, \{ recursive: true, force: true \}\)/);
+  assert.doesNotMatch(source, /rsync -a --delete/);
   assert.doesNotMatch(source, /if \(tmpHasActiveViberootsRoot\) return/);
   assert.match(runInTempSource, /rewriteTempViberootsInput/);
   assert.match(runInTempSource, /viberoots\\.url/);
   assert.match(runInTempSource, /path:\$\{activeViberootsRoot\}/);
   assert.match(runInTempSource, /path\.join\(root, "flake\.nix"\)/);
   assert.match(runInTempSource, /import\.meta\.url/);
+});
+
+test("runInTemp seed copies do not repair permissions with broad chmod", async () => {
+  const seedStoreSource = await readRepoFile(
+    "build-tools/tools/tests/lib/test-helpers/seed-store.ts",
+  );
+  const seedCopySource = await readRepoFile(
+    "build-tools/tools/tests/lib/test-helpers/seed-copy.ts",
+  );
+
+  assert.doesNotMatch(seedStoreSource, /chmod -R u\+w/);
+  assert.match(seedCopySource, /copySeedStoreToTempRepo/);
+  assert.match(seedCopySource, /makeDirectoryPublishable\(stagingDir\)/);
+  assert.match(seedCopySource, /process\.platform !== "darwin"/);
+  assert.match(seedCopySource, /makeTreeWritable\(stagingDir\)/);
 });

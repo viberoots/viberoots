@@ -181,11 +181,11 @@ export const CLOUDFLARE_PAGES_PROVIDER_CAPABILITY: DeploymentProviderCapability 
   ],
   additionalSections: [
     {
-      title: "Initial Pleomino Topology",
+      title: "Example Topology",
       bullets: [
-        bullet("`pleomino-dev` stays on `nixos-shared-host` as the shared-dev path"),
-        bullet("`pleomino-staging` uses `cloudflare-pages` with protection class `shared_nonprod`"),
-        bullet("`pleomino-prod` uses `cloudflare-pages` with protection class `production_facing`"),
+        bullet("`example-dev` stays on `nixos-shared-host` as the shared-dev path"),
+        bullet("`example-staging` uses `cloudflare-pages` with protection class `shared_nonprod`"),
+        bullet("`example-prod` uses `cloudflare-pages` with protection class `production_facing`"),
       ],
     },
   ],

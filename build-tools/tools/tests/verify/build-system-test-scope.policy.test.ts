@@ -4,13 +4,15 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  collectChangedPaths,
   hasRelevantBuildSystemChanges,
   isBuildSystemPath,
   isIgnoredBuildSystemScopePath,
   parseBuildSystemTestMode,
+  resolveBuildSystemBuckTestScope,
 } from "../../lib/build-system-test-scope";
 import { resolveNonBuildSystemBuckTargets } from "../../lib/non-build-system-scope";
-import { runInTemp } from "../lib/test-helpers";
+import { mktemp, runInTemp } from "../lib/test-helpers";
 
 test("build-system test scope mode parsing supports auto/always/never", () => {
   assert.equal(parseBuildSystemTestMode(undefined), "auto");
@@ -69,6 +71,41 @@ test("relevant build-system changes exclude ignored paths", () => {
     ]),
     true,
   );
+});
+
+test("dirty nested viberoots repo expands to build-system changed paths", async () => {
+  const root = await mktemp("build-system-scope-nested-viberoots-");
+  try {
+    const nested = path.join(root, "viberoots");
+    const toolPath = path.join(nested, "build-tools", "tools", "dev", "verify.ts");
+    await fsp.mkdir(path.dirname(toolPath), { recursive: true });
+    await fsp.writeFile(toolPath, "export const marker = 1;\n");
+
+    await $({ cwd: nested })`git init -b main`;
+    await $({ cwd: nested })`git add .`;
+    await $({ cwd: nested })`git -c user.name=test -c user.email=test@example.com commit -m init`;
+
+    await $({ cwd: root })`git init -b main`;
+    await $({ cwd: root })`git add viberoots`;
+    await $({ cwd: root })`git -c user.name=test -c user.email=test@example.com commit -m init`;
+
+    await fsp.writeFile(toolPath, "export const marker = 2;\n");
+
+    const changedPaths = await collectChangedPaths(root, {});
+    assert.equal(changedPaths.includes("viberoots"), true);
+    assert.equal(changedPaths.includes("viberoots/build-tools/tools/dev/verify.ts"), true);
+    assert.equal(hasRelevantBuildSystemChanges(changedPaths), true);
+
+    const scope = await resolveBuildSystemBuckTestScope({
+      root,
+      requestedTargets: ["//..."],
+      env: {},
+    });
+    assert.deepEqual(scope.targets, ["//..."]);
+    assert.equal(scope.hasBuildSystemChanges, true);
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
 });
 
 test("git helper probes use non-throwing zx calls", async () => {

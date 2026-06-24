@@ -1,11 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
-import { ensureNodeModulesForDevApp } from "./lib/dev-node-modules";
+import { ensureNodeModulesForDevApp, spawnViteSsrDevServer } from "./lib/dev-node-modules";
 import {
   assertSingleQueueInvariant,
   producerByteLength,
@@ -85,17 +84,8 @@ test(
         if (res.status !== 200) return null;
         return res.body.length;
       };
-      const devServer = spawn("pnpm", ["run", "dev"], {
-        cwd: appAbs,
-        stdio: "pipe",
-        env: {
-          ...process.env,
-          NODE_ENV: "development",
-          NODE_OPTIONS: "",
-          ESBUILD_BINARY_PATH: esbuildBin,
-          NEXT_TELEMETRY_DISABLED: "1",
-          PORT: String(port),
-        },
+      const devServer = spawnViteSsrDevServer(appAbs, port, {
+        ESBUILD_BINARY_PATH: esbuildBin,
       });
       devServer.stdout?.on("data", (chunk) => {
         serverStdout.push(String(chunk || ""));

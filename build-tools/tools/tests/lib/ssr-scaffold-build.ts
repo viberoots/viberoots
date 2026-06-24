@@ -13,6 +13,7 @@ import { parseWasmModuleManifest } from "../../scaffolding/webapp-module-manifes
 import { terminateChildTree } from "./process-tree";
 import { DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS, stageTempRepoPaths } from "./test-helpers/git-stage";
 import { exists } from "./test-helpers";
+import { pnpmInstallForDevTest } from "../scaffolding/lib/dev-node-modules";
 
 async function httpGet(
   url: string,
@@ -79,14 +80,6 @@ async function readCanonicalServerWasmArtifact(outPath: string): Promise<string 
     );
   }
   return path.join(outPath, "dist", ...defaultEntry.runtimeDestinations.server.split("/"));
-}
-
-async function installNodeModules(appAbs: string, _$: any): Promise<void> {
-  await _$({
-    cwd: appAbs,
-    stdio: "inherit",
-    env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-  })`pnpm install --prod --frozen-lockfile --ignore-scripts --ignore-workspace --reporter=append-only`;
 }
 
 async function workspaceFlakeRef(root: string): Promise<string> {
@@ -234,7 +227,12 @@ export async function scaffoldBuildAndSmoke(
   assert.deepEqual(runnable?.run.dev?.argv, ["pnpm", "--dir", importer, "dev:ssr"]);
 
   if (!runRuntimeSmoke) return;
-  await installNodeModules(appAbs, _$);
+  await pnpmInstallForDevTest({
+    tmp,
+    _$,
+    filter: `./${importer}...`,
+    frozenLockfile: true,
+  });
   await fsp.rm(path.join(appAbs, "dist"), { recursive: true, force: true });
   await fsp.cp(path.join(outPath, "dist"), path.join(appAbs, "dist"), { recursive: true });
   const res = await runNodeServerSmoke(appAbs, marker);

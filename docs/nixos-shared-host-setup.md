@@ -47,7 +47,7 @@ Current supported scope:
   - `static-webapp`
   - `ssr-webapp` for the reviewed single-component host slice
 - protection class: `shared_nonprod`
-- example deployment: `//projects/deployments/pleomino/dev:deploy`
+- example deployment: `//projects/deployments/example-app/dev:deploy`
 
 ## When Vault Is In Scope
 
@@ -407,10 +407,10 @@ Before you rebuild, generate the reviewed identity group shape with:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy admin identity sync \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --realm-file ./deployment-host/identity-provider/deployment-auth-realm.json \
   --acting-principal <principal> \
-  --admin-group deploy-admin-identity-shape-admin-project-pleomino
+  --admin-group deploy-admin-identity-shape-admin-project-example-app
 ```
 
 `deploymentHost.identityProvider.generatedImportRoot` is the reviewed
@@ -435,12 +435,12 @@ One reviewed membership grant example is:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --action submit \
   --user-email alice@example.com \
   --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json \
   --acting-principal <principal> \
-  --admin-group deploy-admin-identity-membership-admin-project-pleomino
+  --admin-group deploy-admin-identity-membership-admin-project-example-app
 ```
 
 `deploymentHost.identityProvider.databasePasswordFile` is a host-managed secret
@@ -455,18 +455,18 @@ manual SSH session:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy admin identity sync \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --profile mini \
   --apply-host-dry-run
 
 direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --profile mini \
   --action submit \
   --apply-host
 
 direnv exec . build-tools/tools/bin/deploy admin identity grant-user \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --profile mini \
   --action submit \
   --user-email alice@example.com \
@@ -491,9 +491,9 @@ fix the reviewed mapper contract before retrying the self-service flow.
 The reviewed deploy-admin identity grants stay separate from ordinary deploy
 grants. Typical examples are:
 
-- `deploy-admin-identity-read-project-pleomino`
-- `deploy-admin-identity-shape-admin-project-pleomino`
-- `deploy-admin-identity-membership-admin-project-pleomino`
+- `deploy-admin-identity-read-project-example-app`
+- `deploy-admin-identity-shape-admin-project-example-app`
+- `deploy-admin-identity-membership-admin-project-example-app`
 
 With that shape, add `8200` to the existing
 `networking.firewall.allowedTCPPorts` expression and add host-owned nginx
@@ -715,7 +715,7 @@ Plan from a dev machine:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --profile mini \
   --plan
 ```
@@ -738,7 +738,7 @@ direnv exec . build-tools/tools/bin/nixos-shared-host-install \
   --ssh-known-hosts "$HOME/.ssh/mini-known-hosts"
 
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --profile mini \
   --artifact-dir ./dist
 ```
@@ -766,9 +766,9 @@ Deploy from Jenkins:
 
 ```bash
 direnv exec . build-tools/tools/bin/nixos-shared-host-jenkins-deploy \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --profile mini \
-  --artifact-dir "$WORKSPACE/projects/apps/pleomino/dist" \
+  --artifact-dir "$WORKSPACE/projects/apps/example-app/dist" \
   --ssh-identity-file "$JENKINS_SSH_IDENTITY" \
   --ssh-known-hosts "$JENKINS_KNOWN_HOSTS"
 ```
@@ -788,7 +788,7 @@ inspect that same run:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --profile mini \
   --status \
   --deploy-run-id "$DEPLOY_RUN_ID"
@@ -805,7 +805,7 @@ Then approve that same run:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/example-app/dev:deploy \
   --profile mini \
   --approve \
   --deploy-run-id "$DEPLOY_RUN_ID" \

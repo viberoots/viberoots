@@ -1,3 +1,5 @@
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import process from "node:process";
 import "../dev/zx-init.mjs";
 import { resolveNonBuildSystemBuckTargets } from "./non-build-system-scope";
@@ -194,6 +196,23 @@ export async function collectChangedPaths(
   root: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<string[]> {
+  const rootChangedPaths = await collectGitChangedPaths(root, env);
+  const nestedViberootsChangedPaths = await collectNestedViberootsChangedPaths(
+    root,
+    env,
+    rootChangedPaths,
+  );
+  return Array.from(
+    new Set<string>(
+      [...rootChangedPaths, ...nestedViberootsChangedPaths].map((p) => normalizePath(p)),
+    ),
+  ).sort();
+}
+
+async function collectGitChangedPaths(
+  root: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string[]> {
   const committed = await mergeBaseChangedPaths(root, env);
   const statusRaw = await $({
     cwd: root,
@@ -206,6 +225,26 @@ export async function collectChangedPaths(
   return Array.from(
     new Set<string>([...committed, ...statusPaths].map((p) => normalizePath(p))),
   ).sort();
+}
+
+async function collectNestedViberootsChangedPaths(
+  root: string,
+  env: NodeJS.ProcessEnv,
+  rootChangedPaths: string[],
+): Promise<string[]> {
+  if (!rootChangedPaths.some((p) => p === "viberoots" || p.startsWith("viberoots/"))) {
+    return [];
+  }
+  const viberootsRoot = path.join(root, "viberoots");
+  const hasNestedGit = await fsp
+    .access(path.join(viberootsRoot, ".git"))
+    .then(() => true)
+    .catch(() => false);
+  if (!hasNestedGit) {
+    return [];
+  }
+  const nestedPaths = await collectGitChangedPaths(viberootsRoot, env);
+  return nestedPaths.map((p) => normalizePath(path.posix.join("viberoots", p))).filter(Boolean);
 }
 
 async function hasBuildSystemChanges(root: string, env: NodeJS.ProcessEnv): Promise<boolean> {

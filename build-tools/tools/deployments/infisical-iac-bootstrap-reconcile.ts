@@ -3,13 +3,14 @@ import {
   buildMetadataHandoffPatch,
   isFirstBootstrapPlaceholder,
 } from "./infisical-iac-bootstrap-metadata-handoff";
+import type { DeploymentBootstrapScope } from "./infisical-iac-bootstrap-config";
 import type { DeploymentRuntimeMetadata } from "./infisical-iac-bootstrap-types";
 
 export function reconcileDeploymentMetadata(
   live: DeploymentRuntimeMetadata,
   reviewed: Required<DeploymentRuntimeMetadata>,
   reviewedSource?: string,
-  opts: { allowReviewedIdHandoff?: boolean } = {},
+  opts: { allowReviewedIdHandoff?: boolean; scope?: DeploymentBootstrapScope } = {},
 ) {
   const mismatches = [
     ...compareHost("site url", live.siteUrl, reviewed.siteUrl, true),
@@ -76,16 +77,16 @@ export function reconcileDeploymentMetadata(
         schemaVersion: "infisical-iac-bootstrap-reconciliation@1",
         status: "metadata_handoff_required" as const,
         mismatches: mismatches.map((item) => item.text),
-        patch: buildMetadataHandoffPatch(live, reviewed, reviewedSource),
+        patch: buildMetadataHandoffPatch(live, reviewed, reviewedSource, opts.scope),
       };
     }
+    const reviewedLocation = reviewedMetadataLocation(opts.scope);
     throw new Error(
       [
-        "OpenTofu output reconciliation failed against reviewed Pleomino Infisical metadata.",
+        "OpenTofu output reconciliation failed against reviewed deployment Infisical metadata.",
         ...mismatches.map((item) => `- ${item.text}`),
         "Concrete remediation:",
-        "- Update projects/config/shared.json deployment contexts:",
-        "  deploymentContexts.pleomino-staging.infisical and deploymentContexts.pleomino-prod.infisical.",
+        `- Update ${reviewedLocation}.`,
         "- Keep Infisical host/project id, machine identity id, and credential file-name fields aligned with reviewed OpenTofu outputs.",
         "- Keep the stable refs in this command's handoff report unchanged unless the reviewed naming convention changes.",
         "- Rerun this bootstrap command after patching metadata; do not attempt a live deployment until reconciliation passes.",
@@ -93,6 +94,11 @@ export function reconcileDeploymentMetadata(
     );
   }
   return { schemaVersion: "infisical-iac-bootstrap-reconciliation@1", status: "ok" as const };
+}
+
+function reviewedMetadataLocation(scope?: DeploymentBootstrapScope) {
+  if (!scope) return "projects/config/shared.json deployment contexts";
+  return `${scope.reviewedContextConfigPath} deploymentContexts.${scope.family}-${scope.stage}.infisical`;
 }
 
 function compare(

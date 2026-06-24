@@ -5,6 +5,7 @@ import { parseBootstrapArgs, usage } from "./infisical-iac-bootstrap-args";
 import { getArgvTokens } from "../lib/argv";
 import { findRepoRoot } from "../lib/repo";
 import {
+  deploymentScopeFromTarget,
   resolveInfisicalHost,
   withDeploymentBootstrapDefaults,
 } from "./infisical-iac-bootstrap-config";
@@ -26,17 +27,12 @@ import { confirmBootstrapPreflight } from "./infisical-iac-bootstrap-preflight";
 import { reconcileDeploymentMetadata } from "./infisical-iac-bootstrap-reconcile";
 import { ensureDeploymentCredentials } from "./infisical-iac-deployment-credentials";
 import {
-  readPleominoReviewedMetadata,
-  readPleominoReviewedMetadataSource,
+  readDeploymentReviewedMetadata,
+  readDeploymentReviewedMetadataSource,
 } from "./infisical-iac-bootstrap-reviewed-metadata";
 import { errorMessage } from "./infisical-iac-bootstrap-redaction";
 import { DEFAULT_SPRINKLEREF_CONFIG_PATH } from "./sprinkleref-config-select";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
-
-const PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS = new Set([
-  "//projects/deployments/pleomino/staging:deploy",
-  "//projects/deployments/pleomino/prod:deploy",
-]);
 
 export async function runInfisicalIacBootstrap(
   args: BootstrapArgs,
@@ -51,13 +47,17 @@ export async function runInfisicalIacBootstrap(
     return await runRepoBootstrap(args, runInfisicalIacBootstrap);
   }
   const deploymentArgs = withDeploymentBootstrapDefaults(args);
-  deploymentScopeFromTarget(deploymentArgs);
+  const scope = deploymentScopeFromTarget(deploymentArgs);
   const workspaceRoot = context.workspaceRoot || (await findRepoRoot(process.cwd()));
   const configPath =
     context.configPath || path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
   const rootContext = { ...context, workspaceRoot, configPath };
-  const reviewedSource = await readPleominoReviewedMetadataSource(undefined, workspaceRoot);
-  const reviewedMetadata = await readPleominoReviewedMetadata(undefined, workspaceRoot);
+  const reviewedSource = await readDeploymentReviewedMetadataSource(
+    scope,
+    undefined,
+    workspaceRoot,
+  );
+  const reviewedMetadata = await readDeploymentReviewedMetadata(scope, undefined, workspaceRoot);
   const effectiveArgs = withReviewedHost(deploymentArgs, reviewedMetadata.siteUrl);
   if (effectiveArgs.dryRun) return dryRun(effectiveArgs, rootContext);
   await confirmBootstrapPreflight(effectiveArgs);
@@ -102,6 +102,7 @@ export async function runInfisicalIacBootstrap(
   const metadata = readDeploymentRuntimeMetadata(resolvedArgs, spawnCommandRunner);
   const reconciliation = reconcileDeploymentMetadata(metadata, reviewedMetadata, reviewedSource, {
     allowReviewedIdHandoff: Boolean(tofu.adoption.projectId),
+    scope,
   });
   if (reconciliation.status === "metadata_handoff_required") {
     const result = { reconciliation, deploymentCredentialLifecycle: [], credentialHandoff: null };
@@ -127,18 +128,6 @@ export async function runInfisicalIacBootstrap(
   };
   console.log(JSON.stringify(result, null, 2));
   return result;
-}
-
-function deploymentScopeFromTarget(args: BootstrapArgs) {
-  if (!args.target) throw new Error("deployment bootstrap requires --target <buck-target>");
-  if (!PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS.has(args.target)) {
-    throw new Error(
-      `deployment bootstrap target ${args.target} is not supported; supported targets: ${[
-        ...PLEOMINO_DEPLOYMENT_BOOTSTRAP_TARGETS,
-      ].join(", ")}`,
-    );
-  }
-  return { kind: "pleomino" as const, target: args.target };
 }
 
 async function dryRun(

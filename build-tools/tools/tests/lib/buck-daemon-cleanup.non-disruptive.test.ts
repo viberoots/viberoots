@@ -7,6 +7,8 @@ import { test } from "node:test";
 import { buckProcessTableLines } from "../../lib/process-inspection";
 import { runInTemp } from "./test-helpers";
 
+const BUCK_CLEANUP_RSYNC_ROOTS = "viberoots build-tools toolchains third_party/providers prelude";
+
 async function killAndWait(child: ReturnType<typeof spawn>, timeoutMs = 2000): Promise<void> {
   const done =
     child.exitCode !== null || child.signalCode !== null
@@ -57,7 +59,11 @@ test("buck cleanup: does not kill buck2 daemons belonging to other running temp 
     ],
     {
       stdio: ["ignore", "pipe", "pipe"],
-      env: { ...process.env, VBR_BUCK_REAPER_STATE_FILE: "" },
+      env: {
+        ...process.env,
+        TEST_RSYNC_ROOTS: process.env.TEST_RSYNC_ROOTS || BUCK_CLEANUP_RSYNC_ROOTS,
+        VBR_BUCK_REAPER_STATE_FILE: "",
+      },
     },
   );
 
@@ -81,34 +87,43 @@ test("buck cleanup: does not kill buck2 daemons belonging to other running temp 
     exitCode = code;
   });
 
-  const t0 = Date.now();
-  while ((!tmp || !ready) && Date.now() - t0 < 120_000) {
-    if (exitCode !== null) break;
-    await new Promise((r) => setTimeout(r, 50));
+  try {
+    const t0 = Date.now();
+    while ((!tmp || !ready) && Date.now() - t0 < 120_000) {
+      if (exitCode !== null) break;
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    assert.ok(tmp, `expected child tmp path; got stdout:\n${stdout}\nstderr:\n${stderr}`);
+    assert.ok(ready, `expected child READY; got stdout:\n${stdout}\nstderr:\n${stderr}`);
+
+    const token = path.basename(tmp);
+    await waitForPresent(token, 10_000);
+
+    const originalRsyncRoots = process.env.TEST_RSYNC_ROOTS;
+    try {
+      process.env.TEST_RSYNC_ROOTS = originalRsyncRoots || BUCK_CLEANUP_RSYNC_ROOTS;
+      // Run an unrelated temp-repo test. Its cleanup must not kill the child's forkserver,
+      // because the child's repo still exists and is not under the other temp root.
+      await runInTemp("buck-cleanup-nondisruptive-other", async (_tmp2, $) => {
+        await $`buck2 build //.viberoots/workspace:flake.lock`;
+      });
+    } finally {
+      if (originalRsyncRoots === undefined) delete process.env.TEST_RSYNC_ROOTS;
+      else process.env.TEST_RSYNC_ROOTS = originalRsyncRoots;
+    }
+
+    // Signal the child to run another buck2 build while it is still running.
+    await fsp.writeFile(path.join(tmp, "go.signal"), "go\n", "utf8");
+
+    const t1 = Date.now();
+    while (!stdout.includes("PING_OK") && Date.now() - t1 < 60_000) {
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    assert.ok(
+      stdout.includes("PING_OK"),
+      `expected child to complete second build; stdout:\n${stdout}`,
+    );
+  } finally {
+    await killAndWait(child);
   }
-  assert.ok(tmp, `expected child tmp path; got stdout:\n${stdout}\nstderr:\n${stderr}`);
-  assert.ok(ready, `expected child READY; got stdout:\n${stdout}\nstderr:\n${stderr}`);
-
-  const token = path.basename(tmp);
-  await waitForPresent(token, 10_000);
-
-  // Run an unrelated temp-repo test. Its cleanup must not kill the child's forkserver,
-  // because the child's repo still exists and is not under the other temp root.
-  await runInTemp("buck-cleanup-nondisruptive-other", async (_tmp2, $) => {
-    await $`buck2 build //.viberoots/workspace:flake.lock`;
-  });
-
-  // Signal the child to run another buck2 build while it is still running.
-  await fsp.writeFile(path.join(tmp, "go.signal"), "go\n", "utf8");
-
-  const t1 = Date.now();
-  while (!stdout.includes("PING_OK") && Date.now() - t1 < 60_000) {
-    await new Promise((r) => setTimeout(r, 50));
-  }
-  assert.ok(
-    stdout.includes("PING_OK"),
-    `expected child to complete second build; stdout:\n${stdout}`,
-  );
-
-  await killAndWait(child);
 });

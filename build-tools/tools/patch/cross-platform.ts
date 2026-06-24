@@ -3,6 +3,10 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { copyTree } from "../lib/copy-tree";
+import {
+  markMacosMetadataNeverIndex,
+  mkdirWithMacosMetadataExclusion,
+} from "../lib/macos-metadata";
 
 export async function chmodRecursive(root: string): Promise<void> {
   const stack: string[] = [root];
@@ -45,8 +49,9 @@ export async function makeWorkspace(args: {
   const rand = crypto.randomBytes(3).toString("hex");
   const safeKey = moduleKey.replace(/[^A-Za-z0-9._@-]+/g, "_");
   const dst = path.join(base, `${safeKey}-${stamp}-${pid}-${rand}`);
-  await fsp.mkdir(base, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(base);
   await copyTree(originPath, dst, { cloneMode: "try", force: true });
+  await markMacosMetadataNeverIndex(dst);
   // Ensure workspace is writable even if source tree had read-only bits
   await chmodRecursive(dst);
   return dst;

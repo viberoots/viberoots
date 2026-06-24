@@ -29,6 +29,47 @@ async function ensureDir(p: string) {
   await fsp.mkdir(p, { recursive: true });
 }
 
+async function mergeExactStorePathIntoUnifiedStore(opts: {
+  exactStorePath: string;
+  unifyStore: string;
+}): Promise<void> {
+  const archive = path.join(opts.exactStorePath, "store.tar");
+  if (fs.existsSync(archive)) {
+    await ensureDir(opts.unifyStore);
+    await $`tar -xf ${archive} -C ${opts.unifyStore}`;
+    return;
+  }
+  await mergePnpmStore(opts.exactStorePath, opts.unifyStore);
+}
+
+function pnpmStoreVersionNumber(name: string): number | null {
+  const match = name.match(/^v(\d+)$/);
+  if (!match) return null;
+  const version = Number(match[1]);
+  return Number.isSafeInteger(version) ? version : null;
+}
+
+async function pruneStalePnpmStoreVersions(unifyStore: string): Promise<void> {
+  let ents: Array<fsp.Dirent>;
+  try {
+    ents = await fsp.readdir(unifyStore, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  const versions = ents
+    .filter((ent) => ent.isDirectory())
+    .flatMap((ent) => {
+      const version = pnpmStoreVersionNumber(ent.name);
+      return version === null ? [] : [{ name: ent.name, version }];
+    });
+  if (versions.length <= 1) return;
+  const currentVersion = Math.max(...versions.map((entry) => entry.version));
+  for (const entry of versions) {
+    if (entry.version >= currentVersion) continue;
+    await fsp.rm(path.join(unifyStore, entry.name), { recursive: true, force: true });
+  }
+}
+
 function unifiedStoreRecoveryMessage(lockPath: string, waitTimeoutMs: number): string {
   return [
     `timed out waiting for unified pnpm store lock after ${waitTimeoutMs}ms (${lockPath})`,
@@ -156,6 +197,7 @@ async function main() {
   try {
     const cur = (await readTextSafe(pathFile)).trim();
     if (isCurrentEpochStore(cur)) {
+      await pruneStalePnpmStoreVersions(cur);
       // Ensure existing store is user-writable so buck-out is removable without sudo
       try {
         await $`bash --noprofile --norc -c ${`chmod -R u+rwX "${cur}" || true`}`;
@@ -170,6 +212,7 @@ async function main() {
     try {
       const cur = (await readTextSafe(pathFile)).trim();
       if (isCurrentEpochStore(cur)) {
+        await pruneStalePnpmStoreVersions(cur);
         console.log(cur);
         return;
       }
@@ -190,9 +233,10 @@ async function main() {
     // so avoid re-running fixed-output validation inside Nix just to assemble
     // a shared writable cache for future local pnpm operations.
     for (const imp of uniq) {
-      const { storeDir } = await prepareExactPnpmStore({ repoRoot: repo, importer: imp });
-      await mergePnpmStore(storeDir, unifyStore);
+      const { exactStorePath } = await prepareExactPnpmStore({ repoRoot: repo, importer: imp });
+      await mergeExactStorePathIntoUnifiedStore({ exactStorePath, unifyStore });
     }
+    await pruneStalePnpmStoreVersions(unifyStore);
 
     // Ensure everything under the unified store is user-writable so buck-out is removable without sudo
     try {

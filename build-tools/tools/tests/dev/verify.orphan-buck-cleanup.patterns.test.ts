@@ -6,6 +6,7 @@ import { isLikelyEphemeralIsolation } from "../../dev/verify/buck-orphan-cleanup
 import {
   liveOwnerPidFromEphemeralIsolation,
   ownerPidFromEphemeralIsolation,
+  tryTempRepoRootFromBuckDaemonCwd,
 } from "../../dev/verify/buck-orphan-cleanup-lib";
 
 test("orphan buck cleanup: matches ephemeral verify/debug/test isolations only", () => {
@@ -48,4 +49,33 @@ test("orphan buck cleanup: live-owner parsing stays scoped to the encoded verify
   const otherNested = `verify-nested-${process.pid + 1}-deadbeefcafe`;
   assert.equal(liveOwnerPidFromEphemeralIsolation(currentNested), process.pid);
   assert.equal(ownerPidFromEphemeralIsolation(otherNested), process.pid + 1);
+});
+
+test("orphan buck cleanup: missing temp-root daemons require cwd root evidence", () => {
+  assert.deepEqual(
+    tryTempRepoRootFromBuckDaemonCwd(
+      "/private/tmp/viberoots-verify-user.noindex/tmpdir/viberoots-buck-cell-A1b2C3/buck-out/v2",
+    ),
+    {
+      repoRoot: "/private/tmp/viberoots-verify-user.noindex/tmpdir/viberoots-buck-cell-A1b2C3",
+      iso: "v2",
+    },
+  );
+  assert.deepEqual(
+    tryTempRepoRootFromBuckDaemonCwd(
+      "/private/tmp/viberoots-verify-user.noindex/tmpdir/kubernetes-e2e-smoke-failure-Mybe1Z/buck-out/zxtest-install-sync-980d024fc5",
+    ),
+    {
+      repoRoot:
+        "/private/tmp/viberoots-verify-user.noindex/tmpdir/kubernetes-e2e-smoke-failure-Mybe1Z",
+      iso: "zxtest-install-sync-980d024fc5",
+    },
+  );
+  assert.equal(tryTempRepoRootFromBuckDaemonCwd("/Users/example/repo/buck-out/v2"), null);
+  assert.equal(
+    tryTempRepoRootFromBuckDaemonCwd(
+      "/private/tmp/viberoots-verify-user.noindex/tmpdir-suffix/repo/buck-out/v2",
+    ),
+    null,
+  );
 });

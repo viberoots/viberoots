@@ -11,6 +11,7 @@ import { verifyBuck2Threads } from "./buck2-threads";
 import { buildVerifyTestEnvArgs, previewVerifyNestedBuckIsolation } from "./buck2-test-env";
 import { buildBuckProcessEnvForPolicy } from "./buck2-test-remote-env";
 import { registerVerifyBuckTestIsolations } from "./verify-buck-isolation-registration";
+import { withGitAutoMaintenanceDisabledEnv } from "../../lib/git-auto-maintenance-env";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { buckTestArgsForExecutionPolicy, targetPlatformArgsForPolicy } from "./remote-policy";
 import type { VerifyExecutionPolicy } from "./remote-policy";
@@ -36,8 +37,8 @@ export function spawnVerifyBuck2Tests(opts: {
   spawnImpl?: typeof spawn;
 }): { pgid: number; nestedIso: string; wait: () => Promise<number> } {
   const minPerTestTimeoutSecs = 20 * 60;
-  const tsecRaw = Number((process.env.VERIFY_TIMEOUT_SECS || "7200").trim());
-  const tsec = Number.isFinite(tsecRaw) && tsecRaw > 0 ? Math.floor(tsecRaw) : 7200;
+  const tsecRaw = Number((process.env.VERIFY_TIMEOUT_SECS || "14400").trim());
+  const tsec = Number.isFinite(tsecRaw) && tsecRaw > 0 ? Math.floor(tsecRaw) : 14400;
   const tms = tsec * 1000;
   const testNixTimeoutRaw = Number((process.env.TEST_NIX_TIMEOUT_SECS || "").trim());
   const requestedTestNixTimeoutSecs =
@@ -87,7 +88,9 @@ export function spawnVerifyBuck2Tests(opts: {
   ];
   const buckCommandForDiagnostics = [buck2Path, ...buckArgs];
   const startS = Math.floor(Date.now() / 1000);
-  const buckEnv = buildBuckProcessEnvForPolicy(opts.executionPolicy);
+  const buckEnv = withGitAutoMaintenanceDisabledEnv(
+    buildBuckProcessEnvForPolicy(opts.executionPolicy),
+  );
   const buckLogEnv = buckLogEnvForExecutionPolicy(opts.executionPolicy);
   writeRemoteBuckMaterializationMetadata({ policy: opts.executionPolicy, passName });
 

@@ -24,6 +24,7 @@ test("s: forwards to tail-log --status -w (help path)", async () => {
   const res = await $`${path.join(binDir, "s")} --help`.nothrow();
   // tail-log exits 2 for help, prints usage to stderr.
   assert.equal(res.exitCode, 2);
+  assert.equal(res.stdout, "");
   assert.match(res.stderr, /tail-log/i);
   assert.match(res.stderr, /--status/i);
   assert.match(res.stderr, /--watch|-w/i);
@@ -44,6 +45,7 @@ test("s: strict consumer root resolves viberoots script paths", async () => {
     },
   })`s --help`.nothrow();
   assert.equal(res.exitCode, 2);
+  assert.equal(res.stdout, "");
   assert.match(res.stderr, /tail-log/i);
   assert.doesNotMatch(res.stderr, /ERR_MODULE_NOT_FOUND/);
 });

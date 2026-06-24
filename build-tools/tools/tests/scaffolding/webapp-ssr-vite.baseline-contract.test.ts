@@ -54,6 +54,7 @@ test("Vite SSR template metadata and scaffold baseline are present", async () =>
 
   await runInTemp("scaf-webapp-ssr-vite-baseline", async (tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
+    const prettier = path.join(viberootsRoot(), "node_modules", ".bin", "prettier");
     await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --skip-lockfile-gen`;
     const appRoot = path.join(tmp, "projects", "apps", "demo-vite-ssr");
     const expectedFiles = [
@@ -125,6 +126,6 @@ test("Vite SSR template metadata and scaffold baseline are present", async () =>
 
     await $({
       cwd: viberootsRoot(),
-    })`pnpm prettier --check ${path.join(appRoot, "pnpm-lock.yaml")} ${path.join(appRoot, "scripts", "build-ssr.mjs")} ${path.join(appRoot, "scripts", "dev-wasm-watch.mjs")} ${path.join(appRoot, "server", "dev.mjs")} ${path.join(appRoot, "server", "index.ts")} ${path.join(appRoot, "server", "ts-modules.ts")} ${path.join(appRoot, "src", "home.tsx")} ${path.join(appRoot, "src", "ts-modules.ts")} ${path.join(appRoot, "src", "wasm-contract.ts")} ${path.join(appRoot, "test", "entry-server.test.ts")} ${path.join(appRoot, "vite.config.ts")}`;
+    })`${prettier} --check ${path.join(appRoot, "pnpm-lock.yaml")} ${path.join(appRoot, "scripts", "build-ssr.mjs")} ${path.join(appRoot, "scripts", "dev-wasm-watch.mjs")} ${path.join(appRoot, "server", "dev.mjs")} ${path.join(appRoot, "server", "index.ts")} ${path.join(appRoot, "server", "ts-modules.ts")} ${path.join(appRoot, "src", "home.tsx")} ${path.join(appRoot, "src", "ts-modules.ts")} ${path.join(appRoot, "src", "wasm-contract.ts")} ${path.join(appRoot, "test", "entry-server.test.ts")} ${path.join(appRoot, "vite.config.ts")}`;
   });
 });

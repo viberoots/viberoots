@@ -10,6 +10,7 @@ let
     inherit pkgs viberootsRoot;
     inherit (remoteTools) remote-worker-tools;
   };
+  pnpm11 = import ../pnpm-11.nix { inherit pkgs; };
 in
 {
   gomod2nix = {
@@ -18,7 +19,7 @@ in
   };
   pnpm = {
     type = "app";
-    program = "${pkgs.pnpm}/bin/pnpm";
+    program = "${pnpm11}/bin/pnpm";
   };
   bulk-move = {
     type = "app";

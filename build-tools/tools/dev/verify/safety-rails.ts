@@ -1,5 +1,6 @@
 import "zx/globals";
 import * as fsp from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 import { resolveToolPath } from "../../lib/tool-paths";
@@ -9,8 +10,10 @@ import {
   formatLoadAvg,
   formatProcessCounts,
   makeThrottledProcessSampler,
+  sampleTopProcesses,
   summarizeVerifySafetyRailsTelemetry,
   type ProcessCounts,
+  type TopProcessSample,
 } from "./safety-rails-telemetry";
 
 export { summarizeVerifySafetyRailsTelemetry, writeVerifySafetyRailsTriggerSnapshot };
@@ -86,10 +89,34 @@ export function decideVerifySafetyRailsTrigger(opts: {
   return null;
 }
 
+export function makeTransientRootSampler(opts: {
+  transientRoot: string;
+  sampleSec: number;
+  nearThresholdSampleSec: number;
+  marginGiB: number;
+  nowMs?: () => number;
+}): (curFreeGiB: number, lowSpaceGiB: number) => boolean {
+  let lastTransientSampleMs = 0;
+  return (curFreeGiB: number, lowSpaceGiB: number): boolean => {
+    if (!opts.transientRoot) return false;
+    const threshold = lowSpaceGiB > 0 ? lowSpaceGiB + opts.marginGiB : opts.marginGiB;
+    const intervalSec =
+      threshold > 0 && curFreeGiB <= threshold ? opts.nearThresholdSampleSec : opts.sampleSec;
+    const now = opts.nowMs?.() ?? Date.now();
+    if (lastTransientSampleMs > 0 && now - lastTransientSampleMs < intervalSec * 1000) {
+      return false;
+    }
+    lastTransientSampleMs = now;
+    return true;
+  };
+}
+
 export type VerifySafetyRailsPollDeps = {
   freeGiBForPath: (p: string) => Promise<number | null>;
   transientGiBForPath?: (p: string) => Promise<number>;
+  shouldSampleTransientRoot?: (curFreeGiB: number, lowSpaceGiB: number) => boolean;
   sampleProcessCounts?: () => Promise<ProcessCounts | null>;
+  sampleTopProcesses?: () => Promise<TopProcessSample | null>;
   writeSnapshot: (dir: string, reason: string) => Promise<void>;
   onTrigger: (reason: string) => Promise<void>;
   killProcessGroup: (processGroupIdToKill: number, signal: NodeJS.Signals) => void;
@@ -102,13 +129,18 @@ export async function pollVerifySafetyRailsOnce(opts: {
   processGroupIdToKill: number;
   transientRoot?: string;
   lowSpaceGiB: number;
+  highLoadTopProcessesThreshold?: number;
   telemetryPath: string;
   deps: VerifySafetyRailsPollDeps;
 }): Promise<VerifySafetyRailsDecision | null> {
   const cur = await opts.deps.freeGiBForPath("/nix/store");
   if (cur == null) return null;
+  const shouldSampleTransientRoot =
+    opts.transientRoot &&
+    opts.deps.transientGiBForPath &&
+    (opts.deps.shouldSampleTransientRoot?.(cur, opts.lowSpaceGiB) ?? true);
   const curTransientGiB =
-    opts.transientRoot && opts.deps.transientGiBForPath
+    shouldSampleTransientRoot && opts.deps.transientGiBForPath
       ? await opts.deps.transientGiBForPath(opts.transientRoot).catch(() => 0)
       : 0;
   const processCounts = opts.deps.sampleProcessCounts
@@ -118,6 +150,19 @@ export async function pollVerifySafetyRailsOnce(opts: {
     opts.telemetryPath,
     `${Date.now()} freeGiB=${cur} transientGiB=${curTransientGiB} reclaimableFreeGiB=${cur + curTransientGiB} ${formatLoadAvg()} ${formatProcessCounts(processCounts)}`,
   );
+  const [load1] = os.loadavg();
+  const highLoadThreshold = opts.highLoadTopProcessesThreshold ?? Number.POSITIVE_INFINITY;
+  if (Number.isFinite(load1) && load1 >= highLoadThreshold && opts.deps.sampleTopProcesses) {
+    const topProcesses = await opts.deps.sampleTopProcesses().catch(() => null);
+    if (topProcesses && topProcesses.lines.length > 0) {
+      for (const line of topProcesses.lines) {
+        await appendLine(
+          opts.telemetryPath,
+          `[verify] high-load top-process load1=${load1.toFixed(2)} ${line}`,
+        );
+      }
+    }
+  }
 
   const activeGc = await opts.deps.activeNixGcProcesses();
   if (activeGc.length > 0) {
@@ -162,6 +207,26 @@ export async function startVerifySafetyRails(opts: {
     60,
     5,
   );
+  const transientSampleSec = defaultOrAtLeast(
+    parseNum(process.env.VERIFY_SAFETY_RAILS_TRANSIENT_SAMPLE_SECS),
+    1800,
+    30,
+  );
+  const transientNearThresholdSampleSec = defaultOrAtLeast(
+    parseNum(process.env.VERIFY_SAFETY_RAILS_TRANSIENT_NEAR_THRESHOLD_SAMPLE_SECS),
+    120,
+    30,
+  );
+  const transientSampleMarginGiB = defaultOrAtLeast(
+    parseNum(process.env.VERIFY_SAFETY_RAILS_TRANSIENT_SAMPLE_MARGIN_GB),
+    20,
+    0,
+  );
+  const topProcessesLoadThreshold = defaultOrAtLeast(
+    parseNum(process.env.VERIFY_SAFETY_RAILS_TOP_PROCESSES_LOAD1),
+    75,
+    0,
+  );
 
   const base = await freeGiBForPath("/nix/store");
   if (base == null) {
@@ -196,6 +261,12 @@ export async function startVerifySafetyRails(opts: {
   let stopped = false;
   let pollInFlight = false;
   const throttledProcessSample = makeThrottledProcessSampler(processSampleSec);
+  const shouldSampleTransientRoot = makeTransientRootSampler({
+    transientRoot,
+    sampleSec: transientSampleSec,
+    nearThresholdSampleSec: transientNearThresholdSampleSec,
+    marginGiB: transientSampleMarginGiB,
+  });
   const timer = setInterval(() => {
     void (async () => {
       if (stopped) return;
@@ -208,16 +279,19 @@ export async function startVerifySafetyRails(opts: {
           processGroupIdToKill: opts.processGroupIdToKill,
           transientRoot,
           lowSpaceGiB: lowSpace,
+          highLoadTopProcessesThreshold: topProcessesLoadThreshold,
           telemetryPath: telemetry,
           deps: {
             freeGiBForPath,
             transientGiBForPath: dirGiBForPath,
+            shouldSampleTransientRoot,
             writeSnapshot: async (dir, reason) =>
               writeVerifySafetyRailsTriggerSnapshot(dir, reason),
             onTrigger: async (reason) => {
               await opts.onTrigger?.(reason);
             },
             sampleProcessCounts: throttledProcessSample,
+            sampleTopProcesses,
             killProcessGroup: (pgid, signal) => {
               process.kill(-pgid, signal);
             },

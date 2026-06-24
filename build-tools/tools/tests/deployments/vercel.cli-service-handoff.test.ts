@@ -43,7 +43,6 @@ import { installHarnessClientProfile } from "./nixos-shared-host.remote-exec.ins
 import { vercelDeploymentFixture } from "./vercel.fixture";
 
 type OperationKind = "deploy" | "preview" | "preview_cleanup" | "retry" | "rollback";
-
 function protectedVercelDeployment(): VercelDeployment {
   const lanePolicy = nixosSharedHostLanePolicyFixture({ defaultClientProfile: "mini" });
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
@@ -62,7 +61,6 @@ function protectedVercelDeployment(): VercelDeployment {
     ],
   });
 }
-
 async function installVercelTargets(tmp: string, deployment: VercelDeployment) {
   const fragments = sharedPolicyTargetsByDir([deployment as any]);
   appendTargetsFragment(fragments, labelDir(deployment.component.target), {

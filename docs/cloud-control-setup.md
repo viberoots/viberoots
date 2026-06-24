@@ -11,7 +11,7 @@ control-plane setup \
   --runtime-input ./runtime-input.json \
   --supabase-postgres-profile ./supabase-postgres.profile.json \
   --public-url https://deploy.example.test \
-  --deployment-id pleomino-staging \
+  --deployment-id example-staging \
   --auth-callback-host deploy-auth.example.test \
   --artifact-backend aws-s3 \
   --artifact-bucket deployment-control-plane-artifacts \
@@ -127,7 +127,7 @@ cloud-control fixture deployment, corrupts one stored artifact to prove material
 closed, then runs a successful duplicate submission through admission revalidation, queue claiming,
 lease/worker authority, provider locking, artifact upload and materialization, stage-state updates,
 audit records, UI reads, and MCP reads. The fixture intentionally uses
-`cloud-control-fixture-staging-s3` so the check does not depend on Pleomino or another demo project.
+`cloud-control-fixture-staging-s3` so the check does not depend on ExampleApp or another demo project.
 
 Live smoke stays opt-in. Set `VBR_CONTROL_PLANE_LIVE_SMOKE=1` only for a non-production target and
 provide `VBR_CONTROL_PLANE_LIVE_SERVICE_URL`, `VBR_CONTROL_PLANE_LIVE_TOKEN_FILE`,

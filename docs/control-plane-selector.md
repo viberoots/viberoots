@@ -38,10 +38,10 @@ them:
         "backend": "service"
       }
     },
-    "pleomino-prod": {
+    "example-prod": {
       "serviceClient": {
-        "controlPlaneUrl": "https://deploy.pleomino.example.com",
-        "controlPlaneTokenRef": "secret://control-planes/pleomino-prod/service-token"
+        "controlPlaneUrl": "https://deploy.example-app.example.com",
+        "controlPlaneTokenRef": "secret://control-planes/example-prod/service-token"
       },
       "records": {
         "backend": "service"
@@ -49,8 +49,8 @@ them:
     }
   },
   "deploymentContexts": {
-    "pleomino-prod": {
-      "controlPlane": "pleomino-prod",
+    "example-prod": {
+      "controlPlane": "example-prod",
       "secretBackend": "infisical/default",
       "aws": {
         "accountId": "123456789012",
@@ -63,7 +63,7 @@ them:
         "defaultPath": "/"
       }
     },
-    "pleomino-staging": {
+    "example-staging": {
       "controlPlane": "viberoots-prod",
       "secretBackend": "infisical/default",
       "aws": {
@@ -145,7 +145,7 @@ plaintext JSON.
 Deployment metadata selects a context:
 
 ```python
-deployment_context = "pleomino-prod"
+deployment_context = "example-prod"
 ```
 
 Context resolution must:
@@ -169,10 +169,10 @@ The normalized graph node should contain one provider-neutral field:
 ```json
 {
   "control_plane": {
-    "name": "pleomino-prod",
+    "name": "example-prod",
     "service_client": {
-      "control_plane_url": "https://deploy.pleomino.example.com",
-      "control_plane_token_ref": "secret://control-planes/pleomino-prod/service-token"
+      "control_plane_url": "https://deploy.example-app.example.com",
+      "control_plane_token_ref": "secret://control-planes/example-prod/service-token"
     },
     "records": {
       "backend": "service"
@@ -322,13 +322,13 @@ provider accounts:
 ```json
 {
   "deploymentContexts": {
-    "pleomino-staging": {
+    "example-staging": {
       "controlPlane": "viberoots-prod",
       "aws": {
         "accountId": "210987654321"
       }
     },
-    "pleomino-prod": {
+    "example-prod": {
       "controlPlane": "viberoots-prod",
       "aws": {
         "accountId": "123456789012"

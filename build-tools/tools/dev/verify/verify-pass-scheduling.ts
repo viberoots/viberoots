@@ -1,7 +1,7 @@
 import process from "node:process";
 
-function isSerialVerifyPass(name: string): boolean {
-  return name.startsWith("isolated");
+export function isSerialVerifyPass(name: string): boolean {
+  return name === "isolated" || name === "isolated-bounded" || name.startsWith("isolated:");
 }
 
 const DEFAULT_RESOURCE_LIMITED_START_DELAY_SECS = 900;
@@ -36,6 +36,27 @@ export function resourceLimitedStartDelaySeconds<
     return DEFAULT_RESOURCE_LIMITED_START_DELAY_SECS;
   }
   return 0;
+}
+
+export function splitVerifyPassGroupForStagedStart<
+  T extends { name: string; targets: readonly unknown[] },
+>(
+  group: readonly T[],
+  env: NodeJS.ProcessEnv = process.env,
+): {
+  delaySeconds: number;
+  immediatePasses: T[];
+  delayedPasses: T[];
+} {
+  const delaySeconds = resourceLimitedStartDelaySeconds(group, env);
+  if (delaySeconds <= 0) {
+    return { delaySeconds: 0, immediatePasses: [...group], delayedPasses: [] };
+  }
+  return {
+    delaySeconds,
+    immediatePasses: group.filter((pass) => pass.name !== "resource-limited"),
+    delayedPasses: group.filter((pass) => pass.name === "resource-limited"),
+  };
 }
 
 export function groupVerifyPassesForExecution<T extends { name: string }>(

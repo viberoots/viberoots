@@ -2,10 +2,30 @@ import "./worker-init";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import { buck2dProcsForRepo, buckIsolationDirsForRepo, forkserversUnderRepo } from "./buck-procs";
+import {
+  buck2dProcsForRepo,
+  buckIsolationDirsForRepo,
+  forkserversUnderRepo,
+  isolationDirFromCmd,
+  pidCmdline,
+} from "./buck-procs";
 
 const BUCK_KILL_TIMEOUT_MS = 5000;
-const BUCK_FORKSERVER_REAP_DEADLINE_MS = 20000;
+const BUCK_FORKSERVER_REAP_DEADLINE_MS = 60000;
+const BUCK_FORKSERVER_REAP_POLL_MS = 250;
+const BUCK_FORKSERVER_REAP_QUIET_MS = 1000;
+const BUCK_DAEMON_CLEANUP_SETTLE_MS = 20000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+function signalPid(pid: number, signal: NodeJS.Signals): void {
+  if (!Number.isFinite(pid) || pid <= 1) return;
+  try {
+    process.kill(pid, signal);
+  } catch {}
+}
 
 async function assertNoBuckForkserversUnderRepo(repoRoot: string, $: any): Promise<void> {
   const offenders = await forkserversUnderRepo(repoRoot, $);
@@ -46,43 +66,112 @@ function isoFromForkserverStateDir(repoRoot: string, forkserverCmd: string): str
 }
 
 async function killBuckForkserversUnderRepo(repoRoot: string, $: any): Promise<void> {
-  const offenders = await forkserversUnderRepo(repoRoot, $);
+  let offenders = await forkserversUnderRepo(repoRoot, $);
+  const isos = Array.from(
+    new Set(offenders.map((o) => isoFromForkserverStateDir(repoRoot, o.cmd)).filter(Boolean)),
+  );
+  await Promise.allSettled(isos.map((iso) => killBuckIsolation(repoRoot, iso, $)));
+  offenders = await forkserversUnderRepo(repoRoot, $);
   for (const o of offenders) {
     const iso = isoFromForkserverStateDir(repoRoot, o.cmd);
-    if (iso && o.ppid > 1) {
-      try {
-        process.kill(o.ppid, "SIGTERM");
-      } catch {}
-    }
-    try {
-      if (o.pid > 1) process.kill(o.pid, "SIGTERM");
-    } catch {}
+    if (iso) signalPid(o.ppid, "SIGTERM");
+    signalPid(o.pid, "SIGTERM");
   }
-  await new Promise((r) => setTimeout(r, 250));
-  for (const o of offenders) {
-    if (o.ppid > 1) {
-      try {
-        process.kill(o.ppid, "SIGKILL");
-      } catch {}
-    }
-    try {
-      if (o.pid > 1) process.kill(o.pid, "SIGKILL");
-    } catch {}
+  await sleep(250);
+
+  let remaining = await forkserversUnderRepo(repoRoot, $);
+  for (const o of remaining) {
+    const iso = isoFromForkserverStateDir(repoRoot, o.cmd);
+    if (iso || (await forkserverParentMatchesIsolation(o.ppid, iso, $)))
+      signalPid(o.ppid, "SIGKILL");
+    signalPid(o.pid, "SIGKILL");
   }
+  await sleep(250);
+
+  remaining = await forkserversUnderRepo(repoRoot, $);
+  for (const o of remaining) {
+    const iso = isoFromForkserverStateDir(repoRoot, o.cmd);
+    if (iso || (await forkserverParentMatchesIsolation(o.ppid, iso, $)))
+      signalPid(o.ppid, "SIGKILL");
+    signalPid(o.pid, "SIGKILL");
+  }
+}
+
+async function killBuckIsolation(repoRoot: string, iso: string, $: any): Promise<void> {
+  if (!repoRoot || !iso) return;
+  await $({
+    stdio: "ignore",
+    cwd: repoRoot,
+    reject: false,
+    nothrow: true,
+    timeout: BUCK_KILL_TIMEOUT_MS,
+    // lint: allow-hardcoded-buck-isolation: cleanup kills the isolation proven by forkserver state-dir
+  })`buck2 --isolation-dir ${iso} kill`;
+}
+
+async function forkserverParentMatchesIsolation(
+  ppid: number,
+  iso: string,
+  $: any,
+): Promise<boolean> {
+  if (!iso || !Number.isFinite(ppid) || ppid <= 1) return false;
+  const cmd = await pidCmdline(ppid, $);
+  return cmd.includes("buck2d[") && isolationDirFromCmd(cmd) === iso;
 }
 
 async function reapBuckForkserversUnderRepo(repoRoot: string, $: any): Promise<void> {
   const deadline = Date.now() + BUCK_FORKSERVER_REAP_DEADLINE_MS;
-  let offenders = await forkserversUnderRepo(repoRoot, $);
-  while (offenders.length > 0 && Date.now() < deadline) {
-    await killBuckForkserversUnderRepo(repoRoot, $);
-    await new Promise((r) => setTimeout(r, 250));
-    offenders = await forkserversUnderRepo(repoRoot, $);
+  let quietSince: number | undefined;
+  while (Date.now() < deadline) {
+    const offenders = await forkserversUnderRepo(repoRoot, $);
+    if (offenders.length > 0) {
+      quietSince = undefined;
+      await killBuckForkserversUnderRepo(repoRoot, $);
+      await sleep(BUCK_FORKSERVER_REAP_POLL_MS);
+      continue;
+    }
+    quietSince ??= Date.now();
+    if (Date.now() - quietSince >= BUCK_FORKSERVER_REAP_QUIET_MS) return;
+    await sleep(BUCK_FORKSERVER_REAP_POLL_MS);
   }
   await assertNoBuckForkserversUnderRepo(repoRoot, $);
 }
 
-export async function killBuckDaemonsForRepo(repoRoot: string, $: any): Promise<void> {
+async function nestedBuckRepoRoots(repoRoot: string): Promise<string[]> {
+  const out: string[] = [];
+  const seen = new Set([path.resolve(repoRoot)]);
+  async function visit(dir: string, depth: number): Promise<void> {
+    if (depth <= 0) return;
+    let ents: Array<fsp.Dirent>;
+    try {
+      ents = await fsp.readdir(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const ent of ents) {
+      if (!ent.isDirectory()) continue;
+      if ([".git", ".viberoots", "buck-out", "node_modules"].includes(ent.name)) continue;
+      const child = path.join(dir, ent.name);
+      const resolved = path.resolve(child);
+      if (seen.has(resolved)) continue;
+      seen.add(resolved);
+      const hasBuckOut = await fsp
+        .access(path.join(child, "buck-out"))
+        .then(() => true)
+        .catch(() => false);
+      if (hasBuckOut) out.push(child);
+      await visit(child, depth - 1);
+    }
+  }
+  await visit(repoRoot, 3);
+  return out;
+}
+
+export async function buckCleanupRootsForRepo(repoRoot: string): Promise<string[]> {
+  return [repoRoot, ...(await nestedBuckRepoRoots(repoRoot))];
+}
+
+async function killBuckDaemonsForSingleRepo(repoRoot: string, $: any): Promise<void> {
   const buckOut = path.join(repoRoot, "buck-out");
   const buckOutExists = await fsp
     .access(buckOut)
@@ -96,17 +185,9 @@ export async function killBuckDaemonsForRepo(repoRoot: string, $: any): Promise<
       buck2dProcsForRepo(repoRoot, $),
     ]);
     if (forks.length === 0 && procs.length === 0) return;
-    for (const p of procs) {
-      try {
-        process.kill(p.pid, "SIGTERM");
-      } catch {}
-    }
-    await new Promise((r) => setTimeout(r, 150));
-    for (const p of procs) {
-      try {
-        process.kill(p.pid, "SIGKILL");
-      } catch {}
-    }
+    for (const p of procs) signalPid(p.pid, "SIGTERM");
+    await sleep(250);
+    for (const p of procs) signalPid(p.pid, "SIGKILL");
     await reapBuckForkserversUnderRepo(repoRoot, $);
     return;
   }
@@ -115,11 +196,8 @@ export async function killBuckDaemonsForRepo(repoRoot: string, $: any): Promise<
   const isoDirs = await buckIsolationDirsForRepo(repoRoot);
   const want = new Set([...isoDirs, ...procIsos].filter(Boolean));
   if (want.size > 0 && procIsos.size > 0) {
-    // Keep cleanup bounded: serial 10s buck2 kill calls can dominate test wall time
-    // when many temporary isolations are present in a single temp repo.
-    const killIsos = Array.from(procIsos);
     await Promise.allSettled(
-      killIsos.map(
+      Array.from(procIsos).map(
         (iso) =>
           $({
             stdio: "ignore",
@@ -135,17 +213,40 @@ export async function killBuckDaemonsForRepo(repoRoot: string, $: any): Promise<
   if (want.size > 0 && procs.length > 0) {
     for (const p of procs) {
       if (!p.iso || !want.has(p.iso)) continue;
-      try {
-        process.kill(p.pid, "SIGTERM");
-      } catch {}
+      signalPid(p.pid, "SIGTERM");
     }
-    await new Promise((r) => setTimeout(r, 250));
+    await sleep(250);
     for (const p of procs) {
       if (!p.iso || !want.has(p.iso)) continue;
-      try {
-        process.kill(p.pid, "SIGKILL");
-      } catch {}
+      signalPid(p.pid, "SIGKILL");
     }
   }
   await reapBuckForkserversUnderRepo(repoRoot, $);
+}
+
+export async function killBuckDaemonsForRepo(repoRoot: string, $: any): Promise<void> {
+  const roots = await buckCleanupRootsForRepo(repoRoot);
+  await killBuckDaemonsForRoots(roots, $);
+}
+
+export async function killBuckDaemonsForRoots(roots: string[], $: any): Promise<void> {
+  const deadline = Date.now() + BUCK_DAEMON_CLEANUP_SETTLE_MS;
+  while (true) {
+    for (const root of roots) {
+      await killBuckDaemonsForSingleRepo(root, $);
+    }
+    const remaining = (
+      await Promise.all(roots.map(async (root) => await buck2dProcsForRepo(root, $)))
+    ).flat();
+    if (remaining.length === 0) return;
+    if (Date.now() >= deadline) {
+      throw new Error(
+        `buck cleanup: leaked buck2d under temp repo root:\n${remaining
+          .slice(0, 20)
+          .map((p) => `${p.pid} ${p.iso || ""} ${p.cmd}`)
+          .join("\n")}`,
+      );
+    }
+    await sleep(250);
+  }
 }

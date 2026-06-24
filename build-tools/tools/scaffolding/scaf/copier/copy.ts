@@ -2,10 +2,12 @@ import os from "node:os";
 import path from "node:path";
 
 import * as fsp from "node:fs/promises";
+import { markMacosMetadataNeverIndex } from "../../../lib/macos-metadata";
 import { runScafCommand } from "../command-runner";
 
 export async function runCopierCopy(templateDir: string, dest: string, data: Record<string, any>) {
   const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), "scaf-"));
+  await markMacosMetadataNeverIndex(tmpDir);
   const answersPath = path.join(tmpDir, "answers.json");
   await fsp.writeFile(answersPath, JSON.stringify(data, null, 2), "utf8");
   try {

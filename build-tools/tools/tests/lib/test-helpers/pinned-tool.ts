@@ -10,6 +10,8 @@ const pinnedToolCache = new Map<string, Promise<string>>();
 
 function packageExprForTool(tool: string): { packageExpr: string; binRel: string } {
   switch (tool) {
+    case "buildifier":
+      return { packageExpr: "pkgs.buildifier", binRel: path.join("bin", "buildifier") };
     case "zip":
       return { packageExpr: "pkgs.zip", binRel: path.join("bin", "zip") };
     default:

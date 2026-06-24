@@ -50,7 +50,6 @@ function fakeHelmOverrides(fake: Awaited<ReturnType<typeof installFakeKubernetes
     VBR_KUBERNETES_FAKE_HELM_LOG: fake.logPath,
   };
 }
-
 function assertProtectedSharedControlPlaneRecord(
   record: { controlPlane?: { lockScope: string }; finalOutcome: string },
   lockScope: string,

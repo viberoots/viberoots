@@ -16,6 +16,10 @@ type PkgJson = {
   peerDependencies?: Record<string, string>;
 };
 
+const GENERATED_WORKSPACE_OVERRIDES = {
+  nanoid: "3.3.11",
+} as const;
+
 function keysOf(obj: unknown): string[] {
   if (!obj || typeof obj !== "object") return [];
   return Object.keys(obj as Record<string, unknown>).sort((a, b) => a.localeCompare(b));
@@ -35,6 +39,22 @@ async function readJson<T>(absPath: string): Promise<T> {
 function lockfileLooksPlaceholder(doc: { packages?: Record<string, any> }): boolean {
   const pkgCount = Object.keys(doc.packages || {}).length;
   return pkgCount === 0;
+}
+
+async function hasLocalWorkspaceFile(importerAbs: string): Promise<boolean> {
+  return await fsp
+    .access(path.join(importerAbs, "pnpm-workspace.yaml"))
+    .then(() => true)
+    .catch(() => false);
+}
+
+function generatedWorkspaceOverridesMissing(doc: Record<string, any>): boolean {
+  const overrides = doc.overrides || {};
+  if (Object.keys(overrides).length === 0) return false;
+  for (const [name, version] of Object.entries(GENERATED_WORKSPACE_OVERRIDES)) {
+    if (overrides[name] !== version) return true;
+  }
+  return false;
 }
 
 function preferredPnpmStoreDir(defaultStoreDir: string): {
@@ -62,6 +82,10 @@ export async function importerLockfileNeedsRegen(opts: {
   // Importer-local lockfiles use "." as the importer key.
   const imp =
     importers["."] || importers[opts.importerRel] || importers[`./${opts.importerRel}`] || {};
+
+  if (!(await hasLocalWorkspaceFile(importerAbs)) && generatedWorkspaceOverridesMissing(doc)) {
+    return true;
+  }
 
   const pkgDeps = keysOf(pkg.dependencies);
   const pkgDevDeps = keysOf(pkg.devDependencies);

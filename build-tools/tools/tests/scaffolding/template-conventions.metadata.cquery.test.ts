@@ -68,51 +68,51 @@ const EXPECTATIONS: TemplateExpectation[] = [
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-static.dev-hmr.local-ts-dep.test.ts",
-    requiredLabels: ["template:ts/webapp-static", "template:contract", "verify:isolated"],
+    requiredLabels: ["template:ts/webapp-static", "template:contract", "verify:isolated-bounded"],
     requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-static.dev-reload.wasm-producer.test.ts",
-    requiredLabels: ["template:ts/webapp-static", "template:contract", "verify:isolated"],
+    requiredLabels: ["template:ts/webapp-static", "template:contract", "verify:isolated-bounded"],
     requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/"],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp.dev-server.running.test.ts",
-    requiredLabels: ["template:ts/webapp-static", "template:contract", "verify:isolated"],
+    requiredLabels: ["template:ts/webapp-static", "template:contract", "verify:isolated-bounded"],
     requiredTemplateRoots: ["viberoots/build-tools/tools/scaffolding/templates/ts/webapp-static/"],
   },
   {
     script:
       "build-tools/tools/tests/scaffolding/webapp-ssr.scaffold-contract-and-runtime-smoke.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-next", "template:shared", "verify:isolated"],
+    requiredLabels: ["template:ts/webapp-ssr-next", "template:shared", "verify:isolated-bounded"],
     requiredTemplateRoots: [
       "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
     ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr.next-contracts.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated"],
+    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated-bounded"],
     requiredTemplateRoots: [
       "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
     ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-hmr.local-ts-dep.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated"],
+    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated-bounded"],
     requiredTemplateRoots: [
       "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
     ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-reload.wasm-producer.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated"],
+    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated-bounded"],
     requiredTemplateRoots: [
       "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
     ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-runtime-consistency.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated"],
+    requiredLabels: ["template:ts/webapp-ssr-next", "template:contract", "verify:isolated-bounded"],
     requiredTemplateRoots: [
       "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-next/",
     ],
@@ -126,28 +126,28 @@ const EXPECTATIONS: TemplateExpectation[] = [
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.runnable-contracts.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated"],
+    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated-bounded"],
     requiredTemplateRoots: [
       "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
     ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-hmr.local-ts-dep.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated"],
+    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated-bounded"],
     requiredTemplateRoots: [
       "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
     ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-reload.wasm-producer.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated"],
+    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated-bounded"],
     requiredTemplateRoots: [
       "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
     ],
   },
   {
     script: "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-runtime-consistency.test.ts",
-    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated"],
+    requiredLabels: ["template:ts/webapp-ssr-vite", "template:contract", "verify:isolated-bounded"],
     requiredTemplateRoots: [
       "viberoots/build-tools/tools/scaffolding/templates/ts/webapp-ssr-vite/",
     ],

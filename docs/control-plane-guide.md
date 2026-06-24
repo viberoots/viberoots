@@ -582,7 +582,7 @@ control-plane setup \
   --image-publication-evidence ./image-publication.json \
   --public-url https://deploy.example.com \
   --auth-callback-host deploy-auth.example.com \
-  --deployment-id pleomino-staging \
+  --deployment-id example-staging \
   --artifact-backend aws-s3 \
   --artifact-credential-mode aws-instance-profile \
   --artifact-bucket deployment-control-plane-artifacts \

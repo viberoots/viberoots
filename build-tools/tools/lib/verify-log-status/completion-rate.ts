@@ -52,7 +52,11 @@ function completionLabelFromLine(line: string): { status: string; label: string 
   return { status, label: normalizeBuckTestLabel(label) || line };
 }
 
-export function countRecentCompletions(lines: string[], endSec: number): number | undefined {
+export function countRecentCompletions(
+  lines: string[],
+  endSec: number,
+  opts: { targetLabels?: ReadonlySet<string> } = {},
+): number | undefined {
   const seen = new Set<string>();
   let foundTimestamp = false;
   let count = 0;
@@ -66,6 +70,7 @@ export function countRecentCompletions(lines: string[], endSec: number): number 
     if (parsed.isComment) continue;
     const completion = completionLabelFromLine(parsed.normalized);
     if (!completion) continue;
+    if (opts.targetLabels && !opts.targetLabels.has(completion.label)) continue;
     const key = `${completion.status}|${completion.label}`;
     if (seen.has(key)) continue;
     seen.add(key);

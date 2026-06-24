@@ -146,7 +146,7 @@ test("OpenTofu does not switch to adoption when project is already in local stat
   const calls: Array<{ args: string[]; env?: NodeJS.ProcessEnv }> = [];
   const runner: CommandRunner = (call) => {
     calls.push(call);
-    if (call.args.join(" ") === "state list") return "infisical_project.pleomino\n";
+    if (call.args.join(" ") === "state list") return "infisical_project.fixture\n";
     return "";
   };
   const api = {

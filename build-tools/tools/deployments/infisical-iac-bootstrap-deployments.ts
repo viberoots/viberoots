@@ -1,3 +1,4 @@
+import * as fs from "node:fs";
 import * as path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { readGraph, type GraphNode } from "../lib/graph";
@@ -41,11 +42,6 @@ type FanOutIo = {
   stderr?: (text: string) => void;
 };
 
-const SUPPORTED_TARGETS = new Set([
-  "//projects/deployments/pleomino/staging:deploy",
-  "//projects/deployments/pleomino/prod:deploy",
-]);
-
 export async function discoverDeploymentBootstrapTargets(
   opts: {
     workspaceRoot?: string;
@@ -56,6 +52,13 @@ export async function discoverDeploymentBootstrapTargets(
   const graphPath = opts.graphPath || path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
   const fromGraph = await discoverFromGraph(graphPath, workspaceRoot);
   if (fromGraph.offeredTargets.length || fromGraph.unsupportedTargets.length) return fromGraph;
+  if (!hasBuckConfig(workspaceRoot)) {
+    return {
+      ...fromGraph,
+      source: "unavailable",
+      warning: `deployment bootstrap target discovery unavailable: .buckconfig not found in ${workspaceRoot}`,
+    };
+  }
   try {
     return classifyDeploymentTargets(await resolveAllDeployments(workspaceRoot), "buck");
   } catch (error) {
@@ -64,6 +67,14 @@ export async function discoverDeploymentBootstrapTargets(
       source: "unavailable",
       warning: `deployment bootstrap target discovery unavailable: ${errorMessage(error)}`,
     };
+  }
+}
+
+function hasBuckConfig(workspaceRoot: string): boolean {
+  try {
+    return fs.existsSync(path.join(workspaceRoot, ".buckconfig"));
+  } catch {
+    return false;
   }
 }
 
@@ -189,7 +200,7 @@ function classifyCandidates(
   const unsupported = new Map<string, string>();
   for (const candidate of candidates) {
     if (!candidate.target) continue;
-    if (SUPPORTED_TARGETS.has(candidate.target) && candidate.family === "pleomino") {
+    if (candidate.family && targetMatchesFamily(candidate.target, candidate.family)) {
       offered.add(candidate.target);
       continue;
     }
@@ -213,9 +224,17 @@ function isInfisicalDeploymentNode(node: GraphNode) {
 }
 
 function unsupportedReason(candidate: { family?: string }) {
-  return candidate.family === "pleomino"
-    ? "Infisical bootstrap currently supports only reviewed Pleomino staging/prod targets"
-    : "deployment does not match a reviewed Infisical bootstrap family";
+  return candidate.family
+    ? "deployment target path does not match its reviewed deployment family"
+    : "deployment does not declare a reviewed deployment family";
+}
+
+function targetMatchesFamily(target: string, family: string) {
+  return new RegExp(`^//projects/deployments/${escapeRegex(family)}/[^/:]+:deploy$`).test(target);
+}
+
+function escapeRegex(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function contextErrorTarget(error: string) {

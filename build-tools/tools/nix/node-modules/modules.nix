@@ -4,7 +4,7 @@ let
   store = import ./store.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal; };
   lib = common.lib;
   node = pkgs.nodejs_22;
-  pnpm = pkgs.pnpm;
+  pnpm = import ../pnpm-11.nix { inherit pkgs; };
   certs = pkgs.cacert;
   dirnameOf = common.dirnameOf;
   importerOnlySrc = common.importerOnlySrc;
@@ -22,6 +22,55 @@ let
       libc:
         - glibc
         - musl
+  '';
+  pnpmWorkspaceMarkerScript = ''
+    write_pnpm_workspace_marker() {
+      local existing="$TMPDIR/pnpm-workspace.source.yaml"
+      local workspace_config=""
+      local search_dir="$PWD"
+      while [ -n "$search_dir" ] && [ "$search_dir" != "/" ]; do
+        if [ -f "$search_dir/pnpm-workspace.yaml" ]; then
+          workspace_config="$search_dir/pnpm-workspace.yaml"
+          break
+        fi
+        search_dir="$(dirname "$search_dir")"
+      done
+      if [ -n "$workspace_config" ]; then
+        cp "$workspace_config" "$existing"
+      else
+        : > "$existing"
+      fi
+      node - "$existing" <<'NODE' > pnpm-workspace.yaml
+const fs = require("fs");
+const input = process.argv[2];
+const lines = fs.existsSync(input) ? fs.readFileSync(input, "utf8").split(/\r?\n/) : [];
+const out = ["packages:", "  - ./"];
+const skipKeys = new Set(["packages", "supportedArchitectures"]);
+for (let i = 0; i < lines.length;) {
+  const line = lines[i];
+  if (line.trim() === "" || line.trimStart().startsWith("#")) {
+    i += 1;
+    continue;
+  }
+  const match = line.match(/^([A-Za-z0-9_.-]+):(?:\s|$)/);
+  if (!match) {
+    i += 1;
+    continue;
+  }
+  const key = match[1];
+  const start = i;
+  i += 1;
+  while (i < lines.length && !/^[A-Za-z0-9_.-]+:(?:\s|$)/.test(lines[i])) {
+    i += 1;
+  }
+  if (!skipKeys.has(key)) {
+    out.push(...lines.slice(start, i));
+  }
+}
+process.stdout.write(out.join("\n") + "\n");
+NODE
+      printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
+    }
   '';
   inherit repoRoot repoFsRoot prefetchedStorePathGlobal;
 in {
@@ -122,6 +171,11 @@ in {
         debug_mknm "[VBR-MKNM-DEBUG] preparing local pnpm store"
         LOCAL_STORE="$HOME/.pnpm-store"
         mkdir -p "$LOCAL_STORE"
+        PNPM_BIN="${pnpm}/bin/pnpm"
+        PNPM_TRUST_LOCKFILE_ARG=""
+        if "$PNPM_BIN" install --help 2>/dev/null | grep -q -- "--trust-lockfile"; then
+          PNPM_TRUST_LOCKFILE_ARG="--trust-lockfile"
+        fi
 
         seed_store() {
           src="$1"
@@ -140,6 +194,15 @@ in {
               cp -R --no-preserve=mode,ownership "$verDir/index/." "$LOCAL_STORE/$ver/index/"
               chmod -R u+rwX "$LOCAL_STORE/$ver/index"
             fi
+            if [ -f "$verDir/index.db" ]; then
+              cp --no-preserve=mode,ownership "$verDir/index.db" "$LOCAL_STORE/$ver/index.db"
+              chmod u+rw "$LOCAL_STORE/$ver/index.db"
+            fi
+            if [ -d "$verDir/projects" ]; then
+              mkdir -p "$LOCAL_STORE/$ver/projects"
+              cp -R --no-preserve=mode,ownership "$verDir/projects/." "$LOCAL_STORE/$ver/projects/"
+              chmod -R u+rwX "$LOCAL_STORE/$ver/projects"
+            fi
           done
         }
 
@@ -149,13 +212,12 @@ in {
           seed_store ${if prefetchedInput != null then "\"${prefetchedInput}\"" else "\"/nonexistent\""}
         fi
         seed_store "${store}/store"
-        pnpm config set store-dir "$LOCAL_STORE"
+        "$PNPM_BIN" config set store-dir "$LOCAL_STORE"
         # Keep imported package files writable in sandbox builds.
         # Hardlinked files from read-only store paths can fail during bin chmod.
-        pnpm config set package-import-method copy
-        printf '%s\n' "packages:" > pnpm-workspace.yaml
-        printf '%s\n' "  - ./" >> pnpm-workspace.yaml
-        printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
+        "$PNPM_BIN" config set package-import-method copy
+        ${pnpmWorkspaceMarkerScript}
+        write_pnpm_workspace_marker
         FT="${ftVal}"
         IT="${installTimeoutVal}"
         debug_mknm "[VBR-MKNM-DEBUG] NIX_PNPM_FETCH_TIMEOUT=$FT"
@@ -188,7 +250,16 @@ in {
           elif [ "${if genAllowed then "1" else "0"}" = "1" ]; then
             echo "[nix] mkNodeModules: offline install to create lockfile (allow-generate)"
           debug_mknm "[VBR-MKNM-DEBUG] pnpm install (generate) --offline --force --no-frozen-lockfile --ignore-scripts --prod=false (IT=${installTimeoutVal}s)"
-          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --no-frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          set +e
+          pnpm_log="$TMPDIR/pnpm-install-generate.log"
+          timeout "$IT"s env CI="1" NODE_OPTIONS="--no-warnings" PNPM_HOME="$PNPM_HOME" "$PNPM_BIN" install --offline --force --no-frozen-lockfile --ignore-scripts --ignore-pnpmfile --prod=false --reporter=append-only --lockfile-dir "." --dir "." $PNPM_TRUST_LOCKFILE_ARG >"$pnpm_log" 2>&1
+          status="$?"
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "[nix] mkNodeModules: pnpm install (generate) failed with status $status" >&2
+            cat "$pnpm_log" >&2 || true
+            exit "$status"
+          fi
           else
             echo "[nix] mkNodeModules: no lockfile present and generation not allowed; failing"
             exit 3
@@ -197,7 +268,16 @@ in {
           # Install strictly from the fixed-output store for the specific importer (relative to importer root)
           # Force inclusion of devDependencies so tool binaries (e.g., vite) are available
           debug_mknm "[VBR-MKNM-DEBUG] pnpm install (offline) --force --frozen-lockfile --ignore-scripts --prod=false (IT=${installTimeoutVal}s)"
-          timeout "$IT"s env PNPM_HOME="$PNPM_HOME" pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false --lockfile-dir "." --dir "."
+          set +e
+          pnpm_log="$TMPDIR/pnpm-install-offline.log"
+          timeout "$IT"s env CI="1" NODE_OPTIONS="--no-warnings" PNPM_HOME="$PNPM_HOME" "$PNPM_BIN" install --offline --force --frozen-lockfile --ignore-scripts --ignore-pnpmfile --prod=false --reporter=append-only --lockfile-dir "." --dir "." $PNPM_TRUST_LOCKFILE_ARG >"$pnpm_log" 2>&1
+          status="$?"
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "[nix] mkNodeModules: pnpm install (offline) failed with status $status" >&2
+            cat "$pnpm_log" >&2 || true
+            exit "$status"
+          fi
         fi
         echo "[nix] mkNodeModules: install complete"
         if [ "''${VBR_MKNM_DEBUG:-0}" = "1" ]; then

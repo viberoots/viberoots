@@ -43,6 +43,19 @@ async function listBinArtifacts(outPath: string): Promise<string[]> {
   }
 }
 
+async function graphGeneratorSelectedFlakeRef(root: string): Promise<string> {
+  const hiddenWorkspace = path.join(root, ".viberoots", "workspace");
+  if (
+    await fsp
+      .access(path.join(hiddenWorkspace, "flake.nix"))
+      .then(() => true)
+      .catch(() => false)
+  ) {
+    return `path:${hiddenWorkspace}#graph-generator-selected`;
+  }
+  return ".#graph-generator-selected";
+}
+
 type GraphNode = { name?: unknown; labels?: unknown };
 
 function normalizeGraphLabel(value: string): string {
@@ -118,6 +131,7 @@ export async function maybePrintImpureMaterializedBins(opts: {
         continue;
       }
       try {
+        const selectedFlakeRef = await graphGeneratorSelectedFlakeRef(opts.root);
         const stdout = await nixBuildPrintOutPaths({
           root: opts.root,
           env: {
@@ -132,7 +146,7 @@ export async function maybePrintImpureMaterializedBins(opts: {
             "--option",
             "eval-cache",
             "false",
-            ".#graph-generator-selected",
+            selectedFlakeRef,
             "--accept-flake-config",
             "--print-out-paths",
             "-L",

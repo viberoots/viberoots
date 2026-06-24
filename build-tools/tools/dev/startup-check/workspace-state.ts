@@ -58,6 +58,14 @@ async function requireLocalViberootsFlake(flakeText: string): Promise<void> {
 async function requireLocalFlakeLock(flakeText: string): Promise<void> {
   if (!flakeUsesLocalViberoots(flakeText)) return;
   try {
+    const expectedViberootsPaths = new Set([path.resolve("viberoots")]);
+    for (const candidate of [
+      process.env.VIBEROOTS_SOURCE_ROOT || "",
+      process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
+    ]) {
+      const trimmed = String(candidate).trim();
+      if (trimmed) expectedViberootsPaths.add(path.resolve(trimmed));
+    }
     const lockText =
       (await readText(path.join(".viberoots", "workspace", "flake.lock"))) ||
       (await readText("flake.lock"));
@@ -74,6 +82,14 @@ async function requireLocalFlakeLock(flakeText: string): Promise<void> {
         (locked.url === "file:./viberoots" || locked.url === "file:../../viberoots") &&
         original.type === "git" &&
         (original.url === "file:./viberoots" || original.url === "file:../../viberoots"))
+    ) {
+      return;
+    }
+    if (
+      locked.type === "path" &&
+      expectedViberootsPaths.has(path.resolve(String(locked.path || ""))) &&
+      original.type === "path" &&
+      expectedViberootsPaths.has(path.resolve(String(original.path || "")))
     ) {
       return;
     }
@@ -182,7 +198,6 @@ async function cleanupVerifyOwnedRootBuckOut(): Promise<void> {
   for (const entry of entries) {
     const name = entry.name;
     const verifyOwned =
-      name === ".metadata_never_index" ||
       name === "test-logs" ||
       name === "tmp" ||
       name === "zx_shims" ||

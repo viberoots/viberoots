@@ -36,7 +36,7 @@ test("deployment fan-out discovery uses reviewed graph metadata", async () => {
   assert.deepEqual(discovery.unsupportedTargets, [
     {
       target: "//projects/deployments/other-prod:deploy",
-      reason: "deployment does not match a reviewed Infisical bootstrap family",
+      reason: "deployment target path does not match its reviewed deployment family",
     },
   ]);
   assert.equal(discovery.source, "graph");

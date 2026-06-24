@@ -1,9 +1,27 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { pinnedNixpkgsOutPathExpr } from "../../lib/pinned-nixpkgs";
 import { viberootsRepoPath } from "./deployment-command";
+
+const flakeLockPath = viberootsRepoPath("flake.lock");
+const pinnedNixpkgsPathExpr = pinnedNixpkgsOutPathExpr(flakeLockPath);
+
+async function evalNixJson<T>(expr: string): Promise<T> {
+  const result = await $({
+    stdio: "pipe",
+    reject: false,
+    nothrow: true,
+  })`nix eval --impure --expr ${expr} --json`;
+  assert.equal(
+    result.exitCode,
+    0,
+    `nix eval failed\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+  );
+  return JSON.parse(String(result.stdout || "{}")) as T;
+}
 
 test("shared-host service modules do not hardcode a public deployment domain", async () => {
   const moduleDir = viberootsRepoPath("build-tools/tools/nix");
@@ -24,10 +42,10 @@ test("shared-host service modules do not hardcode a public deployment domain", a
 });
 
 test("shared-host postgres module evaluates as an importable reviewed host module", async () => {
-  await runInTemp("shared-host-postgres-module-eval", async (tmp, $) => {
-    const expr = `
+  const expr = `
       let
-        system = import <nixpkgs/nixos> {
+        nixpkgsPath = ${pinnedNixpkgsPathExpr};
+        system = import (nixpkgsPath + "/nixos") {
           configuration = {
             imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-postgres-module.nix")} ];
             system.stateVersion = "24.11";
@@ -45,29 +63,27 @@ test("shared-host postgres module evaluates as an importable reviewed host modul
         }) system.config.services.postgresql.ensureUsers;
       }
     `;
-    const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
-    const out = JSON.parse(String(stdout || "{}")) as {
-      enabled: boolean;
-      package: string;
-      listen: string;
-      port: number;
-      databases: string[];
-      users: Array<{ name: string; ensureDBOwnership: boolean }>;
-    };
-    assert.equal(out.enabled, true);
-    assert.equal(out.package, "postgresql");
-    assert.equal(out.listen, "127.0.0.1");
-    assert.equal(out.port, 5432);
-    assert.deepEqual(out.databases, ["deployctl"]);
-    assert.deepEqual(out.users, [{ name: "deployctl", ensureDBOwnership: true }]);
-  });
+  const out = await evalNixJson<{
+    enabled: boolean;
+    package: string;
+    listen: string;
+    port: number;
+    databases: string[];
+    users: Array<{ name: string; ensureDBOwnership: boolean }>;
+  }>(expr);
+  assert.equal(out.enabled, true);
+  assert.equal(out.package, "postgresql");
+  assert.equal(out.listen, "127.0.0.1");
+  assert.equal(out.port, 5432);
+  assert.deepEqual(out.databases, ["deployctl"]);
+  assert.deepEqual(out.users, [{ name: "deployctl", ensureDBOwnership: true }]);
 });
 
 test("shared-host vault module evaluates as an importable reviewed host module", async () => {
-  await runInTemp("shared-host-vault-module-eval", async (tmp, $) => {
-    const expr = `
+  const expr = `
       let
-        system = import <nixpkgs/nixos> {
+        nixpkgsPath = ${pinnedNixpkgsPathExpr};
+        system = import (nixpkgsPath + "/nixos") {
           configuration = {
             imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-vault-module.nix")} ];
             system.stateVersion = "24.11";
@@ -82,27 +98,25 @@ test("shared-host vault module evaluates as an importable reviewed host module",
         storagePath = system.config.services.vault.storagePath;
       }
     `;
-    const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
-    const out = JSON.parse(String(stdout || "{}")) as {
-      enabled: boolean;
-      package: string;
-      address: string;
-      storageBackend: string;
-      storagePath: string;
-    };
-    assert.equal(out.enabled, true);
-    assert.equal(out.package, "vault");
-    assert.equal(out.address, "127.0.0.1:8200");
-    assert.equal(out.storageBackend, "raft");
-    assert.equal(out.storagePath, "/var/lib/vault");
-  });
+  const out = await evalNixJson<{
+    enabled: boolean;
+    package: string;
+    address: string;
+    storageBackend: string;
+    storagePath: string;
+  }>(expr);
+  assert.equal(out.enabled, true);
+  assert.equal(out.package, "vault");
+  assert.equal(out.address, "127.0.0.1:8200");
+  assert.equal(out.storageBackend, "raft");
+  assert.equal(out.storagePath, "/var/lib/vault");
 });
 
 test("shared-host vault module can augment an existing apps ACME host config", async () => {
-  await runInTemp("shared-host-vault-module-acme-eval", async (tmp, $) => {
-    const expr = `
+  const expr = `
       let
-        system = import <nixpkgs/nixos> {
+        nixpkgsPath = ${pinnedNixpkgsPathExpr};
+        system = import (nixpkgsPath + "/nixos") {
           configuration = {
             imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-vault-module.nix")} ];
             system.stateVersion = "24.11";
@@ -110,7 +124,9 @@ test("shared-host vault module can augment an existing apps ACME host config", a
               domain = "*.example.test";
               extraDomainNames = [ "example.test" ];
               dnsProvider = "route53";
-              credentialsFile = "/root/aws-credentials";
+              credentialFiles = {
+                AWS_SHARED_CREDENTIALS_FILE = "/root/aws-credentials";
+              };
             };
             deploymentHost.vault = {
               enable = true;
@@ -139,27 +155,25 @@ test("shared-host vault module can augment an existing apps ACME host config", a
         localHosts = system.config.networking.hosts."127.0.0.1";
       }
     `;
-    const { stdout } = await $({ cwd: tmp })`nix eval --impure --expr ${expr} --json`;
-    const out = JSON.parse(String(stdout || "{}")) as {
-      address: string;
-      tlsCertFile: string;
-      tlsKeyFile: string;
-      extraConfig: string;
-      listenerExtraConfig: string;
-      acmeGroup: string;
-      acmeMembers: string[];
-      firewallPorts: number[];
-      localHosts: string[];
-    };
-    assert.equal(out.address, "0.0.0.0:8200");
-    assert.match(out.tlsCertFile, /\/var\/lib\/acme\/wildcard\.example\.test\/fullchain\.pem$/);
-    assert.match(out.tlsKeyFile, /\/var\/lib\/acme\/wildcard\.example\.test\/key\.pem$/);
-    assert.match(out.extraConfig, /api_addr = "https:\/\/secrets\.example\.test:8200"/);
-    assert.match(out.extraConfig, /cluster_addr = "https:\/\/vault-1\.example\.test:8201"/);
-    assert.match(out.listenerExtraConfig, /tls_min_version = "tls12"/);
-    assert.equal(out.acmeGroup, "cert-readers");
-    assert.deepEqual(out.acmeMembers, ["vault"]);
-    assert.deepEqual(out.firewallPorts, [8200]);
-    assert.deepEqual(out.localHosts, ["secrets.example.test"]);
-  });
+  const out = await evalNixJson<{
+    address: string;
+    tlsCertFile: string;
+    tlsKeyFile: string;
+    extraConfig: string;
+    listenerExtraConfig: string;
+    acmeGroup: string;
+    acmeMembers: string[];
+    firewallPorts: number[];
+    localHosts: string[];
+  }>(expr);
+  assert.equal(out.address, "0.0.0.0:8200");
+  assert.match(out.tlsCertFile, /\/var\/lib\/acme\/wildcard\.example\.test\/fullchain\.pem$/);
+  assert.match(out.tlsKeyFile, /\/var\/lib\/acme\/wildcard\.example\.test\/key\.pem$/);
+  assert.match(out.extraConfig, /api_addr = "https:\/\/secrets\.example\.test:8200"/);
+  assert.match(out.extraConfig, /cluster_addr = "https:\/\/vault-1\.example\.test:8201"/);
+  assert.match(out.listenerExtraConfig, /tls_min_version = "tls12"/);
+  assert.equal(out.acmeGroup, "cert-readers");
+  assert.deepEqual(out.acmeMembers, ["vault"]);
+  assert.deepEqual(out.firewallPorts, [8200]);
+  assert.deepEqual(out.localHosts, ["secrets.example.test"]);
 });

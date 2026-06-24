@@ -4,6 +4,10 @@ import { test } from "node:test";
 
 test("node-modules-build reuses verified markers even when temp lockfiles are git-dirty", async () => {
   const txt = await fsp.readFile("viberoots/build-tools/tools/dev/node-modules-build.ts", "utf8");
+  const verifyZxNodeModules = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/verify/zx-node-modules.ts",
+    "utf8",
+  );
   if (!txt.includes("await requireFreshPnpmStoreState(lockfileRel, hashKey)")) {
     throw new Error("node-modules-build.ts must require verified pnpm-store state before building");
   }
@@ -20,5 +24,19 @@ test("node-modules-build reuses verified markers even when temp lockfiles are gi
   }
   if (!txt.includes("preparedExactStoreEnv(lockfileRel)")) {
     throw new Error("node-modules-build.ts must consume exact stores prewarmed by `i`");
+  }
+  if (
+    !txt.includes("recoverOutPathFromLinkMarker(importer, lockfileRel)") ||
+    !txt.includes("node-modules-link.${markerKey}.json") ||
+    !txt.includes('fsp.access(path.join(outPath, "node_modules"))')
+  ) {
+    throw new Error("node-modules-build.ts must reuse the node_modules link marker before Nix");
+  }
+  if (
+    !verifyZxNodeModules.includes("linkedNodeModulesOut(root, importer)") ||
+    !verifyZxNodeModules.includes("if (linkedOut) return linkedOut") ||
+    !verifyZxNodeModules.includes("node-modules-link.${markerKey}.json")
+  ) {
+    throw new Error("verify zx setup must reuse the node_modules link marker before Nix");
   }
 });

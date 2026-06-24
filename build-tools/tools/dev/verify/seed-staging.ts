@@ -3,8 +3,10 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import "zx/globals";
 import { setTimeout as sleep } from "node:timers/promises";
 import { copyTree } from "../../lib/copy-tree";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import {
   GENERATED_REPO_STATE_PATHS,
   isGeneratedRepoStateRelPath,
@@ -21,6 +23,7 @@ const REQUIRED_STAGE_FILES = [
   path.join("viberoots", "build-tools", "tools", "node", "gen-wasm-inline-module.ts"),
   path.join("viberoots", "flake.nix"),
 ];
+const PREPARED_MARKER = ".seed-store-prepared-v4";
 
 export function seedStageRootDirForTest(): string {
   if (process.platform === "win32") return path.join(os.tmpdir(), "viberoots-test-seed");
@@ -29,7 +32,10 @@ export function seedStageRootDirForTest(): string {
     user = os.userInfo().username || "";
   } catch {}
   const suffix = user ? `-${user}` : "";
-  return path.join("/tmp", `viberoots-test-seed${suffix}`);
+  const name = `viberoots-test-seed${suffix}`;
+  return process.platform === "darwin"
+    ? path.join("/tmp", `${name}.noindex`)
+    : path.join("/tmp", name);
 }
 
 function seedStageRootDir(): string {
@@ -130,6 +136,7 @@ async function hasGeneratedRepoState(root: string): Promise<boolean> {
 async function stageReady(stageDir: string, seedKey: string): Promise<boolean> {
   const keyFile = path.join(stageDir, "seed.key");
   const readyFile = path.join(stageDir, ".seed-store-ready");
+  const preparedFile = path.join(stageDir, PREPARED_MARKER);
   const existingKey = await fsp.readFile(keyFile, "utf8").catch(() => "");
   if (existingKey.trim() !== seedKey) return false;
   const hasReady = await fsp
@@ -137,6 +144,11 @@ async function stageReady(stageDir: string, seedKey: string): Promise<boolean> {
     .then(() => true)
     .catch(() => false);
   if (!hasReady) return false;
+  const hasPrepared = await fsp
+    .access(preparedFile)
+    .then(() => true)
+    .catch(() => false);
+  if (!hasPrepared) return false;
   if (await hasGeneratedRepoState(stageDir)) return false;
   return (await missingRequiredStageFiles(stageDir)).length === 0;
 }
@@ -155,6 +167,242 @@ export async function shouldStageSeed(seedPath: string): Promise<boolean> {
   const tmpDev = await statDev(os.tmpdir());
   if (seedDev === null || tmpDev === null) return false;
   return seedDev !== tmpDev;
+}
+
+function parseGitStatusRel(line: string): { rel: string; deleted: boolean } | null {
+  if (line.length < 4) return null;
+  const status = line.slice(0, 2);
+  const raw = line.slice(3).trim();
+  if (!raw) return null;
+  const renameSep = raw.indexOf(" -> ");
+  const rel = (renameSep >= 0 ? raw.slice(renameSep + 4) : raw).trim();
+  if (!rel || rel.startsWith(".git/") || rel === ".git") return null;
+  return { rel, deleted: status.includes("D") };
+}
+
+async function activeViberootsRoot(workspaceRoot: string): Promise<string> {
+  const nested = path.join(workspaceRoot, "viberoots");
+  const nestedOk = await fsp
+    .access(path.join(nested, "build-tools", "tools", "dev", "zx-init.mjs"))
+    .then(() => true)
+    .catch(() => false);
+  return nestedOk ? nested : workspaceRoot;
+}
+
+async function listActiveSourceOverlayFiles(source: string): Promise<{
+  changed: string[];
+  deleted: string[];
+}> {
+  const out = await $({
+    stdio: "pipe",
+    cwd: source,
+  })`git status --porcelain=v1 --untracked-files=all`.nothrow();
+  if (out.exitCode !== 0) return { changed: [], deleted: [] };
+  const changed: string[] = [];
+  const deleted: string[] = [];
+  for (const line of String(out.stdout || "").split(/\r?\n/)) {
+    const entry = parseGitStatusRel(line);
+    if (!entry) continue;
+    if (isGeneratedRepoStateRelPath(entry.rel)) continue;
+    if (entry.deleted) {
+      deleted.push(entry.rel);
+      continue;
+    }
+    const abs = path.join(source, entry.rel);
+    const st = await fsp.lstat(abs).catch(() => null);
+    if (!st || st.isDirectory()) continue;
+    changed.push(entry.rel);
+  }
+  return {
+    changed: Array.from(new Set(changed)).sort((a, b) => a.localeCompare(b)),
+    deleted: Array.from(new Set(deleted)).sort((a, b) => a.localeCompare(b)),
+  };
+}
+
+async function overlayActiveViberootsIntoStage(stageDir: string, workspaceRoot: string) {
+  const source = await activeViberootsRoot(workspaceRoot);
+  const overlay = await listActiveSourceOverlayFiles(source);
+  const touched = [...overlay.changed, ...overlay.deleted].map((rel) =>
+    path.join("viberoots", rel),
+  );
+  const stageViberoots = path.join(stageDir, "viberoots");
+  for (const rel of overlay.deleted) {
+    await fsp.rm(path.join(stageViberoots, rel), { recursive: true, force: true });
+  }
+  if (overlay.changed.length > 0) {
+    const fileList = await fsp.mkdtemp(path.join(stageDir, ".seed-viberoots-overlay-"));
+    const listPath = path.join(fileList, "files.txt");
+    await fsp.writeFile(listPath, overlay.changed.join("\n") + "\n", "utf8");
+    try {
+      await $({ cwd: source })`rsync -a --relative --files-from ${listPath} ./ ${stageViberoots}/`;
+    } finally {
+      await fsp.rm(fileList, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+  return touched;
+}
+
+type PathFlakeMetadata = {
+  lastModified?: number;
+  narHash?: string;
+};
+
+async function readPathFlakeMetadata(inputPath: string): Promise<PathFlakeMetadata> {
+  const canonicalInputPath = await fsp.realpath(inputPath).catch(() => inputPath);
+  const out = await $({
+    stdio: "pipe",
+  })`nix flake metadata --json ${`path:${canonicalInputPath}`} --no-write-lock-file`;
+  const parsed = JSON.parse(String(out.stdout || "{}"));
+  const locked = parsed?.locked || {};
+  return {
+    lastModified: typeof locked.lastModified === "number" ? locked.lastModified : undefined,
+    narHash: typeof locked.narHash === "string" ? locked.narHash : undefined,
+  };
+}
+
+function rewriteLocalPathLockEntry(
+  entry: unknown,
+  pathValue: string,
+  metadata?: PathFlakeMetadata,
+): boolean {
+  if (!entry || typeof entry !== "object") return false;
+  const node = entry as { type?: unknown; path?: unknown; url?: unknown };
+  const rawPath =
+    node.type === "path"
+      ? String(node.path || "")
+      : node.type === "git" && String(node.url || "").startsWith("file:")
+        ? String(node.url || "").replace(/^file:/, "")
+        : "";
+  if (!rawPath || path.basename(rawPath) !== "viberoots") return false;
+  const mutableNode = node as {
+    lastModified?: number;
+    lastModifiedDate?: string;
+    narHash?: string;
+    path: unknown;
+    rev?: string;
+    revCount?: number;
+    type: unknown;
+    url?: string;
+  };
+  mutableNode.type = "path";
+  mutableNode.path = pathValue;
+  if (metadata?.lastModified) mutableNode.lastModified = metadata.lastModified;
+  if (metadata?.narHash) mutableNode.narHash = metadata.narHash;
+  delete mutableNode.lastModifiedDate;
+  delete mutableNode.rev;
+  delete mutableNode.revCount;
+  delete mutableNode.url;
+  return true;
+}
+
+async function rewriteStageViberootsInput(stageDir: string): Promise<string[]> {
+  const touched: string[] = [];
+  const flakePath = path.join(stageDir, ".viberoots", "workspace", "flake.nix");
+  const flakeText = await fsp.readFile(flakePath, "utf8").catch(() => "");
+  if (flakeText) {
+    const next = flakeText.replace(
+      /(\bviberoots\.url\s*=\s*)"[^"]*"/,
+      (_match, prefix: string) => `${prefix}"path:./viberoots"`,
+    );
+    if (next !== flakeText) {
+      await fsp.writeFile(flakePath, next, "utf8");
+      touched.push(path.join(".viberoots", "workspace", "flake.nix"));
+    }
+  }
+
+  const lockPath = path.join(stageDir, ".viberoots", "workspace", "flake.lock");
+  const lockText = await fsp.readFile(lockPath, "utf8").catch(() => "");
+  if (lockText) {
+    const metadata = await readPathFlakeMetadata(path.join(stageDir, "viberoots"));
+    let lock: any;
+    try {
+      lock = JSON.parse(lockText);
+    } catch {
+      lock = null;
+    }
+    const inputName = lock?.nodes?.root?.inputs?.viberoots || "viberoots";
+    const node = lock?.nodes?.[inputName] || lock?.nodes?.viberoots || lock?.nodes?.viberootsInput;
+    if (node && typeof node === "object") {
+      const lockedChanged = rewriteLocalPathLockEntry(node.locked, "./viberoots", metadata);
+      const originalChanged = rewriteLocalPathLockEntry(node.original, "./viberoots");
+      if (lockedChanged || originalChanged) {
+        await fsp.writeFile(lockPath, JSON.stringify(lock, null, 2) + "\n", "utf8");
+        touched.push(path.join(".viberoots", "workspace", "flake.lock"));
+      }
+    }
+  }
+  return touched;
+}
+
+async function gitStageRelPaths(stageDir: string, relPaths: string[]): Promise<void> {
+  const existing: string[] = [];
+  const forceExisting: string[] = [];
+  const missing: string[] = [];
+  for (const rel of Array.from(new Set(relPaths)).sort((a, b) => a.localeCompare(b))) {
+    const normalized = rel.split(path.sep).join("/");
+    const abs = path.join(stageDir, normalized);
+    const exists = await fsp
+      .access(abs)
+      .then(() => true)
+      .catch(() => false);
+    if (exists) {
+      if (normalized.startsWith(".viberoots/")) forceExisting.push(normalized);
+      else existing.push(normalized);
+    } else {
+      missing.push(normalized);
+    }
+  }
+  const git = $({ cwd: stageDir, stdio: "pipe" });
+  if (existing.length > 0) await git`git add -- ${existing}`;
+  if (forceExisting.length > 0) await git`git add -f -- ${forceExisting}`;
+  if (missing.length > 0) await git`git rm -q --ignore-unmatch -- ${missing}`;
+}
+
+async function trackedNpmrcDirs(stageDir: string): Promise<string[]> {
+  const out = await $({ cwd: stageDir, stdio: "pipe" })`git ls-files -- "**/.npmrc"`.nothrow();
+  if (out.exitCode !== 0) return [];
+  return String(out.stdout || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((rel) => path.join(stageDir, path.dirname(rel)));
+}
+
+async function ensurePnpmfilePlaceholders(stageDir: string): Promise<string[]> {
+  const dirs = new Set<string>([
+    stageDir,
+    path.join(stageDir, "viberoots"),
+    ...(await trackedNpmrcDirs(stageDir)),
+  ]);
+  const placeholder = "export default {};\n";
+  const touched: string[] = [];
+  for (const dir of dirs) {
+    try {
+      await fsp.mkdir(dir, { recursive: true });
+      const file = path.join(dir, ".pnpmfile.mjs");
+      await fsp.writeFile(file, placeholder, { flag: "wx" });
+      touched.push(path.relative(stageDir, file).split(path.sep).join("/"));
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== "EEXIST") throw err;
+    }
+  }
+  return touched;
+}
+
+async function prepareStageSeed(stageDir: string, workspaceRoot: string): Promise<void> {
+  const touched = [
+    ...(await overlayActiveViberootsIntoStage(stageDir, workspaceRoot)),
+    ...(await rewriteStageViberootsInput(stageDir)),
+    ...(await ensurePnpmfilePlaceholders(stageDir)),
+  ];
+  if (touched.length > 0) {
+    await gitStageRelPaths(stageDir, touched);
+    await $({
+      cwd: stageDir,
+      stdio: "pipe",
+    })`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m seed-overlay --allow-empty`.nothrow();
+  }
+  await fsp.writeFile(path.join(stageDir, PREPARED_MARKER), "ok\n", "utf8");
 }
 
 async function readLockOwner(lockDir: string): Promise<{ pid: number; startedAt: string }> {
@@ -176,7 +424,7 @@ async function acquireSeedStageLock(
   seedTtlMs: number,
 ): Promise<() => Promise<void>> {
   const lockDir = seedStageLockDir(seedKey);
-  await fsp.mkdir(seedStageRootDir(), { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(seedStageRootDir()).catch(() => {});
   const startedAt = new Date().toISOString();
   const maxWaitMs = 5 * 60 * 1000;
   const deadline = Date.now() + maxWaitMs;
@@ -213,6 +461,7 @@ export async function stageSeedStore(
   seedPath: string,
   seedKey: string,
   seedTtlMs: number,
+  opts: { workspaceRoot?: string } = {},
 ): Promise<string> {
   const stageDir = seedStageDir(seedKey);
   const keyFile = path.join(stageDir, "seed.key");
@@ -220,6 +469,7 @@ export async function stageSeedStore(
   if (await stageReady(stageDir, seedKey)) {
     await ensureWritableTree(stageDir);
     await fsp.rm(path.join(stageDir, ".seed-store-writable"), { force: true }).catch(() => {});
+    await mkdirWithMacosMetadataExclusion(stageDir).catch(() => {});
     await makeReadOnlyTree(stageDir);
     return stageDir;
   }
@@ -228,6 +478,7 @@ export async function stageSeedStore(
     if (await stageReady(stageDir, seedKey)) {
       await ensureWritableTree(stageDir);
       await fsp.rm(path.join(stageDir, ".seed-store-writable"), { force: true }).catch(() => {});
+      await mkdirWithMacosMetadataExclusion(stageDir).catch(() => {});
       await makeReadOnlyTree(stageDir);
       return stageDir;
     }
@@ -236,12 +487,19 @@ export async function stageSeedStore(
       await ensureWritableTree(stageDir).catch(() => {});
       await fsp.rm(stageDir, { recursive: true, force: true });
     });
-    await fsp.mkdir(path.dirname(stageDir), { recursive: true }).catch(() => {});
+    await mkdirWithMacosMetadataExclusion(path.dirname(stageDir)).catch(() => {});
     await copyTree(seedPath, stageDir, {
       cloneMode: "none",
       exclude: isGeneratedRepoStateRelPath,
       force: true,
     });
+    await mkdirWithMacosMetadataExclusion(stageDir).catch(() => {});
+    await ensureWritableTree(stageDir);
+    if (opts.workspaceRoot) {
+      await prepareStageSeed(stageDir, opts.workspaceRoot);
+    } else {
+      await fsp.writeFile(path.join(stageDir, PREPARED_MARKER), "ok\n", "utf8");
+    }
     await fsp.writeFile(keyFile, seedKey + "\n", "utf8");
     await fsp.writeFile(readyFile, "ok\n", "utf8");
     await makeReadOnlyTree(stageDir);

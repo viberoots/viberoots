@@ -11,25 +11,66 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-command.ts",
     "utf8",
   );
+  const exactStoreFetch = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-fetch.ts",
+    "utf8",
+  );
   const lockfile = await fsp.readFile(
     "viberoots/build-tools/tools/dev/update-pnpm-hash/lockfile.ts",
+    "utf8",
+  );
+  const lockfileShared = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/lockfile-shared.ts",
     "utf8",
   );
   if (!exactStore.includes("export async function withExactPrefetchedStore")) {
     throw new Error("lockfile.ts must expose an exact-store helper for fixed pnpm-store builds");
   }
   if (
-    !exactStore.includes("fetch") ||
-    !exactStore.includes("--frozen-lockfile") ||
-    !exactStore.includes("--store-dir") ||
+    !exactStore.includes("fetchExactPnpmStore") ||
+    !exactStore.includes("resolveFlakePnpmProgram") ||
+    !exactStore.includes("resolveWorkspaceRootsSync") ||
+    !exactStore.includes("tempViberootsRootFromEnv") ||
+    !exactStore.includes("function canonicalFlakeRoot") ||
+    !exactStore.includes("fs.realpathSync.native(abs)") ||
+    !exactStore.includes("const flakeRoot = canonicalFlakeRoot(repoRoot)") ||
+    !exactStore.includes(
+      "opts.viberootsRoot || tempViberootsRootFromEnv() || roots.viberootsRoot",
+    ) ||
+    !exactStore.includes("#apps.${system}.pnpm.program") ||
+    exactStore.includes("seedExactStoreFromUnifiedStore") ||
+    exactStore.includes("mergePnpmStore") ||
+    exactStore.includes("unified-pnpm-store") ||
+    !exactStore.includes('["run", "--accept-flake-config", "--impure", `path:${flakeRoot}#pnpm`') ||
+    !exactStore.includes('"--", "--version"') ||
+    !exactStoreFetch.includes("pnpmPath: string") ||
+    !exactStoreFetch.includes("command: opts.pnpmPath") ||
+    !exactStoreFetch.includes("--frozen-lockfile") ||
+    !exactStoreFetch.includes("--store-dir") ||
     !exactStore.includes("sharedExactPnpmStateRoot")
   ) {
-    throw new Error("exact-store.ts must prefetch exact stores and reuse shared lock-hash caches");
-  }
-  if (!exactStore.includes('ensureNixStoreToolPathSync("pnpm")')) {
     throw new Error(
-      "exact-store.ts must require a Nix-managed pnpm binary for exact-store fetches",
+      "exact-store.ts must realize and prefetch exact stores with a canonical flake pnpm program and reuse shared lock-hash caches",
     );
+  }
+  if (
+    !exactStoreFetch.includes("isPnpmPostCompletionTermination") ||
+    !exactStoreFetch.includes("signal=SIGKILL") ||
+    !exactStoreFetch.includes("exactStoreLooksPopulated") ||
+    !exactStoreFetch.includes("exact-store-offline-validate-after-termination") ||
+    !exactStoreFetch.includes('"--offline"') ||
+    !exactStoreFetch.includes("verified offline install after pnpm post-completion termination") ||
+    exactStoreFetch.includes('store", "status')
+  ) {
+    throw new Error(
+      "exact-store population must validate a complete offline install after pnpm post-completion termination",
+    );
+  }
+  if (!exactStoreFetch.includes('"--reporter"') || !exactStoreFetch.includes('"silent"')) {
+    throw new Error("exact-store population must disable pnpm progress output");
+  }
+  if (!exactStoreFetch.includes('fsp.rm(path.join(opts.importerAbs, "node_modules")')) {
+    throw new Error("exact-store population must remove transient node_modules");
   }
   if (exactStore.includes("makeFilteredFlakeRef") || exactStore.includes("pnpmFlakeRef(")) {
     throw new Error("exact-store.ts must not route exact-store fetches through live pnpm flakes");
@@ -40,12 +81,16 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (!exactStoreCommand.includes('command: opts.command || "nix"')) {
     throw new Error("exact-store command helpers must support direct command execution");
   }
-  const toolPaths = await fsp.readFile("viberoots/build-tools/tools/lib/tool-paths.ts", "utf8");
-  if (!toolPaths.includes("required tool must resolve to /nix/store")) {
-    throw new Error("tool-paths.ts must fail when a required tool resolves outside /nix/store");
-  }
   if (!lockfile.includes("withExactPrefetchedStore")) {
     throw new Error("lockfile.ts must continue exporting the exact-store helper");
+  }
+  if (!lockfileShared.includes("function pnpmWorkspaceMarker")) {
+    throw new Error("lockfile-shared.ts must keep importer-local workspace marker generation");
+  }
+  if (lockfileShared.includes('"overrides:"') || lockfileShared.includes("nanoid: 3.3.11")) {
+    throw new Error(
+      "importer-local exact-store workspace markers must not inject overrides that can diverge from frozen lockfiles",
+    );
   }
   const pnpmStatePaths = await fsp.readFile(
     "viberoots/build-tools/tools/lib/pnpm-state-paths.ts",
@@ -60,7 +105,8 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     );
   }
   if (
-    !exactStore.includes("runExactStoreCommand") ||
+    (!exactStore.includes("runExactStoreCommand") &&
+      !exactStoreFetch.includes("runExactStoreCommand")) ||
     !exactStoreCommand.includes("withHeartbeat")
   ) {
     throw new Error(
@@ -82,15 +128,49 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (!exactStoreImport.includes("await fsp.rm(archiveDir, { recursive: true, force: true })")) {
     throw new Error("exact-store helpers must remove transient archive dirs after Nix import");
   }
+  if (!exactStore.includes("removeRedundantLocalExactStoreDirs")) {
+    throw new Error("exact-store prep must remove redundant local fetched stores after Nix import");
+  }
   if (
     !exactStore.includes("pruneSupersededExactStoreForImporter") ||
     !exactStore.includes("sharedExactPnpmStateIndexPath")
   ) {
     throw new Error("exact-store prep must prune superseded per-importer lock-hash caches");
   }
+  if (
+    !pnpmStatePaths.includes("sharedExactPnpmStateIndexPath(repoRoot: string, importer: string)") ||
+    !pnpmStatePaths.includes("`${stateKey(repoRoot)}--${sanitizeFragment(importer)}.json`") ||
+    !exactStore.includes("repoRoot: path.resolve(repoRoot)")
+  ) {
+    throw new Error("exact-store pruning indexes must be scoped by exact repo root and importer");
+  }
 
   const store = await fsp.readFile(
     "viberoots/build-tools/tools/nix/node-modules/store.nix",
+    "utf8",
+  );
+  const modules = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/node-modules/modules.nix",
+    "utf8",
+  );
+  const common = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/node-modules/common.nix",
+    "utf8",
+  );
+  const graphGenerator = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/graph-generator.nix",
+    "utf8",
+  );
+  const nodePlanner = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/planner/node.nix",
+    "utf8",
+  );
+  const nodeWebappPlanner = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/planner/node-webapp.nix",
+    "utf8",
+  );
+  const nodeAppPlanner = await fsp.readFile(
+    "viberoots/build-tools/tools/nix/planner/node-app.nix",
     "utf8",
   );
   if (!store.includes('builtins.getEnv "NIX_PNPM_EXACT_STORE"')) {
@@ -111,6 +191,60 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   const dontFixupMatches = store.match(/dontFixup = true;/g) ?? [];
   if (dontFixupMatches.length < 2) {
     throw new Error("store.nix must skip generic fixup work for both pnpm-store cache derivations");
+  }
+  if (!modules.includes('"$verDir/index.db"') || !modules.includes('"$verDir/projects"')) {
+    throw new Error(
+      "mkNodeModules must preserve pnpm v11 store metadata when seeding offline installs",
+    );
+  }
+  for (const [label, source] of [
+    ["store.nix", store],
+    ["modules.nix", modules],
+  ] as const) {
+    if (source.includes('"overrides:"') || source.includes("nanoid: 3.3.11")) {
+      throw new Error(
+        `${label} must not inject lockfile-affecting overrides into generated workspace markers`,
+      );
+    }
+    if (
+      !source.includes("write_pnpm_workspace_marker") ||
+      !source.includes("pnpm-workspace.source.yaml") ||
+      !source.includes("workspace_config") ||
+      !source.includes('search_dir="$(dirname "$search_dir")"') ||
+      !source.includes('const out = ["packages:", "  - ./"]') ||
+      !source.includes('const skipKeys = new Set(["packages", "supportedArchitectures"])') ||
+      !source.includes("!skipKeys.has(key)")
+    ) {
+      throw new Error(
+        `${label} must preserve importer workspace config while replacing package scope and supported architectures`,
+      );
+    }
+    if (!source.includes("pnpmSupportedArchitectures")) {
+      throw new Error(
+        `${label} must keep platform selection pinned in generated workspace markers`,
+      );
+    }
+  }
+  if (
+    !common.includes('impPnpmWsPath = srcBaseStr + "/" + importerDir + "/pnpm-workspace.yaml"') ||
+    !common.includes('name = "importer-pnpm-workspace.yaml"') ||
+    !common.includes("$imp_out_dir/pnpm-workspace.yaml")
+  ) {
+    throw new Error(
+      "importerOnlySrc must preserve importer-local pnpm-workspace.yaml so frozen installs see the same lockfile-affecting config",
+    );
+  }
+  if (
+    !graphGenerator.includes("repoFsRoot = builtins.toPath repoRootStr") ||
+    !nodePlanner.includes("repoFsRoot = ctx.repoFsRoot or repoStoreRoot") ||
+    !nodeWebappPlanner.includes("repoRoot = repoStoreRoot") ||
+    !nodeWebappPlanner.includes("repoFsRoot = repoFsRoot") ||
+    !nodeAppPlanner.includes("repoRoot = repoStoreRoot") ||
+    !nodeAppPlanner.includes("repoFsRoot = repoFsRoot")
+  ) {
+    throw new Error(
+      "graph node planners must pass the active filesystem root to node-modules source filtering while keeping derivation src on the store root",
+    );
   }
 
   const nixBuildHelpers = await fsp.readFile(
@@ -137,17 +271,28 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     "viberoots/build-tools/tools/dev/update-pnpm-hash/verified-marker.ts",
     "utf8",
   );
-  for (const updaterHelper of [
+  const primaryFingerprintList = verifiedMarker.match(
+    /const pnpmStoreBuilderFingerprintFiles = \[([\s\S]*?)\] as const;/,
+  )?.[1];
+  if (!primaryFingerprintList) {
+    throw new Error("pnpm-store builder fingerprint inputs must be declared");
+  }
+  for (const exactStoreProducer of [
     "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-fetch.ts",
     "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-import.ts",
     "viberoots/build-tools/tools/dev/update-pnpm-hash/prefetched-store.ts",
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/realized-store.ts",
   ]) {
-    if (verifiedMarker.includes(updaterHelper)) {
+    if (primaryFingerprintList.includes(exactStoreProducer)) {
       throw new Error(
-        `pnpm-store builder fingerprint must not include updater helper ${updaterHelper}`,
+        `pnpm-store builder fingerprint must not include exact-store provisioning helper ${exactStoreProducer}`,
       );
     }
+  }
+  if (
+    verifiedMarker.includes("viberoots/build-tools/tools/dev/update-pnpm-hash/realized-store.ts")
+  ) {
+    throw new Error("pnpm-store builder fingerprint must not include realized-store helper");
   }
   const updatePnpmHash = await fsp.readFile(
     "viberoots/build-tools/tools/dev/update-pnpm-hash.ts",
@@ -173,6 +318,15 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (!unified.includes("prepareExactPnpmStore")) {
     throw new Error(
       "require-unified-pnpm-store.ts must prepare exact stores before unified prewarm",
+    );
+  }
+  if (
+    !unified.includes("mergeExactStorePathIntoUnifiedStore") ||
+    !unified.includes('"store.tar"') ||
+    !unified.includes("tar -xf")
+  ) {
+    throw new Error(
+      "require-unified-pnpm-store.ts must assemble unified prewarm from archived exact stores",
     );
   }
   if (unified.includes("nix build --impure")) {

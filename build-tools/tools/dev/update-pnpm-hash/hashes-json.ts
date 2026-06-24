@@ -1,4 +1,5 @@
 import * as fsp from "node:fs/promises";
+import fs from "node:fs";
 import path from "node:path";
 import { buildToolPath } from "../dev-build/paths";
 
@@ -8,6 +9,17 @@ function unique(values: string[]): string[] {
 
 function workspaceHashesJsonPath(root: string): string {
   return path.join(root, "projects", "node-modules.hashes.json");
+}
+
+function isStandaloneViberootsSource(root: string): boolean {
+  const rootTool = path.join(root, "build-tools", "tools", "dev", "zx-init.mjs");
+  return (
+    path.basename(root) !== "workspace" &&
+    !root.endsWith(path.join(".viberoots", "workspace")) &&
+    !root.includes(`${path.sep}.viberoots${path.sep}workspace`) &&
+    fs.existsSync(rootTool) &&
+    path.resolve(buildToolPath(root, "tools/dev/zx-init.mjs")) === path.resolve(rootTool)
+  );
 }
 
 function viberootsHashesJsonPaths(root: string): string[] {
@@ -32,9 +44,18 @@ function hashesJsonPaths(): string[] {
   return unique([...viberootsHashesJsonPaths(root), workspaceHashesJsonPath(root)]);
 }
 
+function writableHashesJsonPaths(): string[] {
+  const root = process.cwd();
+  const writable = [workspaceHashesJsonPath(root)];
+  if (isStandaloneViberootsSource(root)) {
+    writable.unshift(viberootsHashesJsonPaths(root)[0]);
+  }
+  return unique(writable);
+}
+
 function ownerHashesJsonPath(lockfileRel: string): string {
   const root = process.cwd();
-  return lockfileRel.startsWith("projects/")
+  return lockfileRel.startsWith("projects/") || !isStandaloneViberootsSource(root)
     ? workspaceHashesJsonPath(root)
     : viberootsHashesJsonPaths(root)[0];
 }
@@ -64,7 +85,7 @@ async function readHashesJson(): Promise<Record<string, string>> {
 
 async function removeHashFromNonOwnerFiles(lockfileRel: string, owner: string): Promise<void> {
   const ownerReal = await fsp.realpath(owner).catch(() => path.resolve(owner));
-  for (const candidate of hashesJsonPaths()) {
+  for (const candidate of writableHashesJsonPaths()) {
     if (candidate === owner) continue;
     const candidateReal = await fsp.realpath(candidate).catch(() => path.resolve(candidate));
     if (candidateReal === ownerReal) continue;
@@ -86,7 +107,7 @@ export async function updateNodeModulesHashesJson(lockfileRel: string, newHash: 
 export async function pruneNodeModulesHashesJson(keepLockfiles: string[]): Promise<string[]> {
   const keep = new Set(keepLockfiles);
   const removed: string[] = [];
-  for (const candidate of hashesJsonPaths()) {
+  for (const candidate of writableHashesJsonPaths()) {
     const obj = await readJsonFile(candidate);
     let changed = false;
     for (const key of Object.keys(obj)) {

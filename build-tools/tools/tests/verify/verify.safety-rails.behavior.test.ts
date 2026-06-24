@@ -6,6 +6,7 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   decideVerifySafetyRailsTrigger,
+  makeTransientRootSampler,
   pollVerifySafetyRailsOnce,
   summarizeVerifySafetyRailsTelemetry,
   writeVerifySafetyRailsTriggerSnapshot,
@@ -105,6 +106,109 @@ test("verify safety rails: free-space drops are telemetry only", async () => {
   assert.match(telemetry, /freeGiB=20/);
 });
 
+test("verify safety rails: transient-root sampler uses long healthy spacing", () => {
+  let now = 1_000_000;
+  const shouldSample = makeTransientRootSampler({
+    transientRoot: "/tmp/viberoots-verify-user.noindex/tmpdir",
+    sampleSec: 1800,
+    nearThresholdSampleSec: 120,
+    marginGiB: 20,
+    nowMs: () => now,
+  });
+
+  assert.equal(shouldSample(200, 5), true);
+  now += 299 * 1000;
+  assert.equal(shouldSample(200, 5), false);
+  now += 1501 * 1000;
+  assert.equal(shouldSample(200, 5), true);
+});
+
+test("verify safety rails: transient-root sampler throttles near-threshold checks", () => {
+  let now = 1_000_000;
+  const shouldSample = makeTransientRootSampler({
+    transientRoot: "/tmp/viberoots-verify-user.noindex/tmpdir",
+    sampleSec: 1800,
+    nearThresholdSampleSec: 120,
+    marginGiB: 20,
+    nowMs: () => now,
+  });
+
+  assert.equal(shouldSample(24, 5), true);
+  now += 30 * 1000;
+  assert.equal(shouldSample(24, 5), false);
+  now += 90 * 1000;
+  assert.equal(shouldSample(24, 5), true);
+});
+
+test("verify safety rails: transient-root size walk is optional per poll", async () => {
+  const analysisDir = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-safety-rails-du-skip-"));
+  const telemetryPath = path.join(analysisDir, "telemetry.log");
+  await fsp.writeFile(telemetryPath, "", "utf8");
+  let transientCalls = 0;
+
+  const decision = await pollVerifySafetyRailsOnce({
+    analysisDir,
+    processGroupIdToKill: 4242,
+    transientRoot: path.join(analysisDir, "tmpdir"),
+    lowSpaceGiB: 5,
+    telemetryPath,
+    deps: {
+      freeGiBForPath: async (_p: string) => 200,
+      transientGiBForPath: async (_p: string) => {
+        transientCalls++;
+        return 12;
+      },
+      shouldSampleTransientRoot: () => false,
+      activeNixGcProcesses: async () => [],
+      onTrigger: async (_reason: string) => {},
+      writeSnapshot: async () => {},
+      killProcessGroup: () => {},
+      setTimeoutFn: () => {},
+    },
+  });
+
+  assert.equal(decision, null);
+  assert.equal(transientCalls, 0);
+  const telemetry = await readText(telemetryPath);
+  assert.match(telemetry, /freeGiB=200/);
+  assert.match(telemetry, /transientGiB=0/);
+});
+
+test("verify safety rails: transient-root size walk still runs when requested", async () => {
+  const analysisDir = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-safety-rails-du-sample-"));
+  const telemetryPath = path.join(analysisDir, "telemetry.log");
+  await fsp.writeFile(telemetryPath, "", "utf8");
+  let transientCalls = 0;
+
+  const decision = await pollVerifySafetyRailsOnce({
+    analysisDir,
+    processGroupIdToKill: 4242,
+    transientRoot: path.join(analysisDir, "tmpdir"),
+    lowSpaceGiB: 5,
+    telemetryPath,
+    deps: {
+      freeGiBForPath: async (_p: string) => 24,
+      transientGiBForPath: async (_p: string) => {
+        transientCalls++;
+        return 12;
+      },
+      shouldSampleTransientRoot: (curFreeGiB, lowSpaceGiB) => curFreeGiB <= lowSpaceGiB + 20,
+      activeNixGcProcesses: async () => [],
+      onTrigger: async (_reason: string) => {},
+      writeSnapshot: async () => {},
+      killProcessGroup: () => {},
+      setTimeoutFn: () => {},
+    },
+  });
+
+  assert.equal(decision, null);
+  assert.equal(transientCalls, 1);
+  const telemetry = await readText(telemetryPath);
+  assert.match(telemetry, /freeGiB=24/);
+  assert.match(telemetry, /transientGiB=12/);
+  assert.match(telemetry, /reclaimableFreeGiB=36/);
+});
+
 test("verify safety rails: free-space drop alone does not stop verify", async () => {
   assert.equal(
     decideVerifySafetyRailsTrigger({
@@ -162,6 +266,38 @@ test("verify safety rails: active nix gc is logged as notice and does not stop v
   );
 });
 
+test("verify safety rails: high-load telemetry includes bounded top-process sample", async () => {
+  const analysisDir = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-safety-rails-top-proc-"));
+  const telemetryPath = path.join(analysisDir, "telemetry.log");
+  await fsp.writeFile(telemetryPath, "", "utf8");
+
+  const decision = await pollVerifySafetyRailsOnce({
+    analysisDir,
+    processGroupIdToKill: 4242,
+    lowSpaceGiB: 0,
+    highLoadTopProcessesThreshold: 0,
+    telemetryPath,
+    deps: {
+      freeGiBForPath: async (_p: string) => 45,
+      activeNixGcProcesses: async () => [],
+      onTrigger: async (_reason: string) => {},
+      writeSnapshot: async () => {},
+      killProcessGroup: () => {},
+      setTimeoutFn: () => {},
+      sampleTopProcesses: async () => ({
+        lines: ["pid=100 ppid=1 stat=R pcpu=88.0 pmem=0.1 cmd=mds_stores"],
+      }),
+    },
+  });
+
+  assert.equal(decision, null);
+  const telemetry = await readText(telemetryPath);
+  assert.match(
+    telemetry,
+    /\[verify\] high-load top-process load1=[0-9.]+ pid=100 .*cmd=mds_stores/,
+  );
+});
+
 test("verify safety rails: telemetry summary captures load and process-count peaks", async () => {
   const analysisDir = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-safety-rails-summary-"));
   const telemetryPath = path.join(analysisDir, "telemetry.log");
@@ -171,6 +307,7 @@ test("verify safety rails: telemetry summary captures load and process-count pea
       "[verify] safety-rails baseline /nix/store free ~100GiB",
       "111 freeGiB=99 load1=10.25 load5=8.00 load15=7.00 processes=200 node=80 buck=5 nix=2 verify_env=60",
       "222 freeGiB=98 load1=12.50 load5=9.25 load15=7.50 processes=250 node=90 buck=7 nix=4 verify_env=70",
+      "[verify] high-load top-process load1=88.00 pid=100 ppid=1 stat=R pcpu=90.0 pmem=0.1 cmd=mds_stores",
       "",
     ].join("\n"),
     "utf8",
@@ -185,4 +322,8 @@ test("verify safety rails: telemetry summary captures load and process-count pea
   assert.equal(summary.maxBuckCount, 7);
   assert.equal(summary.maxNixCount, 4);
   assert.equal(summary.maxVerifyEnvCount, 70);
+  assert.equal(summary.highLoadTopProcessSamples, 1);
+  assert.deepEqual(summary.highLoadTopProcessLines, [
+    "high-load top-process load1=88.00 pid=100 ppid=1 stat=R pcpu=90.0 pmem=0.1 cmd=mds_stores",
+  ]);
 });

@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { allDevOverrideEnvNames } from "../../lib/dev-override-envs";
+import { gitAutoMaintenanceDisabledTestEnvArgs } from "../../lib/git-auto-maintenance-env";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { REMOTE_SAFE_NIX_IMPURE_ENV_VARS } from "./buck2-test-env-policy";
 import type { VerifyExecutionPolicy } from "./remote-policy";
@@ -109,6 +110,7 @@ export function buildRemoteVerifyTestEnvArgs(opts: RemoteVerifyTestEnvArgsOption
     `NIX_PNPM_FETCH_TIMEOUT=${opts.testNixTimeoutSecs}`,
     "--env",
     `NIX_PNPM_INSTALL_TIMEOUT=${opts.testNixTimeoutSecs}`,
+    ...gitAutoMaintenanceDisabledTestEnvArgs(),
     "--env",
     `BUCK_NESTED_ISO=${opts.nestedIso}`,
     ...envArgs(pathEntries),

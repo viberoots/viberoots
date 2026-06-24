@@ -41,7 +41,7 @@ For Infisical-backed deployments, use the deployment context's reviewed
   storing the secret value
 - `secret_requirements`: the list of secrets a deployment needs
 - contract id: the stable name of one secret, such as
-  `secret://deployments/pleomino/cloudflare_api_token`
+  `secret://deployments/example-app/cloudflare_api_token`
 - admitted secret reference: the frozen non-secret replay/runtime metadata
   captured during admission for one resolved secret contract
 - secret fixture: the reviewed local/test override file format named by
@@ -96,7 +96,7 @@ over time so old runs can still be understood:
 {
   name: "cloudflare_api_token",
   step: "publish",
-  contractId: "secret://deployments/pleomino/cloudflare_api_token",
+  contractId: "secret://deployments/example-app/cloudflare_api_token",
   required: true,
 }
 ```
@@ -116,7 +116,7 @@ const runtime = createDeploymentSecretRuntimeForAdmittedContext({
   admittedContext: {
     secretRequirements: requirements,
     targetEnvironment: {
-      lockScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      lockScope: "cloudflare-pages:web-platform-staging/example-staging-pages",
     },
   },
 });
@@ -129,7 +129,7 @@ SprinkleRef reference check to find missing or unmapped deployment contract refs
 
 ```bash
 sprinkleref --check
-sprinkleref --check --target //projects/deployments/pleomino/staging:deploy
+sprinkleref --check --target //projects/deployments/example-app/staging:deploy
 ```
 
 The checker inventories `secret://`, `config://`, and `runtime://` refs without
@@ -153,14 +153,14 @@ infisical_runtime = {
     "site_url": "https://app.infisical.com",
     "project_id": "proj_123",
     "environment": "prod",
-    "secret_path": "/deployments/pleomino",
+    "secret_path": "/deployments/example-app",
     "preferred_credential_source": "infisical_machine_identity_universal_auth",
     "machine_identity_client_id_env": "INFISICAL_CLIENT_ID",
     "machine_identity_client_secret_env": "INFISICAL_CLIENT_SECRET",
 }
 ```
 
-By default, `secret://deployments/pleomino/cloudflare_api_token` resolves to
+By default, `secret://deployments/example-app/cloudflare_api_token` resolves to
 Infisical secret name `cloudflare_api_token` under the configured
 `secret_path`. When `infisical_runtime.secret_path_prefix` is set and no
 mapping path override exists, the runtime appends the normalized prefix to
@@ -173,7 +173,7 @@ path or name overrides:
 
 ```python
 infisical_secret_mappings = {
-    "secret://deployments/pleomino/cloudflare_api_token": {
+    "secret://deployments/example-app/cloudflare_api_token": {
         "secret_path": "/shared/cloudflare",
         "secret_name": "api-token",
         "approved_placeholder": "true",
@@ -231,11 +231,11 @@ Use stable reviewed contract IDs for external dependencies:
   only through the deployment secret runtime; ambient `GITHUB_*` environment
   variables are not accepted.
 
-Live checked-in deployment packages currently use Pleomino-owned reviewed
-contract namespaces. Future deployment families should introduce their own
+The ExampleApp snippets below are reusable examples of reviewed contract namespaces. Real
+deployment families should introduce their own
 `secret://deployments/<family>/<deployment-id>/...` and
-`runtime://deployments/<family>/<deployment-id>/...` namespaces only in the plan
-PR that approves the family as a real deployment surface.
+`runtime://deployments/<family>/<deployment-id>/...` namespaces only in the consuming workspace plan
+PR that approves the family as a live deployment surface.
 
 Keep each requirement step-specific. Provider publish tokens belong to
 `publish`, provisioning credentials belong to `provision`, preview cleanup
@@ -269,24 +269,24 @@ Example:
 ```python
 cloudflare_pages_static_webapp_deployment(
     name = "deploy",
-    component = "//projects/apps/pleomino:app",
+    component = "//projects/apps/example-app:app",
     account = "web-platform-staging",
-    project = "pleomino-staging-pages",
-    lane_policy = "//projects/deployments/pleomino/shared:lane",
+    project = "example-staging-pages",
+    lane_policy = "//projects/deployments/example-app/shared:lane",
     environment_stage = "staging",
-    admission_policy = "//projects/deployments/pleomino/shared:staging_release",
+    admission_policy = "//projects/deployments/example-app/shared:staging_release",
     protection_class = "shared_nonprod",
     secret_requirements = [
         {
             "name": "cloudflare_api_token",
             "step": "publish",
-            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",
+            "contract_id": "secret://deployments/example-app/cloudflare_api_token",
             "required": "true",
         },
         {
             "name": "cloudflare_api_token",
             "step": "preview_cleanup",
-            "contract_id": "secret://deployments/pleomino/cloudflare_api_token",
+            "contract_id": "secret://deployments/example-app/cloudflare_api_token",
             "required": "true",
         },
     ],
@@ -325,7 +325,7 @@ Common example values and when to use them:
   Use this when a post-publish action needs the secret before smoke checks run.
 - `step = "release_actions.post_smoke"`
   Use this when a post-smoke action needs the secret.
-- `contract_id = "secret://deployments/pleomino/cloudflare_api_token"`
+- `contract_id = "secret://deployments/example-app/cloudflare_api_token"`
   Use a stable, descriptive ID. It should stay the same even as the secret
   value rotates.
 - `contract_id = "secret://deployments/console/vercel_api_token"`
@@ -454,10 +454,10 @@ Create `secret-fixture.json`:
 {
   "schemaVersion": "deployment-secret-fixture@1",
   "contracts": {
-    "secret://deployments/pleomino/cloudflare_api_token": {
+    "secret://deployments/example-app/cloudflare_api_token": {
       "value": "super-secret-token",
       "allowedSteps": ["publish"],
-      "targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+      "targetScopes": ["cloudflare-pages:web-platform-staging/example-staging-pages"],
       "refreshMode": "renew",
       "credentialClass": "routine"
     }
@@ -493,7 +493,7 @@ Recommended workflow:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --print-target-identity
 ```
 
@@ -503,12 +503,12 @@ For normal deploy flows, use that exact string in `targetScopes`.
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --print-run-lock-scope \
   --deploy-run-id "$DEPLOY_RUN_ID"
 ```
 
-Checked-in Pleomino protected/shared targets select the deployment service
+Checked-in ExampleApp protected/shared targets select the deployment service
 through their `deployment_context` and the referenced `controlPlanes.<name>`
 profile. Use `--control-plane-url` or `VBR_DEPLOY_CONTROL_PLANE_URL` only for
 commands without deployment context or an explicit reviewed override.
@@ -526,7 +526,7 @@ Common backend shapes:
 - Cloudflare Pages:
   `cloudflare-pages:<account>/<project>`
   Example:
-  `cloudflare-pages:web-platform-staging/pleomino-staging-pages`
+  `cloudflare-pages:web-platform-staging/example-staging-pages`
 - Cloudflare Containers:
   `cloudflare-containers:<account_id>/<worker>`
   Example:
@@ -534,15 +534,15 @@ Common backend shapes:
 - `nixos-shared-host`:
   `nixos-shared-host:<target-group>:<app>`
   Example:
-  `nixos-shared-host:shared-dev:pleomino`
+  `nixos-shared-host:shared-dev:example-app`
 - S3 static:
   `s3-static:<account>/<bucket>`
   Example:
-  `s3-static:web-platform/pleomino-staging-site`
+  `s3-static:web-platform/example-staging-site`
 - Kubernetes:
   `kubernetes:<cluster>/<namespace>/<release>`
   Example:
-  `kubernetes:shared-cluster/web/pleomino`
+  `kubernetes:shared-cluster/web/example-app`
 - App Store Connect:
   `app-store-connect:<issuer>/<app>#track:<track>`
 - Google Play:
@@ -551,7 +551,7 @@ Common backend shapes:
 Copyable example:
 
 ```json
-"targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"]
+"targetScopes": ["cloudflare-pages:web-platform-staging/example-staging-pages"]
 ```
 
 That value should come from one of the two commands above.
@@ -574,7 +574,7 @@ Common fixture fields, example values, and when to use them:
 - `"allowedSteps": ["publish", "smoke"]`
   Use multiple steps only when the same credential is intentionally shared
   across both steps.
-- `"targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"]`
+- `"targetScopes": ["cloudflare-pages:web-platform-staging/example-staging-pages"]`
   Prefer an exact target scope like this for normal operation. This should be
   the deployment's admitted `lockScope` value.
 - `"targetScopes": ["*"]`
@@ -611,18 +611,18 @@ Complete example with more explicit choices:
 {
   "schemaVersion": "deployment-secret-fixture@1",
   "contracts": {
-    "secret://deployments/pleomino/cloudflare_api_token": {
+    "secret://deployments/example-app/cloudflare_api_token": {
       "value": "super-secret-token",
       "allowedSteps": ["publish"],
-      "targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+      "targetScopes": ["cloudflare-pages:web-platform-staging/example-staging-pages"],
       "refreshMode": "renew",
       "credentialClass": "routine",
       "expiresAt": "2026-12-31T23:59:59Z"
     },
-    "secret://deployments/pleomino/preview_basic_auth_password": {
+    "secret://deployments/example-app/preview_basic_auth_password": {
       "value": "preview-password",
       "allowedSteps": ["smoke"],
-      "targetScopes": ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+      "targetScopes": ["cloudflare-pages:web-platform-staging/example-staging-pages"],
       "refreshMode": "none",
       "credentialClass": "routine"
     }
@@ -652,7 +652,7 @@ Example with an explicit local override:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/example-app/staging:deploy \
   --artifact-dir ./dist
 ```
 
@@ -660,7 +660,7 @@ Example without the override:
 
 ```bash
 deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy
+  --deployment //projects/deployments/example-app/staging:deploy
 ```
 
 Use the explicit `--artifact-dir ./dist` form when:
@@ -680,7 +680,7 @@ Use the shorter form without `--artifact-dir` when:
 When the deployment reaches the `publish` step, the runtime:
 
 1. reads the deployment's `secret_requirements`
-2. looks up `secret://deployments/pleomino/cloudflare_api_token` in the selected
+2. looks up `secret://deployments/example-app/cloudflare_api_token` in the selected
    backend
 3. checks that the secret is allowed for the `publish` step
 4. checks that the secret is allowed for the target scope
@@ -697,11 +697,11 @@ Here is the same flow with the example values above:
 1. the deployment says it needs `cloudflare_api_token`
 2. the runtime sees that it is needed for the `publish` step
 3. the runtime looks up
-   `secret://deployments/pleomino/cloudflare_api_token`
+   `secret://deployments/example-app/cloudflare_api_token`
 4. the backend returns `super-secret-token`
 5. the runtime checks that `publish` is included in `allowedSteps`
 6. the runtime checks that
-   `cloudflare-pages:web-platform-staging/pleomino-staging-pages` is allowed in
+   `cloudflare-pages:web-platform-staging/example-staging-pages` is allowed in
    `targetScopes`
 7. the publish step is allowed to continue
 
@@ -715,7 +715,7 @@ would not be available there unless `allowedSteps` also included `"smoke"`.
 
 The deployment records keep the secret reference:
 
-- `secret://deployments/pleomino/cloudflare_api_token`
+- `secret://deployments/example-app/cloudflare_api_token`
 
 They do not store the secret value:
 
@@ -746,12 +746,12 @@ persisting secret values.
 Use the auth commands before a protected/shared deploy when setup is uncertain:
 
 ```bash
-deploy auth doctor --deployment //projects/deployments/pleomino/staging:deploy
-deploy auth explain-vault-role --deployment //projects/deployments/pleomino/staging:deploy
-deploy auth explain-secret-backend --deployment //projects/deployments/pleomino/staging:deploy
-deploy auth explain-infisical-identity --deployment //projects/deployments/pleomino/staging:deploy
-deploy auth print-login --deployment //projects/deployments/pleomino/staging:deploy
-deploy auth print-jenkins-help --deployment //projects/deployments/pleomino/staging:deploy
+deploy auth doctor --deployment //projects/deployments/example-app/staging:deploy
+deploy auth explain-vault-role --deployment //projects/deployments/example-app/staging:deploy
+deploy auth explain-secret-backend --deployment //projects/deployments/example-app/staging:deploy
+deploy auth explain-infisical-identity --deployment //projects/deployments/example-app/staging:deploy
+deploy auth print-login --deployment //projects/deployments/example-app/staging:deploy
+deploy auth print-jenkins-help --deployment //projects/deployments/example-app/staging:deploy
 ```
 
 `deploy auth doctor` is read-only: it reports the selected credential source,
@@ -781,9 +781,9 @@ Use the reviewed admin Vault commands when live Vault auth roles drift from the
 project deployment metadata:
 
 ```bash
-deploy admin vault plan --deployment //projects/deployments/pleomino/staging:deploy
-deploy admin vault check --deployment //projects/deployments/pleomino/staging:deploy
-deploy admin vault sync --deployment //projects/deployments/pleomino/staging:deploy
+deploy admin vault plan --deployment //projects/deployments/example-app/staging:deploy
+deploy admin vault check --deployment //projects/deployments/example-app/staging:deploy
+deploy admin vault sync --deployment //projects/deployments/example-app/staging:deploy
 ```
 
 `plan` is local and read-only. `check` reads live Vault state and exits
@@ -798,9 +798,9 @@ Use the reviewed Infisical admin commands before the first live Infisical-backed
 deployment:
 
 ```bash
-deploy auth explain-secret-backend --deployment //projects/deployments/pleomino/staging:deploy
-deploy admin infisical plan --deployment //projects/deployments/pleomino/staging:deploy
-deploy admin infisical check --deployment //projects/deployments/pleomino/staging:deploy
+deploy auth explain-secret-backend --deployment //projects/deployments/example-app/staging:deploy
+deploy admin infisical plan --deployment //projects/deployments/example-app/staging:deploy
+deploy admin infisical check --deployment //projects/deployments/example-app/staging:deploy
 ```
 
 `plan` is local and read-only. `check` uses the reviewed
@@ -825,9 +825,9 @@ Typical `check` output includes:
   },
   "desiredSecrets": [
     {
-      "contractId": "secret://deployments/pleomino/cloudflare_api_token",
+      "contractId": "secret://deployments/example-app/cloudflare_api_token",
       "selector": {
-        "secretPath": "/deployments/pleomino",
+        "secretPath": "/deployments/example-app",
         "secretName": "cloudflare_api_token"
       },
       "approvedPlaceholder": false

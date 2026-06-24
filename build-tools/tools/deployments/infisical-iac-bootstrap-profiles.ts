@@ -131,7 +131,7 @@ function sameProfile(left: SprinkleRefBackendConfig, right: SprinkleRefBackendCo
 
 function validateInfisicalProfile(name: string, profile: SprinkleRefBackendConfig) {
   for (const [field, value] of Object.entries(profile)) {
-    if (typeof value === "string" && /placeholder|fake|pleomino-project-id/i.test(value)) {
+    if (typeof value === "string" && /placeholder|fake|example-project-id/i.test(value)) {
       throw new Error(
         `SprinkleRef profile ${name} has placeholder ${field}; replace it with real Infisical metadata`,
       );

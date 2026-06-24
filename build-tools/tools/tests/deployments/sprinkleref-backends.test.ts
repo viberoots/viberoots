@@ -92,6 +92,7 @@ test("--sprinkle-category selects access credential lifecycle category only", as
     const args = {
       ...DEFAULT_BOOTSTRAP_ARGS,
       mode: "deployment" as const,
+      target: "//projects/deployments/pleomino/dev:deploy",
       credentialSink: "sprinkleref" as const,
       sprinkleCategory: "access-bootstrap",
     };

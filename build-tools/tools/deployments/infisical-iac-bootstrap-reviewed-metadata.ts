@@ -1,44 +1,55 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { canonicalInfisicalApiUrl } from "./infisical-iac-bootstrap-config";
+import {
+  canonicalInfisicalApiUrl,
+  REVIEWED_CONTEXT_CONFIG_PATH,
+  type DeploymentBootstrapScope,
+} from "./infisical-iac-bootstrap-config";
 import type { DeploymentRuntimeMetadata } from "./infisical-iac-bootstrap-types";
 import { stripJsonComments } from "./json-comments";
 
-export const PLEOMINO_REVIEWED_METADATA_PATH = "projects/deployments/pleomino/shared/family.bzl";
-export const PLEOMINO_REVIEWED_CONTEXT_CONFIG_PATH = "projects/config/shared.json";
-
-export async function readPleominoReviewedMetadata(
-  file = PLEOMINO_REVIEWED_METADATA_PATH,
+export async function readDeploymentReviewedMetadata(
+  scope: DeploymentBootstrapScope,
+  file = scope.reviewedMetadataPath,
   workspaceRoot = process.cwd(),
 ) {
-  const source = await readPleominoReviewedMetadataSource(file, workspaceRoot);
-  if (source.includes("_INFISICAL_SITE_URL")) return parsePleominoReviewedMetadata(source);
-  return parsePleominoReviewedContextConfig(source);
+  const source = await readDeploymentReviewedMetadataSource(scope, file, workspaceRoot);
+  if (source.includes("_INFISICAL_SITE_URL")) return parseDeploymentReviewedMetadata(source);
+  return parseDeploymentReviewedContextConfig(source, scope.family);
 }
 
-export async function readPleominoReviewedMetadataSource(
-  file = PLEOMINO_REVIEWED_METADATA_PATH,
+export async function readDeploymentReviewedMetadataSource(
+  scope: DeploymentBootstrapScope,
+  file = scope.reviewedMetadataPath,
   workspaceRoot = process.cwd(),
 ) {
   const resolved = path.isAbsolute(file) ? file : path.resolve(workspaceRoot, file);
   const source = await fs.readFile(resolved, "utf8");
   if (source.includes("_INFISICAL_SITE_URL")) return source;
-  return await fs.readFile(pleominoContextConfigPath(resolved), "utf8");
+  return await fs.readFile(contextConfigPath(resolved, scope), "utf8");
 }
 
-export function parsePleominoReviewedContextConfig(
+export function parseDeploymentReviewedContextConfig(
   source: string,
+  family: string,
 ): Required<DeploymentRuntimeMetadata> {
   const config = JSON.parse(stripJsonComments(source)) as Record<string, unknown>;
   const contexts = record(config.deploymentContexts, "deploymentContexts");
-  const stages = ["staging", "prod"] as const;
-  const stageContexts: Record<(typeof stages)[number], Record<string, unknown>> = {
-    staging: record(contexts["pleomino-staging"], "pleomino-staging"),
-    prod: record(contexts["pleomino-prod"], "pleomino-prod"),
-  };
-  const firstInfisical = infisicalSection(stageContexts.staging, "pleomino-staging");
+  const prefix = `${family}-`;
+  const stageContexts = Object.fromEntries(
+    Object.entries(contexts)
+      .filter(([key]) => key.startsWith(prefix))
+      .map(([key, value]) => [key.slice(prefix.length), record(value, key)]),
+  ) as Record<string, Record<string, unknown>>;
+  const stages = Object.keys(stageContexts).sort(stageOrder);
+  if (stages.length === 0) {
+    throw new Error(`missing deploymentContexts for family ${family} in checked-in metadata`);
+  }
+  const firstStage = stages[0]!;
+  const firstLabel = `${family}-${firstStage}`;
+  const firstInfisical = infisicalSection(stageContexts[firstStage]!, firstLabel);
   const cloudflareSecretName = secretName(
-    stringField(cloudflareSection(stageContexts.staging, "pleomino-staging"), "apiTokenRef"),
+    stringField(cloudflareSection(stageContexts[firstStage]!, firstLabel), "apiTokenRef"),
   );
   return {
     siteUrl: canonicalInfisicalApiUrl(stringField(firstInfisical, "host")),
@@ -49,12 +60,12 @@ export function parsePleominoReviewedContextConfig(
     cloudflareSecretName,
     environments: Object.fromEntries(
       stages.map((stage) => {
-        const section = infisicalSection(stageContexts[stage], `pleomino-${stage}`);
+        const section = infisicalSection(stageContexts[stage]!, `${family}-${stage}`);
         return [stage, { slug: stringField(section, "environment") }];
       }),
     ),
     deploymentCredentials: stages.map((stage) => {
-      const section = infisicalSection(stageContexts[stage], `pleomino-${stage}`);
+      const section = infisicalSection(stageContexts[stage]!, `${family}-${stage}`);
       return {
         stage,
         identityId: stringField(section, "machineIdentityId"),
@@ -68,7 +79,9 @@ export function parsePleominoReviewedContextConfig(
   };
 }
 
-export function parsePleominoReviewedMetadata(source: string): Required<DeploymentRuntimeMetadata> {
+export function parseDeploymentReviewedMetadata(
+  source: string,
+): Required<DeploymentRuntimeMetadata> {
   const siteUrl = canonicalInfisicalApiUrl(stringConstant(source, "_INFISICAL_SITE_URL"));
   const projectId = stringConstant(source, "_INFISICAL_PROJECT_ID");
   const projectName = stringConstant(source, "_INFISICAL_PROJECT_NAME");
@@ -144,7 +157,7 @@ function nestedStringMap(source: string, name: string) {
 
 function mapBody(source: string, name: string) {
   const start = source.indexOf(`${name} = {`);
-  if (start < 0) throw new Error(`missing ${name} in checked-in Pleomino metadata`);
+  if (start < 0) throw new Error(`missing ${name} in checked-in deployment metadata`);
   const bodyStart = source.indexOf("{", start);
   let depth = 0;
   for (let i = bodyStart; i < source.length; i += 1) {
@@ -152,19 +165,19 @@ function mapBody(source: string, name: string) {
     if (source[i] === "}") depth -= 1;
     if (depth === 0) return source.slice(bodyStart + 1, i);
   }
-  throw new Error(`unterminated ${name} map in checked-in Pleomino metadata`);
+  throw new Error(`unterminated ${name} map in checked-in deployment metadata`);
 }
 
 function required(value: string | undefined, label: string) {
-  if (value === undefined) throw new Error(`missing ${label} in checked-in Pleomino metadata`);
+  if (value === undefined) throw new Error(`missing ${label} in checked-in deployment metadata`);
   return value;
 }
 
-function pleominoContextConfigPath(resolvedMetadataPath: string) {
-  const marker = `${path.sep}projects${path.sep}deployments${path.sep}pleomino${path.sep}`;
+function contextConfigPath(resolvedMetadataPath: string, scope: DeploymentBootstrapScope) {
+  const marker = `${path.sep}projects${path.sep}deployments${path.sep}${scope.family}${path.sep}`;
   const index = resolvedMetadataPath.indexOf(marker);
   const root = index >= 0 ? resolvedMetadataPath.slice(0, index) : process.cwd();
-  return path.join(root, PLEOMINO_REVIEWED_CONTEXT_CONFIG_PATH);
+  return path.join(root, scope.reviewedContextConfigPath || REVIEWED_CONTEXT_CONFIG_PATH);
 }
 
 function infisicalSection(context: Record<string, unknown>, label: string) {
@@ -177,7 +190,7 @@ function cloudflareSection(context: Record<string, unknown>, label: string) {
 
 function record(value: unknown, label: string) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`missing ${label} in checked-in Pleomino metadata`);
+    throw new Error(`missing ${label} in checked-in deployment metadata`);
   }
   return value as Record<string, unknown>;
 }

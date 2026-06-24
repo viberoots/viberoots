@@ -5,18 +5,18 @@ import { InfisicalApi } from "../../deployments/infisical-iac-bootstrap-api";
 import { buildDryRunReport } from "../../deployments/infisical-iac-bootstrap-dry-run";
 import { buildCredentialHandoffReport } from "../../deployments/infisical-iac-bootstrap-handoff";
 import { canonicalInfisicalApiUrl } from "../../deployments/infisical-iac-bootstrap-config";
-import { parsePleominoReviewedMetadata } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
+import { parseDeploymentReviewedMetadata } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
 import { reconcileDeploymentMetadata } from "../../deployments/infisical-iac-bootstrap-reconcile";
 import { errorMessage } from "../../deployments/infisical-iac-bootstrap-redaction";
 
 test("reconciliation accepts reviewed non-secret OpenTofu outputs", () => {
-  const reviewed = parsePleominoReviewedMetadata(METADATA_FIXTURE);
+  const reviewed = parseDeploymentReviewedMetadata(METADATA_FIXTURE);
   const result = reconcileDeploymentMetadata(reviewed, reviewed);
   assert.equal(result.status, "ok");
 });
 
 test("reviewed metadata parser reflects fixture source values", () => {
-  const reviewed = parsePleominoReviewedMetadata(METADATA_FIXTURE);
+  const reviewed = parseDeploymentReviewedMetadata(METADATA_FIXTURE);
   assert.equal(
     reviewed.siteUrl,
     canonicalInfisicalApiUrl(stringConstant(METADATA_FIXTURE, "_INFISICAL_SITE_URL")),
@@ -52,31 +52,31 @@ test("parser reflects reviewed input drift instead of a duplicate copy", () => {
     '_INFISICAL_SITE_URL = "https://drifted.infisical.example"',
   );
   assert.equal(
-    parsePleominoReviewedMetadata(changedProject).siteUrl,
+    parseDeploymentReviewedMetadata(changedProject).siteUrl,
     "https://drifted.infisical.example",
   );
   const changedProjectId = METADATA_FIXTURE.replace(
     /_INFISICAL_PROJECT_ID = "[^"]+"/,
     '_INFISICAL_PROJECT_ID = "proj_drifted"',
   );
-  assert.equal(parsePleominoReviewedMetadata(changedProjectId).projectId, "proj_drifted");
+  assert.equal(parseDeploymentReviewedMetadata(changedProjectId).projectId, "proj_drifted");
   const changedSlug = METADATA_FIXTURE.replace(
     /_INFISICAL_PROJECT_SLUG = "[^"]+"/,
     '_INFISICAL_PROJECT_SLUG = "slug-drifted"',
   );
-  assert.equal(parsePleominoReviewedMetadata(changedSlug).projectSlug, "slug-drifted");
+  assert.equal(parseDeploymentReviewedMetadata(changedSlug).projectSlug, "slug-drifted");
   const changedRef = METADATA_FIXTURE.replace(
     "secret://deployments/fixture/staging/infisical-client-id",
     "secret://deployments/fixture/staging/drifted-client-id",
   );
   assert.equal(
-    parsePleominoReviewedMetadata(changedRef).deploymentCredentials[0]?.clientIdRef,
+    parseDeploymentReviewedMetadata(changedRef).deploymentCredentials[0]?.clientIdRef,
     "secret://deployments/fixture/staging/drifted-client-id",
   );
 });
 
 test("reconciliation mismatch fails with non-secret patch guidance", () => {
-  const reviewed = parsePleominoReviewedMetadata(METADATA_FIXTURE);
+  const reviewed = parseDeploymentReviewedMetadata(METADATA_FIXTURE);
   assert.equal(
     reconcileDeploymentMetadata({ ...reviewed, siteUrl: `${reviewed.siteUrl}/api/` }, reviewed)
       .status,
@@ -127,7 +127,7 @@ test("Infisical API errors redact response-body tokens and secret values", async
 });
 
 test("credential handoff report emits stable refs without secret values", () => {
-  const metadata = parsePleominoReviewedMetadata(METADATA_FIXTURE);
+  const metadata = parseDeploymentReviewedMetadata(METADATA_FIXTURE);
   const report = buildCredentialHandoffReport({
     args: REVIEWED_ARGS,
     sinkSelection: {

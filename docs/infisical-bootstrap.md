@@ -9,7 +9,7 @@ i --without-secrets
 i --machine-label <label>
 ```
 
-`i` checks the canonical project config pair plus repo and Pleomino deployment Universal Auth
+`i` checks the canonical project config pair plus repo and ExampleApp deployment Universal Auth
 credentials for this machine. It uses `projects/config/shared.json` for shared resolver/profile
 metadata and gitignored `projects/config/local.json` for local sink selection and overrides. It does
 not require application secrets such as Cloudflare tokens. Use `--yes` for non-interactive
@@ -19,7 +19,7 @@ can also set `INSTALL_DEPS_WITHOUT_SECRETS=1`; non-interactive setup may be expl
 `INSTALL_DEPS_SETUP_SECRETS=1`.
 
 Lazy `i` secret readiness is capability-gated by checked-out deployment metadata. Partial clones or
-minimized workspaces without `projects/deployments/pleomino/shared/family.bzl` skip Infisical
+minimized workspaces without `projects/deployments/example-app/shared/family.bzl` skip Infisical
 readiness automatically and do not require `--without-secrets`; full checkouts can still use
 `--without-secrets` or `INSTALL_DEPS_WITHOUT_SECRETS=1` as an explicit dependency-only opt-out.
 
@@ -35,7 +35,7 @@ viberoots/build-tools/tools/deployments/infisical-bootstrap.ts deployment --targ
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --yes
 ```
 
-Fresh Pleomino Infisical bootstrap is a reviewed metadata handoff into
+Fresh ExampleApp Infisical bootstrap is a reviewed metadata handoff into
 `projects/config/shared.json` deployment contexts. If OpenTofu creates or adopts live resources
 while context fields still have first-bootstrap placeholders, repo bootstrap prints a non-secret
 patch and pauses before applying it. Interactive operators can approve the `[Y/n]` metadata gate;
@@ -46,18 +46,16 @@ This document intentionally redirects to the repo-root bootstrap spec at
 [`infisical-bootstrap.md`](history/designs/infisical-bootstrap-spec.md). Keep command examples there and here on the
 same `repo` or `deployment --target <buck-target>` mode vocabulary.
 
-Pleomino deployment targets use canonical family labels such as
-`//projects/deployments/pleomino/staging:deploy`. The old flat
-`projects/deployments/pleomino-*` packages are migration history; see
-[`pleomino-deployment-directory-migration.md`](history/migrations/pleomino-deployment-directory-migration.md).
-Pleomino is currently the only checked-in live deployment family; new families
-should be introduced only through an explicit product-approved plan PR.
+ExampleApp deployment targets in this guide are reusable examples that use canonical family labels
+such as `//projects/deployments/example-app/staging:deploy`. A consuming workspace owns any real
+family-specific migration history and should introduce new live families only through an explicit
+product-approved plan PR.
 
 Repo bootstrap materializes backend profile credentials under repo-scoped refs such as
-`secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id`. Pleomino deployment bootstrap
+`secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id`. ExampleApp deployment bootstrap
 continues to report only stage-specific managed workload refs under
-`secret://deployments/pleomino/<stage>/...`. If `projects/config/local.json` overrides profile auth
-to an old Pleomino bootstrap namespace, remove that local override and rerun
+`secret://deployments/example-app/<stage>/...`. If `projects/config/local.json` overrides profile auth
+to an old ExampleApp bootstrap namespace, remove that local override and rerun
 `viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo`.
 Universal Auth client-secret records are per operator machine. Existing local credentials are reused
 by default; a fresh machine creates its own labeled client-secret record and stores it only in the
@@ -83,7 +81,7 @@ materialize: graph-required profiles plus active profiles selected by resolver c
 the current deployment graph does not require that category-selected backend.
 Repo bootstrap applies selected deployment-context defaults before computing required resolver
 profiles. Deployment graph nodes with secret requirements and omitted `secret_backend` use the
-selected context `secretBackend` when present, so Pleomino context deployments require the
+selected context `secretBackend` when present, so ExampleApp context deployments require the
 context-derived Infisical profile. Without a selected context backend, omitted `secret_backend`
 continues to contribute the implicit `vault/default` profile.
 
@@ -103,14 +101,14 @@ build-tools/tools/deployments/infisical-bootstrap-reset-local.ts
 ```
 
 The reset utility prints a loud warning, requires typing `RESET` or passing `--yes`, removes only
-generated SprinkleRef/OpenTofu local state, and deletes the repo bootstrap plus Pleomino deployment
+generated SprinkleRef/OpenTofu local state, and deletes the repo bootstrap plus ExampleApp deployment
 Universal Auth entries from the `viberoots-bootstrap` macOS Keychain service. It does not delete
 Infisical projects, identities, Cloudflare secrets, or application secrets.
 
 Troubleshooting:
 
 - Fresh machines should run `i` and accept the lazy setup prompt. The command creates this
-  machine's repo and Pleomino deployment Universal Auth credentials without importing another
+  machine's repo and ExampleApp deployment Universal Auth credentials without importing another
   machine's secret.
 - Stale macOS Keychain bootstrap credentials usually appear as Universal Auth login failures after
   repo metadata still validates. Rerun

@@ -8,14 +8,18 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 cleanup_verify_root_buck_out() {
 	local allow_default_buck_kill="${1:-0}"
-	local buck_out="${LIVE_ROOT}/buck-out"
+	local cleanup_root="${2:-${LIVE_ROOT}}"
+	local buck_out="${cleanup_root}/buck-out"
+	if [[ "${allow_default_buck_kill}" == "1" && -d "${cleanup_root}" ]] && command -v buck2 >/dev/null 2>&1; then
+		(cd "${cleanup_root}" && timeout 10s buck2 kill >/dev/null 2>&1) || true
+	fi
 	[[ -d "${buck_out}" ]] || return 0
 	local entry base owner_pid
 	for entry in "${buck_out}"/* "${buck_out}"/.[!.]* "${buck_out}"/..?*; do
 		[[ -e "${entry}" ]] || continue
 		base="$(basename "${entry}")"
 		case "${base}" in
-			.metadata_never_index|test-logs|tmp|zx_shims|v2|v-*|verify-nested-*|deployment-query-*|zxtest-shared-*)
+			test-logs|tmp|zx_shims|v2|v-*|verify-nested-*|deployment-query-*|zxtest-shared-*|exporter-shared-*)
 				owner_pid=""
 				case "${base}" in
 					v-*-*) owner_pid="${base#v-}"; owner_pid="${owner_pid%%-*}" ;;
@@ -24,17 +28,17 @@ cleanup_verify_root_buck_out() {
 				if [[ "${owner_pid}" =~ ^[0-9]+$ ]] && kill -0 "${owner_pid}" >/dev/null 2>&1; then
 					continue
 				fi
-				if registered_isolation_owner_alive "${base}"; then
+				if registered_isolation_owner_alive "${base}" "${cleanup_root}"; then
 					continue
 				fi
-					if [[ "${base}" == "v2" && "${allow_default_buck_kill}" != "1" ]]; then
-						continue
-					fi
-					if command -v buck2 >/dev/null 2>&1; then
-						if [[ "${base}" == "v2" ]]; then
-							timeout 10s buck2 kill >/dev/null 2>&1 || true
-						else
-						timeout 10s buck2 --isolation-dir "${base}" kill >/dev/null 2>&1 || true
+				if [[ "${base}" == "v2" && "${allow_default_buck_kill}" != "1" ]]; then
+					continue
+				fi
+				if command -v buck2 >/dev/null 2>&1; then
+					if [[ "${base}" == "v2" ]]; then
+						(cd "${cleanup_root}" && timeout 10s buck2 kill >/dev/null 2>&1) || true
+					else
+						(cd "${cleanup_root}" && timeout 10s buck2 --isolation-dir "${base}" kill >/dev/null 2>&1) || true
 					fi
 				fi
 				rm -rf "${entry}" 2>/dev/null || true
@@ -44,15 +48,24 @@ cleanup_verify_root_buck_out() {
 	rmdir "${buck_out}" 2>/dev/null || true
 }
 
+cleanup_verify_owned_buck_out_roots() {
+	local allow_default_buck_kill="${1:-0}"
+	cleanup_verify_root_buck_out "${allow_default_buck_kill}" "${LIVE_ROOT}"
+	if [[ -n "${VIBEROOTS_ROOT:-}" && "${VIBEROOTS_ROOT}" != "${LIVE_ROOT}" && -f "${VIBEROOTS_ROOT}/build-tools/tools/dev/zx-init.mjs" ]]; then
+		cleanup_verify_root_buck_out "${allow_default_buck_kill}" "${VIBEROOTS_ROOT}"
+	fi
+}
+
 registered_isolation_owner_alive() {
 	local iso="$1"
+	local cleanup_root="${2:-${LIVE_ROOT}}"
 	local state_file="${VBR_VERIFY_PROCESS_STATE_FILE:-${VBR_BUCK_REAPER_STATE_FILE:-}}"
 	[[ -n "${state_file}" && -f "${state_file}" ]] || return 1
 	local line owner_pid
 	while IFS= read -r line; do
 		[[ "${line}" == isolation$'\t'* ]] || continue
 		[[ "${line}" == *"\"iso\":\"${iso}\""* ]] || continue
-		[[ "${line}" == *"\"repoRoot\":\"${LIVE_ROOT}\""* ]] || continue
+		[[ "${line}" == *"\"repoRoot\":\"${cleanup_root}\""* ]] || continue
 		owner_pid="${line#*\"ownerPid\":}"
 		owner_pid="${owner_pid%%,*}"
 		if [[ "${owner_pid}" =~ ^[0-9]+$ ]] && kill -0 "${owner_pid}" >/dev/null 2>&1; then
@@ -63,7 +76,7 @@ registered_isolation_owner_alive() {
 }
 
 status=0
-cleanup_verify_root_buck_out 1
+cleanup_verify_owned_buck_out_roots 1
 "${SCRIPT_DIR}/verify" "$@" || status="$?"
-cleanup_verify_root_buck_out 0
+cleanup_verify_owned_buck_out_roots 1
 exit "${status}"

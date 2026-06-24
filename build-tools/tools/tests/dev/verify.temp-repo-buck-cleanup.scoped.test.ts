@@ -9,6 +9,7 @@ import {
   cleanupOrphanRegisteredTempRepos,
   cleanupRegisteredBuckIsolations,
   cleanupRegisteredTempRepos,
+  registeredTempRootOwnsBuckRepoRoot,
 } from "../../dev/verify/buck-orphan-cleanup";
 import { pathStartsWithRootVariant } from "../../dev/verify/buck-orphan-cleanup-lib";
 import { registeredIsolationProcessPidsFromLines } from "../../dev/verify/registered-buck-cleanup";
@@ -171,7 +172,13 @@ test(
     const spawnChild = () =>
       spawn(nodeBin, ["--experimental-strip-types", "--import", zxInit, childScript], {
         stdio: ["ignore", "pipe", "pipe"],
-        env: { ...process.env, VBR_BUCK_REAPER_STATE_FILE: "" },
+        env: {
+          ...process.env,
+          TEST_RSYNC_ROOTS:
+            process.env.TEST_RSYNC_ROOTS ||
+            "viberoots build-tools toolchains third_party/providers prelude",
+          VBR_BUCK_REAPER_STATE_FILE: "",
+        },
       });
 
     const attachReady = (child: ReturnType<typeof spawnChild>) => {
@@ -312,6 +319,19 @@ test(
     }
   },
 );
+
+test("verify cleanup: nested consumer buck roots are scoped to their exact outer temp root", () => {
+  const rootA = "/tmp/viberoots-run-a";
+  const rootB = "/tmp/viberoots-run-b";
+
+  assert.equal(registeredTempRootOwnsBuckRepoRoot(`${rootA}/consumer-a`, rootA), true);
+  assert.equal(registeredTempRootOwnsBuckRepoRoot(`${rootA}/consumer-b`, rootA), true);
+  assert.equal(registeredTempRootOwnsBuckRepoRoot(`/private${rootA}/consumer-b`, rootA), true);
+
+  assert.equal(registeredTempRootOwnsBuckRepoRoot(`${rootB}/consumer-a`, rootA), false);
+  assert.equal(registeredTempRootOwnsBuckRepoRoot(`${rootB}/consumer-b`, rootA), false);
+  assert.equal(registeredTempRootOwnsBuckRepoRoot(`${rootA}-suffix/consumer-a`, rootA), false);
+});
 
 test(
   "verify cleanup: removing registered temp repos only deletes owned roots",
@@ -462,6 +482,23 @@ test("verify cleanup: registered buck isolation matching does not trust unproven
   assert.deepEqual(pids, [50]);
 });
 
+test("verify cleanup: registered buck isolation matching does not select status watchers", () => {
+  const entry = {
+    iso: "zxtest-shared-abcdef1234",
+    repoRoot: "/tmp/viberoots-run-in-temp-example",
+    ownerPid: 1234,
+    kind: "run-in-temp-zxtest",
+    createdAtMs: 1,
+  };
+  const pids = registeredIsolationProcessPidsFromLines(entry, [
+    "49 1 00:00 /Users/example/repo/viberoots/build-tools/tools/bin/tail-log --status -w 2",
+    "50 49 00:00 (buck2-forkserver) forkserver --fd 23 --state-dir /private/tmp/viberoots-run-in-temp-example/buck-out/zxtest-shared-abcdef1234/forkserver",
+    "51 49 00:00 /Users/example/repo/viberoots/build-tools/tools/bin/s",
+  ]);
+
+  assert.deepEqual(pids, [50]);
+});
+
 test("verify cleanup: registered buck isolation matching uses exact isolation when buck root drifts", () => {
   const entry = {
     iso: "zxtest-shared-abcdef1234",
@@ -505,6 +542,11 @@ test("verify cleanup: stale verify state files remove registered temp roots", as
   try {
     await fsp.mkdir(scanDir, { recursive: true });
     await fsp.writeFile(path.join(ownedTmp, "owned.txt"), "owned\n", "utf8");
+    const readOnlyDir = path.join(ownedTmp, "readonly");
+    await fsp.mkdir(readOnlyDir);
+    await fsp.writeFile(path.join(readOnlyDir, "owned-readonly.txt"), "owned\n", "utf8");
+    await fsp.chmod(path.join(readOnlyDir, "owned-readonly.txt"), 0o400);
+    await fsp.chmod(readOnlyDir, 0o500);
     await fsp.writeFile(stateFile, `${ownedTmp}\n`, "utf8");
 
     const result = await withSyntheticOrphanScanUser(user, async () => {
@@ -515,6 +557,7 @@ test("verify cleanup: stale verify state files remove registered temp roots", as
     assert.ok(result.candidates >= 1);
     await assert.rejects(fsp.access(ownedTmp));
   } finally {
+    await fsp.chmod(path.join(ownedTmp, "readonly"), 0o700).catch(() => {});
     await fsp.rm(stateFile, { force: true }).catch(() => {});
     await fsp.rm(scanRoot, { recursive: true, force: true }).catch(() => {});
     await fsp.rm(ownedTmp, { recursive: true, force: true }).catch(() => {});

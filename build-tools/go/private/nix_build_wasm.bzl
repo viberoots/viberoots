@@ -34,6 +34,7 @@ def _go_nix_build_wasm_impl(ctx):
             timeout_var = "TIMEOUT",
             impure = True,
             build_prefix = build_prefix,
+            graph_target = raw,
         )
         + "else "
         + nix_action_build_selected_out_path_cmd(

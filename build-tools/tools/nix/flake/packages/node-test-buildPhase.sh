@@ -122,7 +122,7 @@ else
   if [ -n "$VITEST_BIN" ]; then
     VITEST_NODE_MODULES=$(dirname "$VITEST_BIN")/..
     NODE_PATH_SUFFIX=""
-    if [ -n "$NODE_PATH" ]; then NODE_PATH_SUFFIX=":"$NODE_PATH; fi
+    if [ -n "${NODE_PATH:-}" ]; then NODE_PATH_SUFFIX=":${NODE_PATH}"; fi
     export NODE_PATH="$VITEST_NODE_MODULES$NODE_PATH_SUFFIX"
 
     VITE_CFG="$TMPDIR/vbr-vite-config.mjs"

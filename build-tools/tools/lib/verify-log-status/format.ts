@@ -25,6 +25,21 @@ export function formatVerifyStatusJsonLine(st: VerifyStatus): string {
     pass_total: st.passTotal ?? null,
     group_completed: st.groupCompleted ?? null,
     group_total: st.groupTotal ?? null,
+    pass_groups: (st.passGroups || []).map((group) => ({
+      name: group.name,
+      index: group.index,
+      total: group.total,
+      completed: group.completed ?? null,
+      target_count: group.targetCount ?? null,
+      pass: group.pass,
+      fail: group.fail,
+      fatal: group.fatal,
+      skip: group.skip,
+      build_failure: group.buildFailure,
+      completion_rate_avg_per_minute: group.completionRateAvgPerMinute ?? null,
+      done: group.done,
+      active: group.active,
+    })),
   };
   return JSON.stringify(out);
 }
@@ -55,6 +70,25 @@ function formatProgressBar(ratio: number | undefined): string {
   return `[${"█".repeat(filled)}${"░".repeat(width - filled)}]`;
 }
 
+function formatPassGroupProgress(
+  group: NonNullable<VerifyStatus["passGroups"]>[number],
+  widths: { name: number; progress: number; state: number },
+): string {
+  const progress =
+    group.completed === undefined || group.targetCount === undefined
+      ? "?"
+      : `${group.completed}/${group.targetCount}`;
+  const state =
+    group.done && (group.fail > 0 || group.fatal > 0 || group.buildFailure > 0)
+      ? "failed"
+      : group.done
+        ? "done"
+        : group.active
+          ? "active"
+          : "pending";
+  return `${group.name.padEnd(widths.name)}  ${progress.padStart(widths.progress)}  ${state.padEnd(widths.state)}  ${formatRate(group.completionRateAvgPerMinute)} avg`;
+}
+
 export function formatVerifyStatusText(
   st: VerifyStatus,
   opts: {
@@ -69,12 +103,6 @@ export function formatVerifyStatusText(
   const completed = st.pass + st.fail + st.fatal + st.skip;
   const total = st.remaining === undefined ? undefined : completed + st.remaining;
   const testsProgress = total === undefined || total <= 0 ? undefined : `${completed}/${total}`;
-  const groupProgress =
-    st.groupCompleted === undefined || st.groupTotal === undefined
-      ? undefined
-      : `${st.groupCompleted}/${st.groupTotal}`;
-  const testsProgressText =
-    groupProgress && testsProgress ? `${groupProgress}, ${testsProgress}` : testsProgress;
   const testsRatio = total === undefined || total <= 0 ? undefined : completed / Math.max(1, total);
   const elapsedSeconds = parseDurationSeconds(st.elapsed);
   const projectedSeconds = parseDurationSeconds(st.projectedDuration);
@@ -124,16 +152,38 @@ export function formatVerifyStatusText(
     `${label("Projected:")}       ${val(`${projectedDuration} duration, ${projectedEndTime} end`)}`,
   );
   lines.push(
-    `${label("Tests:")}           ${val(`${formatProgressBar(testsRatio)} ${testsProgressText || "?"}`)}`,
+    `${label("Tests:")}           ${val(`${formatProgressBar(testsRatio)} ${testsProgress || "?"}`)}`,
   );
   lines.push(`${label("Time:")}            ${val(timeProgress)}`);
   lines.push(
     `${label("Completion rate:")} ${val(`${formatRate(st.completionRateAvgPerMinute)} total avg, ${formatRate(st.completionRateRecentPerMinute)} recent avg`)}`,
   );
-  if (st.passName && st.passIndex && st.passTotal) {
-    lines.push(
-      `${label("Pass group:")}      ${val(`${st.passName} (${st.passIndex}/${st.passTotal})`)}`,
-    );
+  if (st.passGroups && st.passGroups.length > 0) {
+    lines.push(`${label("Pass groups:")}`);
+    const widths = {
+      name: Math.max(...st.passGroups.map((group) => group.name.length)),
+      progress: Math.max(
+        ...st.passGroups.map((group) => {
+          if (group.completed === undefined || group.targetCount === undefined) return 1;
+          return `${group.completed}/${group.targetCount}`.length;
+        }),
+      ),
+      state: Math.max(
+        ..."pending active failed done".split(" ").map((state) => state.length),
+        ...st.passGroups.map((group) =>
+          group.done && (group.fail > 0 || group.fatal > 0 || group.buildFailure > 0)
+            ? "failed".length
+            : group.done
+              ? "done".length
+              : group.active
+                ? "active".length
+                : "pending".length,
+        ),
+      ),
+    };
+    for (const group of st.passGroups) {
+      lines.push(`  ${val(formatPassGroupProgress(group, widths))}`);
+    }
   }
   lines.push(
     `${label(st.done ? "Tests finished:" : st.stopped ? "Tests stopped:" : "Tests so far:")}`,

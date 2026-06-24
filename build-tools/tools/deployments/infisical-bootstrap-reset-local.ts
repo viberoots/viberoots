@@ -9,21 +9,11 @@ import { getArgvTokens } from "../lib/argv";
 
 const KEYCHAIN_SERVICE = "viberoots-bootstrap";
 
-const LOCAL_PATHS = [
-  "sprinkleref",
-  "projects/deployments/pleomino/infisical/opentofu/.terraform",
-  "projects/deployments/pleomino/infisical/opentofu/.terraform.lock.hcl",
-  "projects/deployments/pleomino/infisical/opentofu/terraform.tfstate",
-  "projects/deployments/pleomino/infisical/opentofu/terraform.tfstate.backup",
-];
+const LOCAL_PATHS = ["sprinkleref", ".local/infisical-bootstrap-credentials.json"];
 
 const KEYCHAIN_ACCOUNTS = [
   "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id",
   "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret",
-  "secret://deployments/pleomino/staging/infisical-client-id",
-  "secret://deployments/pleomino/staging/infisical-client-secret",
-  "secret://deployments/pleomino/prod/infisical-client-id",
-  "secret://deployments/pleomino/prod/infisical-client-secret",
 ];
 
 type ResetArgs = {
@@ -63,7 +53,8 @@ export async function runInfisicalBootstrapResetLocal(argv = getArgvTokens(), io
     return;
   }
   const args = parseArgs(argv);
-  printWarning(stdout, args);
+  const localPaths = await discoverLocalPaths(io);
+  printWarning(stdout, args, localPaths);
   if (!args.dryRun && !args.yes) {
     if (!io.question && (!process.stdin.isTTY || !process.stdout.isTTY)) {
       throw new Error("local Infisical bootstrap reset requires an interactive terminal or --yes");
@@ -78,7 +69,7 @@ export async function runInfisicalBootstrapResetLocal(argv = getArgvTokens(), io
     }
   }
   if (args.dryRun) return;
-  await removeLocalPaths(io);
+  await removeLocalPaths(io, localPaths);
   removeKeychainEntries(io, stderr);
   stdout("Local Infisical bootstrap state reset complete.");
 }
@@ -91,13 +82,13 @@ function parseArgs(argv: string[]): ResetArgs {
   return { dryRun: argv.includes("--dry-run"), yes: argv.includes("--yes") };
 }
 
-function printWarning(stdout: (text: string) => void, args: ResetArgs) {
+function printWarning(stdout: (text: string) => void, args: ResetArgs, localPaths: string[]) {
   stdout(
     [
       "WARNING: this deletes local Infisical bootstrap state.",
       "",
       "It removes generated local files:",
-      ...LOCAL_PATHS.map((item) => `  - ${item}`),
+      ...localPaths.map((item) => `  - ${item}`),
       "",
       `It deletes these macOS Keychain entries from service ${KEYCHAIN_SERVICE}:`,
       ...KEYCHAIN_ACCOUNTS.map((item) => `  - ${item}`),
@@ -110,11 +101,32 @@ function printWarning(stdout: (text: string) => void, args: ResetArgs) {
   );
 }
 
-async function removeLocalPaths(io: ResetIo) {
+async function discoverLocalPaths(io: ResetIo) {
+  const root = path.resolve(io.cwd || process.cwd());
+  const discovered = [...LOCAL_PATHS];
+  const deploymentsRoot = path.join(root, "projects", "deployments");
+  const families = (await fs.readdir(deploymentsRoot).catch(() => [])).sort();
+  for (const family of families) {
+    const tofuDir = path.join("projects", "deployments", family, "infisical", "opentofu");
+    const absoluteTofuDir = path.join(root, tofuDir);
+    const entries = new Set(await fs.readdir(absoluteTofuDir).catch(() => []));
+    for (const rel of [
+      ".terraform",
+      ".terraform.lock.hcl",
+      "terraform.tfstate",
+      "terraform.tfstate.backup",
+    ]) {
+      if (entries.has(rel)) discovered.push(path.join(tofuDir, rel));
+    }
+  }
+  return [...new Set(discovered)];
+}
+
+async function removeLocalPaths(io: ResetIo, localPaths: string[]) {
   const root = path.resolve(io.cwd || process.cwd());
   const removePath =
     io.removePath || ((target: string) => fs.rm(target, { recursive: true, force: true }));
-  for (const item of LOCAL_PATHS) {
+  for (const item of localPaths) {
     const target = path.resolve(root, item);
     if (!target.startsWith(`${root}${path.sep}`)) throw new Error(`refusing to remove ${item}`);
     await removePath(target);

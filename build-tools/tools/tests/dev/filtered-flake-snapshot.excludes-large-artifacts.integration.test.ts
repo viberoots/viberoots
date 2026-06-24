@@ -17,6 +17,7 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
   const helper = await readTool("tools/dev/nix-build-filtered-flake.ts");
   const required = [
     "coverage",
+    ".viberoots/buck",
     ".viberoots/buck/tmp",
     ".viberoots/cache",
     ".viberoots/workspace/.viberoots",
@@ -24,7 +25,6 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     ".clinic",
     ".turbo",
     ".cache",
-    "pnpm-workspace.yaml",
     ".node_modules.lockfile-guard.*",
     ".*.tmp",
     ".*.ts.??????",
@@ -35,6 +35,11 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     if (!FILTERED_FLAKE_RSYNC_EXCLUDES.includes(token)) {
       throw new Error(`nix-build-filtered-flake snapshot must include ${token}`);
     }
+  }
+  if (FILTERED_FLAKE_RSYNC_EXCLUDES.includes("pnpm-workspace.yaml")) {
+    throw new Error(
+      "filtered flake snapshots must preserve pnpm-workspace.yaml because it can affect frozen lockfile validation",
+    );
   }
 
   for (const [name, source] of [
@@ -81,6 +86,17 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
   ) {
     throw new Error(
       "nix-build-filtered-flake must evaluate self-contained filtered snapshots from the snapshot workspace root",
+    );
+  }
+  if (
+    !helper.includes("copyWorkspaceGraphIntoSnapshot") ||
+    !helper.includes('path.join(snapDir, ".viberoots", "buck")') ||
+    !helper.includes("fsp.copyFile(graphPath, snapshotGraphPath)") ||
+    !helper.includes("path.join(snapDir, DEFAULT_GRAPH_PATH)") ||
+    !helper.includes("workspaceBuckStat?.isSymbolicLink()")
+  ) {
+    throw new Error(
+      "nix-build-filtered-flake must preserve the active Buck graph inside filtered snapshots",
     );
   }
   if (!helper.includes("repairSnapshotViberootsInput") || !helper.includes("viberoots\\.url")) {

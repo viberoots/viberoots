@@ -5,6 +5,7 @@ import {
   loadVerifyTargetLabels,
   planVerifyTargetPasses,
   summarizeVerifyTargetPlan,
+  VERIFY_BOUNDED_ISOLATED_THREADS,
   VERIFY_BROAD_RESOURCE_LIMITED_THREADS,
   VERIFY_ISOLATED_LABEL,
   VERIFY_MANUAL_LABEL,
@@ -102,6 +103,16 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
     "expected temp-repo cleanup probes to run outside concurrent verify passes",
   );
   assert.equal(isolatedPass.threadsOverride, 1);
+  const boundedIsolatedPass = passes.find((pass) => pass.name === "isolated-bounded");
+  assert.ok(
+    boundedIsolatedPass?.targets.includes("viberoots//:scaffolding_webapp_ssr_next_contracts"),
+    "expected heavy scaffold temp-fixture tests to run in the bounded isolated pass",
+  );
+  assert.ok(
+    boundedIsolatedPass?.targets.every((target) => !isolatedPass.targets.includes(target)),
+    "expected bounded isolated tests to stay out of the strict serial pass",
+  );
+  assert.equal(boundedIsolatedPass?.threadsOverride, VERIFY_BOUNDED_ISOLATED_THREADS);
   const sharedPass = passes.find((pass) => pass.name === "shared");
   assert.ok(sharedPass, "expected wildcard expansion to keep a shared verify pass");
   assert.ok(
@@ -139,12 +150,12 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
   );
   const summary = summarizeVerifyTargetPlan({ targetLabels: targets, passes });
   assert.equal(summary.expandedTargetCount, targets.length);
-  assert.equal(summary.isolatedPassCount, 1);
+  assert.equal(summary.isolatedPassCount, 2);
   assert.ok(summary.isolatedTargetCount >= 15);
   assert.equal(summary.resourceLimitedPassCount, 1);
   assert.ok(summary.resourceLimitedTargetCount > 0);
   assert.equal(summary.sharedTargetCount, sharedPass?.targets.length ?? 0);
-  assert.equal(summary.passCount, 3);
+  assert.equal(summary.passCount, 4);
 });
 
 test("verify target pass loading keeps manual targets explicit-only", () => {

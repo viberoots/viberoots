@@ -8,24 +8,22 @@ import {
   applyMetadataHandoffPatch,
   buildMetadataHandoffPatch,
 } from "../../deployments/infisical-iac-bootstrap-metadata-handoff";
-import {
-  parsePleominoReviewedContextConfig,
-  PLEOMINO_REVIEWED_CONTEXT_CONFIG_PATH,
-} from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
+import { parseDeploymentReviewedContextConfig } from "../../deployments/infisical-iac-bootstrap-reviewed-metadata";
+import { REVIEWED_CONTEXT_CONFIG_PATH } from "../../deployments/infisical-iac-bootstrap-config";
 import { reconcileDeploymentMetadata } from "../../deployments/infisical-iac-bootstrap-reconcile";
 
 test("placeholder context metadata becomes a first-bootstrap handoff patch", () => {
-  const reviewed = parsePleominoReviewedContextConfig(FIRST_BOOTSTRAP_SOURCE);
+  const reviewed = parseDeploymentReviewedContextConfig(FIRST_BOOTSTRAP_SOURCE, "pleomino");
   const result = reconcileDeploymentMetadata(LIVE_METADATA, reviewed, FIRST_BOOTSTRAP_SOURCE);
   assert.equal(result.status, "metadata_handoff_required");
-  assert.equal(result.patch.path, PLEOMINO_REVIEWED_CONTEXT_CONFIG_PATH);
+  assert.equal(result.patch.path, REVIEWED_CONTEXT_CONFIG_PATH);
   assert.match(result.patch.unifiedDiff, /proj_live/);
   assert.match(result.patch.unifiedDiff, /identity_live_staging/);
   assert.doesNotMatch(result.patch.unifiedDiff, /cloudflare_api_token\n\+/);
 });
 
 test("missing live reviewed ids fail closed instead of partial handoff", () => {
-  const reviewed = parsePleominoReviewedContextConfig(FIRST_BOOTSTRAP_SOURCE);
+  const reviewed = parseDeploymentReviewedContextConfig(FIRST_BOOTSTRAP_SOURCE, "pleomino");
   assert.throws(
     () =>
       reconcileDeploymentMetadata(
@@ -57,7 +55,7 @@ test("empty reviewed host requires live output before handoff", () => {
     '"host": "https://app.infisical.com"',
     '"host": ""',
   );
-  const reviewed = parsePleominoReviewedContextConfig(source);
+  const reviewed = parseDeploymentReviewedContextConfig(source, "pleomino");
   assert.throws(
     () => reconcileDeploymentMetadata({ ...LIVE_METADATA, siteUrl: undefined }, reviewed, source),
     /site url: live=<missing> reviewed=<missing>/,
@@ -68,7 +66,7 @@ test("empty reviewed host requires live output before handoff", () => {
 });
 
 test("metadata patch rejects required replacements without live after values", () => {
-  const reviewed = parsePleominoReviewedContextConfig(FIRST_BOOTSTRAP_SOURCE);
+  const reviewed = parseDeploymentReviewedContextConfig(FIRST_BOOTSTRAP_SOURCE, "pleomino");
   assert.throws(
     () =>
       buildMetadataHandoffPatch(
@@ -82,7 +80,7 @@ test("metadata patch rejects required replacements without live after values", (
 
 test("non-placeholder reviewed drift remains a hard reconciliation failure", () => {
   const source = FIRST_BOOTSTRAP_SOURCE.replace("proj_pleomino_deployments", "reviewed-live");
-  const reviewed = parsePleominoReviewedContextConfig(source);
+  const reviewed = parseDeploymentReviewedContextConfig(source, "pleomino");
   assert.throws(
     () => reconcileDeploymentMetadata(LIVE_METADATA, reviewed, source),
     /project id: live=proj_live reviewed=reviewed-live/,
@@ -107,7 +105,7 @@ test("metadata patch changes only reviewed non-secret context fields", async () 
 
 test("metadata patch fails closed when required context paths are missing", () => {
   const source = FIRST_BOOTSTRAP_SOURCE.replace('"projectId": "proj_pleomino_deployments",\n', "");
-  assert.throws(() => buildPatch(source), /missing projectId in checked-in Pleomino metadata/);
+  assert.throws(() => buildPatch(source), /missing projectId in checked-in deployment metadata/);
 });
 
 test("metadata patch rejects unsupported reviewed paths", async () => {
@@ -131,7 +129,7 @@ async function applyPatchToTemp(source: string) {
 }
 
 function buildPatch(source: string) {
-  const reviewed = parsePleominoReviewedContextConfig(source);
+  const reviewed = parseDeploymentReviewedContextConfig(source, "pleomino");
   return buildMetadataHandoffPatch(LIVE_METADATA, reviewed, source);
 }
 

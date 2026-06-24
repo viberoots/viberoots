@@ -117,7 +117,12 @@ async function repairSnapshotViberootsInput(opts: {
 
 async function tempRepoLiveViberootsRoot(): Promise<string> {
   if (String(process.env.VBR_RUN_IN_TEMP_REPO || "").trim() !== "1") return "";
-  const raw = String(process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "").trim();
+  const raw = String(
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
+      process.env.VIBEROOTS_SOURCE_ROOT ||
+      process.env.VIBEROOTS_ROOT ||
+      "",
+  ).trim();
   if (!raw) return "";
   const root = path.resolve(raw);
   try {

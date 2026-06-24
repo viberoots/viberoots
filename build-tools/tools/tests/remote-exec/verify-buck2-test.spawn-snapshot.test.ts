@@ -69,6 +69,14 @@ function remoteOnlyEnvSnapshot(call: SpawnCall): Record<string, string | undefin
   };
 }
 
+function scrubInheritedGitConfigEnv(): void {
+  for (const key of Object.keys(process.env)) {
+    if (key === "GIT_CONFIG_COUNT" || /^GIT_CONFIG_(?:KEY|VALUE)_\d+$/.test(key)) {
+      delete process.env[key];
+    }
+  }
+}
+
 function spawnSnapshot(mode: "local" | RemoteMode, extraEnv: NodeJS.ProcessEnv = {}): Snapshot {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vbr-spawn-snapshot-"));
   const artifactDir = path.join(tmp, "artifacts");
@@ -96,6 +104,7 @@ function spawnSnapshot(mode: "local" | RemoteMode, extraEnv: NodeJS.ProcessEnv =
   });
 
   const prev = { ...process.env };
+  scrubInheritedGitConfigEnv();
   Object.assign(process.env, {
     BUCK_LOG: "warn,buck2_event_log::writer=off,buck2_execute=trace",
     NODE_V8_COVERAGE: path.join(tmp, "coverage", "raw"),
@@ -106,6 +115,7 @@ function spawnSnapshot(mode: "local" | RemoteMode, extraEnv: NodeJS.ProcessEnv =
     NIX_SSL_CERT_FILE: "/nix/store/cacert/etc/ssl/certs/ca-bundle.crt",
     RUST_LOG: "info,buck2_event_log::writer=off,buck2_client_ctx=debug",
     TEST_NIX_TIMEOUT_SECS: "",
+    TEST_TIMING: "summary",
     VBR_BUCK_REAPER_STATE_FILE: "",
     VBR_SHARED_PRELUDE_PATH: "",
     VBR_TEST_SEED_KEY: "",
@@ -114,7 +124,7 @@ function spawnSnapshot(mode: "local" | RemoteMode, extraEnv: NodeJS.ProcessEnv =
     VBR_VERIFY_LOCK_DIR: "",
     VBR_VERIFY_LOG_FILE: "",
     VBR_VERIFY_PROCESS_STATE_FILE: "",
-    VERIFY_TIMEOUT_SECS: "7200",
+    VERIFY_TIMEOUT_SECS: "14400",
     ...extraEnv,
   });
   try {

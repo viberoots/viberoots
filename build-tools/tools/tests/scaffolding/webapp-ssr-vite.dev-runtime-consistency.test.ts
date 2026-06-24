@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import path from "node:path";
 import { after, test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { pnpmInstallForDevTest, spawnViteSsrDevServer } from "./lib/dev-node-modules";
 import { producerByteLength, waitForValue, writeAndBumpMtime } from "./lib/wasm-watch";
 import {
   evaluateRenderedAppText,
@@ -60,11 +60,12 @@ test(
       await writeAndBumpMtime(entryServerPath, serverEntrySource("a"));
 
       await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-vite-ssr`;
-      await _$({
-        cwd: tmp,
-        stdio: "inherit",
-        env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm --dir ${tmp} install --filter ./projects/apps/demo-vite-ssr... --no-frozen-lockfile --prefer-offline --ignore-scripts --reporter=append-only`;
+      await pnpmInstallForDevTest({
+        tmp,
+        _$,
+        filter: "./projects/apps/demo-vite-ssr...",
+        installMode: "raw-pnpm",
+      });
 
       const port = await pickFreePort();
       const serverStdout: string[] = [];
@@ -82,17 +83,7 @@ test(
         if (res.status !== 200) return null;
         return res.body.length;
       };
-      const devServer = spawn("pnpm", ["run", "dev"], {
-        cwd: appAbs,
-        stdio: "pipe",
-        env: {
-          ...process.env,
-          NODE_ENV: "development",
-          NODE_OPTIONS: "",
-          NEXT_TELEMETRY_DISABLED: "1",
-          PORT: String(port),
-        },
-      });
+      const devServer = spawnViteSsrDevServer(appAbs, port);
       devServer.stdout?.on("data", (chunk) => {
         serverStdout.push(String(chunk || ""));
         if (serverStdout.length > 300) serverStdout.shift();

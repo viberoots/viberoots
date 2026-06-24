@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { spawn, type ChildProcess } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import { once } from "node:events";
 import * as fsp from "node:fs/promises";
 import http from "node:http";
@@ -10,6 +10,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
 import { terminateChildTree } from "../lib/process-tree";
 import { runInTemp } from "../lib/test-helpers";
+import { pnpmInstallForDevTest, spawnViteSsrDevServer } from "./lib/dev-node-modules";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -42,16 +43,7 @@ async function httpGet(url: string): Promise<{ status: number; body: string }> {
 }
 
 function startDevServer(appAbs: string, port: number): ChildProcess {
-  return spawn("pnpm", ["run", "dev:ssr"], {
-    cwd: appAbs,
-    stdio: "pipe",
-    env: {
-      ...process.env,
-      PORT: String(port),
-      NODE_OPTIONS: "",
-      NEXT_TELEMETRY_DISABLED: "1",
-    },
-  });
+  return spawnViteSsrDevServer(appAbs, port);
 }
 
 async function waitForResponse(
@@ -112,11 +104,12 @@ test(
       const $ = _$({ cwd: tmp, stdio: "inherit" });
       await $`scaf new ts webapp-ssr-vite demo-vite-ssr --yes --no-tests --skip-lockfile-gen`;
       const appAbs = path.join(tmp, "projects", "apps", "demo-vite-ssr");
-      await _$({
-        cwd: appAbs,
-        stdio: "inherit",
-        env: { ...process.env, NEXT_TELEMETRY_DISABLED: "1", CI: "1" },
-      })`pnpm --dir ${appAbs} install --no-frozen-lockfile --prefer-offline --ignore-workspace --reporter=append-only`;
+      await pnpmInstallForDevTest({
+        tmp,
+        _$,
+        filter: "./projects/apps/demo-vite-ssr...",
+        installMode: "raw-pnpm",
+      });
 
       const entryServerPath = path.join(appAbs, "src", "entry-server.ts");
       const originalEntryServer = await fsp.readFile(entryServerPath, "utf8");

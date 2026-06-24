@@ -39,6 +39,7 @@ function exactStoreSandboxArgs(extraEnv?: NodeJS.ProcessEnv): string[] {
 function activeViberootsOverride(): string[] {
   const workspaceRoot = String(process.env.WORKSPACE_ROOT || process.cwd()).trim();
   const candidates = [
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
     workspaceRoot ? path.join(workspaceRoot, "viberoots") : "",
     workspaceRoot ? path.join(workspaceRoot, ".viberoots", "current") : "",
     process.env.VIBEROOTS_SOURCE_ROOT || "",

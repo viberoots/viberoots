@@ -49,9 +49,22 @@ async function tryNodeModulesOutFromMarker(root: string): Promise<string> {
   }
 }
 
+async function hasBrokenGitFile(root: string): Promise<boolean> {
+  let raw = "";
+  try {
+    raw = await fsp.readFile(path.join(root, ".git"), "utf8");
+  } catch {
+    return false;
+  }
+  const match = raw.match(/^gitdir:\s*(.+?)\s*$/m);
+  if (!match) return false;
+  return !(await pathExists(path.resolve(root, match[1]!)));
+}
+
 async function resolveNodeModulesOut(root: string): Promise<string> {
   const markerOut = await tryNodeModulesOutFromMarker(root);
   if (markerOut) return markerOut;
+  if (await hasBrokenGitFile(root)) return "";
   try {
     const { stdout } = await $({
       stdio: "pipe",

@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
 import { test } from "node:test";
 import fs from "fs-extra";
 import path from "node:path";
@@ -13,17 +14,17 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
     );
 
     await fs.outputFile(
-      path.join(tmp, "libs", "support", "include", "support.h"),
+      path.join(tmp, "projects", "libs", "support", "include", "support.h"),
       ["#pragma once", "int support_answer();", ""].join("\n"),
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "libs", "support", "src", "support.cpp"),
+      path.join(tmp, "projects", "libs", "support", "src", "support.cpp"),
       ['#include "../include/support.h"', "int support_answer() { return 2; }", ""].join("\n"),
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "libs", "support", "TARGETS"),
+      path.join(tmp, "projects", "libs", "support", "TARGETS"),
       [
         'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_headers", "nix_cpp_library")',
         "",
@@ -46,12 +47,12 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
     );
 
     await fs.outputFile(
-      path.join(tmp, "libs", "core", "include", "core.h"),
+      path.join(tmp, "projects", "libs", "core", "include", "core.h"),
       ["#pragma once", "int core_answer();", ""].join("\n"),
       "utf8",
     );
     await fs.outputFile(
-      path.join(tmp, "libs", "core", "src", "core.cpp"),
+      path.join(tmp, "projects", "libs", "core", "src", "core.cpp"),
       [
         '#include "../include/core.h"',
         "#include <support.h>",
@@ -116,14 +117,14 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_test_link_closure")} cquery "deps(//projects/apps/demo:t)" --json --output-attribute name`;
-    if (probe.exitCode !== 0) return;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_test_link_closure")} cquery --target-platforms prelude//platforms:default "deps(//projects/apps/demo:t)" --json --output-attribute name`;
+    assert.equal(probe.exitCode, 0, String(probe.stderr || probe.stdout));
 
     await $({
       cwd: tmp,
     })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     await $({
       cwd: tmp,
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_test_link_closure")} test //projects/apps/demo:t`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_test_link_closure")} test --target-platforms prelude//platforms:default //projects/apps/demo:t`;
   });
 });

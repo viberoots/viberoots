@@ -1,5 +1,6 @@
 import {
   buck2Kill,
+  buckDaemonCwd,
   isPidAlive,
   isTempRepoRoot,
   liveOwnerPidFromEphemeralIsolation,
@@ -8,6 +9,7 @@ import {
   pathExists,
   psLines,
   tryRepoRootFromStateDir,
+  tryTempRepoRootFromBuckDaemonCwd,
 } from "./buck-orphan-cleanup-lib";
 import type { ForkserverProc } from "./buck-orphan-cleanup-lib";
 import {
@@ -17,6 +19,7 @@ import {
 import {
   cleanupOrphanRegisteredTempRepos,
   cleanupRegisteredTempRepos,
+  registeredTempRootOwnsBuckRepoRoot,
 } from "./registered-temp-repo-cleanup";
 import { cleanupOrphanVerifyProcesses, etimeToSeconds } from "./verify-owned-orphan-cleanup";
 
@@ -24,6 +27,7 @@ export {
   cleanupOrphanRegisteredTempRepos,
   cleanupRegisteredBuckIsolations,
   cleanupRegisteredTempRepos,
+  registeredTempRootOwnsBuckRepoRoot,
 };
 
 function parseForkservers(lines: string[]): ForkserverProc[] {
@@ -116,15 +120,46 @@ export async function cleanupOrphanBuckDaemons(opts: {
 
   const daemons = parseBuckDaemons(lines);
   const forkserversByIso = new Map<string, ForkserverProc[]>();
+  const forkserversByRepoIso = new Map<string, ForkserverProc[]>();
   for (const fork of forks) {
     const mapped = tryRepoRootFromStateDir(fork.stateDir);
     if (!mapped) continue;
     const existing = forkserversByIso.get(mapped.iso) ?? [];
     existing.push(fork);
     forkserversByIso.set(mapped.iso, existing);
+    const repoIsoKey = `${mapped.repoRoot}\0${mapped.iso}`;
+    const existingForRepo = forkserversByRepoIso.get(repoIsoKey) ?? [];
+    existingForRepo.push(fork);
+    forkserversByRepoIso.set(repoIsoKey, existingForRepo);
   }
   for (const d of daemons) {
     if (d.ppid > 1 && isPidAlive(d.ppid)) continue;
+    if (d.iso === "v2") {
+      const cwd = await buckDaemonCwd(d.pid, 1500);
+      const mapped = tryTempRepoRootFromBuckDaemonCwd(cwd || "");
+      if (!mapped) continue;
+      if (await pathExists(mapped.repoRoot)) continue;
+      if (etimeToSeconds(d.etime) < staleGraceSec) continue;
+      candidates++;
+      if (killed >= maxKills) continue;
+      if (!isPidAlive(d.pid)) continue;
+      try {
+        process.kill(d.pid, "SIGKILL");
+      } catch {}
+      for (const fork of forkserversByRepoIso.get(`${mapped.repoRoot}\0${mapped.iso}`) ?? []) {
+        if (!isPidAlive(fork.pid)) continue;
+        try {
+          process.kill(fork.pid, "SIGKILL");
+        } catch {}
+      }
+      killed++;
+      if (opts.log) {
+        await opts.log(
+          `[verify] buck2 orphan cleanup: killed missing-temp-root daemon pid=${d.pid} ppid=${d.ppid} etime=${d.etime} repo=${mapped.repoRoot} iso=${mapped.iso}`,
+        );
+      }
+      continue;
+    }
     if (!isLikelyEphemeralIsolation(d.iso)) continue;
     const liveOwnerPid = liveOwnerPidFromEphemeralIsolation(d.iso);
     if (liveOwnerPid && liveOwnerPid !== ignoreLiveOwnerPid) {
@@ -134,6 +169,31 @@ export async function cleanupOrphanBuckDaemons(opts: {
         );
       }
       continue;
+    }
+    if (!liveOwnerPid && etimeToSeconds(d.etime) >= staleGraceSec) {
+      const cwd = await buckDaemonCwd(d.pid, 1500);
+      const mapped = tryTempRepoRootFromBuckDaemonCwd(cwd || "");
+      if (mapped && mapped.iso === d.iso && !(await pathExists(mapped.repoRoot))) {
+        candidates++;
+        if (killed >= maxKills) continue;
+        if (!isPidAlive(d.pid)) continue;
+        try {
+          process.kill(d.pid, "SIGKILL");
+        } catch {}
+        for (const fork of forkserversByRepoIso.get(`${mapped.repoRoot}\0${mapped.iso}`) ?? []) {
+          if (!isPidAlive(fork.pid)) continue;
+          try {
+            process.kill(fork.pid, "SIGKILL");
+          } catch {}
+        }
+        killed++;
+        if (opts.log) {
+          await opts.log(
+            `[verify] buck2 orphan cleanup: killed missing-temp-root daemon pid=${d.pid} ppid=${d.ppid} etime=${d.etime} repo=${mapped.repoRoot} iso=${mapped.iso}`,
+          );
+        }
+        continue;
+      }
     }
     if (!liveOwnerPid && !includeOwnerlessEphemeral) continue;
     if (etimeToSeconds(d.etime) < staleGraceSec) continue;

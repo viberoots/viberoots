@@ -1,6 +1,6 @@
 import * as fsp from "node:fs/promises";
 import os from "node:os";
-import { processCommandLines } from "../../lib/process-inspection";
+import { processCommandLines, processTableLines } from "../../lib/process-inspection";
 
 export type ProcessCounts = {
   total: number;
@@ -19,6 +19,21 @@ export type VerifySafetyRailsTelemetrySummary = {
   maxBuckCount: number | null;
   maxNixCount: number | null;
   maxVerifyEnvCount: number | null;
+  highLoadTopProcessSamples: number;
+  highLoadTopProcessLines: string[];
+};
+
+export type TopProcessSample = {
+  lines: string[];
+};
+
+type ProcessTableEntry = {
+  pid: number;
+  ppid: number;
+  stat: string;
+  pcpu: number;
+  pmem: number;
+  command: string;
 };
 
 export async function sampleProcessCounts(timeoutMs = 1500): Promise<ProcessCounts | null> {
@@ -28,6 +43,56 @@ export async function sampleProcessCounts(timeoutMs = 1500): Promise<ProcessCoun
       "buck2d\\[|\\(buck2-forkserver\\)|(^|/)buck2( |$)|(^|/)node(js)?( |$)|(^|/)nix( |$)|VBR_VERIFY_LOG_FILE=|VBR_VERIFY_PROCESS_STATE_FILE=",
   });
   return lines.length > 0 ? countProcessCommands(lines) : null;
+}
+
+function parseProcessTableLine(line: string): ProcessTableEntry | null {
+  const match = String(line || "")
+    .trim()
+    .match(/^(\d+)\s+(\d+)\s+(\S+)\s+([0-9.]+)\s+([0-9.]+)\s+(.+)$/);
+  if (!match) return null;
+  const pid = Number(match[1]);
+  const ppid = Number(match[2]);
+  const pcpu = Number(match[4]);
+  const pmem = Number(match[5]);
+  if (![pid, ppid, pcpu, pmem].every(Number.isFinite)) return null;
+  return {
+    pid,
+    ppid,
+    stat: match[3] || "?",
+    pcpu,
+    pmem,
+    command: String(match[6] || "").trim(),
+  };
+}
+
+function truncateCommand(command: string, max = 180): string {
+  const oneLine = command.replace(/\s+/g, " ").trim();
+  return oneLine.length <= max ? oneLine : `${oneLine.slice(0, max - 3)}...`;
+}
+
+export async function sampleTopProcesses(
+  timeoutMs = 1500,
+  limit = 12,
+): Promise<TopProcessSample | null> {
+  const lines = await processTableLines({
+    psArgs: ["-A", "-o", "pid=,ppid=,stat=,pcpu=,pmem=,comm="],
+    timeoutMs,
+    pgrepPattern: "mds|mdworker|fseventsd|mediaanalysisd|nix|buck2|node|rsync|git|du",
+    pgrepToLine: (pid, cmd) => `${pid} 0 ? 0 0 ${cmd}`,
+  });
+  const entries = lines.flatMap((line) => {
+    const parsed = parseProcessTableLine(line);
+    return parsed ? [parsed] : [];
+  });
+  if (entries.length === 0) return null;
+  const top = entries
+    .sort((a, b) => b.pcpu - a.pcpu)
+    .slice(0, Math.max(1, limit))
+    .map(
+      (entry) =>
+        `pid=${entry.pid} ppid=${entry.ppid} stat=${entry.stat} pcpu=${entry.pcpu.toFixed(1)} pmem=${entry.pmem.toFixed(1)} cmd=${truncateCommand(entry.command)}`,
+    );
+  return top.length > 0 ? { lines: top } : null;
 }
 
 export function countProcessCommands(lines: string[]): ProcessCounts {
@@ -96,8 +161,17 @@ export async function summarizeVerifySafetyRailsTelemetry(
     maxBuckCount: null,
     maxNixCount: null,
     maxVerifyEnvCount: null,
+    highLoadTopProcessSamples: 0,
+    highLoadTopProcessLines: [],
   };
   for (const line of text.split(/\r?\n/)) {
+    if (line.startsWith("[verify] high-load top-process ")) {
+      summary.highLoadTopProcessSamples++;
+      if (summary.highLoadTopProcessLines.length < 12) {
+        summary.highLoadTopProcessLines.push(line.slice("[verify] ".length));
+      }
+      continue;
+    }
     if (!line.includes("freeGiB=")) continue;
     summary.samples++;
     summary.maxLoad1 = maxMaybe(summary.maxLoad1, matchNumber(line, "load1"));

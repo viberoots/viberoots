@@ -3,46 +3,95 @@ import * as fsp from "node:fs/promises";
 import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
+import { markMacosMetadataNeverIndex } from "../../lib/macos-metadata";
 import { cleanupOrphanBuckDaemons } from "./buck-orphan-cleanup";
 import { appendVerifyLogLine } from "./process-control";
 import { cleanupRegisteredBuckIsolations } from "./registered-buck-cleanup";
 
 const execFileAsync = promisify(execFile);
 
+function verifyOwnedBuckOutEntry(name: string): boolean {
+  return (
+    name === "test-logs" ||
+    name === "tmp" ||
+    name === "zx_shims" ||
+    name === "v2" ||
+    name.startsWith("v-") ||
+    name.startsWith("verify-nested-") ||
+    name.startsWith("deployment-query-") ||
+    name.startsWith("zxtest-shared-") ||
+    name.startsWith("exporter-shared-")
+  );
+}
+
+async function realExistingRoot(root: string): Promise<string | null> {
+  const trimmed = String(root || "").trim();
+  if (!trimmed) return null;
+  const resolved = path.resolve(trimmed);
+  try {
+    return await fsp.realpath(resolved);
+  } catch {
+    return null;
+  }
+}
+
+async function activeSourceCleanupRoots(root: string): Promise<string[]> {
+  const candidates = [
+    root,
+    process.env.VIBEROOTS_SOURCE_ROOT || "",
+    process.env.VIBEROOTS_ROOT || "",
+    path.join(root, ".viberoots", "current"),
+    path.join(root, "viberoots"),
+  ];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    const real = await realExistingRoot(candidate);
+    if (!real || seen.has(real)) continue;
+    if (real !== path.resolve(root)) {
+      const zxInit = path.join(real, "build-tools", "tools", "dev", "zx-init.mjs");
+      try {
+        await fsp.access(zxInit);
+      } catch {
+        continue;
+      }
+    }
+    seen.add(real);
+    out.push(real);
+  }
+  return out;
+}
+
 async function cleanupVerifyRootBuckOut(root: string): Promise<string[]> {
   const buckOut = path.join(root, "buck-out");
   const removed: string[] = [];
+  await execFileAsync("buck2", ["kill"], { cwd: root }).catch(() => {});
   const entries = await fsp.readdir(buckOut, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     const name = entry.name;
-    const verifyOwned =
-      name === ".metadata_never_index" ||
-      name === "test-logs" ||
-      name === "tmp" ||
-      name === "zx_shims" ||
+    const verifyOwned = verifyOwnedBuckOutEntry(name);
+    if (!verifyOwned) continue;
+    if (
       name === "v2" ||
       name.startsWith("v-") ||
       name.startsWith("verify-nested-") ||
       name.startsWith("deployment-query-") ||
-      name.startsWith("zxtest-shared-");
-    if (!verifyOwned) continue;
-    if (name === "v2") {
-      continue;
-    }
-    if (
-      name.startsWith("v-") ||
-      name.startsWith("verify-nested-") ||
-      name.startsWith("deployment-query-") ||
-      name.startsWith("zxtest-shared-")
+      name.startsWith("zxtest-shared-") ||
+      name.startsWith("exporter-shared-")
     ) {
-      await execFileAsync("buck2", ["--isolation-dir", name, "kill"], { cwd: root }).catch(
-        () => {},
-      );
+      if (name === "v2") {
+        await execFileAsync("buck2", ["kill"], { cwd: root }).catch(() => {});
+      } else {
+        await execFileAsync("buck2", ["--isolation-dir", name, "kill"], { cwd: root }).catch(
+          () => {},
+        );
+      }
     }
     await fsp.rm(path.join(buckOut, name), { recursive: true, force: true }).catch(() => {});
     removed.push(name);
   }
   await fsp.rmdir(buckOut).catch(() => {});
+  await markMacosMetadataNeverIndex(buckOut).catch(() => {});
   return removed.sort();
 }
 
@@ -82,15 +131,18 @@ export async function runFinalOrphanBuckCleanup(opts: {
       opts.logFile,
       `[verify] final registered buck cleanup: scanned_isolations=${registeredRes.scanned} candidates=${registeredRes.candidates} killed=${registeredRes.killed}`,
     );
-    const removedRootEntries = await opts.timedPhase(
-      "final-cleanup-root-buck-out",
-      async () => await cleanupVerifyRootBuckOut(opts.root),
-    );
-    if (removedRootEntries.length > 0) {
-      await appendVerifyLogLine(
-        opts.logFile,
-        `[verify] final root buck-out cleanup: removed=${removedRootEntries.join(",")}`,
+    const cleanupRoots = await activeSourceCleanupRoots(opts.root);
+    for (const cleanupRoot of cleanupRoots) {
+      const removedRootEntries = await opts.timedPhase(
+        "final-cleanup-root-buck-out",
+        async () => await cleanupVerifyRootBuckOut(cleanupRoot),
       );
+      if (removedRootEntries.length > 0) {
+        await appendVerifyLogLine(
+          opts.logFile,
+          `[verify] final root buck-out cleanup: root=${cleanupRoot} removed=${removedRootEntries.join(",")}`,
+        );
+      }
     }
   } catch {
   } finally {

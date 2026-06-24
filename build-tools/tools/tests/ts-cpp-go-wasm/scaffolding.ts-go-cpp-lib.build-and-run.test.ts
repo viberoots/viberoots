@@ -17,28 +17,8 @@ test("scaffold ts go-cpp-lib; build addon + wasm; both return 5", { skip: SKIP_P
     // 1) Scaffold the library
     await sh`node ${viberootsTool("viberoots/build-tools/tools/scaffolding/scaf.ts")} new ts go-cpp-lib demo --yes`;
 
-    // 2) Ensure planner + templates are available in the temp repo (copy entire dirs for completeness)
+    // 2) Ensure workspace-root build files are available in the temp repo.
     await fs.mkdirp(path.join(tmp, "build-tools/tools/nix"));
-    await fs.copy(
-      viberootsTool("viberoots/build-tools/tools/nix/templates"),
-      path.join(tmp, "viberoots/build-tools/tools/nix/templates"),
-    );
-    await fs.copy(
-      viberootsTool("viberoots/build-tools/tools/nix/lang-templates.nix"),
-      path.join(tmp, "viberoots/build-tools/tools/nix/lang-templates.nix"),
-    );
-    await fs.copy(
-      viberootsTool("viberoots/build-tools/tools/nix/planner"),
-      path.join(tmp, "viberoots/build-tools/tools/nix/planner"),
-    );
-    await fs.outputFile(
-      path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
-      await fs.readFile(viberootsTool("viberoots/build-tools/cpp/defs.bzl"), "utf8"),
-    );
-    await fs.outputFile(
-      path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
-      await fs.readFile(viberootsTool("viberoots/build-tools/cpp/wasm_defs.bzl"), "utf8"),
-    );
     await fs.outputFile(
       path.join(tmp, "build-tools", "go", "defs.bzl"),
       await fs.readFile(viberootsTool("viberoots/build-tools/go/defs.bzl"), "utf8"),

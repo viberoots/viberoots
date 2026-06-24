@@ -4,6 +4,7 @@ import { execFile, spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { prepareExactPnpmStore } from "../../dev/update-pnpm-hash/exact-store";
 import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 const execFileAsync = promisify(execFile);
@@ -103,10 +104,12 @@ async function nixBuildOutput(attr: string) {
   const repoRoot = process.env.WORKSPACE_ROOT || process.cwd();
   const flakeRef = await workspaceFlakeRef(repoRoot);
   const viberootsInput = path.join(repoRoot, "viberoots");
+  const exactStore = await prepareExactPnpmStore({ repoRoot, importer: "viberoots" });
   const { stdout } = await execFileAsync(
     "nix",
     [
       "build",
+      "--impure",
       `path:${flakeRef}#${attr}`,
       "--override-input",
       "viberoots",
@@ -117,6 +120,10 @@ async function nixBuildOutput(attr: string) {
     ],
     {
       cwd: repoRoot,
+      env: {
+        ...process.env,
+        NIX_PNPM_EXACT_STORE: exactStore.exactStorePath,
+      },
       maxBuffer: 1024 * 1024,
     },
   );

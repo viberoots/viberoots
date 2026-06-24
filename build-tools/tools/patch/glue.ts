@@ -6,7 +6,7 @@ import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { getImporterRootsContract } from "../lib/importer-roots";
 import { normalizeTargetLabel } from "../lib/labels";
 import { runNodeWithZx } from "../lib/node-run";
-import { findRepoRoot } from "../lib/repo";
+import { resolveWorkspaceRootsSync } from "../lib/repo";
 import { ensureWorkspaceBuckStatePackage } from "../lib/workspace-buck-state";
 import { DEFAULT_AUTO_MAP_PATH } from "../lib/workspace-state-paths";
 import { buildToolPath, zxInitPath } from "../dev/dev-build/paths";
@@ -44,6 +44,7 @@ export async function ensureGraph(
     workspaceRoot?: string;
     target?: string;
     queryRoots?: string[];
+    graphPath?: string;
   } = {},
 ): Promise<void> {
   const workspaceRoot = (
@@ -52,7 +53,7 @@ export async function ensureGraph(
     process.env.BUCK_TEST_SRC ||
     process.cwd()
   ).trim();
-  const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
+  const graphPath = opts.graphPath || path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
   const forceInline = String(process.env.EXPORTER_FORCE_INLINE || "").trim() === "1";
   async function isValidJsonFile(p: string): Promise<boolean> {
     try {
@@ -141,7 +142,8 @@ export async function ensureGraph(
 
   const nodeBin = process.execPath;
   const repoRoot =
-    (process.env.REPO_ROOT && process.env.REPO_ROOT.trim()) || (await findRepoRoot(process.cwd()));
+    (process.env.REPO_ROOT && process.env.REPO_ROOT.trim()) ||
+    resolveWorkspaceRootsSync({ start: workspaceRoot }).viberootsRoot;
   const zxInit = zxInitPath(repoRoot);
   const exportScript = buildToolPath(repoRoot, "tools/buck/export-graph.ts");
   const exporterArgs = ["--out", graphPath];
@@ -197,8 +199,18 @@ export async function ensureGraph(
     WORKSPACE_ROOT: workspaceRoot,
     BUCK_TEST_SRC: workspaceRoot,
     REPO_ROOT: repoRoot,
+    VIBEROOTS_ROOT: process.env.VIBEROOTS_ROOT || repoRoot,
+    VIBEROOTS_SOURCE_ROOT: process.env.VIBEROOTS_SOURCE_ROOT || repoRoot,
     ...(opts.queryRoots?.length ? { BUCK_QUERY_ROOTS: opts.queryRoots.join(",") } : {}),
-    ...(wantTargetRaw ? { BUCK_TARGET: wantTargetRaw } : {}),
+    ...(wantTargetRaw
+      ? {
+          BUCK_TARGET: wantTargetRaw,
+          BUCK_TARGET_PLATFORMS:
+            process.env.BUCK_TARGET_PLATFORMS ||
+            process.env.BUCK_TARGET_PLATFORM ||
+            "prelude//platforms:default",
+        }
+      : {}),
   } as Record<string, string>;
 
   if (haveBuck) {

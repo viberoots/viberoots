@@ -128,12 +128,14 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     "default_platform = //:no_cgo",
     "user_platform = //:no_cgo",
     "target_platforms = //:no_cgo",
-    "action_env = SDKROOT,CPATH,LIBRARY_PATH,CGO_CFLAGS,CGO_CPPFLAGS,CGO_ENABLED,WORKSPACE_ROOT,BUCK_TEST_SRC,BUCK_GRAPH_JSON,BUCK_ISOLATION_DIR,BUCK_NESTED_ISO,REPO_ROOT,VIBEROOTS_ROOT,VIBEROOTS_SOURCE_ROOT,ZX_INIT",
+    "action_env = SDKROOT,CPATH,LIBRARY_PATH,CGO_CFLAGS,CGO_CPPFLAGS,CGO_ENABLED,WORKSPACE_ROOT,BUCK_TEST_SRC,BUCK_GRAPH_JSON,BUCK_ISOLATION_DIR,BUCK_NESTED_ISO,REPO_ROOT,VIBEROOTS_ROOT,VIBEROOTS_SOURCE_ROOT,VIBEROOTS_FLAKE_INPUT_ROOT,ZX_INIT",
     "EOF",
     "mkdir -p .viberoots",
     '[ -n "${VIBEROOTS_ROOT:-}" ] && [ -e "$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs" ] && [ ! -e .viberoots/current/build-tools/tools/dev/zx-init.mjs ] && rm -rf .viberoots/current || true',
     '[ -e .viberoots/current ] || { if [ -n "${VIBEROOTS_ROOT:-}" ] && [ -e "$VIBEROOTS_ROOT/build-tools" ]; then ln -s "$VIBEROOTS_ROOT" .viberoots/current; elif [ -e build-tools ]; then ln -s .. .viberoots/current; else ln -s ../viberoots .viberoots/current; fi; }',
     '[ -e viberoots/build-tools ] || [ -L viberoots/build-tools ] || { if [ -n "${VIBEROOTS_ROOT:-}" ] && [ -e "$VIBEROOTS_ROOT/build-tools" ]; then ln -s "$VIBEROOTS_ROOT/build-tools" viberoots/build-tools; elif [ -e .viberoots/current/build-tools ]; then ln -s ../.viberoots/current/build-tools viberoots/build-tools; fi; }',
+    "mkdir -p .viberoots/workspace",
+    'if [ ! -f .viberoots/workspace/flake.lock ]; then if [ -n "${VIBEROOTS_ROOT:-}" ] && [ -f "$VIBEROOTS_ROOT/.viberoots/workspace/flake.lock" ]; then cp "$VIBEROOTS_ROOT/.viberoots/workspace/flake.lock" .viberoots/workspace/flake.lock; elif [ -n "${VIBEROOTS_ROOT:-}" ] && [ -f "$(dirname "$VIBEROOTS_ROOT")/.viberoots/workspace/flake.lock" ]; then cp "$(dirname "$VIBEROOTS_ROOT")/.viberoots/workspace/flake.lock" .viberoots/workspace/flake.lock; elif [ -n "${VIBEROOTS_ROOT:-}" ] && [ -f "$VIBEROOTS_ROOT/flake.lock" ]; then cp "$VIBEROOTS_ROOT/flake.lock" .viberoots/workspace/flake.lock; elif [ -f flake.lock ]; then cp flake.lock .viberoots/workspace/flake.lock; else printf \'{"nodes":{},"root":"root","version":7}\\n\' > .viberoots/workspace/flake.lock; fi; fi',
     'for base in config viberoots/config; do for cell in fbsource_stub fbcode_stub; do mkdir -p "$base/$cell"; printf "[buildfile]\\nname = TARGETS\\n" > "$base/$cell/.buckconfig"; printf "# stub %s cell for temp repositories\\n" "$cell" > "$base/$cell/TARGETS"; done; done',
     "mkdir -p config/go/constraints viberoots/config/go/constraints config/cpu viberoots/config/cpu config/os viberoots/config/os config/os/constraints viberoots/config/os/constraints",
     'for base in config viberoots/config; do printf "[buildfile]\\nname = TARGETS\\n" > "$base/.buckconfig"; printf "# temp repository config prelude placeholder\\n" > "$base/prelude.bzl"; printf "# temp repository config rules placeholder\\n" > "$base/rules.bzl"; done',
@@ -149,6 +151,7 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     "printf 'WORKSPACE_ROOT=%s\\n' \"$PWD\" > .viberoots/workspace/buck/workspace-root.env",
     '[ -n "${VIBEROOTS_ROOT:-}" ] && printf \'VIBEROOTS_ROOT=%s\\n\' "$VIBEROOTS_ROOT" >> .viberoots/workspace/buck/workspace-root.env || true',
     '[ -n "${VIBEROOTS_SOURCE_ROOT:-}" ] && printf \'VIBEROOTS_SOURCE_ROOT=%s\\n\' "$VIBEROOTS_SOURCE_ROOT" >> .viberoots/workspace/buck/workspace-root.env || true',
+    '[ -n "${VIBEROOTS_FLAKE_INPUT_ROOT:-}" ] && printf \'VIBEROOTS_FLAKE_INPUT_ROOT=%s\\n\' "$VIBEROOTS_FLAKE_INPUT_ROOT" >> .viberoots/workspace/buck/workspace-root.env || true',
     '[ -n "${ZX_INIT:-}" ] && printf \'ZX_INIT=%s\\n\' "$ZX_INIT" >> .viberoots/workspace/buck/workspace-root.env || true',
     "cat > .viberoots/workspace/buck/TARGETS <<'EOF'",
     'load("@prelude//:rules.bzl", "export_file")',
@@ -306,6 +309,9 @@ export async function ensureWorkspaceRootEnvFile(
         `WORKSPACE_ROOT=${tmp}`,
         viberootsRoot ? `VIBEROOTS_ROOT=${viberootsRoot}` : "",
         viberootsSourceRoot ? `VIBEROOTS_SOURCE_ROOT=${viberootsSourceRoot}` : "",
+        process.env.VIBEROOTS_FLAKE_INPUT_ROOT
+          ? `VIBEROOTS_FLAKE_INPUT_ROOT=${process.env.VIBEROOTS_FLAKE_INPUT_ROOT}`
+          : "",
         zxInit ? `ZX_INIT=${zxInit}` : "",
         "",
       ]

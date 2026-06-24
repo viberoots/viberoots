@@ -55,7 +55,7 @@ Read a deployment detail:
   "method": "tools/call",
   "params": {
     "name": "deployment_detail",
-    "arguments": { "deploymentId": "pleomino-staging" }
+    "arguments": { "deploymentId": "example-staging" }
   }
 }
 ```
@@ -68,7 +68,7 @@ Read the same deployment detail as a resource:
   "id": "detail-resource",
   "method": "resources/read",
   "params": {
-    "uri": "mcp://deployment-control-plane/deployments/pleomino-staging"
+    "uri": "mcp://deployment-control-plane/deployments/example-staging"
   }
 }
 ```
@@ -84,13 +84,13 @@ Example redacted response shape:
     "tool": "deployment_detail",
     "data": {
       "schemaVersion": "control-plane-read-deployment@1",
-      "deploymentId": "pleomino-staging",
+      "deploymentId": "example-staging",
       "currentStages": [],
       "latestRun": {
         "deployRunId": "deploy-20260515-001",
         "finalOutcome": "publish_failed",
         "error": "token=<redacted>",
-        "artifactIdentity": "static-webapp:pleomino"
+        "artifactIdentity": "static-webapp:example-app"
       }
     }
   }

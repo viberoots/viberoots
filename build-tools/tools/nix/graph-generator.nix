@@ -187,6 +187,7 @@ let
     inherit lib T repoRoot repoRootStr localModuleOverrides pkgPathOf pkgs;
     repoSnapshot = src;
     repoStoreRoot = repoStoreRoot;
+    repoFsRoot = builtins.toPath repoRootStr;
     nodeMods = nodeMods;
     # Provide full nodes list so language plugins (e.g., C++) can walk deps
     nodes = nodesList;

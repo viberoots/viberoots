@@ -49,8 +49,14 @@ test("bin run_ts resolves relative tool scripts from the active viberoots root",
   const helperPath = path.join(root, "build-tools", "tools", "bin", "_env.sh");
   const source = await fsp.readFile(helperPath, "utf8");
 
-  assert.match(source, /live_target_ts="\$\{LIVE_ROOT\}\/viberoots\/build-tools\/tools\/bin\/\$\{rel_path\}"/);
-  assert.match(source, /\[\[ "\$\{VBR_RUN_IN_TEMP_REPO:-\}" == "1" && -f "\$\{live_target_ts\}" \]\]/);
+  assert.match(
+    source,
+    /live_target_ts="\$\{LIVE_ROOT\}\/viberoots\/build-tools\/tools\/bin\/\$\{rel_path\}"/,
+  );
+  assert.match(
+    source,
+    /\[\[ "\$\{VBR_RUN_IN_TEMP_REPO:-\}" == "1" && -f "\$\{live_target_ts\}" \]\]/,
+  );
   assert.match(source, /target_ts="\$\{VIBEROOTS_ROOT\}\/build-tools\/tools\/bin\/\$\{rel_path\}"/);
   assert.doesNotMatch(source, /target_ts="\$\{SCRIPT_DIR\}\/\$\{rel_path\}"/);
 });
@@ -64,5 +70,8 @@ test("bin env derives VIBEROOTS_ROOT from the live workspace rather than inherit
   assert.match(source, /LIVE_ROOT\}\/\.viberoots\/current/);
   assert.match(source, /LIVE_ROOT\}\/viberoots\/build-tools\/tools\/dev\/zx-init\.mjs/);
   assert.doesNotMatch(source, /if \[\[ -z "\$\{VIBEROOTS_ROOT/);
-  assert.doesNotMatch(source, /-z "\$\{SCRIPT_DIR:-\}".*-z "\$\{REPO_ROOT:-\}".*-z "\$\{LIVE_ROOT:-\}"/s);
+  assert.doesNotMatch(
+    source,
+    /-z "\$\{SCRIPT_DIR:-\}".*-z "\$\{REPO_ROOT:-\}".*-z "\$\{LIVE_ROOT:-\}"/s,
+  );
 });

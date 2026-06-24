@@ -1,5 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fs from "node:fs/promises";
+import * as os from "node:os";
+import * as path from "node:path";
 import { test } from "node:test";
 import {
   resetLocalUsage,
@@ -22,7 +25,7 @@ test("local reset dry-run prints consequences without deleting state", async () 
   const text = output.join("\n");
   assert.match(text, /WARNING: this deletes local Infisical bootstrap state/);
   assert.match(text, /sprinkleref/);
-  assert.match(text, /terraform\.tfstate/);
+  assert.match(text, /\.local\/infisical-bootstrap-credentials\.json/);
   assert.match(text, /secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap\/client-secret/);
   assert.match(text, /does not delete Infisical cloud resources/);
   assert.deepEqual(removed, []);
@@ -44,10 +47,16 @@ test("local reset requires explicit RESET confirmation", async () => {
 });
 
 test("local reset removes generated paths and keychain entries after confirmation", async () => {
+  const repo = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-reset-local-"));
+  const tofuDir = path.join(repo, "projects/deployments/example/infisical/opentofu");
+  await fs.mkdir(path.join(tofuDir, ".terraform"), { recursive: true });
+  await fs.writeFile(path.join(tofuDir, ".terraform.lock.hcl"), "");
+  await fs.writeFile(path.join(tofuDir, "terraform.tfstate"), "{}");
+  await fs.writeFile(path.join(tofuDir, "terraform.tfstate.backup"), "{}");
   const removed: string[] = [];
   const keychain: string[][] = [];
   await runInfisicalBootstrapResetLocal([], {
-    cwd: "/repo",
+    cwd: repo,
     platform: "darwin",
     stdout: () => undefined,
     question: async () => "RESET",
@@ -60,13 +69,14 @@ test("local reset removes generated paths and keychain entries after confirmatio
     },
   });
   assert.deepEqual(removed, [
-    "/repo/sprinkleref",
-    "/repo/projects/deployments/pleomino/infisical/opentofu/.terraform",
-    "/repo/projects/deployments/pleomino/infisical/opentofu/.terraform.lock.hcl",
-    "/repo/projects/deployments/pleomino/infisical/opentofu/terraform.tfstate",
-    "/repo/projects/deployments/pleomino/infisical/opentofu/terraform.tfstate.backup",
+    path.join(repo, "sprinkleref"),
+    path.join(repo, ".local/infisical-bootstrap-credentials.json"),
+    path.join(repo, "projects/deployments/example/infisical/opentofu/.terraform"),
+    path.join(repo, "projects/deployments/example/infisical/opentofu/.terraform.lock.hcl"),
+    path.join(repo, "projects/deployments/example/infisical/opentofu/terraform.tfstate"),
+    path.join(repo, "projects/deployments/example/infisical/opentofu/terraform.tfstate.backup"),
   ]);
-  assert.equal(keychain.length, 6);
+  assert.equal(keychain.length, 2);
   assert.equal(keychain[0][0], "security");
   assert.deepEqual(keychain[0].slice(1, 4), [
     "delete-generic-password",

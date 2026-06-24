@@ -198,9 +198,9 @@ target_platforms = prelude//platforms:default
 Project targets stay in the root cell:
 
 ```text
-//projects/apps/pleomino:app
-//projects/libs/pleomino-solver-wasm:wasm
-//projects/deployments/pleomino/dev:deploy
+//projects/apps/example-app:app
+//projects/libs/example-app-solver-wasm:wasm
+//projects/deployments/example-app/dev:deploy
 ```
 
 Viberoots-owned rule loads move to the viberoots cell:

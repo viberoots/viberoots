@@ -1,6 +1,15 @@
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 
-export const DEPLOYMENT_BOOTSTRAP_TOFU_DIR = "projects/deployments/pleomino/infisical/opentofu";
+export type DeploymentBootstrapScope = {
+  target: string;
+  family: string;
+  stage: string;
+  reviewedMetadataPath: string;
+  reviewedContextConfigPath: string;
+  tofuDir: string;
+};
+
+export const REVIEWED_CONTEXT_CONFIG_PATH = "projects/config/shared.json";
 
 export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   mode: "repo",
@@ -32,7 +41,34 @@ export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
 
 export function withDeploymentBootstrapDefaults(args: BootstrapArgs): BootstrapArgs {
   if (args.mode !== "deployment" || args.tofuDir) return args;
-  return { ...args, tofuDir: DEPLOYMENT_BOOTSTRAP_TOFU_DIR };
+  return { ...args, tofuDir: deploymentScopeFromTarget(args).tofuDir };
+}
+
+export function deploymentScopeFromTarget(args: Pick<BootstrapArgs, "target">) {
+  const target = args.target?.trim();
+  if (!target) throw new Error("deployment bootstrap requires --target <buck-target>");
+  const match = target.match(/^\/\/projects\/deployments\/([^/:]+)\/([^/:]+):deploy$/);
+  if (!match) {
+    throw new Error(
+      [
+        `deployment bootstrap target ${target} is not supported`,
+        "expected canonical target shape //projects/deployments/<family>/<stage>:deploy",
+      ].join("; "),
+    );
+  }
+  const family = match[1];
+  const stage = match[2];
+  if (!family || !stage) {
+    throw new Error(`deployment bootstrap target ${target} is missing a family or stage`);
+  }
+  return {
+    target,
+    family,
+    stage,
+    reviewedMetadataPath: `projects/deployments/${family}/shared/family.bzl`,
+    reviewedContextConfigPath: REVIEWED_CONTEXT_CONFIG_PATH,
+    tofuDir: `projects/deployments/${family}/infisical/opentofu`,
+  } satisfies DeploymentBootstrapScope;
 }
 
 export function resolveInfisicalHost(host: string) {

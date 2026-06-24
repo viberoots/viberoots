@@ -21,6 +21,16 @@ const EXPECTATIONS: Array<{
         );
         assert.match(
           source,
+          /["']--reporter["'],\s*["']silent["']/,
+          `${file} must disable pnpm progress output during lockfile provisioning`,
+        );
+        assert.match(
+          source,
+          /["']--network-concurrency["'],\s*["']1["']/,
+          `${file} must keep lockfile provisioning network concurrency bounded`,
+        );
+        assert.match(
+          source,
           /["']fetch["'],\s*["']--force["'],\s*["']--prefer-offline["']/,
           `${file} must keep importer lockfile fetch non-interactive and forceful`,
         );
@@ -29,13 +39,30 @@ const EXPECTATIONS: Array<{
   },
   {
     path: "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
-    fragments: ["withHiddenNodeModules(importerAbs", "NIX_PNPM_INSTALL_TIMEOUT: fetchTimeout"],
+    fragments: ["fetchExactPnpmStore({", "fetchTimeout"],
+  },
+  {
+    path: "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-fetch.ts",
+    fragments: [
+      "withHiddenNodeModules(opts.importerAbs",
+      "NIX_PNPM_INSTALL_TIMEOUT: opts.fetchTimeout",
+    ],
     checks: [
       (source, file) => {
         assert.match(
           source,
-          /["']fetch["'],\s*["']--force["'],\s*["']--frozen-lockfile["']/,
-          `${file} must keep exact-store fetch non-interactive and forceful`,
+          /["']install["'],\s*["']--force["'],\s*["']--frozen-lockfile["']/,
+          `${file} must keep exact-store population non-interactive and forceful`,
+        );
+        assert.match(
+          source,
+          /["']--reporter["'],\s*["']silent["']/,
+          `${file} must disable pnpm progress output during exact-store provisioning`,
+        );
+        assert.match(
+          source,
+          /["']--network-concurrency["'],\s*["']1["']/,
+          `${file} must keep exact-store provisioning network concurrency bounded`,
         );
       },
     ],
@@ -51,15 +78,26 @@ const EXPECTATIONS: Array<{
   {
     path: "viberoots/build-tools/tools/nix/node-modules/modules.nix",
     fragments: [
-      "pnpm install --offline --force --no-frozen-lockfile",
-      "pnpm install --offline --force --frozen-lockfile",
+      '"$PNPM_BIN" install --offline --force --no-frozen-lockfile --ignore-scripts --ignore-pnpmfile --prod=false --reporter=append-only',
+      '"$PNPM_BIN" install --offline --force --frozen-lockfile --ignore-scripts --ignore-pnpmfile --prod=false --reporter=append-only',
+      'cat "$pnpm_log" >&2 || true',
+    ],
+    checks: [
+      (source, file) => {
+        assert.doesNotMatch(
+          source,
+          /PNPM_BIN=.*pnpm10/,
+          `${file} mkNodeModules must not downgrade installer selection from pnpm based on pnpm-store directory version`,
+        );
+      },
     ],
   },
   {
     path: "viberoots/build-tools/tools/nix/node-modules/store.nix",
     fragments: [
-      "pnpm install --offline --force --frozen-lockfile --ignore-scripts --prod=false",
-      "mkPnpmStoreUnfixed: pnpm install (offline exact-store)",
+      "validate_exact_store_shape",
+      "mkPnpmStore: validating exact prefetched store shape after prior pnpm install (offline exact-store)",
+      "mkPnpmStoreUnfixed: validating exact prefetched store shape after prior pnpm install (offline exact-store)",
       "Run 'i' to refresh pnpm hashes and prewarm exact pnpm stores.",
     ],
     checks: [

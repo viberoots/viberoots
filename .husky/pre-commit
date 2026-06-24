@@ -51,17 +51,22 @@ if ! command -v nix >/dev/null 2>&1; then
   echo "error: Nix is required for pre-commit. Install Nix and try again." 1>&2
   exit 127
 fi
+LINT_STAGED_BIN="${PNPM_DIR}/node_modules/.bin/lint-staged"
+if [ ! -x "${LINT_STAGED_BIN}" ]; then
+  LINT_STAGED_BIN="lint-staged"
+fi
 
 # Run lint-staged inside the repo's Nix dev shell so pnpm and tools are on PATH.
 # If already in a dev shell, avoid spawning nix develop again (slow, can hang in CI).
 # Disable node_modules linking and skip node install to avoid spawning many node processes.
+# Keep pnpm noninteractive if it decides node_modules must be purged before exec.
 # Avoid mutating flake.lock during hooks with --no-write-lock-file
 if [ "${IN_NIX_SHELL:-}" = "1" ]; then
   cd "${ROOT_DIR}"
-  BUCK_CONFIG_LOCK=1 NO_NODE_MODULES_LINK=1 SKIP_NODE_INSTALL=1 timeout 9m pnpm --dir "${PNPM_DIR}" exec lint-staged --cwd "${ROOT_DIR}" --config "${LINT_STAGED_CONFIG}" --relative --allow-empty
+  timeout 9m env CI=1 BUCK_CONFIG_LOCK=1 NO_NODE_MODULES_LINK=1 SKIP_NODE_INSTALL=1 npm_config_confirm_modules_purge=false NPM_CONFIG_CONFIRM_MODULES_PURGE=false "${LINT_STAGED_BIN}" --cwd "${ROOT_DIR}" --config "${LINT_STAGED_CONFIG}" --relative --allow-empty
 else
   cd "${ROOT_DIR}"
-  BUCK_CONFIG_LOCK=1 NO_NODE_MODULES_LINK=1 SKIP_NODE_INSTALL=1 WORKSPACE_ROOT="${ROOT_DIR}" timeout 9m nix develop "${FLAKE_REF}" --accept-flake-config --no-write-lock-file -c pnpm --dir "${PNPM_DIR}" exec lint-staged --cwd "${ROOT_DIR}" --config "${LINT_STAGED_CONFIG}" --relative --allow-empty
+  timeout 9m nix develop "${FLAKE_REF}" --accept-flake-config --no-write-lock-file -c env CI=1 BUCK_CONFIG_LOCK=1 NO_NODE_MODULES_LINK=1 SKIP_NODE_INSTALL=1 npm_config_confirm_modules_purge=false NPM_CONFIG_CONFIRM_MODULES_PURGE=false WORKSPACE_ROOT="${ROOT_DIR}" "${LINT_STAGED_BIN}" --cwd "${ROOT_DIR}" --config "${LINT_STAGED_CONFIG}" --relative --allow-empty
 fi
 
 # Do not force-clean tree here; lint-staged already restages intended fixes and preserves partial commits.

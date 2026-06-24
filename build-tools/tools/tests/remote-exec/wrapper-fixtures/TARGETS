@@ -69,7 +69,7 @@ node_nix_test(
 node_nix_test(
     name = "node_ready_handles",
     importer = ".",
-    labels = ["fixture:ready", "existing:label", "verify:manual"],
+    labels = ["fixture:ready", "existing:label", "remote:ready", "verify:manual"],
     remote_ready_runner = "remote-ready-runner.sh",
     srcs = ["fixture.txt"],
 )
@@ -91,7 +91,7 @@ go_nix_test(
 
 go_nix_test(
     name = "go_ready_handles",
-    labels = ["fixture:ready", "existing:label", "lang:go", "patch_scope:package-local", "verify:manual"],
+    labels = ["fixture:ready", "existing:label", "remote:ready", "lang:go", "patch_scope:package-local", "verify:manual"],
     nix_inputs = ["fixture.txt"],
     out = "go_ready_handles.stamp",
     remote_ready_runner = "remote-ready-runner.sh",
@@ -115,7 +115,7 @@ python_nix_test(
 
 python_nix_test(
     name = "python_ready_handles",
-    labels = ["fixture:ready", "existing:label", "verify:manual"],
+    labels = ["fixture:ready", "existing:label", "remote:ready", "verify:manual"],
     nix_inputs = ["fixture.txt"],
     out = "python_ready_handles.stamp",
     remote_ready_runner = "remote-ready-runner.sh",
@@ -141,7 +141,7 @@ cpp_nix_test(
 
 cpp_nix_test(
     name = "cpp_ready_handles",
-    labels = ["fixture:ready", "existing:label", "verify:manual"],
+    labels = ["fixture:ready", "existing:label", "remote:ready", "verify:manual"],
     nix_inputs = ["fixture.txt"],
     out = "cpp_ready_handles.stamp",
     planner = ":cpp_planner",

@@ -7,6 +7,8 @@ import { assertVerifyRemoteTargetsAllowed } from "./remote-target-policy";
 import type { VerifyExecutionPolicy } from "./remote-policy";
 
 export const VERIFY_ISOLATED_LABEL = "verify:isolated";
+export const VERIFY_BOUNDED_ISOLATED_LABEL = "verify:isolated-bounded";
+export const VERIFY_BOUNDED_ISOLATED_THREADS = 2;
 export const VERIFY_MANUAL_LABEL = "verify:manual";
 export const VERIFY_RESOURCE_LIMITED_LABEL = "verify:resource-limited";
 export const VERIFY_RESOURCE_LIMITED_THREADS = 4;
@@ -86,11 +88,16 @@ export function planVerifyTargetPasses(
 ): VerifyTargetPass[] {
   const sharedTargets: string[] = [];
   const isolatedTargets: string[] = [];
+  const boundedIsolatedTargets: string[] = [];
   const resourceLimitedTargets: string[] = [];
 
   for (const entry of targets) {
     if (entry.labels.includes(VERIFY_ISOLATED_LABEL)) {
       isolatedTargets.push(entry.target);
+      continue;
+    }
+    if (entry.labels.includes(VERIFY_BOUNDED_ISOLATED_LABEL)) {
+      boundedIsolatedTargets.push(entry.target);
       continue;
     }
     if (entry.labels.includes(VERIFY_RESOURCE_LIMITED_LABEL)) {
@@ -117,6 +124,13 @@ export function planVerifyTargetPasses(
             },
           ]
         : [];
+  if (boundedIsolatedTargets.length > 0) {
+    passes.push({
+      name: "isolated-bounded",
+      targets: boundedIsolatedTargets,
+      threadsOverride: VERIFY_BOUNDED_ISOLATED_THREADS,
+    });
+  }
   if (resourceLimitedTargets.length > 0) {
     passes.push({
       name: "resource-limited",
