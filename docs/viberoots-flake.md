@@ -441,6 +441,19 @@ These files belong to the viberoots flake and Buck cell:
 The viberoots cell may contain tests and fixtures, but those tests should not rely on product code
 from the root `projects/` directory except through explicit integration-test fixtures.
 
+### Reusable Fixture Policy
+
+Viberoots tests may use small reusable fixtures that model generic consumer projects, dependency
+graphs, deployment targets, provider outputs, and bootstrap files. Those fixtures must stay
+self-contained and must not require the parent repository's real `projects/` tree, shared config,
+provider state, generated maps, deployment records, project docs, product lockfile hashes, or
+project-family bootstrap defaults.
+
+Product-family names from a parent repository are allowed only in tests that explicitly validate
+migration or documentation compatibility for that historical product family. They must not appear
+in reusable runtime defaults, primary viberoots source, remote-consumer fixtures, or the committed
+external consumer template.
+
 ## Buck Cell Architecture
 
 ### Public Load Surface

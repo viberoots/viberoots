@@ -84,11 +84,17 @@ const FORBIDDEN_SOURCE_STATE = [
   "build-tools/tmp",
   "config/workspace_buck/graph.json",
   "config/workspace_providers/auto_map.bzl",
+  "config/workspace_providers/provider_index.json",
   "projects/node-modules.hashes.json",
   "projects/config/shared.json",
+  "projects/config/local.json",
+  "projects/config/control-plane/stack.json",
   "projects/deployments/example-app/staging/TARGETS",
+  "projects/deployments/example-app/provider-state.json",
   "projects/docs/deployments/example-app.md",
   "projects/bootstrap/example-app.json",
+  "projects/bootstrap/pleomino.json",
+  "projects/runtime/bootstrap-defaults.json",
 ];
 
 async function assertCleanConsumerBoundary(
