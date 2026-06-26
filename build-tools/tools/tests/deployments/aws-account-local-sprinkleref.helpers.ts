@@ -23,7 +23,7 @@ export {
 };
 
 export async function writeStack(tmp: string, fields: Record<string, unknown>) {
-  await writeJson(path.join(tmp, "config/control-plane/stack.json"), {
+  await writeJson(path.join(tmp, "projects/config/control-plane/stack.json"), {
     schemaVersion: "aws-account-stack-config@1",
     ...fields,
   });

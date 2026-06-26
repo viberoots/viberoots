@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagStr } from "../lib/cli";
 import { findRepoRoot } from "../lib/repo";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { runManagedCommand } from "../lib/managed-command";
 import { runNodeWithZx } from "../lib/node-run";
 import { sanitizeName } from "../lib/sanitize";
@@ -14,6 +15,10 @@ async function sleep(ms: number): Promise<void> {
 
 async function mkdirIfMissing(abs: string): Promise<void> {
   await fsp.mkdir(abs, { recursive: true });
+}
+
+async function mkdirGeneratedIfMissing(abs: string): Promise<void> {
+  await mkdirWithMacosMetadataExclusion(abs);
 }
 
 async function withLock(lockDir: string, fn: () => Promise<void>): Promise<void> {
@@ -86,7 +91,7 @@ async function main() {
   const cacheDir = path.join(root, "buck-out", "tmp", "wasm-shared", sanitizeName(label));
   const lockDir = `${cacheDir}.lock`;
   await mkdirIfMissing(path.dirname(outAbs));
-  await mkdirIfMissing(cacheDir);
+  await mkdirGeneratedIfMissing(cacheDir);
   const cacheWasm = path.join(cacheDir, "artifact.wasm");
 
   await withLock(lockDir, async () => {

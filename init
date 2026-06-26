@@ -58,6 +58,13 @@ write_buckroot() {
   printf '.\n' >"${file}"
 }
 
+mark_macos_metadata_never_index() {
+  local dir="$1"
+  [[ "$(uname -s 2>/dev/null || true)" == "Darwin" ]] || return 0
+  mkdir -p "${dir}"
+  : >"${dir}/.metadata_never_index" 2>/dev/null || true
+}
+
 repair_workspace_buck_link() {
   local link=".viberoots/workspace/buck"
   local target="../buck"
@@ -111,6 +118,9 @@ repair_current_symlink() {
 cd "${workspace_root}"
 
 mkdir -p projects .viberoots/workspace .viberoots/buck
+mark_macos_metadata_never_index ".viberoots"
+mark_macos_metadata_never_index ".viberoots/workspace"
+mark_macos_metadata_never_index ".viberoots/buck"
 repair_current_symlink
 repair_workspace_buck_link
 repair_workspace_flake_root

@@ -1,6 +1,7 @@
 import { spawn, spawnSync } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { processTableLines } from "../lib/process-inspection";
 
 function runnableBuildTimeoutSec(): number {
@@ -64,7 +65,8 @@ async function emitTimeoutDiagnostics(opts: {
   ]
     .filter(Boolean)
     .join("\n");
-  await fsp.mkdir(outDir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(path.dirname(outDir));
+  await mkdirWithMacosMetadataExclusion(outDir);
   await fsp.writeFile(outPath, body + "\n", "utf8");
   console.error(`[run-runnable] timeout diagnostics: ${outPath}`);
 }

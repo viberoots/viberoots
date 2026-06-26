@@ -1,5 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import {
   buildCqueryQuery,
@@ -19,6 +22,8 @@ import {
   splitVerifyPassGroupForStagedStart,
   verifyPassIsolationDir,
 } from "../../dev/verify/verify-pass-scheduling";
+import { prepareVerifyBuckIsolationMetadata } from "../../dev/verify/verify-passes";
+import { MACOS_METADATA_NEVER_INDEX_FILE } from "../../lib/macos-metadata";
 
 test("verify target cquery quotes explicit labels with operator characters", () => {
   assert.equal(
@@ -291,4 +296,35 @@ test("serial isolated verify passes use dedicated Buck isolations", () => {
     }),
     "v-123-456-isolated-startup-sensitive",
   );
+});
+
+test("verify marks pass and nested Buck isolation roots before spawning Buck", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "verify-pass-isolation-metadata-"));
+  try {
+    await prepareVerifyBuckIsolationMetadata({
+      root,
+      passIso: "v-123-resource-limited",
+      nestedIso: "verify-nested-123-deadbeefcafe",
+      platform: "darwin",
+    });
+
+    for (const rel of [
+      "buck-out",
+      "buck-out/v-123-resource-limited",
+      "buck-out/v-123-resource-limited/forkserver",
+      "buck-out/v-123-resource-limited/test-logs",
+      "buck-out/v-123-resource-limited/tmp",
+      "buck-out/verify-nested-123-deadbeefcafe",
+      "buck-out/verify-nested-123-deadbeefcafe/forkserver",
+      "buck-out/verify-nested-123-deadbeefcafe/test-logs",
+      "buck-out/verify-nested-123-deadbeefcafe/tmp",
+    ]) {
+      assert.ok(
+        (await fsp.stat(path.join(root, rel, MACOS_METADATA_NEVER_INDEX_FILE))).isFile(),
+        rel,
+      );
+    }
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
 });

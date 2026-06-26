@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { buildToolPath } from "../dev-build/paths";
+import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../../lib/macos-metadata";
 
 async function pathExists(p: string): Promise<boolean> {
   try {
@@ -24,13 +25,17 @@ export async function setupCoverage(opts: {
     // Best-effort cleanup of stale raw coverage dirs (local runs only; avoid cross-run interference in CI).
     if (process.env.CI !== "true") {
       const parent = path.join(opts.root, "buck-out", "tmp", "node-v8-coverage");
-      if (await pathExists(parent)) {
+      const rawParents = [parent, path.join(parent, "raw.noindex")];
+      for (const rawParent of rawParents) {
+        if (!(await pathExists(rawParent))) continue;
         await fsp
-          .readdir(parent)
+          .readdir(rawParent)
           .then(async (ents) => {
             for (const e of ents) {
               if (!e.startsWith("v-")) continue;
-              await fsp.rm(path.join(parent, e), { recursive: true, force: true }).catch(() => {});
+              await fsp
+                .rm(path.join(rawParent, e), { recursive: true, force: true })
+                .catch(() => {});
             }
           })
           .catch(() => {});
@@ -42,8 +47,10 @@ export async function setupCoverage(opts: {
 
   process.env.COVERAGE = "1";
   const parent = path.join(opts.root, "buck-out", "tmp", "node-v8-coverage");
-  await fsp.mkdir(parent, { recursive: true }).catch(() => {});
-  const rawDir = await fsp.mkdtemp(path.join(parent, "v-"));
+  const rawDir = await mkdtempNoindex("v-", {
+    baseName: "raw",
+    tmpBase: parent,
+  });
   process.env.NODE_V8_COVERAGE = rawDir;
 
   // Ensure merged report directory is clean and exists.
@@ -54,7 +61,7 @@ export async function setupCoverage(opts: {
       cwd: opts.root,
     })`bash --noprofile --norc -c 'set -euo pipefail; chmod -R u+w coverage >/dev/null 2>&1 || true; find coverage -mindepth 1 -maxdepth 1 -print0 2>/dev/null | xargs -0 rm -rf >/dev/null 2>&1 || true; rmdir coverage >/dev/null 2>&1 || true'`.nothrow();
   }
-  await fsp.mkdir(covDir, { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(covDir).catch(() => {});
 
   return { rawDir };
 }

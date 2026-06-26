@@ -4,6 +4,7 @@ import { extractHash } from "./nix";
 import {
   type PnpmStoreVerifiedMarker,
   persistVerifiedHash,
+  readSharedHashCache,
   restoreHashFromSharedCache,
   withSharedHashCacheLock,
 } from "./verified-marker";
@@ -46,9 +47,15 @@ export async function handleNonDefaultImporter(opts: {
       sharedCacheBuilderFingerprint: opts.sharedCacheBuilderFingerprint,
     });
   };
-  const restoreSharedHash = async () => {
-    if (opts.force) return false;
-    if (!opts.existingLockHash) return false;
+  const restoreSharedHash = async (): Promise<string | null> => {
+    if (opts.force) return null;
+    if (!opts.existingLockHash) return null;
+    const sharedHash = await readSharedHashCache({
+      repoRoot: opts.repoRoot,
+      builderFingerprint: opts.sharedCacheBuilderFingerprint || opts.builderFingerprint,
+      lockHash: opts.existingLockHash,
+    });
+    if (!sharedHash) return null;
     const restored = await restoreHashFromSharedCache({
       repoRoot: opts.repoRoot,
       key: opts.key,
@@ -61,10 +68,7 @@ export async function handleNonDefaultImporter(opts: {
       existingHash: opts.existingHash,
       hasValidExistingHash: opts.hasValidExistingHash,
     });
-    if (restored) {
-      await prepareExactStore({ repoRoot: opts.repoRoot, importer: opts.importer });
-    }
-    return restored;
+    return restored ? sharedHash : null;
   };
   const markerMatchesCurrentBuilder =
     opts.existingLockHash &&
@@ -78,26 +82,35 @@ export async function handleNonDefaultImporter(opts: {
     );
   const withSharedHashComputation = async (compute: () => Promise<boolean>) => {
     if (!opts.existingLockHash) return await compute();
-    return await withSharedHashCacheLock(
+    let restoredHash: string | null = null;
+    const result = await withSharedHashCacheLock(
       {
         repoRoot: opts.repoRoot,
         builderFingerprint: opts.sharedCacheBuilderFingerprint || opts.builderFingerprint,
         lockHash: opts.existingLockHash,
       },
       async () => {
-        if (await restoreSharedHash()) {
+        restoredHash = await restoreSharedHash();
+        if (restoredHash) {
           return true;
         }
         return await compute();
       },
     );
+    if (restoredHash) {
+      await prepareExactStore({ repoRoot: opts.repoRoot, importer: opts.importer });
+    }
+    return result;
   };
-  const verifyExistingHash = async (phasePrefix: string): Promise<boolean> => {
+  const verifyExistingHash = async (
+    phasePrefix: string,
+    hashValue = opts.existingHash,
+  ): Promise<boolean> => {
     const verifyExisting = await opts.runFixedBuild(
       `importer=${opts.importer} step=${phasePrefix} attr=${opts.storeAttr}`,
     );
     if (verifyExisting.ok) {
-      await persistHash(opts.existingHash);
+      await persistHash(hashValue);
       await prepareExactStore({ repoRoot: opts.repoRoot, importer: opts.importer });
       console.log(
         `[update-pnpm-hash] importer=${opts.importer} step=skip-existing-hash attr=${opts.storeAttr} lockfile=${opts.key}`,

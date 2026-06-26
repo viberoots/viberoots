@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import type { GraphNode } from "../lib/graph";
+import { mkdtempNoindex } from "../lib/macos-metadata";
 import type { DeploymentComponent, DeploymentTarget } from "./contract";
 import { DEPLOYMENT_CQUERY_ATTRS } from "./deployment-query-attrs";
 import { queryDeploymentNodesWithAttrs } from "./deployment-query";
@@ -170,7 +170,7 @@ async function validateProviderConfigSemantics(
   workspaceRoot: string,
   deployment: DeploymentTarget,
 ): Promise<void> {
-  const tmpRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "deploy-validate-"));
+  const tmpRoot = await mkdtempNoindex("deploy-validate-", { baseName: "deploy-validate" });
   const outputPath = path.join(tmpRoot, "provider-config.json");
   try {
     switch (deployment.provider) {

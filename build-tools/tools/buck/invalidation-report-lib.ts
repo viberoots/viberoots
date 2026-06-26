@@ -1,8 +1,8 @@
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged } from "../lib/fs-helpers";
 import { readCompositeGraph, type ProviderIndexEntry } from "../lib/graph-view";
 import type { PatchScope, ProviderModel } from "../lib/lang-contracts";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { formatTextRow } from "./invalidation-report-format";
 import {
   computeInvalidationRow,
@@ -80,11 +80,11 @@ export async function generateInvalidationReport(opts: InvalidationReportOptions
 
   const body =
     rows.map((r) => formatTextRow(r, providerIndex)).join("\n") + (rows.length ? "\n" : "");
-  await fsp.mkdir(path.dirname(opts.outPath), { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(path.dirname(opts.outPath)).catch(() => {});
   await writeIfChanged(opts.outPath, header + body);
 
   if (opts.jsonOutPath) {
-    await fsp.mkdir(path.dirname(opts.jsonOutPath), { recursive: true }).catch(() => {});
+    await mkdirWithMacosMetadataExclusion(path.dirname(opts.jsonOutPath)).catch(() => {});
     await writeIfChanged(opts.jsonOutPath, JSON.stringify(json, null, 2) + "\n");
   }
 }

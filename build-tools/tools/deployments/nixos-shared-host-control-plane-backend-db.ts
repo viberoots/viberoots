@@ -2,7 +2,6 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { newDb } from "pg-mem";
 import pg from "pg";
 import { NIXOS_SHARED_HOST_CONTROL_PLANE_BACKEND_SCHEMA_SQL } from "./nixos-shared-host-control-plane-backend-schema";
 import { validateManagedPostgresFeatures } from "./nixos-shared-host-control-plane-backend-features";
@@ -58,6 +57,7 @@ async function initializeBackendSchema(pool: BackendPool) {
 
 async function createBackendPool(databaseUrl: string): Promise<BackendPool> {
   if (isLocalHarnessDatabaseUrl(databaseUrl)) {
+    const { newDb } = await import("pg-mem");
     const db = newDb({
       autoCreateForeignKeyIndices: true,
     });

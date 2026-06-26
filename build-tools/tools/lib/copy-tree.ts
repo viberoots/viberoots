@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { mkdtempNoindex } from "./macos-metadata";
 
 export type CopyFileCloneMode = "none" | "try" | "force";
 
@@ -141,7 +142,9 @@ export async function probeCopyFileCloneSupport(): Promise<boolean> {
   const tryFlag = cloneFlagForMode("try");
   if (tryFlag === null) return false;
 
-  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-clone-probe-"));
+  const dir = await mkdtempNoindex("viberoots-clone-probe-", {
+    baseName: "viberoots-clone-probe",
+  });
   try {
     const src = path.join(dir, "src.txt");
     const dst = path.join(dir, "dst.txt");
@@ -164,7 +167,10 @@ export async function probeCopyFileCloneSupportFrom(args: {
   const flag = cloneFlagForMode(args.cloneMode);
   if (flag === null) return false;
 
-  const probeDir = await fsp.mkdtemp(path.join(args.dstDir, ".clone-probe-"));
+  const probeDir = await mkdtempNoindex(".clone-probe-", {
+    baseName: ".clone-probe",
+    tmpBase: args.dstDir,
+  });
   try {
     const dst = path.join(probeDir, "probe.txt");
     await fsp.copyFile(args.srcFile, dst, flag);

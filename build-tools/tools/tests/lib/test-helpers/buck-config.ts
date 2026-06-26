@@ -128,7 +128,7 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     "default_platform = //:no_cgo",
     "user_platform = //:no_cgo",
     "target_platforms = //:no_cgo",
-    "action_env = SDKROOT,CPATH,LIBRARY_PATH,CGO_CFLAGS,CGO_CPPFLAGS,CGO_ENABLED,WORKSPACE_ROOT,BUCK_TEST_SRC,BUCK_GRAPH_JSON,BUCK_ISOLATION_DIR,BUCK_NESTED_ISO,REPO_ROOT,VIBEROOTS_ROOT,VIBEROOTS_SOURCE_ROOT,VIBEROOTS_FLAKE_INPUT_ROOT,ZX_INIT",
+    "action_env = SDKROOT,CPATH,LIBRARY_PATH,CGO_CFLAGS,CGO_CPPFLAGS,CGO_ENABLED,WORKSPACE_ROOT,BUCK_TEST_SRC,BUCK_GRAPH_JSON,BUCK_ISOLATION_DIR,BUCK_NESTED_ISO,REPO_ROOT,VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT,VIBEROOTS_ROOT,VIBEROOTS_SOURCE_ROOT,VIBEROOTS_FLAKE_INPUT_ROOT,ZX_INIT",
     "EOF",
     "mkdir -p .viberoots",
     '[ -n "${VIBEROOTS_ROOT:-}" ] && [ -e "$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs" ] && [ ! -e .viberoots/current/build-tools/tools/dev/zx-init.mjs ] && rm -rf .viberoots/current || true',
@@ -151,6 +151,7 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
     "printf 'WORKSPACE_ROOT=%s\\n' \"$PWD\" > .viberoots/workspace/buck/workspace-root.env",
     '[ -n "${VIBEROOTS_ROOT:-}" ] && printf \'VIBEROOTS_ROOT=%s\\n\' "$VIBEROOTS_ROOT" >> .viberoots/workspace/buck/workspace-root.env || true',
     '[ -n "${VIBEROOTS_SOURCE_ROOT:-}" ] && printf \'VIBEROOTS_SOURCE_ROOT=%s\\n\' "$VIBEROOTS_SOURCE_ROOT" >> .viberoots/workspace/buck/workspace-root.env || true',
+    '[ -n "${VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT:-}" ] && printf \'VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT=%s\\n\' "$VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT" >> .viberoots/workspace/buck/workspace-root.env || true',
     '[ -n "${VIBEROOTS_FLAKE_INPUT_ROOT:-}" ] && printf \'VIBEROOTS_FLAKE_INPUT_ROOT=%s\\n\' "$VIBEROOTS_FLAKE_INPUT_ROOT" >> .viberoots/workspace/buck/workspace-root.env || true',
     '[ -n "${ZX_INIT:-}" ] && printf \'ZX_INIT=%s\\n\' "$ZX_INIT" >> .viberoots/workspace/buck/workspace-root.env || true',
     "cat > .viberoots/workspace/buck/TARGETS <<'EOF'",
@@ -309,6 +310,9 @@ export async function ensureWorkspaceRootEnvFile(
         `WORKSPACE_ROOT=${tmp}`,
         viberootsRoot ? `VIBEROOTS_ROOT=${viberootsRoot}` : "",
         viberootsSourceRoot ? `VIBEROOTS_SOURCE_ROOT=${viberootsSourceRoot}` : "",
+        process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT
+          ? `VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT=${process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT}`
+          : "",
         process.env.VIBEROOTS_FLAKE_INPUT_ROOT
           ? `VIBEROOTS_FLAKE_INPUT_ROOT=${process.env.VIBEROOTS_FLAKE_INPUT_ROOT}`
           : "",

@@ -23,6 +23,7 @@ async function liveBuckIsolations(): Promise<Set<string>> {
 export async function cleanupDevBuildRootBuckOut(root: string): Promise<string[]> {
   const buckOut = path.join(root, "buck-out");
   const removed: string[] = [];
+  const broadCleanup = process.env.VBR_DEVBUILD_BROAD_BUCK_OUT_CLEANUP === "1";
   let entries: string[] = [];
   try {
     entries = await fsp.readdir(buckOut);
@@ -34,6 +35,7 @@ export async function cleanupDevBuildRootBuckOut(root: string): Promise<string[]
   for (const entry of entries) {
     if (!isDevBuildRootBuckOutEntry(entry)) continue;
     if (entry.startsWith("devbuild-") || entry.startsWith("exporter-")) {
+      if (live.has(entry) && !broadCleanup) continue;
       await $({ stdio: "ignore" })`buck2 --isolation-dir ${entry} kill`.nothrow();
       live.delete(entry);
     }

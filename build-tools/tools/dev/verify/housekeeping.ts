@@ -2,6 +2,7 @@ import "zx/globals";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { emptyDirectoryPreservingMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { runNodeWithZx } from "../../lib/node-run";
 import { resolveToolPath } from "../../lib/tool-paths";
 import { buildToolPath } from "../dev-build/paths";
@@ -92,9 +93,9 @@ export async function runVerifyHousekeeping(opts: {
     stdio: "pipe",
   }).catch(() => {});
 
-  await fsp
-    .rm(path.join(root, "buck-out", "test-logs"), { recursive: true, force: true })
-    .catch(() => {});
+  await emptyDirectoryPreservingMacosMetadataExclusion(
+    path.join(root, "buck-out", "test-logs"),
+  ).catch(() => {});
 
   let free = await freeGiBAtPath(root);
   process.stderr.write(`[verify] disk free: ~${free}GiB\n`);

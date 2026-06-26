@@ -11,7 +11,7 @@ import { filteredFlakeRsyncExcludeArgs } from "./nix-build-filtered-flake-lib";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 import { emitTimingDetail } from "../lib/timing-detail";
 import { resolveToolPathSync } from "../lib/tool-paths";
-import { markMacosMetadataNeverIndex } from "../lib/macos-metadata";
+import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../lib/macos-metadata";
 
 function executablePath(filePath: string): string {
   const candidate = filePath.trim();
@@ -37,12 +37,13 @@ export async function makeFilteredFlakeRef(opts: {
   graphPath?: string;
 }): Promise<{ flakeRef: string; workspaceRoot: string; cleanup: () => Promise<void> }> {
   const tmpBase = process.env.TMPDIR || "/tmp";
-  const workDirRaw = await fsp.mkdtemp(path.join(tmpBase, "vbr-flake-"));
-  await markMacosMetadataNeverIndex(workDirRaw);
+  const workDirRaw = await mkdtempNoindex("vbr-flake-", {
+    baseName: "vbr-flake",
+    tmpBase,
+  });
   const workDir = await fsp.realpath(workDirRaw).catch(() => workDirRaw);
   const snapDir = path.join(workDir, "src");
-  await fsp.mkdir(snapDir, { recursive: true });
-  await markMacosMetadataNeverIndex(snapDir);
+  await mkdirWithMacosMetadataExclusion(snapDir);
   const snapDirReal = await fsp.realpath(snapDir).catch(() => snapDir);
   const src = path.resolve(opts.workspaceRoot);
   console.warn(
@@ -113,7 +114,7 @@ async function copyWorkspaceGraphIntoSnapshot(
     return;
   }
   const snapshotGraphPath = path.join(snapDir, DEFAULT_GRAPH_PATH);
-  await fsp.mkdir(path.dirname(snapshotGraphPath), { recursive: true });
+  await mkdirWithMacosMetadataExclusion(path.dirname(snapshotGraphPath));
   await fsp.copyFile(graphPath, snapshotGraphPath);
 }
 

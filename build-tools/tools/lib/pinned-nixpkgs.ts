@@ -30,5 +30,6 @@ export function pinnedCacertBundleExpr(lockPath: string): string {
 export function nixEvalTempDirOutsideWorkspace(workspaceRoot: string): string {
   const base = process.platform === "win32" ? os.tmpdir() : "/tmp";
   const workspaceBase = path.basename(path.resolve(workspaceRoot)) || "workspace";
-  return path.join(base, `viberoots-nix-eval-${workspaceBase}`);
+  const noindex = process.platform === "darwin" ? ".noindex" : "";
+  return path.join(base, `viberoots-nix-eval-${workspaceBase}${noindex}`);
 }

@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs/promises";
+import path from "node:path";
 import { getFlagBool, getFlagStr } from "../lib/cli";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import {
   buildCacheManifest,
   discoverCacheAttrs,
@@ -51,6 +53,7 @@ async function main() {
       ...(extra.targets || []),
     ],
   });
+  await mkdirWithMacosMetadataExclusion(path.dirname(out));
   writeManifest(out, manifest);
   const command = renderPublisherCommand(manifest, destination);
   console.log(JSON.stringify({ manifest: out, attrs: attrs.length, dryRun, command }, null, 2));

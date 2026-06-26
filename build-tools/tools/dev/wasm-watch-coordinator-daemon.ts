@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagStr } from "../lib/cli";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { repoRoot } from "../lib/repo";
 import {
   computeFingerprintMap,
@@ -72,7 +73,7 @@ function tasksFromLeases(leases: CoordinatorLease[]): CoordinatorTask[] {
 
 async function ensureDirs(baseDir: string): Promise<{ leasesDir: string; daemonPid: string }> {
   const leasesDir = path.join(baseDir, "leases");
-  await fsp.mkdir(leasesDir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(leasesDir);
   const daemonPid = path.join(baseDir, "daemon.pid");
   return { leasesDir, daemonPid };
 }
@@ -92,7 +93,9 @@ async function main() {
   const idleExitMs = Math.max(5000, Number(getFlagStr("idle-exit-ms", "120000")));
   const baseDir = path.join(root, "buck-out", "tmp", "wasm-watch-coordinator");
   const instanceLockDir = path.join(baseDir, "daemon.instance.lock");
-  await fsp.mkdir(baseDir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(path.join(root, "buck-out"));
+  await mkdirWithMacosMetadataExclusion(path.join(root, "buck-out", "tmp"));
+  await mkdirWithMacosMetadataExclusion(baseDir);
   try {
     await fsp.mkdir(instanceLockDir);
   } catch {

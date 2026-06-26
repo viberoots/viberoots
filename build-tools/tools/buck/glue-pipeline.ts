@@ -1,8 +1,8 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { runNodeWithZx } from "../lib/node-run";
 import { ensureWorkspaceBuckStatePackage } from "../lib/workspace-buck-state";
 import { ensureWorkspaceProvidersPackage } from "../lib/workspace-providers-package";
@@ -95,7 +95,7 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
     if (verbose) console.error(`[glue-pipeline] gen-auto-map → ${outAutoMap}`);
     // Ensure output directory exists to avoid noisy errors in temp repos
     try {
-      await fsp.mkdir(path.dirname(outAutoMap), { recursive: true });
+      await mkdirWithMacosMetadataExclusion(path.dirname(outAutoMap));
     } catch {}
     await runNodeWithZx({
       nodeBin,
@@ -119,7 +119,7 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
     const reportScript = buildToolPath(repoRoot, "tools/buck/invalidation-report.ts");
     if (verbose) console.error(`[glue-pipeline] invalidation-report → ${outInvalidationReport}`);
     try {
-      await fsp.mkdir(path.dirname(outInvalidationReport), { recursive: true });
+      await mkdirWithMacosMetadataExclusion(path.dirname(outInvalidationReport));
     } catch {}
     await runNodeWithZx({
       nodeBin,

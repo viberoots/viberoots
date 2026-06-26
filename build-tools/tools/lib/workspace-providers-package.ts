@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged } from "./fs-helpers";
+import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 import { DEFAULT_AUTO_MAP_PATH, DEFAULT_PROVIDER_TARGETS_PATH } from "./workspace-state-paths";
 
 const CXX_PROVIDER_TARGETS = [
@@ -106,7 +107,9 @@ export async function ensureWorkspaceProvidersPackage(
 ): Promise<void> {
   const targetsPath = path.join(workspaceRoot, DEFAULT_PROVIDER_TARGETS_PATH);
   const autoMapPath = path.join(workspaceRoot, DEFAULT_AUTO_MAP_PATH);
-  await fsp.mkdir(path.dirname(targetsPath), { recursive: true });
+  await mkdirWithMacosMetadataExclusion(path.join(workspaceRoot, ".viberoots"));
+  await mkdirWithMacosMetadataExclusion(path.dirname(path.dirname(targetsPath)));
+  await mkdirWithMacosMetadataExclusion(path.dirname(targetsPath));
   await writeIfMissing(
     path.join(path.dirname(targetsPath), ".buckconfig"),
     "[buildfile]\nname = TARGETS\n",

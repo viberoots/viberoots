@@ -5,6 +5,18 @@
       "justification": "Legacy C++ macro parity contract kept as one reviewed comparison test pending decomposition."
     },
     {
+      "path": "dev/pnpm-fixed-store.exact-prefetch.contract.test.ts",
+      "justification": "Pre-existing oversized pnpm exact-prefetch contract test pending focused scenario split; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "dev/update-pnpm-hash.hashes-json.prune.integration.test.ts",
+      "justification": "Pre-existing oversized pnpm hash-cache pruning integration test pending focused scenario split; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "dev/update-pnpm-hash.shared-hash-cache.test.ts",
+      "justification": "Pre-existing oversized pnpm shared hash-cache test pending focused scenario split; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
       "path": "dev/verify.temp-repo-buck-cleanup.scoped.test.ts",
       "justification": "Legacy scoped verify temp-repo cleanup contract pending a focused split."
     },
@@ -13,8 +25,24 @@
       "justification": "Shared Buck daemon cleanup helper for temp-repo tests pending decomposition."
     },
     {
+      "path": "lib/test-helpers/buck-kill.ts",
+      "justification": "Pre-existing oversized Buck process kill helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "lib/test-helpers/buck-procs.ts",
+      "justification": "Pre-existing oversized Buck process inspection helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
       "path": "lib/test-helpers/run-in-temp.ts",
       "justification": "Shared temp-repo harness pending extraction into smaller focused helpers."
+    },
+    {
+      "path": "lib/verify-log-status.pass-aggregation.test.ts",
+      "justification": "Pre-existing oversized verify-log pass aggregation test pending focused scenario split; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "lib/verify-log-status.projection.test.ts",
+      "justification": "Pre-existing oversized verify-log projection test pending focused scenario split; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
     },
     {
       "path": "nix/node-modules.per-importer.attr.test.ts",
@@ -23,6 +51,10 @@
     {
       "path": "node/node.wasm-inline-module.instantiate.test.ts",
       "justification": "Legacy wasm inline-module integration coverage pending a narrower split."
+    },
+    {
+      "path": "remote-exec/verify-remote-policy.run-verify.test.ts",
+      "justification": "Pre-existing oversized remote verify policy integration test pending focused scenario split; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
     },
     {
       "path": "scaffolding/go-cli.simple-patched-uuid.runtime.test.ts",
@@ -35,6 +67,10 @@
     {
       "path": "scaffolding/go-cli.thirdparty-runtime.patched-uuid.test.ts",
       "justification": "Legacy third-party runtime patch coverage pending decomposition."
+    },
+    {
+      "path": "scaffolding/lib/dev-node-modules.ts",
+      "justification": "Pre-existing oversized scaffolding node_modules helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
     },
     {
       "path": "scaffolding/template-conventions.metadata.cquery.test.ts",
@@ -63,6 +99,22 @@
     {
       "path": "ts-cpp-go-wasm/packaging.conditional-exports.test.ts",
       "justification": "Legacy packaging conditional-exports integration coverage pending decomposition."
+    },
+    {
+      "path": "verify/verify.contract.enforcement.test.ts",
+      "justification": "Pre-existing oversized verify contract enforcement test pending focused scenario split; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "verify/verify.safety-rails.behavior.test.ts",
+      "justification": "Pre-existing oversized verify safety-rails behavior test pending focused scenario split; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "verify/verify.target-passes.test.ts",
+      "justification": "Pre-existing oversized verify target-passes test pending focused scenario split; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "viberoots/remote-consumer-fixture.test.ts",
+      "justification": "Pre-existing oversized remote-consumer fixture test pending focused scenario split; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
     }
   ]
 }

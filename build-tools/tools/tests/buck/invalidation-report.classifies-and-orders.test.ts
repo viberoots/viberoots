@@ -10,6 +10,7 @@ import {
   DEFAULT_PROVIDER_INDEX_JSON_PATH,
   workspaceProviderLabel,
 } from "../../lib/workspace-state-paths";
+import { MACOS_METADATA_NEVER_INDEX_FILE } from "../../lib/macos-metadata";
 import { runInTemp } from "../lib/test-helpers";
 
 test("invalidation-report: stable ordering, patch scope classification, and global nix input expectation (fixture)", async () => {
@@ -132,6 +133,20 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
 
     const reportPath = path.join(tmp, DEFAULT_INVALIDATION_REPORT_PATH);
     const txt = await fsp.readFile(reportPath, "utf8");
+    if (process.platform === "darwin") {
+      const marker = path.join(
+        tmp,
+        ".viberoots",
+        "workspace",
+        "buck",
+        MACOS_METADATA_NEVER_INDEX_FILE,
+      );
+      const marked = await fsp
+        .stat(marker)
+        .then((st) => st.isFile())
+        .catch(() => false);
+      if (!marked) throw new Error(`expected macOS metadata exclusion marker at ${marker}`);
+    }
 
     // Stable ordering: targets are sorted lexicographically by normalized label.
     const idxGo = txt.indexOf("target=//projects/libs/go:lib");

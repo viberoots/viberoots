@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 import { VIBEROOTS_CURRENT_REL, VIBEROOTS_WORKSPACE_REL, resolveWorkspaceRootSync } from "./repo";
 import { remoteSourcePath } from "./workspace-remote-source";
 
@@ -150,8 +151,8 @@ async function ensureWorkspaceBuckStateLink(workspaceRoot: string): Promise<void
   const realDir = path.join(workspaceRoot, ".viberoots", "buck");
   const linkPath = path.join(workspaceRoot, VIBEROOTS_WORKSPACE_REL, "buck");
   const linkTarget = "../buck";
-  await fsp.mkdir(realDir, { recursive: true });
-  await fsp.mkdir(path.dirname(linkPath), { recursive: true });
+  await mkdirWithMacosMetadataExclusion(realDir);
+  await mkdirWithMacosMetadataExclusion(path.dirname(linkPath));
   try {
     const stat = await fsp.lstat(linkPath);
     if (stat.isSymbolicLink()) {
@@ -233,8 +234,8 @@ export async function activateWorkspace(opts: ActivationOptions = {}): Promise<A
         path.join(workspaceRoot, ".viberoots", "cache"),
       ];
 
-  await fsp.mkdir(viberootsDir, { recursive: true });
-  for (const dir of workspaceDirs) await fsp.mkdir(dir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(viberootsDir);
+  for (const dir of workspaceDirs) await mkdirWithMacosMetadataExclusion(dir);
   if (!opts.shellEntry) {
     await ensureWorkspaceBuckStateLink(workspaceRoot);
     await removeNestedWorkspaceActivationState(workspaceRoot);

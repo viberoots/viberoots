@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../../../lib/macos-metadata";
 import { GENERATED_REPO_STATE_PATHS } from "../../../dev/verify/generated-state-excludes";
 
 const requiredFiles = [".buckconfig"];
@@ -29,19 +30,17 @@ if rc != 0:
 const darwinCloneTreeScript = String.raw`
 import ctypes
 import os
-import shutil
 import stat
 import sys
 
 src_root = sys.argv[1]
 dst_root = sys.argv[2]
+repair_permissions = sys.argv[3] == "1"
 libc = ctypes.CDLL(None, use_errno=True)
 clonefile = libc.clonefile
 clonefile.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int]
 clonefile.restype = ctypes.c_int
 
-if os.path.exists(dst_root):
-    shutil.rmtree(dst_root)
 os.makedirs(dst_root, exist_ok=True)
 
 def clone_regular_file(src, dst):
@@ -56,7 +55,8 @@ for cur, dirs, files in os.walk(src_root, topdown=True, followlinks=False):
     os.makedirs(dst_cur, exist_ok=True)
     try:
         st = os.lstat(cur)
-        os.chmod(dst_cur, stat.S_IMODE(st.st_mode) | 0o700)
+        if repair_permissions:
+            os.chmod(dst_cur, stat.S_IMODE(st.st_mode) | 0o700)
     except OSError:
         pass
 
@@ -82,8 +82,15 @@ for cur, dirs, files in os.walk(src_root, topdown=True, followlinks=False):
             continue
         if not stat.S_ISREG(st.st_mode):
             raise RuntimeError(f"unsupported file type: {src}")
+        if os.path.lexists(dst):
+            if rel == "." and name == ".metadata_never_index":
+                if repair_permissions:
+                    os.chmod(dst, stat.S_IMODE(st.st_mode) | 0o600)
+                continue
+            raise FileExistsError(f"destination already exists: {dst}")
         clone_regular_file(src, dst)
-        os.chmod(dst, stat.S_IMODE(st.st_mode) | 0o600)
+        if repair_permissions:
+            os.chmod(dst, stat.S_IMODE(st.st_mode) | 0o600)
 `;
 
 async function makeDirectoryPublishable(dir: string): Promise<void> {
@@ -194,7 +201,10 @@ export async function probeSeedCowCopyFrom(args: {
   dstDir: string;
 }): Promise<boolean> {
   await fsp.mkdir(args.dstDir, { recursive: true });
-  const probeDir = await fsp.mkdtemp(path.join(args.dstDir, ".seed-copy-probe-"));
+  const probeDir = await mkdtempNoindex(".seed-copy-probe-", {
+    baseName: ".seed-copy-probe",
+    tmpBase: args.dstDir,
+  });
   const dstFile = path.join(probeDir, "probe.txt");
   try {
     const result = await copyFileCow(args.srcFile, dstFile);
@@ -209,9 +219,17 @@ export async function probeSeedCowCopyFrom(args: {
 }
 
 async function copyTreeCow(srcRoot: string, dstRoot: string): Promise<void> {
+  const repairPermissions =
+    process.platform !== "darwin" ||
+    !(await fsp
+      .access(path.join(srcRoot, ".seed-store-prepared-v5"))
+      .then(() => true)
+      .catch(() => false));
   const result =
     process.platform === "darwin"
-      ? await $(fastCopyOpts)`python3 -c ${darwinCloneTreeScript} ${srcRoot} ${dstRoot}`
+      ? await $(
+          fastCopyOpts,
+        )`python3 -c ${darwinCloneTreeScript} ${srcRoot} ${dstRoot} ${repairPermissions ? "1" : "0"}`
       : await $(fastCopyOpts)`cp -a --reflink=always ${`${srcRoot}/.`} ${dstRoot}`;
   if (result.exitCode !== 0) {
     throw new Error(
@@ -244,7 +262,7 @@ export async function copySeedStoreToTempRepo(args: {
   await fsp.rm(stagingDir, { recursive: true, force: true }).catch(() => {});
   let published = false;
   try {
-    await fsp.mkdir(stagingDir, { recursive: true });
+    await mkdirWithMacosMetadataExclusion(stagingDir);
     let copyError: unknown = null;
     try {
       await copyTreeCow(args.seedPath, stagingDir);

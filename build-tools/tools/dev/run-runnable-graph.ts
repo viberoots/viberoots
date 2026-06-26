@@ -5,6 +5,7 @@ import { ensureGraph } from "../buck/glue-run";
 import { runNixBuildWithProgress } from "./run-runnable-nix";
 import { untrackedRequiresImpureForTargets } from "./dev-build/untracked";
 import { makeFilteredFlakeRef } from "./filtered-flake";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 
 async function withScopedGraphEnv<T>(
   workspaceRoot: string,
@@ -158,7 +159,8 @@ export async function buildRunnableManifest(
   const outPath = lastOutPath(stdout, "graph-generator did not emit an output path");
   const linkDir = path.join(workspaceRoot, "buck-out", "tmp");
   const linkPath = path.join(linkDir, "runnable-manifest-current");
-  await fsp.mkdir(linkDir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(path.join(workspaceRoot, "buck-out"));
+  await mkdirWithMacosMetadataExclusion(linkDir);
   try {
     await fsp.rm(linkPath, { recursive: true, force: true });
   } catch {}

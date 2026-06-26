@@ -50,12 +50,12 @@ test("aws-account config-init emits scheme-first config refs without categories"
       schemaVersion: "viberoots-project-local-config@1",
       values: { "control-plane": { aws: { "account-id": "project-config-id" } } },
     });
-    await fsp.rm(path.join(tmp, "config/control-plane/stack.json"), { force: true });
+    await fsp.rm(path.join(tmp, "projects/config/control-plane/stack.json"), { force: true });
     await withControlPlaneArgv(["aws-account", "config-init", "--domain", "example.com"], () =>
       runAwsAccountCommand({ cwd: tmp, stdout: () => undefined }),
     );
     const stack = JSON.parse(
-      await fsp.readFile(path.join(tmp, "config/control-plane/stack.json"), "utf8"),
+      await fsp.readFile(path.join(tmp, "projects/config/control-plane/stack.json"), "utf8"),
     );
     assert.deepEqual(stack.awsAccountId, { ref: ACCOUNT_REF });
     const config = await readAwsAccountConfig(tmp);

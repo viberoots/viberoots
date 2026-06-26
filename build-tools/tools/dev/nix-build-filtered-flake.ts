@@ -17,7 +17,7 @@ import { prepareExactPnpmStore } from "./update-pnpm-hash/exact-store";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 import { getImporterRootsContract } from "../lib/importer-roots";
 import { sanitizeName } from "../lib/sanitize";
-import { markMacosMetadataNeverIndex } from "../lib/macos-metadata";
+import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../lib/macos-metadata";
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -181,12 +181,12 @@ async function copyWorkspaceGraphIntoSnapshot(root: string, snapDir: string): Pr
   if (!(await pathExists(graphPath))) return;
   const snapshotGraphPath = path.join(snapDir, DEFAULT_GRAPH_PATH);
   const snapshotBuckRoot = path.join(snapDir, ".viberoots", "buck");
-  await fsp.mkdir(snapshotBuckRoot, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(snapshotBuckRoot);
   await fsp.copyFile(graphPath, path.join(snapshotBuckRoot, "graph.json"));
   const snapshotWorkspaceBuck = path.dirname(snapshotGraphPath);
   const workspaceBuckStat = await fsp.lstat(snapshotWorkspaceBuck).catch(() => null);
   if (!workspaceBuckStat?.isSymbolicLink()) {
-    await fsp.mkdir(snapshotWorkspaceBuck, { recursive: true });
+    await mkdirWithMacosMetadataExclusion(snapshotWorkspaceBuck);
     await fsp.copyFile(graphPath, snapshotGraphPath);
   }
 }
@@ -289,8 +289,10 @@ async function main(): Promise<void> {
   const snapshotOnly = getFlagBool("snapshot-only");
   const root = path.resolve(String(process.env.WORKSPACE_ROOT || process.cwd()).trim());
   const tmpBase = process.env.TMPDIR || "/tmp";
-  const workDir = await fsp.mkdtemp(path.join(tmpBase, "vbr-flake-"));
-  await markMacosMetadataNeverIndex(workDir);
+  const workDir = await mkdtempNoindex("vbr-flake-", {
+    baseName: "vbr-flake",
+    tmpBase,
+  });
   const snapDir = path.join(workDir, "src");
   let keepSnapshot = snapshotOnly;
   const withHeartbeat = async <T>(label: string, p: Promise<T>): Promise<T> => {
@@ -306,8 +308,7 @@ async function main(): Promise<void> {
     }
   };
   try {
-    await fsp.mkdir(snapDir, { recursive: true });
-    await markMacosMetadataNeverIndex(snapDir);
+    await mkdirWithMacosMetadataExclusion(snapDir);
     const rsyncExcludes = filteredFlakeRsyncExcludeArgs();
     const selectedCppSources = await readSelectedCppSnapshotSources(root);
     const snapshotStart = Date.now();

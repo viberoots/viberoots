@@ -97,7 +97,7 @@ control-plane aws-account config-init --domain <domain>
 control-plane aws-account setup-plan
 ```
 
-By default this writes `config/control-plane/stack.json`. The file is intentionally minimal:
+By default this writes `projects/config/control-plane/stack.json`. The file is intentionally minimal:
 defaults and derived values stay implicit, while account/provider values without defaults are
 written as inline values or structured SprinkleRef refs. This keeps the file usable as a short
 setup checklist instead of a dump of every derived option.
@@ -555,7 +555,7 @@ The operator should normally provide only `--domain`, the expected AWS account i
 identifiers, the AWS organization id, and either the structured `supabaseAccessToken` ref or a
 setup-shell `SUPABASE_ACCESS_TOKEN` for the first stack. Prefer writing non-secret clone-local
 values to `projects/config/local.json` and keeping the shared refs in
-`config/control-plane/stack.json`. `config-init` writes the small checklist by default and records
+`projects/config/control-plane/stack.json`. `config-init` writes the small checklist by default and records
 non-default overrides only when they are explicitly supplied. Use `--config <path>` only for
 exception cases, such as a second control-plane stack in the same clone. Override hostnames or
 `--evidence-dir` only when DNS policy or CI artifact collection requires a different shape.
@@ -713,7 +713,7 @@ Minimum values to collect before running automation:
   the Supabase Management API and records whether it is Team or Enterprise evidence for
   PrivateLink readiness.
 - A Supabase Management API token available through structured `supabaseAccessToken` in
-  `config/control-plane/stack.json`, a local redirect to the `bootstrap` category, or exported in
+  `projects/config/control-plane/stack.json`, a local redirect to the `bootstrap` category, or exported in
   the setup shell as `SUPABASE_ACCESS_TOKEN` for early bootstrap. The token value must be kept out
   of stack config files, generated profiles, local values JSON, and evidence.
 - Registrar access for your registrar so the authoritative nameservers for `example.com` can be moved to the

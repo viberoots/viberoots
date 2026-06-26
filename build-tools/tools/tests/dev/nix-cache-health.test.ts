@@ -233,6 +233,8 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   assert.match(buck, /curl -fsS --connect-timeout 3 --max-time 5/);
   assert.match(buck, /if curl -fsS --connect-timeout 3 --max-time 5/);
   assert.match(buck, /if nix store info --store/);
+  assert.match(buck, /viberoots-nix-cache\.noindex/);
+  assert.match(buck, /NIX_CACHE_TMPDIR\/\.metadata_never_index/);
   assert.doesNotMatch(
     buck,
     /curl -fsS --connect-timeout 3 --max-time 5[^;]+; NIX_CACHE_PROBE_STATUS/,
@@ -246,6 +248,15 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   assert.match(env, /curl -fsS --connect-timeout 3 --max-time 5/);
   assert.match(env, /if curl -fsS --connect-timeout 3 --max-time 5 "\$\{cache_info_url\}"/);
   assert.match(env, /if nix store info --store "\$\{substituter\}" --option connect-timeout 3/);
+  assert.match(env, /env_mark_macos_metadata_never_index "\$\{cache_dir\}"/);
+  assert.match(env, /env_mark_macos_metadata_never_index "\$\{NODE_V8_COVERAGE\}"/);
+
+  const devshell = await fsp.readFile("viberoots/build-tools/tools/nix/devshell.nix", "utf8");
+  assert.match(devshell, /_vbr_mark_macos_metadata_never_index "\$cache_dir"/);
+  assert.match(
+    devshell,
+    /_vbr_mark_macos_metadata_never_index "\$PWD\/\.viberoots\/workspace\/buck\/tmp"/,
+  );
 
   const zxTest = await fsp.readFile("viberoots/build-tools/tools/buck/zx_test.bzl", "utf8");
   assertOrder(zxTest, "nix_cache_health_shell()", "PRELUDE_PATH");

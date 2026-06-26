@@ -1,9 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import type { KubernetesDeployment } from "./contract";
-import { markMacosMetadataNeverIndex } from "../lib/macos-metadata";
+import { mkdtempNoindex } from "../lib/macos-metadata";
 import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import {
   assertKubernetesLiveStateMatchesDeployment,
@@ -30,8 +29,9 @@ async function withReviewedKubeconfig<T>(
   if (!kubeconfig) {
     throw new Error("kubernetes publish requires reviewed kubernetes_publish_kubeconfig");
   }
-  const tempRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-kubernetes-publish-"));
-  await markMacosMetadataNeverIndex(tempRoot);
+  const tempRoot = await mkdtempNoindex("vbr-kubernetes-publish-", {
+    baseName: "vbr-kubernetes-publish",
+  });
   const kubeconfigPath = path.join(tempRoot, "kubeconfig");
   const homePath = path.join(tempRoot, "home");
   try {

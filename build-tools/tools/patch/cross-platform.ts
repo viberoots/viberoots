@@ -40,7 +40,11 @@ export async function makeWorkspace(args: {
   moduleKey: string;
 }): Promise<string> {
   const { lang, originPath, moduleKey } = args;
-  const base = path.join(os.tmpdir(), `viberoots-patch-${lang}`);
+  const baseName = `viberoots-patch-${lang}`;
+  const base =
+    process.platform === "darwin"
+      ? path.join(os.tmpdir(), `${baseName}.noindex`)
+      : path.join(os.tmpdir(), baseName);
   const stamp = new Date()
     .toISOString()
     .replace(/[-:TZ.]/g, "")
@@ -50,6 +54,7 @@ export async function makeWorkspace(args: {
   const safeKey = moduleKey.replace(/[^A-Za-z0-9._@-]+/g, "_");
   const dst = path.join(base, `${safeKey}-${stamp}-${pid}-${rand}`);
   await mkdirWithMacosMetadataExclusion(base);
+  await mkdirWithMacosMetadataExclusion(dst);
   await copyTree(originPath, dst, { cloneMode: "try", force: true });
   await markMacosMetadataNeverIndex(dst);
   // Ensure workspace is writable even if source tree had read-only bits

@@ -13,7 +13,8 @@ def _rust_nix_build_impl(ctx):
         + "SAFE_LOG_KEY=\"${SAFE_LOG_KEY//\\//_}\"; "
         + "SAFE_LOG_KEY=\"${SAFE_LOG_KEY//:/_}\"; "
         + "BUILD_SELECTED_LOG=\"$WORKSPACE_ROOT/buck-out/tmp/build-selected/rust_nix_build.${SAFE_LOG_KEY}.log\"; "
-        + "mkdir -p \"$(dirname \"$BUILD_SELECTED_LOG\")\"; "
+        + "BUILD_SELECTED_LOG_DIR=\"$(dirname \"$BUILD_SELECTED_LOG\")\"; mkdir -p \"$BUILD_SELECTED_LOG_DIR\"; "
+        + "if [ \"$(uname -s 2>/dev/null || true)\" = \"Darwin\" ]; then [ ! -e \"$WORKSPACE_ROOT/buck-out/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/buck-out/.metadata_never_index\"; [ ! -e \"$WORKSPACE_ROOT/buck-out/tmp/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/buck-out/tmp/.metadata_never_index\"; [ ! -e \"$BUILD_SELECTED_LOG_DIR/.metadata_never_index\" ] && : > \"$BUILD_SELECTED_LOG_DIR/.metadata_never_index\"; fi; "
     )
     run_and_copy = (
         nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)

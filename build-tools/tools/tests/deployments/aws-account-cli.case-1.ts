@@ -97,9 +97,9 @@ test("aws-account config-init writes canonical stack config with empty unknowns"
     await withControlPlaneArgv(["aws-account", "config-init"], () =>
       runAwsAccountCommand({ cwd: tmp, stdout: (text) => out.push(text) }),
     );
-    const configPath = path.join(tmp, "config", "control-plane", "stack.json");
+    const configPath = path.join(tmp, "projects", "config", "control-plane", "stack.json");
     const config = JSON.parse(await fsp.readFile(configPath, "utf8")) as Record<string, unknown>;
-    assert.ok(out[0]?.includes("config/control-plane/stack.json"));
+    assert.ok(out[0]?.includes("projects/config/control-plane/stack.json"));
     assert.equal(config.schemaVersion, "aws-account-stack-config@1");
     assert.equal(config.domain, "");
     assert.deepEqual(config.awsAccountId, {
@@ -162,7 +162,7 @@ test("aws-account config-init writes only explicit non-default overrides", async
       ],
       () => runAwsAccountCommand({ cwd: tmp, stdout: () => undefined }),
     );
-    const configPath = path.join(tmp, "config", "control-plane", "stack.json");
+    const configPath = path.join(tmp, "projects", "config", "control-plane", "stack.json");
     const config = JSON.parse(await fsp.readFile(configPath, "utf8")) as Record<string, unknown>;
     assert.equal(config.domain, "example.com");
     assert.equal(config.region, "eu-west-1");

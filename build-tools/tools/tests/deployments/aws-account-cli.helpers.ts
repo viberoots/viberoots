@@ -35,7 +35,10 @@ export async function exists(filePath: string): Promise<boolean> {
 }
 
 export async function removeCanonicalStackConfig(root: string): Promise<void> {
-  await fsp.rm(path.join(root, "config", "control-plane"), { recursive: true, force: true });
+  await fsp.rm(path.join(root, "projects", "config", "control-plane"), {
+    recursive: true,
+    force: true,
+  });
 }
 
 export async function withCwd<T>(dir: string, run: () => Promise<T>): Promise<T> {

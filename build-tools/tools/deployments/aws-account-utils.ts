@@ -17,7 +17,7 @@ export async function pathExists(filePath: string): Promise<boolean> {
 }
 
 export function defaultStackConfigPath(cwd: string): string {
-  return path.resolve(cwd, "config", "control-plane", "stack.json");
+  return path.resolve(cwd, "projects", "config", "control-plane", "stack.json");
 }
 
 export function renderStackConfigFile(values: Record<string, unknown>): string {
@@ -163,7 +163,7 @@ export function printUsage(stdout = console.log) {
       "usage: control-plane aws-account <bootstrap|status|resume|check|setup-plan|evidence|clean|config-init>",
       "",
       "defaults: --stack control --region us-east-1 --service deploy --auth-service auth --private-db-service db",
-      "canonical config: config/control-plane/stack.json",
+      "canonical config: projects/config/control-plane/stack.json",
       "normal first run:",
       "  control-plane aws-account config-init [--domain <domain>]",
       "  sprinkleref --init-local",

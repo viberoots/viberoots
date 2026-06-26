@@ -94,6 +94,19 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
       out.includes('${TIMEOUT:+$TIMEOUT }nix run --accept-flake-config \\"$ZX_WRAPPER_REF\\"'),
       "expected build-selected nix fallback to use the resolved wrapper flake",
     );
+    assert.ok(
+      out.includes("buck-out/tmp/build-selected"),
+      "expected build-selected stderr to stay under the workspace buck-out temp tree",
+    );
+    assert.ok(
+      out.includes("VBR_BUILD_SELECTED_LOG_DIR/.metadata_never_index"),
+      "expected build-selected log directory to be excluded from macOS metadata indexing",
+    );
+    assert.equal(
+      out.includes("/tmp/build-selected.log"),
+      false,
+      "expected build-selected stderr to avoid the global /tmp fallback",
+    );
     assert.ok(out.includes("sed -E"), "expected build-selected out-path parsing to strip ANSI");
 
     assert.equal(

@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { runManagedCommand } from "../../lib/managed-command";
 import { newManagedCommandActivity } from "./activity";
 import { runExactStoreCommand } from "./exact-store-command";
@@ -15,7 +16,7 @@ async function createExactStoreArchive(opts: {
   const archiveDir = path.join(path.dirname(opts.storeDir), "archive");
   const archivePath = path.join(archiveDir, "store.tar");
   await fsp.rm(archiveDir, { recursive: true, force: true }).catch(() => {});
-  await fsp.mkdir(archiveDir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(archiveDir);
   const activity = newManagedCommandActivity();
   const result = await withHeartbeat(
     `importer=${opts.importer} step=exact-store-archive`,

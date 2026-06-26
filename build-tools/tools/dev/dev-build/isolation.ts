@@ -67,7 +67,7 @@ export function createIsolation(opts: CreateIsolationOptions = {}): Isolation {
   const isolationFlags: string[] =
     process.env.BUCK_NO_ISOLATION === "1" ? [] : ["--isolation-dir", buckIsolation];
   async function killIsolationIfOwned() {
-    if (!createdOwnIsolation) return;
+    if (!createdOwnIsolation || !killOnExit) return;
     try {
       await $`buck2 --isolation-dir ${buckIsolation} kill`;
     } catch {}

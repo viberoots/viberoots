@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { spawnVerifyBuck2Tests } from "./buck2-test";
+import { previewVerifyNestedBuckIsolation } from "./buck2-test-env";
 import {
   groupVerifyPassesForExecution,
   isSerialVerifyPass,
@@ -15,6 +16,7 @@ import {
   summarizeVerifyTargetPlan,
 } from "./target-passes";
 import type { VerifyExecutionPolicy } from "./remote-policy";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 
 async function appendVerifyPassLog(file: string | null, line: string): Promise<void> {
   if (!file) return;
@@ -31,6 +33,29 @@ function terminatePassProcessGroup(pgid: number): void {
     } catch {}
   }, 10_000);
   timer.unref?.();
+}
+
+export async function prepareVerifyBuckIsolationMetadata(opts: {
+  root: string;
+  passIso: string;
+  nestedIso: string;
+  platform?: NodeJS.Platform;
+}): Promise<void> {
+  const buckOut = path.join(opts.root, "buck-out");
+  const dirs = [
+    buckOut,
+    path.join(buckOut, opts.passIso),
+    path.join(buckOut, opts.passIso, "forkserver"),
+    path.join(buckOut, opts.passIso, "test-logs"),
+    path.join(buckOut, opts.passIso, "tmp"),
+    path.join(buckOut, opts.nestedIso),
+    path.join(buckOut, opts.nestedIso, "forkserver"),
+    path.join(buckOut, opts.nestedIso, "test-logs"),
+    path.join(buckOut, opts.nestedIso, "tmp"),
+  ];
+  for (const dir of dirs) {
+    await mkdirWithMacosMetadataExclusion(dir, opts.platform).catch(() => {});
+  }
 }
 
 export async function runVerifyBuckPasses(opts: {
@@ -85,6 +110,11 @@ export async function runVerifyBuckPasses(opts: {
       opts.logFile,
       `[verify] target pass begin name=${pass.name} index=${index + 1}/${passes.length} iso=${passIso} start_s=${startS} target_count=${pass.targets.length} targets=${pass.targets.join(" ")}`,
     );
+    await prepareVerifyBuckIsolationMetadata({
+      root: opts.root,
+      passIso,
+      nestedIso: previewVerifyNestedBuckIsolation(passIso, pass.name),
+    });
     const spawned = spawnVerifyBuck2Tests({
       root: opts.root,
       iso: passIso,

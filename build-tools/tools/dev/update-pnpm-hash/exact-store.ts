@@ -3,6 +3,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import {
   sharedExactPnpmStateIndexPath,
   sharedExactPnpmStateRoot,
@@ -25,16 +26,19 @@ function canonicalFlakeRoot(root: string): string {
   }
 }
 
-function resolveFlakePnpmProgram(repoRoot: string): string {
+function currentHostSystem(): string {
+  const platform = process.platform;
+  const arch = process.arch;
+  if (platform === "darwin" && arch === "arm64") return "aarch64-darwin";
+  if (platform === "linux" && arch === "arm64") return "aarch64-linux";
+  if (platform === "linux" && arch === "x64") return "x86_64-linux";
+  throw new Error(`unsupported host system for flake pnpm lookup: ${platform}/${arch}`);
+}
+
+function resolveFlakePnpmProgram(repoRoot: string, timeoutMs: number): string {
   const flakeRoot = canonicalFlakeRoot(repoRoot);
-  const system = execFileSync(
-    "nix",
-    ["eval", "--impure", "--raw", "--expr", "builtins.currentSystem"],
-    {
-      encoding: "utf8",
-      timeout: 30_000,
-    },
-  ).trim();
+  const evalTimeoutMs = Math.max(timeoutMs, 120_000);
+  const system = currentHostSystem();
   const program = execFileSync(
     "nix",
     [
@@ -46,7 +50,7 @@ function resolveFlakePnpmProgram(repoRoot: string): string {
     ],
     {
       encoding: "utf8",
-      timeout: 120_000,
+      timeout: evalTimeoutMs,
     },
   ).trim();
   if (program.startsWith("/nix/store/") && !fs.existsSync(program)) {
@@ -55,7 +59,7 @@ function resolveFlakePnpmProgram(repoRoot: string): string {
       ["run", "--accept-flake-config", "--impure", `path:${flakeRoot}#pnpm`, "--", "--version"],
       {
         encoding: "utf8",
-        timeout: 120_000,
+        timeout: evalTimeoutMs,
         stdio: "pipe",
       },
     );
@@ -103,7 +107,7 @@ async function pruneSupersededExactStoreForImporter(
       });
     }
   } catch {}
-  await fsp.mkdir(path.dirname(indexPath), { recursive: true });
+  await mkdirWithMacosMetadataExclusion(path.dirname(indexPath));
   const tmp = `${indexPath}.${process.pid}.${Date.now()}.tmp`;
   await fsp.writeFile(
     tmp,
@@ -216,11 +220,6 @@ export async function prepareExactPnpmStore(opts: {
   const fetchTimeout = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "").trim() || "600";
   const timeoutMs = (Number.parseInt(fetchTimeout, 10) || 600) * 1000 + 120_000;
   const lockHash = await sha256HexFile(lockfileAbs);
-  const rootEnv = { ...process.env, WORKSPACE_ROOT: opts.repoRoot };
-  const roots = resolveWorkspaceRootsSync({ start: opts.repoRoot, env: rootEnv });
-  const pnpmPath = resolveFlakePnpmProgram(
-    opts.viberootsRoot || tempViberootsRootFromEnv() || roots.viberootsRoot,
-  );
   const cacheDir = await sharedExactPnpmStateRoot(lockHash);
   await pruneSupersededExactStoreForImporter(opts.repoRoot, opts.importer, lockHash);
   const storeDir = path.join(cacheDir, "store");
@@ -258,10 +257,16 @@ export async function prepareExactPnpmStore(opts: {
     }
   };
   let preparedMarker = await readMarker();
-  await fsp.mkdir(cacheDir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(cacheDir);
   await withExactStoreLock(lockPath, async () => {
     preparedMarker = await readMarker();
     if (preparedMarker) return;
+    const rootEnv = { ...process.env, WORKSPACE_ROOT: opts.repoRoot };
+    const roots = resolveWorkspaceRootsSync({ start: opts.repoRoot, env: rootEnv });
+    const pnpmPath = resolveFlakePnpmProgram(
+      opts.viberootsRoot || tempViberootsRootFromEnv() || roots.viberootsRoot,
+      timeoutMs,
+    );
     const { workspaceFileAbs, hadLocalWorkspaceFile } =
       await ensureLocalWorkspaceMarker(importerAbs);
     try {
@@ -269,8 +274,8 @@ export async function prepareExactPnpmStore(opts: {
       await removeExactStoreArchive(cacheDir);
       await fsp.rm(storeDir, { recursive: true, force: true }).catch(() => {});
       await fsp.rm(homeDir, { recursive: true, force: true }).catch(() => {});
-      await fsp.mkdir(homeDir, { recursive: true });
-      await fsp.mkdir(storeDir, { recursive: true });
+      await mkdirWithMacosMetadataExclusion(homeDir);
+      await mkdirWithMacosMetadataExclusion(storeDir);
       await fetchExactPnpmStore({
         importer: opts.importer,
         importerAbs,

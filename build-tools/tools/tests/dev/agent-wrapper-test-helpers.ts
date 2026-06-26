@@ -21,7 +21,12 @@ export const viberootsRoot = (() => {
   return repoRoot;
 })();
 export const scratchRoot = path.join(repoRoot, "buck-out", "tmp");
-export const externalScratchRoot = path.join(os.tmpdir(), "viberoots-agent-wrapper-tests");
+export const externalScratchRoot = path.join(
+  os.tmpdir(),
+  process.platform === "darwin"
+    ? "viberoots-agent-wrapper-tests.noindex"
+    : "viberoots-agent-wrapper-tests",
+);
 
 export function binWrapper(name: string): string {
   return path.join(viberootsRoot, "build-tools", "tools", "bin", name);

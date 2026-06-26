@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
+import { mkdtempNoindex } from "../../lib/macos-metadata";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 
 async function exists(p: string): Promise<boolean> {
@@ -106,7 +106,7 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
   }
 
   const beforeHash = await sha256File(path.join(dir, "gomod2nix.toml"));
-  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "gomod2nix-"));
+  const tmp = await mkdtempNoindex("gomod2nix-", { baseName: "gomod2nix" });
   try {
     if (hasGoMod) await fsp.copyFile(path.join(dir, "go.mod"), path.join(tmp, "go.mod"));
     if (hasGoSum) await fsp.copyFile(path.join(dir, "go.sum"), path.join(tmp, "go.sum"));

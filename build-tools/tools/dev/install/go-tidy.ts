@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
+import { mkdtempNoindex } from "../../lib/macos-metadata";
 
 export async function runGoModTidyForMissingSum(
   root: string,
@@ -30,7 +30,7 @@ export async function runGoModTidyForMissingSum(
           console.log(`[go] dry-run: (missing go.sum) in .: go mod tidy (isolated)`);
         } else {
           if (verbose) console.log(`[go] go mod tidy (isolated) for .`);
-          const tmpTidy = await fsp.mkdtemp(path.join(os.tmpdir(), "go-tidy-"));
+          const tmpTidy = await mkdtempNoindex("go-tidy-", { baseName: "go-tidy" });
           try {
             await fsp.copyFile(path.join(baseAbs, "go.mod"), path.join(tmpTidy, "go.mod"));
             await $({ cwd: tmpTidy, stdio: "inherit" })`go mod tidy`;

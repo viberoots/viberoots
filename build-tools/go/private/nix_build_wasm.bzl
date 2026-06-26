@@ -21,8 +21,13 @@ def _go_nix_build_wasm_impl(ctx):
         "SAFE_LOG_KEY=\"%s\"; " % raw
         + "SAFE_LOG_KEY=\"${SAFE_LOG_KEY//\\//_}\"; "
         + "SAFE_LOG_KEY=\"${SAFE_LOG_KEY//:/_}\"; "
-        + "BUILD_SELECTED_LOG=\"$WORKSPACE_ROOT/buck-out/tmp/build-selected/go_nix_build_wasm_build.${SAFE_LOG_KEY}.log\"; "
-        + "mkdir -p \"$(dirname \"$BUILD_SELECTED_LOG\")\"; "
+        + "BUILD_SELECTED_LOG_DIR=\"$WORKSPACE_ROOT/buck-out/tmp/build-selected\"; "
+        + "BUILD_SELECTED_LOG=\"$BUILD_SELECTED_LOG_DIR/go_nix_build_wasm_build.${SAFE_LOG_KEY}.log\"; "
+        + "mkdir -p \"$BUILD_SELECTED_LOG_DIR\"; "
+        + "GO_WASM_UNAME_FILE=\"$BUILD_SELECTED_LOG_DIR/uname.txt\"; "
+        + "GO_WASM_UNAME=\"\"; "
+        + "if uname -s > \"$GO_WASM_UNAME_FILE\" 2>/dev/null; then if read -r GO_WASM_UNAME < \"$GO_WASM_UNAME_FILE\" 2>/dev/null; then :; else GO_WASM_UNAME=\"\"; fi; else GO_WASM_UNAME=\"\"; fi; "
+        + "if [ \"$GO_WASM_UNAME\" = \"Darwin\" ]; then [ ! -e \"$WORKSPACE_ROOT/buck-out/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/buck-out/.metadata_never_index\"; [ ! -e \"$WORKSPACE_ROOT/buck-out/tmp/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/buck-out/tmp/.metadata_never_index\"; [ ! -e \"$BUILD_SELECTED_LOG_DIR/.metadata_never_index\" ] && : > \"$BUILD_SELECTED_LOG_DIR/.metadata_never_index\"; fi; "
     )
     run_and_copy = (
         "DEST=\"$0\"; case \"$DEST\" in /*) ;; *) DEST=\"$PWD/$DEST\" ;; esac; "

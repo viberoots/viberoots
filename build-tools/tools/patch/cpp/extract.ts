@@ -1,13 +1,9 @@
 import * as fsp from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { createDbg } from "../lib/util";
 import { encodeNixAttrForPatchPrefix, normalizeNixAttr } from "../../lib/providers";
 import { copyTree } from "../../lib/copy-tree";
-import {
-  markMacosMetadataNeverIndex,
-  mkdirWithMacosMetadataExclusion,
-} from "../../lib/macos-metadata";
+import { mkdtempNoindex } from "../../lib/macos-metadata";
 import { resolveNixpkg } from "./resolve";
 import { chmodRecursive } from "../cross-platform";
 
@@ -60,11 +56,12 @@ export async function ensureOriginAndWorkspace(
   const { pname, version, srcPath } = pre || (await resolveNixpkg(attrNorm));
   const key = `${attrNorm}@${version}`.toLowerCase();
   const safeKey = encodeNixAttrForPatchPrefix(key);
-  const base = path.join(os.tmpdir(), "viberoots-patch-cpp");
-  await mkdirWithMacosMetadataExclusion(base);
-  const originRoot = await fsp.mkdtemp(path.join(base, `origin-${safeKey}-`));
-  const wsRoot = await fsp.mkdtemp(path.join(base, `ws-${safeKey}-`));
-  await Promise.all([markMacosMetadataNeverIndex(originRoot), markMacosMetadataNeverIndex(wsRoot)]);
+  const originRoot = await mkdtempNoindex(`origin-${safeKey}-`, {
+    baseName: "viberoots-patch-cpp",
+  });
+  const wsRoot = await mkdtempNoindex(`ws-${safeKey}-`, {
+    baseName: "viberoots-patch-cpp",
+  });
   const originPath = await extractOrCopySrc(srcPath, originRoot);
   // Create workspace by cloning originPath
   await copyTree(originPath, wsRoot, { cloneMode: "try", force: true });

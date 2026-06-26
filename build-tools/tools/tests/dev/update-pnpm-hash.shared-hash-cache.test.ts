@@ -13,10 +13,13 @@ import {
   writeSharedHashCache,
 } from "../../dev/update-pnpm-hash/verified-marker";
 
-test("shared pnpm-store hash cache is keyed by lock hash and importer-aware builder fingerprint", async () => {
+test("shared pnpm-store hash cache can use an explicit durable root", async () => {
   const repoRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "pnpm-shared-cache-"));
   const prevRepoRoot = process.env.REPO_ROOT;
-  process.env.REPO_ROOT = repoRoot;
+  const prevSharedRoot = process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT;
+  const durableRoot = path.join(repoRoot, "durable-cache-root");
+  process.env.REPO_ROOT = path.join(repoRoot, "temp-repo");
+  process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = durableRoot;
   try {
     await writeSharedHashCache(repoRoot, {
       lockHash: "lock-a",
@@ -48,14 +51,20 @@ test("shared pnpm-store hash cache is keyed by lock hash and importer-aware buil
       }),
       null,
     );
+    const durableEntries = await fsp.readdir(
+      path.join(durableRoot, ".viberoots", "workspace", "buck", "pnpm-store-hash-cache"),
+    );
+    assert.deepEqual(durableEntries, ["builder-1"]);
   } finally {
     if (prevRepoRoot === undefined) delete process.env.REPO_ROOT;
     else process.env.REPO_ROOT = prevRepoRoot;
+    if (prevSharedRoot === undefined) delete process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT;
+    else process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = prevSharedRoot;
     await fsp.rm(repoRoot, { recursive: true, force: true });
   }
 });
 
-test("non-default pnpm-store hash refresh verifies shared-cache hits", async () => {
+test("non-default pnpm-store hash refresh restores shared-cache hits without rebuilding", async () => {
   const repoRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "pnpm-shared-cache-lock-"));
   const prevRepoRoot = process.env.REPO_ROOT;
   const prevCwd = process.cwd();
@@ -65,6 +74,7 @@ test("non-default pnpm-store hash refresh verifies shared-cache hits", async () 
   const key = "projects/libs/demo/pnpm-lock.yaml";
   const markerPath = path.join(repoRoot, "buck-out", "tmp", "pnpm-store-verified.demo.json");
   const fixedPhases: string[] = [];
+  let prepareCount = 0;
 
   process.env.REPO_ROOT = repoRoot;
   process.chdir(repoRoot);
@@ -128,7 +138,9 @@ test("non-default pnpm-store hash refresh verifies shared-cache hits", async () 
         runUnfixedBuild: async () => {
           throw new Error("shared-cache verification test should not run unfixed build");
         },
-        prepareExactStore: async () => {},
+        prepareExactStore: async () => {
+          prepareCount++;
+        },
       });
 
     assert.deepEqual(await Promise.all([runOne(), runOne()]), [true, true]);
@@ -136,6 +148,7 @@ test("non-default pnpm-store hash refresh verifies shared-cache hits", async () 
       "importer=projects/libs/demo step=fixed-build attr=pnpm-store.projects-libs-demo",
       "importer=projects/libs/demo step=fixed-build-after-hash attr=pnpm-store.projects-libs-demo",
     ]);
+    assert.equal(prepareCount, 1);
     assert.equal(await readSharedHashCache({ repoRoot, builderFingerprint, lockHash }), hashValue);
   } finally {
     process.chdir(prevCwd);
@@ -242,6 +255,7 @@ test("shared pnpm-store hash cache reuses verified identical lockfiles across im
   const lockHash = `lock-${path.basename(repoRoot)}`;
   const sharedCacheBuilderFingerprint = "shared-store-builder";
   const fixedPhases: string[] = [];
+  const preparedImporters: string[] = [];
 
   process.env.REPO_ROOT = repoRoot;
   process.chdir(repoRoot);
@@ -311,7 +325,9 @@ test("shared pnpm-store hash cache reuses verified identical lockfiles across im
         runUnfixedBuild: async () => {
           throw new Error("cross-importer shared-cache test should not run unfixed build");
         },
-        prepareExactStore: async () => {},
+        prepareExactStore: async () => {
+          preparedImporters.push(importer);
+        },
       });
     };
 
@@ -321,6 +337,7 @@ test("shared pnpm-store hash cache reuses verified identical lockfiles across im
       "importer=projects/apps/demo-a step=fixed-build attr=pnpm-store.projects-apps-demo-a",
       "importer=projects/apps/demo-a step=fixed-build-after-hash attr=pnpm-store.projects-apps-demo-a",
     ]);
+    assert.deepEqual(preparedImporters, ["projects/apps/demo-b"]);
     assert.equal(
       await readSharedHashCache({
         repoRoot,
@@ -341,14 +358,100 @@ test("shared pnpm-store hash cache reuses verified identical lockfiles across im
   }
 });
 
-test("shared cache fingerprint excludes importer identity while verified marker fingerprint remains importer-aware", async () => {
+test("non-default marker fast path does not rebuild already verified hashes", async () => {
+  const repoRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "pnpm-marker-fastpath-"));
+  const prevRepoRoot = process.env.REPO_ROOT;
+  const prevCwd = process.cwd();
+  const verifiedHash = "sha256-fffffffffffffffffffffffffffffffffffffffffff=";
+  const builderFingerprint = `builder-${path.basename(repoRoot)}`;
+  const lockHash = `lock-${path.basename(repoRoot)}`;
+  const key = "projects/apps/demo/pnpm-lock.yaml";
+  const markerPath = path.join(repoRoot, "buck-out", "tmp", "pnpm-store-verified.demo.json");
+  let prepared = false;
+
+  process.env.REPO_ROOT = repoRoot;
+  process.chdir(repoRoot);
+  try {
+    await fsp.mkdir(path.join(repoRoot, "projects", "apps", "demo"), { recursive: true });
+    await fsp.writeFile(
+      path.join(repoRoot, "projects", "node-modules.hashes.json"),
+      JSON.stringify({ [key]: verifiedHash }, null, 2) + "\n",
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(repoRoot, "projects", "apps", "demo", "package.json"),
+      '{"scripts":{}}\n',
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(repoRoot, key),
+      [
+        "lockfileVersion: '9.0'",
+        "",
+        "settings:",
+        "  autoInstallPeers: true",
+        "  excludeLinksFromLockfile: false",
+        "",
+        "importers:",
+        "  .: {}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    assert.equal(
+      await handleNonDefaultImporter({
+        importer: "projects/apps/demo",
+        key,
+        repoRoot,
+        builderFingerprint,
+        storeAttr: "pnpm-store.projects-apps-demo",
+        unfixedAttr: "pnpm-store-unfixed.projects-apps-demo",
+        timeoutSec: "600",
+        force: false,
+        markerPath,
+        hasValidExistingHash: true,
+        existingHash: verifiedHash,
+        existingLockHash: lockHash,
+        existingMarker: {
+          importer: "projects/apps/demo",
+          lockfile: key,
+          lockHash,
+          hashValue: verifiedHash,
+          builderFingerprint,
+        },
+        acceptedBuilderFingerprints: [builderFingerprint],
+        runFixedBuild: async (phaseLabel) => {
+          throw new Error(`matching marker fast path should not run fixed build: ${phaseLabel}`);
+        },
+        runUnfixedBuild: async () => {
+          throw new Error("matching marker fast path should not run unfixed build");
+        },
+        prepareExactStore: async () => {
+          prepared = true;
+        },
+      }),
+      true,
+    );
+    assert.equal(prepared, true);
+    const marker = await readVerifiedMarker(markerPath);
+    assert.equal(marker?.hashValue, verifiedHash);
+  } finally {
+    process.chdir(prevCwd);
+    if (prevRepoRoot === undefined) delete process.env.REPO_ROOT;
+    else process.env.REPO_ROOT = prevRepoRoot;
+    await fsp.rm(repoRoot, { recursive: true, force: true });
+  }
+});
+
+test("shared cache fingerprint excludes package identity while verified marker fingerprint remains importer-aware", async () => {
   const repoRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "pnpm-shared-cache-fingerprint-"));
   try {
     for (const name of ["demo-a", "demo-b"]) {
       await fsp.mkdir(path.join(repoRoot, "projects", "apps", name), { recursive: true });
       await fsp.writeFile(
         path.join(repoRoot, "projects", "apps", name, "package.json"),
-        JSON.stringify({ private: true }, null, 2) + "\n",
+        JSON.stringify({ name, private: true, scripts: { build: `echo ${name}` } }, null, 2) + "\n",
         "utf8",
       );
     }

@@ -1,0 +1,8 @@
+{
+  "sourceFileSizeExceptions": [
+    {
+      "path": "defs_stage.bzl",
+      "justification": "Pre-existing oversized Node stage macro pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    }
+  ]
+}

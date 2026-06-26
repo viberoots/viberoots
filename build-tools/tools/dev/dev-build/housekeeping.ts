@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { nodeBin, zxNodeBase } from "./paths";
 
@@ -37,7 +38,7 @@ async function olderThanMinutes(p: string, min: number): Promise<boolean> {
 
 async function touch(p: string): Promise<void> {
   try {
-    await fsp.mkdir(path.dirname(p), { recursive: true }).catch(() => {});
+    await mkdirWithMacosMetadataExclusion(path.dirname(p)).catch(() => {});
     await fsp.writeFile(p, `${Date.now()}`, "utf8");
   } catch {}
 }
@@ -66,7 +67,7 @@ export async function runHousekeeping(opts: { isCI: boolean; root: string }): Pr
     }
 
     const hkDir = path.join(opts.root, "buck-out", ".housekeeping");
-    await fsp.mkdir(hkDir, { recursive: true }).catch(() => {});
+    await mkdirWithMacosMetadataExclusion(hkDir).catch(() => {});
     const optStamp = path.join(hkDir, ".optimize-stamp");
     const gcStamp = path.join(hkDir, ".gc-stamp");
     const gcLevelFile = path.join(hkDir, ".gc-level");

@@ -4,6 +4,7 @@ import path from "node:path";
 import { collectDeps } from "../lib/node-deps-enforcement-core";
 import { toPosixPath } from "../lib/posix-path";
 import { getImporterRootsContract } from "../lib/importer-roots";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { sanitizeName } from "../lib/sanitize";
 import { writeIfChanged } from "../lib/fs-helpers";
 import { resolveModuleContractsPaths, type ModuleContractsPaths } from "./module-contract-paths";
@@ -216,7 +217,7 @@ export async function syncModuleContractsForApp(args: {
       ?.moduleKey || tsModules[0]!.moduleKey;
   const wasmManifestText = manifestJson(1, wasmDefault, wasmModules);
   const tsManifestText = manifestJson(1, tsDefault, tsModules);
-  await fsp.mkdir(paths.contractsDir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(paths.contractsDir);
   await writeIfChanged(paths.wasmManifestPath, wasmManifestText);
   await writeIfChanged(paths.tsManifestPath, tsManifestText);
   const manifestDir = graphSurfaceData.appLabels.includes("framework:next")

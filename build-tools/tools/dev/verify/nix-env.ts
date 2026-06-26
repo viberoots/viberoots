@@ -2,11 +2,12 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import "zx/globals";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { nixEvalTempDirOutsideWorkspace, pinnedNixpkgsOutPathExpr } from "../../lib/pinned-nixpkgs";
 
 export async function ensureVerifyPinnedNixpkgs(root: string): Promise<void> {
   const nixEvalTmp = nixEvalTempDirOutsideWorkspace(root);
-  await fsp.mkdir(nixEvalTmp, { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(nixEvalTmp).catch(() => {});
   const hiddenLock = path.join(root, ".viberoots", "workspace", "flake.lock");
   const rootLock = path.join(root, "flake.lock");
   const lockPath = await fsp

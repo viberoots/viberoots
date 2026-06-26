@@ -289,6 +289,29 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
       );
     }
   }
+  const currentFingerprintBody = verifiedMarker.match(
+    /export async function currentVerifiedMarkerFingerprint\([\s\S]*?return await verifiedMarkerFingerprintForFiles\(([\s\S]*?)\);\n}/,
+  )?.[1];
+  const sharedCacheFingerprintBody = verifiedMarker.match(
+    /export async function currentSharedPnpmStoreHashCacheFingerprint\([\s\S]*?return await verifiedMarkerFingerprintForFiles\(([\s\S]*?)\);\n}/,
+  )?.[1];
+  const candidatesBody = verifiedMarker.match(
+    /export async function currentVerifiedMarkerFingerprintCandidates\([\s\S]*?\n}/,
+  )?.[0];
+  if (
+    !currentFingerprintBody ||
+    !currentFingerprintBody.includes("pnpmStoreBuilderFingerprintFiles") ||
+    currentFingerprintBody.includes("exactStoreProvisioningFingerprintFiles") ||
+    !sharedCacheFingerprintBody ||
+    !sharedCacheFingerprintBody.includes("exactStoreProvisioningFingerprintFiles") ||
+    !candidatesBody ||
+    !candidatesBody.includes("currentVerifiedMarkerFingerprint") ||
+    !candidatesBody.includes("exactStoreProvisioningFingerprintFiles")
+  ) {
+    throw new Error(
+      "verified marker primary/cache fingerprints must separate pnpm-store builder inputs from exact-store provisioning inputs",
+    );
+  }
   if (
     verifiedMarker.includes("viberoots/build-tools/tools/dev/update-pnpm-hash/realized-store.ts")
   ) {

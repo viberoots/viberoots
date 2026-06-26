@@ -72,6 +72,15 @@ in {
         export PATH="$vbr_nix_bin:$repo_prefix''${nix_prefix:+:$nix_prefix}''${host_tail:+:$host_tail}"
       }
 
+      _vbr_mark_macos_metadata_never_index() {
+        local dir="$1"
+        [ -n "$dir" ] || return 0
+        mkdir -p "$dir" 2>/dev/null || true
+        if [ "$(uname -s 2>/dev/null || true)" = "Darwin" ]; then
+          : > "$dir/.metadata_never_index" 2>/dev/null || true
+        fi
+      }
+
       link_script="$PWD/build-tools/tools/dev/devshell-link-node-modules.ts"
       if [ -f "$link_script" ]; then
         if [ -e node_modules ] && [ ! -L node_modules ]; then
@@ -150,7 +159,11 @@ EOF
       unalias i b v t >/dev/null 2>&1 || true
       
       cache_dir="$PWD/.viberoots/workspace/buck/tmp/devshell-cache"
-      mkdir -p "$cache_dir" 2>/dev/null || true
+      _vbr_mark_macos_metadata_never_index "$PWD/.viberoots"
+      _vbr_mark_macos_metadata_never_index "$PWD/.viberoots/workspace"
+      _vbr_mark_macos_metadata_never_index "$PWD/.viberoots/workspace/buck"
+      _vbr_mark_macos_metadata_never_index "$PWD/.viberoots/workspace/buck/tmp"
+      _vbr_mark_macos_metadata_never_index "$cache_dir"
       lock_hash=""
       if [ -f flake.lock ]; then
         if command -v shasum >/dev/null 2>&1; then
@@ -191,7 +204,8 @@ EOF
           vbr_source="$PWD"
         elif [ -f "$PWD/viberoots/flake.nix" ]; then
           vbr_source="$PWD/viberoots"
-          mkdir -p "$PWD/.viberoots" "$PWD/.viberoots/workspace"
+          _vbr_mark_macos_metadata_never_index "$PWD/.viberoots"
+          _vbr_mark_macos_metadata_never_index "$PWD/.viberoots/workspace"
           if [ "$(readlink "$PWD/.viberoots/current" 2>/dev/null || true)" != "../viberoots" ]; then
             rm -f "$PWD/.viberoots/current"
             ln -s ../viberoots "$PWD/.viberoots/current"

@@ -13,6 +13,10 @@
       "justification": "Legacy planner entrypoint sketch remains checked in as one reviewed Nix file pending decomposition."
     },
     {
+      "path": "node-modules/modules.nix",
+      "justification": "Pre-existing oversized pnpm node_modules Nix module pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
       "path": "node-modules/store.nix",
       "justification": "Legacy pnpm store template keeps fixed and unfixed paths together pending decomposition."
     },

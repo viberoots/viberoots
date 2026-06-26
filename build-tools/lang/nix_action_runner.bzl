@@ -34,7 +34,8 @@ def nix_action_export_graph_cmd(
         roots = WORKSPACE_IMPORTER_ROOTS if WORKSPACE_IMPORTER_ROOTS else ["apps", "libs"]
         query_roots = ",".join(roots + ["go", "cpp", "third_party"])
     return (
-        "mkdir -p \"$WORKSPACE_ROOT/.viberoots/workspace/buck\"; "
+        "mkdir -p \"$WORKSPACE_ROOT/.viberoots\" \"$WORKSPACE_ROOT/.viberoots/workspace\" \"$WORKSPACE_ROOT/.viberoots/workspace/buck\"; "
+        + "if [ \"$(uname -s 2>/dev/null || true)\" = \"Darwin\" ]; then [ ! -e \"$WORKSPACE_ROOT/.viberoots/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/.viberoots/.metadata_never_index\"; [ ! -e \"$WORKSPACE_ROOT/.viberoots/workspace/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/.viberoots/workspace/.metadata_never_index\"; [ ! -e \"$WORKSPACE_ROOT/.viberoots/workspace/buck/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/.viberoots/workspace/buck/.metadata_never_index\"; fi; "
         + "VBR_NODE_ZX_INIT=\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
         + "if command -v node >/dev/null 2>&1; then "
         + ("  BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_QUERY_ROOTS=\"%s\" " % query_roots)
@@ -54,10 +55,14 @@ def nix_action_build_selected_out_path_cmd(
         out_var = "OUT_PATH",
         raw_var = "OUT_RAW",
         status_var = "NIX_STATUS",
-        log_file = "/tmp/build-selected.log",
+        log_file = "$WORKSPACE_ROOT/buck-out/tmp/build-selected/build-selected.log",
         zx_wrapper = "path:$VIBEROOTS_ROOT#zx-wrapper"):
     return (
         "ZX_WRAPPER_REF=\"%s\"; " % zx_wrapper
+        + ("VBR_BUILD_SELECTED_LOG=\"%s\"; " % log_file)
+        + "case \"$VBR_BUILD_SELECTED_LOG\" in /*) VBR_BUILD_SELECTED_LOG_DIR=\"$(dirname \"$VBR_BUILD_SELECTED_LOG\")\" ;; *) VBR_BUILD_SELECTED_LOG_DIR=\"$(dirname \"${WORKSPACE_ROOT:-$PWD}/$VBR_BUILD_SELECTED_LOG\")\" ;; esac; "
+        + "mkdir -p \"$VBR_BUILD_SELECTED_LOG_DIR\"; "
+        + "if [ \"$(uname -s 2>/dev/null || true)\" = \"Darwin\" ]; then [ ! -e \"$VBR_BUILD_SELECTED_LOG_DIR/.metadata_never_index\" ] && : > \"$VBR_BUILD_SELECTED_LOG_DIR/.metadata_never_index\"; fi; "
         + "VBR_NODE_ZX_INIT=\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
         + "BUCK_TEST_SRC=\"$WORKSPACE_ROOT\"; "
         + ("BUCK_TARGET=\"%s\"; " % target_label)
@@ -70,7 +75,7 @@ def nix_action_build_selected_out_path_cmd(
         + "else "
         + "${TIMEOUT:+$TIMEOUT }nix run --accept-flake-config \"$ZX_WRAPPER_REF\" -- "
         + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/build-selected.ts\"; "
-        + ("fi 2> \"%s\"); " % log_file)
+        + "fi 2> \"$VBR_BUILD_SELECTED_LOG\"); "
         + ("%s=$?; set -e; " % status_var)
         + (
             "%s=$(printf %s \"$%s\" | sed -E 's/\\x1B\\[[0-9;]*[A-Za-z]//g' | tr -d '\\r'); "

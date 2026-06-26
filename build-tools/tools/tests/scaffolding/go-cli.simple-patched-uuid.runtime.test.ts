@@ -195,12 +195,36 @@ async function writeGoSumFromDownload(
 }
 
 async function readPinnedNixpkgsUrl(tmpRepoRoot: string): Promise<string> {
-  // Pin nixpkgs to the repo's flake.lock to avoid nondeterministic Go toolchain/tag selection
+  const nixPathEntry = String(process.env.NIX_PATH || "")
+    .split(":")
+    .find((entry) => entry.startsWith("nixpkgs="));
+  const nixPath = nixPathEntry?.slice("nixpkgs=".length).trim();
+  if (nixPath && path.isAbsolute(nixPath) && (await fsp.stat(nixPath).catch(() => null))) {
+    return `path:${nixPath}`;
+  }
+
+  // Pin nixpkgs to the repo's flake.lock to avoid nondeterministic Go toolchain/tag selection.
+  // Temp repos usually carry the viberoots workspace lock, not a root flake.lock.
+  const lockPaths = [
+    path.join(tmpRepoRoot, ".viberoots", "workspace", "flake.lock"),
+    path.join(tmpRepoRoot, "flake.lock"),
+  ];
+  for (const lockPath of lockPaths) {
+    const lockedUrl = await readNixpkgsUrlFromLock(lockPath);
+    if (lockedUrl) return lockedUrl;
+  }
+
+  throw new Error(
+    `could not resolve pinned nixpkgs for temp repo ${tmpRepoRoot}; expected NIX_PATH nixpkgs=... or a local flake.lock`,
+  );
+}
+
+async function readNixpkgsUrlFromLock(lockPath: string): Promise<string | null> {
   try {
-    const lockPath = path.join(tmpRepoRoot, "flake.lock");
     const txt = await fsp.readFile(lockPath, "utf8");
     const lock = JSON.parse(txt);
-    const node = (lock?.nodes?.nixpkgs || lock?.nodes?.root?.inputs?.nixpkgs) && lock.nodes.nixpkgs;
+    const inputName = lock?.nodes?.root?.inputs?.nixpkgs || "nixpkgs";
+    const node = lock?.nodes?.[inputName] || lock?.nodes?.nixpkgs;
     const locked = node?.locked || {};
     const owner = locked.owner || "NixOS";
     const repo = locked.repo || "nixpkgs";
@@ -209,8 +233,7 @@ async function readPinnedNixpkgsUrl(tmpRepoRoot: string): Promise<string> {
       return `github:${owner}/${repo}/${rev}`;
     }
   } catch {}
-  // Fallback to a moving channel if lock is unavailable in the temp repo (should be rare)
-  return "github:NixOS/nixpkgs/nixos-unstable";
+  return null;
 }
 
 test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () => {

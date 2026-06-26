@@ -1,7 +1,7 @@
 import { createSign } from "node:crypto";
 import * as fsp from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
+import { mkdtempNoindex } from "../lib/macos-metadata";
 
 export type ReviewedSourceGithubAppCredentialFiles = {
   mode: "github-app";
@@ -30,7 +30,9 @@ export async function githubAppGitFetchEnv(
     privateKey,
     jwt: githubAppJwt({ appId, privateKey }),
   });
-  const tmpDir = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-github-app-askpass-"));
+  const tmpDir = await mkdtempNoindex("vbr-github-app-askpass-", {
+    baseName: "vbr-github-app-askpass",
+  });
   const askpass = path.join(tmpDir, "askpass.sh");
   await fsp.writeFile(askpass, `#!/bin/sh\nprintf '%s\\n' '${token.replace(/'/g, "'\\''")}'\n`, {
     mode: 0o700,

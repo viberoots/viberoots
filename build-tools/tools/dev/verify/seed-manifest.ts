@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged } from "../../lib/fs-helpers";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 
 export async function writeVerifySeedRemoteManifest(opts: {
   root: string;
@@ -13,7 +14,7 @@ export async function writeVerifySeedRemoteManifest(opts: {
     "verify-seed",
     "remote-ready-manifest.json",
   );
-  await fsp.mkdir(path.dirname(manifestPath), { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(path.dirname(manifestPath)).catch(() => {});
   await writeIfChanged(
     manifestPath,
     JSON.stringify(

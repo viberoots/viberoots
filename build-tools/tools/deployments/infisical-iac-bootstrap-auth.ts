@@ -1,9 +1,9 @@
 import * as fs from "node:fs/promises";
-import * as os from "node:os";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
 import type { BootstrapArgs, CommandRunner } from "./infisical-iac-bootstrap-types";
 import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
+import { mkdtempNoindex } from "../lib/macos-metadata";
 
 export const spawnCommandRunner: CommandRunner = (opts) => {
   const result = spawnSync(opts.command, opts.args, {
@@ -57,7 +57,9 @@ export async function getAccessToken(
       `missing Infisical access token env var: ${args.accessTokenEnv}; remove --no-login or export a token`,
     );
   }
-  const tempHome = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-iac-bootstrap-home-"));
+  const tempHome = await mkdtempNoindex("infisical-iac-bootstrap-home-", {
+    baseName: "infisical-iac-bootstrap-home",
+  });
   const cliEnv = isolatedCliEnv(tempHome, args.cliDomain);
   try {
     runner({

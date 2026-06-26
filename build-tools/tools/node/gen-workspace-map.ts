@@ -6,6 +6,7 @@ import { writeIfChanged } from "../lib/fs-helpers";
 import { readCompositeGraph } from "../lib/graph-view";
 import { isWorkspaceImporterPath } from "../lib/importers";
 import { normalizeTargetLabel, parseLockfileLabel } from "../lib/labels";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { collectDeps, listImporters } from "../lib/node-deps-enforcement-core";
 import { repoRoot } from "../lib/repo";
 import { DEFAULT_NODE_WORKSPACE_MAP_PATH } from "../lib/workspace-state-paths";
@@ -185,7 +186,7 @@ async function main(): Promise<void> {
   for (const k of Object.keys(mapping).sort((a, b) => a.localeCompare(b))) {
     ordered[k] = mapping[k];
   }
-  await fsp.mkdir(path.dirname(outPath), { recursive: true });
+  await mkdirWithMacosMetadataExclusion(path.dirname(path.resolve(outPath)));
   await writeIfChanged(outPath, JSON.stringify(ordered, null, 2) + "\n");
 }
 

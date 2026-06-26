@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { sampleVerifyProcessLines } from "./buck2-failure-diagnostics";
 
 type BuckArtifactFile = {
@@ -61,7 +62,7 @@ async function copyIfSmall(
   if (stat.size > remainingBytes) {
     return { path: rel, bytes: stat.size, copied: false, reason: "capture-budget-exceeded" };
   }
-  await fsp.mkdir(path.dirname(dst), { recursive: true });
+  await mkdirWithMacosMetadataExclusion(path.dirname(dst));
   await fsp.copyFile(src, dst);
   return { path: rel, bytes: stat.size, copied: true };
 }
@@ -128,7 +129,7 @@ export async function captureBuck2DebugArtifacts(opts: {
     files: [],
   };
 
-  await fsp.mkdir(captureRoot, { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(captureRoot).catch(() => {});
   await fsp
     .writeFile(
       path.join(captureRoot, "buck2-command.json"),

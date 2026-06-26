@@ -25,7 +25,9 @@ Validation command:
 - If a test selector was requested, run `i && b && v <test selector>`.
 
 Logging and progress:
-- Pipe the full combined command output to a timestamped log file under buck-out/tmp/agent-test-logs/.
+- Pipe the full combined command output to a timestamped log file under `.viberoots/workspace/buck/agent-test-logs/`.
+  Do not put this outer supervising log under `buck-out/tmp`; repo cleanup can unlink that
+  directory while `i && b && v` is still running.
 - Do not paste verbose output into the conversation.
 - When validation starts, report the command shape, the log path, and the start time.
 - Do not run validation as one long blocking foreground command. Start the logged validation process in the background, then poll it so you can report progress while it runs.
@@ -41,8 +43,8 @@ Do not modify source files unless explicitly asked to investigate and fix failur
 Instruct the tester to use a command equivalent to:
 
 ```bash
-mkdir -p buck-out/tmp/agent-test-logs
-log="$PWD/buck-out/tmp/agent-test-logs/i-b-v-$(date +%Y%m%d-%H%M%S).log"
+mkdir -p .viberoots/workspace/buck/agent-test-logs
+log="$PWD/.viberoots/workspace/buck/agent-test-logs/i-b-v-$(date +%Y%m%d-%H%M%S).log"
 v_args=()
 set -euo pipefail
 start_epoch="$(date +%s)"
@@ -107,8 +109,8 @@ When the tester finishes:
 Prefer `rg`, `tail`, and narrow `sed -n` ranges when reviewing logs. Search first for high-signal patterns:
 
 ```bash
-rg -n "error|failed|failure|exception|panic|timeout|Command failed|Exit code|FAIL|FAILED" buck-out/tmp/agent-test-logs/<log>
-tail -n 200 buck-out/tmp/agent-test-logs/<log>
+rg -n "error|failed|failure|exception|panic|timeout|Command failed|Exit code|FAIL|FAILED" .viberoots/workspace/buck/agent-test-logs/<log>
+tail -n 200 .viberoots/workspace/buck/agent-test-logs/<log>
 ```
 
 Only read broader ranges when the first failing signature lacks context.

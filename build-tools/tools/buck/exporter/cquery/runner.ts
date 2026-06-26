@@ -75,7 +75,11 @@ function stableExporterIsolation(cwd: string): string {
   return `exporter-shared-${h}`;
 }
 
-function computeIsolationFlags(cwd: string): { iso: string; flags: string[]; ownsIso: boolean } {
+export function computeIsolationFlags(cwd: string): {
+  iso: string;
+  flags: string[];
+  ownsIso: boolean;
+} {
   if (process.env.BUCK_NO_ISOLATION === "1") return { iso: "", flags: [], ownsIso: false };
   const reuseRaw = String(process.env.BUCK_EXPORTER_REUSE_DAEMON || "").trim();
   const reuse = reuseRaw ? reuseRaw === "1" : true;

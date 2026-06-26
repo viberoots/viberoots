@@ -23,7 +23,8 @@ def _python_nix_test_impl(ctx):
         + "SAFE_LOG_KEY=\"${SAFE_LOG_KEY//\\//_}\"; "
         + "SAFE_LOG_KEY=\"${SAFE_LOG_KEY//:/_}\"; "
         + "BUILD_SELECTED_LOG=\"$WORKSPACE_ROOT/buck-out/tmp/build-selected/python_nix_test.${SAFE_LOG_KEY}.log\"; "
-        + "mkdir -p \"$(dirname \"$BUILD_SELECTED_LOG\")\"; "
+        + "BUILD_SELECTED_LOG_DIR=\"$(dirname \"$BUILD_SELECTED_LOG\")\"; mkdir -p \"$BUILD_SELECTED_LOG_DIR\"; "
+        + "if [ \"$(uname -s 2>/dev/null || true)\" = \"Darwin\" ]; then [ ! -e \"$WORKSPACE_ROOT/buck-out/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/buck-out/.metadata_never_index\"; [ ! -e \"$WORKSPACE_ROOT/buck-out/tmp/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/buck-out/tmp/.metadata_never_index\"; [ ! -e \"$BUILD_SELECTED_LOG_DIR/.metadata_never_index\" ] && : > \"$BUILD_SELECTED_LOG_DIR/.metadata_never_index\"; fi; "
     )
     run_and_exec = (
         "WORKSPACE_ROOT_ENV_ARG=\"${1:-}\"; "

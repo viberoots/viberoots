@@ -2,7 +2,9 @@
 import { test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import assert from "node:assert/strict";
 import { runInTemp } from "../lib/test-helpers";
+import { MACOS_METADATA_NEVER_INDEX_FILE } from "../../lib/macos-metadata";
 
 test("gen-auto-map: second run is a no-op when graph unchanged", async () => {
   await runInTemp("auto-map-idem", async (tmp, $) => {
@@ -14,6 +16,16 @@ test("gen-auto-map: second run is a no-op when graph unchanged", async () => {
       "utf8",
     );
     await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+    if (process.platform === "darwin") {
+      assert.ok(
+        await fsp
+          .stat(
+            path.join(tmp, ".viberoots", "workspace", "providers", MACOS_METADATA_NEVER_INDEX_FILE),
+          )
+          .then((st) => st.isFile())
+          .catch(() => false),
+      );
+    }
     const before = await fsp.readFile(
       path.join(tmp, ".viberoots", "workspace", "providers", "auto_map.bzl"),
       "utf8",

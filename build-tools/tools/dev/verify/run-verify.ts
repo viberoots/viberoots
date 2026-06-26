@@ -2,6 +2,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import "zx/globals";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { isRemoteVerifyPolicy, shouldComputeLocalZxTestNodeModules } from "./remote-policy";
 import { defaultRunVerifyDeps, type RunVerifyDeps } from "./run-verify-deps";
 import { buildToolsRoot, zxInitPath } from "../dev-build/paths";
@@ -96,7 +97,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     "verify-analysis",
     `run-${process.pid}-${Date.now()}`,
   );
-  await fsp.mkdir(analysisDir, { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(analysisDir).catch(() => {});
   await fsp.rm(path.join(root, ".tmp"), { recursive: true, force: true }).catch(() => {});
   await timedPhase(
     "ensure-buck-prelude-config",

@@ -2,6 +2,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { recordCacheHit, recordCacheMiss } from "./golist";
 import type { Batch } from "./types";
 
@@ -11,7 +12,7 @@ export async function readOrBuildSimulatedBatchCache(
   resolveNodeSourcePath: (targetName: string, src: string) => string,
   buildLabels: () => Promise<Map<string, string[]>>,
 ): Promise<Map<string, string[]>> {
-  await fsp.mkdir(cacheDir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(cacheDir);
   const cachePath = path.join(
     cacheDir,
     `${await cacheKeyForBatch(batch, resolveNodeSourcePath)}.json`,

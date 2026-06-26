@@ -68,6 +68,16 @@ test("init-workspace keeps current on workspace root before local tool extractio
       assert.equal((await fsp.stat(path.join(root, rel))).isDirectory(), true);
     }
     assert.equal(await fsp.readlink(path.join(root, ".viberoots/workspace/buck")), "../buck");
+    if (process.platform === "darwin") {
+      for (const rel of [
+        ".viberoots/.metadata_never_index",
+        ".viberoots/workspace/.metadata_never_index",
+        ".viberoots/workspace/providers/.metadata_never_index",
+        ".viberoots/buck/.metadata_never_index",
+      ]) {
+        assert.equal((await fsp.stat(path.join(root, rel))).isFile(), true, rel);
+      }
+    }
     assert.equal(await fsp.readFile(path.join(root, "flake.nix"), "utf8"), flakeBefore);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });

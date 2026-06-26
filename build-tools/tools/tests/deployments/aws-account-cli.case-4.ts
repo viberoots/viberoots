@@ -108,9 +108,9 @@ test("aws-account check classifies empty local Supabase values as local setup ga
   await runInTemp("aws-account-check-local-supabase-guidance", async (tmp) => {
     await removeCanonicalStackConfig(tmp);
     await fsp.mkdir(path.join(tmp, "projects/config"), { recursive: true });
-    await fsp.mkdir(path.join(tmp, "config/control-plane"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "projects/config/control-plane"), { recursive: true });
     await fsp.writeFile(
-      path.join(tmp, "config/control-plane/stack.json"),
+      path.join(tmp, "projects/config/control-plane/stack.json"),
       JSON.stringify(
         {
           domain: "example.com",

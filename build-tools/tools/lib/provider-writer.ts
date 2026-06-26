@@ -2,6 +2,7 @@
 import path from "node:path";
 import { renderTargetsFile, writeIfChanged, maybeAssumeUnchanged } from "./fs-helpers";
 import { ensureAutoSection } from "./auto-section";
+import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 import { providerNameForImporter } from "./providers";
 import { providersHeaderFor, providersLoadFor } from "./providers-headers";
 import { DEFAULT_PROVIDER_TARGETS_PATH, providerAutoTargetsPath } from "./workspace-state-paths";
@@ -91,12 +92,14 @@ export async function writeImporterProviders(
   const header =
     opts.fileHeader && opts.fileHeader.length > 0 ? opts.fileHeader : headerFrom(opts.ruleLoad);
   const outPath = resolveInWorkspace(opts.outFile);
+  await mkdirWithMacosMetadataExclusion(path.dirname(outPath));
   await writeIfChanged(outPath, renderTargetsFile(header, entries));
   await maybeAssumeUnchanged(outPath);
 
   // Synchronize managed section in curated TARGETS
   if (opts.autoSection) {
     const file = resolveInWorkspace(opts.autoSection.file || DEFAULT_PROVIDER_TARGETS_PATH);
+    await mkdirWithMacosMetadataExclusion(path.dirname(file));
     await ensureAutoSection({
       file,
       begin: opts.autoSection.begin,

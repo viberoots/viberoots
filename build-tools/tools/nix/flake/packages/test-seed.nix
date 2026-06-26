@@ -86,7 +86,10 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
   rm -rf \
     "$out/.viberoots/buck" \
     "$out/.viberoots/cache" \
+    "$out/.viberoots/codex-logs" \
     "$out/.viberoots/workspace/.viberoots" \
+    "$out/.viberoots/workspace/codex-test-logs" \
+    "$out/build-tools/tmp" \
     "$out/viberoots/.viberoots"
   chmod -R u+w "$out"
   export GIT_AUTHOR_NAME=seed

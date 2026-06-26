@@ -3,6 +3,7 @@ import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { processStartSignature } from "../../lib/process-inspection";
 
 async function pidStartSignature(pid: number): Promise<string> {
@@ -23,7 +24,7 @@ async function pidAliveWithSignature(pid: number, sig: string): Promise<boolean>
 }
 
 async function mkdirIfMissing(p: string): Promise<void> {
-  await fsp.mkdir(p, { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(p).catch(() => {});
 }
 
 async function readText(p: string): Promise<string> {
@@ -105,6 +106,7 @@ export async function acquireVerifyLock(opts: {
     }
   }
 
+  await mkdirWithMacosMetadataExclusion(lockDir).catch(() => {});
   const sig = await pidStartSignature(process.pid);
   await writeText(pidFile, String(process.pid));
   await writeText(sigFile, sig);

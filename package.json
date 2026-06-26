@@ -18,7 +18,7 @@
     "lint:fix": "pnpm -s lint:eslint:fix && pnpm -s fmt",
     "prepare": "husky",
     "coverage:summary": "build-tools/tools/dev/coverage-summary.ts",
-    "coverage:build": "node build-tools/tools/dev/coverage-raw-normalize.mjs && node ./node_modules/c8/bin/c8.js report --clean=false --temp-directory coverage/raw --reports-dir coverage --reporter=json-summary --reporter=lcov --reporter=html --merge-async --extension .ts --allowExternal --src . --include '**/*.ts' --exclude 'node_modules/**' --exclude 'buck-out/**' --exclude '.clinic/**' --exclude '**/*.d.ts' && node build-tools/tools/dev/coverage-normalize.mjs",
+    "coverage:build": "zx-wrapper build-tools/tools/dev/coverage-mark-dirs.ts && node build-tools/tools/dev/coverage-raw-normalize.mjs && node ./node_modules/c8/bin/c8.js report --clean=false --temp-directory coverage/raw --reports-dir coverage --reporter=json-summary --reporter=lcov --reporter=html --merge-async --extension .ts --allowExternal --src . --include '**/*.ts' --exclude 'node_modules/**' --exclude 'buck-out/**' --exclude '.clinic/**' --exclude '**/*.d.ts' && node build-tools/tools/dev/coverage-normalize.mjs",
     "coverage:open": "pnpm coverage:build && pnpm coverage:summary --open-browser || open coverage/lcov-report/index.html",
     "test:cov": "buck2 test //... && pnpm coverage:build"
   },

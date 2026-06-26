@@ -89,7 +89,7 @@ test("deploy --operator-readiness does not require resolving selected secret tok
 });
 
 async function writeAwsAccountEvidence(tmp: string) {
-  await writeJson(tmp, "config/control-plane/stack.json", {
+  await writeJson(tmp, "projects/config/control-plane/stack.json", {
     schemaVersion: "aws-account-stack-config@1",
     domain: "example.com",
     awsAccountId: "111122223333",

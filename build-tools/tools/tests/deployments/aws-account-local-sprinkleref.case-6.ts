@@ -55,7 +55,7 @@ test("aws-account setup-plan is available before stack config initialization", a
     assert.match(text, /control-plane aws-account config-init --domain <domain>/);
     assert.match(text, /sprinkleref --init/);
     assert.match(text, /sprinkleref --init-local/);
-    assert.match(text, /path: config\/control-plane\/stack\.json/);
+    assert.match(text, /path: projects\/config\/control-plane\/stack\.json/);
   });
 });
 

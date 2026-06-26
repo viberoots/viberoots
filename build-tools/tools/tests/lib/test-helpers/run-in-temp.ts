@@ -35,7 +35,7 @@ import { pathExists } from "../../../lib/repo";
 import { mkdirWithMacosMetadataExclusion } from "../../../lib/macos-metadata";
 
 const LOCAL_FIXTURE_SERVICE_ENV = "VBR_DEPLOY_LOCAL_FIXTURE_SERVICE";
-const PREPARED_SEED_MARKER = ".seed-store-prepared-v4";
+const PREPARED_SEED_MARKER = ".seed-store-prepared-v5";
 
 let cachedDevEnvExport: Promise<string> | null = null;
 type PathFlakeMetadata = {
@@ -47,6 +47,15 @@ let cachedPinnedNixpkgsPath: Promise<string> | null = null;
 let cachedPinnedCacertPath: Promise<string> | null = null;
 let cachedUnifiedPnpmStorePath: Promise<string> | null = null;
 let envMutationQueue: Promise<void> = Promise.resolve();
+const legacyStableRootCleanup = new Set<string>();
+
+async function removeLegacyDarwinStableRoot(root: string): Promise<void> {
+  if (process.platform !== "darwin" || !root.endsWith(".noindex")) return;
+  const legacy = root.slice(0, -".noindex".length);
+  if (legacyStableRootCleanup.has(legacy)) return;
+  legacyStableRootCleanup.add(legacy);
+  await fsp.rm(legacy, { recursive: true, force: true }).catch(() => {});
+}
 
 function transientNixStoreError(output: unknown): boolean {
   const text = String(output || "");
@@ -214,7 +223,9 @@ async function stableTestHomeRoot(): Promise<string> {
     user = os.userInfo().username || "";
   } catch {}
   const suffix = user ? `-${user}` : "";
-  const root = path.join(base, `viberoots-test-home${suffix}`);
+  const noindex = process.platform === "darwin" ? ".noindex" : "";
+  const root = path.join(base, `viberoots-test-home${suffix}${noindex}`);
+  await removeLegacyDarwinStableRoot(root);
   await mkdirWithMacosMetadataExclusion(root).catch(() => {});
   return root;
 }
@@ -227,7 +238,9 @@ async function stableGoModCacheRoot(): Promise<string> {
     user = os.userInfo().username || "";
   } catch {}
   const suffix = user ? `-${user}` : "";
-  const root = path.join(base, `viberoots-go-modcache${suffix}`);
+  const noindex = process.platform === "darwin" ? ".noindex" : "";
+  const root = path.join(base, `viberoots-go-modcache${suffix}${noindex}`);
+  await removeLegacyDarwinStableRoot(root);
   await mkdirWithMacosMetadataExclusion(root).catch(() => {});
   return root;
 }
@@ -240,7 +253,9 @@ async function stableXdgCacheRoot(): Promise<string> {
     user = os.userInfo().username || "";
   } catch {}
   const suffix = user ? `-${user}` : "";
-  const root = path.join(base, `viberoots-xdg-cache${suffix}`);
+  const noindex = process.platform === "darwin" ? ".noindex" : "";
+  const root = path.join(base, `viberoots-xdg-cache${suffix}${noindex}`);
+  await removeLegacyDarwinStableRoot(root);
   await mkdirWithMacosMetadataExclusion(root).catch(() => {});
   return root;
 }
@@ -755,6 +770,7 @@ export async function runInTemp<T>(
     exportEnv.WORKSPACE_ROOT = tmp;
     exportEnv.BUCK_TEST_SRC = tmp;
     exportEnv.REPO_ROOT = tmp;
+    exportEnv.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = process.cwd();
     exportEnv.VBR_RUN_IN_TEMP_REPO = "1";
     exportEnv.SCAF_ALLOW_LIVE_REPO = "1";
     exportEnv.VIBEROOTS_ROOT = activeViberootsRoot;
@@ -838,6 +854,7 @@ export async function runInTemp<T>(
     VBR_RUN_IN_TEMP_REPO: "1",
     SCAF_ALLOW_LIVE_REPO: "1",
     REPO_ROOT: process.cwd(),
+    VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT: process.cwd(),
     HOME: home,
     XDG_CACHE_HOME: activeXdgCacheHome,
   });
@@ -1010,6 +1027,7 @@ export async function runInTemp<T>(
     }
   }
   exportEnv.REPO_ROOT = process.cwd();
+  exportEnv.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = process.cwd();
   exportEnv.CGO_ENABLED = String(exportEnv.CGO_ENABLED || "").trim() || "0";
 
   const injected = String((envOut as any).stdout || "");

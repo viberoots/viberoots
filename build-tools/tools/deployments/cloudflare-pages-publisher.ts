@@ -1,11 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import type { CloudflarePagesDeployment } from "./contract";
-import { markMacosMetadataNeverIndex } from "../lib/macos-metadata";
+import { mkdtempNoindex } from "../lib/macos-metadata";
 import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 
 const execFileAsync = promisify(execFile);
@@ -131,8 +130,9 @@ function commandError(stdout: string, stderr: string): string {
 }
 
 async function withDefaultWranglerConfig(renderedConfigPath: string): Promise<string> {
-  const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-cloudflare-pages-wrangler-"));
-  await markMacosMetadataNeverIndex(workDir);
+  const workDir = await mkdtempNoindex("vbr-cloudflare-pages-wrangler-", {
+    baseName: "vbr-cloudflare-pages-wrangler",
+  });
   await fsp.copyFile(path.resolve(renderedConfigPath), path.join(workDir, "wrangler.json"));
   return workDir;
 }

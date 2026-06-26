@@ -36,6 +36,15 @@ test("shared Buck isolation lock serializes first shared startup per process", a
       }),
     ]);
     assert.equal(maxActive, 1);
+    if (process.platform === "darwin") {
+      for (const rel of [
+        "buck-out/.metadata_never_index",
+        "buck-out/tmp/.metadata_never_index",
+        "buck-out/tmp/shared-isolation-locks/.metadata_never_index",
+      ]) {
+        assert.equal((await fsp.stat(path.join(root, rel))).isFile(), true, rel);
+      }
+    }
   } finally {
     await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
   }

@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { withExclusiveInstallLock } from "../install/lock";
 import { updateNodeModulesHashesJson } from "./hashes-json";
 
@@ -30,7 +31,7 @@ const pnpmStoreBuilderFingerprintFiles = [
   "viberoots/build-tools/tools/nix/node-modules/modules.nix",
 ] as const;
 
-const legacyExactStoreProvisioningFingerprintFiles = [
+const exactStoreProvisioningFingerprintFiles = [
   ...pnpmStoreBuilderFingerprintFiles,
   "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
   "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-fetch.ts",
@@ -65,6 +66,10 @@ export function verifiedMarkerPath(repoRoot: string, importer: string): string {
 }
 
 function sharedCacheRepoRoot(repoRoot: string): string {
+  const explicitRoot = String(process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT || "").trim();
+  if (explicitRoot && path.isAbsolute(explicitRoot)) {
+    return path.resolve(explicitRoot);
+  }
   const liveRoot = String(process.env.REPO_ROOT || "").trim();
   if (liveRoot && path.isAbsolute(liveRoot)) {
     return path.resolve(liveRoot);
@@ -146,7 +151,11 @@ async function verifiedMarkerFingerprintForFiles(
   repoRoot: string,
   importer: string,
   files: readonly string[],
-  opts: { includeImporterInputs?: boolean; includeImporterIdentity?: boolean } = {},
+  opts: {
+    includeImporterInputs?: boolean;
+    includeImporterIdentity?: boolean;
+    includeImporterPackageJson?: boolean;
+  } = {},
 ): Promise<string> {
   const hash = crypto.createHash("sha256");
   hash.update(`platform=${process.platform}\n`);
@@ -163,11 +172,16 @@ async function verifiedMarkerFingerprintForFiles(
   if (opts.includeImporterIdentity !== false) {
     hash.update(`importer=${importerRoot || "."}\n`);
   }
-  for (const rel of [
-    importerRoot ? `${importerRoot}/package.json` : "package.json",
+  const importerInputFiles = [
+    opts.includeImporterPackageJson === false
+      ? null
+      : importerRoot
+        ? `${importerRoot}/package.json`
+        : "package.json",
     importerRoot ? `${importerRoot}/.npmrc` : ".npmrc",
     importerRoot ? `${importerRoot}/pnpm-workspace.yaml` : "pnpm-workspace.yaml",
-  ]) {
+  ].filter((rel): rel is string => Boolean(rel));
+  for (const rel of importerInputFiles) {
     hash.update(
       opts.includeImporterIdentity === false
         ? `importer-file=${path.basename(rel)}\n`
@@ -202,9 +216,10 @@ export async function currentSharedPnpmStoreHashCacheFingerprint(
   return await verifiedMarkerFingerprintForFiles(
     repoRoot,
     importer,
-    pnpmStoreBuilderFingerprintFiles,
+    exactStoreProvisioningFingerprintFiles,
     {
       includeImporterIdentity: false,
+      includeImporterPackageJson: false,
     },
   );
 }
@@ -214,20 +229,20 @@ export async function currentVerifiedMarkerFingerprintCandidates(
   importer = ".",
 ): Promise<string[]> {
   const current = await currentVerifiedMarkerFingerprint(repoRoot, importer);
-  const legacyExactStoreProvisioning = await verifiedMarkerFingerprintForFiles(
+  const exactStoreProvisioning = await verifiedMarkerFingerprintForFiles(
     repoRoot,
     importer,
-    legacyExactStoreProvisioningFingerprintFiles,
+    exactStoreProvisioningFingerprintFiles,
     { includeImporterInputs: true },
   );
-  return Array.from(new Set([current, legacyExactStoreProvisioning]));
+  return Array.from(new Set([current, exactStoreProvisioning]));
 }
 
 export async function writeVerifiedMarker(
   markerPath: string,
   marker: PnpmStoreVerifiedMarker,
 ): Promise<void> {
-  await fsp.mkdir(path.dirname(markerPath), { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(path.dirname(markerPath)).catch(() => {});
   await fsp.writeFile(markerPath, JSON.stringify(marker, null, 2) + "\n", "utf8");
 }
 
@@ -237,7 +252,7 @@ export async function writeSharedHashCache(
 ): Promise<void> {
   const cachePath = sharedHashCachePath(repoRoot, entry.builderFingerprint, entry.lockHash);
   const tmpPath = `${cachePath}.tmp-${process.pid}`;
-  await fsp.mkdir(path.dirname(cachePath), { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(path.dirname(cachePath)).catch(() => {});
   await fsp.writeFile(tmpPath, JSON.stringify(entry, null, 2) + "\n", "utf8");
   await fsp.rename(tmpPath, cachePath);
 }

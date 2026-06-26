@@ -95,14 +95,23 @@ test("verify seed snapshot excludes generated workspace buck state", async () =>
   assert.match(source, /lib\.hasPrefix "\.viberoots\/workspace\/buck\/" rel/);
   assert.match(source, /rel == "\.viberoots\/workspace\/\.viberoots"/);
   assert.match(source, /lib\.hasPrefix "\.viberoots\/workspace\/\.viberoots\/" rel/);
+  assert.match(source, /rel == "\.viberoots\/workspace\/codex-test-logs"/);
+  assert.match(source, /lib\.hasPrefix "\.viberoots\/workspace\/codex-test-logs\/" rel/);
   assert.match(source, /rel == "\.viberoots\/buck"/);
   assert.match(source, /lib\.hasPrefix "\.viberoots\/buck\/" rel/);
   assert.match(source, /rel == "\.viberoots\/cache"/);
   assert.match(source, /lib\.hasPrefix "\.viberoots\/cache\/" rel/);
+  assert.match(source, /rel == "\.viberoots\/codex-logs"/);
+  assert.match(source, /lib\.hasPrefix "\.viberoots\/codex-logs\/" rel/);
+  assert.match(source, /rel == "build-tools\/tmp"/);
+  assert.match(source, /lib\.hasPrefix "build-tools\/tmp\/" rel/);
   assert.match(source, /rel == "viberoots\/\.viberoots"/);
   assert.match(source, /lib\.hasPrefix "viberoots\/\.viberoots\/" rel/);
   assert.match(seedSource, /"\$out\/\.viberoots\/buck"/);
+  assert.match(seedSource, /"\$out\/\.viberoots\/codex-logs"/);
   assert.match(seedSource, /"\$out\/\.viberoots\/workspace\/\.viberoots"/);
+  assert.match(seedSource, /"\$out\/\.viberoots\/workspace\/codex-test-logs"/);
+  assert.match(seedSource, /"\$out\/build-tools\/tmp"/);
   assert.match(seedSource, /"\$out\/viberoots\/\.viberoots"/);
   assert.match(seedStagingSource, /isGeneratedRepoStateRelPath/);
   assert.match(seedStagingSource, /hasGeneratedRepoState/);
@@ -110,7 +119,10 @@ test("verify seed snapshot excludes generated workspace buck state", async () =>
   assert.match(seedStoreSource, /isGeneratedRepoStateRelPath/);
   assert.match(seedStoreSource, /if \(isGeneratedRepoStateRelPath\(rel\)\) return false/);
   assert.match(rsyncSource, /\/\.viberoots\/buck/);
+  assert.match(rsyncSource, /\/\.viberoots\/codex-logs/);
   assert.match(rsyncSource, /\/\.viberoots\/workspace\/\.viberoots/);
+  assert.match(rsyncSource, /\/\.viberoots\/workspace\/codex-test-logs/);
+  assert.match(rsyncSource, /\/build-tools\/tmp/);
   assert.match(rsyncSource, /"prelude"/);
   assert.match(rsyncSource, /"patches"/);
   assert.match(rsyncSource, /extractedToolRoots\.has\(r\)/);
@@ -174,7 +186,7 @@ test("verify seed staging rebuilds stale ready stages missing required repo file
   );
 });
 
-test("verify seed staging publishes read-only shared stages", async () => {
+test("verify seed staging publishes copy-ready writable shared stages", async () => {
   const seed = await mktemp("seed-stage-readonly-source-");
   const requiredFiles = [
     "flake.nix",
@@ -196,8 +208,8 @@ test("verify seed staging publishes read-only shared stages", async () => {
   const rootMode = (await fsp.stat(staged)).mode;
   const flakeMode = (await fsp.stat(path.join(staged, "flake.nix"))).mode;
 
-  assert.equal(rootMode & 0o222, 0);
-  assert.equal(flakeMode & 0o222, 0);
+  assert.notEqual(rootMode & 0o200, 0);
+  assert.notEqual(flakeMode & 0o200, 0);
   if (process.platform === "darwin") {
     await fsp.stat(path.join(staged, ".metadata_never_index"));
   }
@@ -222,6 +234,24 @@ test("runInTemp seed overlay refreshes active viberoots source", async () => {
   assert.match(runInTempSource, /import\.meta\.url/);
 });
 
+test("runInTemp seed overlay honors prepared seed marker version", async () => {
+  const seedStoreSource = await readRepoFile(
+    "build-tools/tools/tests/lib/test-helpers/seed-store.ts",
+  );
+  const runInTempSource = await readRepoFile(
+    "build-tools/tools/tests/lib/test-helpers/run-in-temp.ts",
+  );
+  const seedStagingSource = await readRepoFile("build-tools/tools/dev/verify/seed-staging.ts");
+
+  for (const source of [seedStoreSource, runInTempSource, seedStagingSource]) {
+    assert.match(source, /\.seed-store-prepared-v5/);
+    assert.doesNotMatch(source, /\.seed-store-prepared-v4/);
+    assert.doesNotMatch(source, /\.seed-store-prepared-v3/);
+  }
+  assert.match(seedStoreSource, /if \(prepared\) return \[\]/);
+  assert.match(seedStoreSource, /if \(prepared && rel\.startsWith\("viberoots\/"\)\) continue/);
+});
+
 test("runInTemp seed copies do not repair permissions with broad chmod", async () => {
   const seedStoreSource = await readRepoFile(
     "build-tools/tools/tests/lib/test-helpers/seed-store.ts",
@@ -232,7 +262,11 @@ test("runInTemp seed copies do not repair permissions with broad chmod", async (
 
   assert.doesNotMatch(seedStoreSource, /chmod -R u\+w/);
   assert.match(seedCopySource, /copySeedStoreToTempRepo/);
+  assert.match(seedCopySource, /mkdirWithMacosMetadataExclusion\(stagingDir\)/);
+  assert.doesNotMatch(seedCopySource, /shutil\.rmtree\(dst_root\)/);
   assert.match(seedCopySource, /makeDirectoryPublishable\(stagingDir\)/);
   assert.match(seedCopySource, /process\.platform !== "darwin"/);
   assert.match(seedCopySource, /makeTreeWritable\(stagingDir\)/);
+  assert.match(seedCopySource, /\.seed-store-prepared-v5/);
+  assert.match(seedCopySource, /repair_permissions = sys\.argv\[3\] == "1"/);
 });

@@ -110,6 +110,11 @@ export function writeRemoteBuckMaterializationMetadata(opts: {
   if (!materialization.failedInputs && !materialization.failedOutputs) return;
   const passDir = remoteBuckPassArtifactDir(opts.policy, opts.passName);
   fs.mkdirSync(passDir, { recursive: true });
+  if (process.platform === "darwin") {
+    try {
+      fs.writeFileSync(path.join(passDir, ".metadata_never_index"), "", { flag: "wx" });
+    } catch {}
+  }
   fs.writeFileSync(
     path.join(passDir, "failed-materialization-policy.json"),
     JSON.stringify(

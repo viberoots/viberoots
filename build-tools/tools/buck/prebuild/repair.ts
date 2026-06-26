@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { runNodeWithZx } from "../../lib/node-run";
 import { resolveWorkspaceRootsSync } from "../../lib/repo";
 import { runGlue } from "../glue-run";
@@ -16,7 +17,8 @@ async function ensureProviderIndexArtifacts(): Promise<void> {
   const jsonPath = path.join(process.cwd(), DEFAULT_PROVIDER_INDEX_JSON_PATH);
   const ensureDir = async () => {
     try {
-      await fsp.mkdir(path.dirname(idxPath), { recursive: true });
+      await mkdirWithMacosMetadataExclusion(path.dirname(path.dirname(idxPath)));
+      await mkdirWithMacosMetadataExclusion(path.dirname(idxPath));
     } catch {}
   };
   const hasValidIndex = async (): Promise<boolean> => {
@@ -108,7 +110,7 @@ async function ensureLocalPreludeMapping() {
       try {
         await fsp.writeFile(path.join(process.cwd(), ".buckroot"), ".\n");
       } catch {}
-      await fsp.mkdir(path.join(process.cwd(), ".viberoots"), { recursive: true });
+      await mkdirWithMacosMetadataExclusion(path.join(process.cwd(), ".viberoots"));
       const current = path.join(process.cwd(), ".viberoots/current");
       if (!fs.existsSync(current)) {
         await fsp.symlink("..", current);

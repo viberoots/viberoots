@@ -68,7 +68,7 @@ Before running AWS setup commands, make sure the repo config model is clear:
 
 - `projects/config/shared.json` is the checked-in shared topology surface.
 - `projects/config/local.json` is the gitignored per-operator override surface.
-- `config/control-plane/stack.json` is the AWS account setup stack input file.
+- `projects/config/control-plane/stack.json` is the AWS account setup stack input file.
 - `config://...` refs name non-secret project config values.
 - `secret://...` refs name true secrets in the selected secret backend.
 - `runtime://...` refs name values supplied by the selected runtime host contract.
@@ -1095,7 +1095,7 @@ do not satisfy protected/shared readiness by themselves.
       plane, AWS account, Supabase project, deployment contexts, and secret backend selectors.
 - [ ] `projects/config/local.json` is absent or contains only gitignored local overrides and local
       placeholders; it does not contain plaintext secrets.
-- [ ] `control-plane aws-account config-init` has produced `config/control-plane/stack.json` with
+- [ ] `control-plane aws-account config-init` has produced `projects/config/control-plane/stack.json` with
       `config://...` refs for non-secret coordinates and `secret://...` or `runtime://...` refs for
       secrets.
 - [ ] `control-plane aws-account check` reaches either a passing state or an actionable

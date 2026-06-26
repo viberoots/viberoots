@@ -5,6 +5,7 @@ import path from "node:path";
 import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 
 const EXTERNAL_PNPM_STATE_META = "state.json";
+let legacyStablePnpmStateCleanup: Promise<void> | null = null;
 
 function sanitizeFragment(input: string): string {
   return (
@@ -22,7 +23,21 @@ function stablePnpmStateBase(): string {
     user = os.userInfo().username || "";
   } catch {}
   const suffix = user ? `-${sanitizeFragment(user)}` : "";
-  return path.join(tmpBase, `viberoots-pnpm${suffix}`);
+  const noindex = process.platform === "darwin" ? ".noindex" : "";
+  return path.join(tmpBase, `viberoots-pnpm${suffix}${noindex}`);
+}
+
+async function removeLegacyDarwinStablePnpmStateBase(): Promise<void> {
+  if (process.platform !== "darwin") return;
+  if (legacyStablePnpmStateCleanup) return await legacyStablePnpmStateCleanup;
+  legacyStablePnpmStateCleanup = (async () => {
+    const current = stablePnpmStateBase();
+    if (!current.endsWith(".noindex")) return;
+    await fsp
+      .rm(current.slice(0, -".noindex".length), { recursive: true, force: true })
+      .catch(() => {});
+  })();
+  return await legacyStablePnpmStateCleanup;
 }
 
 export function sharedPnpmStateBasePath(): string {
@@ -42,6 +57,7 @@ export function sharedExactPnpmStateIndexPath(repoRoot: string, importer: string
 }
 
 export async function sharedExactPnpmStateRoot(lockHash: string): Promise<string> {
+  await removeLegacyDarwinStablePnpmStateBase();
   const rootDir = sharedExactPnpmStateRootPath(lockHash);
   await mkdirWithMacosMetadataExclusion(path.dirname(path.dirname(rootDir)));
   await mkdirWithMacosMetadataExclusion(path.dirname(rootDir));
@@ -61,6 +77,7 @@ export async function externalPnpmStateDirs(scopeAbs: string): Promise<{
   homeDir: string;
   storeDir: string;
 }> {
+  await removeLegacyDarwinStablePnpmStateBase();
   const normalizedScope = path.resolve(scopeAbs);
   const rootDir = path.join(stablePnpmStateBase(), stateKey(scopeAbs));
   const homeDir = path.join(rootDir, "home");

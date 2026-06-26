@@ -10,6 +10,7 @@ import {
 import { filteredFlakeRsyncExcludeArgs } from "../nix-build-filtered-flake-lib";
 import { emitTimingDetail } from "../../lib/timing-detail";
 import { resolveToolPathSync } from "../../lib/tool-paths";
+import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../../lib/macos-metadata";
 
 function executablePath(filePath: string): string {
   const candidate = filePath.trim();
@@ -33,10 +34,13 @@ export async function makeFilteredFlakeRef(opts: {
   attr: string;
 }): Promise<{ flakeRef: string; workspaceRoot: string; cleanup: () => Promise<void> }> {
   const tmpBase = process.env.TMPDIR || "/tmp";
-  const workDirRaw = await fsp.mkdtemp(path.join(tmpBase, "scaf-flake-"));
+  const workDirRaw = await mkdtempNoindex("scaf-flake-", {
+    baseName: "scaf-flake",
+    tmpBase,
+  });
   const workDir = await fsp.realpath(workDirRaw).catch(() => workDirRaw);
   const snapDir = path.join(workDir, "src");
-  await fsp.mkdir(snapDir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(snapDir);
   const snapDirReal = await fsp.realpath(snapDir).catch(() => snapDir);
   const src = path.resolve(opts.repoRoot);
   if (filteredFlakeDiagnosticsEnabled()) {

@@ -7,10 +7,10 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 . "${SCRIPT_DIR}/_env.sh"
 
 cleanup_verify_root_buck_out() {
-	local allow_default_buck_kill="${1:-0}"
+	local allow_broad_buck_cleanup="${1:-0}"
 	local cleanup_root="${2:-${LIVE_ROOT}}"
 	local buck_out="${cleanup_root}/buck-out"
-	if [[ "${allow_default_buck_kill}" == "1" && -d "${cleanup_root}" ]] && command -v buck2 >/dev/null 2>&1; then
+	if [[ "${allow_broad_buck_cleanup}" == "1" && -d "${cleanup_root}" ]] && command -v buck2 >/dev/null 2>&1; then
 		(cd "${cleanup_root}" && timeout 10s buck2 kill >/dev/null 2>&1) || true
 	fi
 	[[ -d "${buck_out}" ]] || return 0
@@ -19,21 +19,26 @@ cleanup_verify_root_buck_out() {
 		[[ -e "${entry}" ]] || continue
 		base="$(basename "${entry}")"
 		case "${base}" in
-			test-logs|tmp|zx_shims|v2|v-*|verify-nested-*|deployment-query-*|zxtest-shared-*|exporter-shared-*)
+			v-*|verify-nested-*)
 				owner_pid=""
 				case "${base}" in
 					v-*-*) owner_pid="${base#v-}"; owner_pid="${owner_pid%%-*}" ;;
 					verify-nested-*-*) owner_pid="${base#verify-nested-}"; owner_pid="${owner_pid%%-*}" ;;
 				esac
+				[[ "${owner_pid}" =~ ^[0-9]+$ ]] || continue
 				if [[ "${owner_pid}" =~ ^[0-9]+$ ]] && kill -0 "${owner_pid}" >/dev/null 2>&1; then
 					continue
 				fi
 				if registered_isolation_owner_alive "${base}" "${cleanup_root}"; then
 					continue
 				fi
-				if [[ "${base}" == "v2" && "${allow_default_buck_kill}" != "1" ]]; then
-					continue
+				if command -v buck2 >/dev/null 2>&1; then
+					(cd "${cleanup_root}" && timeout 10s buck2 --isolation-dir "${base}" kill >/dev/null 2>&1) || true
 				fi
+				rm -rf "${entry}" 2>/dev/null || true
+				;;
+			test-logs|tmp|zx_shims|v2|deployment-query-*|zxtest-shared-*|exporter-shared-*)
+				[[ "${allow_broad_buck_cleanup}" == "1" ]] || continue
 				if command -v buck2 >/dev/null 2>&1; then
 					if [[ "${base}" == "v2" ]]; then
 						(cd "${cleanup_root}" && timeout 10s buck2 kill >/dev/null 2>&1) || true
@@ -49,10 +54,10 @@ cleanup_verify_root_buck_out() {
 }
 
 cleanup_verify_owned_buck_out_roots() {
-	local allow_default_buck_kill="${1:-0}"
-	cleanup_verify_root_buck_out "${allow_default_buck_kill}" "${LIVE_ROOT}"
+	local allow_broad_buck_cleanup="${1:-0}"
+	cleanup_verify_root_buck_out "${allow_broad_buck_cleanup}" "${LIVE_ROOT}"
 	if [[ -n "${VIBEROOTS_ROOT:-}" && "${VIBEROOTS_ROOT}" != "${LIVE_ROOT}" && -f "${VIBEROOTS_ROOT}/build-tools/tools/dev/zx-init.mjs" ]]; then
-		cleanup_verify_root_buck_out "${allow_default_buck_kill}" "${VIBEROOTS_ROOT}"
+		cleanup_verify_root_buck_out "${allow_broad_buck_cleanup}" "${VIBEROOTS_ROOT}"
 	fi
 }
 
@@ -76,7 +81,7 @@ registered_isolation_owner_alive() {
 }
 
 status=0
-cleanup_verify_owned_buck_out_roots 1
+cleanup_verify_owned_buck_out_roots "${VBR_VERIFY_BROAD_BUCK_OUT_CLEANUP:-0}"
 "${SCRIPT_DIR}/verify" "$@" || status="$?"
-cleanup_verify_owned_buck_out_roots 1
+cleanup_verify_owned_buck_out_roots "${VBR_VERIFY_BROAD_BUCK_OUT_CLEANUP:-0}"
 exit "${status}"

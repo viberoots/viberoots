@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { createRegisteredStateCleaner } from "./verify/registered-state-cleanup";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { findRepoRoot } from "../lib/repo";
 
 type EnvSnapshot = {
@@ -27,8 +28,8 @@ export async function withRegisteredToolState<T>(kind: string, fn: () => Promise
   const root = await findRepoRoot(process.cwd());
   const tmpRoot = path.join(root, ".viberoots", "workspace", "buck", "tmp");
   const logRoot = path.join(root, ".viberoots", "workspace", "buck", "test-logs");
-  await fsp.mkdir(tmpRoot, { recursive: true });
-  await fsp.mkdir(logRoot, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(tmpRoot);
+  await mkdirWithMacosMetadataExclusion(logRoot);
   const stamp = `${Date.now()}-${process.pid}`;
   const stateFile = path.join(tmpRoot, `${kind}-buck-reaper-${stamp}.txt`);
   const logFile = path.join(logRoot, `${kind}-cleanup-${stamp}.log`);

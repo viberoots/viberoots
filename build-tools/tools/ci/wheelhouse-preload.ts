@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagStr } from "../lib/cli";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import {
   buildCacheManifest,
   discoverWheelhouseCacheAttrs,
@@ -54,7 +55,7 @@ export async function runWheelhousePreload(): Promise<void> {
     },
     declaredRemoteExecutables: [],
   });
-  await fsp.mkdir(path.dirname(manifestOut), { recursive: true });
+  await mkdirWithMacosMetadataExclusion(path.dirname(manifestOut));
   writeManifest(manifestOut, manifest);
   if (to && to.trim() !== "") {
     const command = renderPublisherCommand(manifest, to);

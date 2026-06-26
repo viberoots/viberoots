@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { writeIfChanged, maybeAssumeUnchanged } from "../lib/fs-helpers";
 // zx is available via shebang; we'll use `$` to interact with git when present.
 import { readCompositeGraph } from "../lib/graph-view";
@@ -10,8 +11,8 @@ import { getFlagStr } from "../lib/cli";
 import { ensureGraph } from "./glue-run";
 import { isProviderPackageNode } from "../lib/graph-utils";
 import { isSupportedImporterLabel } from "../lib/importers";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { DEFAULT_AUTO_MAP_PATH } from "../lib/workspace-state-paths";
-// no path import needed when not checking provider existence
 
 type Node = {
   name: string;
@@ -78,6 +79,7 @@ async function main() {
   const header = `# @workspace_providers//:auto_map.bzl\n# GENERATED FILE — DO NOT EDIT.\n\nMODULE_PROVIDERS = {\n`;
   const footer = `\n}\n`;
   const data = header + body + footer;
+  await mkdirWithMacosMetadataExclusion(path.dirname(path.resolve(outPath)));
   await writeIfChanged(outPath, data);
 
   if (unsupportedLockfileLabels.length > 0) {

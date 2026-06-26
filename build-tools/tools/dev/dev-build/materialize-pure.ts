@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { pathExists } from "../../lib/repo";
 import { resolveToolPath } from "../../lib/tool-paths";
 import {
@@ -149,7 +150,7 @@ export async function materializePureGraphIfEnabled(opts: {
   if (opts.isCI || !opts.materialize || opts.impure) return;
 
   const linkDir = path.resolve(opts.root, ".viberoots", "workspace", "buck", "tmp");
-  await fsp.mkdir(linkDir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(linkDir);
   const linkName = path.join(linkDir, `buck-go-${Date.now()}`);
 
   const exactEnv = await exactStoreMapEnv(opts.root);

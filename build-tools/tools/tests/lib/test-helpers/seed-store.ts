@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { mkdtempNoindex } from "../../../lib/macos-metadata";
 import {
   GENERATED_REPO_STATE_PATHS,
   isGeneratedRepoStateRelPath,
@@ -26,7 +27,7 @@ export type RepoInitResult = {
 };
 
 const CLONE_PROBE_LABEL = "seedStore clone probe (copyFileCloneSupport)";
-const PREPARED_MARKER = ".seed-store-prepared-v3";
+const PREPARED_MARKER = ".seed-store-prepared-v5";
 
 let seedStoreCowCopySupported: true | null = null;
 let seedStoreCowCopySupportedPromise: Promise<true> | null = null;
@@ -150,7 +151,10 @@ async function overlayUntrackedFilesIntoTempRepo(tmpDir: string): Promise<string
     overlayFilesOncePerWorker = Promise.resolve(valid);
   }
   if (valid.length === 0) return [];
-  const fileList = await fsp.mkdtemp(path.join(tmpDir, ".seed-overlay-"));
+  const fileList = await mkdtempNoindex(".seed-overlay-", {
+    baseName: ".seed-overlay",
+    tmpBase: tmpDir,
+  });
   const listPath = path.join(fileList, "files.txt");
   await fsp.writeFile(listPath, valid.join("\n") + "\n", "utf8");
   try {
@@ -249,7 +253,10 @@ async function overlayActiveViberootsIntoTempRepo(tmpDir: string): Promise<strin
     await fsp.rm(path.join(tmpViberoots, rel), { recursive: true, force: true });
   }
   if (overlay.changed.length === 0) return touchedRelPaths;
-  const fileList = await fsp.mkdtemp(path.join(tmpDir, ".seed-viberoots-overlay-"));
+  const fileList = await mkdtempNoindex(".seed-viberoots-overlay-", {
+    baseName: ".seed-viberoots-overlay",
+    tmpBase: tmpDir,
+  });
   const listPath = path.join(fileList, "files.txt");
   await fsp.writeFile(listPath, overlay.changed.join("\n") + "\n", "utf8");
   try {

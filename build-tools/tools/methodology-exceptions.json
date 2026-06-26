@@ -1,6 +1,10 @@
 {
   "sourceFileSizeExceptions": [
     {
+      "path": "buck/exporter/cquery/runner.ts",
+      "justification": "Pre-existing oversized Buck cquery runner pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
       "path": "buck/zx_test.bzl",
       "justification": "Pre-existing oversized Buck test macro pending focused decomposition outside the remote-consumer final checkpoint."
     },
@@ -17,12 +21,24 @@
       "justification": "Pre-existing oversized node_modules linker pending focused decomposition outside the remote-consumer final checkpoint."
     },
     {
+      "path": "dev/install/secret-readiness.ts",
+      "justification": "Pre-existing oversized install secret-readiness helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
       "path": "dev/nix-build-filtered-flake.ts",
       "justification": "Pre-existing oversized filtered-flake builder pending focused decomposition outside the remote-consumer final checkpoint."
     },
     {
       "path": "dev/node-modules-build.ts",
       "justification": "Pre-existing oversized node_modules build helper pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/require-unified-pnpm-store.ts",
+      "justification": "Pre-existing oversized pnpm-store guard pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "dev/startup-check/workspace-state.ts",
+      "justification": "Pre-existing oversized startup workspace-state helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
     },
     {
       "path": "dev/update-pnpm-hash.ts",
@@ -37,12 +53,32 @@
       "justification": "Pre-existing oversized non-default importer hash helper pending focused decomposition outside the remote-consumer final checkpoint."
     },
     {
+      "path": "dev/update-pnpm-hash/verified-marker.ts",
+      "justification": "Pre-existing oversized pnpm verified-marker helper pending focused decomposition; current change only renames validation terminology without expanding behavior."
+    },
+    {
       "path": "dev/verify/args.ts",
       "justification": "Pre-existing oversized verify argument parser pending focused decomposition outside the remote-consumer final checkpoint."
     },
     {
+      "path": "dev/verify/buck-orphan-cleanup.ts",
+      "justification": "Pre-existing oversized verify Buck orphan cleanup helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "dev/verify/buck2-test.ts",
+      "justification": "Pre-existing oversized verify Buck test runner pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "dev/verify/registered-temp-repo-cleanup.ts",
+      "justification": "Pre-existing oversized verify temp-repo cleanup helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
       "path": "dev/verify/run-verify.ts",
       "justification": "Pre-existing oversized verify runner pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/verify/safety-rails.ts",
+      "justification": "Pre-existing oversized verify safety-rails helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
     },
     {
       "path": "dev/verify/seed-staging.ts",
@@ -61,8 +97,16 @@
       "justification": "Pre-existing oversized wasm watch coordinator pending focused decomposition outside the remote-consumer final checkpoint."
     },
     {
+      "path": "lib/build-system-test-scope.ts",
+      "justification": "Pre-existing oversized build-system test-scope helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
+    },
+    {
       "path": "lib/managed-command.ts",
       "justification": "Pre-existing oversized managed-command helper pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "lib/verify-log-status/compute.ts",
+      "justification": "Pre-existing oversized verify-log status computation helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
     },
     {
       "path": "tests/dev/nix-cache-health.test.ts",

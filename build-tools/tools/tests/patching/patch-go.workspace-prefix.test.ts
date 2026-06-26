@@ -27,7 +27,9 @@ test("patch-go: workspace parent dir is viberoots-patch-go", async () => {
       process.exit(2);
     }
     const parent = path.basename(path.dirname(ws));
-    if (parent !== "viberoots-patch-go") {
+    const expectedParent =
+      process.platform === "darwin" ? "viberoots-patch-go.noindex" : "viberoots-patch-go";
+    if (parent !== expectedParent) {
       console.error("unexpected workspace parent dir", { parent, ws });
       process.exit(2);
     }

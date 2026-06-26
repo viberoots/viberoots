@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { activeNixGcPids } from "../../lib/nix-gc-lock";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { processTableLines } from "../../lib/process-inspection";
 import { pathExists } from "../../lib/repo";
 
@@ -117,7 +118,7 @@ export async function ensureNodeModulesGcRoot(
       return;
     }
     const gcDir = path.join(root, ".nix-gcroots");
-    await fsp.mkdir(gcDir, { recursive: true });
+    await mkdirWithMacosMetadataExclusion(gcDir);
     const gcRoot = path.join(gcDir, `node-modules.${key}`);
     const deriver = await runManagedCommand({
       command: "nix-store",

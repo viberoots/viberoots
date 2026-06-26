@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { getFlagStr } from "../lib/cli";
 import { resolveModuleContractsPaths } from "./module-contract-paths";
 import { syncModuleContractsForApp } from "./sync-module-contracts-core";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { findRepoRoot } from "../lib/repo";
 import {
   specsFromWasmManifest,
@@ -30,7 +31,7 @@ async function ensureDaemon(root: string, pollMs: number): Promise<void> {
   const baseDir = path.join(root, "buck-out", "tmp", "wasm-watch-coordinator");
   const pidPath = path.join(baseDir, "daemon.pid");
   const lockDir = path.join(baseDir, "daemon.start.lock");
-  await fsp.mkdir(baseDir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(baseDir);
   const toolDir = path.dirname(fileURLToPath(import.meta.url));
   const daemonScript = path.join(toolDir, "wasm-watch-coordinator-daemon.ts");
   const daemonDeps = [
@@ -165,7 +166,7 @@ async function main() {
   });
   const baseDir = path.join(resolved.repoRoot, "buck-out", "tmp", "wasm-watch-coordinator");
   const leasesDir = path.join(baseDir, "leases");
-  await fsp.mkdir(leasesDir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(leasesDir);
   const leaseId = `${resolved.appId}-${process.pid}`;
   const leasePath = path.join(leasesDir, `${leaseId}.json`);
   const writeLease = async (specs: Awaited<ReturnType<typeof specsFromWasmManifest>>) => {

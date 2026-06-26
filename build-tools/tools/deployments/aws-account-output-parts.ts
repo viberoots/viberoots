@@ -138,7 +138,7 @@ export function collectMissingConfigFields(
 }
 
 function stackConfigPathForSummary(): string {
-  return getFlagStr("config", "").trim() || "config/control-plane/stack.json";
+  return getFlagStr("config", "").trim() || "projects/config/control-plane/stack.json";
 }
 
 export function awsAccountCheckCommand(status: AwsAccountStatus, json: boolean): string {

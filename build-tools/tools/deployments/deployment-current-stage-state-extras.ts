@@ -73,7 +73,7 @@ function evidence(
   if (!ref) return undefined;
   return {
     kind,
-    referencePath: secretSafeStageStateValue(ref),
+    referencePath: ref,
     ...(clean(fingerprint) ? { fingerprint: secretSafeStageStateValue(clean(fingerprint)) } : {}),
   };
 }
@@ -109,10 +109,8 @@ function artifactEvidence(record: StageStateRecordExtras): DeploymentRetainedArt
       if (!storedArtifactPath && !provenancePath) return undefined;
       return {
         identity: secretSafeStageStateValue(identity),
-        ...(storedArtifactPath
-          ? { storedArtifactPath: secretSafeStageStateValue(storedArtifactPath) }
-          : {}),
-        ...(provenancePath ? { provenancePath: secretSafeStageStateValue(provenancePath) } : {}),
+        ...(storedArtifactPath ? { storedArtifactPath } : {}),
+        ...(provenancePath ? { provenancePath } : {}),
       };
     })
     .filter((entry): entry is DeploymentRetainedArtifactEvidence => Boolean(entry));

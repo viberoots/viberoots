@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
+import { MACOS_METADATA_NEVER_INDEX_FILE } from "../../lib/macos-metadata";
 import { DEFAULT_NODE_WORKSPACE_MAP_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
@@ -53,6 +54,13 @@ test("workspace map generation matches providers", async () => {
     assert.equal(DEFAULT_NODE_WORKSPACE_MAP_PATH, ".viberoots/workspace/node/workspace-map.json");
     const outPath = path.join(tmp, DEFAULT_NODE_WORKSPACE_MAP_PATH);
     const got = await fs.readJson(outPath);
+    if (process.platform === "darwin") {
+      assert.ok(
+        await fs.pathExists(
+          path.join(tmp, ".viberoots", "workspace", "node", MACOS_METADATA_NEVER_INDEX_FILE),
+        ),
+      );
+    }
     assert.deepEqual(got, {
       "@repo/ui": "//projects/libs/ui:ui",
       "@repo/web": "//projects/apps/web:web",

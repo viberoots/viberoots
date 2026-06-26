@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { withScopedEnv } from "../lib/test-helpers/scoped-env";
+import { MACOS_METADATA_NEVER_INDEX_FILE } from "../../lib/macos-metadata";
 
 test("provider-writer: deterministic output and managed section sync", async () => {
   await runInTemp("provider-writer-determinism", async (tmp, $) => {
@@ -40,6 +41,20 @@ test("provider-writer: deterministic output and managed section sync", async () 
         },
       });
       const out1 = await fsp.readFile(path.join(tmp, outFile), "utf8");
+      if (process.platform === "darwin") {
+        const marker = path.join(
+          tmp,
+          ".viberoots",
+          "workspace",
+          "providers",
+          MACOS_METADATA_NEVER_INDEX_FILE,
+        );
+        const marked = await fsp
+          .stat(marker)
+          .then((st) => st.isFile())
+          .catch(() => false);
+        if (!marked) throw new Error(`expected macOS metadata exclusion marker at ${marker}`);
+      }
       const h1 = crypto.createHash("sha256").update(out1).digest("hex");
 
       // Second write (no-op expected)

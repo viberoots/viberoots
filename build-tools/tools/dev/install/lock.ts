@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 
 function repoIdentity(): string {
   const cwd = process.cwd();
@@ -67,7 +68,7 @@ export async function withExclusiveInstallLock<T>(
   const verbose = opts?.verbose ?? false;
   const p = lockPathFor(key, opts?.scopeRootAbs);
   const parent = path.dirname(p);
-  await fsp.mkdir(parent, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(parent);
   const dbg = String(process.env.INSTALL_LOCK_DEBUG || "").trim() === "1";
 
   const start = Date.now();

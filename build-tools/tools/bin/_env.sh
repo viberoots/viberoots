@@ -63,6 +63,15 @@ env_init_paths() {
 	export VIBEROOTS_WORKSPACE="${LIVE_ROOT}/.viberoots/workspace"
 }
 
+env_mark_macos_metadata_never_index() {
+	local dir="$1"
+	[[ -n "${dir}" ]] || return 0
+	mkdir -p "${dir}" 2>/dev/null || true
+	if [[ "$(uname -s 2>/dev/null || true)" == "Darwin" ]]; then
+		[[ -e "${dir}/.metadata_never_index" ]] || : > "${dir}/.metadata_never_index" 2>/dev/null || true
+	fi
+}
+
 tool_path() {
 	local tool="$1"
 	local dir
@@ -214,7 +223,7 @@ ensure_viberoots_current() {
 	if [[ -e "${current}/build-tools/tools/dev/zx-init.mjs" ]]; then
 		return 0
 	fi
-	mkdir -p "${live_root}/.viberoots" 2>/dev/null || return 1
+	env_mark_macos_metadata_never_index "${live_root}/.viberoots"
 	if [[ -L "${current}" && ! -e "${current}" ]]; then
 		rm -f "${current}"
 	fi
@@ -253,7 +262,11 @@ ensure_buck_prelude() {
 	command -v nix >/dev/null 2>&1 || return 1
 
 	local cache_dir="${live_root}/.viberoots/workspace/buck/tmp/devshell-cache"
-	mkdir -p "${cache_dir}" 2>/dev/null || true
+	env_mark_macos_metadata_never_index "${live_root}/.viberoots"
+	env_mark_macos_metadata_never_index "${live_root}/.viberoots/workspace"
+	env_mark_macos_metadata_never_index "${live_root}/.viberoots/workspace/buck"
+	env_mark_macos_metadata_never_index "${live_root}/.viberoots/workspace/buck/tmp"
+	env_mark_macos_metadata_never_index "${cache_dir}"
 	local lock_hash=""
 	if [[ -f "${live_root}/flake.lock" ]]; then
 		if command -v shasum >/dev/null 2>&1; then
@@ -383,7 +396,8 @@ ensure_coverage_dir() {
 		if [[ -z "${NODE_V8_COVERAGE:-}" ]]; then
 			export NODE_V8_COVERAGE="${repo_root}/coverage/raw"
 		fi
-		mkdir -p "${NODE_V8_COVERAGE}"
+		env_mark_macos_metadata_never_index "$(dirname "${NODE_V8_COVERAGE}")"
+		env_mark_macos_metadata_never_index "${NODE_V8_COVERAGE}"
 	fi
 }
 

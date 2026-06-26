@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 import { processStartSignature as inspectProcessStartSignature } from "./process-inspection";
 
 type LockOwner = {
@@ -108,7 +109,9 @@ export async function withSharedBuckIsolationStartupLock<T>(
   if (initialized.has(key)) return await fn();
 
   const lockRoot = path.join(resolvedRoot, "buck-out", "tmp", "shared-isolation-locks");
-  await fsp.mkdir(lockRoot, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(path.join(resolvedRoot, "buck-out"));
+  await mkdirWithMacosMetadataExclusion(path.join(resolvedRoot, "buck-out", "tmp"));
+  await mkdirWithMacosMetadataExclusion(lockRoot);
   const lockDir = path.join(lockRoot, `${sanitizeIsolationName(iso)}.lock`);
   const release = await acquireLock(lockDir, iso);
   try {

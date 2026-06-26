@@ -4,6 +4,7 @@ import { resolveRequestedVerifyScope } from "../dev/verify/requested-scope";
 import { parseVerifyExecutionPolicy } from "../dev/verify/remote-policy";
 import { summarizeVerifyScopeDecision } from "../dev/verify/selection-output";
 import { runVerifyBuckPasses } from "../dev/verify/verify-passes";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 
 function ciBuckTestTimeoutSecs(): number {
   return Number(process.env.TIMEOUT_SEC || 1200);
@@ -28,7 +29,9 @@ export async function runCiBuckTestStage(): Promise<void> {
 
   const iso = `ci-buck-test-${process.pid}`;
   const analysisDir = path.join(root, "buck-out", "tmp", "ci-buck-test-analysis");
-  await fsp.mkdir(analysisDir, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(path.join(root, "buck-out"));
+  await mkdirWithMacosMetadataExclusion(path.join(root, "buck-out", "tmp"));
+  await mkdirWithMacosMetadataExclusion(analysisDir);
   const status = await runVerifyBuckPasses({
     root,
     iso,

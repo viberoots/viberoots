@@ -57,10 +57,16 @@ let
     (lib.hasPrefix ".viberoots/workspace/buck/" rel) ||
     rel == ".viberoots/workspace/.viberoots" ||
     (lib.hasPrefix ".viberoots/workspace/.viberoots/" rel) ||
+    rel == ".viberoots/workspace/codex-test-logs" ||
+    (lib.hasPrefix ".viberoots/workspace/codex-test-logs/" rel) ||
     rel == ".viberoots/buck" ||
     (lib.hasPrefix ".viberoots/buck/" rel) ||
     rel == ".viberoots/cache" ||
     (lib.hasPrefix ".viberoots/cache/" rel) ||
+    rel == ".viberoots/codex-logs" ||
+    (lib.hasPrefix ".viberoots/codex-logs/" rel) ||
+    rel == "build-tools/tmp" ||
+    (lib.hasPrefix "build-tools/tmp/" rel) ||
     rel == "viberoots/.viberoots" ||
     (lib.hasPrefix "viberoots/.viberoots/" rel) ||
     rel == ".viberoots/workspace/providers/nix_attr_map.bzl" ||

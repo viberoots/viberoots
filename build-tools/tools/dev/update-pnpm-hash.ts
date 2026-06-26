@@ -133,6 +133,7 @@ async function inner() {
           hashValue: existingHash,
           builderFingerprint,
         },
+        sharedCacheBuilderFingerprint,
       });
       console.log(
         `[update-pnpm-hash] importer=${importer} step=skip-root-marker attr=${storeAttr} lockfile=${key}`,
@@ -192,6 +193,7 @@ async function inner() {
           hashValue: nextHash,
           builderFingerprint,
         },
+        sharedCacheBuilderFingerprint,
       });
     }
     console.log("pnpm-store:", storeAttr, "hash updated and build succeeded");
@@ -207,6 +209,7 @@ async function inner() {
       importer,
       storeAttr,
       builderFingerprint,
+      sharedCacheBuilderFingerprint,
       existingLockHash,
       existingHash,
       hasValidExistingHash,
@@ -233,6 +236,7 @@ async function inner() {
             hashValue: existingHash,
             builderFingerprint,
           },
+          sharedCacheBuilderFingerprint,
         });
       }
     }
@@ -292,6 +296,7 @@ async function inner() {
           hashValue: nextHash,
           builderFingerprint,
         },
+        sharedCacheBuilderFingerprint,
       });
     }
   }

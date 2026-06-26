@@ -12,6 +12,7 @@ import {
 import { unifiedPnpmStoreEpochDigest } from "./unified-pnpm-store-epoch";
 import { prepareExactPnpmStore } from "./update-pnpm-hash/lockfile";
 import { mergePnpmStore } from "./update-pnpm-hash/prefetched-store";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 
 function sha256Hex(s: string) {
   return crypto.createHash("sha256").update(s).digest("hex");
@@ -26,7 +27,7 @@ async function readTextSafe(p: string): Promise<string> {
 }
 
 async function ensureDir(p: string) {
-  await fsp.mkdir(p, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(p);
 }
 
 async function mergeExactStorePathIntoUnifiedStore(opts: {

@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagStr } from "../../lib/cli";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { dirsForTarget, findModuleRootForDirs, isGoNode, packageDirFromTargetName } from "./batch";
 import { attrList } from "./cquery/attrs";
 import { cqueryNodes } from "./cquery/index";
@@ -215,7 +216,7 @@ async function emitMetrics(dst: string, m: Metrics) {
   // Bootstrap-safe: rely only on node:fs/promises
   const dir = path.dirname(dst);
   try {
-    await fsp.mkdir(dir, { recursive: true });
+    await mkdirWithMacosMetadataExclusion(dir);
   } catch {}
   await fsp.writeFile(dst, JSON.stringify(m, null, 2) + "\n", "utf8");
 }

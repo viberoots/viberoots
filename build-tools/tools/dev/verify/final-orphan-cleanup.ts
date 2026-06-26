@@ -65,14 +65,24 @@ async function activeSourceCleanupRoots(root: string): Promise<string[]> {
 async function cleanupVerifyRootBuckOut(root: string): Promise<string[]> {
   const buckOut = path.join(root, "buck-out");
   const removed: string[] = [];
-  await execFileAsync("buck2", ["kill"], { cwd: root }).catch(() => {});
   const entries = await fsp.readdir(buckOut, { withFileTypes: true }).catch(() => []);
+  const broadCleanup = process.env.VBR_VERIFY_BROAD_BUCK_OUT_CLEANUP === "1";
   for (const entry of entries) {
     const name = entry.name;
     const verifyOwned = verifyOwnedBuckOutEntry(name);
     if (!verifyOwned) continue;
-    if (
-      name === "v2" ||
+    const ownerPid = (name.match(/^v-(\d+)-/) || name.match(/^verify-nested-(\d+)-/))?.[1] || "";
+    if (ownerPid) {
+      try {
+        process.kill(Number(ownerPid), 0);
+        continue;
+      } catch {}
+    } else if (!broadCleanup) {
+      continue;
+    }
+    if (name === "v2") {
+      await execFileAsync("buck2", ["kill"], { cwd: root }).catch(() => {});
+    } else if (
       name.startsWith("v-") ||
       name.startsWith("verify-nested-") ||
       name.startsWith("deployment-query-") ||

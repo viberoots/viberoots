@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 
 async function dirExists(p: string): Promise<boolean> {
   try {
@@ -14,13 +15,13 @@ async function dirExists(p: string): Promise<boolean> {
 async function ensureMergedDir(dst: string): Promise<void> {
   const cur = await fsp.lstat(dst).catch(() => null);
   if (!cur) {
-    await fsp.mkdir(dst, { recursive: true });
+    await mkdirWithMacosMetadataExclusion(dst);
     return;
   }
   if (cur.isSymbolicLink()) {
     const target = await fsp.realpath(dst).catch(() => "");
     await fsp.rm(dst, { force: true }).catch(() => {});
-    await fsp.mkdir(dst, { recursive: true });
+    await mkdirWithMacosMetadataExclusion(dst);
     if (target) {
       await fsp.cp(target, dst, { recursive: true }).catch(() => {});
     }
@@ -40,7 +41,7 @@ async function removeExistingTarget(target: string): Promise<void> {
 }
 
 async function copyResolvedFile(source: string, target: string): Promise<void> {
-  await fsp.mkdir(path.dirname(target), { recursive: true });
+  await mkdirWithMacosMetadataExclusion(path.dirname(target));
   await fsp.chmod(path.dirname(target), 0o755).catch(() => {});
   await removeExistingTarget(target);
   await fsp.copyFile(source, target);
@@ -51,7 +52,7 @@ async function copyResolvedFile(source: string, target: string): Promise<void> {
 async function mergeResolvedTree(source: string, target: string): Promise<void> {
   const st = await fsp.stat(source);
   if (st.isDirectory()) {
-    await fsp.mkdir(target, { recursive: true });
+    await mkdirWithMacosMetadataExclusion(target);
     const entries = await fsp.readdir(source, { withFileTypes: true });
     for (const entry of entries) {
       await mergeSymlinkSafe(path.join(source, entry.name), path.join(target, entry.name));
@@ -182,13 +183,13 @@ export async function syncLocalPrefetchIntoPnpmStore(targetStore: string): Promi
 async function syncPnpmStore(sourceStore: string, targetStore: string): Promise<void> {
   if (!(await dirExists(sourceStore))) return;
   if (path.resolve(sourceStore) === path.resolve(targetStore)) return;
-  await fsp.mkdir(targetStore, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(targetStore);
   const entries = await fsp.readdir(sourceStore, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     if (!entry.isDirectory() || !entry.name.startsWith("v")) continue;
     const srcVer = path.join(sourceStore, entry.name);
     const dstVer = path.join(targetStore, entry.name);
-    await fsp.mkdir(dstVer, { recursive: true });
+    await mkdirWithMacosMetadataExclusion(dstVer);
     const srcFiles = path.join(srcVer, "files");
     const dstFiles = path.join(dstVer, "files");
     if (await dirExists(srcFiles)) {
@@ -214,7 +215,7 @@ async function syncImmutablePnpmStore(sourceStore: string, targetStore: string):
     const markerPath = immutableSyncMarkerPath(targetStore, sourceStore);
     if (await fsp.stat(markerPath).catch(() => null)) return;
     await syncPnpmStore(sourceStore, targetStore);
-    await fsp.mkdir(path.dirname(markerPath), { recursive: true });
+    await mkdirWithMacosMetadataExclusion(path.dirname(markerPath));
     await fsp.writeFile(markerPath, `${path.resolve(sourceStore)}\n`, "utf8");
   });
 }

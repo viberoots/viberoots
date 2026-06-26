@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { buildToolsRoot } from "./dev-build/paths";
 
 const BZL_REL = path.join("toolchains", "toolchain_paths.bzl");
@@ -33,7 +34,7 @@ async function ensureWorkspaceToolchains(root: string): Promise<string> {
   } catch {
     return "";
   }
-  await fsp.mkdir(dst, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(dst);
   await fsp.cp(src, dst, {
     errorOnExist: false,
     force: true,

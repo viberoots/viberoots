@@ -4,6 +4,7 @@ import path from "node:path";
 import process from "node:process";
 import "zx/globals";
 import { writeIfChanged } from "../../lib/fs-helpers";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { runManagedCommand } from "../../lib/managed-command";
 import { verifySeedBuildArgs, type VerifySeedBuildMode } from "./seed-build";
 import { shouldStageSeed, stageSeedStore } from "./seed-staging";
@@ -161,7 +162,7 @@ async function buildSeedStorePath(
   // the current seed between verify runs. Each build overwrites the symlink, so only
   // the most-recent seed derivation is pinned; older ones remain GC-eligible.
   const gcRootPath = path.join(seedRootDir(root), "nix-root");
-  await fsp.mkdir(seedRootDir(root), { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(seedRootDir(root)).catch(() => {});
   process.stderr.write(
     `[verify] seed build: nix build path:${root}/.viberoots/workspace#test-seed (timeout=${timeoutSec}s)\n`,
   );
@@ -202,7 +203,7 @@ async function buildSeedStorePath(
 
 async function writeCurrentSeed(root: string, seedPath: string, seedKey: string): Promise<void> {
   const dir = seedRootDir(root);
-  await fsp.mkdir(dir, { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(dir).catch(() => {});
   await writeIfChanged(path.join(dir, "current"), seedPath + "\n");
   await writeIfChanged(path.join(dir, "current.key"), seedKey + "\n");
 }
@@ -229,7 +230,7 @@ async function createPin(
   seedKey: string,
 ): Promise<string> {
   const pinDir = path.join(pinRootDir(root), iso);
-  await fsp.mkdir(pinDir, { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(pinDir).catch(() => {});
   await fsp.writeFile(
     path.join(pinDir, "owner.json"),
     JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString(), seedKey }) + "\n",

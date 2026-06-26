@@ -25,11 +25,20 @@ def _cpp_nix_test_impl(ctx):
     # Compute expected test binary name deterministically based on the planner label
     expected_bin = sanitize_name(raw)
     attr = sanitize_nix_attr_from_target_label(raw)
+    safe_log_path_prefix = (
+        "SAFE_LOG_KEY=\"%s\"; " % raw
+        + "SAFE_LOG_KEY=\"${SAFE_LOG_KEY//\\//_}\"; "
+        + "SAFE_LOG_KEY=\"${SAFE_LOG_KEY//:/_}\"; "
+        + "BUILD_SELECTED_LOG=\"$WORKSPACE_ROOT/buck-out/tmp/build-selected/cpp_nix_test.${SAFE_LOG_KEY}.log\"; "
+        + "BUILD_SELECTED_LOG_DIR=\"$(dirname \"$BUILD_SELECTED_LOG\")\"; mkdir -p \"$BUILD_SELECTED_LOG_DIR\"; "
+        + "if [ \"$(uname -s 2>/dev/null || true)\" = \"Darwin\" ]; then [ ! -e \"$WORKSPACE_ROOT/buck-out/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/buck-out/.metadata_never_index\"; [ ! -e \"$WORKSPACE_ROOT/buck-out/tmp/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/buck-out/tmp/.metadata_never_index\"; [ ! -e \"$BUILD_SELECTED_LOG_DIR/.metadata_never_index\" ] && : > \"$BUILD_SELECTED_LOG_DIR/.metadata_never_index\"; fi; "
+    )
     run_and_exec = (
         "WORKSPACE_ROOT_ENV_ARG=\"${1:-}\"; "
         + "if [ -n \"$WORKSPACE_ROOT_ENV_ARG\" ] && [ -f \"$WORKSPACE_ROOT_ENV_ARG\" ]; then . \"$WORKSPACE_ROOT_ENV_ARG\" 2>/dev/null || true; fi; "
         + nix_calling_env_export_source_snapshot(snapshot_root = "${2:-}", manifest_path = "${3:-}")
         + nix_bootstrap_env_core()
+        + safe_log_path_prefix
         + ("echo '[cpp_nix_test] planner_label=%s' >&2; " % raw)
         + ("echo '[cpp_nix_test] target_attr=%s' >&2; " % attr)
         + ("export BUCK_TARGET_ATTR='%s'; " % attr)
@@ -38,13 +47,13 @@ def _cpp_nix_test_impl(ctx):
             out_var = "OUT_PATH",
             raw_var = "OUT_RAW",
             status_var = "NIX_STATUS",
-            log_file = "/tmp/cpp_nix_test_build.log",
+            log_file = "$BUILD_SELECTED_LOG",
             zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
         )
         + "echo \"[cpp_nix_test] OUT_PATH=$OUT_PATH\" >&2; "
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$OUT_PATH\" ]; then "
         + "  echo '[cpp_nix_test] build-selected failed' >&2; "
-        + "  cat /tmp/cpp_nix_test_build.log >&2 || true; "
+        + "  if [ -f \"$BUILD_SELECTED_LOG\" ]; then cat \"$BUILD_SELECTED_LOG\" >&2; fi; "
         + "  if [ \"$NIX_STATUS\" -ne 0 ]; then exit \"$NIX_STATUS\"; fi; "
         + "  echo '[cpp_nix_test] build-selected produced no output path' >&2; "
         + "  exit 2; "

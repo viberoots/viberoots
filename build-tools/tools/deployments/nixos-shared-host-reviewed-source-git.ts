@@ -1,9 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
+import { mkdtempNoindex } from "../lib/macos-metadata";
 import { shSingleQuote } from "../lib/shell-quote";
 import type { DeploymentTarget } from "./contract";
 import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
@@ -169,7 +169,9 @@ export async function gitFetchEnvForReviewedRemote(
     trim(process.env[REVIEWED_SOURCE_SSH_KNOWN_HOSTS_FILE_ENV]);
   const tmpDir = configuredKnownHostsFile
     ? ""
-    : await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-github-known-hosts-"));
+    : await mkdtempNoindex("vbr-github-known-hosts-", {
+        baseName: "vbr-github-known-hosts",
+      });
   const knownHostsFile = configuredKnownHostsFile || path.join(tmpDir, "known_hosts");
   if (!configuredKnownHostsFile) await fsp.writeFile(knownHostsFile, `${GITHUB_KNOWN_HOSTS}\n`);
   const sshKeyFile =

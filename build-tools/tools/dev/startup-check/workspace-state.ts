@@ -194,28 +194,42 @@ async function requirePreludeEntrypoint(): Promise<void> {
 
 async function cleanupVerifyOwnedRootBuckOut(): Promise<void> {
   const buckOut = "buck-out";
+  const broadCleanup = process.env.VBR_STARTUP_BROAD_BUCK_OUT_CLEANUP === "1";
   const entries = await fsp.readdir(buckOut, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     const name = entry.name;
-    const verifyOwned =
+    if (name.startsWith("v-") || name.startsWith("verify-nested-")) {
+      const ownerPid = (name.match(/^v-(\d+)-/) || name.match(/^verify-nested-(\d+)-/))?.[1] || "";
+      if (!ownerPid) {
+        if (!broadCleanup) continue;
+      } else {
+        try {
+          process.kill(Number(ownerPid), 0);
+          continue;
+        } catch {}
+      }
+      await execFileAsync("buck2", ["--isolation-dir", name, "kill"]).catch(() => {});
+    } else if (
       name === "test-logs" ||
       name === "tmp" ||
       name === "zx_shims" ||
       name === "v2" ||
-      name.startsWith("v-") ||
-      name.startsWith("verify-nested-") ||
       name.startsWith("deployment-query-") ||
-      name.startsWith("zxtest-shared-");
-    if (!verifyOwned) continue;
-    if (name === "v2") {
-      await execFileAsync("buck2", ["kill"]).catch(() => {});
-    } else if (
-      name.startsWith("v-") ||
-      name.startsWith("verify-nested-") ||
-      name.startsWith("deployment-query-") ||
-      name.startsWith("zxtest-shared-")
+      name.startsWith("zxtest-shared-") ||
+      name.startsWith("exporter-shared-")
     ) {
-      await execFileAsync("buck2", ["--isolation-dir", name, "kill"]).catch(() => {});
+      if (!broadCleanup) continue;
+      if (name === "v2") {
+        await execFileAsync("buck2", ["kill"]).catch(() => {});
+      } else if (
+        name.startsWith("deployment-query-") ||
+        name.startsWith("zxtest-shared-") ||
+        name.startsWith("exporter-shared-")
+      ) {
+        await execFileAsync("buck2", ["--isolation-dir", name, "kill"]).catch(() => {});
+      }
+    } else {
+      continue;
     }
     await fsp.rm(path.join(buckOut, name), { recursive: true, force: true }).catch(() => {});
   }

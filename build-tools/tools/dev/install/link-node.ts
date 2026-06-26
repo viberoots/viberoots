@@ -8,6 +8,7 @@ import { writeIfChanged } from "../../lib/fs-helpers";
 import { resolveImporterDir } from "../../lib/lockfiles";
 import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { pathExists, repoRoot } from "../../lib/repo";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
 import {
@@ -264,7 +265,7 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
         lockHash,
         outPath,
       };
-      await fsp.mkdir(path.dirname(markerPath), { recursive: true }).catch(() => {});
+      await mkdirWithMacosMetadataExclusion(path.dirname(markerPath)).catch(() => {});
       await writeIfChanged(markerPath, JSON.stringify(marker, null, 2) + "\n");
     }
   }

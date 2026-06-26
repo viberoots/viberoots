@@ -42,6 +42,12 @@ export async function ensureBuckPreludeConfig(root: string): Promise<void> {
     await $({ cwd: root })`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
       mkdir -p .viberoots/workspace/providers .viberoots/workspace/buck
+      if [ "$(uname -s 2>/dev/null || true)" = "Darwin" ]; then
+        [ -e .viberoots/.metadata_never_index ] || : > .viberoots/.metadata_never_index
+        [ -e .viberoots/workspace/.metadata_never_index ] || : > .viberoots/workspace/.metadata_never_index
+        [ -e .viberoots/workspace/providers/.metadata_never_index ] || : > .viberoots/workspace/providers/.metadata_never_index
+        [ -e .viberoots/workspace/buck/.metadata_never_index ] || : > .viberoots/workspace/buck/.metadata_never_index
+      fi
       cat > .buckconfig <<'EOF'
 [buildfile]
 name = TARGETS

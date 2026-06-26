@@ -60,9 +60,9 @@ test("aws-account check can prompt to initialize stack config and continue", asy
       } finally {
         process.exitCode = previousExitCode;
       }
-      const configPath = path.join(tmp, "config", "control-plane", "stack.json");
+      const configPath = path.join(tmp, "projects", "config", "control-plane", "stack.json");
       const config = JSON.parse(await fsp.readFile(configPath, "utf8")) as Record<string, unknown>;
-      assert.match(prompts[0] || "", /Generate config\/control-plane\/stack\.json now/);
+      assert.match(prompts[0] || "", /Generate projects\/config\/control-plane\/stack\.json now/);
       assert.match(prompts[1] || "", /Domain/);
       assert.equal(config.domain, "example.com");
       assert.equal(Object.hasOwn(config, "serviceHost"), false);
@@ -70,8 +70,13 @@ test("aws-account check can prompt to initialize stack config and continue", asy
         const runtimeConfig = await readAwsAccountConfig(tmp);
         assert.equal(runtimeConfig.serviceHost, "deploy.control.example.com");
       });
-      assert.ok(out.join("\n").includes("Continuing with config/control-plane/stack.json"));
-      assert.equal(out.join("\n").includes("Next:\n  Edit config/control-plane/stack.json"), false);
+      assert.ok(
+        out.join("\n").includes("Continuing with projects/config/control-plane/stack.json"),
+      );
+      assert.equal(
+        out.join("\n").includes("Next:\n  Edit projects/config/control-plane/stack.json"),
+        false,
+      );
       assert.ok(out.join("\n").includes("  PASS    check-supabase"));
       assert.ok(
         await exists(
@@ -110,7 +115,7 @@ test("aws-account check prints config-init guidance without an interactive promp
     }
     assert.ok(out[0]?.includes("AWS account stack config is not initialized."));
     assert.ok(out[0]?.includes("control-plane aws-account config-init"));
-    assert.ok(out[0]?.includes("config/control-plane/stack.json"));
+    assert.ok(out[0]?.includes("projects/config/control-plane/stack.json"));
   });
 });
 
@@ -153,7 +158,7 @@ test("aws-account check prompt fills domain in an existing stack config", async 
           }),
         }),
       );
-      const configPath = path.join(tmp, "config", "control-plane", "stack.json");
+      const configPath = path.join(tmp, "projects", "config", "control-plane", "stack.json");
       const config = JSON.parse(await fsp.readFile(configPath, "utf8")) as Record<string, unknown>;
       assert.equal(config.domain, "example.com");
       assert.equal(config.awsAccountId, "123456789012");
@@ -226,7 +231,7 @@ test("aws-account config-init with domain skips stale fill-domain guidance", asy
       assert.doesNotMatch(text, /control-plane aws-account check/);
       assert.doesNotMatch(text, /fill "domain"/);
       const config = JSON.parse(
-        await fsp.readFile(path.join(tmp, "config/control-plane/stack.json"), "utf8"),
+        await fsp.readFile(path.join(tmp, "projects/config/control-plane/stack.json"), "utf8"),
       );
       assert.equal(config.domain, "deploy.example.com");
     });

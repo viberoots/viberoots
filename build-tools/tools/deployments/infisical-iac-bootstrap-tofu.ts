@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
-import * as os from "node:os";
 import * as path from "node:path";
 import * as readline from "node:readline/promises";
+import { mkdtempNoindex } from "../lib/macos-metadata";
 import {
   canonicalInfisicalApiUrl,
   deploymentScopeFromTarget,
@@ -24,7 +24,9 @@ import type {
 
 export async function planFilePath(args: BootstrapArgs) {
   if (args.tofuPlanFile) return path.resolve(args.tofuPlanFile);
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-iac-bootstrap-plan-"));
+  const dir = await mkdtempNoindex("infisical-iac-bootstrap-plan-", {
+    baseName: "infisical-iac-bootstrap-plan",
+  });
   return path.join(dir, "deployment-infisical.tfplan");
 }
 

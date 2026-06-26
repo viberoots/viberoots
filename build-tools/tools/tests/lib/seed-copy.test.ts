@@ -61,6 +61,16 @@ test("copySeedStoreToTempRepo publishes a complete forced-CoW seed copy atomical
   const seed = await mktemp("seed-copy-source-");
   const tmp = await mktemp("seed-copy-dest-");
   await writeRequiredSeedFiles(seed);
+  await fsp.writeFile(path.join(seed, ".metadata_never_index"), "", "utf8");
+  for (const rel of [
+    path.join(".viberoots", "codex-logs", "full.log"),
+    path.join(".viberoots", "workspace", "codex-test-logs", "focused.log"),
+    path.join("build-tools", "tmp", "rsync-nested-buck-out-123", "buck-out", "artifact"),
+  ]) {
+    const abs = path.join(seed, rel);
+    await fsp.mkdir(path.dirname(abs), { recursive: true });
+    await fsp.writeFile(abs, "generated\n", "utf8");
+  }
   await fsp.writeFile(path.join(tmp, "stale.txt"), "stale\n", "utf8");
 
   const supported = await probeSeedCowCopyFrom({
@@ -84,7 +94,19 @@ test("copySeedStoreToTempRepo publishes a complete forced-CoW seed copy atomical
     `${path.join("viberoots", "build-tools", "tools", "dev", "zx-init.mjs")}\n`,
   );
   assert.ok((await fsp.stat(path.join(tmp, "docs"))).isDirectory());
+  if (process.platform === "darwin") {
+    await fsp.stat(path.join(tmp, ".metadata_never_index"));
+  }
   await assert.rejects(fsp.access(path.join(tmp, "stale.txt")));
+  await assert.rejects(fsp.access(path.join(tmp, ".viberoots", "codex-logs", "full.log")));
+  await assert.rejects(
+    fsp.access(path.join(tmp, ".viberoots", "workspace", "codex-test-logs", "focused.log")),
+  );
+  await assert.rejects(
+    fsp.access(
+      path.join(tmp, "build-tools", "tmp", "rsync-nested-buck-out-123", "buck-out", "artifact"),
+    ),
+  );
   assert.equal(await fsp.readFile(path.join(seed, "flake.nix"), "utf8"), "flake.nix\n");
 });
 

@@ -71,7 +71,7 @@ test("restore validation accepts current-stage state backed by a Kubernetes reco
       restoreRoot: path.join(tmp, "restore"),
       protectionClass: "shared_nonprod",
     });
-    assert.equal(status.latestRestoreTest?.status, "passed");
+    assert.equal(status.latestRestoreTest?.status, "passed", status.latestRestoreTest?.error);
     assert.equal(status.latestRestoreTest?.restoredCurrentStageStateCount, 1);
     assert.equal(status.latestRestoreTest?.retainedArtifactReferenceCount, 3);
   });

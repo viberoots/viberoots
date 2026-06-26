@@ -2,6 +2,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { requireGoToolchainBin } from "../../lib/toolchain-paths";
 import type { GoPkg, Tuple } from "./types";
 
@@ -33,7 +34,7 @@ async function sha256OfFile(p: string): Promise<string> {
 }
 
 async function ensureDir(p: string) {
-  await fsp.mkdir(p, { recursive: true });
+  await mkdirWithMacosMetadataExclusion(p);
 }
 
 export async function runGoList(

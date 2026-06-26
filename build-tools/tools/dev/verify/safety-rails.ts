@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { resolveToolPath } from "../../lib/tool-paths";
 import { activeNixGcProcesses } from "./preflight";
 import { writeVerifySafetyRailsTriggerSnapshot } from "./safety-rails-snapshot";
@@ -235,7 +236,7 @@ export async function startVerifySafetyRails(opts: {
   const transientRoot = String(process.env.TMPDIR || "").trim();
   const baseTransientGiB = transientRoot ? await dirGiBForPath(transientRoot) : 0;
 
-  await fsp.mkdir(opts.analysisDir, { recursive: true }).catch(() => {});
+  await mkdirWithMacosMetadataExclusion(opts.analysisDir).catch(() => {});
   const telemetry = path.join(opts.analysisDir, "nix-store-telemetry.log");
   await appendLine(telemetry, `[verify] safety-rails baseline /nix/store free ~${base}GiB`);
   await appendLine(

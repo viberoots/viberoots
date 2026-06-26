@@ -9,7 +9,7 @@ export function renderPrivateLinkPsqlHelper(input: CloudControlSetupInput): Reco
 
 function renderPrivateLinkPsqlProofHelper(): string {
   return `#!/usr/bin/env node
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -25,7 +25,15 @@ if (!urlFile || !outFile) {
 
 const raw = (await readFile(urlFile, "utf8")).trim();
 const parsed = new URL(raw);
-const temp = mkdtempSync(path.join(tmpdir(), "privatelink-psql-"));
+const tempParent = path.join(tmpdir(), "privatelink-psql.noindex");
+mkdirSync(tempParent, { recursive: true });
+try {
+  writeFileSync(path.join(tempParent, ".metadata_never_index"), "", { flag: "wx" });
+} catch {}
+const temp = mkdtempSync(path.join(tempParent, "run-"));
+try {
+  writeFileSync(path.join(temp, ".metadata_never_index"), "", { flag: "wx" });
+} catch {}
 try {
   const pgpass = path.join(temp, "pgpass");
   writeFileSync(

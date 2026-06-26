@@ -3,6 +3,15 @@ set -euo pipefail
 
 SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/$(basename -- "${BASH_SOURCE[0]}")"
 
+mark_macos_metadata_never_index() {
+  [[ "$(uname -s 2>/dev/null || true)" == "Darwin" ]] || return 0
+  local dir
+  for dir in "$@"; do
+    [[ -n "$dir" ]] || continue
+    [[ -e "${dir}/.metadata_never_index" ]] || : > "${dir}/.metadata_never_index" 2>/dev/null || true
+  done
+}
+
 is_same_file() {
   local a="$1"
   local b="$2"
@@ -289,8 +298,14 @@ cleanup_partial_worktree() {
   local real_git="$1"
   local target="$2"
   local stage="$3"
-  [[ -n "$stage" ]] && rm -rf -- "$stage"
-  [[ -n "$target" ]] && "$real_git" worktree remove --force "$target" >/dev/null 2>&1 || true
+  if [[ -n "$stage" ]]; then
+    rm -rf -- "$stage"
+    rm -rf -- "$(dirname -- "$stage")"
+  fi
+  if [[ -n "$target" ]]; then
+    "$real_git" worktree remove --force "$target" >/dev/null 2>&1 || true
+    rm -rf -- "$target"
+  fi
 }
 
 run_cow_worktree_add() {
@@ -301,6 +316,7 @@ run_cow_worktree_add() {
   local source_root
   local target_parent
   local target_abs
+  local stage_parent=""
   local stage=""
   local staged_repo=""
   local manifest=""
@@ -315,7 +331,11 @@ run_cow_worktree_add() {
 
   target_parent="$(cd -- "$(dirname -- "$target")" && pwd -P)"
   target_abs="${target_parent}/$(basename -- "$target")"
-  stage="$(mktemp -d "${target_parent}/.git-cow-stage.XXXXXX")"
+  stage_parent="${target_parent}/.git-cow-stage.noindex"
+  mkdir -p -- "$stage_parent"
+  mark_macos_metadata_never_index "$stage_parent"
+  stage="$(mktemp -d "${stage_parent}/stage.XXXXXX")"
+  mark_macos_metadata_never_index "$stage"
   staged_repo="${stage}/repo"
   manifest="${stage}/paths.zlist"
 
@@ -346,6 +366,7 @@ run_cow_worktree_add() {
   fi
 
   rm -rf -- "$stage"
+  rm -rf -- "$stage_parent"
 
   if "$real_git" -C "$target_abs" reset --mixed -q HEAD >/dev/null; then
     :

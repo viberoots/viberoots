@@ -34,7 +34,9 @@ test("patch-python: workspace parent dir is viberoots-patch-python", async () =>
       process.exit(2);
     }
     const parent = path.basename(path.dirname(ws));
-    if (parent !== "viberoots-patch-python") {
+    const expectedParent =
+      process.platform === "darwin" ? "viberoots-patch-python.noindex" : "viberoots-patch-python";
+    if (parent !== expectedParent) {
       console.error("unexpected workspace parent dir", { parent, ws });
       process.exit(2);
     }
