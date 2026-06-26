@@ -10,11 +10,13 @@ import {
   MIGRATION_LABEL_SKIP_PATHS,
   PLAN_NUMBER_SKIP_PATHS,
   PLAN_NUMBER_SKIP_PREFIXES,
+  readMigrationLabelSkipPaths,
 } from "./stale-names-lint-allowlists";
 
 const execFileAsync = promisify(execFile);
 const RETIRED_INPUT_CONTRACT_TERM = ["secret", "spec"].join("");
 const RETIRED_INPUT_CONTRACT_TITLE = "Secret" + "spec";
+let migrationLabelSkipPaths: ReadonlySet<string> = MIGRATION_LABEL_SKIP_PATHS;
 
 const REPO_NAME_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /\bbucknix\b/g, label: "stale name: bucknix" },
@@ -165,7 +167,7 @@ function scanText(rel: string, text: string, lineForOffset: (offset: number) => 
       }
     }
   }
-  if (!MIGRATION_LABEL_SKIP_PATHS.has(rel)) {
+  if (!migrationLabelSkipPaths.has(rel)) {
     for (const { re, label } of MIGRATION_LABEL_PATTERNS) {
       for (const m of text.matchAll(re)) {
         const index = m.index ?? 0;
@@ -182,7 +184,7 @@ function scanPath(rel: string): Hit[] {
   const patterns = [
     ...REPO_NAME_PATTERNS,
     ...(!skipPlanNumbers(rel) ? PLAN_NUMBER_PATTERNS : []),
-    ...(!MIGRATION_LABEL_SKIP_PATHS.has(rel) ? MIGRATION_LABEL_PATTERNS : []),
+    ...(!migrationLabelSkipPaths.has(rel) ? MIGRATION_LABEL_PATTERNS : []),
   ];
   return patterns.flatMap(({ re, label }) =>
     Array.from(rel.matchAll(re), () => ({ rel, line: 1, label })),
@@ -203,6 +205,7 @@ async function main(): Promise<void> {
   const repoRoot = process.cwd();
   const failOnHits = !getFlagBool("no-fail");
   const positional = getPositionals();
+  migrationLabelSkipPaths = await readMigrationLabelSkipPaths(repoRoot);
 
   let relPaths: string[];
   if (positional.length > 0) {

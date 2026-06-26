@@ -22,7 +22,7 @@ import {
   splitVerifyPassGroupForStagedStart,
   verifyPassIsolationDir,
 } from "../../dev/verify/verify-pass-scheduling";
-import { prepareVerifyBuckIsolationMetadata } from "../../dev/verify/verify-passes";
+import { prepareVerifyBuckIsolationMetadata } from "../../dev/verify/buck-isolation-metadata";
 import { MACOS_METADATA_NEVER_INDEX_FILE } from "../../lib/macos-metadata";
 
 test("verify target cquery quotes explicit labels with operator characters", () => {

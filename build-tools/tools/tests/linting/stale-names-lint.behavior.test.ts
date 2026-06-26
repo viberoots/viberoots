@@ -41,6 +41,25 @@ test("stale-names-lint rejects internal v1/v2 migration identifiers", async () =
   );
 });
 
+test("stale-names-lint reads parent-owned migration label skip paths", async () => {
+  const repo = await fsp.mkdtemp(path.join(process.cwd(), "buck-out/tmp/stale-names-config-"));
+  await fsp.mkdir(path.join(repo, "projects/config"), { recursive: true });
+  await fsp.writeFile(
+    path.join(repo, "projects/config/stale-names-lint.json"),
+    JSON.stringify({ migrationLabelSkipPaths: ["projects/demo/state.ts"] }),
+    "utf8",
+  );
+  await fsp.mkdir(path.join(repo, "projects/demo"), { recursive: true });
+  await fsp.writeFile(path.join(repo, "projects/demo/state.ts"), "type DemoStateV1 = {};\n");
+
+  const result = await execFileAsync(
+    "zx-wrapper",
+    [path.resolve(process.cwd(), script), "projects/demo/state.ts"],
+    { cwd: repo },
+  );
+  assert.match(result.stderr, /no stale names found/);
+});
+
 test("stale-names-lint keeps external version strings out of migration-label checks", async () => {
   const file = await writeFixture(
     "fixture.ts",

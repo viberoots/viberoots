@@ -31,14 +31,17 @@ test("devshell exposes user-facing tools from Nix on PATH", async () => {
     cwd: root,
     env: {
       ...process.env,
+      IN_NIX_SHELL: "",
       WORKSPACE_ROOT: root,
       VIBEROOTS_ROOT: "",
       VIBEROOTS_SOURCE_ROOT: "",
+      _VIBEROOTS_DEVSHELL_ACTIVE: "",
+      _VIBEROOTS_DEVSHELL_ROOT: "",
     },
     stdio: "pipe",
     reject: false,
     nothrow: true,
-  })`bash --noprofile --norc -c ${`
+  })`direnv exec . bash --noprofile --norc -c ${`
 set -euo pipefail
 ROOT="$PWD"
 for bin in nix buck2 node pnpm go python3 uv jq rsync copier yq gomod2nix viberoots zx-wrapper s v i b; do

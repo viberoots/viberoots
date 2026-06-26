@@ -1,3 +1,8 @@
+import * as fsp from "node:fs/promises";
+import path from "node:path";
+
+const WORKSPACE_STALE_NAMES_CONFIG = "projects/config/stale-names-lint.json";
+
 export const ALLOWED_PATHS = new Set([
   "build-tools/tools/dev/stale-names-lint.ts",
   "build-tools/tools/dev/stale-names-lint-allowlists.ts",
@@ -57,5 +62,45 @@ export const MIGRATION_LABEL_SKIP_PATHS = new Set([
   "build-tools/tools/tests/linting/stale-names-lint.behavior.test.ts",
   "build-tools/tools/tests/scaffolding/sync-providers-node.determinism.test.ts",
   "build-tools/tools/tests/scaffolding/webapp.module-dep-label-normalization.contract.test.ts",
-  "projects/apps/pleomino/src/game/persistence-state-v1.ts",
 ]);
+
+function normalizeRel(p: string): string {
+  return p.replaceAll("\\", "/").replace(/^\.\/+/, "");
+}
+
+function validateParentOwnedPath(configPath: string, value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) {
+    throw new Error(`${configPath}: migrationLabelSkipPaths entries must be non-empty strings`);
+  }
+  const rel = normalizeRel(value);
+  if (path.isAbsolute(value) || rel.startsWith("../") || rel.includes("/../")) {
+    throw new Error(`${configPath}: migrationLabelSkipPaths entries must stay repo-relative`);
+  }
+  if (rel === "viberoots" || rel.startsWith("viberoots/")) {
+    throw new Error(`${configPath}: parent config cannot skip viberoots-owned source`);
+  }
+  return rel;
+}
+
+export async function readMigrationLabelSkipPaths(repoRoot: string): Promise<Set<string>> {
+  const skipPaths = new Set(MIGRATION_LABEL_SKIP_PATHS);
+  const configPath = path.join(repoRoot, WORKSPACE_STALE_NAMES_CONFIG);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(await fsp.readFile(configPath, "utf8")) as unknown;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return skipPaths;
+    throw err;
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${WORKSPACE_STALE_NAMES_CONFIG}: expected a JSON object`);
+  }
+  const entries = (parsed as { migrationLabelSkipPaths?: unknown }).migrationLabelSkipPaths ?? [];
+  if (!Array.isArray(entries)) {
+    throw new Error(`${WORKSPACE_STALE_NAMES_CONFIG}: migrationLabelSkipPaths must be an array`);
+  }
+  for (const entry of entries) {
+    skipPaths.add(validateParentOwnedPath(WORKSPACE_STALE_NAMES_CONFIG, entry));
+  }
+  return skipPaths;
+}
