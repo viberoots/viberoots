@@ -39,6 +39,7 @@ function resolveFlakePnpmProgram(repoRoot: string, timeoutMs: number): string {
   const flakeRoot = canonicalFlakeRoot(repoRoot);
   const evalTimeoutMs = Math.max(timeoutMs, 120_000);
   const system = currentHostSystem();
+  console.error(`[update-pnpm-hash] resolving flake pnpm program for ${system}`);
   const program = execFileSync(
     "nix",
     [
@@ -54,6 +55,7 @@ function resolveFlakePnpmProgram(repoRoot: string, timeoutMs: number): string {
     },
   ).trim();
   if (program.startsWith("/nix/store/") && !fs.existsSync(program)) {
+    console.error("[update-pnpm-hash] realizing flake pnpm program");
     execFileSync(
       "nix",
       ["run", "--accept-flake-config", "--impure", `path:${flakeRoot}#pnpm`, "--", "--version"],

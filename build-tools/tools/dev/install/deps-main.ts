@@ -22,6 +22,8 @@ import { discoverImportersWithLock } from "./importers";
 import { pruneNodeModulesHashesJson } from "../update-pnpm-hash/hashes-json";
 import { ensureInstallSecretReadiness } from "./secret-readiness";
 import { prewarmUnifiedPnpmStore } from "./unified-pnpm-prewarm";
+import { checkBootstrapCompletion } from "../../lib/bootstrap-completion";
+import { repairGeneratedWorkspaceLock } from "../../lib/workspace-lock-repair";
 
 type Flags = {
   force: boolean;
@@ -37,6 +39,27 @@ type Flags = {
   rotateDeploymentCredentials: boolean;
   forceOverwriteLocalCredentials: boolean;
 };
+
+async function runGeneratedWorkspaceLockRepair(opts: {
+  repoRoot: string;
+  dryRun: boolean;
+  verbose: boolean;
+  phase: "initial" | "final";
+}): Promise<void> {
+  const lockRepair = await repairGeneratedWorkspaceLock({
+    workspaceRoot: opts.repoRoot,
+    dryRun: opts.dryRun,
+    verbose: opts.verbose,
+  });
+  if (opts.dryRun && lockRepair.status === "would-repair") {
+    console.log("[install-deps] dry-run: would refresh generated workspace viberoots lock input");
+  } else if (opts.verbose && lockRepair.status === "skipped") {
+    console.log(`[install-deps] workspace lock repair skipped: ${lockRepair.reason}`);
+  } else if (opts.verbose && lockRepair.status === "fresh") {
+    console.log(`[install-deps] workspace lock repair fresh (${opts.phase})`);
+  }
+}
+
 // Resolve absolute workspace root path without requiring callers to run from repo root.
 async function resolveWorkspaceRoot(): Promise<string> {
   const cwd = process.cwd();
@@ -90,6 +113,11 @@ const {
 const effSkipGoTidy =
   skipGoTidy || (glueOnly && String(process.env.INSTALL_DEPS_SKIP_GO_TIDY || "") !== "0");
 const repoRoot = await resolveWorkspaceRoot();
+await checkBootstrapCompletion({
+  workspaceRoot: repoRoot,
+  repair: !dryRun,
+  verbose,
+});
 await applyNixCacheHealthPolicy(repoRoot);
 // Make the selected workspace explicit so downstream helpers operate on the intended repo root.
 try {
@@ -124,12 +152,24 @@ if (glueOnly) {
   }
   const glueOnlyImporters = await discoverImportersWithLock(repoRoot, { cwd: process.cwd() });
   await syncModuleContractsForWebapps(repoRoot, glueOnlyImporters, dryRun, verbose);
+  if (!dryRun) {
+    await withExclusiveInstallLock(
+      "workspace-lock-repair",
+      async () => {
+        await runGeneratedWorkspaceLockRepair({ repoRoot, dryRun, verbose, phase: "final" });
+      },
+      {
+        verbose: verbose || String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1",
+      },
+    );
+  }
   console.log("Glue refreshed.");
   process.exit(0);
 }
 const importers = await discoverImportersWithLock(repoRoot, { cwd: process.cwd() });
 if (verbose) console.log("[install-deps] discovered importers:", importers.join(", "));
 if (dryRun) {
+  await runGeneratedWorkspaceLockRepair({ repoRoot, dryRun, verbose, phase: "initial" });
   for (const imp of importers) {
     const relLock = path.join(imp, "pnpm-lock.yaml");
     const attr = nodeModulesAttr(imp);
@@ -148,6 +188,7 @@ if (dryRun) {
         console.log("[install-deps] lock acquired");
       }
       try {
+        await runGeneratedWorkspaceLockRepair({ repoRoot, dryRun, verbose, phase: "initial" });
         const activeLockfiles = importers.map((imp) =>
           imp === "viberoots" ? "pnpm-lock.yaml" : path.join(imp, "pnpm-lock.yaml"),
         );
@@ -164,9 +205,7 @@ if (dryRun) {
           const commandCwd = repoRoot;
           const commandEnv = process.env;
           const relLock = path.join(imp, "pnpm-lock.yaml");
-          if (verbose) {
-            console.log(`[install-deps] importer ${imp}: updating pnpm-store hash (${relLock})`);
-          }
+          console.log(`[install-deps] importer ${imp}: preparing pnpm store (${relLock})`);
           // Update the FOD hash for this importer lockfile
           await $({
             stdio: "inherit",
@@ -180,9 +219,7 @@ if (dryRun) {
             },
           })`zx-wrapper ${absUpdate} --lockfile ${relLock}`;
           // Realize and link importer node_modules via link-node (single strict path).
-          if (verbose) {
-            console.log(`[install-deps] importer ${imp}: realizing+linking node_modules`);
-          }
+          console.log(`[install-deps] importer ${imp}: realizing and linking node_modules`);
           await $({
             cwd: commandCwd,
             stdio: "inherit",
@@ -253,4 +290,15 @@ await ensureInstallSecretReadiness({
     forceOverwriteLocalCredentials,
   },
 });
+if (!dryRun) {
+  await withExclusiveInstallLock(
+    "workspace-lock-repair",
+    async () => {
+      await runGeneratedWorkspaceLockRepair({ repoRoot, dryRun, verbose, phase: "final" });
+    },
+    {
+      verbose: verbose || String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1",
+    },
+  );
+}
 console.log("Dependencies installed and node_modules linked.");

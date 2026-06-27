@@ -28,7 +28,7 @@ test("install path selects flake refs by importer scope", async () => {
   }
 
   const depsMain = await read("tools/dev/install/deps-main.ts");
-  if (!depsMain.includes("importer ${imp}: realizing+linking node_modules")) {
+  if (!depsMain.includes("importer ${imp}: realizing and linking node_modules")) {
     throw new Error("deps-main.ts must delegate node_modules realization to link-node");
   }
   if (depsMain.includes("nix build ${flakeRef}#${attr}")) {

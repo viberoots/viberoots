@@ -110,7 +110,10 @@ export async function buildStore(
   const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim() || "0";
   const cores = String(process.env.NIX_CORES || "").trim() || "0";
   const timeoutSec = resolvedFetchTimeoutSec();
-  const streamBuildLogs = String(process.env.VBR_STREAM_NIX_BUILD_LOGS || "").trim() !== "0";
+  const streamBuildLogs = String(process.env.VBR_STREAM_NIX_BUILD_LOGS || "").trim() === "1";
+  console.error(
+    `[update-pnpm-hash] nix build ${attrPath} (timeout=${timeoutSec}s, logs=${streamBuildLogs ? "stream" : "compact"})`,
+  );
   const res = await runManagedCommand({
     command: "nix",
     args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores, extraEnv }),
@@ -158,7 +161,10 @@ export async function buildUnfixedAndHash(
   const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim() || "0";
   const cores = String(process.env.NIX_CORES || "").trim() || "0";
   const timeoutSec = resolvedFetchTimeoutSec();
-  const streamBuildLogs = String(process.env.VBR_STREAM_NIX_BUILD_LOGS || "").trim() !== "0";
+  const streamBuildLogs = String(process.env.VBR_STREAM_NIX_BUILD_LOGS || "").trim() === "1";
+  console.error(
+    `[update-pnpm-hash] nix build ${attrPath} and hash result (timeout=${timeoutSec}s, logs=${streamBuildLogs ? "stream" : "compact"})`,
+  );
   const built = await runManagedCommand({
     command: "nix",
     args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores, extraEnv }),

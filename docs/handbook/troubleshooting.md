@@ -8,15 +8,19 @@
 ## Viberoots submodule state
 
 - Missing or uninitialized submodule:
-  - Run `git submodule update --init viberoots`.
-  - Then run `./viberoots/init` so `.viberoots/current` points at `../viberoots` and the hidden
-    workspace/devshell files are repaired.
+  - Prefer rerunning bootstrap in submodule mode:
+    `curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_CONSUMER=submodule bash`
+  - This initializes the submodule when needed, points `.viberoots/current` at `../viberoots`,
+    repairs hidden workspace/devshell files, and runs any current bootstrap migration checks.
 - Dirty submodule:
   - Inspect `git -C viberoots status --short`.
   - Commit or discard intentional viberoots-source edits in the submodule before parent validation.
 - Gitlink mismatch:
   - Inspect `git submodule status viberoots`.
-  - Either check out the parent-pinned revision with `git submodule update viberoots` or intentionally update the parent gitlink after the submodule commit exists.
+  - Either check out the parent-pinned revision with `git submodule update viberoots` or
+    intentionally update the parent gitlink after the submodule commit exists. If you are upgrading
+    the workspace to a newer viberoots ref, rerun latest-main bootstrap with
+    `VBR_CONSUMER=submodule VBR_REF=<tag-or-commit>`.
 - Old-layout blocker:
   - Root `build-tools/`, `third_party/providers/`, `prelude/`, and `toolchains/` should not exist in the parent workspace.
   - Generated provider and graph state belongs under `.viberoots/workspace/`.
@@ -34,6 +38,13 @@
   - `viberoots/build-tools/tools/ci/run-stage.ts --stage sync-providers`
   - `viberoots/build-tools/tools/ci/run-stage.ts --stage gen-auto-map`
   - `viberoots/build-tools/tools/ci/run-stage.ts --stage prebuild-guard`
+
+## Local generated-state bloat
+
+- First preview safe cleanup with `viberoots gc --dry-run`.
+- If the plan only includes Nix store cleanup and stale viberoots-owned generated paths, run `viberoots gc`.
+- Use `viberoots gc --optimize` only for explicit maintenance. It currently adds Nix store deduplication and can take longer than normal cleanup.
+- Do not run broad cleanup while verify is active; stop or wait for the run first.
 
 ## Missing importer provider (Node)
 

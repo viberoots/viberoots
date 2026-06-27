@@ -262,6 +262,11 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
       "update-pnpm-hash nix helpers must support explicit streaming of nix builder logs",
     );
   }
+  if (!nixBuildHelpers.includes('VBR_STREAM_NIX_BUILD_LOGS || "").trim() === "1"')) {
+    throw new Error(
+      "update-pnpm-hash nix helpers must keep install-time nix build logs compact by default; set VBR_STREAM_NIX_BUILD_LOGS=1 to stream them",
+    );
+  }
   if (nixBuildHelpers.includes('"substituters"')) {
     throw new Error(
       "update-pnpm-hash fixed-store builds must not disable substituters; local builders are controlled separately",

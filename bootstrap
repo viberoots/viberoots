@@ -1,0 +1,673 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+env_or_default() {
+  local default_value="$1"
+  shift
+  local name value
+  for name in "$@"; do
+    value="${!name:-}"
+    if [[ -n "${value}" ]]; then
+      printf '%s' "${value}"
+      return 0
+    fi
+  done
+  printf '%s' "${default_value}"
+}
+
+mode="$(env_or_default flake VBR_CONSUMER VBR_CONSUMER_MODE VIBEROOTS_CONSUMER_MODE VIBROOTS_CONSUMER_MODE)"
+ref="$(env_or_default main VBR_REF VIBEROOTS_REF)"
+workspace_root="$(env_or_default "" VBR_WORKSPACE_ROOT WORKSPACE_ROOT)"
+workspace_name=""
+viberoots_url=""
+official_submodule_url="https://github.com/viberoots/viberoots.git"
+submodule_url="$(env_or_default "${official_submodule_url}" VBR_SUBMODULE VBR_SUBMODULE_URL VIBEROOTS_SUBMODULE_URL)"
+trust_submodule_url="$(env_or_default 0 VBR_TRUST_SUBMODULE VBR_TRUST_SUBMODULE_URL VIBEROOTS_TRUST_SUBMODULE_URL)"
+install_nix="$(env_or_default 1 VBR_INSTALL_NIX VIBEROOTS_INSTALL_NIX)"
+run_install="$(env_or_default 1 VBR_RUN_INSTALL VIBEROOTS_RUN_INSTALL)"
+run_validate="$(env_or_default 0 VBR_RUN_VALIDATE VIBEROOTS_RUN_VALIDATE)"
+dry_run="$(env_or_default 0 VBR_DRY_RUN VIBEROOTS_DRY_RUN)"
+direnv_allow="$(env_or_default 1 VBR_DIRENV_ALLOW VIBEROOTS_DIRENV_ALLOW)"
+
+usage() {
+  cat >&2 <<'EOF'
+usage: bootstrap [--mode flake|submodule] [--ref <ref>] [--workspace-root <dir>]
+                 [--workspace-name <name>] [--viberoots-url <flake-ref>]
+                 [--submodule-url <git-url>] [--no-run-install] [--run-validate]
+                 [--trust-submodule-url] [--no-install-nix] [--no-direnv-allow]
+                 [--dry-run]
+
+Defaults:
+  --mode flake
+  --ref main
+  --install-nix
+  --run-install
+  --run-validate disabled
+  --direnv-allow
+  --dry-run disabled
+  --viberoots-url github:viberoots/viberoots/<ref>
+  --submodule-url https://github.com/viberoots/viberoots.git
+
+Examples:
+  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | bash
+  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_CONSUMER=submodule bash
+  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_INSTALL_NIX=0 bash
+  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_RUN_INSTALL=0 bash
+  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_RUN_VALIDATE=1 bash
+  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_DIRENV_ALLOW=0 bash
+  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_DRY_RUN=1 bash
+EOF
+  exit 2
+}
+
+load_nix_profile() {
+  if [[ -n "${VIBEROOTS_NIX_PROFILE_SCRIPT:-}" && -f "${VIBEROOTS_NIX_PROFILE_SCRIPT}" ]]; then
+    # shellcheck disable=SC1090
+    source "${VIBEROOTS_NIX_PROFILE_SCRIPT}"
+    return 0
+  fi
+  for __candidate in \
+    "/nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh" \
+    "${HOME}/.nix-profile/etc/profile.d/nix.sh"
+  do
+    if [[ -f "${__candidate}" ]]; then
+      # shellcheck disable=SC1090
+      source "${__candidate}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+require_command() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "error: required command not found: $1" >&2
+    exit 1
+  fi
+}
+
+gitmodules_has_viberoots_submodule() {
+  [[ -f .gitmodules ]] &&
+    git config -f .gitmodules --get-regexp '^submodule\..*\.path$' |
+      awk '{print $2}' |
+      grep -qx 'viberoots'
+}
+
+gitmodules_viberoots_url() {
+  if [[ ! -f .gitmodules ]]; then
+    return 1
+  fi
+  local section
+  section="$(
+    git config -f .gitmodules --get-regexp '^submodule\..*\.path$' |
+      awk '$2 == "viberoots" {print $1; exit}'
+  )"
+  if [[ -z "${section}" ]]; then
+    return 1
+  fi
+  git config -f .gitmodules --get "${section%.path}.url"
+}
+
+is_official_submodule_url() {
+  case "$1" in
+    "${official_submodule_url}"|"https://github.com/viberoots/viberoots"|"git@github.com:viberoots/viberoots.git")
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+confirm_trusted_submodule_url() {
+  local url="$1"
+  if is_official_submodule_url "${url}" || [[ "${trust_submodule_url}" == "1" ]]; then
+    return 0
+  fi
+  cat >&2 <<EOF
+warning: submodule mode will use a non-default viberoots repository:
+  ${url}
+
+That repository can run non-viberoots code during setup, install, build, and validation.
+Only continue if you trust this repository and the selected ref.
+EOF
+  if ! { : </dev/tty >/dev/tty; } 2>/dev/null; then
+    echo "error: refusing non-default submodule URL without confirmation; rerun with VBR_TRUST_SUBMODULE=1 if this is intentional" >&2
+    exit 1
+  fi
+  local answer
+  printf 'Type "yes" to continue: ' >/dev/tty
+  IFS= read -r answer </dev/tty
+  if [[ "${answer}" != "yes" ]]; then
+    echo "error: refusing non-default submodule URL" >&2
+    exit 1
+  fi
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --mode)
+      mode="${2:-}"
+      shift 2
+      ;;
+    --mode=*)
+      mode="${1#--mode=}"
+      shift
+      ;;
+    --ref)
+      ref="${2:-}"
+      shift 2
+      ;;
+    --ref=*)
+      ref="${1#--ref=}"
+      shift
+      ;;
+    --workspace-root)
+      workspace_root="${2:-}"
+      shift 2
+      ;;
+    --workspace-root=*)
+      workspace_root="${1#--workspace-root=}"
+      shift
+      ;;
+    --workspace-name)
+      workspace_name="${2:-}"
+      shift 2
+      ;;
+    --workspace-name=*)
+      workspace_name="${1#--workspace-name=}"
+      shift
+      ;;
+    --viberoots-url)
+      viberoots_url="${2:-}"
+      shift 2
+      ;;
+    --viberoots-url=*)
+      viberoots_url="${1#--viberoots-url=}"
+      shift
+      ;;
+    --submodule-url)
+      submodule_url="${2:-}"
+      shift 2
+      ;;
+    --submodule-url=*)
+      submodule_url="${1#--submodule-url=}"
+      shift
+      ;;
+    --trust-submodule-url)
+      trust_submodule_url=1
+      shift
+      ;;
+    --run-install)
+      run_install=1
+      shift
+      ;;
+    --no-run-install)
+      run_install=0
+      shift
+      ;;
+    --install-nix)
+      install_nix=1
+      shift
+      ;;
+    --no-install-nix)
+      install_nix=0
+      shift
+      ;;
+    --run-validate)
+      run_validate=1
+      shift
+      ;;
+    --no-run-validate)
+      run_validate=0
+      shift
+      ;;
+    --direnv-allow)
+      direnv_allow=1
+      shift
+      ;;
+    --no-direnv-allow|--no-direnv)
+      direnv_allow=0
+      shift
+      ;;
+    --dry-run)
+      dry_run=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      usage
+      ;;
+  esac
+done
+
+if [[ "${mode}" != "flake" && "${mode}" != "submodule" ]]; then
+  echo "error: --mode must be flake or submodule" >&2
+  exit 2
+fi
+if [[ "${install_nix}" != "0" && "${install_nix}" != "1" ]]; then
+  echo "error: VBR_INSTALL_NIX must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "${trust_submodule_url}" != "0" && "${trust_submodule_url}" != "1" ]]; then
+  echo "error: VBR_TRUST_SUBMODULE must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "${run_install}" != "0" && "${run_install}" != "1" ]]; then
+  echo "error: VBR_RUN_INSTALL must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "${run_validate}" != "0" && "${run_validate}" != "1" ]]; then
+  echo "error: VBR_RUN_VALIDATE must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "${dry_run}" != "0" && "${dry_run}" != "1" ]]; then
+  echo "error: VBR_DRY_RUN must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "${direnv_allow}" != "0" && "${direnv_allow}" != "1" ]]; then
+  echo "error: VBR_DIRENV_ALLOW must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "${run_validate}" == "1" && "${direnv_allow}" != "1" ]]; then
+  echo "error: VBR_RUN_VALIDATE=1 requires VBR_DIRENV_ALLOW=1" >&2
+  exit 2
+fi
+
+workspace_root="${workspace_root:-$(pwd -P)}"
+workspace_root="$(cd "$(dirname "${workspace_root}")" && pwd)/$(basename "${workspace_root}")"
+workspace_name="${workspace_name:-$(basename "${workspace_root}")}"
+viberoots_url="${viberoots_url:-github:viberoots/viberoots/${ref}}"
+
+run_install_flag=""
+if [[ "${run_install}" == "1" ]]; then
+  run_install_flag="--run-install"
+fi
+direnv_allow_flag=""
+if [[ "${direnv_allow}" == "0" ]]; then
+  direnv_allow_flag="--no-direnv"
+fi
+
+actions=()
+record_action() {
+  actions+=("$1")
+}
+
+transaction_dir=".viberoots/bootstrap/transactions"
+transaction_file="${transaction_dir}/current.json"
+transaction_id=""
+transaction_active=0
+
+json_escape() {
+  local value="$1"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  printf '%s' "${value}"
+}
+
+json_value() {
+  json_escape "$1"
+}
+
+flake_locked_rev() {
+  local lock_file=".viberoots/workspace/flake.lock"
+  [[ -f "${lock_file}" ]] || return 0
+  awk '
+    /"viberoots"/ { inNode=1 }
+    inNode && /"locked"/ { inLocked=1 }
+    inNode && inLocked && /"rev"/ {
+      gsub(/[",]/, "", $2)
+      print $2
+      exit
+    }
+  ' "${lock_file}" 2>/dev/null || true
+}
+
+flake_requested_ref() {
+  local flake_file=".viberoots/workspace/flake.nix"
+  [[ -f "${flake_file}" ]] || return 0
+  sed -n 's/.*viberoots\.url = "\(.*\)";.*/\1/p' "${flake_file}" | head -n 1
+}
+
+resolve_flake_rev() {
+  local flake_ref="$1"
+  nix flake metadata --json --accept-flake-config --no-write-lock-file "${flake_ref}" 2>/dev/null |
+    sed -n 's/.*"rev":"\([^"]*\)".*/\1/p' |
+    head -n 1 || true
+}
+
+resolve_submodule_target_rev() {
+  local url="$1"
+  local desired_ref="$2"
+  git ls-remote "${url}" "${desired_ref}" 2>/dev/null | awk 'NR == 1 {print $1}' || true
+}
+
+current_source_rev() {
+  if [[ "${mode}" == "submodule" && -d viberoots ]]; then
+    git -C viberoots rev-parse HEAD 2>/dev/null || true
+  elif [[ "${mode}" == "flake" ]]; then
+    flake_locked_rev
+  fi
+}
+
+current_source_ref() {
+  if [[ "${mode}" == "submodule" ]]; then
+    git -C viberoots rev-parse --abbrev-ref HEAD 2>/dev/null || true
+  elif [[ "${mode}" == "flake" ]]; then
+    flake_requested_ref
+  fi
+}
+
+target_source_rev() {
+  if [[ "${mode}" == "submodule" ]]; then
+    resolve_submodule_target_rev "${effective_source:-${submodule_url}}" "${ref}"
+  elif [[ "${mode}" == "flake" ]]; then
+    resolve_flake_rev "${viberoots_url}"
+  fi
+}
+
+begin_transaction() {
+  if [[ -f "${transaction_file}" ]]; then
+    transaction_active=1
+    record_action "resumed incomplete bootstrap transaction"
+    echo "bootstrap transaction: resuming ${transaction_file}"
+    return 0
+  fi
+  mkdir -p "${transaction_dir}"
+  transaction_id="$(date -u +%Y%m%dT%H%M%SZ)-$$"
+  local tmp_file="${transaction_file}.tmp"
+  local from_ref from_rev to_rev source
+  from_ref="$(current_source_ref)"
+  from_rev="$(current_source_rev)"
+  to_rev="$(target_source_rev)"
+  source="${effective_source:-${viberoots_url}}"
+  cat >"${tmp_file}" <<EOF
+{
+  "schema": 1,
+  "transactionId": "$(json_value "${transaction_id}")",
+  "status": "planned",
+  "ownerPid": $$,
+  "startedAt": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "mode": "$(json_value "${mode}")",
+  "workspaceRoot": "$(json_value "${workspace_root}")",
+  "workspaceName": "$(json_value "${workspace_name}")",
+  "source": "$(json_value "${source}")",
+  "from": {
+    "ref": "$(json_value "${from_ref:-unknown}")",
+    "rev": "$(json_value "${from_rev:-unknown}")"
+  },
+  "to": {
+    "ref": "$(json_value "${ref}")",
+    "url": "$(json_value "${source}")",
+    "rev": "$(json_value "${to_rev:-unknown}")"
+  }
+}
+EOF
+  mv "${tmp_file}" "${transaction_file}"
+  transaction_active=1
+  record_action "recorded bootstrap transaction"
+}
+
+complete_transaction() {
+  [[ "${transaction_active}" == "1" && -f "${transaction_file}" ]] || return 0
+  local done_dir="${transaction_dir}/completed"
+  mkdir -p "${done_dir}"
+  local done_id="${transaction_id:-$(date -u +%Y%m%dT%H%M%SZ)-$$}"
+  mv "${transaction_file}" "${done_dir}/${done_id}.json"
+  transaction_active=0
+  record_action "completed bootstrap transaction"
+}
+
+run_migrations() {
+  echo "migrations:"
+  echo "  - no known migration steps necessary"
+}
+
+required_bootstrap_files_present() {
+  [[ -f .buckroot ]] &&
+    [[ -f .buckconfig ]] &&
+    [[ -f .envrc ]] &&
+    [[ -d projects ]] &&
+    [[ -e .viberoots/current ]] &&
+    [[ -f .viberoots/workspace/flake.nix ]] &&
+    { [[ "${mode}" != "submodule" ]] || [[ -x viberoots/init ]]; }
+}
+
+file_contains_literal() {
+  local file="$1"
+  local needle="$2"
+  [[ -f "${file}" ]] && grep -Fq -- "${needle}" "${file}"
+}
+
+submodule_source_matches() {
+  if gitmodules_has_viberoots_submodule; then
+    local configured_url
+    configured_url="$(gitmodules_viberoots_url || true)"
+    [[ "${configured_url:-${submodule_url}}" == "${submodule_url}" ]] || return 1
+  fi
+  [[ -d viberoots ]] || return 1
+  if git -C viberoots rev-parse --verify --quiet "${ref}^{commit}" >/dev/null; then
+    [[ "$(git -C viberoots rev-parse HEAD)" == "$(git -C viberoots rev-parse "${ref}^{commit}")" ]]
+  elif git -C viberoots rev-parse --verify --quiet "origin/${ref}^{commit}" >/dev/null; then
+    [[ "$(git -C viberoots rev-parse HEAD)" == "$(git -C viberoots rev-parse "origin/${ref}^{commit}")" ]]
+  else
+    return 0
+  fi
+}
+
+bootstrap_source_matches() {
+  if [[ "${mode}" == "flake" ]]; then
+    file_contains_literal ".viberoots/workspace/flake.nix" "${viberoots_url}" &&
+      ! grep -Fq -- '--override-input viberoots' .envrc
+  else
+    submodule_source_matches &&
+      file_contains_literal ".envrc" '--override-input viberoots' &&
+      [[ "$(readlink .viberoots/current 2>/dev/null || true)" == "../viberoots" ]]
+  fi
+}
+
+target_revision_matches_current() {
+  local target_rev current_rev
+  target_rev="$(target_source_rev)"
+  current_rev="$(current_source_rev)"
+  [[ -z "${target_rev}" || -z "${current_rev}" || "${target_rev}" == "${current_rev}" ]]
+}
+
+bootstrap_ready() {
+  required_bootstrap_files_present && bootstrap_source_matches && target_revision_matches_current
+}
+
+print_summary() {
+  local status="$1"
+  local source="$2"
+  echo
+  echo "viberoots bootstrap summary"
+  echo "  status: ${status}"
+  echo "  mode: ${mode}"
+  echo "  ref: ${ref}"
+  echo "  workspace: ${workspace_root}"
+  echo "  workspace name: ${workspace_name}"
+  echo "  source: ${source}"
+  echo "  install nix: $([[ "${install_nix}" == "1" ]] && echo yes || echo no)"
+  echo "  install: $([[ "${run_install}" == "1" ]] && echo yes || echo no)"
+  echo "  validate: $([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
+  echo "  direnv allow: $([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
+  if [[ "${mode}" == "submodule" ]]; then
+    echo "  trust custom submodule: $([[ "${trust_submodule_url}" == "1" ]] && echo yes || echo no)"
+  fi
+  echo "  actions:"
+  if [[ "${#actions[@]}" -eq 0 ]]; then
+    echo "    - no setup changes needed"
+  else
+    local action
+    for action in "${actions[@]}"; do
+      echo "    - ${action}"
+    done
+  fi
+}
+
+cat <<EOF
+viberoots bootstrap
+  mode: ${mode}
+  ref: ${ref}
+  workspace: ${workspace_root}
+  workspace name: ${workspace_name}
+  install nix: $([[ "${install_nix}" == "1" ]] && echo yes || echo no)
+  install: $([[ "${run_install}" == "1" ]] && echo yes || echo no)
+  validate: $([[ "${run_validate}" == "1" ]] && echo yes || echo no)
+  direnv allow: $([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)
+  viberoots url: ${viberoots_url}
+EOF
+if [[ "${mode}" == "submodule" ]]; then
+  echo "  submodule url: ${submodule_url}"
+  echo "  trust custom submodule url: $([[ "${trust_submodule_url}" == "1" ]] && echo yes || echo no)"
+fi
+if [[ "${dry_run}" == "1" ]]; then
+  echo "  dry run: yes"
+  echo
+  echo "planned actions:"
+  if ! command -v nix >/dev/null 2>&1 && [[ "${install_nix}" == "1" ]]; then
+    echo "  - install Nix with the Determinate Nix installer"
+  fi
+  echo "  - create workspace directory if missing"
+  echo "  - initialize git repository if missing"
+  if [[ "${mode}" == "flake" ]]; then
+    echo "  - run viberoots init-consumer from ${viberoots_url}#viberoots"
+  else
+    echo "  - add or update viberoots submodule at ./viberoots"
+    if ! is_official_submodule_url "${submodule_url}" && [[ "${trust_submodule_url}" != "1" ]]; then
+      echo "  - require confirmation before using non-default submodule URL"
+    fi
+    echo "  - run ./viberoots/init"
+  fi
+  echo "  - run direnv setup through viberoots bootstrap"
+  if [[ "${direnv_allow}" == "1" ]]; then
+    echo "  - run direnv allow"
+  fi
+  if [[ "${run_install}" == "1" ]]; then
+    echo "  - run i"
+  fi
+  if [[ "${run_validate}" == "1" ]]; then
+    echo "  - run b && v"
+  fi
+  exit 0
+fi
+
+if ! command -v nix >/dev/null 2>&1; then
+  if [[ "${install_nix}" != "1" ]]; then
+    echo "error: nix is required; install Nix or rerun with VBR_INSTALL_NIX=1" >&2
+    exit 1
+  fi
+  require_command curl
+  echo "Nix not found; installing with the Determinate Nix installer..."
+  record_action "installed Nix with the Determinate Nix installer"
+  curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix |
+    sh -s -- install --no-confirm
+  load_nix_profile || true
+fi
+if ! command -v nix >/dev/null 2>&1; then
+  load_nix_profile || true
+fi
+require_command nix
+
+if ! command -v git >/dev/null 2>&1; then
+  nix profile install nixpkgs#git
+  export PATH="${HOME}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:${PATH}"
+  record_action "installed Git with nix profile"
+fi
+require_command git
+
+if [[ ! -d "${workspace_root}" ]]; then
+  record_action "created workspace directory"
+fi
+mkdir -p "${workspace_root}"
+cd "${workspace_root}"
+
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  git init
+  record_action "initialized git repository"
+fi
+
+effective_source="${viberoots_url}"
+if [[ "${mode}" == "submodule" ]]; then
+  effective_source="${submodule_url}"
+  if gitmodules_has_viberoots_submodule; then
+    existing_submodule_url="$(gitmodules_viberoots_url || true)"
+    effective_source="${existing_submodule_url:-${submodule_url}}"
+  fi
+fi
+
+if bootstrap_ready; then
+  run_migrations
+  print_summary "already up to date" "${effective_source}"
+elif [[ "${mode}" == "flake" ]]; then
+  begin_transaction
+  run_migrations
+  record_action "ran viberoots init-consumer"
+  nix run --accept-flake-config "${viberoots_url}#viberoots" -- \
+    init-consumer \
+    --mode flake \
+    --workspace-root "${workspace_root}" \
+    --workspace-name "${workspace_name}" \
+    --viberoots-url "${viberoots_url}" \
+    ${run_install_flag:+"${run_install_flag}"} \
+    ${direnv_allow_flag:+"${direnv_allow_flag}"}
+  complete_transaction
+  print_summary "bootstrapped" "${effective_source}"
+else
+  confirm_trusted_submodule_url "${effective_source}"
+  if [[ -d viberoots ]] &&
+    [[ -n "$(git -C viberoots status --porcelain=v1 2>/dev/null || true)" ]] &&
+    [[ "$(git -C viberoots rev-parse --abbrev-ref HEAD 2>/dev/null || true)" != "${ref}" ]]; then
+    echo "error: viberoots submodule has local changes; commit or stash them before changing refs" >&2
+    exit 1
+  fi
+  begin_transaction
+  run_migrations
+  if [[ ! -e viberoots ]]; then
+    if gitmodules_has_viberoots_submodule; then
+      git submodule update --init --recursive viberoots
+      record_action "initialized existing viberoots submodule"
+    else
+      git submodule add "${submodule_url}" viberoots
+      record_action "added viberoots submodule"
+    fi
+  elif [[ ! -d viberoots ]]; then
+    echo "error: viberoots exists and is not a directory" >&2
+    exit 1
+  elif gitmodules_has_viberoots_submodule; then
+    git submodule update --init --recursive viberoots
+    record_action "updated viberoots submodule"
+  fi
+  if git -C viberoots fetch origin "${ref}" >/dev/null 2>&1; then
+    record_action "fetched viberoots ref"
+  fi
+  if git -C viberoots rev-parse --verify --quiet "origin/${ref}^{commit}" >/dev/null; then
+    git -C viberoots checkout --quiet "origin/${ref}"
+    record_action "checked out origin/${ref}"
+  elif git -C viberoots rev-parse --verify --quiet "${ref}^{commit}" >/dev/null; then
+    git -C viberoots checkout --quiet "${ref}"
+    record_action "checked out ${ref}"
+  fi
+  ./viberoots/init \
+    --mode submodule \
+    --workspace-name "${workspace_name}" \
+    ${run_install_flag:+"${run_install_flag}"} \
+    ${direnv_allow_flag:+"${direnv_allow_flag}"}
+  record_action "ran ./viberoots/init"
+  complete_transaction
+  print_summary "bootstrapped" "${effective_source}"
+fi
+
+if [[ "${run_validate}" == "1" ]]; then
+  direnv exec "${workspace_root}" sh -lc 'i && b && v'
+  echo "Validation complete."
+elif [[ "${direnv_allow}" == "1" ]]; then
+  echo "Next: cd ${workspace_root} && i && b && v"
+else
+  echo "Next: cd ${workspace_root} && direnv allow && direnv exec . sh -lc 'i && b && v'"
+fi

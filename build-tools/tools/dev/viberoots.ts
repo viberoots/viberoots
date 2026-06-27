@@ -7,8 +7,148 @@ import { findExtractionBlockers } from "../lib/extraction-blockers";
 import { resolveWorkspaceRootsSync } from "../lib/repo";
 import { activateWorkspace } from "../lib/workspace-activation";
 import { remoteSourceStatus } from "../lib/workspace-remote-source";
+import { initConsumer } from "../lib/consumer-bootstrap";
+import { checkBootstrapCompletion } from "../lib/bootstrap-completion";
+import { removeSubmodule, useFlake, useSubmodule } from "../lib/consumer-source-mode";
+import { runLiveBootstrap } from "../lib/live-bootstrap";
+import { runViberootsGc } from "../lib/maintenance-gc";
 
 type VersionStatus = ReturnType<typeof buildVersionStatus>;
+type CommandMeta = {
+  name: string;
+  usage: string;
+  description: string;
+  options: string[];
+};
+
+const commandMetadata: CommandMeta[] = [
+  {
+    name: "status",
+    usage: "viberoots status [--json]",
+    description: "Print active source mode and workspace status.",
+    options: ["--json"],
+  },
+  {
+    name: "bootstrap-check",
+    usage:
+      "viberoots bootstrap-check [--workspace-root <path>] [--repair-if-needed] [--verbose] [--json]",
+    description: "Inspect or repair an incomplete bootstrap transaction.",
+    options: ["--workspace-root", "--repair-if-needed", "--verbose", "--json", "--help"],
+  },
+  {
+    name: "bootstrap",
+    usage: "viberoots bootstrap [--mode flake|submodule] [--ref <ref>] [--dry-run]",
+    description: "Run the latest live bootstrap script from GitHub main.",
+    options: [
+      "--mode",
+      "--ref",
+      "--workspace-root",
+      "--run-install",
+      "--no-run-install",
+      "--run-validate",
+      "--no-direnv-allow",
+      "--dry-run",
+      "--bootstrap-url",
+      "--trust-bootstrap-url",
+      "--help",
+    ],
+  },
+  {
+    name: "update",
+    usage: "viberoots update [--mode flake|submodule] [--ref <ref>] [--dry-run]",
+    description: "Alias for viberoots bootstrap; runs the latest live bootstrap script.",
+    options: [
+      "--mode",
+      "--ref",
+      "--workspace-root",
+      "--run-install",
+      "--no-run-install",
+      "--run-validate",
+      "--no-direnv-allow",
+      "--dry-run",
+      "--bootstrap-url",
+      "--trust-bootstrap-url",
+      "--help",
+    ],
+  },
+  {
+    name: "gc",
+    usage: "viberoots gc [--dry-run] [--aggressive] [--optimize] [--nix|--no-nix] [--verbose]",
+    description: "Conservatively clean Nix and viberoots-owned generated local state.",
+    options: [
+      "--dry-run",
+      "--aggressive",
+      "--optimize",
+      "--nix",
+      "--no-nix",
+      "--nix-delete-older-than",
+      "--keep-current-profile",
+      "--verbose",
+      "--workspace-root",
+      "--help",
+    ],
+  },
+  {
+    name: "init-consumer",
+    usage:
+      "viberoots init-consumer --viberoots-url <flake-ref> [--mode flake|submodule] [--workspace-root <path>]",
+    description: "Create or repair generated consumer workspace files.",
+    options: [
+      "--mode",
+      "--workspace-root",
+      "--workspace-name",
+      "--viberoots-url",
+      "--source",
+      "--no-lock",
+      "--no-direnv",
+      "--setup-direnv",
+      "--run-install",
+      "--help",
+    ],
+  },
+  {
+    name: "use-submodule",
+    usage: "viberoots use-submodule [--url <git-url>] [--trust-url] [--no-direnv] [--run-install]",
+    description: "Switch this consumer workspace to local viberoots submodule mode.",
+    options: ["--url", "--trust-url", "--no-direnv", "--run-install", "--workspace-root", "--help"],
+  },
+  {
+    name: "use-flake",
+    usage:
+      "viberoots use-flake [--ref <tag-or-commit>] [--remove-submodule] [--no-direnv] [--run-install]",
+    description: "Switch this consumer workspace to pinned flake source mode.",
+    options: [
+      "--ref",
+      "--remove-submodule",
+      "--no-direnv",
+      "--run-install",
+      "--workspace-root",
+      "--help",
+    ],
+  },
+  {
+    name: "remove-submodule",
+    usage: "viberoots remove-submodule [--dry-run]",
+    description: "Remove an inactive viberoots submodule after strict safety checks.",
+    options: ["--dry-run", "--workspace-root", "--help"],
+  },
+  {
+    name: "completion",
+    usage: "viberoots completion bash",
+    description: "Print shell completion code.",
+    options: ["bash", "--help"],
+  },
+  {
+    name: "help",
+    usage: "viberoots help [command]",
+    description: "Print command help.",
+    options: [],
+  },
+];
+
+function commandMeta(name: string): CommandMeta | undefined {
+  return commandMetadata.find((command) => command.name === name);
+}
 
 function git(args: string[], cwd: string): string {
   try {
@@ -108,7 +248,9 @@ function buildVersionStatus() {
     submoduleState:
       roots.sourceMode === "local"
         ? submoduleState(roots.workspaceRoot, roots.viberootsRoot)
-        : "not-applicable",
+        : expectedRevision
+          ? `inactive-${submoduleState(roots.workspaceRoot, path.join(roots.workspaceRoot, "viberoots"))}`
+          : "not-applicable",
     dirtyState: dirtyState(roots.viberootsRoot, roots.sourceMode),
     currentPointsToLiveCheckout: roots.currentPointsToLiveCheckout,
     extractionBlockers: findExtractionBlockers(roots.workspaceRoot),
@@ -159,15 +301,191 @@ async function initWorkspace(): Promise<void> {
   );
 }
 
+function printHelp(commandName?: string): void {
+  if (commandName) {
+    const command = commandMeta(commandName);
+    if (!command) {
+      console.error(`error: unknown command: ${commandName}`);
+      console.error("run: viberoots help");
+      process.exit(2);
+    }
+    console.log(command.usage);
+    console.log(command.description);
+    if (command.options.length) {
+      console.log("options:");
+      for (const option of command.options) console.log(`  ${option}`);
+    }
+    return;
+  }
+  console.log("viberoots commands:");
+  for (const command of commandMetadata) {
+    console.log(`  ${command.usage}`);
+    console.log(`    ${command.description}`);
+  }
+}
+
+function printBashCompletion(): void {
+  const commandNames = commandMetadata.map((command) => command.name).join(" ");
+  const optionCases = commandMetadata
+    .map((command) => `    ${command.name}) opts="${command.options.join(" ")}" ;;`)
+    .join("\n");
+  console.log(`_viberoots()
+{
+  local cur prev cmd opts
+  COMPREPLY=()
+  cur="\${COMP_WORDS[COMP_CWORD]}"
+  prev="\${COMP_WORDS[COMP_CWORD-1]}"
+  cmd="\${COMP_WORDS[1]}"
+  if [[ \${COMP_CWORD} -eq 1 ]]; then
+    COMPREPLY=( $(compgen -W "${commandNames}" -- "\${cur}") )
+    return 0
+  fi
+  case "\${cmd}" in
+${optionCases}
+    *) opts="" ;;
+  esac
+  COMPREPLY=( $(compgen -W "\${opts}" -- "\${cur}") )
+  return 0
+}
+complete -F _viberoots viberoots
+complete -F _viberoots vbr`);
+}
+
 function usage(): never {
-  console.error("usage: viberoots <version|status|init-workspace> [--json] [--source <path>]");
+  console.error("error: unknown command");
+  console.error("run: viberoots help");
   process.exit(2);
+}
+
+function liveBootstrapEnvOverrides(): Record<string, string> {
+  const overrides: Record<string, string> = {};
+  const mode = getFlagStr("mode");
+  const ref = getFlagStr("ref");
+  const workspaceRoot = getFlagStr("workspace-root");
+  if (mode) overrides.VBR_CONSUMER = mode;
+  if (ref) overrides.VBR_REF = ref;
+  if (workspaceRoot) overrides.VBR_WORKSPACE_ROOT = path.resolve(workspaceRoot);
+  if (getFlagBool("run-install")) overrides.VBR_RUN_INSTALL = "1";
+  if (getFlagBool("no-run-install")) overrides.VBR_RUN_INSTALL = "0";
+  if (getFlagBool("run-validate")) overrides.VBR_RUN_VALIDATE = "1";
+  if (getFlagBool("no-direnv-allow")) overrides.VBR_DIRENV_ALLOW = "0";
+  if (getFlagBool("dry-run")) overrides.VBR_DRY_RUN = "1";
+  return overrides;
 }
 
 async function main() {
   const [command = "version"] = getPositionals();
+  if (getFlagBool("help") && commandMeta(command)) {
+    printHelp(command);
+    return;
+  }
+  if (command === "help") {
+    const [, helpCommand] = getPositionals();
+    printHelp(helpCommand);
+    return;
+  }
+  if (command === "completion") {
+    const [, shell] = getPositionals();
+    if (shell !== "bash") {
+      console.error("error: only bash completion is supported");
+      console.error("run: viberoots completion bash");
+      process.exit(2);
+    }
+    printBashCompletion();
+    return;
+  }
   if (command === "init-workspace") {
     await initWorkspace();
+    return;
+  }
+  if (command === "init-consumer") {
+    const mode = getFlagStr("mode", "flake");
+    if (mode !== "flake" && mode !== "submodule") {
+      console.error("error: init-consumer --mode must be flake or submodule");
+      process.exit(2);
+    }
+    const defaultViberootsUrl = mode === "submodule" ? "path:../../viberoots" : "";
+    const viberootsUrl = getFlagStr("viberoots-url", defaultViberootsUrl);
+    if (!viberootsUrl) {
+      console.error("error: init-consumer requires --viberoots-url <flake-ref>");
+      process.exit(2);
+    }
+    const setupDirenv = getFlagStr("setup-direnv", "auto");
+    if (!["auto", "always", "never"].includes(setupDirenv)) {
+      console.error("error: init-consumer --setup-direnv must be auto, always, or never");
+      process.exit(2);
+    }
+    await initConsumer({
+      workspaceRoot: path.resolve(getFlagStr("workspace-root", process.cwd())),
+      viberootsUrl,
+      workspaceName: getFlagStr("workspace-name", "viberoots-consumer"),
+      sourceMode: mode,
+      sourcePath: getFlagStr("source") || (mode === "submodule" ? "viberoots" : undefined),
+      lock: !getFlagBool("no-lock"),
+      allowDirenv: !getFlagBool("no-direnv"),
+      setupDirenv: setupDirenv as "auto" | "always" | "never",
+      runInstall: getFlagBool("run-install"),
+    });
+    return;
+  }
+  if (command === "bootstrap-check") {
+    const result = await checkBootstrapCompletion({
+      workspaceRoot: path.resolve(getFlagStr("workspace-root", process.cwd())),
+      repair: getFlagBool("repair-if-needed"),
+      verbose: getFlagBool("verbose"),
+    });
+    if (getFlagBool("json")) console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+  if (command === "bootstrap" || command === "update") {
+    await runLiveBootstrap({
+      command,
+      bootstrapUrl: getFlagStr("bootstrap-url", ""),
+      trustBootstrapUrl: getFlagBool("trust-bootstrap-url"),
+      envOverrides: liveBootstrapEnvOverrides(),
+    });
+    return;
+  }
+  if (command === "gc") {
+    await runViberootsGc({
+      workspaceRoot: path.resolve(getFlagStr("workspace-root", process.cwd())),
+      dryRun: getFlagBool("dry-run"),
+      aggressive: getFlagBool("aggressive"),
+      optimize: getFlagBool("optimize"),
+      nix: getFlagBool("nix") || !getFlagBool("no-nix"),
+      verbose: getFlagBool("verbose"),
+      nixDeleteOlderThan: getFlagStr("nix-delete-older-than", ""),
+      keepCurrentProfile: getFlagBool("keep-current-profile"),
+    });
+    return;
+  }
+  if (command === "use-submodule") {
+    await useSubmodule({
+      workspaceRoot: path.resolve(getFlagStr("workspace-root", process.cwd())),
+      workspaceName: getFlagStr("workspace-name", ""),
+      url: getFlagStr("url", ""),
+      trustUrl: getFlagBool("trust-url"),
+      allowDirenv: !getFlagBool("no-direnv"),
+      runInstall: getFlagBool("run-install"),
+    });
+    return;
+  }
+  if (command === "use-flake") {
+    await useFlake({
+      workspaceRoot: path.resolve(getFlagStr("workspace-root", process.cwd())),
+      workspaceName: getFlagStr("workspace-name", ""),
+      ref: getFlagStr("ref", ""),
+      removeSubmodule: getFlagBool("remove-submodule"),
+      allowDirenv: !getFlagBool("no-direnv"),
+      runInstall: getFlagBool("run-install"),
+    });
+    return;
+  }
+  if (command === "remove-submodule") {
+    await removeSubmodule({
+      workspaceRoot: path.resolve(getFlagStr("workspace-root", process.cwd())),
+      dryRun: getFlagBool("dry-run"),
+    });
     return;
   }
   if (command !== "version" && command !== "status") usage();

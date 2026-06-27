@@ -70,10 +70,13 @@ function isNixStorePath(p: string): boolean {
 
 async function nixPathInfo(root: string, attr: string): Promise<string> {
   const { flakeRef, viberootsOverrideArgs } = await workspaceFlakeRef(root);
+  console.error(`[toolchain-paths] checking ${attr} in Nix store`);
   const res = await $({
     cwd: root,
     stdio: "pipe",
-  })`nix path-info --impure ${`${flakeRef}#${attr}`} ${viberootsOverrideArgs} --json --accept-flake-config`.nothrow();
+  })`nix path-info --impure ${`${flakeRef}#${attr}`} ${viberootsOverrideArgs} --json --accept-flake-config`
+    .quiet()
+    .nothrow();
   if (res.exitCode !== 0) return "";
   const txt = String(res.stdout || "").trim();
   if (!txt.startsWith("[")) return "";
@@ -96,10 +99,11 @@ async function nixPathInfo(root: string, attr: string): Promise<string> {
 
 async function nixBuildOutPath(root: string, attr: string): Promise<string> {
   const { flakeRef, viberootsOverrideArgs } = await workspaceFlakeRef(root);
+  console.error(`[toolchain-paths] realizing ${attr} with nix build`);
   const res = await $({
     cwd: root,
     stdio: "pipe",
-  })`nix build --impure ${`${flakeRef}#${attr}`} ${viberootsOverrideArgs} --no-link --print-out-paths --accept-flake-config`;
+  })`nix build --impure ${`${flakeRef}#${attr}`} ${viberootsOverrideArgs} --no-link --print-out-paths --accept-flake-config`.quiet();
   const out =
     String(res.stdout || "")
       .trim()

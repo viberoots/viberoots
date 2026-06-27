@@ -21,7 +21,7 @@ test("install deps nix calls disable per-invocation auto-GC lock waits", async (
     "viberoots/build-tools/tools/dev/install/deps-main.ts",
     "utf8",
   );
-  if (!depsMain.includes("importer ${imp}: realizing+linking node_modules")) {
+  if (!depsMain.includes("importer ${imp}: realizing and linking node_modules")) {
     throw new Error("deps-main.ts must delegate node_modules realization to link-node");
   }
   if (depsMain.includes("--print-build-logs")) {

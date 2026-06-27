@@ -229,6 +229,33 @@ test("viberoots wrapper resolves command source from VIBEROOTS_ROOT", async () =
   }
 });
 
+test("vbr wrapper resolves command source from nested consumer directories", async () => {
+  const tmp = await workspace("vbr-alias-command");
+  try {
+    const nested = path.join(tmp, "projects", "apps", "demo");
+    await fsp.mkdir(nested, { recursive: true });
+    const viberootsRoot = path.join(process.cwd(), "viberoots");
+    const binDir = path.join(viberootsRoot, "build-tools", "tools", "bin");
+    const { stdout } = await execFileAsync("vbr", ["version", "--json"], {
+      cwd: nested,
+      env: {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}`,
+        NO_DEV_SHELL: "1",
+        WORKSPACE_ROOT: tmp,
+        VIBEROOTS_ROOT: viberootsRoot,
+      },
+    });
+    const status = JSON.parse(String(stdout));
+    assert.equal(status.sourceMode, "local");
+    assert.equal(status.workspaceRoot, tmp);
+    assert.equal(status.viberootsRoot, viberootsRoot);
+    assert.equal(status.revisionSource, "git");
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test("viberoots version reports local source mode and checked-out revision", async () => {
   const tmp = await workspace("vbr-version-local");
   try {

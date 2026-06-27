@@ -4,9 +4,13 @@ This guide helps a new contributor land any PR in this plan successfully, follow
 
 ### 1. Environment setup (direnv + dev shell)
 
-- Ensure direnv is active in your shell and permitted for the repo:
-  - `direnv allow` (once per clone), verify it loads automatically in new shells
-- Ensure `nix-direnv` is installed (required for cached shell loading in this repo):
+- Prepare or repair viberoots workspace state with the current bootstrap entrypoint:
+  - default remote-flake consumer mode: `curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | bash`
+  - submodule contributor mode: `curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_CONSUMER=submodule bash`
+  - Always fetch bootstrap from `main`; use `VBR_REF=<tag-or-commit>` only to choose the viberoots ref consumed by the workspace.
+  - The bootstrap command is idempotent, runs `direnv allow` and `i` by default, and records crash-safe upgrade intent under `.viberoots/bootstrap/transactions/`.
+- Ensure direnv loads automatically in new shells after bootstrap. If you intentionally skipped the default `VBR_DIRENV_ALLOW=1` path, run `direnv allow` once for the checkout.
+- Ensure `nix-direnv` is installed (bootstrap installs it for normal local setup; install manually only when repairing outside bootstrap):
   - `nix profile install nixpkgs#nix-direnv`
 - Quick checks (must succeed):
   - `nix --version`, `buck2 --version`, `go version`, `node --version`, `pnpm --version`
@@ -18,15 +22,12 @@ This guide helps a new contributor land any PR in this plan successfully, follow
   - `rm -rf .direnv && direnv allow && direnv reload`
 - Optional: run our startup check if present (prints clear hints):
   - `node --import ./viberoots/build-tools/tools/dev/zx-init.mjs --experimental-strip-types viberoots/build-tools/tools/dev/startup-check.ts`
-- Prepare ignored viberoots workspace state before Buck-cell dogfood or external workspace runs:
-  - `git submodule update --init viberoots`
-  - `./viberoots/init`
-  - This creates or repairs `.viberoots/current`, `.viberoots/workspace/`, `.envrc`,
-    `.buckconfig`, `.buckroot`, and the light workspace README files without rewriting edited
-    project files.
-  - In the current in-repo dogfood layout, `.viberoots/current` points at the local `viberoots/`
-    submodule so Buck and Nix workflows observe local build-tool edits immediately. In external or
-    remote-source workspaces it points at the resolved viberoots source instead.
+- Bootstrap creates or repairs `.viberoots/current`, `.viberoots/workspace/`, `.envrc`,
+  `.buckconfig`, `.buckroot`, and the light workspace README files without rewriting edited
+  project files.
+  - In submodule mode, `.viberoots/current` points at the local `viberoots/` submodule so Buck and
+    Nix workflows observe local build-tool edits immediately.
+  - In remote-flake mode, `.viberoots/current` points at the resolved viberoots source instead.
 
 Note on Python lockfiles: The initial Python rollout is uv‑only. Poetry/pip‑tools are out of scope unless/until a future PR adds them. See `viberoots/build-tools/docs/lang/python-design.md` (PR‑17) for details.
 Python provider sync activation in sparse/partial clones is lockfile‑driven: the presence of an `uv.lock` under `projects/apps/*` or `projects/libs/*` enables Python providers.
@@ -299,6 +300,7 @@ These guardrails assume test tooling stays aligned with the dev shell and global
 - **Prefer bounded-concurrency seed copies**: per-file copy loops in temp-repo setup can become global bottlenecks under verify fan-out; use bounded parallel file copies rather than fully serial recursion.
 - **Avoid parallel `direnv exec` for profiling**: concurrent `direnv`/Nix eval can block on `.direnv/flake-profile` and distort timing; collect timing baselines with serialized runs.
 - **Keep Nix GC idle during verify**: active `nix store gc`/`nix-store --gc` can contend on `/nix/var/nix/db/db.sqlite` and can invalidate just-realized store paths during temp-repo tests. Verify waits briefly for active GC and fails before Buck starts if GC remains active. Stop GC jobs and re-run before diagnosing target-level regressions. `l --status` / `s` will show `GC detected: yes` when the log contains a GC preflight warning.
+- **Preview maintenance cleanup before running it**: use `viberoots gc --dry-run` to inspect Nix and local generated-state cleanup candidates before mutating the checkout. Do not run `viberoots gc` while verify is active. Keep `viberoots gc --optimize` opt-in maintenance, not a default speed fix.
 - **Keep macOS metadata indexing out of verify temp trees**: on Darwin, verify keeps high-churn temp repos under `/tmp/viberoots-verify-$USER.noindex/tmpdir` instead of the watched checkout or per-user `/var/folders` temp area, clears stale current and legacy repo-local `buck-out/tmp/tmpdir*` contents at startup when not in explicit concurrent-verify mode, and writes `.metadata_never_index` markers under generated output/temp roots. If `fseventsd`, `mds`, or `mds_stores` stays near the top of `ps` or pass/min drops sharply, treat that as run-level contention and investigate the temp-root policy before accepting full-suite timing evidence.
 - **Preserve metadata exclusion markers during cleanup**: cleanup may remove verify-owned `buck-out` children such as `v-*`, `verify-nested-*`, `tmp`, and `test-logs`, but it must not delete `.metadata_never_index`. Removing the marker after every verify can make the next broad run pay Spotlight/FSEvents contention even when temp repos themselves live under `.noindex`.
 - **Treat invalid store-path errors during verify as GC-corruption signals for that run**: if logs include `error: path '/nix/store/... .drv' is not valid` together with verify GC warning/notice lines, treat the run as tainted by concurrent store mutation. Stop GC and re-run the affected targets first; do not use that run for regression attribution.
