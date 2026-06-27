@@ -43,8 +43,30 @@ Ownership boundary:
 - Consumer-owned code belongs under `projects/`.
 - viberoots-owned tooling belongs in this source tree.
 - Generated hidden state belongs under `.viberoots/workspace/`.
-- Do not manually install tools into a consumer repo. Tools must be installed, pinned, or surfaced through viberoots patterns.
-- Do not copy viberoots-owned roots such as `build-tools/`, `toolchains/`, `patches/`, `plugins/`, `types/`, or `docs/` into the consumer parent root.
+
+## Default Working Loop
+
+- Inspect repo state first with `git status --short`.
+- Inspect submodules when present with `git submodule status`.
+- Use `viberoots status` when available to confirm source mode, generated state, and extraction readiness.
+- Identify the ownership boundary before editing: viberoots source change, consumer project change, generated-state or bootstrap change, or documentation-only change.
+- Read the nearest applicable docs before editing.
+- Make the smallest coherent change.
+- Validate narrowly first, then broaden only when the change crosses broader boundaries.
+- Report what changed, what was validated, and what remains unvalidated.
+
+## Ownership Decision Table
+
+| Change needed                                     | Edit location                                                |
+| ------------------------------------------------- | ------------------------------------------------------------ |
+| Consumer app, library, or product behavior        | `projects/`                                                  |
+| viberoots reusable tooling                        | viberoots source tree                                        |
+| repo-skills or plugin behavior owned by viberoots | viberoots source tree and its skill or plugin docs and tests |
+| Consumer-specific skill or plugin configuration   | consumer-owned config or documented extension point          |
+| Generated workspace output                        | generator, schema, or source input, not emitted output       |
+| Bootstrap behavior                                | bootstrap source plus transaction and diagnostic tests       |
+| Build macro behavior                              | macro or generator source plus focused build-system tests    |
+| Documentation for consumer usage                  | consumer docs or viberoots docs depending on ownership       |
 
 ## Required First Reads
 
@@ -76,6 +98,37 @@ Start with these docs before changing code or advising users:
 - Reviewed file-size exceptions are declared in owner-local `methodology-exceptions.json` manifests. That filename refers to exceptions to this methodology, not to a separate methodology source file.
 - Use automated checking and explicit validation points to prevent architectural principles from eroding during development.
 
+## Change Shape Guidance
+
+- Prefer narrow changes when unrelated work is already in flight.
+- A broader horizontal change is acceptable when the working tree is clean, no overlapping PRs or branches are active, the change updates one coherent contract across implementation, tests, docs, generated examples, and CLI help, and splitting it would create avoidable merge conflicts or leave the repo in an inconsistent intermediate state.
+- Do not use a broad PR as permission to mix unrelated product, tooling, cleanup, and style changes.
+
+## Edit Discipline
+
+- Do not reformat, reorder, rename, or normalize unrelated files.
+- Avoid opportunistic cleanup unless the cleanup is required for the current change, stays in the same ownership boundary, is covered by validation for the affected path, and is clearly separated from behavior changes in the final report.
+
+## Buck/Nix/Pnpm Rules
+
+- Do not bypass Buck, Nix, pnpm wrappers, or repo-provided scripts with ad hoc local commands.
+- Do not introduce global-tool assumptions.
+- Do not make generated Buck files the source of truth.
+- Prefer changing source-owned metadata, macros, generators, or schemas over editing emitted files.
+- When pnpm, Nix, or Buck behavior changes, validate the affected extraction or generation path, not just the final command output.
+- Keep dependency installation reproducible through existing viberoots mechanisms.
+
+## Repository Skills And Plugins
+
+- repo-skills and plugins are reusable agent capabilities owned by viberoots when they are part of this source tree.
+- Treat repo-skills and plugins like other reusable tooling, not ad hoc per-project scripts.
+- Before adding or changing a repo-skill or plugin, search for existing patterns and extend them when appropriate.
+- repo-skills and plugins must have clear ownership, declared inputs, deterministic outputs, and validation coverage.
+- Do not install or copy repo-skill or plugin code into `projects/` or consumer roots unless the documented viberoots process explicitly generates or surfaces it there.
+- If a consumer repo needs custom behavior, prefer consumer-owned configuration or documented extension points over modifying reusable viberoots repo-skills for one project.
+- repo-skills and plugins are part of the reviewed source contract when they influence agent behavior, generated output, build behavior, verification, bootstrap, or documentation.
+- When changing a repo-skill or plugin, update affected docs, examples, tests, schemas, wrappers, or generated fixtures in the same change when applicable.
+
 ## Common Commands
 
 - Use `i` to install or refresh dependencies and generated glue.
@@ -84,6 +137,13 @@ Start with these docs before changing code or advising users:
 - Use focused `v` selectors before broad test runs.
 - Use `ALL_TESTS=1 v` only when full-suite evidence is needed.
 - Use coverage only when explicitly required by the current task, PR, or CI path.
+
+## Validation Discipline
+
+- Prefer the smallest test that exercises the changed behavior.
+- After fixing a failure, rerun the exact failing target or command first.
+- Expand to neighboring tests when the changed code has plausible semantic impact there.
+- Use full-suite validation only when the change crosses broad infrastructure boundaries or the user/PR workflow requires it.
 
 ## Security Considerations
 
@@ -116,6 +176,30 @@ Start with these docs before changing code or advising users:
 - Avoid premature optimization that clutters the codebase.
 - Maintain performance baselines and regression detection.
 - Treat "tests are passing" as insufficient evidence unless the relevant behavior is covered by those tests.
+
+## Operational Guardrails
+
+- Do not add fallback behavior that masks bugs in the primary path. Prefer failing clearly with actionable diagnostics over silently taking a secondary path.
+- If a fallback is necessary for production reliability, it must be explicit, logged, tested, and documented as a compatibility path, not a hidden recovery path.
+- Do not fix a failing test by weakening assertions, broadening mocks, skipping cases, or changing expected output unless the product contract has explicitly changed.
+- Treat docs, tests, CLI help, generated examples, and implementation as one contract. When behavior changes, update all affected surfaces in the same change.
+- Prefer deleting obsolete compatibility paths over preserving aliases, shims, or legacy names. Keep compatibility only when there is a known external user or migration window.
+- Do not introduce ambient-environment dependencies. Commands, tests, and generated artifacts must declare their required inputs instead of depending on local shell state, global tools, current branches, or machine-specific paths.
+- When touching deployment, bootstrap, generated-state, or source-mode behavior, verify both the happy path and the failure diagnostic. A correct rejection must explain what the operator should do next.
+- Do not infer broad authority from missing configuration. Missing scope, identity, deployment target, or reviewed source information must fail closed.
+- Avoid test-only behavior in production code. If a test needs a seam, expose a real dependency boundary or fixture path that preserves the production contract.
+- Before adding a new wrapper, command, config key, schema field, or generated file, search for the existing pattern and extend it unless there is a documented reason not to.
+- Do not let generated artifacts become the reviewed source of truth. Tests may inspect generated output, but source-owned inputs, generators, and schemas remain authoritative.
+- When investigating failures, preserve the first failing evidence. Do not clean caches, rerun setup, regenerate state, or broaden the command until the original failure mode is captured or intentionally dismissed.
+- Investigate failures from the first concrete failing command or target. Avoid broad rewrites or speculative fixes before reproducing the failure narrowly.
+- Run focused validation for impacted targets before broad validation. Do not start a full suite when focused tests are enough to prove or disprove a change.
+- Do not interrupt, kill, or clean up user-owned processes unless explicitly asked. When monitoring a run, observe logs and process state without disturbing it.
+- Treat execution time, disk growth, cache misses, and Spotlight/indexing regressions as evidence-driven investigations. Compare against similar prior runs before declaring a root cause.
+- Do not attribute slowdowns to GC, cache state, Spotlight, or scoping without concrete evidence from logs, process inspection, filesystem state, or comparable timings.
+- Preserve all uncommitted user work. Before committing, staging, cleanup, or generated-state removal, inspect status in both the parent repo and any nested Git repos or submodules.
+- For submodule changes, commit and push the submodule first, then commit and push the parent repo pointer.
+- Generated state may be cleaned only when it is known to be regenerated safely. Prefer `--dry-run` or an explicit cleanup plan when the cleanup surface is broad.
+- Documentation guardrails should be added only after a root cause is confirmed and the fix is validated under comparable conditions.
 
 ## Core Philosophy
 
@@ -165,8 +249,9 @@ Provide lightweight, performant, clean architectural code.
 
 - Keep files at or below 250 lines. If a file would exceed that, split it into 2 or 3 clearly separated files with focused responsibilities.
 - Reviewed file-size exceptions are declared in owner-local `methodology-exceptions.json` manifests. That filename refers to exceptions to this methodology, not to a separate methodology source file.
-- Keep code self-explanatory without comments.
-- Avoid using comments in code. The code must be self-explanatory.
+- Prefer self-explanatory code.
+- Avoid comments that restate the code.
+- Use comments for non-obvious constraints, external contracts, security assumptions, generated-code boundaries, bootstrap or source-mode behavior, and historical compatibility decisions.
 - When sharing code, always place it in its own artifact with clear path labeling.
 - Apply KISS and DRY principles expertly.
 - Reuse existing functions before creating new ones.
@@ -293,7 +378,7 @@ Any failed checkpoint blocks phase advancement.
 ### Code Quality Gates
 
 - Names are self-explanatory.
-- Code must be self-explanatory without comments.
+- Comments explain non-obvious constraints, external contracts, security assumptions, generated-code boundaries, bootstrap or source-mode behavior, or historical compatibility decisions.
 - Performance characteristics match workload requirements.
 - Every addition serves the core project purpose.
 - Regression tests prevent performance degradation.
@@ -426,7 +511,6 @@ Project execution indicators:
 - Use `ALL_TESTS=1 v` only when full-suite evidence is needed.
 - Use `viberoots status` for source-mode and extraction-readiness diagnostics.
 - Use `viberoots gc --dry-run` before destructive local generated-state cleanup unless the user explicitly asks for normal cleanup.
-- Do not manually install tools in `projects/` or consumer roots. Route tool installation through Nix, bootstrap, or viberoots wrappers.
 - Generated state under `.viberoots/`, `buck-out/`, `.direnv/`, and `node_modules/` is not source of truth.
 - Avoid editing generated files unless the generator is also updated.
 - Keep consumer-owned state out of the viberoots source tree.
