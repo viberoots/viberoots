@@ -34,7 +34,7 @@ Python provider sync activation in sparse/partial clones is lockfile‑driven: t
 
 ### 2. Project rules you must follow
 
-- Follow `@METHODOLOGY.XML` and `@viberoots/build-tools/docs/build-system-design.md` at all times.
+- Follow `@AGENTS.md` and `@viberoots/build-tools/docs/build-system-design.md` at all times.
 - Never commit without verifying that all tests are wired and passing:
   - default PR loop: `i && b && v` (coverage-off and scope-aware by default)
   - full pre-merge command: `i && b && ALL_TESTS=1 v` (coverage-off by default)

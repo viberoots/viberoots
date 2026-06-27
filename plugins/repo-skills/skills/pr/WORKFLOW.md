@@ -96,7 +96,7 @@ Read the supplied plan document, or the configured `default_plan_document` in `r
 
 - `build-tools/docs/build-system-design.md`
 - `docs/handbook/getting-started-on-a-pr.md`
-- `METHODOLOGY.XML`
+- `AGENTS.md`
 
 If the user explicitly names additional docs, read those too.
 

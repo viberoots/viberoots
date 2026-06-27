@@ -128,7 +128,7 @@ ADRs. Resist additions until a concrete case demands one.
   document should cross-reference `docs/contributor-naming-conventions.md` so ADR authors know the
   constraint before they start writing, not when the pre-commit hook fires.
 
-- METHODOLOGY.XML's `DocumentationBuildingProcess` section asks "Is there enough documentation for
+- AGENTS.md's `DocumentationBuildingProcess` section asks "Is there enough documentation for
   future reference?" as a quality gate criterion. The ADR corpus answers this for architectural
   decisions. The process document completes the loop by explaining how the corpus grows.
 

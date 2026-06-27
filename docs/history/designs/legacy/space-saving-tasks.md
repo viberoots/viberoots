@@ -520,7 +520,7 @@ Implement.
 The mitigations above address the primary disk-growth failure modes, but there are still gaps that make regressions easier:
 
 - Some verify safety behaviors are enforced by “contract string” checks, not behavioral tests.
-- A few key files exceed the ≤250 line rule in `METHODOLOGY.XML`, which makes long-term maintenance harder and increases regression risk.
+- A few key files exceed the ≤250 line rule in `AGENTS.md`, which makes long-term maintenance harder and increases regression risk.
 - A small amount of CLI parsing drift exists (minor `process.argv` checks), which conflicts with the tooling hygiene rules in `docs/handbook/getting-started-on-a-pr.md`.
 
 This PR closes those gaps without changing the user-facing behavior of `v` or the build system contracts.

@@ -68,7 +68,7 @@ downstream repo with at least one real deployment.
 **Single monorepo is the path of least resistance but may not scale.** Putting downstream product inside
 viberoots eliminates the upstream-tracking problem entirely but collapses the separation between
 the platform layer and the product layer. It means downstream product is subject to viberoots's full
-methodology — `METHODOLOGY.XML`, stale-names lint, the six-stage CI pipeline, the 250-line file
+methodology — `AGENTS.md`, stale-names lint, the six-stage CI pipeline, the 250-line file
 limit, all of it. If viberoots is intended to become a publicly maintained platform for multiple
 downstream products, the monorepo model creates a governance question: who controls the repo, and
 how are product-specific changes reviewed against platform conventions?

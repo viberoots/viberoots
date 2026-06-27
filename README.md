@@ -111,6 +111,7 @@ i && b && v
 
 ## Topic Entrypoints
 
+- **Agent Guidance**: [`AGENTS.md`](AGENTS.md) is the single active guide for agent behavior, methodology, repo boundaries, and key usage docs.
 - **Repository Map**: [`docs/README.md`](docs/README.md) is the main documentation index for current repo docs, ADRs, operator references, and documentation placement rules.
 - **Build System**: [`build-tools/docs/README.md`](build-tools/docs/README.md) covers Buck2/Nix architecture, language rules, remote execution, linking, scaffolding, and generated glue.
 - **Language Work**: [`build-tools/docs/lang/README.md`](build-tools/docs/lang/README.md) covers language design requirements. [`docs/handbook/new-language-walkthrough.md`](docs/handbook/new-language-walkthrough.md) covers the add-a-language workflow.

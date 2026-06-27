@@ -6,7 +6,7 @@ This note sketches the cleanest path to ship a pure-logic library usable from:
 - Go (native library consuming the same logic via cgo)
 - C++ (native library directly, mainly for tests/tooling)
 
-The core requirement: reuse the same source files for logic (no platform/system calls), while staying consistent with our repository rules, build-tools/docs/build-system-design.md, and METHODOLOGY.XML.
+The core requirement: reuse the same source files for logic (no platform/system calls), while staying consistent with our repository rules, build-tools/docs/build-system-design.md, and AGENTS.md.
 
 ### Goals and constraints
 
@@ -237,7 +237,7 @@ The Buck/Nix wiring copies `top.wasm` into `dist/` for web and copies the `.node
 - Node importer-scoped providers are unchanged; no new provider shapes.
 - Glue (if any) stays as zx TypeScript and is not committed.
 
-### Consistency with METHODOLOGY.XML
+### Consistency with AGENTS.md
 
 - Architectural minimalism: one logic implementation in C++ with a tiny C ABI.
 - Determinism: Nix templates build native/Wasm artifacts; `gomod2nix.toml` is maintained via `build-tools/tools/bin/i`.

@@ -45,7 +45,7 @@ This PR hardens the Node provider system by adding comprehensive tests for deter
 - The system gracefully handles edge cases (no lockfiles, missing yaml package, empty importers)
 - The documentation clearly explains the importer-scoped strategy
 
-## Design Principles (from METHODOLOGY.XML)
+## Design Principles (from AGENTS.md)
 
 - **Files ≤ 250 lines** — Each test file contains one test
 - **Deterministic operations** — Synchronous, predictable behavior
@@ -931,7 +931,7 @@ This PR enables:
 - [docs/history/designs/legacy/pnpm-plan.md](./pnpm-plan.md) — Original PR plan
 - [pnpm-design.md](../../../../build-tools/docs/lang/pnpm-design.md) — Overall PNPM design
 - [build-tools/docs/build-system-design.md](../../../../build-tools/docs/build-system-design.md) — Provider strategy
-- [METHODOLOGY.XML](../../../../METHODOLOGY.XML) — Development methodology
+- [AGENTS.md](../../../../AGENTS.md) — Development methodology
 - [PR1-COMPLETE.md](./PR1-COMPLETE.md) — PR 1 completion status
 
 ## Appendix: Test Fixtures

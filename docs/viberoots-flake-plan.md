@@ -863,7 +863,7 @@ workspace as a submodule.
   - `vendor/uv2nix/**`
   - reusable tool package metadata
   - viberoots docs/tests
-  - `AI-PREFERENCES.XML`, `METHODOLOGY.XML`, `TESTING.md`, viberoots-owned `docs/**`,
+  - `AGENTS.md`, `TESTING.md`, viberoots-owned `docs/**`,
     `config/**`, `patches/**`, `plugins/**`, `types/**`, viberoots pnpm package metadata,
     lockfiles, and pnpm hashes
 - Keep parent-owned paths in the parent workspace:
@@ -897,7 +897,7 @@ workspace as a submodule.
   - root `prelude/`;
   - root `toolchains/`;
   - root `docs/`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`,
-    `AI-PREFERENCES.XML`, `METHODOLOGY.XML`, `TESTING.md`, `TARGETS`, `config/`, `patches/`,
+    `AGENTS.md`, `TESTING.md`, `TARGETS`, `config/`, `patches/`,
     `plugins/`, and `types/`;
   - forwarding packages for `//build-tools` loads;
   - forwarding packages or generated outputs for `//third_party/providers`.

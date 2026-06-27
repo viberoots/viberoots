@@ -41,7 +41,7 @@ The document should cover the full life cycle in plain language:
    - `wheelhouse-preload` — Python wheelhouse build + optional binary cache push
    - `buck-test` — full test run; coverage is a separate explicit opt-in pass
 
-4. **Review** — PR is reviewed against `METHODOLOGY.XML` and `build-tools/docs/build-system-design.md`
+4. **Review** — PR is reviewed against `AGENTS.md` and `build-tools/docs/build-system-design.md`
    for architectural compliance (SoC, DRY, KISS, file-size, determinism). CI must be green on all
    three matrix platforms before merge.
 
@@ -130,7 +130,7 @@ monorepos. CI regenerates glue from scratch. Local development regenerates it on
 document that omits this will cause contributor confusion when they see that `graph.json`,
 `auto_map.bzl`, and provider files are not in the repo history.
 
-**METHODOLOGY.XML is a general methodology, not a viberoots-specific SDLC doc.** It defines coding
+**AGENTS.md is a general methodology, not a viberoots-specific SDLC doc.** It defines coding
 principles and enforcement checkpoints but does not describe the actual lifecycle of a change in
 this repository. The SDLC document fills that gap — it should reference the methodology for the
 quality gate it imposes on code review, without reproducing the methodology text itself.

@@ -245,7 +245,7 @@ Acceptance criteria:
 
 Notes:
 
-- Ties to preferences in `AI-PREFERENCES.XML` and discipline in `METHODOLOGY.XML`.
+- Ties to preferences in `AGENTS.md` and discipline in `AGENTS.md`.
 
 ---
 

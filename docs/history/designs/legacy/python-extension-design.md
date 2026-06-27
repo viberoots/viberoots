@@ -6,7 +6,7 @@ It is intended to match:
 
 - `build-tools/docs/build-system-design.md` (Buck2 exports intent; Nix realizes; deterministic inputs)
 - `docs/history/build-system/linking-roadmap.md` / `docs/history/designs/legacy/linking-plan-4.md` (Python extension modules phase)
-- `METHODOLOGY.XML` (minimalism, deterministic reliability, reuse existing helpers)
+- `AGENTS.md` (minimalism, deterministic reliability, reuse existing helpers)
 
 ## Scope (what this enables)
 

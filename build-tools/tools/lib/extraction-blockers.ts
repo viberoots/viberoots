@@ -7,7 +7,13 @@ export type ExtractionBlocker = {
   detail: string;
 };
 
-const ALLOWED_VISIBLE_ROOT_ENTRIES = new Set(["README.md", "projects", "viberoots"]);
+const ALLOWED_VISIBLE_ROOT_ENTRIES = new Set([
+  "AGENTS.md",
+  "README.md",
+  "buck-out",
+  "projects",
+  "viberoots",
+]);
 
 const ROOT_LEGACY_PATHS = [
   "build-tools",
@@ -61,7 +67,7 @@ function visibleRootBlockers(root: string): ExtractionBlocker[] {
       kind: "path" as const,
       path: name,
       detail:
-        "visible parent root entry is outside the extracted workspace contract; only README.md, projects, and viberoots are allowed",
+        "visible parent root entry is outside the extracted workspace contract; only AGENTS.md, README.md, buck-out, projects, and viberoots are allowed",
     }));
 }
 

@@ -27,7 +27,7 @@ The repository is organized as a single monorepo with the following top-level la
 | `toolchains/`           | Buck toolchain wiring                                                                                                    |
 | `flake.nix`             | Nix devshell and hermetic build outputs                                                                                  |
 | `TARGETS`               | Authoritative deployment and project metadata (Buck2)                                                                    |
-| `METHODOLOGY.XML`       | Project methodology and architectural principles                                                                         |
+| `AGENTS.md`             | Project methodology and architectural principles                                                                         |
 
 Two complementary build systems are used together and are both required:
 

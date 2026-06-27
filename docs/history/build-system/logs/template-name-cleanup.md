@@ -23,7 +23,7 @@ After reviewing:
 
 - `build-tools/docs/build-system-design.md`
 - `docs/handbook/getting-started-on-a-pr.md`
-- `METHODOLOGY.XML`
+- `AGENTS.md`
 - all templates under `build-tools/tools/scaffolding/templates`
 
 I want a single TypeScript template family and a tighter naming contract.

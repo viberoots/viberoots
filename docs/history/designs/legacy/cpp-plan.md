@@ -33,7 +33,7 @@ This document proposes adding C++ as a first-class language to the repo with min
 
 ### Project rules and operational requirements (global)
 
-- Follow repository rules and design docs at all times: `@METHODOLOGY.XML` and `@build-tools/docs/build-system-design.md`.
+- Follow repository rules and design docs at all times: `@AGENTS.md` and `@build-tools/docs/build-system-design.md`.
 - Never commit without first verifying that all tests are wired and passing. Run the full suite with coverage and the project's external timeout policy (e.g., `buck2 test //... -- --env COVERAGE=1`).
 - Ensure the dev shell environment is loaded via `direnv` so required tools (e.g., `buck2`, `timeout`, `nix`, `pnpm`) are on PATH. If needed: `direnv allow` and ensure your shell evaluates `direnv` before running commands.
 

@@ -18,7 +18,7 @@ Use this checklist before saying the work is ready for a commit.
 - [ ] Re-read the required docs for this run instead of assuming they were already reviewed in an earlier thread.
 - [ ] Read `build-tools/docs/build-system-design.md` when present.
 - [ ] Read `docs/handbook/getting-started-on-a-pr.md` when present.
-- [ ] Read `METHODOLOGY.XML` when present.
+- [ ] Read `AGENTS.md` when present.
 - [ ] Note any missing expected docs briefly instead of silently skipping them.
 
 ## Implementation

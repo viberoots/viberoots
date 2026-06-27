@@ -9,7 +9,7 @@ This document proposes a design to support explicit, deterministic C++ dependenc
 - Direct-only and transitive link closure policies
 - Static and shared linking (with a clear default)
 
-I wrote this to be consistent with our build design in `build-tools/docs/build-system-design.md` and our methodology in `METHODOLOGY.XML`. Buck remains the source of truth for the graph. Nix remains the builder. The planner stays small. Semantics are explicit at call sites.
+I wrote this to be consistent with our build design in `build-tools/docs/build-system-design.md` and our methodology in `AGENTS.md`. Buck remains the source of truth for the graph. Nix remains the builder. The planner stays small. Semantics are explicit at call sites.
 
 ## Problem statement
 

@@ -1,6 +1,6 @@
 ---
 name: assess-plan
-description: Thoroughly review a target spec or plan document against the current repository implementation, existing test coverage, and repo guardrails while using the shared persisted default document also used by `pr` and `augment`. Use when the agent should assess whether everything described in the shared plan or an explicitly supplied spec file is fully implemented, meaningfully tested, and compliant with methodology requirements, especially in this repo where `build-tools/docs/build-system-design.md` and `METHODOLOGY.XML` are required review context. Trigger on prompts like `$assess-plan` or `$assess-plan docs/spec.md`.
+description: Thoroughly review a target spec or plan document against the current repository implementation, existing test coverage, and repo guardrails while using the shared persisted default document also used by `pr` and `augment`. Use when the agent should assess whether everything described in the shared plan or an explicitly supplied spec file is fully implemented, meaningfully tested, and compliant with methodology requirements, especially in this repo where `build-tools/docs/build-system-design.md` and `AGENTS.md` are required review context. Trigger on prompts like `$assess-plan` or `$assess-plan docs/spec.md`.
 ---
 
 # Assess Plan
@@ -29,7 +29,7 @@ After updating the defaults file, use that explicit path for the current task an
 Read these files for every assessment after resolving the target spec path:
 
 - `build-tools/docs/build-system-design.md`
-- `METHODOLOGY.XML`
+- `AGENTS.md`
 - `[spec]`
 
 ## Workflow
@@ -63,7 +63,7 @@ If you need to run commands:
 
 ### 4. Evaluate Against Methodology and Guardrails
 
-Use `METHODOLOGY.XML` and the build-system design doc as active review criteria, not background reading.
+Use `AGENTS.md` and the build-system design doc as active review criteria, not background reading.
 
 - Check whether the implementation follows the intended architecture and operating model.
 - Call out methodology or guardrail violations even when functionality appears complete.

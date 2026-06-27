@@ -48,8 +48,6 @@ async function assertCommandOnPath(command: string): Promise<string> {
 
 test("dogfood buckconfig routes viberoots-owned cells through current", async () => {
   const disallowedOldLayoutPaths = [
-    "AI-PREFERENCES.XML",
-    "METHODOLOGY.XML",
     "TESTING.md",
     "TARGETS",
     "build-tools/tools",
@@ -77,6 +75,7 @@ test("dogfood buckconfig routes viberoots-owned cells through current", async ()
       `root must not contain old combined-repo entry ${entry}`,
     );
   }
+  assert.equal((await fsp.stat(path.join(process.cwd(), "AGENTS.md"))).isFile(), true);
 
   const sections = buckconfigSections(await fsp.readFile(".buckconfig", "utf8"));
   const expected = new Map([

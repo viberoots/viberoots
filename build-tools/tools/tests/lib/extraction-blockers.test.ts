@@ -64,12 +64,13 @@ test("extraction blocker detection ignores legacy references in non-active docs"
 test("extraction blocker detection enforces the visible root allowlist", async () => {
   const root = await tmpWorkspace("vbr-extraction-blockers-visible-root");
   try {
+    await fsp.writeFile(path.join(root, "AGENTS.md"), "follow viberoots/AGENTS.md\n", "utf8");
     await fsp.writeFile(path.join(root, "Jenkinsfile"), "pipeline {}\n", "utf8");
     await fsp.mkdir(path.join(root, "buck-out"), { recursive: true });
     await fsp.mkdir(path.join(root, "plugins"), { recursive: true });
 
     const blockers = findExtractionBlockers(root).map((b) => `${b.kind}:${b.path}`);
-    assert.deepEqual(blockers, ["path:Jenkinsfile", "path:buck-out", "path:plugins"]);
+    assert.deepEqual(blockers, ["path:Jenkinsfile", "path:plugins"]);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }

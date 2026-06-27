@@ -5771,7 +5771,7 @@ declared fully complete while the public CLI still has known behavior gaps.
 
 I will close the remaining methodology gap identified during plan review: the deployment system is
 functionally implemented and tested, but some deployment-owned files still violate the hard file-size
-boundary from [Project Documentation Methodology](../../../METHODOLOGY.XML).
+boundary from [Project Documentation Methodology](../../../AGENTS.md).
 This PR brings the deployment area into explicit compliance by splitting oversized deployment-owned
 modules and tests into smaller reviewed units without weakening behavior, coverage, or the deployment
 contracts already established by earlier PRs.

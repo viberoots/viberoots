@@ -5,7 +5,7 @@
 **Depends on:** #27 Simple ADR Process / Conventions, #28 Document Simple SDLC, #32 Internal PKI / Service Auth Strategy, #33 Secret Rotation Policy & Workflows, #35 SBOM Generation, #36 Supply-Chain Scanning, #37 Validated Backup/Restore/Disaster Recovery Procedures, #42 Clean Up / Organize viberoots Docs
 **Estimated effort:** M
 **Date:** 2026-05-25
-**Summary:** Complete the pre-flight checklist before setting the repo to public: entropy-based history audit, `LICENSE` file, responsible disclosure policy, resolve `kiltyj` namespace references in auth config, CC BY-SA 4.0 attribution for `METHODOLOGY.XML`, and harden fork-PR CI secret exposure.
+**Summary:** Complete the pre-flight checklist before setting the repo to public: entropy-based history audit, `LICENSE` file, responsible disclosure policy, resolve `kiltyj` namespace references in auth config, CC BY-SA 4.0 attribution for `AGENTS.md`, and harden fork-PR CI secret exposure.
 
 ## What
 
@@ -30,7 +30,7 @@ must be true before and immediately after that switch:
    outside their approved allowlist paths (see `docs/history/migrations/repo-rename.md`). The rename sequence closes
    these gaps; this task verifies they are fully closed before public exposure.
 
-3. **Licensing declared.** Add a `LICENSE` file to the repository root. The `METHODOLOGY.XML`
+3. **Licensing declared.** Add a `LICENSE` file to the repository root. The `AGENTS.md`
    header declares that its methodology content is licensed CC BY-SA 4.0 (Disciplined AI Software
    Development Methodology © 2025 by Jay Baleine). The source code license must be separately
    declared. At minimum this means deciding and documenting which license applies to the build
@@ -71,7 +71,7 @@ must be true before and immediately after that switch:
 
 9. **Add `CONTRIBUTING.md`.** A minimal guide describing: how to set up the dev environment
    (pointing to the SDLC doc), the `i && b && v` pre-push requirement, the Conventional Commits
-   format, and the PR review standard against `METHODOLOGY.XML`. The file should be short (one page
+   format, and the PR review standard against `AGENTS.md`. The file should be short (one page
    or less) and link out to `docs/handbook/` rather than duplicating it.
 
 10. **Add `CODE_OF_CONDUCT.md`.** A standard code of conduct (Contributor Covenant v2.1 is the
@@ -147,7 +147,7 @@ old identity string is not caught by content enforcement. The pre-flight check m
 most sensitive checked-in generated files (manifests, deployment fixtures, golden outputs) manually
 before flipping visibility.
 
-**License ambiguity.** The `METHODOLOGY.XML` is CC BY-SA 4.0. The source code has no declared
+**License ambiguity.** The `AGENTS.md` is CC BY-SA 4.0. The source code has no declared
 license until step 3 adds one. An unlicensed public repository is technically "all rights reserved"
 by default under copyright law, which means external contributors cannot legally use or contribute
 to the code without explicit permission. This creates a practical and legal problem for any
@@ -183,10 +183,10 @@ visibility flip is cleaner than a staged approach.
 
 ## Considerations
 
-**The METHODOLOGY.XML attribution requirement is load-bearing.** The CC BY-SA 4.0 license on the
+**The AGENTS.md attribution requirement is load-bearing.** The CC BY-SA 4.0 license on the
 methodology requires that any public sharing of the methodology content carry the full attribution:
 "Disciplined AI Software Development Methodology © 2025 by Jay Baleine, licensed under CC BY-SA
-4.0, https://creativecommons.org/licenses/by-sa/4.0/." Once the repo is public, the `METHODOLOGY.XML`
+4.0, https://creativecommons.org/licenses/by-sa/4.0/." Once the repo is public, the `AGENTS.md`
 file is public content. The attribution header already present in that file satisfies the
 requirement for the file itself. The `README.md` and any external documentation that reproduces or
 summarizes the methodology must also carry the attribution. Do not reproduce the methodology text

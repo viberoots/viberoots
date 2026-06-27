@@ -184,6 +184,7 @@ async function rejectStaleLocalCurrent(
   currentPath: string,
   sourcePath: string,
   workspaceRoot: string,
+  expectedTarget: string,
 ): Promise<void> {
   try {
     const stat = await fsp.lstat(currentPath);
@@ -193,17 +194,18 @@ async function rejectStaleLocalCurrent(
     throw e;
   }
   const sourceReal = await fsp.realpath(sourcePath);
+  const expectedReal = expectedTarget === ".." ? workspaceRoot : sourceReal;
   let currentReal = "";
   try {
     currentReal = await fsp.realpath(currentPath);
   } catch {
     const target = await fsp.readlink(currentPath);
+    if (target === expectedTarget) return;
     throw new Error(`${currentPath} points at ${target}; expected local viberoots ${sourceReal}`);
   }
-  if (currentReal === workspaceRoot) return;
-  if (currentReal !== sourceReal) {
+  if (currentReal !== expectedReal) {
     throw new Error(
-      `${currentPath} points at ${currentReal}; expected local viberoots ${sourceReal}`,
+      `${currentPath} points at ${currentReal}; expected local viberoots ${expectedReal}`,
     );
   }
 }
@@ -240,7 +242,9 @@ export async function activateWorkspace(opts: ActivationOptions = {}): Promise<A
     await ensureWorkspaceBuckStateLink(workspaceRoot);
     await removeNestedWorkspaceActivationState(workspaceRoot);
   }
-  if (sourceIsLocalViberoots) await rejectStaleLocalCurrent(currentPath, sourcePath, workspaceRoot);
+  if (sourceIsLocalViberoots) {
+    await rejectStaleLocalCurrent(currentPath, sourcePath, workspaceRoot, currentTarget);
+  }
   await replaceCurrentSymlink(currentPath, currentTarget);
   validateBuckconfigCells(workspaceRoot, { allowMissingPrelude: opts.shellEntry });
 

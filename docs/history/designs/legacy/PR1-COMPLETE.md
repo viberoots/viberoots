@@ -115,5 +115,5 @@ PR 2 can proceed with provider wiring hardening and determinism tests.
 - The `shared-workspace-lockfile=false` setting is **by design**, not a workaround
 - The shellHook guards are **essential** — without them, recursive nix develop causes runaway processes
 - The 10 commits represent iterative debugging and could be squashed if desired
-- All changes align with METHODOLOGY.XML (files <250 lines, clear separation of concerns, deterministic)
+- All changes align with AGENTS.md (files <250 lines, clear separation of concerns, deterministic)
 - All changes align with build-tools/docs/build-system-design.md (provider strategy, importer-scoped labels)

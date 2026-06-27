@@ -255,7 +255,7 @@
     {
       "num": 43,
       "title": "Make viberoots Public",
-      "summary": "Complete the pre-flight checklist before setting the repo to public: entropy-based history audit, `LICENSE` file, responsible disclosure policy, resolve `kiltyj` namespace references in auth config, CC BY-SA 4.0 attribution for `METHODOLOGY.XML`, and harden fork-PR CI secret exposure.",
+      "summary": "Complete the pre-flight checklist before setting the repo to public: entropy-based history audit, `LICENSE` file, responsible disclosure policy, resolve `kiltyj` namespace references in auth config, CC BY-SA 4.0 attribution for `AGENTS.md`, and harden fork-PR CI secret exposure.",
       "depends_on": [27, 28, 32, 33, 35, 36, 37, 42]
     },
     {

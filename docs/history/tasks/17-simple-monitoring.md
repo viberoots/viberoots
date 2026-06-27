@@ -123,7 +123,7 @@ This task blocks #41 autoscaling: autoscaling decisions require `queue_depth` an
 making viberoots public: a public project should have a public status page before it invites
 external users.
 
-The METHODOLOGY.XML requirement to "maintain performance baselines and regression detection" applies
+The AGENTS.md requirement to "maintain performance baselines and regression detection" applies
 here. The `queue_wait_age_ms` and `running_age_ms` metrics, once scraped by Prometheus, serve as
 the baseline for detecting worker throughput regressions between releases.
 

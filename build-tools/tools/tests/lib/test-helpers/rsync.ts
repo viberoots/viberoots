@@ -5,6 +5,7 @@ import { timeAsync } from "./timing";
 
 export async function rsyncRepoTo(tmp: string) {
   await timeAsync(`rsyncRepoTo(${path.basename(tmp)})`, async () => {
+    const sourceRoot = path.resolve(process.env.TEST_RSYNC_SOURCE_ROOT || process.cwd());
     const rootsEnv: string = (process.env.TEST_RSYNC_ROOTS || "").trim();
     if (rootsEnv) {
       const roots = rootsEnv
@@ -13,6 +14,7 @@ export async function rsyncRepoTo(tmp: string) {
         .filter(Boolean);
       try {
         await $`bash --noprofile --norc -c ${`set -euo pipefail
+          cd "${sourceRoot}"
           if [ -f flake.nix ]; then mkdir -p "${tmp}"; cp -f flake.nix "${tmp}/flake.nix"; fi
           if [ -f flake.lock ]; then mkdir -p "${tmp}"; cp -f flake.lock "${tmp}/flake.lock"; fi
           if [ -f .viberoots/workspace/flake.nix ]; then mkdir -p "${tmp}/.viberoots/workspace"; cp -f .viberoots/workspace/flake.nix "${tmp}/.viberoots/workspace/flake.nix"; fi
@@ -21,7 +23,7 @@ export async function rsyncRepoTo(tmp: string) {
       } catch {}
       const rootsToCopy = new Set<string>(roots);
       const hasNestedViberoots = await fsp
-        .access("viberoots/flake.nix")
+        .access(path.join(sourceRoot, "viberoots", "flake.nix"))
         .then(() => true)
         .catch(() => false);
       if (hasNestedViberoots) {
@@ -35,13 +37,14 @@ export async function rsyncRepoTo(tmp: string) {
         "toolchains",
       ]);
       for (const r of rootsToCopy) {
+        const sourcePath = path.join(sourceRoot, r);
         const exists = await fsp
-          .lstat(r)
+          .lstat(sourcePath)
           .then(() => true)
           .catch(() => false);
         if (!exists && hasNestedViberoots && extractedToolRoots.has(r)) continue;
         try {
-          await $`rsync -a --relative ${r} ${tmp}/`;
+          await $({ cwd: sourceRoot })`rsync -a --relative ${r} ${tmp}/`;
         } catch {}
       }
       return;
@@ -108,6 +111,10 @@ export async function rsyncRepoTo(tmp: string) {
     // These are not part of the repo and should not make temp-repo seeding flaky.
     excludes.push("/.patch-sessions.json.tmp");
     const args = excludes.map((e) => ["--exclude", e]).flat();
-    await $`rsync -a ${args} ./ ${tmp}/`;
+    await $`rsync -a ${args} ${sourceRoot}/ ${tmp}/`;
+    const overlayRoot = String(process.env.TEST_RSYNC_OVERLAY_ROOT || "").trim();
+    if (overlayRoot) {
+      await $`rsync -a ${args} ${path.resolve(overlayRoot)}/ ${tmp}/`;
+    }
   });
 }

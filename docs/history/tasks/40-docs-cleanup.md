@@ -193,7 +193,7 @@ trade-off is acceptable: the Go quickstart content should move to a `docs/handbo
 
 - `docs/history/designs/legacy/PR1-COMPLETE.md` and `docs/history/designs/legacy/PR2-SUMMARY.md` are completion checkpoints for past PRs. These are the purest examples of archivable content: they were useful when the PR was being reviewed and have no ongoing reference value.
 
-- METHODOLOGY.XML section `DocumentationBuildingProcess` asks "Is there enough documentation for future reference?" and "Does the documentation accurately reflect the current state of the system?" Both questions apply here. The session-note accumulation in `build-history/` and `design-history/` represents documentation that no longer reflects the current system; retaining it uncritically violates the second criterion.
+- AGENTS.md section `DocumentationBuildingProcess` asks "Is there enough documentation for future reference?" and "Does the documentation accurately reflect the current state of the system?" Both questions apply here. The session-note accumulation in `build-history/` and `design-history/` represents documentation that no longer reflects the current system; retaining it uncritically violates the second criterion.
 
 - The `docs/tasks/` directory has gaps in its numbering (tasks 27, 32, 36-39 are missing). The index for `docs/history/tasks/README.md` should note these are reserved or unassigned, not imply the sequence is complete.
 

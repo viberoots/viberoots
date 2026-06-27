@@ -1,6 +1,6 @@
 ## PR 9 — PNPM/Node Tests and Hardening (Updated Design)
 
-This PR finalizes the PNPM/Node path by adding missing tests around importer‑scoped providers, effective‑set precision (including peers/optionals), name‑collision guards, auto‑map integration checks, a thin provider index test, a safe patch‑wrapper behavioral test, and a Node patch lint. It aligns with `METHODOLOGY.XML` and existing repository conventions.
+This PR finalizes the PNPM/Node path by adding missing tests around importer‑scoped providers, effective‑set precision (including peers/optionals), name‑collision guards, auto‑map integration checks, a thin provider index test, a safe patch‑wrapper behavioral test, and a Node patch lint. It aligns with `AGENTS.md` and existing repository conventions.
 
 ### Current state (as of this PR)
 

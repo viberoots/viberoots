@@ -13,7 +13,7 @@ Introduce a thin, shared structured logging library used by both the TypeScript 
 any Go application services, and wire it into a centralized log aggregation destination so all
 runtime output is queryable in one place.
 
-METHODOLOGY.XML lists "Centralized Logging: Error handling and diagnostic output with JSON
+AGENTS.md lists "Centralized Logging: Error handling and diagnostic output with JSON
 integration" as a Phase 0 must-have. As of this writing no such facility exists: the control plane
 emits bare `console.log` / `console.error` calls (e.g., `nixos-shared-host-control-plane-service.ts`
 lines 76, 106, 111; `nixos-shared-host-control-plane-worker.ts` line 86), and the worker loop

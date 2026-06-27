@@ -135,7 +135,7 @@ From `docs/history/designs/legacy/pnpm-plan.md`:
 - [x] Full test suite passes (177 → 187+ tests)
 - [x] No process leaks after test runs
 - [x] All files ≤250 lines
-- [x] Follows METHODOLOGY.XML principles
+- [x] Follows AGENTS.md principles
 
 ## Risk Assessment
 
