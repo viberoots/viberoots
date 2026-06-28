@@ -64,6 +64,53 @@ test("shared pnpm-store hash cache can use an explicit durable root", async () =
   }
 });
 
+test("shared pnpm-store hash cache prefers workspace root over nested repo root", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "pnpm-shared-cache-workspace-"));
+  const workspaceRoot = path.join(root, "workspace");
+  const nestedRepoRoot = path.join(workspaceRoot, "viberoots");
+  const prevRepoRoot = process.env.REPO_ROOT;
+  const prevWorkspaceRoot = process.env.WORKSPACE_ROOT;
+  const prevSharedRoot = process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT;
+  delete process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT;
+  process.env.WORKSPACE_ROOT = workspaceRoot;
+  process.env.REPO_ROOT = nestedRepoRoot;
+  try {
+    await writeSharedHashCache(nestedRepoRoot, {
+      lockHash: "lock-a",
+      hashValue: "sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=",
+      builderFingerprint: "builder-1",
+    });
+
+    assert.equal(
+      await readSharedHashCache({
+        repoRoot: nestedRepoRoot,
+        builderFingerprint: "builder-1",
+        lockHash: "lock-a",
+      }),
+      "sha256-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa=",
+    );
+    assert.deepEqual(
+      await fsp.readdir(
+        path.join(workspaceRoot, ".viberoots", "workspace", "buck", "pnpm-store-hash-cache"),
+      ),
+      ["builder-1"],
+    );
+    await assert.rejects(
+      fsp.readdir(
+        path.join(nestedRepoRoot, ".viberoots", "workspace", "buck", "pnpm-store-hash-cache"),
+      ),
+    );
+  } finally {
+    if (prevRepoRoot === undefined) delete process.env.REPO_ROOT;
+    else process.env.REPO_ROOT = prevRepoRoot;
+    if (prevWorkspaceRoot === undefined) delete process.env.WORKSPACE_ROOT;
+    else process.env.WORKSPACE_ROOT = prevWorkspaceRoot;
+    if (prevSharedRoot === undefined) delete process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT;
+    else process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = prevSharedRoot;
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("non-default pnpm-store hash refresh restores shared-cache hits without rebuilding", async () => {
   const repoRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "pnpm-shared-cache-lock-"));
   const prevRepoRoot = process.env.REPO_ROOT;

@@ -159,7 +159,9 @@ async function collectTrackedLockfiles(
     const { stdout, exitCode } = await $({
       stdio: "pipe",
       cwd: baseRoot,
-    })`git ls-files '**/${basename}'`.nothrow();
+    })`git ls-files '**/${basename}'`
+      .nothrow()
+      .quiet();
     if (exitCode !== 0) return out;
     const candidates = String(stdout || "")
       .split(/\r?\n/)

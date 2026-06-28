@@ -61,6 +61,15 @@ in {
         local vbr_nix_bin="${viberootsCommand}/bin"
         local vbr_tools_bin="$PWD/build-tools/tools/bin"
         local vbr_node_bin="$PWD/node_modules/.bin"
+        local vbr_host_nix_bin=""
+        if [ -n "''${VBR_NIX_BIN:-}" ] && [ -x "$VBR_NIX_BIN" ]; then
+          :
+        elif [ -x /nix/var/nix/profiles/default/bin/nix ]; then
+          vbr_host_nix_bin="/nix/var/nix/profiles/default/bin"
+          export VBR_NIX_BIN="/nix/var/nix/profiles/default/bin/nix"
+        elif [ -x "$vbr_nix_bin/nix" ]; then
+          export VBR_NIX_BIN="$vbr_nix_bin/nix"
+        fi
         if [ ! -d "$vbr_tools_bin" ] && [ -d "$PWD/viberoots/build-tools/tools/bin" ]; then
           vbr_tools_bin="$PWD/viberoots/build-tools/tools/bin"
           vbr_node_bin="$PWD/viberoots/node_modules/.bin"
@@ -69,7 +78,7 @@ in {
         local nix_prefix="''${HOST_PATH:-}"
         local host_tail
         host_tail="$(_vbr_filter_host_path "$PATH")"
-        export PATH="$vbr_nix_bin:$repo_prefix''${nix_prefix:+:$nix_prefix}''${host_tail:+:$host_tail}"
+        export PATH="$repo_prefix:''${vbr_host_nix_bin:+$vbr_host_nix_bin:}$vbr_nix_bin''${nix_prefix:+:$nix_prefix}''${host_tail:+:$host_tail}"
       }
 
       _vbr_mark_macos_metadata_never_index() {
@@ -236,6 +245,15 @@ EOF
 PROMPT='%F{green}[nix-shell]%f %m:%~$ '
 _vbr_update_path() {
   local vbr_nix_bin="${viberootsCommand}/bin"
+  local vbr_host_nix_bin=""
+  if [[ -n "''${VBR_NIX_BIN:-}" && -x "$VBR_NIX_BIN" ]]; then
+    :
+  elif [[ -x /nix/var/nix/profiles/default/bin/nix ]]; then
+    vbr_host_nix_bin="/nix/var/nix/profiles/default/bin"
+    export VBR_NIX_BIN="/nix/var/nix/profiles/default/bin/nix"
+  elif [[ -x "$vbr_nix_bin/nix" ]]; then
+    export VBR_NIX_BIN="$vbr_nix_bin/nix"
+  fi
   local d="$PWD"
   while [[ "$d" != "/" ]]; do
     local vbr_tools_bin="$d/build-tools/tools/bin"
@@ -251,12 +269,12 @@ _vbr_update_path() {
       IFS=':'
       for entry in $PATH; do
         case "$entry" in
-          ""|/opt/homebrew/bin|/opt/homebrew/sbin|/usr/local/Homebrew/*|/usr/local/Cellar/*|"$vbr_nix_bin"|"$vbr_tools_bin"|"$d/.direnv/bin"|"$d/node_modules/.bin"|"$d/viberoots/node_modules/.bin"|"$vbr_node_bin") ;;
+          ""|/opt/homebrew/bin|/opt/homebrew/sbin|/usr/local/Homebrew/*|/usr/local/Cellar/*|"$vbr_host_nix_bin"|"$vbr_nix_bin"|"$vbr_tools_bin"|"$d/.direnv/bin"|"$d/node_modules/.bin"|"$d/viberoots/node_modules/.bin"|"$vbr_node_bin") ;;
           *) out="''${out:+$out:}$entry" ;;
         esac
       done
       IFS="$old_ifs"
-      export PATH="$vbr_nix_bin:$vbr_tools_bin:$d/.direnv/bin:$vbr_node_bin''${HOST_PATH:+:$HOST_PATH}''${out:+:$out}"
+      export PATH="$vbr_tools_bin:$d/.direnv/bin:$vbr_node_bin:''${vbr_host_nix_bin:+$vbr_host_nix_bin:}$vbr_nix_bin''${HOST_PATH:+:$HOST_PATH}''${out:+:$out}"
       return
     fi
     d="$(dirname "$d")"

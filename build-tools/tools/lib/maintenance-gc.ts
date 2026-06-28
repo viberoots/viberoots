@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
+import { resolveToolPathSync } from "./tool-paths";
 
 const execFileAsync = promisify(execFile);
 
@@ -77,8 +78,9 @@ const protectedRelPaths = new Set([
 ]);
 
 async function defaultCommandAvailable(command: string): Promise<boolean> {
+  const resolvedCommand = command === "nix" ? resolveToolPathSync("nix") : command;
   try {
-    await execFileAsync(command, ["--version"], { maxBuffer: 1024 * 1024 });
+    await execFileAsync(resolvedCommand, ["--version"], { maxBuffer: 1024 * 1024 });
     return true;
   } catch {
     return false;
@@ -86,9 +88,10 @@ async function defaultCommandAvailable(command: string): Promise<boolean> {
 }
 
 async function defaultRunCommand(command: string, args: string[]): Promise<void> {
+  const resolvedCommand = command === "nix" ? resolveToolPathSync("nix") : command;
   await new Promise<void>((resolve, reject) => {
     const started = Date.now();
-    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(resolvedCommand, args, { stdio: ["ignore", "pipe", "pipe"] });
     child.stdout.on("data", (chunk) => process.stdout.write(chunk));
     child.stderr.on("data", (chunk) => process.stderr.write(chunk));
     const heartbeat = setInterval(() => {

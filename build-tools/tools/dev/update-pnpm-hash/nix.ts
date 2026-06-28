@@ -4,6 +4,7 @@ import path from "node:path";
 import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
 import { localOnlyNixBuilderArgs } from "../../lib/nix-builder-policy";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 export function extractHash(text: string): string | null {
   const mismatchGot = text.match(/got:\s*(sha256-[A-Za-z0-9+/=\-_]{43,})/);
@@ -72,6 +73,7 @@ function nixBuildArgs(opts: {
     `${opts.flakeRef}#${opts.attrPath}`,
     "--impure",
     "--no-link",
+    "--no-write-lock-file",
     "--accept-flake-config",
     ...activeViberootsOverride(),
     ...localOnlyNixBuilderArgs(),
@@ -111,11 +113,12 @@ export async function buildStore(
   const cores = String(process.env.NIX_CORES || "").trim() || "0";
   const timeoutSec = resolvedFetchTimeoutSec();
   const streamBuildLogs = String(process.env.VBR_STREAM_NIX_BUILD_LOGS || "").trim() === "1";
+  const nixBin = resolveToolPathSync("nix");
   console.error(
     `[update-pnpm-hash] nix build ${attrPath} (timeout=${timeoutSec}s, logs=${streamBuildLogs ? "stream" : "compact"})`,
   );
   const res = await runManagedCommand({
-    command: "nix",
+    command: nixBin,
     args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores, extraEnv }),
     cwd: process.cwd(),
     env: envWithFetchTimeout(timeoutSec, extraEnv),
@@ -162,11 +165,12 @@ export async function buildUnfixedAndHash(
   const cores = String(process.env.NIX_CORES || "").trim() || "0";
   const timeoutSec = resolvedFetchTimeoutSec();
   const streamBuildLogs = String(process.env.VBR_STREAM_NIX_BUILD_LOGS || "").trim() === "1";
+  const nixBin = resolveToolPathSync("nix");
   console.error(
     `[update-pnpm-hash] nix build ${attrPath} and hash result (timeout=${timeoutSec}s, logs=${streamBuildLogs ? "stream" : "compact"})`,
   );
   const built = await runManagedCommand({
-    command: "nix",
+    command: nixBin,
     args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores, extraEnv }),
     cwd: process.cwd(),
     env: envWithFetchTimeout(timeoutSec, extraEnv),
@@ -196,7 +200,7 @@ export async function buildUnfixedAndHash(
     return { ok: false, output: "nix build returned no out path for " + attrPath };
   }
   const hashed = await runManagedCommand({
-    command: "nix",
+    command: nixBin,
     args: ["hash", "path", "--sri", outPath],
     cwd: process.cwd(),
     env: process.env,
@@ -217,7 +221,8 @@ export async function buildUnfixedAndHash(
 
 async function currentSystem(): Promise<string> {
   try {
-    const res = await $({ stdio: "pipe" })`nix eval --impure --expr builtins.currentSystem`;
+    const nixBin = resolveToolPathSync("nix");
+    const res = await $({ stdio: "pipe" })`${nixBin} eval --impure --expr builtins.currentSystem`;
     return String(res.stdout || "")
       .trim()
       .replace(/^"|"$/g, "");
@@ -234,9 +239,10 @@ export async function flakeAttrExists(
   try {
     const sys = await currentSystem();
     if (!sys) return false;
+    const nixBin = resolveToolPathSync("nix");
     const out = await $({
       stdio: "pipe",
-    })`bash --noprofile --norc -c ${`nix eval --impure ${flakeRef}#packages.${sys}.${attrset} --apply 'builtins.hasAttr "${key}"' --accept-flake-config`}`;
+    })`${nixBin} eval --impure ${flakeRef}#packages.${sys}.${attrset} --apply ${`builtins.hasAttr "${key}"`} --accept-flake-config`;
     const val = String(out.stdout || "").trim();
     return val === "true";
   } catch {

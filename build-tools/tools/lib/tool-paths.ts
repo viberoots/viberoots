@@ -40,6 +40,13 @@ function isExecutable(candidate: string): boolean {
 }
 
 function preferredCandidate(tool: string, env: NodeJS.ProcessEnv): string {
+  if (tool === "nix") {
+    const selected = String(env.VBR_NIX_BIN || env.NIX_BIN || "").trim();
+    if (selected && isExecutable(selected)) return selected;
+    const hostProfileNix = "/nix/var/nix/profiles/default/bin/nix";
+    if (isExecutable(hostProfileNix)) return hostProfileNix;
+  }
+
   const candidates = candidateToolPaths(tool, env);
   for (const candidate of candidates) {
     if (isNixStorePath(candidate) && isExecutable(candidate)) return candidate;
@@ -59,6 +66,9 @@ export function ensureNixStoreToolPathSync(
   env: NodeJS.ProcessEnv = process.env,
 ): string {
   const resolved = resolveToolPathSync(tool, env);
+  if (tool === "nix" && path.resolve(resolved) === "/nix/var/nix/profiles/default/bin/nix") {
+    return resolved;
+  }
   if (!isNixStorePath(resolved)) {
     throw new Error(`required tool must resolve to /nix/store: ${tool} -> ${resolved}`);
   }

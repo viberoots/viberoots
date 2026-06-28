@@ -135,7 +135,9 @@ try {
   const chk = await $({
     cwd: flakeRoot,
     stdio: "pipe",
-  })`git rev-parse --is-inside-work-tree`.nothrow();
+  })`git rev-parse --is-inside-work-tree`
+    .nothrow()
+    .quiet();
   if (String(chk.stdout || "").trim() !== "true") {
     throw new Error("not a git worktree");
   }

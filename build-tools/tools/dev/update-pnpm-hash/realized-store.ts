@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { runManagedCommand } from "../../lib/managed-command";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 import { withExactPrefetchedStore } from "./exact-store";
 
 const REALIZED_FIXED_STORE_TIMEOUT_MS = 30_000;
@@ -13,8 +14,9 @@ async function realizedFixedStoreRoot(opts: {
 }): Promise<string | null> {
   const env = { ...process.env };
   delete env.NIX_PNPM_EXACT_STORE;
+  const nixBin = resolveToolPathSync("nix");
   const result = await runManagedCommand({
-    command: "nix",
+    command: nixBin,
     args: ["path-info", `${opts.flakeRef}#${opts.attrPath}`, "--impure", "--accept-flake-config"],
     cwd: opts.repoRoot,
     env,

@@ -6,6 +6,7 @@
  */
 import fsp from "node:fs/promises";
 import path from "node:path";
+import { writeIfChanged } from "../lib/fs-helpers";
 import { buildToolPath } from "./dev-build/paths";
 
 type RawContract = Partial<{
@@ -44,20 +45,6 @@ function renderBzl(allowDotImporter: boolean, workspaceRoots: string[]): string 
     `WORKSPACE_IMPORTER_ROOTS = ${roots}`,
     "",
   ].join("\n");
-}
-
-async function writeIfChanged(dst: string, data: string) {
-  try {
-    const cur = await fsp.readFile(dst, "utf8");
-    if (cur === data) return;
-  } catch {}
-  await fsp.mkdir(path.dirname(dst), { recursive: true });
-  const tmp = path.join(
-    path.dirname(dst),
-    `.${path.basename(dst)}.${process.pid}.${Date.now()}.tmp`,
-  );
-  await fsp.writeFile(tmp, data, "utf8");
-  await fsp.rename(tmp, dst);
 }
 
 async function firstExistingFile(paths: string[]): Promise<string> {
@@ -100,8 +87,10 @@ async function main() {
   const workspaceRoots =
     workspaceRootsRaw.length > 0 ? workspaceRootsRaw : DEFAULT_WORKSPACE_ROOTS.slice();
   const out = renderBzl(allowDotImporter, workspaceRoots);
-  await writeIfChanged(bzlPath, out);
-  console.log(`wrote ${bzlPath} (${workspaceRoots.length} workspace roots)`);
+  const changed = await writeIfChanged(bzlPath, out);
+  console.log(
+    `wrote ${bzlPath} (${workspaceRoots.length} workspace roots)${changed ? "" : " (unchanged)"}`,
+  );
 }
 
 main().catch((e) => {

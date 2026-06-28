@@ -3,6 +3,8 @@ import * as fsp from "node:fs/promises";
 import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
+import { resolveToolPathSync } from "./tool-paths";
+import { alignGeneratedWorkspaceFlakeInput } from "./workspace-flake-repair";
 
 const execFileAsync = promisify(execFile);
 
@@ -14,10 +16,7 @@ export type WorkspaceLockRepairOptions = {
   deps?: WorkspaceLockRepairDeps;
 };
 
-export type WorkspaceLockRepairDeps = {
-  execFile?: typeof execFileAsync;
-  now?: () => Date;
-};
+export type WorkspaceLockRepairDeps = { execFile?: typeof execFileAsync; now?: () => Date };
 
 export type WorkspaceLockRepairResult =
   | { status: "fresh" }
@@ -31,9 +30,7 @@ type FlakeLock = {
   version?: number;
 };
 
-type MetadataResult = {
-  locks?: FlakeLock;
-};
+type MetadataResult = { locks?: FlakeLock };
 
 function canonicalPath(p: string): string {
   const abs = path.resolve(p);
@@ -45,20 +42,17 @@ function canonicalPath(p: string): string {
 }
 
 async function exists(p: string): Promise<boolean> {
-  try {
-    await fsp.access(p);
-    return true;
-  } catch {
-    return false;
-  }
+  return fsp.access(p).then(
+    () => true,
+    () => false,
+  );
 }
 
 async function readJson<T>(file: string): Promise<T | null> {
-  try {
-    return JSON.parse(await fsp.readFile(file, "utf8")) as T;
-  } catch {
-    return null;
-  }
+  return fsp.readFile(file, "utf8").then(
+    (text) => JSON.parse(text) as T,
+    () => null,
+  );
 }
 
 function stableStringify(value: unknown): string {
@@ -94,8 +88,25 @@ function locksDifferOnlyInViberoots(before: FlakeLock, after: FlakeLock): boolea
   return stableStringify(viberootsNode(before)) !== stableStringify(viberootsNode(after));
 }
 
+function normalizeLocalViberootsNode(lock: FlakeLock, viberootsSource: string): FlakeLock {
+  const normalized = JSON.parse(JSON.stringify(lock)) as FlakeLock;
+  const node = normalized.nodes?.viberoots as
+    | {
+        locked?: { type?: string; path?: string };
+        original?: { type?: string; path?: string };
+      }
+    | undefined;
+  if (!node) return normalized;
+  if (node.locked?.type === "path") {
+    node.locked.path = viberootsSource;
+  }
+  node.original = { type: "path", path: viberootsSource };
+  return normalized;
+}
+
 function validLocalViberootsSource(workspaceRoot: string): string {
   const candidates = [
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
     process.env.VIBEROOTS_SOURCE_ROOT || "",
     process.env.VIBEROOTS_ROOT || "",
     path.join(workspaceRoot, "viberoots"),
@@ -134,8 +145,9 @@ async function metadataLocks(opts: {
   viberootsSource: string;
   execFileImpl: typeof execFileAsync;
 }): Promise<FlakeLock | null> {
+  const command = opts.execFileImpl === execFileAsync ? resolveToolPathSync("nix") : "nix";
   const { stdout } = await opts.execFileImpl(
-    "nix",
+    command,
     [
       "flake",
       "metadata",
@@ -186,15 +198,28 @@ export async function repairGeneratedWorkspaceLock(
   if (opts.verbose) {
     console.error("[install-deps] checking generated workspace viberoots lock input");
   }
-  const candidate = await metadataLocks({
+  const flakeRepair = await alignGeneratedWorkspaceFlakeInput({
+    flakeFile: path.join(workspaceFlakeDir, "flake.nix"),
+    viberootsSource,
+    dryRun: opts.dryRun,
+  });
+  if (flakeRepair === "would-repair") {
+    return { status: "would-repair", reason: "stale-viberoots-input" };
+  }
+  if (flakeRepair === "repaired") {
+    console.error("[install-deps] refreshing generated workspace viberoots flake input");
+  }
+  const candidateRaw = await metadataLocks({
     workspaceFlakeDir,
     viberootsSource,
     execFileImpl: opts.deps?.execFile || execFileAsync,
   });
-  if (!candidate?.nodes?.viberoots) {
+  if (!candidateRaw?.nodes?.viberoots) {
     return { status: "skipped", reason: "metadata-did-not-return-viberoots-lock-node" };
   }
+  const candidate = normalizeLocalViberootsNode(candidateRaw, viberootsSource);
   if (stableStringify(before) === stableStringify(candidate)) {
+    if (flakeRepair === "repaired") return { status: "repaired", changedInput: "viberoots" };
     return { status: "fresh" };
   }
   if (!locksDifferOnlyInViberoots(before, candidate)) {

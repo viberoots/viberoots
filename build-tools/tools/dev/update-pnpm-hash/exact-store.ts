@@ -10,6 +10,7 @@ import {
   sharedExactPnpmStateRootPath,
 } from "../../lib/pnpm-state-paths";
 import { resolveWorkspaceRootsSync } from "../../lib/repo";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 import { fetchExactPnpmStore } from "./exact-store-fetch";
 import { importExactStoreIntoNixStore } from "./exact-store-import";
 import { cleanupLocalWorkspaceMarker, ensureLocalWorkspaceMarker } from "./lockfile-shared";
@@ -19,10 +20,11 @@ const EXACT_STORE_CACHE_VERSION = 11;
 
 function canonicalFlakeRoot(root: string): string {
   const abs = path.resolve(root);
+  const flakeDir = path.basename(abs) === "flake.nix" ? path.dirname(abs) : abs;
   try {
-    return fs.realpathSync.native(abs);
+    return fs.realpathSync.native(flakeDir);
   } catch {
-    return abs;
+    return flakeDir;
   }
 }
 
@@ -40,11 +42,13 @@ function resolveFlakePnpmProgram(repoRoot: string, timeoutMs: number): string {
   const evalTimeoutMs = Math.max(timeoutMs, 120_000);
   const system = currentHostSystem();
   console.error(`[update-pnpm-hash] resolving flake pnpm program for ${system}`);
+  const nixBin = resolveToolPathSync("nix");
   const program = execFileSync(
-    "nix",
+    nixBin,
     [
       "eval",
       "--accept-flake-config",
+      "--no-write-lock-file",
       "--impure",
       "--raw",
       `path:${flakeRoot}#apps.${system}.pnpm.program`,
@@ -57,8 +61,16 @@ function resolveFlakePnpmProgram(repoRoot: string, timeoutMs: number): string {
   if (program.startsWith("/nix/store/") && !fs.existsSync(program)) {
     console.error("[update-pnpm-hash] realizing flake pnpm program");
     execFileSync(
-      "nix",
-      ["run", "--accept-flake-config", "--impure", `path:${flakeRoot}#pnpm`, "--", "--version"],
+      nixBin,
+      [
+        "run",
+        "--accept-flake-config",
+        "--no-write-lock-file",
+        "--impure",
+        `path:${flakeRoot}#pnpm`,
+        "--",
+        "--version",
+      ],
       {
         encoding: "utf8",
         timeout: evalTimeoutMs,
@@ -73,7 +85,11 @@ function resolveFlakePnpmProgram(repoRoot: string, timeoutMs: number): string {
 }
 
 function tempViberootsRootFromEnv(): string | null {
-  for (const candidate of [process.env.VIBEROOTS_SOURCE_ROOT, process.env.VIBEROOTS_ROOT]) {
+  for (const candidate of [
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT,
+    process.env.VIBEROOTS_SOURCE_ROOT,
+    process.env.VIBEROOTS_ROOT,
+  ]) {
     const root = String(candidate || "").trim();
     if (
       root &&

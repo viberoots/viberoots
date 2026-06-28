@@ -28,6 +28,7 @@ import {
   pinnedNixpkgsOutPathExpr,
 } from "../../../lib/pinned-nixpkgs";
 import { withGitAutoMaintenanceDisabledEnv } from "../../../lib/git-auto-maintenance-env";
+import { withSanitizedInheritedNixConfig } from "../../../lib/nix-config-env";
 import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths";
 import { stableBuckIsolation } from "../../../lib/buck-command-env";
 import { resolveToolPathSync } from "../../../lib/tool-paths";
@@ -35,14 +36,13 @@ import { pathExists } from "../../../lib/repo";
 import { mkdirWithMacosMetadataExclusion } from "../../../lib/macos-metadata";
 
 const LOCAL_FIXTURE_SERVICE_ENV = "VBR_DEPLOY_LOCAL_FIXTURE_SERVICE";
-const PREPARED_SEED_MARKER = ".seed-store-prepared-v5";
+const PREPARED_SEED_MARKER = ".seed-store-prepared-v7";
 
 let cachedDevEnvExport: Promise<string> | null = null;
 type PathFlakeMetadata = {
   lastModified?: number;
   narHash?: string;
 };
-const pathFlakeMetadataCache = new Map<string, Promise<PathFlakeMetadata>>();
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
 let cachedPinnedCacertPath: Promise<string> | null = null;
 let cachedUnifiedPnpmStorePath: Promise<string> | null = null;
@@ -105,18 +105,31 @@ async function exportDevEnvWithRetry($: any): Promise<string> {
   const devEnvRoot = await activeViberootsRootFromWorkspace();
   const runOnce = async () => {
     // Avoid direnv here: it can be slow and re-run per temp repo, while nix develop is deterministic.
+    const nixOut = await $({
+      cwd: devEnvRoot,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+      env: withSanitizedInheritedNixConfig({
+        ...process.env,
+        IN_NIX_SHELL: "1",
+        VIBEROOTS_ROOT: devEnvRoot,
+        VIBEROOTS_SOURCE_ROOT: devEnvRoot,
+      }),
+    })`nix develop --no-write-lock-file --accept-flake-config -c env -0`;
+    if (Number(nixOut.exitCode || 0) !== 127) return nixOut;
     return await $({
       cwd: devEnvRoot,
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: {
+      env: withSanitizedInheritedNixConfig({
         ...process.env,
         IN_NIX_SHELL: "1",
         VIBEROOTS_ROOT: devEnvRoot,
         VIBEROOTS_SOURCE_ROOT: devEnvRoot,
-      },
-    })`bash --noprofile --norc -c 'if command -v nix >/dev/null 2>&1; then NO_NODE_MODULES_LINK=1 nix develop --accept-flake-config -c env -0; elif command -v direnv >/dev/null 2>&1; then eval "$(direnv export bash)"; env -0; else printf ""; fi'`;
+      }),
+    })`bash --noprofile --norc -c 'if command -v direnv >/dev/null 2>&1; then eval "$(direnv export bash)"; env -0; else printf ""; fi'`;
   };
   let out = await runOnce();
   if (
@@ -349,10 +362,13 @@ async function rewriteTempViberootsInput(
   const flakePath = await workspaceFlakePath(tmp);
   const text = await fsp.readFile(flakePath, "utf8").catch(() => "");
   if (!text) return [];
-  const next = text.replace(
+  let next = text.replace(
     /(\bviberoots\.url\s*=\s*)"[^"]*"/,
     (_match, prefix: string) => `${prefix}"path:${activeViberootsRoot}"`,
   );
+  if (!next.includes('"VIBEROOTS_FLAKE_INPUT_ROOT"')) {
+    next = next.replace(/(\s*"VIBEROOTS_SOURCE_ROOT"\n)/, '$1    "VIBEROOTS_FLAKE_INPUT_ROOT"\n');
+  }
   if (next !== text) {
     await fsp.writeFile(flakePath, next, "utf8");
     touched.push(relFromTempRoot(tmp, flakePath));
@@ -363,21 +379,36 @@ async function rewriteTempViberootsInput(
 
 async function readPathFlakeMetadata(inputPath: string): Promise<PathFlakeMetadata> {
   const canonicalInputPath = await fsp.realpath(inputPath).catch(() => inputPath);
-  const cached = pathFlakeMetadataCache.get(canonicalInputPath);
-  if (cached) return await cached;
-  const promise = (async () => {
-    const out = await $({
-      stdio: "pipe",
-    })`nix flake metadata --json ${`path:${canonicalInputPath}`} --no-write-lock-file`;
-    const parsed = JSON.parse(String(out.stdout || "{}"));
+  const prefetched = await $({
+    stdio: "pipe",
+  })`nix flake prefetch --json ${`path:${canonicalInputPath}`}`.nothrow();
+  if (prefetched.exitCode === 0) {
+    const parsed = JSON.parse(String(prefetched.stdout || "{}"));
     const locked = parsed?.locked || {};
     return {
       lastModified: typeof locked.lastModified === "number" ? locked.lastModified : undefined,
       narHash: typeof locked.narHash === "string" ? locked.narHash : undefined,
     };
-  })();
-  pathFlakeMetadataCache.set(canonicalInputPath, promise);
-  return await promise;
+  }
+  const out = await $({
+    stdio: "pipe",
+  })`nix flake metadata --json ${`path:${canonicalInputPath}`} --no-write-lock-file`;
+  const parsed = JSON.parse(String(out.stdout || "{}"));
+  const locked = parsed?.locked || {};
+  const narHash =
+    typeof locked.narHash === "string"
+      ? locked.narHash
+      : String(
+          (
+            await $({
+              stdio: "pipe",
+            })`nix hash path --sri ${canonicalInputPath}`
+          ).stdout || "",
+        ).trim();
+  return {
+    lastModified: typeof locked.lastModified === "number" ? locked.lastModified : undefined,
+    narHash: narHash || undefined,
+  };
 }
 
 function rewriteLocalPathLockEntry(
@@ -495,7 +526,7 @@ async function removeCppReqsIfRequested(tmp: string): Promise<string[]> {
 }
 
 async function trackedNpmrcDirs(tmp: string): Promise<string[]> {
-  const out = await $({ cwd: tmp, stdio: "pipe" })`git ls-files -- "**/.npmrc"`.nothrow();
+  const out = await $({ cwd: tmp, stdio: "pipe" })`git ls-files -- "**/.npmrc"`.nothrow().quiet();
   if (out.exitCode !== 0) return [];
   return String(out.stdout || "")
     .split(/\r?\n/)
@@ -668,6 +699,26 @@ async function createTempNixShim(shimDir: string): Promise<void> {
       "set -euo pipefail",
       `real_nix=${JSON.stringify(realNix)}`,
       `viberoots_root=${JSON.stringify(viberootsRoot)}`,
+      "sanitize_nix_config(){",
+      '  local kept="" line key',
+      '  if [[ -n "${NIX_CONFIG:-}" ]]; then',
+      '    while IFS= read -r line || [[ -n "$line" ]]; do',
+      '    if [[ "$line" =~ ^[[:space:]]*([A-Za-z0-9._-]+)[[:space:]]*= ]]; then',
+      '      key="${BASH_REMATCH[1]}"',
+      '      if [[ "$key" == "eval-cores" || "$key" == "lazy-trees" ]]; then',
+      "        continue",
+      "      fi",
+      "    fi",
+      "    kept+=\"${line}\"$'\\n'",
+      '    done <<< "$NIX_CONFIG"',
+      "  fi",
+      "  kept=\"${kept%$'\\n'}\"",
+      '  if ! grep -Eq "^[[:space:]]*warn-dirty[[:space:]]*=" <<< "$kept"; then',
+      "    kept+=\"${kept:+$'\\n'}warn-dirty = false\"",
+      "  fi",
+      '  if [[ -n "$kept" ]]; then export NIX_CONFIG="$kept"; else unset NIX_CONFIG; fi',
+      "}",
+      "sanitize_nix_config",
       'if [[ "${1:-}" == "store" && "${2:-}" == "gc" ]]; then',
       '  exec "$real_nix" "$@"',
       "fi",
@@ -794,7 +845,12 @@ export async function runInTemp<T>(
     );
     await rewriteTempViberootsInput(tmp, activeViberootsRoot);
     await prependTempRepoBin(exportEnv, tmp);
-    const nodeOpts = ["--experimental-strip-types", `--import ${exportEnv.ZX_INIT}`];
+    withSanitizedInheritedNixConfig(exportEnv);
+    const nodeOpts = [
+      "--experimental-strip-types",
+      "--disable-warning=ExperimentalWarning",
+      `--import ${exportEnv.ZX_INIT}`,
+    ];
     exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
       .filter(Boolean)
       .join(" ");
@@ -839,25 +895,27 @@ export async function runInTemp<T>(
     "runInTemp createTempZxWrapperShim",
     async () => await createTempZxWrapperShim(buck2ShimDir),
   );
-  const tempSetupEnv = withGitAutoMaintenanceDisabledEnv({
-    ...process.env,
-    WORKSPACE_ROOT: tmp,
-    BUCK_TEST_SRC: tmp,
-    BUCK_ISOLATION_DIR: tempNestedIso,
-    BUCK_NESTED_ISO: tempNestedIso,
-    TEST_NO_BROWSER: process.env.TEST_NO_BROWSER || "1",
-    [LOCAL_FIXTURE_SERVICE_ENV]: process.env[LOCAL_FIXTURE_SERVICE_ENV] || "1",
-    BUCK_EXPORTER_REUSE_DAEMON: process.env.BUCK_EXPORTER_REUSE_DAEMON || "1",
-    BUCKD_STARTUP_TIMEOUT: process.env.BUCKD_STARTUP_TIMEOUT || "300",
-    BUCKD_STARTUP_INIT_TIMEOUT:
-      process.env.BUCKD_STARTUP_INIT_TIMEOUT || process.env.BUCKD_STARTUP_TIMEOUT || "300",
-    VBR_RUN_IN_TEMP_REPO: "1",
-    SCAF_ALLOW_LIVE_REPO: "1",
-    REPO_ROOT: process.cwd(),
-    VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT: process.cwd(),
-    HOME: home,
-    XDG_CACHE_HOME: activeXdgCacheHome,
-  });
+  const tempSetupEnv = withSanitizedInheritedNixConfig(
+    withGitAutoMaintenanceDisabledEnv({
+      ...process.env,
+      WORKSPACE_ROOT: tmp,
+      BUCK_TEST_SRC: tmp,
+      BUCK_ISOLATION_DIR: tempNestedIso,
+      BUCK_NESTED_ISO: tempNestedIso,
+      TEST_NO_BROWSER: process.env.TEST_NO_BROWSER || "1",
+      [LOCAL_FIXTURE_SERVICE_ENV]: process.env[LOCAL_FIXTURE_SERVICE_ENV] || "1",
+      BUCK_EXPORTER_REUSE_DAEMON: process.env.BUCK_EXPORTER_REUSE_DAEMON || "1",
+      BUCKD_STARTUP_TIMEOUT: process.env.BUCKD_STARTUP_TIMEOUT || "300",
+      BUCKD_STARTUP_INIT_TIMEOUT:
+        process.env.BUCKD_STARTUP_INIT_TIMEOUT || process.env.BUCKD_STARTUP_TIMEOUT || "300",
+      VBR_RUN_IN_TEMP_REPO: "1",
+      SCAF_ALLOW_LIVE_REPO: "1",
+      REPO_ROOT: process.cwd(),
+      VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT: process.cwd(),
+      HOME: home,
+      XDG_CACHE_HOME: activeXdgCacheHome,
+    }),
+  );
   prependPath(tempSetupEnv, buck2ShimDir);
   const goModCacheRoot = await timeAsync(
     "runInTemp stableGoModCacheRoot",
@@ -922,12 +980,14 @@ export async function runInTemp<T>(
           await timeAsync(
             "runInTemp gitBootstrap commit",
             async () =>
-              await $tmp`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m init --allow-empty`.nothrow(),
+              await $tmp`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m init --allow-empty`
+                .nothrow()
+                .quiet(),
           );
         } else {
           const ok = await timeAsync(
             "runInTemp gitBootstrap revParseInside",
-            async () => await $tmp`git rev-parse --is-inside-work-tree`.nothrow(),
+            async () => await $tmp`git rev-parse --is-inside-work-tree`.nothrow().quiet(),
           );
           const inside = String(ok.stdout || "").trim();
           if (inside !== "true") {
@@ -937,7 +997,7 @@ export async function runInTemp<T>(
           }
           const head = await timeAsync(
             "runInTemp gitBootstrap revParseHead",
-            async () => await $tmp`git rev-parse HEAD`.nothrow(),
+            async () => await $tmp`git rev-parse HEAD`.nothrow().quiet(),
           );
           if (head.exitCode !== 0) {
             throw new Error(
@@ -952,13 +1012,15 @@ export async function runInTemp<T>(
             );
             const diff = await timeAsync(
               "runInTemp gitBootstrap stagedDiff",
-              async () => await $tmp`git diff --cached --quiet --exit-code`.nothrow(),
+              async () => await $tmp`git diff --cached --quiet --exit-code`.nothrow().quiet(),
             );
             if (diff.exitCode === 1) {
               await timeAsync(
                 "runInTemp gitBootstrap commit",
                 async () =>
-                  await $tmp`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m seed-overlay --allow-empty`.nothrow(),
+                  await $tmp`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m seed-overlay --allow-empty`
+                    .nothrow()
+                    .quiet(),
               );
             } else if (diff.exitCode !== 0) {
               throw new Error(String(diff.stderr || "git diff --cached failed"));
@@ -973,21 +1035,28 @@ export async function runInTemp<T>(
 
   const $setup = $({ cwd: tmp, env: tempSetupEnv, stdio: "pipe" });
   await timeAsync("runInTemp ensureBuckConfigForTempRepo", async () => {
-    await ensureBuckConfigForTempRepo(tmp, $setup);
+    await ensureBuckConfigForTempRepo(tmp, $setup, {
+      viberootsInputRoot: viberootsInputPath,
+      viberootsSourceRoot,
+    });
   });
   await timeAsync("runInTemp ensureWorkspaceRootEnvFile", async () => {
-    await ensureWorkspaceRootEnvFile(tmp, viberootsSourceRoot);
+    await ensureWorkspaceRootEnvFile(tmp, viberootsSourceRoot, viberootsInputPath);
   });
   await timeAsync("runInTemp ensureToolchainPathsForTempRepo", async () => {
     await ensureToolchainPathsForTempRepo(tmp, $setup);
   });
+  await timeAsync("runInTemp rewriteTempViberootsInput after setup", async () => {
+    await rewriteTempViberootsInput(tmp, viberootsInputPath);
+  });
 
   if ((process.env.TEST_NEED_DEV_ENV || "") === "1") {
     const flakeRef = await workspaceFlakeRef(tmp);
+    const viberootsOverrideArgs = ["--override-input", "viberoots", `path:${viberootsInputPath}`];
     const chk = await retryTransientNixStoreFailure(
       "checking temp repo buck2-prelude",
       async () =>
-        await $setup`nix build ${`path:${flakeRef}#buck2-prelude`} --no-link --accept-flake-config --print-build-logs`.nothrow(),
+        await $setup`nix build ${`path:${flakeRef}#buck2-prelude`} ${viberootsOverrideArgs} --no-link --no-write-lock-file --accept-flake-config --print-build-logs`.nothrow(),
       (out) => `${(out as any).stdout || ""}\n${(out as any).stderr || ""}`,
       (out) => Number((out as any).exitCode || 0) !== 0,
     );
@@ -1015,6 +1084,7 @@ export async function runInTemp<T>(
   for (const [k, v] of Object.entries(process.env)) {
     if (typeof v === "string") exportEnv[k] = v;
   }
+  withSanitizedInheritedNixConfig(exportEnv);
   const allowDevOverrides = String(process.env.TEST_ALLOW_DEV_OVERRIDES || "").trim() === "1";
   if (!allowDevOverrides) {
     // Avoid leaking local dev overrides into temp-repo commands unless explicitly allowed.
@@ -1138,7 +1208,11 @@ export async function runInTemp<T>(
     }
   }
 
-  const nodeOpts = ["--experimental-strip-types", `--import ${exportEnv.ZX_INIT}`];
+  const nodeOpts = [
+    "--experimental-strip-types",
+    "--disable-warning=ExperimentalWarning",
+    `--import ${exportEnv.ZX_INIT}`,
+  ];
   exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
     .filter(Boolean)
     .join(" ");

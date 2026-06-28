@@ -46,7 +46,7 @@ async function ensureRealizedStorePath(storePath: string, $: any): Promise<void>
   })`nix-store -q --deriver ${storePath}`;
   const deriverPath = String(deriver.stdout || "").trim();
   if (deriver.exitCode === 0 && deriverPath && deriverPath !== "unknown-deriver") {
-    await $`nix-store -r ${deriverPath}`;
+    await $({ stdio: "pipe" })`nix-store -r ${deriverPath}`.quiet();
     return;
   }
 }
@@ -145,7 +145,11 @@ async function recursiveImporterFileCandidates(
 }
 
 function localViberootsOverrideArgs(): string {
-  const viberootsRoot = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "";
+  const viberootsRoot =
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
+    process.env.VIBEROOTS_SOURCE_ROOT ||
+    process.env.VIBEROOTS_ROOT ||
+    "";
   return viberootsRoot
     ? ` --override-input viberoots ${JSON.stringify(`path:${viberootsRoot}`)}`
     : "";
@@ -273,7 +277,7 @@ test("node-modules derivation snapshots untracked importer files", async () => {
         | { derivations?: Record<string, { outputs?: { out?: { path?: string } } }> };
       const importerDerivations = selectDerivationMap(importerDrvParsed as any);
       const importerDrv = findDerivationByKey(importerDerivations, importerSrcDrvPath);
-      await $`nix-store -r ${importerSrcDrvPath}`;
+      await $({ stdio: "pipe" })`nix-store -r ${importerSrcDrvPath}`.quiet();
       const realizedOutputs = await realizedDerivationOutputPaths(importerSrcDrvPath, $);
       realizedOutputs.forEach((output) => snapshotRoots.add(output));
       importerSrcOut = realizedOutputs[0] || derivationOutputPaths(importerDrv)[0] || "";
@@ -302,7 +306,7 @@ test("node-modules derivation snapshots untracked importer files", async () => {
           inputDrvPath.includes("-importer-src-") ||
           inputOuts.some((outputPath) => nixStoreNameStem(outputPath).includes("importer-src-"));
         if (matchedIndex === -1 && !isImporterSrcInput) continue;
-        await $`nix-store -r ${inputDrvPath}`;
+        await $({ stdio: "pipe" })`nix-store -r ${inputDrvPath}`.quiet();
         const realizedOutputs = await realizedDerivationOutputPaths(inputDrvPath, $);
         realizedOutputs.forEach((output) => snapshotRoots.add(output));
         if (matchedIndex !== -1) {

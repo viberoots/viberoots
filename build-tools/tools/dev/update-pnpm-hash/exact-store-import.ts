@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { runManagedCommand } from "../../lib/managed-command";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 import { newManagedCommandActivity } from "./activity";
 import { runExactStoreCommand } from "./exact-store-command";
 import { withHeartbeat } from "./heartbeat";
@@ -21,7 +22,7 @@ async function createExactStoreArchive(opts: {
   const result = await withHeartbeat(
     `importer=${opts.importer} step=exact-store-archive`,
     runManagedCommand({
-      command: "tar",
+      command: resolveToolPathSync("tar"),
       args: ["-cf", archivePath, "-C", opts.storeDir, "."],
       cwd: opts.repoRoot,
       env: process.env,

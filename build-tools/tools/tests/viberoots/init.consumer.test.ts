@@ -5,6 +5,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
@@ -91,7 +92,7 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     );
     assert.match(
       await fsp.readFile(path.join(workspace, ".envrc"), "utf8"),
-      /use flake "path:\$\{PWD\}\/\.viberoots\/workspace#default" --override-input viberoots "path:\$\{VIBEROOTS_SOURCE_ROOT:-\$\{PWD\}\/viberoots\}"/,
+      /use flake "path:\$\{PWD\}\/\.viberoots\/workspace#default" --override-input viberoots "path:\$\{VIBEROOTS_FLAKE_INPUT_ROOT:-\$\{VIBEROOTS_SOURCE_ROOT:-\$\{PWD\}\/viberoots\}\}"/,
     );
     await assert.rejects(fsp.lstat(path.join(workspace, "flake.nix")));
     await assert.rejects(fsp.lstat(path.join(workspace, "buck-out")));
@@ -226,6 +227,43 @@ test("viberoots init-consumer bootstraps a remote-flake consumer workspace", asy
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }
+});
+
+test("viberoots init-consumer leaves unchanged generated files untouched", async () => {
+  await withConsumerWorkspace(
+    "viberoots-init-stable-generated",
+    async (workspace, viberootsRoot) => {
+      const command = path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots");
+      const args = [
+        "init-consumer",
+        "--workspace-root",
+        workspace,
+        "--workspace-name",
+        "stable-generated",
+        "--viberoots-url",
+        "path:viberoots",
+        "--source",
+        viberootsRoot,
+        "--no-lock",
+        "--no-direnv",
+      ];
+      const env = { ...process.env, NO_DEV_SHELL: "1" };
+
+      await execFileAsync(command, args, { cwd: workspace, env });
+      const flake = path.join(workspace, ".viberoots", "workspace", "flake.nix");
+      const buckconfig = path.join(workspace, ".buckconfig");
+      const before = {
+        flake: (await fsp.stat(flake)).mtimeMs,
+        buckconfig: (await fsp.stat(buckconfig)).mtimeMs,
+      };
+      await sleep(1100);
+
+      await execFileAsync(command, args, { cwd: workspace, env });
+
+      assert.equal((await fsp.stat(flake)).mtimeMs, before.flake);
+      assert.equal((await fsp.stat(buckconfig)).mtimeMs, before.buckconfig);
+    },
+  );
 });
 
 test("curlable bootstrap defaults to flake main and install enabled", async () => {

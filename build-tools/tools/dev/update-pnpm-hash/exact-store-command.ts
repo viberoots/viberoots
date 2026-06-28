@@ -1,5 +1,6 @@
 import process from "node:process";
 import { runManagedCommand } from "../../lib/managed-command";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 import { newManagedCommandActivity } from "./activity";
 import { withHeartbeat } from "./heartbeat";
 
@@ -15,7 +16,7 @@ export async function runExactStoreCommand(opts: {
   const result = await withHeartbeat(
     opts.label,
     runManagedCommand({
-      command: opts.command || "nix",
+      command: opts.command || resolveToolPathSync("nix", opts.env),
       args: opts.args,
       cwd: opts.cwd,
       env: opts.env,

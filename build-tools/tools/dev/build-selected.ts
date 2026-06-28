@@ -16,6 +16,7 @@ import { targetPackageFromLabel } from "./build-selected-helpers";
 import { parseSelectedBuildOutPath, selectedNixBuildArgs } from "./build-selected-nix-command";
 import { makeFilteredFlakeRef } from "./filtered-flake";
 import { prepareExactPnpmStore } from "./update-pnpm-hash/exact-store";
+import { withSanitizedInheritedNixConfig } from "../lib/nix-config-env";
 import { resolveSelectedTargetLabel } from "./target-label-resolver";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 import { buildToolPath, zxInitPath } from "./dev-build/paths";
@@ -98,7 +99,9 @@ async function chooseFlakeRef(opts: {
     const { stdout } = await $({
       stdio: "pipe",
       cwd: opts.workspaceRoot,
-    })`git ls-files --others --exclude-standard`;
+    })`git ls-files --others --exclude-standard`
+      .nothrow()
+      .quiet();
     const untracked = String(stdout || "")
       .trim()
       .split("\n")
@@ -214,7 +217,7 @@ async function main() {
   const providedTargetAttr = (process.env.BUCK_TARGET_ATTR || "").trim();
   const cppTargetAttrSuffix = providedTargetAttr || sanitizeAttrNameFromLabel(target);
   console.error(`[build-selected] cppTargetAttrSuffix=${cppTargetAttrSuffix}`);
-  const sanitizedEnv: Record<string, string> = {
+  const sanitizedEnv: Record<string, string> = withSanitizedInheritedNixConfig({
     ...process.env,
     BUCK_TARGET: target,
     WORKSPACE_ROOT: workspaceRoot,
@@ -223,7 +226,7 @@ async function main() {
     BUCK_QUERY_ROOTS: queryRoots,
     EXPORTER_VALIDATION: validation,
     EXPORTER_DEBUG: exporterDebug,
-  };
+  });
   for (const envName of allDevOverrideEnvNames()) {
     sanitizedEnv[envName] = "";
   }

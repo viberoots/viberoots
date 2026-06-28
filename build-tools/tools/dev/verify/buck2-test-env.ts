@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import process from "node:process";
 import { gitAutoMaintenanceDisabledTestEnvArgs } from "../../lib/git-auto-maintenance-env";
+import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { buildRemoteVerifyTestEnvArgs } from "./buck2-test-remote-env";
 import type { VerifyExecutionPolicy } from "./remote-policy";
@@ -59,6 +60,10 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
   const nixBin = process.env.NIX_BIN || resolveOptionalToolPath("nix");
   const patchBin = process.env.PATCH_BIN || resolveOptionalToolPath("patch");
   const gitBin = process.env.GIT_BIN || resolveOptionalToolPath("git");
+  const nixConfigEnv = withSanitizedInheritedNixConfig({
+    NIX_CONFIG: process.env.NIX_CONFIG,
+    NIX_CONF_DIR: process.env.NIX_CONF_DIR,
+  });
   if (process.env.TEST_TIMING) extraEnvArgs.push("--env", `TEST_TIMING=${process.env.TEST_TIMING}`);
   if (process.env.TEST_TIMING_SUMMARY) {
     extraEnvArgs.push("--env", `TEST_TIMING_SUMMARY=${process.env.TEST_TIMING_SUMMARY}`);
@@ -75,7 +80,8 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     "--env",
     `NIX_PNPM_INSTALL_TIMEOUT=${opts.testNixTimeoutSecs}`,
     ...gitAutoMaintenanceDisabledTestEnvArgs(),
-    ...maybeEnvArg("NIX_CONFIG", process.env.NIX_CONFIG),
+    ...maybeEnvArg("NIX_CONFIG", nixConfigEnv.NIX_CONFIG),
+    ...maybeEnvArg("NIX_CONF_DIR", nixConfigEnv.NIX_CONF_DIR),
     ...maybeEnvArg("VBR_NIX_CACHE_POLICY", process.env.VBR_NIX_CACHE_POLICY),
     ...maybeEnvArg("VBR_NIX_CACHE_HEALTH_APPLIED", process.env.VBR_NIX_CACHE_HEALTH_APPLIED),
     "--env",

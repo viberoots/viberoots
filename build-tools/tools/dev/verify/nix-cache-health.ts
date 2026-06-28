@@ -63,6 +63,13 @@ async function defaultReadEffectiveConfig(): Promise<string> {
 }
 
 async function defaultProbeUrl(url: string, timeoutMs: number): Promise<boolean> {
+  const connectTimeout = String(Math.max(1, Math.ceil(timeoutMs / 1000)));
+  const nix = await $({
+    stdio: "pipe",
+    reject: false,
+  })`nix store info --store ${url} --option connect-timeout ${connectTimeout}`;
+  if ((nix as any).exitCode === 0) return true;
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {

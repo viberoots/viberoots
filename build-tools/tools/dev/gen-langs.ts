@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import fsp from "node:fs/promises";
 import path from "node:path";
+import { writeIfChanged } from "../lib/fs-helpers";
 import { findRepoRoot } from "../lib/repo";
 import { buildToolPath } from "./dev-build/paths";
 
@@ -56,8 +57,8 @@ async function main() {
       return;
     }
   } catch {}
-  await fsp.writeFile(outPath, out, "utf8");
-  console.log("wrote", path.relative(repo, outPath));
+  const changed = await writeIfChanged(outPath, out);
+  console.log("wrote", path.relative(repo, outPath), changed ? "" : "(unchanged)");
 }
 
 main().catch((e) => {

@@ -103,7 +103,9 @@ export async function maybeAutoImpureFromUntrackedFiles(opts: {
     const { stdout } = await $({
       stdio: "pipe",
       cwd: opts.root,
-    })`git ls-files --others --exclude-standard`;
+    })`git ls-files --others --exclude-standard`
+      .nothrow()
+      .quiet();
     const untracked = String(stdout || "")
       .trim()
       .split("\n")

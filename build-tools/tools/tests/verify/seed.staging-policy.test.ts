@@ -84,6 +84,42 @@ test("verify seed staging publishes copy-ready writable shared stages", async ()
   await assert.rejects(fsp.access(path.join(staged, ".seed-store-writable")));
 });
 
+test("verify seed staging invalidates older prepared marker versions", async () => {
+  const seed = await mktemp("seed-stage-marker-source-");
+  await writeRequiredStageFiles(seed);
+
+  const key = `seed-stage-marker-${process.pid}-${Date.now()}`;
+  const staged = await stageSeedStore(seed, key, 60_000);
+  await fsp.rename(
+    path.join(staged, ".seed-store-prepared-v7"),
+    path.join(staged, ".seed-store-prepared-v6"),
+  );
+  await fsp.writeFile(path.join(seed, "eslint.config.js"), "eslint.config.js changed\n", "utf8");
+
+  const rebuilt = await stageSeedStore(seed, key, 60_000);
+
+  assert.equal(rebuilt, staged);
+  assert.equal(
+    await fsp.readFile(path.join(rebuilt, "eslint.config.js"), "utf8"),
+    "eslint.config.js changed\n",
+  );
+  await fsp.access(path.join(rebuilt, ".seed-store-prepared-v7"));
+  await assert.rejects(fsp.access(path.join(rebuilt, ".seed-store-prepared-v6")));
+});
+
+test("verify seed staging rewrites lock metadata after placeholder mutation", async () => {
+  const source = await readRepoFile("build-tools/tools/dev/verify/seed-staging.ts");
+
+  assert.match(source, /\.seed-store-prepared-v7/);
+  assert.doesNotMatch(source, /\.seed-store-prepared-v6/);
+  assert.ok(
+    source.indexOf("...(await ensurePnpmfilePlaceholders(stageDir)),") <
+      source.indexOf("...(await rewriteStageViberootsInput(stageDir)),"),
+  );
+  assert.match(source, /nix flake prefetch --json/);
+  assert.match(source, /nix hash path --sri/);
+});
+
 test("runInTemp seed overlay refreshes active viberoots source", async () => {
   const source = await readRepoFile("build-tools/tools/tests/lib/test-helpers/seed-store.ts");
   const runInTempSource = await readRepoFile(
@@ -98,6 +134,8 @@ test("runInTemp seed overlay refreshes active viberoots source", async () => {
   assert.match(runInTempSource, /rewriteTempViberootsInput/);
   assert.match(runInTempSource, /viberoots\\.url/);
   assert.match(runInTempSource, /path:\$\{activeViberootsRoot\}/);
+  assert.match(runInTempSource, /VIBEROOTS_FLAKE_INPUT_ROOT/);
+  assert.match(runInTempSource, /rewriteTempViberootsInput after setup/);
   assert.match(runInTempSource, /path\.join\(root, "flake\.nix"\)/);
   assert.match(runInTempSource, /import\.meta\.url/);
 });
@@ -112,9 +150,9 @@ test("runInTemp seed overlay honors prepared seed marker version", async () => {
   const seedStagingSource = await readRepoFile("build-tools/tools/dev/verify/seed-staging.ts");
 
   for (const source of [seedStoreSource, runInTempSource, seedStagingSource]) {
-    assert.match(source, /\.seed-store-prepared-v5/);
-    assert.doesNotMatch(source, /\.seed-store-prepared-v4/);
-    assert.doesNotMatch(source, /\.seed-store-prepared-v3/);
+    assert.match(source, /\.seed-store-prepared-v7/);
+    assert.doesNotMatch(source, /\.seed-store-prepared-v6/);
+    assert.doesNotMatch(source, /\.seed-store-prepared-v5/);
   }
   assert.match(seedStoreSource, /if \(prepared\) return \[\]/);
   assert.match(seedStoreSource, /if \(prepared && rel\.startsWith\("viberoots\/"\)\) continue/);
@@ -135,6 +173,6 @@ test("runInTemp seed copies do not repair permissions with broad chmod", async (
   assert.match(seedCopySource, /makeDirectoryPublishable\(stagingDir\)/);
   assert.match(seedCopySource, /process\.platform !== "darwin"/);
   assert.match(seedCopySource, /makeTreeWritable\(stagingDir\)/);
-  assert.match(seedCopySource, /\.seed-store-prepared-v5/);
+  assert.match(seedCopySource, /\.seed-store-prepared-v7/);
   assert.match(seedCopySource, /repair_permissions = sys\.argv\[3\] == "1"/);
 });

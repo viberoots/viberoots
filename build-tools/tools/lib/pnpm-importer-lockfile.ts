@@ -68,6 +68,29 @@ function preferredPnpmStoreDir(defaultStoreDir: string): {
   return { storeDir: defaultStoreDir, usesSharedPrefetch: false };
 }
 
+async function activeViberootsOverride(repoRootAbs: string): Promise<string> {
+  const candidates = [
+    path.join(repoRootAbs, "viberoots"),
+    path.join(repoRootAbs, ".viberoots", "current"),
+  ];
+  for (const candidate of candidates) {
+    const abs = path.resolve(candidate);
+    const hasFlake = await fsp
+      .access(path.join(abs, "flake.nix"))
+      .then(() => true)
+      .catch(() => false);
+    const hasZxInit = await fsp
+      .access(path.join(abs, "build-tools", "tools", "dev", "zx-init.mjs"))
+      .then(() => true)
+      .catch(() => false);
+    if (hasFlake && hasZxInit) {
+      const real = await fsp.realpath(abs).catch(() => abs);
+      return `path:${real}`;
+    }
+  }
+  return "";
+}
+
 export async function importerLockfileNeedsRegen(opts: {
   repoRootAbs: string;
   importerRel: string;
@@ -129,12 +152,16 @@ export async function ensureImporterLockfileFresh(opts: {
   if (!usesSharedPrefetch) {
     await syncLocalPrefetchIntoPnpmStore(storeDir);
   }
+  const viberootsOverride = await activeViberootsOverride(opts.tmp);
 
   await withHiddenNodeModules(importerAbs, async () => {
     await opts.$({
       stdio: "inherit",
-      env: opts.env,
-    })`bash --noprofile --norc -c 'set -euo pipefail; mkdir -p "${homeDir}" "${storeDir}"; export PNPM_HOME="${homeDir}"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config "path:${opts.tmp}#pnpm" -- config set store-dir "${storeDir}"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config "path:${opts.tmp}#pnpm" -- install --force --filter "./${opts.importerRel}" --lockfile-only --prefer-offline --prod=false --ignore-scripts --lockfile-dir "./${opts.importerRel}" --dir "./${opts.importerRel}" --color never; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config "path:${opts.tmp}#pnpm" -- fetch --force --filter "./${opts.importerRel}" --prefer-offline --prod=false --lockfile-dir "./${opts.importerRel}" --dir "./${opts.importerRel}" --color never'`;
+      env: {
+        ...opts.env,
+        VBR_PNPM_LOCKFILE_VIBEROOTS_OVERRIDE: viberootsOverride,
+      },
+    })`bash --noprofile --norc -c 'set -euo pipefail; vbr_override="\${VBR_PNPM_LOCKFILE_VIBEROOTS_OVERRIDE:-}"; vbr_override_args=(); if [[ -n "$vbr_override" ]]; then vbr_override_args=(--override-input viberoots "$vbr_override"); fi; mkdir -p "${homeDir}" "${storeDir}"; export PNPM_HOME="${homeDir}"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config --no-write-lock-file "\${vbr_override_args[@]}" "path:${opts.tmp}#pnpm" -- config set store-dir "${storeDir}"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config --no-write-lock-file "\${vbr_override_args[@]}" "path:${opts.tmp}#pnpm" -- install --force --filter "./${opts.importerRel}" --lockfile-only --prefer-offline --prod=false --ignore-scripts --lockfile-dir "./${opts.importerRel}" --dir "./${opts.importerRel}" --color never; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config --no-write-lock-file "\${vbr_override_args[@]}" "path:${opts.tmp}#pnpm" -- fetch --force --filter "./${opts.importerRel}" --prefer-offline --prod=false --lockfile-dir "./${opts.importerRel}" --dir "./${opts.importerRel}" --color never'`;
   });
   if (!usesSharedPrefetch) {
     await syncSourcePnpmStoreIntoLocalPrefetch(storeDir);

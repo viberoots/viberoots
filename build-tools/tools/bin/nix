@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+
+if [[ -n "${VBR_NIX_BIN:-}" && -x "${VBR_NIX_BIN}" ]]; then
+  exec "${VBR_NIX_BIN}" "$@"
+fi
+
+if [[ -x /nix/var/nix/profiles/default/bin/nix ]]; then
+  exec /nix/var/nix/profiles/default/bin/nix "$@"
+fi
+
+old_ifs="${IFS}"
+IFS=":"
+for entry in ${PATH:-}; do
+  if [[ -n "${entry}" && "${entry}" != "${script_dir}" && -x "${entry}/nix" ]]; then
+    exec "${entry}/nix" "$@"
+  fi
+done
+IFS="${old_ifs}"
+
+echo "nix: unable to resolve selected Nix binary" >&2
+exit 127

@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { printSkip } from "../../lib/errors";
+import { writeIfChanged } from "../../lib/fs-helpers";
 import { nodeFlagsWithZx, nodeOptionsWithoutZxInit } from "../../lib/node-run";
 import { findRepoRoot } from "../../lib/repo";
 import { ensureWorkspaceProvidersPackage } from "../../lib/workspace-providers-package";
@@ -51,8 +52,7 @@ async function ensureAutoMapStubIfMissing() {
     await fsp.access(outPath);
     return;
   } catch {}
-  await fsp.mkdir(path.dirname(outPath), { recursive: true });
-  await fsp.writeFile(
+  await writeIfChanged(
     outPath,
     [
       "# @workspace_providers//:auto_map.bzl",
@@ -63,7 +63,6 @@ async function ensureAutoMapStubIfMissing() {
       "}",
       "",
     ].join("\n"),
-    "utf8",
   );
 }
 

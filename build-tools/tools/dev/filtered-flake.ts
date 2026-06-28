@@ -143,7 +143,6 @@ async function repairSnapshotViberootsInput(opts: {
 }
 
 async function tempRepoLiveViberootsRoot(): Promise<string> {
-  if (String(process.env.VBR_RUN_IN_TEMP_REPO || "").trim() !== "1") return "";
   const raw = String(
     process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
       process.env.VIBEROOTS_SOURCE_ROOT ||
@@ -166,6 +165,7 @@ async function rewriteViberootsInput(flakeDir: string, inputPath: string): Promi
     ? inputPath
     : path.resolve(flakeDir, inputPath);
   const lockedInput = await lockPathInput(resolvedInputPath);
+  const originalPath = path.isAbsolute(inputPath) ? resolvedInputPath : inputPath;
   const flakePath = path.join(flakeDir, "flake.nix");
   const text = await fsp.readFile(flakePath, "utf8").catch(() => "");
   const next = text.replace(
@@ -181,7 +181,7 @@ async function rewriteViberootsInput(flakeDir: string, inputPath: string): Promi
     const node = lock.nodes?.viberoots;
     if (node) {
       node.locked = lockedInput;
-      node.original = { type: "path", path: resolvedInputPath };
+      node.original = { type: "path", path: originalPath };
       await fsp.writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8");
     }
   } catch {}
@@ -189,20 +189,35 @@ async function rewriteViberootsInput(flakeDir: string, inputPath: string): Promi
 
 async function lockPathInput(inputPath: string): Promise<Record<string, unknown>> {
   const nixBin = resolveNixBin();
-  const metadata = await $({
+  const canonicalInputPath = await fsp.realpath(inputPath).catch(() => inputPath);
+  const prefetched = await $({
     stdio: "pipe",
-  })`${nixBin} flake metadata --json ${`path:${inputPath}`} --no-write-lock-file`;
-  const parsed = JSON.parse(String(metadata.stdout || "{}")) as { url?: string };
-  const lockedUrl = new URL(parsed.url || "");
-  const narHash = lockedUrl.searchParams.get("narHash") || "";
-  const lastModified = Number(lockedUrl.searchParams.get("lastModified") || "0");
-  if (!narHash || !Number.isFinite(lastModified) || lastModified <= 0) {
-    throw new Error(`[filtered-flake] failed to lock path input ${inputPath}`);
+  })`${nixBin} flake prefetch --json ${`path:${canonicalInputPath}`}`.nothrow();
+  if (prefetched.exitCode === 0) {
+    try {
+      const parsed = JSON.parse(String(prefetched.stdout || "{}"));
+      const locked = parsed?.locked || {};
+      const narHash = typeof locked.narHash === "string" ? locked.narHash : "";
+      if (/^sha256-[A-Za-z0-9+/=_-]+$/.test(narHash)) {
+        return {
+          ...(typeof locked.lastModified === "number" ? { lastModified: locked.lastModified } : {}),
+          narHash,
+          path: canonicalInputPath,
+          type: "path",
+        };
+      }
+    } catch {}
+  }
+  const hashed = await $({
+    stdio: "pipe",
+  })`${nixBin} hash path --sri ${canonicalInputPath}`;
+  const narHash = String(hashed.stdout || "").trim();
+  if (!/^sha256-[A-Za-z0-9+/=_-]+$/.test(narHash)) {
+    throw new Error(`[filtered-flake] failed to lock path input ${canonicalInputPath}`);
   }
   return {
-    lastModified,
     narHash,
-    path: inputPath,
+    path: canonicalInputPath,
     type: "path",
   };
 }

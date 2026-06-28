@@ -34,6 +34,12 @@ test("install path selects flake refs by importer scope", async () => {
   if (depsMain.includes("nix build ${flakeRef}#${attr}")) {
     throw new Error("deps-main.ts must not duplicate node-modules nix build before link-node");
   }
+  if (!depsMain.includes("VBR_SKIP_FINAL_WORKSPACE_LOCK_REPAIR")) {
+    throw new Error("deps-main.ts must support explicit final workspace lock repair opt-out");
+  }
+  if (!depsMain.includes("shouldRunFinalWorkspaceLockRepair()")) {
+    throw new Error("deps-main.ts must centralize final workspace lock repair policy");
+  }
 
   const linkNode = await read("tools/dev/install/link-node.ts");
   if (!linkNode.includes("const flakeRef = flakeRefForImporter(flakeRoot, importer);")) {
@@ -69,6 +75,20 @@ test("install path selects flake refs by importer scope", async () => {
   }
   if (!importerLockfile.includes('path.join(repoRoot, "viberoots")')) {
     throw new Error("importer lockfile generation must prefer the local viberoots checkout");
+  }
+
+  const sharedImporterLockfile = await read("tools/lib/pnpm-importer-lockfile.ts");
+  if (!sharedImporterLockfile.includes("VBR_PNPM_LOCKFILE_VIBEROOTS_OVERRIDE")) {
+    throw new Error("shared importer lockfile generation must pass a local viberoots override");
+  }
+  if (
+    !sharedImporterLockfile.includes(
+      'vbr_override_args=(--override-input viberoots "$vbr_override")',
+    )
+  ) {
+    throw new Error(
+      "shared importer lockfile generation must override stale viberoots lock inputs",
+    );
   }
 
   const filteredCompat = await read("tools/dev/update-pnpm-hash/filtered-flake.ts");

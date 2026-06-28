@@ -52,12 +52,10 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     }
     if (
       !source.includes("tempRepoLiveViberootsRoot") ||
-      !source.includes("VBR_RUN_IN_TEMP_REPO") ||
+      source.includes('String(process.env.VBR_RUN_IN_TEMP_REPO || "").trim() !== "1"') ||
       !source.includes("VIBEROOTS_SOURCE_ROOT")
     ) {
-      throw new Error(
-        `${name} must reuse the stable live viberoots input for temp-repo filtered flakes`,
-      );
+      throw new Error(`${name} must reuse the stable live viberoots input for filtered flakes`);
     }
   }
 
@@ -73,11 +71,21 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
   ] as const) {
     if (
       !source.includes("lockPathInput") ||
-      !source.includes('"narHash"') ||
-      !source.includes('"lastModified"') ||
-      !source.includes("flake metadata --json")
+      !source.includes("narHash") ||
+      !source.includes("flake prefetch --json") ||
+      !source.includes("hash path --sri")
     ) {
-      throw new Error(`${name} must write hash-bearing path locks for local-file verification`);
+      throw new Error(
+        `${name} must prefetch and write hash-bearing path locks for local-file verification`,
+      );
+    }
+    if (
+      !source.includes("const originalPath = path.isAbsolute") ||
+      !source.includes('node.original = { type: "path", path: originalPath }')
+    ) {
+      throw new Error(
+        `${name} must keep relative path inputs relative in flake.lock original metadata`,
+      );
     }
   }
   if (

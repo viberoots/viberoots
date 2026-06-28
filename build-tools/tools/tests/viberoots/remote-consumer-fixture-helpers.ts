@@ -62,7 +62,8 @@ export async function makeConsumerWithFlakeUrl(
   await fsp.rm(path.join(consumer, ".viberoots", "workspace", "flake.lock"), { force: true });
   await $({
     cwd: path.join(consumer, ".viberoots", "workspace"),
-  })`nix flake lock --accept-flake-config`;
+    stdio: "pipe",
+  })`nix flake lock --accept-flake-config`.quiet();
   return consumer;
 }
 

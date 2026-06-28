@@ -32,8 +32,11 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     !exactStore.includes("resolveWorkspaceRootsSync") ||
     !exactStore.includes("tempViberootsRootFromEnv") ||
     !exactStore.includes("function canonicalFlakeRoot") ||
-    !exactStore.includes("fs.realpathSync.native(abs)") ||
+    !exactStore.includes('path.basename(abs) === "flake.nix"') ||
+    !exactStore.includes("fs.realpathSync.native(flakeDir)") ||
     !exactStore.includes("const flakeRoot = canonicalFlakeRoot(repoRoot)") ||
+    !exactStore.includes('const nixBin = resolveToolPathSync("nix")') ||
+    !exactStore.includes("process.env.VIBEROOTS_FLAKE_INPUT_ROOT") ||
     !exactStore.includes(
       "opts.viberootsRoot || tempViberootsRootFromEnv() || roots.viberootsRoot",
     ) ||
@@ -41,8 +44,14 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     exactStore.includes("seedExactStoreFromUnifiedStore") ||
     exactStore.includes("mergePnpmStore") ||
     exactStore.includes("unified-pnpm-store") ||
-    !exactStore.includes('["run", "--accept-flake-config", "--impure", `path:${flakeRoot}#pnpm`') ||
-    !exactStore.includes('"--", "--version"') ||
+    !exactStore.includes("execFileSync(") ||
+    !exactStore.includes("nixBin,") ||
+    !exactStore.includes('"run"') ||
+    !exactStore.includes('"--accept-flake-config"') ||
+    !exactStore.includes('"--impure"') ||
+    !exactStore.includes("`path:${flakeRoot}#pnpm`") ||
+    !exactStore.includes('"--"') ||
+    !exactStore.includes('"--version"') ||
     !exactStoreFetch.includes("pnpmPath: string") ||
     !exactStoreFetch.includes("command: opts.pnpmPath") ||
     !exactStoreFetch.includes("--frozen-lockfile") ||
@@ -78,7 +87,10 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (!exactStoreCommand.includes("runManagedCommand")) {
     throw new Error("exact-store helpers must continue running through managed command helpers");
   }
-  if (!exactStoreCommand.includes('command: opts.command || "nix"')) {
+  if (
+    !exactStoreCommand.includes("command: opts.command || resolveToolPathSync(") ||
+    !exactStoreCommand.includes('"nix", opts.env')
+  ) {
     throw new Error("exact-store command helpers must support direct command execution");
   }
   if (!lockfile.includes("withExactPrefetchedStore")) {

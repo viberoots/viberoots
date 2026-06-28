@@ -2,6 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
+import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { runInTemp } from "../lib/test-helpers";
 
 function readJsonStdout(stdout: unknown): any {
@@ -41,10 +42,10 @@ test("nix templates resolve dev override env names from build-tools/tools/lib/de
 
     // Go: ensure the template's default env name comes from the manifest by verifying override src.
     {
-      const env = {
+      const env = withSanitizedInheritedNixConfig({
         ...process.env,
         [manifest.go]: JSON.stringify({ "example@v1.0.0": "/tmp/src-go" }),
-      };
+      });
       const cmd = `nix-instantiate --eval --strict --json -E '
         let
           base = import <nixpkgs> {};
@@ -70,10 +71,10 @@ test("nix templates resolve dev override env names from build-tools/tools/lib/de
 
     // Python: replace uv2nix adapter with a stub so evaluation stays small; check devOverrides payload.
     {
-      const env = {
+      const env = withSanitizedInheritedNixConfig({
         ...process.env,
         [manifest.python]: JSON.stringify({ "example@v1.0.0": "/tmp/src-py" }),
-      };
+      });
       const cmd = `nix-instantiate --eval --strict --json -E '
         let
           pkgs = import <nixpkgs> {};
@@ -94,10 +95,10 @@ test("nix templates resolve dev override env names from build-tools/tools/lib/de
 
     // C++: use a minimal pkgs stub and check that devMap is non-empty when only the manifest-derived env is set.
     {
-      const env = {
+      const env = withSanitizedInheritedNixConfig({
         ...process.env,
         [manifest.cpp]: JSON.stringify({ "pkgs.zlib": "/tmp/src-cpp" }),
-      };
+      });
       const cmd = `nix-instantiate --eval --strict --json -E '
         let
           base = import <nixpkgs> {};

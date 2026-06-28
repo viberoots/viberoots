@@ -48,4 +48,7 @@ test("install deps nix calls disable per-invocation auto-GC lock waits", async (
   if (!nixShell.includes("--option min-free 0 --option max-free 0")) {
     throw new Error("nix_shell.bzl nix build helper must disable min-free/max-free");
   }
+  if (!nixShell.includes("nix build %s --no-write-lock-file --accept-flake-config")) {
+    throw new Error("nix_shell.bzl nix build helper must avoid lock-file write attempts");
+  }
 });

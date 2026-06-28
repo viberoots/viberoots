@@ -32,9 +32,15 @@ async function runLockfileCommandsWithGcRetry(opts: {
   homeDir: string;
   storeDir: string;
 }): Promise<void> {
-  const nixRunPrefix = opts.viberootsOverride
-    ? ["run", "--accept-flake-config", "--override-input", "viberoots", opts.viberootsOverride]
-    : ["run", "--accept-flake-config"];
+  const viberootsOverrideArgs = opts.viberootsOverride
+    ? ["--override-input", "viberoots", opts.viberootsOverride]
+    : [];
+  const nixRunPrefix = [
+    "run",
+    "--accept-flake-config",
+    "--no-write-lock-file",
+    ...viberootsOverrideArgs,
+  ];
   const runPnpm = async (...args: string[]) =>
     await $({
       cwd: opts.importerAbs,

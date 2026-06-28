@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
+import * as os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import { applyNixCacheHealthPolicy } from "../../dev/verify/nix-cache-health";
 import { evaluateNixCacheReadinessFromConfig } from "../../lib/nix-cache-readiness";
@@ -130,6 +132,47 @@ test("nix cache health off mode leaves NIX_CONFIG unchanged", async () => {
   );
 });
 
+test("nix cache health default probe uses Nix credentials", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "nix-cache-health-"));
+  const logPath = path.join(tmp, "probe.log");
+  const nixPath = path.join(tmp, "nix");
+  await fsp.writeFile(
+    nixPath,
+    [
+      "#!/usr/bin/env bash",
+      'if [ "$1" = "config" ] && [ "$2" = "show" ]; then',
+      "  printf '%s\\n' 'extra-substituters = https://auth.example/cache'",
+      "  exit 0",
+      "fi",
+      'if [ "$1" = "store" ] && [ "$2" = "info" ]; then',
+      '  printf \'%s\\n\' "$*" >> "$NIX_PROBE_LOG"',
+      "  exit 0",
+      "fi",
+      "exit 1",
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+
+  await withEnv(
+    {
+      PATH: `${tmp}:${process.env.PATH || ""}`,
+      NIX_PROBE_LOG: logPath,
+      VBR_NIX_CACHE_POLICY: "auto",
+      VBR_NIX_CACHE_HEALTH_APPLIED: "",
+    },
+    async () => {
+      const result = await applyNixCacheHealthPolicy("/tmp/repo");
+      assert.equal(result.changed, false);
+      assert.deepEqual(result.kept, ["https://auth.example/cache"]);
+      assert.match(
+        await fsp.readFile(logPath, "utf8"),
+        /store info --store https:\/\/auth\.example\/cache/,
+      );
+    },
+  );
+});
+
 test("nix cache readiness reports reachable, absent, degraded, and strict states", async () => {
   const reachable = await evaluateNixCacheReadinessFromConfig(
     [
@@ -233,6 +276,7 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   assert.match(buck, /curl -fsS --connect-timeout 3 --max-time 5/);
   assert.match(buck, /if curl -fsS --connect-timeout 3 --max-time 5/);
   assert.match(buck, /if nix store info --store/);
+  assert.ok(buck.indexOf("if nix store info --store") < buck.indexOf("elif command -v curl"));
   assert.match(buck, /viberoots-nix-cache\.noindex/);
   assert.match(buck, /NIX_CACHE_TMPDIR\/\.metadata_never_index/);
   assert.doesNotMatch(
@@ -248,6 +292,9 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   assert.match(env, /curl -fsS --connect-timeout 3 --max-time 5/);
   assert.match(env, /if curl -fsS --connect-timeout 3 --max-time 5 "\$\{cache_info_url\}"/);
   assert.match(env, /if nix store info --store "\$\{substituter\}" --option connect-timeout 3/);
+  assert.ok(
+    env.indexOf('if nix store info --store "${substituter}"') < env.indexOf("elif command -v curl"),
+  );
   assert.match(env, /env_mark_macos_metadata_never_index "\$\{cache_dir\}"/);
   assert.match(env, /env_mark_macos_metadata_never_index "\$\{NODE_V8_COVERAGE\}"/);
 

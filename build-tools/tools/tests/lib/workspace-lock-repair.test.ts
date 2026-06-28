@@ -11,6 +11,10 @@ async function withWorkspace(
   fn: (workspace: string, lockFile: string) => Promise<void>,
 ): Promise<void> {
   const workspace = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), `${prefix}-`)));
+  const prevViberootsSourceRoot = process.env.VIBEROOTS_SOURCE_ROOT;
+  const prevViberootsRoot = process.env.VIBEROOTS_ROOT;
+  delete process.env.VIBEROOTS_SOURCE_ROOT;
+  delete process.env.VIBEROOTS_ROOT;
   try {
     const generated = path.join(workspace, ".viberoots", "workspace");
     const source = path.join(workspace, "viberoots");
@@ -18,10 +22,18 @@ async function withWorkspace(
     await fsp.writeFile(path.join(source, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
     await fsp.writeFile(path.join(source, "build-tools", "tools", "dev", "zx-init.mjs"), "\n");
     await fsp.mkdir(generated, { recursive: true });
-    await fsp.writeFile(path.join(generated, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
+    await fsp.writeFile(
+      path.join(generated, "flake.nix"),
+      `{ inputs.viberoots.url = "path:${source}"; outputs = _: {}; }\n`,
+      "utf8",
+    );
     const lockFile = path.join(generated, "flake.lock");
     await fn(workspace, lockFile);
   } finally {
+    if (prevViberootsSourceRoot === undefined) delete process.env.VIBEROOTS_SOURCE_ROOT;
+    else process.env.VIBEROOTS_SOURCE_ROOT = prevViberootsSourceRoot;
+    if (prevViberootsRoot === undefined) delete process.env.VIBEROOTS_ROOT;
+    else process.env.VIBEROOTS_ROOT = prevViberootsRoot;
     await fsp.rm(workspace, { recursive: true, force: true });
   }
 }
@@ -68,6 +80,31 @@ test("workspace lock repair no-ops when candidate lock is unchanged", async () =
   });
 });
 
+test("workspace lock repair normalizes generated flake local viberoots url", async () => {
+  await withWorkspace("vbr-flake-input", async (workspace, lockFile) => {
+    const source = path.join(workspace, "viberoots");
+    const staleSource = path.join(path.dirname(workspace), "other", "viberoots");
+    const current = lock(workspace, "sha256-old");
+    await writeLock(lockFile, current);
+    await fsp.writeFile(
+      path.join(workspace, ".viberoots", "workspace", "flake.nix"),
+      `{ inputs.viberoots.url = "path:${staleSource}"; outputs = _: {}; }\n`,
+      "utf8",
+    );
+
+    const result = await repairGeneratedWorkspaceLock({
+      workspaceRoot: workspace,
+      deps: { execFile: execReturning(current) },
+    });
+
+    assert.deepEqual(result, { status: "repaired", changedInput: "viberoots" });
+    assert.match(
+      await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
+      new RegExp(`viberoots\\.url = "path:${source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}";`),
+    );
+  });
+});
+
 test("workspace lock repair writes candidate when only viberoots input changed", async () => {
   await withWorkspace("vbr-lock-repair", async (workspace, lockFile) => {
     const current = lock(workspace, "sha256-old");
@@ -81,6 +118,28 @@ test("workspace lock repair writes candidate when only viberoots input changed",
 
     assert.deepEqual(result, { status: "repaired", changedInput: "viberoots" });
     assert.deepEqual(JSON.parse(await fsp.readFile(lockFile, "utf8")), candidate);
+  });
+});
+
+test("workspace lock repair normalizes stale viberoots original path", async () => {
+  await withWorkspace("vbr-lock-original", async (workspace, lockFile) => {
+    const source = path.join(workspace, "viberoots");
+    const staleSource = path.join(path.dirname(workspace), "other", "viberoots");
+    const current = lock(workspace, "sha256-old");
+    const candidate = lock(workspace, "sha256-old");
+    current.nodes.viberoots.original.path = staleSource;
+    candidate.nodes.viberoots.original.path = staleSource;
+    await writeLock(lockFile, current);
+
+    const result = await repairGeneratedWorkspaceLock({
+      workspaceRoot: workspace,
+      deps: { execFile: execReturning(candidate) },
+    });
+
+    assert.deepEqual(result, { status: "repaired", changedInput: "viberoots" });
+    const repaired = JSON.parse(await fsp.readFile(lockFile, "utf8"));
+    assert.equal(repaired.nodes.viberoots.locked.path, source);
+    assert.equal(repaired.nodes.viberoots.original.path, source);
   });
 });
 

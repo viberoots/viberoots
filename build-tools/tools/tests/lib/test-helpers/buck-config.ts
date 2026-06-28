@@ -3,6 +3,11 @@ import path from "node:path";
 import { DEFAULT_GRAPH_PATH, WORKSPACE_BUCK_STATE_DIR } from "../../../lib/workspace-state-paths";
 import "./worker-init";
 let cachedPreludePath: Promise<string> | null = null;
+interface TempRepoBuckConfigOptions {
+  viberootsInputRoot?: string;
+  viberootsSourceRoot?: string;
+}
+
 async function workspaceFlakePath(root: string): Promise<string> {
   const hidden = path.join(root, ".viberoots", "workspace", "flake.nix");
   try {
@@ -12,7 +17,11 @@ async function workspaceFlakePath(root: string): Promise<string> {
   return path.join(root, "flake.nix");
 }
 
-async function resolvePreludePath(tmp: string, $: any): Promise<string> {
+async function resolvePreludePath(
+  tmp: string,
+  $: any,
+  opts?: TempRepoBuckConfigOptions,
+): Promise<string> {
   const sharedPrelude = String(process.env.VBR_SHARED_PRELUDE_PATH || "").trim();
   if (sharedPrelude) {
     try {
@@ -21,11 +30,17 @@ async function resolvePreludePath(tmp: string, $: any): Promise<string> {
     } catch {}
   }
 
-  const localPrelude = path.join(tmp, "prelude");
-  try {
-    await fsp.access(localPrelude);
-    return localPrelude;
-  } catch {}
+  const localPreludeCandidates = [
+    path.join(tmp, "prelude"),
+    path.join(tmp, ".viberoots", "current", "prelude"),
+    path.join(tmp, "viberoots", "prelude"),
+  ];
+  for (const localPrelude of localPreludeCandidates) {
+    try {
+      await fsp.access(localPrelude);
+      return localPrelude;
+    } catch {}
+  }
 
   // Fast path: seeded temp repos intentionally stay small and may omit prelude.
   // Reuse the already-materialized workspace prelude when available.
@@ -48,17 +63,29 @@ async function resolvePreludePath(tmp: string, $: any): Promise<string> {
   if (!cachedPreludePath) {
     cachedPreludePath = (async () => {
       const flakePath = await workspaceFlakePath(tmp);
-      const viberootsSourceRoot = String(
-        process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "",
+      const flakeRoot = path.dirname(flakePath);
+      const viberootsInputRoot = String(
+        opts?.viberootsInputRoot ||
+          process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
+          opts?.viberootsSourceRoot ||
+          process.env.VIBEROOTS_SOURCE_ROOT ||
+          process.env.VIBEROOTS_ROOT ||
+          "",
       ).trim();
-      const viberootsOverrideArgs = viberootsSourceRoot
-        ? ["--override-input", "viberoots", `path:${viberootsSourceRoot}`]
+      const hasViberootsInputRoot =
+        viberootsInputRoot &&
+        (await fsp
+          .access(path.join(viberootsInputRoot, "flake.nix"))
+          .then(() => true)
+          .catch(() => false));
+      const viberootsOverrideArgs = hasViberootsInputRoot
+        ? ["--override-input", "viberoots", `path:${viberootsInputRoot}`]
         : [];
       try {
         const pre = await $({
           cwd: tmp,
           stdio: "pipe",
-        })`nix build --impure ${`path:${flakePath}#buck2-prelude`} ${viberootsOverrideArgs} --no-link --accept-flake-config --print-out-paths`;
+        })`nix build --impure ${`path:${flakeRoot}#buck2-prelude`} ${viberootsOverrideArgs} --no-link --no-write-lock-file --accept-flake-config --print-out-paths`;
         const out = String(pre.stdout || "")
           .trim()
           .split("\n")
@@ -70,7 +97,7 @@ async function resolvePreludePath(tmp: string, $: any): Promise<string> {
         const ev = await $({
           cwd: tmp,
           stdio: "pipe",
-        })`nix eval --impure --raw ${`path:${flakePath}#inputs.buck2.outPath`} ${viberootsOverrideArgs}`;
+        })`nix eval --impure --raw ${`path:${flakeRoot}#inputs.buck2.outPath`} ${viberootsOverrideArgs} --no-write-lock-file`;
         const p = String(ev.stdout || "").trim();
         if (p) return path.join(p, "prelude").replaceAll("\\", "/");
       } catch {}
@@ -80,8 +107,12 @@ async function resolvePreludePath(tmp: string, $: any): Promise<string> {
   return await cachedPreludePath;
 }
 
-export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<void> {
-  const preludePath = await resolvePreludePath(tmp, $);
+export async function ensureBuckConfigForTempRepo(
+  tmp: string,
+  $: any,
+  opts?: TempRepoBuckConfigOptions,
+): Promise<void> {
+  const preludePath = await resolvePreludePath(tmp, $, opts);
 
   const setupScript = [
     "set -euo pipefail",
@@ -275,6 +306,7 @@ export async function ensureBuckConfigForTempRepo(tmp: string, $: any): Promise<
 export async function ensureWorkspaceRootEnvFile(
   tmp: string,
   activeViberootsRoot?: string,
+  selectedViberootsInputRoot?: string,
 ): Promise<void> {
   try {
     const current = path.join(tmp, ".viberoots", "current");
@@ -283,6 +315,8 @@ export async function ensureWorkspaceRootEnvFile(
     const viberootsRoot = activeViberootsRoot || process.env.VIBEROOTS_ROOT || "";
     const viberootsSourceRoot =
       activeViberootsRoot || process.env.VIBEROOTS_SOURCE_ROOT || viberootsRoot;
+    const viberootsInputRoot =
+      selectedViberootsInputRoot || process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "";
     await fsp.mkdir(path.join(tmp, ".viberoots"), { recursive: true });
     const currentOk = await fsp
       .access(currentZxInit)
@@ -313,9 +347,7 @@ export async function ensureWorkspaceRootEnvFile(
         process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT
           ? `VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT=${process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT}`
           : "",
-        process.env.VIBEROOTS_FLAKE_INPUT_ROOT
-          ? `VIBEROOTS_FLAKE_INPUT_ROOT=${process.env.VIBEROOTS_FLAKE_INPUT_ROOT}`
-          : "",
+        viberootsInputRoot ? `VIBEROOTS_FLAKE_INPUT_ROOT=${viberootsInputRoot}` : "",
         zxInit ? `ZX_INIT=${zxInit}` : "",
         "",
       ]

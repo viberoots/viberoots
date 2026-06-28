@@ -113,9 +113,9 @@ test("git helper probes use non-throwing zx calls", async () => {
     "viberoots/build-tools/tools/lib/build-system-test-scope.ts",
     "utf8",
   );
-  assert.equal(txt.includes("git rev-parse --verify --quiet ${ref}`.nothrow()"), true);
-  assert.equal(txt.includes("git merge-base ${ref} HEAD`.nothrow()"), true);
-  assert.equal(txt.includes("git status --porcelain=v1`.nothrow()"), true);
+  assert.match(txt, /git rev-parse --verify --quiet \$\{ref\}`\s*\.nothrow\(\)\s*\.quiet\(\)/);
+  assert.match(txt, /git merge-base \$\{ref\} HEAD`\s*\.nothrow\(\)\s*\.quiet\(\)/);
+  assert.match(txt, /git status --porcelain=v1`\s*\.nothrow\(\)\s*\.quiet\(\)/);
 });
 
 test("non-build-system target scope derives selectors from top-level workspace roots", async () => {

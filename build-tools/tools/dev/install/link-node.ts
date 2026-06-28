@@ -8,6 +8,7 @@ import { writeIfChanged } from "../../lib/fs-helpers";
 import { resolveImporterDir } from "../../lib/lockfiles";
 import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { pathExists, repoRoot } from "../../lib/repo";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
@@ -160,15 +161,17 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
         stdoutBytes: 0,
         stderrBytes: 0,
       };
+      const nixBin = resolveToolPathSync("nix");
       const buildWithEnv = async (exactStoreEnv: NodeJS.ProcessEnv) =>
         await withHeartbeat(
           `importer=${importer} step=build attr=node-modules.${attr}`,
           runManagedCommand({
-            command: "nix",
+            command: nixBin,
             args: [
               "build",
               `${buildFlakeRefBase}#node-modules.${attr}`,
               "--no-link",
+              "--no-write-lock-file",
               "--accept-flake-config",
               "--impure",
               "--option",

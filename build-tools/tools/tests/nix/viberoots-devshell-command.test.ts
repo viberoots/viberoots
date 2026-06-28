@@ -8,7 +8,11 @@ test("devshell wires viberoots as a Nix-provided PATH command", async () => {
   const devshell = await fsp.readFile("viberoots/build-tools/tools/nix/devshell.nix", "utf8");
   assert.match(devshell, /viberootsCommand = import \.\/packages\/viberoots-command\.nix/);
   assert.match(devshell, /buildInputs = \[[^\]]*\bviberootsCommand\b/s);
-  assert.match(devshell, /export PATH="\$vbr_nix_bin:\$repo_prefix/);
+  assert.match(devshell, /local vbr_host_nix_bin=""/);
+  assert.match(devshell, /\[ -n "''\$\{VBR_NIX_BIN:-\}" \] && \[ -x "\$VBR_NIX_BIN" \]/);
+  assert.match(devshell, /\/nix\/var\/nix\/profiles\/default\/bin\/nix/);
+  assert.match(devshell, /export VBR_NIX_BIN="\/nix\/var\/nix\/profiles\/default\/bin\/nix"/);
+  assert.match(devshell, /export PATH="\$repo_prefix:/);
   assert.match(devshell, /local vbr_tools_bin="\$PWD\/build-tools\/tools\/bin"/);
   assert.match(devshell, /vbr_tools_bin="\$PWD\/viberoots\/build-tools\/tools\/bin"/);
   assert.match(devshell, /local repo_prefix="\$vbr_tools_bin:\$PWD\/\.direnv\/bin:\$vbr_node_bin"/);

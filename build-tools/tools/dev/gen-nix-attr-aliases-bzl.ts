@@ -5,7 +5,7 @@
  * - Safe no-op when JSON is missing or empty
  */
 import fsp from "node:fs/promises";
-import path from "node:path";
+import { writeIfChanged } from "../lib/fs-helpers";
 import { buildToolPath } from "./dev-build/paths";
 
 async function readJsonIfExists<T = unknown>(p: string): Promise<T | null> {
@@ -45,20 +45,6 @@ function renderBzl(map: Record<string, string>): string {
   ].join("\n");
 }
 
-async function writeIfChanged(dst: string, data: string) {
-  try {
-    const cur = await fsp.readFile(dst, "utf8");
-    if (cur === data) return;
-  } catch {}
-  await fsp.mkdir(path.dirname(dst), { recursive: true });
-  const tmp = path.join(
-    path.dirname(dst),
-    `.${path.basename(dst)}.${process.pid}.${Date.now()}.tmp`,
-  );
-  await fsp.writeFile(tmp, data, "utf8");
-  await fsp.rename(tmp, dst);
-}
-
 async function main() {
   const root = process.cwd();
   const jsonPath = buildToolPath(root, "tools/lib/nix-attr-aliases.json");
@@ -66,8 +52,10 @@ async function main() {
   const src = await readJsonIfExists<Record<string, string>>(jsonPath);
   const map = validateMap(src || {});
   const data = renderBzl(map);
-  await writeIfChanged(bzlPath, data);
-  console.log(`wrote ${bzlPath} (${Object.keys(map).length} aliases)`);
+  const changed = await writeIfChanged(bzlPath, data);
+  console.log(
+    `wrote ${bzlPath} (${Object.keys(map).length} aliases)${changed ? "" : " (unchanged)"}`,
+  );
 }
 
 main().catch((e) => {

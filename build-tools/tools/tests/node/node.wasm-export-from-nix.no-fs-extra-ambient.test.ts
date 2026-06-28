@@ -90,6 +90,10 @@ if [[ "$*" == *"flake metadata"* ]]; then
   printf '{"url":"path:%s?lastModified=1&narHash=sha256-test"}\\n' "\${VIBEROOTS_ROOT:-$PWD}"
   exit 0
 fi
+if [[ "$*" == hash\\ path\\ --sri* ]]; then
+  echo "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  exit 0
+fi
 echo "${fakeOut}"
 `,
     );
@@ -157,6 +161,10 @@ test("export-wasm-from-nix does not force C++ planner mode for Python wasm targe
 set -euo pipefail
 if [[ "$*" == *"flake metadata"* ]]; then
   printf '{"url":"path:%s?lastModified=1&narHash=sha256-test"}\\n' "\${VIBEROOTS_ROOT:-$PWD}"
+  exit 0
+fi
+if [[ "$*" == hash\\ path\\ --sri* ]]; then
+  echo "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
   exit 0
 fi
 if [ "\${BUCK_TARGET:-}" = "//projects/libs/demo-py-wasm:pyext" ] && [ -n "\${PLANNER_ONLY_CPP:-}" ]; then

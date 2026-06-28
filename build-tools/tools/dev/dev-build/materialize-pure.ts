@@ -27,9 +27,11 @@ async function workspaceFlakeRef(root: string, attr: string): Promise<string> {
 }
 
 async function viberootsOverrideArgs(root: string): Promise<string> {
-  const sourceRoot = String(process.env.VIBEROOTS_SOURCE_ROOT || "").trim();
-  if (sourceRoot && (await pathExists(path.join(sourceRoot, "flake.nix")))) {
-    return ` --override-input viberoots path:${sourceRoot}`;
+  const inputRoot = String(
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || process.env.VIBEROOTS_SOURCE_ROOT || "",
+  ).trim();
+  if (inputRoot && (await pathExists(path.join(inputRoot, "flake.nix")))) {
+    return ` --override-input viberoots path:${inputRoot}`;
   }
   const local = path.join(root, "viberoots");
   if (await pathExists(path.join(local, "flake.nix"))) {

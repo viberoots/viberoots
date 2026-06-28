@@ -60,6 +60,10 @@ async function runGeneratedWorkspaceLockRepair(opts: {
   }
 }
 
+function shouldRunFinalWorkspaceLockRepair(): boolean {
+  return String(process.env.VBR_SKIP_FINAL_WORKSPACE_LOCK_REPAIR || "").trim() !== "1";
+}
+
 // Resolve absolute workspace root path without requiring callers to run from repo root.
 async function resolveWorkspaceRoot(): Promise<string> {
   const cwd = process.cwd();
@@ -152,7 +156,7 @@ if (glueOnly) {
   }
   const glueOnlyImporters = await discoverImportersWithLock(repoRoot, { cwd: process.cwd() });
   await syncModuleContractsForWebapps(repoRoot, glueOnlyImporters, dryRun, verbose);
-  if (!dryRun) {
+  if (!dryRun && shouldRunFinalWorkspaceLockRepair()) {
     await withExclusiveInstallLock(
       "workspace-lock-repair",
       async () => {
@@ -162,6 +166,8 @@ if (glueOnly) {
         verbose: verbose || String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1",
       },
     );
+  } else if (!dryRun && verbose) {
+    console.log("[install-deps] final workspace lock repair skipped");
   }
   console.log("Glue refreshed.");
   process.exit(0);
@@ -290,7 +296,7 @@ await ensureInstallSecretReadiness({
     forceOverwriteLocalCredentials,
   },
 });
-if (!dryRun) {
+if (!dryRun && shouldRunFinalWorkspaceLockRepair()) {
   await withExclusiveInstallLock(
     "workspace-lock-repair",
     async () => {
@@ -300,5 +306,7 @@ if (!dryRun) {
       verbose: verbose || String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1",
     },
   );
+} else if (!dryRun && verbose) {
+  console.log("[install-deps] final workspace lock repair skipped");
 }
 console.log("Dependencies installed and node_modules linked.");

@@ -23,7 +23,7 @@ const REQUIRED_STAGE_FILES = [
   path.join("viberoots", "build-tools", "tools", "node", "gen-wasm-inline-module.ts"),
   path.join("viberoots", "flake.nix"),
 ];
-const PREPARED_MARKER = ".seed-store-prepared-v5";
+const PREPARED_MARKER = ".seed-store-prepared-v7";
 
 export function seedStageRootDirForTest(): string {
   if (process.platform === "win32") return path.join(os.tmpdir(), "viberoots-test-seed");
@@ -169,7 +169,9 @@ async function listActiveSourceOverlayFiles(source: string): Promise<{
   const out = await $({
     stdio: "pipe",
     cwd: source,
-  })`git status --porcelain=v1 --untracked-files=all`.nothrow();
+  })`git status --porcelain=v1 --untracked-files=all`
+    .nothrow()
+    .quiet();
   if (out.exitCode !== 0) return { changed: [], deleted: [] };
   const changed: string[] = [];
   const deleted: string[] = [];
@@ -225,14 +227,35 @@ type PathFlakeMetadata = {
 
 async function readPathFlakeMetadata(inputPath: string): Promise<PathFlakeMetadata> {
   const canonicalInputPath = await fsp.realpath(inputPath).catch(() => inputPath);
+  const prefetched = await $({
+    stdio: "pipe",
+  })`nix flake prefetch --json ${`path:${canonicalInputPath}`}`.nothrow();
+  if (prefetched.exitCode === 0) {
+    const parsed = JSON.parse(String(prefetched.stdout || "{}"));
+    const locked = parsed?.locked || {};
+    return {
+      lastModified: typeof locked.lastModified === "number" ? locked.lastModified : undefined,
+      narHash: typeof locked.narHash === "string" ? locked.narHash : undefined,
+    };
+  }
   const out = await $({
     stdio: "pipe",
   })`nix flake metadata --json ${`path:${canonicalInputPath}`} --no-write-lock-file`;
   const parsed = JSON.parse(String(out.stdout || "{}"));
   const locked = parsed?.locked || {};
+  const narHash =
+    typeof locked.narHash === "string"
+      ? locked.narHash
+      : String(
+          (
+            await $({
+              stdio: "pipe",
+            })`nix hash path --sri ${canonicalInputPath}`
+          ).stdout || "",
+        ).trim();
   return {
     lastModified: typeof locked.lastModified === "number" ? locked.lastModified : undefined,
-    narHash: typeof locked.narHash === "string" ? locked.narHash : undefined,
+    narHash: narHash || undefined,
   };
 }
 
@@ -335,7 +358,9 @@ async function gitStageRelPaths(stageDir: string, relPaths: string[]): Promise<v
 }
 
 async function trackedNpmrcDirs(stageDir: string): Promise<string[]> {
-  const out = await $({ cwd: stageDir, stdio: "pipe" })`git ls-files -- "**/.npmrc"`.nothrow();
+  const out = await $({ cwd: stageDir, stdio: "pipe" })`git ls-files -- "**/.npmrc"`
+    .nothrow()
+    .quiet();
   if (out.exitCode !== 0) return [];
   return String(out.stdout || "")
     .split(/\r?\n/)
@@ -368,15 +393,17 @@ async function ensurePnpmfilePlaceholders(stageDir: string): Promise<string[]> {
 async function prepareStageSeed(stageDir: string, workspaceRoot: string): Promise<void> {
   const touched = [
     ...(await overlayActiveViberootsIntoStage(stageDir, workspaceRoot)),
-    ...(await rewriteStageViberootsInput(stageDir)),
     ...(await ensurePnpmfilePlaceholders(stageDir)),
+    ...(await rewriteStageViberootsInput(stageDir)),
   ];
   if (touched.length > 0) {
     await gitStageRelPaths(stageDir, touched);
     await $({
       cwd: stageDir,
       stdio: "pipe",
-    })`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m seed-overlay --allow-empty`.nothrow();
+    })`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m seed-overlay --allow-empty`
+      .nothrow()
+      .quiet();
   }
   await fsp.writeFile(path.join(stageDir, PREPARED_MARKER), "ok\n", "utf8");
 }

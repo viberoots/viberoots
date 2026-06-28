@@ -27,7 +27,7 @@ export type RepoInitResult = {
 };
 
 const CLONE_PROBE_LABEL = "seedStore clone probe (copyFileCloneSupport)";
-const PREPARED_MARKER = ".seed-store-prepared-v5";
+const PREPARED_MARKER = ".seed-store-prepared-v7";
 
 let seedStoreCowCopySupported: true | null = null;
 let seedStoreCowCopySupportedPromise: Promise<true> | null = null;
@@ -71,7 +71,9 @@ async function listUntrackedFilesOncePerWorker(): Promise<string[]> {
       const out = await $({
         stdio: "pipe",
         cwd: process.cwd(),
-      })`git ls-files --others --exclude-standard`.nothrow();
+      })`git ls-files --others --exclude-standard`
+        .nothrow()
+        .quiet();
       if (out.exitCode !== 0) return [];
       return String(out.stdout || "")
         .split(/\r?\n/)
@@ -90,7 +92,9 @@ async function listTrackedChangedFilesOncePerWorker(): Promise<string[]> {
       const out = await $({
         stdio: "pipe",
         cwd: process.cwd(),
-      })`git status --porcelain=v1 --untracked-files=no`.nothrow();
+      })`git status --porcelain=v1 --untracked-files=no`
+        .nothrow()
+        .quiet();
       if (out.exitCode !== 0) return [];
       const rels = String(out.stdout || "")
         .split(/\r?\n/)
@@ -186,7 +190,9 @@ async function listActiveSourceOverlayFiles(source: string): Promise<{
   const out = await $({
     stdio: "pipe",
     cwd: source,
-  })`git status --porcelain=v1 --untracked-files=all`.nothrow();
+  })`git status --porcelain=v1 --untracked-files=all`
+    .nothrow()
+    .quiet();
   if (out.exitCode !== 0) return { changed: [], deleted: [] };
   const changed: string[] = [];
   const deleted: string[] = [];

@@ -1,11 +1,13 @@
 #!/usr/bin/env zx-wrapper
 // Asserts that with CI=true and NIX_CPP_DEV_OVERRIDE_JSON set, Nix eval fails.
+import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
+
 async function main() {
-  const env = {
+  const env = withSanitizedInheritedNixConfig({
     ...process.env,
     CI: "true",
     NIX_CPP_DEV_OVERRIDE_JSON: '{"pkgs.zlib":"/tmp/does-not-matter"}',
-  };
+  });
   const expr = `
     let
       base = import <nixpkgs> {};
@@ -18,7 +20,12 @@ async function main() {
       C = import ./viberoots/build-tools/tools/nix/templates/cpp-common.nix { inherit pkgs; };
     in C._ci_guard
   `;
-  const evalResult = await $({ env })`nix-instantiate --eval --strict -E ${expr}`.nothrow();
+  const evalResult = await $({
+    env,
+    stdio: "pipe",
+  })`nix-instantiate --eval --strict -E ${expr}`
+    .nothrow()
+    .quiet();
   const output = `${evalResult.stdout || ""}\n${evalResult.stderr || ""}`;
   if (evalResult.exitCode === 0) {
     console.error("expected CI guard to fail but it passed");

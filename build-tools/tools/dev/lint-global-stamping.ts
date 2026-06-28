@@ -15,7 +15,7 @@ function repoPath(p: string): string {
 
 async function listBzlFiles(): Promise<string[]> {
   // Prefer git to respect .gitignore and avoid vendor/third_party noise
-  const out = await $`git ls-files '*.bzl'`.nothrow();
+  const out = await $`git ls-files '*.bzl'`.nothrow().quiet();
   const txt = String(out.stdout || "").trim();
   return txt
     ? txt

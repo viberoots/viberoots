@@ -5,8 +5,19 @@ import { test } from "node:test";
 test("update-pnpm-hash uses importer-aware fast path and fixed-first root path", async () => {
   const mainFile = "viberoots/build-tools/tools/dev/update-pnpm-hash.ts";
   const nondefaultFile = "viberoots/build-tools/tools/dev/update-pnpm-hash/nondefault.ts";
+  const nixFile = "viberoots/build-tools/tools/dev/update-pnpm-hash/nix.ts";
+  const exactStoreFile = "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts";
+  const importerLockfileFile =
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts";
+  const scaffoldingLockfileFile = "viberoots/build-tools/tools/lib/pnpm-importer-lockfile.ts";
+  const tempBuckConfigFile = "viberoots/build-tools/tools/tests/lib/test-helpers/buck-config.ts";
   const mainTxt = await fsp.readFile(mainFile, "utf8");
   const nondefaultTxt = await fsp.readFile(nondefaultFile, "utf8");
+  const nixTxt = await fsp.readFile(nixFile, "utf8");
+  const exactStoreTxt = await fsp.readFile(exactStoreFile, "utf8");
+  const importerLockfileTxt = await fsp.readFile(importerLockfileFile, "utf8");
+  const scaffoldingLockfileTxt = await fsp.readFile(scaffoldingLockfileFile, "utf8");
+  const tempBuckConfigTxt = await fsp.readFile(tempBuckConfigFile, "utf8");
 
   if (!mainTxt.includes("handleNonDefaultImporter")) {
     throw new Error("update-pnpm-hash.ts must route non-default importers through dedicated flow");
@@ -69,5 +80,26 @@ test("update-pnpm-hash uses importer-aware fast path and fixed-first root path",
     throw new Error(
       "update-pnpm-hash.ts must consult the shared lock-hash cache for root importer",
     );
+  }
+  if (!nixTxt.includes('"--no-write-lock-file"')) {
+    throw new Error("update-pnpm-hash nix builds must not mutate generated flake locks");
+  }
+  if (!exactStoreTxt.includes('path.basename(abs) === "flake.nix"')) {
+    throw new Error("exact-store flake root resolution must accept flake.nix file paths");
+  }
+  if (!exactStoreTxt.includes('"--no-write-lock-file"')) {
+    throw new Error("exact-store flake program probes must not mutate generated flake locks");
+  }
+  if (!importerLockfileTxt.includes('"--no-write-lock-file"')) {
+    throw new Error("importer lockfile pnpm flake runs must not mutate generated flake locks");
+  }
+  if (!scaffoldingLockfileTxt.includes("--no-write-lock-file")) {
+    throw new Error("scaffolding lockfile pnpm flake runs must not mutate generated flake locks");
+  }
+  if (
+    !tempBuckConfigTxt.includes("const flakeRoot = path.dirname(flakePath)") ||
+    !tempBuckConfigTxt.includes("--no-write-lock-file")
+  ) {
+    throw new Error("temp repo buck config Nix probes must use flake dirs without lock writes");
   }
 });

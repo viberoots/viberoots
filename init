@@ -4,7 +4,7 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 workspace_root="$(cd -- "${script_dir}/.." && pwd)"
 viberoots_dir="${workspace_root}/viberoots"
-viberoots_source_dir="${VIBEROOTS_SOURCE_ROOT:-${viberoots_dir}}"
+viberoots_flake_input_dir="${VIBEROOTS_FLAKE_INPUT_ROOT:-${viberoots_dir}}"
 
 if [[ "${script_dir}" != "${viberoots_dir}" ]]; then
   echo "error: viberoots/init must be run from a checkout mounted at ./viberoots" >&2
@@ -18,7 +18,7 @@ NO_DEV_SHELL=1 WORKSPACE_ROOT="${workspace_root}" "${viberoots_dir}/build-tools/
   --mode submodule \
   --workspace-root "${workspace_root}" \
   --workspace-name "viberoots-consumer" \
-  --viberoots-url "path:${viberoots_source_dir}" \
+  --viberoots-url "path:${viberoots_flake_input_dir}" \
   --source "${viberoots_dir}" \
   --no-lock \
   "$@"

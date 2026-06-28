@@ -43,12 +43,13 @@ test("_env.sh supports safe direnv bypass fast-path", async () => {
     );
   }
   if (
-    !txt.includes('VIBEROOTS_SOURCE_ROOT="${active_viberoots_root}" nix build') ||
-    !txt.includes('--override-input viberoots "path:${active_viberoots_root}"') ||
-    !txt.includes("active_viberoots_hash")
+    !txt.includes('local selected_viberoots_input_root="${VIBEROOTS_FLAKE_INPUT_ROOT:-') ||
+    !txt.includes('VIBEROOTS_FLAKE_INPUT_ROOT="${selected_viberoots_input_root}" nix build') ||
+    !txt.includes('--override-input viberoots "path:${selected_viberoots_input_root}"') ||
+    !txt.includes("selected_viberoots_input_hash")
   ) {
     throw new Error(
-      "_env.sh prelude materialization must override the viberoots input to the active tooling root",
+      "_env.sh prelude materialization must override and cache by the selected viberoots flake input root",
     );
   }
 });

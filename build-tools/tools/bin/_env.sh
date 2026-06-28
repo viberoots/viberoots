@@ -164,18 +164,16 @@ env_apply_nix_cache_health() {
 			http://*|https://*)
 				local cache_info_url="${substituter%/}/nix-cache-info"
 				local probe_status=0
-				if command -v curl >/dev/null 2>&1; then
+				if nix store info --store "${substituter}" --option connect-timeout 3 >/dev/null 2>&1; then
+					probe_status=0
+				elif command -v curl >/dev/null 2>&1; then
 					if curl -fsS --connect-timeout 3 --max-time 5 "${cache_info_url}" >/dev/null 2>&1; then
 						probe_status=0
 					else
 						probe_status="$?"
 					fi
 				else
-					if nix store info --store "${substituter}" --option connect-timeout 3 >/dev/null 2>&1; then
-						probe_status=0
-					else
-						probe_status="$?"
-					fi
+					probe_status=1
 				fi
 				if [[ "${probe_status}" -eq 0 ]]; then
 					available+=("${substituter}")
@@ -276,7 +274,8 @@ ensure_buck_prelude() {
 		fi
 	fi
 	local active_viberoots_root="${VIBEROOTS_SOURCE_ROOT:-${VIBEROOTS_ROOT:-}}"
-	if [[ -z "${active_viberoots_root}" || ! -f "${active_viberoots_root}/build-tools/tools/dev/zx-init.mjs" ]]; then
+	local selected_viberoots_input_root="${VIBEROOTS_FLAKE_INPUT_ROOT:-${active_viberoots_root}}"
+	if [[ -z "${active_viberoots_root}" || ! -f "${active_viberoots_root}/flake.nix" || ! -f "${active_viberoots_root}/build-tools/tools/dev/zx-init.mjs" ]]; then
 		if [[ -f "${live_root}/viberoots/build-tools/tools/dev/zx-init.mjs" ]]; then
 			active_viberoots_root="${live_root}/viberoots"
 		elif [[ -f "${live_root}/.viberoots/current/build-tools/tools/dev/zx-init.mjs" ]]; then
@@ -284,21 +283,24 @@ ensure_buck_prelude() {
 		else
 			active_viberoots_root=""
 		fi
+		if [[ -z "${VIBEROOTS_FLAKE_INPUT_ROOT:-}" ]]; then
+			selected_viberoots_input_root="${active_viberoots_root}"
+		fi
 	fi
-	local active_viberoots_hash=""
-	if [[ -n "${active_viberoots_root}" ]]; then
+	local selected_viberoots_input_hash=""
+	if [[ -n "${selected_viberoots_input_root}" ]]; then
 		if command -v shasum >/dev/null 2>&1; then
-			active_viberoots_hash="$(printf "%s" "${active_viberoots_root}" | shasum -a 256 2>/dev/null | awk '{print $1}')"
+			selected_viberoots_input_hash="$(printf "%s" "${selected_viberoots_input_root}" | shasum -a 256 2>/dev/null | awk '{print $1}')"
 		elif command -v sha256sum >/dev/null 2>&1; then
-			active_viberoots_hash="$(printf "%s" "${active_viberoots_root}" | sha256sum 2>/dev/null | awk '{print $1}')"
+			selected_viberoots_input_hash="$(printf "%s" "${selected_viberoots_input_root}" | sha256sum 2>/dev/null | awk '{print $1}')"
 		fi
 	fi
 	local lock_suffix=""
 	if [[ -n "${lock_hash}" ]]; then
 		lock_suffix="-${lock_hash}"
 	fi
-	if [[ -n "${active_viberoots_hash}" ]]; then
-		lock_suffix="${lock_suffix}-vbr-${active_viberoots_hash}"
+	if [[ -n "${selected_viberoots_input_hash}" ]]; then
+		lock_suffix="${lock_suffix}-vbr-${selected_viberoots_input_hash}"
 	fi
 	local pre_cache="${cache_dir}/prelude-path${lock_suffix}"
 	local pre_link="${cache_dir}/buck2-prelude${lock_suffix}"
@@ -317,13 +319,13 @@ ensure_buck_prelude() {
 		if [[ -f "${live_root}/.viberoots/workspace/flake.nix" ]]; then
 			workspace_flake_ref="${live_root}/.viberoots/workspace"
 		fi
-			if [[ -n "${active_viberoots_root}" ]]; then
-				pre_out="$(VIBEROOTS_SOURCE_ROOT="${active_viberoots_root}" nix build --override-input viberoots "path:${active_viberoots_root}" "path:${workspace_flake_ref}#buck2-prelude" --out-link "${pre_link}" --accept-flake-config --print-out-paths 2>/dev/null || true)"
-			else
-				pre_out="$(nix build "path:${workspace_flake_ref}#buck2-prelude" --out-link "${pre_link}" --accept-flake-config --print-out-paths 2>/dev/null || true)"
-			fi
+		if [[ -n "${selected_viberoots_input_root}" && -f "${selected_viberoots_input_root}/flake.nix" ]]; then
+			pre_out="$(VIBEROOTS_SOURCE_ROOT="${active_viberoots_root}" VIBEROOTS_FLAKE_INPUT_ROOT="${selected_viberoots_input_root}" nix build --override-input viberoots "path:${selected_viberoots_input_root}" "path:${workspace_flake_ref}#buck2-prelude" --out-link "${pre_link}" --no-write-lock-file --accept-flake-config --print-out-paths 2>/dev/null || true)"
+		else
+			pre_out="$(nix build "path:${workspace_flake_ref}#buck2-prelude" --out-link "${pre_link}" --no-write-lock-file --accept-flake-config --print-out-paths 2>/dev/null || true)"
+		fi
 		if [[ -z "${pre_out}" ]]; then
-			pre_out="$(nix eval --raw "path:${workspace_flake_ref}#inputs.buck2.outPath" 2>/dev/null || true)"
+			pre_out="$(nix eval --raw --no-write-lock-file "path:${workspace_flake_ref}#inputs.buck2.outPath" 2>/dev/null || true)"
 		fi
 		if [[ -n "${pre_out}" && -f "${pre_out}/prelude/prelude.bzl" ]]; then
 			pre_target="${pre_out}/prelude"

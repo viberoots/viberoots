@@ -64,6 +64,8 @@ test("link-node writes marker at repo root", async () => {
     const env = {
       ...process.env,
       VBR_LINK_NODE_FAKE_NIX: "1",
+      VBR_NIX_BIN: nixPath,
+      NIX_BIN: nixPath,
       PATH: `${binDir}:${process.env.PATH || ""}`,
       WORKSPACE_ROOT: tmp,
     };
@@ -111,6 +113,10 @@ test("link-node writes marker at repo root", async () => {
     assert.ok(
       logged.includes(`${path.join(tmp, ".viberoots", "workspace")}#node-modules.default`),
       "expected root importer to use hidden workspace flake ref in strict consumer layout",
+    );
+    assert.ok(
+      logged.includes("--no-write-lock-file"),
+      "expected root importer build to avoid rewriting temp workspace flake.lock",
     );
   });
 });

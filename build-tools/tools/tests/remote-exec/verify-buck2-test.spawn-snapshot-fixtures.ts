@@ -7,6 +7,7 @@ export function normalizeSpawnArg(arg: string): string {
   if (arg.startsWith("NIX_SSL_CERT_FILE=")) return "NIX_SSL_CERT_FILE=<cert>";
   if (arg.startsWith("SSL_CERT_FILE=")) return "SSL_CERT_FILE=<cert>";
   if (arg.startsWith("NODE_EXTRA_CA_CERTS=")) return "NODE_EXTRA_CA_CERTS=<cert>";
+  if (arg.startsWith("NIX_CONF_DIR=")) return "NIX_CONF_DIR=<nix-conf-dir>";
   if (arg.startsWith("NIX_BIN=")) return "NIX_BIN=<nix>";
   if (arg.startsWith("PATCH_BIN=")) return "PATCH_BIN=<patch>";
   if (arg.startsWith("GIT_BIN=")) return "GIT_BIN=<git>";
@@ -40,7 +41,9 @@ function commonTestEnvArgs(): string[] {
     "--env",
     "GIT_CONFIG_VALUE_2=false",
     "--env",
-    "NIX_CONFIG=experimental-features = nix-command flakes\nwarn-dirty = false\nbuilders = \nbuild-hook = \nmax-jobs = auto\n",
+    "NIX_CONFIG=experimental-features = nix-command flakes\nwarn-dirty = false\nbuilders =\nbuild-hook =\nmax-jobs = auto",
+    "--env",
+    "NIX_CONF_DIR=<nix-conf-dir>",
     "--env",
     "VBR_NIX_CACHE_HEALTH_APPLIED=1",
     "--env",

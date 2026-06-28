@@ -12,12 +12,12 @@ async function exists(p: string): Promise<boolean> {
   }
 }
 
-export async function writeIfChanged(dst: string, data: string) {
+export async function writeIfChanged(dst: string, data: string): Promise<boolean> {
   if (await exists(dst)) {
     const cur = await fsp.readFile(dst, "utf8");
     const a = crypto.createHash("sha256").update(cur).digest("hex");
     const b = crypto.createHash("sha256").update(data).digest("hex");
-    if (a === b) return;
+    if (a === b) return false;
   }
   await fsp.mkdir(path.dirname(dst), { recursive: true });
   // Atomic write: write to a temp file in the same directory and rename
@@ -26,20 +26,22 @@ export async function writeIfChanged(dst: string, data: string) {
   const tmp = path.join(dir, `.tmp-${base}-${crypto.randomBytes(6).toString("hex")}`);
   await fsp.writeFile(tmp, data, "utf8");
   await fsp.rename(tmp, dst);
-  // silent
+  return true;
 }
 
 export async function maybeAssumeUnchanged(file: string) {
   try {
     const { stdout, exitCode } = await $({
       stdio: "pipe",
-    })`git rev-parse --is-inside-work-tree`.nothrow();
+    })`git rev-parse --is-inside-work-tree`
+      .nothrow()
+      .quiet();
     if (exitCode === 0 && String(stdout || "").trim() === "true") {
       // Avoid noisy pathspec errors: check tracked status via --cached and stdout presence
-      const check = await $({ stdio: "pipe" })`git ls-files --cached -- ${file}`.nothrow();
+      const check = await $({ stdio: "pipe" })`git ls-files --cached -- ${file}`.nothrow().quiet();
       const tracked = String(check.stdout || "").trim().length > 0;
       if (tracked) {
-        await $({ stdio: "pipe" })`git update-index --assume-unchanged ${file}`.nothrow();
+        await $({ stdio: "pipe" })`git update-index --assume-unchanged ${file}`.nothrow().quiet();
       }
     }
   } catch {}

@@ -63,7 +63,11 @@ test("node-modules locked derivation ignores broken shared prefetched store inpu
 
     const flakeRoot = await workspaceFlakeRef(tmp);
     const flakeRef = `path:${flakeRoot}`;
-    const viberootsRoot = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "";
+    const viberootsRoot =
+      process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
+      process.env.VIBEROOTS_SOURCE_ROOT ||
+      process.env.VIBEROOTS_ROOT ||
+      "";
     const override = viberootsRoot
       ? ` --override-input viberoots ${JSON.stringify(`path:${viberootsRoot}`)}`
       : "";

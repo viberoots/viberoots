@@ -20,20 +20,47 @@ import {
 export const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
-function viberootsDevTool(name: string): string {
-  const root = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || process.cwd();
-  return path.join(viberootsRoot(root), "build-tools", "tools", "dev", name);
+function viberootsDevTool(name: string, workspaceRoot = process.cwd()): string {
+  return path.join(viberootsRoot(workspaceRoot), "build-tools", "tools", "dev", name);
 }
 
-function viberootsBuckTool(name: string): string {
-  const root = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || process.cwd();
-  return path.join(viberootsRoot(root), "build-tools", "tools", "buck", name);
+function viberootsBuckTool(name: string, workspaceRoot = process.cwd()): string {
+  return path.join(viberootsRoot(workspaceRoot), "build-tools", "tools", "buck", name);
 }
 
 function viberootsRoot(candidate: string): string {
   const root = path.resolve(candidate);
+  const consumerRoot = path.join(root, "viberoots");
+  if (
+    fs.existsSync(path.join(consumerRoot, "flake.nix")) &&
+    fs.existsSync(path.join(consumerRoot, "build-tools", "tools", "dev", "zx-init.mjs"))
+  ) {
+    return consumerRoot;
+  }
   if (fs.existsSync(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"))) return root;
-  return path.join(root, "viberoots");
+  const envRoot = process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || "";
+  if (envRoot && path.resolve(envRoot) !== root) {
+    const resolvedEnvRoot = path.resolve(envRoot);
+    if (
+      fs.existsSync(path.join(resolvedEnvRoot, "flake.nix")) &&
+      fs.existsSync(path.join(resolvedEnvRoot, "build-tools", "tools", "dev", "zx-init.mjs"))
+    ) {
+      return resolvedEnvRoot;
+    }
+  }
+  return consumerRoot;
+}
+
+function tempWorkspaceEnv(tmp: string, extra: Record<string, string> = {}): Record<string, string> {
+  const root = viberootsRoot(tmp);
+  return {
+    ...process.env,
+    WORKSPACE_ROOT: tmp,
+    VIBEROOTS_ROOT: root,
+    VIBEROOTS_SOURCE_ROOT: root,
+    ZX_INIT: path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"),
+    ...extra,
+  };
 }
 
 async function pickFreePort(): Promise<number> {
@@ -94,7 +121,7 @@ export async function scaffoldAndPrepareWorkspace(
   const appRel = path.join("projects", "apps", name).replace(/\\/g, "/");
   const graphJsonAbs = path.join(tmp, DEFAULT_GRAPH_PATH);
   const appLabel = `//${appRel}:app`;
-  const $ = _$({ cwd: tmp, stdio: "inherit" });
+  const $ = _$({ cwd: tmp, stdio: "inherit", env: tempWorkspaceEnv(tmp) });
   await $`scaf new ts ${template} ${name} --yes --no-tests --skip-lockfile-gen`;
   await stageTempRepoPaths({
     tmp,
@@ -104,8 +131,8 @@ export async function scaffoldAndPrepareWorkspace(
   await _$({
     cwd: tmp,
     stdio: "inherit",
-    env: { ...process.env, WORKSPACE_ROOT: tmp, NIX_PNPM_ALLOW_GENERATE: "1" },
-  })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${`${appRel}/pnpm-lock.yaml`}`;
+    env: tempWorkspaceEnv(tmp, { NIX_PNPM_ALLOW_GENERATE: "1" }),
+  })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts", tmp)} --lockfile ${`${appRel}/pnpm-lock.yaml`}`;
   await stageTempRepoPaths({
     tmp,
     _$,
@@ -115,14 +142,14 @@ export async function scaffoldAndPrepareWorkspace(
   await _$({
     cwd: tmp,
     stdio: "inherit",
-    env: { ...process.env, WORKSPACE_ROOT: tmp, BUCK_TARGET: appLabel },
-  })`zx-wrapper ${viberootsDevTool("install/deps-main.ts")} --verbose --glue-only`;
+    env: tempWorkspaceEnv(tmp, { BUCK_TARGET: appLabel }),
+  })`zx-wrapper ${viberootsDevTool("install/deps-main.ts", tmp)} --verbose --glue-only`;
   await fsp.rm(graphJsonAbs, { force: true });
   await _$({
     cwd: tmp,
     stdio: "inherit",
-    env: { ...process.env, WORKSPACE_ROOT: tmp, BUCK_TEST_SRC: tmp, BUCK_TARGET: appLabel },
-  })`zx-wrapper ${viberootsBuckTool("export-graph.ts")} --out ${graphJsonAbs}`;
+    env: tempWorkspaceEnv(tmp, { BUCK_TEST_SRC: tmp, BUCK_TARGET: appLabel }),
+  })`zx-wrapper ${viberootsBuckTool("export-graph.ts", tmp)} --out ${graphJsonAbs}`;
   // deps-main --glue-only is the single authoritative glue path for this flow.
   await fsp.access(graphJsonAbs);
   await stageTempRepoPaths({
@@ -152,16 +179,14 @@ export async function buildSelectedSsr(
   const built = await _$({
     cwd: tmp,
     stdio: "pipe",
-    env: {
-      ...process.env,
-      WORKSPACE_ROOT: tmp,
+    env: tempWorkspaceEnv(tmp, {
       BUCK_TEST_SRC: tmp,
       NIX_PNPM_ALLOW_GENERATE: "1",
       NIX_PNPM_EXACT_STORE: exactStore.exactStorePath,
       BUCK_GRAPH_JSON: graphJson,
       BUCK_TARGET: label,
-    },
-  })`bash --noprofile --norc -c ${`set -euo pipefail; nix build "path:${flakeRef}#graph-generator-pure-selected" --impure --no-link --accept-flake-config --builders "" --print-build-logs --print-out-paths`}`;
+    }),
+  })`bash --noprofile --norc -c ${`set -euo pipefail; nix build "path:${flakeRef}#graph-generator-pure-selected" --impure --no-link --no-write-lock-file --accept-flake-config --builders "" --print-build-logs --print-out-paths`}`;
   const outPath =
     String(built.stdout || "")
       .trim()

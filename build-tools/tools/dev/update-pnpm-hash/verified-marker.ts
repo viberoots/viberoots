@@ -70,6 +70,10 @@ function sharedCacheRepoRoot(repoRoot: string): string {
   if (explicitRoot && path.isAbsolute(explicitRoot)) {
     return path.resolve(explicitRoot);
   }
+  const workspaceRoot = String(process.env.WORKSPACE_ROOT || "").trim();
+  if (workspaceRoot && path.isAbsolute(workspaceRoot)) {
+    return path.resolve(workspaceRoot);
+  }
   const liveRoot = String(process.env.REPO_ROOT || "").trim();
   if (liveRoot && path.isAbsolute(liveRoot)) {
     return path.resolve(liveRoot);
