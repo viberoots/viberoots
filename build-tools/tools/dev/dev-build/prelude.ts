@@ -2,6 +2,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
 import { activateWorkspace } from "../../lib/workspace-activation";
+import {
+  BUCK_PROJECT_IGNORE_LINE,
+  withBuckProjectIgnorePolicy,
+} from "../../lib/buck-project-ignore";
+import { writeIfChanged } from "../../lib/fs-helpers";
 async function pathExists(p: string): Promise<boolean> {
   try {
     await fsp.access(p);
@@ -11,14 +16,15 @@ async function pathExists(p: string): Promise<boolean> {
   }
 }
 
-export async function ensureBuckPreludeConfig(root: string): Promise<void> {
+export async function ensureBuckPreludeConfig(root: string): Promise<boolean> {
   try {
     await applyNixCacheHealthPolicy(root);
     try {
+      const rootCfgPath = path.join(root, ".buckconfig");
       const preludeFileExists = await pathExists(
         path.join(root, ".viberoots", "current", "prelude", "prelude.bzl"),
       );
-      const rootCfgExists = await pathExists(path.join(root, ".buckconfig"));
+      const rootCfgExists = await pathExists(rootCfgPath);
       const workspaceProvidersCfgExists = await pathExists(
         path.join(root, ".viberoots", "workspace", "providers", ".buckconfig"),
       );
@@ -35,7 +41,11 @@ export async function ensureBuckPreludeConfig(root: string): Promise<void> {
         workspaceBuckCfgExists &&
         workspaceTargetsExists
       ) {
-        return;
+        const rootCfg = await fsp.readFile(rootCfgPath, "utf8");
+        if (!rootCfg.includes(BUCK_PROJECT_IGNORE_LINE)) {
+          return await writeIfChanged(rootCfgPath, withBuckProjectIgnorePolicy(rootCfg));
+        }
+        return false;
       }
     } catch {}
 
@@ -82,7 +92,7 @@ user_platform = prelude//platforms:default
 target_platforms = prelude//platforms:default
 
 [project]
-ignore = .viberoots/buck,.viberoots/workspace/buck/tmp,.claude/worktrees,.codex/worktrees
+${BUCK_PROJECT_IGNORE_LINE}
 EOF
     `}`;
     await activateWorkspace({ start: root });
@@ -104,6 +114,7 @@ filegroup(
 )
 EOF
     `}`;
+    return true;
   } catch (e) {
     console.error("failed to ensure Buck prelude config:", e);
     throw e;

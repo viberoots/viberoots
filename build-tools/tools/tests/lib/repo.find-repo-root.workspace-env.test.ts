@@ -12,6 +12,13 @@ import { runInTemp } from "./test-helpers";
 const execFileAsync = promisify(execFile);
 const VERSION_SCRIPT = "viberoots/build-tools/tools/dev/viberoots.ts";
 
+async function exists(p: string): Promise<boolean> {
+  return await fsp.access(p).then(
+    () => true,
+    () => false,
+  );
+}
+
 async function workspace(prefix: string): Promise<string> {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), `${prefix}-`));
   await fsp.writeFile(path.join(tmp, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
@@ -251,6 +258,36 @@ test("vbr wrapper resolves command source from nested consumer directories", asy
     assert.equal(status.workspaceRoot, tmp);
     assert.equal(status.viberootsRoot, viberootsRoot);
     assert.equal(status.revisionSource, "git");
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("vbr develop prints relative workspace flake refs from nested consumer directories", async () => {
+  const tmp = await extractedWorkspace("vbr-develop-command");
+  try {
+    const nested = path.join(tmp, "projects", "apps", "demo");
+    await fsp.mkdir(nested, { recursive: true });
+    const viberootsRoot = path.join(process.cwd(), "viberoots");
+    const binDir = path.join(viberootsRoot, "build-tools", "tools", "bin");
+    const { stdout } = await execFileAsync("vbr", ["develop", "--print", "--command", "true"], {
+      cwd: nested,
+      env: {
+        ...process.env,
+        PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}`,
+        NO_DEV_SHELL: "1",
+        WORKSPACE_ROOT: tmp,
+        VIBEROOTS_ROOT: viberootsRoot,
+      },
+    });
+    const command = String(stdout).trim();
+    assert.equal(
+      command,
+      "nix develop --no-write-lock-file --accept-flake-config path:../../../.viberoots/workspace#default --override-input viberoots path:../../../viberoots --command true",
+    );
+    assert.doesNotMatch(command, new RegExp(tmp.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(command, new RegExp(viberootsRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.equal(await exists(path.join(nested, ".viberoots")), false);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }

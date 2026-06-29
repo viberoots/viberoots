@@ -27,6 +27,12 @@ test("install deps nix calls disable per-invocation auto-GC lock waits", async (
   if (depsMain.includes("--print-build-logs")) {
     throw new Error("deps-main.ts must not run duplicate node-modules nix builds");
   }
+  if (!depsMain.includes("const prevSkipPnpmHash = process.env.INSTALL_GLUE_SKIP_PNPM_HASH")) {
+    throw new Error("deps-main.ts must preserve the caller's glue pnpm-hash skip setting");
+  }
+  if (!depsMain.includes('process.env.INSTALL_GLUE_SKIP_PNPM_HASH = "1"')) {
+    throw new Error("deps-main.ts must avoid duplicate pnpm hash reconciliation during glue");
+  }
 
   const linkNode = await fsp.readFile(
     "viberoots/build-tools/tools/dev/install/link-node.ts",

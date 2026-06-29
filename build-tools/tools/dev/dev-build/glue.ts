@@ -3,8 +3,8 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 import { readCompositeGraph } from "../../lib/graph-view";
-import { runGomod2nixGenerate, runGomod2nixScanAll } from "../install/gomod2nix";
 import { buildToolPath, nodeBin, zxNodeBase } from "./paths";
+import { runGluePipeline } from "../../buck/glue-pipeline";
 
 export async function cleanDevBuildWorkspace(root: string): Promise<void> {
   await $({
@@ -129,13 +129,6 @@ export async function refreshGlueAndExportGraph(root: string): Promise<string> {
     "tools/dev/install-deps.ts",
   )} --glue-only`}`;
 
-  try {
-    await runGomod2nixGenerate(false, false);
-    await runGomod2nixScanAll(false, false);
-  } catch (e) {
-    console.warn("[dev-build] gomod2nix generation skipped:", e);
-  }
-
   await debugListTargets(root);
 
   const runEnv = {
@@ -148,6 +141,7 @@ export async function refreshGlueAndExportGraph(root: string): Promise<string> {
   const scope = (process.env.DEVBUILD_SCOPE || "").trim();
   const graphPath = await exportGraph(root, { scope, env: runEnv });
   await ensureNonEmptyGraphOrExit(root, graphPath);
+  await runGluePipeline({ graphPath, skipProviderSync: true });
 
   process.env.BUCK_GRAPH_JSON = graphPath;
   return graphPath;

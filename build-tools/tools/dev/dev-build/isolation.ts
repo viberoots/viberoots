@@ -9,6 +9,7 @@ export type Isolation = {
   isolationFlags: string[];
   reuseDaemon: boolean;
   killOnExit: boolean;
+  registerForCleanup: boolean;
   killIsolationIfOwned: () => Promise<void>;
   attachSignalHandlers: () => void;
   attachExitHandlers: () => void;
@@ -64,6 +65,7 @@ export function createIsolation(opts: CreateIsolationOptions = {}): Isolation {
   const defaultIso = reuseDaemon ? `devbuild-shared-${repoHash}` : `devbuild-${process.pid}`;
   const buckIsolation = inheritedIso ? inheritedIso : defaultIso;
   const createdOwnIsolation = !inheritedIso && process.env.BUCK_NO_ISOLATION !== "1";
+  const registerForCleanup = createdOwnIsolation && killOnExit;
   const isolationFlags: string[] =
     process.env.BUCK_NO_ISOLATION === "1" ? [] : ["--isolation-dir", buckIsolation];
   async function killIsolationIfOwned() {
@@ -125,6 +127,7 @@ export function createIsolation(opts: CreateIsolationOptions = {}): Isolation {
     isolationFlags,
     reuseDaemon,
     killOnExit,
+    registerForCleanup,
     killIsolationIfOwned,
     attachSignalHandlers,
     attachExitHandlers,

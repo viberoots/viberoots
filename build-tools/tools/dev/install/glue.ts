@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { printSkip } from "../../lib/errors";
+import { createCommandUi } from "../../lib/command-ui";
 import { writeIfChanged } from "../../lib/fs-helpers";
 import { nodeFlagsWithZx, nodeOptionsWithoutZxInit } from "../../lib/node-run";
 import { findRepoRoot } from "../../lib/repo";
@@ -11,6 +12,28 @@ import { DEFAULT_AUTO_MAP_PATH } from "../../lib/workspace-state-paths";
 import { buildToolPath, zxInitPath } from "../dev-build/paths";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
 import { discoverImportersWithLock } from "./importers";
+import { glueFingerprintFresh, writeGlueFingerprint } from "./glue-freshness";
+
+function outputTail(value: unknown): string {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const max = 12_000;
+  return text.length > max ? text.slice(text.length - max) : text;
+}
+
+function printGlueFailure(label: string, result: unknown): void {
+  const proc = result as {
+    stdout?: unknown;
+    stderr?: unknown;
+    cause?: { stdout?: unknown; stderr?: unknown };
+  };
+  const details = [proc.stderr, proc.stdout, proc.cause?.stderr, proc.cause?.stdout]
+    .map(outputTail)
+    .filter(Boolean)
+    .join("\n");
+  process.stderr.write(`[install-deps] glue step failed: ${label}\n`);
+  if (details) process.stderr.write(`${details}\n`);
+}
 
 function repoRoot(): string {
   const here = path.dirname(new URL(import.meta.url).pathname);
@@ -67,6 +90,7 @@ async function ensureAutoMapStubIfMissing() {
 }
 
 export async function runGlue(dryRun: boolean, verbose: boolean) {
+  const ui = createCommandUi({ verbose });
   const nodeBase = zxNodeBase();
   const nodeBin = process.execPath || "node";
   const wsRoot = await workspaceRoot();
@@ -127,6 +151,7 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
               script: updater,
               args: ["--lockfile", relLock],
               cwd: repo,
+              stdio: verbose ? "inherit" : "pipe",
               env: {
                 ...process.env,
                 INSTALL_LOCK_SKIP: "1",
@@ -174,6 +199,19 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   ];
   await ensureAutoMapStubIfMissing();
   await ensurePreludeSymlinkIfMissing();
+  if (!dryRun) {
+    const freshness = await glueFingerprintFresh(wsRoot);
+    if (freshness.fresh) {
+      if (verbose) console.log("[install-deps] glue already fresh; skipping");
+      else ui.ok("glue", "already fresh");
+      return;
+    }
+    if (verbose) {
+      console.log(`[install-deps] glue refresh required (${freshness.reason})`);
+    } else {
+      ui.step("glue", "refreshing");
+    }
+  }
   for (const c of cmds) {
     if (c.when === false) {
       if (c.skipReason) {
@@ -199,6 +237,19 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
             .join(" "),
         }
       : baseEnv;
-    await $({ stdio: "inherit", cwd: wsRoot, env })`bash --noprofile --norc -c ${c.cmd}`;
+    const child = $({
+      stdio: verbose ? "inherit" : "pipe",
+      cwd: wsRoot,
+      env,
+      reject: false,
+    })`bash --noprofile --norc -c ${c.cmd}`;
+    const res = verbose ? await child : await child.quiet();
+    if (res.exitCode !== 0) {
+      printGlueFailure(c.label, res);
+      process.exit(res.exitCode || 1);
+    }
+  }
+  if (!dryRun) {
+    await writeGlueFingerprint(wsRoot);
   }
 }

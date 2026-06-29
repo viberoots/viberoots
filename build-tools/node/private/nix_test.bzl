@@ -1,6 +1,6 @@
 load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
 load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_calling_env_export_source_snapshot", "nix_timeout_wrapper_var")
-load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "run_nix_action", "stamp_remote_readiness_labels")
+load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "stamp_remote_readiness_labels", "write_nix_test_stamp")
 load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
@@ -77,11 +77,7 @@ def _node_nix_test_impl(ctx):
 
     # Declare a tiny deterministic output so builds have an artifact
     stamp = ctx.actions.declare_output(ctx.attrs.out)
-    cmd = cmd_args(
-        ["bash", "-c", "echo node_nix_test > \"$1\"", "stamp", stamp.as_output()],
-        hidden = ctx.attrs.srcs,
-    )
-    policy_info = run_nix_action(ctx, cmd, category = "node_nix_test_stamp")
+    policy_info = write_nix_test_stamp(ctx, stamp, "node_nix_test\n")
     re_executor, executor_overrides = get_re_executors_from_props(ctx)
     snapshot_inputs = []
     if ctx.attrs.source_snapshot != None:

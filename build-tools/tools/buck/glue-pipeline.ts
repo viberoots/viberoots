@@ -11,6 +11,7 @@ import {
   DEFAULT_AUTO_MAP_PATH,
   DEFAULT_INVALIDATION_REPORT_PATH,
 } from "../lib/workspace-state-paths";
+import { writeGlueFingerprint } from "../dev/install/glue-freshness";
 
 type RunGluePipelineOptions = {
   graphPath?: string;
@@ -130,6 +131,8 @@ export async function runGluePipeline(opts: RunGluePipelineOptions = {}): Promis
   } else if (verbose) {
     console.error("[glue-pipeline] invalidation-report (skipped)");
   }
+
+  await writeGlueFingerprint(repoRoot);
 }
 
 async function main() {

@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 import { findExtractionBlockers, formatExtractionBlockers } from "../../lib/extraction-blockers";
+import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 
 const execFileAsync = promisify(execFile);
 
@@ -35,7 +36,10 @@ async function readWorkspaceFlakeText(): Promise<string> {
 
 async function git(args: string[], cwd = "."): Promise<string> {
   try {
-    const { stdout } = await execFileAsync("git", args, { cwd });
+    const { stdout } = await execFileAsync("git", args, {
+      cwd,
+      env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
+    });
     return String(stdout || "").trim();
   } catch {
     return "";
@@ -140,7 +144,8 @@ function strictSubmoduleState(): boolean {
 
 function warnOrThrowSubmoduleState(message: string): void {
   if (strictSubmoduleState()) throw new Error(message);
-  console.warn(message);
+  if (isVbrVerbose()) console.warn(message);
+  else createCommandUi({ verbose: false }).warn(message.replace(/^\[startup-check\]\s*/, ""));
 }
 
 async function requireSubmoduleGitState(flakeText: string): Promise<void> {

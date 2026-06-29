@@ -206,7 +206,7 @@ export async function repairGeneratedWorkspaceLock(
   if (flakeRepair === "would-repair") {
     return { status: "would-repair", reason: "stale-viberoots-input" };
   }
-  if (flakeRepair === "repaired") {
+  if (flakeRepair === "repaired" && opts.verbose) {
     console.error("[install-deps] refreshing generated workspace viberoots flake input");
   }
   const candidateRaw = await metadataLocks({
@@ -229,7 +229,9 @@ export async function repairGeneratedWorkspaceLock(
     return { status: "would-repair", reason: "stale-viberoots-input" };
   }
 
-  console.error("[install-deps] refreshing generated workspace viberoots lock input");
+  if (opts.verbose) {
+    console.error("[install-deps] refreshing generated workspace viberoots lock input");
+  }
   const now = opts.deps?.now?.() || new Date();
   const backup = `${lockFile}.vbr-repair.${process.pid}.${now
     .toISOString()

@@ -6,6 +6,7 @@ import {
   initLocalSprinkleRefValues,
   initSprinkleRefConfigs,
 } from "../deployments/sprinkleref-templates";
+import { BUCK_PROJECT_IGNORE_LINE } from "./buck-project-ignore";
 import { writeIfChanged } from "./fs-helpers";
 import { activateWorkspace } from "./workspace-activation";
 import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
@@ -183,7 +184,7 @@ user_platform = prelude//platforms:default
 target_platforms = prelude//platforms:default
 
 [project]
-ignore = .viberoots/buck,.viberoots/workspace/buck/tmp,.claude/worktrees,.codex/worktrees
+${BUCK_PROJECT_IGNORE_LINE}
 `;
 }
 
@@ -240,7 +241,7 @@ fi
 watch_file .viberoots/workspace/flake.nix
 watch_file .viberoots/workspace/flake.lock
 
-use flake "path:\${PWD}/.viberoots/workspace#default"${localOverride}
+use flake "path:\${PWD}/.viberoots/workspace#default" --accept-flake-config${localOverride}
 `;
 }
 

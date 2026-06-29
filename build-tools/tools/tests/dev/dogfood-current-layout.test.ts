@@ -78,6 +78,8 @@ test("dogfood buckconfig routes viberoots-owned cells through current", async ()
   assert.equal((await fsp.stat(path.join(process.cwd(), "AGENTS.md"))).isFile(), true);
 
   const sections = buckconfigSections(await fsp.readFile(".buckconfig", "utf8"));
+  assert.equal(sections.get("project")?.get("ignore")?.includes(".git"), true);
+  assert.equal(sections.get("project")?.get("ignore")?.includes(".direnv"), true);
   const expected = new Map([
     ["viberoots", "./.viberoots/current"],
     ["prelude", "./.viberoots/current/prelude"],

@@ -7,12 +7,15 @@ const actionFiles = [
   "viberoots/build-tools/go/private/nix_build.bzl",
   "viberoots/build-tools/go/private/nix_build_carchive.bzl",
   "viberoots/build-tools/go/private/nix_build_wasm.bzl",
-  "viberoots/build-tools/go/private/nix_test.bzl",
   "viberoots/build-tools/python/private/nix_build.bzl",
-  "viberoots/build-tools/python/private/nix_test.bzl",
   "viberoots/build-tools/cpp/private/nix_build.bzl",
-  "viberoots/build-tools/cpp/private/nix_test.bzl",
   "viberoots/build-tools/rust/private/nix_build.bzl",
+];
+
+const testStampFiles = [
+  "viberoots/build-tools/go/private/nix_test.bzl",
+  "viberoots/build-tools/python/private/nix_test.bzl",
+  "viberoots/build-tools/cpp/private/nix_test.bzl",
   "viberoots/build-tools/node/private/nix_test.bzl",
   "viberoots/build-tools/tools/buck/zx_test.bzl",
 ];
@@ -53,6 +56,23 @@ test("Nix-backed action rules use the shared remote action policy helper", () =>
     assert.match(text, /run_nix_action\(/, file);
     assert.doesNotMatch(text, /ctx\.actions\.run\(/, file);
   }
+});
+
+test("test wrapper default outputs use deterministic policy stamps", () => {
+  for (const file of testStampFiles) {
+    const text = read(file);
+    assert.match(text, /remote_action_policy\.bzl/, file);
+    assert.match(text, /write_nix_test_stamp\(/, file);
+    assert.doesNotMatch(text, /run_nix_action\(/, file);
+    assert.doesNotMatch(text, /ctx\.actions\.run\(/, file);
+    assert.doesNotMatch(text, /category = ".*_test_stamp"/, file);
+    assert.doesNotMatch(text, /echo .*_test >/, file);
+  }
+
+  const policyText = read("viberoots/build-tools/lang/remote_action_policy.bzl");
+  assert.match(policyText, /def write_nix_test_stamp/);
+  assert.match(policyText, /ctx\.actions\.write\(output, content\)/);
+  assert.match(policyText, /NixRemoteActionPolicyInfo/);
 });
 
 test("shared action policy stamps local-only, hybrid, and remote-ready metadata", () => {

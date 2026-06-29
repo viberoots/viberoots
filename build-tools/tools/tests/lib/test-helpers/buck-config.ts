@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH, WORKSPACE_BUCK_STATE_DIR } from "../../../lib/workspace-state-paths";
+import { BUCK_PROJECT_IGNORE_LINE } from "../../../lib/buck-project-ignore";
 import "./worker-init";
 let cachedPreludePath: Promise<string> | null = null;
 interface TempRepoBuckConfigOptions {
@@ -160,6 +161,9 @@ export async function ensureBuckConfigForTempRepo(
     "user_platform = //:no_cgo",
     "target_platforms = //:no_cgo",
     "action_env = SDKROOT,CPATH,LIBRARY_PATH,CGO_CFLAGS,CGO_CPPFLAGS,CGO_ENABLED,WORKSPACE_ROOT,BUCK_TEST_SRC,BUCK_GRAPH_JSON,BUCK_ISOLATION_DIR,BUCK_NESTED_ISO,REPO_ROOT,VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT,VIBEROOTS_ROOT,VIBEROOTS_SOURCE_ROOT,VIBEROOTS_FLAKE_INPUT_ROOT,ZX_INIT",
+    "",
+    "[project]",
+    BUCK_PROJECT_IGNORE_LINE,
     "EOF",
     "mkdir -p .viberoots",
     '[ -n "${VIBEROOTS_ROOT:-}" ] && [ -e "$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs" ] && [ ! -e .viberoots/current/build-tools/tools/dev/zx-init.mjs ] && rm -rf .viberoots/current || true',

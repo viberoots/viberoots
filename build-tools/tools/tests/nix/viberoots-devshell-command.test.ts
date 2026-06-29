@@ -7,6 +7,12 @@ import { test } from "node:test";
 test("devshell wires viberoots as a Nix-provided PATH command", async () => {
   const devshell = await fsp.readFile("viberoots/build-tools/tools/nix/devshell.nix", "utf8");
   assert.match(devshell, /viberootsCommand = import \.\/packages\/viberoots-command\.nix/);
+  assert.match(devshell, /entry_cwd="\$PWD"/);
+  assert.match(devshell, /dev_root="''\$\{WORKSPACE_ROOT:-\$PWD\}"/);
+  assert.match(devshell, /dev_root="\$\(cd "\$WORKSPACE_ROOT" && pwd\)"/);
+  assert.match(devshell, /local d="''\$\{WORKSPACE_ROOT:-\$PWD\}"/);
+  assert.match(devshell, /\( -n "''\$\{WORKSPACE_ROOT:-\}" \|\| -f "\$d\/flake\.nix" \)/);
+  assert.match(devshell, /cd "\$entry_cwd"/);
   assert.match(devshell, /buildInputs = \[[^\]]*\bviberootsCommand\b/s);
   assert.match(devshell, /local vbr_host_nix_bin=""/);
   assert.match(devshell, /\[ -n "''\$\{VBR_NIX_BIN:-\}" \] && \[ -x "\$VBR_NIX_BIN" \]/);
@@ -21,6 +27,9 @@ test("devshell wires viberoots as a Nix-provided PATH command", async () => {
   assert.match(devshell, /vbr_source="\$PWD"/);
   assert.match(devshell, /export VIBEROOTS_ROOT="\$vbr_source"/);
   assert.match(devshell, /viberoots init-workspace --shell-entry --source "\$vbr_source"/);
+  assert.match(devshell, /eval "\$\(vbr completion zsh\)"/);
+  assert.match(devshell, /eval "\$\(vbr completion bash\)"/);
+  assert.doesNotMatch(devshell, /eval "\$\(viberoots completion/);
 
   const built = await $({
     stdio: "pipe",

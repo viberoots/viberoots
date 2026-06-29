@@ -19,6 +19,10 @@ export const DEFAULT_INVALIDATION_REPORT_PATH = path.join(
   WORKSPACE_BUCK_STATE_DIR,
   "invalidation-report.txt",
 );
+export const DEFAULT_PREBUILD_FINGERPRINT_PATH = path.join(
+  WORKSPACE_BUCK_STATE_DIR,
+  "prebuild-fingerprint.json",
+);
 
 export const DEFAULT_AUTO_MAP_PATH = path.join(WORKSPACE_PROVIDER_DIR, "auto_map.bzl");
 export const DEFAULT_PROVIDER_TARGETS_PATH = path.join(WORKSPACE_PROVIDER_DIR, "TARGETS");

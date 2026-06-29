@@ -86,13 +86,13 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
       "../buck",
     );
     assert.equal(await fsp.readFile(path.join(workspace, ".buckroot"), "utf8"), ".\n");
-    assert.match(
-      await fsp.readFile(path.join(workspace, ".buckconfig"), "utf8"),
-      /\.viberoots\/current\/prelude/,
-    );
+    const buckconfig = await fsp.readFile(path.join(workspace, ".buckconfig"), "utf8");
+    assert.match(buckconfig, /\.viberoots\/current\/prelude/);
+    assert.match(buckconfig, /^ignore = .*\.git/m);
+    assert.match(buckconfig, /^ignore = .*\.direnv/m);
     assert.match(
       await fsp.readFile(path.join(workspace, ".envrc"), "utf8"),
-      /use flake "path:\$\{PWD\}\/\.viberoots\/workspace#default" --override-input viberoots "path:\$\{VIBEROOTS_FLAKE_INPUT_ROOT:-\$\{VIBEROOTS_SOURCE_ROOT:-\$\{PWD\}\/viberoots\}\}"/,
+      /use flake "path:\$\{PWD\}\/\.viberoots\/workspace#default" --accept-flake-config --override-input viberoots "path:\$\{VIBEROOTS_FLAKE_INPUT_ROOT:-\$\{VIBEROOTS_SOURCE_ROOT:-\$\{PWD\}\/viberoots\}\}"/,
     );
     await assert.rejects(fsp.lstat(path.join(workspace, "flake.nix")));
     await assert.rejects(fsp.lstat(path.join(workspace, "buck-out")));

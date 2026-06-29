@@ -42,7 +42,7 @@ export function parseDevBuildArgs(argsIn: string[]): DevBuildArgs {
   let restArgs = argsIn;
 
   if (argsIn.length === 0) {
-    restArgs = ["//..."];
+    restArgs = [];
   } else if (KNOWN_SUBCMDS.has(argsIn[0] || "")) {
     subcmd = argsIn[0] as string;
     restArgs = argsIn.slice(1);

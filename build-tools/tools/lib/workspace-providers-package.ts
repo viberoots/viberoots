@@ -15,14 +15,24 @@ const CXX_PROVIDER_TARGETS = [
 ].join("\n");
 
 const DEFS_CPP = [
-  'load("@prelude//:rules.bzl", "genrule")',
+  "def _nix_cxx_provider_impl(ctx):",
+  '    out = ctx.actions.write(ctx.attrs.out, "cpp_provider:%s\\n" % ctx.attrs.attr)',
+  "    return [DefaultInfo(default_output = out)]",
+  "",
+  "_nix_cxx_provider_rule = rule(",
+  "    impl = _nix_cxx_provider_impl,",
+  "    attrs = {",
+  '        "attr": attrs.string(),',
+  '        "out": attrs.string(),',
+  '        "labels": attrs.list(attrs.string(), default = []),',
+  "    },",
+  ")",
   "",
   "def nix_cxx_provider(name, attr):",
-  "    genrule(",
+  "    _nix_cxx_provider_rule(",
   "        name = name,",
-  "        srcs = [],",
   '        out = name + ".stamp",',
-  '        cmd = "echo cpp_provider:${attr} > $OUT",',
+  "        attr = attr,",
   '        labels = ["lang:cpp", "nixpkg:%s" % attr],',
   '        visibility = ["//visibility:public"],',
   "    )",
@@ -36,14 +46,31 @@ const DEFS_CPP = [
 ].join("\n");
 
 const DEFS_NODE = [
-  'load("@prelude//:rules.bzl", "genrule")',
+  "def _node_importer_deps_impl(ctx):",
+  "    out = ctx.actions.write(",
+  "        ctx.attrs.out,",
+  '        "node_importer:%s %s\\n" % (ctx.attrs.importer, ctx.attrs.lockfile),',
+  "    )",
+  "    return [DefaultInfo(default_output = out)]",
+  "",
+  "_node_importer_deps_rule = rule(",
+  "    impl = _node_importer_deps_impl,",
+  "    attrs = {",
+  '        "lockfile": attrs.string(),',
+  '        "importer": attrs.string(),',
+  '        "patch_paths": attrs.list(attrs.string(), default = []),',
+  '        "out": attrs.string(),',
+  '        "labels": attrs.list(attrs.string(), default = []),',
+  "    },",
+  ")",
   "",
   "def node_importer_deps(name, lockfile, importer, patch_paths = []):",
-  "    genrule(",
+  "    _node_importer_deps_rule(",
   "        name = name,",
-  "        srcs = [],",
   '        out = name + ".stamp",',
-  '        cmd = "echo node_importer:${importer} ${lockfile} > $OUT",',
+  "        lockfile = lockfile,",
+  "        importer = importer,",
+  "        patch_paths = patch_paths,",
   '        labels = ["lang:node"],',
   '        visibility = ["PUBLIC"],',
   "    )",
@@ -51,14 +78,31 @@ const DEFS_NODE = [
 ].join("\n");
 
 const DEFS_PYTHON = [
-  'load("@prelude//:rules.bzl", "genrule")',
+  "def _python_importer_deps_impl(ctx):",
+  "    out = ctx.actions.write(",
+  "        ctx.attrs.out,",
+  '        "python_importer:%s %s\\n" % (ctx.attrs.importer, ctx.attrs.lockfile),',
+  "    )",
+  "    return [DefaultInfo(default_output = out)]",
+  "",
+  "_python_importer_deps_rule = rule(",
+  "    impl = _python_importer_deps_impl,",
+  "    attrs = {",
+  '        "lockfile": attrs.string(),',
+  '        "importer": attrs.string(),',
+  '        "patch_paths": attrs.list(attrs.string(), default = []),',
+  '        "out": attrs.string(),',
+  '        "labels": attrs.list(attrs.string(), default = []),',
+  "    },",
+  ")",
   "",
   "def python_importer_deps(name, lockfile, importer, patch_paths = []):",
-  "    genrule(",
+  "    _python_importer_deps_rule(",
   "        name = name,",
-  "        srcs = [],",
   '        out = name + ".stamp",',
-  '        cmd = "echo python_importer:${importer} ${lockfile} > $OUT",',
+  "        lockfile = lockfile,",
+  "        importer = importer,",
+  "        patch_paths = patch_paths,",
   '        labels = ["lang:python"],',
   '        visibility = ["PUBLIC"],',
   "    )",
@@ -114,9 +158,9 @@ export async function ensureWorkspaceProvidersPackage(
     path.join(path.dirname(targetsPath), ".buckconfig"),
     "[buildfile]\nname = TARGETS\n",
   );
-  await writeIfMissing(path.join(path.dirname(targetsPath), "defs_cpp.bzl"), DEFS_CPP);
-  await writeIfMissing(path.join(path.dirname(targetsPath), "defs_node.bzl"), DEFS_NODE);
-  await writeIfMissing(path.join(path.dirname(targetsPath), "defs_python.bzl"), DEFS_PYTHON);
+  await writeIfChanged(path.join(path.dirname(targetsPath), "defs_cpp.bzl"), DEFS_CPP);
+  await writeIfChanged(path.join(path.dirname(targetsPath), "defs_node.bzl"), DEFS_NODE);
+  await writeIfChanged(path.join(path.dirname(targetsPath), "defs_python.bzl"), DEFS_PYTHON);
   await ensureCuratedTargets(workspaceRoot);
   await writeIfMissing(autoMapPath, "MODULE_PROVIDERS = {}\n");
 }

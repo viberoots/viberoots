@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import "zx/globals";
+import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { writeIfChanged } from "../../lib/fs-helpers";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { runManagedCommand } from "../../lib/managed-command";
@@ -163,9 +164,15 @@ async function buildSeedStorePath(
   // the most-recent seed derivation is pinned; older ones remain GC-eligible.
   const gcRootPath = path.join(seedRootDir(root), "nix-root");
   await mkdirWithMacosMetadataExclusion(seedRootDir(root)).catch(() => {});
-  process.stderr.write(
-    `[verify] seed build: nix build path:${root}/.viberoots/workspace#test-seed (timeout=${timeoutSec}s)\n`,
-  );
+  const verbose = isVbrVerbose();
+  const ui = createCommandUi({ verbose });
+  if (verbose) {
+    process.stderr.write(
+      `[verify] seed build: nix build path:${root}/.viberoots/workspace#test-seed (timeout=${timeoutSec}s)\n`,
+    );
+  } else {
+    ui.step("seed", "checking test fixture store");
+  }
   const cmd = await runManagedCommand({
     command: "nix",
     args: verifySeedBuildArgs({ root, mode, gcRootPath }),
@@ -197,7 +204,8 @@ async function buildSeedStorePath(
     .pop();
   if (!out)
     throw new Error("verify seed: nix build .viberoots/workspace#test-seed returned no store path");
-  process.stderr.write("[verify] seed build: complete\n");
+  if (verbose) process.stderr.write("[verify] seed build: complete\n");
+  else ui.ok("seed", "ready");
   return out;
 }
 

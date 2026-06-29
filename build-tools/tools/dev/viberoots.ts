@@ -1,8 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { getFlagBool, getFlagStr, getPositionals } from "../lib/cli";
+import { getArgvTokens } from "../lib/argv";
 import { findExtractionBlockers } from "../lib/extraction-blockers";
 import { resolveWorkspaceRootsSync } from "../lib/repo";
 import { activateWorkspace } from "../lib/workspace-activation";
@@ -12,6 +13,7 @@ import { checkBootstrapCompletion } from "../lib/bootstrap-completion";
 import { removeSubmodule, useFlake, useSubmodule } from "../lib/consumer-source-mode";
 import { runLiveBootstrap } from "../lib/live-bootstrap";
 import { runViberootsGc } from "../lib/maintenance-gc";
+import { repairGeneratedWorkspaceLock } from "../lib/workspace-lock-repair";
 
 type VersionStatus = ReturnType<typeof buildVersionStatus>;
 type CommandMeta = {
@@ -27,6 +29,12 @@ const commandMetadata: CommandMeta[] = [
     usage: "viberoots status [--json]",
     description: "Print active source mode and workspace status.",
     options: ["--json"],
+  },
+  {
+    name: "develop",
+    usage: "viberoots develop [--print] [nix-develop-args...]",
+    description: "Enter the generated workspace dev shell with the selected viberoots input.",
+    options: ["--print", "--verbose", "--help", "--command"],
   },
   {
     name: "bootstrap-check",
@@ -134,9 +142,9 @@ const commandMetadata: CommandMeta[] = [
   },
   {
     name: "completion",
-    usage: "viberoots completion bash",
+    usage: "viberoots completion bash|zsh",
     description: "Print shell completion code.",
-    options: ["bash", "--help"],
+    options: ["bash", "zsh", "--help"],
   },
   {
     name: "help",
@@ -351,6 +359,125 @@ complete -F _viberoots viberoots
 complete -F _viberoots vbr`);
 }
 
+function printZshCompletion(): void {
+  const commandNames = commandMetadata.map((command) => command.name).join(" ");
+  const optionCases = commandMetadata
+    .map(
+      (command) =>
+        `    ${command.name}) _arguments -S ${command.options.map((option) => JSON.stringify(`${option}[${option}]`)).join(" ")} ;;`,
+    )
+    .join("\n");
+  console.log(`#compdef viberoots vbr
+_viberoots()
+{
+  local -a commands
+  commands=(${commandNames})
+  if (( CURRENT == 2 )); then
+    _describe 'viberoots command' commands
+    return
+  fi
+  local cmd="\${words[2]}"
+  case "\${cmd}" in
+${optionCases}
+    *) _files ;;
+  esac
+}
+compdef _viberoots viberoots
+compdef _viberoots vbr`);
+}
+
+function relativePathRef(fromDir: string, target: string): string {
+  const rel = path.relative(fromDir, target) || ".";
+  if (rel === ".") return ".";
+  return rel.startsWith(".") ? rel : `./${rel}`;
+}
+
+function selectedViberootsInputRoot(roots: ReturnType<typeof resolveWorkspaceRootsSync>): string {
+  const explicit = (process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "").trim();
+  if (explicit) return path.resolve(roots.workspaceRoot, explicit);
+  const visibleSubmodule = path.join(roots.workspaceRoot, "viberoots");
+  if (fs.existsSync(visibleSubmodule)) return visibleSubmodule;
+  const sourceRoot = (process.env.VIBEROOTS_SOURCE_ROOT || "").trim();
+  if (sourceRoot) return path.resolve(roots.workspaceRoot, sourceRoot);
+  return roots.viberootsRoot;
+}
+
+function developPassthroughArgs(): string[] {
+  const tokens = getArgvTokens();
+  const args = tokens[0] === "develop" ? tokens.slice(1) : tokens;
+  const out: string[] = [];
+  for (const arg of args) {
+    if (arg === "--print" || arg === "--verbose") continue;
+    out.push(arg);
+  }
+  return out;
+}
+
+function developCommand(): {
+  command: string;
+  args: string[];
+  env: NodeJS.ProcessEnv;
+  selectedInputRoot: string;
+  workspaceRoot: string;
+} {
+  const roots = resolveWorkspaceRootsSync();
+  const cwd = process.cwd();
+  const selectedInputRoot = selectedViberootsInputRoot(roots);
+  const workspaceFlake = `${relativePathRef(cwd, roots.viberootsWorkspace)}#default`;
+  const viberootsInput = relativePathRef(cwd, selectedInputRoot);
+  const toolsBin = path.join(roots.viberootsRoot, "build-tools", "tools", "bin");
+  return {
+    command: "nix",
+    args: [
+      "develop",
+      "--no-write-lock-file",
+      "--accept-flake-config",
+      `path:${workspaceFlake}`,
+      "--override-input",
+      "viberoots",
+      `path:${viberootsInput}`,
+      ...developPassthroughArgs(),
+    ],
+    env: {
+      ...process.env,
+      PATH: `${toolsBin}${path.delimiter}${process.env.PATH || ""}`,
+      WORKSPACE_ROOT: roots.workspaceRoot,
+      VIBEROOTS_FLAKE_INPUT_ROOT: selectedInputRoot,
+    },
+    selectedInputRoot,
+    workspaceRoot: roots.workspaceRoot,
+  };
+}
+
+function printShellCommand(command: string, args: string[]): void {
+  const quote = (arg: string) =>
+    /^[A-Za-z0-9_./:=+#@%,-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`;
+  console.log([command, ...args].map(quote).join(" "));
+}
+
+async function runDevelop(): Promise<void> {
+  const { command, args, env, selectedInputRoot, workspaceRoot } = developCommand();
+  if (getFlagBool("print") || getFlagBool("verbose")) {
+    printShellCommand(command, args);
+    if (getFlagBool("print")) return;
+  }
+  const oldInputRoot = process.env.VIBEROOTS_FLAKE_INPUT_ROOT;
+  process.env.VIBEROOTS_FLAKE_INPUT_ROOT = selectedInputRoot;
+  try {
+    await repairGeneratedWorkspaceLock({ workspaceRoot });
+  } finally {
+    if (oldInputRoot === undefined) delete process.env.VIBEROOTS_FLAKE_INPUT_ROOT;
+    else process.env.VIBEROOTS_FLAKE_INPUT_ROOT = oldInputRoot;
+  }
+  const result = spawnSync(command, args, { stdio: "inherit", env });
+  if (result.error) throw result.error;
+  if (result.signal) {
+    process.kill(process.pid, result.signal);
+    return;
+  }
+  process.exit(result.status ?? 1);
+}
+
 function usage(): never {
   console.error("error: unknown command");
   console.error("run: viberoots help");
@@ -386,12 +513,22 @@ async function main() {
   }
   if (command === "completion") {
     const [, shell] = getPositionals();
-    if (shell !== "bash") {
-      console.error("error: only bash completion is supported");
-      console.error("run: viberoots completion bash");
+    if (shell === "bash") {
+      printBashCompletion();
+      return;
+    }
+    if (shell === "zsh") {
+      printZshCompletion();
+      return;
+    }
+    {
+      console.error("error: completion shell must be bash or zsh");
+      console.error("run: viberoots completion bash|zsh");
       process.exit(2);
     }
-    printBashCompletion();
+  }
+  if (command === "develop") {
+    await runDevelop();
     return;
   }
   if (command === "init-workspace") {

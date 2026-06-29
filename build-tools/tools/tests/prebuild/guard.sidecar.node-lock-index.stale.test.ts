@@ -6,35 +6,45 @@ import { exists, runInTemp } from "../lib/test-helpers";
 
 test("prebuild-guard: detects stale node-lock-index.json vs graph.json", async () => {
   await runInTemp("prebuild-node-lock-stale", async (tmp, $) => {
-    const providersDir = path.join(tmp, "third_party", "providers");
+    const providersDir = path.join(tmp, ".viberoots", "workspace", "providers");
     await fsp.mkdir(providersDir, { recursive: true });
 
     const graphPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     const sidecarPath = path.join(tmp, ".viberoots", "workspace", "buck", "node-lock-index.json");
     const invalidationReport = path.join(
       tmp,
-      "viberoots",
-      "build-tools",
-      "tools",
+      ".viberoots",
+      "workspace",
       "buck",
       "invalidation-report.txt",
     );
 
-    // Create initial sidecar and graph
+    await fsp.symlink("/nix/store/viberoots-test-prelude/prelude", path.join(tmp, "prelude"));
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
     await fsp.writeFile(sidecarPath, JSON.stringify({ index: {} }, null, 2) + "\n", "utf8");
     await fsp.writeFile(invalidationReport, "# invalidation-report\n", "utf8");
-    await fsp.writeFile(graphPath, JSON.stringify({ nodes: [] }, null, 2) + "\n", "utf8");
+    await fsp.writeFile(
+      graphPath,
+      JSON.stringify(
+        {
+          nodes: [
+            {
+              name: "//projects/apps/demo:app",
+              labels: ["lockfile:projects/apps/demo/pnpm-lock.yaml#projects/apps/demo"],
+            },
+          ],
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
     await fsp.writeFile(
       path.join(providersDir, "auto_map.bzl"),
       "# gen\nMODULE_PROVIDERS = {}\n",
       "utf8",
     );
-    await fsp.writeFile(path.join(providersDir, "TARGETS.auto"), "# generated\n", "utf8");
-
-    // Make graph.json newer than sidecar
-    await new Promise((r) => setTimeout(r, 10));
-    await fsp.appendFile(graphPath, "\n# touch\n", "utf8");
+    await fsp.writeFile(path.join(providersDir, "TARGETS.node.auto"), "# generated\n", "utf8");
 
     // CI should fail due to stale sidecar
     let failed = false;

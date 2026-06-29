@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { isNixStorePath, resolvePreferredCmdPath } from "./startup-check/cmd-paths";
 import { validateStartupWorkspaceState } from "./startup-check/workspace-state";
+import { isVbrVerbose } from "../lib/command-ui";
 import { DEV_OVERRIDE_LANGS, devOverrideEnvNameForLang } from "../lib/dev-override-envs";
 
 async function which(cmd: string) {
@@ -236,7 +237,9 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("startup-check: OK");
+  if (isVbrVerbose()) {
+    console.log("startup-check: OK");
+  }
 }
 
 main().catch((e) => {

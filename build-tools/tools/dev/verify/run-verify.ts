@@ -3,6 +3,7 @@ import path from "node:path";
 import process from "node:process";
 import "zx/globals";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
+import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { isRemoteVerifyPolicy, shouldComputeLocalZxTestNodeModules } from "./remote-policy";
 import { defaultRunVerifyDeps, type RunVerifyDeps } from "./run-verify-deps";
 import { buildToolsRoot, zxInitPath } from "../dev-build/paths";
@@ -21,6 +22,8 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
   const invocationCwd = process.cwd();
   const root = deps.repoRoot();
   const parsedArgs = deps.parseVerifyArgs();
+  const verbose = isVbrVerbose();
+  const ui = createCommandUi({ verbose });
   const executionPolicy = deps.parseVerifyExecutionPolicyForArgs({ args: parsedArgs });
   const remoteVerify = isRemoteVerifyPolicy(executionPolicy);
   const { iso, stateFile } = await deps.initializeVerifyProcessState(root);
@@ -39,6 +42,10 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
       args: parsedArgs,
     })
     .catch(cleanupEarlyFailure);
+  if (!verbose) {
+    ui.heading("viberoots verify");
+    ui.step("target", selection.targets.join(" "));
+  }
   const zxInit = zxInitPath(root);
   await timedPhase(
     "nix-cache-health",
@@ -171,16 +178,18 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     process.env.VBR_TEST_SEED_PIN_DIR = seed.pinDir;
     seedCleanup = seed.cleanup;
   } else {
-    process.stderr.write("[verify] seed build: skipped for scoped verify run\n");
+    if (verbose) process.stderr.write("[verify] seed build: skipped for scoped verify run\n");
     delete process.env.VBR_TEST_SEED_STORE_PATH;
     delete process.env.VBR_TEST_SEED_KEY;
     delete process.env.VBR_TEST_SEED_PIN_DIR;
     delete process.env.VBR_TEST_SEED_REMOTE_MANIFEST;
     if (!remoteVerify && !String(process.env.TEST_RSYNC_ROOTS || "").trim()) {
       process.env.TEST_RSYNC_ROOTS = SCOPED_VERIFY_RSYNC_ROOTS;
-      process.stderr.write(
-        `[verify] scoped temp repos: TEST_RSYNC_ROOTS=${SCOPED_VERIFY_RSYNC_ROOTS}\n`,
-      );
+      if (verbose) {
+        process.stderr.write(
+          `[verify] scoped temp repos: TEST_RSYNC_ROOTS=${SCOPED_VERIFY_RSYNC_ROOTS}\n`,
+        );
+      }
     }
   }
   if (!remoteVerify) {
@@ -252,6 +261,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
   await cleanupRegisteredTempRepoState();
   await deps.maybeWriteVerifyTimingSummary({ root, logFile: lock.logFile, zxInitPath: zxInit });
   if (status === 0 && cov.rawDir) await deps.runMergedCoverageReport({ root, rawDir: cov.rawDir });
+  if (status === 0) ui.ok("verify", "passed");
   if (seedCleanup) {
     await timedPhase("seed-cleanup", async () => await seedCleanup?.());
     seedCleanup = null;

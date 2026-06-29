@@ -3,6 +3,8 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
 import { findUvLockfiles } from "../../lib/lockfiles";
+import { repoRoot } from "../../lib/repo";
+import { absenceCacheFresh, writeAbsenceCache } from "./absence-cache";
 
 async function sha256File(file: string): Promise<string> {
   try {
@@ -19,9 +21,16 @@ async function sha256File(file: string): Promise<string> {
  * a future uv2nix conversion without changing callers.
  */
 export async function runUvRefreshAll(dryRun: boolean, verbose: boolean) {
-  const locks = await findUvLockfiles();
+  const root = repoRoot();
+  const scanRoots = ["."];
+  if (!dryRun && (await absenceCacheFresh(root, "uv-locks-absent", scanRoots))) {
+    if (verbose) console.log("[uv2nix] scan skipped: no uv.lock present");
+    return;
+  }
+  const locks = await findUvLockfiles({ baseRoot: root, roots: ["."] });
   if (!locks.length) {
-    console.log("[uv2nix] skip: no uv.lock present");
+    if (verbose) console.log("[uv2nix] skip: no uv.lock present");
+    if (!dryRun) await writeAbsenceCache(root, "uv-locks-absent", scanRoots);
     return;
   }
   if (dryRun) {

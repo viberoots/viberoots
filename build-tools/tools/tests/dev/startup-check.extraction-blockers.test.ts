@@ -54,6 +54,26 @@ async function commitAll(root: string, message: string): Promise<string> {
   return await git(root, ["rev-parse", "HEAD"]);
 }
 
+async function captureWarningOutput(fn: () => Promise<void>): Promise<string> {
+  const oldWarn = console.warn;
+  const oldWrite = process.stderr.write;
+  const chunks: string[] = [];
+  console.warn = (message?: unknown) => {
+    chunks.push(String(message || ""));
+  };
+  process.stderr.write = ((chunk: unknown, ..._args: unknown[]) => {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk || ""));
+    return true;
+  }) as typeof process.stderr.write;
+  try {
+    await fn();
+  } finally {
+    console.warn = oldWarn;
+    process.stderr.write = oldWrite;
+  }
+  return chunks.join("\n");
+}
+
 async function submoduleWorkspace(prefix: string): Promise<{ root: string; submodule: string }> {
   const root = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), `${prefix}-`)));
   const submodule = path.join(root, "viberoots");
@@ -71,16 +91,16 @@ async function submoduleWorkspace(prefix: string): Promise<{ root: string; submo
     ].join("\n"),
   );
   await writeFile(
-    path.join(root, "flake.nix"),
-    '{ inputs.viberoots.url = "path:./viberoots"; outputs = _: {}; }\n',
+    path.join(root, ".viberoots", "workspace", "flake.nix"),
+    `{ inputs.viberoots.url = "path:${submodule}"; outputs = _: {}; }\n`,
   );
   await writeFile(
-    path.join(root, "flake.lock"),
+    path.join(root, ".viberoots", "workspace", "flake.lock"),
     JSON.stringify({
       nodes: {
         viberoots: {
-          locked: { type: "path", path: "./viberoots" },
-          original: { type: "path", path: "./viberoots" },
+          locked: { type: "path", path: submodule },
+          original: { type: "path", path: submodule },
         },
       },
     }),
@@ -167,18 +187,12 @@ test("startup-check accepts workspace lock resolved through VIBEROOTS_SOURCE_ROO
 test("startup-check warns but allows dirty local viberoots submodule", async () => {
   const { root, submodule } = await submoduleWorkspace("vbr-startup-submodule-dirty");
   const oldCwd = process.cwd();
-  const oldWarn = console.warn;
-  const warnings: string[] = [];
   try {
     await writeFile(path.join(submodule, "dirty.txt"), "dirty\n");
     process.chdir(root);
-    console.warn = (message?: unknown) => {
-      warnings.push(String(message || ""));
-    };
-    await validateStartupWorkspaceState();
-    assert.match(warnings.join("\n"), /submodule has uncommitted changes/);
+    const warnings = await captureWarningOutput(validateStartupWorkspaceState);
+    assert.match(warnings, /submodule has uncommitted changes/);
   } finally {
-    console.warn = oldWarn;
     process.chdir(oldCwd);
     await fsp.rm(root, { recursive: true, force: true });
   }
@@ -206,7 +220,7 @@ test("startup-check rejects misaligned local viberoots flake lock", async () => 
   const oldCwd = process.cwd();
   try {
     await writeFile(
-      path.join(root, "flake.lock"),
+      path.join(root, ".viberoots", "workspace", "flake.lock"),
       JSON.stringify({
         nodes: {
           viberoots: {
@@ -230,18 +244,12 @@ test("startup-check rejects misaligned local viberoots flake lock", async () => 
 test("startup-check warns but allows local viberoots checkout without parent gitlink", async () => {
   const { root } = await submoduleWorkspace("vbr-startup-local-checkout");
   const oldCwd = process.cwd();
-  const oldWarn = console.warn;
-  const warnings: string[] = [];
   try {
     await git(root, ["rm", "--cached", "viberoots"]);
     process.chdir(root);
-    console.warn = (message?: unknown) => {
-      warnings.push(String(message || ""));
-    };
-    await validateStartupWorkspaceState();
-    assert.match(warnings.join("\n"), /not recorded as a git submodule gitlink/);
+    const warnings = await captureWarningOutput(validateStartupWorkspaceState);
+    assert.match(warnings, /not recorded as a git submodule gitlink/);
   } finally {
-    console.warn = oldWarn;
     process.chdir(oldCwd);
     await fsp.rm(root, { recursive: true, force: true });
   }
@@ -270,19 +278,13 @@ test("startup-check strict mode rejects local viberoots checkout without parent 
 test("startup-check warns but allows gitlink-mismatched local viberoots submodule", async () => {
   const { root, submodule } = await submoduleWorkspace("vbr-startup-submodule-mismatch");
   const oldCwd = process.cwd();
-  const oldWarn = console.warn;
-  const warnings: string[] = [];
   try {
     await writeFile(path.join(submodule, "next.txt"), "next\n");
     await commitAll(submodule, "submodule next");
     process.chdir(root);
-    console.warn = (message?: unknown) => {
-      warnings.push(String(message || ""));
-    };
-    await validateStartupWorkspaceState();
-    assert.match(warnings.join("\n"), /does not match parent gitlink/);
+    const warnings = await captureWarningOutput(validateStartupWorkspaceState);
+    assert.match(warnings, /does not match parent gitlink/);
   } finally {
-    console.warn = oldWarn;
     process.chdir(oldCwd);
     await fsp.rm(root, { recursive: true, force: true });
   }

@@ -3,9 +3,16 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { parseDevBuildArgs } from "../../dev/dev-build/args";
 import { normalizeDevBuildTargetArgs } from "../../dev/dev-build/target-args";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
+
+test("dev-build defaults empty build scope to full repo coverage", () => {
+  assert.deepEqual(parseDevBuildArgs([]).restArgs, ["//..."]);
+  assert.deepEqual(parseDevBuildArgs(["build"]).restArgs, ["//..."]);
+  assert.deepEqual(parseDevBuildArgs(["--impure"]).restArgs, ["//..."]);
+});
 
 test("dev-build normalizes path-like target args for build/test/run", async () => {
   await runInTemp("dev-build-target-args-normalize", async (tmp) => {
@@ -107,5 +114,17 @@ test("dev-build drops missing optional patch recursive scopes", async () => {
       args: ["//patches/cpp/..."],
     });
     assert.deepEqual(existingPatchScope, ["//patches/cpp/..."]);
+  });
+});
+
+test("dev-build target normalization defaults to full scope", async () => {
+  await runInTemp("dev-build-target-args-default-source-only", async (tmp) => {
+    const defaultScope = await normalizeDevBuildTargetArgs({
+      workspaceRoot: tmp,
+      baseDir: tmp,
+      subcmd: "build",
+      args: [],
+    });
+    assert.deepEqual(defaultScope, ["//..."]);
   });
 });

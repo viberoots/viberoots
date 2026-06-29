@@ -342,6 +342,43 @@ export async function prepareExactPnpmStore(opts: {
   await removeRedundantLocalExactStoreDirs({ storeDir, homeDir });
   return { storeDir, exactStorePath: preparedMarker.nixStorePath, cleanup: async () => {} };
 }
+
+export async function hasPreparedExactPnpmStore(opts: {
+  repoRoot: string;
+  importer: string;
+  lockHash: string;
+}): Promise<boolean> {
+  const indexPath = sharedExactPnpmStateIndexPath(opts.repoRoot, opts.importer);
+  try {
+    const raw = await fsp.readFile(indexPath, "utf8");
+    const parsed = JSON.parse(raw) as { version?: number; lockHash?: string };
+    if (parsed.version !== EXACT_STORE_CACHE_VERSION || parsed.lockHash !== opts.lockHash) {
+      return false;
+    }
+  } catch {
+    return false;
+  }
+
+  const markerPath = path.join(sharedExactPnpmStateRootPath(opts.lockHash), "ready.json");
+  try {
+    const raw = await fsp.readFile(markerPath, "utf8");
+    const parsed = JSON.parse(raw) as {
+      version?: number;
+      lockHash?: string;
+      nixStorePath?: string;
+    };
+    const nixStorePath = String(parsed.nixStorePath || "").trim();
+    return (
+      parsed.version === EXACT_STORE_CACHE_VERSION &&
+      parsed.lockHash === opts.lockHash &&
+      nixStorePath.startsWith("/nix/store/") &&
+      fs.existsSync(nixStorePath)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function withExactPrefetchedStore<T>(
   opts: { repoRoot: string; importer: string },
   fn: (env: NodeJS.ProcessEnv) => Promise<T>,

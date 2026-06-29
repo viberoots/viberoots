@@ -147,7 +147,7 @@ After setup, the repo shell provides short wrappers for normal local work:
 
 ```bash
 i        # install/link dependencies and refresh generated glue
-b        # build the default repo scope
+b        # build the full default repo scope
 v        # run impacted tests and verification checks
 ```
 
@@ -176,6 +176,7 @@ d //projects/apps/example-app:app
 `d` uses the target's declared `run.dev` command and reports a clear error when the target is not a dev runnable. For targeted work, pass Buck labels through the wrappers:
 
 ```bash
+b //projects/...
 b //projects/apps/example-app:app
 v //projects/apps/example-app:latency-guardrail
 ```

@@ -18,6 +18,7 @@ test("dev-build reuses buck daemon by default", () => {
     const iso = createIsolation();
     assert.equal(iso.reuseDaemon, true);
     assert.equal(iso.killOnExit, false);
+    assert.equal(iso.registerForCleanup, false);
     assert.ok(iso.buckIsolation.startsWith("devbuild-shared-"));
     assert.deepEqual(iso.isolationFlags, ["--isolation-dir", iso.buckIsolation]);
   } finally {
@@ -41,8 +42,15 @@ test("dev-build cleanup preserves reusable Buck daemons by default", async () =>
     "viberoots/build-tools/tools/dev/dev-build/root-buck-out-cleanup.ts",
     "utf8",
   );
+  const runSource = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/dev-build/run-dev-build.ts",
+    "utf8",
+  );
 
   assert.match(isolationSource, /if \(!createdOwnIsolation \|\| !killOnExit\) return;/);
+  assert.match(isolationSource, /const registerForCleanup = createdOwnIsolation && killOnExit;/);
+  assert.match(isolationSource, /registerForCleanup,/);
+  assert.match(runSource, /stateFile && iso\.buckIsolation && iso\.registerForCleanup/);
   assert.match(cleanupSource, /VBR_DEVBUILD_BROAD_BUCK_OUT_CLEANUP/);
   assert.match(cleanupSource, /if \(live\.has\(entry\) && !broadCleanup\) continue;/);
 });
@@ -61,6 +69,7 @@ test("dev-build isolation override can force a fresh daemon for one run", () => 
     const iso = createIsolation({ reuseDaemon: false });
     assert.equal(iso.reuseDaemon, false);
     assert.equal(iso.killOnExit, true);
+    assert.equal(iso.registerForCleanup, true);
     assert.ok(iso.buckIsolation.startsWith("devbuild-"));
     assert.deepEqual(iso.isolationFlags, ["--isolation-dir", iso.buckIsolation]);
   } finally {

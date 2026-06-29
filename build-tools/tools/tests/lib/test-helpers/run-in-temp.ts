@@ -34,6 +34,7 @@ import { stableBuckIsolation } from "../../../lib/buck-command-env";
 import { resolveToolPathSync } from "../../../lib/tool-paths";
 import { pathExists } from "../../../lib/repo";
 import { mkdirWithMacosMetadataExclusion } from "../../../lib/macos-metadata";
+import { ensureWorkspaceProvidersPackage } from "../../../lib/workspace-providers-package";
 
 const LOCAL_FIXTURE_SERVICE_ENV = "VBR_DEPLOY_LOCAL_FIXTURE_SERVICE";
 const PREPARED_SEED_MARKER = ".seed-store-prepared-v7";
@@ -1039,6 +1040,9 @@ export async function runInTemp<T>(
       viberootsInputRoot: viberootsInputPath,
       viberootsSourceRoot,
     });
+  });
+  await timeAsync("runInTemp ensureWorkspaceProvidersPackage", async () => {
+    await ensureWorkspaceProvidersPackage(tmp);
   });
   await timeAsync("runInTemp ensureWorkspaceRootEnvFile", async () => {
     await ensureWorkspaceRootEnvFile(tmp, viberootsSourceRoot, viberootsInputPath);

@@ -1,7 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
 import { test } from "node:test";
-import { untrackedRequiresImpureForTargets } from "../../dev/dev-build/untracked";
+import {
+  maybeAutoImpureFromUntrackedFiles,
+  untrackedRequiresImpureForTargets,
+} from "../../dev/dev-build/untracked";
+import { runInTemp } from "../lib/test-helpers";
 
 test("target-aware untracked policy ignores unrelated docs/tests paths", () => {
   const r = untrackedRequiresImpureForTargets({
@@ -33,4 +38,39 @@ test("target-aware untracked policy marks global build inputs relevant", () => {
   });
   assert.equal(r.requiresImpure, true);
   assert.equal(r.relevant.length, 2);
+});
+
+test("auto impure logging is compact in quiet mode", async () => {
+  await runInTemp("dev-build-untracked-quiet-log", async (tmp) => {
+    await $({ cwd: tmp, stdio: "ignore" })`git init`;
+    await fsp.mkdir(`${tmp}/projects/apps/myapp/src`, { recursive: true });
+    await fsp.writeFile(`${tmp}/projects/apps/myapp/src/new.ts`, "", "utf8");
+
+    const prevVerbose = process.env.VBR_VERBOSE;
+    delete process.env.VBR_VERBOSE;
+    const prevWrite = process.stderr.write;
+    let stderr = "";
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr += String(chunk);
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      const result = await maybeAutoImpureFromUntrackedFiles({
+        isCI: false,
+        root: tmp,
+        impure: false,
+        subcmd: "build",
+        restArgs: ["//projects/apps/myapp:app"],
+      });
+      assert.equal(result.impure, true);
+      assert.match(stderr, /warn\s+impure build due to \d+ relevant untracked file\(s\)/);
+      assert.match(stderr, /    - .+/);
+      assert.match(stderr, /    - \.\.\. \d+ more/);
+      assert.doesNotMatch(stderr, /Falling back to --impure/);
+    } finally {
+      process.stderr.write = prevWrite;
+      if (typeof prevVerbose === "string") process.env.VBR_VERBOSE = prevVerbose;
+      else delete process.env.VBR_VERBOSE;
+    }
+  });
 });

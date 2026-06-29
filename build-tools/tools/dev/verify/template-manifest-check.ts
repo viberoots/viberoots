@@ -1,4 +1,5 @@
 import process from "node:process";
+import { isVbrVerbose } from "../../lib/command-ui";
 import { runNodeWithZx } from "../../lib/node-run";
 import { buildToolPath } from "../dev-build/paths";
 
@@ -8,9 +9,11 @@ export async function runTemplateManifestCheck(opts: {
   nonBuildSystemOnlyScope: boolean;
 }): Promise<void> {
   if (opts.nonBuildSystemOnlyScope) {
-    process.stderr.write(
-      "[verify] template-manifest check: skipped for non-build-system verify scope\n",
-    );
+    if (isVbrVerbose()) {
+      process.stderr.write(
+        "[verify] template-manifest check: skipped for non-build-system verify scope\n",
+      );
+    }
     return;
   }
   await runNodeWithZx({
@@ -18,6 +21,7 @@ export async function runTemplateManifestCheck(opts: {
     script: buildToolPath(opts.root, "tools/scaffolding/gen-template-manifest-artifacts.ts"),
     args: ["--check"],
     zxInitPath: opts.zxInitPath,
+    stdio: isVbrVerbose() ? "inherit" : "pipe",
   });
 }
 

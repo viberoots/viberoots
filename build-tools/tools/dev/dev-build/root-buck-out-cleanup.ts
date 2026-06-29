@@ -3,7 +3,11 @@ import path from "node:path";
 import { buckProcessCommandLines } from "../../lib/process-inspection";
 
 function isDevBuildRootBuckOutEntry(name: string): boolean {
-  return name === ".housekeeping" || name.startsWith("devbuild-") || name.startsWith("exporter-");
+  return name.startsWith("devbuild-") || name.startsWith("exporter-");
+}
+
+function isSharedDevBuildRootBuckOutEntry(name: string): boolean {
+  return name.startsWith("devbuild-shared-") || name.startsWith("exporter-shared-");
 }
 
 async function removeIfEmpty(dir: string): Promise<void> {
@@ -35,6 +39,7 @@ export async function cleanupDevBuildRootBuckOut(root: string): Promise<string[]
   for (const entry of entries) {
     if (!isDevBuildRootBuckOutEntry(entry)) continue;
     if (entry.startsWith("devbuild-") || entry.startsWith("exporter-")) {
+      if (isSharedDevBuildRootBuckOutEntry(entry) && !broadCleanup) continue;
       if (live.has(entry) && !broadCleanup) continue;
       await $({ stdio: "ignore" })`buck2 --isolation-dir ${entry} kill`.nothrow();
       live.delete(entry);
@@ -54,6 +59,7 @@ export async function cleanupDevBuildRootBuckOut(root: string): Promise<string[]
       continue;
     }
     if (entry === "shared-isolation-locks") {
+      if (!broadCleanup) continue;
       await fsp.rm(abs, { recursive: true, force: true }).catch(() => {});
       removed.push(`tmp/${entry}`);
       continue;

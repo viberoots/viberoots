@@ -2,6 +2,7 @@ import "zx/globals";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
+import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { emptyDirectoryPreservingMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { runNodeWithZx } from "../../lib/node-run";
 import { resolveToolPath } from "../../lib/tool-paths";
@@ -80,10 +81,14 @@ export async function runVerifyHousekeeping(opts: {
 }): Promise<{ freeGiB: number }> {
   const root = opts.root;
   const target = opts.targetFreeGiB;
+  const verbose = isVbrVerbose();
+  const ui = createCommandUi({ verbose });
 
-  process.stderr.write(
-    "[verify] housekeeping preflight: cleaning temp outs and checking disk space...\n",
-  );
+  if (verbose) {
+    process.stderr.write(
+      "[verify] housekeeping preflight: cleaning temp outs and checking disk space...\n",
+    );
+  }
 
   await runNodeWithZx({
     cwd: root,
@@ -98,7 +103,7 @@ export async function runVerifyHousekeeping(opts: {
   ).catch(() => {});
 
   let free = await freeGiBAtPath(root);
-  process.stderr.write(`[verify] disk free: ~${free}GiB\n`);
+  if (verbose) process.stderr.write(`[verify] disk free: ~${free}GiB\n`);
 
   if (free < 4) {
     process.stderr.write(
@@ -110,10 +115,12 @@ export async function runVerifyHousekeeping(opts: {
   }
 
   if (opts.runNixStoreOptimize === true) {
+    if (!verbose) ui.step("housekeeping", "optimising nix store");
     await runBoundedNixOptimise(root, 60);
     free = await freeGiBAtPath(root);
   } else {
-    process.stderr.write("[verify] housekeeping: skipping nix store optimise by default\n");
+    if (verbose)
+      process.stderr.write("[verify] housekeeping: skipping nix store optimise by default\n");
   }
 
   if (free < target) {

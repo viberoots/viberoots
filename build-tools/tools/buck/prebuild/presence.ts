@@ -43,19 +43,29 @@ export async function computeMissingOutputs(outputs: string[]): Promise<string[]
   }
 
   {
-    const preludePath = "prelude";
+    const preludePath = ".viberoots/current/prelude";
+    const legacyPreludePath = "prelude";
     try {
       const st = await fsp.lstat(preludePath);
-      if (!st.isSymbolicLink()) {
+      if (!st.isDirectory() && !st.isSymbolicLink()) {
         outPresence.push("prelude (expected Nix store symlink)");
       } else {
-        const target = await fsp.readlink(preludePath).catch(() => "");
-        if (!target.startsWith("/nix/store/")) {
-          outPresence.push("prelude (expected Nix store symlink)");
-        }
+        await fsp.access(path.join(preludePath, "prelude.bzl"));
       }
     } catch {
-      outPresence.push(preludePath);
+      try {
+        const st = await fsp.lstat(legacyPreludePath);
+        if (!st.isSymbolicLink()) {
+          outPresence.push("prelude (expected Nix store symlink)");
+        } else {
+          const target = await fsp.readlink(legacyPreludePath).catch(() => "");
+          if (!target.startsWith("/nix/store/")) {
+            outPresence.push("prelude (expected Nix store symlink)");
+          }
+        }
+      } catch {
+        outPresence.push(preludePath);
+      }
     }
   }
 

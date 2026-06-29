@@ -2,7 +2,9 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { mkdtempNoindex } from "../../lib/macos-metadata";
+import { repoRoot } from "../../lib/repo";
 import { resolveToolPathSync } from "../../lib/tool-paths";
+import { absenceCacheFresh, writeAbsenceCache } from "./absence-cache";
 
 async function exists(p: string): Promise<boolean> {
   try {
@@ -46,14 +48,31 @@ async function needsGomod2nixRefresh(dir: string): Promise<boolean> {
   return srcM > outM;
 }
 
+function absenceNameForDir(root: string, dir: string): { name: string; roots: string[] } {
+  const relRaw = path.relative(root, dir).replace(/\\/g, "/") || ".";
+  const safe = relRaw.replace(/[^a-zA-Z0-9._-]+/g, "-").replace(/^\.$/, "root");
+  return { name: `gomod2nix-${safe}-absent`, roots: [relRaw] };
+}
+
 export async function runGomod2nixGenerate(dryRun: boolean, verbose: boolean) {
-  await runGomod2nixGenerateIn(process.cwd(), dryRun, verbose);
+  await runGomod2nixGenerateIn(repoRoot(), dryRun, verbose);
 }
 
 export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbose: boolean) {
+  const root = repoRoot();
   const hasGoMod = await exists(path.join(dir, "go.mod"));
   const hasGoSum = await exists(path.join(dir, "go.sum"));
   if (!hasGoMod && !hasGoSum) {
+    if (!dryRun) {
+      const absence = absenceNameForDir(root, dir);
+      if (await absenceCacheFresh(root, absence.name, absence.roots)) {
+        if (verbose) console.log(`[gomod2nix] scan skipped: no go.mod or go.sum present`);
+        return;
+      }
+      if (verbose) console.log(`[gomod2nix] skip: no go.mod or go.sum present`);
+      await writeAbsenceCache(root, absence.name, absence.roots);
+      return;
+    }
     // Always emit a clear skip message (tests depend on exact phrasing)
     console.log(`[gomod2nix] skip: no go.mod or go.sum present`);
     return;
@@ -172,10 +191,13 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
 
 export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean) {
   // Scan for go.mod+go.sum under projects/apps/* and projects/libs/* and generate per-module gomod2nix.toml
-  const roots = [
-    path.join(process.cwd(), "projects", "apps"),
-    path.join(process.cwd(), "projects", "libs"),
-  ];
+  const root = repoRoot();
+  const scanRoots = ["projects/apps", "projects/libs"];
+  if (!dryRun && (await absenceCacheFresh(root, "gomod2nix-absent", scanRoots))) {
+    if (verbose) console.log("[gomod2nix] project scan skipped: no Go modules present");
+    return;
+  }
+  const roots = scanRoots.map((r) => path.join(root, r));
   const dirs: string[] = [];
   for (const r of roots) {
     try {
@@ -189,6 +211,10 @@ export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean) {
         }
       }
     } catch {}
+  }
+  if (!dirs.length && !dryRun) {
+    await writeAbsenceCache(root, "gomod2nix-absent", scanRoots);
+    return;
   }
   for (const d of dirs) {
     const refresh = await needsGomod2nixRefresh(d);

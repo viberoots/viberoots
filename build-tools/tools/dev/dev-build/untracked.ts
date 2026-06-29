@@ -1,3 +1,5 @@
+import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
+
 function explicitTargetPackages(subcmd: string, restArgs: string[]): string[] {
   if (subcmd !== "build" && subcmd !== "test" && subcmd !== "run") return [];
   const pkgs = new Set<string>();
@@ -99,6 +101,8 @@ export async function maybeAutoImpureFromUntrackedFiles(opts: {
   restArgs: string[];
 }): Promise<{ impure: boolean }> {
   if (opts.isCI || opts.impure) return { impure: opts.impure };
+  const verbose = isVbrVerbose();
+  const ui = createCommandUi({ verbose });
   try {
     const { stdout } = await $({
       stdio: "pipe",
@@ -117,23 +121,37 @@ export async function maybeAutoImpureFromUntrackedFiles(opts: {
       const decision = untrackedRequiresImpureForTargets({ untracked, targetPackages: targetPkgs });
       if (!decision.requiresImpure) {
         if (decision.ignored.length > 0) {
-          console.warn(
-            `[dev-build] keeping pure mode for explicit targets; ignoring ${decision.ignored.length} unrelated untracked file(s)`,
-          );
+          if (verbose) {
+            console.warn(
+              `[dev-build] keeping pure mode for explicit targets; ignoring ${decision.ignored.length} unrelated untracked file(s)`,
+            );
+          } else {
+            ui.ok("purity", `ignored ${decision.ignored.length} unrelated untracked file(s)`);
+          }
         }
         return { impure: false };
       }
-      console.warn("[dev-build] Falling back to --impure due to relevant untracked files:");
-      for (const f of decision.relevant.slice(0, 50)) console.warn(` - ${f}`);
-      if (decision.relevant.length > 50) {
-        console.warn(` ... and ${decision.relevant.length - 50} more`);
+      if (verbose) {
+        console.warn("[dev-build] Falling back to --impure due to relevant untracked files:");
+        for (const f of decision.relevant.slice(0, 50)) console.warn(` - ${f}`);
+        if (decision.relevant.length > 50) {
+          console.warn(` ... and ${decision.relevant.length - 50} more`);
+        }
+      } else {
+        ui.warn(`impure build due to ${decision.relevant.length} relevant untracked file(s)`);
+        ui.list(decision.relevant, { stream: "stderr" });
       }
       return { impure: true };
     }
 
-    console.warn("[dev-build] Falling back to --impure due to untracked files:");
-    for (const f of untracked.slice(0, 50)) console.warn(` - ${f}`);
-    if (untracked.length > 50) console.warn(` ... and ${untracked.length - 50} more`);
+    if (verbose) {
+      console.warn("[dev-build] Falling back to --impure due to untracked files:");
+      for (const f of untracked.slice(0, 50)) console.warn(` - ${f}`);
+      if (untracked.length > 50) console.warn(` ... and ${untracked.length - 50} more`);
+    } else {
+      ui.warn(`impure build due to ${untracked.length} untracked file(s)`);
+      ui.list(untracked, { stream: "stderr" });
+    }
     return { impure: true };
   } catch {}
   return { impure: false };

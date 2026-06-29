@@ -17,7 +17,7 @@ import {
 } from "./presence";
 import { autoFixGlue } from "./repair";
 import { collectDiagnostics, logList, mtimeSafe } from "./report";
-import { listInputs, listOutputs } from "./scan";
+import { listFreshnessOutputs, listInputs, listOutputs } from "./scan";
 import { DEFAULT_INVALIDATION_REPORT_PATH } from "../../lib/workspace-state-paths";
 
 type Mode = "ci" | "local";
@@ -49,11 +49,12 @@ export async function run(): Promise<void> {
 
   const inputs = await listInputs();
   const outputs = listOutputs();
+  const freshnessOutputs = listFreshnessOutputs(outputs);
   const invalidationReportPath = DEFAULT_INVALIDATION_REPORT_PATH;
 
   const outPresence = await computeMissingOutputs(outputs);
-  const presentOutputs = outputs.filter((o) => fs.existsSync(o));
-  const needFixFreshness = checkFreshness(inputs, presentOutputs, skewMs, mode);
+  const presentOutputs = freshnessOutputs.filter((o) => fs.existsSync(o));
+  const needFixFreshness = await checkFreshness(inputs, freshnessOutputs, skewMs, mode);
   const needFix = outPresence.length > 0 || needFixFreshness;
 
   const missingNodeProviders = await findMissingNodeImporterProviders();

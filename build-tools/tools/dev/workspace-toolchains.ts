@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { writeIfChanged } from "../lib/fs-helpers";
 import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { buildToolsRoot } from "./dev-build/paths";
 
@@ -35,12 +36,41 @@ async function ensureWorkspaceToolchains(root: string): Promise<string> {
     return "";
   }
   await mkdirWithMacosMetadataExclusion(dst);
-  await fsp.cp(src, dst, {
-    errorOnExist: false,
-    force: true,
-    recursive: true,
-  });
+  await syncToolchainTree(src, dst);
   return dst;
+}
+
+async function syncToolchainTree(src: string, dst: string): Promise<void> {
+  await mkdirWithMacosMetadataExclusion(dst);
+  const keep = new Set([".metadata_never_index"]);
+  const seen = new Set<string>();
+  let entries: import("node:fs").Dirent[] = [];
+  try {
+    entries = await fsp.readdir(src, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const dstPath = path.join(dst, entry.name);
+    seen.add(entry.name);
+    if (entry.isDirectory()) {
+      await syncToolchainTree(srcPath, dstPath);
+    } else if (entry.isFile()) {
+      await writeIfChanged(dstPath, await fsp.readFile(srcPath, "utf8"));
+    }
+  }
+
+  let dstEntries: import("node:fs").Dirent[] = [];
+  try {
+    dstEntries = await fsp.readdir(dst, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of dstEntries) {
+    if (seen.has(entry.name) || keep.has(entry.name)) continue;
+    await fsp.rm(path.join(dst, entry.name), { force: true, recursive: true }).catch(() => {});
+  }
 }
 
 export async function toolchainBzlPaths(root: string): Promise<string[]> {

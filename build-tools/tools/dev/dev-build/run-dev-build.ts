@@ -1,4 +1,5 @@
 import * as fsp from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { parseDevBuildArgs } from "./args";
 import { runBuckCommand } from "./buck";
@@ -19,8 +20,10 @@ import { pruneDeadDevBuildIsolationDirs } from "../clean-temp-outs-lib";
 import { registerBuckIsolationSync } from "../verify/owned-process-state";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
 import { getArgvTokens } from "../../lib/cli";
+import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 import { findRepoRoot } from "../../lib/repo";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 export async function missingOptionalPatchDirsForFreshIsolation(opts: {
   root: string;
@@ -52,6 +55,8 @@ export async function missingOptionalPatchDirsForFreshIsolation(opts: {
 export async function runDevBuild(): Promise<void> {
   const invocationCwd = process.cwd();
   const root = await findRepoRoot(invocationCwd);
+  const verbose = isVbrVerbose();
+  const ui = createCommandUi({ verbose });
   const isCI = process.env.CI === "true";
   const graphPath = path.join(root, DEFAULT_GRAPH_PATH);
   const graphExistedBefore = await fsp
@@ -67,13 +72,13 @@ export async function runDevBuild(): Promise<void> {
   await applyNixCacheHealthPolicy(root);
 
   const removedDeadDevBuildIsos = await pruneDeadDevBuildIsolationDirs(root).catch(() => []);
-  if (removedDeadDevBuildIsos.length > 0) {
+  if (verbose && removedDeadDevBuildIsos.length > 0) {
     console.warn(
       `[dev-build] pruned dead buck-out/devbuild-* dirs before startup: ${removedDeadDevBuildIsos.join(", ")}`,
     );
   }
   const removedRootBuckOut = await cleanupDevBuildRootBuckOut(root).catch(() => []);
-  if (removedRootBuckOut.length > 0) {
+  if (verbose && removedRootBuckOut.length > 0) {
     console.warn(
       `[dev-build] pruned dev-build root buck-out entries before startup: ${removedRootBuckOut.join(", ")}`,
     );
@@ -90,6 +95,10 @@ export async function runDevBuild(): Promise<void> {
         args: parsed0.restArgs,
       }),
     };
+    if (!verbose) {
+      ui.heading("viberoots build");
+      ui.step("target", `${parsed.subcmd} ${parsed.restArgs.join(" ")}`);
+    }
     const missingOptionalPatchDirs = await missingOptionalPatchDirsForFreshIsolation({
       root,
       subcmd: parsed.subcmd,
@@ -106,7 +115,7 @@ export async function runDevBuild(): Promise<void> {
       reuseDaemon: useFreshIsolationForMissingPatchDirs ? false : undefined,
     });
     const stateFile = String(process.env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim();
-    if (stateFile && iso.buckIsolation) {
+    if (stateFile && iso.buckIsolation && iso.registerForCleanup) {
       registerBuckIsolationSync({
         stateFile,
         iso: iso.buckIsolation,
@@ -143,17 +152,29 @@ export async function runDevBuild(): Promise<void> {
     let materialize = materializeDecision.materialize;
     let materializeReason = materializeDecision.reason;
 
-    await ensureBuckPreludeConfig(root);
+    const buckConfigChanged = await ensureBuckPreludeConfig(root);
+    if (buckConfigChanged) {
+      const buck2Path = resolveToolPathSync("buck2");
+      spawnSync(buck2Path, [...iso.isolationFlags, "kill"], {
+        cwd: root,
+        env: { ...process.env, HOME: process.env.BUCK2_REAL_HOME || process.env.HOME },
+        stdio: "ignore",
+        timeout: 10_000,
+      });
+      console.warn("[dev-build] restarted Buck daemon after generated .buckconfig repair");
+    }
     await runStartupCheck(root);
     await ensureDevBuildStoreSpace({
       subcmd: parsed.subcmd,
       restArgs: parsed.restArgs,
     });
 
-    if (parsed.materialize && !materialize) {
+    if (parsed.materialize && !materialize && verbose) {
       console.log(
         `[dev-build] fast-path: skipping glue/materialize (${materializeDecision.reason})`,
       );
+    } else if (parsed.materialize && !materialize) {
+      ui.ok("prebuild", materializeDecision.reason);
     }
 
     await cleanDevBuildWorkspace(root);
@@ -171,7 +192,9 @@ export async function runDevBuild(): Promise<void> {
         if (!afterRefreshDecision.materialize) {
           materialize = false;
           materializeReason = "prebuild-fresh-after-refresh";
-          console.log("[dev-build] fast-path: skipping pure materialization after glue refresh");
+          if (verbose)
+            console.log("[dev-build] fast-path: skipping pure materialization after glue refresh");
+          else ui.ok("prebuild", "fresh after glue refresh");
         } else {
           materializeReason = afterRefreshDecision.reason;
         }
@@ -189,7 +212,9 @@ export async function runDevBuild(): Promise<void> {
     if (materialize && impure && !exportedGraphDuringMaterialize) {
       await exportGraphImpure(root);
     } else if (materialize && impure && exportedGraphDuringMaterialize) {
-      console.log("[dev-build] fast-path: reusing freshly exported graph for impure build");
+      if (verbose)
+        console.log("[dev-build] fast-path: reusing freshly exported graph for impure build");
+      else ui.ok("graph", "reusing fresh export");
     }
 
     await runBuckCommand({
@@ -219,7 +244,7 @@ export async function runDevBuild(): Promise<void> {
       await iso.killIsolationIfOwned().catch(() => {});
     }
     const removed = await cleanupDevBuildRootBuckOut(root).catch(() => []);
-    if (removed.length > 0) {
+    if (verbose && removed.length > 0) {
       console.warn(`[dev-build] final root buck-out cleanup: removed=${removed.join(",")}`);
     }
   }

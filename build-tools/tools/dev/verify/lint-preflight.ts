@@ -3,9 +3,23 @@ import process from "node:process";
 import * as fsp from "node:fs/promises";
 import "zx/globals";
 import { collectChangedPaths } from "../../lib/build-system-test-scope";
+import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { runNodeWithZx } from "../../lib/node-run";
 import { resolveToolPath } from "../../lib/tool-paths";
 import { buildToolsRoot, buildToolPath } from "../dev-build/paths";
+
+function verbose(): boolean {
+  return isVbrVerbose();
+}
+
+function printCapturedFailure(error: unknown): void {
+  const err = error as { stdout?: unknown; stderr?: unknown };
+  const details = [err?.stderr, err?.stdout]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean)
+    .join("\n");
+  if (details) process.stderr.write(`${details}\n`);
+}
 
 async function firstExisting(root: string, relCandidates: string[]): Promise<string> {
   for (const rel of relCandidates) {
@@ -21,10 +35,21 @@ async function firstExisting(root: string, relCandidates: string[]): Promise<str
 async function runVerifyFileSizePreflight(root: string, zxInitPath: string): Promise<void> {
   const script = buildToolPath(root, "tools/dev/file-size-lint.ts");
   const args = ["--scope=source", "--fail=true"];
-  process.stderr.write("[verify] file-size preflight: running strict repo-owned file-size gate\n");
+  if (verbose()) {
+    process.stderr.write(
+      "[verify] file-size preflight: running strict repo-owned file-size gate\n",
+    );
+  }
   try {
-    await runNodeWithZx({ cwd: root, script, args, zxInitPath, stdio: "inherit" });
-  } catch {
+    await runNodeWithZx({
+      cwd: root,
+      script,
+      args,
+      zxInitPath,
+      stdio: verbose() ? "inherit" : "pipe",
+    });
+  } catch (error) {
+    printCapturedFailure(error);
     process.stderr.write(
       "error: file-size preflight failed; split oversized files and re-run 'v'\n",
     );
@@ -34,10 +59,21 @@ async function runVerifyFileSizePreflight(root: string, zxInitPath: string): Pro
 
 async function runVerifyStaleNamesPreflight(root: string, zxInitPath: string): Promise<void> {
   const script = buildToolPath(root, "tools/dev/stale-names-lint.ts");
-  process.stderr.write("[verify] stale-names preflight: scanning active source for stale names\n");
+  if (verbose()) {
+    process.stderr.write(
+      "[verify] stale-names preflight: scanning active source for stale names\n",
+    );
+  }
   try {
-    await runNodeWithZx({ cwd: root, script, args: ["--full"], zxInitPath, stdio: "inherit" });
-  } catch {
+    await runNodeWithZx({
+      cwd: root,
+      script,
+      args: ["--full"],
+      zxInitPath,
+      stdio: verbose() ? "inherit" : "pipe",
+    });
+  } catch (error) {
+    printCapturedFailure(error);
     process.stderr.write(
       "error: stale-names preflight failed; fix stale repo names, plan numbers, or migration labels and re-run 'v'\n",
     );
@@ -60,12 +96,21 @@ async function runVerifyNixGapsPolicyPreflight(root: string, zxInitPath: string)
     "viberoots/docs/handbook/nix-gaps-exceptions.json",
   ]);
   const args = ["--starlark-api", starlarkApi, "--nix-gaps", nixGaps, "--exceptions", exceptions];
-  process.stderr.write(
-    "[verify] nix-gaps policy preflight: running inventory + exception checks\n",
-  );
+  if (verbose()) {
+    process.stderr.write(
+      "[verify] nix-gaps policy preflight: running inventory + exception checks\n",
+    );
+  }
   try {
-    await runNodeWithZx({ cwd: root, script, args, zxInitPath, stdio: "inherit" });
-  } catch {
+    await runNodeWithZx({
+      cwd: root,
+      script,
+      args,
+      zxInitPath,
+      stdio: verbose() ? "inherit" : "pipe",
+    });
+  } catch (error) {
+    printCapturedFailure(error);
     process.stderr.write(
       "error: nix-gaps policy preflight failed; update docs/policy files and re-run 'v'\n",
     );
@@ -162,6 +207,7 @@ export async function runVerifyLintPreflight(
   zxInitPath: string,
   opts: { lintFilters?: string[] | null; includeBuildSystemPolicy?: boolean } = {},
 ): Promise<void> {
+  const ui = createCommandUi({ verbose: verbose() });
   const includeBuildSystemPolicy = opts.includeBuildSystemPolicy !== false;
   const skipLint = (process.env.VERIFY_SKIP_LINT || "").trim() === "1";
   if (skipLint) {
@@ -189,13 +235,19 @@ export async function runVerifyLintPreflight(
     lintFilters.length > 0 ? lintFilters : changedLintPaths.filter(isPrettierPath);
   const scoped = lintFilters.length > 0 || changedLintPaths.length > 0;
   if (!scoped) {
-    process.stderr.write("[verify] lint preflight: skipped (no changed lint/prettier files)\n");
+    if (verbose()) {
+      process.stderr.write("[verify] lint preflight: skipped (no changed lint/prettier files)\n");
+    }
   }
   const eslintConfig = scoped && eslintTargets.length > 0 ? await resolveEslintConfig(root) : "";
   const lintCmd = scoped
     ? `${eslintTargets.length > 0 ? `eslint --config ${path.relative(root, eslintConfig) || "."} --no-warn-ignored ${eslintTargets.join(" ")} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern '**/.vite-cache/**' && ` : ""}prettier -c ${prettierTargets.join(" ")}`
     : "skip (no changed lint/prettier files)";
-  process.stderr.write(`[verify] lint preflight: timeout -k 10s ${secs}s ${lintCmd}\n`);
+  if (verbose()) {
+    process.stderr.write(`[verify] lint preflight: timeout -k 10s ${secs}s ${lintCmd}\n`);
+  } else if (scoped) {
+    ui.step("preflight", `lint/format ${eslintTargets.length + prettierTargets.length} files`);
+  }
   const timeoutPath = await resolveToolPath("timeout");
   const eslintPath =
     scoped && eslintTargets.length > 0 ? await resolveRepoNodeBin(root, "eslint") : "";
@@ -205,12 +257,15 @@ export async function runVerifyLintPreflight(
   const eslintRes =
     scoped && eslintTargets.length > 0
       ? await $({
-          stdio: "inherit",
+          stdio: verbose() ? "inherit" : "pipe",
           cwd: root,
           reject: false,
         })`${timeoutPath} -k 10s ${secs}s ${eslintPath} --config ${eslintConfig} --no-warn-ignored ${eslintTargets} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern "**/.vite-cache/**"`
       : { exitCode: 0 };
   if (eslintRes.exitCode !== 0) {
+    if (!verbose()) {
+      process.stderr.write(String(eslintRes.stderr || eslintRes.stdout || ""));
+    }
     process.stderr.write(
       "error: lint preflight failed; refusing to run verify while formatting/lint is dirty\n" +
         "hint: run 'pnpm -s lint:fix' (or format the specific files), then re-run 'v'\n",
@@ -219,11 +274,14 @@ export async function runVerifyLintPreflight(
   }
   if (scoped && prettierTargets.length > 0) {
     const prettierRes = await $({
-      stdio: "inherit",
+      stdio: verbose() ? "inherit" : "pipe",
       cwd: root,
       reject: false,
     })`${timeoutPath} -k 10s ${secs}s ${prettierPath} -c ${prettierTargets}`;
     if (prettierRes.exitCode !== 0) {
+      if (!verbose()) {
+        process.stderr.write(String(prettierRes.stderr || prettierRes.stdout || ""));
+      }
       process.stderr.write(
         "error: lint preflight failed; refusing to run verify while formatting/lint is dirty\n" +
           "hint: run 'pnpm -s lint:fix' (or format the specific files), then re-run 'v'\n",
@@ -238,11 +296,13 @@ export async function runVerifyLintPreflight(
     await runVerifyFileSizePreflight(root, zxInitPath);
     await runVerifyNixGapsPolicyPreflight(root, zxInitPath);
   } else {
-    process.stderr.write(
-      "[verify] file-size preflight: skipped build-system file-size gates for non-build-system verify scope\n",
-    );
-    process.stderr.write(
-      "[verify] nix-gaps policy preflight: skipped for non-build-system verify scope\n",
-    );
+    if (verbose()) {
+      process.stderr.write(
+        "[verify] file-size preflight: skipped build-system file-size gates for non-build-system verify scope\n",
+      );
+      process.stderr.write(
+        "[verify] nix-gaps policy preflight: skipped for non-build-system verify scope\n",
+      );
+    }
   }
 }

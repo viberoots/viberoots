@@ -1,8 +1,9 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
+import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { resolveToolPathSync } from "../../lib/tool-paths";
-import { nodeBin, zxNodeBase } from "./paths";
+import { buildToolPath, nodeBin, zxNodeBase } from "./paths";
 
 async function getDiskStats(root: string): Promise<{ freePct: number; freeBytes: number }> {
   try {
@@ -43,50 +44,95 @@ async function touch(p: string): Promise<void> {
   } catch {}
 }
 
-export async function runHousekeeping(opts: { isCI: boolean; root: string }): Promise<void> {
+function optimiseMode(): "auto" | "always" | "off" {
+  const mode = (process.env.VBR_OPTIMISE_MODE || "auto").trim();
+  if (mode === "always" || mode === "off") return mode;
+  return "auto";
+}
+
+function optimiseCooldownMinutes(): number {
+  const raw = Number((process.env.VBR_OPTIMISE_COOLDOWN_MINUTES || "120").trim());
+  return Number.isFinite(raw) && raw >= 0 ? raw : 120;
+}
+
+function cleanTempOutsCooldownMinutes(): number {
+  const raw = Number((process.env.VBR_CLEAN_TEMP_OUTS_COOLDOWN_MINUTES || "5").trim());
+  return Number.isFinite(raw) && raw >= 0 ? raw : 5;
+}
+
+export async function runHousekeeping(opts: {
+  cleanTempOuts?: () => Promise<boolean>;
+  diskStats?: () => Promise<{ freePct: number; freeBytes: number }>;
+  isCI: boolean;
+  root: string;
+}): Promise<void> {
   try {
     const hkEnabled = (process.env.VBR_HOUSEKEEPING || "1").trim() !== "0";
     const gcMode = (process.env.VBR_GC_MODE || "auto").trim(); // auto | warn | off
     if (opts.isCI || !hkEnabled) return;
+    const verbose = isVbrVerbose();
+    const ui = createCommandUi({ verbose });
 
     const nodeBase = zxNodeBase(opts.root);
     const node = nodeBin();
     const timeoutPath = resolveToolPathSync("timeout");
-    console.log("[housekeeping] starting post-build housekeeping...");
-
-    const cleanMinutes = 30;
-    const cleanRes = await $({
-      stdio: "ignore",
-      cwd: opts.root,
-    })`bash --noprofile --norc -c ${`${node} ${nodeBase} ${path.join(
-      opts.root,
-      "build-tools/tools/dev/clean-temp-outs.ts",
-    )} --minutes ${String(cleanMinutes)}`}`.nothrow();
-    if (cleanRes.exitCode === 0) {
-      console.log("[housekeeping] cleaned temp outputs (buck-impure-*, dangling result)");
-    }
+    if (verbose) console.log("[housekeeping] starting post-build housekeeping...");
 
     const hkDir = path.join(opts.root, "buck-out", ".housekeeping");
     await mkdirWithMacosMetadataExclusion(hkDir).catch(() => {});
+    const cleanStamp = path.join(hkDir, ".clean-temp-outs-stamp");
     const optStamp = path.join(hkDir, ".optimize-stamp");
     const gcStamp = path.join(hkDir, ".gc-stamp");
     const gcLevelFile = path.join(hkDir, ".gc-level");
 
-    const { freePct: beforePct, freeBytes: beforeBytes } = await getDiskStats(opts.root);
-    const underPressure = beforePct < 12 || beforeBytes < 8 * 1024 * 1024 * 1024;
-    console.log(
-      `[housekeeping] disk status: free=${beforePct.toFixed(0)}% (${fmtBytes(beforeBytes)})`,
-    );
+    if (await olderThanMinutes(cleanStamp, cleanTempOutsCooldownMinutes())) {
+      const cleaned = opts.cleanTempOuts
+        ? await opts.cleanTempOuts()
+        : await (async () => {
+            const cleanMinutes = 30;
+            const cleanRes = await $({
+              stdio: "ignore",
+              cwd: opts.root,
+            })`bash --noprofile --norc -c ${`${node} ${nodeBase} ${buildToolPath(
+              opts.root,
+              "tools/dev/clean-temp-outs.ts",
+            )} --minutes ${String(cleanMinutes)}`}`.nothrow();
+            return cleanRes.exitCode === 0;
+          })();
+      if (cleaned) {
+        await touch(cleanStamp);
+        if (verbose)
+          console.log("[housekeeping] cleaned temp outputs (buck-impure-*, dangling result)");
+      }
+    } else {
+      if (verbose) console.log("[housekeeping] temp cleanup: skipped (cooldown)");
+    }
 
-    if (await olderThanMinutes(optStamp, 120)) {
-      console.log("[housekeeping] optimise: running (<=60s)...");
+    const diskStats = opts.diskStats || (() => getDiskStats(opts.root));
+    const { freePct: beforePct, freeBytes: beforeBytes } = await diskStats();
+    const underPressure = beforePct < 12 || beforeBytes < 8 * 1024 * 1024 * 1024;
+    if (verbose || underPressure) {
+      const detail = `free=${beforePct.toFixed(0)}% (${fmtBytes(beforeBytes)})`;
+      if (verbose) console.log(`[housekeeping] disk status: ${detail}`);
+      else ui.warn(`low disk space: ${detail}`);
+    }
+
+    const optMode = optimiseMode();
+    const shouldOptimise = optMode === "always" || (optMode === "auto" && underPressure);
+    if (optMode === "off") {
+      if (verbose) console.log("[housekeeping] optimise: skipped (off)");
+    } else if (!shouldOptimise) {
+      if (verbose) console.log("[housekeeping] optimise: skipped (sufficient free space)");
+    } else if (await olderThanMinutes(optStamp, optimiseCooldownMinutes())) {
+      if (verbose) console.log("[housekeeping] optimise: running (<=60s)...");
+      else ui.step("housekeeping", "optimising nix store");
       await $({
         stdio: "ignore",
         cwd: opts.root,
-      })`bash --noprofile --norc -c 'set -euo pipefail; TOUT=60; TIMEOUT_PATH="$1"; set +e; "$TIMEOUT_PATH" -k 5s "${TOUT}s" nix store optimise >/dev/null 2>&1; exit 0' -- ${timeoutPath}`.nothrow();
+      })`bash --noprofile --norc -c 'set -euo pipefail; TOUT=60; TIMEOUT_PATH="$1"; set +e; "$TIMEOUT_PATH" -k 5s "$TOUT"s nix store optimise >/dev/null 2>&1; exit 0' -- ${timeoutPath}`.nothrow();
       await touch(optStamp);
     } else {
-      console.log("[housekeeping] optimise: skipped (cooldown)");
+      if (verbose) console.log("[housekeeping] optimise: skipped (cooldown)");
     }
 
     if (gcMode === "auto" && underPressure && (await olderThanMinutes(gcStamp, 10))) {
@@ -97,30 +143,35 @@ export async function runHousekeeping(opts: { isCI: boolean; root: string }): Pr
         if (Number.isFinite(n) && n >= 1 && n <= 3) level = n;
       } catch {}
       const cap = level === 1 ? "1G" : level === 2 ? "2G" : "4G";
-      console.log(`[housekeeping] GC: running --max-freed ${cap} (<=45s)...`);
+      if (verbose) console.log(`[housekeeping] GC: running --max-freed ${cap} (<=45s)...`);
+      else ui.step("housekeeping", `running nix GC ${cap}`);
       await $({
         stdio: "ignore",
         cwd: opts.root,
-      })`bash --noprofile --norc -c 'set -euo pipefail; TOUT=45; TIMEOUT_PATH="$1"; CAP="$2"; set +e; "$TIMEOUT_PATH" -k 5s "${TOUT}s" nix-store --gc --max-freed "$CAP" >/dev/null 2>&1; exit 0' -- ${timeoutPath} ${cap}`.nothrow();
+      })`bash --noprofile --norc -c 'set -euo pipefail; TOUT=45; TIMEOUT_PATH="$1"; CAP="$2"; set +e; "$TIMEOUT_PATH" -k 5s "$TOUT"s nix-store --gc --max-freed "$CAP" >/dev/null 2>&1; exit 0' -- ${timeoutPath} ${cap}`.nothrow();
       await touch(gcStamp);
 
-      const { freePct: afterPct, freeBytes: afterBytes } = await getDiskStats(opts.root);
+      const { freePct: afterPct, freeBytes: afterBytes } = await diskStats();
       const stillLow = afterPct < 12 || afterBytes < 8 * 1024 * 1024 * 1024;
       const nextLevel = stillLow ? Math.min(3, level + 1) : 1;
       try {
         await fsp.writeFile(gcLevelFile, String(nextLevel), "utf8");
       } catch {}
-      console.log(
-        `[housekeeping] GC: done; free=${afterPct.toFixed(0)}% (${fmtBytes(afterBytes)})`,
-      );
+      if (verbose) {
+        console.log(
+          `[housekeeping] GC: done; free=${afterPct.toFixed(0)}% (${fmtBytes(afterBytes)})`,
+        );
+      } else {
+        ui.ok("housekeeping", `free=${afterPct.toFixed(0)}% (${fmtBytes(afterBytes)})`);
+      }
     } else if (gcMode === "warn" && underPressure) {
       console.warn(
         "[housekeeping] low disk free detected; consider: nix-store --gc --max-freed 1G",
       );
     } else if (gcMode === "auto" && !underPressure) {
-      console.log("[housekeeping] GC: skipped (sufficient free space)");
+      if (verbose) console.log("[housekeeping] GC: skipped (sufficient free space)");
     }
 
-    console.log("[housekeeping] finished.");
+    if (verbose) console.log("[housekeeping] finished.");
   } catch {}
 }

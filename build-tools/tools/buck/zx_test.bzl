@@ -5,7 +5,7 @@ load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//tests:re_utils.bzl", "get_re_executors_from_props")
 load("@viberoots//build-tools/lang:nix_cache_health.bzl", "nix_cache_health_shell")
 load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_calling_env_export_source_snapshot")
-load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "remote_ready_evidence", "run_nix_action", "stamp_remote_readiness_labels")
+load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "remote_ready_evidence", "stamp_remote_readiness_labels", "write_nix_test_stamp")
 load("@viberoots//build-tools/lang:source_snapshot.bzl", "SourceSnapshotInfo")
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
@@ -217,10 +217,6 @@ def _zx_test_impl(ctx):
         ] + runtime_inputs + snapshot_inputs + evidence_inputs,
     )
     stamp = ctx.actions.declare_output(ctx.attrs.out)
-    stamp_cmd = cmd_args(
-        ["bash", "-c", "echo zx_test > \"$1\"", "stamp", stamp.as_output()],
-        hidden = [ctx.attrs.script] + (ctx.attrs.template_inputs or []),
-    )
     policy_mode = "remote-ready" if "remote:ready" in labels else "local-only"
     policy_evidence = remote_ready_evidence(
         source_snapshot,
@@ -230,10 +226,10 @@ def _zx_test_impl(ctx):
         ctx.attrs.tool_closure,
         ctx.attrs.remote_builder_smoke,
     ) if policy_mode == "remote-ready" else None
-    policy_info = run_nix_action(
+    policy_info = write_nix_test_stamp(
         ctx,
-        stamp_cmd,
-        category = "zx_test_stamp",
+        stamp,
+        "zx_test\n",
         mode = policy_mode,
         evidence = policy_evidence,
     )

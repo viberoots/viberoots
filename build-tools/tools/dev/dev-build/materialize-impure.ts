@@ -2,6 +2,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 import { inferRunnableFromOutPath } from "../../lib/runnables";
+import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { buildToolPath, nodeBin, zxNodeBase } from "./paths";
 import { runNixBuildWithProgress } from "../run-runnable-nix";
 
@@ -108,6 +109,8 @@ export async function maybePrintImpureMaterializedBins(opts: {
   subcmd: string;
   restArgs: string[];
 }): Promise<void> {
+  const verbose = isVbrVerbose();
+  const ui = createCommandUi({ verbose });
   if (!opts.impure) return;
   if (opts.subcmd === "test") return;
 
@@ -184,13 +187,22 @@ export async function maybePrintImpureMaterializedBins(opts: {
     const graphTxt = await fsp.readFile(graphPath, "utf8");
     const runnables = extractRunnablesFromGraph(JSON.parse(graphTxt));
     if (runnables.length > 0) {
-      console.log("Impure runnable targets (from exported graph labels):");
-      for (const r of runnables) console.log(` - ${r.label} [${r.kind}]`);
+      if (verbose) {
+        console.log("Impure runnable targets (from exported graph labels):");
+        for (const r of runnables) console.log(` - ${r.label} [${r.kind}]`);
+      } else {
+        ui.ok("runnables", `${runnables.length} available`);
+        ui.list(runnables.map((r) => `${r.label} [${r.kind}]`));
+      }
       return;
     }
-    console.log("Impure build: no runnable targets found in exported graph labels.");
+    if (verbose) console.log("Impure build: no runnable targets found in exported graph labels.");
   } catch {
-    console.log(`Impure build: could not read exported graph for runnable listing (${graphPath}).`);
+    if (verbose) {
+      console.log(
+        `Impure build: could not read exported graph for runnable listing (${graphPath}).`,
+      );
+    }
   }
   return;
 }

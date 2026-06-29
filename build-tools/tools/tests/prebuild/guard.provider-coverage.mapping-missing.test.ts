@@ -4,6 +4,8 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
+import { writePrebuildFingerprint } from "../../buck/prebuild/fingerprint";
+import { listFreshnessOutputs, listOutputs } from "../../buck/prebuild/scan";
 
 test("prebuild-guard: flags missing MODULE_PROVIDERS mapping for nixpkg-labeled node", async () => {
   await runInTemp("prebuild-coverage-mapping-missing", async (tmp, $) => {
@@ -81,6 +83,10 @@ test("prebuild-guard: flags missing MODULE_PROVIDERS mapping for nixpkg-labeled 
       "# invalidation-report\n",
       "utf8",
     );
+    await writePrebuildFingerprint({
+      root: tmp,
+      outputs: listFreshnessOutputs(listOutputs()),
+    });
     await $({
       cwd: tmp,
       stdio: "inherit",

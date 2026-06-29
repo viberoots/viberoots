@@ -23,7 +23,11 @@ let
 in {
   default = pkgs.mkShell {
     shellHook = ''
-      dev_root="$PWD"
+      entry_cwd="$PWD"
+      dev_root="''${WORKSPACE_ROOT:-$PWD}"
+      if [ -n "''${WORKSPACE_ROOT:-}" ]; then
+        dev_root="$(cd "$WORKSPACE_ROOT" && pwd)"
+      fi
       if [ ! -f "$dev_root/flake.nix" ]; then
         search_root="$dev_root"
         while [ "$search_root" != "/" ] && [ ! -f "$search_root/flake.nix" ]; do
@@ -238,6 +242,9 @@ if [[ -o interactive ]]; then
   if command -v scaf >/dev/null 2>&1; then
     eval "$(scaf completions zsh)"
   fi
+  if command -v vbr >/dev/null 2>&1; then
+    eval "$(vbr completion zsh)"
+  fi
 fi
 EOF
       export ZDOTDIR="$PWD/.nix-zsh"
@@ -254,7 +261,7 @@ _vbr_update_path() {
   elif [[ -x "$vbr_nix_bin/nix" ]]; then
     export VBR_NIX_BIN="$vbr_nix_bin/nix"
   fi
-  local d="$PWD"
+  local d="''${WORKSPACE_ROOT:-$PWD}"
   while [[ "$d" != "/" ]]; do
     local vbr_tools_bin="$d/build-tools/tools/bin"
     local vbr_node_bin="$d/node_modules/.bin"
@@ -262,7 +269,7 @@ _vbr_update_path() {
       vbr_tools_bin="$d/viberoots/build-tools/tools/bin"
       vbr_node_bin="$d/viberoots/node_modules/.bin"
     fi
-    if [[ -f "$d/flake.nix" && -d "$vbr_tools_bin" ]]; then
+    if [[ ( -n "''${WORKSPACE_ROOT:-}" || -f "$d/flake.nix" ) && -d "$vbr_tools_bin" ]]; then
       local old_ifs="$IFS"
       local entry
       local out=""
@@ -288,12 +295,18 @@ compinit -i
 if command -v scaf >/dev/null 2>&1; then
   eval "$(scaf completions zsh)"
 fi
+if command -v vbr >/dev/null 2>&1; then
+  eval "$(vbr completion zsh)"
+fi
 EOF
 
       if [ -n "$BASH_VERSION" ] && [ "$is_interactive" = "1" ]; then
         export PS1="\n\033[32m[nix-shell]\033[0m \h:\w$ "
         if [ -d "node_modules/zx" ]; then
           eval "$(scaf completions bash)"
+        fi
+        if command -v vbr >/dev/null 2>&1; then
+          eval "$(vbr completion bash)"
         fi
       fi
 
@@ -303,7 +316,11 @@ EOF
         if command -v scaf >/dev/null 2>&1; then
           eval "$(scaf completions zsh)"
         fi
+        if command -v vbr >/dev/null 2>&1; then
+          eval "$(vbr completion zsh)"
+        fi
       fi
+      cd "$entry_cwd"
 
       # Strict consumer workspaces route the Buck prelude through
       # .viberoots/current/prelude; do not recreate a visible root prelude shim.

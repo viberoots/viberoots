@@ -1,7 +1,7 @@
 load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
 load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_calling_env_export_source_snapshot", "nix_timeout_wrapper_var")
 load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
-load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "run_nix_action", "stamp_remote_readiness_labels")
+load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "stamp_remote_readiness_labels", "write_nix_test_stamp")
 load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
 load("@prelude//test:inject_test_run_info.bzl", "inject_test_run_info")
@@ -58,11 +58,7 @@ def _python_nix_test_impl(ctx):
         + "$TIMEOUT \"$BIN\""
     )
     stamp = ctx.actions.declare_output(ctx.attrs.out)
-    stamp_cmd = cmd_args(
-        ["bash", "-c", "echo python_nix_test > \"$1\"", "stamp", stamp.as_output()],
-        hidden = ctx.attrs.nix_inputs,
-    )
-    policy_info = run_nix_action(ctx, stamp_cmd, category = "python_nix_test_stamp")
+    policy_info = write_nix_test_stamp(ctx, stamp, "python_nix_test\n")
     re_executor, executor_overrides = get_re_executors_from_props(ctx)
     snapshot_inputs = []
     if ctx.attrs.source_snapshot != None:

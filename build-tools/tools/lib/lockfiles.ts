@@ -88,6 +88,7 @@ export async function resolveImporterDir(cwd?: string, flag?: string): Promise<s
 }
 
 export type FindLockfilesOptions = {
+  baseRoot?: string;
   roots?: string[];
   ignore?: string[];
 };
@@ -183,7 +184,7 @@ async function findLockfilesByBasename(
 ): Promise<string[]> {
   const ignore = new Set<string>(opts?.ignore || []);
   for (const d of DEFAULT_IGNORES) ignore.add(d);
-  const baseRoot = path.resolve(process.cwd());
+  const baseRoot = path.resolve(opts?.baseRoot || process.cwd());
   const rootsAbs = (opts?.roots && opts.roots.length ? opts.roots : ["."])
     .map((r) => (path.isAbsolute(r) ? r : path.resolve(baseRoot, r)))
     .map((r) => r.trim())

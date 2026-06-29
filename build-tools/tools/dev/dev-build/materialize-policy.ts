@@ -1,4 +1,3 @@
-import fs from "node:fs";
 import { checkFreshness } from "../../buck/prebuild/freshness";
 import { computeCoverageMissing } from "../../buck/prebuild/coverage";
 import {
@@ -6,7 +5,7 @@ import {
   findMissingNodeImporterProviders,
   findMissingPythonImporterProviders,
 } from "../../buck/prebuild/presence";
-import { listInputs, listOutputs } from "../../buck/prebuild/scan";
+import { listFreshnessOutputs, listInputs, listOutputs } from "../../buck/prebuild/scan";
 
 type PrebuildSummary = {
   ageDeltaMs?: number;
@@ -66,9 +65,9 @@ export async function shouldMaterializeByDefault(opts: {
       process.chdir(opts.root);
       const inputs = await listInputs();
       const outputs = listOutputs();
-      const presentOutputs = outputs.filter((o) => fs.existsSync(o));
+      const freshnessOutputs = listFreshnessOutputs(outputs);
       const missingOutputs = await computeMissingOutputs(outputs);
-      const staleByFreshness = checkFreshness(inputs, presentOutputs, skewMs, "local");
+      const staleByFreshness = await checkFreshness(inputs, freshnessOutputs, skewMs, "local");
       const missingNodeProviders = await findMissingNodeImporterProviders();
       const missingPythonProviders = await findMissingPythonImporterProviders();
       const coverageMissing = await computeCoverageMissing();

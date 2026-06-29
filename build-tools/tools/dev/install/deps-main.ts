@@ -22,7 +22,10 @@ import { discoverImportersWithLock } from "./importers";
 import { pruneNodeModulesHashesJson } from "../update-pnpm-hash/hashes-json";
 import { ensureInstallSecretReadiness } from "./secret-readiness";
 import { prewarmUnifiedPnpmStore } from "./unified-pnpm-prewarm";
+import { importerInstallFreshness } from "./importer-freshness";
+import { writeGlueFingerprint } from "./glue-freshness";
 import { checkBootstrapCompletion } from "../../lib/bootstrap-completion";
+import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { repairGeneratedWorkspaceLock } from "../../lib/workspace-lock-repair";
 
 type Flags = {
@@ -64,6 +67,36 @@ function shouldRunFinalWorkspaceLockRepair(): boolean {
   return String(process.env.VBR_SKIP_FINAL_WORKSPACE_LOCK_REPAIR || "").trim() !== "1";
 }
 
+async function writeFinalPrebuildFingerprint(opts: {
+  dryRun: boolean;
+  skipGlue: boolean;
+}): Promise<void> {
+  if (opts.dryRun || opts.skipGlue) return;
+  await writeGlueFingerprint(repoRoot);
+}
+
+function commandOutputTail(value: unknown): string {
+  const output = String(value || "").trim();
+  if (!output) return "";
+  const max = 12_000;
+  return output.length > max ? output.slice(output.length - max) : output;
+}
+
+function printFailedChildOutput(label: string, result: unknown): void {
+  const proc = result as {
+    stdout?: unknown;
+    stderr?: unknown;
+    exitCode?: unknown;
+    cause?: { stdout?: unknown; stderr?: unknown };
+  };
+  const details = [proc.stderr, proc.stdout, proc.cause?.stderr, proc.cause?.stdout]
+    .map(commandOutputTail)
+    .filter(Boolean)
+    .join("\n");
+  process.stderr.write(`[install-deps] ${label} failed\n`);
+  if (details) process.stderr.write(`${details}\n`);
+}
+
 // Resolve absolute workspace root path without requiring callers to run from repo root.
 async function resolveWorkspaceRoot(): Promise<string> {
   const cwd = process.cwd();
@@ -82,7 +115,6 @@ async function resolveWorkspaceRoot(): Promise<string> {
   }
   return gitRoot;
 }
-console.log("Installing dependencies...");
 const envDryRun = process.env.INSTALL_DEPS_DRY_RUN === "1";
 const envSkipGoTidy = process.env.INSTALL_DEPS_SKIP_GO_TIDY === "1";
 const {
@@ -101,7 +133,7 @@ const {
 } = {
   force: getFlagBool("force"),
   dryRun: getFlagBool("dry-run") || envDryRun,
-  verbose: getFlagBool("verbose") || hasShortFlag("v"),
+  verbose: getFlagBool("verbose") || hasShortFlag("v") || isVbrVerbose(),
   skipGlue: getFlagBool("skip-glue"),
   glueOnly: getFlagBool("glue-only"),
   skipGoTidy: getFlagBool("skip-go-tidy") || envSkipGoTidy,
@@ -113,6 +145,9 @@ const {
   rotateDeploymentCredentials: getFlagBool("rotate-deployment-credentials"),
   forceOverwriteLocalCredentials: getFlagBool("force-overwrite-local-credentials"),
 } satisfies Flags;
+const ui = createCommandUi({ verbose });
+if (verbose) console.log("Installing dependencies...");
+else ui.heading("viberoots install");
 // In glue-only mode, default to skipping go mod tidy unless explicitly overridden
 const effSkipGoTidy =
   skipGoTidy || (glueOnly && String(process.env.INSTALL_DEPS_SKIP_GO_TIDY || "") !== "0");
@@ -169,7 +204,9 @@ if (glueOnly) {
   } else if (!dryRun && verbose) {
     console.log("[install-deps] final workspace lock repair skipped");
   }
-  console.log("Glue refreshed.");
+  await writeFinalPrebuildFingerprint({ dryRun, skipGlue });
+  if (verbose) console.log("Glue refreshed.");
+  else ui.ok("glue", "refreshed");
   process.exit(0);
 }
 const importers = await discoverImportersWithLock(repoRoot, { cwd: process.cwd() });
@@ -207,15 +244,36 @@ if (dryRun) {
         const absUpdate = buildToolPath(repoRoot, "tools/dev/update-pnpm-hash.ts");
         const activeZxInit = zxInitPath(repoRoot);
         for (const imp of importers) {
-          const isViberootsImporter = imp === "viberoots";
           const commandCwd = repoRoot;
           const commandEnv = process.env;
           const relLock = path.join(imp, "pnpm-lock.yaml");
-          console.log(`[install-deps] importer ${imp}: preparing pnpm store (${relLock})`);
+          const freshness = await importerInstallFreshness({
+            repoRoot,
+            importer: imp,
+            force,
+          });
+          if (freshness.fresh) {
+            if (verbose) {
+              console.log(`[install-deps] importer ${imp}: node_modules already fresh; skipping`);
+            } else {
+              ui.ok("node_modules", `${imp} already fresh`);
+            }
+            continue;
+          } else if (verbose) {
+            console.log(
+              `[install-deps] importer ${imp}: refreshing node_modules (${freshness.reason})`,
+            );
+          }
+          if (verbose) {
+            console.log(`[install-deps] importer ${imp}: preparing pnpm store (${relLock})`);
+          } else {
+            ui.step("node_modules", `${imp} refreshing`);
+          }
           // Update the FOD hash for this importer lockfile
-          await $({
-            stdio: "inherit",
+          const updateCmd = $({
+            stdio: verbose ? "inherit" : "pipe",
             cwd: commandCwd,
+            reject: false,
             env: {
               ...commandEnv,
               ZX_INIT: activeZxInit,
@@ -224,17 +282,30 @@ if (dryRun) {
               NIX_PNPM_FETCH_TIMEOUT: String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"),
             },
           })`zx-wrapper ${absUpdate} --lockfile ${relLock}`;
+          const updateRes = verbose ? await updateCmd : await updateCmd.quiet();
+          if (updateRes.exitCode !== 0) {
+            printFailedChildOutput(`update-pnpm-hash ${imp}`, updateRes);
+            process.exit(updateRes.exitCode || 1);
+          }
           // Realize and link importer node_modules via link-node (single strict path).
-          console.log(`[install-deps] importer ${imp}: realizing and linking node_modules`);
-          await $({
+          if (verbose) {
+            console.log(`[install-deps] importer ${imp}: realizing and linking node_modules`);
+          }
+          const linkCmd = $({
             cwd: commandCwd,
-            stdio: "inherit",
+            stdio: verbose ? "inherit" : "pipe",
+            reject: false,
             env: {
               ...commandEnv,
               ZX_INIT: activeZxInit,
               NIX_PNPM_FETCH_TIMEOUT: String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"),
             },
           })`zx-wrapper ${buildToolPath(repoRoot, "tools/dev/install/link-node.ts")} --importer ${imp} ${force ? "--force" : ""}`;
+          const linkRes = verbose ? await linkCmd : await linkCmd.quiet();
+          if (linkRes.exitCode !== 0) {
+            printFailedChildOutput(`link-node ${imp}`, linkRes);
+            process.exit(linkRes.exitCode || 1);
+          }
         }
       } finally {
         if (prevInstallLockSkip === undefined) {
@@ -271,7 +342,17 @@ await runGomod2nixScanAll(dryRun, verbose);
 // Best-effort Python lock refresh (uv). No-ops if no uv.lock present.
 await runUvRefreshAll(dryRun, verbose);
 if (!skipGlue) {
-  await runGlue(dryRun, verbose);
+  const prevSkipPnpmHash = process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
+  process.env.INSTALL_GLUE_SKIP_PNPM_HASH = "1";
+  try {
+    await runGlue(dryRun, verbose);
+  } finally {
+    if (prevSkipPnpmHash === undefined) {
+      delete process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
+    } else {
+      process.env.INSTALL_GLUE_SKIP_PNPM_HASH = prevSkipPnpmHash;
+    }
+  }
 } else if (verbose) {
   console.log("[skip] glue regeneration");
 }
@@ -309,4 +390,6 @@ if (!dryRun && shouldRunFinalWorkspaceLockRepair()) {
 } else if (!dryRun && verbose) {
   console.log("[install-deps] final workspace lock repair skipped");
 }
-console.log("Dependencies installed and node_modules linked.");
+await writeFinalPrebuildFingerprint({ dryRun, skipGlue });
+if (verbose) console.log("Dependencies installed and node_modules linked.");
+else ui.ok("install", "complete");

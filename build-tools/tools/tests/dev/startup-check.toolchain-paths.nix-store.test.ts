@@ -10,6 +10,7 @@ await runInTemp("startup-check-toolchain-paths-nix-store", async (_tmp, $) => {
     env: {
       ...process.env,
       STARTUP_CHECK_ALLOW_NON_NIX_STORE: "",
+      VBR_VERBOSE: "1",
     },
   })`${process.execPath || "node"} ${startupCheckScript}`.nothrow();
   assert.equal(

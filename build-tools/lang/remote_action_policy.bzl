@@ -243,3 +243,17 @@ def run_nix_action(ctx, cmd, category, mode = "local-only", evidence = None, fal
         metadata = policy.metadata,
         remote_builder_smoke_policy = policy.remote_builder_smoke_policy,
     )]
+
+def write_nix_test_stamp(ctx, output, content, mode = "local-only", evidence = None, fallback_reason = None):
+    policy = remote_action_policy(
+        mode = mode,
+        evidence = evidence,
+        fallback_reason = fallback_reason,
+    )
+    ctx.actions.write(output, content)
+    return [NixRemoteActionPolicyInfo(
+        builder_policy = policy.builder_policy,
+        labels = policy.labels,
+        metadata = policy.metadata,
+        remote_builder_smoke_policy = policy.remote_builder_smoke_policy,
+    )]

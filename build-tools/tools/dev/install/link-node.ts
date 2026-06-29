@@ -69,6 +69,7 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
     "tmp",
     `node-modules-link.${markerKey}.json`,
   );
+  let symlinkAlreadyCorrect = false;
   {
     try {
       const [lockBuf, markerRaw] = await Promise.all([
@@ -98,6 +99,7 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
           hasMarkerTarget
         ) {
           outPath = markerTarget;
+          symlinkAlreadyCorrect = symlinkMatches;
           if (!symlinkMatches) {
             console.error(
               "[link-node] marker target valid; node_modules symlink will be corrected",
@@ -240,10 +242,12 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
     }
     await fsp.rm(nm, { recursive: true, force: true });
   }
-  await fsp.symlink(linkTarget, nm).catch(async () => {
-    await fsp.rm(nm, { recursive: true, force: true }).catch(() => {});
-    await fsp.symlink(linkTarget, nm);
-  });
+  if (!symlinkAlreadyCorrect) {
+    await fsp.symlink(linkTarget, nm).catch(async () => {
+      await fsp.rm(nm, { recursive: true, force: true }).catch(() => {});
+      await fsp.symlink(linkTarget, nm);
+    });
+  }
   // Verify
   try {
     const st = await fsp.lstat(nm);

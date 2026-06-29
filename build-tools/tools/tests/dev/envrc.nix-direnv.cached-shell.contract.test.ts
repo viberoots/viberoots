@@ -10,6 +10,9 @@ test(".envrc uses nix-direnv loading path and keeps use flake", async () => {
   if (!txt.includes("use flake")) {
     throw new Error(".envrc must use flake through nix-direnv");
   }
+  if (!txt.includes("--accept-flake-config")) {
+    throw new Error(".envrc must trust the generated workspace flake config");
+  }
 });
 
 test(".envrc preserves required local-only NIX_CONFIG guardrails", async () => {

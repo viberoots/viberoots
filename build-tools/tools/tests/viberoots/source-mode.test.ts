@@ -112,6 +112,7 @@ test("viberoots help and bash completion are generated from command metadata", a
   const help = await execFileAsync(bin, ["help"], { cwd: viberootsRoot, env });
   for (const command of [
     "status",
+    "develop",
     "bootstrap-check",
     "bootstrap",
     "update",
@@ -120,7 +121,7 @@ test("viberoots help and bash completion are generated from command metadata", a
     "use-submodule",
     "use-flake",
     "remove-submodule",
-    "completion bash",
+    "completion bash|zsh",
     "help",
   ]) {
     assert.match(help.stdout, new RegExp(`viberoots ${command}`));
@@ -130,7 +131,7 @@ test("viberoots help and bash completion are generated from command metadata", a
   assert.match(completion.stdout, /_viberoots\(\)/);
   assert.match(
     completion.stdout,
-    /status bootstrap-check bootstrap update gc init-consumer use-submodule use-flake remove-submodule completion help/,
+    /status develop bootstrap-check bootstrap update gc init-consumer use-submodule use-flake remove-submodule completion help/,
   );
   assert.match(completion.stdout, /complete -F _viberoots viberoots/);
   assert.match(completion.stdout, /complete -F _viberoots vbr/);
@@ -143,6 +144,16 @@ test("viberoots help and bash completion are generated from command metadata", a
     /use-flake\) opts="--ref --remove-submodule --no-direnv --run-install --workspace-root --help"/,
   );
   assert.match(completion.stdout, /remove-submodule\) opts="--dry-run --workspace-root --help"/);
+
+  const zshCompletion = await execFileAsync(bin, ["completion", "zsh"], {
+    cwd: viberootsRoot,
+    env,
+  });
+  assert.match(zshCompletion.stdout, /#compdef viberoots vbr/);
+  assert.match(zshCompletion.stdout, /compdef _viberoots viberoots/);
+  assert.match(zshCompletion.stdout, /compdef _viberoots vbr/);
+  assert.match(zshCompletion.stdout, /commands=\(status develop bootstrap-check/);
+  assert.match(zshCompletion.stdout, /develop\) _arguments -S .*--command\[--command\]/);
 
   await assert.rejects(
     execFileAsync(bin, ["unknown-command"], { cwd: viberootsRoot, env }),

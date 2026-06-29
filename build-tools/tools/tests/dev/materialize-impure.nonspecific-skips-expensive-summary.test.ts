@@ -38,7 +38,9 @@ test("materialize impure skips full graph summary for non-specific target sets",
     );
 
     const prevPath = process.env.PATH || "";
+    const prevVerbose = process.env.VBR_VERBOSE;
     process.env.PATH = `${stubBin}:${prevPath}`;
+    process.env.VBR_VERBOSE = "1";
     const prevLog = console.log;
     const logs: string[] = [];
     console.log = (...args: unknown[]) => logs.push(args.map((a) => String(a)).join(" "));
@@ -58,6 +60,45 @@ test("materialize impure skips full graph summary for non-specific target sets",
     } finally {
       console.log = prevLog;
       process.env.PATH = prevPath;
+      if (typeof prevVerbose === "string") process.env.VBR_VERBOSE = prevVerbose;
+      else delete process.env.VBR_VERBOSE;
+    }
+  });
+});
+
+test("materialize impure prints compact runnable summary in quiet mode", async () => {
+  await runInTemp("materialize-impure-quiet-summary", async (tmp) => {
+    await fsp.mkdir(path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH)), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, DEFAULT_GRAPH_PATH),
+      JSON.stringify({
+        nodes: [{ name: "//projects/apps/web:web", labels: ["lang:node", "kind:app"] }],
+      }),
+      "utf8",
+    );
+
+    const prevVerbose = process.env.VBR_VERBOSE;
+    delete process.env.VBR_VERBOSE;
+    const prevWrite = process.stdout.write;
+    let stdout = "";
+    process.stdout.write = ((chunk: string | Uint8Array) => {
+      stdout += String(chunk);
+      return true;
+    }) as typeof process.stdout.write;
+    try {
+      await maybePrintImpureMaterializedBins({
+        root: tmp,
+        impure: true,
+        subcmd: "build",
+        restArgs: ["//..."],
+      });
+      assert.match(stdout, /ok\s+runnables 1 available/);
+      assert.match(stdout, /    - \/\/projects\/apps\/web:web \[app\]/);
+      assert.doesNotMatch(stdout, /Impure runnable targets/);
+    } finally {
+      process.stdout.write = prevWrite;
+      if (typeof prevVerbose === "string") process.env.VBR_VERBOSE = prevVerbose;
+      else delete process.env.VBR_VERBOSE;
     }
   });
 });

@@ -17,4 +17,10 @@ test("link-node root importer supports marker fast-path", async () => {
   if (!txt.includes("marker target valid; node_modules symlink will be corrected")) {
     throw new Error("link-node.ts must allow marker fast-path even when symlink needs correction");
   }
+  if (!txt.includes("symlinkAlreadyCorrect = symlinkMatches")) {
+    throw new Error("link-node.ts must remember when marker fast-path symlink is already correct");
+  }
+  if (!txt.includes("if (!symlinkAlreadyCorrect)")) {
+    throw new Error("link-node.ts must avoid rewriting an already-correct node_modules symlink");
+  }
 });

@@ -142,11 +142,12 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
     "expected generic tool process state and cleanup logs to live under hidden workspace buck state",
   );
   assert.ok(
-    devBuildRootCleanup.includes('name === ".housekeeping"') &&
+    devBuildRootCleanup.includes("isSharedDevBuildRootBuckOutEntry") &&
+      !devBuildRootCleanup.includes('name === ".housekeeping"') &&
       devBuildRootCleanup.includes('name.startsWith("devbuild-")') &&
       devBuildRootCleanup.includes('name.startsWith("exporter-")') &&
       devBuildRootCleanup.includes("buck2 --isolation-dir"),
-    "expected dev-build cleanup to remove dev-build-owned root buck-out entries and kill their daemons",
+    "expected dev-build cleanup to remove throwaway dev-build root buck-out entries while preserving no-op state for reusable builds",
   );
 
   assert.ok(

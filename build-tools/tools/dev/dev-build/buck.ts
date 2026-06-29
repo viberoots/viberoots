@@ -1,4 +1,26 @@
 import { withSharedBuckIsolationStartupLock } from "../../lib/shared-buck-isolation-lock";
+import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
+
+function outputTail(value: unknown): string {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const max = 20_000;
+  return text.length > max ? text.slice(text.length - max) : text;
+}
+
+function printBuckFailure(proc: unknown): void {
+  const out = proc as {
+    stdout?: unknown;
+    stderr?: unknown;
+    cause?: { stdout?: unknown; stderr?: unknown };
+  };
+  const details = [out.stderr, out.stdout, out.cause?.stderr, out.cause?.stdout]
+    .map(outputTail)
+    .filter(Boolean)
+    .join("\n");
+  process.stderr.write("[dev-build] buck failed\n");
+  if (details) process.stderr.write(`${details}\n`);
+}
 
 export async function runBuckCommand(opts: {
   root: string;
@@ -15,6 +37,8 @@ export async function runBuckCommand(opts: {
   const baseCmd = `${buckBin} ${opts.isolationFlags.join(" ")} ${opts.subcmd} ${platformFlags.join(
     " ",
   )} ${opts.restArgs.join(" ")}`;
+  const verbose = isVbrVerbose();
+  const ui = createCommandUi({ verbose });
   const useStderrFilter = String(process.env.BUCK_STDERR_FILTER || "").trim() === "1";
   // Default to direct stderr passthrough. Bash process-substitution filters can hang if any child
   // process inherits stderr fds and keeps the substitution pipe open.
@@ -28,15 +52,21 @@ export async function runBuckCommand(opts: {
       ? String(opts.isolationFlags[isoFlagIndex + 1])
       : "";
   const proc = await withSharedBuckIsolationStartupLock(opts.root, isolation, async () => {
-    return await $({
-      stdio: "inherit",
+    const buckCmd = $({
+      stdio: verbose ? "inherit" : "pipe",
       cwd: opts.root,
+      reject: false,
       env: {
         ...process.env,
         HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
       },
-    })`bash --noprofile --norc -c ${cmd}`.catch((e) => e);
+    })`bash --noprofile --norc -c ${cmd}`;
+    return await (verbose ? buckCmd : buckCmd.quiet()).catch((e) => e);
   });
   const code = typeof proc?.exitCode === "number" ? proc.exitCode : 1;
-  if (code !== 0) process.exit(code);
+  if (code !== 0) {
+    if (!verbose) printBuckFailure(proc);
+    process.exit(code);
+  }
+  ui.ok("buck", `${opts.subcmd} complete`);
 }

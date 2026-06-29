@@ -11,6 +11,7 @@ import { verifyBuck2Threads } from "./buck2-threads";
 import { buildVerifyTestEnvArgs, previewVerifyNestedBuckIsolation } from "./buck2-test-env";
 import { buildBuckProcessEnvForPolicy } from "./buck2-test-remote-env";
 import { registerVerifyBuckTestIsolations } from "./verify-buck-isolation-registration";
+import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { withGitAutoMaintenanceDisabledEnv } from "../../lib/git-auto-maintenance-env";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { buckTestArgsForExecutionPolicy, targetPlatformArgsForPolicy } from "./remote-policy";
@@ -113,6 +114,8 @@ export function spawnVerifyBuck2Tests(opts: {
   let stderrTail = "";
   let exitCodeRaw: number | null = null;
   let exitSignalRaw: NodeJS.Signals | null = null;
+  const streamBuckOutput = isVbrVerbose() || opts.console !== "auto";
+  const ui = createCommandUi({ verbose: streamBuckOutput });
   const slowest = createBuck2SlowestRecorder(25);
   const appendTail = (current: string, next: string): string => {
     const max = 64 * 1024;
@@ -165,7 +168,7 @@ export function spawnVerifyBuck2Tests(opts: {
     passCount += r.pass;
     failCount += r.fail;
     for (const c of r.completions) slowest.record(c);
-    process.stdout.write(s);
+    if (streamBuckOutput) process.stdout.write(s);
     if (opts.logFile) void fsp.appendFile(opts.logFile, s, "utf8").catch(() => {});
   });
   proc.stderr?.on("data", (b) => {
@@ -176,7 +179,7 @@ export function spawnVerifyBuck2Tests(opts: {
     passCount += r.pass;
     failCount += r.fail;
     for (const c of r.completions) slowest.record(c);
-    process.stderr.write(s);
+    if (streamBuckOutput) process.stderr.write(s);
     if (opts.logFile) void fsp.appendFile(opts.logFile, s, "utf8").catch(() => {});
   });
 
@@ -216,6 +219,15 @@ export function spawnVerifyBuck2Tests(opts: {
         .catch(() => {});
     }
     if (exitCode !== 0) {
+      if (!streamBuckOutput) {
+        const detail = [stderrTail, stdoutTail]
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+          .join("\n");
+        if (detail) {
+          process.stderr.write(`\n[verify] buck2 ${passName} output tail:\n${detail}\n`);
+        }
+      }
       if (shouldCaptureBuck2DebugArtifacts({ status: exitCode, stderrTail })) {
         await captureBuck2DebugArtifacts({
           root: opts.root,
@@ -247,6 +259,10 @@ export function spawnVerifyBuck2Tests(opts: {
       });
     }
     await slowest.write(opts.logFile, passName);
+    if (exitCode === 0) {
+      const count = passCount > 0 ? `${passCount} passed` : "passed";
+      ui.ok("tests", `${passName} ${count} in ${durationS}s`);
+    }
     return exitCode ?? 1;
   };
   return { pgid, nestedIso, wait };
