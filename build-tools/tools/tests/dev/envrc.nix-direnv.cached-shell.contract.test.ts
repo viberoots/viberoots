@@ -13,6 +13,15 @@ test(".envrc uses nix-direnv loading path and keeps use flake", async () => {
   if (!txt.includes("--accept-flake-config")) {
     throw new Error(".envrc must trust the generated workspace flake config");
   }
+  if (!txt.includes("__vbr_flake_input_root")) {
+    throw new Error(".envrc must select the local viberoots flake input through a validated root");
+  }
+  if (!txt.includes('! -f "${__vbr_flake_input_root}/flake.nix"')) {
+    throw new Error(".envrc must reject stale local viberoots flake input roots");
+  }
+  if (!txt.includes('export VIBEROOTS_FLAKE_INPUT_ROOT="${__vbr_flake_input_root}"')) {
+    throw new Error(".envrc must sanitize the impure viberoots flake input env var");
+  }
 });
 
 test(".envrc preserves required local-only NIX_CONFIG guardrails", async () => {

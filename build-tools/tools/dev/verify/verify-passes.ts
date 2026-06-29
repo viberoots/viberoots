@@ -10,6 +10,7 @@ import {
   verifyPassIsolationDir,
 } from "./verify-pass-scheduling";
 import { killBuckIsolation } from "./process-control";
+import { createVerifyProgressReporter, verifyProgressEnabled } from "./progress-line";
 import { startVerifySafetyRails, summarizeVerifySafetyRailsTelemetry } from "./safety-rails";
 import {
   assertVerifyTargetPlanNotEmpty,
@@ -17,6 +18,7 @@ import {
   summarizeVerifyTargetPlan,
 } from "./target-passes";
 import type { VerifyExecutionPolicy } from "./remote-policy";
+import { isVbrVerbose } from "../../lib/command-ui";
 
 async function appendVerifyPassLog(file: string | null, line: string): Promise<void> {
   if (!file) return;
@@ -49,6 +51,8 @@ export async function runVerifyBuckPasses(opts: {
   onNestedIsoDone?: (iso: string) => void;
   executionPolicy: VerifyExecutionPolicy;
   exactOverallTimeoutSecs?: number;
+  suppressFailureOutputTail?: () => boolean;
+  shouldAbort?: () => boolean;
 }): Promise<number> {
   const plan = resolveVerifyTargetPlan({
     root: opts.root,
@@ -77,8 +81,26 @@ export async function runVerifyBuckPasses(opts: {
     );
   }
 
+  const showProgress =
+    opts.console === "auto" && !isVbrVerbose() && verifyProgressEnabled(process.env);
+  const progress = createVerifyProgressReporter({
+    enabled: showProgress,
+    passes: passes.map((pass) => ({ name: pass.name, total: pass.targets.length })),
+  });
+  progress.start();
+  const shouldAbort = () => opts.shouldAbort?.() === true;
+  const waitOrAbort = async (ms: number): Promise<void> => {
+    const deadline = Date.now() + ms;
+    while (!shouldAbort()) {
+      const remaining = deadline - Date.now();
+      if (remaining <= 0) return;
+      await new Promise((resolve) => setTimeout(resolve, Math.min(remaining, 250)));
+    }
+  };
+
   const passIndexes = new Map(passes.map((pass, index) => [pass, index]));
   const startPass = async (pass: (typeof passes)[number], passIso = opts.iso) => {
+    if (shouldAbort()) return null;
     const index = passIndexes.get(pass) ?? 0;
     const passAnalysisDir = path.join(opts.analysisDir, `pass-${index + 1}`);
     const startMs = Date.now();
@@ -92,6 +114,7 @@ export async function runVerifyBuckPasses(opts: {
       passIso,
       nestedIso: previewVerifyNestedBuckIsolation(passIso, pass.name),
     });
+    if (shouldAbort()) return null;
     const spawned = spawnVerifyBuck2Tests({
       root: opts.root,
       iso: passIso,
@@ -104,6 +127,11 @@ export async function runVerifyBuckPasses(opts: {
       analysisDir: passAnalysisDir,
       executionPolicy: opts.executionPolicy,
       exactOverallTimeoutSecs: opts.exactOverallTimeoutSecs,
+      suppressFailureOutputTail: opts.suppressFailureOutputTail,
+      onProgressStart: (name) => progress.update(name, { status: "running" }),
+      onProgressUpdate: (name, state) => progress.update(name, state),
+      onProgressStop: (name, status) =>
+        progress.update(name, { status: status === 0 ? "done" : "failed" }),
     });
     opts.onPgid(spawned.pgid);
     opts.onNestedIso?.(spawned.nestedIso);
@@ -162,6 +190,10 @@ export async function runVerifyBuckPasses(opts: {
 
   let aggregateStatus = 0;
   for (const group of groupVerifyPassesForExecution(passes)) {
+    if (shouldAbort()) {
+      await appendVerifyPassLog(opts.logFile, "[verify] target pass scheduling aborted");
+      break;
+    }
     const groupStartMs = Date.now();
     const useDedicatedPassIsolation = group.length > 1;
     const dedicatedIsolationFor = (passName: string) =>
@@ -191,22 +223,26 @@ export async function runVerifyBuckPasses(opts: {
       });
       running.push({ pgid: run.pgid, status });
     };
-    for (const run of await Promise.all(
-      immediatePasses.map((pass) =>
-        startPass(
-          pass,
-          verifyPassIsolationDir({
-            baseIso: opts.iso,
-            passName: pass.name,
-            dedicated: dedicatedIsolationFor(pass.name),
-          }),
+    if (!shouldAbort()) {
+      for (const run of await Promise.all(
+        immediatePasses.map((pass) =>
+          startPass(
+            pass,
+            verifyPassIsolationDir({
+              baseIso: opts.iso,
+              passName: pass.name,
+              dedicated: dedicatedIsolationFor(pass.name),
+            }),
+          ),
         ),
-      ),
-    )) {
-      trackRun(run);
+      )) {
+        if (run) trackRun(run);
+      }
     }
-    if (delayedPasses.length > 0) {
-      await new Promise((resolve) => setTimeout(resolve, delaySeconds * 1000));
+    if (delayedPasses.length > 0 && !shouldAbort()) {
+      await waitOrAbort(delaySeconds * 1000);
+    }
+    if (delayedPasses.length > 0 && !shouldAbort()) {
       for (const run of await Promise.all(
         delayedPasses.map((pass) =>
           startPass(
@@ -219,7 +255,7 @@ export async function runVerifyBuckPasses(opts: {
           ),
         ),
       )) {
-        trackRun(run);
+        if (run) trackRun(run);
       }
     }
     const statuses = await Promise.all(running.map(async (run) => await run.status));
@@ -234,7 +270,12 @@ export async function runVerifyBuckPasses(opts: {
     if (status !== 0) {
       for (const run of running) terminatePassProcessGroup(run.pgid);
     }
+    if (shouldAbort()) {
+      await appendVerifyPassLog(opts.logFile, "[verify] target pass scheduling aborted");
+      break;
+    }
   }
 
-  return aggregateStatus;
+  progress.stop({ clear: false });
+  return shouldAbort() && aggregateStatus === 0 ? 130 : aggregateStatus;
 }

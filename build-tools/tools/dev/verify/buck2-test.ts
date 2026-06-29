@@ -35,6 +35,10 @@ export function spawnVerifyBuck2Tests(opts: {
   analysisDir?: string | null;
   executionPolicy: VerifyExecutionPolicy;
   exactOverallTimeoutSecs?: number;
+  suppressFailureOutputTail?: () => boolean;
+  onProgressStart?: (passName: string, total: number) => void;
+  onProgressUpdate?: (passName: string, state: { completed: number; failed: number }) => void;
+  onProgressStop?: (passName: string, status: number) => void;
   spawnImpl?: typeof spawn;
 }): { pgid: number; nestedIso: string; wait: () => Promise<number> } {
   const minPerTestTimeoutSecs = 20 * 60;
@@ -108,6 +112,7 @@ export function spawnVerifyBuck2Tests(opts: {
 
   let passCount = 0;
   let failCount = 0;
+  let completionCount = 0;
   let stdoutCarry = "";
   let stderrCarry = "";
   let stdoutTail = "";
@@ -116,6 +121,7 @@ export function spawnVerifyBuck2Tests(opts: {
   let exitSignalRaw: NodeJS.Signals | null = null;
   const streamBuckOutput = isVbrVerbose() || opts.console !== "auto";
   const ui = createCommandUi({ verbose: streamBuckOutput });
+  const externalProgress = Boolean(opts.onProgressUpdate);
   const slowest = createBuck2SlowestRecorder(25);
   const appendTail = (current: string, next: string): string => {
     const max = 64 * 1024;
@@ -142,7 +148,7 @@ export function spawnVerifyBuck2Tests(opts: {
         const fail = failCount;
         const ppm = elapsedS > 0 ? (pass / (elapsedS / 60)).toFixed(1) : "0.0";
         const line = `[verify] pacing checkpoint elapsed_s=${elapsedS} pass=${pass} fail=${fail} pass_per_min=${ppm} threads=${threads > 0 ? threads : "default"}`;
-        process.stderr.write(line + "\n");
+        if (streamBuckOutput) process.stderr.write(line + "\n");
         await fsp.appendFile(opts.logFile!, line + "\n", "utf8").catch(() => {});
       })();
     }, afterMs);
@@ -159,15 +165,22 @@ export function spawnVerifyBuck2Tests(opts: {
     parentIso: opts.iso,
     nestedIso,
   });
+  opts.onProgressStart?.(passName, opts.targets.length);
+
+  const recordParsedProgress = (r: ReturnType<typeof parseBuck2ProgressFromLines>) => {
+    passCount += r.pass;
+    failCount += r.fail;
+    completionCount += r.completions.length;
+    for (const c of r.completions) slowest.record(c);
+    opts.onProgressUpdate?.(passName, { completed: completionCount, failed: failCount });
+  };
 
   proc.stdout?.on("data", (b) => {
     const s = String(b);
     const r = parseBuck2ProgressFromLines(s, stdoutCarry);
     stdoutCarry = r.carry;
     stdoutTail = appendTail(stdoutTail, s);
-    passCount += r.pass;
-    failCount += r.fail;
-    for (const c of r.completions) slowest.record(c);
+    recordParsedProgress(r);
     if (streamBuckOutput) process.stdout.write(s);
     if (opts.logFile) void fsp.appendFile(opts.logFile, s, "utf8").catch(() => {});
   });
@@ -176,9 +189,7 @@ export function spawnVerifyBuck2Tests(opts: {
     const r = parseBuck2ProgressFromLines(s, stderrCarry);
     stderrCarry = r.carry;
     stderrTail = appendTail(stderrTail, s);
-    passCount += r.pass;
-    failCount += r.fail;
-    for (const c of r.completions) slowest.record(c);
+    recordParsedProgress(r);
     if (streamBuckOutput) process.stderr.write(s);
     if (opts.logFile) void fsp.appendFile(opts.logFile, s, "utf8").catch(() => {});
   });
@@ -195,6 +206,7 @@ export function spawnVerifyBuck2Tests(opts: {
     );
     for (const timer of pacingTimers) clearTimeout(timer);
     const exitCode = typeof close.code === "number" ? close.code : 1;
+    opts.onProgressStop?.(passName, exitCode);
     const closeSignal = close.signal;
     if (opts.logFile) {
       await fsp
@@ -219,7 +231,9 @@ export function spawnVerifyBuck2Tests(opts: {
         .catch(() => {});
     }
     if (exitCode !== 0) {
-      if (!streamBuckOutput) {
+      const suppressFailureOutputTail = opts.suppressFailureOutputTail?.() === true;
+      const preferLogReference = Boolean(opts.logFile);
+      if (!streamBuckOutput && !suppressFailureOutputTail && !preferLogReference) {
         const detail = [stderrTail, stdoutTail]
           .map((value) => String(value || "").trim())
           .filter(Boolean)
@@ -259,7 +273,7 @@ export function spawnVerifyBuck2Tests(opts: {
       });
     }
     await slowest.write(opts.logFile, passName);
-    if (exitCode === 0) {
+    if (exitCode === 0 && !externalProgress) {
       const count = passCount > 0 ? `${passCount} passed` : "passed";
       ui.ok("tests", `${passName} ${count} in ${durationS}s`);
     }

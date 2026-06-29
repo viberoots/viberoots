@@ -191,7 +191,20 @@ ${BUCK_PROJECT_IGNORE_LINE}
 function envrc(viberootsUrl: string): string {
   const localOverride =
     viberootsUrl.startsWith("path:") || viberootsUrl.startsWith("git+file:")
-      ? ` --override-input viberoots "path:\${VIBEROOTS_FLAKE_INPUT_ROOT:-\${VIBEROOTS_SOURCE_ROOT:-\${PWD}/viberoots}}"`
+      ? ` --override-input viberoots "path:\${__vbr_flake_input_root}"`
+      : "";
+  const localInputSelector =
+    viberootsUrl.startsWith("path:") || viberootsUrl.startsWith("git+file:")
+      ? `
+__vbr_flake_input_root="\${VIBEROOTS_FLAKE_INPUT_ROOT:-}"
+if [[ -z "\${__vbr_flake_input_root}" || ! -f "\${__vbr_flake_input_root}/flake.nix" ]]; then
+  __vbr_flake_input_root="\${VIBEROOTS_SOURCE_ROOT:-}"
+fi
+if [[ -z "\${__vbr_flake_input_root}" || ! -f "\${__vbr_flake_input_root}/flake.nix" ]]; then
+  __vbr_flake_input_root="\${PWD}/viberoots"
+fi
+export VIBEROOTS_FLAKE_INPUT_ROOT="\${__vbr_flake_input_root}"
+`
       : "";
   return `# ${generatedMarker}
 if [[ "\${NIX_CONFIG:-}" != *"builders ="* ]]; then
@@ -204,6 +217,7 @@ export NODE_OPTIONS="--disable-warning=ExperimentalWarning\${NODE_OPTIONS:+ $NOD
 if [[ -n "\${IN_NIX_SHELL:-}" ]]; then
   return
 fi
+${localInputSelector}
 
 __nix_direnv_direnvrc=""
 for __candidate in \\
@@ -242,6 +256,7 @@ watch_file .viberoots/workspace/flake.nix
 watch_file .viberoots/workspace/flake.lock
 
 use flake "path:\${PWD}/.viberoots/workspace#default" --accept-flake-config${localOverride}
+unset __vbr_flake_input_root
 `;
 }
 

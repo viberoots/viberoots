@@ -287,6 +287,12 @@ ensure_buck_prelude() {
 			selected_viberoots_input_root="${active_viberoots_root}"
 		fi
 	fi
+	if [[ -z "${selected_viberoots_input_root}" || ! -f "${selected_viberoots_input_root}/flake.nix" ]]; then
+		selected_viberoots_input_root="${active_viberoots_root}"
+	fi
+	if [[ -n "${selected_viberoots_input_root}" && -f "${selected_viberoots_input_root}/flake.nix" ]]; then
+		export VIBEROOTS_FLAKE_INPUT_ROOT="${selected_viberoots_input_root}"
+	fi
 	local selected_viberoots_input_hash=""
 	if [[ -n "${selected_viberoots_input_root}" ]]; then
 		if command -v shasum >/dev/null 2>&1; then

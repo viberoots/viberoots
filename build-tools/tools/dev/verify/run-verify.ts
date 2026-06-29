@@ -255,9 +255,18 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
         onNestedIso: (nestedIso) => activeNestedIsos.add(nestedIso),
         onNestedIsoDone: (nestedIso) => activeNestedIsos.delete(nestedIso),
         executionPolicy,
+        suppressFailureOutputTail: () => requestedExitCode !== null,
+        shouldAbort: () => requestedExitCode !== null,
       }),
   );
   if (shutdownPromise) await shutdownPromise;
+  if (requestedExitCode !== null) {
+    ui.warn("verify interrupted");
+    if (lock.logFile) ui.list([`log ${lock.logFile}`], { stream: "stderr", limit: 1 });
+  } else if (status !== 0) {
+    ui.warn("verify failed");
+    if (lock.logFile) ui.list([`log ${lock.logFile}`], { stream: "stderr", limit: 1 });
+  }
   await cleanupRegisteredTempRepoState();
   await deps.maybeWriteVerifyTimingSummary({ root, logFile: lock.logFile, zxInitPath: zxInit });
   if (status === 0 && cov.rawDir) await deps.runMergedCoverageReport({ root, rawDir: cov.rawDir });

@@ -184,6 +184,33 @@ test("startup-check accepts workspace lock resolved through VIBEROOTS_SOURCE_ROO
   }
 });
 
+test("startup-check accepts hidden workspace lock paths relative to the hidden flake", async () => {
+  const { root, submodule } = await submoduleWorkspace("vbr-startup-hidden-lock-relative");
+  const oldCwd = process.cwd();
+  try {
+    await writeFile(
+      path.join(root, ".viberoots", "workspace", "flake.nix"),
+      `{ inputs.viberoots.url = "path:../../viberoots"; outputs = _: {}; }\n`,
+    );
+    await writeFile(
+      path.join(root, ".viberoots", "workspace", "flake.lock"),
+      JSON.stringify({
+        nodes: {
+          viberoots: {
+            locked: { type: "path", path: submodule },
+            original: { type: "path", path: "../../viberoots" },
+          },
+        },
+      }),
+    );
+    process.chdir(root);
+    await validateStartupWorkspaceState();
+  } finally {
+    process.chdir(oldCwd);
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("startup-check warns but allows dirty local viberoots submodule", async () => {
   const { root, submodule } = await submoduleWorkspace("vbr-startup-submodule-dirty");
   const oldCwd = process.cwd();

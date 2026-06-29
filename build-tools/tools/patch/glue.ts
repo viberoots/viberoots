@@ -10,6 +10,7 @@ import { resolveWorkspaceRootsSync } from "../lib/repo";
 import { ensureWorkspaceBuckStatePackage } from "../lib/workspace-buck-state";
 import { DEFAULT_AUTO_MAP_PATH } from "../lib/workspace-state-paths";
 import { buildToolPath, zxInitPath } from "../dev/dev-build/paths";
+import { isVbrVerbose } from "../lib/command-ui";
 
 async function buck2Present(): Promise<boolean> {
   try {
@@ -47,6 +48,10 @@ export async function ensureGraph(
     graphPath?: string;
   } = {},
 ): Promise<void> {
+  const verbose = isVbrVerbose();
+  const debug = (message: string): void => {
+    if (verbose) console.error(message);
+  };
   const workspaceRoot = (
     opts.workspaceRoot ||
     process.env.WORKSPACE_ROOT ||
@@ -77,9 +82,7 @@ export async function ensureGraph(
       return false;
     }
   }
-  try {
-    console.error(`[ensureGraph] workspaceRoot=${workspaceRoot}`);
-  } catch {}
+  debug(`[ensureGraph] workspaceRoot=${workspaceRoot}`);
   await ensureWorkspaceBuckStatePackage(workspaceRoot);
   const wantTargetRaw = (opts.target || process.env.BUCK_TARGET || "").trim();
   const shouldRegenerate = async (): Promise<boolean> => {
@@ -106,18 +109,12 @@ export async function ensureGraph(
   };
 
   if (!(await shouldRegenerate())) {
-    try {
-      console.error(`[ensureGraph] graph exists and satisfies BUCK_TARGET: ${graphPath}`);
-    } catch {}
+    debug(`[ensureGraph] graph exists and satisfies BUCK_TARGET: ${graphPath}`);
     return;
   }
 
   if (wantTargetRaw) {
-    try {
-      console.error(
-        `[ensureGraph] target ${wantTargetRaw} missing in existing graph — regenerating`,
-      );
-    } catch {}
+    debug(`[ensureGraph] target ${wantTargetRaw} missing in existing graph — regenerating`);
   }
 
   await fsp.mkdir(path.dirname(graphPath), { recursive: true });
@@ -153,9 +150,7 @@ export async function ensureGraph(
     normalizeLabels: boolean;
     target: string;
   }) => {
-    try {
-      console.error(`[ensureGraph] inline export via buck2 → ${graphPath}`);
-    } catch {}
+    debug(`[ensureGraph] inline export via buck2 → ${graphPath}`);
     const importerRoots = getImporterRootsContract().workspaceRoots;
     const defaultRoots = Array.from(new Set([...importerRoots, "go", "cpp", "third_party"]));
     const rawRoots = (

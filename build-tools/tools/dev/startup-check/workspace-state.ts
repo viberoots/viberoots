@@ -34,6 +34,13 @@ async function readWorkspaceFlakeText(): Promise<string> {
   return await readText("flake.nix");
 }
 
+async function readWorkspaceFlakeLock(): Promise<{ text: string; dir: string }> {
+  const hiddenPath = path.join(".viberoots", "workspace", "flake.lock");
+  const hidden = await readText(hiddenPath);
+  if (hidden) return { text: hidden, dir: path.dirname(hiddenPath) };
+  return { text: await readText("flake.lock"), dir: "." };
+}
+
 async function git(args: string[], cwd = "."): Promise<string> {
   try {
     const { stdout } = await execFileAsync("git", args, {
@@ -70,13 +77,13 @@ async function requireLocalFlakeLock(flakeText: string): Promise<void> {
       const trimmed = String(candidate).trim();
       if (trimmed) expectedViberootsPaths.add(path.resolve(trimmed));
     }
-    const lockText =
-      (await readText(path.join(".viberoots", "workspace", "flake.lock"))) ||
-      (await readText("flake.lock"));
+    const { text: lockText, dir: lockDir } = await readWorkspaceFlakeLock();
     const lock = JSON.parse(lockText);
     const node = lock?.nodes?.viberoots || lock?.nodes?.viberootsInput;
     const locked = node?.locked || {};
     const original = node?.original || {};
+    const resolveLockPath = (p: unknown): string =>
+      typeof p === "string" && p ? path.resolve(lockDir, p) : "";
     if (
       (locked.type === "path" &&
         (locked.path === "./viberoots" || locked.path === "../../viberoots") &&
@@ -91,9 +98,9 @@ async function requireLocalFlakeLock(flakeText: string): Promise<void> {
     }
     if (
       locked.type === "path" &&
-      expectedViberootsPaths.has(path.resolve(String(locked.path || ""))) &&
+      expectedViberootsPaths.has(resolveLockPath(locked.path)) &&
       original.type === "path" &&
-      expectedViberootsPaths.has(path.resolve(String(original.path || "")))
+      expectedViberootsPaths.has(resolveLockPath(original.path))
     ) {
       return;
     }

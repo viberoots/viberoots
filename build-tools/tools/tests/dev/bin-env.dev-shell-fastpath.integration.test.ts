@@ -44,6 +44,8 @@ test("_env.sh supports safe direnv bypass fast-path", async () => {
   }
   if (
     !txt.includes('local selected_viberoots_input_root="${VIBEROOTS_FLAKE_INPUT_ROOT:-') ||
+    !txt.includes('! -f "${selected_viberoots_input_root}/flake.nix"') ||
+    !txt.includes('export VIBEROOTS_FLAKE_INPUT_ROOT="${selected_viberoots_input_root}"') ||
     !txt.includes('VIBEROOTS_FLAKE_INPUT_ROOT="${selected_viberoots_input_root}" nix build') ||
     !txt.includes('--override-input viberoots "path:${selected_viberoots_input_root}"') ||
     !txt.includes("selected_viberoots_input_hash")

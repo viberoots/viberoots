@@ -449,6 +449,21 @@ function developCommand(): {
   };
 }
 
+function selectedWorkspaceRootForCommand(): string {
+  const explicit = getFlagStr("workspace-root", "");
+  if (explicit) return path.resolve(explicit);
+  const cwdFirstEnv = {
+    ...process.env,
+    WORKSPACE_ROOT: "",
+    _VIBEROOTS_DEVSHELL_ROOT: "",
+    BUCK_TEST_SRC: "",
+    LIVE_ROOT: "",
+  };
+  const cwdRoot = resolveWorkspaceRootsSync({ start: process.cwd(), env: cwdFirstEnv });
+  if (fs.existsSync(cwdRoot.viberootsWorkspace)) return cwdRoot.workspaceRoot;
+  return resolveWorkspaceRootsSync().workspaceRoot;
+}
+
 function printShellCommand(command: string, args: string[]): void {
   const quote = (arg: string) =>
     /^[A-Za-z0-9_./:=+#@%,-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`;
@@ -585,7 +600,7 @@ async function main() {
   }
   if (command === "gc") {
     await runViberootsGc({
-      workspaceRoot: path.resolve(getFlagStr("workspace-root", process.cwd())),
+      workspaceRoot: selectedWorkspaceRootForCommand(),
       dryRun: getFlagBool("dry-run"),
       aggressive: getFlagBool("aggressive"),
       optimize: getFlagBool("optimize"),
@@ -598,7 +613,7 @@ async function main() {
   }
   if (command === "use-submodule") {
     await useSubmodule({
-      workspaceRoot: path.resolve(getFlagStr("workspace-root", process.cwd())),
+      workspaceRoot: selectedWorkspaceRootForCommand(),
       workspaceName: getFlagStr("workspace-name", ""),
       url: getFlagStr("url", ""),
       trustUrl: getFlagBool("trust-url"),
@@ -609,7 +624,7 @@ async function main() {
   }
   if (command === "use-flake") {
     await useFlake({
-      workspaceRoot: path.resolve(getFlagStr("workspace-root", process.cwd())),
+      workspaceRoot: selectedWorkspaceRootForCommand(),
       workspaceName: getFlagStr("workspace-name", ""),
       ref: getFlagStr("ref", ""),
       removeSubmodule: getFlagBool("remove-submodule"),
@@ -620,7 +635,7 @@ async function main() {
   }
   if (command === "remove-submodule") {
     await removeSubmodule({
-      workspaceRoot: path.resolve(getFlagStr("workspace-root", process.cwd())),
+      workspaceRoot: selectedWorkspaceRootForCommand(),
       dryRun: getFlagBool("dry-run"),
     });
     return;

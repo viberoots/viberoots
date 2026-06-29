@@ -138,6 +138,13 @@ function refToFlakeUrl(ref: string): string {
   return `github:viberoots/viberoots/${ref}`;
 }
 
+function officialSubmoduleUrlToFlakeUrl(url: string, ref: string): string {
+  if (url === "git@github.com:viberoots/viberoots.git") {
+    return `git+ssh://git@github.com/viberoots/viberoots.git?ref=${encodeURIComponent(ref)}`;
+  }
+  return refToFlakeUrl(ref);
+}
+
 function isOfficialSubmoduleUrl(url: string): boolean {
   return officialSubmoduleUrls.has(url);
 }
@@ -317,6 +324,7 @@ export async function useFlake(opts: UseFlakeOptions): Promise<void> {
   const ref = opts.ref || process.env.VBR_REF || "main";
   const currentTarget = await readlinkIfPresent(path.join(workspaceRoot, ".viberoots", "current"));
   const state = await detectSubmodule(workspaceRoot, git);
+  const flakeUrl = officialSubmoduleUrlToFlakeUrl(state.url, ref);
   const tx = await writeTransaction(workspaceRoot, {
     mode: "flake",
     operation: "use-flake",
@@ -326,7 +334,7 @@ export async function useFlake(opts: UseFlakeOptions): Promise<void> {
     workspaceName: workspaceName(workspaceRoot, opts.workspaceName),
     currentTarget,
     requestedRef: ref,
-    requestedUrl: refToFlakeUrl(ref),
+    requestedUrl: flakeUrl,
     submodule: state,
   });
   const previousViberootsRoot = process.env.VIBEROOTS_ROOT;
@@ -335,7 +343,7 @@ export async function useFlake(opts: UseFlakeOptions): Promise<void> {
     await initConsumer({
       workspaceRoot,
       workspaceName: workspaceName(workspaceRoot, opts.workspaceName),
-      viberootsUrl: refToFlakeUrl(ref),
+      viberootsUrl: flakeUrl,
       sourceMode: "flake",
       lock: true,
       allowDirenv: opts.allowDirenv !== false,

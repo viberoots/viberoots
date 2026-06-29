@@ -191,6 +191,24 @@ node_wasm_inline_module(
         await fs.outputFile(path.join(cliDir, ".npmrc"), "node-linker=isolated\n");
         await fs.outputFile(path.join(cliDir, ".pnpmfile.mjs"), "export default {};\n");
         await fs.outputFile(
+          path.join(cliDir, "pnpm-lock.yaml"),
+          `lockfileVersion: "9.0"
+
+settings:
+  autoInstallPeers: true
+  excludeLinksFromLockfile: false
+
+importers:
+  .:
+    dependencies:
+      "@libs/demo-wasm-inline":
+        specifier: workspace:*
+        version: link:../../libs/demo-wasm-inline
+
+packages: {}
+`,
+        );
+        await fs.outputFile(
           path.join(cliDir, "src", "index.ts"),
           `import { wasmBytes } from "@libs/demo-wasm-inline";
 
@@ -239,10 +257,6 @@ nix_node_cli_bin(
 )
 `,
         );
-        await $({
-          cwd: cliDir,
-          stdio: "inherit",
-        })`pnpm install --lockfile-only --ignore-scripts --ignore-pnpmfile --dir . --lockfile-dir .`;
         await $({
           cwd: tmp,
           stdio: "inherit",

@@ -49,3 +49,29 @@ test("quiet UI emits status lines and verbose UI suppresses them", () => {
   assert.match(stderr.join(""), /    - bad/);
   assert.doesNotMatch(stdout.join(""), /hidden/);
 });
+
+test("quiet UI colors top-level headings in TTY output", () => {
+  const stdout: string[] = [];
+  const originalStdoutWrite = process.stdout.write;
+  const originalIsTty = process.stdout.isTTY;
+  const originalNoColor = process.env.NO_COLOR;
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    stdout.push(String(chunk));
+    return true;
+  }) as typeof process.stdout.write;
+  Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
+  delete process.env.NO_COLOR;
+  try {
+    createCommandUi({ verbose: false }).heading("viberoots build");
+  } finally {
+    process.stdout.write = originalStdoutWrite;
+    Object.defineProperty(process.stdout, "isTTY", {
+      value: originalIsTty,
+      configurable: true,
+    });
+    if (originalNoColor === undefined) delete process.env.NO_COLOR;
+    else process.env.NO_COLOR = originalNoColor;
+  }
+
+  assert.equal(stdout.join(""), "\u001b[1;38;5;141mviberoots build\u001b[0m\n");
+});

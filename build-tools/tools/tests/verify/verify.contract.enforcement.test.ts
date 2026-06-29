@@ -199,8 +199,12 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
   );
   assert.ok(
     verifyPasses.includes("aggregateStatus") &&
-      verifyPasses.includes("return aggregateStatus") &&
-      !verifyPasses.includes("return status;\n    }\n  }\n\n  return 0;"),
+      verifyPasses.includes(
+        "if (status !== 0 && aggregateStatus === 0) aggregateStatus = status",
+      ) &&
+      verifyPasses.includes(
+        "return shouldAbort() && aggregateStatus === 0 ? 130 : aggregateStatus",
+      ),
     "expected verify pass scheduling to run later pass groups after earlier pass failures",
   );
 });

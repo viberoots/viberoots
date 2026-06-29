@@ -43,7 +43,7 @@ export function createCommandUi(opts?: { verbose?: boolean }): CommandUi {
   return {
     verbose,
     heading: (label) => {
-      if (!verbose) process.stdout.write(`${label}\n`);
+      if (!verbose) process.stdout.write(`${color("1;38;5;141", label, useColor())}\n`);
     },
     step: (label, detail) => {
       if (verbose) return;
