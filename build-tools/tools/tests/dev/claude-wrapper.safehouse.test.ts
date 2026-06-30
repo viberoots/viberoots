@@ -212,6 +212,58 @@ test("claude wrapper leaves main repo orchestration unsandboxed by default", asy
   }
 });
 
+test("claude --yolo enables skip-permissions without forwarding the alias", async () => {
+  await fsp.mkdir(externalScratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "claude-wrapper-"));
+  try {
+    const gitRoot = path.join(tmp, "repo");
+    await fsp.mkdir(gitRoot, { recursive: true });
+    const fake = await makeFakeTools(tmp, gitRoot);
+    const res = await $({
+      cwd: gitRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
+      },
+    })`${wrapper} --yolo --print parent`;
+
+    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
+    const log = await fsp.readFile(fake.log, "utf8");
+    assert.doesNotMatch(log, /safehouse /);
+    assert.match(log, /claude --dangerously-skip-permissions --print parent/);
+    assert.doesNotMatch(log, /--yolo/);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("claude --yolo does not duplicate skip-permissions in worktree safehouse", async () => {
+  await fsp.mkdir(scratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(scratchRoot, "claude-wrapper-"));
+  try {
+    const worktreeRoot = path.join(tmp, ".claude", "worktrees", "worker-yolo");
+    await fsp.mkdir(worktreeRoot, { recursive: true });
+    const fake = await makeFakeTools(tmp, worktreeRoot);
+    const res = await $({
+      cwd: worktreeRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
+      },
+    })`${wrapper} --yolo --print hello`;
+
+    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
+    const log = await fsp.readFile(fake.log, "utf8");
+    assert.match(log, /claude --dangerously-skip-permissions --print hello/);
+    assert.doesNotMatch(log, /--dangerously-skip-permissions --dangerously-skip-permissions/);
+    assert.doesNotMatch(log, /--yolo/);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test("claude wrapper refuses unsandboxed worktree agents when safehouse is missing", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "claude-wrapper-"));

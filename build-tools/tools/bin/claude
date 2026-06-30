@@ -4,9 +4,19 @@ set -euo pipefail
 SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/$(basename -- "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname -- "${SCRIPT_PATH}")"
 
+is_cmux_claude_wrapper() {
+  local candidate="$1"
+  local candidate_dir
+  [[ -x "$candidate" ]] || return 1
+  candidate_dir="$(cd -- "$(dirname -- "$candidate")" 2>/dev/null && pwd -P || return 1)"
+  [[ -x "$candidate_dir/cmux" ]] || return 1
+  LC_ALL=C sed -n '1,8p' "$candidate" 2>/dev/null | grep -q "cmux claude wrapper"
+}
+
 find_tool_excluding_wrapper_dir() {
   local tool="$1"
   local dir
+  local candidate
   local old_ifs="$IFS"
   IFS=':'
   for dir in ${PATH:-}; do
@@ -14,8 +24,12 @@ find_tool_excluding_wrapper_dir() {
     if [[ "$(cd -- "$dir" 2>/dev/null && pwd -P || printf '%s' "$dir")" == "$SCRIPT_DIR" ]]; then
       continue
     fi
-    if [[ -x "$dir/$tool" ]]; then
-      printf '%s\n' "$(cd -- "$(dirname -- "$dir/$tool")" && pwd -P)/$(basename -- "$dir/$tool")"
+    candidate="$dir/$tool"
+    if [[ "$tool" == "claude" ]] && is_cmux_claude_wrapper "$candidate"; then
+      continue
+    fi
+    if [[ -x "$candidate" ]]; then
+      printf '%s\n' "$(cd -- "$(dirname -- "$candidate")" && pwd -P)/$(basename -- "$candidate")"
       IFS="$old_ifs"
       return 0
     fi
@@ -205,11 +219,26 @@ parse_claude_worktree_args() {
         WORKTREE_REQUESTED=1
         WORKTREE_NAME="${token#-w}"
         ;;
+      --yolo)
+        CLAUDE_ARGS+=("--dangerously-skip-permissions")
+        ;;
       *)
         CLAUDE_ARGS+=("$token")
         ;;
     esac
   done
+}
+
+claude_args_request_skip_permissions() {
+  local token
+  for token in "$@"; do
+    case "$token" in
+      --dangerously-skip-permissions)
+        return 0
+        ;;
+    esac
+  done
+  return 1
 }
 
 default_worktree_name() {
@@ -674,10 +703,14 @@ if should_safehouse_claude "$root"; then
   fi
 
   if is_worker_worktree "$root"; then
-    run_claude_in_safehouse "$root" --dangerously-skip-permissions "$@"
+    if claude_args_request_skip_permissions "${CLAUDE_ARGS[@]}"; then
+      run_claude_in_safehouse "$root" "${CLAUDE_ARGS[@]}"
+    else
+      run_claude_in_safehouse "$root" --dangerously-skip-permissions "${CLAUDE_ARGS[@]}"
+    fi
   fi
 
-  run_claude_in_safehouse "$root" "$@"
+  run_claude_in_safehouse "$root" "${CLAUDE_ARGS[@]}"
 fi
 
-exec env DISABLE_AUTOUPDATER=1 "$real_claude" "$@"
+exec env DISABLE_AUTOUPDATER=1 "$real_claude" "${CLAUDE_ARGS[@]}"

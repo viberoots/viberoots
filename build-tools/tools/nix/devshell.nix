@@ -235,6 +235,11 @@ EOF
       # Prepare zsh/bash env for completions and aliases
       mkdir -p .nix-zsh
       cat > .nix-zsh/.zshenv <<'EOF'
+# Runs first in every zsh (interactive or not). Collapsing PATH/path here lets
+# each freshly-spawned shell (e.g. a cmux pane) self-heal any duplicate-laden
+# PATH it inherited, so the environment can never overflow ARG_MAX and break
+# exec with "Argument list too long".
+typeset -gU path PATH
 if [[ -o interactive ]]; then
   PROMPT='%F{green}[nix-shell]%f %m:%~$ '
   autoload -Uz compinit
@@ -250,6 +255,10 @@ EOF
       export ZDOTDIR="$PWD/.nix-zsh"
       cat > .nix-zsh/.zshrc <<'EOF'
 PROMPT='%F{green}[nix-shell]%f %m:%~$ '
+# Keep PATH/path de-duplicated so the chpwd hook below cannot grow the
+# environment without bound (HOST_PATH was re-appended on every cd, eventually
+# overflowing ARG_MAX and breaking exec with "Argument list too long").
+typeset -gU path PATH
 _vbr_update_path() {
   local vbr_nix_bin="${viberootsCommand}/bin"
   local vbr_host_nix_bin=""
