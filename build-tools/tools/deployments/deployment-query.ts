@@ -14,14 +14,16 @@ import {
   queryLabelList,
 } from "./deployment-query-helpers";
 
-const DEPLOYMENT_GRAPH_QUERY_ROOTS = [
+export const SUPPORTED_DEPLOYMENT_QUERY_ROOTS = [
   "projects/deployments",
   "projects/apps",
   "projects/libs",
   "sandbox/deployments",
   "sandbox/apps",
   "sandbox/libs",
-];
+] as const;
+
+const DEPLOYMENT_GRAPH_QUERY_ROOTS = [...SUPPORTED_DEPLOYMENT_QUERY_ROOTS];
 
 function deploymentQueryRootsExpr(workspaceRoot: string): string {
   const roots = DEPLOYMENT_GRAPH_QUERY_ROOTS.filter((root) => {

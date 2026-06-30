@@ -1,9 +1,11 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { readGraph, type GraphNode } from "../lib/graph";
+import type { GraphNode } from "../lib/graph";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { readCompositeGraph } from "../lib/graph-view";
 import { normalizeTargetLabel } from "../lib/labels";
 import { findRepoRoot } from "../lib/repo";
+import { deploymentGraphReadOptions } from "./deployment-graph-read-options";
 import { resolveDeploymentContextNodes } from "./deployment-contexts";
 import { resolveAllDeployments } from "./deployment-query";
 import { errorMessage } from "./infisical-iac-bootstrap-redaction";
@@ -65,7 +67,9 @@ async function discoverFromGraph(
   graphPath: string,
   workspaceRoot = process.cwd(),
 ): Promise<DeploymentBootstrapDiscovery> {
-  const nodes = await readGraph(graphPath).catch(() => []);
+  const nodes = await readCompositeGraph(deploymentGraphReadOptions(workspaceRoot, graphPath))
+    .then((graph) => graph.nodes)
+    .catch(() => []);
   const contextErrors: string[] = [];
   const contextResolvedNodes = resolveDeploymentContextNodes(nodes, contextErrors, workspaceRoot);
   if (contextErrors.length > 0) {

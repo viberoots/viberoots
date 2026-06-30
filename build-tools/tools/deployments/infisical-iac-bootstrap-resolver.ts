@@ -2,8 +2,10 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
-import { readGraph, type GraphNode } from "../lib/graph";
+import type { GraphNode } from "../lib/graph";
+import { readCompositeGraph } from "../lib/graph-view";
 import { findRepoRoot } from "../lib/repo";
+import { deploymentGraphReadOptions } from "./deployment-graph-read-options";
 import { resolveDeploymentContextNodes } from "./deployment-contexts";
 import {
   deploymentSecretBackendSelectorErrors,
@@ -103,13 +105,14 @@ export async function requiredBackendProfiles(
   workspaceRoot?: string,
 ) {
   const profiles = new Set<string>();
-  const rawNodes = await readGraph(graphPath).catch(() => []);
+  const selectedWorkspaceRoot = workspaceRoot || (await workspaceRootForGraph(graphPath));
+  const rawNodes = await readCompositeGraph(
+    deploymentGraphReadOptions(selectedWorkspaceRoot, graphPath),
+  )
+    .then((graph) => graph.nodes)
+    .catch(() => []);
   const contextErrors: string[] = [];
-  const nodes = resolveDeploymentContextNodes(
-    rawNodes,
-    contextErrors,
-    workspaceRoot || (await workspaceRootForGraph(graphPath)),
-  );
+  const nodes = resolveDeploymentContextNodes(rawNodes, contextErrors, selectedWorkspaceRoot);
   if (contextErrors.length > 0) throw new Error(contextErrors.join("\n"));
   for (const node of nodes) {
     const secretBackend = stringAttr(node, "secret_backend");

@@ -151,6 +151,65 @@ Current reviewed central control-plane implementation note:
 - That `pending_approval` response must already carry the stable `deploy_run_id` for the frozen run being held.
 - The reviewed `approve` run action must target that existing run, keep the same `deploy_run_id`, and fail closed when the caller's expected payload or reviewed provisioner-plan binding no longer matches the frozen run.
 
+## Resource Graph Inventory
+
+`build-tools/tools/deployments/resource-graph-inventory.ts` defines the checked inventory for the
+current deployment resource graph. The inventory is read-only and names existing concepts so later
+resource-graph work can build from observed behavior rather than a new authoring model.
+
+- Buck deployment metadata remains the reviewed authoring path for repo-owned intent.
+- Inventory reads deployment extraction output through `deploymentGraphReadOptions` and the shared
+  composite graph reader so provider-index and node-lock sidecars remain available to graph and
+  build-system consumers.
+- Resource identity is kind plus stable id. Buck-reviewed intent normally uses deployment ids,
+  canonical labels, provider-target identities, policy refs, requirement contracts, and component
+  ids. Resolved deployment-context inputs use selected context/control-plane/profile names. Runtime
+  facts use backend-native ids such as submission ids, deploy-run ids, challenge ids, upload-session
+  ids, stage-state ids, and audit ids.
+- Resource references are non-secret ids or refs only. Secret requirements, runtime-config
+  requirements, service-client profiles, artifact challenges, upload sessions, and retained
+  evidence must expose references, validation outcomes, fingerprints, sizes, expiry, or provenance,
+  not raw tokens, proof keys, upload payloads, or secret-bearing paths.
+- Runtime inventory is read from named current-system source families, not an arbitrary kind map:
+  reviewed runtime input, auth-provider profile, cutover/readiness evidence, observability profile,
+  mini-migration preflight evidence, artifact challenges, static-webapp upload sessions, staged
+  artifact facts, artifact-binding provenance, cleanup evidence, execution snapshots, deploy runs,
+  run actions, current stage state, stage history, audit events, retained evidence, and
+  control-plane runtime status. Validator-backed families preserve the full reviewed object under
+  inventory facts after validation succeeds.
+- Artifact and upload inventory must preserve reviewed runtime safety facts, including challenge
+  issuance, redacted nonce and proof-key validation outcomes, one-time consumption state, admitted
+  provenance, failure diagnostics for rejected challenges, upload `sizeBytes`, expiry,
+  archive path, object identity, `upload-session:<id>` provenance, admitted artifact references,
+  rejected cleanup diagnostics, and bounded `artifact_cleanup_janitor_records` documents when
+  rejected staged-upload cleanup must be deferred.
+- Service-client inventory must preserve runtime selection evidence for deployment-context
+  selection, explicit context override, explicit URL or named remote selection, ambient environment
+  selection, rejected named remote lookup, local `--profile`, local `--profile-root`, lane-policy
+  default profile, and token-env profile paths. Inventory records expose profile names, URL, token
+  references, token-env names, source mode, status, and diagnostics, never raw token values.
+  Inventory tests must exercise the actual resolver/profile/context paths before mapping the
+  resulting evidence into inventory records.
+- Lane governance and target exception inventory must expose reviewed safety metadata: graph edges
+  to governing policies and affected deployments, source-ref policies, trusted reporter identities,
+  approval boundaries, admission fingerprints, status visibility, target identities, lock scope,
+  reviewed approval evidence, and reconciliation ownership.
+- Authority is explicit: Buck-reviewed deployment, component, provider-target, policy, requirement,
+  provisioner, release-action, and artifact-input facts are `reviewed_intent`; deployment-context,
+  selected control-plane, and service-client profile facts are `resolved_input`; control-plane
+  records, execution snapshots, deploy runs, run actions, stage state, history, audit, evidence,
+  artifact challenges, static-webapp upload sessions, staged artifacts, auth-provider profiles,
+  runtime inputs, observability, readiness, cleanup, and mini-migration preflight facts are
+  `observed_runtime`.
+- Redacted `projects/config/local.json` override evidence is part of the inventory, and
+  `VBR_DISALLOW_LOCAL_OVERRIDES=1` remains a fail-closed deployment-context resolution behavior.
+- Supported deployment query roots are part of the inventory contract: `projects/deployments`,
+  `projects/apps`, `projects/libs`, `sandbox/deployments`, `sandbox/apps`, and `sandbox/libs`.
+
+The inventory is not a mutation API, a deployment source of truth, or hand-authored resource YAML.
+It must not mutate deployment records, provider state, generated provider files, workspace source,
+or project configuration.
+
 ## Operator Semantics
 
 - `operation_kind` uses the canonical set: `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`.

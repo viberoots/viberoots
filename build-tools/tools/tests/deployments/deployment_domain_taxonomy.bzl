@@ -87,3 +87,14 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/deploy.front-door.operator-readiness.test.ts": True,
 })
+
+REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
+    "build-tools/tools/tests/deployments/resource-graph-inventory.providers.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-inventory.provider-families.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-inventory.janitor.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-inventory.runtime.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-inventory.safety.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-inventory.service-client.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-inventory.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-taxonomy.test.ts": True,
+})

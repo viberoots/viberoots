@@ -911,6 +911,89 @@ Secret backend note:
 - protected/shared kubernetes service publish, retry, rollback, and promotion must declare `secret_requirements` at the `publish` step; ambient Helm or cluster credentials are rejected and the publisher process receives only the resolved reviewed credential env
 - Kubernetes service artifacts must be admitted immutable artifact references, `sha256:<digest>` files, or image references pinned with `@sha256`; mutable tag identities such as `latest`, `dev`, `staging`, and `prod` are rejected
 
+## Capability Entry: `opentofu`
+
+### Identity
+
+- `provider`: `opentofu`
+- canonical target identity fields:
+  - `stack_identity`
+  - `state_backend_identity`
+- canonical lock-key shape:
+  - `opentofu:<stack_identity>#state:<state_backend_identity>`
+- required reviewed provider-target fields:
+  - `stack_identity` identifies the reviewed foundation or migration stack
+  - `state_backend_identity` identifies the reviewed state backend boundary
+
+### Component Support
+
+- supported component kinds:
+  - `provision-only`
+- multi-component support:
+  - not supported for provision-only OpenTofu stacks
+- additional unsupported shapes:
+  - publishable application components
+  - multi-component stacks
+
+### Rollout Support
+
+- default rollout mode:
+  - `all_at_once`
+- rollout-policy omission posture:
+  - omission is reviewed only for a single provision-only migration bundle
+- supported rollout modes:
+  - `all_at_once`
+
+### Preview Support
+
+- preview support:
+  - not reviewed for provision-only OpenTofu deployments
+
+### Smoke / Release Health
+
+- default smoke model:
+  - post-apply checks come from reviewed migration evidence rather than HTTP smoke
+
+### Built-In Publisher Contract
+
+- built-in publisher type:
+  - `provision-only`
+- exact publish input:
+  - one admitted migration bundle bound to one reviewed stack
+- checked-in provider config:
+  - `opentofu/` stack files remain provider-local configuration for the deployment package
+  - the reviewed stack config declares separate reviewed plan JSON and saved apply plan artifacts
+
+### Retry / Idempotency
+
+- provision-only replay is not supported unless a future capability entry defines it
+- ambiguous OpenTofu outcomes must fail closed before repeating provider mutation
+
+### Partial Publish Observability
+
+- the foundation record preserves:
+  - canonical provider-target identity
+  - stack identity
+  - state backend identity
+  - reviewed plan and apply evidence fingerprints
+  - post-apply check outcomes
+
+### Provisioner Support
+
+- the provider itself is the reviewed `opentofu-stack` provision-only path
+- OpenTofu files must stay under the deployment package `opentofu/` directory and bind stack identity plus state backend identity into admission evidence
+
+### Built-In `release_actions` Support
+
+- protected/shared built-in `release_actions`:
+  - release actions are not supported for OpenTofu provision-only runs
+
+### Protected/Shared Eligibility
+
+- in policy for reviewed provision-only migration bundles
+- protected/shared mutation must route through the reviewed control-plane front door
+- ambient provider credentials are rejected; only resolved reviewed credential env is used
+
 ## Capability Entry: `vercel`
 
 ### Identity

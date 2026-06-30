@@ -1,0 +1,53 @@
+#!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { DEPLOYMENT_RESOURCE_KINDS } from "../../deployments/resource-graph-inventory";
+
+test("deployment resource taxonomy names every planned resource concept", () => {
+  assert.deepEqual(DEPLOYMENT_RESOURCE_KINDS, [
+    "Deployment",
+    "DeploymentFamily",
+    "Component",
+    "ProviderTarget",
+    "DeploymentContext",
+    "ControlPlaneProfile",
+    "ControlPlaneSelection",
+    "EnvironmentStage",
+    "LanePolicy",
+    "LaneGovernancePolicy",
+    "AdmissionPolicy",
+    "RolloutPolicy",
+    "PreviewPolicy",
+    "SmokePolicy",
+    "SourceRefPolicy",
+    "ReadinessGatePolicy",
+    "AttestationPolicy",
+    "SbomPolicy",
+    "SupplyChainPolicy",
+    "SecretRequirement",
+    "RuntimeConfigRequirement",
+    "RuntimeInput",
+    "AuthProviderProfile",
+    "ServiceClientProfile",
+    "DeploymentTargetException",
+    "Provisioner",
+    "ReleaseAction",
+    "ArtifactInput",
+    "ArtifactChallenge",
+    "StaticWebappUploadSession",
+    "StagedArtifact",
+    "ArtifactBindingProvenance",
+    "CleanupEvidence",
+    "ExecutionSnapshot",
+    "DeployRun",
+    "RunAction",
+    "CurrentStageState",
+    "StageHistoryEntry",
+    "AuditEvent",
+    "RetainedEvidence",
+    "ControlPlaneRuntime",
+    "ControlPlaneReadinessEvidence",
+    "ControlPlaneObservabilityEvidence",
+    "MiniMigrationPreflightEvidence",
+  ]);
+});
