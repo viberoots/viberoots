@@ -1,5 +1,9 @@
 #!/usr/bin/env zx-wrapper
-import type { DeploymentResourceInventoryEntry, RuntimeStatusRecord } from "./resource-graph-types";
+import {
+  isAdmittedControlPlaneRuntimeRecord,
+  type DeploymentResourceInventoryEntry,
+  type RuntimeStatusRecord,
+} from "./resource-graph-types";
 
 const SECRET_FIELDS = ["token", "rawToken", "secret", "proof", "nonce"];
 
@@ -71,6 +75,10 @@ function collectStatus(
   required: string[],
 ) {
   for (const record of records || []) {
+    if (!isAdmittedControlPlaneRuntimeRecord(record)) {
+      errors.push(`${kind} ${record.id}: runtime source is not an admitted control-plane record`);
+      continue;
+    }
     const missing = required.filter((field) => !fieldPresent(record.facts[field]));
     const forbidden = SECRET_FIELDS.filter((field) => record.facts[field] !== undefined);
     const semanticErrors = semanticStatusErrors(kind, record);
@@ -90,7 +98,7 @@ function collectStatus(
       kind,
       id: record.id,
       authority: "observed_runtime",
-      source: record.source || { class: "runtime" },
+      source: record.source!,
       ...(record.refs ? { refs: record.refs } : {}),
       facts: record.facts,
     });

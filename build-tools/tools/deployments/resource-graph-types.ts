@@ -11,6 +11,8 @@ export type DeploymentResourceSource = {
   label?: string;
 };
 
+export const ADMITTED_RUNTIME_SOURCE_LABEL = "admitted-control-plane-record";
+
 export type DeploymentResourceInventoryEntry = {
   kind: DeploymentResourceKind;
   id: string;
@@ -68,6 +70,28 @@ export type ServiceClientSelectionRecord = {
   diagnostic?: string;
   refs?: string[];
 };
+
+type AdmittableRuntimeRecord =
+  | RuntimeSourceRecord
+  | RuntimeStatusRecord
+  | ServiceClientSelectionRecord;
+
+const ADMITTED_RUNTIME_RECORD = Symbol("admitted-control-plane-runtime-record");
+
+export function admitControlPlaneRuntimeRecord<T extends AdmittableRuntimeRecord>(record: T): T {
+  Object.defineProperty(record, ADMITTED_RUNTIME_RECORD, { value: true });
+  if (typeof record.source !== "string") {
+    record.source = {
+      ...(record.source || { class: "runtime" }),
+      label: record.source?.label || ADMITTED_RUNTIME_SOURCE_LABEL,
+    };
+  }
+  return record;
+}
+
+export function isAdmittedControlPlaneRuntimeRecord(record: AdmittableRuntimeRecord): boolean {
+  return (record as { [ADMITTED_RUNTIME_RECORD]?: true })[ADMITTED_RUNTIME_RECORD] === true;
+}
 
 export type DeploymentRuntimeInventorySources = {
   runtimeInputs?: RuntimeSourceRecord[];

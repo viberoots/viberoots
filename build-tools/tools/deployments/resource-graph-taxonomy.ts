@@ -24,6 +24,8 @@ export const DEPLOYMENT_RESOURCE_KINDS = [
   "RuntimeInput",
   "AuthProviderProfile",
   "ServiceClientProfile",
+  "WorkspaceGraphState",
+  "LocalProjectConfigOverride",
   "DeploymentTargetException",
   "Provisioner",
   "ReleaseAction",
@@ -82,6 +84,8 @@ const RESOLVED_INPUT_KINDS = new Set<DeploymentResourceKind>([
   "ControlPlaneProfile",
   "ControlPlaneSelection",
   "ServiceClientProfile",
+  "WorkspaceGraphState",
+  "LocalProjectConfigOverride",
 ]);
 
 export const DEPLOYMENT_RESOURCE_TAXONOMY: DeploymentResourceTaxonomyEntry[] =
@@ -94,9 +98,11 @@ export const DEPLOYMENT_RESOURCE_TAXONOMY: DeploymentResourceTaxonomyEntry[] =
         : "reviewed_intent",
     sourceClass: OBSERVED_RUNTIME_KINDS.has(kind)
       ? "runtime"
-      : RESOLVED_INPUT_KINDS.has(kind)
-        ? "deployment_context"
-        : "buck",
+      : kind === "WorkspaceGraphState" || kind === "LocalProjectConfigOverride"
+        ? "workspace_state"
+        : RESOLVED_INPUT_KINDS.has(kind)
+          ? "deployment_context"
+          : "buck",
   }));
 
 export const DEPLOYMENT_RESOURCE_KIND_SET = new Set<DeploymentResourceKind>(

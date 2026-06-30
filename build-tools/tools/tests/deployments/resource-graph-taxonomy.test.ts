@@ -29,6 +29,8 @@ test("deployment resource taxonomy names every planned resource concept", () => 
     "RuntimeInput",
     "AuthProviderProfile",
     "ServiceClientProfile",
+    "WorkspaceGraphState",
+    "LocalProjectConfigOverride",
     "DeploymentTargetException",
     "Provisioner",
     "ReleaseAction",

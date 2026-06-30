@@ -89,6 +89,11 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
 })
 
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
+    "build-tools/tools/tests/deployments/resource-graph-envelope.compat.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-envelope.context.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-envelope.intent.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-envelope.runtime.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-envelope.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-inventory.providers.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-inventory.provider-families.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-inventory.janitor.test.ts": True,

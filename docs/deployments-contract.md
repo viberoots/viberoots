@@ -210,6 +210,31 @@ The inventory is not a mutation API, a deployment source of truth, or hand-autho
 It must not mutate deployment records, provider state, generated provider files, workspace source,
 or project configuration.
 
+## Resource Envelope
+
+`build-tools/tools/deployments/resource-graph-envelope.ts` wraps inventory entries in the canonical
+`deployment.resource.viberoots.dev/v1` envelope. The envelope is additive read/extraction output for
+indexing and status, not a replacement authoring format.
+
+- `metadata.uid` is the stable identity for read-model links. It is derived from the resource kind,
+  id, authority, source class, canonical label, references, and facts. Source paths are excluded so
+  repo-owned Buck intent stays stable across remote materialized source paths, local self
+  activation, and sibling or submodule source activation.
+- `statusRef` is the only canonical status link shape. Runtime envelopes also carry `evidenceRef`
+  so PR-4B can index admitted records without accepting user-authored runtime resources.
+- `metadata.ownerReferences` and `policyRefs` are derived from inventory refs. Producers must not
+  choose an incompatible ownership or inline-status shape.
+- `source` preserves authority class: reviewed Buck intent, resolved deployment-context inputs,
+  workspace/local override evidence recorded on the inventory, and admitted runtime facts remain
+  distinguishable for later read models.
+- Workspace-state envelopes use `source.class = "workspace_state"` for graph-first facts and
+  redacted local override evidence. Runtime envelopes use `source.class = "runtime"` plus the
+  `admitted-control-plane-record` source label so hand-authored runtime-shaped inventory is rejected
+  before it can become an envelope mutation surface.
+- Requirement, service-client, artifact, upload, and evidence envelopes remain secret-safe. They may
+  expose references, validation outcomes, fingerprints, sizes, expiry, provenance, and diagnostics,
+  but not raw tokens, proof material, nonces, secret values, or upload payloads.
+
 ## Operator Semantics
 
 - `operation_kind` uses the canonical set: `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`.

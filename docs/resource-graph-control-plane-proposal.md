@@ -486,12 +486,20 @@ The envelope should include:
 - `metadata.labels`
 - `metadata.ownerReferences`
 - `spec`
-- `status`
+- `statusRef`
+- `evidenceRef`
 - `policyRefs`
 - `source`
 
 This envelope should not force all resources into Kubernetes semantics. It should only standardize
 identity, references, policy binding, and status reporting.
+
+The current implementation uses `deployment.resource.viberoots.dev/v1` envelopes derived from the
+checked deployment resource inventory. The envelope transform is read-only: it preserves existing
+deployment extraction output, excludes source paths from repo-owned Buck intent UIDs, and treats
+runtime envelopes as admitted status/evidence records rather than a mutation API. Runtime envelope
+inputs carry an admitted control-plane source marker, while graph-first workspace state and redacted
+local project overrides remain separate `workspace_state` source facts.
 
 ### 6.3 Keep Buck As The Intent Graph Compiler
 

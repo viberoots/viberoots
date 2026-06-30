@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { createDeploymentResourceInventory } from "../../deployments/resource-graph-inventory";
+import { admitControlPlaneRuntimeRecord } from "../../deployments/resource-graph-types";
 import {
   rejectedServiceClientSelectionRecord,
   resolvedServiceClientSelectionRecord,
@@ -140,7 +141,7 @@ test("service-client inventory records actual selection and rejection paths", as
       }),
     );
     const inventory = createDeploymentResourceInventory([], {
-      runtimeSources: { serviceClientSelections: records },
+      runtimeSources: { serviceClientSelections: records.map(admitControlPlaneRuntimeRecord) },
     });
     assert.deepEqual(inventory.errors, []);
     assert.equal(JSON.stringify(inventory.resources).includes("profile-token"), false);
@@ -167,7 +168,7 @@ test("service-client inventory records actual selection and rejection paths", as
     ),
   );
   const inventory = createDeploymentResourceInventory([], {
-    runtimeSources: { serviceClientSelections: invalidRecords },
+    runtimeSources: { serviceClientSelections: invalidRecords.map(admitControlPlaneRuntimeRecord) },
   });
   assert.deepEqual(inventory.errors, []);
   const evidence = inventory.resources.find((resource) => resource.id === "remote-invalid");

@@ -52,6 +52,7 @@ export function createDeploymentResourceInventory(
   const resources = [
     ...extracted.deployments.flatMap(collectDeploymentIntentResources),
     ...collectResolvedInputResources(extracted.deployments),
+    ...collectWorkspaceStateResources(loadedConfig, opts.sidecars),
     ...runtime.resources,
   ];
   return {
@@ -108,6 +109,39 @@ function collectResolvedInputResources(
     }
   }
   return out;
+}
+
+function collectWorkspaceStateResources(
+  loadedConfig: ReturnType<typeof readProjectConfigSync>,
+  graphRead: DeploymentResourceInventory["graphRead"] | undefined,
+): DeploymentResourceInventoryEntry[] {
+  const redactedOverrides = redactedProjectConfigOverrides(loadedConfig.overrides);
+  const resources: DeploymentResourceInventoryEntry[] = [
+    {
+      kind: "WorkspaceGraphState",
+      id: "composite-graph-read",
+      authority: "resolved_input",
+      source: { class: "workspace_state", label: "composite-graph-read" },
+      facts: {
+        providerIndexAvailable: graphRead?.providerIndexAvailable || false,
+        nodeLockIndexAvailable: graphRead?.nodeLockIndexAvailable || false,
+      },
+    },
+  ];
+  if (redactedOverrides.length > 0) {
+    resources.push({
+      kind: "LocalProjectConfigOverride",
+      id: "local-project-config",
+      authority: "resolved_input",
+      source: {
+        class: "workspace_state",
+        label: "local-project-config-override",
+        path: loadedConfig.localPath,
+      },
+      facts: { redactedOverrides },
+    });
+  }
+  return resources;
 }
 
 function resolved(

@@ -4,6 +4,10 @@ import type {
   DeploymentRuntimeInventorySources,
   ServiceClientSelectionRecord,
 } from "./resource-graph-types";
+import {
+  ADMITTED_RUNTIME_SOURCE_LABEL,
+  isAdmittedControlPlaneRuntimeRecord,
+} from "./resource-graph-types";
 import type { NixosSharedHostResolvedServiceClient } from "./nixos-shared-host-service-client-config";
 
 export function collectServiceClientSelectionResources(
@@ -12,6 +16,12 @@ export function collectServiceClientSelectionResources(
   sources: DeploymentRuntimeInventorySources,
 ) {
   for (const selection of sources.serviceClientSelections || []) {
+    if (!isAdmittedControlPlaneRuntimeRecord(selection)) {
+      errors.push(
+        `ServiceClientProfile ${selection.id}: runtime source is not an admitted control-plane record`,
+      );
+      continue;
+    }
     if (!selection.id || !selection.source || !selection.status) {
       errors.push("ServiceClientProfile selection is missing id, source, or status");
       continue;
@@ -28,7 +38,7 @@ export function collectServiceClientSelectionResources(
       kind: "ServiceClientProfile",
       id: selection.id,
       authority: "observed_runtime",
-      source: { class: "runtime" },
+      source: { class: "runtime", label: ADMITTED_RUNTIME_SOURCE_LABEL },
       ...(selection.refs ? { refs: selection.refs } : {}),
       facts: definedFacts({
         source: selection.source,

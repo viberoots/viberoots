@@ -8,6 +8,7 @@ import {
   createDeploymentResourceInventory,
   readDeploymentResourceInventory,
 } from "../../deployments/resource-graph-inventory";
+import { admitControlPlaneRuntimeRecord } from "../../deployments/resource-graph-types";
 import {
   DEFAULT_NODE_LOCK_INDEX_PATH,
   DEFAULT_PROVIDER_INDEX_JSON_PATH,
@@ -72,62 +73,51 @@ test("resource inventory maps extracted deployment metadata and runtime facts", 
         {
           runtimeSources: {
             executionSnapshots: [
-              {
-                id: "run-1:snapshot",
-                facts: {
-                  snapshotId: "run-1:snapshot",
-                  deploymentId: "pleomino-staging",
-                  capturedAt: "2026-01-01T00:00:00.000Z",
-                },
-              },
+              status("run-1:snapshot", {
+                snapshotId: "run-1:snapshot",
+                deploymentId: "pleomino-staging",
+                capturedAt: "2026-01-01T00:00:00.000Z",
+              }),
             ],
             deployRuns: [
-              {
-                id: "run-1",
-                facts: { runId: "run-1", deploymentId: "pleomino-staging", status: "passed" },
-              },
+              status("run-1", {
+                runId: "run-1",
+                deploymentId: "pleomino-staging",
+                status: "passed",
+              }),
             ],
             currentStageStates: [
-              {
-                id: "pleomino-staging:staging",
-                facts: {
-                  deploymentId: "pleomino-staging",
-                  stage: "staging",
-                  state: "deployed",
-                },
-              },
+              status("pleomino-staging:staging", {
+                deploymentId: "pleomino-staging",
+                stage: "staging",
+                state: "deployed",
+              }),
             ],
             artifactChallenges: [
-              {
-                id: "challenge-1",
-                facts: {
-                  challengeId: "challenge-1",
-                  deploymentId: "pleomino-staging",
-                  proofKeyId: "key-1",
-                  issuedAt: "2026-01-01T00:00:00.000Z",
-                  nonceValidationOutcome: "matched-redacted-nonce-digest",
-                  proofKeyValidationOutcome: "trusted-key",
-                  oneTimeConsumption: "consumed-once",
-                  admittedProvenance: "artifact-binding:binding-1",
-                  status: "accepted",
-                },
-              },
+              status("challenge-1", {
+                challengeId: "challenge-1",
+                deploymentId: "pleomino-staging",
+                proofKeyId: "key-1",
+                issuedAt: "2026-01-01T00:00:00.000Z",
+                nonceValidationOutcome: "matched-redacted-nonce-digest",
+                proofKeyValidationOutcome: "trusted-key",
+                oneTimeConsumption: "consumed-once",
+                admittedProvenance: "artifact-binding:binding-1",
+                status: "accepted",
+              }),
             ],
             staticWebappUploadSessions: [
-              {
-                id: "upload-session:1",
-                facts: {
-                  uploadSessionId: "upload-session:1",
-                  submissionId: "submission-1",
-                  archiveFormat: "tar.gz",
-                  archivePath: "uploads/upload-session-1/archive.tar.gz",
-                  objectIdentity: "object://artifact-store/upload-session-1/archive.tar.gz",
-                  digest: "sha256:artifact",
-                  sizeBytes: 42,
-                  expiresAt: "2026-01-01T00:05:00.000Z",
-                  provenance: "upload-session:upload-session:1",
-                },
-              },
+              status("upload-session:1", {
+                uploadSessionId: "upload-session:1",
+                submissionId: "submission-1",
+                archiveFormat: "tar.gz",
+                archivePath: "uploads/upload-session-1/archive.tar.gz",
+                objectIdentity: "object://artifact-store/upload-session-1/archive.tar.gz",
+                digest: "sha256:artifact",
+                sizeBytes: 42,
+                expiresAt: "2026-01-01T00:05:00.000Z",
+                provenance: "upload-session:upload-session:1",
+              }),
             ],
           },
         },
@@ -222,7 +212,7 @@ test("graph-first Infisical inventory paths use composite graph reads", async ()
 
 test("resource inventory fails closed for invalid runtime source records", () => {
   const inventory = createDeploymentResourceInventory([], {
-    runtimeSources: { artifactChallenges: [{ id: "bad", facts: { challengeId: "bad" } }] },
+    runtimeSources: { artifactChallenges: [status("bad", { challengeId: "bad" })] },
   });
   assert.match(
     inventory.errors.join("\n"),
@@ -234,6 +224,10 @@ async function writeFile(tmp: string, relPath: string, value: unknown) {
   const target = path.join(tmp, relPath);
   await fsp.mkdir(path.dirname(target), { recursive: true });
   await fsp.writeFile(target, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+function status(id: string, facts: Record<string, unknown>) {
+  return admitControlPlaneRuntimeRecord({ id, facts });
 }
 
 async function listFiles(root: string) {

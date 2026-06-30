@@ -6,6 +6,7 @@ import { validateRuntimeInput } from "./cloud-control-runtime-input";
 import { validateMiniCloudMigrationEvidence } from "./control-plane-mini-migration-preflight";
 import { collectRuntimeArtifactStatus } from "./resource-graph-runtime-artifacts";
 import { collectServiceClientSelectionResources } from "./resource-graph-service-client";
+import { isAdmittedControlPlaneRuntimeRecord } from "./resource-graph-types";
 import type {
   DeploymentResourceInventoryEntry,
   DeploymentRuntimeInventorySources,
@@ -96,6 +97,10 @@ function collectValidated(
   validate: (record: RuntimeSourceRecord) => string[],
 ) {
   for (const record of records || []) {
+    if (!isAdmittedControlPlaneRuntimeRecord(record)) {
+      errors.push(`${kind} ${record.id}: runtime source is not an admitted control-plane record`);
+      continue;
+    }
     const validationErrors = validate(record);
     if (validationErrors.length > 0) {
       errors.push(...validationErrors.map((error) => `${kind} ${record.id}: ${error}`));
@@ -113,6 +118,10 @@ function collectStatus(
   required: string[],
 ) {
   for (const record of records || []) {
+    if (!isAdmittedControlPlaneRuntimeRecord(record)) {
+      errors.push(`${kind} ${record.id}: runtime source is not an admitted control-plane record`);
+      continue;
+    }
     const missing = required.filter((field) => !String(record.facts[field] || "").trim());
     const forbidden = ["token", "rawToken", "secret", "proof", "nonce"].filter(
       (field) => record.facts[field] !== undefined,

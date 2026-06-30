@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createDeploymentResourceInventory } from "../../deployments/resource-graph-inventory";
 import type { DeploymentRuntimeInventorySources } from "../../deployments/resource-graph-types";
+import {
+  admitControlPlaneRuntimeRecord,
+  type RuntimeSourceRecord,
+} from "../../deployments/resource-graph-types";
 import { REQUIRED_AWS_EC2_ALARMS } from "../../deployments/cloud-control-aws-ec2-host-profile";
 import { IMAGE_BUILD_IDENTITY, evidence } from "./cloud-control-cutover-fixture";
 import { runtimeInputProfile } from "./cloud-control-runtime-input.fixture";
@@ -24,23 +28,18 @@ test("runtime inventory validates and preserves reviewed runtime evidence object
   const input = runtimeInputProfile();
   const inventory = createDeploymentResourceInventory([], {
     runtimeSources: {
-      runtimeInputs: [{ id: "runtime-input", value: input, validation }],
-      authProviderProfiles: [{ id: "auth-profile", value: input.authProvider, validation }],
+      runtimeInputs: [source("runtime-input", input)],
+      authProviderProfiles: [source("auth-profile", input.authProvider)],
       readinessEvidence: [
-        {
-          id: "cutover-readiness",
-          value: evidence(),
-          validation: {
-            ...validation,
-            expectedHostProfile: "aws-ec2",
-            expectedImageBuildIdentity: IMAGE_BUILD_IDENTITY,
-            maxAgeMinutes: 60,
-            operation: "cutover",
-          },
-        },
+        source("cutover-readiness", evidence(), {
+          expectedHostProfile: "aws-ec2",
+          expectedImageBuildIdentity: IMAGE_BUILD_IDENTITY,
+          maxAgeMinutes: 60,
+          operation: "cutover",
+        }),
       ],
-      observabilityEvidence: [{ id: "observability", value: observabilityProfile() }],
-      miniMigrationEvidence: [{ id: "mini-migration", value: miniMigrationEvidence() }],
+      observabilityEvidence: [source("observability", observabilityProfile())],
+      miniMigrationEvidence: [source("mini-migration", miniMigrationEvidence())],
     },
   });
   assert.deepEqual(inventory.errors, []);
@@ -138,7 +137,19 @@ test("runtime inventory requires full challenge and upload artifact provenance",
 });
 
 function status(id: string, facts: Record<string, unknown>) {
-  return { id, facts };
+  return admitControlPlaneRuntimeRecord({ id, facts });
+}
+
+function source(
+  id: string,
+  value: unknown,
+  validationOverrides: Partial<RuntimeSourceRecord["validation"]> = {},
+) {
+  return admitControlPlaneRuntimeRecord({
+    id,
+    value,
+    validation: { ...validation, ...validationOverrides },
+  });
 }
 
 function challengeFacts() {

@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createDeploymentResourceInventory } from "../../deployments/resource-graph-inventory";
+import { admitControlPlaneRuntimeRecord } from "../../deployments/resource-graph-types";
 
 test("runtime inventory validates staged-upload cleanup janitor records", () => {
   const valid = createDeploymentResourceInventory([], {
@@ -33,7 +34,7 @@ test("runtime inventory validates staged-upload cleanup janitor records", () => 
 });
 
 function status(id: string, facts: Record<string, unknown>) {
-  return { id, facts };
+  return admitControlPlaneRuntimeRecord({ id, facts });
 }
 
 function janitorFacts() {
