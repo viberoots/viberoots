@@ -3,7 +3,7 @@ set -euo pipefail
 
 # shell helpers
 # shellcheck source=/dev/null
-. "$(cd "$(dirname "$0")" && pwd)/_env.sh"
+. "$(cd "$(dirname "$0")" && pwd)/devshell.sh"
 
 LOCK_DIR="${LIVE_ROOT}/buck-out/tmp/verify-lock"
 

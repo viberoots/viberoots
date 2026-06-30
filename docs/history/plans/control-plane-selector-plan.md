@@ -933,7 +933,7 @@ configuration.
 - Expected implementation paths:
   - `build-tools/tools/dev/verify/**`
   - `build-tools/tools/dev/dev-build/**`
-  - `build-tools/tools/bin/_env.sh`
+  - `build-tools/tools/bin/devshell.sh`
   - `build-tools/lang/**`
   - `build-tools/tools/tests/dev/**`
   - `build-tools/tools/tests/remote-exec/**`

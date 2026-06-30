@@ -10,7 +10,7 @@ if [[ "${1:-}" == "aws-account" && -z "${VIBEROOTS_AWS_ACCOUNT_NIX_ENV:-}" && -z
 fi
 
 # shellcheck source=/dev/null
-. "${SCRIPT_DIR}/_env.sh"
+. "${SCRIPT_DIR}/devshell.sh"
 
 if [[ "${1:-}" == "aws-account" && -z "${IN_NIX_SHELL:-}" && -z "${NO_DEV_SHELL:-}" ]]; then
   export BUCK_DEV_SHELL_FASTPATH=0

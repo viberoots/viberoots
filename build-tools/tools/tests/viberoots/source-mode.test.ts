@@ -42,6 +42,22 @@ async function writeMinimalSourceTree(root: string): Promise<void> {
   await fsp.writeFile(path.join(root, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
 }
 
+async function assertDirenvBootstrap(workspace: string): Promise<void> {
+  const envrc = await fsp.readFile(path.join(workspace, ".envrc"), "utf8");
+  assert.match(envrc, /\.viberoots\/bootstrap\/direnv-stage0\.sh/);
+  assert.doesNotMatch(envrc, /__vbr_flake_args/);
+
+  const stage0 = await fsp.readFile(
+    path.join(workspace, ".viberoots", "bootstrap", "direnv-stage0.sh"),
+    "utf8",
+  );
+  assert.match(
+    stage0,
+    /__vbr_flake_args=\(--override-input viberoots "path:\$\{__vbr_flake_input_root\}"\)/,
+  );
+  assert.match(stage0, /__vbr_stage0_apply_nix_cache_health \|\| return 1/);
+}
+
 async function writeFakeGit(
   workspace: string,
   opts: {
@@ -183,10 +199,7 @@ test("use-submodule adds a missing submodule and repairs current symlink", async
       /git submodule add https:\/\/github\.com\/viberoots\/viberoots\.git viberoots/,
     );
     assert.equal(await fsp.readlink(path.join(workspace, ".viberoots", "current")), "../viberoots");
-    assert.match(
-      await fsp.readFile(path.join(workspace, ".envrc"), "utf8"),
-      /--override-input viberoots/,
-    );
+    await assertDirenvBootstrap(workspace);
   });
 });
 
@@ -273,10 +286,7 @@ test("use-flake switches generated files and leaves inactive submodule by defaul
     );
 
     assert.equal(await fsp.realpath(path.join(workspace, ".viberoots", "current")), remoteSource);
-    assert.doesNotMatch(
-      await fsp.readFile(path.join(workspace, ".envrc"), "utf8"),
-      /--override-input viberoots/,
-    );
+    await assertDirenvBootstrap(workspace);
     assert.match(
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
       /github:viberoots\/viberoots\/v1\.2\.3/,

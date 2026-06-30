@@ -243,7 +243,7 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   );
   assertOrder(prelude, "await applyNixCacheHealthPolicy(root)", "if (");
 
-  const env = await fsp.readFile("viberoots/build-tools/tools/bin/_env.sh", "utf8");
+  const env = await fsp.readFile("viberoots/build-tools/tools/bin/devshell.sh", "utf8");
   assertOrder(
     env,
     "env_apply_nix_cache_health || return 1",

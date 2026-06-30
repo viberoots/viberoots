@@ -3,7 +3,7 @@ set -euo pipefail
 
 # shell helpers
 # shellcheck source=/dev/null
-. "$(cd "$(dirname "$0")" && pwd)/_env.sh"
+. "$(cd "$(dirname "$0")" && pwd)/devshell.sh"
 
 # Substantive logic lives in TypeScript (zx). Keep this wrapper tiny for file-size linting.
 run_ts "../dev/verify.ts" "$@"

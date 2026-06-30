@@ -46,7 +46,7 @@ test("runInTemp installs a zx-wrapper shim for temp-repo build-tools command pat
 
 test("bin run_ts resolves relative tool scripts from the active viberoots root", async () => {
   const root = await sourceRoot();
-  const helperPath = path.join(root, "build-tools", "tools", "bin", "_env.sh");
+  const helperPath = path.join(root, "build-tools", "tools", "bin", "devshell.sh");
   const source = await fsp.readFile(helperPath, "utf8");
 
   assert.match(
@@ -63,7 +63,7 @@ test("bin run_ts resolves relative tool scripts from the active viberoots root",
 
 test("bin env derives VIBEROOTS_ROOT from the live workspace rather than inherited process state", async () => {
   const root = await sourceRoot();
-  const helperPath = path.join(root, "build-tools", "tools", "bin", "_env.sh");
+  const helperPath = path.join(root, "build-tools", "tools", "bin", "devshell.sh");
   const source = await fsp.readFile(helperPath, "utf8");
 
   assert.match(source, /VIBEROOTS_SOURCE_ROOT/);

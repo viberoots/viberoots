@@ -967,11 +967,11 @@ zx-wrapper` invocation in the repo (~99 spawn sites) without per-site edits, inc
   `flake/packages/node-service.nix`, `flake/packages/node-vercel-next.nix`, and
   `planner/node-webapp.nix`. These run `sync-module-contracts.ts`, `service-artifact.ts`, and
   `next-artifact.ts` in hermetic sandboxes that strip `NODE_OPTIONS`, so the env-only hook from
-  `_env.sh` does not reach them.
+  `devshell.sh` does not reach them.
 - Thread `--import` through the `bulk-move` flake app (`flake/outputs-apps.nix`) and the vite
   plugin in `projects/apps/pleomino/vite.config.ts` that spawns
   `materialize-static-pwa-precache.ts` via `execFileSync`.
-- Keep the dev-shell `NODE_OPTIONS` export from `_env.sh` (committed in `255ee410`) as the
+- Keep the dev-shell `NODE_OPTIONS` export from `devshell.sh` (committed in `255ee410`) as the
   dev-shell side of the contract.
 - Defer to a follow-up PR: the actual `.ts`-extension sweep across `.ts`/`.tsx` source files, plus
   the matching contract-test updates (`webapp.phase3-runtime-consistency-policy.contract.test.ts`,
@@ -1010,7 +1010,7 @@ zx-wrapper` invocation in the repo (~99 spawn sites) without per-site edits, inc
   baseline (PR-12 baseline 2443s).
 - Removing `.ts` from a relative `import` in any single representative source file does not break
   either the dev-shell `i`/`b`/`v` flow or a nix-built derivation that runs `node`.
-- The dev-shell `NODE_OPTIONS` export from `_env.sh` (committed in `255ee410`) remains in place as
+- The dev-shell `NODE_OPTIONS` export from `devshell.sh` (committed in `255ee410`) remains in place as
   the dev-shell side of the contract; the new wrapper-side discovery is additive, not a
   replacement.
 - The follow-up sweep PR can run a deterministic source-tree rewrite and remain green without

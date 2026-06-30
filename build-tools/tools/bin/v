@@ -4,7 +4,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # shell helpers
 # shellcheck source=/dev/null
-. "${SCRIPT_DIR}/_env.sh"
+. "${SCRIPT_DIR}/devshell.sh"
 
 cleanup_verify_root_buck_out() {
 	local allow_broad_buck_cleanup="${1:-0}"

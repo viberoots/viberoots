@@ -7,6 +7,7 @@ import {
   initSprinkleRefConfigs,
 } from "../deployments/sprinkleref-templates";
 import { BUCK_PROJECT_IGNORE_LINE } from "./buck-project-ignore";
+import { direnvStage0, envrc } from "./consumer-direnv";
 import { writeIfChanged } from "./fs-helpers";
 import { activateWorkspace } from "./workspace-activation";
 import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
@@ -185,78 +186,6 @@ target_platforms = prelude//platforms:default
 
 [project]
 ${BUCK_PROJECT_IGNORE_LINE}
-`;
-}
-
-function envrc(viberootsUrl: string): string {
-  const localOverride =
-    viberootsUrl.startsWith("path:") || viberootsUrl.startsWith("git+file:")
-      ? ` --override-input viberoots "path:\${__vbr_flake_input_root}"`
-      : "";
-  const localInputSelector =
-    viberootsUrl.startsWith("path:") || viberootsUrl.startsWith("git+file:")
-      ? `
-__vbr_flake_input_root="\${VIBEROOTS_FLAKE_INPUT_ROOT:-}"
-if [[ -z "\${__vbr_flake_input_root}" || ! -f "\${__vbr_flake_input_root}/flake.nix" ]]; then
-  __vbr_flake_input_root="\${VIBEROOTS_SOURCE_ROOT:-}"
-fi
-if [[ -z "\${__vbr_flake_input_root}" || ! -f "\${__vbr_flake_input_root}/flake.nix" ]]; then
-  __vbr_flake_input_root="\${PWD}/viberoots"
-fi
-export VIBEROOTS_FLAKE_INPUT_ROOT="\${__vbr_flake_input_root}"
-`
-      : "";
-  return `# ${generatedMarker}
-if [[ "\${NIX_CONFIG:-}" != *"builders ="* ]]; then
-  export NIX_CONFIG=$'builders = \\nbuild-hook = \\nmax-jobs = auto\\n'"\${NIX_CONFIG:-}"
-fi
-if [[ "\${NIX_CONFIG:-}" != *"warn-dirty = false"* ]]; then
-  export NIX_CONFIG=$'warn-dirty = false\\n'"\${NIX_CONFIG:-}"
-fi
-export NODE_OPTIONS="--disable-warning=ExperimentalWarning\${NODE_OPTIONS:+ $NODE_OPTIONS}"
-if [[ -n "\${IN_NIX_SHELL:-}" ]]; then
-  return
-fi
-${localInputSelector}
-
-__nix_direnv_direnvrc=""
-for __candidate in \\
-  "\${HOME}/.nix-profile/share/nix-direnv/direnvrc" \\
-  "/nix/var/nix/profiles/default/share/nix-direnv/direnvrc"
-do
-  if [[ -f "\${__candidate}" ]]; then
-    __nix_direnv_direnvrc="\${__candidate}"
-    break
-  fi
-done
-
-if [[ -z "\${__nix_direnv_direnvrc}" ]]; then
-  echo "error: nix-direnv is required for this repository shell cache path." 1>&2
-  echo "install: nix profile install nixpkgs#nix-direnv" 1>&2
-  echo "then run: direnv reload" 1>&2
-  return 1
-fi
-
-source "\${__nix_direnv_direnvrc}"
-unset __nix_direnv_direnvrc
-unset __candidate
-
-if [[ "\${NIX_CONFIG:-}" != *"experimental-features ="* ]]; then
-  export NIX_CONFIG=$'experimental-features = nix-command flakes\\n'"\${NIX_CONFIG:-}"
-fi
-export WORKSPACE_ROOT="\${PWD}"
-
-if [[ -f "\${PWD}/.viberoots/current/build-tools/tools/bin/_env.sh" ]]; then
-  source "\${PWD}/.viberoots/current/build-tools/tools/bin/_env.sh"
-  env_apply_nix_cache_health
-  set +u
-fi
-
-watch_file .viberoots/workspace/flake.nix
-watch_file .viberoots/workspace/flake.lock
-
-use flake "path:\${PWD}/.viberoots/workspace#default" --accept-flake-config${localOverride}
-unset __vbr_flake_input_root
 `;
 }
 
@@ -491,7 +420,12 @@ export async function initConsumer(opts: InitConsumerOptions): Promise<void> {
 
   await writeBuckroot(opts.workspaceRoot);
   await writeGeneratedFile(opts.workspaceRoot, ".buckconfig", buckconfig());
-  await writeGeneratedFile(opts.workspaceRoot, ".envrc", envrc(opts.viberootsUrl));
+  await writeGeneratedFile(opts.workspaceRoot, ".envrc", envrc());
+  await writeGeneratedFile(
+    opts.workspaceRoot,
+    ".viberoots/bootstrap/direnv-stage0.sh",
+    direnvStage0(),
+  );
   await writeGeneratedFile(opts.workspaceRoot, ".viberoots/workspace/flake.nix", flakeNix(opts));
   await writeGeneratedFile(opts.workspaceRoot, ".viberoots/workspace/TARGETS", workspaceTargets());
   await writeIfMissing(opts.workspaceRoot, "README.md", consumerReadme(sourceMode));
