@@ -86,6 +86,33 @@ require_command() {
   fi
 }
 
+git_is_usable() {
+  command -v git >/dev/null 2>&1 && git --version >/dev/null 2>&1
+}
+
+ensure_git_metadata_writable() {
+  local git_probe
+  git_probe="$(git rev-parse --git-path viberoots-bootstrap-write-test 2>/dev/null || true)"
+  if [[ -z "${git_probe}" ]]; then
+    echo "error: unable to resolve Git metadata path for ${workspace_root}" >&2
+    exit 1
+  fi
+  if ! { : >"${git_probe}"; } 2>/dev/null; then
+    cat >&2 <<EOF
+error: Git metadata is not writable for ${workspace_root}
+
+Submodule mode needs to update the repository index and .git/modules state.
+The workspace files may be writable while .git is read-only, which prevents
+commands such as 'git submodule add' from creating .git/index.lock.
+
+Fix: rerun bootstrap from an environment that can write ${git_probe%/*}, or
+use flake mode in restricted sandboxes that cannot grant .git write access.
+EOF
+    exit 1
+  fi
+  rm -f "${git_probe}" 2>/dev/null || true
+}
+
 gitmodules_has_viberoots_submodule() {
   [[ -f .gitmodules ]] &&
     git config -f .gitmodules --get-regexp '^submodule\..*\.path$' |
@@ -574,12 +601,15 @@ if ! command -v nix >/dev/null 2>&1; then
 fi
 require_command nix
 
-if ! command -v git >/dev/null 2>&1; then
+if ! git_is_usable; then
   nix profile install nixpkgs#git
   export PATH="${HOME}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:${PATH}"
   record_action "installed Git with nix profile"
 fi
-require_command git
+if ! git_is_usable; then
+  echo "error: git is required but the git on PATH is not usable; install Git or rerun after fixing PATH" >&2
+  exit 1
+fi
 
 if [[ ! -d "${workspace_root}" ]]; then
   record_action "created workspace directory"
@@ -620,6 +650,7 @@ elif [[ "${mode}" == "flake" ]]; then
   print_summary "bootstrapped" "${effective_source}"
 else
   confirm_trusted_submodule_url "${effective_source}"
+  ensure_git_metadata_writable
   if [[ -d viberoots ]] &&
     [[ -n "$(git -C viberoots status --porcelain=v1 2>/dev/null || true)" ]] &&
     [[ "$(git -C viberoots rev-parse --abbrev-ref HEAD 2>/dev/null || true)" != "${ref}" ]]; then

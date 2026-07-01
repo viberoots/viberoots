@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { REQUIRED_AWS_EC2_ALARMS } from "./cloud-control-aws-ec2-host-profile";
+import { REQUIRED_AWS_EC2_ALARMS } from "./cloud-control-aws-ec2-alarms";
 import { validateAuthProviderProfile } from "./cloud-control-auth-provider-profile";
 import { validateCloudControlCutover } from "./cloud-control-cutover-validate";
 import { validateRuntimeInput } from "./cloud-control-runtime-input";

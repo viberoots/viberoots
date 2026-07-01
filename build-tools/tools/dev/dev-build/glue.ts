@@ -33,11 +33,11 @@ async function debugListTargets(root: string): Promise<void> {
       if (txt) console.warn("[dev-build][debug] projects/libs/demo-lib/TARGETS contents:\n" + txt);
     } catch {}
     console.warn("[dev-build][debug] running 'buck2 targets //...'");
-    await $({ stdio: "inherit", cwd: root })`buck2 targets //...`;
+    await $({ stdio: "inherit", cwd: root, env: buckProcessEnv() })`buck2 targets //...`;
   } catch {}
 }
 
-async function exportGraph(root: string, opts: { scope?: string; env: Record<string, string> }) {
+async function exportGraph(root: string, opts: { scope?: string; env: NodeJS.ProcessEnv }) {
   const node = nodeBin();
   const nodeBase = zxNodeBase(root);
   const graphPath = path.join(root, DEFAULT_GRAPH_PATH);
@@ -60,6 +60,21 @@ function stableExporterIsolation(root: string): string {
   return `exporter-shared-${h}`;
 }
 
+function buckProcessEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  const sslCertFile = process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE || "";
+  return {
+    ...process.env,
+    ...extra,
+    HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
+    ...(sslCertFile
+      ? {
+          SSL_CERT_FILE: sslCertFile,
+          NIX_SSL_CERT_FILE: process.env.NIX_SSL_CERT_FILE || sslCertFile,
+        }
+      : {}),
+  };
+}
+
 async function ensureNonEmptyGraphOrExit(root: string, graphPath: string): Promise<void> {
   const comp = await readCompositeGraph({ graphPath: path.resolve(root, DEFAULT_GRAPH_PATH) });
   const graphLen = Array.isArray(comp?.nodes) ? comp.nodes.length : 0;
@@ -71,12 +86,11 @@ async function ensureNonEmptyGraphOrExit(root: string, graphPath: string): Promi
         "[dev-build] graph empty; retrying export with --scope lang:go for bootstrap scenarios",
       );
       process.env.DEVBUILD_TRIED_FALLBACK = "1";
-      const runEnv = {
-        ...process.env,
+      const runEnv = buckProcessEnv({
         BUCK_NESTED_ISO: stableExporterIsolation(root),
         BUCK_EXPORTER_REUSE_DAEMON: "1",
         ...(String(process.env.DEVBUILD_DEBUG || "").trim() === "1" ? { EXPORTER_DEBUG: "1" } : {}),
-      } as any;
+      });
       await exportGraph(root, { scope: "lang:go", env: runEnv });
       const comp2 = await readCompositeGraph({ graphPath: path.resolve(root, DEFAULT_GRAPH_PATH) });
       const graphLen2 = Array.isArray(comp2?.nodes) ? comp2.nodes.length : 0;
@@ -88,9 +102,9 @@ async function ensureNonEmptyGraphOrExit(root: string, graphPath: string): Promi
       try {
         console.warn("[dev-build] bootstrap: warming up buck targets and re-exporting");
         try {
-          await $({ stdio: "inherit", cwd: root })`buck2 targets //...`;
+          await $({ stdio: "inherit", cwd: root, env: buckProcessEnv() })`buck2 targets //...`;
         } catch {}
-        const runEnvNoIso = { ...runEnv, BUCK_NO_ISOLATION: "1", EXPORTER_DEBUG: "1" } as any;
+        const runEnvNoIso = { ...runEnv, BUCK_NO_ISOLATION: "1", EXPORTER_DEBUG: "1" };
         await exportGraph(root, { env: runEnvNoIso });
         const comp3 = await readCompositeGraph({
           graphPath: path.resolve(root, DEFAULT_GRAPH_PATH),
@@ -134,12 +148,11 @@ export async function refreshGlueAndExportGraph(root: string): Promise<string> {
 
   await debugListTargets(root);
 
-  const runEnv = {
-    ...process.env,
+  const runEnv = buckProcessEnv({
     BUCK_NESTED_ISO: stableExporterIsolation(root),
     BUCK_EXPORTER_REUSE_DAEMON: "1",
     ...(String(process.env.DEVBUILD_DEBUG || "").trim() === "1" ? { EXPORTER_DEBUG: "1" } : {}),
-  } as any;
+  });
 
   const scope = (process.env.DEVBUILD_SCOPE || "").trim();
   const graphPath = await exportGraph(root, { scope, env: runEnv });
