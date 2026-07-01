@@ -67,6 +67,7 @@ async function makeSourceRoot(prefix: string): Promise<string> {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), prefix));
   await fsp.mkdir(path.join(root, "viberoots", "build-tools"), { recursive: true });
   await fsp.writeFile(path.join(root, "viberoots", "flake.nix"), "{}\n");
+  await fsp.writeFile(path.join(root, "viberoots", ".live-edit-marker"), "transient\n");
   await fsp.writeFile(path.join(root, "viberoots", "build-tools", "keep.txt"), "keep\n");
   await fsp.mkdir(path.join(root, "viberoots", ".viberoots", "workspace", "buck"), {
     recursive: true,
@@ -87,6 +88,7 @@ async function makeViberootsSourceRoot(prefix: string): Promise<string> {
     recursive: true,
   });
   await fsp.writeFile(path.join(root, ".viberoots", "workspace", "flake.nix"), "{}\n");
+  await fsp.writeFile(path.join(root, ".source-fingerprint"), "transient\n");
   await fsp.writeFile(
     path.join(root, ".viberoots", "workspace", "buck", "unified-pnpm-store", "large-store-blob"),
     "generated\n",
@@ -158,6 +160,7 @@ test("rsync: filtered roots exclude nested viberoots generated workspace state",
     );
     await fsp.access(path.join(dest, "viberoots", "build-tools", "keep.txt"));
     await assertMissing(path.join(dest, "viberoots", ".viberoots"));
+    await assertMissing(path.join(dest, "viberoots", ".live-edit-marker"));
   } finally {
     await fsp.rm(source, { recursive: true, force: true });
     await fsp.rm(dest, { recursive: true, force: true });
@@ -180,6 +183,7 @@ test("rsync: viberoots source roots exclude generated workspace buck state", asy
     await fsp.access(path.join(dest, "build-tools", "keep.txt"));
     await fsp.access(path.join(dest, ".viberoots", "workspace", "flake.nix"));
     await assertMissing(path.join(dest, ".viberoots", "workspace", "buck"));
+    await assertMissing(path.join(dest, ".source-fingerprint"));
   } finally {
     await fsp.rm(source, { recursive: true, force: true });
     await fsp.rm(dest, { recursive: true, force: true });

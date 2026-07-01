@@ -1,13 +1,21 @@
-// Ensure zx globals are available even when running from a temp dir without node_modules
-// Compute workspace root from this file's location (repo/build-tools/tools/dev/zx-init.mjs)
 const urlMod = await import("node:url");
 const pathMod = await import("node:path");
 const fsMod = await import("node:fs");
 const here = urlMod.fileURLToPath(import.meta.url);
 const SELF_ROOT = pathMod.resolve(pathMod.dirname(here), "../../..");
 const SOURCE_ROOT_ENV = String(process.env.VIBEROOTS_SOURCE_ROOT || "").trim();
+const FILTERED_INPUT_MARKER = "/.viberoots/workspace/viberoots-flake-input";
+function isGeneratedFilteredInput(root) {
+  const normalized = String(root || "")
+    .split(pathMod.sep)
+    .join("/");
+  return (
+    normalized.endsWith(FILTERED_INPUT_MARKER) || normalized.includes(`${FILTERED_INPUT_MARKER}/`)
+  );
+}
 function rootWithZxInit(root) {
   if (!root) return "";
+  if (isGeneratedFilteredInput(root)) return "";
   const abs = pathMod.resolve(root);
   const init = pathMod.join(abs, "build-tools", "tools", "dev", "zx-init.mjs");
   if (!fsMod.existsSync(init)) return "";
@@ -19,16 +27,10 @@ function rootWithZxInit(root) {
 }
 const WORKSPACE_ROOT_FIXED =
   rootWithZxInit(SOURCE_ROOT_ENV) || rootWithZxInit(SELF_ROOT) || SELF_ROOT;
-// Ensure zx globals are available as early as possible via bare import using NODE_PATH
-// This covers cases where workspace/node_modules is not present in sandboxes but NODE_PATH points
-// to a host workspace node_modules. Fail silently if not available; other strategies follow.
 try {
   await import("zx/globals");
 } catch {}
 
-// (intentionally no global NIX_CONFIG mutations here; .envrc handles quieting nix)
-
-// Best-effort absolute URL to zx globals for resolver to use
 let ZX_GLOBALS_URL = "";
 
 try {
@@ -147,6 +149,8 @@ const src = `export async function resolve(specifier, context, nextResolve) {
         return await nextResolve(zxGlobals, context);
       }
       const envPath = (process.env.NODE_PATH || '').split('${process.platform === "win32" ? ";" : ":"}').filter(Boolean);
+      const testNodeModulesOut = String(process.env.ZX_TEST_NODE_MODULES_OUT || '').trim();
+      if (testNodeModulesOut) envPath.push(testNodeModulesOut.endsWith('/node_modules') ? testNodeModulesOut : testNodeModulesOut + '/node_modules');
       for (const entry of envPath) {
         const baseUrl = new URL(entry.endsWith('/') ? entry : entry + '/', base);
         try {
@@ -192,12 +196,10 @@ const src = `export async function resolve(specifier, context, nextResolve) {
   return nextResolve(specifier, context);
 }`;
 const dataUrl = "data:text/javascript," + encodeURIComponent(src);
-register(
-  dataUrl,
-  pathToFileURL(
-    WORKSPACE_ROOT_FIXED.endsWith("/") ? WORKSPACE_ROOT_FIXED : WORKSPACE_ROOT_FIXED + "/",
-  ),
-);
+const workspaceRootUrl = WORKSPACE_ROOT_FIXED.endsWith("/")
+  ? WORKSPACE_ROOT_FIXED
+  : WORKSPACE_ROOT_FIXED + "/";
+register(dataUrl, pathToFileURL(workspaceRootUrl));
 
 const verifyProcessStateFile = String(process.env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim();
 const verifyLogFile = String(process.env.VBR_VERIFY_LOG_FILE || "").trim();

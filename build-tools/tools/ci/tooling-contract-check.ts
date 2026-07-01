@@ -26,6 +26,7 @@ function isExcluded(filePath: string): boolean {
     /^node_modules\//,
     /^buck-out\//,
     /^coverage\//,
+    /^\.viberoots\/workspace\/viberoots-flake-input\//,
     /\.md$/,
     /\.nix$/,
     /\.bzl$/,

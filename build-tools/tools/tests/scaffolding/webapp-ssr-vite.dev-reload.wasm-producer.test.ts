@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { after, test } from "node:test";
+import { resolveModuleContractsPaths } from "../../dev/module-contract-paths";
 import { runInTemp } from "../lib/test-helpers";
 import { ensureNodeModulesForDevApp, spawnViteSsrDevServer } from "./lib/dev-node-modules";
 import {
@@ -120,8 +121,10 @@ test(
           (res) => res.status === 200 && res.body.includes(`server:${expectedB} at /`),
         );
 
+        const generatedServerWasmPath = await readGeneratedServerWasmPath(tmp, appAbs);
         await fsp.rm(serverWasmPath, { force: true });
         await fsp.rm(runtimeWasmPath, { force: true });
+        await fsp.rm(generatedServerWasmPath, { force: true });
         const missingWasmResponse = await waitForValue(
           async () => await httpGet(`http://127.0.0.1:${port}/`),
           (res) =>
@@ -165,3 +168,19 @@ after(() => {
   const code = (process as any).exitCode ?? 0;
   setImmediate(() => process.exit(code));
 });
+
+async function readGeneratedServerWasmPath(tmp: string, appAbs: string): Promise<string> {
+  const contracts = resolveModuleContractsPaths({ appCwd: appAbs, root: tmp });
+  const manifest = JSON.parse(await fsp.readFile(contracts.wasmManifestPath, "utf8")) as {
+    defaultModuleKey?: string;
+    modules?: Array<{
+      moduleKey?: string;
+      runtimeDestinations?: { server?: string };
+    }>;
+  };
+  const defaultKey = String(manifest.defaultModuleKey || "");
+  const entry = (manifest.modules || []).find((mod) => mod.moduleKey === defaultKey);
+  const serverRel = String(entry?.runtimeDestinations?.server || "");
+  assert.ok(serverRel, "generated wasm manifest must declare a server runtime destination");
+  return path.resolve(appAbs, serverRel);
+}

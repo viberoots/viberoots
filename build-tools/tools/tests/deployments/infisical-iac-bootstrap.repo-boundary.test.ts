@@ -163,6 +163,7 @@ async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
   const oldEnv = { ...process.env };
   delete process.env.SPRINKLEREF_CONFIG;
   process.env.WORKSPACE_ROOT = workspaceRootForTemp(dir);
+  process.env._VIBEROOTS_DEVSHELL_ROOT = workspaceRootForTemp(dir);
   process.env.LIVE_ROOT = workspaceRootForTemp(dir);
   process.chdir(dir);
   try {

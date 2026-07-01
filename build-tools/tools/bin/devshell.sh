@@ -355,6 +355,34 @@ ensure_buck_prelude() {
 	[[ -f "${live_root}/.viberoots/current/prelude/prelude.bzl" ]]
 }
 
+devshell_inputs_stale() {
+	local live_root="$1"
+	local marker="${live_root}/.viberoots/workspace/viberoots-flake-input/.source-fingerprint"
+	[[ -d "${live_root}/viberoots" ]] || return 1
+	[[ -f "${marker}" ]] || return 0
+	local file
+	for file in \
+		"${live_root}/.viberoots/workspace/flake.nix" \
+		"${live_root}/.viberoots/workspace/flake.lock" \
+		"${live_root}/viberoots/flake.nix" \
+		"${live_root}/viberoots/flake.lock" \
+		"${live_root}/viberoots/build-tools/tools/nix/devshell.nix" \
+		"${live_root}/viberoots/build-tools/tools/lib/consumer-direnv.ts"; do
+		[[ -f "${file}" && "${file}" -nt "${marker}" ]] && return 0
+	done
+	return 1
+}
+
+devshell_stale_reload_allowed() {
+	[[ -z "${BUCK_TEST_TARGET:-}" ]] || return 1
+	[[ -z "${BUCK_TEST_SRC:-}" ]] || return 1
+	[[ -z "${VBR_VERIFY_LOG_FILE:-}" ]] || return 1
+	[[ -z "${VBR_VERIFY_PROCESS_STATE_FILE:-}" ]] || return 1
+	[[ -z "${VBR_TEST_SEED_STORE_PATH:-}" ]] || return 1
+	[[ -z "${VBR_RUN_IN_TEMP_REPO:-}" ]] || return 1
+	return 0
+}
+
 exec_in_dev_shell() {
 	local live_root="$1"; shift
 	local fastpath_enabled="${BUCK_DEV_SHELL_FASTPATH:-1}"
@@ -377,15 +405,24 @@ exec_in_dev_shell() {
 		if [[ "${missing}" == "0" && -f "${zx_init_path}" ]]; then
 			can_bypass_direnv="1"
 		fi
-		if [[ "${can_bypass_direnv}" == "1" ]] && ! ensure_buck_prelude "${live_root}"; then
-			can_bypass_direnv="0"
+	fi
+	if [[ -z "${NO_DEV_SHELL:-}" && "${VBR_DEVSHELL_STALE_RELOAD_ATTEMPTED:-}" != "1" ]] && devshell_stale_reload_allowed && devshell_inputs_stale "${live_root}"; then
+		if command -v direnv >/dev/null 2>&1; then
+			echo "warn dev shell inputs changed; re-running this command through direnv exec" 1>&2
+			BUCK_CONFIG_LOCK=1 VBR_DEVSHELL_STALE_RELOAD_ATTEMPTED=1 exec direnv exec "$live_root" "$@"
+		elif [[ -z "${IN_NIX_SHELL:-}" ]]; then
+			echo "error: direnv not found on PATH; run inside the dev shell" 1>&2
+			exit 127
 		fi
 	fi
-  if [[ -n "${NO_DEV_SHELL:-}" ]]; then
-    exec "$@"
-  elif [[ -z "${IN_NIX_SHELL:-}" && "${can_bypass_direnv}" == "1" ]]; then
+	if [[ "${can_bypass_direnv}" == "1" ]] && ! ensure_buck_prelude "${live_root}"; then
+		can_bypass_direnv="0"
+	fi
+	if [[ -n "${NO_DEV_SHELL:-}" ]]; then
+		exec "$@"
+	elif [[ -z "${IN_NIX_SHELL:-}" && "${can_bypass_direnv}" == "1" ]]; then
 		BUCK_CONFIG_LOCK=1 exec "$@"
-  elif [[ -z "${IN_NIX_SHELL:-}" ]]; then
+	elif [[ -z "${IN_NIX_SHELL:-}" ]]; then
 		if ! command -v direnv >/dev/null 2>&1; then
 			echo "error: direnv not found on PATH; run inside the dev shell" 1>&2
 			exit 127
@@ -417,21 +454,21 @@ node_ts() {
 	local node_bin="${NODE_BIN:-node}"
 	# Prefer explicit ZX_INIT if provided (e.g., tests), else viberoots source path.
 	local zx_init_path="${ZX_INIT:-${VIBEROOTS_ROOT}/build-tools/tools/dev/zx-init.mjs}"
-  # If zx-wrapper is available, prefer it to guarantee zx globals ($) are provided
-  if command -v zx-wrapper >/dev/null 2>&1; then
-    exec_in_dev_shell "$live_root" \
-      zx-wrapper \
-      --import "${zx_init_path}" \
-      "$target_ts" "$@"
-  else
-    exec_in_dev_shell "$live_root" \
-      "$node_bin" \
-      --experimental-top-level-await \
-      --disable-warning=ExperimentalWarning \
-      --experimental-strip-types \
-      --import "${zx_init_path}" \
-      "$target_ts" "$@"
-  fi
+	# If zx-wrapper is available, prefer it to guarantee zx globals ($) are provided
+	if command -v zx-wrapper >/dev/null 2>&1; then
+		exec_in_dev_shell "$live_root" \
+			zx-wrapper \
+			--import "${zx_init_path}" \
+			"$target_ts" "$@"
+	else
+		exec_in_dev_shell "$live_root" \
+			"$node_bin" \
+			--experimental-top-level-await \
+			--disable-warning=ExperimentalWarning \
+			--experimental-strip-types \
+			--import "${zx_init_path}" \
+			"$target_ts" "$@"
+	fi
 }
 
 run_ts() {

@@ -112,9 +112,11 @@ function fixtureSession(
 async function withCwd<T>(dir: string, run: () => Promise<T>) {
   const cwd = process.cwd();
   const oldWorkspaceRoot = process.env.WORKSPACE_ROOT;
+  const oldDevshellRoot = process.env._VIBEROOTS_DEVSHELL_ROOT;
   const oldLiveRoot = process.env.LIVE_ROOT;
   process.chdir(dir);
   process.env.WORKSPACE_ROOT = dir;
+  process.env._VIBEROOTS_DEVSHELL_ROOT = dir;
   process.env.LIVE_ROOT = dir;
   try {
     return await run();
@@ -122,6 +124,8 @@ async function withCwd<T>(dir: string, run: () => Promise<T>) {
     process.chdir(cwd);
     if (oldWorkspaceRoot === undefined) delete process.env.WORKSPACE_ROOT;
     else process.env.WORKSPACE_ROOT = oldWorkspaceRoot;
+    if (oldDevshellRoot === undefined) delete process.env._VIBEROOTS_DEVSHELL_ROOT;
+    else process.env._VIBEROOTS_DEVSHELL_ROOT = oldDevshellRoot;
     if (oldLiveRoot === undefined) delete process.env.LIVE_ROOT;
     else process.env.LIVE_ROOT = oldLiveRoot;
   }

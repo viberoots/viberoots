@@ -2,15 +2,19 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { $ } from "zx";
+const $ = globalThis.$;
 import YAML from "yaml";
 import { writeCloudControlSetupBundle } from "../../deployments/cloud-control-setup";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
 import { REQUIRED_AWS_EC2_ALARMS } from "../../deployments/cloud-control-aws-ec2-host-profile";
+import { pinnedNixpkgsOutPathExpr } from "../../lib/pinned-nixpkgs";
 import { IMAGE_REF } from "./cloud-control-cutover-fixture";
 import { ec2HostProfileInput as input } from "./cloud-control-aws-ec2-host-profile.fixture";
+import { viberootsRepoPath } from "./deployment-command";
 import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
+
+const pinnedNixpkgsPathExpr = pinnedNixpkgsOutPathExpr(viberootsRepoPath("flake.lock"));
 
 test("AWS EC2 setup renders realizable units podman script and NixOS module reuse", () => {
   const bundle = renderCloudControlSetupBundle(input());
@@ -61,7 +65,8 @@ test("generated NixOS EC2 wrapper evaluates through the existing container modul
     await writeCloudControlSetupBundle(input({ outDir: tmp }));
     const expr = `
       let
-        system = import <nixpkgs/nixos> {
+        nixpkgsPath = ${pinnedNixpkgsPathExpr};
+        system = import (nixpkgsPath + "/nixos") {
           configuration = {
             nixpkgs.hostPlatform = "x86_64-linux";
             imports = [ ./nixos/aws-ec2-control-plane-host.example.nix ];

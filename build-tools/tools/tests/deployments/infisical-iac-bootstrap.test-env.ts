@@ -10,16 +10,20 @@ export async function withTempWorkspace<T>(
   const old = {
     config: process.env.SPRINKLEREF_CONFIG,
     workspaceRoot: process.env.WORKSPACE_ROOT,
+    devshellRoot: process.env._VIBEROOTS_DEVSHELL_ROOT,
     liveRoot: process.env.LIVE_ROOT,
     viberootsRoot: process.env.VIBEROOTS_ROOT,
     viberootsSourceRoot: process.env.VIBEROOTS_SOURCE_ROOT,
+    viberootsFlakeInputRoot: process.env.VIBEROOTS_FLAKE_INPUT_ROOT,
   };
   process.chdir(dir);
   process.env.WORKSPACE_ROOT = dir;
+  process.env._VIBEROOTS_DEVSHELL_ROOT = dir;
   process.env.LIVE_ROOT = dir;
   const sourceRoot = resolveSourceRoot(cwd);
   process.env.VIBEROOTS_ROOT = sourceRoot;
   process.env.VIBEROOTS_SOURCE_ROOT = sourceRoot;
+  process.env.VIBEROOTS_FLAKE_INPUT_ROOT = sourceRoot;
   if (opts.clearConfig) delete process.env.SPRINKLEREF_CONFIG;
   if (opts.configPath) process.env.SPRINKLEREF_CONFIG = opts.configPath;
   try {
@@ -28,9 +32,11 @@ export async function withTempWorkspace<T>(
     process.chdir(cwd);
     restoreEnv("SPRINKLEREF_CONFIG", old.config);
     restoreEnv("WORKSPACE_ROOT", old.workspaceRoot);
+    restoreEnv("_VIBEROOTS_DEVSHELL_ROOT", old.devshellRoot);
     restoreEnv("LIVE_ROOT", old.liveRoot);
     restoreEnv("VIBEROOTS_ROOT", old.viberootsRoot);
     restoreEnv("VIBEROOTS_SOURCE_ROOT", old.viberootsSourceRoot);
+    restoreEnv("VIBEROOTS_FLAKE_INPUT_ROOT", old.viberootsFlakeInputRoot);
   }
 }
 

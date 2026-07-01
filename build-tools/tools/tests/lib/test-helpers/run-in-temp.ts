@@ -116,6 +116,7 @@ async function exportDevEnvWithRetry($: any): Promise<string> {
         IN_NIX_SHELL: "1",
         VIBEROOTS_ROOT: devEnvRoot,
         VIBEROOTS_SOURCE_ROOT: devEnvRoot,
+        VIBEROOTS_FLAKE_INPUT_ROOT: devEnvRoot,
       }),
     })`nix develop --no-write-lock-file --accept-flake-config -c env -0`;
     if (Number(nixOut.exitCode || 0) !== 127) return nixOut;
@@ -129,6 +130,7 @@ async function exportDevEnvWithRetry($: any): Promise<string> {
         IN_NIX_SHELL: "1",
         VIBEROOTS_ROOT: devEnvRoot,
         VIBEROOTS_SOURCE_ROOT: devEnvRoot,
+        VIBEROOTS_FLAKE_INPUT_ROOT: devEnvRoot,
       }),
     })`bash --noprofile --norc -c 'if command -v direnv >/dev/null 2>&1; then eval "$(direnv export bash)"; env -0; else printf ""; fi'`;
   };
@@ -281,15 +283,16 @@ async function activeViberootsRootFromWorkspace(): Promise<string> {
     "../../../../..",
   );
   const candidates = [
-    moduleRoot,
-    path.join(repoRoot, "viberoots"),
-    path.join(repoRoot, ".viberoots", "current"),
     process.env.VIBEROOTS_SOURCE_ROOT || "",
     process.env.VIBEROOTS_ROOT || "",
+    path.join(repoRoot, "viberoots"),
+    path.join(repoRoot, ".viberoots", "current"),
+    moduleRoot,
     repoRoot,
   ].filter(Boolean);
   for (const candidate of candidates) {
     const root = path.resolve(candidate);
+    if (isGeneratedFilteredViberootsInputPath(root)) continue;
     const consumerViberoots = path.join(root, "viberoots");
     if (
       (await pathExists(path.join(consumerViberoots, "flake.nix"))) &&
@@ -305,6 +308,16 @@ async function activeViberootsRootFromWorkspace(): Promise<string> {
     }
   }
   return repoRoot;
+}
+
+function isGeneratedFilteredViberootsInputPath(value: string): boolean {
+  const normalized = String(value || "")
+    .split(path.sep)
+    .join("/");
+  return (
+    normalized.endsWith("/.viberoots/workspace/viberoots-flake-input") ||
+    normalized.includes("/.viberoots/workspace/viberoots-flake-input/")
+  );
 }
 
 function relFromTempRoot(tmp: string, absPath: string): string {
@@ -427,7 +440,7 @@ function rewriteLocalPathLockEntry(
         : "";
   if (!rawPath) return false;
   const base = path.basename(rawPath);
-  if (base !== "viberoots") return false;
+  if (base !== "viberoots" && !isGeneratedFilteredViberootsInputPath(rawPath)) return false;
   const mutableNode = node as {
     lastModified?: number;
     lastModifiedDate?: string;

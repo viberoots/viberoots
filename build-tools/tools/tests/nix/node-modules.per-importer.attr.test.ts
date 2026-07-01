@@ -146,9 +146,9 @@ async function recursiveImporterFileCandidates(
 
 function localViberootsOverrideArgs(): string {
   const viberootsRoot =
-    process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
     process.env.VIBEROOTS_SOURCE_ROOT ||
     process.env.VIBEROOTS_ROOT ||
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
     "";
   return viberootsRoot
     ? ` --override-input viberoots ${JSON.stringify(`path:${viberootsRoot}`)}`

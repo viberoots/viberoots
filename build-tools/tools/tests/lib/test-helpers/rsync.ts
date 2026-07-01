@@ -64,7 +64,7 @@ function repoRsyncExcludeArgs(): string[] {
   excludes.push("/third_party/providers/TARGETS.auto", "/third_party/providers/TARGETS.*.auto");
   // Volatile patch-session temp files may appear/disappear during a test run.
   // These are not part of the repo and should not make temp-repo seeding flaky.
-  excludes.push("/.patch-sessions.json.tmp");
+  excludes.push("/.patch-sessions.json.tmp", ".live-edit-marker", ".source-fingerprint");
   return excludes.map((e) => ["--exclude", e]).flat();
 }
 

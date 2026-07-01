@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { $ } from "zx";
+const $ = globalThis.$;
 import { writeCloudControlSetupBundle } from "../../deployments/cloud-control-setup";
 import YAML from "yaml";
 import { renderCloudControlSetupBundle } from "../../deployments/cloud-control-setup-render";
+import { pinnedNixpkgsOutPathExpr } from "../../lib/pinned-nixpkgs";
 import { ec2HostProfileInput } from "./cloud-control-aws-ec2-host-profile.fixture";
+import { viberootsRepoPath } from "./deployment-command";
 import { runInScratchTemp } from "../lib/test-helpers";
 
 const SSH_FILES = ["reviewed-source-ssh-key", "reviewed-source-known-hosts"] as const;
@@ -13,6 +15,7 @@ const GITHUB_APP_FILES = [
   "reviewed-source-github-app-installation-id",
   "reviewed-source-github-app-private-key",
 ] as const;
+const pinnedNixpkgsPathExpr = pinnedNixpkgsOutPathExpr(viberootsRepoPath("flake.lock"));
 
 test("AWS EC2 NixOS example renders SSH reviewed-source credentials only in SSH mode", () => {
   const bundle = renderCloudControlSetupBundle(instanceProfileInput());
@@ -58,7 +61,8 @@ test("AWS EC2 NixOS wrapper imports from bundle root and configures GitHub App m
     );
     const expr = `
       let
-        system = import <nixpkgs/nixos> {
+        nixpkgsPath = ${pinnedNixpkgsPathExpr};
+        system = import (nixpkgsPath + "/nixos") {
           configuration = {
             nixpkgs.hostPlatform = "x86_64-linux";
             imports = [ ./nixos/aws-ec2-control-plane-host.example.nix ];

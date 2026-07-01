@@ -2,7 +2,6 @@
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { $ } from "zx";
 import type { GraphNode } from "../../lib/graph";
 import {
   cloudflarePagesAdmissionPolicyNodeFixture,
@@ -14,6 +13,8 @@ import {
   s3StaticLanePolicyNodeFixture,
 } from "./s3-static.fixture";
 import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-governance.fixture";
+
+const $ = globalThis.$;
 
 export function appNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return { name: "//projects/apps/pleomino:app", labels: ["kind:app", "webapp:pwa"], ...overrides };

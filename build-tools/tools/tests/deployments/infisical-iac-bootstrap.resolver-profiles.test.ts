@@ -198,14 +198,7 @@ const sharedConfigPath = () => path.join(projectConfigDir(), "shared.json");
 
 async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
   const cwd = process.cwd();
-  const oldConfig = process.env.SPRINKLEREF_CONFIG;
-  const oldProjectId = process.env.VBR_INFISICAL_PROJECT_ID;
-  const oldToken = process.env.INFISICAL_ACCESS_TOKEN;
-  const oldVaultAddr = process.env.VBR_VAULT_ADDR;
-  const oldVaultToken = process.env.VBR_VAULT_TOKEN;
-  const oldRuntimeHost = process.env.VBR_RUNTIME_HOST;
-  const oldWorkspaceRoot = process.env.WORKSPACE_ROOT;
-  const oldLiveRoot = process.env.LIVE_ROOT;
+  const oldEnv = { ...process.env };
   const oldFetch = globalThis.fetch;
   delete process.env.SPRINKLEREF_CONFIG;
   process.env.VBR_RUNTIME_HOST = "local-file";
@@ -214,6 +207,7 @@ async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
   process.env.VBR_VAULT_ADDR = "https://vault.test";
   process.env.VBR_VAULT_TOKEN = "vault-token";
   process.env.WORKSPACE_ROOT = dir;
+  process.env._VIBEROOTS_DEVSHELL_ROOT = dir;
   process.env.LIVE_ROOT = dir;
   globalThis.fetch = fakeRepoBootstrapFetch as typeof fetch;
   process.chdir(dir);
@@ -221,22 +215,7 @@ async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
     await run();
   } finally {
     process.chdir(cwd);
-    if (oldConfig === undefined) delete process.env.SPRINKLEREF_CONFIG;
-    else process.env.SPRINKLEREF_CONFIG = oldConfig;
-    if (oldProjectId === undefined) delete process.env.VBR_INFISICAL_PROJECT_ID;
-    else process.env.VBR_INFISICAL_PROJECT_ID = oldProjectId;
-    if (oldToken === undefined) delete process.env.INFISICAL_ACCESS_TOKEN;
-    else process.env.INFISICAL_ACCESS_TOKEN = oldToken;
-    if (oldVaultAddr === undefined) delete process.env.VBR_VAULT_ADDR;
-    else process.env.VBR_VAULT_ADDR = oldVaultAddr;
-    if (oldVaultToken === undefined) delete process.env.VBR_VAULT_TOKEN;
-    else process.env.VBR_VAULT_TOKEN = oldVaultToken;
-    if (oldRuntimeHost === undefined) delete process.env.VBR_RUNTIME_HOST;
-    else process.env.VBR_RUNTIME_HOST = oldRuntimeHost;
-    if (oldWorkspaceRoot === undefined) delete process.env.WORKSPACE_ROOT;
-    else process.env.WORKSPACE_ROOT = oldWorkspaceRoot;
-    if (oldLiveRoot === undefined) delete process.env.LIVE_ROOT;
-    else process.env.LIVE_ROOT = oldLiveRoot;
+    process.env = oldEnv;
     globalThis.fetch = oldFetch;
   }
 }

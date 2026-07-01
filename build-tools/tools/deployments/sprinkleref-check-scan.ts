@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { $ } from "zx";
+const $ = globalThis.$;
 import type { SprinkleRefLocation, SprinkleRefScheme } from "./sprinkleref-check-types";
 
 const REF_RE = /\b(secret|config|runtime):\/\/[A-Za-z0-9._~:/?#[\]@!$&'()*+,;=%-]+/g;

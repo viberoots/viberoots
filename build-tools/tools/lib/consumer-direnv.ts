@@ -127,30 +127,69 @@ __vbr_stage0_apply_nix_cache_health() {
   echo "[env] nix cache health: using optional substituter(s): \${optional_kept_joined:-<none>}" 1>&2
 }
 
+__vbr_stage0_filtered_viberoots_input() {
+  local src="\${1:-}"
+  [[ -n "\${src}" && -f "\${src}/flake.nix" ]] || return 1
+  local src_real
+  src_real="$(cd "\${src}" && pwd -P 2>/dev/null || true)"
+  [[ -n "\${src_real}" ]] || return 1
+  local local_real=""
+  [[ -d "\${PWD}/viberoots" ]] && local_real="$(cd "\${PWD}/viberoots" && pwd -P 2>/dev/null || true)"
+  [[ -n "\${local_real}" && "\${src_real}" == "\${local_real}" ]] || return 1
+  command -v rsync >/dev/null 2>&1 || return 1
+
+  local dst="\${PWD}/.viberoots/workspace/viberoots-flake-input"
+  mkdir -p "\${dst}" || return 1
+  : > "\${PWD}/.viberoots/workspace/.metadata_never_index" 2>/dev/null || true
+  : > "\${dst}/.metadata_never_index" 2>/dev/null || true
+  rsync -a --delete \\
+    --exclude /.git --exclude /node_modules --exclude /buck-out --exclude /.viberoots \\
+    --exclude /.direnv --exclude /.pnpm-store --exclude /.pnpm-home --exclude /coverage \\
+    --exclude /.clinic --exclude /.turbo --exclude /.cache --exclude /dist --exclude /build \\
+    --exclude /.vite --exclude /.next --exclude /.wasm-producer \\
+    --exclude '.node_modules.lockfile-guard.*' --exclude '.*.tmp' \\
+    --exclude '.*.ts.??????' --exclude '.*.tsx.??????' \\
+    --exclude '.*.js.??????' --exclude '.*.mjs.??????' \\
+    --exclude result --exclude 'result-*' \\
+    "\${src_real}/" "\${dst}/" >/dev/null 2>&1 || return 1
+  [[ -f "\${dst}/flake.nix" ]] || return 1; : > "\${dst}/.source-fingerprint" 2>/dev/null || true
+  printf '%s\\n' "\${dst}"
+}
+
 __vbr_flake_args=()
 __vbr_flake_input_root="\${VIBEROOTS_FLAKE_INPUT_ROOT:-}"
+if [[ -n "\${__vbr_flake_input_root}" && -d "\${PWD}/viberoots" ]]; then
+  __vbr_input_real="$(cd "\${__vbr_flake_input_root}" && pwd -P 2>/dev/null || true)"
+  __vbr_filtered_real="$(cd "\${PWD}/.viberoots/workspace/viberoots-flake-input" 2>/dev/null && pwd -P || true)"
+  [[ -n "\${__vbr_filtered_real}" && "\${__vbr_input_real}" == "\${__vbr_filtered_real}" ]] && __vbr_flake_input_root="\${PWD}/viberoots"
+fi
+unset __vbr_input_real __vbr_filtered_real
 if [[ -z "\${__vbr_flake_input_root}" || ! -f "\${__vbr_flake_input_root}/flake.nix" ]]; then
   __vbr_flake_input_root="\${VIBEROOTS_SOURCE_ROOT:-}"
 fi
 if [[ -z "\${__vbr_flake_input_root}" || ! -f "\${__vbr_flake_input_root}/flake.nix" ]]; then
-  __vbr_current_real=""
-  __vbr_local_real=""
-  if [[ -e "\${PWD}/.viberoots/current" ]]; then
-    __vbr_current_real="$(cd "\${PWD}/.viberoots/current" && pwd -P 2>/dev/null || true)"
-  fi
-  if [[ -d "\${PWD}/viberoots" ]]; then
-    __vbr_local_real="$(cd "\${PWD}/viberoots" && pwd -P 2>/dev/null || true)"
-  fi
-  if [[ -n "\${__vbr_local_real}" && "\${__vbr_current_real}" == "\${__vbr_local_real}" ]]; then
+  __vbr_current_real=""; __vbr_local_real=""; __vbr_filtered_real=""
+  [[ -e "\${PWD}/.viberoots/current" ]] && __vbr_current_real="$(cd "\${PWD}/.viberoots/current" && pwd -P 2>/dev/null || true)"
+  [[ -d "\${PWD}/viberoots" ]] && __vbr_local_real="$(cd "\${PWD}/viberoots" && pwd -P 2>/dev/null || true)"
+  [[ -d "\${PWD}/.viberoots/workspace/viberoots-flake-input" ]] && __vbr_filtered_real="$(cd "\${PWD}/.viberoots/workspace/viberoots-flake-input" && pwd -P 2>/dev/null || true)"
+  if [[ -n "\${__vbr_local_real}" && ( "\${__vbr_current_real}" == "\${__vbr_local_real}" || "\${__vbr_current_real}" == "\${__vbr_filtered_real}" ) ]]; then
     __vbr_flake_input_root="\${PWD}/viberoots"
   fi
-  unset __vbr_current_real
-  unset __vbr_local_real
+  unset __vbr_current_real __vbr_local_real __vbr_filtered_real
 fi
 if [[ -f "\${__vbr_flake_input_root}/flake.nix" ]]; then
+  __vbr_source_root="\${__vbr_flake_input_root}"
+  __vbr_filtered_flake_input_root="$(__vbr_stage0_filtered_viberoots_input "\${__vbr_flake_input_root}" || true)"
+  if [[ -n "\${__vbr_filtered_flake_input_root}" && -f "\${__vbr_filtered_flake_input_root}/flake.nix" ]]; then
+    __vbr_flake_input_root="\${__vbr_filtered_flake_input_root}"
+  fi
+  unset __vbr_filtered_flake_input_root
+  export VIBEROOTS_SOURCE_ROOT="\${__vbr_source_root}"
   export VIBEROOTS_FLAKE_INPUT_ROOT="\${__vbr_flake_input_root}"
   __vbr_flake_args=(--override-input viberoots "path:\${__vbr_flake_input_root}")
+  [[ "\${__vbr_source_root}" == "\${PWD}/viberoots" && ( -L "\${PWD}/.viberoots/current" || ! -e "\${PWD}/.viberoots/current" ) ]] && ln -sfn ../viberoots "\${PWD}/.viberoots/current"
 else
+  unset VIBEROOTS_SOURCE_ROOT
   unset VIBEROOTS_FLAKE_INPUT_ROOT
 fi
 
@@ -192,14 +231,20 @@ fi
 
 watch_file .viberoots/workspace/flake.nix
 watch_file .viberoots/workspace/flake.lock
-if [[ -f viberoots/flake.nix ]]; then
-  watch_file viberoots/flake.nix
-fi
+[[ -f viberoots/flake.nix ]] && watch_file viberoots/flake.nix
 
 use flake "path:\${PWD}/.viberoots/workspace#default" --accept-flake-config "\${__vbr_flake_args[@]}"
-unset __vbr_flake_input_root
-unset __vbr_flake_args
-unset -f __vbr_stage0_strip_nix_cache_overrides
-unset -f __vbr_stage0_apply_nix_cache_health
+if [[ -n "\${__vbr_source_root:-}" && -d "\${PWD}/viberoots" ]]; then
+  __vbr_source_real="$(cd "\${__vbr_source_root}" && pwd -P 2>/dev/null || true)"
+  __vbr_local_real="$(cd "\${PWD}/viberoots" && pwd -P 2>/dev/null || true)"
+  if [[ -n "\${__vbr_source_real}" && "\${__vbr_source_real}" == "\${__vbr_local_real}" ]]; then
+    [[ -L "\${PWD}/.viberoots/current" || ! -e "\${PWD}/.viberoots/current" ]] && ln -sfn ../viberoots "\${PWD}/.viberoots/current"
+    export VIBEROOTS_ROOT="\${__vbr_source_root}"
+    export VIBEROOTS_SOURCE_ROOT="\${__vbr_source_root}"
+  fi
+  unset __vbr_source_real __vbr_local_real
+fi
+unset __vbr_flake_input_root __vbr_source_root __vbr_flake_args
+unset -f __vbr_stage0_strip_nix_cache_overrides __vbr_stage0_apply_nix_cache_health __vbr_stage0_filtered_viberoots_input
 `;
 }

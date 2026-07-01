@@ -4,7 +4,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { $ } from "zx";
+const $ = globalThis.$;
 import { runSprinkleRefCheck } from "../../deployments/sprinkleref-check";
 import { scanRepositoryRefs } from "../../deployments/sprinkleref-check-scan";
 

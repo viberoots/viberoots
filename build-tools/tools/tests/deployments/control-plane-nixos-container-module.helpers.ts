@@ -1,7 +1,9 @@
 #!/usr/bin/env zx-wrapper
+import { pinnedNixpkgsOutPathExpr } from "../../lib/pinned-nixpkgs";
 import { viberootsRepoPath } from "./deployment-command";
 
 export type EvalOut = Record<string, unknown>;
+const pinnedNixpkgsPathExpr = pinnedNixpkgsOutPathExpr(viberootsRepoPath("flake.lock"));
 
 const credentialConfig = `
   credentials = {
@@ -43,8 +45,9 @@ export async function evalModule(
   ];
   const expr = `
     let
-      lib = import <nixpkgs/lib>;
-      system = import <nixpkgs/nixos> {
+      nixpkgsPath = ${pinnedNixpkgsPathExpr};
+      lib = import (nixpkgsPath + "/lib");
+      system = import (nixpkgsPath + "/nixos") {
         configuration = {
           nixpkgs.hostPlatform = "x86_64-linux";
           imports = [ ${imports.join(" ")} ];

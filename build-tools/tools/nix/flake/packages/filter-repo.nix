@@ -12,7 +12,9 @@ let
   s = builtins.toString p;
   isRootDir = d: (s == (root + "/" + d)) || (lib.hasPrefix (root + "/" + d + "/") s);
   isRootFile = f: s == (root + "/" + f);
-  isAnyDir = d: lib.hasInfix ("/" + d + "/") s || lib.hasSuffix ("/" + d) s;
+  isGeneratedTree = d:
+    (_type == "directory" || _type == "symlink")
+    && (lib.hasInfix ("/" + d + "/") s || lib.hasSuffix ("/" + d) s);
 in
 !(
   isRootDir "coverage" ||
@@ -27,12 +29,12 @@ in
   isRootDir ".direnv" ||
   isRootDir ".git" ||
   isRootFile ".envrc" ||
-  isAnyDir "node_modules" ||
-  isAnyDir ".pnpm" ||
-  isAnyDir ".pnpm-store" ||
-  isAnyDir "dist" ||
-  isAnyDir "build" ||
-  isAnyDir ".vite" ||
-  isAnyDir ".next" ||
-  isAnyDir ".wasm-producer"
+  isGeneratedTree "node_modules" ||
+  isGeneratedTree ".pnpm" ||
+  isGeneratedTree ".pnpm-store" ||
+  isGeneratedTree "dist" ||
+  isGeneratedTree "build" ||
+  isGeneratedTree ".vite" ||
+  isGeneratedTree ".next" ||
+  isGeneratedTree ".wasm-producer"
 )

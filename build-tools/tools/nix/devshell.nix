@@ -243,10 +243,18 @@ EOF
           }
         else
           vbr_flake_input_root="''${VIBEROOTS_FLAKE_INPUT_ROOT:-}"
+          vbr_filtered_input="$PWD/.viberoots/workspace/viberoots-flake-input"
           if [ -n "$vbr_flake_input_root" ] && [ -f "$vbr_flake_input_root/flake.nix" ]; then
-            export VIBEROOTS_ROOT="$vbr_flake_input_root"
-            export VIBEROOTS_SOURCE_ROOT="$vbr_flake_input_root"
-            viberoots init-workspace --shell-entry --source "$vbr_flake_input_root" >/dev/null || {
+            vbr_source_root="''${VIBEROOTS_SOURCE_ROOT:-$vbr_flake_input_root}"
+            if [ -d "$PWD/viberoots" ] && [ -d "$vbr_filtered_input" ] && [ "$(cd "$vbr_source_root" 2>/dev/null && pwd -P || true)" = "$(cd "$vbr_filtered_input" 2>/dev/null && pwd -P || true)" ]; then
+              vbr_source_root="$PWD/viberoots"
+            fi
+            if [ ! -f "$vbr_source_root/flake.nix" ]; then
+              vbr_source_root="$vbr_flake_input_root"
+            fi
+            export VIBEROOTS_ROOT="$vbr_source_root"
+            export VIBEROOTS_SOURCE_ROOT="$vbr_source_root"
+            viberoots init-workspace --shell-entry --source "$vbr_source_root" >/dev/null || {
               echo "(devShell) viberoots workspace activation failed" >&2
               return 1 2>/dev/null || exit 1
             }
@@ -268,9 +276,14 @@ EOF
           fi
           if [ -d "$PWD/.viberoots/current" ]; then
             vbr_source="$(cd "$PWD/.viberoots/current" && pwd -P)"
+            if [ -d "$PWD/viberoots" ] && [ -d "$vbr_filtered_input" ] && [ "$vbr_source" = "$(cd "$vbr_filtered_input" 2>/dev/null && pwd -P || true)" ]; then
+              ln -sfn ../viberoots "$PWD/.viberoots/current"
+              vbr_source="$(cd "$PWD/.viberoots/current" && pwd -P)"
+            fi
             export VIBEROOTS_ROOT="$vbr_source"
             export VIBEROOTS_SOURCE_ROOT="$vbr_source"
           fi
+          unset vbr_filtered_input
         fi
       fi
       _vbr_prepare_tool_helpers

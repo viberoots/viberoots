@@ -32,6 +32,21 @@ remote execution systems with custom implementations.
 - [`docs/control-plane-managed-dependencies.md`](control-plane-managed-dependencies.md)
 - [`docs/viberoots-source-modes.md`](viberoots-source-modes.md)
 - [`docs/viberoots-maintenance-commands.md`](viberoots-maintenance-commands.md)
+- [`../build-tools/docs/nixpkgs-source-selection-plan.md`](../build-tools/docs/nixpkgs-source-selection-plan.md)
+
+## Sequencing Note
+
+Implementation is intentionally paused after PR-3 while
+[`../build-tools/docs/nixpkgs-source-selection-plan.md`](../build-tools/docs/nixpkgs-source-selection-plan.md)
+is implemented. When this plan resumes at PR-4A, assume target-scoped nixpkgs source selection,
+package pins, filtered/remote/cache source-plan evidence, and consumer workspace parity are already
+available.
+
+PR-4A and later PRs should consume the source-selection fields and source-plan evidence produced by
+the build-system work. They should not introduce a second nixpkgs registry, duplicate source-plan
+resolver, package compatibility database, tool/library classifier, or alternate remote/cache
+manifest shape. Resource graph status may expose secret-safe profile and pin evidence, but it should
+link to or copy only the normalized evidence needed for operator diagnosis and artifact replay.
 
 ## Implementation Guardrails
 
@@ -45,6 +60,10 @@ remote execution systems with custom implementations.
 - Keep Buck as the reviewed intent graph compiler for repo-owned resources.
 - Keep Nix as the source of user-facing tools, build reproducibility, dev shells, toolchains, OCI
   image construction, and artifact environments.
+- When indexing or displaying build-system source facts after the nixpkgs source-selection work has
+  landed, reuse its graph fields, source-plan evidence, source snapshot data, and cache-manifest
+  conventions. Do not infer nixpkgs source identity from labels, raw flake inputs, or derivation
+  paths.
 - Keep durable cloud mutation reviewed, evidence-backed, and provider appropriate. Repository
   commands may orchestrate plan/apply and evidence collection, but must not become an unreviewed
   imperative provisioning engine.
@@ -621,6 +640,11 @@ without replacing deployment-specific mutation tables.
 - Index extracted intent envelopes enough to list resource graph nodes and basic edges. PR-4A may
   create placeholder schema for runtime envelopes, but it must not ingest or expose runtime facts
   beyond an explicit unindexed/pre-read-model marker.
+- Index secret-safe build source-selection metadata present on extracted intent envelopes or
+  exported graph facts, including `nixpkgs_profile`, normalized `nixpkg_pins` profile names, and a
+  durable source-plan or manifest reference when the build-system export provides one. PR-4A should
+  record profile names and normalized attr/profile links, not raw nixpkgs commits, raw flake URLs, or
+  package compatibility interpretations.
 - Expose minimum read-only API or CLI status surfaces for listing extracted intent graph nodes and
   basic edges.
 - Extend the existing read pipeline rather than adding a parallel graph status path. Minimum status
@@ -652,6 +676,9 @@ without replacing deployment-specific mutation tables.
 ### 3. External prerequisites
 
 - PR-3 resource graph export should be available.
+- The nixpkgs source-selection plan should be implemented through the remote/cache and consumer
+  workspace parity work, so PR-4A can index the final source-selection graph fields and source-plan
+  evidence rather than an interim shape.
 
 ### 4. Tests to be added
 
@@ -669,6 +696,9 @@ without replacing deployment-specific mutation tables.
   service-token/browser-session auth-context behavior, redaction, and durable audit rows.
 - Tests proving runtime records are either absent from PR-4A status or explicitly marked
   unindexed/pre-read-model until PR-4B ingests them.
+- Source-selection fixture tests proving extracted intent with a non-default `nixpkgs_profile` and a
+  normalized `nixpkg_pins` map indexes profile names, attr/profile links, and source-plan refs
+  without exposing raw commits or treating pins as compatibility policy.
 - Secret-safety tests for minimum status output.
 - Regression tests proving deployment submission, idempotency, queueing, locking, and stage-state
   mutation still use deployment-specific invariants.
@@ -689,6 +719,8 @@ without replacing deployment-specific mutation tables.
 - Operators can list extracted-intent deployments, policies, provider targets, components,
   deployment target exceptions, and artifacts as resource graph nodes.
 - Operators can see basic graph edges without using a generic mutation path.
+- Operators can see secret-safe source-selection evidence for extracted intent when the build graph
+  supplies it.
 - Read-model output is secret-safe.
 - Deployment-specific mutation invariants remain authoritative.
 
@@ -724,6 +756,11 @@ authoritative.
 - Link deployments, provider targets, policies, artifacts, execution snapshots, deploy runs, current
   stage state, run actions, retained render evidence, retained artifact evidence, and stage history
   through stable resource IDs.
+- Link execution snapshots, retained artifact evidence, source snapshots, and cache-manifest records
+  to the source-plan evidence produced by the build system when that evidence is available. The read
+  model should preserve the selected target's `nixpkgs_profile`, normalized pin attr/profile links,
+  and source-plan reference needed to explain exact-artifact replay, without copying raw nixpkgs
+  commits into default status output.
 - Link deployment target exceptions to affected deployments, provider target changes, shared lock
   scopes, approval evidence, and status output while preserving their fail-closed validation
   behavior.
@@ -819,6 +856,10 @@ authoritative.
   allowing ambient or explicit overrides to hide deployment-context-selected authority.
 - Status tests proving selected control-plane name and token ref are optional by source and that raw
   token material is never backfilled into graph status.
+- Status tests proving build source-plan evidence from execution snapshots, retained artifact
+  evidence, source snapshots, and cache manifests links to the expected resource IDs, preserves
+  `nixpkgs_profile` and normalized pin attr/profile links, and does not expose raw nixpkgs commits
+  by default.
 - Status tests for `--remote <name>` profile selection, including successful resolution and
   fail-closed missing, invalid, or context-selected override profile cases.
 - Status tests for local service-client profile evidence, including explicit profile, profile-root,
@@ -893,6 +934,8 @@ authoritative.
   deployment-context selection, selected control planes, and stage state.
 - Operators can see the selected control-plane source and retained evidence references needed to
   explain the current stage without exposing raw credentials or secret-bearing payloads.
+- Operators can trace build source-plan evidence from extracted intent through retained artifact or
+  execution evidence where the build-system source-selection manifest is available.
 - Read-model output is secret-safe.
 - Deployment-specific mutation invariants remain authoritative.
 
@@ -934,6 +977,9 @@ keeping provider-specific capabilities explicit.
   - rollback or recovery evidence where available
 - Include retained render evidence and retained artifact evidence from current stage state when
   those facts are available and secret-safe.
+- Preserve links from provider evidence to build source-plan evidence only where provider status is
+  already explaining a built artifact or execution snapshot. Provider normalization must not infer
+  nixpkgs compatibility, drift, or support semantics from `nixpkgs_profile` or `nixpkg_pins`.
 - Normalize retained render evidence only for the current initial kinds `replay_snapshot`,
   `provider_config`, `provisioner_plan`, and `execution_snapshot`, and retained artifact evidence
   only for `identity`, `storedArtifactPath`, and `provenancePath`, until a later PR extends the
@@ -959,6 +1005,8 @@ keeping provider-specific capabilities explicit.
   relevant evidence field or explicitly marked unsupported/deferred with fail-closed behavior.
 - Evidence normalization tests for retained render evidence and retained artifact evidence that
   distinguish stable evidence references from raw secret-bearing payloads.
+- Evidence tests proving provider status may link to source-plan evidence for built artifacts but
+  does not classify source-selection choices as provider compatibility facts.
 - Negative tests proving unsupported drift, preview, partial publish, smoke, or rollback semantics
   fail closed rather than being emulated.
 - Read-model tests proving provider evidence links to the expected resource IDs.
@@ -1025,6 +1073,10 @@ the reviewed IaC boundary.
 - Ensure OpenTofu remains a provisioner and evidence system for durable cloud infrastructure, not
   the sole source of resource intent.
 - Ensure all OpenTofu tooling remains Nix-provided.
+- Preserve source-plan evidence for Nix-provided OpenTofu tooling and provisioner artifacts when
+  the build-system source-selection manifests expose it. Provisioner status should report the
+  selected profile or pin evidence needed for replay diagnostics, not raw nixpkgs commits or a
+  provisioner-specific source-selection model.
 - Preserve reviewed plan/apply/evidence workflows.
 
 ### 3. External prerequisites
@@ -1041,6 +1093,8 @@ the reviewed IaC boundary.
   without adding first-class policy resource refs before PR-7.
 - Replay compatibility tests for provisioner evidence.
 - Tests proving Nix provides OpenTofu tooling for these paths.
+- Tests proving OpenTofu tooling and provisioner artifact evidence can link to build-system
+  source-plan evidence without duplicating the nixpkgs source-selection registry or resolver.
 - Negative tests proving provisioner resources do not store raw secrets and do not duplicate
   provider-owned live state.
 
@@ -1301,6 +1355,8 @@ reconciler authoritative.
   - reviewed Buck intent
   - deployment context resolution and selected control-plane profile
   - redacted local override evidence and source-mode-stable intent identity
+  - target source-selection evidence, including `nixpkgs_profile`, normalized `nixpkg_pins`
+    attr/profile links, and source-plan or cache-manifest references when present
   - extracted resource graph
   - artifact challenge outcome, static-webapp upload-session provenance, and artifact binding
   - admitted immutable execution snapshot
@@ -1336,6 +1392,9 @@ reconciler authoritative.
 ### 3. External prerequisites
 
 - PR-1 through PR-8 should be complete, including both PR-4A and PR-4B.
+- The nixpkgs source-selection implementation plan should be complete enough that local selected
+  builds, filtered selected builds, remote source snapshots, cache manifests, and generated consumer
+  workspace flakes produce equivalent source-plan evidence for the representative path.
 
 ### 4. Tests to be added
 
@@ -1401,6 +1460,10 @@ reconciler authoritative.
 - End-to-end assertions proving redacted `projects/config/local.json` override evidence appears in
   graph status, `VBR_DISALLOW_LOCAL_OVERRIDES=1` rejects local override usage, and repo-owned intent
   UIDs and status links stay stable across supported source modes.
+- End-to-end assertions proving the representative path can expose source-selection evidence from
+  local selected builds, filtered selected builds, remote source snapshots, cache manifests, and
+  generated consumer workspace flakes without changing resource identity, copying raw nixpkgs
+  commits into default status, or treating package pins as compatibility policy.
 - End-to-end regeneration assertions proving regenerable `.viberoots/workspace` graph output can be
   cleaned and rebuilt through `workspace-state-paths` logical paths without changing durable
   control-plane graph/status identity, repo-owned intent UIDs, or status links. The assertion must
@@ -1435,6 +1498,8 @@ reconciler authoritative.
 - The primary protected/shared Cloudflare Pages deployment path, or an equal-coverage replacement
   recorded by an earlier PR, can be traced from Buck intent through admitted runtime graph, provider
   evidence, worker evidence, run-action history, stage state, and audit.
+- The same path can explain the build-system source plan used for artifacts without adding a second
+  nixpkgs source-selection model to the resource graph.
 - The provisioner-inclusive OpenTofu fixture can be traced through provisioner identity, retained
   provisioner evidence, current stage/status links, and first-class policy resource ID/version
   bindings.

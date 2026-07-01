@@ -93,6 +93,25 @@ test("zx-init resolves repo node_modules when the child cwd is outside the repo"
   }
 });
 
+test("zx-init resolves packages from ZX_TEST_NODE_MODULES_OUT", async () => {
+  const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "zx-init-node-modules-out-"));
+  try {
+    const root = path.join(dir, "out", "node_modules", "fixture-pkg");
+    await fsp.mkdir(root, { recursive: true });
+    await fsp.writeFile(path.join(root, "package.json"), '{"type":"module"}\n', "utf8");
+    await fsp.writeFile(path.join(root, "index.js"), "export const value = 42;\n", "utf8");
+    const result = await runNodeScriptWithOutput(
+      "import { value } from 'fixture-pkg'; console.log(value);",
+      { ...process.env, NODE_PATH: "", ZX_TEST_NODE_MODULES_OUT: path.join(dir, "out") },
+      { cwd: dir, eval: true },
+    );
+    assert.equal(result.code, 0, result.stderr);
+    assert.equal(result.stdout.trim(), "42");
+  } finally {
+    await fsp.rm(dir, { recursive: true, force: true });
+  }
+});
+
 test("zx-init registers verify-owned processes only when explicitly opted in", async () => {
   const dir = await fsp.mkdtemp(path.join(os.tmpdir(), "zx-init-verify-registration-"));
   const stateFile = path.join(dir, "state.txt");
@@ -150,14 +169,12 @@ test("zx-init consumes verify-owned process registration opt-in before spawning 
       [
         'import { spawn } from "node:child_process";',
         'import { once } from "node:events";',
-        'import path from "node:path";',
-        "const zxInit = path.join(process.cwd(), 'build-tools', 'tools', 'dev', 'zx-init.mjs');",
+        `const zxInit = ${JSON.stringify(buildToolPath(process.cwd(), "tools/dev/zx-init.mjs"))};`,
         "const child = spawn(process.execPath, ['--experimental-strip-types', '--import', zxInit, '-e', ''], {",
         "  cwd: process.cwd(),",
         "  env: process.env,",
         "  stdio: 'ignore',",
-        "});",
-        "const [code] = await once(child, 'close');",
+        "}); const [code] = await once(child, 'close');",
         "process.exit(typeof code === 'number' ? code : 1);",
         "",
       ].join("\n"),

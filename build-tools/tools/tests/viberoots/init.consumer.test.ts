@@ -49,6 +49,19 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
     stage0,
     /__vbr_flake_args=\(--override-input viberoots "path:\$\{__vbr_flake_input_root\}"\)/,
   );
+  assert.match(stage0, /__vbr_stage0_filtered_viberoots_input\(\)/);
+  assert.match(stage0, /viberoots-flake-input/);
+  assert.match(stage0, /export VIBEROOTS_SOURCE_ROOT="\$\{__vbr_source_root\}"/);
+  assert.match(stage0, /__vbr_current_real.*__vbr_filtered_real/s);
+  assert.match(stage0, /ln -sfn \.\.\/viberoots/);
+  for (const excluded of [
+    "--exclude /.viberoots",
+    "--exclude /node_modules",
+    "--exclude /buck-out",
+    "--exclude /.direnv",
+  ]) {
+    assert.match(stage0, new RegExp(excluded.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
   assert.match(stage0, /__vbr_stage0_apply_nix_cache_health \|\| return 1/);
   assert.match(stage0, /error: viberoots workspace flake is missing\./);
   assert.match(stage0, /run: viberoots bootstrap-check --repair-if-needed/);

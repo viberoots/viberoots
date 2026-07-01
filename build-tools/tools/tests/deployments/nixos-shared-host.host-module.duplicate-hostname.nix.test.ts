@@ -4,9 +4,12 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { pinnedNixpkgsOutPathExpr } from "../../lib/pinned-nixpkgs";
 import { viberootsRepoPath } from "./deployment-command";
 import { createNixosSharedHostPlatformState } from "../../deployments/nixos-shared-host-platform";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
+
+const pinnedNixpkgsPathExpr = pinnedNixpkgsOutPathExpr(viberootsRepoPath("flake.lock"));
 
 test("nixos-shared-host Nix module fails closed on duplicate hostnames", async () => {
   await runInTemp("nixos-shared-host-module-dup-host", async (tmp, $) => {
@@ -37,7 +40,8 @@ test("nixos-shared-host Nix module fails closed on duplicate hostnames", async (
     );
     const expr = `
       let
-        system = import <nixpkgs/nixos> {
+        nixpkgsPath = ${pinnedNixpkgsPathExpr};
+        system = import (nixpkgsPath + "/nixos") {
           configuration = {
             imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/nixos-shared-host-module.nix")} ];
             nixosSharedHost.enable = true;

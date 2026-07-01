@@ -148,8 +148,8 @@ export function createVerifyProgressReporter(opts: {
     if (!force && rendered === lastRendered) return;
     lastRendered = rendered;
     if (isTty) {
-      if (renderedLines > 0) stream.write(`\u001b[${renderedLines}A`);
-      stream.write("\u001b[J");
+      if (renderedLines > 0) stream.write(`\r\u001b[${renderedLines}A`);
+      stream.write("\r\u001b[J");
       stream.write(`${rendered}\n`);
       renderedLines = lines.length;
       return;
@@ -180,7 +180,11 @@ export function createVerifyProgressReporter(opts: {
         const startMs = startedAtByPass.get(passName);
         elapsedByCompletedPass.set(passName, startMs === undefined ? 0 : now() - startMs);
       }
-      states.set(passName, { ...current, ...next });
+      const merged = { ...current, ...next };
+      if (merged.status === "done" && merged.total > 0) {
+        merged.completed = merged.total;
+      }
+      states.set(passName, merged);
       write();
     },
     stop: (stopOpts) => {
@@ -188,8 +192,8 @@ export function createVerifyProgressReporter(opts: {
       timer = null;
       if (!opts.enabled) return;
       if (isTty && stopOpts?.clear !== false && renderedLines > 0) {
-        stream.write(`\u001b[${renderedLines}A`);
-        stream.write("\u001b[J");
+        stream.write(`\r\u001b[${renderedLines}A`);
+        stream.write("\r\u001b[J");
       } else if (isTty && renderedLines > 0) {
         stream.write("\n");
       }

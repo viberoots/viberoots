@@ -95,6 +95,7 @@ export type FindLockfilesOptions = {
 
 const DEFAULT_IGNORES = new Set<string>([
   ".git",
+  ".viberoots",
   "buck-out",
   "node_modules",
   ".pnpm-store",

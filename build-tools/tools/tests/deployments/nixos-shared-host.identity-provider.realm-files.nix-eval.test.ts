@@ -4,7 +4,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { pinnedNixpkgsOutPathExpr } from "../../lib/pinned-nixpkgs";
 import { viberootsRepoPath } from "./deployment-command";
+
+const pinnedNixpkgsPathExpr = pinnedNixpkgsOutPathExpr(viberootsRepoPath("flake.lock"));
 
 test("shared-host identity provider module forwards reviewed realm files to Keycloak", async () => {
   await runInTemp("shared-host-identity-provider-realm-files-eval", async (tmp, $) => {
@@ -12,7 +15,8 @@ test("shared-host identity provider module forwards reviewed realm files to Keyc
     await fsp.writeFile(realmFile, JSON.stringify({ realm: "deployments", enabled: true }));
     const expr = `
       let
-        system = import <nixpkgs/nixos> {
+        nixpkgsPath = ${pinnedNixpkgsPathExpr};
+        system = import (nixpkgsPath + "/nixos") {
           configuration = {
             imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-identity-provider-module.nix")} ];
             system.stateVersion = "24.11";

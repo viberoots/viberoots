@@ -67,10 +67,10 @@ async function resolvePreludePath(
       const flakeRoot = path.dirname(flakePath);
       const viberootsInputRoot = String(
         opts?.viberootsInputRoot ||
-          process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
           opts?.viberootsSourceRoot ||
           process.env.VIBEROOTS_SOURCE_ROOT ||
           process.env.VIBEROOTS_ROOT ||
+          process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
           "",
       ).trim();
       const hasViberootsInputRoot =
@@ -320,7 +320,11 @@ export async function ensureWorkspaceRootEnvFile(
     const viberootsSourceRoot =
       activeViberootsRoot || process.env.VIBEROOTS_SOURCE_ROOT || viberootsRoot;
     const viberootsInputRoot =
-      selectedViberootsInputRoot || process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "";
+      selectedViberootsInputRoot ||
+      process.env.VIBEROOTS_SOURCE_ROOT ||
+      process.env.VIBEROOTS_ROOT ||
+      process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
+      "";
     await fsp.mkdir(path.join(tmp, ".viberoots"), { recursive: true });
     const currentOk = await fsp
       .access(currentZxInit)

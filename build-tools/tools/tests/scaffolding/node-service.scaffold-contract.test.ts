@@ -66,7 +66,12 @@ test(
       await $`git commit -m update-hashes`.nothrow();
       const flakeRef = await workspaceFlakeRef(tmp);
       const exactStore = await prepareExactPnpmStore({ repoRoot: tmp, importer });
-      const viberootsInputRoot = String(process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "").trim();
+      const viberootsInputRoot = String(
+        process.env.VIBEROOTS_SOURCE_ROOT ||
+          process.env.VIBEROOTS_ROOT ||
+          process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
+          "",
+      ).trim();
       const viberootsOverrideArgs = viberootsInputRoot
         ? ` --override-input viberoots ${JSON.stringify(`path:${viberootsInputRoot}`)}`
         : "";

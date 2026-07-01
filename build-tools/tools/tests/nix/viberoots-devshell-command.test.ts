@@ -42,10 +42,8 @@ test("devshell wires viberoots as a Nix-provided PATH command", async () => {
   assert.match(devshell, /export VIBEROOTS_ROOT="\$PWD"/);
   assert.match(devshell, /viberoots init-workspace --shell-entry --source "\$PWD"/);
   assert.match(devshell, /vbr_flake_input_root="''\$\{VIBEROOTS_FLAKE_INPUT_ROOT:-\}"/);
-  assert.match(
-    devshell,
-    /viberoots init-workspace --shell-entry --source "\$vbr_flake_input_root"/,
-  );
+  assert.match(devshell, /vbr_source_root="''\$\{VIBEROOTS_SOURCE_ROOT:-\$vbr_flake_input_root\}"/);
+  assert.match(devshell, /viberoots init-workspace --shell-entry --source "\$vbr_source_root"/);
   assert.match(devshell, /viberoots init-workspace --shell-entry >\/dev\/null/);
   assert.match(devshell, /vbr_source="\$\(cd "\$PWD\/\.viberoots\/current" && pwd -P\)"/);
   assert.match(devshell, /export VIBEROOTS_ROOT="\$vbr_source"/);

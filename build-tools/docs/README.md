@@ -12,6 +12,10 @@ owning package under [`../../projects/`](../../projects/).
 ## Current References
 
 - [`build-system-design.md`](build-system-design.md): main Buck2/Nix architecture reference.
+- [`nixpkgs-source-selection-design.md`](nixpkgs-source-selection-design.md): design for
+  target-scoped nixpkgs profiles and package-level nixpkgs pins.
+- [`nixpkgs-source-selection-plan.md`](nixpkgs-source-selection-plan.md): implementation plan for
+  target-scoped nixpkgs profiles and package-level nixpkgs pins.
 - [`scaffolding.md`](scaffolding.md): scaffolding behavior and supported generators.
 - [`remote-build-setup.md`](remote-build-setup.md): remote-builder, cache, and Buck2 remote
   execution readiness guide.

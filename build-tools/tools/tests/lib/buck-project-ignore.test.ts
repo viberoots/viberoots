@@ -10,6 +10,7 @@ test("buck project ignore policy excludes mutable non-build state", () => {
   assert.equal(ignored.includes(".git"), true);
   assert.equal(ignored.includes(".direnv"), true);
   assert.equal(ignored.includes(".viberoots/buck/tmp"), true);
+  assert.equal(ignored.includes(".viberoots/workspace/viberoots-flake-input"), true);
 });
 
 test("buck project ignore policy migrates existing generated configs", () => {
@@ -26,7 +27,7 @@ ignore = .viberoots/buck,.viberoots/workspace/buck/tmp,.claude/worktrees,.codex/
 name = TARGETS
 
 [project]
-ignore = .git, .direnv, .viberoots/buck, .viberoots/buck/tmp, .viberoots/workspace/buck/tmp, .claude/worktrees, .codex/worktrees
+ignore = .git, .direnv, .viberoots/buck, .viberoots/buck/tmp, .viberoots/workspace/buck/tmp, .viberoots/workspace/viberoots-flake-input, .claude/worktrees, .codex/worktrees
 `,
   );
 });

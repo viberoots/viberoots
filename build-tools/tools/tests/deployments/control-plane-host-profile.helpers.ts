@@ -2,10 +2,12 @@
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { parseControlPlaneRuntimeConfig } from "../../deployments/control-plane-runtime-config";
+import { pinnedNixpkgsOutPathExpr } from "../../lib/pinned-nixpkgs";
 import { REVIEWED_IMAGE_DIGEST } from "./control-plane-nixos-container-module.helpers";
 import { viberootsRepoPath } from "./deployment-command";
 
 const execFileAsync = promisify(execFile);
+const pinnedNixpkgsPathExpr = pinnedNixpkgsOutPathExpr(viberootsRepoPath("flake.lock"));
 
 export type NixosDefaults = Record<string, string | number | boolean>;
 
@@ -29,7 +31,8 @@ export async function loadNixosRenderedConfig(): Promise<
 > {
   const expr = `
     let
-      system = import <nixpkgs/nixos> {
+      nixpkgsPath = ${pinnedNixpkgsPathExpr};
+      system = import (nixpkgsPath + "/nixos") {
         configuration = {
           nixpkgs.hostPlatform = "x86_64-linux";
           imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/deployment-control-plane-container-module.nix")} ];

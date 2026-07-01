@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { pinnedNixpkgsOutPathExpr } from "../../lib/pinned-nixpkgs";
 import { viberootsRepoPath } from "./deployment-command";
+
+const pinnedNixpkgsPathExpr = pinnedNixpkgsOutPathExpr(viberootsRepoPath("flake.lock"));
 
 test("shared-host identity provider module bootstraps generated identity imports", async () => {
   const modulePath = viberootsRepoPath(
@@ -21,7 +24,8 @@ test("shared-host identity provider module bootstraps generated identity imports
   await runInTemp("shared-host-identity-provider-generated-imports-eval", async (tmp, $) => {
     const expr = `
       let
-        system = import <nixpkgs/nixos> {
+        nixpkgsPath = ${pinnedNixpkgsPathExpr};
+        system = import (nixpkgsPath + "/nixos") {
           configuration = {
             imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-identity-provider-module.nix")} ];
             system.stateVersion = "24.11";

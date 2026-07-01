@@ -21,6 +21,40 @@ test("devshell.sh supports safe direnv bypass fast-path", async () => {
     throw new Error("devshell.sh must compute explicit direnv bypass eligibility");
   }
   if (
+    !txt.includes("devshell_inputs_stale") ||
+    !txt.includes("devshell_stale_reload_allowed") ||
+    !txt.includes(".source-fingerprint") ||
+    !txt.includes("re-running this command through direnv exec") ||
+    !txt.includes("VBR_DEVSHELL_STALE_RELOAD_ATTEMPTED=1") ||
+    !txt.includes('exec direnv exec "$live_root" "$@"')
+  ) {
+    throw new Error("devshell.sh fast-path must fall back through direnv for stale shell inputs");
+  }
+  for (const envName of [
+    "BUCK_TEST_TARGET",
+    "BUCK_TEST_SRC",
+    "VBR_VERIFY_LOG_FILE",
+    "VBR_VERIFY_PROCESS_STATE_FILE",
+    "VBR_TEST_SEED_STORE_PATH",
+    "VBR_RUN_IN_TEMP_REPO",
+  ]) {
+    if (!txt.includes(`[[ -z "\${${envName}:-}" ]] || return 1`)) {
+      throw new Error(`devshell.sh stale direnv reload must be disabled when ${envName} is set`);
+    }
+  }
+  const execInDevShell = txt.slice(txt.indexOf("exec_in_dev_shell()"));
+  if (
+    execInDevShell.indexOf("devshell_stale_reload_allowed") >
+    execInDevShell.indexOf("devshell_inputs_stale")
+  ) {
+    throw new Error("devshell.sh must check stale reload eligibility before stale inputs");
+  }
+  if (
+    execInDevShell.indexOf("devshell_inputs_stale") > execInDevShell.indexOf("ensure_buck_prelude")
+  ) {
+    throw new Error("devshell.sh must reload stale shell inputs before materializing prelude");
+  }
+  if (
     !txt.includes("for tool in zx-wrapper nix buck2 pnpm git") ||
     !txt.includes('[[ "${missing}" == "0" && -f "${zx_init_path}" ]]')
   ) {
@@ -51,6 +85,7 @@ test("devshell.sh supports safe direnv bypass fast-path", async () => {
     !txt.includes('local selected_viberoots_input_root="${VIBEROOTS_FLAKE_INPUT_ROOT:-') ||
     !txt.includes('! -f "${selected_viberoots_input_root}/flake.nix"') ||
     !txt.includes('export VIBEROOTS_FLAKE_INPUT_ROOT="${selected_viberoots_input_root}"') ||
+    !txt.includes('VIBEROOTS_SOURCE_ROOT="${active_viberoots_root}"') ||
     !txt.includes('VIBEROOTS_FLAKE_INPUT_ROOT="${selected_viberoots_input_root}" nix build') ||
     !txt.includes('--override-input viberoots "path:${selected_viberoots_input_root}"') ||
     !txt.includes("selected_viberoots_input_hash")

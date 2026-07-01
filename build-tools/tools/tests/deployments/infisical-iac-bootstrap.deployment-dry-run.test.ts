@@ -84,10 +84,12 @@ async function withCwd<T>(dir: string, run: () => Promise<T>) {
   const cwd = process.cwd();
   const oldConfig = process.env.SPRINKLEREF_CONFIG;
   const oldWorkspaceRoot = process.env.WORKSPACE_ROOT;
+  const oldDevshellRoot = process.env._VIBEROOTS_DEVSHELL_ROOT;
   const oldLiveRoot = process.env.LIVE_ROOT;
   process.chdir(dir);
   delete process.env.SPRINKLEREF_CONFIG;
   process.env.WORKSPACE_ROOT = workspaceRootForTemp(dir);
+  process.env._VIBEROOTS_DEVSHELL_ROOT = workspaceRootForTemp(dir);
   process.env.LIVE_ROOT = workspaceRootForTemp(dir);
   try {
     return await run();
@@ -97,6 +99,8 @@ async function withCwd<T>(dir: string, run: () => Promise<T>) {
     else process.env.SPRINKLEREF_CONFIG = oldConfig;
     if (oldWorkspaceRoot === undefined) delete process.env.WORKSPACE_ROOT;
     else process.env.WORKSPACE_ROOT = oldWorkspaceRoot;
+    if (oldDevshellRoot === undefined) delete process.env._VIBEROOTS_DEVSHELL_ROOT;
+    else process.env._VIBEROOTS_DEVSHELL_ROOT = oldDevshellRoot;
     if (oldLiveRoot === undefined) delete process.env.LIVE_ROOT;
     else process.env.LIVE_ROOT = oldLiveRoot;
   }

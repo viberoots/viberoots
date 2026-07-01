@@ -4,7 +4,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
-import { $ } from "zx";
+const $ = globalThis.$;
 import { runSprinkleRefCli } from "../../deployments/sprinkleref-cli";
 
 test("sprinkleref CLI check reports scanner usage errors with exit code 3", async () => {

@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { $ } from "zx";
+const $ = globalThis.$;
 import { nodesFromCqueryJson } from "../buck/exporter/cquery/nodes";
 import { normalizeTargetLabel } from "../lib/labels";
 import type { GraphNode } from "../lib/graph";

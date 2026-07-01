@@ -13,22 +13,22 @@ async function activeBuildToolPath(rel: string): Promise<string> {
   return path.join("viberoots", "build-tools", rel);
 }
 
-test("hidden workspace flake delegates workspace construction to local viberoots input", async () => {
+test("hidden workspace flake delegates workspace construction through the selected viberoots input", async () => {
   const flake = await fsp.readFile(path.join(".viberoots", "workspace", "flake.nix"), "utf8");
-  assert.match(flake, /viberoots\.url\s*=\s*"path:.*\/viberoots"/);
+  assert.match(flake, /viberoots\.url\s*=\s*"path:.*\/viberoots(?:-flake-input)?"/);
   assert.match(flake, /inputs\.viberoots\.lib\.mkWorkspace/);
   assert.match(flake, /if root != "" then builtins\.toPath root else \.\.\/\.\./);
   assert.match(flake, /viberootsInput\s*=\s*inputs\.viberoots/);
   assert.doesNotMatch(flake, /import\s+\.\/build-tools\/tools\/nix\/flake\/outputs\.nix/);
 });
 
-test("hidden workspace flake lock records local viberoots path input", async () => {
+test("hidden workspace flake lock records a local viberoots path input", async () => {
   const lock = JSON.parse(
     await fsp.readFile(path.join(".viberoots", "workspace", "flake.lock"), "utf8"),
   );
   assert.equal(lock.nodes.root.inputs.viberoots, "viberoots");
   assert.equal(lock.nodes.viberoots.locked.type, "path");
-  assert.match(lock.nodes.viberoots.locked.path, /viberoots$/);
+  assert.match(lock.nodes.viberoots.locked.path, /viberoots(?:-flake-input)?$/);
 });
 
 test("graph planner packages use the workspace source under delegated flakes", async () => {

@@ -41,6 +41,10 @@ test("runInTemp rewrites only the local viberoots lock path to its active temp s
     assert.match(String(tmpLock.nodes[inputName].locked.narHash || ""), /^sha256-/);
     assert.equal(tmpLock.nodes[inputName].original.type, "path");
     assert.equal(tmpLock.nodes[inputName].original.path, expectedInputRoot);
+    assert.ok(
+      !JSON.stringify(tmpLock.nodes[inputName]).includes("viberoots-flake-input"),
+      "expected filtered input lock paths to be rewritten to the active temp source",
+    );
 
     const originalWithoutViberoots = structuredClone(original);
     const tmpWithoutViberoots = structuredClone(tmpLock);

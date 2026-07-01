@@ -113,3 +113,53 @@ test("verify progress reporter freezes completed pass elapsed time", () => {
   assert.doesNotMatch(output, /1\/1 done 2s \/ ~/);
   assert.doesNotMatch(output, /1\/1 done 10s/);
 });
+
+test("verify progress reporter redraws tty output from column zero", () => {
+  const writes: string[] = [];
+  const reporter = createVerifyProgressReporter({
+    enabled: true,
+    passes: [{ name: "isolated", total: 8 }],
+    stream: {
+      isTTY: true,
+      write: (chunk) => {
+        writes.push(String(chunk));
+      },
+    },
+  });
+
+  reporter.start();
+  reporter.update("isolated", { status: "running", completed: 6 });
+  reporter.stop();
+
+  const output = writes.join("");
+  assert.match(output, /\r\u001b\[1A\r\u001b\[J/);
+  assert.doesNotMatch(output, /[^\r]\u001b\[1A\u001b\[J/);
+});
+
+test("verify progress reporter renders successful passes complete", () => {
+  let now = 0;
+  const writes: string[] = [];
+  const reporter = createVerifyProgressReporter({
+    enabled: true,
+    passes: [{ name: "shared", total: 1505 }],
+    now: () => now,
+    stream: {
+      isTTY: true,
+      write: (chunk) => {
+        writes.push(String(chunk));
+      },
+    },
+  });
+
+  reporter.start();
+  reporter.update("shared", { status: "running" });
+  now = 3_900_000;
+  reporter.update("shared", { completed: 1499 });
+  now = 3_910_000;
+  reporter.update("shared", { status: "done" });
+  reporter.stop({ clear: false });
+
+  const output = writes.join("");
+  assert.match(output, /1505\/1505 done 1:05:10/);
+  assert.doesNotMatch(output, /1499\/1505 done/);
+});

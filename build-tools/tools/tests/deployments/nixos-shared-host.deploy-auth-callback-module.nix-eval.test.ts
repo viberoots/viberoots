@@ -2,13 +2,17 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { pinnedNixpkgsOutPathExpr } from "../../lib/pinned-nixpkgs";
 import { viberootsRepoPath } from "./deployment-command";
+
+const pinnedNixpkgsPathExpr = pinnedNixpkgsOutPathExpr(viberootsRepoPath("flake.lock"));
 
 test("shared-host deploy auth callback module routes public HTTPS to deployment service", async () => {
   await runInTemp("shared-host-deploy-auth-callback-module-eval", async (tmp, $) => {
     const expr = `
       let
-        system = import <nixpkgs/nixos> {
+        nixpkgsPath = ${pinnedNixpkgsPathExpr};
+        system = import (nixpkgsPath + "/nixos") {
           configuration = {
             imports = [ ${viberootsRepoPath("viberoots/build-tools/tools/nix/shared-host-deploy-auth-callback-module.nix")} ];
             system.stateVersion = "24.11";

@@ -159,6 +159,7 @@ test("repo dry-run reports non-empty deployment fan-out targets read-only", asyn
   const oldEnv = { ...process.env };
   process.chdir(dir);
   process.env.WORKSPACE_ROOT = dir;
+  process.env._VIBEROOTS_DEVSHELL_ROOT = dir;
   process.env.LIVE_ROOT = dir;
   try {
     await fs.mkdir(".viberoots/workspace/buck", { recursive: true });
@@ -186,6 +187,7 @@ async function withCwd<T>(dir: string, run: () => Promise<T>) {
   const oldEnv = { ...process.env };
   process.chdir(dir);
   process.env.WORKSPACE_ROOT = dir;
+  process.env._VIBEROOTS_DEVSHELL_ROOT = dir;
   process.env.LIVE_ROOT = dir;
   try {
     return await run();

@@ -55,6 +55,13 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
     stage0,
     /__vbr_flake_args=\(--override-input viberoots "path:\$\{__vbr_flake_input_root\}"\)/,
   );
+  assert.match(stage0, /__vbr_stage0_filtered_viberoots_input\(\)/);
+  assert.match(stage0, /viberoots-flake-input/);
+  assert.match(stage0, /export VIBEROOTS_SOURCE_ROOT="\$\{__vbr_source_root\}"/);
+  assert.match(stage0, /__vbr_current_real.*__vbr_filtered_real/s);
+  assert.match(stage0, /ln -sfn \.\.\/viberoots/);
+  assert.match(stage0, /--exclude \/\.viberoots/);
+  assert.match(stage0, /--exclude \/node_modules/);
   assert.match(stage0, /"\$\{__vbr_current_real\}" == "\$\{__vbr_local_real\}"/);
   assert.match(stage0, /__vbr_stage0_apply_nix_cache_health \|\| return 1/);
 }

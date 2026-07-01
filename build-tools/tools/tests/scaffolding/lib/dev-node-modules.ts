@@ -20,6 +20,12 @@ type PnpmDevInstallOptions = {
   env?: NodeJS.ProcessEnv;
 };
 
+type WorkspacePackageInfo = {
+  name: string;
+  relPath: string;
+  dependencies: Record<string, string>;
+};
+
 async function readPrewarmedPnpmStore(): Promise<string> {
   const existing = String(process.env.LOCAL_PNPM_STORE || "").trim();
   if (existing) return existing;
@@ -35,6 +41,84 @@ async function readPrewarmedPnpmStore(): Promise<string> {
     if (st?.isDirectory()) return storePath;
   }
   return "";
+}
+
+function mergedDependencySpecs(pkg: {
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  optionalDependencies?: Record<string, string>;
+}): Record<string, string> {
+  return {
+    ...(pkg.dependencies || {}),
+    ...(pkg.devDependencies || {}),
+    ...(pkg.optionalDependencies || {}),
+  };
+}
+
+async function workspacePackageInfoMap(tmp: string): Promise<Map<string, WorkspacePackageInfo>> {
+  const out = new Map<string, WorkspacePackageInfo>();
+  for (const rootRel of ["projects/apps", "projects/libs"]) {
+    const root = path.join(tmp, rootRel);
+    const entries = await fsp.readdir(root, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      const relPath = path.posix.join(rootRel, entry.name);
+      const pkgDir = path.join(tmp, relPath);
+      const pkgRaw = await fsp.readFile(path.join(pkgDir, "package.json"), "utf8").catch(() => "");
+      if (!pkgRaw) continue;
+      const pkg = JSON.parse(pkgRaw) as {
+        name?: string;
+        dependencies?: Record<string, string>;
+        devDependencies?: Record<string, string>;
+        optionalDependencies?: Record<string, string>;
+      };
+      const name = String(pkg.name || "").trim();
+      if (!name) continue;
+      out.set(name, {
+        name,
+        relPath,
+        dependencies: mergedDependencySpecs(pkg),
+      });
+    }
+  }
+  return out;
+}
+
+async function rawPnpmWorkspacePackagePaths(tmp: string, importer: string): Promise<string[]> {
+  const packages = await workspacePackageInfoMap(tmp);
+  const importerAbs = path.join(tmp, importer);
+  const importerPkg = JSON.parse(
+    await fsp.readFile(path.join(importerAbs, "package.json"), "utf8"),
+  ) as {
+    name?: string;
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+    optionalDependencies?: Record<string, string>;
+  };
+  const importerName = String(importerPkg.name || "").trim();
+  if (!importerName) throw new Error(`package.json for ${importer} is missing a package name`);
+  const importerInfo: WorkspacePackageInfo = {
+    name: importerName,
+    relPath: importer,
+    dependencies: mergedDependencySpecs(importerPkg),
+  };
+  packages.set(importerName, importerInfo);
+
+  const selected = new Map<string, WorkspacePackageInfo>();
+  const visit = (info: WorkspacePackageInfo): void => {
+    if (selected.has(info.name)) return;
+    selected.set(info.name, info);
+    for (const [depName, spec] of Object.entries(info.dependencies)) {
+      if (!String(spec || "").startsWith("workspace:")) continue;
+      const dep = packages.get(depName);
+      if (!dep) throw new Error(`workspace dependency ${depName} not found for ${info.relPath}`);
+      visit(dep);
+    }
+  };
+  visit(importerInfo);
+  return Array.from(new Set(Array.from(selected.values()).map((info) => info.relPath))).sort(
+    (a, b) => a.localeCompare(b),
+  );
 }
 
 async function rawPnpmInstallForDevTest(
@@ -53,13 +137,13 @@ async function rawPnpmInstallForDevTest(
   };
   const filter = String(importerPkg.name || "").trim();
   if (!filter) throw new Error(`package.json for ${importer} is missing a package name`);
+  const workspacePackagePaths = await rawPnpmWorkspacePackagePaths(opts.tmp, importer);
   await fsp
     .writeFile(
       path.join(opts.tmp, "pnpm-workspace.yaml"),
       [
         "packages:",
-        "  - projects/apps/*",
-        "  - projects/libs/*",
+        ...workspacePackagePaths.map((pkgPath) => `  - ${pkgPath}`),
         "overrides:",
         "  nanoid: 3.3.11",
         "",
@@ -175,18 +259,8 @@ async function symlinkStoreNodeModulesEntries(
 
 async function workspacePackageMap(tmp: string): Promise<Map<string, string>> {
   const out = new Map<string, string>();
-  for (const rootRel of ["projects/apps", "projects/libs"]) {
-    const root = path.join(tmp, rootRel);
-    const entries = await fsp.readdir(root, { withFileTypes: true }).catch(() => []);
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const pkgDir = path.join(root, entry.name);
-      const pkgRaw = await fsp.readFile(path.join(pkgDir, "package.json"), "utf8").catch(() => "");
-      if (!pkgRaw) continue;
-      const pkg = JSON.parse(pkgRaw) as { name?: string };
-      const name = String(pkg.name || "").trim();
-      if (name) out.set(name, pkgDir);
-    }
+  for (const [name, info] of await workspacePackageInfoMap(tmp)) {
+    out.set(name, path.join(tmp, info.relPath));
   }
   return out;
 }

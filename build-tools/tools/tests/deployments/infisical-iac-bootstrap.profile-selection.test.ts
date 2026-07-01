@@ -142,6 +142,7 @@ async function withRepoEnv(dir: string, run: () => Promise<void>) {
     INFISICAL_ACCESS_TOKEN: "admin-token",
     VBR_INFISICAL_PROJECT_ID: "proj_repo_test",
     WORKSPACE_ROOT: dir,
+    _VIBEROOTS_DEVSHELL_ROOT: dir,
     LIVE_ROOT: dir,
   };
   delete process.env.SPRINKLEREF_CONFIG;
