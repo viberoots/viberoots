@@ -43,6 +43,37 @@ test("claude --remove-worktree removes the worktree, branch, and stale metadata"
   }
 });
 
+test("claude --remove-worktree removes a clean submodule-containing worktree", async () => {
+  await fsp.mkdir(scratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(scratchRoot, "claude-wrapper-"));
+  try {
+    const gitRoot = path.join(tmp, "repo");
+    const worktreeRoot = path.join(gitRoot, ".claude", "worktrees", "remove-me");
+    await fsp.mkdir(worktreeRoot, { recursive: true });
+    await fsp.writeFile(path.join(worktreeRoot, ".git"), "gitdir: fake\n", "utf8");
+    await fsp.writeFile(path.join(worktreeRoot, "SUBMODULE_GUARD"), "", "utf8");
+    const fake = await makeFakeTools(tmp, gitRoot);
+    const res = await $({
+      cwd: gitRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
+      },
+    })`${wrapper} --remove-worktree remove-me`;
+
+    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
+    await assert.rejects(fsp.stat(worktreeRoot), /ENOENT/);
+    const log = await fsp.readFile(fake.log, "utf8");
+    assert.match(log, /git worktree remove .*remove-me/);
+    assert.match(log, /git -C .*remove-me submodule deinit -f --all/);
+    assert.match(log, /git worktree remove --force .*remove-me/);
+    assert.match(String(res.stderr), /contains clean submodules/);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test("claude --remove-worktree ignores appended launch arguments", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "claude-wrapper-"));
