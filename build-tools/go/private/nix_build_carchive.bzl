@@ -66,6 +66,8 @@ go_nix_build_carchive = rule(
         "srcs": attrs.list(attrs.source(), default = []),
         "nix_inputs": attrs.list(attrs.source(), default = []),
         "labels": attrs.list(attrs.string(), default = []),
+        "nixpkgs_profile": attrs.string(default = "default"),
+        "nixpkg_pins": attrs.dict(key = attrs.string(), value = attrs.dict(key = attrs.string(), value = attrs.string()), default = {}),
         "override_cgo_enabled": attrs.bool(default = False),
         "asan": attrs.bool(default = False),
         "race": attrs.bool(default = False),

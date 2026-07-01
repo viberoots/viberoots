@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { normalizeTargetLabel, packagePathFromLabel } from "../../../lib/labels";
+import { normalizeNixpkgPins, normalizeNixpkgsProfile } from "../../source-selection";
 import type { Node } from "../types";
 
 function uniqSorted(xs: string[]): string[] {
@@ -97,6 +98,10 @@ export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
       }
       return out;
     })();
+    const nixpkgsProfile = normalizeNixpkgsProfile(
+      a["nixpkgs_profile"] ?? a["buck.nixpkgs_profile"],
+    );
+    const nixpkgPins = normalizeNixpkgPins(a["nixpkg_pins"] ?? a["buck.nixpkg_pins"]);
 
     const node: any = {
       ...(a as any),
@@ -110,6 +115,8 @@ export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
       ...(headerDeps ? { header_deps: headerDeps } : {}),
       ...(linkClosure ? { link_closure: linkClosure } : {}),
       ...(overridesNormalized ? { link_closure_overrides: overridesNormalized } : {}),
+      nixpkgs_profile: nixpkgsProfile,
+      nixpkg_pins: nixpkgPins,
     };
     if (!module && "module" in node) delete node.module;
     nodes.push(node as Node);
@@ -144,6 +151,11 @@ export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
         ...((cur as any).header_deps || []),
         ...((n as any).header_deps || []),
       ]),
+      nixpkgs_profile: (n as any).nixpkgs_profile || (cur as any).nixpkgs_profile || "default",
+      nixpkg_pins: {
+        ...(((cur as any).nixpkg_pins || {}) as Record<string, Record<string, string>>),
+        ...(((n as any).nixpkg_pins || {}) as Record<string, Record<string, string>>),
+      },
     });
   }
 

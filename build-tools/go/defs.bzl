@@ -10,6 +10,8 @@ load("@viberoots//build-tools/go:defs_wasm.bzl", _nix_go_tiny_wasm_lib = "nix_go
 
 
 def _apply_go_nix_rule_attrs(attrs, prepared):
+    attrs["nixpkgs_profile"] = prepared.get("nixpkgs_profile", "default")
+    attrs["nixpkg_pins"] = prepared.get("nixpkg_pins", {})
     if "override_cgo_enabled" in prepared:
         attrs["override_cgo_enabled"] = prepared["override_cgo_enabled"]
     if "asan" in prepared:
@@ -109,6 +111,8 @@ def nix_go_binary(name, **kwargs):
         goarch = orig.get("goarch", None),
         cgo_enabled = orig.get("cgo_enabled", None),
         nixpkg_deps = wiring.nixpkg_deps,
+        nixpkgs_profile = prepared.get("nixpkgs_profile", "default"),
+        nixpkg_pins = prepared.get("nixpkg_pins", {}),
         repo_cgo_deps = repo_cgo_deps,
         local_patch_dirs = wiring.local_patch_dirs,
     )

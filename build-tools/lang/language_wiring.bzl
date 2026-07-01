@@ -10,6 +10,7 @@ load(
     "prepare_importer_non_genrule_nix_calling_wiring",
 )
 load("@viberoots//build-tools/lang:lang_contracts.bzl", "patch_invalidation_strategy_for_lang")
+load("@viberoots//build-tools/lang:macro_kwargs.bzl", "normalize_source_selection_attrs")
 load("@viberoots//build-tools/lang:remote_action_policy.bzl", "stamp_remote_readiness_labels")
 load(
     "@viberoots//build-tools/lang/internal:nix_calling_importer_genrule_wiring.bzl",
@@ -81,9 +82,12 @@ def prepare_language_wiring(
     """
     strategy = _require_strategy(lang)
     deps2 = list(deps) if isinstance(deps, list) else []
+    base_kwargs = dict(kwargs) if isinstance(kwargs, dict) else {}
+    if lang in ("cpp", "go", "python"):
+        normalize_source_selection_attrs(base_kwargs)
 
     if strategy.patch_scope == "package-local":
-        kw = _apply_labels(kwargs, labels)
+        kw = _apply_labels(base_kwargs, labels)
         if wasm_variant != None:
             return prepare_package_local_wasm_wiring(
                 name = name,
@@ -113,7 +117,7 @@ def prepare_language_wiring(
     if wiring == "non_genrule":
         return prepare_importer_non_genrule_wiring(
             name = name,
-            kwargs = kwargs,
+            kwargs = base_kwargs,
             deps = deps2,
             lang = lang,
             kind = kind,
@@ -135,7 +139,7 @@ def prepare_language_wiring(
         global_stamp = global_inputs_stamp if global_inputs_stamp != None else False
         return prepare_importer_non_genrule_nix_calling_wiring(
             name = name,
-            kwargs = kwargs,
+            kwargs = base_kwargs,
             deps = deps2,
             lang = lang,
             kind = kind,
@@ -160,7 +164,7 @@ def prepare_language_wiring(
             fail("prepare_language_wiring: srcs is required when wiring=genrule")
         return prepare_importer_genrule_kwargs(
             name = name,
-            kwargs = kwargs,
+            kwargs = base_kwargs,
             srcs = srcs,
             deps = deps2,
             lang = lang,
@@ -179,7 +183,7 @@ def prepare_language_wiring(
         global_stamp = global_inputs_stamp if global_inputs_stamp != None else True
         return prepare_importer_nix_calling_genrule_wiring(
             name = name,
-            kwargs = kwargs,
+            kwargs = base_kwargs,
             srcs = srcs,
             deps = deps2,
             lang = lang,
@@ -199,7 +203,7 @@ def prepare_language_wiring(
     if wiring == "srcsless_rule":
         return prepare_importer_srcsless_rule_wiring(
             name = name,
-            kwargs = kwargs,
+            kwargs = base_kwargs,
             deps = deps2,
             lang = lang,
             kind = kind,

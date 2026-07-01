@@ -195,6 +195,8 @@ def wire_package_local_planner_visible_stub(
     link_closure = kw.get("link_closure", "direct") or "direct"
     link_closure_overrides = kw.get("link_closure_overrides", {}) or {}
     link_mode = kw.get("link_mode", "static") or "static"
+    nixpkgs_profile = kw.get("nixpkgs_profile", "default") or "default"
+    nixpkg_pins = kw.get("nixpkg_pins", {}) or {}
 
     wire_planner_visible_stub(
         name = name,
@@ -215,12 +217,13 @@ def wire_package_local_planner_visible_stub(
         link_closure = link_closure,
         link_closure_overrides = link_closure_overrides,
         link_mode = link_mode,
+        nixpkgs_profile = nixpkgs_profile,
+        nixpkg_pins = nixpkg_pins,
     )
     return struct(
         kwargs = kw,
         local_patch_dirs = info.local_patch_dirs,
         nixpkg_deps = info.nixpkg_deps,
     )
-
 
 

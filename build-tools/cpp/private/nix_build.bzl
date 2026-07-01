@@ -168,6 +168,8 @@ cpp_nix_build = rule(
         "link_closure": attrs.string(default = "direct"),
         "link_closure_overrides": attrs.dict(key = attrs.label(), value = attrs.string(), default = {}),
         "link_mode": attrs.string(default = "static"),
+        "nixpkgs_profile": attrs.string(default = "default"),
+        "nixpkg_pins": attrs.dict(key = attrs.string(), value = attrs.dict(key = attrs.string(), value = attrs.string()), default = {}),
         "srcs": attrs.list(attrs.source(), default = []),  # include local patch files as inputs
         "nix_inputs": attrs.list(attrs.source(), default = []),  # explicit Nix inputs that should affect the rule key
         "labels": attrs.list(attrs.string(), default = []),

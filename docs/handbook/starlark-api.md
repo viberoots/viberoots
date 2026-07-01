@@ -115,6 +115,31 @@ nix_go_binary(
 - If you are asking "do I want extra metadata/context attached?" consider `extra_module_providers`.
 - If you are unsure, start without it. Add it only when you have a concrete tooling/graph need.
 
+## Nixpkgs Source Selection
+
+Nix-backed macros that consume `nixpkg_deps` accept source-selection fields:
+
+- `nixpkgs_profile`: string. Defaults to `"default"`. This names the nixpkgs profile used for the
+  target's base package universe.
+- `nixpkg_pins`: dict. Defaults to `{}`. Pin entries map normalized nixpkgs attrs to an object with
+  `nixpkgs_profile` and a non-empty `rationale`.
+
+Example shape:
+
+```python
+nix_cpp_library(
+    name = "native",
+    srcs = ["native.cc"],
+    nixpkg_deps = ["pkgs.zlib"],
+    nixpkgs_profile = "default",
+    nixpkg_pins = {},
+)
+```
+
+Non-empty `nixpkg_pins` are parsed and validated, then rejected until package-pin resolution lands.
+Use `nixpkgs_profile` for target-level source selection once non-default profiles are available.
+BUILD files must not put raw commits or raw flake URLs in these fields.
+
 ## Go macros
 
 Load from `@viberoots//build-tools/go:defs.bzl`.

@@ -50,6 +50,8 @@ python_pyext_stub = rule(
         # Build-time Python deps (from importer uv.lock wheelhouse env).
         # This is a planner/exporter contract only; this stub does not interpret it.
         "build_py_deps": attrs.list(attrs.string(), default = []),
+        "nixpkgs_profile": attrs.string(default = "default"),
+        "nixpkg_pins": attrs.dict(key = attrs.string(), value = attrs.dict(key = attrs.string(), value = attrs.string()), default = {}),
         # `attrs.source()` allows both files and target outputs (like genrule srcs).
         "srcs": attrs.list(attrs.source(), default = []),
         "labels": attrs.list(attrs.string(), default = []),
@@ -60,5 +62,4 @@ python_pyext_stub = rule(
 __all__ = [
     "python_pyext_stub",
 ]
-
 

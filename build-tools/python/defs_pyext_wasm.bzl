@@ -110,6 +110,8 @@ def nix_python_wasm_extension_module(
         cflags = prepared.get("cflags", []) or [],
         ldflags = prepared.get("ldflags", []) or [],
         build_py_deps = prepared.get("build_py_deps", []) or [],
+        nixpkgs_profile = prepared.get("nixpkgs_profile", "default"),
+        nixpkg_pins = prepared.get("nixpkg_pins", {}),
         srcs = prepared.get("srcs", []) or [],
         nix_inputs = prepared.get("nix_inputs", []) or [],
         labels = prepared.get("labels", []) or [],
@@ -119,4 +121,3 @@ def nix_python_wasm_extension_module(
 __all__ = [
     "nix_python_wasm_extension_module",
 ]
-

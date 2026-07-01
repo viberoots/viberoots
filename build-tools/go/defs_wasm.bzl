@@ -45,6 +45,8 @@ def nix_go_tiny_wasm_lib(name, **kwargs):
         link_deps = prepared.get("link_deps", []) or [],
         link_closure = prepared.get("link_closure", link_closure),
         link_closure_overrides = prepared.get("link_closure_overrides", link_closure_overrides),
+        nixpkgs_profile = prepared.get("nixpkgs_profile", "default"),
+        nixpkg_pins = prepared.get("nixpkg_pins", {}),
         use_selected_wasm = use_selected_wasm,
         srcs = prepared.get("srcs", []) or [],
         nix_inputs = global_nix_inputs(),

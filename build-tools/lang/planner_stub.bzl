@@ -40,6 +40,8 @@ planner_stub = rule(
         "link_closure_overrides": attrs.dict(key = attrs.label(), value = attrs.string(), default = {}),
         # Shared-lib opt-in (planner/exporter contract; unused by this rule impl).
         "link_mode": attrs.string(default = "static"),
+        "nixpkgs_profile": attrs.string(default = "default"),
+        "nixpkg_pins": attrs.dict(key = attrs.string(), value = attrs.dict(key = attrs.string(), value = attrs.string()), default = {}),
         # `attrs.source()` allows both files and target outputs (like genrule srcs),
         # which is useful for planner-only nodes that must carry edges via srcs.
         "srcs": attrs.list(attrs.source(), default = []),
@@ -64,6 +66,5 @@ def planner_stub_with_package_local_patches(
     kw["srcs"] = srcs or []
     include_package_local_patches(kw, lang, local_patch_dirs)
     planner_stub(**kw)
-
 
 

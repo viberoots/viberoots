@@ -44,6 +44,8 @@ def nix_python_wasm_app(name, lockfile_label = None, deps = [], labels = [], **k
         srcs = prepared.get("srcs", []) or [],
         nix_inputs = prepared.get("nix_inputs", []) or [],
         labels = prepared.get("labels", []) or [],
+        nixpkgs_profile = prepared.get("nixpkgs_profile", "default"),
+        nixpkg_pins = prepared.get("nixpkg_pins", {}),
         visibility = prepared.get("visibility", []),
     )
     module_surface(
@@ -89,6 +91,8 @@ def nix_python_wasm_lib(name, lockfile_label = None, deps = [], labels = [], **k
         srcs = prepared.get("srcs", []) or [],
         nix_inputs = prepared.get("nix_inputs", []) or [],
         labels = prepared.get("labels", []) or [],
+        nixpkgs_profile = prepared.get("nixpkgs_profile", "default"),
+        nixpkg_pins = prepared.get("nixpkg_pins", {}),
         visibility = prepared.get("visibility", []),
     )
     module_surface(

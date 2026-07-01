@@ -109,6 +109,8 @@ _PYTHON_NIX_TEST_ATTRS = {
         "srcs": attrs.list(attrs.source(), default = []),
         "nix_inputs": attrs.list(attrs.source(), default = []),
         "labels": attrs.list(attrs.string(), default = []),
+        "nixpkgs_profile": attrs.string(default = "default"),
+        "nixpkg_pins": attrs.dict(key = attrs.string(), value = attrs.dict(key = attrs.string(), value = attrs.string()), default = {}),
         "source_snapshot": attrs.option(attrs.source(), default = None),
         "source_snapshot_manifest": attrs.option(attrs.source(), default = None),
         "remote_ready_runner": attrs.option(attrs.source(), default = None),

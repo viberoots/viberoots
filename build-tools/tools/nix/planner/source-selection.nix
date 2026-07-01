@@ -84,13 +84,21 @@ let
       else if builtins.isString raw then raw
       else fail "nixpkgs_profile must be a string";
 
+  pinsFor = node:
+    let raw = if node == null then null else get node "nixpkg_pins"; in
+      if raw == null then { }
+      else if !(builtins.isAttrs raw) then fail "nixpkg_pins must be an attrset"
+      else if raw != { } then fail "non-empty nixpkg_pins are not supported until package-pin resolution lands"
+      else raw;
+
   sourcePlanFor = node:
     let
       profileName = profileNameFor node;
+      nixpkgPins = pinsFor node;
       basePkgs = pkgsForProfile profileName;
     in builtins.seq basePkgs {
       nixpkgs_profile = profileName;
-      nixpkg_pins = { };
+      nixpkg_pins = nixpkgPins;
       base_pkgs = basePkgs;
     };
 

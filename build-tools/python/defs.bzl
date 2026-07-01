@@ -47,6 +47,8 @@ def nix_python_library(name, lockfile_label = None, deps = [], **kwargs):
         srcs = prepared.get("srcs", []) or [],
         nix_inputs = prepared.get("nix_inputs", []) or [],
         labels = prepared.get("labels", []) or [],
+        nixpkgs_profile = prepared.get("nixpkgs_profile", "default"),
+        nixpkg_pins = prepared.get("nixpkg_pins", {}),
         visibility = prepared.get("visibility", []),
     )
 def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
@@ -84,6 +86,8 @@ def nix_python_binary(name, lockfile_label = None, deps = [], **kwargs):
         srcs = srcs,
         nix_inputs = prepared.get("nix_inputs", []) or [],
         labels = prepared.get("labels", []) or [],
+        nixpkgs_profile = prepared.get("nixpkgs_profile", "default"),
+        nixpkg_pins = prepared.get("nixpkg_pins", {}),
         visibility = prepared.get("visibility", []),
     )
 def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
@@ -114,6 +118,8 @@ def nix_python_test(name, lockfile_label = None, deps = [], **kwargs):
         "srcs": prepared.get("srcs", []) or [],
         "nix_inputs": prepared.get("nix_inputs", []) or [],
         "labels": prepared.get("labels", []) or [],
+        "nixpkgs_profile": prepared.get("nixpkgs_profile", "default"),
+        "nixpkg_pins": prepared.get("nixpkg_pins", {}),
         "test_rule_timeout_ms": 30 * 60 * 1000,
         "visibility": prepared.get("visibility", []),
     }
@@ -193,6 +199,8 @@ def nix_python_extension_module(
         cflags = prepared.get("cflags", []) or [],
         ldflags = prepared.get("ldflags", []) or [],
         build_py_deps = prepared.get("build_py_deps", []) or [],
+        nixpkgs_profile = prepared.get("nixpkgs_profile", "default"),
+        nixpkg_pins = prepared.get("nixpkg_pins", {}),
         srcs = prepared.get("srcs", []) or [],
         nix_inputs = prepared.get("nix_inputs", []) or [],
         labels = prepared.get("labels", []) or [],
