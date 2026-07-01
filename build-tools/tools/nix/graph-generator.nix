@@ -1,4 +1,12 @@
-{ pkgs, src ? ../../., graphJsonPath ? null, rootModulesTomlPath ? null, uv2nixLib ? null, nodeMods ? null }:
+{ pkgs
+, src ? ../../.
+, graphJsonPath ? null
+, rootModulesTomlPath ? null
+, uv2nixLib ? null
+, nodeMods ? null
+, nixpkgsRegistry ? null
+, nixpkgsRegistryPath ? ./nixpkgs-source-registry.nix
+}:
 let
   lib = pkgs.lib;
   H = import ./lib/lang-helpers.nix { inherit pkgs; };
@@ -162,6 +170,13 @@ let
   suppressDevOverrideLog = (builtins.getEnv "PLANNER_NO_DEV_OVERRIDE_LOG") != "";
   hasGoOverride = devOverrideJSON != "";
   hasCppOverride = devOverrideCppJSON != "";
+  SourceSelection = import ./planner/source-selection.nix {
+    inherit lib pkgs get;
+    registryInput = nixpkgsRegistry;
+    registryPath = nixpkgsRegistryPath;
+    system = pkgs.stdenv.hostPlatform.system;
+    selectedTargetName = selectedTargetName;
+  };
 
   get = attrs: k: attrs.${k} or null;
   # Use shared helpers for normalized names
@@ -185,6 +200,7 @@ let
   # Build planner context and import language plugins if present
   ctx = {
     inherit lib T repoRoot repoRootStr localModuleOverrides pkgPathOf pkgs;
+    inherit (SourceSelection) nixpkgsRegistry pkgsForProfile sourcePlanFor resolveNixpkgAttr resolveNixpkgAttrs;
     repoSnapshot = src;
     repoStoreRoot = repoStoreRoot;
     repoFsRoot = builtins.toPath repoRootStr;

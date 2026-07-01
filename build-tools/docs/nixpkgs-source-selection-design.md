@@ -259,9 +259,9 @@ Conceptual shape:
 }
 ```
 
-The implementation may keep this in a Nix file under `build-tools/tools/nix/flake/` or another
-build-tools-owned location. Consumer overrides should use documented viberoots extension points,
-not ad hoc files under `projects/`.
+The initial implementation keeps the default registry at
+`build-tools/tools/nix/nixpkgs-source-registry.nix`. Consumer overrides should use documented
+viberoots extension points, not ad hoc files under `projects/`.
 
 Registry requirements:
 
@@ -815,7 +815,7 @@ Failure diagnostics should explain the fix:
 cpp planner: unknown nixpkgs_profile in package pin for //projects/apps/demo:tool:
   attr: pkgs.openssl
   requested profile: nixpkgs-23_11
-  fix: define nixpkgs-23_11 in build-tools/tools/nix/flake/nixpkgs-source-registry.nix,
+  fix: define nixpkgs-23_11 in build-tools/tools/nix/nixpkgs-source-registry.nix,
        or change nixpkg_pins["pkgs.openssl"].nixpkgs_profile.
 ```
 

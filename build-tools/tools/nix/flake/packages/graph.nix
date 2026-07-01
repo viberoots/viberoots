@@ -1,4 +1,4 @@
-{ pkgs, repoSnapshot, uv2nixLib, repoRoot, nodeMods ? null, mkNodeMods ? null }:
+{ pkgs, repoSnapshot, uv2nixLib, repoRoot, nodeMods ? null, mkNodeMods ? null, nixpkgsRegistry ? null }:
 let
   resolvedNodeMods =
     if nodeMods != null then nodeMods
@@ -27,6 +27,7 @@ let
       inherit pkgs;
       src = repoSnapshot;
       nodeMods = resolvedNodeMods;
+      inherit nixpkgsRegistry;
       graphJsonPath = graphArg;
       rootModulesTomlPath =
         let
@@ -52,6 +53,7 @@ let
     inherit pkgs;
     src = repoSnapshot;
     nodeMods = resolvedNodeMods;
+    inherit nixpkgsRegistry;
     graphJsonPath =
       let
         envGraph = builtins.getEnv "BUCK_GRAPH_JSON";

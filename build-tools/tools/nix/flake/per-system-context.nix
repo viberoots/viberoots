@@ -26,6 +26,9 @@ let
       in
       [ gomod2nix.overlays.default ] ++ cppOverlays;
   };
+  nixpkgsRegistry = import ../nixpkgs-source-registry.nix {
+    inputs = { inherit nixpkgs; };
+  };
 
   zx-wrapper = import ../lib/zx-wrapper.nix { inherit pkgs; };
 
@@ -86,6 +89,6 @@ let
     };
 in
 {
-  inherit pkgs system zx-wrapper devshell prelude uv2nixLib liveFsRoot mkNodeMods repoRoot viberootsRoot viberootsNodeMods version releaseTag;
+  inherit pkgs system zx-wrapper devshell prelude uv2nixLib liveFsRoot mkNodeMods repoRoot viberootsRoot viberootsNodeMods version releaseTag nixpkgsRegistry;
   buck2Input = buck2;
 } // (if includeNodeMods then { nodeMods = mkNodeMods { }; } else { })
