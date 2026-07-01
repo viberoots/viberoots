@@ -18,6 +18,7 @@ in this document are planning labels only.
 - [`../../docs/handbook/starlark-api.md`](../../docs/handbook/starlark-api.md)
 - [`../../docs/handbook/provider-sync-cookbook.md`](../../docs/handbook/provider-sync-cookbook.md)
 - [`../../docs/viberoots-source-modes.md`](../../docs/viberoots-source-modes.md)
+- [`../../docs/history/process/turbo-mode.md`](../../docs/history/process/turbo-mode.md)
 
 ## Implementation Guardrails
 
@@ -61,6 +62,48 @@ in this document are planning labels only.
 - If focused validation fails, investigate the root cause before continuing. Do not weaken tests,
   loosen assertions, or add fallbacks that hide source-selection bugs.
 
+## Turbo Mode Policy
+
+This plan may use the turbo-mode process from
+[`../../docs/history/process/turbo-mode.md`](../../docs/history/process/turbo-mode.md), but only as
+a constrained validation cadence. Source selection is fundamental build-system behavior, so turbo
+mode means deferring full validation to named checkpoints, not replacing full validation with focused
+tests.
+
+For this implementation run, use the current viberoots commit as the initial scoped-verify base:
+
+```bash
+GITHUB_BASE_REF=1555522a2ddf5bbfe03f5c2ecedaf649a271fe8b v
+```
+
+Future runs must use the correct viberoots base ref for their own starting point. Do not reuse this
+commit if the range starts elsewhere. A wrong base ref can make `v` choose the wrong changed-file
+scope.
+
+Every time a full-suite run passes and the validated changes are committed, that resulting commit
+becomes the new base ref for later scoped `v` invocations in this implementation range. The initial
+base above is only valid until the first passing full-suite checkpoint commit supersedes it.
+
+Turbo-mode cadence for this plan:
+
+- Before PR-1: establish or cite a full-validation baseline for the current base commit.
+- PR-1 and PR-2: focused validation is acceptable if registry/default parity and graph export tests
+  pass and no shared test harness behavior changes.
+- PR-3: full validation checkpoint after whole-target profile resolution works locally and in
+  filtered builds. After the passing full-suite result is committed, use that commit as the new
+  scoped-verify base.
+- PR-4: focused validation is acceptable if source-aware identity and dev override tests pass.
+- PR-5: run broad targeted validation for package pins, then continue directly to PR-6 before
+  treating package pins as remote/cache ready.
+- PR-6: full validation checkpoint after filtered, remote, cache, and consumer workspace parity
+  lands. After the passing full-suite result is committed, use that commit as the new
+  scoped-verify base.
+- PR-7: mandatory final full validation and plan assessment checkpoint.
+
+Each PR still needs focused tests, docs for its scope, scope review, and an integration-debt entry
+for any intentionally deferred broader validation. A checkpoint cannot close while the ledger has
+open source-selection risks.
+
 ## De-Risking Checkpoints
 
 ### Checkpoint A: Profile Registry And Default Parity
@@ -73,7 +116,8 @@ clear.
 
 After PR-3, a selected C++ target should build with a non-default `nixpkgs_profile`, including
 compiler/stdenv and ordinary nixpkg attr resolution from that profile. Continue only if local selected
-builds and filtered flake builds agree on the selected profile.
+builds and filtered flake builds agree on the selected profile. This is a full-validation checkpoint
+when turbo mode is active.
 
 ### Checkpoint C: Package Pins Preserve Explicit Identity
 
@@ -86,7 +130,8 @@ actionable.
 
 After PR-6, source snapshots, filtered snapshots, cache manifests, and generated consumer workspace
 flakes should all carry enough source-plan evidence to reproduce and explain selected builds. Continue
-only if local, filtered, and remote-prepared plans are equivalent for the same target.
+only if local, filtered, and remote-prepared plans are equivalent for the same target. This is a
+full-validation checkpoint when turbo mode is active.
 
 ## Integration Debt Ledger
 
@@ -546,3 +591,9 @@ should leave the repository with passing focused validation for its scope.
 
 Before enabling package pins for users, run the Checkpoint C validation set. Before treating pins as
 remote/cache ready, run the Checkpoint D validation set.
+
+When turbo mode is active, run the mandatory final full validation after PR-7 with the correct
+viberoots base ref for this implementation range. For this run, scoped `v` invocations should start
+with `GITHUB_BASE_REF=1555522a2ddf5bbfe03f5c2ecedaf649a271fe8b`, then move to each committed
+full-suite checkpoint after it passes. Future runs should replace the initial value with their actual
+starting commit.

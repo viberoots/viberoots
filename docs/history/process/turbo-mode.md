@@ -4,7 +4,26 @@ Status: historical process note for a completed remote-build PR range. Do not us
 default validation policy. Current validation expectations live in `TESTING.md`,
 `docs/handbook/testing.md`, and the active PR instructions.
 
-This mode trades a small amount of short-term integration certainty for faster execution through the PR sequence. It should be used only when the team explicitly accepts that full validation will be deferred, not skipped.
+This mode trades a small amount of short-term integration certainty for faster execution through the
+PR sequence. It should be used only when the team explicitly accepts that full validation will be
+deferred, not skipped.
+
+When turbo mode uses `v` scoped verification, always set the correct viberoots base ref for the
+current PR range. `v` selects changed paths from the merge-base diff plus the dirty worktree, and it
+uses `GITHUB_BASE_REF` before the default branch candidates. If the range starts from a specific
+commit, invoke scoped validation with that commit as the base, for example:
+
+```bash
+GITHUB_BASE_REF=<viberoots-base-commit> v
+```
+
+Do not reuse a stale base ref from a previous turbo run. A wrong base can make scoped validation
+either too narrow to catch regressions or too broad to preserve the intended speedup.
+
+Every time a full-suite run passes and its changes are committed, that resulting commit becomes the
+new base ref for subsequent scoped `v` invocations in the same turbo run. This keeps focused
+validation scoped to changes made since the last full-confidence checkpoint instead of repeatedly
+including already-validated work.
 
 ## Goal
 
@@ -31,6 +50,8 @@ Recommended cadence:
 - Run focused validation for every PR.
 - Run scope review for every PR to confirm the planned feature surface was not accidentally skipped.
 - Run full validation at explicit milestones for the current PR range.
+- After each passing full-validation milestone is committed, update the scoped `v` base ref to that
+  commit.
 - Always run full validation after PR-18.
 
 Higher-risk PRs can still require broader validation immediately. Examples include shared build graph behavior, toolchain changes, remote execution policy, dependency resolution, or cross-cutting test infrastructure.

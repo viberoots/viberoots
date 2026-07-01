@@ -16,19 +16,37 @@ Treat validation as already complete before `cc` is invoked. Inspect the whole c
 1. Confirm the repository state.
 2. Understand the full change set before writing the message.
 3. Choose the most representative conventional commit type and summary.
-4. Stage all tracked, deleted, and untracked files.
-5. Create one commit for the entire local change set immediately, without running extra tests or waiting for additional validation.
+4. If the change set includes modified submodules or nested Git repositories, commit those
+   repositories first.
+5. Stage all tracked, deleted, and untracked files in the current repository.
+6. Create one commit for the entire local change set immediately, without running extra tests or waiting for additional validation.
 
 ## Inspect The Change Set
 
 Start by understanding what would be included in the commit.
 
 - Run `git status --short --branch` to see modified, deleted, renamed, and untracked files.
+- Run `git submodule status` when the repository has submodules, and inspect any modified submodule
+  before staging the parent repository.
 - Run `git diff --stat` and `git diff --cached --stat` to gauge unstaged and staged changes.
 - If the summary is not obvious, inspect the most important files with `git diff -- <path>` or `git diff --cached -- <path>`.
 - Treat the commit as covering all local changes, not just the most recently edited file.
 
 If there are no local changes, stop and report that there is nothing to commit.
+
+## Commit Submodules First
+
+When a working tree contains modified submodules or nested Git repositories, commit those inner
+repositories before committing the parent repository.
+
+- Inspect each changed submodule with `git -C <submodule-path> status --short --branch`.
+- If the submodule has local changes, create the submodule commit first using the same `cc` rules:
+  inspect the submodule change set, choose a representative conventional commit message, stage the
+  submodule's local changes, and commit them inside the submodule.
+- After the submodule commit exists, return to the parent repository and stage the updated submodule
+  gitlink along with any parent-repo changes.
+- Do not commit the parent repo pointer while the submodule still has uncommitted local changes,
+  unless the user explicitly asks to leave those submodule changes uncommitted.
 
 ## Write The Commit Message
 

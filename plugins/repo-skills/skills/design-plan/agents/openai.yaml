@@ -1,0 +1,4 @@
+interface:
+  display_name: "Design Plan"
+  short_description: "Translate a design document into a repo implementation plan"
+  default_prompt: "$design-plan docs/example-design.md docs/example-plan.md"
