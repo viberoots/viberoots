@@ -149,7 +149,7 @@ async function writeGeneratedIfWritable(file: string, data: string): Promise<voi
     await writeIfChanged(file, data);
   } catch (e) {
     const code = (e as NodeJS.ErrnoException)?.code || "";
-    if (code === "EACCES" || code === "EROFS") return;
+    if (code === "EACCES" || code === "EPERM" || code === "EROFS") return;
     throw e;
   }
 }

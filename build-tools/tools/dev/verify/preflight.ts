@@ -43,7 +43,11 @@ export async function logVerifyRevision(root: string, logFile: string | null): P
   if (!logFile) return;
   // Log the current git revision for performance correlation across runs.
   try {
-    const revOut = await $({ cwd: root, stdio: "pipe", reject: false })`git rev-parse HEAD`;
+    const revOut = await $({
+      cwd: root,
+      stdio: "pipe",
+      reject: false,
+    })`git rev-parse --verify HEAD`.quiet();
     const rev = String((revOut as any).stdout || "").trim();
     const dirtyOut = await $({
       cwd: root,

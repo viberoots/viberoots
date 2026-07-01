@@ -12,6 +12,9 @@ pkgs.writeShellScriptBin "viberoots" ''
   export NIX_BIN="${pkgs.nix}/bin/nix"
   export VBR_NIX_BIN="''${VBR_NIX_BIN:-$NIX_BIN}"
   export GIT_BIN="${pkgs.git}/bin/git"
+  export SSL_CERT_FILE="''${SSL_CERT_FILE:-${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt}"
+  export NIX_SSL_CERT_FILE="''${NIX_SSL_CERT_FILE:-$SSL_CERT_FILE}"
+  export NODE_EXTRA_CA_CERTS="''${NODE_EXTRA_CA_CERTS:-$SSL_CERT_FILE}"
   export PATH="${pkgs.git}/bin:${pkgs.nix}/bin:$PATH"
   exec ${zx-wrapper}/bin/zx-wrapper \
     --import "${viberootsSrc}/build-tools/tools/dev/zx-init.mjs" \

@@ -4,7 +4,7 @@ import {
   evidenceText,
   freshEvidenceAt,
 } from "./cloud-control-evidence-helpers";
-import { REQUIRED_AWS_EC2_ALARMS } from "./cloud-control-aws-ec2-host-profile";
+import { REQUIRED_AWS_EC2_ALARMS } from "./cloud-control-aws-ec2-alarms";
 import type { AwsTopologyValidationOptions } from "./cloud-control-aws-topology-runtime";
 
 export type AwsHostProfileValidationOptions = AwsTopologyValidationOptions & {

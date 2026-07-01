@@ -45,6 +45,11 @@ in {
       esac
 
       cd "$dev_root"
+      export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+      export NIX_SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+      export NODE_EXTRA_CA_CERTS="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+      export BUCK2_REAL_HOME="''${BUCK2_REAL_HOME:-$dev_root/.viberoots/workspace/buck/home}"
+      mkdir -p "$BUCK2_REAL_HOME" 2>/dev/null || true
 
       _vbr_filter_host_path() {
         local old_ifs="$IFS"

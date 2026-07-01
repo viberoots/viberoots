@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
@@ -12,6 +11,7 @@ import { shouldStageSeed, stageSeedStore } from "./seed-staging";
 import { writeVerifySeedRemoteManifest } from "./seed-manifest";
 import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope";
 import { pidAlive } from "./seed-utils";
+import { computeGitState } from "./seed-git-state";
 
 export type SeedInfo = {
   seedKey: string;
@@ -71,51 +71,6 @@ async function sweepStalePins(root: string): Promise<void> {
     const stale = !pidAlive(pid) || ageMs > seedTtlMs;
     if (stale) await fsp.rm(dir, { recursive: true, force: true }).catch(() => {});
   }
-}
-
-async function gitOutput(root: string, cmd: string[]): Promise<string> {
-  const res = await $({ cwd: root, stdio: "pipe", reject: false })`${cmd}`;
-  if (res.exitCode !== 0) throw new Error(`verify seed: git ${cmd.join(" ")} failed`);
-  return String(res.stdout || "").trimEnd();
-}
-
-async function computeGitState(root: string): Promise<{
-  head: string;
-  statusEntries: string[];
-  diffHash: string;
-  diffCachedHash: string;
-}> {
-  const head = await gitOutput(root, ["git", "rev-parse", "HEAD"]);
-  const statusRaw = await $({
-    cwd: root,
-    stdio: "pipe",
-    reject: false,
-    nothrow: true,
-  })`git status --porcelain=v1 -z`;
-  if (statusRaw.exitCode !== 0) {
-    throw new Error("verify seed: git status --porcelain=v1 -z failed");
-  }
-  const status = String(statusRaw.stdout || "");
-  const statusEntries = status ? status.split("\0").filter(Boolean) : [];
-  let diffHash = "";
-  let diffCachedHash = "";
-  if (statusEntries.length > 0) {
-    try {
-      const diff = await gitOutput(root, ["git", "diff", "--no-ext-diff", "--binary"]);
-      diffHash = crypto.createHash("sha256").update(diff).digest("hex");
-    } catch {}
-    try {
-      const diffCached = await gitOutput(root, [
-        "git",
-        "diff",
-        "--cached",
-        "--no-ext-diff",
-        "--binary",
-      ]);
-      diffCachedHash = crypto.createHash("sha256").update(diffCached).digest("hex");
-    } catch {}
-  }
-  return { head, statusEntries, diffHash, diffCachedHash };
 }
 
 async function computeSeedKey(root: string): Promise<string> {

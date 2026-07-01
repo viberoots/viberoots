@@ -1,7 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { readDeploymentResourceEnvelopes } from "./resource-graph-envelope";
 import type {
   DeploymentResourceEnvelope,
   DeploymentResourceEnvelopeSet,
@@ -69,6 +68,7 @@ export type ResourceGraphExportResult = {
 export async function exportDeploymentResourceGraph(opts: { workspaceRoot: string }) {
   const workspaceRoot = path.resolve(opts.workspaceRoot);
   await ensureDeploymentGraph(workspaceRoot);
+  const { readDeploymentResourceEnvelopes } = await import("./resource-graph-envelope");
   const envelopeSet = await readDeploymentResourceEnvelopes({ workspaceRoot });
   if (envelopeSet.errors.length > 0) {
     throw new Error(envelopeSet.errors.join("\n"));
