@@ -84,6 +84,35 @@ test("verify seed staging publishes copy-ready writable shared stages", async ()
   await assert.rejects(fsp.access(path.join(staged, ".seed-store-writable")));
 });
 
+test("verify seed staging excludes nested viberoots generated state", async () => {
+  const seed = await mktemp("seed-stage-generated-source-");
+  await writeRequiredStageFiles(seed);
+  await fsp.mkdir(path.join(seed, "viberoots", "build-tools"), { recursive: true });
+  await fsp.writeFile(path.join(seed, "viberoots", "build-tools", "keep.txt"), "keep\n", "utf8");
+  for (const rel of [
+    path.join("viberoots", ".direnv", "flake-profile.rc"),
+    path.join("viberoots", ".nix-gcroots", "devshell"),
+    path.join("viberoots", "buck-out", "v2", "cache"),
+    path.join("viberoots", "node_modules", ".bin", "tool"),
+  ]) {
+    const abs = path.join(seed, rel);
+    await fsp.mkdir(path.dirname(abs), { recursive: true });
+    await fsp.writeFile(abs, "generated\n", "utf8");
+  }
+
+  const key = `seed-stage-generated-${process.pid}-${Date.now()}`;
+  const staged = await stageSeedStore(seed, key, 60_000);
+
+  assert.equal(
+    await fsp.readFile(path.join(staged, "viberoots", "build-tools", "keep.txt"), "utf8"),
+    "keep\n",
+  );
+  await assert.rejects(fsp.access(path.join(staged, "viberoots", ".direnv")));
+  await assert.rejects(fsp.access(path.join(staged, "viberoots", ".nix-gcroots")));
+  await assert.rejects(fsp.access(path.join(staged, "viberoots", "buck-out")));
+  await assert.rejects(fsp.access(path.join(staged, "viberoots", "node_modules")));
+});
+
 test("verify seed staging invalidates older prepared marker versions", async () => {
   const seed = await mktemp("seed-stage-marker-source-");
   await writeRequiredStageFiles(seed);

@@ -1,9 +1,41 @@
 #!/usr/bin/env zx-wrapper
+import fs from "node:fs";
+import path from "node:path";
 import { stableBuckIsolation } from "../lib/buck-command-env";
+import { ensureGraph } from "../buck/glue-run";
 import { normalizeTargetLabel } from "../lib/labels";
 import { registerBuckIsolationSync } from "../dev/verify/owned-process-state";
 
 const CONFIG_SUFFIX = /\s+\([^)]*\)$/;
+
+export const SUPPORTED_DEPLOYMENT_QUERY_ROOTS = [
+  "projects/deployments",
+  "projects/apps",
+  "projects/libs",
+  "sandbox/deployments",
+  "sandbox/apps",
+  "sandbox/libs",
+] as const;
+
+export function deploymentGraphQueryRoots(): string[] {
+  return [...SUPPORTED_DEPLOYMENT_QUERY_ROOTS];
+}
+
+export function deploymentQueryRootsExpr(workspaceRoot: string): string {
+  const roots = deploymentGraphQueryRoots().filter((root) => {
+    try {
+      return fs.existsSync(path.join(workspaceRoot, root));
+    } catch {
+      return false;
+    }
+  });
+  if (roots.length === 0) return "set()";
+  return `set(${roots.map((root) => `//${root}/...`).join(" ")})`;
+}
+
+export async function ensureDeploymentGraph(workspaceRoot: string, target?: string): Promise<void> {
+  await ensureGraph({ workspaceRoot, target, queryRoots: deploymentGraphQueryRoots() });
+}
 
 export function deploymentBuckEnv(
   workspaceRoot?: string,

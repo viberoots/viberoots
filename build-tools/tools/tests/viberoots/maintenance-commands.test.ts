@@ -8,6 +8,7 @@ import { test } from "node:test";
 import { promisify } from "node:util";
 import { runLiveBootstrap } from "../../lib/live-bootstrap";
 import { planViberootsGc, runViberootsGc } from "../../lib/maintenance-gc";
+import { WORKSPACE_RESOURCE_GRAPH_DIR } from "../../lib/workspace-state-paths";
 
 const execFileAsync = promisify(execFile);
 
@@ -211,6 +212,39 @@ test("gc dry-run plans local generated cleanup without mutation or nix execution
       summary.plan.skipped.map((entry) => entry.reason).join("\n"),
       /symlink cleanup candidate refused/,
     );
+  });
+});
+
+test("gc treats resource graph workspace output as regenerable state", async () => {
+  await withTempWorkspace("viberoots-gc-resource-graph", async (workspace) => {
+    const graphDir = path.join(workspace, WORKSPACE_RESOURCE_GRAPH_DIR);
+    const durableGraphDir = path.join(workspace, ".local", "control-plane", "resource-graph");
+    await fsp.mkdir(graphDir, { recursive: true });
+    await fsp.writeFile(path.join(graphDir, "nodes.json"), "{}", "utf8");
+    await fsp.mkdir(durableGraphDir, { recursive: true });
+    await fsp.writeFile(path.join(durableGraphDir, "nodes.json"), "{}", "utf8");
+
+    const dryRun = await runViberootsGc({
+      workspaceRoot: workspace,
+      dryRun: true,
+      nix: false,
+      deps: { commandAvailable: async () => false },
+    });
+    assert.match(
+      dryRun.plan.local.map((entry) => `${entry.path}:${entry.reason}`).join("\n"),
+      /\.viberoots\/workspace\/resource-graph:regenerable resource graph workspace state/,
+    );
+    assert.equal((await fsp.stat(graphDir)).isDirectory(), true);
+    assert.equal((await fsp.stat(durableGraphDir)).isDirectory(), true);
+
+    const summary = await runViberootsGc({
+      workspaceRoot: workspace,
+      nix: false,
+      deps: { commandAvailable: async () => false },
+    });
+    assert.equal(summary.localRemoved, 1);
+    await assert.rejects(fsp.lstat(graphDir));
+    assert.equal((await fsp.stat(durableGraphDir)).isDirectory(), true);
   });
 });
 

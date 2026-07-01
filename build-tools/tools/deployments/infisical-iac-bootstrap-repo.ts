@@ -1,6 +1,6 @@
 import * as path from "node:path";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { findRepoRoot } from "../lib/repo";
+import { defaultDeploymentGraphPath } from "./deployment-graph-read-options";
 import { InfisicalApi } from "./infisical-iac-bootstrap-api";
 import { runDeploymentBootstrapFanOut } from "./infisical-iac-bootstrap-deployments";
 import { applyFanOutMetadataHandoff } from "./infisical-iac-bootstrap-metadata-gate";
@@ -43,7 +43,7 @@ export async function runRepoBootstrap(
 ) {
   await confirmBootstrapPreflight(args);
   const workspaceRoot = await findRepoRoot(process.cwd());
-  const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
+  const graphPath = defaultDeploymentGraphPath(workspaceRoot);
   const configPath = path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
   const resolver = await ensureRepoResolverConfig({
     dryRun: false,

@@ -3,6 +3,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 import { readCompositeGraph } from "../../lib/graph-view";
+import { isVbrVerbose } from "../../lib/command-ui";
 import { buildToolPath, nodeBin, zxNodeBase } from "./paths";
 import { runGluePipeline } from "../../buck/glue-pipeline";
 
@@ -41,11 +42,12 @@ async function exportGraph(root: string, opts: { scope?: string; env: Record<str
   const nodeBase = zxNodeBase(root);
   const graphPath = path.join(root, DEFAULT_GRAPH_PATH);
   const scope = (opts.scope || "").trim();
+  const verbose = isVbrVerbose() || String(process.env.DEVBUILD_DEBUG || "").trim() === "1";
   const cmd = `${node} ${nodeBase} ${buildToolPath(root, "tools/buck/export-graph.ts")}${
     scope ? ` --scope ${scope}` : ""
   } --out ${graphPath}`;
   await $({
-    stdio: "inherit",
+    stdio: verbose ? "inherit" : "pipe",
     cwd: root,
     env: opts.env as any,
   })`bash --noprofile --norc -c ${cmd}`;
@@ -121,8 +123,9 @@ async function ensureNonEmptyGraphOrExit(root: string, graphPath: string): Promi
 export async function refreshGlueAndExportGraph(root: string): Promise<string> {
   const node = nodeBin();
   const nodeBase = zxNodeBase(root);
+  const verbose = isVbrVerbose() || String(process.env.DEVBUILD_DEBUG || "").trim() === "1";
   await $({
-    stdio: "inherit",
+    stdio: verbose ? "inherit" : "pipe",
     cwd: root,
   })`bash --noprofile --norc -c ${`${node} ${nodeBase} ${buildToolPath(
     root,

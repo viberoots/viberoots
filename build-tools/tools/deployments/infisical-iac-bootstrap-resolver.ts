@@ -1,11 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import type { GraphNode } from "../lib/graph";
 import { readCompositeGraph } from "../lib/graph-view";
 import { findRepoRoot } from "../lib/repo";
-import { deploymentGraphReadOptions } from "./deployment-graph-read-options";
+import {
+  defaultDeploymentGraphPath,
+  deploymentGraphReadOptions,
+} from "./deployment-graph-read-options";
 import { resolveDeploymentContextNodes } from "./deployment-contexts";
 import {
   deploymentSecretBackendSelectorErrors,
@@ -76,10 +78,7 @@ export async function repoBootstrapProfiles(opts: {
   config?: SprinkleRefConfig;
   starterCategoryProfiles?: boolean;
 }) {
-  const profiles = await requiredBackendProfiles(
-    opts.graphPath || DEFAULT_GRAPH_PATH,
-    opts.workspaceRoot,
-  );
+  const profiles = await requiredBackendProfiles(opts.graphPath, opts.workspaceRoot);
   if (opts.config) addCategoryProfiles(profiles, opts.config);
   if (opts.starterCategoryProfiles) {
     for (const profile of STARTER_CATEGORY_PROFILES) profiles.add(profile);
@@ -100,14 +99,14 @@ async function workspaceRootForGraph(graphPath: string): Promise<string> {
   return await findRepoRoot(process.cwd());
 }
 
-export async function requiredBackendProfiles(
-  graphPath = DEFAULT_GRAPH_PATH,
-  workspaceRoot?: string,
-) {
+export async function requiredBackendProfiles(graphPath?: string, workspaceRoot?: string) {
   const profiles = new Set<string>();
-  const selectedWorkspaceRoot = workspaceRoot || (await workspaceRootForGraph(graphPath));
+  const selectedWorkspaceRoot =
+    workspaceRoot ||
+    (graphPath ? await workspaceRootForGraph(graphPath) : await findRepoRoot(process.cwd()));
+  const selectedGraphPath = graphPath || defaultDeploymentGraphPath(selectedWorkspaceRoot);
   const rawNodes = await readCompositeGraph(
-    deploymentGraphReadOptions(selectedWorkspaceRoot, graphPath),
+    deploymentGraphReadOptions(selectedWorkspaceRoot, selectedGraphPath),
   )
     .then((graph) => graph.nodes)
     .catch(() => []);

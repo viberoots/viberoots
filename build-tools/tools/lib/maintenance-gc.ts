@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { resolveToolPathSync } from "./tool-paths";
+import { WORKSPACE_RESOURCE_GRAPH_DIR } from "./workspace-state-paths";
 
 const execFileAsync = promisify(execFile);
 
@@ -405,6 +406,12 @@ export async function planViberootsGc(opts: GcOptions): Promise<GcPlan> {
     now,
     olderThanMs,
     "stale generated viberoots Buck temp state",
+  );
+  await addRemovalCandidate(
+    plan,
+    workspaceRoot,
+    path.join(workspaceRoot, WORKSPACE_RESOURCE_GRAPH_DIR),
+    "regenerable resource graph workspace state",
   );
   await addChildrenOlderThan(
     plan,

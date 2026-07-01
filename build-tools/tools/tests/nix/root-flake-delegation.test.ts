@@ -51,10 +51,19 @@ test("nix develop activates live local submodule workflow path", async () => {
   const marker = path.join("viberoots", ".live-edit-marker");
   const script = `
 set -euo pipefail
-test "$(realpath .viberoots/current)" = "$(pwd -P)/viberoots"
+actual_current="$(realpath .viberoots/current)"
+expected_current="$(pwd -P)/viberoots"
+if [ "$actual_current" != "$expected_current" ]; then
+  echo "expected .viberoots/current to resolve to $expected_current"
+  echo "actual: $actual_current"
+  echo "link: $(readlink .viberoots/current || true)"
+  exit 1
+fi
 printf '%s\\n' "${markerText}" > viberoots/.live-edit-marker
 test "$(cat .viberoots/current/.live-edit-marker)" = "${markerText}"
-viberoots status --json | jq -e '.sourceMode == "local" and .currentPointsToLiveCheckout == true'
+status_json="$(viberoots status --json)"
+printf '%s\\n' "$status_json"
+printf '%s\\n' "$status_json" | jq -e '.sourceMode == "local" and .currentPointsToLiveCheckout == true'
 `;
   try {
     const result = await $({

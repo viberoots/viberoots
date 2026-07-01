@@ -492,7 +492,7 @@ print_summary() {
   echo "  workspace: ${workspace_root}"
   echo "  workspace name: ${workspace_name}"
   echo "  source: ${source}"
-  echo "  install nix: $([[ "${install_nix}" == "1" ]] && echo yes || echo no)"
+  echo "  ensure nix: $([[ "${install_nix}" == "1" ]] && echo yes || echo no)"
   echo "  install: $([[ "${run_install}" == "1" ]] && echo yes || echo no)"
   echo "  validate: $([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
   echo "  direnv allow: $([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
@@ -516,7 +516,7 @@ viberoots bootstrap
   ref: ${ref}
   workspace: ${workspace_root}
   workspace name: ${workspace_name}
-  install nix: $([[ "${install_nix}" == "1" ]] && echo yes || echo no)
+  ensure nix: $([[ "${install_nix}" == "1" ]] && echo yes || echo no)
   install: $([[ "${run_install}" == "1" ]] && echo yes || echo no)
   validate: $([[ "${run_validate}" == "1" ]] && echo yes || echo no)
   direnv allow: $([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)

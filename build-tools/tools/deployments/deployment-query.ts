@@ -1,7 +1,4 @@
 #!/usr/bin/env zx-wrapper
-import fs from "node:fs";
-import path from "node:path";
-import { ensureGraph } from "../buck/glue-run";
 import { nodesFromCqueryJson } from "../buck/exporter/cquery/nodes";
 import { normalizeTargetLabel } from "../lib/labels";
 import { componentTargetsFor, extractDeployments, type DeploymentTarget } from "./contract";
@@ -9,33 +6,14 @@ import { DEPLOYMENT_CQUERY_ATTRS } from "./deployment-query-attrs";
 import {
   deploymentBuckEnv,
   deploymentIsolationArgs,
+  deploymentQueryRootsExpr,
+  ensureDeploymentGraph,
   normalizeQueryTarget,
   queryComponentLabels,
   queryLabelList,
 } from "./deployment-query-helpers";
 
-export const SUPPORTED_DEPLOYMENT_QUERY_ROOTS = [
-  "projects/deployments",
-  "projects/apps",
-  "projects/libs",
-  "sandbox/deployments",
-  "sandbox/apps",
-  "sandbox/libs",
-] as const;
-
-const DEPLOYMENT_GRAPH_QUERY_ROOTS = [...SUPPORTED_DEPLOYMENT_QUERY_ROOTS];
-
-function deploymentQueryRootsExpr(workspaceRoot: string): string {
-  const roots = DEPLOYMENT_GRAPH_QUERY_ROOTS.filter((root) => {
-    try {
-      return fs.existsSync(path.join(workspaceRoot, root));
-    } catch {
-      return false;
-    }
-  });
-  if (roots.length === 0) return "set()";
-  return `set(${roots.map((root) => `//${root}/...`).join(" ")})`;
-}
+export { SUPPORTED_DEPLOYMENT_QUERY_ROOTS } from "./deployment-query-helpers";
 
 function relatedLabelsForNodes(
   nodes: ReturnType<typeof nodesFromCqueryJson>,
@@ -90,11 +68,7 @@ export async function queryDeploymentNodesWithAttrs(
   opts?: { env?: NodeJS.ProcessEnv },
 ): Promise<ReturnType<typeof nodesFromCqueryJson>> {
   const normalizedLabels = Array.from(new Set(labels.map((label) => normalizeTargetLabel(label))));
-  await ensureGraph({
-    workspaceRoot,
-    target: normalizedLabels[0],
-    queryRoots: DEPLOYMENT_GRAPH_QUERY_ROOTS,
-  });
+  await ensureDeploymentGraph(workspaceRoot, normalizedLabels[0]);
   const attrFlags = Array.from(new Set(attrs)).flatMap((attr) => ["--output-attribute", attr]);
   const query = `set(${normalizedLabels.join(" ")})`;
   const buckEnv = deploymentBuckEnv(workspaceRoot, opts?.env);
@@ -184,7 +158,7 @@ async function resolveDeploymentFromNodes(
 }
 
 export async function listDeploymentTargets(workspaceRoot: string): Promise<string[]> {
-  await ensureGraph({ workspaceRoot, queryRoots: DEPLOYMENT_GRAPH_QUERY_ROOTS });
+  await ensureDeploymentGraph(workspaceRoot);
   const query = `kind("deployment_target", ${deploymentQueryRootsExpr(workspaceRoot)})`;
   const buckEnv = deploymentBuckEnv(workspaceRoot);
   const { stdout } = await $({

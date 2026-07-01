@@ -4,9 +4,10 @@ import type { GraphNode } from "../lib/graph";
 import { readCompositeGraph } from "../lib/graph-view";
 import { extractDeployments } from "./contract";
 import { deploymentGraphReadOptions } from "./deployment-graph-read-options";
-import { SUPPORTED_DEPLOYMENT_QUERY_ROOTS } from "./deployment-query";
+import { SUPPORTED_DEPLOYMENT_QUERY_ROOTS } from "./deployment-query-helpers";
 import { readProjectConfigSync, redactedProjectConfigOverrides } from "./project-config";
 import { collectDeploymentIntentResources } from "./resource-graph-collectors";
+import { controlPlaneSelectionResourceId } from "./resource-graph-collector-refs";
 import { reviewedProviderCapability } from "./resource-graph-provider-capabilities";
 import { collectRuntimeInventoryResources } from "./resource-graph-runtime";
 import { DEPLOYMENT_RESOURCE_TAXONOMY } from "./resource-graph-taxonomy";
@@ -91,20 +92,33 @@ function collectResolvedInputResources(
   for (const deployment of deployments) {
     const context = deployment.deploymentContext;
     if (context) {
-      out.push(resolved("DeploymentContext", context.name, deployment.label));
+      out.push(
+        resolved("DeploymentContext", context.name, deployment.label, [deployment.deploymentId]),
+      );
     }
     const controlPlane = deployment.controlPlane;
     if (controlPlane) {
       const name = controlPlane.name;
-      out.push(resolved("ControlPlaneProfile", name, deployment.label));
+      const selectionId = controlPlaneSelectionResourceId(deployment.deploymentId, name);
+      out.push(resolved("ControlPlaneProfile", name, deployment.label, [deployment.deploymentId]));
       out.push(
-        resolved("ControlPlaneSelection", `${deployment.deploymentId}:${name}`, deployment.label),
+        resolved("ControlPlaneSelection", selectionId, deployment.label, [
+          deployment.deploymentId,
+          name,
+          ...(context ? [context.name] : []),
+        ]),
       );
       out.push(
-        resolved("ServiceClientProfile", `${name}:service-client`, deployment.label, [], {
-          controlPlaneUrl: controlPlane.serviceClient.controlPlaneUrl,
-          controlPlaneTokenRef: controlPlane.serviceClient.controlPlaneTokenRef,
-        }),
+        resolved(
+          "ServiceClientProfile",
+          `${name}:service-client`,
+          deployment.label,
+          [selectionId],
+          {
+            controlPlaneUrl: controlPlane.serviceClient.controlPlaneUrl,
+            controlPlaneTokenRef: controlPlane.serviceClient.controlPlaneTokenRef,
+          },
+        ),
       );
     }
   }

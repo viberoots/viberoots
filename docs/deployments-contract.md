@@ -235,6 +235,34 @@ indexing and status, not a replacement authoring format.
   expose references, validation outcomes, fingerprints, sizes, expiry, provenance, and diagnostics,
   but not raw tokens, proof material, nonces, secret values, or upload payloads.
 
+## Resource Graph Export
+
+`viberoots resource-graph export` materializes the reviewed deployment resource graph as
+regenerable workspace state under `.viberoots/workspace/resource-graph/`.
+
+The command writes three versioned JSON documents:
+
+- `envelopes.json`: the PR-2 deployment resource envelope list.
+- `nodes.json`: `viberoots.resource-graph.nodes@1`, keyed by envelope `metadata.uid`.
+- `edges.json`: `viberoots.resource-graph.edges@1`, derived from envelope owner references and
+  policy references.
+
+The export command is read-only with respect to deployment authority. It may refresh the existing
+Buck graph through the reviewed deployment graph helper, then reads deployment facts through
+`deploymentGraphReadOptions` and the composite graph reader. It must not scan deployment roots
+directly, write generated providers, mutate control-plane records, alter project configuration, or
+create hand-authored resource YAML.
+
+Buck-query fallback is intentionally outside `resource-graph export` scope. Existing Buck-query
+fallback remains in deployment-target resolution helpers for command paths that need per-target
+resolution, while export uses the graph-first composite-reader path and the shared deployment query
+root helper.
+
+Buck remains the reviewed intent graph compiler for repo-owned deployment resources. The exported
+documents are cacheable workspace-state read models for indexing, status, and diagnostics; they are
+not a replacement authoring path and are removable by `viberoots gc` because they can be
+reproduced from reviewed Buck metadata and resolved workspace inputs.
+
 ## Operator Semantics
 
 - `operation_kind` uses the canonical set: `deploy`, `retry`, `promotion`, `rollback`, `preview_cleanup`.

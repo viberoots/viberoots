@@ -387,6 +387,10 @@ If a local cleanup candidate fails to remove, continue to the next candidate and
 
 Path classification bugs should fail closed.
 
+Resource graph exports under `.viberoots/workspace/resource-graph/` are local generated state. They
+are removable by `viberoots gc` because `viberoots resource-graph export` can regenerate them from
+reviewed Buck deployment metadata and resolved workspace inputs.
+
 ### Implementation Shape
 
 Add a dedicated library:

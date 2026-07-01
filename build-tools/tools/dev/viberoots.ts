@@ -13,7 +13,9 @@ import { checkBootstrapCompletion } from "../lib/bootstrap-completion";
 import { removeSubmodule, useFlake, useSubmodule } from "../lib/consumer-source-mode";
 import { runLiveBootstrap } from "../lib/live-bootstrap";
 import { runViberootsGc } from "../lib/maintenance-gc";
+import { resolveToolPathSync } from "../lib/tool-paths";
 import { repairGeneratedWorkspaceLock } from "../lib/workspace-lock-repair";
+import { exportDeploymentResourceGraph } from "../deployments/resource-graph-export";
 
 type VersionStatus = ReturnType<typeof buildVersionStatus>;
 type CommandMeta = {
@@ -21,6 +23,7 @@ type CommandMeta = {
   usage: string;
   description: string;
   options: string[];
+  subcommands?: CommandMeta[];
 };
 
 const commandMetadata: CommandMeta[] = [
@@ -97,6 +100,20 @@ const commandMetadata: CommandMeta[] = [
     ],
   },
   {
+    name: "resource-graph",
+    usage: "viberoots resource-graph export [--workspace-root <path>]",
+    description: "Export reviewed deployment intent as regenerable resource graph workspace state.",
+    options: ["export", "--help"],
+    subcommands: [
+      {
+        name: "export",
+        usage: "viberoots resource-graph export [--workspace-root <path>]",
+        description: "Write resource graph envelopes, nodes, and edges under .viberoots/workspace.",
+        options: ["--workspace-root", "--help"],
+      },
+    ],
+  },
+  {
     name: "init-consumer",
     usage:
       "viberoots init-consumer --viberoots-url <flake-ref> [--mode flake|submodule] [--workspace-root <path>]",
@@ -158,9 +175,13 @@ function commandMeta(name: string): CommandMeta | undefined {
   return commandMetadata.find((command) => command.name === name);
 }
 
+function subcommandMeta(command: CommandMeta, name: string): CommandMeta | undefined {
+  return command.subcommands?.find((subcommand) => subcommand.name === name);
+}
+
 function git(args: string[], cwd: string): string {
   try {
-    return execFileSync("git", ["-C", cwd, ...args], {
+    return execFileSync(resolveToolPathSync("git"), ["-C", cwd, ...args], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
@@ -311,17 +332,27 @@ async function initWorkspace(): Promise<void> {
 
 function printHelp(commandName?: string): void {
   if (commandName) {
-    const command = commandMeta(commandName);
+    const [topName, subName] = commandName.split(/\s+/, 2);
+    const command = commandMeta(topName || "");
     if (!command) {
       console.error(`error: unknown command: ${commandName}`);
       console.error("run: viberoots help");
       process.exit(2);
     }
-    console.log(command.usage);
-    console.log(command.description);
-    if (command.options.length) {
-      console.log("options:");
-      for (const option of command.options) console.log(`  ${option}`);
+    if (subName) {
+      const subcommand = subcommandMeta(command, subName);
+      if (!subcommand) {
+        console.error(`error: unknown subcommand: ${command.name} ${subName}`);
+        console.error(`run: viberoots help ${command.name}`);
+        process.exit(2);
+      }
+      printCommandHelp(subcommand);
+      return;
+    }
+    printCommandHelp(command);
+    if (command.subcommands?.length) {
+      console.log("subcommands:");
+      for (const subcommand of command.subcommands) console.log(`  ${subcommand.name}`);
     }
     return;
   }
@@ -329,6 +360,15 @@ function printHelp(commandName?: string): void {
   for (const command of commandMetadata) {
     console.log(`  ${command.usage}`);
     console.log(`    ${command.description}`);
+  }
+}
+
+function printCommandHelp(command: CommandMeta): void {
+  console.log(command.usage);
+  console.log(command.description);
+  if (command.options.length) {
+    console.log("options:");
+    for (const option of command.options) console.log(`  ${option}`);
   }
 }
 
@@ -346,6 +386,10 @@ function printBashCompletion(): void {
   cmd="\${COMP_WORDS[1]}"
   if [[ \${COMP_CWORD} -eq 1 ]]; then
     COMPREPLY=( $(compgen -W "${commandNames}" -- "\${cur}") )
+    return 0
+  fi
+  if [[ "\${cmd}" == "resource-graph" && \${COMP_CWORD} -eq 2 ]]; then
+    COMPREPLY=( $(compgen -W "export --help" -- "\${cur}") )
     return 0
   fi
   case "\${cmd}" in
@@ -377,6 +421,10 @@ _viberoots()
     return
   fi
   local cmd="\${words[2]}"
+  if [[ "\${cmd}" == "resource-graph" && CURRENT == 3 ]]; then
+    _arguments -S "export[export]" "--help[--help]"
+    return
+  fi
   case "\${cmd}" in
 ${optionCases}
     *) _files ;;
@@ -516,14 +564,14 @@ function liveBootstrapEnvOverrides(): Record<string, string> {
 }
 
 async function main() {
-  const [command = "version"] = getPositionals();
+  const positionals = getPositionals();
+  const [command = "version"] = positionals;
   if (getFlagBool("help") && commandMeta(command)) {
-    printHelp(command);
+    printHelp(positionals.slice(0, 2).join(" "));
     return;
   }
   if (command === "help") {
-    const [, helpCommand] = getPositionals();
-    printHelp(helpCommand);
+    printHelp(positionals.slice(1, 3).join(" "));
     return;
   }
   if (command === "completion") {
@@ -609,6 +657,30 @@ async function main() {
       nixDeleteOlderThan: getFlagStr("nix-delete-older-than", ""),
       keepCurrentProfile: getFlagBool("keep-current-profile"),
     });
+    return;
+  }
+  if (command === "resource-graph") {
+    const [, subcommand = ""] = getPositionals();
+    if (getFlagBool("help") || subcommand === "--help") {
+      printHelp("resource-graph");
+      return;
+    }
+    if (!subcommand) {
+      console.error("error: resource-graph requires a subcommand");
+      console.error("run: viberoots help resource-graph");
+      process.exit(2);
+    }
+    if (subcommand !== "export") {
+      console.error(`error: unknown resource-graph subcommand: ${subcommand}`);
+      console.error("run: viberoots help resource-graph");
+      process.exit(2);
+    }
+    const result = await exportDeploymentResourceGraph({
+      workspaceRoot: selectedWorkspaceRootForCommand(),
+    });
+    console.log(`resource graph exported: ${path.relative(process.cwd(), result.envelopesPath)}`);
+    console.log(`nodes: ${result.nodeCount} (${path.relative(process.cwd(), result.nodesPath)})`);
+    console.log(`edges: ${result.edgeCount} (${path.relative(process.cwd(), result.edgesPath)})`);
     return;
   }
   if (command === "use-submodule") {

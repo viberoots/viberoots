@@ -13,12 +13,26 @@ if [[ "${script_dir}" != "${viberoots_dir}" ]]; then
   exit 1
 fi
 
-NO_DEV_SHELL=1 WORKSPACE_ROOT="${workspace_root}" "${viberoots_dir}/build-tools/tools/bin/viberoots" \
-  init-consumer \
-  --mode submodule \
-  --workspace-root "${workspace_root}" \
-  --workspace-name "viberoots-consumer" \
-  --viberoots-url "path:${viberoots_flake_input_dir}" \
-  --source "${viberoots_dir}" \
-  --no-lock \
+init_args=(
+  init-consumer
+  --mode submodule
+  --workspace-root "${workspace_root}"
+  --workspace-name "viberoots-consumer"
+  --viberoots-url "path:${viberoots_flake_input_dir}"
+  --source "${viberoots_dir}"
+  --no-lock
   "$@"
+)
+
+if [[ "${VBR_INIT_USE_LOCAL_COMMAND:-0}" == "1" ]]; then
+  NO_DEV_SHELL=1 WORKSPACE_ROOT="${workspace_root}" "${viberoots_dir}/build-tools/tools/bin/viberoots" \
+    "${init_args[@]}"
+else
+  nix_bin="${VBR_NIX_BIN:-nix}"
+  if ! command -v "${nix_bin}" >/dev/null 2>&1; then
+    echo "error: nix is required to initialize a submodule workspace before the dev shell is available" >&2
+    exit 127
+  fi
+  WORKSPACE_ROOT="${workspace_root}" "${nix_bin}" run "path:${viberoots_flake_input_dir}#viberoots" -- \
+    "${init_args[@]}"
+fi

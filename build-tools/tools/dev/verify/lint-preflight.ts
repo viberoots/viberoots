@@ -32,12 +32,21 @@ async function firstExisting(root: string, relCandidates: string[]): Promise<str
   return relCandidates[0] || "";
 }
 
-async function runVerifyFileSizePreflight(root: string, zxInitPath: string): Promise<void> {
+async function runVerifyFileSizePreflight(
+  root: string,
+  zxInitPath: string,
+  opts: { changedOnly?: boolean } = {},
+): Promise<void> {
   const script = buildToolPath(root, "tools/dev/file-size-lint.ts");
   const args = ["--scope=source", "--fail=true"];
+  if (opts.changedOnly) {
+    args.push("--changed-only");
+  }
   if (verbose()) {
     process.stderr.write(
-      "[verify] file-size preflight: running strict repo-owned file-size gate\n",
+      opts.changedOnly
+        ? "[verify] file-size preflight: running changed-file source file-size gate\n"
+        : "[verify] file-size preflight: running strict repo-owned file-size gate\n",
     );
   }
   try {
@@ -292,14 +301,14 @@ export async function runVerifyLintPreflight(
 
   await runVerifyStaleNamesPreflight(root, zxInitPath);
 
+  await runVerifyFileSizePreflight(root, zxInitPath, {
+    changedOnly: !includeBuildSystemPolicy,
+  });
+
   if (includeBuildSystemPolicy) {
-    await runVerifyFileSizePreflight(root, zxInitPath);
     await runVerifyNixGapsPolicyPreflight(root, zxInitPath);
   } else {
     if (verbose()) {
-      process.stderr.write(
-        "[verify] file-size preflight: skipped build-system file-size gates for non-build-system verify scope\n",
-      );
       process.stderr.write(
         "[verify] nix-gaps policy preflight: skipped for non-build-system verify scope\n",
       );

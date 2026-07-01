@@ -45,6 +45,10 @@ function relativeLinkTarget(fromDir: string, target: string): string {
   return rel.startsWith("..") ? rel : `./${rel}`;
 }
 
+function isNixStoreLinkTarget(target: string): boolean {
+  return target.startsWith(`${path.sep}nix${path.sep}store${path.sep}`);
+}
+
 function chooseSource(workspaceRoot: string, opts: ActivationOptions): string {
   if (opts.sourcePath) return path.resolve(workspaceRoot, opts.sourcePath);
   if (flakeUsesLocalViberoots(workspaceRoot)) return path.join(workspaceRoot, "viberoots");
@@ -195,13 +199,16 @@ async function rejectStaleLocalCurrent(
   }
   const sourceReal = await fsp.realpath(sourcePath);
   const expectedReal = expectedTarget === ".." ? workspaceRoot : sourceReal;
+  const currentTarget = await fsp.readlink(currentPath);
+  if (isNixStoreLinkTarget(currentTarget)) return;
   let currentReal = "";
   try {
     currentReal = await fsp.realpath(currentPath);
   } catch {
-    const target = await fsp.readlink(currentPath);
-    if (target === expectedTarget) return;
-    throw new Error(`${currentPath} points at ${target}; expected local viberoots ${sourceReal}`);
+    if (currentTarget === expectedTarget) return;
+    throw new Error(
+      `${currentPath} points at ${currentTarget}; expected local viberoots ${sourceReal}`,
+    );
   }
   if (currentReal !== expectedReal) {
     throw new Error(

@@ -133,7 +133,19 @@ if [[ -z "\${__vbr_flake_input_root}" || ! -f "\${__vbr_flake_input_root}/flake.
   __vbr_flake_input_root="\${VIBEROOTS_SOURCE_ROOT:-}"
 fi
 if [[ -z "\${__vbr_flake_input_root}" || ! -f "\${__vbr_flake_input_root}/flake.nix" ]]; then
-  __vbr_flake_input_root="\${PWD}/viberoots"
+  __vbr_current_real=""
+  __vbr_local_real=""
+  if [[ -e "\${PWD}/.viberoots/current" ]]; then
+    __vbr_current_real="$(cd "\${PWD}/.viberoots/current" && pwd -P 2>/dev/null || true)"
+  fi
+  if [[ -d "\${PWD}/viberoots" ]]; then
+    __vbr_local_real="$(cd "\${PWD}/viberoots" && pwd -P 2>/dev/null || true)"
+  fi
+  if [[ -n "\${__vbr_local_real}" && "\${__vbr_current_real}" == "\${__vbr_local_real}" ]]; then
+    __vbr_flake_input_root="\${PWD}/viberoots"
+  fi
+  unset __vbr_current_real
+  unset __vbr_local_real
 fi
 if [[ -f "\${__vbr_flake_input_root}/flake.nix" ]]; then
   export VIBEROOTS_FLAKE_INPUT_ROOT="\${__vbr_flake_input_root}"

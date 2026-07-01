@@ -103,8 +103,8 @@ test("verify seed snapshot excludes generated workspace buck state", async () =>
   assert.match(source, /lib\.hasPrefix "\.viberoots\/codex-logs\/" rel/);
   assert.match(source, /rel == "build-tools\/tmp"/);
   assert.match(source, /lib\.hasPrefix "build-tools\/tmp\/" rel/);
-  assert.match(source, /rel == "viberoots\/\.viberoots"/);
-  assert.match(source, /lib\.hasPrefix "viberoots\/\.viberoots\/" rel/);
+  assert.match(source, /"\.viberoots"/);
+  assert.match(source, /builtins\.any \(d: rel == "viberoots\/\$\{d\}"/);
   assert.match(seedSource, /"\$out\/\.viberoots\/buck"/);
   assert.match(seedSource, /"\$out\/\.viberoots\/codex-logs"/);
   assert.match(seedSource, /"\$out\/\.viberoots\/workspace\/\.viberoots"/);

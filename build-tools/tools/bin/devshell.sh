@@ -18,7 +18,7 @@ env_reexec_from_cwd_repo() {
 	cwd_root="$(cd "${cwd_root}" && pwd)"
 	[[ "${cwd_root}" != "${script_root}" ]] || return 0
 	local cwd_tool="${cwd_root}/build-tools/tools/bin/${tool_name}"
-	if [[ -x "${cwd_tool}" ]]; then
+	if [[ -f "${cwd_root}/build-tools/tools/dev/viberoots.ts" && -x "${cwd_tool}" ]]; then
 		exec "${cwd_tool}" "$@"
 	fi
 }
@@ -50,6 +50,8 @@ env_init_paths() {
 	fi
 	if [[ -n "${VIBEROOTS_SOURCE_ROOT:-}" ]]; then
 		export VIBEROOTS_ROOT="$(cd "${VIBEROOTS_SOURCE_ROOT}" && pwd)"
+	elif [[ -n "${VIBEROOTS_ROOT:-}" && -f "${VIBEROOTS_ROOT}/build-tools/tools/dev/zx-init.mjs" ]]; then
+		export VIBEROOTS_ROOT="$(cd "${VIBEROOTS_ROOT}" && pwd)"
 	elif [[ -e "${LIVE_ROOT}/.viberoots/current" ]]; then
 		export VIBEROOTS_ROOT="$(cd "${LIVE_ROOT}/.viberoots/current" && pwd)"
 	elif [[ -f "${LIVE_ROOT}/viberoots/build-tools/tools/dev/zx-init.mjs" ]]; then

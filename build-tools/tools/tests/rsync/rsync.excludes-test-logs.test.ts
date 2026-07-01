@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { rsyncRepoTo, runInTemp } from "../lib/test-helpers";
 
 async function withDefaultRsyncCopy(fn: () => Promise<void>): Promise<void> {
   const prevGoOnly = process.env.TEST_PARTIAL_CLONE_GO_ONLY;
@@ -23,6 +23,13 @@ async function exists(p: string): Promise<boolean> {
     .catch(() => false);
 }
 
+async function assertMissing(p: string): Promise<void> {
+  if (await exists(p)) {
+    console.error("expected path to be excluded from temp copy:", p);
+    process.exit(2);
+  }
+}
+
 async function withRsyncOverlayRoot(fn: (overlayRoot: string) => Promise<void>): Promise<void> {
   const overlayRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-rsync-overlay-"));
   const prevOverlayRoot = process.env.TEST_RSYNC_OVERLAY_ROOT;
@@ -34,6 +41,57 @@ async function withRsyncOverlayRoot(fn: (overlayRoot: string) => Promise<void>):
     else process.env.TEST_RSYNC_OVERLAY_ROOT = prevOverlayRoot;
     await fsp.rm(overlayRoot, { recursive: true, force: true });
   }
+}
+
+async function withEnv<T>(
+  updates: Record<string, string | undefined>,
+  fn: () => Promise<T>,
+): Promise<T> {
+  const previous: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(updates)) {
+    previous[key] = process.env[key];
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
+  try {
+    return await fn();
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+}
+
+async function makeSourceRoot(prefix: string): Promise<string> {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), prefix));
+  await fsp.mkdir(path.join(root, "viberoots", "build-tools"), { recursive: true });
+  await fsp.writeFile(path.join(root, "viberoots", "flake.nix"), "{}\n");
+  await fsp.writeFile(path.join(root, "viberoots", "build-tools", "keep.txt"), "keep\n");
+  await fsp.mkdir(path.join(root, "viberoots", ".viberoots", "workspace", "buck"), {
+    recursive: true,
+  });
+  await fsp.writeFile(
+    path.join(root, "viberoots", ".viberoots", "workspace", "buck", "large-store-blob"),
+    "generated\n",
+  );
+  return root;
+}
+
+async function makeViberootsSourceRoot(prefix: string): Promise<string> {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), prefix));
+  await fsp.mkdir(path.join(root, "build-tools"), { recursive: true });
+  await fsp.writeFile(path.join(root, "flake.nix"), "{}\n");
+  await fsp.writeFile(path.join(root, "build-tools", "keep.txt"), "keep\n");
+  await fsp.mkdir(path.join(root, ".viberoots", "workspace", "buck", "unified-pnpm-store"), {
+    recursive: true,
+  });
+  await fsp.writeFile(path.join(root, ".viberoots", "workspace", "flake.nix"), "{}\n");
+  await fsp.writeFile(
+    path.join(root, ".viberoots", "workspace", "buck", "unified-pnpm-store", "large-store-blob"),
+    "generated\n",
+  );
+  return root;
 }
 
 test("rsync: excludes test-logs by default", async () => {
@@ -82,6 +140,49 @@ test("rsync: excludes nested agent worktree build output", async () => {
       console.error("test fixture leaked into live repo:", liveLeakPath);
       process.exit(2);
     }
+  }
+});
+
+test("rsync: filtered roots exclude nested viberoots generated workspace state", async () => {
+  const source = await makeSourceRoot("viberoots-rsync-source-");
+  const dest = await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-rsync-dest-"));
+  try {
+    await withEnv(
+      {
+        TEST_RSYNC_SOURCE_ROOT: source,
+        TEST_RSYNC_ROOTS: "viberoots",
+      },
+      async () => {
+        await rsyncRepoTo(dest);
+      },
+    );
+    await fsp.access(path.join(dest, "viberoots", "build-tools", "keep.txt"));
+    await assertMissing(path.join(dest, "viberoots", ".viberoots"));
+  } finally {
+    await fsp.rm(source, { recursive: true, force: true });
+    await fsp.rm(dest, { recursive: true, force: true });
+  }
+});
+
+test("rsync: viberoots source roots exclude generated workspace buck state", async () => {
+  const source = await makeViberootsSourceRoot("viberoots-rsync-vbr-source-");
+  const dest = await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-rsync-vbr-dest-"));
+  try {
+    await withEnv(
+      {
+        TEST_RSYNC_SOURCE_ROOT: source,
+        TEST_RSYNC_ROOTS: undefined,
+      },
+      async () => {
+        await rsyncRepoTo(dest);
+      },
+    );
+    await fsp.access(path.join(dest, "build-tools", "keep.txt"));
+    await fsp.access(path.join(dest, ".viberoots", "workspace", "flake.nix"));
+    await assertMissing(path.join(dest, ".viberoots", "workspace", "buck"));
+  } finally {
+    await fsp.rm(source, { recursive: true, force: true });
+    await fsp.rm(dest, { recursive: true, force: true });
   }
 });
 

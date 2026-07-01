@@ -98,8 +98,6 @@ const WORKSPACE_ROOT_URL = pathToFileURL(
     : WORKSPACE_ROOT_FIXED + pathMod2.sep,
 ).href;
 
-//
-
 // Minimal resolver:
 // 1) Append .ts to relative/absolute specifiers lacking an extension.
 // 2) Fall back to resolving bare imports by searching NODE_PATH entries, then repo node_modules.
@@ -151,6 +149,14 @@ const src = `export async function resolve(specifier, context, nextResolve) {
       const envPath = (process.env.NODE_PATH || '').split('${process.platform === "win32" ? ";" : ":"}').filter(Boolean);
       for (const entry of envPath) {
         const baseUrl = new URL(entry.endsWith('/') ? entry : entry + '/', base);
+        try {
+          const { createRequire } = await import('node:module');
+          const { pathToFileURL } = await import('node:url');
+          const req = createRequire(new URL('package.json', baseUrl));
+          const resolved = req.resolve(specifier);
+          const href = pathToFileURL(resolved).href;
+          return await nextResolve(href, context);
+        } catch {}
         const candidate = new URL(specifier, baseUrl).href;
         try { return await nextResolve(candidate, context); } catch {}
         const candidateDir = new URL(specifier + '/index.js', baseUrl).href;
@@ -240,5 +246,3 @@ if (verifyProcessStateFile && nestedBuckIso && !globalThis.__vbrVerifyBuckIsolat
     });
   } catch {}
 }
-
-//

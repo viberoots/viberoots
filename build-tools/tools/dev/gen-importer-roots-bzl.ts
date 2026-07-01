@@ -88,9 +88,11 @@ async function main() {
     workspaceRootsRaw.length > 0 ? workspaceRootsRaw : DEFAULT_WORKSPACE_ROOTS.slice();
   const out = renderBzl(allowDotImporter, workspaceRoots);
   const changed = await writeIfChanged(bzlPath, out);
-  console.log(
-    `wrote ${bzlPath} (${workspaceRoots.length} workspace roots)${changed ? "" : " (unchanged)"}`,
-  );
+  if (String(process.env.VBR_VERBOSE || "").trim()) {
+    console.log(
+      `wrote ${bzlPath} (${workspaceRoots.length} workspace roots)${changed ? "" : " (unchanged)"}`,
+    );
+  }
 }
 
 main().catch((e) => {

@@ -66,6 +66,10 @@ test("copySeedStoreToTempRepo publishes a complete forced-CoW seed copy atomical
     path.join(".viberoots", "codex-logs", "full.log"),
     path.join(".viberoots", "workspace", "codex-test-logs", "focused.log"),
     path.join("build-tools", "tmp", "rsync-nested-buck-out-123", "buck-out", "artifact"),
+    path.join("viberoots", ".direnv", "flake-profile.rc"),
+    path.join("viberoots", ".nix-gcroots", "devshell"),
+    path.join("viberoots", "buck-out", "v2", "cache"),
+    path.join("viberoots", "node_modules", ".bin", "tool"),
   ]) {
     const abs = path.join(seed, rel);
     await fsp.mkdir(path.dirname(abs), { recursive: true });
@@ -107,6 +111,10 @@ test("copySeedStoreToTempRepo publishes a complete forced-CoW seed copy atomical
       path.join(tmp, "build-tools", "tmp", "rsync-nested-buck-out-123", "buck-out", "artifact"),
     ),
   );
+  await assert.rejects(fsp.access(path.join(tmp, "viberoots", ".direnv")));
+  await assert.rejects(fsp.access(path.join(tmp, "viberoots", ".nix-gcroots")));
+  await assert.rejects(fsp.access(path.join(tmp, "viberoots", "buck-out")));
+  await assert.rejects(fsp.access(path.join(tmp, "viberoots", "node_modules")));
   assert.equal(await fsp.readFile(path.join(seed, "flake.nix"), "utf8"), "flake.nix\n");
 });
 

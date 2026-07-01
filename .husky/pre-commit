@@ -10,6 +10,24 @@ PNPM_DIR="${ROOT_DIR}"
 if [ ! -f "${PNPM_DIR}/package.json" ] && [ -f "${ROOT_DIR}/viberoots/package.json" ]; then
   PNPM_DIR="${ROOT_DIR}/viberoots"
 fi
+TOOL_PNPM_DIR="${PNPM_DIR}"
+for candidate_tool_dir in "${VIBEROOTS_SOURCE_ROOT:-}" "${VIBEROOTS_FLAKE_INPUT_ROOT:-}"; do
+  if [ -n "${candidate_tool_dir}" ] && [ -x "${candidate_tool_dir}/node_modules/.bin/eslint" ]; then
+    TOOL_PNPM_DIR="${candidate_tool_dir}"
+    break
+  fi
+done
+if [ ! -x "${TOOL_PNPM_DIR}/node_modules/.bin/eslint" ] && [ -n "${NODE_PATH:-}" ]; then
+  OLD_IFS="${IFS}"
+  IFS=:
+  for node_path_dir in ${NODE_PATH}; do
+    if [ -n "${node_path_dir}" ] && [ -x "${node_path_dir}/.bin/eslint" ]; then
+      TOOL_PNPM_DIR="$(cd "${node_path_dir}/.." && pwd)"
+      break
+    fi
+  done
+  IFS="${OLD_IFS}"
+fi
 LINT_STAGED_CONFIG="$(mktemp "${TMPDIR:-/tmp}/lint-staged.XXXXXX.json")"
 trap 'rm -f "${LINT_STAGED_CONFIG}"' EXIT
 node -e '
@@ -17,10 +35,11 @@ const fs = require("node:fs");
 const pkgPath = process.argv[1];
 const outPath = process.argv[2];
 const pnpmDir = process.argv[3];
+const toolPnpmDir = process.argv[4];
 const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
 const cfg = pkg["lint-staged"] || {};
-const eslintBin = `${pnpmDir}/node_modules/.bin/eslint`;
-const prettierBin = `${pnpmDir}/node_modules/.bin/prettier`;
+const eslintBin = `${toolPnpmDir}/node_modules/.bin/eslint`;
+const prettierBin = `${toolPnpmDir}/node_modules/.bin/prettier`;
 const staleNamesLint = `zx-wrapper ${pnpmDir}/build-tools/tools/dev/stale-names-lint.ts`;
 function rewriteTask(task) {
   if (typeof task !== "string") {
@@ -45,15 +64,31 @@ for (const [glob, tasks] of Object.entries(cfg)) {
   cfg[glob] = list.map(rewriteTask);
 }
 fs.writeFileSync(outPath, JSON.stringify(cfg), "utf8");
-' "${PNPM_DIR}/package.json" "${LINT_STAGED_CONFIG}" "${PNPM_DIR}"
+' "${PNPM_DIR}/package.json" "${LINT_STAGED_CONFIG}" "${PNPM_DIR}" "${TOOL_PNPM_DIR}"
 
 if ! command -v nix >/dev/null 2>&1; then
   echo "error: Nix is required for pre-commit. Install Nix and try again." 1>&2
   exit 127
 fi
 LINT_STAGED_BIN="${PNPM_DIR}/node_modules/.bin/lint-staged"
+if [ ! -x "${LINT_STAGED_BIN}" ] && [ -x "${TOOL_PNPM_DIR}/node_modules/.bin/lint-staged" ]; then
+  LINT_STAGED_BIN="${TOOL_PNPM_DIR}/node_modules/.bin/lint-staged"
+fi
 if [ ! -x "${LINT_STAGED_BIN}" ]; then
   LINT_STAGED_BIN="lint-staged"
+fi
+NODE_PATH_PARTS=()
+for node_modules_dir in \
+  "${PNPM_DIR}/node_modules" \
+  "${VIBEROOTS_SOURCE_ROOT:-}/node_modules" \
+  "${VIBEROOTS_FLAKE_INPUT_ROOT:-}/node_modules"; do
+  if [ -n "${node_modules_dir}" ] && [ -d "${node_modules_dir}" ]; then
+    NODE_PATH_PARTS+=("${node_modules_dir}")
+  fi
+done
+if [ "${#NODE_PATH_PARTS[@]}" -gt 0 ]; then
+  NODE_PATH_JOINED="$(IFS=:; echo "${NODE_PATH_PARTS[*]}")"
+  export NODE_PATH="${NODE_PATH_JOINED}${NODE_PATH:+:${NODE_PATH}}"
 fi
 
 # Run lint-staged inside the repo's Nix dev shell so pnpm and tools are on PATH.

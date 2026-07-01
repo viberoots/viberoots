@@ -27,6 +27,22 @@ test("devshell exposes user-facing tools from Nix on PATH", async () => {
     true,
   );
 
+  await $({
+    cwd: root,
+    env: {
+      ...process.env,
+      IN_NIX_SHELL: "",
+      WORKSPACE_ROOT: root,
+      VIBEROOTS_ROOT: "",
+      VIBEROOTS_SOURCE_ROOT: "",
+      _VIBEROOTS_DEVSHELL_ACTIVE: "",
+      _VIBEROOTS_DEVSHELL_ROOT: "",
+    },
+    stdio: "pipe",
+    reject: false,
+    nothrow: true,
+  })`direnv reload`;
+
   const result = await $({
     cwd: root,
     env: {
@@ -48,14 +64,14 @@ for bin in nix buck2 node pnpm go python3 uv jq rsync copier yq gomod2nix vibero
   path="$(command -v "$bin")"
   case "$path" in
     */buck-out/zx_shims/*/bin/buck2) if [ "$bin" = buck2 ]; then continue; fi ;;
-    /nix/store/*|"$PWD"/viberoots/build-tools/tools/bin/*|"$PWD"/.viberoots/current/build-tools/tools/bin/*|"$PWD"/.direnv/bin/*|"$PWD"/node_modules/.bin/*) ;;
+    /nix/store/*|"$PWD"/.viberoots/current/build-tools/tools/bin/*|"$PWD"/.direnv/bin/*|"$PWD"/node_modules/.bin/*) ;;
     *) echo "$bin resolved outside Nix/devshell paths: $path" >&2; exit 1 ;;
   esac
 done
 cd projects
 for bin in s v i b; do
   case "$(command -v "$bin")" in
-    "$ROOT"/viberoots/build-tools/tools/bin/"$bin"|"$ROOT"/.viberoots/current/build-tools/tools/bin/"$bin"|"$ROOT"/.direnv/bin/"$bin"|/nix/store/*/bin/"$bin") ;;
+    "$ROOT"/.viberoots/current/build-tools/tools/bin/"$bin"|"$ROOT"/.direnv/bin/"$bin"|/nix/store/*/bin/"$bin") ;;
     *) echo "$bin not available from projects via devshell path: $(command -v "$bin")" >&2; exit 1 ;;
   esac
 done

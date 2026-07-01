@@ -84,13 +84,34 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
   chmod u+w "$out"
   ${copySubDirScript}
   rm -rf \
+    "$out/.DS_Store" \
+    "$out/.codex-logs" \
+    "$out/.codex-"*.log \
+    "$out/.full-test-output.log" \
+    "$out/.patch-sessions.json" \
     "$out/.viberoots/buck" \
     "$out/.viberoots/cache" \
     "$out/.viberoots/codex-logs" \
     "$out/.viberoots/workspace/.viberoots" \
     "$out/.viberoots/workspace/codex-test-logs" \
     "$out/build-tools/tmp" \
-    "$out/viberoots/.viberoots"
+    "$out/viberoots/.cache" \
+    "$out/viberoots/.clinic" \
+    "$out/viberoots/.codex-logs" \
+    "$out/viberoots/.codex-"*.log \
+    "$out/viberoots/.DS_Store" \
+    "$out/viberoots/.direnv" \
+    "$out/viberoots/.full-test-output.log" \
+    "$out/viberoots/.nix-gcroots" \
+    "$out/viberoots/.patch-sessions.json" \
+    "$out/viberoots/.pnpm-store" \
+    "$out/viberoots/.viberoots" \
+    "$out/viberoots/buck-out" \
+    "$out/viberoots/build-tools/tmp" \
+    "$out/viberoots/coverage" \
+    "$out/viberoots/node_modules" \
+    "$out/viberoots/result" \
+    "$out/viberoots/test-logs"
   chmod -R u+w "$out"
   export GIT_AUTHOR_NAME=seed
   export GIT_AUTHOR_EMAIL=seed@example.com

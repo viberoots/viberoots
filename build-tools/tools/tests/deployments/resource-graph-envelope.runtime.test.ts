@@ -13,7 +13,7 @@ import { admitControlPlaneRuntimeRecord } from "../../deployments/resource-graph
 import { IMAGE_BUILD_IDENTITY, evidence } from "./cloud-control-cutover-fixture";
 import { runtimeInputProfile } from "./cloud-control-runtime-input.fixture";
 
-test("runtime envelopes cover every PR-2 admitted runtime fact kind", () => {
+test("runtime envelopes cover every admitted runtime fact kind", () => {
   const inventory = createDeploymentResourceInventory([], { runtimeSources: runtimeSources() });
   const result = createDeploymentResourceEnvelopes(inventory);
   assert.deepEqual(result.errors, []);

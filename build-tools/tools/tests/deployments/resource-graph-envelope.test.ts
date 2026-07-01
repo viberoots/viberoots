@@ -167,9 +167,31 @@ function manualInventory(sourcePath: string): DeploymentResourceInventory {
         id: "pleomino-prod",
         authority: "reviewed_intent",
         source: { class: "buck", label: "//projects/apps/pleomino:deploy", path: sourcePath },
-        facts: { provider: "cloudflare_pages" },
+        refs: ["provider", "lane", "admission"],
+        facts: {
+          provider: "cloudflare_pages",
+          providerTargetIdentity: "provider",
+          lanePolicyRef: "lane",
+          admissionPolicyRef: "admission",
+        },
       },
+      manualResource("ProviderTarget", "provider", sourcePath),
+      manualResource("LanePolicy", "lane", sourcePath),
+      manualResource("AdmissionPolicy", "admission", sourcePath),
     ],
+  };
+}
+
+function manualResource(
+  kind: DeploymentResourceInventory["resources"][number]["kind"],
+  id: string,
+  sourcePath: string,
+): DeploymentResourceInventory["resources"][number] {
+  return {
+    kind,
+    id,
+    authority: "reviewed_intent",
+    source: { class: "buck", label: "//projects/apps/pleomino:deploy", path: sourcePath },
   };
 }
 

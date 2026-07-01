@@ -135,11 +135,9 @@ cloudflare_containers_deployment(
 )
 `,
     );
-    const viberootsPackageRoot = path.dirname(viberootsToolScript("package.json"));
-    const prettier = path.join(viberootsPackageRoot, "node_modules", ".bin", "prettier");
     await $({
-      cwd: viberootsPackageRoot,
-    })`${prettier} --check ${wranglerPath} ${workerPath}`;
+      cwd: path.dirname(viberootsToolScript("package.json")),
+    })`prettier --check ${wranglerPath} ${workerPath}`;
     const attrFlags = DEPLOYMENT_CQUERY_ATTRS.flatMap((attr) => ["--output-attribute", attr]);
     const query =
       "set(//projects/deployments/api-staging:deploy //projects/apps/api:service_artifact //projects/deployments:defaults //projects/deployments/demo-shared:lane_governance //projects/deployments/demo-shared:lane //projects/deployments/demo-shared:dev_release)";

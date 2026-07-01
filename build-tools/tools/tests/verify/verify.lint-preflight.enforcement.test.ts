@@ -44,6 +44,10 @@ test("verify includes a bounded lint preflight (enforcement)", async () => {
     txt.includes("--scope=source") && txt.includes("--fail=true"),
     "expected verify preflight to pass strict source file-size args",
   );
+  assert.ok(
+    txt.includes("--changed-only"),
+    "expected scoped non-build-system verify to run a changed-file source file-size gate instead of skipping file-size checks entirely",
+  );
   assert.equal(
     txt.includes("--scope=ssr-tests"),
     false,

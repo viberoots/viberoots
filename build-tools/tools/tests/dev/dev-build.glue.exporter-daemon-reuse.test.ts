@@ -16,6 +16,12 @@ test("dev-build glue config enables stable exporter daemon reuse", async () => {
   if (!glue.includes("tools/dev/install-deps.ts") || !glue.includes("--glue-only")) {
     throw new Error("glue.ts must refresh generated glue through install-deps --glue-only");
   }
+  if (!glue.includes("import { isVbrVerbose }")) {
+    throw new Error("glue.ts must use shared verbose-mode detection");
+  }
+  if (!glue.includes('stdio: verbose ? "inherit" : "pipe"')) {
+    throw new Error("glue.ts must pipe child output outside verbose/debug mode");
+  }
   if (glue.includes("runGomod2nixGenerate") || glue.includes("runGomod2nixScanAll")) {
     throw new Error("glue.ts must not duplicate gomod2nix work after install-deps --glue-only");
   }
@@ -41,5 +47,21 @@ test("dev-build glue config enables stable exporter daemon reuse", async () => {
   }
   if (!runner.includes("if (reuse) return await fn();")) {
     throw new Error("cquery runner must skip daemon cleanup when reuse is enabled");
+  }
+
+  const exporter = await fsp.readFile("viberoots/build-tools/tools/buck/exporter/main.ts", "utf8");
+  if (
+    !exporter.includes("process.env.VBR_VERBOSE") ||
+    !exporter.includes("process.env.EXPORTER_DEBUG")
+  ) {
+    throw new Error("exporter success banner must be gated by verbose/debug mode");
+  }
+
+  const importerRoots = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/gen-importer-roots-bzl.ts",
+    "utf8",
+  );
+  if (!importerRoots.includes("process.env.VBR_VERBOSE")) {
+    throw new Error("importer roots generator must only log in verbose mode");
   }
 });

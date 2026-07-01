@@ -43,3 +43,48 @@ test("tooling-contract gate denies direct raw graph.json reads", async () => {
     }
   });
 });
+
+test("tooling-contract gate denies deployment raw workspace graph access", async () => {
+  await runInTemp("tooling-contract-deployment-deny", async (tmp, $) => {
+    const badDir = path.join(tmp, "viberoots", "build-tools", "tools", "deployments");
+    await fs.mkdirp(badDir);
+    const directRead = path.join(badDir, "bad-resource-graph.ts");
+    await fs.writeFile(
+      directRead,
+      [
+        "import fs from 'fs-extra';",
+        "export async function bad(){",
+        "  return fs.readFile('.viberoots/workspace/buck/graph.json', 'utf8');",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const failDirect = await $({
+      cwd: tmp,
+    })`node viberoots/build-tools/tools/ci/tooling-contract-check.ts`.nothrow();
+    if (failDirect.exitCode === 0) {
+      console.error("expected tooling-contract to fail on raw workspace graph read");
+      process.exit(2);
+    }
+
+    await fs.remove(directRead);
+    await fs.writeFile(
+      path.join(badDir, "bad-default-graph.ts"),
+      [
+        'import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";',
+        "export const graphPath = DEFAULT_GRAPH_PATH;",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const failConstant = await $({
+      cwd: tmp,
+    })`node viberoots/build-tools/tools/ci/tooling-contract-check.ts`.nothrow();
+    if (failConstant.exitCode === 0) {
+      console.error("expected tooling-contract to fail on deployment DEFAULT_GRAPH_PATH import");
+      process.exit(2);
+    }
+  });
+});

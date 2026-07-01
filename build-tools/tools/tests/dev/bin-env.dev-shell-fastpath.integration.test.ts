@@ -30,6 +30,11 @@ test("devshell.sh supports safe direnv bypass fast-path", async () => {
     throw new Error("devshell.sh fast-path must preserve BUCK_CONFIG_LOCK on direct exec");
   }
   if (
+    !txt.includes('[[ -f "${cwd_root}/build-tools/tools/dev/viberoots.ts" && -x "${cwd_tool}" ]]')
+  ) {
+    throw new Error("devshell.sh must only re-exec root build-tools from a viberoots source root");
+  }
+  if (
     !txt.includes('[[ -f "${live_root}/.viberoots/current/prelude/prelude.bzl" ]]') ||
     !txt.includes("ensure_viberoots_current") ||
     !txt.includes('target=".."') ||

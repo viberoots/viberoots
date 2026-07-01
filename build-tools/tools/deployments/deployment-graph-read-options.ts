@@ -19,6 +19,10 @@ export function deploymentGraphReadOptions(
   };
 }
 
+export function defaultDeploymentGraphPath(workspaceRoot: string): string {
+  return path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
+}
+
 function resolveWorkspacePath(workspaceRoot: string, value: string): string {
   return path.isAbsolute(value) ? value : path.join(workspaceRoot, value);
 }

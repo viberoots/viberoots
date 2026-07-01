@@ -159,6 +159,25 @@ test("activateWorkspace rejects stale local current symlink", async () => {
   }
 });
 
+test("activateWorkspace replaces stale remote current symlink in local mode", async () => {
+  const root = await workspace("vbr-activate-stale-remote");
+  try {
+    await makeSource(root);
+    await fsp.mkdir(path.join(root, ".viberoots"), { recursive: true });
+    await fsp.symlink(
+      "/nix/store/stale-viberoots-source",
+      path.join(root, ".viberoots", "current"),
+    );
+
+    await activateWorkspace({ start: root, env: { WORKSPACE_ROOT: root } });
+
+    assert.equal(await readlink(root), "..");
+    assert.equal(await fsp.realpath(path.join(root, ".viberoots/current")), root);
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("activateWorkspace rejects dangling local current symlink", async () => {
   const root = await workspace("vbr-activate-dangling-local");
   try {

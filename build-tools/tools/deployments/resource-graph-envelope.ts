@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
 import { readDeploymentResourceInventory } from "./resource-graph-inventory";
+import { inventoryRefErrors } from "./resource-graph-envelope-validation";
 import { ADMITTED_RUNTIME_SOURCE_LABEL } from "./resource-graph-types";
 import type {
   DeploymentResourceInventory,
@@ -74,6 +75,7 @@ export function createDeploymentResourceEnvelopes(inventory: DeploymentResourceI
     envelopes,
     errors: [
       ...inventory.errors,
+      ...inventoryRefErrors(inventory.resources),
       ...rawSecretSourceErrors(inventory.resources),
       ...sourceAuthorityErrors(envelopes),
       ...secretSafetyErrors(envelopes),
@@ -209,7 +211,6 @@ function sourceAuthorityErrors(envelopes: DeploymentResourceEnvelope[]): string[
         `${envelope.kind} ${envelope.metadata.name}: runtime envelope must derive from admitted runtime records`,
     );
 }
-
 const REDACTED_SECRET = "<redacted>";
 
 function redactSecrets(value: unknown): unknown {

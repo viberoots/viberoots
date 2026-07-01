@@ -53,7 +53,7 @@ in {
         IFS=':'
         for entry in $1; do
           case "$entry" in
-            ""|/opt/homebrew/bin|/opt/homebrew/sbin|/usr/local/Homebrew/*|/usr/local/Cellar/*) ;;
+            ""|/opt/homebrew/bin|/opt/homebrew/sbin|/usr/local/Homebrew/*|/usr/local/Cellar/*|"$PWD/viberoots/build-tools/tools/bin"|"$PWD/viberoots/node_modules/.bin") ;;
             *) out="''${out:+$out:}$entry" ;;
           esac
         done
@@ -63,8 +63,8 @@ in {
 
       _vbr_apply_dev_path() {
         local vbr_nix_bin="${viberootsCommand}/bin"
-        local vbr_tools_bin="$PWD/build-tools/tools/bin"
-        local vbr_node_bin="$PWD/node_modules/.bin"
+        local vbr_tools_bin=""
+        local vbr_node_bin=""
         local vbr_host_nix_bin=""
         if [ -n "''${VBR_NIX_BIN:-}" ] && [ -x "$VBR_NIX_BIN" ]; then
           :
@@ -74,9 +74,12 @@ in {
         elif [ -x "$vbr_nix_bin/nix" ]; then
           export VBR_NIX_BIN="$vbr_nix_bin/nix"
         fi
-        if [ ! -d "$vbr_tools_bin" ] && [ -d "$PWD/viberoots/build-tools/tools/bin" ]; then
-          vbr_tools_bin="$PWD/viberoots/build-tools/tools/bin"
-          vbr_node_bin="$PWD/viberoots/node_modules/.bin"
+        if [ -f "$PWD/build-tools/tools/dev/viberoots.ts" ]; then
+          vbr_tools_bin="$PWD/build-tools/tools/bin"
+          vbr_node_bin="$PWD/node_modules/.bin"
+        elif [ -d "$PWD/.viberoots/current/build-tools/tools/bin" ]; then
+          vbr_tools_bin="$PWD/.viberoots/current/build-tools/tools/bin"
+          vbr_node_bin="$PWD/.viberoots/current/node_modules/.bin"
         fi
         local repo_prefix="$vbr_tools_bin:$PWD/.direnv/bin:$vbr_node_bin"
         local nix_prefix="''${HOST_PATH:-}"
@@ -103,12 +106,14 @@ in {
         fi
       fi
 
-      vbr_tools_bin="$PWD/build-tools/tools/bin"
-      if [ ! -d "$vbr_tools_bin" ] && [ -d "$PWD/viberoots/build-tools/tools/bin" ]; then
-        vbr_tools_bin="$PWD/viberoots/build-tools/tools/bin"
-      fi
-
-      if [ -d "$vbr_tools_bin" ]; then
+      _vbr_prepare_tool_helpers() {
+        local vbr_tools_bin=""
+        if [ -f "$PWD/build-tools/tools/dev/viberoots.ts" ]; then
+          vbr_tools_bin="$PWD/build-tools/tools/bin"
+        elif [ -d "$PWD/.viberoots/current/build-tools/tools/bin" ]; then
+          vbr_tools_bin="$PWD/.viberoots/current/build-tools/tools/bin"
+        fi
+        [ -d "$vbr_tools_bin" ] || return 0
         export CMUX_CUSTOM_CLAUDE_PATH="$vbr_tools_bin/claude"
         export CMUX_CUSTOM_CODEX_PATH="$vbr_tools_bin/codex"
         mkdir -p "$PWD/.direnv/bin" 2>/dev/null || true
@@ -165,8 +170,27 @@ EOF
             clang -Wall -Wextra -O2 -o "$PWD/.direnv/bin/apfs-clone-checker" "$PWD/.direnv/bin/apfs-clone-checker.c" >/dev/null 2>&1 || rm -f "$PWD/.direnv/bin/apfs-clone-checker"
           fi
         fi
-        _vbr_apply_dev_path
-      fi
+      }
+
+      _vbr_declared_local_input_root() {
+        local flake="$PWD/.viberoots/workspace/flake.nix"
+        [ -f "$flake" ] || return 1
+        local url
+        url="$(sed -n 's/^[[:space:]]*viberoots\.url[[:space:]]*=[[:space:]]*"\([^"]*\)".*/\1/p' "$flake" | head -n 1)"
+        case "$url" in
+          path:*) ;;
+          *) return 1 ;;
+        esac
+        local declared="''${url#path:}"
+        local resolved=""
+        case "$declared" in
+          /*) resolved="$declared" ;;
+          *) resolved="$(cd "$(dirname "$flake")" && cd "$declared" && pwd -P 2>/dev/null || true)" ;;
+        esac
+        [ -n "$resolved" ] || return 1
+        [ -f "$resolved/flake.nix" ] || return 1
+        printf '%s\n' "$resolved"
+      }
       # Ensure wrapper scripts on PATH are used even if stale aliases linger
       # from an older shellHook revision.
       unalias i b v t >/dev/null 2>&1 || true
@@ -209,28 +233,48 @@ EOF
           fi
         fi
       fi
-      _vbr_apply_dev_path
-
-      if [ -f flake.nix ] || [ -f viberoots/flake.nix ]; then
-        vbr_source="${viberootsRoot}"
+      if [ -f "$PWD/build-tools/tools/dev/viberoots.ts" ] || [ -f "$PWD/.viberoots/workspace/flake.nix" ] || [ -f "$PWD/flake.nix" ]; then
         if [ -f "$PWD/build-tools/tools/dev/viberoots.ts" ]; then
-          vbr_source="$PWD"
-        elif [ -f "$PWD/viberoots/flake.nix" ]; then
-          vbr_source="$PWD/viberoots"
-          _vbr_mark_macos_metadata_never_index "$PWD/.viberoots"
-          _vbr_mark_macos_metadata_never_index "$PWD/.viberoots/workspace"
-          if [ "$(readlink "$PWD/.viberoots/current" 2>/dev/null || true)" != "../viberoots" ]; then
-            rm -f "$PWD/.viberoots/current"
-            ln -s ../viberoots "$PWD/.viberoots/current"
+          export VIBEROOTS_ROOT="$PWD"
+          export VIBEROOTS_SOURCE_ROOT="$PWD"
+          viberoots init-workspace --shell-entry --source "$PWD" >/dev/null || {
+            echo "(devShell) viberoots workspace activation failed" >&2
+            return 1 2>/dev/null || exit 1
+          }
+        else
+          vbr_flake_input_root="''${VIBEROOTS_FLAKE_INPUT_ROOT:-}"
+          if [ -n "$vbr_flake_input_root" ] && [ -f "$vbr_flake_input_root/flake.nix" ]; then
+            export VIBEROOTS_ROOT="$vbr_flake_input_root"
+            export VIBEROOTS_SOURCE_ROOT="$vbr_flake_input_root"
+            viberoots init-workspace --shell-entry --source "$vbr_flake_input_root" >/dev/null || {
+              echo "(devShell) viberoots workspace activation failed" >&2
+              return 1 2>/dev/null || exit 1
+            }
+          elif vbr_flake_input_root="$(_vbr_declared_local_input_root)"; then
+            export VIBEROOTS_FLAKE_INPUT_ROOT="$vbr_flake_input_root"
+            export VIBEROOTS_ROOT="$vbr_flake_input_root"
+            export VIBEROOTS_SOURCE_ROOT="$vbr_flake_input_root"
+            viberoots init-workspace --shell-entry --source "$vbr_flake_input_root" >/dev/null || {
+              echo "(devShell) viberoots workspace activation failed" >&2
+              return 1 2>/dev/null || exit 1
+            }
+          else
+            unset VIBEROOTS_ROOT
+            unset VIBEROOTS_SOURCE_ROOT
+            viberoots init-workspace --shell-entry >/dev/null || {
+              echo "(devShell) viberoots workspace activation failed" >&2
+              return 1 2>/dev/null || exit 1
+            }
+          fi
+          if [ -d "$PWD/.viberoots/current" ]; then
+            vbr_source="$(cd "$PWD/.viberoots/current" && pwd -P)"
+            export VIBEROOTS_ROOT="$vbr_source"
+            export VIBEROOTS_SOURCE_ROOT="$vbr_source"
           fi
         fi
-        export VIBEROOTS_ROOT="$vbr_source"
-        export VIBEROOTS_SOURCE_ROOT="$vbr_source"
-        viberoots init-workspace --shell-entry --source "$vbr_source" >/dev/null || {
-          echo "(devShell) viberoots workspace activation failed" >&2
-          return 1 2>/dev/null || exit 1
-        }
       fi
+      _vbr_prepare_tool_helpers
+      _vbr_apply_dev_path
 
       # Prepare zsh/bash env for completions and aliases
       mkdir -p .nix-zsh
@@ -272,11 +316,14 @@ _vbr_update_path() {
   fi
   local d="''${WORKSPACE_ROOT:-$PWD}"
   while [[ "$d" != "/" ]]; do
-    local vbr_tools_bin="$d/build-tools/tools/bin"
-    local vbr_node_bin="$d/node_modules/.bin"
-    if [[ ! -d "$vbr_tools_bin" && -d "$d/viberoots/build-tools/tools/bin" ]]; then
-      vbr_tools_bin="$d/viberoots/build-tools/tools/bin"
-      vbr_node_bin="$d/viberoots/node_modules/.bin"
+    local vbr_tools_bin=""
+    local vbr_node_bin=""
+    if [[ -f "$d/build-tools/tools/dev/viberoots.ts" ]]; then
+      vbr_tools_bin="$d/build-tools/tools/bin"
+      vbr_node_bin="$d/node_modules/.bin"
+    elif [[ -d "$d/.viberoots/current/build-tools/tools/bin" ]]; then
+      vbr_tools_bin="$d/.viberoots/current/build-tools/tools/bin"
+      vbr_node_bin="$d/.viberoots/current/node_modules/.bin"
     fi
     if [[ ( -n "''${WORKSPACE_ROOT:-}" || -f "$d/flake.nix" ) && -d "$vbr_tools_bin" ]]; then
       local old_ifs="$IFS"
@@ -285,7 +332,7 @@ _vbr_update_path() {
       IFS=':'
       for entry in $PATH; do
         case "$entry" in
-          ""|/opt/homebrew/bin|/opt/homebrew/sbin|/usr/local/Homebrew/*|/usr/local/Cellar/*|"$vbr_host_nix_bin"|"$vbr_nix_bin"|"$vbr_tools_bin"|"$d/.direnv/bin"|"$d/node_modules/.bin"|"$d/viberoots/node_modules/.bin"|"$vbr_node_bin") ;;
+          ""|/opt/homebrew/bin|/opt/homebrew/sbin|/usr/local/Homebrew/*|/usr/local/Cellar/*|"$vbr_host_nix_bin"|"$vbr_nix_bin"|"$vbr_tools_bin"|"$d/.direnv/bin"|"$d/node_modules/.bin"|"$d/viberoots/build-tools/tools/bin"|"$d/viberoots/node_modules/.bin"|"$vbr_node_bin") ;;
           *) out="''${out:+$out:}$entry" ;;
         esac
       done

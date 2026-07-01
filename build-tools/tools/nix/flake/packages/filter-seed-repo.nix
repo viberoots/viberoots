@@ -28,8 +28,23 @@ let
   rootMdKeep = [
     "abstractions.md"
   ];
+  viberootsGeneratedRoots = [
+    ".cache"
+    ".clinic"
+    ".codex-logs"
+    ".direnv"
+    ".nix-gcroots"
+    ".pnpm-store"
+    ".viberoots"
+    "buck-out"
+    "coverage"
+    "node_modules"
+    "result"
+    "test-logs"
+  ];
   isRootFile = rel: !(lib.hasInfix "/" rel) && rel != "";
   isExcludedRootFile = base:
+    base == ".DS_Store" ||
     base == ".envrc" ||
     base == ".git" ||
     base == ".buck" ||
@@ -44,7 +59,10 @@ let
     base == "result" ||
     base == "test-logs" ||
     base == "collect-garbage-log.txt" ||
+    base == ".full-test-output.log" ||
+    base == ".patch-sessions.json" ||
     base == ".patch-sessions.json.tmp" ||
+    (lib.hasPrefix ".codex-" base && lib.hasSuffix ".log" base) ||
     (lib.hasPrefix "quad-alignment-" base && lib.hasSuffix ".md" base) ||
     (lib.hasPrefix "trio-alignment-" base && lib.hasSuffix ".md" base) ||
     (lib.hasSuffix ".md" base && !(lib.elem base rootMdKeep)) ||
@@ -67,8 +85,13 @@ let
     (lib.hasPrefix ".viberoots/codex-logs/" rel) ||
     rel == "build-tools/tmp" ||
     (lib.hasPrefix "build-tools/tmp/" rel) ||
-    rel == "viberoots/.viberoots" ||
-    (lib.hasPrefix "viberoots/.viberoots/" rel) ||
+    builtins.any (d: rel == "viberoots/${d}" || lib.hasPrefix "viberoots/${d}/" rel) viberootsGeneratedRoots ||
+    rel == "viberoots/.DS_Store" ||
+    rel == "viberoots/.full-test-output.log" ||
+    rel == "viberoots/.patch-sessions.json" ||
+    (lib.hasPrefix "viberoots/.codex-" rel && lib.hasSuffix ".log" rel) ||
+    rel == "viberoots/build-tools/tmp" ||
+    (lib.hasPrefix "viberoots/build-tools/tmp/" rel) ||
     rel == ".viberoots/workspace/providers/nix_attr_map.bzl" ||
     (lib.hasPrefix ".viberoots/workspace/providers/TARGETS" rel && lib.hasSuffix ".auto" rel) ||
     rel == "build-tools/tools/buck/graph.json" ||

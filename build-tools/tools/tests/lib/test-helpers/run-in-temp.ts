@@ -1114,7 +1114,16 @@ export async function runInTemp<T>(
   exportEnv.IN_NIX_SHELL = exportEnv.IN_NIX_SHELL || "1";
   try {
     const wsNodeModules = path.join(process.cwd(), "node_modules");
-    exportEnv.NODE_PATH = [wsNodeModules, exportEnv.NODE_PATH || ""]
+    const activeViberootsNodeModules = path.join(activeViberootsRoot, "node_modules");
+    const viberootsSourceNodeModules = path.join(viberootsSourceRoot, "node_modules");
+    const viberootsInputNodeModules = path.join(viberootsInputPath, "node_modules");
+    exportEnv.NODE_PATH = [
+      wsNodeModules,
+      activeViberootsNodeModules,
+      viberootsSourceNodeModules,
+      viberootsInputNodeModules,
+      exportEnv.NODE_PATH || "",
+    ]
       .filter(Boolean)
       .join(path.delimiter);
   } catch {}

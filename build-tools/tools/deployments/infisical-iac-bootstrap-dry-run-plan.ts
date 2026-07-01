@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { findRepoRoot } from "../lib/repo";
+import { defaultDeploymentGraphPath } from "./deployment-graph-read-options";
 import { resolverConfigPath } from "./infisical-iac-bootstrap-preflight";
 import { isGeneratedInfisicalResolverProfile } from "./infisical-iac-bootstrap-profile-kind";
 import { repoBootstrapProfiles } from "./infisical-iac-bootstrap-resolver";
@@ -22,7 +22,7 @@ export async function buildRepoDryRunMaterializationPlan(opts: {
   const configExists = await exists(configPath);
   const config = configExists ? await readSprinkleRefConfig(configPath, workspaceRoot) : undefined;
   const profiles = await repoBootstrapProfiles({
-    graphPath: opts.graphPath || path.join(workspaceRoot, DEFAULT_GRAPH_PATH),
+    graphPath: opts.graphPath || defaultDeploymentGraphPath(workspaceRoot),
     workspaceRoot,
     config,
     starterCategoryProfiles: !configExists,

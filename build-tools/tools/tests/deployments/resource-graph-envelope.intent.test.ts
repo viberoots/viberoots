@@ -10,7 +10,7 @@ import {
 } from "./deployment-metadata.fixture";
 import { s3StaticDeploymentFixture } from "./s3-static.fixture";
 
-test("intent envelopes cover every extractable PR-1 kind from deployment contracts", () => {
+test("intent envelopes cover every extractable kind from deployment contracts", () => {
   const releaseAction = deploymentReleaseActionFixture();
   const targetException = deploymentTargetExceptionFixture({ affectedDeploymentIds: ["pleomino"] });
   const deployment = s3StaticDeploymentFixture({

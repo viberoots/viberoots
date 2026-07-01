@@ -55,6 +55,7 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
     stage0,
     /__vbr_flake_args=\(--override-input viberoots "path:\$\{__vbr_flake_input_root\}"\)/,
   );
+  assert.match(stage0, /"\$\{__vbr_current_real\}" == "\$\{__vbr_local_real\}"/);
   assert.match(stage0, /__vbr_stage0_apply_nix_cache_health \|\| return 1/);
 }
 
@@ -133,6 +134,7 @@ test("viberoots help and bash completion are generated from command metadata", a
     "bootstrap",
     "update",
     "gc",
+    "resource-graph",
     "init-consumer",
     "use-submodule",
     "use-flake",
@@ -147,7 +149,7 @@ test("viberoots help and bash completion are generated from command metadata", a
   assert.match(completion.stdout, /_viberoots\(\)/);
   assert.match(
     completion.stdout,
-    /status develop bootstrap-check bootstrap update gc init-consumer use-submodule use-flake remove-submodule completion help/,
+    /status develop bootstrap-check bootstrap update gc resource-graph init-consumer use-submodule use-flake remove-submodule completion help/,
   );
   assert.match(completion.stdout, /complete -F _viberoots viberoots/);
   assert.match(completion.stdout, /complete -F _viberoots vbr/);

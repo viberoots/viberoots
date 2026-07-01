@@ -12,6 +12,7 @@ function isAllowed(filePath: string): boolean {
     /^build-tools\/tools\/buck\/gen-auto-map\.ts$/,
     /^build-tools\/tools\/buck\/prebuild\//,
     /^build-tools\/tools\/buck\/prebuild-guard\.ts$/,
+    /^build-tools\/tools\/deployments\/deployment-graph-read-options\.ts$/,
     /^build-tools\/tools\/lib\/graph-view\.ts$/,
   ];
   return allow.some((re) => re.test(p));
@@ -37,24 +38,43 @@ function isExcluded(filePath: string): boolean {
 const GRAPH_SEP = "/";
 const GRAPH_LIT = ["build-tools", "tools", "buck", "graph.json"].join(GRAPH_SEP);
 const GRAPH_LIT_WITH_MODULE = ["viberoots", GRAPH_LIT].join(GRAPH_SEP);
+const WORKSPACE_GRAPH_LIT = [".viberoots", "workspace", "buck", "graph.json"].join(GRAPH_SEP);
 const ESC = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 // Examples matched: readGraph(<graph.json>), fs.readFile/readJson/readFileSync(<graph.json>)
 const VIOLATION_RE = new RegExp(
   `(readGraph|readFile|readJson|readFileSync)\\s*\\(\\s*["'](?:${ESC(GRAPH_LIT)}|${ESC(
     GRAPH_LIT_WITH_MODULE,
-  )})["']`,
+  )}|${ESC(WORKSPACE_GRAPH_LIT)})["']`,
 );
+const DEFAULT_GRAPH_IMPORT_RE =
+  /import\s+\{[^}]*\bDEFAULT_GRAPH_PATH\b[^}]*\}\s+from\s+["'][^"']*(graph-const|workspace-state-paths)["']/;
+
+function isDeploymentGraphConsumer(filePath: string): boolean {
+  const p = filePath.replace(/\\/g, "/").replace(/^viberoots\//, "");
+  return /^build-tools\/tools\/deployments\//.test(p);
+}
 
 async function scanFile(file: string): Promise<Finding[]> {
   if (isExcluded(file)) return [];
   if (isAllowed(file)) return [];
   const txt = await fsp.readFile(file, "utf8").catch(() => "");
-  if (!txt || (!txt.includes(GRAPH_LIT) && !txt.includes(GRAPH_LIT_WITH_MODULE))) return [];
+  if (
+    !txt ||
+    (!txt.includes(GRAPH_LIT) &&
+      !txt.includes(GRAPH_LIT_WITH_MODULE) &&
+      !txt.includes(WORKSPACE_GRAPH_LIT) &&
+      !txt.includes("DEFAULT_GRAPH_PATH"))
+  ) {
+    return [];
+  }
   const findings: Finding[] = [];
   const lines = txt.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (VIOLATION_RE.test(line)) {
+      findings.push({ file, line: i + 1, text: line.trim() });
+    }
+    if (isDeploymentGraphConsumer(file) && DEFAULT_GRAPH_IMPORT_RE.test(line)) {
       findings.push({ file, line: i + 1, text: line.trim() });
     }
   }
@@ -99,8 +119,8 @@ async function main() {
   }
 
   console.error(
-    "tooling-contract: ERROR — direct reads of build-tools/tools/buck/graph.json are forbidden. Use the Composite Graph API instead (build-tools/tools/lib/graph-view.ts).\n" +
-      "Allowlisted paths: exporter internals, graph exporter, prebuild guard, auto-map generator, and the composite API itself.\n",
+    "tooling-contract: ERROR — direct graph.json reads are forbidden. Use the Composite Graph API instead (build-tools/tools/lib/graph-view.ts).\n" +
+      "Allowlisted paths: exporter internals, graph exporter, prebuild guard, auto-map generator, deployment graph read options, and the composite API itself.\n",
   );
   for (const f of allFindings) {
     console.error(`${f.file}:${f.line}: ${f.text}`);

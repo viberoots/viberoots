@@ -1,6 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract";
 import * as capabilities from "./resource-graph-provider-capabilities";
+import {
+  componentResourceId,
+  deploymentRefFacts,
+  deploymentRefs,
+  environmentStageResourceId,
+  runtimeConfigRequirementResourceId,
+  secretRequirementResourceId,
+} from "./resource-graph-collector-refs";
+import { collectActionAndArtifactResources } from "./resource-graph-collector-actions";
 import type { DeploymentResourceInventoryEntry } from "./resource-graph-types";
 
 function base(label: string) {
@@ -22,14 +31,13 @@ export function collectDeploymentIntentResources(
 ): DeploymentResourceInventoryEntry[] {
   const out: DeploymentResourceInventoryEntry[] = [];
   out.push(
-    entry("Deployment", deployment.deploymentId, deployment.label, [
-      deployment.component.target,
-      deployment.providerTarget.identity,
-      deployment.lanePolicyRef,
-      deployment.admissionPolicyRef,
-      ...deployment.releaseActions.map((action) => action.ref),
-      ...deployment.targetExceptions.map((exception) => exception.ref),
-    ]),
+    entry(
+      "Deployment",
+      deployment.deploymentId,
+      deployment.label,
+      deploymentRefs(deployment),
+      deploymentRefFacts(deployment),
+    ),
   );
   if (deployment.deploymentFamily) {
     out.push(
@@ -58,7 +66,7 @@ export function collectDeploymentIntentResources(
   );
   for (const component of deployment.components) {
     out.push(
-      entry("Component", `${deployment.deploymentId}:${component.id}`, component.target, [], {
+      entry("Component", componentResourceId(deployment, component.id), component.target, [], {
         kind: component.kind,
         target: component.target,
       }),
@@ -114,7 +122,7 @@ export function collectDeploymentIntentResources(
   );
   collectPolicyChildren(deployment, out);
   collectRequirements(deployment, out);
-  collectActionAndArtifactResources(deployment, out);
+  out.push(...collectActionAndArtifactResources(deployment));
   return out;
 }
 
@@ -181,7 +189,7 @@ function collectRequirements(
     out.push(
       entry(
         "SecretRequirement",
-        `${deployment.deploymentId}:secret:${requirement.step}:${requirement.name}`,
+        secretRequirementResourceId(deployment, requirement.step, requirement.name),
         deployment.label,
         [],
         {
@@ -195,7 +203,7 @@ function collectRequirements(
     out.push(
       entry(
         "RuntimeConfigRequirement",
-        `${deployment.deploymentId}:runtime-config:${requirement.step}:${requirement.name}`,
+        runtimeConfigRequirementResourceId(deployment, requirement.step, requirement.name),
         deployment.label,
         [],
         {
@@ -205,46 +213,4 @@ function collectRequirements(
       ),
     );
   }
-}
-
-function collectActionAndArtifactResources(
-  deployment: DeploymentTarget,
-  out: DeploymentResourceInventoryEntry[],
-): void {
-  for (const action of deployment.releaseActions) {
-    out.push(entry("ReleaseAction", action.ref, action.ref, [deployment.deploymentId]));
-  }
-  for (const targetException of deployment.targetExceptions) {
-    out.push(
-      entry(
-        "DeploymentTargetException",
-        targetException.ref,
-        targetException.ref,
-        [deployment.deploymentId],
-        {
-          exceptionId: targetException.exceptionId,
-          exceptionKind: targetException.exceptionKind,
-          affectedDeploymentIds: targetException.affectedDeploymentIds,
-          oldProviderTargetIdentity: targetException.oldProviderTargetIdentity,
-          newProviderTargetIdentity: targetException.newProviderTargetIdentity,
-          sharedLockScope: targetException.sharedLockScope,
-          approvalEvidence: targetException.approvalEvidence,
-          effectiveAt: targetException.effectiveAt,
-          expiresAt: targetException.expiresAt,
-          completionSignal: targetException.completionSignal,
-          reconciliationOwner: targetException.reconciliationOwner,
-          approvalBoundary: "reviewed-target-exception",
-          statusVisibility: "operator_status",
-        },
-      ),
-    );
-  }
-  if ("provisioner" in deployment && deployment.provisioner) {
-    out.push(entry("Provisioner", `${deployment.deploymentId}:provisioner`, deployment.label));
-  }
-  out.push(
-    entry("ArtifactInput", `${deployment.deploymentId}:artifact-input`, deployment.label, [], {
-      publisher: deployment.publisher.type,
-    }),
-  );
 }

@@ -42,6 +42,7 @@ export function deriveInProgressCounts(
     // We want counters to reflect the top-level buck2 test run.
     if (parsed.isComment) continue;
     const line = parsed.normalized;
+    if (line.startsWith("[verify] failure diagnostics ")) continue;
     let status: "pass" | "fail" | "fatal" | "skip" | null = null;
     let label = "";
 

@@ -202,12 +202,14 @@ export async function run() {
   });
   if (metricsOut) await emitMetrics(metricsOut, gMetrics);
 
-  // Success banner: point consumers to composite API and schema version
-  try {
+  if (
+    String(process.env.VBR_VERBOSE || "").trim() ||
+    String(process.env.EXPORTER_DEBUG || "").trim()
+  ) {
     console.error(
       `[exporter] graph v${SCHEMA_VERSION} ready — use 'node build-tools/tools/buck/graph-view.ts' for the Composite Graph API`,
     );
-  } catch {}
+  }
 }
 
 type GoPkgPerBatch = { batch: Batch; pkgs: any[] };

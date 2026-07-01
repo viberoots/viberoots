@@ -1,6 +1,6 @@
 import * as path from "node:path";
-import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { findRepoRoot } from "../lib/repo";
+import { defaultDeploymentGraphPath } from "./deployment-graph-read-options";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 import { withDeploymentBootstrapDefaults } from "./infisical-iac-bootstrap-config";
 import { buildDeploymentFanOutDryRunReport } from "./infisical-iac-bootstrap-deployments";
@@ -14,7 +14,7 @@ export async function buildDryRunReport(
 ) {
   if (args.mode === "repo") {
     const workspaceRoot = context.workspaceRoot || (await findRepoRoot(process.cwd()));
-    const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
+    const graphPath = defaultDeploymentGraphPath(workspaceRoot);
     const configPath =
       context.configPath || path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
     const sink = await resolveCredentialSinkSelection(args, { workspaceRoot, configPath });

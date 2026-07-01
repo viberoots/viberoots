@@ -59,6 +59,7 @@ export function collectFailedLabels(lines: string[]): string[] {
   for (const raw of lines) {
     const { normalized: line, isComment } = parseLineForMatching(raw);
     if (isComment) continue;
+    if (line.startsWith("[verify] failure diagnostics ")) continue;
     let m: RegExpExecArray | null = null;
     const markerIdx = line.indexOf("✗ Fail:");
     const markerLabel =

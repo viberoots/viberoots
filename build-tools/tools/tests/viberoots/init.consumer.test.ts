@@ -38,6 +38,15 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
   assert.match(stage0, /! -f "\$\{__vbr_flake_input_root\}\/flake\.nix"/);
   assert.match(
     stage0,
+    /__vbr_current_real="\$\(cd "\$\{PWD\}\/\.viberoots\/current" && pwd -P 2>\/dev\/null \|\| true\)"/,
+  );
+  assert.match(
+    stage0,
+    /__vbr_local_real="\$\(cd "\$\{PWD\}\/viberoots" && pwd -P 2>\/dev\/null \|\| true\)"/,
+  );
+  assert.match(stage0, /"\$\{__vbr_current_real\}" == "\$\{__vbr_local_real\}"/);
+  assert.match(
+    stage0,
     /__vbr_flake_args=\(--override-input viberoots "path:\$\{__vbr_flake_input_root\}"\)/,
   );
   assert.match(stage0, /__vbr_stage0_apply_nix_cache_health \|\| return 1/);
@@ -89,6 +98,7 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
           PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
           HOME: fakeHome,
           NO_DEV_SHELL: "1",
+          VBR_INIT_USE_LOCAL_COMMAND: "1",
         },
       },
     );
@@ -165,6 +175,45 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     );
     assert.deepEqual(await visibleRootEntries(workspace), ["README.md", "projects", "viberoots"]);
   });
+});
+
+test("viberoots/init uses the flake command before host node is available", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-init-nix-command-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    const fakeBin = path.join(workspace, ".fake-bin");
+    const checkout = path.join(workspace, "viberoots");
+    const log = path.join(workspace, ".nix-run.log");
+    await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.mkdir(checkout, { recursive: true });
+    await fsp.copyFile(path.join(viberootsRoot, "init"), path.join(checkout, "init"));
+    await fsp.chmod(path.join(checkout, "init"), 0o755);
+    await fsp.symlink("/bin/bash", path.join(fakeBin, "bash"));
+    await fsp.symlink("/usr/bin/dirname", path.join(fakeBin, "dirname"));
+    await fsp.writeFile(
+      path.join(fakeBin, "nix"),
+      `#!/usr/bin/env bash\nprintf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}\n`,
+      { mode: 0o755 },
+    );
+
+    await execFileAsync(path.join(checkout, "init"), ["--setup-direnv", "never"], {
+      cwd: workspace,
+      env: {
+        PATH: fakeBin,
+      },
+    });
+
+    const text = await fsp.readFile(log, "utf8");
+    assert.match(text, /nix run path:.*\/viberoots#viberoots -- init-consumer/);
+    assert.match(text, /--mode submodule/);
+    assert.match(text, /--workspace-root .*viberoots-init-nix-command-/);
+    assert.match(text, /--source .*\/viberoots/);
+    assert.match(text, /--setup-direnv never/);
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
 });
 
 test("viberoots init-consumer bootstraps a remote-flake consumer workspace", async () => {
@@ -317,6 +366,7 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
     assert.match(text, /--run-install/);
     assert.match(stdout, /viberoots bootstrap/);
     assert.match(stdout, /mode: flake/);
+    assert.match(stdout, /ensure nix: yes/);
     assert.match(stdout, /install: yes/);
     assert.match(stdout, /validate: no/);
     assert.match(stdout, /direnv allow: yes/);
@@ -1087,6 +1137,7 @@ test("curlable bootstrap accepts mode and install defaults from environment", as
     });
 
     assert.match(stdout, /mode: submodule/);
+    assert.match(stdout, /ensure nix: yes/);
     assert.match(stdout, /install: no/);
     assert.match(stdout, /add or update viberoots submodule/);
     assert.doesNotMatch(stdout, /run i/);
@@ -1115,6 +1166,7 @@ test("curlable bootstrap accepts VBR-prefixed option aliases", async () => {
     });
 
     assert.match(stdout, /mode: submodule/);
+    assert.match(stdout, /ensure nix: yes/);
     assert.match(
       stdout,
       new RegExp(`workspace: ${targetWorkspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
@@ -1168,6 +1220,7 @@ test("viberoots/init preserves existing edited docs", async () => {
         ...process.env,
         PATH: process.env.PATH ?? "",
         NO_DEV_SHELL: "1",
+        VBR_INIT_USE_LOCAL_COMMAND: "1",
       },
     });
 
@@ -1227,6 +1280,7 @@ test("viberoots/init repairs stale generated workspace files", async () => {
         ...process.env,
         PATH: process.env.PATH ?? "",
         NO_DEV_SHELL: "1",
+        VBR_INIT_USE_LOCAL_COMMAND: "1",
       },
     });
 
@@ -1269,6 +1323,7 @@ test("viberoots/init handles missing direnv before devshell activation", async (
           ...process.env,
           PATH: pathWithoutDirenv,
           NO_DEV_SHELL: "",
+          VBR_INIT_USE_LOCAL_COMMAND: "1",
         },
       },
     );
