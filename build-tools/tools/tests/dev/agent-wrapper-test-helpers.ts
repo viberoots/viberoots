@@ -77,6 +77,15 @@ if [ "$1" = "-C" ]; then
     fi
     exit 0
   fi
+  if [ "$1" = "submodule" ] && [ "$2" = "foreach" ]; then
+    [ ! -e "$workdir/SUBMODULE_DIRTY" ]
+    exit $?
+  fi
+  if [ "$1" = "submodule" ] && [ "$2" = "deinit" ]; then
+    printf 'git -C %s %s\\n' "$workdir" "$*" >> "${log}"
+    touch "$workdir/SUBMODULE_DEINIT"
+    exit 0
+  fi
 fi
 if [ "$1" = "rev-parse" ] && [ "$2" = "--show-toplevel" ]; then
   case "$(pwd -P)" in
@@ -147,6 +156,10 @@ if [ "$1" = "worktree" ] && [ "$2" = "remove" ]; then
   done
   if [ -e "$target/REAL_DIRTY" ] && [ "$force" = 0 ]; then
     exit 13
+  fi
+  if [ -e "$target/SUBMODULE_GUARD" ] && [ ! -e "$target/SUBMODULE_DEINIT" ]; then
+    printf 'fatal: working trees containing submodules cannot be moved or removed\\n' >&2
+    exit 128
   fi
   rm -rf "$target"
   exit 0

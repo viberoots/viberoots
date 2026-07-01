@@ -25,6 +25,8 @@ export const attrList = [
   "link_closure",
   "link_closure_overrides",
   "link_mode",
+  "nixpkgs_profile",
+  "nixpkg_pins",
   "buck.link_mode",
   "buck.link_kind",
   "buck.deps",

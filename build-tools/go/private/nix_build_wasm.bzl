@@ -90,6 +90,8 @@ go_nix_build_wasm = rule(
         "link_deps": attrs.list(attrs.dep(), default = []),
         "link_closure": attrs.string(default = "direct"),
         "link_closure_overrides": attrs.dict(attrs.label(), attrs.string(), default = {}),
+        "nixpkgs_profile": attrs.string(default = "default"),
+        "nixpkg_pins": attrs.dict(key = attrs.string(), value = attrs.dict(key = attrs.string(), value = attrs.string()), default = {}),
         "use_selected_wasm": attrs.bool(default = False),
         "srcs": attrs.list(attrs.source(), default = []),
         "nix_inputs": attrs.list(attrs.source(), default = []),

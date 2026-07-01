@@ -17,6 +17,7 @@ load(
     "@viberoots//build-tools/lang:macro_kwargs.bzl",
     _macro_kwargs_probe = "macro_kwargs_probe",
     _extract_package_local_patch_dirs_and_nixpkg_deps = "extract_package_local_patch_dirs_and_nixpkg_deps",
+    _normalize_source_selection_attrs = "normalize_source_selection_attrs",
     _pop_local_patch_dirs = "pop_local_patch_dirs",
     _pop_nixpkg_deps = "pop_nixpkg_deps",
     _pop_package_local_patch_dirs_and_nixpkg_deps = "pop_package_local_patch_dirs_and_nixpkg_deps",
@@ -133,6 +134,7 @@ pop_nixpkg_deps = _pop_nixpkg_deps
 pop_package_local_patch_dirs_and_nixpkg_deps = _pop_package_local_patch_dirs_and_nixpkg_deps
 extract_package_local_patch_dirs_and_nixpkg_deps = _extract_package_local_patch_dirs_and_nixpkg_deps
 macro_kwargs_probe = _macro_kwargs_probe
+normalize_source_selection_attrs = _normalize_source_selection_attrs
 
 target_key_for_current_package = _target_key_for_current_package
 providers_for = _providers_for
@@ -170,4 +172,3 @@ wire_package_local_wasm_planner_visible_stub = _wire_package_local_wasm_planner_
 
 merge_link_intent_deps = _merge_link_intent_deps
 validate_link_closure_overrides = _validate_link_closure_overrides
-

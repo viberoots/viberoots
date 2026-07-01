@@ -16,7 +16,7 @@ def _binary_pkg_srcs(name):
     return native.glob(["cmd/**/*.go"], exclude = ["**/*_test.go"]) or []
 
 
-def maybe_autowire_go_binary_test(nix_go_library, nix_go_test, name, base_deps, extra_module_providers, build_tags, goos, goarch, cgo_enabled, nixpkg_deps, repo_cgo_deps, local_patch_dirs):
+def maybe_autowire_go_binary_test(nix_go_library, nix_go_test, name, base_deps, extra_module_providers, build_tags, goos, goarch, cgo_enabled, nixpkg_deps, nixpkgs_profile, nixpkg_pins, repo_cgo_deps, local_patch_dirs):
     tests = native.glob(["cmd/%s/**/*_test.go" % name]) or []
     if len(tests) == 0:
         return
@@ -31,6 +31,8 @@ def maybe_autowire_go_binary_test(nix_go_library, nix_go_test, name, base_deps, 
         goarch = goarch,
         cgo_enabled = cgo_enabled,
         nixpkg_deps = nixpkg_deps,
+        nixpkgs_profile = nixpkgs_profile,
+        nixpkg_pins = nixpkg_pins,
         repo_cgo_deps = repo_cgo_deps,
         local_patch_dirs = local_patch_dirs,
         visibility = ["PUBLIC"],
@@ -40,5 +42,4 @@ def maybe_autowire_go_binary_test(nix_go_library, nix_go_test, name, base_deps, 
         library = ":%s" % (name + "_pkg"),
         srcs = tests,
     )
-
 

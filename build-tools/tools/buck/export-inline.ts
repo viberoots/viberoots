@@ -6,6 +6,7 @@ import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { getImporterRootsContract } from "../lib/importer-roots";
 import { normalizeTargetLabel } from "../lib/labels";
 import { resolveWorkspaceRootSync } from "../lib/repo";
+import { normalizeNixpkgPins, normalizeNixpkgsProfile } from "./source-selection";
 
 type InlineExportOptions = {
   workspaceRoot: string;
@@ -32,6 +33,8 @@ function buildAttrs(): string[] {
     "link_closure",
     "link_closure_overrides",
     "link_mode",
+    "nixpkgs_profile",
+    "nixpkg_pins",
     "buck.link_mode",
     "buck.link_kind",
     "buck.deps",
@@ -135,6 +138,8 @@ export async function exportInlineGraph(opts: InlineExportOptions): Promise<void
       deps: deps || a["deps"] || [],
       labels: Array.from(new Set(labelsArr || [])),
       srcs: srcsArr || a["srcs"] || [],
+      nixpkgs_profile: normalizeNixpkgsProfile(a["nixpkgs_profile"] ?? a["buck.nixpkgs_profile"]),
+      nixpkg_pins: normalizeNixpkgPins(a["nixpkg_pins"] ?? a["buck.nixpkg_pins"]),
     });
   }
   const data = (merged.length > 0 ? JSON.stringify({ nodes: merged }, null, 2) : "[]") + "\n";
