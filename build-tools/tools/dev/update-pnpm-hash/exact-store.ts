@@ -46,6 +46,7 @@ function resolveFlakePnpmProgram(repoRoot: string, timeoutMs: number): string {
   const program = execFileSync(
     nixBin,
     [
+      "--quiet",
       "eval",
       "--accept-flake-config",
       "--no-write-lock-file",
@@ -63,6 +64,7 @@ function resolveFlakePnpmProgram(repoRoot: string, timeoutMs: number): string {
     execFileSync(
       nixBin,
       [
+        "--quiet",
         "run",
         "--accept-flake-config",
         "--no-write-lock-file",
