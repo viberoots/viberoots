@@ -50,12 +50,13 @@ function activeViberootsOverride(): string[] {
     .filter(Boolean);
   for (const candidate of candidates) {
     const abs = path.resolve(candidate);
-    if (abs.startsWith("/nix/store/")) continue;
+    const real = fs.existsSync(abs) ? fs.realpathSync.native(abs) : abs;
+    if (real.startsWith("/nix/store/")) continue;
     if (
       fs.existsSync(path.join(abs, "flake.nix")) &&
       fs.existsSync(path.join(abs, "build-tools", "tools", "dev", "zx-init.mjs"))
     ) {
-      return ["--override-input", "viberoots", `path:${abs}`];
+      return ["--override-input", "viberoots", `path:${real}`];
     }
   }
   return [];

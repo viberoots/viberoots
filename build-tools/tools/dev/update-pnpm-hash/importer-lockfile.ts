@@ -155,13 +155,13 @@ async function activeViberootsOverride(repoRoot: string): Promise<string> {
     .filter(Boolean);
   for (const candidate of candidates) {
     const abs = path.resolve(candidate);
-    if (abs.startsWith("/nix/store/")) continue;
     try {
+      const real = await fsp.realpath(abs).catch(() => abs);
+      if (real.startsWith("/nix/store/")) continue;
       if (
         fs.existsSync(path.join(abs, "flake.nix")) &&
         fs.existsSync(path.join(abs, "build-tools", "tools", "dev", "zx-init.mjs"))
       ) {
-        const real = await fsp.realpath(abs).catch(() => abs);
         return `path:${real}`;
       }
     } catch {}
