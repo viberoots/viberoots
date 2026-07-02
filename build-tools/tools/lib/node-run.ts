@@ -48,6 +48,14 @@ export function nodeOptionsWithoutZxInit(value: string | undefined): string {
   return kept.join(" ");
 }
 
+function normalizedNodePath(value: string | undefined, cwd: string): string {
+  return (value || "")
+    .split(path.delimiter)
+    .filter(Boolean)
+    .map((entry) => (path.isAbsolute(entry) ? entry : path.resolve(cwd, entry)))
+    .join(path.delimiter);
+}
+
 function childErrorDetails(stdout: string, stderr: string): string {
   const details = [stderr, stdout]
     .map((value) => String(value || "").trim())
@@ -66,6 +74,7 @@ export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
   const cwd = opts.cwd || process.cwd();
   const env = { ...(opts.env || process.env) };
   env.NODE_OPTIONS = nodeOptionsWithoutZxInit(env.NODE_OPTIONS);
+  env.NODE_PATH = normalizedNodePath(env.NODE_PATH, cwd);
   const args = opts.args || [];
   const stdio = opts.stdio || "inherit";
   const timeoutMs = Number.isFinite(opts.timeoutMs) ? Math.max(0, opts.timeoutMs || 0) : 0;
