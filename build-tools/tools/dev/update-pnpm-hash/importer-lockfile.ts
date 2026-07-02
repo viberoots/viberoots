@@ -36,6 +36,7 @@ async function runLockfileCommandsWithGcRetry(opts: {
     ? ["--override-input", "viberoots", opts.viberootsOverride]
     : [];
   const nixRunPrefix = [
+    "--quiet",
     "run",
     "--accept-flake-config",
     "--no-write-lock-file",
