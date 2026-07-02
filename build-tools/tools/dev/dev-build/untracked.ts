@@ -67,6 +67,14 @@ function isIgnorableForExplicitTargetBuild(p: string): boolean {
 
 function isGeneratedWorkspaceUntrackedPath(p: string): boolean {
   const x = String(p || "").replace(/\\/g, "/");
+  if (x === ".direnv" || x.startsWith(".direnv/")) return true;
+  if (x === ".nix-zsh" || x.startsWith(".nix-zsh/")) return true;
+  if (x === ".viberoots" || x.startsWith(".viberoots/")) return true;
+  return false;
+}
+
+function isBootstrapScaffoldUntrackedPath(p: string): boolean {
+  const x = String(p || "").replace(/\\/g, "/");
   if (
     x === ".buckconfig" ||
     x === ".buckroot" ||
@@ -84,9 +92,6 @@ function isGeneratedWorkspaceUntrackedPath(p: string): boolean {
   ) {
     return true;
   }
-  if (x === ".direnv" || x.startsWith(".direnv/")) return true;
-  if (x === ".nix-zsh" || x.startsWith(".nix-zsh/")) return true;
-  if (x === ".viberoots" || x.startsWith(".viberoots/")) return true;
   return false;
 }
 
@@ -123,9 +128,22 @@ function writeUntrackedImpureWarning(opts: {
   untracked: string[];
   relevantLabel?: string;
 }): void {
-  const visible = opts.untracked.filter((p) => !isGeneratedWorkspaceUntrackedPath(p));
-  const hiddenGenerated = opts.untracked.length - visible.length;
+  const visible = opts.untracked.filter(
+    (p) => !isGeneratedWorkspaceUntrackedPath(p) && !isBootstrapScaffoldUntrackedPath(p),
+  );
+  const hiddenGenerated = opts.untracked.filter(isGeneratedWorkspaceUntrackedPath).length;
+  const scaffold = opts.untracked.filter(isBootstrapScaffoldUntrackedPath).length;
   const relevant = opts.relevantLabel ? ` ${opts.relevantLabel}` : "";
+  if (visible.length === 0 && scaffold > 0) {
+    opts.ui.warn(`impure build due to ${scaffold} uncommitted scaffold file(s)`);
+    if (hiddenGenerated > 0) {
+      opts.ui.list([`... ${hiddenGenerated} generated workspace file(s) hidden`], {
+        stream: "stderr",
+        limit: 1,
+      });
+    }
+    return;
+  }
   if (visible.length === 0 && hiddenGenerated > 0) {
     opts.ui.warn(`impure build due to ${hiddenGenerated} generated workspace untracked file(s)`);
     return;
@@ -134,6 +152,12 @@ function writeUntrackedImpureWarning(opts: {
   opts.ui.list(visible, { stream: "stderr" });
   if (hiddenGenerated > 0) {
     opts.ui.list([`... ${hiddenGenerated} generated workspace file(s) hidden`], {
+      stream: "stderr",
+      limit: 1,
+    });
+  }
+  if (scaffold > 0) {
+    opts.ui.list([`... ${scaffold} uncommitted scaffold file(s) hidden`], {
       stream: "stderr",
       limit: 1,
     });
