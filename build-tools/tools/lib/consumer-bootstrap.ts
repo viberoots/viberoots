@@ -7,6 +7,7 @@ import {
   initSprinkleRefConfigs,
 } from "../deployments/sprinkleref-templates";
 import { BUCK_PROJECT_IGNORE_LINE } from "./buck-project-ignore";
+import { createCommandUi } from "./command-ui";
 import { direnvStage0, envrc } from "./consumer-direnv";
 import { writeIfChanged } from "./fs-helpers";
 import { activateWorkspace } from "./workspace-activation";
@@ -387,9 +388,10 @@ async function setupDirenvIfNeeded(opts: {
 }
 
 async function runOptionalDirenvAllow(workspaceRoot: string): Promise<void> {
+  const ui = createCommandUi();
   try {
     await execFileAsync("direnv", ["allow", workspaceRoot], { cwd: workspaceRoot });
-    console.log(`direnv allowed: ${workspaceRoot}`);
+    ui.ok("direnv allowed", workspaceRoot);
   } catch {
     console.error("direnv is not installed or not on PATH, or direnv allow failed.");
     console.error(`next: cd ${workspaceRoot}`);
@@ -418,6 +420,7 @@ async function runNixFlakeLock(workspaceRoot: string): Promise<void> {
 }
 
 export async function initConsumer(opts: InitConsumerOptions): Promise<void> {
+  const ui = createCommandUi();
   const sourceMode: ConsumerSourceMode =
     opts.sourceMode || (opts.sourcePath ? "submodule" : "flake");
   await mkdirWithMacosMetadataExclusion(path.join(opts.workspaceRoot, ".viberoots"));
@@ -465,5 +468,5 @@ Project and application source belongs here.
   }
   if (opts.allowDirenv !== false) await runOptionalDirenvAllow(opts.workspaceRoot);
   if (opts.runInstall) await runInstall(opts.workspaceRoot);
-  console.log(`viberoots workspace initialized: ${opts.workspaceRoot}`);
+  ui.ok("workspace initialized", opts.workspaceRoot);
 }

@@ -29,6 +29,67 @@ run_validate="$(env_or_default 0 VBR_RUN_VALIDATE VIBEROOTS_RUN_VALIDATE)"
 dry_run="$(env_or_default 0 VBR_DRY_RUN VIBEROOTS_DRY_RUN)"
 direnv_allow="$(env_or_default 1 VBR_DIRENV_ALLOW VIBEROOTS_DIRENV_ALLOW)"
 
+ui_use_color() {
+  [[ -t 1 && -z "${NO_COLOR:-}" ]]
+}
+
+ui_color() {
+  local code="$1"
+  local value="$2"
+  if ui_use_color; then
+    printf '\033[%sm%s\033[0m' "${code}" "${value}"
+  else
+    printf '%s' "${value}"
+  fi
+}
+
+ui_heading() {
+  ui_color "1;38;5;141" "$1"
+  printf '\n'
+}
+
+ui_status() {
+  local kind="$1"
+  local label="$2"
+  local detail="${3:-}"
+  local mark
+  case "${kind}" in
+    ok) mark="$(ui_color "32" "ok")" ;;
+    warn) mark="$(ui_color "33" "warn")" ;;
+    *) mark="$(ui_color "36" "run")" ;;
+  esac
+  if ui_use_color; then
+    if [[ -n "${detail}" ]]; then
+      printf '  %s   %s %s\n' "${mark}" "${label}" "$(ui_color "2" "${detail}")"
+    else
+      printf '  %s   %s\n' "${mark}" "${label}"
+    fi
+  elif [[ -n "${detail}" ]]; then
+    printf '  %-5s %s %s\n' "${mark}" "${label}" "${detail}"
+  else
+    printf '  %-5s %s\n' "${mark}" "${label}"
+  fi
+}
+
+ui_step() {
+  ui_status run "$@"
+}
+
+ui_ok() {
+  ui_status ok "$@"
+}
+
+ui_warn() {
+  ui_status warn "$@"
+}
+
+ui_list() {
+  local item
+  for item in "$@"; do
+    printf '    - %s\n' "${item}"
+  done
+}
+
 usage() {
   cat >&2 <<'EOF'
 usage: bootstrap [--mode flake|submodule] [--ref <ref>] [--workspace-root <dir>]
@@ -450,8 +511,7 @@ complete_transaction() {
 }
 
 run_migrations() {
-  echo "migrations:"
-  echo "  - no known migration steps necessary"
+  ui_ok "migrations" "no known migration steps necessary"
 }
 
 required_bootstrap_files_present() {
@@ -512,74 +572,72 @@ print_summary() {
   local status="$1"
   local source="$2"
   echo
-  echo "viberoots bootstrap summary"
-  echo "  status: ${status}"
-  echo "  mode: ${mode}"
-  echo "  ref: ${ref}"
-  echo "  workspace: ${workspace_root}"
-  echo "  workspace name: ${workspace_name}"
-  echo "  source: ${source}"
-  echo "  ensure nix: $([[ "${install_nix}" == "1" ]] && echo yes || echo no)"
-  echo "  install: $([[ "${run_install}" == "1" ]] && echo yes || echo no)"
-  echo "  validate: $([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
-  echo "  direnv allow: $([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
+  ui_heading "viberoots bootstrap summary"
+  ui_ok "status" "${status}"
+  ui_step "mode" "${mode}"
+  ui_step "ref" "${ref}"
+  ui_step "workspace" "${workspace_root}"
+  ui_step "workspace name" "${workspace_name}"
+  ui_step "source" "${source}"
+  ui_step "ensure nix" "$([[ "${install_nix}" == "1" ]] && echo yes || echo no)"
+  ui_step "install" "$([[ "${run_install}" == "1" ]] && echo yes || echo no)"
+  ui_step "validate" "$([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
+  ui_step "direnv allow" "$([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
   if [[ "${mode}" == "submodule" ]]; then
-    echo "  trust custom submodule: $([[ "${trust_submodule_url}" == "1" ]] && echo yes || echo no)"
+    ui_step "trust custom submodule" "$([[ "${trust_submodule_url}" == "1" ]] && echo yes || echo no)"
   fi
-  echo "  actions:"
+  ui_step "actions"
   if [[ "${#actions[@]}" -eq 0 ]]; then
-    echo "    - no setup changes needed"
+    ui_list "no setup changes needed"
   else
-    local action
+    local action action_list=()
     for action in "${actions[@]}"; do
-      echo "    - ${action}"
+      action_list+=("${action}")
     done
+    ui_list "${action_list[@]}"
   fi
 }
 
-cat <<EOF
-viberoots bootstrap
-  mode: ${mode}
-  ref: ${ref}
-  workspace: ${workspace_root}
-  workspace name: ${workspace_name}
-  ensure nix: $([[ "${install_nix}" == "1" ]] && echo yes || echo no)
-  install: $([[ "${run_install}" == "1" ]] && echo yes || echo no)
-  validate: $([[ "${run_validate}" == "1" ]] && echo yes || echo no)
-  direnv allow: $([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)
-  viberoots url: ${viberoots_url}
-EOF
+ui_heading "viberoots bootstrap"
+ui_step "mode" "${mode}"
+ui_step "ref" "${ref}"
+ui_step "workspace" "${workspace_root}"
+ui_step "workspace name" "${workspace_name}"
+ui_step "ensure nix" "$([[ "${install_nix}" == "1" ]] && echo yes || echo no)"
+ui_step "install" "$([[ "${run_install}" == "1" ]] && echo yes || echo no)"
+ui_step "validate" "$([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
+ui_step "direnv allow" "$([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
+ui_step "viberoots url" "${viberoots_url}"
 if [[ "${mode}" == "submodule" ]]; then
-  echo "  submodule url: ${submodule_url}"
-  echo "  trust custom submodule url: $([[ "${trust_submodule_url}" == "1" ]] && echo yes || echo no)"
+  ui_step "submodule url" "${submodule_url}"
+  ui_step "trust custom submodule url" "$([[ "${trust_submodule_url}" == "1" ]] && echo yes || echo no)"
 fi
 if [[ "${dry_run}" == "1" ]]; then
-  echo "  dry run: yes"
+  ui_step "dry run" "yes"
   echo
-  echo "planned actions:"
+  ui_heading "planned actions"
   if ! command -v nix >/dev/null 2>&1 && [[ "${install_nix}" == "1" ]]; then
-    echo "  - install Nix with the Determinate Nix installer"
+    ui_list "install Nix with the Determinate Nix installer"
   fi
-  echo "  - create workspace directory if missing"
-  echo "  - initialize git repository if missing"
+  ui_list "create workspace directory if missing" "initialize git repository if missing"
   if [[ "${mode}" == "flake" ]]; then
-    echo "  - run viberoots init-consumer from ${viberoots_url}#viberoots"
+    ui_list "run viberoots init-consumer from ${viberoots_url}#viberoots"
   else
-    echo "  - add or update viberoots submodule at ./viberoots"
+    ui_list "add or update viberoots submodule at ./viberoots"
     if ! is_official_submodule_url "${submodule_url}" && [[ "${trust_submodule_url}" != "1" ]]; then
-      echo "  - require confirmation before using non-default submodule URL"
+      ui_list "require confirmation before using non-default submodule URL"
     fi
-    echo "  - run ./viberoots/init"
+    ui_list "run ./viberoots/init"
   fi
-  echo "  - run direnv setup through viberoots bootstrap"
+  ui_list "run direnv setup through viberoots bootstrap"
   if [[ "${direnv_allow}" == "1" ]]; then
-    echo "  - run direnv allow"
+    ui_list "run direnv allow"
   fi
   if [[ "${run_install}" == "1" ]]; then
-    echo "  - run i"
+    ui_list "run i"
   fi
   if [[ "${run_validate}" == "1" ]]; then
-    echo "  - run b && v"
+    ui_list "run b && v"
   fi
   exit 0
 fi
@@ -618,7 +676,7 @@ mkdir -p "${workspace_root}"
 cd "${workspace_root}"
 
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  git init
+  git init --quiet
   record_action "initialized git repository"
 fi
 
@@ -696,9 +754,9 @@ fi
 
 if [[ "${run_validate}" == "1" ]]; then
   direnv exec "${workspace_root}" sh -lc 'i && b && v'
-  echo "Validation complete."
+  ui_ok "validation" "complete"
 elif [[ "${direnv_allow}" == "1" ]]; then
-  echo "Next: cd ${workspace_root} && i && b && v"
+  ui_ok "next" "cd ${workspace_root} && i && b && v"
 else
-  echo "Next: cd ${workspace_root} && direnv allow && direnv exec . sh -lc 'i && b && v'"
+  ui_ok "next" "cd ${workspace_root} && direnv allow && direnv exec . sh -lc 'i && b && v'"
 fi

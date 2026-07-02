@@ -116,7 +116,7 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
       },
     );
 
-    assert.match(stdout, /viberoots workspace initialized:/);
+    assert.match(stdout, /ok\s+workspace initialized/);
     assert.equal(stderr, "");
     assert.equal(await fsp.readlink(path.join(workspace, ".viberoots", "current")), "../viberoots");
     assert.equal(
@@ -259,7 +259,7 @@ test("viberoots init-consumer bootstraps a remote-flake consumer workspace", asy
       },
     );
 
-    assert.match(stdout, /viberoots workspace initialized:/);
+    assert.match(stdout, /ok\s+workspace initialized/);
     assert.equal(stderr, "");
     assert.equal(await fsp.realpath(path.join(workspace, ".viberoots/current")), viberootsRoot);
     await assert.rejects(fsp.lstat(path.join(workspace, "viberoots")));
@@ -382,14 +382,14 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
     assert.match(text, /--viberoots-url github:viberoots\/viberoots\/main/);
     assert.match(text, /--run-install/);
     assert.match(stdout, /viberoots bootstrap/);
-    assert.match(stdout, /mode: flake/);
-    assert.match(stdout, /ensure nix: yes/);
-    assert.match(stdout, /install: yes/);
-    assert.match(stdout, /validate: no/);
-    assert.match(stdout, /direnv allow: yes/);
+    assert.match(stdout, /run\s+mode flake/);
+    assert.match(stdout, /run\s+ensure nix yes/);
+    assert.match(stdout, /run\s+install yes/);
+    assert.match(stdout, /run\s+validate no/);
+    assert.match(stdout, /run\s+direnv allow yes/);
     assert.match(stdout, /viberoots bootstrap summary/);
-    assert.match(stdout, /status: bootstrapped/);
-    assert.match(stdout, /Next: cd .* && i && b && v/);
+    assert.match(stdout, /ok\s+status bootstrapped/);
+    assert.match(stdout, /ok\s+next cd .* && i && b && v/);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }
@@ -430,8 +430,8 @@ test("curlable bootstrap can run validation internally", async () => {
     });
 
     const text = await fsp.readFile(log, "utf8");
-    assert.match(stdout, /validate: yes/);
-    assert.match(stdout, /Validation complete\./);
+    assert.match(stdout, /run\s+validate yes/);
+    assert.match(stdout, /ok\s+validation complete/);
     assert.match(text, /direnv exec .* sh -lc i && b && v/);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
@@ -471,8 +471,8 @@ test("curlable bootstrap dry-run reports planned actions without commands", asyn
       },
     );
 
-    assert.match(stdout, /dry run: yes/);
-    assert.match(stdout, /planned actions:/);
+    assert.match(stdout, /run\s+dry run yes/);
+    assert.match(stdout, /planned actions/);
     assert.match(stdout, /run viberoots init-consumer/);
     await assert.rejects(fsp.readFile(log, "utf8"));
   } finally {
@@ -536,7 +536,7 @@ test("curlable bootstrap resumes and completes an interrupted transaction", asyn
     );
     assert.match(stdout, /resumed incomplete bootstrap transaction/);
     assert.match(stdout, /completed bootstrap transaction/);
-    assert.match(stdout, /status: bootstrapped/);
+    assert.match(stdout, /ok\s+status bootstrapped/);
     await assert.rejects(fsp.lstat(path.join(transactionDir, "current.json")));
     assert.equal((await fsp.readdir(path.join(transactionDir, "completed"))).length, 1);
     assert.match(
@@ -606,8 +606,8 @@ test("curlable bootstrap installs git through nix when git is missing", async ()
     assert.match(text, /git init/);
     assert.match(text, /--no-direnv/);
     assert.doesNotMatch(text, /--run-install/);
-    assert.match(stdout, /direnv allow: no/);
-    assert.match(stdout, /Next: cd .* && direnv allow && direnv exec \. sh -lc 'i && b && v'/);
+    assert.match(stdout, /run\s+direnv allow no/);
+    assert.match(stdout, /ok\s+next cd .* && direnv allow && direnv exec \. sh -lc 'i && b && v'/);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }
@@ -828,9 +828,9 @@ ln -s ../viberoots .viberoots/current
 
     const text = await fsp.readFile(log, "utf8");
     assert.equal((text.match(/^init /gm) ?? []).length, 1);
-    assert.match(second.stdout, /status: already up to date/);
+    assert.match(second.stdout, /ok\s+status already up to date/);
     assert.match(second.stdout, /no setup changes needed/);
-    assert.match(second.stdout, /source: https:\/\/github\.com\/viberoots\/viberoots\.git/);
+    assert.match(second.stdout, /run\s+source https:\/\/github\.com\/viberoots\/viberoots\.git/);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }
@@ -1073,7 +1073,7 @@ exit 0
     );
 
     const text = await fsp.readFile(log, "utf8");
-    assert.match(stdout, /trust custom submodule url: yes/);
+    assert.match(stdout, /run\s+trust custom submodule url yes/);
     assert.match(text, /git submodule add https:\/\/example\.invalid\/viberoots\.git viberoots/);
     assert.match(text, /init --mode submodule --workspace-name trusted-demo --run-install/);
   } finally {
@@ -1160,9 +1160,9 @@ test("curlable bootstrap accepts mode and install defaults from environment", as
       },
     });
 
-    assert.match(stdout, /mode: submodule/);
-    assert.match(stdout, /ensure nix: yes/);
-    assert.match(stdout, /install: no/);
+    assert.match(stdout, /run\s+mode submodule/);
+    assert.match(stdout, /run\s+ensure nix yes/);
+    assert.match(stdout, /run\s+install no/);
     assert.match(stdout, /add or update viberoots submodule/);
     assert.doesNotMatch(stdout, /run i/);
   } finally {
@@ -1189,14 +1189,14 @@ test("curlable bootstrap accepts VBR-prefixed option aliases", async () => {
       },
     });
 
-    assert.match(stdout, /mode: submodule/);
-    assert.match(stdout, /ensure nix: yes/);
+    assert.match(stdout, /run\s+mode submodule/);
+    assert.match(stdout, /run\s+ensure nix yes/);
     assert.match(
       stdout,
-      new RegExp(`workspace: ${targetWorkspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+      new RegExp(`workspace ${targetWorkspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
     );
-    assert.match(stdout, /install: no/);
-    assert.match(stdout, /direnv allow: no/);
+    assert.match(stdout, /run\s+install no/);
+    assert.match(stdout, /run\s+direnv allow no/);
     assert.match(stdout, /add or update viberoots submodule/);
     assert.doesNotMatch(stdout, /run i/);
   } finally {
@@ -1352,7 +1352,7 @@ test("viberoots/init handles missing direnv before devshell activation", async (
       },
     );
 
-    assert.match(stdout, /viberoots workspace initialized:/);
+    assert.match(stdout, /ok\s+workspace initialized/);
     assert.match(stderr, /direnv is not installed or not on PATH/);
     assert.equal(await fsp.readlink(path.join(workspace, ".viberoots", "current")), "../viberoots");
     assert.equal(
