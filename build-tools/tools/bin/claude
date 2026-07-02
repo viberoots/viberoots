@@ -13,13 +13,14 @@ is_cmux_claude_wrapper() {
   LC_ALL=C sed -n '1,8p' "$candidate" 2>/dev/null | grep -q "cmux claude wrapper"
 }
 
-find_tool_excluding_wrapper_dir() {
+find_tool_in_path_list_excluding_wrapper_dir() {
   local tool="$1"
+  local path_list="${2:-}"
   local dir
   local candidate
   local old_ifs="$IFS"
   IFS=':'
-  for dir in ${PATH:-}; do
+  for dir in ${path_list}; do
     [[ -n "$dir" ]] || continue
     if [[ "$(cd -- "$dir" 2>/dev/null && pwd -P || printf '%s' "$dir")" == "$SCRIPT_DIR" ]]; then
       continue
@@ -35,6 +36,14 @@ find_tool_excluding_wrapper_dir() {
     fi
   done
   IFS="$old_ifs"
+  return 1
+}
+
+find_tool_excluding_wrapper_dir() {
+  local tool="$1"
+  find_tool_in_path_list_excluding_wrapper_dir "$tool" "${PATH:-}" && return 0
+  find_tool_in_path_list_excluding_wrapper_dir "$tool" "${VBR_HOST_PATH:-}" && return 0
+  find_tool_in_path_list_excluding_wrapper_dir "$tool" "${HOST_PATH:-}" && return 0
   return 1
 }
 

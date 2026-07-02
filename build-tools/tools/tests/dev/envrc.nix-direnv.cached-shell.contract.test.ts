@@ -17,6 +17,12 @@ test("generated .envrc delegates to stable stage-0 helper before nix-direnv use 
   assert.doesNotMatch(envrc, /devshell\.sh/);
 
   const stage0 = direnvStage0();
+  assert.match(stage0, /export VBR_HOST_PATH="\$\{PATH:-\}"/);
+  assert.ok(
+    stage0.indexOf('export VBR_HOST_PATH="${PATH:-}"') <
+      stage0.indexOf('if [[ -n "${IN_NIX_SHELL:-}" ]]'),
+  );
+  assert.match(stage0, /\.viberoots\/workspace\/host-path/);
   assert.match(stage0, /source "\$\{__nix_direnv_direnvrc\}"/);
   assert.match(
     stage0,

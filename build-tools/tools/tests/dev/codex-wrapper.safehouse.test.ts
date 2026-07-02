@@ -15,6 +15,33 @@ import {
 
 const wrapper = binWrapper("codex");
 const makeFakeTools = (tmp: string, gitRoot: string) => makeFakeAgentTools(tmp, gitRoot, "codex");
+
+test("codex wrapper falls back to VBR_HOST_PATH for the real Codex binary", async () => {
+  await fsp.mkdir(externalScratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "codex-wrapper-"));
+  try {
+    const gitRoot = path.join(tmp, "repo");
+    await fsp.mkdir(gitRoot, { recursive: true });
+    const fake = await makeFakeTools(tmp, gitRoot);
+    const res = await $({
+      cwd: gitRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(wrapper)}:/usr/bin:/bin`,
+        VBR_HOST_PATH: fake.bin,
+      },
+    })`${wrapper} exec host-path`;
+
+    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
+    const log = await fsp.readFile(fake.log, "utf8");
+    assert.doesNotMatch(log, /safehouse /);
+    assert.match(log, /codex --sandbox danger-full-access exec host-path/);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test("codex --worktree creates through the CoW git wrapper and launches the worker in safehouse", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));

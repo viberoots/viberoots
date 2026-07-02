@@ -4,12 +4,13 @@ set -euo pipefail
 SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/$(basename -- "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname -- "${SCRIPT_PATH}")"
 
-find_tool_excluding_wrapper_dir() {
+find_tool_in_path_list_excluding_wrapper_dir() {
   local tool="$1"
+  local path_list="${2:-}"
   local dir
   local old_ifs="$IFS"
   IFS=':'
-  for dir in ${PATH:-}; do
+  for dir in ${path_list}; do
     [[ -n "$dir" ]] || continue
     if [[ "$(cd -- "$dir" 2>/dev/null && pwd -P || printf '%s' "$dir")" == "$SCRIPT_DIR" ]]; then
       continue
@@ -24,9 +25,17 @@ find_tool_excluding_wrapper_dir() {
   return 1
 }
 
+find_tool_excluding_wrapper_dir() {
+  local tool="$1"
+  find_tool_in_path_list_excluding_wrapper_dir "$tool" "${PATH:-}" && return 0
+  find_tool_in_path_list_excluding_wrapper_dir "$tool" "${VBR_HOST_PATH:-}" && return 0
+  find_tool_in_path_list_excluding_wrapper_dir "$tool" "${HOST_PATH:-}" && return 0
+  return 1
+}
+
 real_codex="$(find_tool_excluding_wrapper_dir codex || true)"
 if [[ -z "$real_codex" ]]; then
-  echo "Error: codex binary not found in PATH (excluding wrapper directory)" >&2
+  echo "Error: codex binary not found in PATH, VBR_HOST_PATH, or HOST_PATH (excluding wrapper directory)" >&2
   exit 1
 fi
 

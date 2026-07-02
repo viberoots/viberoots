@@ -39,6 +39,10 @@ in {
       fi
       export _VIBEROOTS_DEVSHELL_ACTIVE=1
       export _VIBEROOTS_DEVSHELL_ROOT="$dev_root"
+      if [ -f "$dev_root/.viberoots/workspace/host-path" ]; then
+        VBR_HOST_PATH="$(cat "$dev_root/.viberoots/workspace/host-path" 2>/dev/null || true)"
+        [ -z "$VBR_HOST_PATH" ] || export VBR_HOST_PATH
+      fi
       is_interactive=0
       case "$-" in
         *i*) is_interactive=1 ;;
@@ -87,7 +91,7 @@ in {
           vbr_node_bin="$PWD/.viberoots/current/node_modules/.bin"
         fi
         local repo_prefix="$vbr_tools_bin:$PWD/.direnv/bin:$vbr_node_bin"
-        local nix_prefix="''${HOST_PATH:-}"
+        local nix_prefix="''${VBR_HOST_PATH:-''${HOST_PATH:-}}"
         local host_tail
         host_tail="$(_vbr_filter_host_path "$PATH")"
         export PATH="$repo_prefix:''${vbr_host_nix_bin:+$vbr_host_nix_bin:}$vbr_nix_bin''${nix_prefix:+:$nix_prefix}''${host_tail:+:$host_tail}"
@@ -355,7 +359,8 @@ _vbr_update_path() {
         esac
       done
       IFS="$old_ifs"
-      export PATH="$vbr_tools_bin:$d/.direnv/bin:$vbr_node_bin:''${vbr_host_nix_bin:+$vbr_host_nix_bin:}$vbr_nix_bin''${HOST_PATH:+:$HOST_PATH}''${out:+:$out}"
+      local vbr_host_path="''${VBR_HOST_PATH:-''${HOST_PATH:-}}"
+      export PATH="$vbr_tools_bin:$d/.direnv/bin:$vbr_node_bin:''${vbr_host_nix_bin:+$vbr_host_nix_bin:}$vbr_nix_bin''${vbr_host_path:+:$vbr_host_path}''${out:+:$out}"
       return
     fi
     d="$(dirname "$d")"

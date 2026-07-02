@@ -16,6 +16,33 @@ import {
 
 const wrapper = binWrapper("claude");
 const makeFakeTools = (tmp: string, gitRoot: string) => makeFakeAgentTools(tmp, gitRoot, "claude");
+
+test("claude wrapper falls back to VBR_HOST_PATH for the real Claude binary", async () => {
+  await fsp.mkdir(externalScratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "claude-wrapper-"));
+  try {
+    const gitRoot = path.join(tmp, "repo");
+    await fsp.mkdir(gitRoot, { recursive: true });
+    const fake = await makeFakeTools(tmp, gitRoot);
+    const res = await $({
+      cwd: gitRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(wrapper)}:/usr/bin:/bin`,
+        VBR_HOST_PATH: fake.bin,
+      },
+    })`${wrapper} -p host-path`;
+
+    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
+    const log = await fsp.readFile(fake.log, "utf8");
+    assert.doesNotMatch(log, /safehouse /);
+    assert.match(log, /claude -p host-path/);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test("claude worktree flags create through CoW git and launch in safehouse", async () => {
   for (const { flag, name } of [
     { flag: "--worktree", name: "native-worker" },
@@ -280,6 +307,8 @@ test("claude wrapper refuses unsandboxed worktree agents when safehouse is missi
       env: {
         ...process.env,
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
+        VBR_HOST_PATH: "",
+        HOST_PATH: "",
       },
     })`${wrapper} --print hello`;
 

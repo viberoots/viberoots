@@ -191,6 +191,7 @@ EOF
 }
 
 ui_init_color
+export VBR_HOST_PATH="${VBR_HOST_PATH:-${PATH:-}}"
 
 load_nix_profile() {
   if [[ -n "${VIBEROOTS_NIX_PROFILE_SCRIPT:-}" && -f "${VIBEROOTS_NIX_PROFILE_SCRIPT}" ]]; then

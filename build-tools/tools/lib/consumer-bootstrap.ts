@@ -104,6 +104,15 @@ async function writeIfMissing(workspaceRoot: string, rel: string, content: strin
   await fsp.writeFile(file, content, "utf8");
 }
 
+async function writeHostPath(workspaceRoot: string): Promise<void> {
+  const hostPath = process.env.VBR_HOST_PATH || process.env.PATH || "";
+  if (!hostPath) return;
+  await writeIfChanged(
+    path.join(workspaceRoot, ".viberoots", "workspace", "host-path"),
+    `${hostPath}\n`,
+  );
+}
+
 async function ensureGitignoreEntries(workspaceRoot: string): Promise<void> {
   const file = path.join(workspaceRoot, ".gitignore");
   let current = "";
@@ -474,6 +483,7 @@ export async function initConsumer(opts: InitConsumerOptions): Promise<void> {
   await mkdirWithMacosMetadataExclusion(path.join(opts.workspaceRoot, ".viberoots", "workspace"));
   await mkdirWithMacosMetadataExclusion(path.join(opts.workspaceRoot, ".viberoots", "buck"));
   await mkdirWithMacosMetadataExclusion(path.join(opts.workspaceRoot, "projects"));
+  await writeHostPath(opts.workspaceRoot);
 
   await writeBuckroot(opts.workspaceRoot);
   await writeGeneratedFile(opts.workspaceRoot, ".buckconfig", buckconfig());
