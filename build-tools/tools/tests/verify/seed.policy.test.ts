@@ -62,6 +62,38 @@ test("verify seed build args split local pinning from remote-ready no-link mode"
   assert.ok(!remoteArgs.includes("--out-link"));
 });
 
+test("verify seed build args use active remote viberoots source when no submodule exists", async () => {
+  const root = await mktemp("verify-seed-remote-source-");
+  const source = await mktemp("verify-seed-remote-source-viberoots-");
+  try {
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
+    await fsp.writeFile(path.join(source, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
+    const args = verifySeedBuildArgs({
+      root,
+      mode: "remote-ready",
+      env: { VIBEROOTS_ROOT: source },
+    });
+    assert.deepEqual(
+      args.slice(args.indexOf("--override-input"), args.indexOf("--override-input") + 3),
+      ["--override-input", "viberoots", `path:${source}`],
+    );
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+    await fsp.rm(source, { recursive: true, force: true });
+  }
+});
+
+test("verify seed build args omit missing submodule override in remote consumers", async () => {
+  const root = await mktemp("verify-seed-no-submodule-");
+  try {
+    const args = verifySeedBuildArgs({ root, mode: "remote-ready", env: {} });
+    assert.equal(args.includes("--override-input"), false);
+    assert.equal(args.includes(`path:${root}/viberoots`), false);
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("verify seed reuses matching current seed before building", async () => {
   const source = await readRepoFile("build-tools/tools/dev/verify/seed.ts");
   const currentLookup = source.indexOf("await readCurrentSeed(opts.root, seedKey)");
