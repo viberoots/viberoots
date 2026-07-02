@@ -65,6 +65,12 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     await timedPhase("startup-check", async () => await deps.runStartupCheck(root));
   }
   deps.chdir(root);
+  const zxNodeModulesOut = shouldComputeLocalZxTestNodeModules(executionPolicy)
+    ? await timedPhase(
+        "compute-zx-test-node-modules",
+        async () => await deps.computeZxTestNodeModulesOut(root, zxInit),
+      )
+    : null;
   const nonBuildSystemOnlyScope = deps.isNonBuildSystemOnlyVerifyTargets(selection.targets);
   await timedPhase(
     "lint-preflight",
@@ -72,6 +78,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
       await deps.runVerifyLintPreflight(root, zxInit, {
         lintFilters: selection.lintFilters,
         includeBuildSystemPolicy: !nonBuildSystemOnlyScope,
+        zxNodeModulesOut,
       }),
   ).catch(cleanupEarlyFailure);
   await timedPhase(
@@ -236,12 +243,6 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     return shutdownPromise;
   };
   deps.installVerifySignalHandlers(requestShutdown);
-  const zxNodeModulesOut = shouldComputeLocalZxTestNodeModules(executionPolicy)
-    ? await timedPhase(
-        "compute-zx-test-node-modules",
-        async () => await deps.computeZxTestNodeModulesOut(root, zxInit),
-      )
-    : null;
   let status = 1;
   status = await timedPhase(
     "buck-test-passes",

@@ -35,7 +35,7 @@ async function firstExisting(root: string, relCandidates: string[]): Promise<str
 async function runVerifyFileSizePreflight(
   root: string,
   zxInitPath: string,
-  opts: { changedOnly?: boolean } = {},
+  opts: { changedOnly?: boolean; zxNodeModulesOut?: string | null } = {},
 ): Promise<void> {
   const script = buildToolPath(root, "tools/dev/file-size-lint.ts");
   const args = ["--scope=source", "--fail=true"];
@@ -55,6 +55,7 @@ async function runVerifyFileSizePreflight(
       script,
       args,
       zxInitPath,
+      env: envWithZxNodeModules(opts.zxNodeModulesOut),
       stdio: verbose() ? "inherit" : "pipe",
     });
   } catch (error) {
@@ -66,7 +67,22 @@ async function runVerifyFileSizePreflight(
   }
 }
 
-async function runVerifyStaleNamesPreflight(root: string, zxInitPath: string): Promise<void> {
+function envWithZxNodeModules(zxNodeModulesOut?: string | null): NodeJS.ProcessEnv {
+  const outPath = String(zxNodeModulesOut || "").trim();
+  if (!outPath) return process.env;
+  const nodeModules = path.join(outPath, "node_modules");
+  return {
+    ...process.env,
+    ZX_TEST_NODE_MODULES_OUT: outPath,
+    NODE_PATH: [nodeModules, process.env.NODE_PATH || ""].filter(Boolean).join(path.delimiter),
+  };
+}
+
+async function runVerifyStaleNamesPreflight(
+  root: string,
+  zxInitPath: string,
+  opts: { zxNodeModulesOut?: string | null } = {},
+): Promise<void> {
   const script = buildToolPath(root, "tools/dev/stale-names-lint.ts");
   if (verbose()) {
     process.stderr.write(
@@ -79,6 +95,7 @@ async function runVerifyStaleNamesPreflight(root: string, zxInitPath: string): P
       script,
       args: ["--full"],
       zxInitPath,
+      env: envWithZxNodeModules(opts.zxNodeModulesOut),
       stdio: verbose() ? "inherit" : "pipe",
     });
   } catch (error) {
@@ -90,7 +107,11 @@ async function runVerifyStaleNamesPreflight(root: string, zxInitPath: string): P
   }
 }
 
-async function runVerifyNixGapsPolicyPreflight(root: string, zxInitPath: string): Promise<void> {
+async function runVerifyNixGapsPolicyPreflight(
+  root: string,
+  zxInitPath: string,
+  opts: { zxNodeModulesOut?: string | null } = {},
+): Promise<void> {
   const script = buildToolPath(root, "tools/dev/nix-gaps-inventory-check.ts");
   const starlarkApi = await firstExisting(root, [
     "docs/handbook/starlark-api.md",
@@ -116,6 +137,7 @@ async function runVerifyNixGapsPolicyPreflight(root: string, zxInitPath: string)
       script,
       args,
       zxInitPath,
+      env: envWithZxNodeModules(opts.zxNodeModulesOut),
       stdio: verbose() ? "inherit" : "pipe",
     });
   } catch (error) {
@@ -212,7 +234,11 @@ async function resolveEslintConfig(root: string): Promise<string> {
 export async function runVerifyLintPreflight(
   root: string,
   zxInitPath: string,
-  opts: { lintFilters?: string[] | null; includeBuildSystemPolicy?: boolean } = {},
+  opts: {
+    lintFilters?: string[] | null;
+    includeBuildSystemPolicy?: boolean;
+    zxNodeModulesOut?: string | null;
+  } = {},
 ): Promise<void> {
   const ui = createCommandUi({ verbose: verbose() });
   const includeBuildSystemPolicy = opts.includeBuildSystemPolicy !== false;
@@ -220,7 +246,9 @@ export async function runVerifyLintPreflight(
   if (skipLint) {
     process.stderr.write("[verify] lint preflight: skipped (VERIFY_SKIP_LINT=1)\n");
     if (includeBuildSystemPolicy) {
-      await runVerifyNixGapsPolicyPreflight(root, zxInitPath);
+      await runVerifyNixGapsPolicyPreflight(root, zxInitPath, {
+        zxNodeModulesOut: opts.zxNodeModulesOut,
+      });
     } else {
       process.stderr.write(
         "[verify] nix-gaps policy preflight: skipped for non-build-system verify scope\n",
@@ -313,14 +341,19 @@ export async function runVerifyLintPreflight(
     }
   }
 
-  await runVerifyStaleNamesPreflight(root, zxInitPath);
+  await runVerifyStaleNamesPreflight(root, zxInitPath, {
+    zxNodeModulesOut: opts.zxNodeModulesOut,
+  });
 
   await runVerifyFileSizePreflight(root, zxInitPath, {
     changedOnly: !includeBuildSystemPolicy,
+    zxNodeModulesOut: opts.zxNodeModulesOut,
   });
 
   if (includeBuildSystemPolicy) {
-    await runVerifyNixGapsPolicyPreflight(root, zxInitPath);
+    await runVerifyNixGapsPolicyPreflight(root, zxInitPath, {
+      zxNodeModulesOut: opts.zxNodeModulesOut,
+    });
   } else {
     if (verbose()) {
       process.stderr.write(
