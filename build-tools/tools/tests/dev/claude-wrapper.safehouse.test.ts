@@ -17,20 +17,26 @@ import {
 const wrapper = binWrapper("claude");
 const makeFakeTools = (tmp: string, gitRoot: string) => makeFakeAgentTools(tmp, gitRoot, "claude");
 
-test("claude wrapper falls back to VBR_HOST_PATH for the real Claude binary", async () => {
+test("claude wrapper falls back to captured host path for the real Claude binary", async () => {
   await fsp.mkdir(externalScratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "claude-wrapper-"));
   try {
     const gitRoot = path.join(tmp, "repo");
-    await fsp.mkdir(gitRoot, { recursive: true });
+    await fsp.mkdir(path.join(gitRoot, ".viberoots", "workspace"), { recursive: true });
     const fake = await makeFakeTools(tmp, gitRoot);
+    await fsp.writeFile(
+      path.join(gitRoot, ".viberoots", "workspace", "host-path"),
+      `${fake.bin}\n`,
+      "utf8",
+    );
     const res = await $({
       cwd: gitRoot,
       stdio: "pipe",
       env: {
         ...process.env,
         PATH: `${path.dirname(wrapper)}:/usr/bin:/bin`,
-        VBR_HOST_PATH: fake.bin,
+        VBR_HOST_PATH: "",
+        HOST_PATH: "",
       },
     })`${wrapper} -p host-path`;
 

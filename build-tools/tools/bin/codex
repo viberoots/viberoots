@@ -25,9 +25,29 @@ find_tool_in_path_list_excluding_wrapper_dir() {
   return 1
 }
 
+captured_host_path() {
+  local start
+  local dir
+  for start in "${WORKSPACE_ROOT:-}" "${PWD:-}"; do
+    [[ -n "$start" ]] || continue
+    dir="$start"
+    while [[ "$dir" != "/" ]]; do
+      if [[ -f "$dir/.viberoots/workspace/host-path" ]]; then
+        cat "$dir/.viberoots/workspace/host-path" 2>/dev/null || true
+        return 0
+      fi
+      dir="$(dirname -- "$dir")"
+    done
+  done
+  return 1
+}
+
 find_tool_excluding_wrapper_dir() {
   local tool="$1"
+  local host_path
   find_tool_in_path_list_excluding_wrapper_dir "$tool" "${PATH:-}" && return 0
+  host_path="$(captured_host_path || true)"
+  find_tool_in_path_list_excluding_wrapper_dir "$tool" "$host_path" && return 0
   find_tool_in_path_list_excluding_wrapper_dir "$tool" "${VBR_HOST_PATH:-}" && return 0
   find_tool_in_path_list_excluding_wrapper_dir "$tool" "${HOST_PATH:-}" && return 0
   return 1
@@ -35,7 +55,7 @@ find_tool_excluding_wrapper_dir() {
 
 real_codex="$(find_tool_excluding_wrapper_dir codex || true)"
 if [[ -z "$real_codex" ]]; then
-  echo "Error: codex binary not found in PATH, VBR_HOST_PATH, or HOST_PATH (excluding wrapper directory)" >&2
+  echo "Error: codex binary not found in PATH, captured host path, VBR_HOST_PATH, or HOST_PATH (excluding wrapper directory)" >&2
   exit 1
 fi
 

@@ -26,13 +26,12 @@ if [[ "\${NIX_CONFIG:-}" != *"warn-dirty = false"* ]]; then
 fi
 export NODE_OPTIONS="--disable-warning=ExperimentalWarning\${NODE_OPTIONS:+ $NODE_OPTIONS}"
 if [[ -z "\${IN_NIX_SHELL:-}" ]]; then
-  if [[ -z "\${VBR_HOST_PATH:-}" ]]; then
-    export VBR_HOST_PATH="\${PATH:-}"
-  fi
-  if [[ -n "\${VBR_HOST_PATH:-}" && ! -f "\${PWD}/.viberoots/workspace/host-path" ]]; then
+  __vbr_host_path="\${VBR_HOST_PATH:-\${PATH:-}}"
+  if [[ -n "\${__vbr_host_path:-}" && ! -f "\${PWD}/.viberoots/workspace/host-path" ]]; then
     mkdir -p "\${PWD}/.viberoots/workspace" 2>/dev/null || true
-    printf '%s\\n' "\${VBR_HOST_PATH}" > "\${PWD}/.viberoots/workspace/host-path" 2>/dev/null || true
+    printf '%s\\n' "\${__vbr_host_path}" > "\${PWD}/.viberoots/workspace/host-path" 2>/dev/null || true
   fi
+  unset __vbr_host_path
 fi
 if [[ -n "\${IN_NIX_SHELL:-}" ]]; then
   return
