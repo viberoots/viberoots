@@ -14,6 +14,18 @@ type ScopeDecision = {
 
 const AUTO_TARGETS = ["//..."];
 const AUTO_SCOPE_IGNORED_BUILD_SYSTEM_PATHS = new Set([
+  ".buckconfig",
+  ".buckroot",
+  ".envrc",
+  ".gitignore",
+  "README.md",
+  "projects",
+  "projects/",
+  "projects/.metadata_never_index",
+  "projects/AGENTS.md",
+  "projects/README.md",
+  "projects/config/README.md",
+  "projects/config/shared.json",
   "build-tools/tools/nix/node-modules.hashes.json",
   "viberoots/build-tools/tools/nix/node-modules.hashes.json",
   ".viberoots/workspace/node/workspace-map.json",
@@ -82,6 +94,12 @@ export function isIgnoredBuildSystemScopePath(relPath: string): boolean {
     return true;
   }
   if (p.includes("/.vite-cache/") || p.endsWith("/.vite-cache")) {
+    return true;
+  }
+  if (p.startsWith(".direnv/") || p === ".direnv") {
+    return true;
+  }
+  if (p.startsWith(".nix-zsh/") || p === ".nix-zsh") {
     return true;
   }
   return false;
@@ -239,7 +257,20 @@ async function collectNestedViberootsChangedPaths(
   if (!rootChangedPaths.some((p) => p === "viberoots" || p.startsWith("viberoots/"))) {
     return [];
   }
+  const currentTarget = await fsp
+    .readlink(path.join(root, ".viberoots", "current"))
+    .catch(() => "");
+  if (currentTarget !== "../viberoots") {
+    return [];
+  }
   const viberootsRoot = path.join(root, "viberoots");
+  let viberootsStat: Awaited<ReturnType<typeof fsp.lstat>> | null = null;
+  try {
+    viberootsStat = await fsp.lstat(viberootsRoot);
+  } catch {}
+  if (!viberootsStat || viberootsStat.isSymbolicLink()) {
+    return [];
+  }
   const hasNestedGit = await fsp
     .access(path.join(viberootsRoot, ".git"))
     .then(() => true)

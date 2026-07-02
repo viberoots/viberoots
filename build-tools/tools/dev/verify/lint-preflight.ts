@@ -135,12 +135,31 @@ function normalizeRepoPath(relPath: string): string {
 
 function shouldIgnoreLintPath(relPath: string): boolean {
   if (!relPath) return true;
+  if (relPath === "viberoots" || relPath === ".viberoots/current") return true;
+  if (
+    relPath === ".buckconfig" ||
+    relPath === ".buckroot" ||
+    relPath === ".envrc" ||
+    relPath === ".gitignore" ||
+    relPath === "projects" ||
+    relPath === "projects/" ||
+    relPath === "README.md" ||
+    relPath === "projects/.metadata_never_index" ||
+    relPath === "projects/AGENTS.md" ||
+    relPath === "projects/README.md" ||
+    relPath === "projects/config/README.md" ||
+    relPath === "projects/config/shared.json"
+  ) {
+    return true;
+  }
   if (relPath.includes("/node_modules/") || relPath.startsWith("node_modules/")) return true;
   if (relPath.includes("/buck-out/") || relPath.startsWith("buck-out/")) return true;
   if (relPath.includes("/coverage/") || relPath.startsWith("coverage/")) return true;
   if (relPath.includes("/dist/") || relPath.startsWith("dist/")) return true;
   if (relPath.includes("/.clinic/") || relPath.startsWith(".clinic/")) return true;
   if (relPath.includes("/.vite-cache/") || relPath.startsWith(".vite-cache/")) return true;
+  if (relPath === ".direnv" || relPath.startsWith(".direnv/")) return true;
+  if (relPath === ".nix-zsh" || relPath.startsWith(".nix-zsh/")) return true;
   return false;
 }
 
@@ -162,15 +181,6 @@ function isPrettierPath(relPath: string): boolean {
   );
 }
 
-async function pathIsFile(root: string, relPath: string): Promise<boolean> {
-  try {
-    const stat = await fsp.stat(path.resolve(root, relPath));
-    return stat.isFile();
-  } catch {
-    return false;
-  }
-}
-
 async function resolveRepoNodeBin(root: string, name: string): Promise<string> {
   const candidates = [
     path.join(root, "node_modules", ".bin", name),
@@ -183,8 +193,11 @@ async function resolveRepoNodeBin(root: string, name: string): Promise<string> {
       return candidate;
     } catch {}
   }
+  try {
+    return await resolveToolPath(name);
+  } catch {}
   process.stderr.write(
-    `error: verify lint preflight requires ${name}; checked ${candidates.join(", ")}. Run 'i' to provision repo dev tools before re-running 'v'\n`,
+    `error: verify lint preflight requires ${name}; checked ${candidates.join(", ")} and PATH. Run 'i' to provision repo dev tools before re-running 'v'\n`,
   );
   process.exit(2);
 }
@@ -194,21 +207,6 @@ async function resolveEslintConfig(root: string): Promise<string> {
     root,
     await firstExisting(root, ["eslint.config.js", "viberoots/eslint.config.js"]),
   );
-}
-
-async function resolveChangedLintPaths(root: string): Promise<string[]> {
-  const changedPaths = await collectChangedPaths(root, process.env);
-  const normalized = Array.from(
-    new Set(changedPaths.map((p) => normalizeRepoPath(p)).filter((p) => !shouldIgnoreLintPath(p))),
-  ).sort();
-  if (normalized.length === 0) {
-    return [];
-  }
-
-  const checks = await Promise.all(
-    normalized.map(async (relPath) => [relPath, await pathIsFile(root, relPath)] as const),
-  );
-  return checks.filter(([, isFile]) => isFile).map(([relPath]) => `./${relPath}`);
 }
 
 export async function runVerifyLintPreflight(
@@ -237,12 +235,28 @@ export async function runVerifyLintPreflight(
   const lintFilters = Array.isArray(opts.lintFilters)
     ? opts.lintFilters.map((x) => String(x || "").trim()).filter(Boolean)
     : [];
-  const changedLintPaths = lintFilters.length > 0 ? [] : await resolveChangedLintPaths(root);
+  const rawChangedPaths =
+    lintFilters.length > 0 ? [] : await collectChangedPaths(root, process.env);
+  const normalizedChangedPaths = Array.from(
+    new Set(rawChangedPaths.map((p) => normalizeRepoPath(p)).filter(Boolean)),
+  ).sort();
+  const changedLintPaths =
+    lintFilters.length > 0 ? [] : normalizedChangedPaths.filter((p) => !shouldIgnoreLintPath(p));
+  const onlyIgnoredScaffoldChanges =
+    lintFilters.length === 0 && normalizedChangedPaths.length > 0 && changedLintPaths.length === 0;
   const eslintTargets =
     lintFilters.length > 0 ? lintFilters : changedLintPaths.filter(isEslintPath);
   const prettierTargets =
     lintFilters.length > 0 ? lintFilters : changedLintPaths.filter(isPrettierPath);
   const scoped = lintFilters.length > 0 || changedLintPaths.length > 0;
+  if (onlyIgnoredScaffoldChanges) {
+    if (verbose()) {
+      process.stderr.write(
+        "[verify] lint preflight: skipped (only generated bootstrap scaffold files changed)\n",
+      );
+    }
+    return;
+  }
   if (!scoped) {
     if (verbose()) {
       process.stderr.write("[verify] lint preflight: skipped (no changed lint/prettier files)\n");

@@ -39,6 +39,7 @@ export function shouldPrepareVerifySeedForRequestedTargets(
   const mode = parseVerifySeedMode(env.VBR_VERIFY_SEED_MODE);
   if (mode === "always") return true;
   if (mode === "never") return false;
+  if (effectiveTargets.length === 0) return false;
   return !isNonBuildSystemOnlyVerifyTargets(effectiveTargets);
 }
 

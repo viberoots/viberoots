@@ -150,6 +150,40 @@ test("explicit project target scopes lint/prettier to that importer", async () =
   assert.deepEqual(result.lintFilters, ["./workspace/apps/my-app"]);
 });
 
+test("scaffold-only generated paths select no Buck targets", async () => {
+  const result = await resolveVerifyTemplateTestScope({
+    root: process.cwd(),
+    requestedTargets: ["//..."],
+    env: {},
+    deps: {
+      resolveBuildScope: async () => ({
+        targets: ["//projects/..."],
+        mode: "auto",
+        hasBuildSystemChanges: false,
+      }),
+      resolveTemplateSelection: async () => ({
+        mode: "no-template-impact",
+        targets: [],
+        diagnostics: {
+          mode: "no-template-impact",
+          changedPaths: [".buckconfig", ".buckroot", ".direnv/", ".envrc", "projects/"],
+          changedTemplateIds: [],
+          ownedChangedTestPaths: [],
+          ownedChangedTestTargets: [],
+          nonTemplateBuildSystemPaths: [],
+          safetyFloorTargets: ["//:scaffolding_smoke_lib_readme"],
+          templateTargetsById: {},
+          selectedTargets: [],
+        },
+      }),
+    },
+  });
+  assert.equal(result.selectorMode, "no-template-impact");
+  assert.equal(result.reason, "ignored-change-set");
+  assert.deepEqual(result.targets, []);
+  assert.equal(result.lintFilters, null);
+});
+
 test("always mode fails with actionable diagnostics when change-set is not template-only", async () => {
   await assert.rejects(
     async () =>

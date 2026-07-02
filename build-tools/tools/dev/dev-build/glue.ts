@@ -62,8 +62,13 @@ function stableExporterIsolation(root: string): string {
 
 function buckProcessEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   const sslCertFile = process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE || "";
+  const quietBuck =
+    !isVbrVerbose() &&
+    String(process.env.DEVBUILD_DEBUG || "").trim() !== "1" &&
+    !String(process.env.BUCK_VERBOSE || "").trim();
   return {
     ...process.env,
+    ...(quietBuck ? { BUCK_VERBOSE: "0" } : {}),
     ...extra,
     HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
     ...(sslCertFile
@@ -81,7 +86,7 @@ async function workspaceHasOnlyGeneratedTargets(root: string): Promise<boolean> 
     cwd: root,
     env: buckProcessEnv(),
     nothrow: true,
-  })`buck2 targets //...`;
+  })`buck2 -v 0 targets --console none //...`;
   if (res.exitCode !== 0) return false;
   const targets = String(res.stdout || "")
     .split(/\r?\n/)
@@ -135,7 +140,11 @@ async function ensureNonEmptyGraphOrExit(root: string, graphPath: string): Promi
       try {
         console.warn("[dev-build] bootstrap: warming up buck targets and re-exporting");
         try {
-          await $({ stdio: "inherit", cwd: root, env: buckProcessEnv() })`buck2 targets //...`;
+          await $({
+            stdio: "pipe",
+            cwd: root,
+            env: buckProcessEnv(),
+          })`buck2 -v 0 targets --console none //...`;
         } catch {}
         const runEnvNoIso = {
           ...runEnv,

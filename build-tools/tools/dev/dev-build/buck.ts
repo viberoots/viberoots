@@ -34,10 +34,16 @@ export async function runBuckCommand(opts: {
   const hasUserPlatform =
     opts.restArgs.includes("--target-platforms") || opts.restArgs.includes("--user-platform");
   const platformFlags = hasUserPlatform ? [] : ["--target-platforms", "prelude//platforms:default"];
-  const baseCmd = `${buckBin} ${opts.isolationFlags.join(" ")} ${opts.subcmd} ${platformFlags.join(
+  const verbose = isVbrVerbose();
+  const quietEmptyGraph =
+    !verbose &&
+    String(process.env.DEVBUILD_EMPTY_GRAPH || "").trim() === "1" &&
+    !String(process.env.BUCK_VERBOSE || "").trim();
+  const quietEmptyGraphGlobalFlags = quietEmptyGraph ? ["-v", "0"] : [];
+  const quietEmptyGraphSubcommandFlags = quietEmptyGraph ? ["--console", "none"] : [];
+  const baseCmd = `${buckBin} ${quietEmptyGraphGlobalFlags.join(" ")} ${opts.isolationFlags.join(" ")} ${opts.subcmd} ${quietEmptyGraphSubcommandFlags.join(" ")} ${platformFlags.join(
     " ",
   )} ${opts.restArgs.join(" ")}`;
-  const verbose = isVbrVerbose();
   const ui = createCommandUi({ verbose });
   const useStderrFilter = String(process.env.BUCK_STDERR_FILTER || "").trim() === "1";
   // Default to direct stderr passthrough. Bash process-substitution filters can hang if any child

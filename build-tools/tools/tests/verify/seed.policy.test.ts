@@ -18,6 +18,7 @@ async function readRepoFile(relativePath: string): Promise<string> {
 }
 
 test("verify seed build policy defaults to full-suite only", () => {
+  assert.equal(shouldPrepareVerifySeedForRequestedTargets([], {}), false);
   assert.equal(shouldPrepareVerifySeedForRequestedTargets(["//..."], {}), true);
   assert.equal(
     shouldPrepareVerifySeedForRequestedTargets(["//projects/apps/my-app/..."], {}),

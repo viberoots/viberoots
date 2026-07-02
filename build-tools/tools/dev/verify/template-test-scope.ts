@@ -188,6 +188,16 @@ export async function resolveVerifyTemplateTestScope(opts: {
 
   if (!baseScope.hasBuildSystemChanges && selected.mode === "no-template-impact") {
     const changedPaths = diagnostics.changedPaths.filter((p) => !isIgnoredBuildSystemScopePath(p));
+    if (changedPaths.length === 0 && diagnostics.changedPaths.length > 0) {
+      return {
+        requestedMode,
+        selectorMode: selected.mode,
+        targets: [],
+        diagnostics,
+        lintFilters: null,
+        reason: "ignored-change-set",
+      };
+    }
     const projectImpact = await resolveProjectImpact({
       root: opts.root,
       changedPaths,

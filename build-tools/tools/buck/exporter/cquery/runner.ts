@@ -167,6 +167,12 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
   const platformFlags = ["--target-platforms", platformLabel];
   const rootsExpr = computeRootsExpr(cwd);
   const { iso, flags: isolationFlags, ownsIso } = computeIsolationFlags(cwd);
+  const quietFlags =
+    String(process.env.EXPORTER_DEBUG || "").trim() === "1" ||
+    String(process.env.VBR_VERBOSE || "").trim() === "1" ||
+    String(process.env.BUCK_VERBOSE || "").trim()
+      ? []
+      : ["-v", "0"];
 
   const runQuery = async (q: string): Promise<Record<string, any>> => {
     const qScoped = q.replaceAll("//...", rootsExpr);
@@ -184,7 +190,7 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
         cwd,
         stdio: "pipe",
         env: buckEnv,
-      })`buck2 ${isolationFlags} cquery ${platformFlags} ${query} --json ${flags}`.quiet();
+      })`buck2 ${quietFlags} ${isolationFlags} cquery ${platformFlags} ${query} --json ${flags}`.quiet();
       return stdout;
     };
     const stdout = await withSharedBuckIsolationStartupLock(cwd, iso, runBuck);

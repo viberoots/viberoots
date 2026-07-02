@@ -39,6 +39,12 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
   ).trim();
   const iso = parentIso ? `${parentIso}__exporter-${process.pid}` : `exporter-${process.pid}`;
   const isolationFlags = process.env.BUCK_NO_ISOLATION === "1" ? [] : ["--isolation-dir", iso];
+  const quietFlags =
+    String(process.env.EXPORTER_DEBUG || "").trim() === "1" ||
+    String(process.env.VBR_VERBOSE || "").trim() === "1" ||
+    String(process.env.BUCK_VERBOSE || "").trim()
+      ? []
+      : ["-v", "0"];
 
   // Ensure isolated buckd is killed if this process is interrupted
   if (process.env.BUCK_NO_ISOLATION !== "1") {
@@ -63,7 +69,7 @@ export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[
     }
     const { stdout } = await $({
       stdio: "pipe",
-    })`buck2 ${isolationFlags} cquery ${platformFlags} ${query} --json ${flags}`.quiet();
+    })`buck2 ${quietFlags} ${isolationFlags} cquery ${platformFlags} ${query} --json ${flags}`.quiet();
     return JSON.parse(String(stdout)) as Record<string, any>;
   }
 

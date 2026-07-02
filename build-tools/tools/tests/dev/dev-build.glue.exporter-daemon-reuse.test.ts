@@ -22,6 +22,12 @@ test("dev-build glue config enables stable exporter daemon reuse", async () => {
   if (!glue.includes('stdio: verbose ? "inherit" : "pipe"')) {
     throw new Error("glue.ts must pipe child output outside verbose/debug mode");
   }
+  if (!glue.includes("buck2 -v 0 targets --console none //...")) {
+    throw new Error("generated-target probes must suppress Buck daemon status output");
+  }
+  if (!glue.includes('BUCK_VERBOSE: "0"')) {
+    throw new Error("glue/export probes must suppress Buck daemon status output by default");
+  }
   if (glue.includes('BUCK_NO_ISOLATION: "1", EXPORTER_DEBUG: "1"')) {
     throw new Error("glue fallback warmup must not force exporter debug output");
   }
@@ -51,6 +57,9 @@ test("dev-build glue config enables stable exporter daemon reuse", async () => {
   if (!runner.includes("if (reuse) return await fn();")) {
     throw new Error("cquery runner must skip daemon cleanup when reuse is enabled");
   }
+  if (!runner.includes("const quietFlags =") || !runner.includes("buck2 ${quietFlags}")) {
+    throw new Error("cquery runner must suppress Buck daemon status output by default");
+  }
 
   const exporter = await fsp.readFile("viberoots/build-tools/tools/buck/exporter/main.ts", "utf8");
   if (
@@ -66,5 +75,15 @@ test("dev-build glue config enables stable exporter daemon reuse", async () => {
   );
   if (!importerRoots.includes("process.env.VBR_VERBOSE")) {
     throw new Error("importer roots generator must only log in verbose mode");
+  }
+
+  const exporterIo = await fsp.readFile("viberoots/build-tools/tools/buck/exporter/io.ts", "utf8");
+  if (!exporterIo.includes("const quietFlags =") || !exporterIo.includes("buck2 ${quietFlags}")) {
+    throw new Error("legacy exporter io cquery path must suppress Buck daemon status output");
+  }
+
+  const buck = await fsp.readFile("viberoots/build-tools/tools/dev/dev-build/buck.ts", "utf8");
+  if (!buck.includes("quietEmptyGraphSubcommandFlags") || !buck.includes("DEVBUILD_EMPTY_GRAPH")) {
+    throw new Error("empty-bootstrap final Buck build must suppress daemon status output");
   }
 });

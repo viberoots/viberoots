@@ -43,6 +43,8 @@ test("auto-scope ignores generated metadata and transient dependency/cache direc
     true,
   );
   assert.equal(isIgnoredBuildSystemScopePath(".viberoots/workspace/node/workspace-map.json"), true);
+  assert.equal(isIgnoredBuildSystemScopePath("projects"), true);
+  assert.equal(isIgnoredBuildSystemScopePath("projects/"), true);
   assert.equal(isIgnoredBuildSystemScopePath("workspace/apps/puzzle/node_modules"), true);
   assert.equal(
     isIgnoredBuildSystemScopePath("workspace/apps/puzzle/node_modules/react/index.js"),
@@ -86,7 +88,10 @@ test("dirty nested viberoots repo expands to build-system changed paths", async 
     await $({ cwd: nested })`git -c user.name=test -c user.email=test@example.com commit -m init`;
 
     await $({ cwd: root })`git init -b main`;
+    await fsp.mkdir(path.join(root, ".viberoots"), { recursive: true });
+    await fsp.symlink("../viberoots", path.join(root, ".viberoots", "current"));
     await $({ cwd: root })`git add viberoots`;
+    await $({ cwd: root })`git add .viberoots/current`;
     await $({ cwd: root })`git -c user.name=test -c user.email=test@example.com commit -m init`;
 
     await fsp.writeFile(toolPath, "export const marker = 2;\n");
@@ -105,6 +110,38 @@ test("dirty nested viberoots repo expands to build-system changed paths", async 
     assert.equal(scope.hasBuildSystemChanges, true);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("flake-mode viberoots symlink does not expand nested source changes", async () => {
+  const root = await mktemp("build-system-scope-flake-viberoots-");
+  const storeLike = await mktemp("build-system-scope-flake-source-");
+  try {
+    const toolPath = path.join(storeLike, "build-tools", "tools", "dev", "verify.ts");
+    await fsp.mkdir(path.dirname(toolPath), { recursive: true });
+    await fsp.writeFile(toolPath, "export const marker = 1;\n");
+    await $({ cwd: storeLike })`git init -b main`;
+    await $({ cwd: storeLike })`git add .`;
+    await $({
+      cwd: storeLike,
+    })`git -c user.name=test -c user.email=test@example.com commit -m init`;
+    await fsp.writeFile(toolPath, "export const marker = 2;\n");
+
+    await $({ cwd: root })`git init -b main`;
+    await fsp.mkdir(path.join(root, ".viberoots"), { recursive: true });
+    await fsp.symlink(storeLike, path.join(root, ".viberoots", "current"));
+    await fsp.symlink(storeLike, path.join(root, "viberoots"));
+    const changedPaths = await collectChangedPaths(root, {});
+
+    assert.equal(changedPaths.includes("viberoots"), true);
+    assert.equal(
+      changedPaths.some((p) => p.startsWith("viberoots/")),
+      false,
+    );
+    assert.equal(hasRelevantBuildSystemChanges(changedPaths), false);
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+    await fsp.rm(storeLike, { recursive: true, force: true });
   }
 });
 
