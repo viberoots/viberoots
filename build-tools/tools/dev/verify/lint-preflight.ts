@@ -6,6 +6,7 @@ import "zx/globals";
 import { collectChangedPaths } from "../../lib/build-system-test-scope";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { runNodeWithZx } from "../../lib/node-run";
+import { repoNodeBinCandidates, resolveRepoNodeBin } from "../../lib/repo-node-bin";
 import { resolveToolPath } from "../../lib/tool-paths";
 import { buildToolsRoot, buildToolPath } from "../dev-build/paths";
 
@@ -213,21 +214,11 @@ function isPrettierPath(relPath: string): boolean {
   );
 }
 
-async function resolveRepoNodeBin(root: string, name: string): Promise<string> {
-  const candidates = [
-    path.join(root, "node_modules", ".bin", name),
-    path.join(path.dirname(buildToolsRoot(root)), "node_modules", ".bin", name),
-    path.join(root, "viberoots", "node_modules", ".bin", name),
-  ];
-  for (const candidate of candidates) {
-    try {
-      await fsp.access(candidate);
-      return candidate;
-    } catch {}
-  }
+async function resolveVerifyNodeBin(root: string, name: string): Promise<string> {
   try {
-    return await resolveToolPath(name);
+    return await resolveRepoNodeBin(root, name);
   } catch {}
+  const candidates = await repoNodeBinCandidates(root, name);
   process.stderr.write(
     `error: verify lint preflight requires ${name}; checked ${candidates.join(", ")} and PATH. Run 'i' to provision repo dev tools before re-running 'v'\n`,
   );
@@ -312,9 +303,9 @@ export async function runVerifyLintPreflight(
   }
   const timeoutPath = await resolveToolPath("timeout");
   const eslintPath =
-    scoped && eslintTargets.length > 0 ? await resolveRepoNodeBin(root, "eslint") : "";
+    scoped && eslintTargets.length > 0 ? await resolveVerifyNodeBin(root, "eslint") : "";
   const prettierPath =
-    scoped && prettierTargets.length > 0 ? await resolveRepoNodeBin(root, "prettier") : "";
+    scoped && prettierTargets.length > 0 ? await resolveVerifyNodeBin(root, "prettier") : "";
 
   const eslintRes =
     scoped && eslintTargets.length > 0

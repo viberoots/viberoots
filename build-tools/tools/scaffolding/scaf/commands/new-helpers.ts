@@ -2,6 +2,7 @@ import type { Dirent } from "node:fs";
 
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { requireRepoNodeBin } from "../../../lib/repo-node-bin";
 import { runScafCommand, runScafNodeTool } from "../command-runner";
 
 const FORMAT_EXTENSIONS = new Set([
@@ -102,9 +103,12 @@ export async function formatScaffoldPaths(paths: string[]): Promise<void> {
   const deduped = Array.from(new Set(files));
   if (deduped.length === 0) return;
   const chunkSize = 128;
+  const prettier = await requireRepoNodeBin(process.cwd(), "prettier", {
+    commandName: "scaf new",
+  });
   for (let idx = 0; idx < deduped.length; idx += chunkSize) {
     const chunk = deduped.slice(idx, idx + chunkSize);
-    await runScafCommand("prettier", ["--write", ...chunk], process.cwd());
+    await runScafCommand(prettier, ["--write", ...chunk], process.cwd());
   }
 }
 
@@ -148,7 +152,10 @@ export async function formatImporterLockfiles(
     if (hasLockfile) lockfiles.push(absLockfile);
   }
   if (lockfiles.length === 0) return;
-  await runScafCommand("prettier", ["--write", ...lockfiles], repoRoot);
+  const prettier = await requireRepoNodeBin(repoRoot, "prettier", {
+    commandName: "scaf new",
+  });
+  await runScafCommand(prettier, ["--write", ...lockfiles], repoRoot);
 }
 
 export function templateImportersToRefresh(opts: {
