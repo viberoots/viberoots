@@ -155,6 +155,7 @@ async function activeViberootsOverride(repoRoot: string): Promise<string> {
     .filter(Boolean);
   for (const candidate of candidates) {
     const abs = path.resolve(candidate);
+    if (abs.startsWith("/nix/store/")) continue;
     try {
       if (
         fs.existsSync(path.join(abs, "flake.nix")) &&

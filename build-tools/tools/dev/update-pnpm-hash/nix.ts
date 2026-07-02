@@ -50,6 +50,7 @@ function activeViberootsOverride(): string[] {
     .filter(Boolean);
   for (const candidate of candidates) {
     const abs = path.resolve(candidate);
+    if (abs.startsWith("/nix/store/")) continue;
     if (
       fs.existsSync(path.join(abs, "flake.nix")) &&
       fs.existsSync(path.join(abs, "build-tools", "tools", "dev", "zx-init.mjs"))
