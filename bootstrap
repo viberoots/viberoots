@@ -126,6 +126,18 @@ ui_list() {
   done
 }
 
+ui_continuation_list() {
+  local item text
+  for item in "$@"; do
+    if ui_use_color; then
+      text="$(ui_color "2" "${item}")"
+      printf '        %s\n' "${text}"
+    else
+      printf '        %s\n' "${item}"
+    fi
+  done
+}
+
 usage() {
   cat >&2 <<'EOF'
 usage: bootstrap [--mode flake|submodule] [--ref <ref>] [--workspace-root <dir>]
@@ -627,13 +639,13 @@ print_summary() {
   fi
   ui_set "actions"
   if [[ "${#actions[@]}" -eq 0 ]]; then
-    ui_list "no setup changes needed"
+    ui_continuation_list "no setup changes needed"
   else
     local action action_list=()
     for action in "${actions[@]}"; do
       action_list+=("${action}")
     done
-    ui_list "${action_list[@]}"
+    ui_continuation_list "${action_list[@]}"
   fi
 }
 
@@ -794,8 +806,11 @@ fi
 if [[ "${run_validate}" == "1" ]]; then
   direnv exec "${workspace_root}" sh -lc 'i && b && v'
   ui_ok "validation" "complete"
+  ui_step "devshell" "direnv may load ${workspace_root}/.envrc now"
 elif [[ "${direnv_allow}" == "1" ]]; then
   ui_ok "next" "cd ${workspace_root} && direnv exec . sh -lc 'i && b && v'"
+  ui_step "devshell" "direnv may load ${workspace_root}/.envrc now"
 else
   ui_ok "next" "cd ${workspace_root} && direnv allow && direnv exec . sh -lc 'i && b && v'"
+  ui_step "devshell" "run direnv allow before loading the dev shell"
 fi

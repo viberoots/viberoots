@@ -30,12 +30,12 @@ function formatStatus(kind: "step" | "ok" | "warn", label: string, detail = ""):
   const colors = useColor();
   const mark =
     kind === "ok"
-      ? color("32", "ok", colors)
+      ? color("32;1", "ok", colors)
       : kind === "warn"
-        ? color("33", "warn", colors)
-        : color("36", "run", colors);
+        ? color("33;1", "warn", colors)
+        : color("34;1", "run", colors);
   const suffix = detail.trim() ? ` ${color("2", detail.trim(), colors)}` : "";
-  return `  ${mark.padEnd(colors ? 11 : 5)} ${label}${suffix}`;
+  return `  ${mark}   ${label}${suffix}`;
 }
 
 export function createCommandUi(opts?: { verbose?: boolean }): CommandUi {
