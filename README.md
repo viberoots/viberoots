@@ -8,6 +8,8 @@ Run the bootstrap command below to create or upgrade a workspace. Always fetch b
 
 ```text
 my-project/                         # consumer workspace root
+├── flake.nix                        # generated Nix entry for bare nix develop
+├── flake.lock                       # generated lock mirror for bare nix develop
 ├── projects/                        # application and library code
 ├── .envrc                           # generated shell entry
 ├── .buckconfig                      # generated Buck cells/config
@@ -25,7 +27,7 @@ The bootstrap script creates or refreshes `projects/`, writes the shared viberoo
 
 **Preferred for most users: remote flake import**
 
-Use this when the project mostly consumes viberoots rather than contributing upstream. The repo stays small: no top-level `viberoots/` checkout, and `.viberoots/workspace/flake.lock` pins the source.
+Use this when the project mostly consumes viberoots rather than contributing upstream. The repo stays small: no top-level `viberoots/` checkout. The generated root `flake.nix` supports bare `nix develop`, while `.viberoots/workspace/flake.nix` remains the workspace flake used by direnv and viberoots commands.
 
 ```bash
 mkdir my-project && cd my-project
@@ -151,7 +153,7 @@ b        # build the full default repo scope
 v        # run impacted tests and verification checks
 ```
 
-Shell entry also prepares ignored viberoots workspace state. In a consumer workspace, the hidden `.viberoots/workspace/flake.nix` uses `path:../../viberoots` as the local input while `.envrc` overrides that input to `path:$PWD/viberoots` for local development. Since the flake file itself lives under `.viberoots/workspace`, it resolves the consumer source from `WORKSPACE_ROOT` during Nix evaluation and falls back to `../..` only for local readability. Activation points `.viberoots/current` at the local `viberoots/` source, so Buck cells and Nix-backed commands see local build-tool edits immediately. Generated provider and Buck graph state stays under `.viberoots/workspace/`.
+Shell entry also prepares ignored viberoots workspace state. In a consumer workspace, the hidden `.viberoots/workspace/flake.nix` uses `path:../../viberoots` as the local input while `.envrc` overrides that input to `path:$PWD/viberoots` for local development. The generated root `flake.nix` mirrors the workspace flake so `nix develop` works from the workspace root and nested project directories. Activation points `.viberoots/current` at the active viberoots source, so Buck cells and Nix-backed commands see local build-tool edits immediately. Generated provider and Buck graph state stays under `.viberoots/workspace/`.
 
 Check the active source mode and split-readiness diagnostics with:
 

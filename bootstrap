@@ -518,6 +518,7 @@ required_bootstrap_files_present() {
   [[ -f .buckroot ]] &&
     [[ -f .buckconfig ]] &&
     [[ -f .envrc ]] &&
+    [[ -f flake.nix ]] &&
     [[ -d projects ]] &&
     [[ -e .viberoots/current ]] &&
     [[ -f .viberoots/workspace/flake.nix ]] &&
@@ -696,7 +697,7 @@ elif [[ "${mode}" == "flake" ]]; then
   begin_transaction
   run_migrations
   record_action "ran viberoots init-consumer"
-  nix run --accept-flake-config "${viberoots_url}#viberoots" -- \
+  nix run --refresh --accept-flake-config "${viberoots_url}#viberoots" -- \
     init-consumer \
     --mode flake \
     --workspace-root "${workspace_root}" \

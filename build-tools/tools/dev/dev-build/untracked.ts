@@ -79,6 +79,8 @@ function isBootstrapScaffoldUntrackedPath(p: string): boolean {
     x === ".buckconfig" ||
     x === ".buckroot" ||
     x === ".envrc" ||
+    x === "flake.nix" ||
+    x === "flake.lock" ||
     x === ".gitignore" ||
     x === ".metadata_never_index" ||
     x === "README.md" ||

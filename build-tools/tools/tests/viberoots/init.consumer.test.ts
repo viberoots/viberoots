@@ -138,7 +138,10 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     assert.match(buckconfig, /^ignore = .*\.git/m);
     assert.match(buckconfig, /^ignore = .*\.direnv/m);
     await assertDirenvBootstrap(workspace);
-    await assert.rejects(fsp.lstat(path.join(workspace, "flake.nix")));
+    assert.match(
+      await fsp.readFile(path.join(workspace, "flake.nix"), "utf8"),
+      /if root != "" then builtins\.toPath root else \.\/\.;/,
+    );
     await assert.rejects(fsp.lstat(path.join(workspace, "buck-out")));
     assert.match(
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
@@ -188,7 +191,12 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
       await fsp.readFile(direnvLog, "utf8"),
       `allow ${workspace}\nexec ${workspace} i\n`,
     );
-    assert.deepEqual(await visibleRootEntries(workspace), ["README.md", "projects", "viberoots"]);
+    assert.deepEqual(await visibleRootEntries(workspace), [
+      "README.md",
+      "flake.nix",
+      "projects",
+      "viberoots",
+    ]);
   });
 });
 
@@ -267,6 +275,10 @@ test("viberoots init-consumer bootstraps a remote-flake consumer workspace", asy
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
       /github:viberoots\/viberoots\/v1\.2\.3/,
     );
+    assert.match(
+      await fsp.readFile(path.join(workspace, "flake.nix"), "utf8"),
+      /github:viberoots\/viberoots\/v1\.2\.3/,
+    );
     await assertDirenvBootstrap(workspace);
     assert.match(
       await fsp.readFile(path.join(workspace, ".buckconfig"), "utf8"),
@@ -307,7 +319,7 @@ test("viberoots init-consumer bootstraps a remote-flake consumer workspace", asy
     assert.match(gitignore, /\.direnv\//);
     assert.match(gitignore, /\.nix-zsh\//);
     assert.match(gitignore, /projects\/config\/local\.json/);
-    assert.deepEqual(await visibleRootEntries(workspace), ["README.md", "projects"]);
+    assert.deepEqual(await visibleRootEntries(workspace), ["README.md", "flake.nix", "projects"]);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }
@@ -377,7 +389,10 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
     const text = await fsp.readFile(log, "utf8");
     assert.match(text, /git rev-parse --is-inside-work-tree/);
     assert.match(text, /git init/);
-    assert.match(text, /nix run --accept-flake-config github:viberoots\/viberoots\/main#viberoots/);
+    assert.match(
+      text,
+      /nix run --refresh --accept-flake-config github:viberoots\/viberoots\/main#viberoots/,
+    );
     assert.match(text, /--mode flake/);
     assert.match(text, /--viberoots-url github:viberoots\/viberoots\/main/);
     assert.match(text, /--run-install/);
@@ -541,7 +556,7 @@ test("curlable bootstrap resumes and completes an interrupted transaction", asyn
     assert.equal((await fsp.readdir(path.join(transactionDir, "completed"))).length, 1);
     assert.match(
       await fsp.readFile(log, "utf8"),
-      /nix run --accept-flake-config github:viberoots\/viberoots\/main#viberoots/,
+      /nix run --refresh --accept-flake-config github:viberoots\/viberoots\/main#viberoots/,
     );
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
@@ -682,7 +697,10 @@ test("curlable bootstrap installs nix when nix is missing", async () => {
       text,
       /curl --proto =https --tlsv1.2 -sSf -L https:\/\/install\.determinate\.systems\/nix/,
     );
-    assert.match(text, /nix run --accept-flake-config github:viberoots\/viberoots\/main#viberoots/);
+    assert.match(
+      text,
+      /nix run --refresh --accept-flake-config github:viberoots\/viberoots\/main#viberoots/,
+    );
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }
@@ -792,6 +810,7 @@ printf 'init %s\\n' "$*" >> ${JSON.stringify(log)}
 mkdir -p projects .viberoots/workspace
 : > .buckroot
 : > .buckconfig
+: > flake.nix
 printf '%s\\n' 'use flake "path:\${PWD}/.viberoots/workspace#default" --override-input viberoots "path:\${PWD}/viberoots"' > .envrc
 ln -s ../viberoots .viberoots/current
 : > .viberoots/workspace/flake.nix

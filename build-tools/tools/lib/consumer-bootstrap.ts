@@ -40,6 +40,21 @@ const gitignoreEntries = [
   "projects/config/local.json",
   ".local/",
 ];
+const bootstrapScaffoldPaths = [
+  ".buckconfig",
+  ".buckroot",
+  ".envrc",
+  ".gitignore",
+  ".metadata_never_index",
+  "flake.nix",
+  "flake.lock",
+  "README.md",
+  "projects/.metadata_never_index",
+  "projects/AGENTS.md",
+  "projects/README.md",
+  "projects/config/README.md",
+  "projects/config/shared.json",
+];
 
 async function exists(file: string): Promise<boolean> {
   try {
@@ -251,6 +266,13 @@ function flakeNix(opts: InitConsumerOptions): string {
 `;
 }
 
+function rootFlakeNix(opts: InitConsumerOptions): string {
+  return flakeNix(opts).replace(
+    'if root != "" then builtins.toPath root else ../..;',
+    'if root != "" then builtins.toPath root else ./.;',
+  );
+}
+
 function workspaceTargets(): string {
   return `# ${generatedMarker}
 filegroup(
@@ -417,6 +439,27 @@ async function runNixFlakeLock(workspaceRoot: string): Promise<void> {
     ],
     { cwd: workspaceRoot, maxBuffer: 1024 * 1024 * 16 },
   );
+  const hiddenLock = path.join(workspaceRoot, ".viberoots", "workspace", "flake.lock");
+  if (await exists(hiddenLock)) {
+    await fsp.copyFile(hiddenLock, path.join(workspaceRoot, "flake.lock"));
+  }
+}
+
+async function markBootstrapScaffoldVisibleToGit(workspaceRoot: string): Promise<void> {
+  try {
+    await execFileAsync("git", ["rev-parse", "--is-inside-work-tree"], {
+      cwd: workspaceRoot,
+    });
+    const existing: string[] = [];
+    for (const rel of bootstrapScaffoldPaths) {
+      if (await exists(path.join(workspaceRoot, rel))) existing.push(rel);
+    }
+    if (existing.length > 0) {
+      await execFileAsync("git", ["add", "--intent-to-add", "--", ...existing], {
+        cwd: workspaceRoot,
+      });
+    }
+  } catch {}
 }
 
 export async function initConsumer(opts: InitConsumerOptions): Promise<void> {
@@ -436,6 +479,7 @@ export async function initConsumer(opts: InitConsumerOptions): Promise<void> {
     ".viberoots/bootstrap/direnv-stage0.sh",
     direnvStage0(),
   );
+  await writeGeneratedFile(opts.workspaceRoot, "flake.nix", rootFlakeNix(opts));
   await writeGeneratedFile(opts.workspaceRoot, ".viberoots/workspace/flake.nix", flakeNix(opts));
   await writeGeneratedFile(opts.workspaceRoot, ".viberoots/workspace/TARGETS", workspaceTargets());
   await writeIfMissing(opts.workspaceRoot, "README.md", consumerReadme(sourceMode));
@@ -454,6 +498,7 @@ Project and application source belongs here.
   await initLocalSprinkleRefValues(opts.workspaceRoot);
 
   if (opts.lock !== false) await runNixFlakeLock(opts.workspaceRoot);
+  await markBootstrapScaffoldVisibleToGit(opts.workspaceRoot);
   await repairCurrentSymlinkForBootstrap(opts.workspaceRoot, opts.sourcePath);
   const activation = await activateWorkspace({
     start: opts.workspaceRoot,
