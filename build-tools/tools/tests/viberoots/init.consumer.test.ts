@@ -378,7 +378,7 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
     );
     await fsp.writeFile(
       path.join(fakeBin, "nix"),
-      `#!/usr/bin/env bash\nprintf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}\nprintf "fetching Git repository 'https://github.com/viberoots/viberoots.git'...\\n" >&2\nprintf 'kept nix diagnostic\\n' >&2\nexit 0\n`,
+      `#!/usr/bin/env bash\nprintf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}\nprintf "fetching Git repository 'https://github.com/viberoots/viberoots.git'...\\n" >&2\nprintf 'remote: Enumerating objects: 26, done.\\n' >&2\nprintf 'remote: Counting objects: 100%% (26/26), done.\\n' >&2\nprintf 'remote: Compressing objects: 100%% (2/2), done.\\n' >&2\nprintf 'remote: Total 15 (delta 13), reused 15 (delta 13), pack-reused 0 (from 0)\\n' >&2\nprintf 'From ssh://github.com/viberoots/viberoots\\n' >&2\nprintf 'this derivation will be built:\\n' >&2\nprintf '  /nix/store/example-viberoots.drv\\n' >&2\nprintf \"building '/nix/store/example-viberoots.drv'...\\n\" >&2\nprintf 'kept nix diagnostic\\n' >&2\nexit 0\n`,
       { mode: 0o755 },
     );
     const { stdout, stderr } = await execFileAsync(path.join(viberootsRoot, "bootstrap"), [], {
@@ -412,6 +412,9 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
     assert.match(stdout, /ok\s+next cd .* && direnv exec \. sh -lc 'i && b && v'/);
     assert.match(stdout, /run\s+devshell direnv may load .*\/\.envrc now/);
     assert.doesNotMatch(stderr, /fetching Git repository/);
+    assert.doesNotMatch(stderr, /remote: Enumerating objects/);
+    assert.doesNotMatch(stderr, /this derivation will be built/);
+    assert.doesNotMatch(stderr, /building '\/nix\/store\/example-viberoots\.drv'/);
     assert.match(stderr, /kept nix diagnostic/);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });

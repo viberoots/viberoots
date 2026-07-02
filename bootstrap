@@ -598,6 +598,14 @@ run_nix_init_consumer() {
     2> >(
       while IFS= read -r line; do
         [[ "${line}" == fetching\ Git\ repository\ * ]] && continue
+        [[ "${line}" == remote:\ Enumerating\ objects:* ]] && continue
+        [[ "${line}" == remote:\ Counting\ objects:* ]] && continue
+        [[ "${line}" == remote:\ Compressing\ objects:* ]] && continue
+        [[ "${line}" == remote:\ Total\ * ]] && continue
+        [[ "${line}" == From\ *github.com/viberoots/viberoots ]] && continue
+        [[ "${line}" == "this derivation will be built:" ]] && continue
+        [[ "${line}" == "  /nix/store/"*"-viberoots.drv" ]] && continue
+        [[ "${line}" == "building '/nix/store/"*"-viberoots.drv'..." ]] && continue
         printf '%s\n' "${line}" >&2
       done
     )
