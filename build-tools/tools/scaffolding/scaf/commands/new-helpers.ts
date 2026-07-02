@@ -91,6 +91,12 @@ async function collectFormattableFiles(root: string): Promise<string[]> {
   return Array.from(out).sort();
 }
 
+async function ensureWritableFile(file: string): Promise<void> {
+  const stat = await fsp.stat(file).catch(() => null);
+  if (!stat?.isFile()) return;
+  await fsp.chmod(file, stat.mode | 0o200).catch(() => {});
+}
+
 export async function formatScaffoldPaths(paths: string[]): Promise<void> {
   const unique = Array.from(
     new Set(paths.map((value) => path.resolve(value)).filter((value) => value.length > 0)),
@@ -102,6 +108,7 @@ export async function formatScaffoldPaths(paths: string[]): Promise<void> {
     .sort();
   const deduped = Array.from(new Set(files));
   if (deduped.length === 0) return;
+  await Promise.all(deduped.map((file) => ensureWritableFile(file)));
   const chunkSize = 128;
   const prettier = await requireRepoNodeBin(process.cwd(), "prettier", {
     commandName: "scaf new",
@@ -152,6 +159,7 @@ export async function formatImporterLockfiles(
     if (hasLockfile) lockfiles.push(absLockfile);
   }
   if (lockfiles.length === 0) return;
+  await Promise.all(lockfiles.map((file) => ensureWritableFile(file)));
   const prettier = await requireRepoNodeBin(repoRoot, "prettier", {
     commandName: "scaf new",
   });
