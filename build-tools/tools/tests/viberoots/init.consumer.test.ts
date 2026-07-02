@@ -404,7 +404,7 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
     assert.match(stdout, /set\s+direnv allow yes/);
     assert.match(stdout, /viberoots bootstrap summary/);
     assert.match(stdout, /ok\s+status bootstrapped/);
-    assert.match(stdout, /ok\s+next cd .* && i && b && v/);
+    assert.match(stdout, /ok\s+next cd .* && direnv exec \. sh -lc 'i && b && v'/);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }

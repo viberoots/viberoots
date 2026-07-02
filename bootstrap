@@ -28,9 +28,14 @@ run_install="$(env_or_default 1 VBR_RUN_INSTALL VIBEROOTS_RUN_INSTALL)"
 run_validate="$(env_or_default 0 VBR_RUN_VALIDATE VIBEROOTS_RUN_VALIDATE)"
 dry_run="$(env_or_default 0 VBR_DRY_RUN VIBEROOTS_DRY_RUN)"
 direnv_allow="$(env_or_default 1 VBR_DIRENV_ALLOW VIBEROOTS_DIRENV_ALLOW)"
+ui_color_enabled=0
+
+ui_init_color() {
+  ui_color_enabled=$([[ -t 1 && -z "${NO_COLOR:-}" ]] && echo 1 || echo 0)
+}
 
 ui_use_color() {
-  [[ -t 1 && -z "${NO_COLOR:-}" ]]
+  [[ "${ui_color_enabled}" == "1" ]]
 }
 
 ui_color() {
@@ -52,18 +57,20 @@ ui_status() {
   local kind="$1"
   local label="$2"
   local detail="${3:-}"
-  local mark
+  local mark label_text detail_text
   case "${kind}" in
-    set) mark="$(ui_color "36" "set")" ;;
-    ok) mark="$(ui_color "32" "ok")" ;;
-    warn) mark="$(ui_color "33" "warn")" ;;
-    *) mark="$(ui_color "36" "run")" ;;
+    set) mark="$(ui_color "35;1" "set")" ;;
+    ok) mark="$(ui_color "32;1" "ok")" ;;
+    warn) mark="$(ui_color "33;1" "warn")" ;;
+    *) mark="$(ui_color "34;1" "run")" ;;
   esac
+  label_text="$(ui_color "1" "${label}")"
+  detail_text="$(ui_color "2" "${detail}")"
   if ui_use_color; then
     if [[ -n "${detail}" ]]; then
-      printf '  %s   %s %s\n' "${mark}" "${label}" "$(ui_color "2" "${detail}")"
+      printf '  %s   %s %s\n' "${mark}" "${label_text}" "${detail_text}"
     else
-      printf '  %s   %s\n' "${mark}" "${label}"
+      printf '  %s   %s\n' "${mark}" "${label_text}"
     fi
   elif [[ -n "${detail}" ]]; then
     printf '  %-5s %s %s\n' "${mark}" "${label}" "${detail}"
@@ -125,6 +132,8 @@ Examples:
 EOF
   exit 2
 }
+
+ui_init_color
 
 load_nix_profile() {
   if [[ -n "${VIBEROOTS_NIX_PROFILE_SCRIPT:-}" && -f "${VIBEROOTS_NIX_PROFILE_SCRIPT}" ]]; then
@@ -762,7 +771,7 @@ if [[ "${run_validate}" == "1" ]]; then
   direnv exec "${workspace_root}" sh -lc 'i && b && v'
   ui_ok "validation" "complete"
 elif [[ "${direnv_allow}" == "1" ]]; then
-  ui_ok "next" "cd ${workspace_root} && i && b && v"
+  ui_ok "next" "cd ${workspace_root} && direnv exec . sh -lc 'i && b && v'"
 else
   ui_ok "next" "cd ${workspace_root} && direnv allow && direnv exec . sh -lc 'i && b && v'"
 fi
