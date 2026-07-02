@@ -597,9 +597,7 @@ run_nix_init_consumer() {
     ${direnv_allow_flag:+"${direnv_allow_flag}"} \
     2> >(
       while IFS= read -r line; do
-        case "${line}" in
-          "fetching Git repository '"*) continue ;;
-        esac
+        [[ "${line}" == fetching\ Git\ repository\ * ]] && continue
         printf '%s\n' "${line}" >&2
       done
     )
