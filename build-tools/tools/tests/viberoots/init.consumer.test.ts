@@ -183,7 +183,6 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     assert.match(gitignore, /buck-out\//);
     assert.match(gitignore, /\.direnv\//);
     assert.match(gitignore, /\.nix-zsh\//);
-    assert.match(gitignore, /\.metadata_never_index/);
     assert.match(gitignore, /projects\/config\/local\.json/);
     assert.equal(
       await fsp.readFile(direnvLog, "utf8"),
@@ -307,7 +306,6 @@ test("viberoots init-consumer bootstraps a remote-flake consumer workspace", asy
     assert.match(gitignore, /buck-out\//);
     assert.match(gitignore, /\.direnv\//);
     assert.match(gitignore, /\.nix-zsh\//);
-    assert.match(gitignore, /\.metadata_never_index/);
     assert.match(gitignore, /projects\/config\/local\.json/);
     assert.deepEqual(await visibleRootEntries(workspace), ["README.md", "projects"]);
   } finally {

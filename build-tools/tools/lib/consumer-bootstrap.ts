@@ -36,7 +36,6 @@ const gitignoreEntries = [
   "buck-out/",
   ".direnv/",
   ".nix-zsh/",
-  ".metadata_never_index",
   "projects/config/local.json",
   ".local/",
 ];
