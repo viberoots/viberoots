@@ -586,6 +586,7 @@ run_migrations() {
 }
 
 run_nix_init_consumer() {
+  local ref_update_re='^[[:space:]]+[0-9a-f]{7,}\.\.[0-9a-f]{7,}[[:space:]]+main[[:space:]]+->[[:space:]]+main$'
   ui_step "source" "fetching viberoots"
   nix run --refresh --accept-flake-config "${viberoots_url}#viberoots" -- \
     init-consumer \
@@ -603,6 +604,7 @@ run_nix_init_consumer() {
         [[ "${line}" == remote:\ Compressing\ objects:* ]] && continue
         [[ "${line}" == remote:\ Total\ * ]] && continue
         [[ "${line}" == From\ *github.com/viberoots/viberoots ]] && continue
+        [[ "${line}" =~ ${ref_update_re} ]] && continue
         [[ "${line}" == "this derivation will be built:" ]] && continue
         [[ "${line}" == "  /nix/store/"*"-viberoots.drv" ]] && continue
         [[ "${line}" == "building '/nix/store/"*"-viberoots.drv'..." ]] && continue
