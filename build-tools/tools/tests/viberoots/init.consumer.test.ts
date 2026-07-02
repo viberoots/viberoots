@@ -495,6 +495,89 @@ test("curlable bootstrap dry-run reports planned actions without commands", asyn
   }
 });
 
+test("curlable bootstrap colors headings and status markers when color is forced", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-color-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    const { stdout } = await execFileAsync(
+      path.join(viberootsRoot, "bootstrap"),
+      ["--workspace-root", workspace, "--no-run-install"],
+      {
+        cwd: workspace,
+        env: {
+          ...process.env,
+          NO_COLOR: "",
+          VBR_COLOR: "always",
+          VIBEROOTS_DRY_RUN: "1",
+        },
+      },
+    );
+
+    assert.match(stdout, /\u001b\[1;38;5;141mviberoots bootstrap\u001b\[0m/);
+    assert.match(stdout, /\u001b\[35;1mset\u001b\[0m/);
+    assert.match(stdout, /\u001b\[1mmode\u001b\[0m/);
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("curlable bootstrap honors NO_COLOR over forced color", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-no-color-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    const { stdout } = await execFileAsync(
+      path.join(viberootsRoot, "bootstrap"),
+      ["--workspace-root", workspace, "--no-run-install"],
+      {
+        cwd: workspace,
+        env: {
+          ...process.env,
+          NO_COLOR: "1",
+          VBR_COLOR: "always",
+          VIBEROOTS_DRY_RUN: "1",
+        },
+      },
+    );
+
+    assert.doesNotMatch(stdout, /\u001b\[/);
+    assert.match(stdout, /set\s+mode flake/);
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("curlable bootstrap colors terminal-program sessions even when stdout is captured", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-terminal-color-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    const { stdout } = await execFileAsync(
+      path.join(viberootsRoot, "bootstrap"),
+      ["--workspace-root", workspace, "--no-run-install"],
+      {
+        cwd: workspace,
+        env: {
+          ...process.env,
+          NO_COLOR: "",
+          TERM_PROGRAM: "iTerm.app",
+          VBR_COLOR: "",
+          VIBEROOTS_DRY_RUN: "1",
+        },
+      },
+    );
+
+    assert.match(stdout, /\u001b\[1;38;5;141mviberoots bootstrap\u001b\[0m/);
+    assert.match(stdout, /\u001b\[35;1mset\u001b\[0m/);
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});
+
 test("curlable bootstrap resumes and completes an interrupted transaction", async () => {
   const workspace = await fsp.realpath(
     await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-resume-transaction-")),
