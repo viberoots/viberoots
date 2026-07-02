@@ -26,7 +26,7 @@ test("workspace activation records remote source paths through current symlink",
       assert.equal(result.sourcePath, remoteSource);
       assert.equal(
         await fsp.readlink(path.join(workspace, ".viberoots", "current")),
-        path.relative(path.join(workspace, ".viberoots"), remoteSource),
+        remoteSource,
       );
       await assertExportAndGcUseWorkspaceState(workspace);
     } finally {

@@ -186,7 +186,13 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     assert.match(gitignore, /buck-out\//);
     assert.match(gitignore, /\.direnv\//);
     assert.match(gitignore, /\.nix-zsh\//);
+    assert.match(gitignore, /\.nix-gcroots\//);
+    assert.match(gitignore, /^node_modules$/m);
+    assert.match(gitignore, /node_modules\//);
     assert.match(gitignore, /projects\/config\/local\.json/);
+    if (process.platform === "darwin") {
+      await fsp.stat(path.join(workspace, ".metadata_never_index"));
+    }
     assert.equal(
       await fsp.readFile(direnvLog, "utf8"),
       `allow ${workspace}\nexec ${workspace} i\n`,
@@ -318,7 +324,13 @@ test("viberoots init-consumer bootstraps a remote-flake consumer workspace", asy
     assert.match(gitignore, /buck-out\//);
     assert.match(gitignore, /\.direnv\//);
     assert.match(gitignore, /\.nix-zsh\//);
+    assert.match(gitignore, /\.nix-gcroots\//);
+    assert.match(gitignore, /^node_modules$/m);
+    assert.match(gitignore, /node_modules\//);
     assert.match(gitignore, /projects\/config\/local\.json/);
+    if (process.platform === "darwin") {
+      await fsp.stat(path.join(workspace, ".metadata_never_index"));
+    }
     assert.deepEqual(await visibleRootEntries(workspace), ["README.md", "flake.nix", "projects"]);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });

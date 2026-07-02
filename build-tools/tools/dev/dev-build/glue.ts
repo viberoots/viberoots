@@ -205,7 +205,7 @@ export async function refreshGlueAndExportGraph(root: string): Promise<string> {
   const scope = (process.env.DEVBUILD_SCOPE || "").trim();
   const graphPath = await exportGraph(root, { scope, env: runEnv });
   await ensureNonEmptyGraphOrExit(root, graphPath);
-  await runGluePipeline({ graphPath, skipProviderSync: true });
+  await runGluePipeline({ graphPath });
 
   process.env.BUCK_GRAPH_JSON = graphPath;
   return graphPath;

@@ -36,7 +36,7 @@ async function writeFile(file: string, content: string): Promise<void> {
   await fsp.writeFile(file, content, "utf8");
 }
 
-test("install importer discovery ignores stray untracked importers from repo root", async () => {
+test("install importer discovery includes untracked workspace importers from repo root", async () => {
   const repo = await makeTempRepo();
   await writeFile(path.join(repo, "pnpm-lock.yaml"), "lockfileVersion: 9\n");
   await writeFile(
@@ -51,7 +51,7 @@ test("install importer discovery ignores stray untracked importers from repo roo
 
   const importers = await discoverImportersWithLock(repo, { cwd: repo });
 
-  assert.deepEqual(importers, ["projects/apps/kept"]);
+  assert.deepEqual(importers, ["projects/apps/kept", "projects/apps/stray"]);
 });
 
 test("install importer discovery keeps the current untracked importer when run inside it", async () => {

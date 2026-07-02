@@ -202,6 +202,46 @@ test("startup-check accepts workspace lock resolved through VIBEROOTS_SOURCE_ROO
   }
 });
 
+test("startup-check accepts arbitrary local flake source without requiring submodule", async () => {
+  const root = await workspace("vbr-startup-arbitrary-local-source");
+  const source = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-startup-local-source-")),
+  );
+  const oldCwd = process.cwd();
+  const oldSourceRoot = process.env.VIBEROOTS_SOURCE_ROOT;
+  try {
+    await fsp.rm(path.join(root, "viberoots"), { recursive: true, force: true });
+    await fsp.rm(path.join(root, ".viberoots", "current"), { force: true });
+    await writeFile(path.join(source, "flake.nix"), "{ outputs = _: {}; }\n");
+    await writeFile(path.join(source, "prelude", "prelude.bzl"), "# prelude\n");
+    await fsp.symlink(source, path.join(root, ".viberoots", "current"));
+    await writeFile(
+      path.join(root, ".viberoots", "workspace", "flake.nix"),
+      `{ inputs.viberoots.url = "path:${source}"; outputs = _: {}; }\n`,
+    );
+    await writeFile(
+      path.join(root, ".viberoots", "workspace", "flake.lock"),
+      JSON.stringify({
+        nodes: {
+          viberoots: {
+            locked: { type: "path", path: source },
+            original: { type: "path", path: source },
+          },
+        },
+      }),
+    );
+    process.chdir(root);
+    process.env.VIBEROOTS_SOURCE_ROOT = source;
+    await validateStartupWorkspaceState();
+  } finally {
+    if (oldSourceRoot === undefined) delete process.env.VIBEROOTS_SOURCE_ROOT;
+    else process.env.VIBEROOTS_SOURCE_ROOT = oldSourceRoot;
+    process.chdir(oldCwd);
+    await fsp.rm(source, { recursive: true, force: true });
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("startup-check accepts hidden workspace lock paths relative to the hidden flake", async () => {
   const { root, submodule } = await submoduleWorkspace("vbr-startup-hidden-lock-relative");
   const oldCwd = process.cwd();

@@ -37,6 +37,9 @@ const gitignoreEntries = [
   "buck-out/",
   ".direnv/",
   ".nix-zsh/",
+  ".nix-gcroots/",
+  "node_modules",
+  "node_modules/",
   "projects/config/local.json",
   ".local/",
 ];
@@ -139,7 +142,7 @@ async function writeBuckroot(workspaceRoot: string): Promise<void> {
 
 function relativeLinkTarget(fromDir: string, target: string): string {
   const rel = path.relative(fromDir, target) || ".";
-  return rel.startsWith("..") ? rel : `./${rel}`;
+  return rel.startsWith("..") ? target : `./${rel}`;
 }
 
 async function repairCurrentSymlinkForBootstrap(
@@ -466,6 +469,7 @@ export async function initConsumer(opts: InitConsumerOptions): Promise<void> {
   const ui = createCommandUi();
   const sourceMode: ConsumerSourceMode =
     opts.sourceMode || (opts.sourcePath ? "submodule" : "flake");
+  await mkdirWithMacosMetadataExclusion(opts.workspaceRoot);
   await mkdirWithMacosMetadataExclusion(path.join(opts.workspaceRoot, ".viberoots"));
   await mkdirWithMacosMetadataExclusion(path.join(opts.workspaceRoot, ".viberoots", "workspace"));
   await mkdirWithMacosMetadataExclusion(path.join(opts.workspaceRoot, ".viberoots", "buck"));

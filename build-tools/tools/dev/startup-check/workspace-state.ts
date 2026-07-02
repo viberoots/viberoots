@@ -28,6 +28,12 @@ function flakeUsesLocalViberoots(text: string): boolean {
   return /viberoots\.url\s*=\s*"(?:path|git\+file):[^"]*viberoots"/.test(text);
 }
 
+function flakeUsesSubmoduleViberoots(text: string): boolean {
+  return /viberoots\.url\s*=\s*"(?:path|git\+file):(?:\.\/|\.\.\/\.\.\/)?viberoots"/.test(
+    text,
+  );
+}
+
 async function readWorkspaceFlakeText(): Promise<string> {
   const hidden = await readText(path.join(".viberoots", "workspace", "flake.nix"));
   if (hidden) return hidden;
@@ -58,7 +64,7 @@ async function requireBuckroot(): Promise<void> {
 }
 
 async function requireLocalViberootsFlake(flakeText: string): Promise<void> {
-  if (!flakeUsesLocalViberoots(flakeText)) return;
+  if (!flakeUsesSubmoduleViberoots(flakeText)) return;
   if (!(await exists("viberoots/flake.nix"))) {
     throw new Error(
       "[startup-check] viberoots submodule is missing or uninitialized; run `git submodule update --init viberoots`",
@@ -111,7 +117,7 @@ async function requireLocalFlakeLock(flakeText: string): Promise<void> {
 }
 
 async function requireLocalCurrentTarget(flakeText: string): Promise<void> {
-  if (!flakeUsesLocalViberoots(flakeText)) return;
+  if (!flakeUsesSubmoduleViberoots(flakeText)) return;
   try {
     await fsp.lstat(".viberoots/current");
   } catch (e) {
@@ -156,7 +162,7 @@ function warnOrThrowSubmoduleState(message: string): void {
 }
 
 async function requireSubmoduleGitState(flakeText: string): Promise<void> {
-  if (!flakeUsesLocalViberoots(flakeText)) return;
+  if (!flakeUsesSubmoduleViberoots(flakeText)) return;
   if (!(await exists("viberoots/.git")) && !(await exists(".git/modules/viberoots"))) return;
   const expected = await expectedGitlinkRevision();
   if (!expected) {

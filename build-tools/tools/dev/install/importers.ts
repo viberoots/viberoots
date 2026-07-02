@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getImporterRootsContract } from "../../lib/importer-roots";
+import { findPnpmLockfiles } from "../../lib/lockfiles";
 
 function isWorkspaceImporter(importer: string, workspaceRoots: readonly string[]): boolean {
   return workspaceRoots.some((base) => importer.startsWith(`${base}/`));
@@ -63,6 +64,22 @@ function trackedImporterCandidates(
   return [...importers].sort((left, right) => left.localeCompare(right));
 }
 
+async function workspaceImporterCandidates(
+  root: string,
+  workspaceRoots: readonly string[],
+): Promise<string[]> {
+  const importers = new Set<string>();
+  const lockfiles = await findPnpmLockfiles({ baseRoot: root, roots: [...workspaceRoots] });
+  for (const lockfile of lockfiles) {
+    if (!lockfile.endsWith("/pnpm-lock.yaml")) continue;
+    const importer = lockfile.slice(0, -"pnpm-lock.yaml".length - 1);
+    if (isWorkspaceImporter(importer, workspaceRoots)) {
+      importers.add(importer);
+    }
+  }
+  return [...importers].sort((left, right) => left.localeCompare(right));
+}
+
 export async function discoverImportersWithLock(
   root: string,
   opts?: { cwd?: string },
@@ -75,6 +92,9 @@ export async function discoverImportersWithLock(
       if (importer === "." && !allowDotImporter) continue;
       if (!(await hasLock(root, importer))) continue;
       out.add(importer);
+    }
+    for (const importer of await workspaceImporterCandidates(root, workspaceRoots)) {
+      if (await hasLock(root, importer)) out.add(importer);
     }
     if (!out.has(".") && (await hasLock(root, "viberoots"))) {
       out.add("viberoots");

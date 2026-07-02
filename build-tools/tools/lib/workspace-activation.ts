@@ -42,7 +42,7 @@ function requireFile(filePath: string, message: string): void {
 function relativeLinkTarget(fromDir: string, target: string): string {
   if (target.startsWith(`${path.sep}nix${path.sep}store${path.sep}`)) return target;
   const rel = path.relative(fromDir, target) || ".";
-  return rel.startsWith("..") ? rel : `./${rel}`;
+  return rel.startsWith("..") ? target : `./${rel}`;
 }
 
 function isNixStoreLinkTarget(target: string): boolean {

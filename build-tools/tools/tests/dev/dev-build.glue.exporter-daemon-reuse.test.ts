@@ -34,8 +34,10 @@ test("dev-build glue config enables stable exporter daemon reuse", async () => {
   if (glue.includes("runGomod2nixGenerate") || glue.includes("runGomod2nixScanAll")) {
     throw new Error("glue.ts must not duplicate gomod2nix work after install-deps --glue-only");
   }
-  if (!glue.includes("runGluePipeline({ graphPath, skipProviderSync: true })")) {
-    throw new Error("glue.ts must refresh graph-derived sidecars after exporting graph");
+  if (!glue.includes("runGluePipeline({ graphPath })")) {
+    throw new Error(
+      "glue.ts must sync providers and refresh graph-derived sidecars after exporting graph",
+    );
   }
 
   const runner = await fsp.readFile(
