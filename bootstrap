@@ -17,7 +17,7 @@ env_or_default() {
 
 mode="$(env_or_default flake VBR_CONSUMER VBR_CONSUMER_MODE VIBEROOTS_CONSUMER_MODE VIBROOTS_CONSUMER_MODE)"
 ref="$(env_or_default main VBR_REF VIBEROOTS_REF)"
-workspace_root="$(env_or_default "" VBR_WORKSPACE_ROOT WORKSPACE_ROOT)"
+workspace_root="$(env_or_default "" VBR_WORKSPACE_ROOT)"
 workspace_name=""
 viberoots_url=""
 official_submodule_url="https://github.com/viberoots/viberoots.git"

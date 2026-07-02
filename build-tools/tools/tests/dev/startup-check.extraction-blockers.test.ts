@@ -141,6 +141,24 @@ test("startup-check strict extraction blocker mode fails on old root layout", as
   }
 });
 
+test("startup-check allows generated root flake entrypoints", async () => {
+  const root = await workspace("vbr-startup-root-flake-allowed");
+  const oldCwd = process.cwd();
+  const oldStrict = process.env.VIBEROOTS_STRICT_EXTRACTION_BLOCKERS;
+  try {
+    await fsp.writeFile(path.join(root, "flake.lock"), "{}\n", "utf8");
+    process.chdir(root);
+    process.env.VIBEROOTS_STRICT_EXTRACTION_BLOCKERS = "1";
+
+    await validateStartupWorkspaceState();
+  } finally {
+    process.chdir(oldCwd);
+    if (oldStrict === undefined) delete process.env.VIBEROOTS_STRICT_EXTRACTION_BLOCKERS;
+    else process.env.VIBEROOTS_STRICT_EXTRACTION_BLOCKERS = oldStrict;
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("startup-check accepts a clean local viberoots submodule gitlink", async () => {
   const { root } = await submoduleWorkspace("vbr-startup-submodule-clean");
   const oldCwd = process.cwd();

@@ -1223,6 +1223,37 @@ test("curlable bootstrap accepts VBR-prefixed option aliases", async () => {
   }
 });
 
+test("curlable bootstrap ignores ambient WORKSPACE_ROOT without explicit VBR_WORKSPACE_ROOT", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-ambient-workspace-root-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    const ambientWorkspace = path.join(workspace, "old-workspace");
+    await fsp.mkdir(ambientWorkspace, { recursive: true });
+
+    const { stdout } = await execFileAsync(path.join(viberootsRoot, "bootstrap"), ["--dry-run"], {
+      cwd: workspace,
+      env: {
+        ...process.env,
+        WORKSPACE_ROOT: ambientWorkspace,
+        VBR_RUN_INSTALL: "0",
+      },
+    });
+
+    assert.match(
+      stdout,
+      new RegExp(`workspace ${workspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+    );
+    assert.doesNotMatch(
+      stdout,
+      new RegExp(ambientWorkspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    );
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});
+
 async function visibleRootEntries(workspace: string): Promise<string[]> {
   return (await fsp.readdir(workspace)).filter((entry) => !entry.startsWith(".")).sort();
 }
