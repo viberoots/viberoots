@@ -1,7 +1,7 @@
 import path from "node:path";
 import * as fsp from "node:fs/promises";
-import fg from "fast-glob";
 import { normalizeRepoPath } from "../lib/project-graph";
+import { listFilesMatching } from "./file-size-globs";
 
 export const METHODOLOGY_EXCEPTIONS_FILENAME = "methodology-exceptions.json";
 export const PROJECT_METHODOLOGY_EXCEPTIONS_FILENAME = METHODOLOGY_EXCEPTIONS_FILENAME;
@@ -52,12 +52,10 @@ async function readProjectMethodologyExceptions(
 }
 
 export async function resolveSourceFileSizeExceptionPaths(root: string): Promise<string[]> {
-  const manifests = await fg(`**/${METHODOLOGY_EXCEPTIONS_FILENAME}`, {
-    cwd: root,
-    onlyFiles: true,
-    dot: false,
-    followSymbolicLinks: false,
-    ignore: EXCEPTION_MANIFEST_IGNORE,
+  const manifests = await listFilesMatching({
+    root,
+    include: [`**/${METHODOLOGY_EXCEPTIONS_FILENAME}`],
+    exclude: EXCEPTION_MANIFEST_IGNORE,
   });
   const resolved = new Set<string>();
 

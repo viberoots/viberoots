@@ -4,13 +4,13 @@ import { fileURLToPath } from "node:url";
 import * as fsp from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import fg from "fast-glob";
 import { SOURCE_FILES_SCOPE, type FileSizeScope } from "./file-size-lint-scopes";
 import { resolveSourceFileSizeExceptionPaths } from "./file-size-lint-exceptions";
 import {
   parseFileSizeLintArgs,
   type FileSizeLintOptions as Options,
 } from "./file-size-lint-options";
+import { listFilesMatching } from "./file-size-globs";
 export { SOURCE_FILES_SCOPE, type FileSizeScope };
 
 const execFileAsync = promisify(execFile);
@@ -96,12 +96,10 @@ async function countLines(file: string): Promise<number> {
 export type FileOffender = { file: string; lines: number };
 
 async function listScopeMatches(root: string, scope: FileSizeScope): Promise<Set<string>> {
-  const matches = await fg(scope.include, {
-    cwd: root,
-    onlyFiles: true,
-    dot: false,
-    followSymbolicLinks: false,
-    ignore: scope.exclude,
+  const matches = await listFilesMatching({
+    root,
+    include: scope.include,
+    exclude: scope.exclude,
   });
   return new Set(matches.map(normalizeRelPath));
 }
