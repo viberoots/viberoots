@@ -86,4 +86,16 @@ test("dev-build glue config enables stable exporter daemon reuse", async () => {
   if (!buck.includes("quietEmptyGraphSubcommandFlags") || !buck.includes("DEVBUILD_EMPTY_GRAPH")) {
     throw new Error("empty-bootstrap final Buck build must suppress daemon status output");
   }
+
+  const devBuild = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/dev-build/run-dev-build.ts",
+    "utf8",
+  );
+  if (
+    !devBuild.includes(
+      'if (verbose) {\n        console.warn("[dev-build] restarted Buck daemon after generated .buckconfig repair");\n      }',
+    )
+  ) {
+    throw new Error("generated .buckconfig repair restart message must be verbose-only");
+  }
 });

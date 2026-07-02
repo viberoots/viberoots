@@ -161,7 +161,9 @@ export async function runDevBuild(): Promise<void> {
         stdio: "ignore",
         timeout: 10_000,
       });
-      console.warn("[dev-build] restarted Buck daemon after generated .buckconfig repair");
+      if (verbose) {
+        console.warn("[dev-build] restarted Buck daemon after generated .buckconfig repair");
+      }
     }
     await runStartupCheck(root);
     await ensureDevBuildStoreSpace({
