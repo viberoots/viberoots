@@ -19,7 +19,7 @@ mode="$(env_or_default flake VBR_CONSUMER VBR_CONSUMER_MODE VIBEROOTS_CONSUMER_M
 ref="$(env_or_default main VBR_REF VIBEROOTS_REF)"
 workspace_root="$(env_or_default "" VBR_WORKSPACE_ROOT)"
 workspace_name=""
-viberoots_url=""
+viberoots_url="$(env_or_default "" VBR_URL VBR_VIBEROOTS_URL VIBEROOTS_URL)"
 official_submodule_url="https://github.com/viberoots/viberoots.git"
 submodule_url="$(env_or_default "${official_submodule_url}" VBR_SUBMODULE VBR_SUBMODULE_URL VIBEROOTS_SUBMODULE_URL)"
 trust_submodule_url="$(env_or_default 0 VBR_TRUST_SUBMODULE VBR_TRUST_SUBMODULE_URL VIBEROOTS_TRUST_SUBMODULE_URL)"
@@ -42,6 +42,14 @@ falsy() {
     0 | false | FALSE | no | NO | off | OFF | never | NEVER) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+default_viberoots_url() {
+  if [[ "${ref}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    printf 'git+https://github.com/viberoots/viberoots.git?rev=%s' "${ref}"
+  else
+    printf 'git+https://github.com/viberoots/viberoots.git?ref=%s' "${ref}"
+  fi
 }
 
 ui_init_color() {
@@ -154,7 +162,7 @@ Defaults:
   --run-validate disabled
   --direnv-allow
   --dry-run disabled
-  --viberoots-url github:viberoots/viberoots/<ref>
+  --viberoots-url git+https://github.com/viberoots/viberoots.git?ref=<ref>
   --submodule-url https://github.com/viberoots/viberoots.git
 
 Examples:
@@ -418,7 +426,7 @@ fi
 workspace_root="${workspace_root:-$(pwd -P)}"
 workspace_root="$(cd "$(dirname "${workspace_root}")" && pwd)/$(basename "${workspace_root}")"
 workspace_name="${workspace_name:-$(basename "${workspace_root}")}"
-viberoots_url="${viberoots_url:-github:viberoots/viberoots/${ref}}"
+viberoots_url="${viberoots_url:-$(default_viberoots_url)}"
 
 run_install_flag=""
 if [[ "${run_install}" == "1" ]]; then
