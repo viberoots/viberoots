@@ -5,6 +5,21 @@ import { test } from "node:test";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
+test("install node warning helpers skip quietly before generated inputs exist", async () => {
+  await runInTemp("install-node-warning-missing-inputs", async (tmp, $) => {
+    const out = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+      env: { ...process.env, WORKSPACE_ROOT: tmp },
+    })`node --input-type=module --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs -e "import { warnNodeDepsInLocal, warnNodePatchRequirementsInLocal } from './build-tools/tools/lib/node-deps-enforcement'; await warnNodeDepsInLocal(process.cwd()); await warnNodePatchRequirementsInLocal(process.cwd());"`;
+    const all = `${String(out.stdout || "")}${String(out.stderr || "")}`.trim();
+    if (all)
+      throw new Error(`expected no warning output before generated inputs exist, got: ${all}`);
+  });
+});
+
 test("install node patch warning surfaces importer-specific remediation command", async () => {
   await runInTemp("install-node-patch-warning-command", async (tmp, $) => {
     const importer = path.join(tmp, "projects", "apps", "web");

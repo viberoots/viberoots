@@ -75,10 +75,43 @@ function buckProcessEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
   };
 }
 
+async function workspaceHasOnlyGeneratedTargets(root: string): Promise<boolean> {
+  const res = await $({
+    stdio: "pipe",
+    cwd: root,
+    env: buckProcessEnv(),
+    nothrow: true,
+  })`buck2 targets //...`;
+  if (res.exitCode !== 0) return false;
+  const targets = String(res.stdout || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.includes("//"));
+  return (
+    targets.length > 0 &&
+    targets.every(
+      (target) =>
+        target.includes("//.viberoots/") ||
+        target.includes("//prelude/") ||
+        target.includes("//toolchains/"),
+    )
+  );
+}
+
 async function ensureNonEmptyGraphOrExit(root: string, graphPath: string): Promise<void> {
   const comp = await readCompositeGraph({ graphPath: path.resolve(root, DEFAULT_GRAPH_PATH) });
   const graphLen = Array.isArray(comp?.nodes) ? comp.nodes.length : 0;
   if (Number.isFinite(graphLen) && graphLen > 0) return;
+
+  if (await workspaceHasOnlyGeneratedTargets(root)) {
+    if (isVbrVerbose() || String(process.env.DEVBUILD_DEBUG || "").trim() === "1") {
+      console.warn(
+        "[dev-build] graph empty because workspace has only generated bootstrap targets",
+      );
+    }
+    process.env.DEVBUILD_EMPTY_GRAPH = "1";
+    return;
+  }
 
   if ((process.env.DEVBUILD_TRIED_FALLBACK || "") !== "1") {
     try {
@@ -104,7 +137,13 @@ async function ensureNonEmptyGraphOrExit(root: string, graphPath: string): Promi
         try {
           await $({ stdio: "inherit", cwd: root, env: buckProcessEnv() })`buck2 targets //...`;
         } catch {}
-        const runEnvNoIso = { ...runEnv, BUCK_NO_ISOLATION: "1", EXPORTER_DEBUG: "1" };
+        const runEnvNoIso = {
+          ...runEnv,
+          BUCK_NO_ISOLATION: "1",
+          ...(String(process.env.DEVBUILD_DEBUG || "").trim() === "1"
+            ? { EXPORTER_DEBUG: "1" }
+            : {}),
+        };
         await exportGraph(root, { env: runEnvNoIso });
         const comp3 = await readCompositeGraph({
           graphPath: path.resolve(root, DEFAULT_GRAPH_PATH),

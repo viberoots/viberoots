@@ -725,6 +725,7 @@ test("curlable bootstrap can drive the submodule mode through the same entrypoin
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.mkdir(path.join(workspace, ".git"), { recursive: true });
     await fsp.mkdir(path.join(workspace, "viberoots"), { recursive: true });
     await fsp.writeFile(
       path.join(workspace, "viberoots", "init"),
@@ -733,7 +734,7 @@ test("curlable bootstrap can drive the submodule mode through the same entrypoin
     );
     await fsp.writeFile(
       path.join(fakeBin, "git"),
-      `#!/usr/bin/env bash\nprintf 'git %s\\n' "$*" >> ${JSON.stringify(log)}\ncase "$*" in\n  "rev-parse --is-inside-work-tree") exit 0 ;;\n  "-C viberoots rev-parse --verify --quiet "*) exit 1 ;;\nesac\nexit 0\n`,
+      `#!/usr/bin/env bash\nprintf 'git %s\\n' "$*" >> ${JSON.stringify(log)}\ncase "$*" in\n  "rev-parse --is-inside-work-tree") exit 0 ;;\n  "rev-parse --git-path viberoots-bootstrap-write-test") printf '.git/viberoots-bootstrap-write-test\\n'; exit 0 ;;\n  "-C viberoots rev-parse --verify --quiet "*) exit 1 ;;\nesac\nexit 0\n`,
       { mode: 0o755 },
     );
     await fsp.writeFile(
@@ -778,6 +779,7 @@ test("curlable bootstrap skips setup when already bootstrapped", async () => {
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.mkdir(path.join(workspace, ".git"), { recursive: true });
     await fsp.mkdir(path.join(workspace, "viberoots"), { recursive: true });
     await fsp.writeFile(
       path.join(workspace, "viberoots", "init"),
@@ -794,7 +796,7 @@ ln -s ../viberoots .viberoots/current
     );
     await fsp.writeFile(
       path.join(fakeBin, "git"),
-      `#!/usr/bin/env bash\nprintf 'git %s\\n' "$*" >> ${JSON.stringify(log)}\ncase "$*" in\n  "rev-parse --is-inside-work-tree") exit 0 ;;\n  "-C viberoots rev-parse --verify --quiet "*) exit 1 ;;\nesac\nexit 0\n`,
+      `#!/usr/bin/env bash\nprintf 'git %s\\n' "$*" >> ${JSON.stringify(log)}\ncase "$*" in\n  "rev-parse --is-inside-work-tree") exit 0 ;;\n  "rev-parse --git-path viberoots-bootstrap-write-test") printf '.git/viberoots-bootstrap-write-test\\n'; exit 0 ;;\n  "-C viberoots rev-parse --verify --quiet "*) exit 1 ;;\nesac\nexit 0\n`,
       { mode: 0o755 },
     );
     await fsp.writeFile(
@@ -968,6 +970,7 @@ test("curlable bootstrap refuses an untrusted custom submodule URL non-interacti
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.mkdir(path.join(workspace, ".git"), { recursive: true });
     await fsp.writeFile(
       path.join(fakeBin, "git"),
       `#!/usr/bin/env bash\nprintf 'git %s\\n' "$*" >> ${JSON.stringify(log)}\nif [[ "$*" == "rev-parse --is-inside-work-tree" ]]; then exit 0; fi\nexit 0\n`,
@@ -1014,12 +1017,14 @@ test("curlable bootstrap can explicitly trust a custom submodule URL", async () 
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.mkdir(path.join(workspace, ".git"), { recursive: true });
     await fsp.writeFile(
       path.join(fakeBin, "git"),
       `#!/usr/bin/env bash
 printf 'git %s\\n' "$*" >> ${JSON.stringify(log)}
 case "$*" in
   "rev-parse --is-inside-work-tree") exit 0 ;;
+  "rev-parse --git-path viberoots-bootstrap-write-test") printf '.git/viberoots-bootstrap-write-test\\n'; exit 0 ;;
   "submodule add https://example.invalid/viberoots.git viberoots")
     mkdir -p viberoots
     cat > viberoots/init <<'EOS'
@@ -1081,6 +1086,7 @@ test("curlable bootstrap initializes an existing viberoots submodule", async () 
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.mkdir(path.join(workspace, ".git"), { recursive: true });
     await fsp.writeFile(
       path.join(workspace, ".gitmodules"),
       `[submodule "viberoots"]\n\tpath = viberoots\n\turl = https://github.com/viberoots/viberoots.git\n`,
@@ -1092,6 +1098,7 @@ test("curlable bootstrap initializes an existing viberoots submodule", async () 
 printf 'git %s\\n' "$*" >> ${JSON.stringify(log)}
 case "$*" in
   "rev-parse --is-inside-work-tree") exit 0 ;;
+  "rev-parse --git-path viberoots-bootstrap-write-test") printf '.git/viberoots-bootstrap-write-test\\n'; exit 0 ;;
   "config -f .gitmodules --get-regexp ^submodule\\..*\\.path$") printf 'submodule.viberoots.path viberoots\\n'; exit 0 ;;
   "config -f .gitmodules --get submodule.viberoots.url") printf 'https://github.com/viberoots/viberoots.git\\n'; exit 0 ;;
   "submodule update --init --recursive viberoots")

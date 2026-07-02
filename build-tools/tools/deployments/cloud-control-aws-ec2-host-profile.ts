@@ -25,6 +25,8 @@ import { DEFAULT_EC2_HOST_MODE } from "./cloud-control-aws-ec2-host-mode";
 import { ec2BootstrapDigestForMode } from "./cloud-control-aws-ec2-asg-bootstrap";
 import { REQUIRED_AWS_EC2_ALARMS } from "./cloud-control-aws-ec2-alarms";
 
+export { REQUIRED_AWS_EC2_ALARMS } from "./cloud-control-aws-ec2-alarms";
+
 export function renderAwsEc2ProfileFiles(input: CloudControlSetupInput): Record<string, string> {
   const processes = controlPlaneProcessSpecs(input);
   return {

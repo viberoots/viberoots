@@ -181,8 +181,15 @@ export async function runDevBuild(): Promise<void> {
 
     let exportedGraphDuringMaterialize = false;
     if (!isCI && materialize) {
+      delete process.env.DEVBUILD_EMPTY_GRAPH;
       await refreshGlueAndExportGraph(root);
       exportedGraphDuringMaterialize = true;
+      if (String(process.env.DEVBUILD_EMPTY_GRAPH || "").trim() === "1") {
+        materialize = false;
+        materializeReason = "empty-bootstrap-graph";
+        if (verbose) console.log("[dev-build] fast-path: skipping materialization for empty graph");
+        else ui.ok("prebuild", "empty graph");
+      }
       if (materializeReason === "prebuild-guard-stale") {
         const afterRefreshDecision = await shouldMaterializeByDefault({
           root,

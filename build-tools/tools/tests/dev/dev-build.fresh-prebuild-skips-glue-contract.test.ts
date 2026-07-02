@@ -81,3 +81,25 @@ test("dev-build glue refresh remains the only install-deps glue-only caller", as
   assert.ok(glue.includes(needle), "glue refresh should own the install-deps invocation");
   assert.ok(glue.includes(glueOnlyNeedle), "glue refresh should request glue-only install work");
 });
+
+test("dev-build treats generated-only bootstrap graphs as empty prebuilds", async () => {
+  const runDevBuild = await readTool("build-tools/tools/dev/dev-build/run-dev-build.ts");
+  const glue = await readTool("build-tools/tools/dev/dev-build/glue.ts");
+
+  assert.ok(
+    glue.includes("workspaceHasOnlyGeneratedTargets"),
+    "glue should distinguish generated-only bootstrap targets from exporter failures",
+  );
+  assert.ok(
+    glue.includes('process.env.DEVBUILD_EMPTY_GRAPH = "1"'),
+    "glue should signal an intentionally empty bootstrap graph",
+  );
+  assert.ok(
+    runDevBuild.includes("delete process.env.DEVBUILD_EMPTY_GRAPH;"),
+    "dev-build should clear stale empty-graph state before each refresh",
+  );
+  assert.ok(
+    runDevBuild.includes('materializeReason = "empty-bootstrap-graph"'),
+    "dev-build should skip graph materialization after an intentionally empty bootstrap export",
+  );
+});

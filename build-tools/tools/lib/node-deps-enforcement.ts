@@ -1,4 +1,5 @@
 import path from "node:path";
+import * as fs from "node:fs";
 import { runNodeWithZx } from "./node-run";
 import { buildToolPath, zxInitPath } from "../dev/dev-build/paths";
 
@@ -20,6 +21,11 @@ export async function checkNodeDepsInCi(repoRoot: string): Promise<void> {
 }
 
 export async function warnNodeDepsInLocal(repoRoot: string): Promise<void> {
+  if (
+    !fs.existsSync(path.join(repoRoot, ".viberoots", "workspace", "node", "workspace-map.json"))
+  ) {
+    return;
+  }
   const { zxInitPath, script } = resolveNodeDepsScript(repoRoot);
   try {
     await runNodeWithZx({
@@ -40,6 +46,9 @@ export async function warnNodeDepsInLocal(repoRoot: string): Promise<void> {
 }
 
 export async function warnNodePatchRequirementsInLocal(repoRoot: string): Promise<void> {
+  if (!fs.existsSync(path.join(repoRoot, ".viberoots", "workspace", "buck", "graph.json"))) {
+    return;
+  }
   const activeZxInitPath = zxInitPath(repoRoot);
   const script = buildToolPath(repoRoot, "tools/buck/enforce-node-patch-requirements.ts");
   try {

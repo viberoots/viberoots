@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged } from "../lib/fs-helpers";
 import { repoRoot } from "../lib/repo";
+import { isVbrVerbose } from "../lib/command-ui";
 import { buildToolPath } from "./dev-build/paths";
 import { toolchainBzlPaths } from "./workspace-toolchains";
 
@@ -68,9 +69,13 @@ function isNixStorePath(p: string): boolean {
   return p === "/nix/store" || p.startsWith("/nix/store/");
 }
 
+function logToolchainProgress(message: string): void {
+  if (isVbrVerbose()) console.error(message);
+}
+
 async function nixPathInfo(root: string, attr: string): Promise<string> {
   const { flakeRef, viberootsOverrideArgs } = await workspaceFlakeRef(root);
-  console.error(`[toolchain-paths] checking ${attr} in Nix store`);
+  logToolchainProgress(`[toolchain-paths] checking ${attr} in Nix store`);
   const res = await $({
     cwd: root,
     stdio: "pipe",
@@ -99,7 +104,7 @@ async function nixPathInfo(root: string, attr: string): Promise<string> {
 
 async function nixBuildOutPath(root: string, attr: string): Promise<string> {
   const { flakeRef, viberootsOverrideArgs } = await workspaceFlakeRef(root);
-  console.error(`[toolchain-paths] realizing ${attr} with nix build`);
+  logToolchainProgress(`[toolchain-paths] realizing ${attr} with nix build`);
   const res = await $({
     cwd: root,
     stdio: "pipe",

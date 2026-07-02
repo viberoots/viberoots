@@ -35,10 +35,10 @@ export function nodeBin(): string {
 }
 
 export function buildToolsRoot(root: string): string {
-  const extracted = path.resolve(root, "viberoots", "build-tools");
-  if (fs.existsSync(path.join(extracted, "tools", "dev", "zx-init.mjs"))) return extracted;
   const current = path.resolve(root, ".viberoots/current/build-tools");
   if (fs.existsSync(path.join(current, "tools", "dev", "zx-init.mjs"))) return current;
+  const extracted = path.resolve(root, "viberoots", "build-tools");
+  if (fs.existsSync(path.join(extracted, "tools", "dev", "zx-init.mjs"))) return extracted;
   return path.resolve(root, "build-tools");
 }
 

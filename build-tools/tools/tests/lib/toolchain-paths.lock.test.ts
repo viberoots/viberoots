@@ -56,3 +56,11 @@ test("toolchain path generation lock removes locks owned by dead pids", async ()
 
   assert.equal(ran, true);
 });
+
+test("toolchain path realization progress is verbose-only", async () => {
+  const source = await fsp.readFile("viberoots/build-tools/tools/dev/toolchain-paths.ts", "utf8");
+  assert.ok(source.includes("function logToolchainProgress"));
+  assert.ok(source.includes("isVbrVerbose()"));
+  assert.equal(source.includes("console.error(`[toolchain-paths] checking"), false);
+  assert.equal(source.includes("console.error(`[toolchain-paths] realizing"), false);
+});

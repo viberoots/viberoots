@@ -22,6 +22,9 @@ test("dev-build glue config enables stable exporter daemon reuse", async () => {
   if (!glue.includes('stdio: verbose ? "inherit" : "pipe"')) {
     throw new Error("glue.ts must pipe child output outside verbose/debug mode");
   }
+  if (glue.includes('BUCK_NO_ISOLATION: "1", EXPORTER_DEBUG: "1"')) {
+    throw new Error("glue fallback warmup must not force exporter debug output");
+  }
   if (glue.includes("runGomod2nixGenerate") || glue.includes("runGomod2nixScanAll")) {
     throw new Error("glue.ts must not duplicate gomod2nix work after install-deps --glue-only");
   }
