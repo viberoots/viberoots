@@ -114,6 +114,25 @@ test("verify progress reporter freezes completed pass elapsed time", () => {
   assert.doesNotMatch(output, /1\/1 done 10s/);
 });
 
+test("verify progress reporter stays silent for empty target selections", () => {
+  const writes: string[] = [];
+  const reporter = createVerifyProgressReporter({
+    enabled: true,
+    passes: [],
+    stream: {
+      isTTY: false,
+      write: (chunk) => {
+        writes.push(String(chunk));
+      },
+    },
+  });
+
+  reporter.start();
+  reporter.stop({ clear: false });
+
+  assert.deepEqual(writes, []);
+});
+
 test("verify progress reporter redraws tty output from column zero", () => {
   const writes: string[] = [];
   const reporter = createVerifyProgressReporter({

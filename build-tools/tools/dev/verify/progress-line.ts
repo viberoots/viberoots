@@ -110,6 +110,7 @@ export function createVerifyProgressReporter(opts: {
   stop: (opts?: { clear?: boolean }) => void;
 } {
   const stream = opts.stream || process.stdout;
+  const hasPasses = opts.passes.length > 0;
   const now = opts.now || (() => Date.now());
   const isTty = Boolean(stream.isTTY);
   const shouldColor = useColor(stream);
@@ -142,7 +143,7 @@ export function createVerifyProgressReporter(opts: {
     });
 
   const write = (force = false) => {
-    if (!opts.enabled) return;
+    if (!opts.enabled || !hasPasses) return;
     const lines = formatVerifyProgressLines(snapshot(), { color: shouldColor });
     const rendered = lines.join("\n");
     if (!force && rendered === lastRendered) return;
@@ -162,7 +163,7 @@ export function createVerifyProgressReporter(opts: {
 
   return {
     start: () => {
-      if (!opts.enabled || timer) return;
+      if (!opts.enabled || !hasPasses || timer) return;
       write(true);
       timer = setInterval(() => write(), isTty ? 1000 : 30_000);
       timer.unref?.();

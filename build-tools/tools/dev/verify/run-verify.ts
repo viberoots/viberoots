@@ -44,7 +44,11 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     .catch(cleanupEarlyFailure);
   if (!verbose) {
     ui.heading("viberoots verify");
-    ui.step("target", selection.targets.join(" "));
+    if (selection.targets.length > 0) {
+      ui.step("target", selection.targets.join(" "));
+    } else {
+      ui.step("target", "skipped");
+    }
   }
   const zxInit = zxInitPath(root);
   await timedPhase(

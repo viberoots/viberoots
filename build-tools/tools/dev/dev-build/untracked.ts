@@ -65,6 +65,31 @@ function isIgnorableForExplicitTargetBuild(p: string): boolean {
   return ignorablePrefixes.some((pre) => x.startsWith(pre));
 }
 
+function isGeneratedWorkspaceUntrackedPath(p: string): boolean {
+  const x = String(p || "").replace(/\\/g, "/");
+  if (
+    x === ".buckconfig" ||
+    x === ".buckroot" ||
+    x === ".envrc" ||
+    x === ".gitignore" ||
+    x === ".metadata_never_index" ||
+    x === "README.md" ||
+    x === "projects" ||
+    x === "projects/" ||
+    x === "projects/.metadata_never_index" ||
+    x === "projects/AGENTS.md" ||
+    x === "projects/README.md" ||
+    x === "projects/config/README.md" ||
+    x === "projects/config/shared.json"
+  ) {
+    return true;
+  }
+  if (x === ".direnv" || x.startsWith(".direnv/")) return true;
+  if (x === ".nix-zsh" || x.startsWith(".nix-zsh/")) return true;
+  if (x === ".viberoots" || x.startsWith(".viberoots/")) return true;
+  return false;
+}
+
 function isTargetScopedRelevant(p: string, targetPkgs: string[]): boolean {
   const x = String(p || "").replace(/\\/g, "/");
   return targetPkgs.some((pkg) => x === pkg || x.startsWith(`${pkg}/`));
@@ -91,6 +116,28 @@ export function untrackedRequiresImpureForTargets(opts: {
     relevant.push(p);
   }
   return { requiresImpure: relevant.length > 0, relevant, ignored };
+}
+
+function writeUntrackedImpureWarning(opts: {
+  ui: ReturnType<typeof createCommandUi>;
+  untracked: string[];
+  relevantLabel?: string;
+}): void {
+  const visible = opts.untracked.filter((p) => !isGeneratedWorkspaceUntrackedPath(p));
+  const hiddenGenerated = opts.untracked.length - visible.length;
+  const relevant = opts.relevantLabel ? ` ${opts.relevantLabel}` : "";
+  if (visible.length === 0 && hiddenGenerated > 0) {
+    opts.ui.warn(`impure build due to ${hiddenGenerated} generated workspace untracked file(s)`);
+    return;
+  }
+  opts.ui.warn(`impure build due to ${opts.untracked.length}${relevant} untracked file(s)`);
+  opts.ui.list(visible, { stream: "stderr" });
+  if (hiddenGenerated > 0) {
+    opts.ui.list([`... ${hiddenGenerated} generated workspace file(s) hidden`], {
+      stream: "stderr",
+      limit: 1,
+    });
+  }
 }
 
 export async function maybeAutoImpureFromUntrackedFiles(opts: {
@@ -138,8 +185,11 @@ export async function maybeAutoImpureFromUntrackedFiles(opts: {
           console.warn(` ... and ${decision.relevant.length - 50} more`);
         }
       } else {
-        ui.warn(`impure build due to ${decision.relevant.length} relevant untracked file(s)`);
-        ui.list(decision.relevant, { stream: "stderr" });
+        writeUntrackedImpureWarning({
+          ui,
+          untracked: decision.relevant,
+          relevantLabel: "relevant",
+        });
       }
       return { impure: true };
     }
@@ -149,8 +199,7 @@ export async function maybeAutoImpureFromUntrackedFiles(opts: {
       for (const f of untracked.slice(0, 50)) console.warn(` - ${f}`);
       if (untracked.length > 50) console.warn(` ... and ${untracked.length - 50} more`);
     } else {
-      ui.warn(`impure build due to ${untracked.length} untracked file(s)`);
-      ui.list(untracked, { stream: "stderr" });
+      writeUntrackedImpureWarning({ ui, untracked });
     }
     return { impure: true };
   } catch {}

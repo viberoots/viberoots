@@ -6,7 +6,7 @@ import {
   maybeAutoImpureFromUntrackedFiles,
   untrackedRequiresImpureForTargets,
 } from "../../dev/dev-build/untracked";
-import { runInTemp } from "../lib/test-helpers";
+import { runInScratchTemp, runInTemp } from "../lib/test-helpers";
 
 test("target-aware untracked policy ignores unrelated docs/tests paths", () => {
   const r = untrackedRequiresImpureForTargets({
@@ -67,6 +67,49 @@ test("auto impure logging is compact in quiet mode", async () => {
       assert.match(stderr, /    - .+/);
       assert.match(stderr, /    - \.\.\. \d+ more/);
       assert.doesNotMatch(stderr, /Falling back to --impure/);
+    } finally {
+      process.stderr.write = prevWrite;
+      if (typeof prevVerbose === "string") process.env.VBR_VERBOSE = prevVerbose;
+      else delete process.env.VBR_VERBOSE;
+    }
+  });
+});
+
+test("auto impure logging summarizes generated workspace files in quiet mode", async () => {
+  await runInScratchTemp("dev-build-untracked-generated-quiet-log", async (tmp) => {
+    await $({ cwd: tmp, stdio: "ignore" })`git init`;
+    await fsp.mkdir(`${tmp}/.direnv/bin`, { recursive: true });
+    await fsp.mkdir(`${tmp}/projects/config`, { recursive: true });
+    await fsp.writeFile(`${tmp}/.buckconfig`, "", "utf8");
+    await fsp.writeFile(`${tmp}/.buckroot`, "", "utf8");
+    await fsp.writeFile(`${tmp}/.envrc`, "", "utf8");
+    await fsp.writeFile(`${tmp}/.direnv/bin/nix-direnv-reload`, "", "utf8");
+    await fsp.writeFile(`${tmp}/projects/AGENTS.md`, "", "utf8");
+    await fsp.writeFile(`${tmp}/projects/config/shared.json`, "{}\n", "utf8");
+
+    const prevVerbose = process.env.VBR_VERBOSE;
+    delete process.env.VBR_VERBOSE;
+    const prevWrite = process.stderr.write;
+    let stderr = "";
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      stderr += String(chunk);
+      return true;
+    }) as typeof process.stderr.write;
+    try {
+      const result = await maybeAutoImpureFromUntrackedFiles({
+        isCI: false,
+        root: tmp,
+        impure: false,
+        subcmd: "build",
+        restArgs: ["//..."],
+      });
+      assert.equal(result.impure, true);
+      assert.match(
+        stderr,
+        /warn\s+impure build due to \d+ generated workspace untracked file\(s\)/,
+      );
+      assert.doesNotMatch(stderr, /    - \.buckconfig/);
+      assert.doesNotMatch(stderr, /    - \.direnv/);
     } finally {
       process.stderr.write = prevWrite;
       if (typeof prevVerbose === "string") process.env.VBR_VERBOSE = prevVerbose;
