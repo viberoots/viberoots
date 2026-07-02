@@ -1,6 +1,7 @@
 import path from "node:path";
 import process from "node:process";
 import * as fsp from "node:fs/promises";
+import fs from "node:fs";
 import "zx/globals";
 import { collectChangedPaths } from "../../lib/build-system-test-scope";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
@@ -10,6 +11,15 @@ import { buildToolsRoot, buildToolPath } from "../dev-build/paths";
 
 function verbose(): boolean {
   return isVbrVerbose();
+}
+
+function shouldRunBuildSystemPolicy(root: string): boolean {
+  const toolsRoot = fs.realpathSync.native(path.resolve(buildToolsRoot(root)));
+  const workspaceRoot = fs.realpathSync.native(path.resolve(root));
+  return (
+    toolsRoot === path.join(workspaceRoot, "build-tools") ||
+    toolsRoot.startsWith(`${workspaceRoot}${path.sep}`)
+  );
 }
 
 function printCapturedFailure(error: unknown): void {
@@ -241,7 +251,8 @@ export async function runVerifyLintPreflight(
   } = {},
 ): Promise<void> {
   const ui = createCommandUi({ verbose: verbose() });
-  const includeBuildSystemPolicy = opts.includeBuildSystemPolicy !== false;
+  const includeBuildSystemPolicy =
+    opts.includeBuildSystemPolicy !== false && shouldRunBuildSystemPolicy(root);
   const skipLint = (process.env.VERIFY_SKIP_LINT || "").trim() === "1";
   if (skipLint) {
     process.stderr.write("[verify] lint preflight: skipped (VERIFY_SKIP_LINT=1)\n");
