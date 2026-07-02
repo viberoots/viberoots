@@ -397,11 +397,11 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
     assert.match(text, /--viberoots-url github:viberoots\/viberoots\/main/);
     assert.match(text, /--run-install/);
     assert.match(stdout, /viberoots bootstrap/);
-    assert.match(stdout, /run\s+mode flake/);
-    assert.match(stdout, /run\s+ensure nix yes/);
-    assert.match(stdout, /run\s+install yes/);
-    assert.match(stdout, /run\s+validate no/);
-    assert.match(stdout, /run\s+direnv allow yes/);
+    assert.match(stdout, /set\s+mode flake/);
+    assert.match(stdout, /set\s+ensure nix yes/);
+    assert.match(stdout, /set\s+install yes/);
+    assert.match(stdout, /set\s+validate no/);
+    assert.match(stdout, /set\s+direnv allow yes/);
     assert.match(stdout, /viberoots bootstrap summary/);
     assert.match(stdout, /ok\s+status bootstrapped/);
     assert.match(stdout, /ok\s+next cd .* && i && b && v/);
@@ -1179,9 +1179,9 @@ test("curlable bootstrap accepts mode and install defaults from environment", as
       },
     });
 
-    assert.match(stdout, /run\s+mode submodule/);
-    assert.match(stdout, /run\s+ensure nix yes/);
-    assert.match(stdout, /run\s+install no/);
+    assert.match(stdout, /set\s+mode submodule/);
+    assert.match(stdout, /set\s+ensure nix yes/);
+    assert.match(stdout, /set\s+install no/);
     assert.match(stdout, /add or update viberoots submodule/);
     assert.doesNotMatch(stdout, /run i/);
   } finally {
@@ -1208,14 +1208,14 @@ test("curlable bootstrap accepts VBR-prefixed option aliases", async () => {
       },
     });
 
-    assert.match(stdout, /run\s+mode submodule/);
-    assert.match(stdout, /run\s+ensure nix yes/);
+    assert.match(stdout, /set\s+mode submodule/);
+    assert.match(stdout, /set\s+ensure nix yes/);
     assert.match(
       stdout,
       new RegExp(`workspace ${targetWorkspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
     );
-    assert.match(stdout, /run\s+install no/);
-    assert.match(stdout, /run\s+direnv allow no/);
+    assert.match(stdout, /set\s+install no/);
+    assert.match(stdout, /set\s+direnv allow no/);
     assert.match(stdout, /add or update viberoots submodule/);
     assert.doesNotMatch(stdout, /run i/);
   } finally {

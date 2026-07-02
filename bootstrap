@@ -54,6 +54,7 @@ ui_status() {
   local detail="${3:-}"
   local mark
   case "${kind}" in
+    set) mark="$(ui_color "36" "set")" ;;
     ok) mark="$(ui_color "32" "ok")" ;;
     warn) mark="$(ui_color "33" "warn")" ;;
     *) mark="$(ui_color "36" "run")" ;;
@@ -73,6 +74,10 @@ ui_status() {
 
 ui_step() {
   ui_status run "$@"
+}
+
+ui_set() {
+  ui_status set "$@"
 }
 
 ui_ok() {
@@ -575,19 +580,19 @@ print_summary() {
   echo
   ui_heading "viberoots bootstrap summary"
   ui_ok "status" "${status}"
-  ui_step "mode" "${mode}"
-  ui_step "ref" "${ref}"
-  ui_step "workspace" "${workspace_root}"
-  ui_step "workspace name" "${workspace_name}"
-  ui_step "source" "${source}"
-  ui_step "ensure nix" "$([[ "${install_nix}" == "1" ]] && echo yes || echo no)"
-  ui_step "install" "$([[ "${run_install}" == "1" ]] && echo yes || echo no)"
-  ui_step "validate" "$([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
-  ui_step "direnv allow" "$([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
+  ui_set "mode" "${mode}"
+  ui_set "ref" "${ref}"
+  ui_set "workspace" "${workspace_root}"
+  ui_set "workspace name" "${workspace_name}"
+  ui_set "source" "${source}"
+  ui_set "ensure nix" "$([[ "${install_nix}" == "1" ]] && echo yes || echo no)"
+  ui_set "install" "$([[ "${run_install}" == "1" ]] && echo yes || echo no)"
+  ui_set "validate" "$([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
+  ui_set "direnv allow" "$([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
   if [[ "${mode}" == "submodule" ]]; then
-    ui_step "trust custom submodule" "$([[ "${trust_submodule_url}" == "1" ]] && echo yes || echo no)"
+    ui_set "trust custom submodule" "$([[ "${trust_submodule_url}" == "1" ]] && echo yes || echo no)"
   fi
-  ui_step "actions"
+  ui_set "actions"
   if [[ "${#actions[@]}" -eq 0 ]]; then
     ui_list "no setup changes needed"
   else
@@ -600,21 +605,21 @@ print_summary() {
 }
 
 ui_heading "viberoots bootstrap"
-ui_step "mode" "${mode}"
-ui_step "ref" "${ref}"
-ui_step "workspace" "${workspace_root}"
-ui_step "workspace name" "${workspace_name}"
-ui_step "ensure nix" "$([[ "${install_nix}" == "1" ]] && echo yes || echo no)"
-ui_step "install" "$([[ "${run_install}" == "1" ]] && echo yes || echo no)"
-ui_step "validate" "$([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
-ui_step "direnv allow" "$([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
-ui_step "viberoots url" "${viberoots_url}"
+ui_set "mode" "${mode}"
+ui_set "ref" "${ref}"
+ui_set "workspace" "${workspace_root}"
+ui_set "workspace name" "${workspace_name}"
+ui_set "ensure nix" "$([[ "${install_nix}" == "1" ]] && echo yes || echo no)"
+ui_set "install" "$([[ "${run_install}" == "1" ]] && echo yes || echo no)"
+ui_set "validate" "$([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
+ui_set "direnv allow" "$([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
+ui_set "viberoots url" "${viberoots_url}"
 if [[ "${mode}" == "submodule" ]]; then
-  ui_step "submodule url" "${submodule_url}"
-  ui_step "trust custom submodule url" "$([[ "${trust_submodule_url}" == "1" ]] && echo yes || echo no)"
+  ui_set "submodule url" "${submodule_url}"
+  ui_set "trust custom submodule url" "$([[ "${trust_submodule_url}" == "1" ]] && echo yes || echo no)"
 fi
 if [[ "${dry_run}" == "1" ]]; then
-  ui_step "dry run" "yes"
+  ui_set "dry run" "yes"
   echo
   ui_heading "planned actions"
   if ! command -v nix >/dev/null 2>&1 && [[ "${install_nix}" == "1" ]]; then
