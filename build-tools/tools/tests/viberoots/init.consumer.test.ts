@@ -378,10 +378,10 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
     );
     await fsp.writeFile(
       path.join(fakeBin, "nix"),
-      `#!/usr/bin/env bash\nprintf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}\nexit 0\n`,
+      `#!/usr/bin/env bash\nprintf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}\nprintf "fetching Git repository 'https://github.com/viberoots/viberoots.git'...\\n" >&2\nprintf 'kept nix diagnostic\\n' >&2\nexit 0\n`,
       { mode: 0o755 },
     );
-    const { stdout } = await execFileAsync(path.join(viberootsRoot, "bootstrap"), [], {
+    const { stdout, stderr } = await execFileAsync(path.join(viberootsRoot, "bootstrap"), [], {
       cwd: workspace,
       env: { ...process.env, PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}` },
     });
@@ -407,10 +407,12 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
     assert.match(stdout, /set\s+direnv allow yes/);
     assert.match(stdout, /viberoots bootstrap summary/);
     assert.match(stdout, /ok\s+status bootstrapped/);
-    assert.match(stdout, /set\s+actions\n\s+initialized git repository/);
-    assert.doesNotMatch(stdout, /\n\s+- initialized git repository/);
+    assert.match(stdout, /run\s+source fetching viberoots/);
+    assert.match(stdout, /set\s+actions\n\s+- initialized git repository/);
     assert.match(stdout, /ok\s+next cd .* && direnv exec \. sh -lc 'i && b && v'/);
     assert.match(stdout, /run\s+devshell direnv may load .*\/\.envrc now/);
+    assert.doesNotMatch(stderr, /fetching Git repository/);
+    assert.match(stderr, /kept nix diagnostic/);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }

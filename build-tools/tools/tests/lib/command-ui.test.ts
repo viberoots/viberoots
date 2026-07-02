@@ -105,9 +105,9 @@ test("quiet UI colors and aligns status markers in TTY output", () => {
   assert.equal(
     stdout.join(""),
     [
-      "  \u001b[32;1mok\u001b[0m   direnv allowed \u001b[2m/tmp/work\u001b[0m\n",
+      "  \u001b[32;1mok\u001b[0m    direnv allowed \u001b[2m/tmp/work\u001b[0m\n",
       "  \u001b[34;1mrun\u001b[0m   target \u001b[2mbuild //...\u001b[0m\n",
-      "  \u001b[33;1mwarn\u001b[0m   low disk\n",
+      "  \u001b[33;1mwarn\u001b[0m  low disk\n",
     ].join(""),
   );
 });

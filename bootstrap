@@ -89,20 +89,32 @@ ui_status() {
   local kind="$1"
   local label="$2"
   local detail="${3:-}"
-  local mark label_text detail_text
+  local mark gap label_text detail_text
   case "${kind}" in
-    set) mark="$(ui_color "35;1" "set")" ;;
-    ok) mark="$(ui_color "32;1" "ok")" ;;
-    warn) mark="$(ui_color "33;1" "warn")" ;;
-    *) mark="$(ui_color "34;1" "run")" ;;
+    set)
+      mark="$(ui_color "35;1" "set")"
+      gap="   "
+      ;;
+    ok)
+      mark="$(ui_color "32;1" "ok")"
+      gap="    "
+      ;;
+    warn)
+      mark="$(ui_color "33;1" "warn")"
+      gap="  "
+      ;;
+    *)
+      mark="$(ui_color "34;1" "run")"
+      gap="   "
+      ;;
   esac
   label_text="$(ui_color "1" "${label}")"
   detail_text="$(ui_color "2" "${detail}")"
   if ui_use_color; then
     if [[ -n "${detail}" ]]; then
-      printf '  %s   %s %s\n' "${mark}" "${label_text}" "${detail_text}"
+      printf '  %s%s%s %s\n' "${mark}" "${gap}" "${label_text}" "${detail_text}"
     else
-      printf '  %s   %s\n' "${mark}" "${label_text}"
+      printf '  %s%s%s\n' "${mark}" "${gap}" "${label_text}"
     fi
   elif [[ -n "${detail}" ]]; then
     printf '  %-5s %s %s\n' "${mark}" "${label}" "${detail}"
@@ -135,13 +147,14 @@ ui_list() {
 }
 
 ui_continuation_list() {
-  local item text
+  local item bullet text
   for item in "$@"; do
     if ui_use_color; then
+      bullet="$(ui_color "2" "-")"
       text="$(ui_color "2" "${item}")"
-      printf '        %s\n' "${text}"
+      printf '      %s %s\n' "${bullet}" "${text}"
     else
-      printf '        %s\n' "${item}"
+      printf '      - %s\n' "${item}"
     fi
   done
 }
@@ -572,6 +585,26 @@ run_migrations() {
   ui_ok "migrations" "no known migration steps necessary"
 }
 
+run_nix_init_consumer() {
+  ui_step "source" "fetching viberoots"
+  nix run --refresh --accept-flake-config "${viberoots_url}#viberoots" -- \
+    init-consumer \
+    --mode flake \
+    --workspace-root "${workspace_root}" \
+    --workspace-name "${workspace_name}" \
+    --viberoots-url "${viberoots_url}" \
+    ${run_install_flag:+"${run_install_flag}"} \
+    ${direnv_allow_flag:+"${direnv_allow_flag}"} \
+    2> >(
+      while IFS= read -r line; do
+        case "${line}" in
+          "fetching Git repository '"*) continue ;;
+        esac
+        printf '%s\n' "${line}" >&2
+      done
+    )
+}
+
 required_bootstrap_files_present() {
   [[ -f .buckroot ]] &&
     [[ -f .buckconfig ]] &&
@@ -755,14 +788,7 @@ elif [[ "${mode}" == "flake" ]]; then
   begin_transaction
   run_migrations
   record_action "ran viberoots init-consumer"
-  nix run --refresh --accept-flake-config "${viberoots_url}#viberoots" -- \
-    init-consumer \
-    --mode flake \
-    --workspace-root "${workspace_root}" \
-    --workspace-name "${workspace_name}" \
-    --viberoots-url "${viberoots_url}" \
-    ${run_install_flag:+"${run_install_flag}"} \
-    ${direnv_allow_flag:+"${direnv_allow_flag}"}
+  run_nix_init_consumer
   complete_transaction
   print_summary "bootstrapped" "${effective_source}"
 else

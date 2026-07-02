@@ -28,14 +28,12 @@ function color(code: string, value: string, enabled: boolean): string {
 
 function formatStatus(kind: "step" | "ok" | "warn", label: string, detail = ""): string {
   const colors = useColor();
-  const mark =
-    kind === "ok"
-      ? color("32;1", "ok", colors)
-      : kind === "warn"
-        ? color("33;1", "warn", colors)
-        : color("34;1", "run", colors);
+  const mark = kind === "ok" ? "ok" : kind === "warn" ? "warn" : "run";
+  const code = kind === "ok" ? "32;1" : kind === "warn" ? "33;1" : "34;1";
+  const gap = " ".repeat(Math.max(1, 6 - mark.length));
+  const renderedMark = color(code, mark, colors);
   const suffix = detail.trim() ? ` ${color("2", detail.trim(), colors)}` : "";
-  return `  ${mark}   ${label}${suffix}`;
+  return `  ${renderedMark}${gap}${label}${suffix}`;
 }
 
 export function createCommandUi(opts?: { verbose?: boolean }): CommandUi {
