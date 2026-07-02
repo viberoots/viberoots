@@ -34,10 +34,10 @@ export async function pathExists(p: string): Promise<boolean> {
 
 export async function findRepoRoot(start: string): Promise<string> {
   const candidates = [
+    start,
     (process.env.WORKSPACE_ROOT || "").trim(),
     (process.env._VIBEROOTS_DEVSHELL_ROOT || "").trim(),
     (process.env.LIVE_ROOT || "").trim(),
-    start,
   ].filter(Boolean);
   for (const candidate of candidates) {
     let dir = path.resolve(candidate);
@@ -114,11 +114,11 @@ export function resolveWorkspaceRootSync(
   env: NodeJS.ProcessEnv = process.env,
 ): string {
   const candidates = [
+    start,
     (env.WORKSPACE_ROOT || "").trim(),
     (env._VIBEROOTS_DEVSHELL_ROOT || "").trim(),
     (env.BUCK_TEST_SRC || "").trim(),
     (env.LIVE_ROOT || "").trim(),
-    start,
   ].filter(Boolean);
   for (const candidate of candidates) {
     const root = findFlakeRootSync(candidate);
@@ -166,7 +166,7 @@ export function resolveWorkspaceRootsSync(opts?: {
 }
 
 // Lightweight, synchronous repo root resolver used by zx scripts and helpers.
-// Prefers explicit environment anchors to avoid accidental cwd drift in tests/CI.
+// Prefers the invocation directory so stale shell anchors cannot override cwd.
 export function repoRoot(): string {
   return resolveWorkspaceRootSync();
 }

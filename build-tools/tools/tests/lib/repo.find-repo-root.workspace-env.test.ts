@@ -87,6 +87,28 @@ test("findRepoRoot prefers WORKSPACE_ROOT when temp-workspace commands run under
   });
 });
 
+test("findRepoRoot prefers cwd workspace over stale WORKSPACE_ROOT", async () => {
+  const stale = await workspace("repo-find-root-stale-workspace-env-old");
+  const actual = await workspace("repo-find-root-stale-workspace-env-new");
+  const previous = process.env.WORKSPACE_ROOT;
+  try {
+    const nested = path.join(actual, "projects", "apps", "demo");
+    await fsp.mkdir(nested, { recursive: true });
+    process.env.WORKSPACE_ROOT = stale;
+
+    assert.equal(await findRepoRoot(nested), actual);
+    assert.equal(
+      resolveWorkspaceRootsSync({ start: nested, env: { WORKSPACE_ROOT: stale } }).workspaceRoot,
+      actual,
+    );
+  } finally {
+    if (typeof previous === "string") process.env.WORKSPACE_ROOT = previous;
+    else delete process.env.WORKSPACE_ROOT;
+    await fsp.rm(stale, { recursive: true, force: true });
+    await fsp.rm(actual, { recursive: true, force: true });
+  }
+});
+
 test("workspace root detection prefers extracted parent workspace over nested viberoots flake", async () => {
   const tmp = await extractedWorkspace("vbr-roots-extracted");
   const previousWorkspaceRoot = process.env.WORKSPACE_ROOT;
