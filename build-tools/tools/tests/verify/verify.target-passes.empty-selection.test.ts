@@ -38,3 +38,15 @@ test("verify allows non-empty target plans", () => {
     }),
   );
 });
+
+test("verify allows empty broad selector scans", () => {
+  assert.doesNotThrow(() =>
+    assertVerifyTargetPlanNotEmpty({
+      requestedTargets: ["//..."],
+      plan: {
+        targetLabels: [],
+        passes: [],
+      },
+    }),
+  );
+});
