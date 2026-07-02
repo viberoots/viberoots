@@ -178,10 +178,13 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     assert.match(configReadme, /Use `local\.json` for gitignored, per-operator values/);
     assert.match(configReadme, /Use `secret:\/\/\.\.\.` refs for true secrets/);
     assert.match(configReadme, /sprinkleref --update secret:\/\/path\/to\/secret --create-missing/);
-    assert.match(
-      await fsp.readFile(path.join(workspace, ".gitignore"), "utf8"),
-      /projects\/config\/local\.json/,
-    );
+    const gitignore = await fsp.readFile(path.join(workspace, ".gitignore"), "utf8");
+    assert.match(gitignore, /\.viberoots\//);
+    assert.match(gitignore, /buck-out\//);
+    assert.match(gitignore, /\.direnv\//);
+    assert.match(gitignore, /\.nix-zsh\//);
+    assert.match(gitignore, /\.metadata_never_index/);
+    assert.match(gitignore, /projects\/config\/local\.json/);
     assert.equal(
       await fsp.readFile(direnvLog, "utf8"),
       `allow ${workspace}\nexec ${workspace} i\n`,
@@ -299,10 +302,13 @@ test("viberoots init-consumer bootstraps a remote-flake consumer workspace", asy
     assert.match(configReadme, /Use `shared\.json` for checked-in, non-secret values/);
     assert.match(configReadme, /Use `local\.json` for gitignored, per-operator values/);
     assert.match(configReadme, /Use `secret:\/\/\.\.\.` refs for true secrets/);
-    assert.match(
-      await fsp.readFile(path.join(workspace, ".gitignore"), "utf8"),
-      /projects\/config\/local\.json/,
-    );
+    const gitignore = await fsp.readFile(path.join(workspace, ".gitignore"), "utf8");
+    assert.match(gitignore, /\.viberoots\//);
+    assert.match(gitignore, /buck-out\//);
+    assert.match(gitignore, /\.direnv\//);
+    assert.match(gitignore, /\.nix-zsh\//);
+    assert.match(gitignore, /\.metadata_never_index/);
+    assert.match(gitignore, /projects\/config\/local\.json/);
     assert.deepEqual(await visibleRootEntries(workspace), ["README.md", "projects"]);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
