@@ -26,6 +26,7 @@ in {
     std ? "c++17",
     nixCxxPkgs ? [],
     nixCxxAttrs ? [],
+    nixCxxSourcePlan ? [],
     nixpkgsProfile ? "default",
     srcList ? [],
     patches ? [],
@@ -51,6 +52,11 @@ in {
       # Fallback: restrict to conventional source dir to avoid picking up tests/** by accident
       "find ./src -type f \\( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \\) 2>/dev/null | sed 's#^./##' | sort"
     );
+    sourcePlanLog = lib.concatMapStringsSep "\n" (line:
+      "printf '%s\\n' "
+      + lib.escapeShellArg ("nixpkgsSourcePlan=" + line)
+      + " >> \"$out/build.log\""
+    ) nixCxxSourcePlan;
   in pkgs.stdenv.mkDerivation {
     inherit pname;
     version = "0.1.0";
@@ -116,6 +122,7 @@ in {
       : > "$out/build.log"
       echo "name=${name}" >> "$out/build.log"
       echo "nixpkgsProfile=${nixpkgsProfile}" >> "$out/build.log"
+      ${sourcePlanLog}
       echo "std=${std}" >> "$out/build.log"
       echo "includes=${incFlags}" >> "$out/build.log"
       echo "defines=${defFlags}" >> "$out/build.log"
@@ -128,4 +135,3 @@ in {
     '';
   };
 }
-

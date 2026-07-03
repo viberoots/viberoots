@@ -25,7 +25,12 @@ let
   profileFor = name:
     let plan = sourcePlanFor (nodeFor name); in plan.nixpkgs_profile;
 
-  resolveNixPkgsFor = name: attrs:
+  sourcePlanLineFor = r:
+    r.attr + " -> " + r.profile_name + " (" + r.resolution_kind
+    + (if r.rationale == null then "" else "; rationale=" + r.rationale)
+    + ")";
+
+  resolveNixRecordsFor = name: attrs:
     let
       records = resolveNixpkgAttrs {
         target = nodeFor name;
@@ -36,14 +41,25 @@ let
         map (r: r.attr + " from " + r.profile_name) missing
       );
     in
-      if missing == [] then map (r: r.package) records
+      if missing == [] then records
       else builtins.throw (
         "cpp planner: unresolved nixpkg attrs for " + name + ": " + missingText
       );
 
+  resolveNixFor = name: attrs:
+    let records = resolveNixRecordsFor name attrs;
+    in {
+      packages = map (r: r.package) records;
+      sourcePlan = map sourcePlanLineFor records;
+    };
+
+  resolveNixPkgsFor = name: attrs:
+    (resolveNixFor name attrs).packages;
+
   mkApp = name:
     let
       attrs = collectNixAttrsFor name;
+      resolvedNix = resolveNixFor name attrs;
       TP = templateFor name;
     in TP.cppApp {
       inherit name;
@@ -51,7 +67,8 @@ let
       subdir = pkgPathOf name;
       nixpkgsProfile = profileFor name;
       nixCxxAttrs = [];
-      nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name) ++ (resolveNixPkgsFor name attrs);
+      nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name) ++ resolvedNix.packages;
+      nixCxxSourcePlan = resolvedNix.sourcePlan;
       srcList = normSrcsOf name;
       patches = patchInputsFor name;
     };

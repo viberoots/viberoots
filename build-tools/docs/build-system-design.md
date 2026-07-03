@@ -141,7 +141,8 @@ extra-experimental-features = nix-command flakes
    base package universe. C++ selected builds instantiate templates with that profile's `pkgs`, so
    compiler/stdenv and ordinary `nixpkg_deps` come from the target profile. Go CGO and Python native
    extension nixpkg attrs use the same source-selection resolver before packages reach templates.
-   Non-empty `nixpkg_pins` still fail until package-pin resolution lands.
+   Non-empty `nixpkg_pins` redirect the matching normalized attr through the pin profile and keep
+   unpinned attrs on the target profile.
 
 - Node alignment: We stamp `global_nix_inputs()` only in Node macros that directly call Nix (`node_webapp`, `node_vercel_next_artifact`, `node_service_artifact`, `nix_node_cli_bin(bundle=True)`, `nix_node_cli_bin(bundle=False)`). Non‑Nix macros remain unstamped at the macro level.
 

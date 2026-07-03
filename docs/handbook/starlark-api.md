@@ -130,16 +130,23 @@ Example shape:
 nix_cpp_library(
     name = "native",
     srcs = ["native.cc"],
-    nixpkg_deps = ["pkgs.zlib"],
+    nixpkg_deps = ["pkgs.openssl", "pkgs.zlib"],
     nixpkgs_profile = "default",
-    nixpkg_pins = {},
+    nixpkg_pins = {
+        "pkgs.openssl": {
+            "nixpkgs_profile": "nixpkgs-23_11",
+            "rationale": "Compatibility with a legacy TLS peer during migration.",
+        },
+    },
 )
 ```
 
-Non-empty `nixpkg_pins` are parsed and validated, then rejected until package-pin resolution lands.
-Use `nixpkgs_profile` for target-level source selection. Selected C++ builds use that profile for
-compiler/stdenv and ordinary `nixpkg_deps`; Go CGO and Python native-extension nixpkg attrs use the
-same source-selection resolver.
+Use `nixpkgs_profile` for target-level source selection. Use `nixpkg_pins` for narrow per-attr
+exceptions. Pins redirect attrs already consumed by the selected target; they do not create new
+package dependencies. If repeated pins become the common case, move the target to that
+`nixpkgs_profile` instead. Selected C++ builds use the target profile for compiler/stdenv and
+ordinary unpinned `nixpkg_deps`; pinned attrs resolve from their pin profiles. Go CGO and Python
+native-extension nixpkg attrs use the same source-selection resolver.
 BUILD files must not put raw commits or raw flake URLs in these fields.
 
 ## Go macros

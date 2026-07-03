@@ -879,19 +879,12 @@ ready for users, keep it undocumented or guarded by validation, but keep interna
 
 ### Rollout Compatibility
 
-The whole-target profile surface can land before package pins are usable, but the behavior must be
-explicit:
+The whole-target profile surface landed before package pins were usable. During that intermediate
+state, non-empty `nixpkg_pins` failed instead of being ignored.
 
-- `nixpkgs_profile` may be accepted and documented once whole-target profile resolution works.
-- `nixpkg_pins` should either be absent from public docs or accepted only as `{}` until package-pin
-  resolution works.
-- A non-empty `nixpkg_pins` map before package-pin resolution is implemented must fail. It must not
-  be ignored.
-- Graph fields for empty pins may be emitted early if they stabilize the schema, but diagnostics
-  should not suggest non-empty pins are supported until they are.
-
-This avoids a misleading intermediate state where users can write package pins that silently build
-from the base profile.
+Once package-pin resolution is enabled, non-empty `nixpkg_pins` must resolve pinned attrs from their
+declared profiles, leave unpinned attrs on the target profile, and keep undeclared pin attrs from
+creating package dependencies implicitly.
 
 ## Validation
 

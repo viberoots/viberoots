@@ -503,13 +503,14 @@ The label string is:
 ### Whole-target nixpkgs profiles
 
 Targets may set `nixpkgs_profile` to move selected builds to a named registry profile. The resolver
-builds one source plan per selected target from `nixpkgs_profile` and empty `nixpkg_pins`. For C++,
-the selected profile supplies both the template package set and resolved `nixpkg_deps`, so
-compiler/stdenv and ordinary nixpkgs packages stay in the same package universe. Go CGO and Python
-native-extension nixpkg attrs use the same resolver entrypoint before templates receive packages.
+builds one source plan per selected target from `nixpkgs_profile` and `nixpkg_pins`. For C++, the
+selected profile supplies the template package set and ordinary unpinned `nixpkg_deps`; pinned attrs
+resolve from their declared pin profiles. Go CGO and Python native-extension nixpkg attrs use the
+same resolver entrypoint before templates receive packages.
 
-`nixpkg_pins` remains schema-stable, but non-empty maps are rejected until pin resolution is
-implemented.
+`nixpkg_pins` maps normalized attrs already consumed by the selected plan to alternate named
+profiles. Pins do not create dependencies, and viberoots does not classify packages by build/header,
+link/runtime, tool/library, or compatibility role.
 
 ### Common leak patterns
 

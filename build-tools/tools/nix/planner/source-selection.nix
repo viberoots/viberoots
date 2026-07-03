@@ -129,12 +129,28 @@ let
       else if builtins.isString raw then raw
       else fail "nixpkgs_profile must be a string";
 
-  pinsFor = node:
-    let raw = if node == null then null else get node "nixpkg_pins"; in
-      if raw == null then { }
-      else if !(builtins.isAttrs raw) then fail "nixpkg_pins must be an attrset"
-      else if raw != { } then fail "non-empty nixpkg_pins are not supported until package-pin resolution lands"
-      else raw;
+  PinValidation = import ./source-selection-pins.nix {
+    inherit lib H fail get registryPath validatedProfiles targetNameFor;
+  };
+
+  pinsFor = PinValidation.pinsFor;
+
+  validateDeclaredPins = { target, attrs }:
+    let
+      plan = sourcePlanFor target;
+      targetName = targetNameFor target;
+      declared = builtins.listToAttrs (map (attr: {
+        name = H.normalizeNixAttr attr;
+        value = true;
+      }) attrs);
+      missingPins = builtins.filter (attr: !(builtins.hasAttr attr declared)) (builtins.attrNames plan.nixpkg_pins);
+    in
+      if missingPins == [] then plan
+      else fail (
+        "nixpkg_pins for target " + targetName
+        + " reference undeclared nixpkg attrs: " + builtins.concatStringsSep ", " missingPins
+        + "; pins redirect attrs already consumed by the selected target and do not create dependencies"
+      );
 
   sourcePlanFor = node:
     let
@@ -164,20 +180,22 @@ let
     let
       normalizedAttr = H.normalizeNixAttr attr;
       plan = sourcePlanFor target;
-      profileName = plan.nixpkgs_profile;
+      pin = plan.nixpkg_pins.${normalizedAttr} or null;
+      profileName = if pin == null then plan.nixpkgs_profile else pin.nixpkgs_profile;
+      selectedPkgs = if pin == null then plan.base_pkgs else pkgsForProfile profileName;
       parts0 = lib.splitString "." normalizedAttr;
       parts = if parts0 != [ ] && lib.head parts0 == "pkgs" then lib.tail parts0 else parts0;
-      package0 = lib.attrByPath parts null plan.base_pkgs;
+      package0 = lib.attrByPath parts null selectedPkgs;
       package =
         if package0 != null then package0
-        else if normalizedAttr == "pkgs.googletest" then plan.base_pkgs.gtest or null
+        else if normalizedAttr == "pkgs.googletest" then selectedPkgs.gtest or null
         else null;
     in {
       attr = normalizedAttr;
       profile_name = profileName;
       profile = profileName;
-      resolution_kind = "nixpkgs_profile";
-      rationale = null;
+      resolution_kind = if pin == null then "nixpkgs_profile" else "nixpkg_pin";
+      rationale = if pin == null then null else pin.rationale;
       identity_key = nixpkgIdentityKey {
         attr = normalizedAttr;
         profile_name = profileName;
@@ -187,7 +205,8 @@ let
     };
 
   resolveNixpkgAttrs = { target, attrs }:
-    dedupeNixpkgRecords (map (attr: resolveNixpkgAttr { inherit target attr; }) attrs);
+    let plan = validateDeclaredPins { inherit target attrs; };
+    in builtins.seq plan (dedupeNixpkgRecords (map (attr: resolveNixpkgAttr { inherit target attr; }) attrs));
 in
 {
   nixpkgsRegistry = builtins.seq _schema (builtins.seq _default (registry // { profiles = validatedProfiles; }));

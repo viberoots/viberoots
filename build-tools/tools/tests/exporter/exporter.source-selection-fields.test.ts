@@ -256,16 +256,16 @@ test("Go binary auto-test package library preserves source-selection attrs", asy
   });
 });
 
-test("Buck analysis rejects malformed and temporarily unsupported nixpkg pins", async () => {
-  await runInTemp("exporter-source-selection-pin-rejection", async (tmp, $) => {
+test("Buck analysis rejects malformed nixpkg pins and exports valid non-empty pins", async () => {
+  await runInTemp("exporter-source-selection-pin-validation", async (tmp, $) => {
     const malformedPkgRel = "cpp/source_selection_pin_malformed";
-    const unsupportedPkgRel = "cpp/source_selection_pin_unsupported";
+    const validPkgRel = "cpp/source_selection_pin_valid";
     const malformedPkg = path.join(tmp, malformedPkgRel);
-    const unsupportedPkg = path.join(tmp, unsupportedPkgRel);
+    const validPkg = path.join(tmp, validPkgRel);
     await fs.mkdirp(malformedPkg);
-    await fs.mkdirp(unsupportedPkg);
+    await fs.mkdirp(validPkg);
     await fs.outputFile(path.join(malformedPkg, "lib.cc"), "int value() { return 1; }\n");
-    await fs.outputFile(path.join(unsupportedPkg, "lib.cc"), "int value() { return 1; }\n");
+    await fs.outputFile(path.join(validPkg, "lib.cc"), "int value() { return 1; }\n");
     await fs.outputFile(
       path.join(malformedPkg, "TARGETS"),
       [
@@ -285,7 +285,7 @@ test("Buck analysis rejects malformed and temporarily unsupported nixpkg pins", 
       ].join("\n"),
     );
     await fs.outputFile(
-      path.join(unsupportedPkg, "TARGETS"),
+      path.join(validPkg, "TARGETS"),
       [
         'load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library")',
         "",
@@ -314,14 +314,17 @@ test("Buck analysis rejects malformed and temporarily unsupported nixpkg pins", 
       /nixpkg_pins\[pkgs\.zlib\]\.rationale/,
     );
 
-    const unsupported = await $({
-      cwd: tmp,
-      stdio: "pipe",
-    })`buck2 cquery --target-platforms prelude//platforms:default //${unsupportedPkgRel}:non_empty_pin`.nothrow();
-    assert.notEqual(unsupported.exitCode, 0);
-    assert.match(
-      `${String(unsupported.stderr || "")}\n${String(unsupported.stdout || "")}`,
-      /non-empty nixpkg_pins are not supported until package-pin resolution lands/,
+    const attrs = await cquerySourceSelectionAttrs(
+      $,
+      tmp,
+      "exporter-pin-non-empty",
+      `//${validPkgRel}:non_empty_pin`,
     );
+    assert.deepEqual(attrs.nixpkg_pins, {
+      "pkgs.zlib": {
+        nixpkgs_profile: "default",
+        rationale: "Temporary compatibility check.",
+      },
+    });
   });
 });

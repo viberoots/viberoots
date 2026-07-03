@@ -63,8 +63,6 @@ def pop_nixpkg_pins(kwargs):
         if normalized == "":
             fail("nixpkg_pins contains an empty nixpkgs attr key")
         out[normalized] = _validate_pin_entry(normalized, entry)
-    if len(out) > 0:
-        fail("non-empty nixpkg_pins are not supported until package-pin resolution lands")
     return out
 
 def normalize_source_selection_attrs(kwargs):
