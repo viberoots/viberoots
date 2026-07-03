@@ -6,6 +6,13 @@ import path from "node:path";
 
 async function zxTestNodeModulesImporter(root: string): Promise<string> {
   try {
+    await Promise.all([
+      fsp.access(path.join(root, ".viberoots", "current", "build-tools")),
+      fsp.access(path.join(root, "viberoots", "pnpm-lock.yaml")),
+    ]);
+    return "viberoots";
+  } catch {}
+  try {
     await fsp.access(path.join(root, "pnpm-lock.yaml"));
     return ".";
   } catch {}

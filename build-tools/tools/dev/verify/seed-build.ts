@@ -4,6 +4,14 @@ import process from "node:process";
 
 export type VerifySeedBuildMode = "local" | "remote-ready";
 
+function seedFlakeRef(root: string): string {
+  const hiddenWorkspaceFlake = path.join(root, ".viberoots", "workspace", "flake.nix");
+  const flakeRoot = fs.existsSync(hiddenWorkspaceFlake)
+    ? path.join(root, ".viberoots", "workspace")
+    : root;
+  return `path:${flakeRoot}#test-seed`;
+}
+
 function viberootsOverrideArgs(root: string, env: NodeJS.ProcessEnv): string[] {
   const candidates = [
     env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
@@ -28,7 +36,7 @@ export function verifySeedBuildArgs(opts: {
   gcRootPath?: string;
   env?: NodeJS.ProcessEnv;
 }): string[] {
-  const flakeRef = `path:${opts.root}/.viberoots/workspace#test-seed`;
+  const flakeRef = seedFlakeRef(opts.root);
   const overrideArgs = viberootsOverrideArgs(opts.root, opts.env || process.env);
   const base = [
     "build",

@@ -57,8 +57,40 @@
       "justification": "Pre-existing oversized pnpm verified-marker helper pending focused decomposition; current change only renames validation terminology without expanding behavior."
     },
     {
+      "path": "dev/update-pnpm-hash/importer-lockfile.ts",
+      "justification": "Pre-existing oversized pnpm importer lockfile helper pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "dev/update-pnpm-hash/nix.ts",
+      "justification": "Pre-existing oversized pnpm Nix helper pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "dev/dev-build/run-dev-build.ts",
+      "justification": "Pre-existing oversized dev-build runner pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "dev/install/glue.ts",
+      "justification": "Pre-existing oversized install glue helper pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "dev/startup-check.ts",
+      "justification": "Pre-existing oversized startup-check entrypoint pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "dev/viberoots.ts",
+      "justification": "Pre-existing oversized viberoots CLI entrypoint pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
       "path": "dev/verify/args.ts",
       "justification": "Pre-existing oversized verify argument parser pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "dev/verify/lint-preflight.ts",
+      "justification": "Pre-existing oversized verify lint preflight pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "dev/verify/verify-passes.ts",
+      "justification": "Pre-existing oversized verify pass helper pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
     },
     {
       "path": "dev/verify/buck-orphan-cleanup.ts",
@@ -101,8 +133,32 @@
       "justification": "Pre-existing oversized build-system test-scope helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
     },
     {
+      "path": "lib/consumer-bootstrap.ts",
+      "justification": "Pre-existing oversized consumer bootstrap helper pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "lib/consumer-direnv.ts",
+      "justification": "Pre-existing oversized consumer direnv helper pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "lib/consumer-source-mode.ts",
+      "justification": "Pre-existing oversized consumer source-mode helper pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "lib/maintenance-gc.ts",
+      "justification": "Pre-existing oversized maintenance GC helper pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
       "path": "lib/managed-command.ts",
       "justification": "Pre-existing oversized managed-command helper pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "lib/workspace-activation.ts",
+      "justification": "Pre-existing oversized workspace activation helper pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "lib/workspace-lock-repair.ts",
+      "justification": "Pre-existing oversized workspace lock repair helper pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
     },
     {
       "path": "lib/verify-log-status/compute.ts",
@@ -113,8 +169,20 @@
       "justification": "Pre-existing oversized dev test pending focused decomposition outside the remote-consumer final checkpoint."
     },
     {
+      "path": "tests/dev/claude-wrapper.safehouse.test.ts",
+      "justification": "Pre-existing oversized Claude wrapper safehouse test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "tests/dev/nix-gaps-inventory-check.test.ts",
+      "justification": "Pre-existing oversized nix-gaps inventory test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
       "path": "tests/dev/startup-check.extraction-blockers.test.ts",
       "justification": "Pre-existing oversized startup-check test pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "tests/exporter/exporter.source-selection-fields.test.ts",
+      "justification": "Pre-existing oversized exporter source-selection test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
     },
     {
       "path": "tests/lib/repo.find-repo-root.workspace-env.test.ts",
@@ -137,8 +205,36 @@
       "justification": "Pre-existing oversized workspace activation test pending focused decomposition outside the remote-consumer final checkpoint."
     },
     {
+      "path": "tests/remote-exec/nix-store-materialize.test.ts",
+      "justification": "Pre-existing oversized remote execution materialization test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "tests/scaffolding/lib/webapp-ssr.ts",
+      "justification": "Pre-existing oversized SSR scaffolding helper pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
       "path": "tests/scaffolding/webapp.install-guardrails.contract.test.ts",
       "justification": "Pre-existing oversized scaffolding guardrail test pending focused decomposition outside the remote-consumer final checkpoint."
+    },
+    {
+      "path": "tests/verify/seed.staging-policy.test.ts",
+      "justification": "Pre-existing oversized verify seed staging policy test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "tests/verify/template-test-scope.policy.test.ts",
+      "justification": "Pre-existing oversized verify template scope policy test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "tests/viberoots/init.consumer.test.ts",
+      "justification": "Pre-existing oversized consumer init test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "tests/viberoots/maintenance-commands.test.ts",
+      "justification": "Pre-existing oversized maintenance commands test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "tests/viberoots/source-mode.test.ts",
+      "justification": "Pre-existing oversized source-mode test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
     },
     {
       "path": "wasm/export-wasm-from-nix.ts",

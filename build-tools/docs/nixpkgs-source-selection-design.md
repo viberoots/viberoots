@@ -74,7 +74,7 @@ attr from another named nixpkgs profile:
 
 ```starlark
 nix_cpp_binary(
-    name = "legacy_client",
+    name = "tls_compat_client",
     srcs = ["main.cc"],
     nixpkg_deps = [
         "pkgs.openssl",
@@ -84,7 +84,7 @@ nix_cpp_binary(
     nixpkg_pins = {
         "pkgs.openssl": {
             "nixpkgs_profile": "nixpkgs-23_11",
-            "rationale": "Compatibility with a legacy TLS peer during migration.",
+            "rationale": "Compatibility with an older TLS peer during migration.",
         },
     },
 )
@@ -116,8 +116,8 @@ Examples:
 # Coherent older native stack. This is the preferred shape when the target links
 # old OpenSSL and old curl from the same nixpkgs snapshot.
 nix_cpp_binary(
-    name = "legacy_client",
-    srcs = ["legacy_client.cc"],
+    name = "tls_compat_client",
+    srcs = ["tls_compat_client.cc"],
     nixpkg_deps = [
         "pkgs.openssl",
         "pkgs.curl",
@@ -177,7 +177,7 @@ nix_cpp_binary(
     nixpkg_pins = {
         "pkgs.openssl": {
             "nixpkgs_profile": "nixpkgs-23_11",
-            "rationale": "Compatibility with legacy TLS peer while the server is migrated.",
+            "rationale": "Compatibility with an older TLS peer while the server is migrated.",
         },
     },
 )
@@ -188,7 +188,7 @@ the target-level profile:
 
 ```starlark
 nix_cpp_binary(
-    name = "legacy_client",
+    name = "tls_compat_client",
     srcs = ["main.cc"],
     nixpkg_deps = [
         "pkgs.openssl",

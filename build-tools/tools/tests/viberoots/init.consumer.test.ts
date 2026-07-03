@@ -53,6 +53,8 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
   assert.match(stage0, /viberoots-flake-input/);
   assert.match(stage0, /export VIBEROOTS_SOURCE_ROOT="\$\{__vbr_source_root\}"/);
   assert.match(stage0, /__vbr_current_real.*__vbr_filtered_real/s);
+  assert.doesNotMatch(stage0, /__vbr_input_real/);
+  assert.doesNotMatch(stage0, /__vbr_flake_input_root="\$\{PWD\}\/viberoots"/);
   assert.match(stage0, /ln -sfn \.\.\/viberoots/);
   for (const excluded of [
     "--exclude /.viberoots",

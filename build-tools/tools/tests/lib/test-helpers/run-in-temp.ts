@@ -48,14 +48,14 @@ let cachedPinnedNixpkgsPath: Promise<string> | null = null;
 let cachedPinnedCacertPath: Promise<string> | null = null;
 let cachedUnifiedPnpmStorePath: Promise<string> | null = null;
 let envMutationQueue: Promise<void> = Promise.resolve();
-const legacyStableRootCleanup = new Set<string>();
+const preNoindexStableRootCleanup = new Set<string>();
 
-async function removeLegacyDarwinStableRoot(root: string): Promise<void> {
+async function removeDarwinPreNoindexStableRoot(root: string): Promise<void> {
   if (process.platform !== "darwin" || !root.endsWith(".noindex")) return;
-  const legacy = root.slice(0, -".noindex".length);
-  if (legacyStableRootCleanup.has(legacy)) return;
-  legacyStableRootCleanup.add(legacy);
-  await fsp.rm(legacy, { recursive: true, force: true }).catch(() => {});
+  const preNoindexRoot = root.slice(0, -".noindex".length);
+  if (preNoindexStableRootCleanup.has(preNoindexRoot)) return;
+  preNoindexStableRootCleanup.add(preNoindexRoot);
+  await fsp.rm(preNoindexRoot, { recursive: true, force: true }).catch(() => {});
 }
 
 function transientNixStoreError(output: unknown): boolean {
@@ -241,7 +241,7 @@ async function stableTestHomeRoot(): Promise<string> {
   const suffix = user ? `-${user}` : "";
   const noindex = process.platform === "darwin" ? ".noindex" : "";
   const root = path.join(base, `viberoots-test-home${suffix}${noindex}`);
-  await removeLegacyDarwinStableRoot(root);
+  await removeDarwinPreNoindexStableRoot(root);
   await mkdirWithMacosMetadataExclusion(root).catch(() => {});
   return root;
 }
@@ -256,7 +256,7 @@ async function stableGoModCacheRoot(): Promise<string> {
   const suffix = user ? `-${user}` : "";
   const noindex = process.platform === "darwin" ? ".noindex" : "";
   const root = path.join(base, `viberoots-go-modcache${suffix}${noindex}`);
-  await removeLegacyDarwinStableRoot(root);
+  await removeDarwinPreNoindexStableRoot(root);
   await mkdirWithMacosMetadataExclusion(root).catch(() => {});
   return root;
 }
@@ -271,7 +271,7 @@ async function stableXdgCacheRoot(): Promise<string> {
   const suffix = user ? `-${user}` : "";
   const noindex = process.platform === "darwin" ? ".noindex" : "";
   const root = path.join(base, `viberoots-xdg-cache${suffix}${noindex}`);
-  await removeLegacyDarwinStableRoot(root);
+  await removeDarwinPreNoindexStableRoot(root);
   await mkdirWithMacosMetadataExclusion(root).catch(() => {});
   return root;
 }

@@ -121,6 +121,30 @@ test("verify keeps explicit labels and query expressions untouched", async () =>
   });
 });
 
+test("verify qualifies explicit nested viberoots labels in consumer workspaces", async () => {
+  await runInTemp("verify-target-args-nested-viberoots-labels", async (tmp) => {
+    const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
+    await fsp.mkdir(graphDir, { recursive: true });
+    await fsp.writeFile(path.join(graphDir, "graph.json"), "[]\n", "utf8");
+    await fsp.mkdir(path.join(tmp, "viberoots"), { recursive: true });
+    await fsp.writeFile(path.join(tmp, "viberoots", "pnpm-lock.yaml"), "lockfileVersion: 9\n");
+
+    const fromRootLabel = await normalizeVerifyTargets({
+      workspaceRoot: tmp,
+      baseDir: path.join(tmp, "viberoots"),
+      targets: ["//:planner_nixpkgs_source_selection_identity"],
+    });
+    assert.deepEqual(fromRootLabel, ["viberoots//:planner_nixpkgs_source_selection_identity"]);
+
+    const fromPackageLabel = await normalizeVerifyTargets({
+      workspaceRoot: tmp,
+      baseDir: path.join(tmp, "viberoots", "build-tools", "tools"),
+      targets: [":tooling_unit"],
+    });
+    assert.deepEqual(fromPackageLabel, ["viberoots//build-tools/tools:tooling_unit"]);
+  });
+});
+
 test("verify normalizes root '.' target to full-suite wildcard", async () => {
   await runInTemp("verify-target-args-root-dot", async (tmp) => {
     const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");

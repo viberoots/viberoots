@@ -166,12 +166,6 @@ __vbr_stage0_filtered_viberoots_input() {
 
 __vbr_flake_args=()
 __vbr_flake_input_root="\${VIBEROOTS_FLAKE_INPUT_ROOT:-}"
-if [[ -n "\${__vbr_flake_input_root}" && -d "\${PWD}/viberoots" ]]; then
-  __vbr_input_real="$(cd "\${__vbr_flake_input_root}" && pwd -P 2>/dev/null || true)"
-  __vbr_filtered_real="$(cd "\${PWD}/.viberoots/workspace/viberoots-flake-input" 2>/dev/null && pwd -P || true)"
-  [[ -n "\${__vbr_filtered_real}" && "\${__vbr_input_real}" == "\${__vbr_filtered_real}" ]] && __vbr_flake_input_root="\${PWD}/viberoots"
-fi
-unset __vbr_input_real __vbr_filtered_real
 if [[ -z "\${__vbr_flake_input_root}" || ! -f "\${__vbr_flake_input_root}/flake.nix" ]]; then
   __vbr_flake_input_root="\${VIBEROOTS_SOURCE_ROOT:-}"
 fi

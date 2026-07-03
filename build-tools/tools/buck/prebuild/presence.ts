@@ -44,7 +44,7 @@ export async function computeMissingOutputs(outputs: string[]): Promise<string[]
 
   {
     const preludePath = ".viberoots/current/prelude";
-    const legacyPreludePath = "prelude";
+    const rootPreludePath = "prelude";
     try {
       const st = await fsp.lstat(preludePath);
       if (!st.isDirectory() && !st.isSymbolicLink()) {
@@ -54,11 +54,11 @@ export async function computeMissingOutputs(outputs: string[]): Promise<string[]
       }
     } catch {
       try {
-        const st = await fsp.lstat(legacyPreludePath);
+        const st = await fsp.lstat(rootPreludePath);
         if (!st.isSymbolicLink()) {
           outPresence.push("prelude (expected Nix store symlink)");
         } else {
-          const target = await fsp.readlink(legacyPreludePath).catch(() => "");
+          const target = await fsp.readlink(rootPreludePath).catch(() => "");
           if (!target.startsWith("/nix/store/")) {
             outPresence.push("prelude (expected Nix store symlink)");
           }

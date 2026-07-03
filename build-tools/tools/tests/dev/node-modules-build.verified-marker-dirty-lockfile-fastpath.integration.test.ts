@@ -43,4 +43,11 @@ test("node-modules-build reuses verified markers even when temp lockfiles are gi
   ) {
     throw new Error("verify zx setup must reuse the node_modules link marker before Nix");
   }
+  if (
+    !verifyZxNodeModules.includes('path.join(root, ".viberoots", "current", "build-tools")') ||
+    !verifyZxNodeModules.includes('path.join(root, "viberoots", "pnpm-lock.yaml")') ||
+    !verifyZxNodeModules.includes('return "viberoots";')
+  ) {
+    throw new Error("verify zx setup must prefer the viberoots importer in consumer workspaces");
+  }
 });

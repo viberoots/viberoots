@@ -592,8 +592,8 @@ should leave the repository with passing focused validation for its scope.
 Before enabling package pins for users, run the Checkpoint C validation set. Before treating pins as
 remote/cache ready, run the Checkpoint D validation set.
 
-When turbo mode is active, run the mandatory final full validation after PR-7 with the correct
-viberoots base ref for this implementation range. For this run, scoped `v` invocations should start
+When turbo mode is active, run the mandatory final full validation after the package-pin remote/cache
+checkpoint with the correct viberoots base ref for this implementation range. For this run, scoped `v` invocations should start
 with `GITHUB_BASE_REF=1555522a2ddf5bbfe03f5c2ecedaf649a271fe8b`, then move to each committed
 full-suite checkpoint after it passes. Future runs should replace the initial value with their actual
 starting commit.

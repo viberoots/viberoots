@@ -37,6 +37,8 @@ test("generated .envrc delegates to stable stage-0 helper before nix-direnv use 
   assert.match(stage0, /viberoots-flake-input/);
   assert.match(stage0, /\.source-fingerprint/);
   assert.match(stage0, /__vbr_current_real.*__vbr_filtered_real/s);
+  assert.doesNotMatch(stage0, /__vbr_input_real/);
+  assert.doesNotMatch(stage0, /__vbr_flake_input_root="\$\{PWD\}\/viberoots"/);
   assert.match(stage0, /ln -sfn \.\.\/viberoots/);
   assert.match(stage0, /unset -f .*__vbr_stage0_apply_nix_cache_health/);
 });

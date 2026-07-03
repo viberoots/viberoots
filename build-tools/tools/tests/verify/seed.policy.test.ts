@@ -58,6 +58,17 @@ test("verify seed build args split local pinning from remote-ready no-link mode"
   assert.ok(!remoteArgs.includes("--out-link"));
 });
 
+test("verify seed build args fall back to root flake when generated workspace flake is absent", async () => {
+  const root = await mktemp("verify-seed-root-flake-");
+  try {
+    await fsp.writeFile(path.join(root, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
+    const args = verifySeedBuildArgs({ root, mode: "remote-ready", env: {} });
+    assert.ok(args.includes(`path:${root}#test-seed`));
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("verify seed build args use active remote viberoots source when no submodule exists", async () => {
   const root = await mktemp("verify-seed-remote-source-");
   const source = await mktemp("verify-seed-remote-source-viberoots-");

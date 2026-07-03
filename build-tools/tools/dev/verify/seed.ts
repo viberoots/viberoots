@@ -12,6 +12,7 @@ import { writeVerifySeedRemoteManifest } from "./seed-manifest";
 import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope";
 import { pidAlive } from "./seed-utils";
 import { computeGitState } from "./seed-git-state";
+import fs from "node:fs";
 
 export type SeedInfo = {
   seedKey: string;
@@ -122,9 +123,12 @@ async function buildSeedStorePath(
   await mkdirWithMacosMetadataExclusion(seedRootDir(root)).catch(() => {});
   const verbose = isVbrVerbose();
   const ui = createCommandUi({ verbose });
+  const flakeRoot = fs.existsSync(path.join(root, ".viberoots", "workspace", "flake.nix"))
+    ? path.join(root, ".viberoots", "workspace")
+    : root;
   if (verbose) {
     process.stderr.write(
-      `[verify] seed build: nix build path:${root}/.viberoots/workspace#test-seed (timeout=${timeoutSec}s)\n`,
+      `[verify] seed build: nix build path:${flakeRoot}#test-seed (timeout=${timeoutSec}s)\n`,
     );
   } else {
     ui.step("seed", "checking test fixture store");
@@ -146,11 +150,11 @@ async function buildSeedStorePath(
     const detail = String(cmd.stderr || cmd.stdout || "").trim();
     if (cmd.timedOut) {
       throw new Error(
-        `verify seed: nix build .viberoots/workspace#test-seed timed out after ${timeoutSec}s${detail ? `\n${detail}` : ""}`,
+        `verify seed: nix build path:${flakeRoot}#test-seed timed out after ${timeoutSec}s${detail ? `\n${detail}` : ""}`,
       );
     }
     throw new Error(
-      `verify seed: nix build .viberoots/workspace#test-seed failed (exit ${String(cmd.code)})${detail ? `\n${detail}` : ""}`,
+      `verify seed: nix build path:${flakeRoot}#test-seed failed (exit ${String(cmd.code)})${detail ? `\n${detail}` : ""}`,
     );
   }
   const out = String(cmd.stdout || "")
@@ -159,7 +163,7 @@ async function buildSeedStorePath(
     .filter(Boolean)
     .pop();
   if (!out)
-    throw new Error("verify seed: nix build .viberoots/workspace#test-seed returned no store path");
+    throw new Error(`verify seed: nix build path:${flakeRoot}#test-seed returned no store path`);
   if (verbose) process.stderr.write("[verify] seed build: complete\n");
   else ui.ok("seed", "ready");
   return out;

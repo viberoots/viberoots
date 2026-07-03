@@ -1,33 +1,10 @@
 import path from "node:path";
-import { execSync } from "node:child_process";
 import fs from "node:fs";
 import { nodeFlagsWithZx } from "../../lib/node-run";
+import { resolveWorkspaceRootSync } from "../../lib/repo";
 
 export function repoRoot(): string {
-  const envRoot = String(process.env.WORKSPACE_ROOT || "").trim();
-  if (envRoot) {
-    const root = path.resolve(envRoot);
-    if (fs.existsSync(root)) return root;
-  }
-
-  // Resolve from git so commands work when invoked from subdirectories.
-  try {
-    const out = execSync("git rev-parse --show-toplevel", {
-      cwd: process.cwd(),
-      stdio: ["ignore", "pipe", "ignore"],
-      encoding: "utf8",
-    })
-      .trim()
-      .replace(/\r?\n/g, "");
-    if (out) return out;
-  } catch {
-    // Fall through to non-git fallback.
-  }
-  try {
-    return process.cwd();
-  } catch {}
-  const here = path.dirname(new URL(import.meta.url).pathname);
-  return path.resolve(here, "..", "..", "..", "..");
+  return resolveWorkspaceRootSync();
 }
 
 export function nodeBin(): string {

@@ -176,6 +176,8 @@ let
     registryPath = nixpkgsRegistryPath;
     system = pkgs.stdenv.hostPlatform.system;
     selectedTargetName = selectedTargetName;
+    activeDevOverrideLanguages = overridePresentList;
+    activeDevOverrideEnvs = map (lang: builtins.getAttr lang Overrides) overridePresentList;
   };
 
   get = attrs: k: attrs.${k} or null;

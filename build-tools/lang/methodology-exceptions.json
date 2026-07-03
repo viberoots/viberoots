@@ -2,7 +2,11 @@
   "sourceFileSizeExceptions": [
     {
       "path": "nix_shell.bzl",
-      "justification": "Pre-existing oversized Nix shell macro pending focused decomposition outside the remote-consumer final checkpoint."
+      "justification": "Pre-existing oversized Nix shell Starlark helper pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
+    },
+    {
+      "path": "remote_action_policy.bzl",
+      "justification": "Pre-existing oversized remote action policy pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
     }
   ]
 }

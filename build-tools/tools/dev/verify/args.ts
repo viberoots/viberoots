@@ -164,6 +164,15 @@ export async function normalizeVerifyTargets(opts: {
   for (const [i, t] of normalized.entries()) {
     const original = String(opts.targets[i] || "").trim();
     const normalizedTarget = String(t || "").trim();
+    const nestedViberootsLabel = await qualifyNestedViberootsInvocationTarget({
+      workspaceRoot: opts.workspaceRoot,
+      baseDir: opts.baseDir,
+      original,
+    });
+    if (nestedViberootsLabel) {
+      out.push(nestedViberootsLabel);
+      continue;
+    }
     const rootZxLabel = await resolveRootZxTestLabel({
       workspaceRoot: opts.workspaceRoot,
       baseDir: opts.baseDir,
@@ -211,6 +220,27 @@ export async function normalizeVerifyTargets(opts: {
     out.push(`${pkg}/...`);
   }
   return out;
+}
+
+async function qualifyNestedViberootsInvocationTarget(opts: {
+  workspaceRoot: string;
+  baseDir: string;
+  original: string;
+}): Promise<string | null> {
+  const raw = String(opts.original || "").trim();
+  if (!raw || raw.startsWith("root//") || raw.startsWith("@") || raw.includes(" (")) return null;
+  if (!raw.startsWith("//") && !raw.startsWith(":")) return null;
+
+  const workspaceRoot = path.resolve(opts.workspaceRoot);
+  const nestedViberootsRoot = path.join(workspaceRoot, "viberoots");
+  const baseDir = path.resolve(opts.baseDir || workspaceRoot);
+  const relToNested = path.relative(nestedViberootsRoot, baseDir);
+  if (relToNested.startsWith("..") || path.isAbsolute(relToNested)) return null;
+  if (!(await pathExists(path.join(nestedViberootsRoot, "pnpm-lock.yaml")))) return null;
+
+  if (raw.startsWith("//")) return `viberoots${raw}`;
+  const pkg = relToNested && relToNested !== "." ? `//${relToNested.replace(/\\/g, "/")}` : "//";
+  return `viberoots${pkg}${raw}`;
 }
 
 async function resolveRootZxTestLabel(opts: {
