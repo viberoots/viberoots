@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("cppApp template builds a binary via planner", async () => {
   await runInTemp("cpp-app-template", async (tmp, $) => {
@@ -27,12 +28,12 @@ test("cppApp template builds a binary via planner", async () => {
       JSON.stringify(manifest, null, 2) + "\n",
     );
 
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/nix/planner/cpp.nix"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/nix/planner/cpp.nix",
       path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix"),
     );
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/nix/templates/cpp.nix"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/nix/templates/cpp.nix",
       path.join(tmp, "viberoots/build-tools/tools/nix/templates/cpp.nix"),
     );
 
@@ -54,7 +55,7 @@ test("cppApp template builds a binary via planner", async () => {
       JSON.stringify(graph) + "\n",
     );
 
-    const flake = path.join(process.cwd(), "viberoots/build-tools/tools/nix/graph-generator.nix");
+    const flake = viberootsSourcePath("viberoots/build-tools/tools/nix/graph-generator.nix");
     const res = await $({
       cwd: tmp,
     })`nix build --accept-flake-config -f ${flake} --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux"} --arg graphJsonPath ./.viberoots/workspace/buck/graph.json --no-link --print-out-paths`.nothrow();

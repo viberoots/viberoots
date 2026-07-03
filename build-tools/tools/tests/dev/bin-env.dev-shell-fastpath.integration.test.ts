@@ -1,15 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 async function readRepoFile(rel: string): Promise<string> {
-  for (const candidate of [rel, path.join("viberoots", rel)]) {
-    try {
-      return await fsp.readFile(candidate, "utf8");
-    } catch {}
-  }
-  return await fsp.readFile(rel, "utf8");
+  return await fsp.readFile(viberootsSourcePath(rel), "utf8");
 }
 
 test("devshell.sh supports safe direnv bypass fast-path", async () => {

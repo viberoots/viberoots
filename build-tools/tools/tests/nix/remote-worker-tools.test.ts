@@ -5,6 +5,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 process.env.TEST_RSYNC_ROOTS =
   process.env.TEST_RSYNC_ROOTS ||
@@ -86,17 +87,22 @@ test("remote worker bootstrap uses closure PATH and avoids scheduler registratio
 });
 
 test("remote worker bootstrap app is a thin zx-wrapper launcher", async () => {
-  const app = await fs.readFile("viberoots/build-tools/tools/nix/flake/outputs-apps.nix", "utf8");
+  const app = await fs.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/nix/flake/outputs-apps.nix"),
+    "utf8",
+  );
   const packages = await fs.readFile(
-    "viberoots/build-tools/tools/nix/flake/packages/default.nix",
+    viberootsSourcePath("viberoots/build-tools/tools/nix/flake/packages/default.nix"),
     "utf8",
   );
   const launcher = await fs.readFile(
-    "viberoots/build-tools/tools/nix/flake/packages/remote-worker-bootstrap.nix",
+    viberootsSourcePath(
+      "viberoots/build-tools/tools/nix/flake/packages/remote-worker-bootstrap.nix",
+    ),
     "utf8",
   );
   const helper = await fs.readFile(
-    "viberoots/build-tools/tools/remote-exec/remote-worker-bootstrap.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/remote-exec/remote-worker-bootstrap.ts"),
     "utf8",
   );
 

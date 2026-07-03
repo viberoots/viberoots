@@ -6,9 +6,12 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   computeSelectedCppPackageClosure,
+  FILTERED_FLAKE_RSYNC_EXCLUDES,
   graphNodesFromJson,
   selectedCppSnapshotRelPaths,
   selectedCppSnapshotRsyncSources,
+  selectedNodeSnapshotRelPaths,
+  selectedNodeSnapshotRsyncSources,
 } from "../../dev/nix-build-filtered-flake-lib";
 
 test("selected cpp filtered-flake snapshots follow the target package closure", () => {
@@ -143,5 +146,67 @@ test("selected cpp snapshot rsync sources keep flake files at the snapshot root"
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
     await fsp.rm(out, { recursive: true, force: true });
+  }
+});
+
+test("selected node filtered-flake snapshots keep only the importer and native sidecars", () => {
+  const snapshotRelPaths = selectedNodeSnapshotRelPaths("projects/apps/pleomino");
+
+  assert.deepEqual(snapshotRelPaths.slice(0, 7), [
+    ".npmrc",
+    "flake.lock",
+    "flake.nix",
+    "gomod2nix.toml",
+    "package.json",
+    "pnpm-lock.yaml",
+    "projects/node-modules.hashes.json",
+  ]);
+  assert.ok(
+    snapshotRelPaths.includes("build-tools") &&
+      snapshotRelPaths.includes("prelude") &&
+      snapshotRelPaths.includes("toolchains") &&
+      snapshotRelPaths.includes("viberoots"),
+    "expected selected node snapshot to retain shared flake and local viberoots roots",
+  );
+  assert.ok(
+    snapshotRelPaths.includes("projects/apps/pleomino") &&
+      snapshotRelPaths.includes("projects/apps/pleomino-native") &&
+      snapshotRelPaths.includes("projects/libs/pleomino-go"),
+    "expected selected node snapshot to retain importer and native sidecar paths",
+  );
+  assert.ok(
+    !snapshotRelPaths.includes("projects/apps/unrelated"),
+    "selected node snapshot should not carry unrelated project packages",
+  );
+
+  assert.deepEqual(selectedNodeSnapshotRsyncSources(snapshotRelPaths).slice(0, 3), [
+    "./.npmrc",
+    "./flake.lock",
+    "./flake.nix",
+  ]);
+});
+
+test("filtered-flake rsync excludes generated workspace state that churns source hashes", () => {
+  for (const rel of [
+    ".codex-logs",
+    ".viberoots/buck",
+    ".viberoots/cache",
+    ".viberoots/codex-logs",
+    ".viberoots/workspace/buck",
+    ".viberoots/workspace/codex-test-logs",
+    ".viberoots/workspace/install-cache",
+    ".viberoots/workspace/pr-logs",
+    "viberoots/.codex-logs",
+    "viberoots/.direnv",
+    "viberoots/.nix-gcroots",
+    "viberoots/.viberoots",
+    "viberoots/buck-out",
+    "viberoots/build-tools/tmp",
+    "viberoots/test-logs",
+  ]) {
+    assert.ok(
+      FILTERED_FLAKE_RSYNC_EXCLUDES.includes(rel),
+      `missing filtered-flake exclude: ${rel}`,
+    );
   }
 });

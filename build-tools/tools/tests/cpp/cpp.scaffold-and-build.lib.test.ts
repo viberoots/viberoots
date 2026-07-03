@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("cpp lib scaffold builds via planner (archive exists)", async () => {
   await runInTemp("cpp-scaffold-build-lib", async (tmp, $) => {
@@ -31,20 +32,20 @@ test("cpp lib scaffold builds via planner (archive exists)", async () => {
 
     // Copy planner plugin + template used by the planner into temp repo
     await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/planner"));
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/nix/planner/cpp.nix"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/nix/planner/cpp.nix",
       path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix"),
     );
     await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/templates"));
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/nix/templates/cpp.nix"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/nix/templates/cpp.nix",
       path.join(tmp, "viberoots/build-tools/tools/nix/templates/cpp.nix"),
     );
 
     // Copy cpp macros so TARGETS can load @viberoots//build-tools/cpp:defs.bzl
     await fs.mkdirp(path.join(tmp, "viberoots", "build-tools", "cpp"));
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/cpp/defs.bzl"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/cpp/defs.bzl",
       path.join(tmp, "viberoots/build-tools/cpp/defs.bzl"),
     );
 
@@ -87,7 +88,7 @@ test("cpp lib scaffold builds via planner (archive exists)", async () => {
     await $({ cwd: tmp })`node viberoots/build-tools/tools/buck/prebuild-guard.ts`.nothrow();
 
     // Build with planner via graph-generator.nix (function call, passing src and graph)
-    const flake = path.join(process.cwd(), "viberoots/build-tools/tools/nix/graph-generator.nix");
+    const flake = viberootsSourcePath("viberoots/build-tools/tools/nix/graph-generator.nix");
     const system = process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux";
     const res = await $({
       cwd: tmp,

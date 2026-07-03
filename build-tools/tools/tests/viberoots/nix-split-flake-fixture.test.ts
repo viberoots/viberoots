@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { workspaceFlakeRef } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 async function writeFile(file: string, text: string): Promise<void> {
   await fsp.mkdir(path.dirname(file), { recursive: true });
@@ -74,7 +75,7 @@ test("viberoots Nix fixture receives workspaceSrc outside viberoots source", asy
 
 test("real viberoots mkWorkspace exposes metadata for external workspace source", async () => {
   await runInNixTemp("viberoots-real-mkworkspace", async (tmp) => {
-    const viberootsRoot = path.join(process.cwd(), "viberoots");
+    const viberootsRoot = viberootsSourcePath(".");
     await writeFile(path.join(tmp, "workspace-marker"), "workspace\n");
 
     const result = await $({

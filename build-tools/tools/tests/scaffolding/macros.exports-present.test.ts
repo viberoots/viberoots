@@ -2,10 +2,14 @@
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("viberoots/build-tools/go/defs.bzl exports nix_go_* macros and uses shared realize_provider_edges", async () => {
   await runInTemp("macros-exports", async (tmp, $) => {
-    const txt = await fsp.readFile("viberoots/build-tools/go/defs.bzl", "utf8");
+    const txt = await fsp.readFile(
+      viberootsSourcePath("viberoots/build-tools/go/defs.bzl"),
+      "utf8",
+    );
     const need = [
       "def nix_go_library(",
       "def nix_go_binary(",
@@ -29,7 +33,7 @@ test("viberoots/build-tools/go/defs.bzl exports nix_go_* macros and uses shared 
 
     // Policy lives in go/private; ensure that helper is present and uses shared provider-edge wiring.
     const privateTxt = await fsp.readFile(
-      "viberoots/build-tools/go/private/cgo_wiring.bzl",
+      viberootsSourcePath("viberoots/build-tools/go/private/cgo_wiring.bzl"),
       "utf8",
     );
     const privateNeed = [

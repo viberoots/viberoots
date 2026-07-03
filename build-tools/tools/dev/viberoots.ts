@@ -40,6 +40,12 @@ const commandMetadata: CommandMeta[] = [
     options: ["--print", "--verbose", "--help", "--command"],
   },
   {
+    name: "init-workspace",
+    usage: "viberoots init-workspace [--workspace-root <path>] [--source <path>] [--shell-entry]",
+    description: "Create or repair generated workspace activation state.",
+    options: ["--workspace-root", "--source", "--shell-entry", "--json", "--help"],
+  },
+  {
     name: "bootstrap-check",
     usage:
       "viberoots bootstrap-check [--workspace-root <path>] [--repair-if-needed] [--verbose] [--json]",
@@ -314,7 +320,9 @@ function printText(status: VersionStatus): void {
 }
 
 async function initWorkspace(): Promise<void> {
+  const workspaceRoot = selectedWorkspaceRootForCommand();
   const result = await activateWorkspace({
+    start: workspaceRoot,
     sourcePath: getFlagStr("source"),
     shellEntry: getFlagBool("shell-entry"),
   });

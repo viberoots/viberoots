@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { exportGraphInTemp, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 // base-contract invalidation test: touching a non-app/lib file at repo root should NOT
 // change the app binary derivation (cache hit expected; store path unchanged).
@@ -46,8 +46,9 @@ test("planner: touching root-only file does not change app bin store path", asyn
     })`gomod2nix --dir projects/apps/demo-cli`;
     // Use app-local gomod2nix.toml (nearest ancestor resolution) to avoid broad root invalidations
 
-    // Generate glue, then build graph-generator bundle
+    // Generate glue, export the current Buck graph, then build graph-generator bundle.
     await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
+    await exportGraphInTemp({ tmp, $ });
     const t1 = Date.now();
     const { stdout: outStd1 } = await $({
       cwd: tmp,

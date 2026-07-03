@@ -86,7 +86,7 @@ test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVer
           origLog.apply(console, [s]);
         } catch {}
       };
-      await cppHandler.apply(["zlib", "--patch-dir", "patches/cpp"]);
+      await cppHandler.apply(["zlib", "--patch-dir", path.join(tmp, "patches", "cpp")]);
     } finally {
       console.log = origLog;
     }

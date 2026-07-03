@@ -119,12 +119,13 @@ in {
     cflags ? [],
     ldflags ? [],
     nixCxxAttrs ? [],
+    nixCxxPkgs ? [],
     buildPyDeps ? [],
     repoCxxPkgs ? [],
     includeRoots ? [],
   }:
     PyExt {
-      inherit name module lockfile srcRoot subdir srcList cflags ldflags nixCxxAttrs wheelhouse buildPyDeps repoCxxPkgs includeRoots;
+      inherit name module lockfile srcRoot subdir srcList cflags ldflags nixCxxAttrs nixCxxPkgs wheelhouse buildPyDeps repoCxxPkgs includeRoots;
     };
 
   pyExtWasm = {
@@ -202,5 +203,4 @@ in {
       groups = [];
     };
 }
-
 

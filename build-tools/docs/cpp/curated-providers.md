@@ -69,6 +69,11 @@ TEST(Demo, OpenSSLSmoke) {
 ### Notes
 
 - Naming: use canonical nixpkgs attrs such as `pkgs.openssl` and `pkgs.zlib`; the macro stamps normalized `nixpkg:*` labels for downstream tooling.
-- Determinism: the planner collects `nixpkg:*` labels and passes them to `build-tools/tools/nix/templates/cpp.nix`, which resolves include and library paths from nixpkgs; no paths are hard-coded in Starlark.
+- Determinism: the planner collects `nixpkg:*` labels, resolves them through the selected target's
+  `nixpkgs_profile`, and passes packages to `build-tools/tools/nix/templates/cpp.nix`; no paths are
+  hard-coded in Starlark.
+- Source profiles: `nixpkgs_profile` moves the whole selected C++ target to a named registry
+  profile, including compiler/stdenv and ordinary `nixpkg_deps`. Non-empty `nixpkg_pins` are still
+  rejected until package-pin resolution lands.
 - Linking: GoogleTest linking is auto-detected by the template when `pkgs.googletest` is present; other libraries only need to be listed in `nixpkg_deps`.
 - Normalization contract: `nixpkg:` labels are normalized consistently across Starlark/TypeScript/Nix; the parity matrix lives at `build-tools/tools/tests/normalization-parity.test.ts`.

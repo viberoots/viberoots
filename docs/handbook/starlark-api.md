@@ -137,7 +137,9 @@ nix_cpp_library(
 ```
 
 Non-empty `nixpkg_pins` are parsed and validated, then rejected until package-pin resolution lands.
-Use `nixpkgs_profile` for target-level source selection once non-default profiles are available.
+Use `nixpkgs_profile` for target-level source selection. Selected C++ builds use that profile for
+compiler/stdenv and ordinary `nixpkg_deps`; Go CGO and Python native-extension nixpkg attrs use the
+same source-selection resolver.
 BUILD files must not put raw commits or raw flake URLs in these fields.
 
 ## Go macros

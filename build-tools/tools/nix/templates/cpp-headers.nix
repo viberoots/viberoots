@@ -11,6 +11,7 @@ in {
     name,
     srcRoot ? ../../..,
     subdir ? ".",
+    nixpkgsProfile ? "default",
     srcList ? [],
     patches ? [],
   }:
@@ -54,9 +55,9 @@ in {
 
       : > "$out/build.log"
       echo "name=${name}" >> "$out/build.log"
+      echo "nixpkgsProfile=${nixpkgsProfile}" >> "$out/build.log"
       echo "headers=''${#HDRS[@]}" >> "$out/build.log"
     '';
   };
 }
-
 

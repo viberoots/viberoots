@@ -1,84 +1,19 @@
 {
-  "enabled": ["cpp", "go", "node", "rust", "python"],
+  "enabled": ["go", "cpp"],
   "languages": [
     {
       "id": "go",
       "displayName": "Go",
-      "requiredPaths": [
-        "viberoots/build-tools/tools/nix/templates/go.nix",
-        "viberoots/build-tools/go/defs.bzl"
-      ],
-      "optionalPaths": [],
-      "kinds": ["cli", "lib", "test"],
-      "capabilities": {
-        "patching": true,
-        "lockfileLabels": false,
-        "testAutoWire": true
-      },
+      "requiredPaths": ["viberoots/build-tools/go/defs.bzl"],
+      "kinds": ["lib"],
       "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/go"
-    },
-    {
-      "id": "node",
-      "displayName": "Node",
-      "requiredPaths": ["**/pnpm-lock.yaml"],
-      "optionalPaths": ["patches/node"],
-      "kinds": ["app", "lib", "workspace"],
-      "capabilities": {
-        "patching": true,
-        "lockfileLabels": true,
-        "testAutoWire": false
-      },
-      "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/ts"
     },
     {
       "id": "cpp",
       "displayName": "C++",
-      "requiredPaths": [
-        "viberoots/build-tools/cpp/defs.bzl",
-        "viberoots/build-tools/cpp/wasm_defs.bzl",
-        "viberoots/build-tools/tools/nix/planner/cpp.nix",
-        "viberoots/build-tools/tools/nix/planner/cpp-link-helpers.nix",
-        "viberoots/build-tools/tools/nix/planner/cpp-go-archives.nix",
-        "viberoots/build-tools/tools/nix/planner/cpp-helpers.nix",
-        "viberoots/build-tools/tools/nix/planner/cpp-provider-attrs-fallback.nix",
-        "viberoots/build-tools/tools/nix/templates/cpp.nix",
-        "viberoots/build-tools/tools/nix/templates/cpp-headers.nix",
-        "viberoots/build-tools/tools/nix/templates/cpp-shared-lib.nix"
-      ],
-      "optionalPaths": [],
-      "kinds": ["bin", "headers", "lib", "test"],
-      "capabilities": {
-        "patching": true
-      },
-      "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/cpp"
-    },
-    {
-      "id": "rust",
-      "displayName": "Rust",
-      "requiredPaths": [
-        "viberoots/build-tools/tools/nix/planner/rust.nix",
-        "viberoots/build-tools/tools/buck/exporter/lang/rust.ts",
-        "viberoots/build-tools/tools/buck/providers/rust.ts"
-      ],
+      "requiredPaths": ["viberoots/build-tools/tools/nix/planner/cpp.nix"],
       "kinds": ["bin", "lib"],
-      "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/rust"
-    },
-    {
-      "id": "python",
-      "displayName": "Python",
-      "requiredPaths": [
-        "viberoots/build-tools/tools/nix/templates/python.nix",
-        "viberoots/build-tools/python/defs.bzl",
-        "viberoots/build-tools/tools/buck/exporter/lang/python.ts",
-        "viberoots/build-tools/tools/buck/providers/python.ts",
-        "**/uv.lock"
-      ],
-      "kinds": ["app", "lib"],
-      "capabilities": {
-        "patching": true,
-        "lockfileLabels": true
-      },
-      "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/python"
+      "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/cpp"
     }
   ]
 }

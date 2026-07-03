@@ -1,13 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
 test("build-tools/node/defs_stage.bzl runs node patch requirement preflight for stage entrypoints", async () => {
-  const file = "viberoots/build-tools/node/defs_stage.bzl";
+  const file = viberootsSourcePath("viberoots/build-tools/node/defs_stage.bzl");
   const txt = await fsp.readFile(file, "utf8");
 
   const preflightCalls = (txt.match(/nix_calling_node_patch_requirements_preflight\(/g) || [])

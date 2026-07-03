@@ -149,9 +149,11 @@ async function writeBuckroot(workspaceRoot: string): Promise<void> {
   await fsp.writeFile(file, ".\n", "utf8");
 }
 
-function relativeLinkTarget(fromDir: string, target: string): string {
+function relativeLinkTarget(workspaceRoot: string, fromDir: string, target: string): string {
+  const workspaceRel = path.relative(workspaceRoot, target);
+  if (workspaceRel.startsWith("..") || path.isAbsolute(workspaceRel)) return target;
   const rel = path.relative(fromDir, target) || ".";
-  return rel.startsWith("..") ? target : `./${rel}`;
+  return rel.startsWith(".") ? rel : `./${rel}`;
 }
 
 async function repairCurrentSymlinkForBootstrap(
@@ -161,6 +163,7 @@ async function repairCurrentSymlinkForBootstrap(
   if (!sourcePath) return;
   const currentPath = path.join(workspaceRoot, ".viberoots", "current");
   const target = relativeLinkTarget(
+    workspaceRoot,
     path.dirname(currentPath),
     path.resolve(workspaceRoot, sourcePath),
   );

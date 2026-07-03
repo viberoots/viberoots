@@ -49,6 +49,10 @@ function isNixStoreLinkTarget(target: string): boolean {
   return target.startsWith(`${path.sep}nix${path.sep}store${path.sep}`);
 }
 
+function isGeneratedRemoteSourceLinkTarget(target: string): boolean {
+  return isNixStoreLinkTarget(target) || path.basename(target).startsWith("nix-store-vbr-source-");
+}
+
 function chooseSource(workspaceRoot: string, opts: ActivationOptions): string {
   if (opts.sourcePath) return path.resolve(workspaceRoot, opts.sourcePath);
   if (flakeUsesLocalViberoots(workspaceRoot)) return path.join(workspaceRoot, "viberoots");
@@ -200,7 +204,8 @@ async function rejectStaleLocalCurrent(
   const sourceReal = await fsp.realpath(sourcePath);
   const expectedReal = expectedTarget === ".." ? workspaceRoot : sourceReal;
   const currentTarget = await fsp.readlink(currentPath);
-  if (isNixStoreLinkTarget(currentTarget)) return;
+  const currentTargetAbs = path.resolve(path.dirname(currentPath), currentTarget);
+  if (isGeneratedRemoteSourceLinkTarget(currentTargetAbs)) return;
   let currentReal = "";
   try {
     currentReal = await fsp.realpath(currentPath);

@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { buildSelectedOutPath, runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("ts package packaging with conditional exports and artifact staging", async () => {
   await runInTemp("packaging", async (tmp, $) => {
@@ -172,11 +173,11 @@ nix_cpp_node_addon(
     // 4) Provide C++ defs in the temp repo (planner-visible)
     await fs.outputFile(
       path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
-      await fs.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
+      await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/defs.bzl"), "utf8"),
     );
     await fs.outputFile(
       path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
-      await fs.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
+      await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/wasm_defs.bzl"), "utf8"),
     );
 
     // 5) TS package with dual entries and conditional exports

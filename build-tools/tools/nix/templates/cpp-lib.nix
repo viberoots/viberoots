@@ -24,6 +24,7 @@ in {
     std ? "c++17",
     nixCxxPkgs ? [],
     nixCxxAttrs ? [],
+    nixpkgsProfile ? "default",
     srcList ? [],
     patches ? [],
   }:
@@ -90,6 +91,7 @@ in {
 
       : > "$out/build.log"
       echo "name=${name}" >> "$out/build.log"
+      echo "nixpkgsProfile=${nixpkgsProfile}" >> "$out/build.log"
       echo "std=${std}" >> "$out/build.log"
       echo "includes=${incFlags}" >> "$out/build.log"
       echo "defines=${defFlags}" >> "$out/build.log"
@@ -99,5 +101,4 @@ in {
     '';
   };
 }
-
 

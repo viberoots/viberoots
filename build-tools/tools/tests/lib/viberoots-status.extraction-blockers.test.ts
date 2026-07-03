@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 
 const execFileAsync = promisify(execFile);
 const VERSION_SCRIPT = new URL("../../dev/viberoots.ts", import.meta.url).pathname;
+const ZX_INIT = new URL("../../dev/zx-init.mjs", import.meta.url).pathname;
 
 async function git(args: string[], cwd: string): Promise<string> {
   const { stdout } = await execFileAsync("git", args, { cwd });
@@ -39,10 +40,21 @@ test("viberoots status reports local live checkout and extraction blockers", asy
     await fsp.writeFile(path.join(root, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
     await fsp.symlink("../viberoots", path.join(root, ".viberoots", "current"));
 
-    const { stdout } = await execFileAsync("zx-wrapper", [VERSION_SCRIPT, "status", "--json"], {
-      cwd: process.cwd(),
-      env: { ...process.env, WORKSPACE_ROOT: root, VIBEROOTS_ROOT: "", NO_DEV_SHELL: "1" },
-    });
+    const { stdout } = await execFileAsync(
+      "zx-wrapper",
+      ["--import", ZX_INIT, VERSION_SCRIPT, "status", "--json"],
+      {
+        cwd: root,
+        env: {
+          ...process.env,
+          VIBEROOTS_SOURCE_ROOT: "",
+          VIBEROOTS_FLAKE_INPUT_ROOT: "",
+          WORKSPACE_ROOT: root,
+          VIBEROOTS_ROOT: "",
+          NO_DEV_SHELL: "1",
+        },
+      },
+    );
 
     const status = JSON.parse(String(stdout));
     assert.equal(status.sourceMode, "local");
@@ -51,7 +63,7 @@ test("viberoots status reports local live checkout and extraction blockers", asy
     assert.equal(status.currentPointsToLiveCheckout, true);
     assert.deepEqual(
       status.extractionBlockers.map((b: { kind: string; path: string }) => `${b.kind}:${b.path}`),
-      ["path:build-tools", "path:flake.nix"],
+      ["path:build-tools"],
     );
   } finally {
     await fsp.rm(root, { recursive: true, force: true });

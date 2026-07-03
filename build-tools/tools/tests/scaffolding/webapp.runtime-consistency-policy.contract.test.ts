@@ -3,8 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-
-const VIBEROOTS_ROOT = path.join(process.cwd(), "viberoots");
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 type Phase3TemplateContract = {
   id: string;
@@ -44,7 +43,7 @@ const SSR_CONTRACTS: Phase3TemplateContract[] = [
 
 test("SSR runtime-consistency: script and path contracts stay deterministic across templates", async () => {
   for (const contract of SSR_CONTRACTS) {
-    const templateAbs = path.join(VIBEROOTS_ROOT, contract.templateRoot);
+    const templateAbs = viberootsSourcePath(contract.templateRoot);
     const packageJson = await fsp.readFile(path.join(templateAbs, "package.json.jinja"), "utf8");
     const devScript = await fsp.readFile(
       path.join(templateAbs, "scripts", "dev.mjs.jinja"),
@@ -120,15 +119,7 @@ test("SSR runtime-consistency: script and path contracts stay deterministic acro
 
 test("SSR runtime-consistency policy docs: runtime consistency and startup guidance stay explicit", async () => {
   const templateReadme = await fsp.readFile(
-    path.join(
-      VIBEROOTS_ROOT,
-      "build-tools",
-      "tools",
-      "scaffolding",
-      "templates",
-      "ts",
-      "README.md.jinja",
-    ),
+    viberootsSourcePath("build-tools/tools/scaffolding/templates/ts/README.md.jinja"),
     "utf8",
   );
   assert.match(
@@ -141,7 +132,7 @@ test("SSR runtime-consistency policy docs: runtime consistency and startup guida
   assert.match(templateReadme, /\[wasm-watch\] sync:ok/);
 
   const hmrPlan = await fsp.readFile(
-    path.join(VIBEROOTS_ROOT, "docs", "history", "designs", "legacy", "hmr-plan.md"),
+    viberootsSourcePath("docs/history/designs/legacy/hmr-plan.md"),
     "utf8",
   );
   assert.match(hmrPlan, /### Phase 3 Closeout Status/);
@@ -163,7 +154,7 @@ test("SSR runtime-consistency policy docs: runtime consistency and startup guida
   assert.match(hmrPlan, /Escalation triggers to adopt Playwright coverage in a future phase/);
 
   const scaffoldingDoc = await fsp.readFile(
-    path.join(VIBEROOTS_ROOT, "build-tools", "docs", "scaffolding.md"),
+    viberootsSourcePath("build-tools/docs/scaffolding.md"),
     "utf8",
   );
   assert.match(scaffoldingDoc, /Dev-update contract matrix for in-scope templates/);
@@ -189,56 +180,30 @@ test("SSR runtime-consistency policy docs: runtime consistency and startup guida
 
 test("shared helper reuse: representative template local-dep tests import shared helpers", async () => {
   const staticLocalDep = await fsp.readFile(
-    path.join(
-      VIBEROOTS_ROOT,
-      "build-tools",
-      "tools",
-      "tests",
-      "scaffolding",
-      "webapp-static.dev-hmr.local-ts-dep.test.ts",
+    viberootsSourcePath(
+      "build-tools/tools/tests/scaffolding/webapp-static.dev-hmr.local-ts-dep.test.ts",
     ),
     "utf8",
   );
   assert.match(staticLocalDep, /from "\.\/lib\/webapp-local-ts-dep"/);
 
   const viteLocalDep = await fsp.readFile(
-    path.join(
-      VIBEROOTS_ROOT,
-      "build-tools",
-      "tools",
-      "tests",
-      "scaffolding",
-      "webapp-ssr-vite.dev-hmr.local-ts-dep.test.ts",
+    viberootsSourcePath(
+      "build-tools/tools/tests/scaffolding/webapp-ssr-vite.dev-hmr.local-ts-dep.test.ts",
     ),
     "utf8",
   );
   assert.match(viteLocalDep, /from "\.\/lib\/webapp-ssr-vite-local-ts-dep"/);
 
   const viteLocalDepHelper = await fsp.readFile(
-    path.join(
-      VIBEROOTS_ROOT,
-      "build-tools",
-      "tools",
-      "tests",
-      "scaffolding",
-      "lib",
-      "webapp-ssr-vite-local-ts-dep.ts",
-    ),
+    viberootsSourcePath("build-tools/tools/tests/scaffolding/lib/webapp-ssr-vite-local-ts-dep.ts"),
     "utf8",
   );
   assert.match(viteLocalDepHelper, /from "\.\/wasm-watch"/);
   assert.match(viteLocalDepHelper, /writeAndBumpMtime/);
 
   const staticLocalDepHelper = await fsp.readFile(
-    path.join(
-      VIBEROOTS_ROOT,
-      "build-tools",
-      "tools",
-      "tests",
-      "scaffolding",
-      "lib",
-      "webapp-local-ts-dep.ts",
-    ),
+    viberootsSourcePath("build-tools/tools/tests/scaffolding/lib/webapp-local-ts-dep.ts"),
     "utf8",
   );
   assert.match(staticLocalDepHelper, /from "\.\/wasm-watch"/);
@@ -246,26 +211,16 @@ test("shared helper reuse: representative template local-dep tests import shared
   assert.match(staticLocalDepHelper, /writeAndBumpMtime/);
 
   const staticPwaLocalDep = await fsp.readFile(
-    path.join(
-      VIBEROOTS_ROOT,
-      "build-tools",
-      "tools",
-      "tests",
-      "scaffolding",
-      "webapp-static-pwa.dev-hmr.local-ts-dep.test.ts",
+    viberootsSourcePath(
+      "build-tools/tools/tests/scaffolding/webapp-static-pwa.dev-hmr.local-ts-dep.test.ts",
     ),
     "utf8",
   );
   assert.match(staticPwaLocalDep, /from "\.\/lib\/webapp-local-ts-dep"/);
 
   const nextLocalDep = await fsp.readFile(
-    path.join(
-      VIBEROOTS_ROOT,
-      "build-tools",
-      "tools",
-      "tests",
-      "scaffolding",
-      "webapp-ssr-next.dev-hmr.local-ts-dep.test.ts",
+    viberootsSourcePath(
+      "build-tools/tools/tests/scaffolding/webapp-ssr-next.dev-hmr.local-ts-dep.test.ts",
     ),
     "utf8",
   );

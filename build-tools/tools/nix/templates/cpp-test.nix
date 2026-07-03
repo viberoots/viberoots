@@ -29,6 +29,8 @@ in {
     std ? "c++17",
     nixCxxPkgs ? [],
     nixCxxAttrs ? [],
+    nixCxxAttrNames ? nixCxxAttrs,
+    nixpkgsProfile ? "default",
     srcList ? [],
     patches ? [],
   }:
@@ -47,10 +49,10 @@ in {
     extraC   = joinExtraC (cflags ++ [ "-ffunction-sections" "-fdata-sections" ]);
     extraLD  = joinExtraC ldflags;
     platLD   = if pkgs.stdenv.isDarwin then "-Wl,-dead_strip" else "-Wl,--gc-sections";
-    # Heuristic: if gtest/googletest is among nixCxxAttrs, add -lgtest and -lgtest_main and force include/lib paths
-    hasGTest = hasGTestAttr nixCxxAttrs;
+    # Heuristic: if gtest/googletest is among the original attr names, add test libs.
+    hasGTest = hasGTestAttr nixCxxAttrNames;
     gtestLibs = if hasGTest then "-lgtest_main -lgtest" else "";
-    gtestPkgsAll = gtestPkgsAllFor nixCxxAttrs;
+    gtestPkgsAll = if nixCxxAttrs == [] then nixCxxPkgs else gtestPkgsAllFor nixCxxAttrs;
     gtestInc = if hasGTest && (gtestPkgsAll != []) then (
       lib.concatStringsSep " " (map (p: "-isystem ${toIncludeBase p}/include") gtestPkgsAll)
     ) else "";
@@ -75,6 +77,7 @@ in {
       tmp="$TMPDIR/obj"; mkdir -p "$tmp"
 
       echo "[cpp.test] nixCxxAttrs=${lib.concatStringsSep "," nixCxxAttrs}" >&2
+      echo "[cpp.test] nixpkgsProfile=${nixpkgsProfile}" >&2
       echo "[cpp.test] resolvedPkgs=${lib.concatStringsSep " " (map (p: toIncludeBase p) resolvedPkgs)}" >&2
       echo "[cpp.test] nixInc=${nixInc}" >&2
       echo "[cpp.test] gtestInc=${gtestInc}" >&2
@@ -124,6 +127,7 @@ in {
 
       : > "$out/build.log"
       echo "name=${name}" >> "$out/build.log"
+      echo "nixpkgsProfile=${nixpkgsProfile}" >> "$out/build.log"
       echo "std=${std}" >> "$out/build.log"
       echo "includes=${incFlags}" >> "$out/build.log"
       echo "defines=${defFlags}" >> "$out/build.log"
@@ -138,5 +142,4 @@ in {
     '';
   };
 }
-
 

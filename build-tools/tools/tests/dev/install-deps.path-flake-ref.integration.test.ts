@@ -106,7 +106,7 @@ test("install path selects flake refs by importer scope", async () => {
   if (!hashNix.includes("flakeRef: string")) {
     throw new Error("update-pnpm-hash/nix.ts helpers must accept flakeRef parameter");
   }
-  if (!hashNix.includes('return ["--override-input", "viberoots", `path:${abs}`];')) {
+  if (!hashNix.includes('return ["--override-input", "viberoots", `path:${real}`];')) {
     throw new Error("update-pnpm-hash nix builds must override stale viberoots lock inputs");
   }
   if (!hashNix.includes("...activeViberootsOverride()")) {

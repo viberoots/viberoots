@@ -55,7 +55,7 @@ function expectRemoteProvider(providerText: string): void {
   expectProjectRelative(providerText);
   assert.match(providerText, /default_executor=CommandExecutorConfig/);
   assert.match(providerText, /RemoteEnabledExecutorOptions/);
-  assert.match(providerText, /RemoteExecutorUseCaseData\(\s*"buck2-test"/);
+  assert.match(providerText, /RemoteExecutorUseCase[\s\S]*data: "buck2-test"/);
   assert.match(providerText, /"viberoots_remote_profile": "linux-x86_64-default"/);
   assert.match(providerText, /"resource_class": "default"/);
   assert.match(providerText, /executor_overrides=\{\s*"listing": CommandExecutorConfig/s);

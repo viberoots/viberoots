@@ -7,6 +7,7 @@ import { parseVerifyExecutionPolicy } from "../../dev/verify/remote-policy";
 import { validateRemoteExecTargets } from "../../dev/remote-exec-policy-check";
 import { normalizeTargetLabel } from "../../lib/labels";
 import { inheritedBuckIsolation } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const tinyTarget =
   "root//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles";
@@ -91,7 +92,10 @@ test("only declared wrapper fixtures are remote-ready in the Buck graph", async 
 });
 
 test("only the tiny target is documented as initially remote-ready", async () => {
-  const doc = await fs.readFile("viberoots/build-tools/docs/remote-build-setup.md", "utf8");
+  const doc = await fs.readFile(
+    viberootsSourcePath("viberoots/build-tools/docs/remote-build-setup.md"),
+    "utf8",
+  );
   const matches = [...doc.matchAll(/`([^`]+)` is the only initial `remote:ready` target/g)];
 
   assert.equal(matches.length, 1);

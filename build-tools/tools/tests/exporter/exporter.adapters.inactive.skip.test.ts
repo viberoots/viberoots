@@ -4,12 +4,16 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 await runInTemp("exporter-adapters-inactive", async (tmp, $) => {
   const langDir = path.join(tmp, "viberoots/build-tools/tools/buck/exporter/lang");
   await fs.mkdirp(langDir);
   // Only provide go adapter; omit cpp adapter to simulate inactive adapter scenario
-  const goSrc = await fs.readFile("viberoots/build-tools/tools/buck/exporter/lang/go.ts", "utf8");
+  const goSrc = await fs.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/buck/exporter/lang/go.ts"),
+    "utf8",
+  );
   await fs.writeFile(path.join(langDir, "go.ts"), goSrc, "utf8");
 
   const nodes = [

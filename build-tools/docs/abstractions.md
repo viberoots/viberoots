@@ -500,6 +500,17 @@ The label string is:
 - `build-tools/tools/tests/normalization-parity.test.ts` (Starlark vs TS vs Nix)
 - `build-tools/tools/tests/provider-names/nix-attr-normalization.test.ts` (TS behavior)
 
+### Whole-target nixpkgs profiles
+
+Targets may set `nixpkgs_profile` to move selected builds to a named registry profile. The resolver
+builds one source plan per selected target from `nixpkgs_profile` and empty `nixpkg_pins`. For C++,
+the selected profile supplies both the template package set and resolved `nixpkg_deps`, so
+compiler/stdenv and ordinary nixpkgs packages stay in the same package universe. Go CGO and Python
+native-extension nixpkg attrs use the same resolver entrypoint before templates receive packages.
+
+`nixpkg_pins` remains schema-stable, but non-empty maps are rejected until pin resolution is
+implemented.
+
 ### Common leak patterns
 
 These are the usual ways this leaks:

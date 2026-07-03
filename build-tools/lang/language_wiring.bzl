@@ -83,7 +83,10 @@ def prepare_language_wiring(
     strategy = _require_strategy(lang)
     deps2 = list(deps) if isinstance(deps, list) else []
     base_kwargs = dict(kwargs) if isinstance(kwargs, dict) else {}
-    if lang in ("cpp", "go", "python"):
+    if lang in ("cpp", "go", "python") and (
+            strategy.patch_scope == "package-local" or
+            wiring == "non_genrule_nix_calling" or
+            wiring == "nix_calling_genrule"):
         normalize_source_selection_attrs(base_kwargs)
 
     if strategy.patch_scope == "package-local":

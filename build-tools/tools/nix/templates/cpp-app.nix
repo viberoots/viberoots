@@ -26,6 +26,7 @@ in {
     std ? "c++17",
     nixCxxPkgs ? [],
     nixCxxAttrs ? [],
+    nixpkgsProfile ? "default",
     srcList ? [],
     patches ? [],
   }:
@@ -67,6 +68,7 @@ in {
       tmp="$TMPDIR/obj"; mkdir -p "$tmp"
 
       echo "[cpp.app] nixCxxAttrs=${lib.concatStringsSep "," nixCxxAttrs}" >&2
+      echo "[cpp.app] nixpkgsProfile=${nixpkgsProfile}" >&2
       echo "[cpp.app] nixInc=${nixInc}" >&2
 
       mapfile -t SRCS < <(${srcsCmd})
@@ -113,6 +115,7 @@ in {
 
       : > "$out/build.log"
       echo "name=${name}" >> "$out/build.log"
+      echo "nixpkgsProfile=${nixpkgsProfile}" >> "$out/build.log"
       echo "std=${std}" >> "$out/build.log"
       echo "includes=${incFlags}" >> "$out/build.log"
       echo "defines=${defFlags}" >> "$out/build.log"
@@ -125,5 +128,4 @@ in {
     '';
   };
 }
-
 

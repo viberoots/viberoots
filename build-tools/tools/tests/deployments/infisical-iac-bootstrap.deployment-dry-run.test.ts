@@ -60,6 +60,7 @@ test("deployment dry-run auto sink reads resolver config from workspace root", a
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-dry-run-"));
   const nested = path.join(dir, "projects", "deployments", "nested");
   await fs.mkdir(nested, { recursive: true });
+  await fs.writeFile(path.join(dir, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
   await writeReviewedMetadata(dir);
   await writeJson(path.join(dir, "projects/config/shared.json"), resolverConfig("root"));
   await writeJson(path.join(nested, "projects/config/shared.json"), keychainResolverConfig());

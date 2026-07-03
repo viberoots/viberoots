@@ -10,6 +10,7 @@ import {
   type NixStoreMaterializationManifest,
 } from "../../remote-exec/nix-store-materialize";
 import { validateRemoteExecTargets } from "../../dev/remote-exec-policy-check";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const manifest: NixStoreMaterializationManifest = {
   schemaVersion: "viberoots.nix-store-materialization.v1",
@@ -229,8 +230,14 @@ test("remote policy rejects undeclared Nix store references in remote-ready comm
 });
 
 test("Starlark materialization helpers emit path labels consumed by policy parser", () => {
-  const helper = fs.readFileSync("viberoots/build-tools/lang/nix_store_materialize.bzl", "utf8");
-  const policy = fs.readFileSync("viberoots/build-tools/lang/remote_action_policy.bzl", "utf8");
+  const helper = fs.readFileSync(
+    viberootsSourcePath("viberoots/build-tools/lang/nix_store_materialize.bzl"),
+    "utf8",
+  );
+  const policy = fs.readFileSync(
+    viberootsSourcePath("viberoots/build-tools/lang/remote_action_policy.bzl"),
+    "utf8",
+  );
   assert.match(helper, /materialization-manifest:path=%s/);
   assert.match(helper, /storePaths/);
   assert.match(policy, /materialization-manifest:path=%s/);

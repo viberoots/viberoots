@@ -108,12 +108,17 @@ let
       plan = sourcePlanFor target;
       parts0 = lib.splitString "." normalizedAttr;
       parts = if parts0 != [ ] && lib.head parts0 == "pkgs" then lib.tail parts0 else parts0;
+      package0 = lib.attrByPath parts null plan.base_pkgs;
+      package =
+        if package0 != null then package0
+        else if normalizedAttr == "pkgs.googletest" then plan.base_pkgs.gtest or null
+        else null;
     in {
       attr = normalizedAttr;
       profile_name = plan.nixpkgs_profile;
       profile = plan.nixpkgs_profile;
       resolution_kind = "nixpkgs_profile";
-      package = lib.attrByPath parts null plan.base_pkgs;
+      inherit package;
     };
 
   resolveNixpkgAttrs = { target, attrs }:

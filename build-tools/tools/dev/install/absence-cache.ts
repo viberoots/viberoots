@@ -7,6 +7,8 @@ type DirStamp = {
   rel: string;
   exists: boolean;
   mtimeMs: number;
+  entryCount: number;
+  childMtimeMs: number;
 };
 
 type AbsenceStamp = {
@@ -35,13 +37,25 @@ function toRel(repoRoot: string, abs: string): string {
   return rel || ".";
 }
 
-async function statDir(abs: string): Promise<{ exists: boolean; mtimeMs: number }> {
+async function statDir(abs: string): Promise<Omit<DirStamp, "rel">> {
   try {
     const st = await fsp.stat(abs);
-    if (!st.isDirectory()) return { exists: false, mtimeMs: 0 };
-    return { exists: true, mtimeMs: st.mtimeMs || 0 };
+    if (!st.isDirectory()) {
+      return { exists: false, mtimeMs: 0, entryCount: 0, childMtimeMs: 0 };
+    }
+    let entryCount = 0;
+    let childMtimeMs = 0;
+    try {
+      const entries = await fsp.readdir(abs);
+      entryCount = entries.length;
+      for (const name of entries) {
+        const child = await fsp.stat(path.join(abs, name)).catch(() => null);
+        childMtimeMs = Math.max(childMtimeMs, child?.mtimeMs || 0);
+      }
+    } catch {}
+    return { exists: true, mtimeMs: st.mtimeMs || 0, entryCount, childMtimeMs };
   } catch {
-    return { exists: false, mtimeMs: 0 };
+    return { exists: false, mtimeMs: 0, entryCount: 0, childMtimeMs: 0 };
   }
 }
 
@@ -95,6 +109,8 @@ export async function absenceCacheFresh(
     const cur = await statDir(path.resolve(repoRoot, prev.rel));
     if (cur.exists !== prev.exists) return false;
     if (cur.mtimeMs !== prev.mtimeMs) return false;
+    if (cur.entryCount !== Number(prev.entryCount || 0)) return false;
+    if (cur.childMtimeMs !== Number(prev.childMtimeMs || 0)) return false;
   }
   return true;
 }

@@ -43,7 +43,7 @@ async function readlink(root: string): Promise<string> {
 async function runInit(root: string, args: string[] = []) {
   const { stdout } = await execFileAsync(
     "zx-wrapper",
-    [COMMAND, "init-workspace", "--json", ...args],
+    [COMMAND, "init-workspace", "--json", "--workspace-root", root, ...args],
     {
       cwd: process.cwd(),
       env: { ...process.env, WORKSPACE_ROOT: root, VIBEROOTS_ROOT: "", NO_DEV_SHELL: "1" },

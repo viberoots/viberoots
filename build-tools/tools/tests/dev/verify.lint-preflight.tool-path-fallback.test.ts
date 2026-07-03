@@ -7,8 +7,11 @@ test("verify lint preflight resolves formatter tools from devshell PATH", async 
     "viberoots/build-tools/tools/dev/verify/lint-preflight.ts",
     "utf8",
   );
-  if (!source.includes("return await resolveToolPath(name);")) {
-    throw new Error("lint preflight must fall back to devshell PATH tools");
+  if (!source.includes('from "../../lib/repo-node-bin"')) {
+    throw new Error("lint preflight must use repo node-bin resolution");
+  }
+  if (!source.includes("return await resolveRepoNodeBin(root, name);")) {
+    throw new Error("lint preflight must delegate node-bin lookup to the PATH-capable resolver");
   }
   if (!source.includes("and PATH")) {
     throw new Error("missing-tool message should mention the PATH fallback");

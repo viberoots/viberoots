@@ -78,13 +78,19 @@ test("quiet UI colors top-level headings in TTY output", () => {
 
 test("quiet UI colors and aligns status markers in TTY output", () => {
   const stdout: string[] = [];
+  const stderr: string[] = [];
   const originalStdoutWrite = process.stdout.write;
+  const originalStderrWrite = process.stderr.write;
   const originalIsTty = process.stdout.isTTY;
   const originalNoColor = process.env.NO_COLOR;
   process.stdout.write = ((chunk: string | Uint8Array) => {
     stdout.push(String(chunk));
     return true;
   }) as typeof process.stdout.write;
+  process.stderr.write = ((chunk: string | Uint8Array) => {
+    stderr.push(String(chunk));
+    return true;
+  }) as typeof process.stderr.write;
   Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
   delete process.env.NO_COLOR;
   try {
@@ -94,6 +100,7 @@ test("quiet UI colors and aligns status markers in TTY output", () => {
     ui.warn("low disk");
   } finally {
     process.stdout.write = originalStdoutWrite;
+    process.stderr.write = originalStderrWrite;
     Object.defineProperty(process.stdout, "isTTY", {
       value: originalIsTty,
       configurable: true,
@@ -107,7 +114,7 @@ test("quiet UI colors and aligns status markers in TTY output", () => {
     [
       "  \u001b[32;1mok\u001b[0m    direnv allowed \u001b[2m/tmp/work\u001b[0m\n",
       "  \u001b[34;1mrun\u001b[0m   target \u001b[2mbuild //...\u001b[0m\n",
-      "  \u001b[33;1mwarn\u001b[0m  low disk\n",
     ].join(""),
   );
+  assert.equal(stderr.join(""), "  \u001b[33;1mwarn\u001b[0m  low disk\n");
 });

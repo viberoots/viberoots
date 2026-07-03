@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("cpp zlib include via nixpkg_deps at call site", async () => {
   await runInTemp("cpp-nixpkg-include-zlib", async (tmp, $) => {
@@ -12,20 +13,20 @@ test("cpp zlib include via nixpkg_deps at call site", async () => {
     // Copy macros and Nix artifacts required by the external runner
     await fs.outputFile(
       path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
-      await fs.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
+      await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/defs.bzl"), "utf8"),
     );
     await fs.outputFile(
       path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
-      await fs.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
+      await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/wasm_defs.bzl"), "utf8"),
     );
     await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/templates"));
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/nix/templates/cpp.nix"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/nix/templates/cpp.nix",
       path.join(tmp, "viberoots/build-tools/tools/nix/templates/cpp.nix"),
     );
     await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/planner"));
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/nix/planner/cpp.nix"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/nix/planner/cpp.nix",
       path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix"),
     );
     // Minimal manifest enabling cpp

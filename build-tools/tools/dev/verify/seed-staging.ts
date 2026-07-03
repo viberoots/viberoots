@@ -26,6 +26,8 @@ const REQUIRED_STAGE_FILES = [
 const PREPARED_MARKER = ".seed-store-prepared-v7";
 
 export function seedStageRootDirForTest(): string {
+  const override = String(process.env.VBR_VERIFY_SEED_STAGE_ROOT || "").trim();
+  if (override) return path.resolve(override);
   if (process.platform === "win32") return path.join(os.tmpdir(), "viberoots-test-seed");
   let user = "";
   try {
@@ -52,6 +54,16 @@ function seedStageDir(seedKey: string): string {
 
 function seedStageLockDir(seedKey: string): string {
   return path.join(seedStageRootDir(), `lock-${seedStageKey(seedKey)}`);
+}
+
+async function pathMtimeMs(p: string): Promise<number> {
+  const st = await fsp.stat(p).catch(() => null);
+  return st?.mtimeMs || 0;
+}
+
+async function removeWritableTree(root: string): Promise<void> {
+  await ensureWritableTree(root).catch(() => {});
+  await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
 }
 
 async function ensureWritableTree(root: string): Promise<void> {
@@ -422,6 +434,72 @@ async function readLockOwner(lockDir: string): Promise<{ pid: number; startedAt:
   }
 }
 
+async function lockIsStale(lockDir: string, seedTtlMs: number): Promise<boolean> {
+  const owner = await readLockOwner(lockDir);
+  const ownerMs = owner.startedAt ? Date.parse(owner.startedAt) : 0;
+  const ageMs = ownerMs ? Date.now() - ownerMs : seedTtlMs + 1;
+  return !pidAlive(owner.pid) || ageMs > seedTtlMs;
+}
+
+async function stageDirIsStale(stageDir: string, seedTtlMs: number): Promise<boolean> {
+  const ageMs = Date.now() - (await pathMtimeMs(stageDir));
+  return ageMs > seedTtlMs;
+}
+
+async function livePinnedSeedStageDirs(workspaceRoot?: string): Promise<Set<string>> {
+  const pinned = new Set<string>();
+  if (!workspaceRoot) return pinned;
+  const pinsDir = path.join(
+    workspaceRoot,
+    ".viberoots",
+    "workspace",
+    "buck",
+    "verify-seed",
+    "pins",
+  );
+  const entries = await fsp.readdir(pinsDir, { withFileTypes: true }).catch(() => []);
+  const root = seedStageRootDir();
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const pinDir = path.join(pinsDir, entry.name);
+    const owner = await fsp
+      .readFile(path.join(pinDir, "owner.json"), "utf8")
+      .then((txt) => JSON.parse(txt) as { pid?: number })
+      .catch(() => null);
+    if (!owner || !pidAlive(Number(owner.pid || 0))) continue;
+    const target = await fsp.readlink(path.join(pinDir, "seed")).catch(() => "");
+    if (!target) continue;
+    const resolved = path.resolve(pinDir, target);
+    if (path.dirname(resolved) === root) pinned.add(path.basename(resolved));
+  }
+  return pinned;
+}
+
+async function sweepStaleSeedStages(
+  seedKey: string,
+  seedTtlMs: number,
+  workspaceRoot?: string,
+): Promise<void> {
+  const root = seedStageRootDir();
+  const keepSeedDir = path.basename(seedStageDir(seedKey));
+  const keepLockDir = path.basename(seedStageLockDir(seedKey));
+  const livePinnedDirs = await livePinnedSeedStageDirs(workspaceRoot);
+  const entries = await fsp.readdir(root, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const abs = path.join(root, entry.name);
+    if (entry.name.startsWith("lock-")) {
+      if (entry.name !== keepLockDir && (await lockIsStale(abs, seedTtlMs))) {
+        await fsp.rm(abs, { recursive: true, force: true }).catch(() => {});
+      }
+      continue;
+    }
+    if (!entry.name.startsWith("seed-") || entry.name === keepSeedDir) continue;
+    if (livePinnedDirs.has(entry.name)) continue;
+    if (await stageDirIsStale(abs, seedTtlMs)) await removeWritableTree(abs);
+  }
+}
+
 async function acquireSeedStageLock(
   seedKey: string,
   seedTtlMs: number,
@@ -466,6 +544,7 @@ export async function stageSeedStore(
   seedTtlMs: number,
   opts: { workspaceRoot?: string } = {},
 ): Promise<string> {
+  await sweepStaleSeedStages(seedKey, seedTtlMs, opts.workspaceRoot);
   const stageDir = seedStageDir(seedKey);
   const keyFile = path.join(stageDir, "seed.key");
   const readyFile = path.join(stageDir, ".seed-store-ready");

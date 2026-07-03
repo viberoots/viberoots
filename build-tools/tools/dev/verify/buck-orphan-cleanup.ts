@@ -121,6 +121,10 @@ export async function cleanupOrphanBuckDaemons(opts: {
   const daemons = parseBuckDaemons(lines);
   const forkserversByIso = new Map<string, ForkserverProc[]>();
   const forkserversByRepoIso = new Map<string, ForkserverProc[]>();
+  const forkserversByParentPid = new Map<
+    number,
+    Array<ForkserverProc & { repoRoot: string; iso: string }>
+  >();
   for (const fork of forks) {
     const mapped = tryRepoRootFromStateDir(fork.stateDir);
     if (!mapped) continue;
@@ -131,17 +135,54 @@ export async function cleanupOrphanBuckDaemons(opts: {
     const existingForRepo = forkserversByRepoIso.get(repoIsoKey) ?? [];
     existingForRepo.push(fork);
     forkserversByRepoIso.set(repoIsoKey, existingForRepo);
+    const existingForParent = forkserversByParentPid.get(fork.ppid) ?? [];
+    existingForParent.push({ ...fork, repoRoot: mapped.repoRoot, iso: mapped.iso });
+    forkserversByParentPid.set(fork.ppid, existingForParent);
   }
   for (const d of daemons) {
     if (d.ppid > 1 && isPidAlive(d.ppid)) continue;
+    const childForkservers = forkserversByParentPid.get(d.pid) ?? [];
+    const childTempForkservers = childForkservers.filter((fork) => isTempRepoRoot(fork.repoRoot));
+    if (childTempForkservers.length > 0 && etimeToSeconds(d.etime) >= staleGraceSec) {
+      candidates++;
+      if (killed >= maxKills) continue;
+      for (const fork of childTempForkservers) {
+        if (await pathExists(fork.repoRoot)) {
+          await buck2Kill(fork.repoRoot, fork.iso, 5000);
+        }
+      }
+      if (isPidAlive(d.pid)) {
+        try {
+          process.kill(d.pid, "SIGKILL");
+        } catch {}
+      }
+      for (const fork of childTempForkservers) {
+        if (!isPidAlive(fork.pid)) continue;
+        try {
+          process.kill(fork.pid, "SIGKILL");
+        } catch {}
+      }
+      killed++;
+      if (opts.log) {
+        const repos = Array.from(new Set(childTempForkservers.map((fork) => fork.repoRoot))).join(
+          ",",
+        );
+        await opts.log(
+          `[verify] buck2 orphan cleanup: killed temp-repo daemon pid=${d.pid} ppid=${d.ppid} etime=${d.etime} iso=${d.iso} repos=${repos}`,
+        );
+      }
+      continue;
+    }
     if (d.iso === "v2") {
       const cwd = await buckDaemonCwd(d.pid, 1500);
       const mapped = tryTempRepoRootFromBuckDaemonCwd(cwd || "");
       if (!mapped) continue;
-      if (await pathExists(mapped.repoRoot)) continue;
       if (etimeToSeconds(d.etime) < staleGraceSec) continue;
       candidates++;
       if (killed >= maxKills) continue;
+      if (await pathExists(mapped.repoRoot)) {
+        await buck2Kill(mapped.repoRoot, mapped.iso, 5000);
+      }
       if (!isPidAlive(d.pid)) continue;
       try {
         process.kill(d.pid, "SIGKILL");
@@ -155,7 +196,7 @@ export async function cleanupOrphanBuckDaemons(opts: {
       killed++;
       if (opts.log) {
         await opts.log(
-          `[verify] buck2 orphan cleanup: killed missing-temp-root daemon pid=${d.pid} ppid=${d.ppid} etime=${d.etime} repo=${mapped.repoRoot} iso=${mapped.iso}`,
+          `[verify] buck2 orphan cleanup: killed temp-root daemon pid=${d.pid} ppid=${d.ppid} etime=${d.etime} repo=${mapped.repoRoot} iso=${mapped.iso}`,
         );
       }
       continue;

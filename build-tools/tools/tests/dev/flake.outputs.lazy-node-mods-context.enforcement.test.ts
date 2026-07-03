@@ -1,11 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("flake outputs split light and heavy per-system contexts", async () => {
-  const outputsFile = "viberoots/build-tools/tools/nix/flake/workspace.nix";
-  const sysFile = "viberoots/build-tools/tools/nix/flake/for-all-systems.nix";
-  const ctxFile = "viberoots/build-tools/tools/nix/flake/per-system-context.nix";
+  const outputsFile = viberootsSourcePath("viberoots/build-tools/tools/nix/flake/workspace.nix");
+  const sysFile = viberootsSourcePath("viberoots/build-tools/tools/nix/flake/for-all-systems.nix");
+  const ctxFile = viberootsSourcePath(
+    "viberoots/build-tools/tools/nix/flake/per-system-context.nix",
+  );
 
   const [outputsTxt, sysTxt, ctxTxt] = await Promise.all([
     fsp.readFile(outputsFile, "utf8"),

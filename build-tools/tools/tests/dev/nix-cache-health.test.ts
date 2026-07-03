@@ -4,8 +4,15 @@ import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { fileURLToPath } from "node:url";
 import { applyNixCacheHealthPolicy } from "../../dev/verify/nix-cache-health";
 import { evaluateNixCacheReadinessFromConfig } from "../../lib/nix-cache-readiness";
+
+const VIBEROOTS_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+
+function sourceFile(rel: string): string {
+  return path.join(VIBEROOTS_ROOT, rel);
+}
 
 async function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => Promise<T>): Promise<T> {
   const prev = { ...process.env };
@@ -226,24 +233,24 @@ test("nix cache readiness redacts query and userinfo from recorded substituter i
 
 test("nix cache health runs before dev-build and install nix entrypoints", async () => {
   const runVerify = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/verify/run-verify.ts",
+    sourceFile("build-tools/tools/dev/verify/run-verify.ts"),
     "utf8",
   );
   assertOrder(runVerify, "await deps.applyNixCacheHealthPolicy(root)", "prepareVerifySeed");
 
   const devBuild = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/dev-build/run-dev-build.ts",
+    sourceFile("build-tools/tools/dev/dev-build/run-dev-build.ts"),
     "utf8",
   );
   assertOrder(devBuild, "await applyNixCacheHealthPolicy(root)", "await runStartupCheck(root)");
 
   const prelude = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/dev-build/prelude.ts",
+    sourceFile("build-tools/tools/dev/dev-build/prelude.ts"),
     "utf8",
   );
   assertOrder(prelude, "await applyNixCacheHealthPolicy(root)", "if (");
 
-  const env = await fsp.readFile("viberoots/build-tools/tools/bin/devshell.sh", "utf8");
+  const env = await fsp.readFile(sourceFile("build-tools/tools/bin/devshell.sh"), "utf8");
   assertOrder(
     env,
     "env_apply_nix_cache_health || return 1",
@@ -251,25 +258,25 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   );
 
   const depsMain = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/install/deps-main.ts",
+    sourceFile("build-tools/tools/dev/install/deps-main.ts"),
     "utf8",
   );
   assertOrder(depsMain, "await applyNixCacheHealthPolicy(repoRoot)", "if (glueOnly)");
 
   const linkNode = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/install/link-node.ts",
+    sourceFile("build-tools/tools/dev/install/link-node.ts"),
     "utf8",
   );
   assertOrder(linkNode, "await applyNixCacheHealthPolicy(root)", "const flakeRoot");
 
-  const glue = await fsp.readFile("viberoots/build-tools/tools/dev/install/glue.ts", "utf8");
+  const glue = await fsp.readFile(sourceFile("build-tools/tools/dev/install/glue.ts"), "utf8");
   assertOrder(
     glue,
     "await applyNixCacheHealthPolicy(wsRoot)",
     "missing .viberoots/current/prelude",
   );
 
-  const buck = await fsp.readFile("viberoots/build-tools/lang/nix_cache_health.bzl", "utf8");
+  const buck = await fsp.readFile(sourceFile("build-tools/lang/nix_cache_health.bzl"), "utf8");
   assert.match(buck, /VBR_NIX_CACHE_HEALTH_APPLIED/);
   assert.match(buck, /printf -v NIX_CONFIG '%s\\nsubstituters =%s\\nextra-substituters =%s/);
   assert.match(buck, /nix-cache-info/);
@@ -298,18 +305,18 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   assert.match(env, /env_mark_macos_metadata_never_index "\$\{cache_dir\}"/);
   assert.match(env, /env_mark_macos_metadata_never_index "\$\{NODE_V8_COVERAGE\}"/);
 
-  const devshell = await fsp.readFile("viberoots/build-tools/tools/nix/devshell.nix", "utf8");
+  const devshell = await fsp.readFile(sourceFile("build-tools/tools/nix/devshell.nix"), "utf8");
   assert.match(devshell, /_vbr_mark_macos_metadata_never_index "\$cache_dir"/);
   assert.match(
     devshell,
     /_vbr_mark_macos_metadata_never_index "\$PWD\/\.viberoots\/workspace\/buck\/tmp"/,
   );
 
-  const zxTest = await fsp.readFile("viberoots/build-tools/tools/buck/zx_test.bzl", "utf8");
+  const zxTest = await fsp.readFile(sourceFile("build-tools/tools/buck/zx_test.bzl"), "utf8");
   assertOrder(zxTest, "nix_cache_health_shell()", "PRELUDE_PATH");
 
   const verifyBuckEnv = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/verify/buck2-test-env.ts",
+    sourceFile("build-tools/tools/dev/verify/buck2-test-env.ts"),
     "utf8",
   );
   assert.match(verifyBuckEnv, /maybeEnvArg\("NIX_CONFIG"/);

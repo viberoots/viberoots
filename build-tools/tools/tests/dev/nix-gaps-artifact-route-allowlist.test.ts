@@ -4,8 +4,10 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const scriptPath = "viberoots/build-tools/tools/dev/nix-gaps-inventory-check.ts";
+const scriptSourcePath = viberootsSourcePath(scriptPath);
 const exceptionsPath = "docs/handbook/nix-gaps-exceptions.json";
 
 const starlarkApi = `# Starlark API reference
@@ -88,7 +90,7 @@ const exceptionsWithoutAllowlist = `{
 
 test("nix-gaps inventory check passes when mixed route is explicitly allowlisted", async () => {
   await runInTemp("nix-gaps-artifact-route-allowlist-pass", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsMixedRoute);
     await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsWithMixedAllowlist);
@@ -100,7 +102,7 @@ test("nix-gaps inventory check passes when mixed route is explicitly allowlisted
 
 test("nix-gaps inventory check fails when mixed route is not allowlisted", async () => {
   await runInTemp("nix-gaps-artifact-route-allowlist-missing", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsMixedRoute);
     await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsWithoutAllowlist);
@@ -115,7 +117,7 @@ test("nix-gaps inventory check fails when mixed route is not allowlisted", async
 
 test("nix-gaps inventory check fails on stale artifact allowlist entries", async () => {
   await runInTemp("nix-gaps-artifact-route-allowlist-stale", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsNoRouteGap);
     await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsWithMixedAllowlist);

@@ -1,14 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
 test("node Nix-calling macros route through unified wiring helper", async () => {
-  const file = "viberoots/build-tools/node/defs_nix.bzl";
-  const helperFile = "viberoots/build-tools/node/defs_nix_helpers.bzl";
+  const file = viberootsSourcePath("viberoots/build-tools/node/defs_nix.bzl");
+  const helperFile = viberootsSourcePath("viberoots/build-tools/node/defs_nix_helpers.bzl");
   const txt = await fsp.readFile(file, "utf8");
   const helperTxt = await fsp.readFile(helperFile, "utf8");
 

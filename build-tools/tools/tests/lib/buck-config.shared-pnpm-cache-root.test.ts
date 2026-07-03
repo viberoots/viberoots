@@ -56,6 +56,7 @@ test("temp repo buck config uses selected flake input for nix prelude resolution
     await fsp.mkdir(binDir, { recursive: true });
     await fsp.mkdir(selectedInputRoot, { recursive: true });
     await fsp.mkdir(path.join(fakePreludeOut, "prelude"), { recursive: true });
+    await fsp.writeFile(path.join(fakePreludeOut, "prelude", "prelude.bzl"), "# prelude\n", "utf8");
     await fsp.writeFile(
       path.join(selectedInputRoot, "flake.nix"),
       "{ outputs = _: {}; }\n",
@@ -121,6 +122,11 @@ test("temp repo buck config uses seeded local prelude before nix fallback", asyn
   const oldSharedPrelude = process.env.VBR_SHARED_PRELUDE_PATH;
   try {
     await fsp.mkdir(path.join(tmp, "viberoots", "prelude"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "viberoots", "prelude", "prelude.bzl"),
+      "# prelude\n",
+      "utf8",
+    );
     await fsp.mkdir(binDir, { recursive: true });
     await fsp.writeFile(
       path.join(binDir, "nix"),

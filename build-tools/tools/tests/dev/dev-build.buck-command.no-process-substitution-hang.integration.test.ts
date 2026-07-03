@@ -1,9 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("runBuckCommand defaults to direct stderr (no process-substitution hang risk)", async () => {
-  const txt = await fsp.readFile("viberoots/build-tools/tools/dev/dev-build/buck.ts", "utf8");
+  const txt = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/dev-build/buck.ts"),
+    "utf8",
+  );
   if (
     !txt.includes(
       'const useStderrFilter = String(process.env.BUCK_STDERR_FILTER || "").trim() === "1";',

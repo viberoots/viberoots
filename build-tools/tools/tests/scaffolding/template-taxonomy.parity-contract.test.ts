@@ -11,6 +11,7 @@ import {
 } from "../../scaffolding/scaf/templates/taxonomy";
 import { readTemplateMeta } from "../../scaffolding/scaf/templates/meta";
 import { TEMPLATE_SAFETY_FLOOR_TARGETS } from "../../lib/template-test-selector";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 function sortedUnique(values: readonly string[]): string[] {
   return Array.from(new Set(values)).sort();
@@ -97,7 +98,7 @@ test("taxonomy contract: canonical ids are unique and language-qualified", () =>
 
 test("parity: resolver and metadata readers match canonical ts ids", async () => {
   const resolverRaw = await fsp.readFile(
-    "viberoots/build-tools/tools/scaffolding/resolver.json",
+    viberootsSourcePath("viberoots/build-tools/tools/scaffolding/resolver.json"),
     "utf8",
   );
   const resolver = JSON.parse(resolverRaw) as Record<string, Record<string, string>>;
@@ -115,7 +116,7 @@ test("parity: resolver and metadata readers match canonical ts ids", async () =>
 
 test("anti-drift: template conventions reference canonical taxonomy only", async () => {
   const bzl = await fsp.readFile(
-    "viberoots/build-tools/tools/tests/template_conventions.bzl",
+    viberootsSourcePath("viberoots/build-tools/tools/tests/template_conventions.bzl"),
     "utf8",
   );
   assert.equal(
@@ -148,7 +149,7 @@ test("anti-drift: template conventions reference canonical taxonomy only", async
 
 test("parity: template taxonomy adapter ids match canonical taxonomy", async () => {
   const adapter = await fsp.readFile(
-    "viberoots/build-tools/tools/tests/template_taxonomy_adapter.bzl",
+    viberootsSourcePath("viberoots/build-tools/tools/tests/template_taxonomy_adapter.bzl"),
     "utf8",
   );
   const adapterIds = parseCanonicalTemplateIdsFromAdapter(adapter);

@@ -9,6 +9,16 @@ interface TempRepoBuckConfigOptions {
   viberootsSourceRoot?: string;
 }
 
+async function hasPreludeEntrypoint(preludePath: string): Promise<boolean> {
+  if (!preludePath) return false;
+  try {
+    await fsp.access(path.join(preludePath, "prelude.bzl"));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function workspaceFlakePath(root: string): Promise<string> {
   const hidden = path.join(root, ".viberoots", "workspace", "flake.nix");
   try {
@@ -24,12 +34,7 @@ async function resolvePreludePath(
   opts?: TempRepoBuckConfigOptions,
 ): Promise<string> {
   const sharedPrelude = String(process.env.VBR_SHARED_PRELUDE_PATH || "").trim();
-  if (sharedPrelude) {
-    try {
-      await fsp.access(sharedPrelude);
-      return sharedPrelude;
-    } catch {}
-  }
+  if (await hasPreludeEntrypoint(sharedPrelude)) return sharedPrelude;
 
   const localPreludeCandidates = [
     path.join(tmp, "prelude"),
@@ -37,26 +42,18 @@ async function resolvePreludePath(
     path.join(tmp, "viberoots", "prelude"),
   ];
   for (const localPrelude of localPreludeCandidates) {
-    try {
-      await fsp.access(localPrelude);
-      return localPrelude;
-    } catch {}
+    if (await hasPreludeEntrypoint(localPrelude)) return localPrelude;
   }
 
   // Fast path: seeded temp repos intentionally stay small and may omit prelude.
   // Reuse the already-materialized workspace prelude when available.
   const repoPrelude = path.join(process.cwd(), "prelude");
-  try {
-    await fsp.access(repoPrelude);
-    return repoPrelude;
-  } catch {}
+  if (!opts?.viberootsInputRoot && (await hasPreludeEntrypoint(repoPrelude))) return repoPrelude;
 
   if (cachedPreludePath) {
     const cached = await cachedPreludePath;
-    try {
-      await fsp.access(cached);
-      return cached;
-    } catch {
+    if (await hasPreludeEntrypoint(cached)) return cached;
+    else {
       cachedPreludePath = null;
     }
   }
@@ -92,15 +89,32 @@ async function resolvePreludePath(
           .split("\n")
           .filter(Boolean)
           .pop();
-        if (out) return path.join(out, "prelude").replaceAll("\\", "/");
+        const preludePath = out ? path.join(out, "prelude").replaceAll("\\", "/") : "";
+        if (await hasPreludeEntrypoint(preludePath)) return preludePath;
       } catch {}
+      if (hasViberootsInputRoot) {
+        try {
+          const pre = await $({
+            cwd: tmp,
+            stdio: "pipe",
+          })`nix build --impure ${`path:${viberootsInputRoot}#buck2-prelude`} --no-link --no-write-lock-file --accept-flake-config --print-out-paths`;
+          const out = String(pre.stdout || "")
+            .trim()
+            .split("\n")
+            .filter(Boolean)
+            .pop();
+          const preludePath = out ? path.join(out, "prelude").replaceAll("\\", "/") : "";
+          if (await hasPreludeEntrypoint(preludePath)) return preludePath;
+        } catch {}
+      }
       try {
         const ev = await $({
           cwd: tmp,
           stdio: "pipe",
         })`nix eval --impure --raw ${`path:${flakeRoot}#inputs.buck2.outPath`} ${viberootsOverrideArgs} --no-write-lock-file`;
         const p = String(ev.stdout || "").trim();
-        if (p) return path.join(p, "prelude").replaceAll("\\", "/");
+        const preludePath = p ? path.join(p, "prelude").replaceAll("\\", "/") : "";
+        if (await hasPreludeEntrypoint(preludePath)) return preludePath;
       } catch {}
       return "";
     })();
@@ -166,8 +180,9 @@ export async function ensureBuckConfigForTempRepo(
     BUCK_PROJECT_IGNORE_LINE,
     "EOF",
     "mkdir -p .viberoots",
+    "[ -L .viberoots/current ] && [ ! -e .viberoots/current/prelude/prelude.bzl ] && [ -e viberoots/prelude/prelude.bzl ] && rm -f .viberoots/current || true",
     '[ -n "${VIBEROOTS_ROOT:-}" ] && [ -e "$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs" ] && [ ! -e .viberoots/current/build-tools/tools/dev/zx-init.mjs ] && rm -rf .viberoots/current || true',
-    '[ -e .viberoots/current ] || { if [ -n "${VIBEROOTS_ROOT:-}" ] && [ -e "$VIBEROOTS_ROOT/build-tools" ]; then ln -s "$VIBEROOTS_ROOT" .viberoots/current; elif [ -e build-tools ]; then ln -s .. .viberoots/current; else ln -s ../viberoots .viberoots/current; fi; }',
+    '[ -e .viberoots/current ] || { if [ -e viberoots/prelude/prelude.bzl ] && [ -e viberoots/build-tools ]; then ln -s ../viberoots .viberoots/current; elif [ -n "${VIBEROOTS_ROOT:-}" ] && [ -e "$VIBEROOTS_ROOT/build-tools" ]; then ln -s "$VIBEROOTS_ROOT" .viberoots/current; elif [ -e build-tools ]; then ln -s .. .viberoots/current; else ln -s ../viberoots .viberoots/current; fi; }',
     '[ -e viberoots/build-tools ] || [ -L viberoots/build-tools ] || { if [ -n "${VIBEROOTS_ROOT:-}" ] && [ -e "$VIBEROOTS_ROOT/build-tools" ]; then ln -s "$VIBEROOTS_ROOT/build-tools" viberoots/build-tools; elif [ -e .viberoots/current/build-tools ]; then ln -s ../.viberoots/current/build-tools viberoots/build-tools; fi; }',
     "mkdir -p .viberoots/workspace",
     'if [ ! -f .viberoots/workspace/flake.lock ]; then if [ -n "${VIBEROOTS_ROOT:-}" ] && [ -f "$VIBEROOTS_ROOT/.viberoots/workspace/flake.lock" ]; then cp "$VIBEROOTS_ROOT/.viberoots/workspace/flake.lock" .viberoots/workspace/flake.lock; elif [ -n "${VIBEROOTS_ROOT:-}" ] && [ -f "$(dirname "$VIBEROOTS_ROOT")/.viberoots/workspace/flake.lock" ]; then cp "$(dirname "$VIBEROOTS_ROOT")/.viberoots/workspace/flake.lock" .viberoots/workspace/flake.lock; elif [ -n "${VIBEROOTS_ROOT:-}" ] && [ -f "$VIBEROOTS_ROOT/flake.lock" ]; then cp "$VIBEROOTS_ROOT/flake.lock" .viberoots/workspace/flake.lock; elif [ -f flake.lock ]; then cp flake.lock .viberoots/workspace/flake.lock; else printf \'{"nodes":{},"root":"root","version":7}\\n\' > .viberoots/workspace/flake.lock; fi; fi',

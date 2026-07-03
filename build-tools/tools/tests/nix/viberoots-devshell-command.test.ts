@@ -3,11 +3,15 @@ import assert from "node:assert/strict";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("devshell wires viberoots as a Nix-provided PATH command", async () => {
-  const devshell = await fsp.readFile("viberoots/build-tools/tools/nix/devshell.nix", "utf8");
+  const devshell = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/nix/devshell.nix"),
+    "utf8",
+  );
   const packagedCommand = await fsp.readFile(
-    "viberoots/build-tools/tools/nix/packages/viberoots-command.nix",
+    viberootsSourcePath("viberoots/build-tools/tools/nix/packages/viberoots-command.nix"),
     "utf8",
   );
   assert.match(devshell, /viberootsCommand = import \.\/packages\/viberoots-command\.nix/);

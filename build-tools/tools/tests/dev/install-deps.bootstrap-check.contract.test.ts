@@ -2,9 +2,13 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("install-deps runs bootstrap completion check before install setup and honors dry-run", async () => {
-  const source = await fsp.readFile("viberoots/build-tools/tools/dev/install/deps-main.ts", "utf8");
+  const source = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/install/deps-main.ts"),
+    "utf8",
+  );
   const checkIndex = source.indexOf("await checkBootstrapCompletion({");
   const cachePolicyIndex = source.indexOf("await applyNixCacheHealthPolicy(repoRoot)");
   const importersIndex = source.indexOf("await discoverImportersWithLock");

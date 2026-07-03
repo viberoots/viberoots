@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { buildSelectedOutPath, runInTemp } from "../lib/test-helpers";
+import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("wasm static lib builds and exports headers (smoke link optional)", async () => {
   await runInTemp("wasm-static-lib", async (tmp, $) => {
@@ -55,21 +56,21 @@ int add(int a, int b) { return a + b; }
     // Ensure C++ macros are available in the temp repo
     await fs.outputFile(
       path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
-      await fs.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
+      await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/defs.bzl"), "utf8"),
     );
     await fs.outputFile(
       path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
-      await fs.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
+      await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/wasm_defs.bzl"), "utf8"),
     );
     // Make planner templates visible (temp repo will prefer main workspace templates when absent)
     await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/templates"));
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/nix/templates/cpp.nix"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/nix/templates/cpp.nix",
       path.join(tmp, "viberoots/build-tools/tools/nix/templates/cpp.nix"),
     );
     await fs.mkdirp(path.join(tmp, "viberoots/build-tools/tools/nix/planner"));
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/nix/planner/cpp.nix"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/nix/planner/cpp.nix",
       path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix"),
     );
 

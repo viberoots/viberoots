@@ -1,11 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("update-pnpm-hash nondefault importer verifies fixed build before unfixed rebuild", async () => {
-  const mainTxt = await fsp.readFile("viberoots/build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
+  const mainTxt = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash.ts"),
+    "utf8",
+  );
   const txt = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/nondefault.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/nondefault.ts"),
     "utf8",
   );
   if (!txt.includes("step=fixed-build attr=${opts.storeAttr}")) {

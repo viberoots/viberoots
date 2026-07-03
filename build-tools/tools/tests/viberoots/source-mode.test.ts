@@ -137,6 +137,7 @@ test("viberoots help and bash completion are generated from command metadata", a
   for (const command of [
     "status",
     "develop",
+    "init-workspace",
     "bootstrap-check",
     "bootstrap",
     "update",
@@ -156,7 +157,7 @@ test("viberoots help and bash completion are generated from command metadata", a
   assert.match(completion.stdout, /_viberoots\(\)/);
   assert.match(
     completion.stdout,
-    /status develop bootstrap-check bootstrap update gc resource-graph init-consumer use-submodule use-flake remove-submodule completion help/,
+    /status develop init-workspace bootstrap-check bootstrap update gc resource-graph init-consumer use-submodule use-flake remove-submodule completion help/,
   );
   assert.match(completion.stdout, /complete -F _viberoots viberoots/);
   assert.match(completion.stdout, /complete -F _viberoots vbr/);
@@ -177,7 +178,7 @@ test("viberoots help and bash completion are generated from command metadata", a
   assert.match(zshCompletion.stdout, /#compdef viberoots vbr/);
   assert.match(zshCompletion.stdout, /compdef _viberoots viberoots/);
   assert.match(zshCompletion.stdout, /compdef _viberoots vbr/);
-  assert.match(zshCompletion.stdout, /commands=\(status develop bootstrap-check/);
+  assert.match(zshCompletion.stdout, /commands=\(status develop init-workspace bootstrap-check/);
   assert.match(zshCompletion.stdout, /develop\) _arguments -S .*--command\[--command\]/);
 
   await assert.rejects(

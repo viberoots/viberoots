@@ -74,7 +74,7 @@ test("macro kwargs helper probe: defaults, overrides, and tolerant nixpkg_deps p
     const pBad = await buildOutPath(tmp, $, "//projects/apps/demo:bad_nixpkg_shape");
 
     const d = lines(await fsp.readFile(pDefault, "utf8"));
-    assert.deepEqual(d, ["patch_dir:patches/go"]);
+    assert.deepEqual(d, ["patch_dir:patches/go", "nixpkgs_profile:default", "nixpkg_pins:0"]);
 
     const c = lines(await fsp.readFile(pCustom, "utf8"));
     assert.ok(c.includes("patch_dir:patches/custom"));
@@ -91,6 +91,6 @@ test("macro kwargs helper probe: defaults, overrides, and tolerant nixpkg_deps p
 
     const b = lines(await fsp.readFile(pBad, "utf8"));
     // Non-list nixpkg_deps is ignored deterministically, so no nixpkg labels should be emitted.
-    assert.deepEqual(b, ["patch_dir:patches/go"]);
+    assert.deepEqual(b, ["patch_dir:patches/go", "nixpkgs_profile:default", "nixpkg_pins:0"]);
   });
 });

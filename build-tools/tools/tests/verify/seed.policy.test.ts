@@ -7,14 +7,10 @@ import { shouldPrepareVerifySeedForRequestedTargets } from "../../dev/verify/see
 import { verifySeedBuildArgs } from "../../dev/verify/seed-build";
 import { writeVerifySeedRemoteManifest } from "../../dev/verify/seed-manifest";
 import { mktemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 async function readRepoFile(relativePath: string): Promise<string> {
-  for (const candidate of [relativePath, path.join("viberoots", relativePath)]) {
-    try {
-      return await fsp.readFile(candidate, "utf8");
-    } catch {}
-  }
-  return await fsp.readFile(relativePath, "utf8");
+  return await fsp.readFile(viberootsSourcePath(relativePath), "utf8");
 }
 
 test("verify seed build policy defaults to full-suite only", () => {

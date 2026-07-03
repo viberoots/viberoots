@@ -141,6 +141,7 @@ test("repo bootstrap dry-run reads resolver config from workspace root from nest
     await writeJson(path.join(dir, ".viberoots/workspace/buck/graph.json"), {
       nodes: [{ name: "//deployments/app:build" }],
     });
+    await fs.writeFile(path.join(dir, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
     const sink = await resolveCredentialSinkSelection({
       ...DEFAULT_BOOTSTRAP_ARGS,
       mode: "repo",
@@ -150,7 +151,10 @@ test("repo bootstrap dry-run reads resolver config from workspace root from nest
       plan.profiles.map((profile) => profile.name),
       ["infisical-root"],
     );
-    assert.equal(plan.resolverConfig.path, path.join(dir, "projects/config/shared.json"));
+    assert.equal(
+      plan.resolverConfig.path,
+      await fs.realpath(path.join(dir, "projects/config/shared.json")),
+    );
   });
 });
 

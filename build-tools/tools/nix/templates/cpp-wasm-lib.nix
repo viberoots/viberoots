@@ -5,6 +5,8 @@ let
   H = C.H;
   clangxx = C.clangxx;
   llvmAr = C.llvmAr;
+  nixIncFlags = C.nixIncFlags;
+  resolveAttrsToPkgs = C.resolveAttrsToPkgs;
 in {
   # Build a wasm32 static library from C/C++ sources under subdir of srcRoot.
   # - Uses cbuild-tools/lang/clang++ with --target=wasm32-unknown-unknown by default (no syscalls).
@@ -14,7 +16,9 @@ in {
     name,
     srcRoot ? ../../..,
     subdir ? ".",
+    nixCxxPkgs ? [],
     nixCxxAttrs ? [],
+    nixpkgsProfile ? "default",
     includes ? [],
     defines ? [],
     cflags ? [],
@@ -43,6 +47,8 @@ in {
       )
       else null;
     sysrootArg = if sysrootPath != null then ("--sysroot=" + sysrootPath) else "";
+    resolvedPkgs = nixCxxPkgs ++ (resolveAttrsToPkgs nixCxxAttrs);
+    nixInc = nixIncFlags resolvedPkgs;
     # Discover sources deterministically; include both C and C++ units.
     srcsCmd = if srcList != [] then (
       "printf '%s\\n' " + (lib.concatStringsSep " " (map (s: "'" + s + "'") (lib.sort (a: b: a < b) srcList))) + " | sort"
@@ -78,7 +84,7 @@ in {
       # Common flags: pure compute, no exceptions/RTTI, no host I/O
       cxxflags_common="--target=${wasmTarget} ${sysrootArg} -std=${std} -fno-exceptions -fno-rtti -fno-threadsafe-statics -fno-bounds-check -fvisibility=hidden -fno-asynchronous-unwind-tables -fno-unwind-tables -fno-omit-frame-pointer -g0 -O2 -pipe"
       cflags_common="--target=${wasmTarget} ${sysrootArg} -std=c11 -fvisibility=hidden -g0 -O2 -pipe"
-      incFlags="${lib.concatStringsSep " " (map (p: "-I${p}") includes)}"
+      incFlags="${nixInc} ${lib.concatStringsSep " " (map (p: "-I${p}") includes)}"
       defFlags="${lib.concatStringsSep " " (map (d: "-D${d}") defines)}"
       extraC="${lib.concatStringsSep " " (map (f: f) cflags)}"
 
@@ -107,6 +113,7 @@ in {
 
       : > "$out/build.log"
       echo "name=${name}" >> "$out/build.log"
+      echo "nixpkgsProfile=${nixpkgsProfile}" >> "$out/build.log"
       echo "wasmTarget=${wasmTarget}" >> "$out/build.log"
       ${if wasmTarget == "wasm32-wasi" then ''echo "sysroot=${sysrootArg}" >> "$out/build.log"'' else ""}
       echo "std=${std}" >> "$out/build.log"
@@ -118,5 +125,3 @@ in {
     '';
   };
 }
-
-

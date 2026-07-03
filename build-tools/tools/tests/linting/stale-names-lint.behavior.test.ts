@@ -5,9 +5,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const execFileAsync = promisify(execFile);
-const script = "viberoots/build-tools/tools/dev/stale-names-lint.ts";
+const script = viberootsSourcePath("viberoots/build-tools/tools/dev/stale-names-lint.ts");
 const retiredInputContractTerm = ["secret", "spec"].join("");
 
 async function writeFixture(name: string, text: string): Promise<string> {
@@ -52,11 +53,9 @@ test("stale-names-lint reads parent-owned migration label skip paths", async () 
   await fsp.mkdir(path.join(repo, "projects/demo"), { recursive: true });
   await fsp.writeFile(path.join(repo, "projects/demo/state.ts"), "type DemoStateV1 = {};\n");
 
-  const result = await execFileAsync(
-    "zx-wrapper",
-    [path.resolve(process.cwd(), script), "projects/demo/state.ts"],
-    { cwd: repo },
-  );
+  const result = await execFileAsync("zx-wrapper", [script, "projects/demo/state.ts"], {
+    cwd: repo,
+  });
   assert.match(result.stderr, /no stale names found/);
 });
 

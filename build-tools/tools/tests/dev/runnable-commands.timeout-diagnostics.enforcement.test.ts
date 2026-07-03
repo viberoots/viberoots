@@ -1,9 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("run-runnable exposes timeout diagnostics toggles", async () => {
-  const file = "viberoots/build-tools/tools/dev/run-runnable-nix.ts";
+  const file = viberootsSourcePath("viberoots/build-tools/tools/dev/run-runnable-nix.ts");
   const txt = await fsp.readFile(file, "utf8");
   if (!txt.includes("VBR_RUNNABLE_TIMEOUT_DIAG")) {
     throw new Error(`${file} must expose VBR_RUNNABLE_TIMEOUT_DIAG toggle`);

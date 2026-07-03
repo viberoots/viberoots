@@ -1,9 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("link-node builds non-default importers from stable workspace flake ref", async () => {
-  const file = "viberoots/build-tools/tools/dev/install/link-node.ts";
+  const file = viberootsSourcePath("viberoots/build-tools/tools/dev/install/link-node.ts");
   const txt = await fsp.readFile(file, "utf8");
   if (!txt.includes("makeFilteredFlakeRef(root)")) {
     throw new Error("link-node.ts must use filtered flake snapshot for non-default importers");
@@ -27,7 +28,7 @@ test("link-node builds non-default importers from stable workspace flake ref", a
   }
 
   const compat = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/lockfile.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/lockfile.ts"),
     "utf8",
   );
   if (!compat.includes("export async function makeFilteredFlakeRef(repoRoot: string)")) {
@@ -36,13 +37,16 @@ test("link-node builds non-default importers from stable workspace flake ref", a
     );
   }
 
-  const filtered = await fsp.readFile("viberoots/build-tools/tools/dev/filtered-flake.ts", "utf8");
+  const filtered = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/filtered-flake.ts"),
+    "utf8",
+  );
   if (!filtered.includes("dirty-tree entries=") || !filtered.includes("snapshot ready in")) {
     throw new Error("filtered-flake.ts must expose dirty-tree and snapshot-size diagnostics");
   }
 
   const filteredCompat = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/filtered-flake.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/filtered-flake.ts"),
     "utf8",
   );
   if (

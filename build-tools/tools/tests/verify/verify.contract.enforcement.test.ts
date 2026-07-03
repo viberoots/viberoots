@@ -5,41 +5,51 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { ensureRepoLocalTmpRoot } from "../../dev/verify/tmp-root";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("verify contract: TMPDIR policy + coverage gating + disk gate strings present", async () => {
-  const tmpRoot = await fsp.readFile("viberoots/build-tools/tools/dev/verify/tmp-root.ts", "utf8");
-  const coverage = await fsp.readFile("viberoots/build-tools/tools/dev/verify/coverage.ts", "utf8");
+  const tmpRoot = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/verify/tmp-root.ts"),
+    "utf8",
+  );
+  const coverage = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/verify/coverage.ts"),
+    "utf8",
+  );
   const housekeeping = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/verify/housekeeping.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/verify/housekeeping.ts"),
     "utf8",
   );
   const runVerify = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/verify/run-verify.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/verify/run-verify.ts"),
     "utf8",
   );
-  const vWrapper = await fsp.readFile("viberoots/build-tools/tools/bin/v", "utf8");
+  const vWrapper = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/bin/v"),
+    "utf8",
+  );
   const signalShutdown = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/verify/signal-shutdown.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/verify/signal-shutdown.ts"),
     "utf8",
   );
   const runVerifyState = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/verify/run-verify-state.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/verify/run-verify-state.ts"),
     "utf8",
   );
   const finalOrphanCleanup = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/verify/final-orphan-cleanup.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/verify/final-orphan-cleanup.ts"),
     "utf8",
   );
   const startupWorkspaceState = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/startup-check/workspace-state.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/startup-check/workspace-state.ts"),
     "utf8",
   );
   const registeredToolState = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/registered-tool-state.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/registered-tool-state.ts"),
     "utf8",
   );
   const devBuildRootCleanup = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/dev-build/root-buck-out-cleanup.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/dev-build/root-buck-out-cleanup.ts"),
     "utf8",
   );
 
@@ -183,7 +193,7 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
   );
 
   const verifyPasses = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/verify/verify-passes.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/verify/verify-passes.ts"),
     "utf8",
   );
   assert.ok(

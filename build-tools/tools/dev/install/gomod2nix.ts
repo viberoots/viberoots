@@ -54,12 +54,17 @@ function absenceNameForDir(root: string, dir: string): { name: string; roots: st
   return { name: `gomod2nix-${safe}-absent`, roots: [relRaw] };
 }
 
+function installWorkspaceRoot(): string {
+  const envRoot = String(process.env.WORKSPACE_ROOT || "").trim();
+  return envRoot ? path.resolve(envRoot) : repoRoot();
+}
+
 export async function runGomod2nixGenerate(dryRun: boolean, verbose: boolean) {
-  await runGomod2nixGenerateIn(repoRoot(), dryRun, verbose);
+  await runGomod2nixGenerateIn(installWorkspaceRoot(), dryRun, verbose);
 }
 
 export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbose: boolean) {
-  const root = repoRoot();
+  const root = installWorkspaceRoot();
   const hasGoMod = await exists(path.join(dir, "go.mod"));
   const hasGoSum = await exists(path.join(dir, "go.sum"));
   if (!hasGoMod && !hasGoSum) {
@@ -97,7 +102,7 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
   // on network resolution; prefer pre-existing gomod2nix.toml or skip.
   if (hasGoMod && !hasGoSum) {
     console.error(
-      `[gomod2nix] error: go.sum missing in ${path.relative(process.cwd(), dir) || "."}; run 'build-tools/tools/dev/install-deps.ts' (or pass --skip-go-tidy to skip)`,
+      `[gomod2nix] error: go.sum missing in ${path.relative(root, dir) || "."}; run 'build-tools/tools/dev/install-deps.ts' (or pass --skip-go-tidy to skip)`,
     );
     process.exit(2);
   }
@@ -117,9 +122,9 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
     const cur = (await exists(dst)) ? await fsp.readFile(dst, "utf8") : "";
     if (cur !== minimal) {
       await fsp.writeFile(dst, minimal, "utf8");
-      console.log(`[gomod2nix] updated ${path.relative(process.cwd(), dst)}`);
+      console.log(`[gomod2nix] updated ${path.relative(root, dst)}`);
     } else if (verbose) {
-      console.log(`[gomod2nix] no changes: ${path.relative(process.cwd(), dst)}`);
+      console.log(`[gomod2nix] no changes: ${path.relative(root, dst)}`);
     }
     return;
   }
@@ -129,7 +134,7 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
   try {
     if (hasGoMod) await fsp.copyFile(path.join(dir, "go.mod"), path.join(tmp, "go.mod"));
     if (hasGoSum) await fsp.copyFile(path.join(dir, "go.sum"), path.join(tmp, "go.sum"));
-    console.log(`[gomod2nix] running in ${tmp} for ${path.relative(process.cwd(), dir) || "."}`);
+    console.log(`[gomod2nix] running in ${tmp} for ${path.relative(root, dir) || "."}`);
     // Log effective env relevant to network behavior
     try {
       const gp = process.env.GOPROXY || "";
@@ -173,9 +178,9 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
     const cur = (await exists(dst)) ? await fsp.readFile(dst, "utf8") : "";
     if (cur !== next) {
       await fsp.writeFile(dst, next, "utf8");
-      console.log(`[gomod2nix] updated ${path.relative(process.cwd(), dst)}`);
+      console.log(`[gomod2nix] updated ${path.relative(root, dst)}`);
     } else if (verbose) {
-      console.log(`[gomod2nix] no changes: ${path.relative(process.cwd(), dst)}`);
+      console.log(`[gomod2nix] no changes: ${path.relative(root, dst)}`);
     }
   } finally {
     try {
@@ -184,14 +189,12 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
   }
   const afterHash = await sha256File(path.join(dir, "gomod2nix.toml"));
   if (verbose)
-    console.log(
-      `[gomod2nix] hash (${path.relative(process.cwd(), dir)}): ${afterHash || "(none)"}`,
-    );
+    console.log(`[gomod2nix] hash (${path.relative(root, dir)}): ${afterHash || "(none)"}`);
 }
 
 export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean) {
   // Scan for go.mod+go.sum under projects/apps/* and projects/libs/* and generate per-module gomod2nix.toml
-  const root = repoRoot();
+  const root = installWorkspaceRoot();
   const scanRoots = ["projects/apps", "projects/libs"];
   if (!dryRun && (await absenceCacheFresh(root, "gomod2nix-absent", scanRoots))) {
     if (verbose) console.log("[gomod2nix] project scan skipped: no Go modules present");
@@ -219,7 +222,7 @@ export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean) {
   for (const d of dirs) {
     const refresh = await needsGomod2nixRefresh(d);
     if (!refresh) {
-      if (verbose) console.log(`[gomod2nix] up-to-date: ${path.relative(process.cwd(), d) || "."}`);
+      if (verbose) console.log(`[gomod2nix] up-to-date: ${path.relative(root, d) || "."}`);
       continue;
     }
     await runGomod2nixGenerateIn(d, dryRun, verbose);

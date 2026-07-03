@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("cpp kindOf maps binary/lib/test correctly", async () => {
   await runInTemp("planner-cpp-kind", async (tmp, $) => {
@@ -24,8 +25,8 @@ test("cpp kindOf maps binary/lib/test correctly", async () => {
       path.join(tmp, "viberoots/build-tools/tools/nix/langs.json"),
       JSON.stringify(manifest, null, 2) + "\n",
     );
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/nix/planner/cpp.nix"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/nix/planner/cpp.nix",
       path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix"),
     );
 

@@ -71,7 +71,7 @@ function isPatternVerifyTarget(target: string): boolean {
 }
 
 export function isBroadVerifyTargetScan(target: string): boolean {
-  return isPatternVerifyTarget(target);
+  return String(target || "").trim() === "//...";
 }
 
 function isManualVerifyTarget(labels: readonly string[]): boolean {

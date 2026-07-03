@@ -24,6 +24,23 @@ let
   patchInputsFor = cpp.patchInputsFor;
   collectNixAttrsFor = cpp.collectNixAttrsFor;
 
+  resolveNixCxxPkgsFor = name: attrs:
+    let
+      n = nodeOfName name;
+      target = if n == null then {} else n;
+      records = ctx.resolveNixpkgAttrs {
+        inherit target attrs;
+      };
+      missing = builtins.filter (r: r.package == null) records;
+      missingText = builtins.concatStringsSep ", " (
+        map (r: r.attr + " from " + r.profile_name) missing
+      );
+    in
+      if missing == [] then map (r: r.package) records
+      else builtins.throw (
+        "python planner: unresolved nixpkg attrs for " + name + ": " + missingText
+      );
+
   collectPyExtDepsTransitive = name:
     let
       startDeps = depsOfName name;
@@ -130,6 +147,7 @@ let
             srcRoot = repoRoot;
           }
         ) else null;
+      nixCxxAttrs = collectNixAttrsFor name;
     in T.pyExt {
       inherit name;
       module = mod;
@@ -137,7 +155,8 @@ let
       srcRoot = repoRoot;
       subdir = pkgPathOf name;
       srcList = core.srcsOf name;
-      nixCxxAttrs = collectNixAttrsFor name;
+      nixCxxAttrs = [];
+      nixCxxPkgs = resolveNixCxxPkgsFor name nixCxxAttrs;
       cflags = cflags;
       ldflags = ldflags;
       wheelhouse = wheelhouse;

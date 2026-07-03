@@ -8,7 +8,9 @@ in {
     name,
     srcRoot ? ../../..,
     subdir ? ".",
+    nixCxxPkgs ? [],
     nixCxxAttrs ? [],
+    nixpkgsProfile ? "default",
     includes ? [],
     defines ? [],
     cflags ? [],
@@ -24,7 +26,8 @@ in {
     base = H.sanitizeName name;
     jsOut = "$out/lib/${base}.js";
     wasmOut = "$out/lib/${base}.wasm";
-    incFlags = C.nixIncFlags nixCxxAttrs + " " + (lib.concatStringsSep " " (map (p: "-I${p}") includes));
+    resolvedPkgs = nixCxxPkgs ++ (C.resolveAttrsToPkgs nixCxxAttrs);
+    incFlags = C.nixIncFlags resolvedPkgs + " " + (lib.concatStringsSep " " (map (p: "-I${p}") includes));
     defFlags = lib.concatStringsSep " " (map (d: "-D${d}") defines);
     extraC = lib.concatStringsSep " " cflags;
     exportedStr =
@@ -151,6 +154,7 @@ in {
       std="${std}"
       {
         echo "toolchain=${pkgs.emscripten}"
+        echo "nixpkgsProfile=${nixpkgsProfile}"
         echo "emcc=${emcc}"
         echo "empp=${empp}"
         echo "incFlags=$incFlags"

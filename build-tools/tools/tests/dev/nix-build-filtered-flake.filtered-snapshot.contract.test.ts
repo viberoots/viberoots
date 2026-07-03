@@ -2,13 +2,17 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("filtered flake builds mark the snapshot so graph-generator can reuse flake src", async () => {
   const helper = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/nix-build-filtered-flake.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/nix-build-filtered-flake.ts"),
     "utf8",
   );
-  const planner = await fsp.readFile("viberoots/build-tools/tools/nix/graph-generator.nix", "utf8");
+  const planner = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/nix/graph-generator.nix"),
+    "utf8",
+  );
 
   assert.ok(
     helper.includes('VBR_FILTERED_FLAKE_SNAPSHOT: "1"'),

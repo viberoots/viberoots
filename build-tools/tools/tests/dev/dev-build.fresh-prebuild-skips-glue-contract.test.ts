@@ -1,34 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 async function readTool(relativePath: string): Promise<string> {
-  for (const root of candidateViberootsRoots()) {
-    const filePath = path.join(root, relativePath);
-    if (await exists(filePath)) return await fsp.readFile(filePath, "utf8");
-  }
-  throw new Error(`could not resolve viberoots source for ${relativePath}`);
-}
-
-function candidateViberootsRoots(): string[] {
-  return [
-    process.env.VIBEROOTS_SOURCE_ROOT,
-    process.env.VIBEROOTS_ROOT,
-    process.cwd(),
-    path.join(process.cwd(), "viberoots"),
-  ].flatMap((p) => {
-    const trimmed = String(p || "").trim();
-    return trimmed ? [trimmed] : [];
-  });
-}
-
-async function exists(filePath: string): Promise<boolean> {
-  return await fsp
-    .access(filePath)
-    .then(() => true)
-    .catch(() => false);
+  return await fsp.readFile(viberootsSourcePath(relativePath), "utf8");
 }
 
 test("dev-build fresh-prebuild fast path is before glue refresh", async () => {

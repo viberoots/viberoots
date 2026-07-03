@@ -4,8 +4,10 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const scriptPath = "viberoots/build-tools/tools/dev/node-route-doc-contract-check.ts";
+const scriptSourcePath = viberootsSourcePath(scriptPath);
 
 const prPlanDoc = `## Close Node gen/lib/bin/stage/inline gaps and enforce route parity (superseded in part by another plan update)
 
@@ -31,7 +33,7 @@ const designDoc = `1. **Planner languages vs. macro-only languages:** \`node_ass
 
 test("node-route-doc-contract-check passes when docs contract is aligned", async () => {
   await runInTemp("node-route-doc-contract-check-pass", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps-prs.md"), prPlanDoc);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsDoc);
     await fs.outputFile(
@@ -47,7 +49,7 @@ test("node-route-doc-contract-check passes when docs contract is aligned", async
 
 test("node-route-doc-contract-check fails when supersession marker drifts", async () => {
   await runInTemp("node-route-doc-contract-check-fail", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(
       path.join(tmp, "docs/handbook/nix-gaps-prs.md"),
       prPlanDoc.replace("(superseded in part by another plan update)", ""),

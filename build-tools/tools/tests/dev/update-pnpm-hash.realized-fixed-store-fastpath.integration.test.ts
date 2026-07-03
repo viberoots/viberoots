@@ -1,15 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("update-pnpm-hash reuses realized fixed pnpm-store outputs before exact-store prep", async () => {
-  const mainTxt = await fsp.readFile("viberoots/build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
+  const mainTxt = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash.ts"),
+    "utf8",
+  );
   const helperTxt = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/realized-store.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/realized-store.ts"),
     "utf8",
   );
   const storeTxt = await fsp.readFile(
-    "viberoots/build-tools/tools/nix/node-modules/store.nix",
+    viberootsSourcePath("viberoots/build-tools/tools/nix/node-modules/store.nix"),
     "utf8",
   );
   if (!mainTxt.includes("withResolvedExactPrefetchedStore")) {

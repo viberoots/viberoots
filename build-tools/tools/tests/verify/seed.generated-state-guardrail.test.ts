@@ -1,17 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
 import { isGeneratedRepoStateRelPath } from "../../dev/verify/generated-state-excludes";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 async function readRepoFile(relativePath: string): Promise<string> {
-  for (const candidate of [relativePath, path.join("viberoots", relativePath)]) {
-    try {
-      return await fsp.readFile(candidate, "utf8");
-    } catch {}
-  }
-  return await fsp.readFile(relativePath, "utf8");
+  return await fsp.readFile(viberootsSourcePath(relativePath), "utf8");
 }
 
 const generatedStatePaths = [

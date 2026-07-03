@@ -56,9 +56,13 @@ test("pkgsForProfile default preserves existing pkgs attr resolution", async () 
           selectedTargetName = "//projects/apps/demo:tool";
         };
         resolved = S.resolveNixpkgAttr { target = {}; attr = "pkgs.zlib"; };
+        gtest = S.resolveNixpkgAttr { target = {}; attr = "pkgs.gtest"; };
       in {
         samePkg = (S.pkgsForProfile "default").zlib.drvPath == pkgs.zlib.drvPath;
         resolvedPkg = resolved.package.drvPath == pkgs.zlib.drvPath;
+        gtestPkg =
+          if pkgs ? googletest then gtest.package.drvPath == pkgs.googletest.drvPath
+          else gtest.package.drvPath == pkgs.gtest.drvPath;
         profile = resolved.profile_name;
         kind = resolved.resolution_kind;
       }
@@ -66,6 +70,7 @@ test("pkgsForProfile default preserves existing pkgs attr resolution", async () 
     assert.deepEqual(await nixEvalJson(tmp, $, expr), {
       samePkg: true,
       resolvedPkg: true,
+      gtestPkg: true,
       profile: "default",
       kind: "nixpkgs_profile",
     });

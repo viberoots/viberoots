@@ -4,12 +4,14 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const scriptPath = "viberoots/build-tools/tools/dev/nix-gaps-baseline.ts";
+const scriptSourcePath = viberootsSourcePath(scriptPath);
 
 test("nix-gaps baseline generator writes required sections", async () => {
   await runInTemp("nix-gaps-baseline", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
 
     const outPath = path.join(tmp, "docs/handbook/nix-gaps-baseline.md");
     await $({

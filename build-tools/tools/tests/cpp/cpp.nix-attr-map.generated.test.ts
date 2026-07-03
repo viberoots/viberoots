@@ -4,6 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("inspect-cpp-attrs lists nixpkg attrs from graph nodes", async () => {
   await runInTemp("cpp-inspect-attrs", async (tmp, $) => {
@@ -14,7 +15,7 @@ test("inspect-cpp-attrs lists nixpkg attrs from graph nodes", async () => {
     ];
     await fs.outputFile(path.join(tmp, DEFAULT_GRAPH_PATH), JSON.stringify(graph), "utf8");
 
-    const cli = path.join(process.cwd(), "viberoots/build-tools/tools/buck/inspect-cpp-attrs.ts");
+    const cli = viberootsSourcePath("viberoots/build-tools/tools/buck/inspect-cpp-attrs.ts");
     const { stdout } = await $({ cwd: tmp, stdio: "pipe" })`node ${cli} --json`;
     const data = JSON.parse(String(stdout || "{}"));
     const targets = (data && data.targets) || {};

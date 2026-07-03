@@ -10,7 +10,12 @@ import { findRepoRoot, resolveWorkspaceRootsSync } from "../../lib/repo";
 import { runInTemp } from "./test-helpers";
 
 const execFileAsync = promisify(execFile);
-const VERSION_SCRIPT = "viberoots/build-tools/tools/dev/viberoots.ts";
+const REPO_ROOT = process.cwd();
+const VIBEROOTS_ROOT = path.join(REPO_ROOT, "viberoots");
+const ZX_INIT = path.join(VIBEROOTS_ROOT, "build-tools", "tools", "dev", "zx-init.mjs");
+const VERSION_SCRIPT = path.join(VIBEROOTS_ROOT, "build-tools", "tools", "dev", "viberoots.ts");
+const VIBEROOTS_BIN = path.join(VIBEROOTS_ROOT, "build-tools", "tools", "bin", "viberoots");
+const VBR_BIN_DIR = path.join(VIBEROOTS_ROOT, "build-tools", "tools", "bin");
 
 async function exists(p: string): Promise<boolean> {
   return await fsp.access(p).then(
@@ -59,15 +64,21 @@ async function initGitRepo(root: string): Promise<string> {
 }
 
 async function runVersion(workspaceRoot: string, extraEnv: NodeJS.ProcessEnv = {}) {
-  const { stdout } = await execFileAsync("zx-wrapper", [VERSION_SCRIPT, "version", "--json"], {
-    cwd: process.cwd(),
-    env: {
-      ...process.env,
-      ...extraEnv,
-      WORKSPACE_ROOT: workspaceRoot,
-      NO_DEV_SHELL: "1",
+  const { stdout } = await execFileAsync(
+    "zx-wrapper",
+    ["--import", ZX_INIT, VERSION_SCRIPT, "version", "--json"],
+    {
+      cwd: workspaceRoot,
+      env: {
+        ...process.env,
+        VIBEROOTS_SOURCE_ROOT: "",
+        VIBEROOTS_FLAKE_INPUT_ROOT: "",
+        ...extraEnv,
+        WORKSPACE_ROOT: workspaceRoot,
+        NO_DEV_SHELL: "1",
+      },
     },
-  });
+  );
   return JSON.parse(String(stdout));
 }
 
@@ -235,23 +246,21 @@ test("resolveWorkspaceRootsSync honors explicit workspace and viberoots root ove
 test("viberoots wrapper resolves command source from VIBEROOTS_ROOT", async () => {
   const tmp = await workspace("vbr-version-command");
   try {
-    const { stdout } = await execFileAsync(
-      "viberoots/build-tools/tools/bin/viberoots",
-      ["version", "--json"],
-      {
-        cwd: process.cwd(),
-        env: {
-          ...process.env,
-          NO_DEV_SHELL: "1",
-          WORKSPACE_ROOT: tmp,
-          VIBEROOTS_ROOT: path.join(process.cwd(), "viberoots"),
-        },
+    const { stdout } = await execFileAsync(VIBEROOTS_BIN, ["version", "--json"], {
+      cwd: tmp,
+      env: {
+        ...process.env,
+        VIBEROOTS_SOURCE_ROOT: "",
+        VIBEROOTS_FLAKE_INPUT_ROOT: "",
+        NO_DEV_SHELL: "1",
+        WORKSPACE_ROOT: tmp,
+        VIBEROOTS_ROOT,
       },
-    );
+    });
     const status = JSON.parse(String(stdout));
     assert.equal(status.sourceMode, "local");
     assert.equal(status.workspaceRoot, tmp);
-    assert.equal(status.viberootsRoot, path.join(process.cwd(), "viberoots"));
+    assert.equal(status.viberootsRoot, VIBEROOTS_ROOT);
     assert.equal(status.revisionSource, "git");
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
@@ -263,22 +272,22 @@ test("vbr wrapper resolves command source from nested consumer directories", asy
   try {
     const nested = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(nested, { recursive: true });
-    const viberootsRoot = path.join(process.cwd(), "viberoots");
-    const binDir = path.join(viberootsRoot, "build-tools", "tools", "bin");
     const { stdout } = await execFileAsync("vbr", ["version", "--json"], {
       cwd: nested,
       env: {
         ...process.env,
-        PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}`,
+        PATH: `${VBR_BIN_DIR}${path.delimiter}${process.env.PATH ?? ""}`,
+        VIBEROOTS_SOURCE_ROOT: "",
+        VIBEROOTS_FLAKE_INPUT_ROOT: "",
         NO_DEV_SHELL: "1",
         WORKSPACE_ROOT: tmp,
-        VIBEROOTS_ROOT: viberootsRoot,
+        VIBEROOTS_ROOT,
       },
     });
     const status = JSON.parse(String(stdout));
     assert.equal(status.sourceMode, "local");
     assert.equal(status.workspaceRoot, tmp);
-    assert.equal(status.viberootsRoot, viberootsRoot);
+    assert.equal(status.viberootsRoot, VIBEROOTS_ROOT);
     assert.equal(status.revisionSource, "git");
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
@@ -290,16 +299,16 @@ test("vbr develop prints relative workspace flake refs from nested consumer dire
   try {
     const nested = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(nested, { recursive: true });
-    const viberootsRoot = path.join(process.cwd(), "viberoots");
-    const binDir = path.join(viberootsRoot, "build-tools", "tools", "bin");
     const { stdout } = await execFileAsync("vbr", ["develop", "--print", "--command", "true"], {
       cwd: nested,
       env: {
         ...process.env,
-        PATH: `${binDir}${path.delimiter}${process.env.PATH ?? ""}`,
+        PATH: `${VBR_BIN_DIR}${path.delimiter}${process.env.PATH ?? ""}`,
+        VIBEROOTS_SOURCE_ROOT: "",
+        VIBEROOTS_FLAKE_INPUT_ROOT: "",
         NO_DEV_SHELL: "1",
         WORKSPACE_ROOT: tmp,
-        VIBEROOTS_ROOT: viberootsRoot,
+        VIBEROOTS_ROOT,
       },
     });
     const command = String(stdout).trim();
@@ -308,7 +317,7 @@ test("vbr develop prints relative workspace flake refs from nested consumer dire
       "nix develop --no-write-lock-file --accept-flake-config path:../../../.viberoots/workspace#default --override-input viberoots path:../../../viberoots --command true",
     );
     assert.doesNotMatch(command, new RegExp(tmp.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-    assert.doesNotMatch(command, new RegExp(viberootsRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(command, new RegExp(VIBEROOTS_ROOT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.equal(await exists(path.join(nested, ".viberoots")), false);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });

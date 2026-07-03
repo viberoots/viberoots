@@ -17,6 +17,8 @@ function sanitizeFragment(input: string): string {
 }
 
 function stablePnpmStateBase(): string {
+  const override = String(process.env.VBR_PNPM_STATE_BASE || "").trim();
+  if (override && path.isAbsolute(override)) return path.resolve(override);
   const tmpBase = process.platform === "win32" ? os.tmpdir() : "/tmp";
   let user = "";
   try {
@@ -118,10 +120,101 @@ async function pathExists(p: string): Promise<boolean> {
   }
 }
 
+function pidAlive(pid: number): boolean {
+  if (!Number.isFinite(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function pathMtimeMs(p: string): Promise<number> {
+  const st = await fsp.stat(p).catch(() => null);
+  return st?.mtimeMs || 0;
+}
+
+async function exactPrepareLockActive(lockPath: string): Promise<boolean> {
+  try {
+    const parsed = JSON.parse(await fsp.readFile(lockPath, "utf8")) as {
+      pid?: number;
+      startedAtMs?: number;
+    };
+    return pidAlive(Number(parsed.pid || 0));
+  } catch {
+    return false;
+  }
+}
+
+async function pruneExactPnpmStateDirs(base: string): Promise<string[]> {
+  const pruned: string[] = [];
+  const exactRoot = path.join(base, "exact");
+  const indexRoot = path.join(base, "exact-index");
+  const liveLockHashes = new Set<string>();
+  const indexEntries = await fsp.readdir(indexRoot, { withFileTypes: true }).catch(() => []);
+  for (const entry of indexEntries) {
+    if (!entry.isFile() || !entry.name.endsWith(".json")) continue;
+    const indexPath = path.join(indexRoot, entry.name);
+    try {
+      const parsed = JSON.parse(await fsp.readFile(indexPath, "utf8")) as {
+        repoRoot?: string;
+        lockHash?: string;
+      };
+      const repoRootRaw = String(parsed.repoRoot || "").trim();
+      const lockHashRaw = String(parsed.lockHash || "").trim();
+      const repoRoot = repoRootRaw ? path.resolve(repoRootRaw) : "";
+      const lockHash = lockHashRaw ? sanitizeFragment(lockHashRaw) : "";
+      if (!repoRoot || !(await pathExists(repoRoot)) || !lockHash) {
+        await fsp.rm(indexPath, { force: true }).catch(() => {});
+        pruned.push(indexPath);
+        continue;
+      }
+      liveLockHashes.add(lockHash);
+    } catch {
+      await fsp.rm(indexPath, { force: true }).catch(() => {});
+      pruned.push(indexPath);
+    }
+  }
+
+  const exactEntries = await fsp.readdir(exactRoot, { withFileTypes: true }).catch(() => []);
+  const incompleteTtlRaw = Number.parseInt(
+    process.env.VBR_EXACT_PNPM_INCOMPLETE_TTL_MS || "3600000",
+    10,
+  );
+  const incompleteTtlMs =
+    Number.isFinite(incompleteTtlRaw) && incompleteTtlRaw >= 0 ? incompleteTtlRaw : 3_600_000;
+  for (const entry of exactEntries) {
+    if (!entry.isDirectory()) continue;
+    const exactDir = path.join(exactRoot, entry.name);
+    if (await exactPrepareLockActive(path.join(exactDir, ".prepare.lock"))) continue;
+    const readyPath = path.join(exactDir, "ready.json");
+    let nixStorePath = "";
+    try {
+      const parsed = JSON.parse(await fsp.readFile(readyPath, "utf8")) as {
+        nixStorePath?: string;
+      };
+      nixStorePath = String(parsed.nixStorePath || "").trim();
+    } catch {}
+    const missingReady = !nixStorePath;
+    const incompleteAgeMs = Date.now() - (await pathMtimeMs(exactDir));
+    if (
+      !liveLockHashes.has(entry.name) ||
+      (missingReady && incompleteAgeMs > incompleteTtlMs) ||
+      (nixStorePath.startsWith("/nix/store/") && !(await pathExists(nixStorePath)))
+    ) {
+      await fsp.rm(exactDir, { recursive: true, force: true }).catch(() => {});
+      pruned.push(exactDir);
+    }
+  }
+  return pruned;
+}
+
 export async function pruneOrphanExternalPnpmStateDirs(): Promise<string[]> {
   const base = stablePnpmStateBase();
   const entries = await fsp.readdir(base, { withFileTypes: true }).catch(() => []);
   const pruned: string[] = [];
+  pruned.push(...(await pruneExactPnpmStateDirs(base)));
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     if (entry.name === "exact" || entry.name === "exact-index") continue;

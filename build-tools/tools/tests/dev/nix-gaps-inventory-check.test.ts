@@ -4,8 +4,10 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const scriptPath = "viberoots/build-tools/tools/dev/nix-gaps-inventory-check.ts";
+const scriptSourcePath = viberootsSourcePath(scriptPath);
 const exceptionsPath = "docs/handbook/nix-gaps-exceptions.json";
 
 const starlarkApi = `# Starlark API reference
@@ -173,7 +175,7 @@ const exceptionsMissingJustification = `{
 
 test("nix-gaps inventory check passes when inventory is complete", async () => {
   await runInTemp("nix-gaps-inventory-pass", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsComplete);
     await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsComplete);
@@ -185,7 +187,7 @@ test("nix-gaps inventory check passes when inventory is complete", async () => {
 
 test("nix-gaps inventory check fails when a macro is missing", async () => {
   await runInTemp("nix-gaps-inventory-fail", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsMissing);
     await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsComplete);
@@ -201,7 +203,7 @@ test("nix-gaps inventory check fails when a macro is missing", async () => {
 
 test("nix-gaps inventory check fails when a Node macro is missing from classification table", async () => {
   await runInTemp("nix-gaps-node-classification-fail", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(
       path.join(tmp, "docs/handbook/nix-gaps.md"),
@@ -220,7 +222,7 @@ test("nix-gaps inventory check fails when a Node macro is missing from classific
 
 test("nix-gaps inventory check fails when exception policy section is missing", async () => {
   await runInTemp("nix-gaps-exception-policy-missing", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsMissingExceptionPolicy);
     await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsComplete);
@@ -236,7 +238,7 @@ test("nix-gaps inventory check fails when exception policy section is missing", 
 
 test("nix-gaps inventory check fails when exception entry lacks justification", async () => {
   await runInTemp("nix-gaps-exception-justification-missing", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsComplete);
     await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsMissingJustification);

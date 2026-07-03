@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("cpp present: validator passes and diagnose enables cpp", async () => {
   await runInTemp("cpp-present", async (tmp, $) => {
@@ -47,16 +48,16 @@ test("cpp present: validator passes and diagnose enables cpp", async () => {
     );
 
     // Copy validator/diagnose scripts into temp
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/dev/langs.schema.json"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/dev/langs.schema.json",
       path.join(tmp, "viberoots/build-tools/tools/dev/langs.schema.json"),
     );
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/dev/validate-langs.ts"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/dev/validate-langs.ts",
       path.join(tmp, "viberoots/build-tools/tools/dev/validate-langs.ts"),
     );
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/dev/langs-diagnose.ts"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/dev/langs-diagnose.ts",
       path.join(tmp, "viberoots/build-tools/tools/dev/langs-diagnose.ts"),
     );
 

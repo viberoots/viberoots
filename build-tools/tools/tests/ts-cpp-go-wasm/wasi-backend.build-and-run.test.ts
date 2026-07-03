@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { buildSelectedOutPath, exportGraphInTemp, runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("wasi_single backend builds and runs add(2,3)=5 via node:wasi", async () => {
   await runInTemp("wasi-backend", async (tmp, $) => {
@@ -46,11 +47,11 @@ nix_cpp_wasm_static_lib(
     // 2) Provide C++ defs in the temp repo (planner-visible)
     await fs.outputFile(
       path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
-      await fs.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
+      await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/defs.bzl"), "utf8"),
     );
     await fs.outputFile(
       path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
-      await fs.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
+      await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/wasm_defs.bzl"), "utf8"),
     );
 
     // 3) TinyGo package exporting a wasm function `add` (pure Go, no C++ link required for smoke)

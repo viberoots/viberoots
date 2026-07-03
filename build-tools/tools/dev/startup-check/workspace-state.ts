@@ -4,6 +4,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { findExtractionBlockers, formatExtractionBlockers } from "../../lib/extraction-blockers";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 
 const execFileAsync = promisify(execFile);
 
@@ -28,10 +29,19 @@ function flakeUsesLocalViberoots(text: string): boolean {
   return /viberoots\.url\s*=\s*"(?:path|git\+file):[^"]*viberoots"/.test(text);
 }
 
+function localViberootsInputPath(text: string): string {
+  const match = text.match(/viberoots\.url\s*=\s*"(?:path|git\+file):([^"]+)"/);
+  const raw = match?.[1]?.trim() || "";
+  if (!raw) return "";
+  const filePath = raw.startsWith("file:") ? raw.slice("file:".length) : raw;
+  if (filePath === "../../viberoots") {
+    return path.resolve(".viberoots", "workspace", filePath);
+  }
+  return path.resolve(filePath);
+}
+
 function flakeUsesSubmoduleViberoots(text: string): boolean {
-  return /viberoots\.url\s*=\s*"(?:path|git\+file):(?:\.\/|\.\.\/\.\.\/)?viberoots"/.test(
-    text,
-  );
+  return localViberootsInputPath(text) === path.resolve("viberoots");
 }
 
 async function readWorkspaceFlakeText(): Promise<string> {
@@ -49,7 +59,7 @@ async function readWorkspaceFlakeLock(): Promise<{ text: string; dir: string }> 
 
 async function git(args: string[], cwd = "."): Promise<string> {
   try {
-    const { stdout } = await execFileAsync("git", args, {
+    const { stdout } = await execFileAsync(resolveToolPathSync("git"), args, {
       cwd,
       env: { ...process.env, GIT_OPTIONAL_LOCKS: "0" },
     });

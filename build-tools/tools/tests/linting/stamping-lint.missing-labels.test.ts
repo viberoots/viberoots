@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { runInTemp } from "../lib/test-helpers";
 import path from "node:path";
 import fs from "fs-extra";
+import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("stamping-lint flags go_* targets missing lang:go", async () => {
   await runInTemp("stamping-lint-missing", async (tmp, $) => {
@@ -16,8 +17,8 @@ test("stamping-lint flags go_* targets missing lang:go", async () => {
     await fs.outputFile(path.join(tmp, "TARGETS"), targets);
     await fs.outputFile(path.join(tmp, "pkg/demo/demo.go"), "package demo\n\nfunc X(){}\n");
     // Copy lint script
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/dev/stamping-lint.ts"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/dev/stamping-lint.ts",
       path.join(tmp, "viberoots/build-tools/tools/dev/stamping-lint.ts"),
     );
     const res = await $({

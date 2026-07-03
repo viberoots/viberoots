@@ -1,13 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 import { test } from "node:test";
-
-const VIBEROOTS_ROOT = path.join(process.cwd(), "viberoots");
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 async function readRepoFile(relativePath: string): Promise<string> {
-  return await fsp.readFile(path.join(VIBEROOTS_ROOT, relativePath), "utf8");
+  return await fsp.readFile(viberootsSourcePath(relativePath), "utf8");
 }
 
 test("canonical runtime-path contract: runtime and planner surfaces stay manifest-driven", async () => {

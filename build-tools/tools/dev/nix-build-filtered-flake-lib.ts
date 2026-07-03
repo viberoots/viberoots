@@ -21,15 +21,47 @@ const SHARED_CPP_SNAPSHOT_ROOT_FILES = [
   "pnpm-lock.yaml",
 ];
 
+const SHARED_NODE_SNAPSHOT_ROOTS = SHARED_CPP_SNAPSHOT_ROOTS;
+const SHARED_NODE_SNAPSHOT_ROOT_FILES = [
+  ...SHARED_CPP_SNAPSHOT_ROOT_FILES,
+  "projects/node-modules.hashes.json",
+];
+
 export const FILTERED_FLAKE_RSYNC_EXCLUDES = [
   ".git",
   "node_modules",
   "buck-out",
+  ".codex-logs",
+  ".full-test-output.log",
+  ".patch-sessions.json",
+  "test-logs",
   ".viberoots/buck",
   ".viberoots/buck/tmp",
   ".viberoots/cache",
+  ".viberoots/codex-logs",
   ".viberoots/workspace/.viberoots",
+  ".viberoots/workspace/backups",
+  ".viberoots/workspace/buck",
+  ".viberoots/workspace/codex-test-logs",
+  ".viberoots/workspace/install-cache",
+  ".viberoots/workspace/node",
+  ".viberoots/workspace/pr-logs",
   "viberoots/.viberoots",
+  "viberoots/.cache",
+  "viberoots/.clinic",
+  "viberoots/.codex-logs",
+  "viberoots/.direnv",
+  "viberoots/.full-test-output.log",
+  "viberoots/.nix-gcroots",
+  "viberoots/.patch-sessions.json",
+  "viberoots/.pnpm-store",
+  "viberoots/buck-out",
+  "viberoots/build-tools/tmp",
+  "viberoots/coverage",
+  "viberoots/node_modules",
+  "viberoots/result",
+  "viberoots/result-*",
+  "viberoots/test-logs",
   ".direnv",
   ".pnpm-store",
   ".pnpm-home",
@@ -133,5 +165,27 @@ export function selectedCppSnapshotRelPaths(packagePaths: readonly string[]): st
 }
 
 export function selectedCppSnapshotRsyncSources(relPaths: readonly string[]): string[] {
+  return relPaths.map((relPath) => `./${relPath}`);
+}
+
+export function selectedNodeSnapshotRelPaths(importerDir: string): string[] {
+  const ordered = new Set<string>();
+  for (const rel of SHARED_NODE_SNAPSHOT_ROOT_FILES) ordered.add(rel);
+  for (const rel of SHARED_NODE_SNAPSHOT_ROOTS) ordered.add(rel);
+  const normalized = String(importerDir || "")
+    .trim()
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "");
+  if (!normalized || normalized === ".") return [...ordered];
+  ordered.add(normalized);
+  const name = normalized.split("/").pop() || "";
+  if (name) {
+    ordered.add(`${normalized}-native`);
+    ordered.add(`projects/libs/${name}-go`);
+  }
+  return [...ordered];
+}
+
+export function selectedNodeSnapshotRsyncSources(relPaths: readonly string[]): string[] {
   return relPaths.map((relPath) => `./${relPath}`);
 }

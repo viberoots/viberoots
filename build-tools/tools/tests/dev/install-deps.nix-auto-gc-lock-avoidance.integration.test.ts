@@ -1,10 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("install deps nix calls disable per-invocation auto-GC lock waits", async () => {
   const hashNix = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/nix.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/nix.ts"),
     "utf8",
   );
   if (!hashNix.includes('"min-free"') || !hashNix.includes('"max-free"')) {
@@ -18,7 +19,7 @@ test("install deps nix calls disable per-invocation auto-GC lock waits", async (
   }
 
   const depsMain = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/install/deps-main.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/install/deps-main.ts"),
     "utf8",
   );
   if (!depsMain.includes("importer ${imp}: realizing and linking node_modules")) {
@@ -35,7 +36,7 @@ test("install deps nix calls disable per-invocation auto-GC lock waits", async (
   }
 
   const linkNode = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/install/link-node.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/install/link-node.ts"),
     "utf8",
   );
   if (!linkNode.includes('"min-free"') || !linkNode.includes('"max-free"')) {
@@ -50,7 +51,10 @@ test("install deps nix calls disable per-invocation auto-GC lock waits", async (
     );
   }
 
-  const nixShell = await fsp.readFile("viberoots/build-tools/lang/nix_shell.bzl", "utf8");
+  const nixShell = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/lang/nix_shell.bzl"),
+    "utf8",
+  );
   if (!nixShell.includes("--option min-free 0 --option max-free 0")) {
     throw new Error("nix_shell.bzl nix build helper must disable min-free/max-free");
   }

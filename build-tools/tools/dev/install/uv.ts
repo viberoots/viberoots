@@ -21,7 +21,8 @@ async function sha256File(file: string): Promise<string> {
  * a future uv2nix conversion without changing callers.
  */
 export async function runUvRefreshAll(dryRun: boolean, verbose: boolean) {
-  const root = repoRoot();
+  const envRoot = String(process.env.WORKSPACE_ROOT || "").trim();
+  const root = envRoot ? path.resolve(envRoot) : repoRoot();
   const scanRoots = ["."];
   if (!dryRun && (await absenceCacheFresh(root, "uv-locks-absent", scanRoots))) {
     if (verbose) console.log("[uv2nix] scan skipped: no uv.lock present");

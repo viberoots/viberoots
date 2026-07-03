@@ -1,11 +1,6 @@
 { lib }:
-# build-tools/tools/nix/planner/go.nix — language plugin for Go (import-if-exists)
-# Exports a function that accepts a context from graph-generator and returns
-# the Go language adapter surface used by the planner.
-
 ctx:
 let
-  # Unpack required fields from the provided context
   T = ctx.T;
   get = ctx.get;
   modulesTomlFor = ctx.modulesTomlFor;
@@ -19,7 +14,6 @@ let
     pkgPathOf = ctx.pkgPathOf;
   };
   kindConfigs = import ./kind-configs.nix;
-  # Shared, top-level helpers (deduplicated from mkApp/mkLib)
   byName = L.byName;
   LC = import ./link-closure.nix { inherit lib; };
   GoWasm = import ./go-wasm.nix { inherit lib; };
@@ -58,6 +52,27 @@ let
         else builtins.throw "go planner: normalized link_closure_overrides has duplicate keys for '${name}'";
     in builtins.listToAttrs pairs;
   dedupePreserveOrder = L.dedupePreserveOrder;
+  nodeForSourcePlan = name: if builtins.hasAttr name byName then byName.${name} else {};
+  collectNixCgoAttrsFor = name:
+    let
+      attrFrom = l: lib.removePrefix "nixpkg:" l;
+      labels = L.collectLabelsWithPrefix name "nixpkg:";
+      attrs = map attrFrom labels;
+      uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
+    in builtins.sort (a: b: a < b) (uniq attrs);
+  resolveNixCgoPkgsFor = name: attrs:
+    let
+      records = ctx.resolveNixpkgAttrs {
+        target = nodeForSourcePlan name;
+        attrs = attrs;
+      };
+      missing = builtins.filter (r: r.package == null) records;
+      missingText = builtins.concatStringsSep ", " (map (r: r.attr + " from " + r.profile_name) missing);
+    in
+      if missing == [] then map (r: r.package) records
+      else builtins.throw (
+        "go planner (cgo): unresolved nixpkg attrs for " + name + ": " + missingText
+      );
   isCppNode = nm:
     let n = if builtins.hasAttr nm byName then byName.${nm} else null;
         rt0 = if n == null then null else (get n "rule_type");
@@ -140,8 +155,6 @@ let
     inherit T get repoRoot pkgPathOf byName L LC normalizeLabelList normalizeOverrides;
     inherit dedupePreserveOrder labelsOfName nodeOfName;
   };
-
-  # Helper: compute absolute patch directories from a node's srcs ('.patch' siblings)
   patchDirsAbsFor = name:
     let
       srcs = L.srcsOf name;
@@ -171,104 +184,60 @@ let
     in if chosen == null || chosen == "." then "."
        else if lib.hasPrefix "./" chosen then chosen
        else "./" + chosen;
+  cgoArgsFor = name:
+    let nixCgoAttrs = collectNixCgoAttrsFor name; in {
+      nixCgoAttrs = [];
+      nixCgoPkgs = resolveNixCgoPkgsFor name nixCgoAttrs;
+      repoCgoPkgs = repoCgoPkgsFor name;
+    };
 in {
   isTarget = L.isTargetByRuleTypeOrLabel {
     ruleTypePrefixes = [ "go_" ];
     label = "lang:go";
   };
-
   kindOf = n:
     L.kindOf {
       labels = L.labelsOf n;
       ruleType = L.ruleTypeOf n;
       name = L.nameOf n;
       config = kindConfigs.go;
-    };
-
+  };
   modulesFileFor = name: modulesTomlFor name;
-
   mkApp = name:
-    let
-      repoCgoPkgs = repoCgoPkgsFor name;
-      # Derive nixCgoAttrs (nixpkgs attrs) from transitive deps via shared DFS
-      nixCgoAttrs = let
-        attrFrom = l: lib.removePrefix "nixpkg:" l;
-        labels = L.collectLabelsWithPrefix name "nixpkg:";
-        attrs = map attrFrom labels;
-        uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
-      in builtins.sort (a: b: a < b) (uniq attrs);
-    in T.goApp {
+    T.goApp ({
       inherit name;
       modulesToml = modulesTomlFor name;
       devOverridesMap = localModuleOverrides;
       srcRoot = repoRoot;
       subdir = (pkgPathOf name);
       patchDirs = patchDirsAbsFor name;
-      nixCgoAttrs = nixCgoAttrs;
-      repoCgoPkgs = repoCgoPkgs;
-    };
-
+    } // cgoArgsFor name);
   mkLib = name:
-    let
-      repoCgoPkgs = repoCgoPkgsFor name;
-      nixCgoAttrs = let
-        attrFrom = l: lib.removePrefix "nixpkg:" l;
-        labels = L.collectLabelsWithPrefix name "nixpkg:";
-        attrs = map attrFrom labels;
-        uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
-      in builtins.sort (a: b: a < b) (uniq attrs);
-    in T.goLib {
+    T.goLib ({
       inherit name;
       modulesToml = modulesTomlFor name;
       srcRoot = repoRoot;
       subdir = (pkgPathOf name);
       patchDirs = patchDirsAbsFor name;
-      nixCgoAttrs = nixCgoAttrs;
-      repoCgoPkgs = repoCgoPkgs;
-    };
-
+    } // cgoArgsFor name);
   mkTest = name:
-    let
-      repoCgoPkgs = repoCgoPkgsFor name;
-      nixCgoAttrs = let
-        attrFrom = l: lib.removePrefix "nixpkg:" l;
-        labels = L.collectLabelsWithPrefix name "nixpkg:";
-        attrs = map attrFrom labels;
-        uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
-      in builtins.sort (a: b: a < b) (uniq attrs);
-      srcList = L.srcsOf name;
-    in T.goTest {
+    T.goTest ({
       inherit name;
       modulesToml = modulesTomlFor name;
       devOverridesMap = localModuleOverrides;
       srcRoot = repoRoot;
       subdir = (pkgPathOf name);
       patchDirs = patchDirsAbsFor name;
-      nixCgoAttrs = nixCgoAttrs;
-      repoCgoPkgs = repoCgoPkgs;
-      srcList = srcList;
-    };
-
+      srcList = L.srcsOf name;
+    } // cgoArgsFor name);
   mkCArchive = name:
-    let
-      repoCgoPkgs = repoCgoPkgsFor name;
-      nixCgoAttrs = let
-        attrFrom = l: lib.removePrefix "nixpkg:" l;
-        labels = L.collectLabelsWithPrefix name "nixpkg:";
-        attrs = map attrFrom labels;
-        uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
-      in builtins.sort (a: b: a < b) (uniq attrs);
-    in T.goCArchive {
+    T.goCArchive ({
       inherit name;
       modulesToml = modulesTomlFor name;
       srcRoot = repoRoot;
       subdir = (pkgPathOf name);
       pkgPath = pkgPathForCArchive name;
       patchDirs = patchDirsAbsFor name;
-      nixCgoAttrs = nixCgoAttrs;
-      repoCgoPkgs = repoCgoPkgs;
-    };
-
+    } // cgoArgsFor name);
   mkTinyWasm = wasm.mkTinyWasm;
 }
-

@@ -4,6 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runInTemp } from "../lib/test-helpers";
+import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("exporter discovers adapters by glob and ignores non-existent", async () => {
   await runInTemp("exporter-discovery", async (tmp, $) => {
@@ -11,12 +12,12 @@ test("exporter discovers adapters by glob and ignores non-existent", async () =>
     const langDir = path.join(tmp, "viberoots/build-tools/tools/buck/exporter/lang");
     await fs.mkdirp(langDir);
     // Minimal exporter main/types to allow import without buck
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/buck/exporter/types.ts"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/buck/exporter/types.ts",
       path.join(tmp, "viberoots/build-tools/tools/buck/exporter/types.ts"),
     );
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/buck/exporter/lang/contract.ts"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/buck/exporter/lang/contract.ts",
       path.join(tmp, "viberoots/build-tools/tools/buck/exporter/lang/contract.ts"),
     );
     // Create a simple adapter file adapter.ts exporting { adapter }

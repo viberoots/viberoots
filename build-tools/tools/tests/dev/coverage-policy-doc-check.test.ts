@@ -4,8 +4,10 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const scriptPath = "viberoots/build-tools/tools/dev/coverage-policy-doc-check.ts";
+const scriptSourcePath = viberootsSourcePath(scriptPath);
 
 const testingDoc = `# Testing
 
@@ -47,7 +49,7 @@ const nixGapsPrsDoc = `# Nix Gaps PR Plan
 
 test("coverage-policy-doc-check passes when policy docs are aligned", async () => {
   await runInTemp("coverage-policy-doc-check-pass", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "TESTING.md"), testingDoc);
     await fs.outputFile(
       path.join(tmp, "docs/handbook/getting-started-on-a-pr.md"),
@@ -63,7 +65,7 @@ test("coverage-policy-doc-check passes when policy docs are aligned", async () =
 
 test("coverage-policy-doc-check fails when one policy fragment drifts", async () => {
   await runInTemp("coverage-policy-doc-check-fail", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "TESTING.md"), testingDoc);
     await fs.outputFile(
       path.join(tmp, "docs/handbook/getting-started-on-a-pr.md"),

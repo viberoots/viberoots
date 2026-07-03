@@ -4,6 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runInTemp } from "../lib/test-helpers";
+import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("langs.json valid passes validator", async () => {
   await runInTemp("langs-validate-valid", async (tmp, $) => {
@@ -26,12 +27,12 @@ test("langs.json valid passes validator", async () => {
       path.join(tmp, "viberoots/build-tools/tools/nix/langs.json"),
       JSON.stringify(manifest, null, 2) + "\n",
     );
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/dev/langs.schema.json"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/dev/langs.schema.json",
       path.join(tmp, "viberoots/build-tools/tools/dev/langs.schema.json"),
     );
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/dev/validate-langs.ts"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/dev/validate-langs.ts",
       path.join(tmp, "viberoots/build-tools/tools/dev/validate-langs.ts"),
     );
     const res = await $({ cwd: tmp })`node viberoots/build-tools/tools/dev/validate-langs.ts`;

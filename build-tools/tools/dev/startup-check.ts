@@ -34,6 +34,43 @@ async function sourceRoot(): Promise<string> {
   return process.cwd();
 }
 
+async function repairLocalBuckPrelude(source: string): Promise<void> {
+  if (!(await pathExists(sourcePath(source, "build-tools/tools/nix/buck-prelude.nix")))) return;
+  if (await pathExists(sourcePath(source, "prelude/prelude.bzl"))) return;
+
+  const preludeLink = sourcePath(source, "prelude");
+  let canReplace = false;
+  try {
+    const stat = await fsp.lstat(preludeLink);
+    canReplace = stat.isSymbolicLink();
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    canReplace = true;
+  }
+  if (!canReplace) {
+    throw new Error(`[startup-check] invalid Buck prelude: ${preludeLink} is not a symlink`);
+  }
+
+  const built = await $({
+    cwd: source,
+    stdio: "pipe",
+  })`nix build --impure ${`path:${source}#buck2-prelude`} --no-link --no-write-lock-file --accept-flake-config --print-out-paths`;
+  const outPath =
+    String(built.stdout || "")
+      .trim()
+      .split("\n")
+      .filter(Boolean)
+      .pop() || "";
+  const target = path.join(outPath, "prelude");
+  if (!(await pathExists(path.join(target, "prelude.bzl")))) {
+    throw new Error("[startup-check] failed to materialize Buck prelude from #buck2-prelude");
+  }
+  await fsp.unlink(preludeLink).catch((e) => {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+  });
+  await fsp.symlink(target, preludeLink);
+}
+
 function sourcePath(root: string, ...parts: string[]): string {
   return path.join(root, ...parts);
 }
@@ -221,6 +258,13 @@ async function main() {
   await requireImpureEnvPassthrough();
 
   // No overlayfs requirement: patch workspaces use cp -cR on macOS when available, else cp -a.
+
+  try {
+    await repairLocalBuckPrelude(source);
+  } catch (e) {
+    console.error(e instanceof Error ? e.message : String(e));
+    process.exit(1);
+  }
 
   for (const lang of DEV_OVERRIDE_LANGS) {
     const envName = devOverrideEnvNameForLang(lang);

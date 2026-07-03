@@ -1,9 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("update-pnpm-hash logs fixed and unfixed phase progress", async () => {
-  const file = "viberoots/build-tools/tools/dev/update-pnpm-hash.ts";
+  const file = viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash.ts");
   const txt = await fsp.readFile(file, "utf8");
   if (!txt.includes("step=fixed-build")) {
     throw new Error("update-pnpm-hash.ts must log fixed-build phase");

@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
 import process from "node:process";
 import { test } from "node:test";
 import { isLikelyEphemeralIsolation } from "../../dev/verify/buck-orphan-cleanup";
@@ -8,6 +9,11 @@ import {
   ownerPidFromEphemeralIsolation,
   tryTempRepoRootFromBuckDaemonCwd,
 } from "../../dev/verify/buck-orphan-cleanup-lib";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
+
+async function readRepoFile(relativePath: string): Promise<string> {
+  return await fsp.readFile(viberootsSourcePath(relativePath), "utf8");
+}
 
 test("orphan buck cleanup: matches ephemeral verify/debug/test isolations only", () => {
   const yes = [
@@ -49,6 +55,16 @@ test("orphan buck cleanup: live-owner parsing stays scoped to the encoded verify
   const otherNested = `verify-nested-${process.pid + 1}-deadbeefcafe`;
   assert.equal(liveOwnerPidFromEphemeralIsolation(currentNested), process.pid);
   assert.equal(ownerPidFromEphemeralIsolation(otherNested), process.pid + 1);
+});
+
+test("orphan buck cleanup: orphaned temp-repo daemons are killable with live temp roots", async () => {
+  const source = await readRepoFile("build-tools/tools/dev/verify/buck-orphan-cleanup.ts");
+
+  assert.match(source, /forkserversByParentPid/);
+  assert.match(source, /childTempForkservers/);
+  assert.match(source, /isTempRepoRoot\(fork\.repoRoot\)/);
+  assert.match(source, /killed temp-repo daemon/);
+  assert.doesNotMatch(source, /if \(await pathExists\(mapped\.repoRoot\)\) continue;/);
 });
 
 test("orphan buck cleanup: missing temp-root daemons require cwd root evidence", () => {

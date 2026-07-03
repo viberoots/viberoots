@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { readGraph } from "../../lib/graph";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 await runInTemp("cpp-macro-stamp-lib", async (tmp, $) => {
   // Minimal C++ lib under projects/libs/demo
@@ -12,11 +13,11 @@ await runInTemp("cpp-macro-stamp-lib", async (tmp, $) => {
   await fs.outputFile(path.join(pkg, "src", "demo.cpp"), "int add(int a,int b){return a+b;}\n");
   await fs.outputFile(
     path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
-    await fs.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
+    await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/defs.bzl"), "utf8"),
   );
   await fs.outputFile(
     path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
-    await fs.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
+    await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/wasm_defs.bzl"), "utf8"),
   );
   await fs.outputFile(
     path.join(pkg, "TARGETS"),

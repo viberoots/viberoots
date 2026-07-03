@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { buildSelectedOutPath, exportGraphInTemp, runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("tinygo top.wasm builds and loader returns add(2,3)=5", async () => {
   await runInTemp("tinygo-wasm", async (tmp, $) => {
@@ -81,11 +82,11 @@ nix_go_tiny_wasm_lib(
     // 3) Provide C++ defs in the temp repo
     await fs.outputFile(
       path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
-      await fs.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
+      await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/defs.bzl"), "utf8"),
     );
     await fs.outputFile(
       path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
-      await fs.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
+      await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/wasm_defs.bzl"), "utf8"),
     );
 
     // 4) Export graph and build TinyGo wasm via graph-generator-selected-wasm

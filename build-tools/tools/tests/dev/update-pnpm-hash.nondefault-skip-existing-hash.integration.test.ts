@@ -1,11 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("update-pnpm-hash skips non-default recompute when existing hash is present", async () => {
-  const mainTxt = await fsp.readFile("viberoots/build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
+  const mainTxt = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash.ts"),
+    "utf8",
+  );
   const nondefaultTxt = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/nondefault.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/nondefault.ts"),
     "utf8",
   );
   if (!mainTxt.includes("readNodeModulesHashForLockfile")) {

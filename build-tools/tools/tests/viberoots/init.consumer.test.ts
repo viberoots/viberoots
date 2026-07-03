@@ -523,7 +523,7 @@ test("curlable bootstrap can run validation internally", async () => {
     });
 
     const text = await fsp.readFile(log, "utf8");
-    assert.match(stdout, /run\s+validate yes/);
+    assert.match(stdout, /set\s+validate yes/);
     assert.match(stdout, /ok\s+validation complete/);
     assert.match(text, /direnv exec .* sh -lc i && b && v/);
   } finally {
@@ -564,7 +564,7 @@ test("curlable bootstrap dry-run reports planned actions without commands", asyn
       },
     );
 
-    assert.match(stdout, /run\s+dry run yes/);
+    assert.match(stdout, /set\s+dry run yes/);
     assert.match(stdout, /planned actions/);
     assert.match(stdout, /run viberoots init-consumer/);
     await assert.rejects(fsp.readFile(log, "utf8"));
@@ -717,7 +717,7 @@ test("curlable bootstrap resumes and completes an interrupted transaction", asyn
     assert.equal((await fsp.readdir(path.join(transactionDir, "completed"))).length, 1);
     assert.match(
       await fsp.readFile(log, "utf8"),
-      /nix run --refresh --accept-flake-config github:viberoots\/viberoots\/main#viberoots/,
+      /nix run --refresh --accept-flake-config git\+https:\/\/github\.com\/viberoots\/viberoots\.git\?ref=main#viberoots/,
     );
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
@@ -782,7 +782,7 @@ test("curlable bootstrap installs git through nix when git is missing", async ()
     assert.match(text, /git init/);
     assert.match(text, /--no-direnv/);
     assert.doesNotMatch(text, /--run-install/);
-    assert.match(stdout, /run\s+direnv allow no/);
+    assert.match(stdout, /set\s+direnv allow no/);
     assert.match(stdout, /ok\s+next cd .* && direnv allow && direnv exec \. sh -lc 'i && b && v'/);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
@@ -860,7 +860,7 @@ test("curlable bootstrap installs nix when nix is missing", async () => {
     );
     assert.match(
       text,
-      /nix run --refresh --accept-flake-config github:viberoots\/viberoots\/main#viberoots/,
+      /nix run --refresh --accept-flake-config git\+https:\/\/github\.com\/viberoots\/viberoots\.git\?ref=main#viberoots/,
     );
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
@@ -1010,7 +1010,7 @@ ln -s ../viberoots .viberoots/current
     assert.equal((text.match(/^init /gm) ?? []).length, 1);
     assert.match(second.stdout, /ok\s+status already up to date/);
     assert.match(second.stdout, /no setup changes needed/);
-    assert.match(second.stdout, /run\s+source https:\/\/github\.com\/viberoots\/viberoots\.git/);
+    assert.match(second.stdout, /set\s+source https:\/\/github\.com\/viberoots\/viberoots\.git/);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }
@@ -1253,7 +1253,7 @@ exit 0
     );
 
     const text = await fsp.readFile(log, "utf8");
-    assert.match(stdout, /run\s+trust custom submodule url yes/);
+    assert.match(stdout, /set\s+trust custom submodule url yes/);
     assert.match(text, /git submodule add https:\/\/example\.invalid\/viberoots\.git viberoots/);
     assert.match(text, /init --mode submodule --workspace-name trusted-demo --run-install/);
   } finally {

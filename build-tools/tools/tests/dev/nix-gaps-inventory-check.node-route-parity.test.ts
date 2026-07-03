@@ -4,8 +4,10 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const scriptPath = "viberoots/build-tools/tools/dev/nix-gaps-inventory-check.ts";
+const scriptSourcePath = viberootsSourcePath(scriptPath);
 const exceptionsPath = "docs/handbook/nix-gaps-exceptions.json";
 
 const starlarkApi = `# Starlark API reference
@@ -117,7 +119,7 @@ const emptyExceptions = `{
 
 test("nix-gaps checker accepts standalone stage/inline route when docs and implementation match", async () => {
   await runInTemp("nix-gaps-node-route-standalone-pass", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), inventoryStandaloneRoute);
     await fs.outputFile(path.join(tmp, exceptionsPath), emptyExceptions);
@@ -134,7 +136,7 @@ test("nix-gaps checker accepts standalone stage/inline route when docs and imple
 
 test("nix-gaps checker fails when docs claim wrapper route but stage/inline implementation is standalone", async () => {
   await runInTemp("nix-gaps-node-route-mismatch-fail", async (tmp, $) => {
-    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptPath, "utf8"));
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), inventoryWrapperRoute);
     await fs.outputFile(path.join(tmp, exceptionsPath), emptyExceptions);

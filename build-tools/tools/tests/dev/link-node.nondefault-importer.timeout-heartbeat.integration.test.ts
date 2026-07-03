@@ -1,10 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("link-node non-default importer build uses heartbeat and timeout", async () => {
-  const mainFile = "viberoots/build-tools/tools/dev/install/link-node.ts";
-  const helperFile = "viberoots/build-tools/tools/dev/install/link-node-helpers.ts";
+  const mainFile = viberootsSourcePath("viberoots/build-tools/tools/dev/install/link-node.ts");
+  const helperFile = viberootsSourcePath(
+    "viberoots/build-tools/tools/dev/install/link-node-helpers.ts",
+  );
   const main = await fsp.readFile(mainFile, "utf8");
   const helper = await fsp.readFile(helperFile, "utf8");
   if (!main.includes("withHeartbeat(")) {

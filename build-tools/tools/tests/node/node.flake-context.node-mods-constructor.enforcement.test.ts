@@ -1,11 +1,16 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("flake package callsites resolve nodeMods from nodeMods or mkNodeMods", async () => {
-  const defaultFile = "viberoots/build-tools/tools/nix/flake/packages/default.nix";
-  const graphFile = "viberoots/build-tools/tools/nix/flake/packages/graph.nix";
-  const checksFile = "viberoots/build-tools/tools/nix/flake/outputs-checks.nix";
+  const defaultFile = viberootsSourcePath(
+    "viberoots/build-tools/tools/nix/flake/packages/default.nix",
+  );
+  const graphFile = viberootsSourcePath("viberoots/build-tools/tools/nix/flake/packages/graph.nix");
+  const checksFile = viberootsSourcePath(
+    "viberoots/build-tools/tools/nix/flake/outputs-checks.nix",
+  );
 
   const [defaultTxt, graphTxt, checksTxt] = await Promise.all([
     fsp.readFile(defaultFile, "utf8"),

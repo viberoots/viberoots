@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { evaluateDefaultLocalPolicy } from "../../remote-exec/default-local-policy";
 import { validRuntimeInventory } from "./runtime-prerequisites.fixture";
 
-const inventoryFile = "viberoots/build-tools/tools/nix/flake/packages/remote-worker-tools.nix";
+const inventoryFile = "build-tools/tools/nix/flake/packages/remote-worker-tools.nix";
 
 async function fixture(files: Record<string, string>): Promise<string> {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "runtime-prereq-policy-"));

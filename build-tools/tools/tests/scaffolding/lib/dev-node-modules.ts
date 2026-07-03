@@ -155,8 +155,6 @@ async function rawPnpmInstallForDevTest(
     });
   const storeArgs = localPnpmStore ? ["--store-dir", localPnpmStore] : [];
   const sharedArgs = [
-    "--dir",
-    opts.tmp,
     "--lockfile-dir",
     importerAbs,
     "--filter",
@@ -187,7 +185,10 @@ async function rawPnpmInstallForDevTest(
   if (opts.lockfileOnly) {
     return;
   }
-  await base`${node} ${pnpm} install ${sharedArgs} --frozen-lockfile --prefer-offline`;
+  const lockfilePolicy = opts.frozenLockfile
+    ? "--config.frozen-lockfile=true"
+    : "--config.frozen-lockfile=false";
+  await base`${node} ${pnpm} install ${sharedArgs} ${lockfilePolicy} --prefer-offline`;
   await overlayWorkspacePackagesForDevTest(opts.tmp, importer);
 }
 

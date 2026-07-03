@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { ensureNixStoreToolPathSync, resolveToolPathSync } from "../../lib/tool-paths";
+import { viberootsSourcePath } from "./test-helpers/source-paths";
 
 test("resolveToolPathSync prefers nix store binaries before host PATH entries", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "tool-paths-"));
@@ -157,7 +158,10 @@ test("install-time nix helpers use resolved Nix tool path", async () => {
 });
 
 test("maintenance gc default runner resolves Nix through tool selector", async () => {
-  const source = await fsp.readFile("viberoots/build-tools/tools/lib/maintenance-gc.ts", "utf8");
+  const source = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/lib/maintenance-gc.ts"),
+    "utf8",
+  );
   assert.match(source, /resolveToolPathSync\("nix"\)/);
   assert.doesNotMatch(source, /spawn\(command,/);
   assert.doesNotMatch(source, /execFileAsync\(command,/);

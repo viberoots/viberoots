@@ -1,16 +1,26 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("update-pnpm-hash uses importer-aware fast path and fixed-first root path", async () => {
-  const mainFile = "viberoots/build-tools/tools/dev/update-pnpm-hash.ts";
-  const nondefaultFile = "viberoots/build-tools/tools/dev/update-pnpm-hash/nondefault.ts";
-  const nixFile = "viberoots/build-tools/tools/dev/update-pnpm-hash/nix.ts";
-  const exactStoreFile = "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts";
-  const importerLockfileFile =
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts";
-  const scaffoldingLockfileFile = "viberoots/build-tools/tools/lib/pnpm-importer-lockfile.ts";
-  const tempBuckConfigFile = "viberoots/build-tools/tools/tests/lib/test-helpers/buck-config.ts";
+  const mainFile = viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash.ts");
+  const nondefaultFile = viberootsSourcePath(
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/nondefault.ts",
+  );
+  const nixFile = viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/nix.ts");
+  const exactStoreFile = viberootsSourcePath(
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
+  );
+  const importerLockfileFile = viberootsSourcePath(
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts",
+  );
+  const scaffoldingLockfileFile = viberootsSourcePath(
+    "viberoots/build-tools/tools/lib/pnpm-importer-lockfile.ts",
+  );
+  const tempBuckConfigFile = viberootsSourcePath(
+    "viberoots/build-tools/tools/tests/lib/test-helpers/buck-config.ts",
+  );
   const mainTxt = await fsp.readFile(mainFile, "utf8");
   const nondefaultTxt = await fsp.readFile(nondefaultFile, "utf8");
   const nixTxt = await fsp.readFile(nixFile, "utf8");

@@ -1,13 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import * as fsp from "node:fs/promises";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
 test("build-tools/node/defs_nix.bzl must not reintroduce local importer normalization helpers", async () => {
-  const file = "viberoots/build-tools/node/defs_nix.bzl";
+  const file = viberootsSourcePath("viberoots/build-tools/node/defs_nix.bzl");
   const txt = await fsp.readFile(file, "utf8");
 
   assert(

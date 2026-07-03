@@ -2,9 +2,13 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { readFile } from "node:fs/promises";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("provider-names uses shortHash from providers.ts (no local duplicate)", async () => {
-  const src = await readFile("viberoots/build-tools/tools/lib/provider-names.ts", "utf8");
+  const src = await readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/lib/provider-names.ts"),
+    "utf8",
+  );
   assert.match(
     src,
     /from\s+["']\.\/short-hash["']/,

@@ -2,9 +2,13 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("@viberoots//build-tools/lang:defs_common.bzl must not re-export removed mutating helpers", async () => {
-  const txt = await fsp.readFile("viberoots/build-tools/lang/defs_common.bzl", "utf8");
+  const txt = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/lang/defs_common.bzl"),
+    "utf8",
+  );
   const offenders = txt
     .split("\n")
     .map((l, i) => ({ line: i + 1, text: l }))

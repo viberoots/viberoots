@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { buildSelectedOutPath, exportGraphInTemp, runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("backend toggle tinygo_single and emscripten_dual both return add(2,3)=5", async () => {
   await runInTemp("backend-toggle", async (tmp, $) => {
@@ -91,11 +92,11 @@ nix_go_tiny_wasm_lib(
     // 3) Provide C++ defs in the temp repo (planner-visible)
     await fsp.writeFile(
       path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
-      await fsp.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
+      await fsp.readFile(viberootsSourcePath("viberoots/build-tools/cpp/defs.bzl"), "utf8"),
     );
     await fsp.writeFile(
       path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
-      await fsp.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
+      await fsp.readFile(viberootsSourcePath("viberoots/build-tools/cpp/wasm_defs.bzl"), "utf8"),
     );
 
     // 4) Export graph once

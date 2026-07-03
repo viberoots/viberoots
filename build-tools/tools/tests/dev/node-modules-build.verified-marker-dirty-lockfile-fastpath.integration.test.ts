@@ -1,11 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("node-modules-build reuses verified markers even when temp lockfiles are git-dirty", async () => {
-  const txt = await fsp.readFile("viberoots/build-tools/tools/dev/node-modules-build.ts", "utf8");
+  const txt = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/node-modules-build.ts"),
+    "utf8",
+  );
   const verifyZxNodeModules = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/verify/zx-node-modules.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/verify/zx-node-modules.ts"),
     "utf8",
   );
   if (!txt.includes("await requireFreshPnpmStoreState(lockfileRel, hashKey)")) {

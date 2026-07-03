@@ -3,11 +3,15 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { CANONICAL_TS_TEMPLATE_IDS } from "../../scaffolding/scaf/templates/taxonomy";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 type ResolverConfig = Record<string, Record<string, string>>;
 
 test("resolver keeps canonical TypeScript templates under ts only", async () => {
-  const raw = await fsp.readFile("viberoots/build-tools/tools/scaffolding/resolver.json", "utf8");
+  const raw = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/scaffolding/resolver.json"),
+    "utf8",
+  );
   const cfg = JSON.parse(raw) as ResolverConfig;
 
   const ts = cfg.ts || {};

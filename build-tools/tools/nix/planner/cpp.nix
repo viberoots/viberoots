@@ -89,6 +89,7 @@ let
       inherit lib T byName labelsOf linkModeOf pkgPathOf repoRoot normSrcsOf patchInputsFor;
       inherit collectNixAttrsFor nixAttrsFromSelf repoCppHeaderPkgsFor repoCppLibPkgsFor;
       inherit repoGoCArchivesFor providerAttrsFallback;
+      inherit (ctx) resolveNixpkgAttrs sourcePlanFor;
     };
     mkApp = Targets.mkApp;
     mkLib = Targets.mkLib;

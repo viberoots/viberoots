@@ -11,6 +11,8 @@ import {
   graphNodesFromJson,
   selectedCppSnapshotRsyncSources,
   selectedCppSnapshotRelPaths,
+  selectedNodeSnapshotRelPaths,
+  selectedNodeSnapshotRsyncSources,
 } from "./nix-build-filtered-flake-lib";
 import { targetPackageFromLabel } from "./build-selected-helpers";
 import { prepareExactPnpmStore } from "./update-pnpm-hash/exact-store";
@@ -236,6 +238,27 @@ async function readSelectedCppSnapshotSources(
   return { packagePaths, rsyncSources };
 }
 
+async function readSelectedNodeSnapshotSources(
+  root: string,
+  attr: string,
+): Promise<{ importer: string; rsyncSources: string[] } | null> {
+  if (!attr.startsWith("node-test.")) return null;
+  const importers = await pnpmImportersFromAttrs(root, attr);
+  const importer = targetPackageFromLabel(String(process.env.BUCK_TARGET || "")) || importers[0];
+  if (!importer || importer === ".") return null;
+  if (!(await pathExists(path.join(root, importer, "pnpm-lock.yaml")))) return null;
+  const relPaths = selectedNodeSnapshotRelPaths(importer);
+  const presentRelPaths: string[] = [];
+  for (const relPath of relPaths) {
+    const absPath = path.resolve(root, relPath);
+    if (!(await pathExists(absPath))) continue;
+    presentRelPaths.push(relPath);
+  }
+  const rsyncSources = selectedNodeSnapshotRsyncSources(presentRelPaths);
+  if (rsyncSources.length === 0) return null;
+  return { importer, rsyncSources };
+}
+
 async function pnpmImportersFromAttrs(root: string, attr: string): Promise<string[]> {
   const { workspaceRoots } = getImporterRootsContract();
   const out: string[] = [];
@@ -326,6 +349,8 @@ async function main(): Promise<void> {
     await mkdirWithMacosMetadataExclusion(snapDir);
     const rsyncExcludes = filteredFlakeRsyncExcludeArgs();
     const selectedCppSources = await readSelectedCppSnapshotSources(root);
+    const selectedNodeSources =
+      selectedCppSources == null ? await readSelectedNodeSnapshotSources(root, attr) : null;
     const snapshotStart = Date.now();
     if (selectedCppSources != null) {
       console.error(
@@ -342,6 +367,22 @@ async function main(): Promise<void> {
           stdio: "inherit",
           cwd: root,
         })`rsync -a --delete --relative ${rsyncExcludes} ${selectedCppSources.rsyncSources} ${snapDir}/`,
+      );
+    } else if (selectedNodeSources != null) {
+      console.error(
+        "[nix-build-filtered-flake] creating selected node snapshot:",
+        snapDir,
+        "importer=",
+        selectedNodeSources.importer,
+        "rsyncSources=",
+        String(selectedNodeSources.rsyncSources.length),
+      );
+      await withHeartbeat(
+        "snapshot-rsync",
+        $({
+          stdio: "inherit",
+          cwd: root,
+        })`rsync -a --delete --relative ${rsyncExcludes} ${selectedNodeSources.rsyncSources} ${snapDir}/`,
       );
     } else {
       console.error("[nix-build-filtered-flake] creating filtered snapshot:", snapDir);

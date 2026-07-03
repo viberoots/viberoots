@@ -1,13 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
 test("build-tools/node/defs_core.bzl routes nix_node_gen through graph-generator-selected wrapper", async () => {
-  const file = "viberoots/build-tools/node/defs_core.bzl";
+  const file = viberootsSourcePath("viberoots/build-tools/node/defs_core.bzl");
   const txt = await fsp.readFile(file, "utf8");
 
   assert(

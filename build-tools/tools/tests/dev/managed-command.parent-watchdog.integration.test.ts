@@ -1,11 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("managed-command starts parent-lifecycle watchdog for spawned process group", async () => {
-  const txt = await fsp.readFile("viberoots/build-tools/tools/lib/managed-command.ts", "utf8");
+  const txt = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/lib/managed-command.ts"),
+    "utf8",
+  );
   const watchdogTxt = await fsp.readFile(
-    "viberoots/build-tools/tools/lib/managed-command-watchdog.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/lib/managed-command-watchdog.ts"),
     "utf8",
   );
   if (!txt.includes("startParentWatchdog")) {

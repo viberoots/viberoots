@@ -13,15 +13,45 @@
 , repoCppLibPkgsFor
 , repoGoCArchivesFor
 , providerAttrsFallback
+, resolveNixpkgAttrs
+, sourcePlanFor
 }:
 let
+  nodeFor = name: if builtins.hasAttr name byName then byName.${name} else {};
+
+  templateFor = name:
+    let plan = sourcePlanFor (nodeFor name); in T.cppForPkgs plan.base_pkgs;
+
+  profileFor = name:
+    let plan = sourcePlanFor (nodeFor name); in plan.nixpkgs_profile;
+
+  resolveNixPkgsFor = name: attrs:
+    let
+      records = resolveNixpkgAttrs {
+        target = nodeFor name;
+        attrs = attrs;
+      };
+      missing = builtins.filter (r: r.package == null) records;
+      missingText = builtins.concatStringsSep ", " (
+        map (r: r.attr + " from " + r.profile_name) missing
+      );
+    in
+      if missing == [] then map (r: r.package) records
+      else builtins.throw (
+        "cpp planner: unresolved nixpkg attrs for " + name + ": " + missingText
+      );
+
   mkApp = name:
-    T.cppApp {
+    let
+      attrs = collectNixAttrsFor name;
+      TP = templateFor name;
+    in TP.cppApp {
       inherit name;
       srcRoot = repoRoot;
       subdir = pkgPathOf name;
-      nixCxxAttrs = collectNixAttrsFor name;
-      nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name);
+      nixpkgsProfile = profileFor name;
+      nixCxxAttrs = [];
+      nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name) ++ (resolveNixPkgsFor name attrs);
       srcList = normSrcsOf name;
       patches = patchInputsFor name;
     };
@@ -30,6 +60,8 @@ let
     let
       n = if builtins.hasAttr name byName then byName.${name} else null;
       labs = if n == null then [] else labelsOf n;
+      attrs = collectNixAttrsFor name;
+      TP = templateFor name;
       isWasmStatic = builtins.elem "flavor:wasm" labs || builtins.elem "wasm:static" labs;
       isEmscripten = builtins.elem "flavor:emscripten" labs || builtins.elem "wasm:emscripten" labs;
       wantWasi = builtins.elem "wasm:wasi" labs;
@@ -51,7 +83,9 @@ let
             inherit name;
             srcRoot = repoRoot;
             subdir = pkgPathOf name;
-            nixCxxAttrs = collectNixAttrsFor name;
+            nixpkgsProfile = profileFor name;
+            nixCxxAttrs = [];
+            nixCxxPkgs = resolveNixPkgsFor name attrs;
             srcList = normSrcsOf name;
             patches = patchInputsFor name;
           };
@@ -68,14 +102,14 @@ let
           nativeLibAttrs = baseAttrs // {
             nixCxxPkgs =
               if mode == "shared"
-              then (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name)
-              else repoCppHeaderPkgsFor name;
+              then (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (resolveNixPkgsFor name attrs)
+              else repoCppHeaderPkgsFor name ++ (resolveNixPkgsFor name attrs);
           };
         in
-          if isEmscripten then T.cppWasmEmscriptenLib (wasmLibAttrs // emscriptenAttrs)
-          else if isWasmStatic then T.cppWasmStaticLib wasmLibAttrs
-          else if mode == "shared" then T.cppSharedLib nativeLibAttrs
-          else T.cppLib nativeLibAttrs
+          if isEmscripten then TP.cppWasmEmscriptenLib (wasmLibAttrs // emscriptenAttrs)
+          else if isWasmStatic then TP.cppWasmStaticLib wasmLibAttrs
+          else if mode == "shared" then TP.cppSharedLib nativeLibAttrs
+          else TP.cppLib nativeLibAttrs
       );
 
   mkHeaders = name:
@@ -84,20 +118,20 @@ let
       _ = if mode == "shared"
         then builtins.throw ("cpp planner: link_mode=shared is invalid for header-only target " + name + " (expected kind:headers without shared linkage)")
         else null;
-    in T.cppHeaders {
+      TP = templateFor name;
+    in TP.cppHeaders {
       inherit name;
       srcRoot = repoRoot;
       subdir = pkgPathOf name;
+      nixpkgsProfile = profileFor name;
       srcList = normSrcsOf name;
       patches = patchInputsFor name;
     };
 
   mkTest = name:
-    T.cppTest {
-      inherit name;
-      srcRoot = repoRoot;
-      subdir = pkgPathOf name;
-      nixCxxAttrs =
+    let
+      TP = templateFor name;
+      attrs =
         let
           fromDeps = collectNixAttrsFor name;
           fromSelf = nixAttrsFromSelf name;
@@ -105,18 +139,29 @@ let
           uniq = xs: builtins.attrNames (builtins.listToAttrs (map (a: { name = a; value = true; }) xs));
           all = builtins.sort (a: b: a < b) (uniq merged);
         in if all == [] then providerAttrsFallback else all;
-      nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name);
+    in TP.cppTest {
+      inherit name;
+      srcRoot = repoRoot;
+      subdir = pkgPathOf name;
+      nixpkgsProfile = profileFor name;
+      nixCxxAttrs = [];
+      nixCxxAttrNames = attrs;
+      nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name) ++ (resolveNixPkgsFor name attrs);
       srcList = normSrcsOf name;
       patches = patchInputsFor name;
     };
 
   mkAddon = name:
-    T.cppNodeAddon {
+    let
+      attrs = collectNixAttrsFor name;
+      TP = templateFor name;
+    in TP.cppNodeAddon {
       inherit name;
       srcRoot = repoRoot;
       subdir = pkgPathOf name;
-      nixCxxAttrs = collectNixAttrsFor name;
-      nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name);
+      nixpkgsProfile = profileFor name;
+      nixCxxAttrs = [];
+      nixCxxPkgs = (repoCppHeaderPkgsFor name) ++ (repoCppLibPkgsFor name) ++ (repoGoCArchivesFor name) ++ (resolveNixPkgsFor name attrs);
       srcList = normSrcsOf name;
       patches = patchInputsFor name;
     };

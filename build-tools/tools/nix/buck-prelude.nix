@@ -15,8 +15,9 @@
         --replace-fail "        is_deferrable = True," ""
       substituteInPlace "$out/prelude/toolchains/cxx/zig/defs.bzl" \
         --replace-fail ", is_deferrable = True" ""
+      substituteInPlace "$out/prelude/utils/utils.bzl" \
+        --replace-fail 'if type(src) == "artifact":' 'if isinstance(src, Artifact):'
       runHook postInstall
     '';
   };
 }
-

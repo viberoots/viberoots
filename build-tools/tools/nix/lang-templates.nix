@@ -2,12 +2,14 @@
 let
   Go  = import ./templates/go.nix  { inherit pkgs; };
   Cpp = import ./templates/cpp.nix { inherit pkgs; };
+  cppForPkgs = profilePkgs: import ./templates/cpp.nix { pkgs = profilePkgs; };
   Node = import ./templates/node.nix { inherit pkgs; };
   Rust = import ./templates/rust.nix { inherit pkgs; };
   # Lazily import Python templates only when uv2nixLib is available.
   Python = if uv2nixLib != null then import ./templates/python.nix { inherit pkgs uv2nixLib; } else null;
   PythonWasm = if uv2nixLib != null then import ./templates/python/wasm.nix { inherit pkgs uv2nixLib; } else null;
 in {
+  inherit cppForPkgs;
   inherit (Go)  goApp goLib goTest goCArchive goTinyWasmLib;
   inherit (Cpp) cppApp cppHeaders cppLib cppSharedLib cppTest cppNodeAddon cppWasmStaticLib cppWasmEmscriptenLib;
   inherit (Rust) rustApp rustLib;
@@ -22,5 +24,4 @@ in {
 } else {}) // (if PythonWasm != null then {
   inherit (PythonWasm) pyWasmApp pyWasmLib;
 } else {})
-
 

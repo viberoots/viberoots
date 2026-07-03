@@ -220,7 +220,7 @@ test("generated activation config reaches zx_test executor analysis", async () =
   assert.match(activated.stdout, /default_executor=CommandExecutorConfig/);
   assert.match(activated.stdout, /executor: RemoteEnabled/);
   assert.match(activated.stdout, /executor: Remote\(/);
-  assert.match(activated.stdout, /RemoteExecutorUseCaseData\(\s*"buck2-test"/);
+  assert.match(activated.stdout, /RemoteExecutorUseCase[\s\S]*data: "buck2-test"/);
   assert.match(activated.stdout, /"viberoots_remote_profile": "linux-x86_64-default"/);
   assert.match(activated.stdout, /"resource_class": "default"/);
   assert.match(activated.stdout, /executor_overrides=\{\s*"listing": CommandExecutorConfig/);

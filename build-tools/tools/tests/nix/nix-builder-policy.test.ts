@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 import {
   localOnlyNixBuilderArgs,
   nixBuilderPolicyArgs,
@@ -20,7 +21,10 @@ test("TypeScript Nix builder policy renders explicit local-only builders", () =>
 });
 
 test("Starlark Nix builder policy constants and renderer stay available", () => {
-  const text = fs.readFileSync("viberoots/build-tools/lang/nix_builder_policy.bzl", "utf8");
+  const text = fs.readFileSync(
+    viberootsSourcePath("viberoots/build-tools/lang/nix_builder_policy.bzl"),
+    "utf8",
+  );
   assert.match(text, /NIX_BUILDER_LOCAL_ONLY = "local_only"/);
   assert.match(text, /NIX_BUILDER_INHERIT_CONFIG = "inherit_config"/);
   assert.match(text, /NIX_BUILDER_FORCE_BUILDERS_FILE = "force_builders_file"/);

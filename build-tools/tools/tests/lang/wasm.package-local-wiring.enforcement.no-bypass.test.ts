@@ -1,14 +1,21 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 function assert(condition: boolean, message: string) {
   if (!condition) throw new Error(message);
 }
 
 test("package-local WASM macros use the shared @viberoots//build-tools/lang wasm wiring helpers", async () => {
-  const goDefs = await fsp.readFile("viberoots/build-tools/go/defs.bzl", "utf8");
-  const cppDefs = await fsp.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8");
+  const goDefs = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/go/defs.bzl"),
+    "utf8",
+  );
+  const cppDefs = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/cpp/wasm_defs.bzl"),
+    "utf8",
+  );
 
   assert(
     !goDefs.includes("stamp_wasm_variant("),

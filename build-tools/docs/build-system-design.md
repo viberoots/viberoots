@@ -137,6 +137,12 @@ extra-experimental-features = nix-command flakes
    - **Nix “target label → attr suffix” mapping**: the canonical contract lives in `build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel` and `//build-tools/lang:nix_attr.bzl:sanitize_nix_attr_from_target_label`. If this mapping changes, update both and keep `build-tools/tools/tests/labels/nix-attr-sanitize.parity.test.ts` passing.
 1. **Global inputs policy (PR‑5):** Treat repository‑level global inputs (e.g., `flake.lock`) primarily at the builder/Nix level. Macros must not hardcode `//.viberoots/workspace:flake.lock`. When a macro directly calls Nix, wire global inputs through `//build-tools/lang:defs_common.bzl:wire_global_nix_inputs(...)` (implemented in `//build-tools/lang:nix_calling_macros.bzl` and backed by `//build-tools/lang:global_inputs.bzl:global_nix_inputs()`).
 
+1. **Nixpkgs source profiles:** Nix-backed selected builds use the target's `nixpkgs_profile` as the
+   base package universe. C++ selected builds instantiate templates with that profile's `pkgs`, so
+   compiler/stdenv and ordinary `nixpkg_deps` come from the target profile. Go CGO and Python native
+   extension nixpkg attrs use the same source-selection resolver before packages reach templates.
+   Non-empty `nixpkg_pins` still fail until package-pin resolution lands.
+
 - Node alignment: We stamp `global_nix_inputs()` only in Node macros that directly call Nix (`node_webapp`, `node_vercel_next_artifact`, `node_service_artifact`, `nix_node_cli_bin(bundle=True)`, `nix_node_cli_bin(bundle=False)`). Non‑Nix macros remain unstamped at the macro level.
 
 1. **Scaffolding:** When you add new target types, **update/augment** the existing scaffolding tools in `build-tools/tools/` (don’t invent new scaffolding).

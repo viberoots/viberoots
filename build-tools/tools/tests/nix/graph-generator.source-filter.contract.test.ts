@@ -2,9 +2,13 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("graph generator app/lib source filter excludes generated directories", async () => {
-  const file = await fsp.readFile("viberoots/build-tools/tools/nix/graph-generator.nix", "utf8");
+  const file = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/nix/graph-generator.nix"),
+    "utf8",
+  );
   assert.match(file, /isGeneratedDir/, "expected a generated-directory guard");
   assert.match(
     file,

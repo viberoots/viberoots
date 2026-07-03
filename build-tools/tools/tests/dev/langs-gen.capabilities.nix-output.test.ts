@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("gen-langs: generates langs.nix from manifest capabilities deterministically", async () => {
   await runInTemp("gen-langs-capabilities", async (tmp, $) => {
@@ -55,8 +56,8 @@ test("gen-langs: generates langs.nix from manifest capabilities deterministicall
     );
 
     // Copy generator script
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/dev/gen-langs.ts"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/dev/gen-langs.ts",
       path.join(tmp, "viberoots/build-tools/tools/dev/gen-langs.ts"),
     );
 

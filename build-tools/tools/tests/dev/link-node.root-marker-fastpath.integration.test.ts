@@ -1,9 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("link-node root importer supports marker fast-path", async () => {
-  const file = "viberoots/build-tools/tools/dev/install/link-node.ts";
+  const file = viberootsSourcePath("viberoots/build-tools/tools/dev/install/link-node.ts");
   const txt = await fsp.readFile(file, "utf8");
   if (!txt.includes("using marker fast-path for importer")) {
     throw new Error("link-node.ts must log importer marker fast-path usage");

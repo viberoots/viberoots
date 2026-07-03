@@ -29,6 +29,7 @@ in {
     std ? "c++17",
     nixCxxPkgs ? [],
     nixCxxAttrs ? [],
+    nixpkgsProfile ? "default",
     srcList ? [],
     patches ? [],
   }:
@@ -83,6 +84,7 @@ in {
       tmpInc="$TMPDIR/inc"; mkdir -p "$tmpInc"
 
       echo "[cpp.node-addon] nixCxxAttrs=${lib.concatStringsSep "," nixCxxAttrs}" >&2
+      echo "[cpp.node-addon] nixpkgsProfile=${nixpkgsProfile}" >&2
       echo "[cpp.node-addon] nixInc=${nixInc}" >&2
       echo "[cpp.node-addon] nodeInc=${nodeInc}" >&2
 
@@ -142,6 +144,7 @@ in {
 
       : > "$out/build.log"
       echo "name=${name}" >> "$out/build.log"
+      echo "nixpkgsProfile=${nixpkgsProfile}" >> "$out/build.log"
       echo "addonName=${addonName}" >> "$out/build.log"
       echo "std=${std}" >> "$out/build.log"
       echo "includes=${incFlags}" >> "$out/build.log"
@@ -155,5 +158,4 @@ in {
     '';
   };
 }
-
 

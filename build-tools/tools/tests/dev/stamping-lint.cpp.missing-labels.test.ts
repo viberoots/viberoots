@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs-extra";
 import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 await runInTemp("stamping-lint-cpp-missing", async (tmp, $) => {
   const env = { ...process.env };
@@ -38,11 +39,11 @@ await runInTemp("stamping-lint-cpp-missing", async (tmp, $) => {
   );
   await fs.outputFile(
     path.join(tmp, "viberoots", "build-tools", "cpp", "defs.bzl"),
-    await fs.readFile("viberoots/build-tools/cpp/defs.bzl", "utf8"),
+    await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/defs.bzl"), "utf8"),
   );
   await fs.outputFile(
     path.join(tmp, "viberoots", "build-tools", "cpp", "wasm_defs.bzl"),
-    await fs.readFile("viberoots/build-tools/cpp/wasm_defs.bzl", "utf8"),
+    await fs.readFile(viberootsSourcePath("viberoots/build-tools/cpp/wasm_defs.bzl"), "utf8"),
   );
   await $({
     cwd: tmp,

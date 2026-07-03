@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("cpp planner imports and detects cxx_* and lang:cpp", async () => {
   await runInTemp("planner-cpp-detect", async (tmp, $) => {
@@ -33,8 +34,8 @@ test("cpp planner imports and detects cxx_* and lang:cpp", async () => {
     );
 
     // Ensure planner plugin is present (copied from workspace)
-    await fs.copy(
-      path.join(process.cwd(), "viberoots/build-tools/tools/nix/planner/cpp.nix"),
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/nix/planner/cpp.nix",
       path.join(tmp, "viberoots/build-tools/tools/nix/planner/cpp.nix"),
     );
 
@@ -49,7 +50,7 @@ test("cpp planner imports and detects cxx_* and lang:cpp", async () => {
     );
 
     // Build graph-generator to force plugin load and selection
-    const flake = path.join(process.cwd(), "viberoots/build-tools/tools/nix/graph-generator.nix");
+    const flake = viberootsSourcePath("viberoots/build-tools/tools/nix/graph-generator.nix");
     const res = await $({
       cwd: tmp,
     })`nix build --accept-flake-config -f ${flake} --argstr system ${process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux"} --no-link --print-out-paths`.nothrow();

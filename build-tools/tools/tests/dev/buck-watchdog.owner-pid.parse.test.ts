@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { ownerPidForIsolation } from "../../dev/buck-watchdog-lib";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("ownerPidForIsolation parses only pid-owned isolations", () => {
   assert.equal(ownerPidForIsolation("v-123"), 123);
@@ -22,10 +23,13 @@ test("ownerPidForIsolation parses only pid-owned isolations", () => {
 
 test("verify watchdog does not sweep verify-owned isolations while parent is alive", async () => {
   const processControl = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/verify/process-control.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/verify/process-control.ts"),
     "utf8",
   );
-  const watchdog = await fsp.readFile("viberoots/build-tools/tools/dev/buck-watchdog.ts", "utf8");
+  const watchdog = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/buck-watchdog.ts"),
+    "utf8",
+  );
 
   assert.match(processControl, /--patterns v-,verify-nested-/);
   assert.match(processControl, /--sweep-while-parent-alive 0/);

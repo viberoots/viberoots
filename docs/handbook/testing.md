@@ -7,6 +7,13 @@
   budgets and usually takes longer than a single external `timeout` wrapper.
 - Use zx `#!/usr/bin/env zx-wrapper` for tests.
 - Do not modify PATH inside tests; rely on the dev shell to supply tools.
+- Source-inspection tests must resolve checked-out viberoots files with
+  `viberootsSourcePath(...)` from
+  `build-tools/tools/tests/lib/test-helpers/source-paths.ts`, not by reading
+  `viberoots/...` relative to the process CWD. Tests may run from either the
+  consumer workspace root, the viberoots checkout, or a copied temp checkout.
+  Keep paths that intentionally address files inside `runInTemp(...)` workspaces
+  relative to that temp root; use the helper only for reading checked-out source.
 
 ## Temp repos (`runInTemp`)
 

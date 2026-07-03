@@ -14,6 +14,7 @@ let
   cflags0 = args.cflags or [];
   ldflags0 = args.ldflags or [];
   nixCxxAttrs0 = args.nixCxxAttrs or [];
+  nixCxxPkgs0 = args.nixCxxPkgs or [];
   repoCxxPkgs0 = args.repoCxxPkgs or [];
   includeRoots0 = args.includeRoots or [];
   wheelhouse0 = args.wheelhouse or null;
@@ -42,6 +43,7 @@ let
     else builtins.throw ("pyExt: expected " + ctx + " to be a list of derivations");
 
   repoCxxPkgs = ensureDrvList "repoCxxPkgs" repoCxxPkgs0;
+  nixCxxPkgs = ensureDrvList "nixCxxPkgs" nixCxxPkgs0;
   includeRoots = ensureStringList "includeRoots" includeRoots0;
   includeRootsSorted = lib.sort (a: b: a < b) includeRoots;
   repoInc = lib.concatStringsSep " " (map (p: "-I${p}") includeRootsSorted);
@@ -75,7 +77,7 @@ let
   sortedCompileSrcs = lib.sort (a: b: a < b) compileSrcs;
   wantCxx = builtins.any isCxx compileSrcs;
 
-  nixPkgs = C.resolveAttrsToPkgs nixCxxAttrs;
+  nixPkgs = nixCxxPkgs ++ (C.resolveAttrsToPkgs nixCxxAttrs);
   nixInc = C.nixIncFlags nixPkgs;
   nixLib = C.nixLibFlags nixPkgs;
   repoLib = C.nixLibFlags repoCxxPkgs;
@@ -216,5 +218,4 @@ PY
     cp -R build/site/. "$out/site/"
   '';
 }
-
 
