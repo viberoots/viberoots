@@ -132,3 +132,51 @@ test("Python pyext selected paths resolve nixpkg attrs through the source-select
     });
   });
 });
+
+test("C++ Node addon selected paths resolve nixpkg attrs through the source-selection resolver", async () => {
+  await runInScratchTemp("nixpkgs-profile-cpp-node-addon-resolver", async (tmp, $) => {
+    const nixpkgsPath = await pinnedNixpkgsPath($);
+    const cppPlanner = path.join(sourceRoot, "build-tools", "tools", "nix", "planner", "cpp.nix");
+    const expr = `
+      ${plannerContext(
+        tmp,
+        nixpkgsPath,
+        `[
+          {
+            name = "//projects/node:addon";
+            rule_type = "cpp_node_addon";
+            labels = [ "lang:cpp" "kind:addon" "nixpkg:pkgs.profileProbe" ];
+            deps = [];
+            srcs = [];
+            nixpkgs_profile = "alt";
+          }
+        ]`,
+      )}
+      let
+        T.cppForPkgs = pkgsForProfile: {
+          cppNodeAddon = args: {
+            rawAttrs = args.nixCxxAttrs;
+            nixpkgsProfile = args.nixpkgsProfile;
+            resolvedProfiles = map (p: p.profile) args.nixCxxPkgs;
+            resolvedMarkers = map (p: p.marker) args.nixCxxPkgs;
+          };
+        };
+        Cpp = (import ${cppPlanner} { inherit lib; }) {
+          inherit T get nodes repoRoot pkgPathOf resolveNixpkgAttrs;
+          sourcePlanFor = target: {
+            nixpkgs_profile = target.nixpkgs_profile or "default";
+            nixpkg_pins = {};
+            base_pkgs = pkgs;
+          };
+          modulesTomlFor = name: null;
+        };
+      in Cpp.mkAddon "//projects/node:addon"
+    `;
+    assert.deepEqual(await nixEvalJson($, tmp, expr), {
+      rawAttrs: [],
+      nixpkgsProfile: "alt",
+      resolvedProfiles: ["alt"],
+      resolvedMarkers: ["pkgs.profileProbe"],
+    });
+  });
+});

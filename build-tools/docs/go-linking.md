@@ -21,6 +21,9 @@ I keep these constraints in mind because they are enforced by the planner:
 - `link_closure` is only allowed for cgo-enabled Go targets.
 - `link_closure_overrides` keys must be present in `repo_cgo_deps`.
 - `link_closure` only follows `link_deps` on supported native producers (C++ libs stamped `lang:cpp, kind:lib`).
+- `nixpkg_deps` on cgo targets resolve through the selected target source plan. The target
+  `nixpkgs_profile` supplies unpinned attrs, and `nixpkg_pins` redirect declared attrs to their pin
+  profiles with rationale preserved for planner inspection.
 
 ### Example
 

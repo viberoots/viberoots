@@ -329,6 +329,9 @@ Notes
 
 - Python macros accept `lockfile_label` explicitly for clarity in scaffolds; callers usually pass `lockfile:"<path>#<importer>"`. The helper dedupes/validates exactly one importer‑scoped label.
 - Use `nixpkg_deps = ["pkgs.openssl", ...]` when C‑extensions require toolchain/system libs; labels become `nixpkg:<attr>` and are auto‑mapped to providers just like Go/C++.
+- Native extension `nixpkg_deps` resolve through the selected target source plan. Unpinned attrs use
+  the target `nixpkgs_profile`; `nixpkg_pins` redirect declared attrs to named profiles and keep
+  rationale available for planner inspection.
 
 ---
 

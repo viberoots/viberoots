@@ -139,10 +139,12 @@ extra-experimental-features = nix-command flakes
 
 1. **Nixpkgs source profiles:** Nix-backed selected builds use the target's `nixpkgs_profile` as the
    base package universe. C++ selected builds instantiate templates with that profile's `pkgs`, so
-   compiler/stdenv and ordinary `nixpkg_deps` come from the target profile. Go CGO and Python native
-   extension nixpkg attrs use the same source-selection resolver before packages reach templates.
-   Non-empty `nixpkg_pins` redirect the matching normalized attr through the pin profile and keep
-   unpinned attrs on the target profile.
+   compiler/stdenv and ordinary `nixpkg_deps` come from the target profile. Go CGO, Python native
+   extension, and C++ Node addon nixpkg attrs use the same source-selection resolver before packages
+   reach templates. Non-empty `nixpkg_pins` redirect the matching normalized attr through the pin
+   profile and keep unpinned attrs on the target profile. Planner inspection reports target,
+   profile, attr, resolution kind, and rationale fields, and leaves raw lockfile commits behind the
+   registry/lockfile evidence boundary.
 
 - Node alignment: We stamp `global_nix_inputs()` only in Node macros that directly call Nix (`node_webapp`, `node_vercel_next_artifact`, `node_service_artifact`, `nix_node_cli_bin(bundle=True)`, `nix_node_cli_bin(bundle=False)`). Non‑Nix macros remain unstamped at the macro level.
 

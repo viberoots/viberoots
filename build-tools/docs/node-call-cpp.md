@@ -124,6 +124,8 @@ Add a small macro in `@viberoots//build-tools/cpp:defs.bzl`:
   - Stamps labels as `lang:cpp` with kind `addon`.
   - Appends `local_patch_dirs` to `srcs` so patch changes invalidate precisely.
   - Forwards to `cpp_nix_build` (or a thin wrapper) selecting the Node-API addon Nix template.
+  - Resolves `nixpkg_deps` through the same selected-target source plan as other C++ artifacts, so
+    `nixpkgs_profile` and `nixpkg_pins` apply to addon native dependencies.
   - Output file: `{{ addon_name or name }}.node`.
 
 This keeps C++ a planner language and avoids introducing Node‑specific logic into Node macros.

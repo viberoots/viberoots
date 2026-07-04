@@ -74,6 +74,7 @@ TEST(Demo, OpenSSLSmoke) {
   hard-coded in Starlark.
 - Source profiles: `nixpkgs_profile` moves the whole selected C++ target to a named registry
   profile, including compiler/stdenv and ordinary unpinned `nixpkg_deps`. `nixpkg_pins` can redirect
-  specific declared attrs to another named profile with a per-pin rationale.
+  specific declared attrs to another named profile with a per-pin rationale. The same resolver path
+  covers C++ libraries, binaries, tests, wasm libraries, and C++ Node addons.
 - Linking: GoogleTest linking is auto-detected by the template when `pkgs.googletest` is present; other libraries only need to be listed in `nixpkg_deps`.
 - Normalization contract: `nixpkg:` labels are normalized consistently across Starlark/TypeScript/Nix; the parity matrix lives at `build-tools/tools/tests/normalization-parity.test.ts`.

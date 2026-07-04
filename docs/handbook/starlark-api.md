@@ -146,12 +146,14 @@ exceptions. Pins redirect attrs already consumed by the selected target; they do
 package dependencies. If repeated pins become the common case, move the target to that
 `nixpkgs_profile` instead. Selected C++ builds use the target profile for compiler/stdenv and
 ordinary unpinned `nixpkg_deps`; pinned attrs resolve from their pin profiles. Go CGO and Python
-native-extension nixpkg attrs use the same source-selection resolver.
+native-extension nixpkg attrs use the same source-selection resolver, as do C++ Node addons.
 BUILD files must not put raw commits or raw flake URLs in these fields.
 Consumer workspaces that need an additional named profile can expose the generated lockfile-backed
 `nixpkgs_23_11` input through `.viberoots/workspace/nixpkgs-source-registry-extension.nix`;
 selected-build, filtered-snapshot, remote source-snapshot, and cache-manifest paths preserve
-normalized `nixpkgs_profile` and `nixpkg_pins` profile evidence.
+normalized `nixpkgs_profile` and `nixpkg_pins` profile evidence. Planner inspection output names the
+target, base profile, normalized attrs, supplying profiles, resolution kind, and pin rationale where
+one applies; raw commits remain in the lockfile or registry evidence instead of default diagnostics.
 
 ## Go macros
 

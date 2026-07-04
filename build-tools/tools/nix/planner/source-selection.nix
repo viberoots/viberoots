@@ -24,6 +24,7 @@ let
     );
 
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
+  Inspect = import ./source-selection-inspect.nix { inherit lib; };
   fail = msg: builtins.throw ("nixpkgs source registry: " + msg);
 
   schemaVersion =
@@ -207,6 +208,15 @@ let
   resolveNixpkgAttrs = { target, attrs }:
     let plan = validateDeclaredPins { inherit target attrs; };
     in builtins.seq plan (dedupeNixpkgRecords (map (attr: resolveNixpkgAttr { inherit target attr; }) attrs));
+
+  inspectSourcePlan = { target, attrs }:
+    let
+      plan = validateDeclaredPins { inherit target attrs; };
+      records = dedupeNixpkgRecords (map (attr: resolveNixpkgAttr { inherit target attr; }) attrs);
+    in Inspect.inspectionLines {
+      targetLabel = targetNameFor target;
+      inherit plan records;
+    };
 in
 {
   nixpkgsRegistry = builtins.seq _schema (builtins.seq _default (registry // { profiles = validatedProfiles; }));
@@ -215,6 +225,7 @@ in
     sourcePlanFor
     resolveNixpkgAttr
     resolveNixpkgAttrs
+    inspectSourcePlan
     nixpkgIdentityKey
     describeNixpkgRecord
     dedupeNixpkgRecords;

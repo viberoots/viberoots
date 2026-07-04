@@ -512,6 +512,10 @@ same resolver entrypoint before templates receive packages.
 profiles. Pins do not create dependencies, and viberoots does not classify packages by build/header,
 link/runtime, tool/library, or compatibility role.
 
+Planner inspection uses the same resolver records. `inspectSourcePlan` reports the selected target,
+base `nixpkgs_profile`, normalized attrs, supplying profiles, resolution kind, and pin rationale
+without printing raw commits or flake URLs.
+
 ### Common leak patterns
 
 These are the usual ways this leaks:
