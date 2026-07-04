@@ -31,6 +31,7 @@ export async function cleanupLocalOrphanBuckDaemons(logFile: string | null): Pro
     const res = await cleanupOrphanBuckDaemons({
       log: async (line) => await appendVerifyLogLine(logFile, line),
       maxKills: 50,
+      includeOwnerlessEphemeral: true,
     });
     await appendVerifyLogLine(
       logFile,

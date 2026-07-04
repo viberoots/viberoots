@@ -36,7 +36,7 @@ import { startFakeInfisicalServer } from "./infisical.test-server";
 import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { startStaticWebappHttpsMultiServer } from "./static-webapp.https-server";
 
-const contractId = "secret://deployments/pleomino/cloudflare_api_token";
+const contractId = "secret://deployments/sample-webapp/cloudflare_api_token";
 const cfToken = "cf-test-token";
 const lifecycleSteps: DeploymentRequirementStep[] = ["provision", "publish", "smoke"];
 
@@ -81,8 +81,8 @@ test("Cloudflare lifecycle resolves provision, publish, and smoke secrets throug
           providerTarget: {
             ...cloudflarePagesDeploymentFixture().providerTarget,
             accountId: "1b911846f80a89272c0dbaf44f5c810f",
-            customDomain: "staging.pleomino.com",
-            customDomainZoneId: "zone-pleomino",
+            customDomain: "staging.sample-webapp.com",
+            customDomainZoneId: "zone-sample-webapp",
           },
           secretRequirements: lifecycleSteps.map((step) =>
             deploymentRequirementFixture({
@@ -101,7 +101,7 @@ test("Cloudflare lifecycle resolves provision, publish, and smoke secrets throug
       };
       await writeLifecycleArtifact(artifactDir, `<html>${backend}</html>\n`);
       await writeLifecycleWranglerConfig(
-        path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+        path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
       );
       await installCloudflarePagesTargets(tmp, [deployment]);
       await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -152,8 +152,8 @@ test("Cloudflare lifecycle resolves provision, publish, and smoke secrets throug
       );
       const publicServer = await startStaticWebappHttpsMultiServer({
         hosts: {
-          "pleomino-staging-pages.pages.dev": publishedRoot,
-          "staging.pleomino.com": publishedRoot,
+          "sample-webapp-staging-pages.pages.dev": publishedRoot,
+          "staging.sample-webapp.com": publishedRoot,
         },
         tlsRoot: tmp,
       });

@@ -812,10 +812,10 @@ weakening the fail-closed build-system rules.
 I add an explicit compliance selector without changing default verify behavior.
 
 - Invocation contract:
-  - `v --selector project-closure --project projects/apps/pleomino`
-  - `v --selector project-closure --project projects/apps/pleomino --project projects/libs/shared-ui`
-  - `v --selector project-closure --projects projects/apps/pleomino,projects/libs/shared-ui`
-  - `v --selector project-closure --project projects/apps/pleomino --explain-selection`
+  - `v --selector project-closure --project projects/apps/sample-webapp`
+  - `v --selector project-closure --project projects/apps/sample-webapp --project projects/libs/shared-ui`
+  - `v --selector project-closure --projects projects/apps/sample-webapp,projects/libs/shared-ui`
+  - `v --selector project-closure --project projects/apps/sample-webapp --explain-selection`
   - env aliases: `VERIFY_SELECTOR=project-closure`, `VERIFY_PROJECTS=<csv>`
   - CLI flags take precedence over env aliases
 - Validation contract:

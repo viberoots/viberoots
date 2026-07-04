@@ -49,7 +49,7 @@ test("cloudflare-pages rollback re-publishes a prior admitted exact artifact", a
     await writeArtifact(artifactA, "<html>known-good</html>\n");
     await writeArtifact(artifactB, "<html>bad-release</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);

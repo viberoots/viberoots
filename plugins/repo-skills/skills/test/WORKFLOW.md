@@ -89,7 +89,7 @@ printf 'status=%s\nlog=%s\nelapsed_seconds=%s\n' "$status" "$log" "$elapsed_seco
 exit "$status"
 ```
 
-Set `v_args` from the selector the user provided. Leave it empty when no selector was provided. For a single target selector, use one array element, for example `v_args=("//build-tools/tools/tests/node:node.service-artifact.contract.test")`. For selector flags, use one array element per shell argument, for example `v_args=(--selector project-closure --project projects/apps/pleomino)`. Keep the validation process redirected to the log in every case, but keep the polling loop visible so progress reaches the tester's chat.
+Set `v_args` from the selector the user provided. Leave it empty when no selector was provided. For a single target selector, use one array element, for example `v_args=("//build-tools/tools/tests/node:node.service-artifact.contract.test")`. For selector flags, use one array element per shell argument, for example `v_args=(--selector project-closure --project projects/apps/sample-webapp)`. Keep the validation process redirected to the log in every case, but keep the polling loop visible so progress reaches the tester's chat.
 
 Run this from the repo root using `bash -lc` or `zsh -lc` so direnv can export the environment into the shell that runs validation. If `direnv export bash` says the directory is blocked, run `direnv allow` once for this checkout, rerun the command, and mention that in the tester report.
 

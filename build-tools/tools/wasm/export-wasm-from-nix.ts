@@ -27,8 +27,11 @@ async function findRepoRoot(start) {
   let dir = path.resolve(start);
   for (;;) {
     if (await isConsumerWorkspaceRoot(dir)) return dir;
-    if (await isWorkspaceRoot(dir)) return dir;
     const parent = path.dirname(dir);
+    if (path.basename(dir) === "viberoots" && (await isConsumerWorkspaceRoot(parent))) {
+      return parent;
+    }
+    if (await isWorkspaceRoot(dir)) return dir;
     if (parent === dir) break;
     dir = parent;
   }

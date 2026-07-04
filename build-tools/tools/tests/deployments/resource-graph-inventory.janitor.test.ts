@@ -41,14 +41,14 @@ function janitorFacts() {
   return {
     recordId: "janitor-1",
     submissionId: "submission-1",
-    deploymentId: "pleomino",
+    deploymentId: "sample-webapp",
     reason: "rejected-submission-cleanup",
     createdAt: "2026-01-01T00:00:00.000Z",
     documentJson: {
       schemaVersion: "nixos-shared-host-staged-artifact-janitor@1",
       reason: "rejected-submission-cleanup",
       submissionId: "submission-1",
-      deploymentId: "pleomino",
+      deploymentId: "sample-webapp",
       stagedReference: {
         rootBasename: "staged-artifacts",
         basename: "upload-1",

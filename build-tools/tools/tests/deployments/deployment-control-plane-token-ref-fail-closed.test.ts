@@ -17,7 +17,7 @@ import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import { infisicalTestContext } from "./deployment-secret-infisical.fixture";
 import { startFakeInfisicalServer } from "./infisical.test-server";
 
-const STAGING_REF = "secret://control-plane/pleomino/staging/service-token";
+const STAGING_REF = "secret://control-plane/sample-webapp/staging/service-token";
 
 test("protected/shared secret token refs require explicit backend selection before mutation", async () => {
   const control = await startControlPlaneRecorder();
@@ -72,7 +72,7 @@ test("unresolved selected secret token ref fails before provider mutation", asyn
   try {
     await assert.rejects(
       () => runFrontDoor(deployment(STAGING_REF, server.siteUrl, control.url)),
-      /required secret contract secret:\/\/control-plane\/pleomino\/staging\/service-token is missing/,
+      /required secret contract secret:\/\/control-plane\/sample-webapp\/staging\/service-token is missing/,
     );
     assert.deepEqual(control.paths, []);
   } finally {
@@ -85,7 +85,9 @@ test("unresolved selected secret token ref fails before provider mutation", asyn
 test("fixture backend success alone does not satisfy selected control-plane token ref", async () => {
   await withSecretFixture(
     {
-      "secret://deployments/pleomino/cloudflare_api_token": { value: "provider-fixture-token" },
+      "secret://deployments/sample-webapp/cloudflare_api_token": {
+        value: "provider-fixture-token",
+      },
     },
     async () => {
       await assert.rejects(
@@ -107,16 +109,16 @@ function deployment(
   controlPlaneUrl = "https://control-plane.example",
 ) {
   const base = cloudflarePagesDeploymentFixture({
-    deploymentId: "pleomino-staging",
+    deploymentId: "sample-webapp-staging",
     controlPlane: {
-      name: "pleomino-staging",
+      name: "sample-webapp-staging",
       serviceClient: {
         controlPlaneUrl,
         controlPlaneTokenRef: tokenRef,
       },
       records: { backend: "service" },
     },
-    deploymentContext: { name: "pleomino-staging" },
+    deploymentContext: { name: "sample-webapp-staging" },
   });
   return {
     ...base,

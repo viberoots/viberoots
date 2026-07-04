@@ -21,10 +21,11 @@ void (async function main() {
       },
     })`${devBuild} build //.viberoots/workspace:flake.lock --no-materialize`;
 
-    // Ensure no index changes occurred
-    const { stdout } = await $tmp`git status --porcelain`;
-    console.log("# git porcelain:", String(stdout || "").trim());
-    if (String(stdout || "").trim() !== "") {
+    const { stdout: staged } = await $tmp`git diff --cached --name-only`;
+    const { stdout: tracked } = await $tmp`git status --porcelain --untracked-files=no`;
+    const changed = [staged, tracked].map((value) => String(value || "").trim()).filter(Boolean);
+    console.log("# git staged/tracked:", changed.join("\n"));
+    if (changed.length > 0) {
       console.log("not ok 1 - dev-build mutated git index");
       console.log("  ---\n  diag: git index changed\n  ...");
       return false;

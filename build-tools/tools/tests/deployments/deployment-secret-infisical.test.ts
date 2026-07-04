@@ -25,7 +25,7 @@ test("Infisical admission freezes non-secret selector and runtime reads admitted
       id: "sec_1",
       projectId: "proj_123",
       environment: "prod",
-      secretPath: "/deployments/pleomino",
+      secretPath: "/deployments/sample-webapp",
       secretName: "cloudflare_api_token",
       version: "3",
       secretValue: "token-v3",
@@ -43,7 +43,7 @@ test("Infisical admission freezes non-secret selector and runtime reads admitted
     assert.equal(admitted[0]?.resolvedVersion, "3");
     assert.equal(
       admitted[0]?.referenceId,
-      "infisical:proj_123:prod:/deployments/pleomino:cloudflare_api_token#sec_1@3",
+      "infisical:proj_123:prod:/deployments/sample-webapp:cloudflare_api_token#sec_1@3",
     );
     assert.equal(server.secretCalls[0], "cloudflare_api_token:false:");
     assert.ok(!JSON.stringify(admitted).includes("token-v3"));
@@ -51,7 +51,7 @@ test("Infisical admission freezes non-secret selector and runtime reads admitted
       id: "sec_1",
       projectId: "proj_123",
       environment: "prod",
-      secretPath: "/deployments/pleomino",
+      secretPath: "/deployments/sample-webapp",
       secretName: "cloudflare_api_token",
       version: "4",
       secretValue: "token-v4",
@@ -141,7 +141,7 @@ test("Infisical admission falls back to value read when metadata-only read omits
       id: "sec_1",
       projectId: "proj_123",
       environment: "prod",
-      secretPath: "/deployments/pleomino",
+      secretPath: "/deployments/sample-webapp",
       secretName: "cloudflare_api_token",
       version: "7",
       secretValue: "sensitive-fallback-token",
@@ -201,7 +201,7 @@ test("Infisical replay mismatch fails without leaking secret values", async () =
       id: "sec_1",
       projectId: "proj_123",
       environment: "prod",
-      secretPath: "/deployments/pleomino",
+      secretPath: "/deployments/sample-webapp",
       secretName: "cloudflare_api_token",
       version: "3",
       secretValue: "sensitive-runtime-token",

@@ -56,7 +56,7 @@ test("lower-level AWS setup rejects non-generated registry evidence", async () =
           artifactRegion: "us-east-1",
           artifactBackend: "aws-s3",
           artifactBackendEvidence: "",
-          deploymentIds: ["pleomino-staging"],
+          deploymentIds: ["sample-webapp-staging"],
           reviewedSourceMode: "ssh",
           authCallbackHost: "deploy-auth.example.test",
           authCallbackPath: "/oidc/callback",

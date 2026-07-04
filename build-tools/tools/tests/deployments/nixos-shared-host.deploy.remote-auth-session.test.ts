@@ -15,7 +15,7 @@ import {
   installClientProfile,
   prepareRemoteExecFixture,
   remoteExecEnv,
-  REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+  REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
 import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { withEnvOverrides, waitFor } from "./nixos-shared-host.control-plane.helpers";
@@ -39,7 +39,7 @@ test("remote profile deploy creates a service-owned auth session for interactive
         sub: "human-1",
         email: "ada@example.com",
         preferred_username: "Ada",
-        groups: ["deploy-submitters-pleomino-dev"],
+        groups: ["deploy-submitters-sample-webapp-dev"],
       },
     });
     const {
@@ -54,7 +54,7 @@ test("remote profile deploy creates a service-owned auth session for interactive
     } = await prepareRemoteExecFixture({
       tmp,
       $,
-      artifactFiles: { "index.html": "<html>pleomino</html>\n", healthz: "ok\n" },
+      artifactFiles: { "index.html": "<html>sample-webapp</html>\n", healthz: "ok\n" },
     });
     const authDeployment = {
       ...deployment,
@@ -135,7 +135,7 @@ test("remote profile deploy creates a service-owned auth session for interactive
       const summary = await summaryPromise;
       assert.equal(summary.executionMode, "remote-profile");
       assert.equal(summary.controlPlane.finalOutcome, "succeeded");
-      assert.equal(summary.deploymentLabel, REVIEWED_PLEOMINO_DEPLOYMENT_LABEL);
+      assert.equal(summary.deploymentLabel, REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL);
       assert.equal(oidc.tokenRequests.length > 0, true);
     } finally {
       await worker.close();

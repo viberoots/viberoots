@@ -7,10 +7,17 @@ import {
   readDirtyGitStats,
   readSnapshotStats,
 } from "../filtered-flake-diagnostics";
-import { filteredFlakeRsyncExcludeArgs } from "../nix-build-filtered-flake-lib";
+import {
+  defaultFilteredFlakeSnapshotRelPaths,
+  defaultFilteredFlakeSnapshotRsyncSources,
+  filteredFlakeRsyncExcludeArgs,
+  selectedNodeSnapshotRelPaths,
+  selectedNodeSnapshotRsyncSources,
+} from "../nix-build-filtered-flake-lib";
 import { emitTimingDetail } from "../../lib/timing-detail";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../../lib/macos-metadata";
+import { findWorkspacePackageRepoDirs } from "./importer-workspace-packages";
 
 function executablePath(filePath: string): string {
   const candidate = filePath.trim();
@@ -29,9 +36,21 @@ function resolveNixBin(): string {
   return resolveToolPathSync("nix");
 }
 
+async function existingRelPaths(root: string, relPaths: readonly string[]): Promise<string[]> {
+  const present: string[] = [];
+  for (const rel of relPaths) {
+    try {
+      await fsp.lstat(path.join(root, rel));
+      present.push(rel);
+    } catch {}
+  }
+  return present;
+}
+
 export async function makeFilteredFlakeRef(opts: {
   repoRoot: string;
   attr: string;
+  importer?: string;
 }): Promise<{ flakeRef: string; workspaceRoot: string; cleanup: () => Promise<void> }> {
   const tmpBase = process.env.TMPDIR || "/tmp";
   const workDirRaw = await mkdtempNoindex("scaf-flake-", {
@@ -55,9 +74,22 @@ export async function makeFilteredFlakeRef(opts: {
   }
   const snapshotStart = Date.now();
   const rsyncExcludes = filteredFlakeRsyncExcludeArgs();
+  const workspacePackageDirs = opts.importer
+    ? await findWorkspacePackageRepoDirs({
+        repoRoot: src,
+        importerAbs: path.join(src, opts.importer),
+      })
+    : [];
+  const requestedRelPaths = opts.importer
+    ? selectedNodeSnapshotRelPaths(opts.importer, workspacePackageDirs)
+    : defaultFilteredFlakeSnapshotRelPaths();
+  const snapshotSources = opts.importer
+    ? selectedNodeSnapshotRsyncSources(await existingRelPaths(src, requestedRelPaths))
+    : defaultFilteredFlakeSnapshotRsyncSources(await existingRelPaths(src, requestedRelPaths));
   await $({
     stdio: "pipe",
-  })`rsync -a --delete ${rsyncExcludes} ${src}/ ${snapDirReal}/`;
+    cwd: src,
+  })`rsync -a --delete --relative ${rsyncExcludes} ${snapshotSources} ${snapDirReal}/`;
   if (filteredFlakeDiagnosticsEnabled()) {
     const stats = await readSnapshotStats(snapDirReal);
     const elapsedMs = Date.now() - snapshotStart;
@@ -106,35 +138,11 @@ async function repairSnapshotViberootsInput(opts: {
     return;
   }
   const flakeLocalViberootsRoot = path.join(opts.flakeDir, "viberoots");
-  const liveViberootsRoot = await tempRepoLiveViberootsRoot();
-  if (liveViberootsRoot) {
-    await fsp.rm(flakeLocalViberootsRoot, { recursive: true, force: true }).catch(() => {});
-    await rewriteViberootsInput(opts.flakeDir, liveViberootsRoot);
-    return;
-  }
   await fsp.rm(flakeLocalViberootsRoot, { recursive: true, force: true }).catch(() => {});
   await $({
     stdio: "pipe",
   })`rsync -a --delete --exclude .git --exclude node_modules ${snapshotViberootsRoot}/ ${flakeLocalViberootsRoot}/`;
   await rewriteViberootsInput(opts.flakeDir, "./viberoots");
-}
-
-async function tempRepoLiveViberootsRoot(): Promise<string> {
-  const raw = String(
-    process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
-      process.env.VIBEROOTS_SOURCE_ROOT ||
-      process.env.VIBEROOTS_ROOT ||
-      "",
-  ).trim();
-  if (!raw) return "";
-  const root = path.resolve(raw);
-  try {
-    await fsp.access(path.join(root, "flake.nix"));
-    await fsp.access(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"));
-  } catch {
-    return "";
-  }
-  return await fsp.realpath(root).catch(() => root);
 }
 
 async function rewriteViberootsInput(flakeDir: string, inputPath: string): Promise<void> {

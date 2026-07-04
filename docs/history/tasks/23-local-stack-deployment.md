@@ -175,7 +175,7 @@ disabled for simplicity. This differs from the smoke config intentionally.
 should also show how to submit a `local_only` deploy against the running service using the existing
 `deploy` CLI with `VBR_DEPLOY_LOCAL_FIXTURE_SERVICE=1` and `--control-plane-url http://127.0.0.1:7780`.
 A minimal `//projects/deployments/local-stack-test:deploy` fixture target in the repo would make
-this self-contained, or the doc can reference the existing `pleomino-dev` deployment metadata with
+this self-contained, or the doc can reference the existing `sample-webapp-dev` deployment metadata with
 an explicit `--override-protection-class local_only` flag if that flag is reviewed. Either way,
 the developer must be able to issue a full submit-admit-execute cycle without touching the legacy self-hosted control-plane host.
 

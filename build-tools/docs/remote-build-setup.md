@@ -123,6 +123,9 @@ remote-readiness lanes. In dry-run mode it builds the initial prewarm attrs with
 `--no-link --print-out-paths`, archives flake inputs with `nix flake archive --json`, and writes a
 manifest containing system, source revision, flake lock hash, attrs, exact output paths, selected
 graph/target outputs when provided, cache endpoint identity, and tool versions:
+When a selected graph or source-plan evidence file is supplied, the manifest also records the
+selected target's `nixpkgs_profile` and normalized `nixpkg_pins` attr/profile links. Pin rationales
+stay out of the cache manifest; the lockfile and registry evidence identify the package source.
 
 ```bash
 node build-tools/tools/ci/publish-nix-cache-manifest.ts \
@@ -541,6 +544,7 @@ The manifest schema is `viberoots.source-snapshot.v1` and records:
 - `ambientWorkspaceRoot`: the local checkout used only to construct the snapshot
 - `declaredGraphPath`: the declared Buck graph artifact used for the snapshot
 - `graphPathInSnapshot`: currently `build-tools/tools/buck/graph.json`
+- `sourcePlans`: selected-target `nixpkgs_profile` and normalized `nixpkg_pins` attr/profile links
 - `excludes`: filtered mutable/local directories
 - `files`: files present in the snapshot
 

@@ -29,7 +29,10 @@ test("repo profile materialization writes Infisical project id without secret va
     written,
     /"clientIdRef": "secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap\/client-id"/,
   );
-  assert.doesNotMatch(written, /secret:\/\/deployments\/pleomino|secretValue|pleomino-project-id/);
+  assert.doesNotMatch(
+    written,
+    /secret:\/\/deployments\/sample-webapp|secretValue|sample-webapp-project-id/,
+  );
   assert.deepEqual(api.calls, [
     "GET /api/v1/projects?type=secret-manager",
     "POST /api/v1/projects",

@@ -21,6 +21,9 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     ".viberoots/buck/tmp",
     ".viberoots/cache",
     ".viberoots/workspace/.viberoots",
+    ".viberoots/workspace/cache",
+    ".viberoots/workspace/nix-xdg-cache",
+    ".viberoots/workspace/xdg-cache",
     "viberoots/.viberoots",
     ".clinic",
     ".turbo",
@@ -51,11 +54,12 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
       throw new Error(`${name} must use the shared filtered-flake rsync excludes`);
     }
     if (
-      !source.includes("tempRepoLiveViberootsRoot") ||
-      source.includes('String(process.env.VBR_RUN_IN_TEMP_REPO || "").trim() !== "1"') ||
-      !source.includes("VIBEROOTS_SOURCE_ROOT")
+      !source.includes("repairSnapshotViberootsInput") ||
+      (!source.includes("rewriteViberootsInput") &&
+        !source.includes("rewriteSnapshotViberootsInput")) ||
+      !source.includes("lockPathInput")
     ) {
-      throw new Error(`${name} must reuse the stable live viberoots input for filtered flakes`);
+      throw new Error(`${name} must repair filtered snapshot viberoots inputs with locked paths`);
     }
   }
 
@@ -86,6 +90,22 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
       throw new Error(
         `${name} must keep relative path inputs relative in flake.lock original metadata`,
       );
+    }
+  }
+  for (const [name, source] of [
+    ["update-pnpm-hash filtered snapshot", updaterHelper],
+    ["selected-build filtered snapshot", selectedHelper],
+    ["nix-build-filtered-flake snapshot", helper],
+  ] as const) {
+    if (
+      !source.includes("defaultFilteredFlakeSnapshotRelPaths") ||
+      !source.includes("defaultFilteredFlakeSnapshotRsyncSources") ||
+      !source.includes("--relative")
+    ) {
+      throw new Error(`${name} must use the shared allowlisted filtered-flake snapshot roots`);
+    }
+    if (source.includes("${src}/ ${snapDirReal}/") || source.includes("${root}/ ${snapDir}/")) {
+      throw new Error(`${name} must not broad-rsync the workspace root into filtered snapshots`);
     }
   }
   if (

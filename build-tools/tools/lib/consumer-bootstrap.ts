@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -8,7 +9,7 @@ import {
 } from "../deployments/sprinkleref-templates";
 import { BUCK_PROJECT_IGNORE_LINE } from "./buck-project-ignore";
 import { createCommandUi } from "./command-ui";
-import { direnvStage0, envrc } from "./consumer-direnv";
+import { direnvStage0, envrc, filterCapturedHostPath } from "./consumer-direnv";
 import { writeIfChanged } from "./fs-helpers";
 import { activateWorkspace } from "./workspace-activation";
 import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
@@ -58,6 +59,25 @@ const bootstrapScaffoldPaths = [
   "projects/config/README.md",
   "projects/config/shared.json",
 ];
+const viberootsInputExcludes = new Set([
+  ".git",
+  ".direnv",
+  "node_modules",
+  "buck-out",
+  ".viberoots",
+  ".pnpm-store",
+  ".pnpm-home",
+  "coverage",
+  ".clinic",
+  ".turbo",
+  ".cache",
+  "dist",
+  "build",
+  ".vite",
+  ".next",
+  ".wasm-producer",
+  "result",
+]);
 
 async function exists(file: string): Promise<boolean> {
   try {
@@ -104,13 +124,82 @@ async function writeIfMissing(workspaceRoot: string, rel: string, content: strin
   await fsp.writeFile(file, content, "utf8");
 }
 
-async function writeHostPath(workspaceRoot: string): Promise<void> {
-  const hostPath = process.env.VBR_HOST_PATH || process.env.PATH || "";
-  if (!hostPath) return;
-  await writeIfChanged(
-    path.join(workspaceRoot, ".viberoots", "workspace", "host-path"),
-    `${hostPath}\n`,
+function pathHasExternalAgentTool(hostPath: string, workspaceRoot: string): boolean {
+  const wrapperDirs = new Set(
+    [".viberoots/current/build-tools/tools/bin", "viberoots/build-tools/tools/bin"].map((rel) =>
+      path.resolve(workspaceRoot, rel),
+    ),
   );
+  for (const dir of hostPath.split(path.delimiter)) {
+    if (!dir) continue;
+    const resolved = path.resolve(dir);
+    if (wrapperDirs.has(resolved)) continue;
+    if (["codex", "claude"].some((tool) => fs.existsSync(path.join(dir, tool)))) return true;
+  }
+  return false;
+}
+
+async function writeHostPathIfUseful(workspaceRoot: string): Promise<void> {
+  const hostPath = filterCapturedHostPath(process.env.VBR_HOST_PATH || process.env.PATH || "");
+  if (!hostPath) return;
+  const file = path.join(workspaceRoot, ".viberoots", "workspace", "host-path");
+  if (process.env.VBR_HOST_PATH || pathHasExternalAgentTool(hostPath, workspaceRoot)) {
+    await writeIfChanged(file, `${hostPath}\n`);
+  }
+}
+
+function shouldExcludeViberootsInputRel(rel: string): boolean {
+  const parts = rel.split(path.sep).filter(Boolean);
+  if (parts.some((part) => viberootsInputExcludes.has(part))) return true;
+  const base = parts.at(-1) || "";
+  return (
+    base === ".metadata_never_index" ||
+    base === ".source-fingerprint" ||
+    base === ".node_modules.lockfile-guard" ||
+    base.startsWith(".node_modules.lockfile-guard.") ||
+    base.endsWith(".tmp") ||
+    /^.*\.(ts|tsx|js|mjs)\.[A-Za-z0-9]{6}$/.test(base) ||
+    base.startsWith("result-")
+  );
+}
+
+async function copyViberootsInputTree(src: string, dst: string): Promise<void> {
+  await fsp.rm(dst, { recursive: true, force: true });
+  await fsp.mkdir(dst, { recursive: true });
+  async function visit(dir: string): Promise<void> {
+    for (const entry of await fsp.readdir(dir, { withFileTypes: true })) {
+      const source = path.join(dir, entry.name);
+      const rel = path.relative(src, source);
+      if (shouldExcludeViberootsInputRel(rel)) continue;
+      const target = path.join(dst, rel);
+      if (entry.isDirectory()) {
+        await fsp.mkdir(target, { recursive: true });
+        await visit(source);
+      } else if (entry.isSymbolicLink()) {
+        await fsp.mkdir(path.dirname(target), { recursive: true });
+        await fsp.symlink(await fsp.readlink(source), target);
+      } else if (entry.isFile()) {
+        await fsp.mkdir(path.dirname(target), { recursive: true });
+        await fsp.copyFile(source, target);
+      }
+    }
+  }
+  await visit(src);
+  await fsp.writeFile(path.join(dst, ".metadata_never_index"), "", "utf8");
+  await fsp.writeFile(path.join(dst, ".source-fingerprint"), "", "utf8");
+}
+
+async function prepareFilteredViberootsInput(
+  workspaceRoot: string,
+  opts: InitConsumerOptions,
+): Promise<string | undefined> {
+  const sourcePath = opts.sourcePath ? path.resolve(workspaceRoot, opts.sourcePath) : "";
+  const localSourcePath = path.resolve(workspaceRoot, "viberoots");
+  if (!sourcePath || sourcePath !== localSourcePath) return undefined;
+  if (!(await exists(path.join(sourcePath, "flake.nix")))) return undefined;
+  const filtered = path.join(workspaceRoot, ".viberoots", "workspace", "viberoots-flake-input");
+  await copyViberootsInputTree(sourcePath, filtered);
+  return filtered;
 }
 
 async function ensureGitignoreEntries(workspaceRoot: string): Promise<void> {
@@ -227,7 +316,25 @@ ${BUCK_PROJECT_IGNORE_LINE}
 `;
 }
 
-function flakeNix(opts: InitConsumerOptions): string {
+function usesLocalSubmoduleSource(opts: InitConsumerOptions): boolean {
+  if (!opts.sourcePath || !opts.viberootsUrl.startsWith("path:")) return false;
+  return (
+    path.resolve(opts.workspaceRoot, opts.sourcePath) ===
+    path.resolve(opts.workspaceRoot, "viberoots")
+  );
+}
+
+function workspaceViberootsUrl(opts: InitConsumerOptions): string {
+  if (usesLocalSubmoduleSource(opts)) return "path:./viberoots-flake-input";
+  return opts.viberootsUrl;
+}
+
+function rootViberootsUrl(opts: InitConsumerOptions): string {
+  if (usesLocalSubmoduleSource(opts)) return "path:./.viberoots/workspace/viberoots-flake-input";
+  return opts.viberootsUrl;
+}
+
+function flakeNix(opts: InitConsumerOptions, viberootsUrl = opts.viberootsUrl): string {
   return `# ${generatedMarker}
 {
   description = "viberoots consumer workspace";
@@ -258,16 +365,24 @@ function flakeNix(opts: InitConsumerOptions): string {
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs_23_11.url = "github:NixOS/nixpkgs/nixos-23.11";
     buck2.url = "github:facebook/buck2/201beb86106fecdc84e30260b0f1abb5bf576988";
     gomod2nix.url = "github:nix-community/gomod2nix";
     gomod2nix.inputs.nixpkgs.follows = "nixpkgs";
-    viberoots.url = "${opts.viberootsUrl}";
+    viberoots.url = "${viberootsUrl}";
     viberoots.inputs.nixpkgs.follows = "nixpkgs";
     viberoots.inputs.buck2.follows = "buck2";
     viberoots.inputs.gomod2nix.follows = "gomod2nix";
   };
 
   outputs = inputs:
+    let
+      registryExtensionPath = ./nixpkgs-source-registry-extension.nix;
+      nixpkgsRegistryExtension =
+        if builtins.pathExists registryExtensionPath
+        then import registryExtensionPath { inherit inputs; }
+        else { profiles = { }; };
+    in
     inputs.viberoots.lib.mkWorkspace {
       workspaceSrc =
         let
@@ -276,16 +391,22 @@ function flakeNix(opts: InitConsumerOptions): string {
         if root != "" then builtins.toPath root else ../..;
       viberootsInput = inputs.viberoots;
       workspaceName = "${opts.workspaceName}";
+      inherit nixpkgsRegistryExtension;
     };
 }
 `;
 }
 
 function rootFlakeNix(opts: InitConsumerOptions): string {
-  return flakeNix(opts).replace(
-    'if root != "" then builtins.toPath root else ../..;',
-    'if root != "" then builtins.toPath root else ./.;',
-  );
+  return flakeNix(opts, rootViberootsUrl(opts))
+    .replace(
+      'if root != "" then builtins.toPath root else ../..;',
+      'if root != "" then builtins.toPath root else ./.;',
+    )
+    .replace(
+      "registryExtensionPath = ./nixpkgs-source-registry-extension.nix;",
+      "registryExtensionPath = ./.viberoots/workspace/nixpkgs-source-registry-extension.nix;",
+    );
 }
 
 function workspaceTargets(): string {
@@ -443,20 +564,25 @@ async function runInstall(workspaceRoot: string): Promise<void> {
   });
 }
 
-async function runNixFlakeLock(workspaceRoot: string): Promise<void> {
+async function runNixFlakeLock(opts: InitConsumerOptions): Promise<void> {
+  const filteredViberootsInput = await prepareFilteredViberootsInput(opts.workspaceRoot, opts);
+  const overrideArgs = filteredViberootsInput
+    ? ["--override-input", "viberoots", `path:${filteredViberootsInput}`]
+    : [];
   await execFileAsync(
     "nix",
     [
       "flake",
       "lock",
       "--accept-flake-config",
-      `path:${path.join(workspaceRoot, ".viberoots", "workspace")}`,
+      ...overrideArgs,
+      `path:${path.join(opts.workspaceRoot, ".viberoots", "workspace")}`,
     ],
-    { cwd: workspaceRoot, maxBuffer: 1024 * 1024 * 16 },
+    { cwd: opts.workspaceRoot, maxBuffer: 1024 * 1024 * 16 },
   );
-  const hiddenLock = path.join(workspaceRoot, ".viberoots", "workspace", "flake.lock");
+  const hiddenLock = path.join(opts.workspaceRoot, ".viberoots", "workspace", "flake.lock");
   if (await exists(hiddenLock)) {
-    await fsp.copyFile(hiddenLock, path.join(workspaceRoot, "flake.lock"));
+    await fsp.copyFile(hiddenLock, path.join(opts.workspaceRoot, "flake.lock"));
   }
 }
 
@@ -486,7 +612,7 @@ export async function initConsumer(opts: InitConsumerOptions): Promise<void> {
   await mkdirWithMacosMetadataExclusion(path.join(opts.workspaceRoot, ".viberoots", "workspace"));
   await mkdirWithMacosMetadataExclusion(path.join(opts.workspaceRoot, ".viberoots", "buck"));
   await mkdirWithMacosMetadataExclusion(path.join(opts.workspaceRoot, "projects"));
-  await writeHostPath(opts.workspaceRoot);
+  await writeHostPathIfUseful(opts.workspaceRoot);
 
   await writeBuckroot(opts.workspaceRoot);
   await writeGeneratedFile(opts.workspaceRoot, ".buckconfig", buckconfig());
@@ -497,7 +623,11 @@ export async function initConsumer(opts: InitConsumerOptions): Promise<void> {
     direnvStage0(),
   );
   await writeGeneratedFile(opts.workspaceRoot, "flake.nix", rootFlakeNix(opts));
-  await writeGeneratedFile(opts.workspaceRoot, ".viberoots/workspace/flake.nix", flakeNix(opts));
+  await writeGeneratedFile(
+    opts.workspaceRoot,
+    ".viberoots/workspace/flake.nix",
+    flakeNix(opts, workspaceViberootsUrl(opts)),
+  );
   await writeGeneratedFile(opts.workspaceRoot, ".viberoots/workspace/TARGETS", workspaceTargets());
   await writeIfMissing(opts.workspaceRoot, "README.md", consumerReadme(sourceMode));
   await writeIfMissing(
@@ -514,7 +644,7 @@ Project and application source belongs here.
   await initSprinkleRefConfigs({ dir: path.join(opts.workspaceRoot, "projects", "config") });
   await initLocalSprinkleRefValues(opts.workspaceRoot);
 
-  if (opts.lock !== false) await runNixFlakeLock(opts.workspaceRoot);
+  if (opts.lock !== false) await runNixFlakeLock(opts);
   await markBootstrapScaffoldVisibleToGit(opts.workspaceRoot);
   await repairCurrentSymlinkForBootstrap(opts.workspaceRoot, opts.sourcePath);
   const activation = await activateWorkspace({

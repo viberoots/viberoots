@@ -26,7 +26,7 @@ database:
 credentials:
   directory: ${credentials}
   infisicalDeployments:
-    - deploymentId: pleomino-staging
+    - deploymentId: sample-webapp-staging
       siteUrl: https://app.infisical.com
       projectId: project-staging
       environment: staging
@@ -44,7 +44,7 @@ test("production runtime config requires deployment-scoped Infisical files", asy
 
     await assert.rejects(
       () => validateControlPlaneRuntimeConfigFiles(config),
-      /pleomino-staging\.clientIdFile.*pleomino-staging-infisical-client-id/,
+      /sample-webapp-staging\.clientIdFile.*sample-webapp-staging-infisical-client-id/,
     );
   });
 });
@@ -52,13 +52,16 @@ test("production runtime config requires deployment-scoped Infisical files", asy
 test("production runtime config rejects empty Infisical credential files", async () => {
   await withConfig("runtime-infisical-empty", async ({ credentials }) => {
     await writeRequired(credentials);
-    await fsp.writeFile(path.join(credentials, "pleomino-staging-infisical-client-id"), "");
-    await fsp.writeFile(path.join(credentials, "pleomino-staging-infisical-client-secret"), "");
+    await fsp.writeFile(path.join(credentials, "sample-webapp-staging-infisical-client-id"), "");
+    await fsp.writeFile(
+      path.join(credentials, "sample-webapp-staging-infisical-client-secret"),
+      "",
+    );
     const config = parseControlPlaneRuntimeConfig(configYaml(credentials));
 
     await assert.rejects(
       () => validateControlPlaneRuntimeConfigFiles(config),
-      /pleomino-staging\.clientIdFile credential file must not be empty/,
+      /sample-webapp-staging\.clientIdFile credential file must not be empty/,
     );
   });
 });
@@ -72,7 +75,7 @@ test("production runtime config rejects mismatched Infisical credential filename
 
     await assert.rejects(
       () => validateControlPlaneRuntimeConfigFiles(config),
-      /clientSecretFileName must be exactly pleomino-staging-infisical-client-secret/,
+      /clientSecretFileName must be exactly sample-webapp-staging-infisical-client-secret/,
     );
   });
 });
@@ -82,8 +85,8 @@ test("production runtime config rejects malformed Infisical deployment IDs", asy
     await writeRequired(credentials);
     const config = parseControlPlaneRuntimeConfig(
       configYaml(credentials).replace(
-        "deploymentId: pleomino-staging",
-        "deploymentId: pleomino/staging",
+        "deploymentId: sample-webapp-staging",
+        "deploymentId: sample-webapp/staging",
       ),
     );
 
@@ -97,15 +100,15 @@ test("production runtime config rejects malformed Infisical deployment IDs", asy
 test("production runtime config rejects unreadable Infisical credential files", async () => {
   await withConfig("runtime-infisical-unreadable", async ({ credentials }) => {
     await writeRequired(credentials);
-    await fsp.writeFile(path.join(credentials, "pleomino-staging-infisical-client-id"), "id");
-    const secretFile = path.join(credentials, "pleomino-staging-infisical-client-secret");
+    await fsp.writeFile(path.join(credentials, "sample-webapp-staging-infisical-client-id"), "id");
+    const secretFile = path.join(credentials, "sample-webapp-staging-infisical-client-secret");
     await fsp.writeFile(secretFile, "secret");
     await fsp.chmod(secretFile, 0o000);
     const config = parseControlPlaneRuntimeConfig(configYaml(credentials));
 
     await assert.rejects(
       () => validateControlPlaneRuntimeConfigFiles(config),
-      /failed to read credential file for credentials\.infisicalDeployments\.pleomino-staging\.clientSecretFile/,
+      /failed to read credential file for credentials\.infisicalDeployments\.sample-webapp-staging\.clientSecretFile/,
     );
     await fsp.chmod(secretFile, 0o600);
   });
@@ -114,9 +117,9 @@ test("production runtime config rejects unreadable Infisical credential files", 
 test("production runtime config accepts deployment-scoped Infisical files", async () => {
   await withConfig("runtime-infisical-complete", async ({ credentials }) => {
     await writeRequired(credentials);
-    await fsp.writeFile(path.join(credentials, "pleomino-staging-infisical-client-id"), "id");
+    await fsp.writeFile(path.join(credentials, "sample-webapp-staging-infisical-client-id"), "id");
     await fsp.writeFile(
-      path.join(credentials, "pleomino-staging-infisical-client-secret"),
+      path.join(credentials, "sample-webapp-staging-infisical-client-secret"),
       "secret",
     );
     const config = parseControlPlaneRuntimeConfig(configYaml(credentials));

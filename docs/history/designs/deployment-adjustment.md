@@ -120,7 +120,7 @@ A control-plane stage-state record should preserve information equivalent to:
 
 ```json
 {
-  "deployment_id": "pleomino-prod",
+  "deployment_id": "sample-webapp-prod",
   "stage": "prod",
   "current_run_id": "run_123",
   "source_run_id": "run_098",
@@ -203,7 +203,7 @@ First deploy to a lower stage should submit an admitted source revision and
 artifact:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/dev:deploy \
+deploy --deployment //projects/deployments/sample-webapp/dev:deploy \
   --source-revision "$GIT_SHA" \
   --artifact-ref "$IMAGE_DIGEST_OR_ARTIFACT_REF" \
   --admission-evidence "$JENKINS_CHECKS"
@@ -212,13 +212,13 @@ deploy --deployment //projects/deployments/pleomino/dev:deploy \
 Promotion should select an earlier admitted run:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/staging:deploy \
+deploy --deployment //projects/deployments/sample-webapp/staging:deploy \
   --promote \
   --source-run-id <dev-run-id>
 ```
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/sample-webapp/prod:deploy \
   --promote \
   --source-run-id <staging-run-id>
 ```
@@ -226,7 +226,7 @@ deploy --deployment //projects/deployments/pleomino/prod:deploy \
 Rollback should redeploy a prior known-good admitted run:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy \
+deploy --deployment //projects/deployments/sample-webapp/prod:deploy \
   --rollback \
   --source-run-id <prior-prod-run-id>
 ```

@@ -33,8 +33,8 @@ export async function writeWranglerConfig(filePath: string): Promise<void> {
 
 export function rebuildDevDeployment(): CloudflarePagesDeployment {
   return cloudflarePagesDeploymentFixture({
-    deploymentId: "pleomino-rebuild-dev-pages",
-    label: "//projects/deployments/pleomino/rebuild-dev-pages:deploy",
+    deploymentId: "sample-webapp-rebuild-dev-pages",
+    label: "//projects/deployments/sample-webapp/rebuild-dev-pages:deploy",
     environmentStage: "dev",
     lanePolicyRef: rebuildLanePolicy().ref,
     lanePolicy: rebuildLanePolicy(),
@@ -42,29 +42,29 @@ export function rebuildDevDeployment(): CloudflarePagesDeployment {
     admissionPolicy: rebuildDevAdmissionPolicy(),
     providerTarget: {
       account: "web-platform-dev",
-      project: "pleomino-rebuild-dev-pages",
-      id: "pleomino-rebuild-dev-pages",
-      canonicalUrl: "https://pleomino-rebuild-dev-pages.pages.dev/",
-      providerTargetIdentity: "cloudflare-pages:web-platform-dev/pleomino-rebuild-dev-pages",
+      project: "sample-webapp-rebuild-dev-pages",
+      id: "sample-webapp-rebuild-dev-pages",
+      canonicalUrl: "https://sample-webapp-rebuild-dev-pages.pages.dev/",
+      providerTargetIdentity: "cloudflare-pages:web-platform-dev/sample-webapp-rebuild-dev-pages",
     },
   });
 }
 
 export function rebuildStagingDeployment(): CloudflarePagesDeployment {
   return cloudflarePagesDeploymentFixture({
-    deploymentId: "pleomino-rebuild-staging",
-    label: "//projects/deployments/pleomino/rebuild-staging:deploy",
+    deploymentId: "sample-webapp-rebuild-staging",
+    label: "//projects/deployments/sample-webapp/rebuild-staging:deploy",
     lanePolicyRef: rebuildLanePolicy().ref,
     lanePolicy: rebuildLanePolicy(),
     admissionPolicyRef: rebuildStagingAdmissionPolicy().ref,
     admissionPolicy: rebuildStagingAdmissionPolicy(),
     providerTarget: {
       account: "web-platform-staging",
-      project: "pleomino-rebuild-staging-pages",
-      id: "pleomino-rebuild-staging-pages",
-      canonicalUrl: "https://pleomino-rebuild-staging-pages.pages.dev/",
+      project: "sample-webapp-rebuild-staging-pages",
+      id: "sample-webapp-rebuild-staging-pages",
+      canonicalUrl: "https://sample-webapp-rebuild-staging-pages.pages.dev/",
       providerTargetIdentity:
-        "cloudflare-pages:web-platform-staging/pleomino-rebuild-staging-pages",
+        "cloudflare-pages:web-platform-staging/sample-webapp-rebuild-staging-pages",
     },
   });
 }
@@ -110,11 +110,18 @@ export async function createSourceRun(
   backendDatabaseUrl: string;
 }> {
   const deployment = rebuildDevDeployment();
-  const deploymentJson = path.join(tmp, "pleomino-rebuild-dev-pages.json");
+  const deploymentJson = path.join(tmp, "sample-webapp-rebuild-dev-pages.json");
   const artifactDir = path.join(tmp, "source-artifact");
   await writeCloudflareArtifact(artifactDir, "<html>source release</html>\n");
   await writeWranglerConfig(
-    path.join(tmp, "projects", "deployments", "pleomino", "rebuild-dev-pages", "wrangler.jsonc"),
+    path.join(
+      tmp,
+      "projects",
+      "deployments",
+      "sample-webapp",
+      "rebuild-dev-pages",
+      "wrangler.jsonc",
+    ),
   );
   await installCloudflarePagesTargets(tmp, [deployment]);
   await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -153,10 +160,10 @@ export async function createSourceRun(
 
 function rebuildLanePolicy() {
   return nixosSharedHostLanePolicyFixture({
-    ref: "//projects/deployments/pleomino/rebuild-shared:lane",
+    ref: "//projects/deployments/sample-webapp/rebuild-shared:lane",
     name: "lane",
     governance: nixosSharedHostLaneGovernanceFixture({
-      ref: "//projects/deployments/pleomino/rebuild-shared:lane_governance",
+      ref: "//projects/deployments/sample-webapp/rebuild-shared:lane_governance",
       sourceRefPolicies: [
         sourceRefPolicy("dev", "main"),
         sourceRefPolicy("staging", "main"),
@@ -164,13 +171,13 @@ function rebuildLanePolicy() {
       ],
     }),
     artifactReuseMode: "rebuild_per_stage",
-    fingerprint: "sha256:lane-pleomino-rebuild-per-stage",
+    fingerprint: "sha256:lane-sample-webapp-rebuild-per-stage",
   });
 }
 
 function rebuildDevAdmissionPolicy() {
   return nixosSharedHostAdmissionPolicyFixture({
-    ref: "//projects/deployments/pleomino/rebuild-shared:dev_release",
+    ref: "//projects/deployments/sample-webapp/rebuild-shared:dev_release",
     name: "dev_release",
     requiredChecks: [],
   });
@@ -178,11 +185,11 @@ function rebuildDevAdmissionPolicy() {
 
 function rebuildStagingAdmissionPolicy() {
   return nixosSharedHostAdmissionPolicyFixture({
-    ref: "//projects/deployments/pleomino/rebuild-shared:staging_release",
+    ref: "//projects/deployments/sample-webapp/rebuild-shared:staging_release",
     name: "staging_release",
     allowedRefs: ["main"],
     requiredChecks: [],
-    fingerprint: "sha256:admission-pleomino-rebuild-staging",
+    fingerprint: "sha256:admission-sample-webapp-rebuild-staging",
   });
 }
 

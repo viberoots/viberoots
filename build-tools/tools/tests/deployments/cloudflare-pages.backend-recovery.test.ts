@@ -21,9 +21,9 @@ async function writeCloudflareSubmission(opts: {
   submittedAt: string;
   lifecycleState: "waiting_for_lock" | "running";
 }) {
-  const deploymentId = "pleomino-staging";
-  const deploymentLabel = "//projects/deployments/pleomino/staging:deploy";
-  const lockScope = "cloudflare-pages:web-platform-staging/pleomino-staging-pages";
+  const deploymentId = "sample-webapp-staging";
+  const deploymentLabel = "//projects/deployments/sample-webapp/staging:deploy";
+  const lockScope = "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages";
   const executionSnapshotPath = path.join(
     opts.recordsRoot,
     "control-plane",

@@ -38,21 +38,21 @@ async function initTrackedFixture(root: string): Promise<void> {
 
 test("project-local file-size exceptions stay scoped to the owning project", async () => {
   await withTempRoot("file-size-project-exceptions", async (tmp) => {
-    const pleominoRoot = path.join(tmp, "projects/apps/pleomino");
+    const sampleRoot = path.join(tmp, "projects/apps/sample-webapp");
     const otherRoot = path.join(tmp, "projects/apps/other");
-    const pleominoSource = "src/generated/oversized.ts";
+    const sampleSource = "src/generated/oversized.ts";
     const otherSource = "src/generated/oversized.ts";
 
-    await fsp.mkdir(path.join(pleominoRoot, "src/generated"), { recursive: true });
+    await fsp.mkdir(path.join(sampleRoot, "src/generated"), { recursive: true });
     await fsp.mkdir(path.join(otherRoot, "src/generated"), { recursive: true });
     await fsp.writeFile(
-      path.join(pleominoRoot, METHODOLOGY_EXCEPTIONS_FILENAME),
+      path.join(sampleRoot, METHODOLOGY_EXCEPTIONS_FILENAME),
       JSON.stringify(
         {
           sourceFileSizeExceptions: [
             {
-              path: pleominoSource,
-              justification: "Generated fixture owned by Pleomino.",
+              path: sampleSource,
+              justification: "Generated fixture owned by the sample web app.",
             },
           ],
         },
@@ -61,12 +61,15 @@ test("project-local file-size exceptions stay scoped to the owning project", asy
       ),
       "utf8",
     );
-    await fsp.writeFile(path.join(pleominoRoot, pleominoSource), oversizedModule(260), "utf8");
+    await fsp.writeFile(path.join(sampleRoot, sampleSource), oversizedModule(260), "utf8");
     await fsp.writeFile(path.join(otherRoot, otherSource), oversizedModule(260), "utf8");
     await initTrackedFixture(tmp);
 
     const exceptions = await resolveSourceFileSizeExceptionPaths(tmp);
-    assert.equal(exceptions.includes("projects/apps/pleomino/src/generated/oversized.ts"), true);
+    assert.equal(
+      exceptions.includes("projects/apps/sample-webapp/src/generated/oversized.ts"),
+      true,
+    );
     assert.equal(exceptions.includes("projects/apps/other/src/generated/oversized.ts"), false);
 
     const offenders = await findFileSizeOffenders({

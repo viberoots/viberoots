@@ -79,8 +79,7 @@ Write Markdown links so they work in GitHub and native Markdown viewers:
 - [`deployment-secrets-api.md`](deployment-secrets-api.md): secret API reference.
 - [`adrs/README.md`](adrs/README.md): accepted architecture decision records.
 - [`handbook/README.md`](handbook/README.md): contributor handbook and build-tooling references.
-- [`../projects/docs/`](../projects/docs/): product-specific planning artifacts for the data-room
-  / Ragie Phase 0 pilot.
+- [`../projects/docs/`](../projects/docs/): product-specific planning artifacts for sample projects.
 
 ## Build System
 

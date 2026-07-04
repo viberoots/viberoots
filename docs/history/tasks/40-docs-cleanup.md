@@ -45,7 +45,7 @@ distinct documentation types that are not cleanly separated, and has no index or
      and `node-golang-addon.md` may have reference value. Evaluate each.
 
    - Root-level one-off docs that have been fully executed: `repo-rename.md` (the rename is
-     complete), `runtime-prefix-migration.md`, `pleomino-deployment-directory-migration.md`,
+     complete), `runtime-prefix-migration.md`, `sample-webapp-deployment-directory-migration.md`,
      `host-migration-instructions.md` (Parts A-C are historical; Part D may still be active),
      `deployment-scope-cleanup.md`. Verify each is no longer actionable before removing.
 

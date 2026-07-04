@@ -59,8 +59,8 @@ test("deployment verify scope leaves unrelated paths unclassified", () => {
     "viberoots/build-tools/tools/nix/node-modules/store.nix",
     "build-tools/tools/tests/scaffolding/template-taxonomy.contract.test.ts",
     "docs/history/plans/deployment-plan.md",
-    "projects/apps/pleomino/TARGETS",
-    "projects/deployments/pleomino/dev/TARGETS",
+    "projects/apps/sample-webapp/TARGETS",
+    "projects/deployments/sample-webapp/dev/TARGETS",
   ];
   for (const relPath of unrelatedPaths) {
     assert.equal(isReviewedDeploymentOwnedBuildSystemPath(relPath), false, relPath);

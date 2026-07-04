@@ -8,13 +8,13 @@ import { requireCloudflarePagesApiTokenForStep } from "../../deployments/cloudfl
 import type { CloudflarePagesAdmittedContext } from "../../deployments/cloudflare-pages-admission";
 import { cloudflarePagesApiTokenRequirements } from "./cloudflare-pages.fixture";
 
-const targetScope = "cloudflare-pages:web-platform-staging/pleomino-staging-pages";
+const targetScope = "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages";
 
 function admittedContext(overrides: Partial<CloudflarePagesAdmittedContext> = {}) {
   return {
-    lanePolicyRef: "//projects/deployments/pleomino/shared:lane",
+    lanePolicyRef: "//projects/deployments/sample-webapp/shared:lane",
     lanePolicyFingerprint: "sha256:lane",
-    admissionPolicyRef: "//projects/deployments/pleomino/shared:staging_release",
+    admissionPolicyRef: "//projects/deployments/sample-webapp/shared:staging_release",
     admissionPolicyFingerprint: "sha256:admission",
     environmentStage: "staging",
     secretBackend: "vault",
@@ -51,7 +51,7 @@ async function writeFixture(tmp: string, allowedSteps: string[]) {
     JSON.stringify({
       schemaVersion: DEPLOYMENT_SECRET_FIXTURE_SCHEMA,
       contracts: {
-        "secret://deployments/pleomino/cloudflare_api_token": {
+        "secret://deployments/sample-webapp/cloudflare_api_token": {
           value: "cleanup-token",
           allowedSteps,
           targetScopes: [targetScope],
@@ -98,13 +98,13 @@ test("cloudflare preview cleanup rejects credentials not authorized for cleanup"
               {
                 name: "cloudflare_api_token",
                 step: "preview_cleanup",
-                contractId: "secret://deployments/pleomino/cloudflare_api_token",
+                contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
                 required: true,
                 backend: "vault",
-                referenceId: "vault:secret://deployments/pleomino/cloudflare_api_token",
+                referenceId: "vault:secret://deployments/sample-webapp/cloudflare_api_token",
                 targetScope,
-                backendRef: "secret://deployments/pleomino/cloudflare_api_token",
-                selectorRef: "secret://deployments/pleomino/cloudflare_api_token",
+                backendRef: "secret://deployments/sample-webapp/cloudflare_api_token",
+                selectorRef: "secret://deployments/sample-webapp/cloudflare_api_token",
                 resolvedAt: "2026-04-19T00:00:00.000Z",
                 refreshMode: "none",
                 credentialClass: "routine",
@@ -137,13 +137,13 @@ test("cloudflare secret step resolves Vault secrets through admitted context met
           {
             name: "cloudflare_api_token",
             step: "publish",
-            contractId: "secret://deployments/pleomino/cloudflare_api_token",
+            contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
             required: true,
             backend: "vault",
-            referenceId: "vault:secret://deployments/pleomino/cloudflare_api_token",
+            referenceId: "vault:secret://deployments/sample-webapp/cloudflare_api_token",
             targetScope,
-            backendRef: "secret://deployments/pleomino/cloudflare_api_token",
-            selectorRef: "secret://deployments/pleomino/cloudflare_api_token",
+            backendRef: "secret://deployments/sample-webapp/cloudflare_api_token",
+            selectorRef: "secret://deployments/sample-webapp/cloudflare_api_token",
             resolvedAt: "2026-05-13T00:00:00.000Z",
             refreshMode: "none",
             credentialClass: "routine",
@@ -175,14 +175,14 @@ test("cloudflare secret step rejects Vault secrets outside target scope", async 
           admittedContext: admittedContext({
             targetEnvironment: {
               ...admittedContext().targetEnvironment,
-              lockScope: "cloudflare-pages:web-platform-prod/pleomino-prod-pages",
+              lockScope: "cloudflare-pages:web-platform-prod/sample-webapp-prod-pages",
             },
             secretRequirements: cloudflarePagesApiTokenRequirements(),
           }),
           step: "publish",
           requirements: cloudflarePagesApiTokenRequirements(),
         }),
-      /not authorized for target scope cloudflare-pages:web-platform-prod\/pleomino-prod-pages/,
+      /not authorized for target scope cloudflare-pages:web-platform-prod\/sample-webapp-prod-pages/,
     );
   } finally {
     if (original === undefined) delete process.env.VBR_DEPLOYMENT_SECRET_FIXTURE_PATH;

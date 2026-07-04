@@ -25,73 +25,73 @@ function staticWebappComponent(label: string): GraphNode {
 test("deriveCloudflarePagesProviderTarget normalizes canonical url and lock identity", () => {
   const target = deriveCloudflarePagesProviderTarget({
     account: "web-platform-staging",
-    project: "pleomino-staging-pages",
+    project: "sample-webapp-staging-pages",
   });
   assert.deepEqual(target, {
     account: "web-platform-staging",
-    project: "pleomino-staging-pages",
-    id: "pleomino-staging-pages",
-    canonicalUrl: "https://pleomino-staging-pages.pages.dev/",
-    providerTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    project: "sample-webapp-staging-pages",
+    id: "sample-webapp-staging-pages",
+    canonicalUrl: "https://sample-webapp-staging-pages.pages.dev/",
+    providerTargetIdentity: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
   });
 });
 
 test("deriveCloudflarePagesProviderTarget uses custom domain as canonical url", () => {
   const target = deriveCloudflarePagesProviderTarget({
     account: "web-platform-staging",
-    project: "pleomino-staging-pages",
-    customDomain: "staging.pleomino.com",
-    customDomainZoneId: "zone-pleomino",
+    project: "sample-webapp-staging-pages",
+    customDomain: "staging.sample-webapp.com",
+    customDomainZoneId: "zone-sample-webapp",
   });
-  assert.equal(target.customDomain, "staging.pleomino.com");
-  assert.equal(target.customDomainZoneId, "zone-pleomino");
-  assert.equal(target.canonicalUrl, "https://staging.pleomino.com/");
+  assert.equal(target.customDomain, "staging.sample-webapp.com");
+  assert.equal(target.customDomainZoneId, "zone-sample-webapp");
+  assert.equal(target.canonicalUrl, "https://staging.sample-webapp.com/");
   assert.equal(
     target.providerTargetIdentity,
-    "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
   );
 });
 
 test("extractCloudflarePagesDeployments reads provider target and publisher config", () => {
   const nodes: GraphNode[] = [
-    staticWebappComponent("//projects/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/sample-webapp:app"),
     cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture({
-      name: "//projects/deployments/pleomino/shared:dev_release",
+      name: "//projects/deployments/sample-webapp/shared:dev_release",
       allowed_refs: ["main"],
-      required_checks: ["deploy/pleomino-dev"],
+      required_checks: ["deploy/sample-webapp-dev"],
     }),
     {
-      name: "//projects/deployments/pleomino/dev:deploy",
+      name: "//projects/deployments/sample-webapp/dev:deploy",
       provider: "cloudflare-pages",
-      component: "//projects/apps/pleomino:app",
+      component: "//projects/apps/sample-webapp:app",
       component_kind: "static-webapp",
       publisher: "wrangler-pages",
       publisher_config: "wrangler.jsonc",
       protection_class: "shared_nonprod",
-      lane_policy: "//projects/deployments/pleomino/shared:lane",
+      lane_policy: "//projects/deployments/sample-webapp/shared:lane",
       environment_stage: "dev",
-      admission_policy: "//projects/deployments/pleomino/shared:dev_release",
+      admission_policy: "//projects/deployments/sample-webapp/shared:dev_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       provider_target: {
         account: "web-platform-dev",
-        project: "pleomino-dev-pages",
+        project: "sample-webapp-dev-pages",
       },
     },
     {
-      name: "//projects/deployments/pleomino/staging:deploy",
+      name: "//projects/deployments/sample-webapp/staging:deploy",
       provider: "cloudflare-pages",
-      component: "//projects/apps/pleomino:app",
+      component: "//projects/apps/sample-webapp:app",
       component_kind: "static-webapp",
       publisher: "wrangler-pages",
       publisher_config: "wrangler.jsonc",
       protection_class: "shared_nonprod",
-      lane_policy: "//projects/deployments/pleomino/shared:lane",
+      lane_policy: "//projects/deployments/sample-webapp/shared:lane",
       environment_stage: "staging",
-      admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+      admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       preview: {
@@ -102,12 +102,12 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
         smoke_target: "preview_url",
         lock_scope: "shared",
       },
-      prerequisites: [{ deployment_id: "pleomino-dev", mode: "ordering_only" }],
+      prerequisites: [{ deployment_id: "sample-webapp-dev", mode: "ordering_only" }],
       provider_target: {
         account: "web-platform-staging",
-        custom_domain: "staging.pleomino.com",
-        custom_domain_zone_id: "zone-pleomino",
-        project: "pleomino-staging-pages",
+        custom_domain: "staging.sample-webapp.com",
+        custom_domain_zone_id: "zone-sample-webapp",
+        project: "sample-webapp-staging-pages",
       },
     },
   ];
@@ -118,16 +118,16 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
   assert.deepEqual(deployments[0]?.prerequisites, []);
   assert.equal(deployments[1]?.publisher.config, "wrangler.jsonc");
   assert.deepEqual(deployments[1]?.prerequisites, [
-    { deploymentId: "pleomino-dev", mode: "ordering_only" },
+    { deploymentId: "sample-webapp-dev", mode: "ordering_only" },
   ]);
-  assert.equal(deployments[1]?.providerTarget.id, "pleomino-staging-pages");
-  assert.equal(deployments[1]?.providerTarget.customDomain, "staging.pleomino.com");
-  assert.equal(deployments[1]?.providerTarget.customDomainZoneId, "zone-pleomino");
-  assert.equal(deployments[1]?.providerTarget.canonicalUrl, "https://staging.pleomino.com/");
+  assert.equal(deployments[1]?.providerTarget.id, "sample-webapp-staging-pages");
+  assert.equal(deployments[1]?.providerTarget.customDomain, "staging.sample-webapp.com");
+  assert.equal(deployments[1]?.providerTarget.customDomainZoneId, "zone-sample-webapp");
+  assert.equal(deployments[1]?.providerTarget.canonicalUrl, "https://staging.sample-webapp.com/");
   assert.equal(deployments[1]?.preview?.identitySelector, "source_run");
   assert.equal(
     deployments[1]?.providerTarget.providerTargetIdentity,
-    "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
   );
 });
 
@@ -141,10 +141,10 @@ test("deriveCloudflarePagesPreviewTarget preserves the live target while derivin
   assert.ok((previewTarget.previewBranch?.length ?? 0) <= 31);
   assert.equal(
     previewTarget.providerTargetIdentity,
-    `cloudflare-pages:web-platform-staging/pleomino-staging-pages#preview:${previewTarget.previewBranch}`,
+    `cloudflare-pages:web-platform-staging/sample-webapp-staging-pages#preview:${previewTarget.previewBranch}`,
   );
   assert.equal(
     previewTarget.canonicalUrl,
-    `https://${previewTarget.previewBranch}.pleomino-staging-pages.pages.dev/`,
+    `https://${previewTarget.previewBranch}.sample-webapp-staging-pages.pages.dev/`,
   );
 });

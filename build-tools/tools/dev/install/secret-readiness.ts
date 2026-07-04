@@ -4,6 +4,10 @@ import * as readline from "node:readline/promises";
 import path from "node:path";
 import process from "node:process";
 import type { DeploymentBootstrapScope } from "../../deployments/infisical-iac-bootstrap-config";
+import {
+  MacosKeychainInaccessibleError,
+  type KeychainRunner,
+} from "../../deployments/sprinkleref-keychain";
 import { runNodeWithZx } from "../../lib/node-run";
 import { PROJECT_SHARED_CONFIG_PATH } from "../../deployments/project-config";
 import { loadDeploymentReadinessModules, sinkFromSelection } from "./secret-readiness-modules";
@@ -28,6 +32,11 @@ export type SecretReadinessDeps = {
 type SecretReadinessProbe = {
   ready: boolean;
   reason: string;
+};
+
+type SecretReadinessProbeOpts = {
+  platform?: NodeJS.Platform;
+  keychainRunner?: KeychainRunner;
 };
 
 const deploymentMetadataRoot = path.join("projects", "deployments");
@@ -60,6 +69,9 @@ export async function ensureInstallSecretReadiness(opts: {
   }
   if (opts.verbose)
     console.log(`[install-deps] Infisical local readiness missing: ${probe.reason}`);
+  if (isKeychainInaccessibleReason(probe.reason)) {
+    throw new Error(`Infisical local credentials are not ready: ${probe.reason}`);
+  }
   const allowed = opts.flags.yes || process.env.INSTALL_DEPS_SETUP_SECRETS === "1";
   const interactive = opts.deps?.isInteractive?.() ?? isInteractiveShell();
   if (!allowed && !interactive) throw new Error(nonInteractiveMessage());
@@ -76,7 +88,10 @@ export async function ensureInstallSecretReadiness(opts: {
   await runRepoBootstrap(opts);
 }
 
-export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
+export async function probeLocalSecretReadiness(
+  repoRoot = process.cwd(),
+  opts: SecretReadinessProbeOpts = {},
+) {
   if (!(await isInstallSecretReadinessApplicable(repoRoot))) {
     return { ready: true, reason: "not applicable in this checkout" };
   }
@@ -109,12 +124,18 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
       ? { ...process.env, SPRINKLEREF_CONFIG: process.env.SPRINKLEREF_CONFIG }
       : { ...process.env, SPRINKLEREF_CONFIG: path.join(repoRoot, PROJECT_SHARED_CONFIG_PATH) },
   });
-  const sink = await sinkFromSelection(args, selection, repoRoot, {
-    LocalFileCredentialSink,
-    createSprinkleRefStore,
-    readSprinkleRefConfig,
-    resolveBootstrapAccessCredentialSinkBackend,
-  });
+  const sink = await sinkFromSelection(
+    args,
+    selection,
+    repoRoot,
+    {
+      LocalFileCredentialSink,
+      createSprinkleRefStore,
+      readSprinkleRefConfig,
+      resolveBootstrapAccessCredentialSinkBackend,
+    },
+    opts,
+  );
   const repoRefs = repoBootstrapCredentialRefs({ name: args.identityName });
   const requiredRefs = [repoRefs.clientIdRef, repoRefs.clientSecretRef];
   for (const metadataPath of metadataPaths) {
@@ -128,10 +149,26 @@ export async function probeLocalSecretReadiness(repoRoot = process.cwd()) {
     }
   }
   for (const ref of requiredRefs) {
-    if (!(await sink.has(ref)))
-      return { ready: false, reason: "missing local Universal Auth credentials" };
+    let present = false;
+    try {
+      present = await sink.has(ref);
+    } catch (error) {
+      if (error instanceof MacosKeychainInaccessibleError) {
+        return { ready: false, reason: keychainInaccessibleReason(error) };
+      }
+      throw error;
+    }
+    if (!present) return { ready: false, reason: "missing local Universal Auth credentials" };
   }
   return { ready: true, reason: "ready" };
+}
+
+function keychainInaccessibleReason(error: MacosKeychainInaccessibleError) {
+  return `${error.message}. Unlock Keychain or run from a login session with Keychain access; do not use --without-secrets unless you only need dependency setup.`;
+}
+
+function isKeychainInaccessibleReason(reason: string) {
+  return /macOS Keychain service .* is inaccessible from this process/.test(reason);
 }
 
 export async function isInstallSecretReadinessApplicable(repoRoot = process.cwd()) {

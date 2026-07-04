@@ -15,7 +15,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 function configYaml(credentials: string) {
   return `
-instanceId: pleomino
+instanceId: sample-webapp
 service:
   publicUrl: https://deploy.example.test
   tokenFile: ${credentials}/control-plane-token
@@ -35,47 +35,47 @@ reviewedSource:
 `;
 }
 
-test("Pleomino Infisical workers read deployment credential files into scoped bindings", async () => {
-  await runInTemp("pleomino-infisical-worker-credentials", async (tmp) => {
+test("Sample webapp Infisical workers read deployment credential files into scoped bindings", async () => {
+  await runInTemp("sample-webapp-infisical-worker-credentials", async (tmp) => {
     const credentials = path.join(tmp, "credentials");
     await fsp.mkdir(credentials, { recursive: true });
     await fsp.writeFile(
-      path.join(credentials, "pleomino-staging-infisical-client-id"),
+      path.join(credentials, "sample-webapp-staging-infisical-client-id"),
       "file-client-id\n",
     );
     await fsp.writeFile(
-      path.join(credentials, "pleomino-staging-infisical-client-secret"),
+      path.join(credentials, "sample-webapp-staging-infisical-client-secret"),
       "file-client-secret\n",
     );
     const directory = createControlPlaneCredentialDirectory(
       parseControlPlaneRuntimeConfig(configYaml(credentials), { repoRoot: path.join(tmp, "repo") }),
     );
-    const processClientId = process.env.PLEOMINO_STAGING_INFISICAL_CLIENT_ID;
-    const processClientSecret = process.env.PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET;
-    delete process.env.PLEOMINO_STAGING_INFISICAL_CLIENT_ID;
-    delete process.env.PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET;
+    const processClientId = process.env.SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_ID;
+    const processClientSecret = process.env.SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_SECRET;
+    delete process.env.SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_ID;
+    delete process.env.SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_SECRET;
     try {
       const prepared = await prepareWorkerDeploymentSecretRuntime({
         workspaceRoot: tmp,
         credentialDirectory: directory,
         env: {
-          PLEOMINO_STAGING_INFISICAL_CLIENT_ID: "ambient-client-id",
-          PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET: "ambient-client-secret",
+          SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_ID: "ambient-client-id",
+          SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_SECRET: "ambient-client-secret",
         },
         deployment: {
           ...cloudflarePagesDeploymentFixture({
             secretRequirements: [infisicalRequirement],
-            deploymentId: "pleomino-staging",
+            deploymentId: "sample-webapp-staging",
           }),
           secretBackend: "infisical" as const,
           infisicalRuntime: {
             siteUrl: "https://app.infisical.com",
-            projectId: "proj_reviewed_pleomino",
+            projectId: "proj_reviewed_sample_webapp",
             environment: "staging",
             secretPath: "/",
             preferredCredentialSource: "machine_identity_universal_auth",
-            machineIdentityClientIdEnv: "PLEOMINO_STAGING_INFISICAL_CLIENT_ID",
-            machineIdentityClientSecretEnv: "PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET",
+            machineIdentityClientIdEnv: "SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_ID",
+            machineIdentityClientSecretEnv: "SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_SECRET",
             machineIdentityId: "identity_reviewed_staging",
           },
         },
@@ -85,16 +85,17 @@ test("Pleomino Infisical workers read deployment credential files into scoped bi
       if (prepared.secretContext?.credential.kind !== "universal_auth") return;
       assert.equal(prepared.secretContext.credential.clientId, "file-client-id");
       assert.equal(prepared.secretContext.credential.clientSecret, "file-client-secret");
-      assert.equal(process.env.PLEOMINO_STAGING_INFISICAL_CLIENT_ID, undefined);
-      assert.equal(process.env.PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET, undefined);
+      assert.equal(process.env.SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_ID, undefined);
+      assert.equal(process.env.SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_SECRET, undefined);
       await cleanupWorkerDeploymentSecretRuntime(prepared);
       assert.equal(prepared.secretContext, undefined);
     } finally {
-      if (processClientId === undefined) delete process.env.PLEOMINO_STAGING_INFISICAL_CLIENT_ID;
-      else process.env.PLEOMINO_STAGING_INFISICAL_CLIENT_ID = processClientId;
+      if (processClientId === undefined)
+        delete process.env.SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_ID;
+      else process.env.SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_ID = processClientId;
       if (processClientSecret === undefined)
-        delete process.env.PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET;
-      else process.env.PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET = processClientSecret;
+        delete process.env.SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_SECRET;
+      else process.env.SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_SECRET = processClientSecret;
     }
   });
 });

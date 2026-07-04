@@ -1,15 +1,33 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
+import type { DeploymentTarget } from "../../deployments/contract";
 import { infisicalRequirement, infisicalRuntime } from "./deployment-secret-infisical.fixture";
 
-export const INFISICAL_ADMIN_DEPLOYMENT = "//projects/deployments/pleomino/staging:deploy";
+export const INFISICAL_ADMIN_DEPLOYMENT = "//projects/deployments/sample-webapp/staging:deploy";
 
-export async function infisicalAdminDeployment(siteUrl = "http://127.0.0.1") {
-  const deployment = await resolveDeploymentFromTarget(process.cwd(), INFISICAL_ADMIN_DEPLOYMENT);
+export async function infisicalAdminDeployment(
+  siteUrl = "http://127.0.0.1",
+): Promise<DeploymentTarget> {
   return {
-    ...deployment,
+    deploymentId: "sample-webapp-staging",
+    label: INFISICAL_ADMIN_DEPLOYMENT,
+    name: "deploy",
+    provider: "cloudflare-pages",
+    publisher: { type: "wrangler-pages", config: "wrangler.jsonc" },
+    providerTarget: {
+      id: "sample-webapp-staging",
+      account: "sample-platform-staging",
+      project: "sample-webapp-staging-pages",
+    },
+    protectionClass: "shared_nonprod",
+    lanePolicyRef: "//projects/deployments/sample-webapp/shared:lane",
+    lanePolicy: { stages: [], sourceRefPolicy: {}, allowedPromotionEdges: [] },
+    environmentStage: "staging",
+    admissionPolicyRef: "//projects/deployments/sample-webapp/shared:staging_release",
+    admissionPolicy: { allowedRefs: ["main"], requiredChecks: [], requiredApprovals: [] },
+    prerequisites: [],
     secretBackend: "infisical" as const,
+    secretBackendProfile: "infisical-default",
     infisicalRuntime: {
       ...infisicalRuntime,
       siteUrl,
@@ -19,7 +37,12 @@ export async function infisicalAdminDeployment(siteUrl = "http://127.0.0.1") {
       machineIdentityId: "identity_123",
     },
     secretRequirements: [infisicalRequirement],
-  };
+    runtimeConfigRequirements: [],
+    releaseActions: [],
+    targetExceptions: [],
+    component: { kind: "static-webapp", target: "//projects/apps/sample-webapp:app" },
+    components: [],
+  } as DeploymentTarget;
 }
 
 export function infisicalAdminEnv() {

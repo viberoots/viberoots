@@ -38,7 +38,7 @@ test("secret runtime stays backend-agnostic while selecting least-privilege step
       },
       value: `${name}-value`,
       allowedSteps: [name === "publish_token" ? "publish" : "smoke"],
-      targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+      targetScopes: ["cloudflare-pages:web-platform-staging/sample-webapp-staging-pages"],
       credentialClass: "routine",
       refreshMode: "none",
     })),
@@ -54,7 +54,7 @@ test("secret runtime stays backend-agnostic while selecting least-privilege step
         contractId: "secret://smoke_token",
       }),
     ],
-    targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
   });
 
   const publish = await runtime.enterStep("publish");
@@ -74,7 +74,7 @@ test("secret runtime caches the same backend reference separately per lifecycle 
           binding,
           value: `${binding.step}-token`,
           allowedSteps: [binding.step],
-          targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+          targetScopes: ["cloudflare-pages:web-platform-staging/sample-webapp-staging-pages"],
           credentialClass: "routine",
           refreshMode: "none",
         };
@@ -84,15 +84,15 @@ test("secret runtime caches the same backend reference separately per lifecycle 
       deploymentRequirementFixture({
         name: "cloudflare_api_token",
         step: "provision",
-        contractId: "secret://deployments/pleomino/cloudflare_api_token",
+        contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
       }),
       deploymentRequirementFixture({
         name: "cloudflare_api_token",
         step: "publish",
-        contractId: "secret://deployments/pleomino/cloudflare_api_token",
+        contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
       }),
     ],
-    targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
   });
 
   assert.equal((await runtime.enterStep("provision")).cloudflare_api_token, "provision-token");
@@ -116,7 +116,7 @@ test("secret runtime renews an expired renewable credential without widening sco
         },
         value: "first-token",
         allowedSteps: ["publish"],
-        targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+        targetScopes: ["cloudflare-pages:web-platform-staging/sample-webapp-staging-pages"],
         credentialClass: "routine",
         refreshMode: "renew",
         expiresAt: new Date(nowMs + 1_000).toISOString(),
@@ -131,7 +131,7 @@ test("secret runtime renews an expired renewable credential without widening sco
       },
     ),
     requirements: [deploymentRequirementFixture({ name: "publish_token", step: "publish" })],
-    targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
     now: () => new Date(nowMs),
   });
 
@@ -157,13 +157,13 @@ test("secret runtime reacquires an expired non-renewable credential", async () =
       },
       value: acquireCount === 0 ? "first-token" : "second-token",
       allowedSteps: ["publish"],
-      targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+      targetScopes: ["cloudflare-pages:web-platform-staging/sample-webapp-staging-pages"],
       credentialClass: "routine",
       refreshMode: "reacquire",
       expiresAt: new Date(nowMs + 1_000).toISOString(),
     })),
     requirements: [deploymentRequirementFixture({ name: "publish_token", step: "publish" })],
-    targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
     now: () => new Date(nowMs),
   });
 
@@ -188,13 +188,13 @@ test("secret runtime fails closed when a required credential cannot be refreshed
       },
       value: "first-token",
       allowedSteps: ["publish"],
-      targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+      targetScopes: ["cloudflare-pages:web-platform-staging/sample-webapp-staging-pages"],
       credentialClass: "routine",
       refreshMode: "renew",
       expiresAt: new Date(nowMs + 1_000).toISOString(),
     })),
     requirements: [deploymentRequirementFixture({ name: "publish_token", step: "publish" })],
-    targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
     now: () => new Date(nowMs),
   });
 
@@ -220,7 +220,7 @@ test("secret runtime keeps break-glass credentials out of the routine path", asy
     },
     value: "emergency-token",
     allowedSteps: ["publish"],
-    targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+    targetScopes: ["cloudflare-pages:web-platform-staging/sample-webapp-staging-pages"],
     credentialClass: "break_glass",
     refreshMode: "none",
   }));
@@ -228,7 +228,7 @@ test("secret runtime keeps break-glass credentials out of the routine path", asy
   const routine = createDeploymentSecretRuntime({
     backend,
     requirements: [requirement],
-    targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
   });
   await assert.rejects(async () => await routine.enterStep("publish"), /break-glass path/);
 
@@ -236,7 +236,7 @@ test("secret runtime keeps break-glass credentials out of the routine path", asy
     authority: { kind: "break-glass-worker" },
     backend,
     requirements: [requirement],
-    targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
   });
   const resolved = await breakGlass.enterStep("publish");
   assert.equal(resolved.publish_token, "emergency-token");

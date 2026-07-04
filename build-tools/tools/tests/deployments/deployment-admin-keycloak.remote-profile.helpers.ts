@@ -12,7 +12,7 @@ import { resolveDeploymentFromTarget } from "../../deployments/deployment-query"
 import { shouldUseServiceOwnedInteractiveAuth } from "../../deployments/deployment-service-auth-client";
 import { stableBuckIsolation } from "../../lib/buck-command-env";
 import { waitFor } from "./nixos-shared-host.control-plane.helpers";
-import { REVIEWED_PLEOMINO_DEPLOYMENT_LABEL } from "./nixos-shared-host.deploy.remote-exec.helpers";
+import { REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL } from "./nixos-shared-host.deploy.remote-exec.helpers";
 
 export const CONTROL_PLANE_TOKEN = "test-control-plane-token";
 let buckQueryNonce = 0;
@@ -78,7 +78,14 @@ async function allocateLoopbackPort(): Promise<number> {
 }
 
 export async function enableInteractivePkceVaultRuntime(tmp: string, issuer: string) {
-  const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino", "dev", "TARGETS");
+  const deployTargetsPath = path.join(
+    tmp,
+    "projects",
+    "deployments",
+    "sample-webapp",
+    "dev",
+    "TARGETS",
+  );
   const source = await fsp.readFile(deployTargetsPath, "utf8");
   const bindPort = await allocateLoopbackPort();
   const vaultRuntimeBlock = [
@@ -100,15 +107,15 @@ export async function enableInteractivePkceVaultRuntime(tmp: string, issuer: str
   const nextSource = source.includes("vault_runtime = {")
     ? source.replace(/vault_runtime\s*=\s*\{[\s\S]*?\n\s*\},/m, vaultRuntimeBlock)
     : source.replace(
-        '    admission_policy = "//projects/deployments/pleomino/shared:dev_release",\n',
+        '    admission_policy = "//projects/deployments/sample-webapp/shared:dev_release",\n',
         [
-          '    admission_policy = "//projects/deployments/pleomino/shared:dev_release",',
+          '    admission_policy = "//projects/deployments/sample-webapp/shared:dev_release",',
           vaultRuntimeBlock,
         ].join("\n"),
       );
   if (nextSource === source) {
     throw new Error(
-      "interactive PKCE vault runtime fixture update did not match pleomino-dev TARGETS",
+      "interactive PKCE vault runtime fixture update did not match sample-webapp-dev TARGETS",
     );
   }
   await fsp.writeFile(deployTargetsPath, nextSource, "utf8");
@@ -121,7 +128,7 @@ export async function enableInteractivePkceVaultRuntime(tmp: string, issuer: str
       try {
         const deployment = await resolveDeploymentFromTarget(
           tmp,
-          REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+          REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
           { env: freshBuckQueryEnv(tmp) },
         );
         return deployment.vaultRuntime?.oidcIssuer === issuer &&

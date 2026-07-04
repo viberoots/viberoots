@@ -93,7 +93,15 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
     "$out/.viberoots/cache" \
     "$out/.viberoots/codex-logs" \
     "$out/.viberoots/workspace/.viberoots" \
+    "$out/.viberoots/workspace/backups" \
+    "$out/.viberoots/workspace/buck" \
+    "$out/.viberoots/workspace/cache" \
     "$out/.viberoots/workspace/codex-test-logs" \
+    "$out/.viberoots/workspace/install-cache" \
+    "$out/.viberoots/workspace/nix-xdg-cache" \
+    "$out/.viberoots/workspace/node" \
+    "$out/.viberoots/workspace/pr-logs" \
+    "$out/.viberoots/workspace/xdg-cache" \
     "$out/build-tools/tmp" \
     "$out/viberoots/.cache" \
     "$out/viberoots/.clinic" \

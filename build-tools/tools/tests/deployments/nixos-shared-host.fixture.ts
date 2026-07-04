@@ -48,7 +48,7 @@ export function nixosSharedHostLanePolicyFixture(overrides: Partial<DeploymentLa
     | DeploymentLanePromotionCompatibility
     | undefined;
   return {
-    ref: overrides.ref || "//projects/deployments/pleomino/shared:lane",
+    ref: overrides.ref || "//projects/deployments/sample-webapp/shared:lane",
     name: overrides.name || "lane",
     stages: overrides.stages || ["dev", "staging", "prod"],
     sourceRefPolicy: overrides.sourceRefPolicy || {
@@ -65,7 +65,7 @@ export function nixosSharedHostLanePolicyFixture(overrides: Partial<DeploymentLa
       : {}),
     governanceRef: overrides.governanceRef || governance.ref,
     governance,
-    fingerprint: overrides.fingerprint || "sha256:lane-pleomino",
+    fingerprint: overrides.fingerprint || "sha256:lane-sample-webapp",
   };
 }
 
@@ -73,10 +73,10 @@ export function nixosSharedHostAdmissionPolicyFixture(
   overrides: Partial<DeploymentAdmissionPolicy> = {},
 ) {
   return {
-    ref: overrides.ref || "//projects/deployments/pleomino/shared:dev_release",
+    ref: overrides.ref || "//projects/deployments/sample-webapp/shared:dev_release",
     name: overrides.name || "dev_release",
     allowedRefs: overrides.allowedRefs || ["main"],
-    requiredChecks: overrides.requiredChecks || ["deploy/pleomino-dev"],
+    requiredChecks: overrides.requiredChecks || ["deploy/sample-webapp-dev"],
     requiredApprovals: overrides.requiredApprovals || [],
     retryBranchPolicy: overrides.retryBranchPolicy || "branch_independent",
     retryApprovalReuse: overrides.retryApprovalReuse || "fresh_only",
@@ -86,7 +86,7 @@ export function nixosSharedHostAdmissionPolicyFixture(
       : {}),
     ...(overrides.sbom ? { sbom: overrides.sbom as DeploymentSbomPolicy } : {}),
     supplyChainGates: overrides.supplyChainGates || ([] as DeploymentSupplyChainGatePolicy[]),
-    fingerprint: overrides.fingerprint || "sha256:admission-pleomino-dev",
+    fingerprint: overrides.fingerprint || "sha256:admission-sample-webapp-dev",
   };
 }
 

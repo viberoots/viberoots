@@ -11,12 +11,12 @@ test("app target boundary rejects imports from another app target", () => {
   const errors = appTargetBoundaryErrors([
     {
       name: "//projects/apps/console:app",
-      deps: ["//projects/apps/data-room-web:app", "//projects/libs/shared-ui:lib"],
+      deps: ["//projects/apps/sample-web:app", "//projects/libs/shared-ui:lib"],
     },
-    { name: "//projects/apps/data-room-web:app", deps: [] },
+    { name: "//projects/apps/sample-web:app", deps: [] },
   ]);
   assert.deepEqual(errors, [
-    "//projects/apps/console:app: app target must not import app target //projects/apps/data-room-web:app",
+    "//projects/apps/console:app: app target must not import app target //projects/apps/sample-web:app",
   ]);
 });
 

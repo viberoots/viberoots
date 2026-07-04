@@ -21,24 +21,24 @@ export function s3StaticDeploymentFixture(
   const admissionPolicy =
     overrides.admissionPolicy ||
     nixosSharedHostAdmissionPolicyFixture({
-      ref: "//projects/deployments/pleomino/shared:staging_release",
+      ref: "//projects/deployments/sample-webapp/shared:staging_release",
       name: "staging_release",
       allowedRefs: ["main"],
       requiredChecks: [],
-      fingerprint: "sha256:admission-pleomino-s3-staging",
+      fingerprint: "sha256:admission-sample-webapp-s3-staging",
     });
   const providerTarget = {
     ...deriveS3StaticProviderTarget({
       account: "web-platform-staging",
-      bucket: "pleomino-staging-site",
+      bucket: "sample-webapp-staging-site",
       region: "us-west-2",
       distribution: "staging.example.test",
     }),
     ...(overrides.providerTarget || {}),
   };
   return {
-    deploymentId: overrides.deploymentId || "pleomino-staging-s3",
-    label: overrides.label || "//projects/deployments/pleomino/staging-s3:deploy",
+    deploymentId: overrides.deploymentId || "sample-webapp-staging-s3",
+    label: overrides.label || "//projects/deployments/sample-webapp/staging-s3:deploy",
     name: overrides.name || "deploy",
     provider: S3_STATIC_PROVIDER,
     protectionClass: overrides.protectionClass || "shared_nonprod",
@@ -56,13 +56,13 @@ export function s3StaticDeploymentFixture(
     ...(overrides.rolloutPolicy ? { rolloutPolicy: overrides.rolloutPolicy } : {}),
     component: {
       kind: STATIC_WEBAPP_COMPONENT,
-      target: overrides.component?.target || "//projects/apps/pleomino:app",
+      target: overrides.component?.target || "//projects/apps/sample-webapp:app",
     },
     components: overrides.components || [
       {
         id: "default",
         kind: STATIC_WEBAPP_COMPONENT,
-        target: overrides.component?.target || "//projects/apps/pleomino:app",
+        target: overrides.component?.target || "//projects/apps/sample-webapp:app",
       },
     ],
     publisher: overrides.publisher || { type: "aws-s3-sync", config: "aws-s3-sync.jsonc" },
@@ -73,9 +73,9 @@ export function s3StaticDeploymentFixture(
 
 export function s3StaticAdmissionPolicyNodeFixture(overrides: Partial<GraphNode> = {}): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
-    name: "//projects/deployments/pleomino/shared:staging_release",
+    name: "//projects/deployments/sample-webapp/shared:staging_release",
     allowed_refs: ["main"],
-    required_checks: ["deploy/pleomino-staging-s3"],
+    required_checks: ["deploy/sample-webapp-staging-s3"],
     ...overrides,
   });
 }

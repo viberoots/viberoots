@@ -74,7 +74,7 @@ function input(overrides: Partial<CloudControlSetupInput>): CloudControlSetupInp
     artifactBackendEvidence: "",
     artifactBucket: "deployment-control-plane-artifacts",
     artifactRegion: "us-east-1",
-    deploymentIds: ["pleomino-staging"],
+    deploymentIds: ["sample-webapp-staging"],
     reviewedSourceMode: "ssh",
     authCallbackHost: "deploy-auth.example.test",
     authCallbackPath: "/oidc/callback",

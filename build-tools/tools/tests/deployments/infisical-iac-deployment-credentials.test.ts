@@ -40,7 +40,7 @@ class OverlapDetectingSink extends MemorySink {
 
 test("deployment credentials preserve existing remote and bootstrap category values", async () => {
   const sink = deploymentSink({
-    "secret://deployments/pleomino/staging/infisical-client-secret": "existing-secret",
+    "secret://deployments/sample-webapp/staging/infisical-client-secret": "existing-secret",
   });
   const api = fakeDeploymentCredentialApi({
     remoteSecrets: { staging: [{ id: "secret_other", description: "teammate laptop" }] },
@@ -54,7 +54,7 @@ test("deployment credentials preserve existing remote and bootstrap category val
   assert.equal(result[0]?.status, "reused");
   assert.equal(api.postCount, 0);
   assert.equal(
-    sink.values.get("secret://deployments/pleomino/staging/infisical-client-id"),
+    sink.values.get("secret://deployments/sample-webapp/staging/infisical-client-id"),
     "client-id-staging",
   );
 });
@@ -77,15 +77,15 @@ test("deployment credentials create current-machine secret when local value is m
   assert.equal(api.postCount, 1);
   assert.equal(
     api.descriptions[0],
-    "viberoots deployment staging Universal Auth identity=pleomino-staging-deploy machine=dev-laptop",
+    "viberoots deployment staging Universal Auth identity=sample-webapp-staging-deploy machine=dev-laptop",
   );
 });
 
 test("deployment credential preserve mode refuses client id overwrite even with force", async () => {
-  const clientIdRef = "secret://deployments/pleomino/staging/infisical-client-id";
+  const clientIdRef = "secret://deployments/sample-webapp/staging/infisical-client-id";
   const sink = deploymentSink({
     [clientIdRef]: "old-client-id",
-    "secret://deployments/pleomino/staging/infisical-client-secret": "existing-secret",
+    "secret://deployments/sample-webapp/staging/infisical-client-secret": "existing-secret",
   });
   const api = fakeDeploymentCredentialApi({ remoteSecrets: { staging: [{}] } });
   await assert.rejects(
@@ -104,8 +104,8 @@ test("deployment credential preserve mode refuses client id overwrite even with 
 
 test("deployment credential rotation creates remote secret and overwrites selected sink", async () => {
   const sink = deploymentSink({
-    "secret://deployments/pleomino/prod/infisical-client-id": "old-id",
-    "secret://deployments/pleomino/prod/infisical-client-secret": "old-secret",
+    "secret://deployments/sample-webapp/prod/infisical-client-id": "old-id",
+    "secret://deployments/sample-webapp/prod/infisical-client-secret": "old-secret",
   });
   const api = fakeDeploymentCredentialApi({
     remoteSecrets: { prod: [{}] },
@@ -124,11 +124,11 @@ test("deployment credential rotation creates remote secret and overwrites select
   assert.equal(result[0]?.status, "rotated");
   assert.equal(api.postCount, 1);
   assert.equal(
-    sink.values.get("secret://deployments/pleomino/prod/infisical-client-id"),
+    sink.values.get("secret://deployments/sample-webapp/prod/infisical-client-id"),
     "client-id-prod",
   );
   assert.equal(
-    sink.values.get("secret://deployments/pleomino/prod/infisical-client-secret"),
+    sink.values.get("secret://deployments/sample-webapp/prod/infisical-client-secret"),
     "new-secret",
   );
 });
@@ -150,26 +150,26 @@ test("deployment credentials write staging and prod serially into one sink", asy
     ],
   );
   assert.equal(
-    sink.values.get("secret://deployments/pleomino/staging/infisical-client-id"),
+    sink.values.get("secret://deployments/sample-webapp/staging/infisical-client-id"),
     "client-id-staging",
   );
   assert.equal(
-    sink.values.get("secret://deployments/pleomino/staging/infisical-client-secret"),
+    sink.values.get("secret://deployments/sample-webapp/staging/infisical-client-secret"),
     "new-secret-staging",
   );
   assert.equal(
-    sink.values.get("secret://deployments/pleomino/prod/infisical-client-id"),
+    sink.values.get("secret://deployments/sample-webapp/prod/infisical-client-id"),
     "client-id-prod",
   );
   assert.equal(
-    sink.values.get("secret://deployments/pleomino/prod/infisical-client-secret"),
+    sink.values.get("secret://deployments/sample-webapp/prod/infisical-client-secret"),
     "new-secret-prod",
   );
 });
 
 test("deployment credentials reuse local secret without remote records", async () => {
   const sink = deploymentSink({
-    "secret://deployments/pleomino/staging/infisical-client-secret": "existing-secret",
+    "secret://deployments/sample-webapp/staging/infisical-client-secret": "existing-secret",
   });
   const api = fakeDeploymentCredentialApi({ remoteSecrets: { staging: [] } });
   const result = await ensureDeploymentCredentials({
@@ -184,7 +184,7 @@ test("deployment credentials reuse local secret without remote records", async (
 
 test("deployment credentials reuse local secret when force is set without rotation", async () => {
   const sink = deploymentSink({
-    "secret://deployments/pleomino/staging/infisical-client-secret": "existing-secret",
+    "secret://deployments/sample-webapp/staging/infisical-client-secret": "existing-secret",
   });
   const api = fakeDeploymentCredentialApi({ remoteSecrets: { staging: [] } });
   const result = await ensureDeploymentCredentials({
@@ -196,7 +196,7 @@ test("deployment credentials reuse local secret when force is set without rotati
   assert.equal(result[0]?.status, "reused");
   assert.equal(api.postCount, 0);
   assert.equal(
-    sink.values.get("secret://deployments/pleomino/staging/infisical-client-secret"),
+    sink.values.get("secret://deployments/sample-webapp/staging/infisical-client-secret"),
     "existing-secret",
   );
 });

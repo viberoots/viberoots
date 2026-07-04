@@ -24,10 +24,7 @@ test("workspace activation records remote source paths through current symlink",
       await writeSourceFlake(remoteSource);
       const result = await activate(workspace, remoteSource);
       assert.equal(result.sourcePath, remoteSource);
-      assert.equal(
-        await fsp.readlink(path.join(workspace, ".viberoots", "current")),
-        remoteSource,
-      );
+      assert.equal(await fsp.readlink(path.join(workspace, ".viberoots", "current")), remoteSource);
       await assertExportAndGcUseWorkspaceState(workspace);
     } finally {
       await fsp.rm(remoteSource, { recursive: true, force: true });
@@ -90,7 +87,7 @@ async function writeGraph(workspace: string): Promise<void> {
     `${JSON.stringify(
       cloudflareNodes([
         cloudflareDeployment({
-          provider_target: { account: "web-platform", project: "pleomino-staging" },
+          provider_target: { account: "web-platform", project: "sample-webapp-staging" },
         }),
       ]),
       null,

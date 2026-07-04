@@ -18,7 +18,7 @@ test("local-file backend writes restrictive files and never logs values", async 
   const dir = await tmp();
   const file = path.join(dir, "secrets.json");
   const store = new SprinkleRefLocalFileStore(file);
-  await store.add("secret://deployments/pleomino/staging/token", "secret-value");
+  await store.add("secret://deployments/sample-webapp/staging/token", "secret-value");
   assert.equal((await fs.stat(file)).mode & 0o777, 0o600);
   assert.doesNotMatch(store.describe(), /secret-value/);
 });
@@ -92,7 +92,7 @@ test("--sprinkle-category selects access credential lifecycle category only", as
     const args = {
       ...DEFAULT_BOOTSTRAP_ARGS,
       mode: "deployment" as const,
-      target: "//projects/deployments/pleomino/dev:deploy",
+      target: "//projects/deployments/sample-webapp/dev:deploy",
       credentialSink: "sprinkleref" as const,
       sprinkleCategory: "access-bootstrap",
     };

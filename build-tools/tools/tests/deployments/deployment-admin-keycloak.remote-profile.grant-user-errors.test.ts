@@ -10,7 +10,7 @@ import {
   installClientProfile,
   prepareRemoteExecFixture,
   remoteExecEnv,
-  REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+  REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
 import {
   completePendingAuthSession,
@@ -33,7 +33,7 @@ test("remote profile grant-user reviewed auth errors", async (t) => {
         claims: {
           sub: "human-1",
           email: "ada@example.com",
-          groups: ["deploy-submitters-pleomino-dev"],
+          groups: ["deploy-submitters-sample-webapp-dev"],
         },
       });
       await enableInteractivePkceVaultRuntime(tmp, oidc.issuer);
@@ -61,7 +61,7 @@ test("remote profile grant-user reviewed auth errors", async (t) => {
           cwd: tmp,
           env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
           stdio: "pipe",
-        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)} --action submit`.nothrow();
+        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak grant-user --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)} --action submit`.nothrow();
         await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
         const result = await resultPromise;
         assert.notEqual(result.exitCode, 0);
@@ -87,7 +87,7 @@ test("remote profile grant-user reviewed auth errors", async (t) => {
         claims: {
           sub: "human-2",
           preferred_username: "Ada",
-          groups: ["deploy-admin-keycloak-membership-admin-project-pleomino"],
+          groups: ["deploy-admin-keycloak-membership-admin-project-sample-webapp"],
         },
       });
       await enableInteractivePkceVaultRuntime(tmp, oidc.issuer);
@@ -115,7 +115,7 @@ test("remote profile grant-user reviewed auth errors", async (t) => {
           cwd: tmp,
           env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
           stdio: "pipe",
-        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)} --action submit`.nothrow();
+        })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak grant-user --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)} --action submit`.nothrow();
         await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot, 400);
         const result = await resultPromise;
         assert.notEqual(result.exitCode, 0);

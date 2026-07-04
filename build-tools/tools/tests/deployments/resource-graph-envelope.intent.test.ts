@@ -12,9 +12,11 @@ import { s3StaticDeploymentFixture } from "./s3-static.fixture";
 
 test("intent envelopes cover every extractable kind from deployment contracts", () => {
   const releaseAction = deploymentReleaseActionFixture();
-  const targetException = deploymentTargetExceptionFixture({ affectedDeploymentIds: ["pleomino"] });
+  const targetException = deploymentTargetExceptionFixture({
+    affectedDeploymentIds: ["sample-webapp"],
+  });
   const deployment = s3StaticDeploymentFixture({
-    deploymentId: "pleomino",
+    deploymentId: "sample-webapp",
     provisioner: { type: "terraform-stack" },
     releaseActions: [releaseAction],
     targetExceptions: [targetException],
@@ -22,7 +24,7 @@ test("intent envelopes cover every extractable kind from deployment contracts", 
       {
         name: "database_url",
         step: "release_actions.pre_publish",
-        contractId: "secret://deployments/pleomino/database-url",
+        contractId: "secret://deployments/sample-webapp/database-url",
         required: true,
       },
     ],
@@ -30,7 +32,7 @@ test("intent envelopes cover every extractable kind from deployment contracts", 
       {
         name: "schema_version",
         step: "release_actions.pre_publish",
-        contractId: "runtime://deployments/pleomino/schema-version",
+        contractId: "runtime://deployments/sample-webapp/schema-version",
         required: true,
       },
     ],
@@ -40,9 +42,9 @@ test("intent envelopes cover every extractable kind from deployment contracts", 
       smoke: "both",
       steps: ["dev", "staging", "prod"],
     },
-    smoke: { runner: "curl", url: "https://pleomino.example", expectedStatus: "200" },
+    smoke: { runner: "curl", url: "https://sample-webapp.example", expectedStatus: "200" },
   });
-  deployment.deploymentFamily = "pleomino-family";
+  deployment.deploymentFamily = "sample-webapp-family";
   deployment.preview = {
     targetDerivation: "preview",
     isolationClass: "branch",
@@ -82,11 +84,11 @@ test("intent envelopes cover every extractable kind from deployment contracts", 
   }
   assert.equal(
     envelope(envelopes, "SecretRequirement").spec.contractId,
-    "secret://deployments/pleomino/database-url",
+    "secret://deployments/sample-webapp/database-url",
   );
   assert.equal(
     envelope(envelopes, "RuntimeConfigRequirement").spec.contractId,
-    "runtime://deployments/pleomino/schema-version",
+    "runtime://deployments/sample-webapp/schema-version",
   );
 });
 

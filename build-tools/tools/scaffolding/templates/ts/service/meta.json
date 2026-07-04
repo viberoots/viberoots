@@ -11,8 +11,8 @@
       "TARGETS uses node_service_artifact and nix_node_test with one importer-scoped lockfile label."
     ],
     "examples": [
-      "scaf new ts service data-room-worker",
-      "scaf new ts service data-room-web --importer=projects/apps/data-room-web"
+      "scaf new ts service example-worker",
+      "scaf new ts service example-web --importer=projects/apps/example-web"
     ]
   }
 }

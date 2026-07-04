@@ -14,7 +14,7 @@ import { runtimeInputProfile } from "./cloud-control-runtime-input.fixture";
 const validation = {
   expectedCallbackHost: "deploy-auth.example.test",
   expectedCallbackPath: "/oidc/callback",
-  deploymentIds: ["pleomino-staging"],
+  deploymentIds: ["sample-webapp-staging"],
   production: true,
 };
 
@@ -67,17 +67,27 @@ test("runtime inventory covers current control-plane state concepts", () => {
     executionSnapshots: [
       status("snapshot-1", {
         snapshotId: "snapshot-1",
-        deploymentId: "pleomino-staging",
+        deploymentId: "sample-webapp-staging",
         capturedAt: "2026-01-01T00:00:00.000Z",
       }),
     ],
-    deployRuns: [status("run-1", { runId: "run-1", deploymentId: "pleomino", status: "passed" })],
+    deployRuns: [
+      status("run-1", { runId: "run-1", deploymentId: "sample-webapp", status: "passed" }),
+    ],
     runActions: [status("action-1", { actionId: "action-1", runId: "run-1", status: "passed" })],
     currentStageStates: [
-      status("pleomino:staging", { deploymentId: "pleomino", stage: "staging", state: "green" }),
+      status("sample-webapp:staging", {
+        deploymentId: "sample-webapp",
+        stage: "staging",
+        state: "green",
+      }),
     ],
     stageHistoryEntries: [
-      status("history-1", { historyId: "history-1", deploymentId: "pleomino", stage: "staging" }),
+      status("history-1", {
+        historyId: "history-1",
+        deploymentId: "sample-webapp",
+        stage: "staging",
+      }),
     ],
     auditEvents: [status("audit-1", { eventId: "audit-1", actor: "operator", action: "deploy" })],
     retainedEvidence: [status("evidence-1", { evidenceId: "evidence-1", digest: "sha256:e" })],
@@ -155,7 +165,7 @@ function source(
 function challengeFacts() {
   return {
     challengeId: "challenge-1",
-    deploymentId: "pleomino",
+    deploymentId: "sample-webapp",
     proofKeyId: "proof-key-1",
     issuedAt: "2026-01-01T00:00:00.000Z",
     nonceValidationOutcome: "matched-redacted-nonce-digest",

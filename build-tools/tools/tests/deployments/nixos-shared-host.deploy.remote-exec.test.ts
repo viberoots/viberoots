@@ -13,7 +13,7 @@ import {
   installClientProfile,
   prepareRemoteExecFixture,
   remoteExecEnv,
-  REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+  REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
 import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { readBackendSnapshot } from "./nixos-shared-host.control-plane.helpers";
@@ -35,7 +35,7 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
     } = await prepareRemoteExecFixture({
       tmp,
       $,
-      artifactFiles: { "index.html": "<html>pleomino</html>\n", healthz: "ok\n" },
+      artifactFiles: { "index.html": "<html>sample-webapp</html>\n", healthz: "ok\n" },
     });
     const objectStore = memoryControlPlaneArtifactStore();
     const controlPlane = await startNixosSharedHostControlPlaneServer({
@@ -72,7 +72,7 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
       const result = await $({
         cwd: tmp,
         env: remoteExecEnv(env),
-      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.executionMode, "remote-profile");
       assert.equal(summary.stagedArtifactCleanup, "removed");
@@ -81,19 +81,19 @@ test("remote deploy stages the artifact, runs deploy remotely, writes remote rec
       assert.equal(summary.remoteRecordsRoot, remoteRecordsRoot);
       const record = summary.controlPlane.record;
       assert.equal(record.finalOutcome, "succeeded");
-      assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:pleomino");
+      assert.equal(record.controlPlane.lockScope, "nixos-shared-host:default:sample-webapp");
       const snapshot = await readBackendSnapshot(
         remoteRecordsRoot,
         String(record.controlPlane.submissionId),
       );
-      assert.equal(snapshot.deploymentId, "pleomino-dev");
+      assert.equal(snapshot.deploymentId, "sample-webapp-dev");
       assert.equal(snapshot.executionSnapshotObject?.provenance?.payloadKind, "execution-snapshot");
       assert.equal(snapshot.artifactObjects?.length, 1);
       const liveIndex = path.join(
         nixosSharedHostContainerRoot(remoteRuntimeRoot, deployment.providerTarget.containerName),
         "srv/static-app/live/index.html",
       );
-      assert.equal(await fsp.readFile(liveIndex, "utf8"), "<html>pleomino</html>\n");
+      assert.equal(await fsp.readFile(liveIndex, "utf8"), "<html>sample-webapp</html>\n");
       await assert.rejects(fsp.access(summary.stagedArtifactPath));
     } finally {
       await worker.close();
@@ -154,7 +154,7 @@ test("remote deploy retains the staged artifact when retention is requested expl
       const result = await $({
         cwd: tmp,
         env: remoteExecEnv(env),
-      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --retain-remote-artifact --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --retain-remote-artifact --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.stagedArtifactCleanup, "retained");
       assert.equal(summary.retentionRequested, true);
@@ -183,7 +183,7 @@ test("remote deploy fails closed when the reviewed remote repo checkout is missi
     const result = await $({
       cwd: tmp,
       env: remoteExecEnv(env),
-    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /remote repo preflight over SSH failed/);
     assert.match(String(result.stderr), /missing reviewed remote repo checkout/);
@@ -205,7 +205,7 @@ test("remote deploy reports missing control-plane token before SSH preflight", a
         VBR_DEPLOY_CONTROL_PLANE_TOKEN: "",
         FAKE_SSH_FAIL: "1",
       }),
-    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /requires VBR_DEPLOY_CONTROL_PLANE_TOKEN to be set/);
     assert.doesNotMatch(String(result.stderr), /fake ssh transport failure/);

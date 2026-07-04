@@ -30,9 +30,10 @@ test("target transition records retirement and migration with reviewed exception
   await runInTemp("cloudflare-pages-target-transition-success", async (tmp) => {
     const recordsRoot = path.join(tmp, "records");
     const retirement = deploymentTargetExceptionFixture({
-      ref: "//projects/deployments/pleomino/staging:retire_window",
-      affectedDeploymentIds: ["pleomino-staging"],
-      oldProviderTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      ref: "//projects/deployments/sample-webapp/staging:retire_window",
+      affectedDeploymentIds: ["sample-webapp-staging"],
+      oldProviderTargetIdentity:
+        "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
       approvalEvidence: "approval://retire-window",
     });
     const retiredDeployment = cloudflarePagesDeploymentFixture({
@@ -52,23 +53,24 @@ test("target transition records retirement and migration with reviewed exception
     assert.equal(retired.record.oldProviderTargetIdentity, retirement.oldProviderTargetIdentity);
     assert.equal(retired.record.resultingOwnershipState.kind, "retired");
     const migration = deploymentTargetExceptionFixture({
-      ref: "//projects/deployments/pleomino/next-staging:migrate_window",
+      ref: "//projects/deployments/sample-webapp/next-staging:migrate_window",
       exceptionKind: "migration",
-      affectedDeploymentIds: ["pleomino-staging", "pleomino-next-staging"],
-      oldProviderTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
-      newProviderTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-next-pages",
-      sharedLockScope: "cloudflare-pages:web-platform-staging/pleomino-transition-window",
+      affectedDeploymentIds: ["sample-webapp-staging", "sample-webapp-next-staging"],
+      oldProviderTargetIdentity:
+        "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
+      newProviderTargetIdentity: "cloudflare-pages:web-platform-staging/sample-webapp-next-pages",
+      sharedLockScope: "cloudflare-pages:web-platform-staging/sample-webapp-transition-window",
       approvalEvidence: "approval://migrate-window",
     });
     const migratedDeployment = cloudflarePagesDeploymentFixture({
-      deploymentId: "pleomino-next-staging",
-      label: "//projects/deployments/pleomino/next-staging:deploy",
+      deploymentId: "sample-webapp-next-staging",
+      label: "//projects/deployments/sample-webapp/next-staging:deploy",
       providerTarget: {
         ...cloudflarePagesDeploymentFixture().providerTarget,
-        project: "pleomino-next-pages",
-        id: "pleomino-next-pages",
-        providerTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-next-pages",
-        canonicalUrl: "https://pleomino-next-pages.pages.dev/",
+        project: "sample-webapp-next-pages",
+        id: "sample-webapp-next-pages",
+        providerTargetIdentity: "cloudflare-pages:web-platform-staging/sample-webapp-next-pages",
+        canonicalUrl: "https://sample-webapp-next-pages.pages.dev/",
       },
       targetExceptions: [migration],
     });
@@ -97,21 +99,21 @@ test("target transition fails closed for missing, expired, or superseded excepti
   await runInTemp("cloudflare-pages-target-transition-fail-closed", async (tmp) => {
     const recordsRoot = path.join(tmp, "records");
     const expired = deploymentTargetExceptionFixture({
-      ref: "//projects/deployments/pleomino/staging:expired_window",
-      affectedDeploymentIds: ["pleomino-staging"],
+      ref: "//projects/deployments/sample-webapp/staging:expired_window",
+      affectedDeploymentIds: ["sample-webapp-staging"],
       approvalEvidence: "approval://expired",
       effectiveAt: "2026-01-01T00:00:00.000Z",
       expiresAt: "2026-02-01T00:00:00.000Z",
     });
     const superseded = deploymentTargetExceptionFixture({
-      ref: "//projects/deployments/pleomino/staging:alias_window_old",
-      affectedDeploymentIds: ["pleomino-staging"],
+      ref: "//projects/deployments/sample-webapp/staging:alias_window_old",
+      affectedDeploymentIds: ["sample-webapp-staging"],
       approvalEvidence: "approval://old",
       effectiveAt: "2026-01-01T00:00:00.000Z",
     });
     const newer = deploymentTargetExceptionFixture({
-      ref: "//projects/deployments/pleomino/staging:alias_window_new",
-      affectedDeploymentIds: ["pleomino-staging"],
+      ref: "//projects/deployments/sample-webapp/staging:alias_window_new",
+      affectedDeploymentIds: ["sample-webapp-staging"],
       approvalEvidence: "approval://new",
       effectiveAt: "2026-03-01T00:00:00.000Z",
     });
@@ -124,7 +126,7 @@ test("target transition fails closed for missing, expired, or superseded excepti
           deployment,
           recordsRoot,
           operationKind: "retire_target",
-          targetExceptionRef: "//projects/deployments/pleomino/staging:missing",
+          targetExceptionRef: "//projects/deployments/sample-webapp/staging:missing",
           admissionEvidence: approvalEvidence(
             "approval://missing",
             deployment.deploymentId,
@@ -170,9 +172,10 @@ test("target transition requires operator authorization and reviewed approval ev
   await runInTemp("cloudflare-pages-target-transition-authz", async (tmp) => {
     const recordsRoot = path.join(tmp, "records");
     const exception = deploymentTargetExceptionFixture({
-      ref: "//projects/deployments/pleomino/staging:retire_window",
-      affectedDeploymentIds: ["pleomino-staging"],
-      oldProviderTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      ref: "//projects/deployments/sample-webapp/staging:retire_window",
+      affectedDeploymentIds: ["sample-webapp-staging"],
+      oldProviderTargetIdentity:
+        "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
       approvalEvidence: "approval://transition-ticket",
     });
     const deployment = cloudflarePagesDeploymentFixture({

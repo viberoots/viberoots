@@ -148,6 +148,10 @@ package dependencies. If repeated pins become the common case, move the target t
 ordinary unpinned `nixpkg_deps`; pinned attrs resolve from their pin profiles. Go CGO and Python
 native-extension nixpkg attrs use the same source-selection resolver.
 BUILD files must not put raw commits or raw flake URLs in these fields.
+Consumer workspaces that need an additional named profile can expose the generated lockfile-backed
+`nixpkgs_23_11` input through `.viberoots/workspace/nixpkgs-source-registry-extension.nix`;
+selected-build, filtered-snapshot, remote source-snapshot, and cache-manifest paths preserve
+normalized `nixpkgs_profile` and `nixpkg_pins` profile evidence.
 
 ## Go macros
 

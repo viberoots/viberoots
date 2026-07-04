@@ -33,7 +33,7 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
   );
   assert.match(
     stage0,
-    /use flake "path:\$\{PWD\}\/\.viberoots\/workspace#default" --accept-flake-config "\$\{__vbr_flake_args\[@\]\}"/,
+    /use flake "path:\$\{PWD\}\/\.viberoots\/workspace#default" --accept-flake-config --no-write-lock-file "\$\{__vbr_flake_args\[@\]\}"/,
   );
   assert.match(stage0, /! -f "\$\{__vbr_flake_input_root\}\/flake\.nix"/);
   assert.match(
@@ -45,16 +45,21 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
     /__vbr_local_real="\$\(cd "\$\{PWD\}\/viberoots" && pwd -P 2>\/dev\/null \|\| true\)"/,
   );
   assert.match(stage0, /"\$\{__vbr_current_real\}" == "\$\{__vbr_local_real\}"/);
+  assert.match(stage0, /__vbr_flake_input_is_generated_filtered=0/);
+  assert.match(stage0, /__vbr_flake_input_is_generated_filtered=1/);
+  assert.match(stage0, /if \[\[ "\$\{__vbr_flake_input_is_generated_filtered\}" == "1" \]\]/);
+  assert.match(stage0, /__vbr_flake_args=\(\)/);
   assert.match(
     stage0,
     /__vbr_flake_args=\(--override-input viberoots "path:\$\{__vbr_flake_input_root\}"\)/,
   );
   assert.match(stage0, /__vbr_stage0_filtered_viberoots_input\(\)/);
+  assert.match(stage0, /__vbr_stage0_align_workspace_flake_input\(\)/);
   assert.match(stage0, /viberoots-flake-input/);
   assert.match(stage0, /export VIBEROOTS_SOURCE_ROOT="\$\{__vbr_source_root\}"/);
   assert.match(stage0, /__vbr_current_real.*__vbr_filtered_real/s);
-  assert.doesNotMatch(stage0, /__vbr_input_real/);
-  assert.doesNotMatch(stage0, /__vbr_flake_input_root="\$\{PWD\}\/viberoots"/);
+  assert.match(stage0, /__vbr_input_real.*__vbr_filtered_real/s);
+  assert.match(stage0, /__vbr_flake_input_root="\$\{PWD\}\/viberoots"/);
   assert.match(stage0, /ln -sfn \.\.\/viberoots/);
   for (const excluded of [
     "--exclude /.viberoots",
@@ -147,7 +152,7 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     await assert.rejects(fsp.lstat(path.join(workspace, "buck-out")));
     assert.match(
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
-      /path:.*\/viberoots/,
+      /path:\.\/viberoots-flake-input/,
     );
     assert.match(
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
@@ -374,6 +379,58 @@ test("viberoots init-consumer leaves unchanged generated files untouched", async
       assert.equal((await fsp.stat(buckconfig)).mtimeMs, before.buckconfig);
     },
   );
+});
+
+test("viberoots init-consumer locks local submodule workspaces through filtered input", async () => {
+  await withConsumerWorkspace("viberoots-init-filtered-lock", async (workspace, viberootsRoot) => {
+    const fakeBin = path.join(workspace, ".fake-bin");
+    const log = path.join(workspace, ".nix.log");
+    await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.writeFile(
+      path.join(fakeBin, "nix"),
+      `#!/usr/bin/env bash\nprintf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}\nexit 0\n`,
+      { mode: 0o755 },
+    );
+
+    await execFileAsync(
+      path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots"),
+      [
+        "init-consumer",
+        "--workspace-root",
+        workspace,
+        "--workspace-name",
+        "filtered-lock",
+        "--viberoots-url",
+        `path:${path.join(workspace, "viberoots")}`,
+        "--source",
+        path.join(workspace, "viberoots"),
+        "--no-direnv",
+      ],
+      {
+        cwd: workspace,
+        env: {
+          ...process.env,
+          PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
+          NO_DEV_SHELL: "1",
+        },
+      },
+    );
+
+    const text = await fsp.readFile(log, "utf8");
+    assert.match(text, /nix flake lock --accept-flake-config --override-input viberoots path:/);
+    assert.match(text, /\.viberoots\/workspace\/viberoots-flake-input/);
+    assert.doesNotMatch(text, /--override-input viberoots path:.*\/viberoots(?:\s|$)/);
+    assert.match(
+      await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
+      /viberoots\.url = "path:\.\/viberoots-flake-input";/,
+    );
+    await fsp.stat(
+      path.join(workspace, ".viberoots", "workspace", "viberoots-flake-input", "flake.nix"),
+    );
+    await assert.rejects(
+      fsp.stat(path.join(workspace, ".viberoots", "workspace", "viberoots-flake-input", ".git")),
+    );
+  });
 });
 
 test("curlable bootstrap defaults to flake main and install enabled", async () => {
@@ -1531,7 +1588,7 @@ test("viberoots/init repairs stale generated workspace files", async () => {
     await assertDirenvBootstrap(workspace);
     assert.match(
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
-      /path:.*\/viberoots/,
+      /path:\.\/viberoots-flake-input/,
     );
     assert.match(
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "TARGETS"), "utf8"),

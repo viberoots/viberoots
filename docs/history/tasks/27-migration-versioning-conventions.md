@@ -15,7 +15,7 @@ of schema or infrastructure change in the repo. Three distinct migration surface
 **1. Application database SQL migrations (Supabase Postgres)**
 
 The repo already has a working migration bundle mechanism but no written conventions for authors
-of new migrations. `platform-db/migrations/` and `data-room-db/migrations/` are Buck `filegroup`
+of new migrations. `platform-db/migrations/` and `example-db/migrations/` are Buck `filegroup`
 targets labeled `kind:migrations` and `deployment:migration-set`. The `migration_bundle` rule in
 `build-tools/deployments/migration_bundle_rules.bzl` assembles them into a deterministic bundle
 artifact whose `manifest.json` carries `schema_version: "deployment-migration-bundle@1"` and an
@@ -137,7 +137,7 @@ applying plan artifacts against live environments.
 
 The application database (task #13, Supabase DB Deployment) already has placeholder SQL files
 and a working bundle/apply path. Real schema will land in `platform-db/migrations/` and
-`data-room-db/migrations/` as soon as the Supabase project is provisioned. Without conventions,
+`example-db/migrations/` as soon as the Supabase project is provisioned. Without conventions,
 the first real migration is likely to be written in whatever style the author prefers, setting a
 precedent that is hard to change later.
 

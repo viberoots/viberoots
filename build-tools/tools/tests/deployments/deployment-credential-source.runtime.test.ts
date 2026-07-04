@@ -9,7 +9,7 @@ import { fakeJwt, startFakeOidcServer } from "./deploy-vault-jwt.test-helpers";
 function runtimeBase(issuerUrl: string, env: NodeJS.ProcessEnv) {
   return {
     addr: "https://vault.example.net:8200",
-    roleName: "deploy-pleomino-read",
+    roleName: "deploy-sample-webapp-read",
     issuerUrl,
     audience: "deployments-vault",
     repository: "viberoots/viberoots",

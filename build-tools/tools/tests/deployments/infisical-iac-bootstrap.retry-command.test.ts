@@ -32,14 +32,14 @@ test("deployment retry command preserves target and credential intent", () => {
   const command = bootstrapRetryCommand({
     ...DEFAULT_BOOTSTRAP_ARGS,
     mode: "deployment",
-    target: "//projects/deployments/pleomino/staging:deploy",
+    target: "//projects/deployments/sample-webapp/staging:deploy",
     machineLabel: "ci-builder",
     rotateDeploymentCredentials: true,
   });
 
   assert.match(
     command,
-    /infisical-bootstrap\.ts deployment --target \/\/projects\/deployments\/pleomino\/staging:deploy /,
+    /infisical-bootstrap\.ts deployment --target \/\/projects\/deployments\/sample-webapp\/staging:deploy /,
   );
   assert.match(command, /--machine-label ci-builder/);
   assert.match(command, /--rotate-deployment-credentials/);
@@ -50,7 +50,7 @@ test("deployment retry command omits custom local and generated paths", () => {
   const command = bootstrapRetryCommand({
     ...DEFAULT_BOOTSTRAP_ARGS,
     mode: "deployment",
-    target: "//projects/deployments/pleomino/staging:deploy",
+    target: "//projects/deployments/sample-webapp/staging:deploy",
     tofuDir: "custom/tofu",
     tofuPlanFile: ".generated/custom.tfplan",
     credentialSink: "local-file",
@@ -62,7 +62,7 @@ test("deployment retry command omits custom local and generated paths", () => {
   });
 
   assert.match(command, /infisical-bootstrap\.ts deployment --target/);
-  assert.match(command, /\/\/projects\/deployments\/pleomino\/staging:deploy/);
+  assert.match(command, /\/\/projects\/deployments\/sample-webapp\/staging:deploy/);
   assert.match(command, /--machine-label ci-builder/);
   assert.match(command, /--rotate-bootstrap-credentials/);
   assert.match(command, /--rotate-deployment-credentials/);

@@ -13,7 +13,7 @@ import {
 
 function appNode(): GraphNode {
   return {
-    name: "//projects/apps/pleomino:app",
+    name: "//projects/apps/sample-webapp:app",
     labels: ["kind:app", "webapp:pwa"],
   };
 }
@@ -30,7 +30,7 @@ function requirement(overrides: Record<string, string> = {}) {
   return {
     name: "cloudflare_api_token",
     step: "publish",
-    contract_id: "secret://deployments/pleomino/cloudflare_api_token",
+    contract_id: "secret://deployments/sample-webapp/cloudflare_api_token",
     required: "true",
     ...overrides,
   };
@@ -50,22 +50,22 @@ function infisicalRuntime(overrides: Record<string, unknown> = {}) {
 
 function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
-    name: "//projects/deployments/pleomino/staging:deploy",
+    name: "//projects/deployments/sample-webapp/staging:deploy",
     provider: "cloudflare-pages",
-    component: "//projects/apps/pleomino:app",
+    component: "//projects/apps/sample-webapp:app",
     component_kind: "static-webapp",
     publisher: "wrangler-pages",
     publisher_config: "wrangler.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {
       account: "web-platform-staging",
-      project: "pleomino-staging-pages",
-      id: "pleomino-staging-pages",
+      project: "sample-webapp-staging-pages",
+      id: "sample-webapp-staging-pages",
     },
     ...overrides,
   };
@@ -104,11 +104,11 @@ test("infisical backend exposes only non-secret routing metadata", () => {
       secret_backend: "infisical/default",
       secret_requirements: [requirement()],
       infisical_runtime: infisicalRuntime({
-        secret_path: "/deployments/pleomino",
+        secret_path: "/deployments/sample-webapp",
       }),
       infisical_secret_mappings: {
-        "secret://deployments/pleomino/cloudflare_api_token": {
-          secret_path: "/cloudflare/pleomino",
+        "secret://deployments/sample-webapp/cloudflare_api_token": {
+          secret_path: "/cloudflare/sample-webapp",
           secret_name: "CLOUDFLARE_API_TOKEN",
         },
       },
@@ -119,8 +119,9 @@ test("infisical backend exposes only non-secret routing metadata", () => {
   assert.equal(deployments[0]?.secretBackendProfile, "infisical-default");
   assert.equal(deployments[0]?.infisicalRuntime?.projectId, "proj_123");
   assert.equal(
-    deployments[0]?.infisicalSecretMappings?.["secret://deployments/pleomino/cloudflare_api_token"]
-      ?.secretName,
+    deployments[0]?.infisicalSecretMappings?.[
+      "secret://deployments/sample-webapp/cloudflare_api_token"
+    ]?.secretName,
     "CLOUDFLARE_API_TOKEN",
   );
 });
@@ -153,7 +154,7 @@ test("infisical metadata validation rejects unsafe or stale metadata", () => {
       machine_identity_client_id: "not-reviewed",
     }),
     infisical_secret_mappings: {
-      "secret://deployments/pleomino/stale": {
+      "secret://deployments/sample-webapp/stale": {
         secret_path: "relative",
         secret_name: "",
       },
@@ -170,7 +171,7 @@ test("infisical metadata validation rejects unsafe or stale metadata", () => {
     ),
   );
   assert.ok(
-    errors.some((entry) => entry.includes("stale key secret://deployments/pleomino/stale")),
+    errors.some((entry) => entry.includes("stale key secret://deployments/sample-webapp/stale")),
   );
   assert.ok(errors.some((entry) => entry.includes("secret_path must start with /")));
   assert.ok(errors.some((entry) => entry.includes("secret_name is required")));

@@ -37,27 +37,58 @@ function exactStoreSandboxArgs(extraEnv?: NodeJS.ProcessEnv): string[] {
   return [];
 }
 
-function activeViberootsOverride(): string[] {
+function validViberootsSource(candidate: string): string {
+  const abs = path.resolve(candidate);
+  const real = fs.existsSync(abs) ? fs.realpathSync.native(abs) : abs;
+  if (real.startsWith("/nix/store/")) return "";
+  if (
+    fs.existsSync(path.join(abs, "flake.nix")) &&
+    fs.existsSync(path.join(abs, "build-tools", "tools", "dev", "zx-init.mjs"))
+  ) {
+    return real;
+  }
+  return "";
+}
+
+function flakeDirFromRef(flakeRef: string): string {
+  const withoutAttr = flakeRef.replace(/#.*$/, "");
+  if (!withoutAttr.startsWith("path:")) return "";
+  return path.resolve(withoutAttr.slice("path:".length));
+}
+
+function flakeLocalViberootsSource(flakeRef: string): string {
+  const flakeDir = flakeDirFromRef(flakeRef);
+  if (!flakeDir) return "";
+  const flakeFile = path.join(flakeDir, "flake.nix");
+  let text = "";
+  try {
+    text = fs.readFileSync(flakeFile, "utf8");
+  } catch {
+    return "";
+  }
+  const match = text.match(/\bviberoots\.url\s*=\s*"path:(\.[^"]*)"/);
+  if (!match?.[1]) return "";
+  return validViberootsSource(path.resolve(flakeDir, match[1]));
+}
+
+function activeViberootsOverride(flakeRef: string): string[] {
+  if (flakeLocalViberootsSource(flakeRef)) return [];
   const workspaceRoot = String(process.env.WORKSPACE_ROOT || process.cwd()).trim();
   const candidates = [
-    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
+    workspaceRoot
+      ? path.join(workspaceRoot, ".viberoots", "workspace", "viberoots-flake-input")
+      : "",
     workspaceRoot ? path.join(workspaceRoot, "viberoots") : "",
     workspaceRoot ? path.join(workspaceRoot, ".viberoots", "current") : "",
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
     process.env.VIBEROOTS_SOURCE_ROOT || "",
     process.env.VIBEROOTS_ROOT || "",
   ]
     .map((candidate) => String(candidate || "").trim())
     .filter(Boolean);
   for (const candidate of candidates) {
-    const abs = path.resolve(candidate);
-    const real = fs.existsSync(abs) ? fs.realpathSync.native(abs) : abs;
-    if (real.startsWith("/nix/store/")) continue;
-    if (
-      fs.existsSync(path.join(abs, "flake.nix")) &&
-      fs.existsSync(path.join(abs, "build-tools", "tools", "dev", "zx-init.mjs"))
-    ) {
-      return ["--override-input", "viberoots", `path:${real}`];
-    }
+    const real = validViberootsSource(candidate);
+    if (real) return ["--override-input", "viberoots", `path:${real}`];
   }
   return [];
 }
@@ -77,7 +108,7 @@ function nixBuildArgs(opts: {
     "--no-link",
     "--no-write-lock-file",
     "--accept-flake-config",
-    ...activeViberootsOverride(),
+    ...activeViberootsOverride(opts.flakeRef),
     ...localOnlyNixBuilderArgs(),
     "--print-build-logs",
     "--option",

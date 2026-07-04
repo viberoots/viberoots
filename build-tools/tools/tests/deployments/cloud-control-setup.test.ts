@@ -42,7 +42,7 @@ function baseInput(overrides: Partial<CloudControlSetupInput> = {}): CloudContro
     artifactRegion: "us-east-1",
     artifactBackend: "aws-s3",
     artifactBackendEvidence: "",
-    deploymentIds: ["pleomino-staging"],
+    deploymentIds: ["sample-webapp-staging"],
     reviewedSourceMode: "ssh",
     authCallbackHost: "deploy-auth.example.test",
     authCallbackPath: "/oidc/callback",
@@ -87,8 +87,8 @@ test("cloud setup bundle renders runtime, credentials, commands, and capabilitie
   assert.equal(managed.postgres.candidate, "supabase-managed-postgres");
   assert.equal(managed.artifactStore.backend, "aws-s3");
   assert.equal(ingress.serviceIngress.readiness, "/readyz");
-  assert.ok(manifest.requiredFiles.includes("pleomino-staging-infisical-client-secret"));
-  assert.equal(config.credentials.infisicalDeployments[0].deploymentId, "pleomino-staging");
+  assert.ok(manifest.requiredFiles.includes("sample-webapp-staging-infisical-client-secret"));
+  assert.equal(config.credentials.infisicalDeployments[0].deploymentId, "sample-webapp-staging");
   assert.equal(config.reviewedSource.mode, "ssh");
   assert.equal(
     config.reviewedSource.sshKnownHostsFile,

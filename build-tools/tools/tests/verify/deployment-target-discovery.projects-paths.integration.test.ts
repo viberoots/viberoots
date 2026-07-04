@@ -12,12 +12,12 @@ test("deployment target discovery resolves projects/deployments labels from an i
     const previousIsolation = process.env.BUCK_NESTED_ISO;
     process.env.BUCK_NESTED_ISO = inheritedBuckIsolation("verify_deployment_target_discovery");
     try {
-      const appTargetsPath = path.join(tmp, "projects", "apps", "pleomino", "TARGETS");
+      const appTargetsPath = path.join(tmp, "projects", "apps", "sample-app", "TARGETS");
       const sharedTargetsPath = path.join(
         tmp,
         "projects",
         "deployments",
-        "pleomino",
+        "sample",
         "shared",
         "TARGETS",
       );
@@ -25,7 +25,7 @@ test("deployment target discovery resolves projects/deployments labels from an i
         tmp,
         "projects",
         "deployments",
-        "pleomino",
+        "sample",
         "dev",
         "TARGETS",
       );
@@ -40,7 +40,7 @@ test("deployment target discovery resolves projects/deployments labels from an i
           "genrule(",
           '    name = "app",',
           '    out = "app.txt",',
-          '    cmd = "printf pleomino > $OUT",',
+          '    cmd = "printf sample > $OUT",',
           '    labels = ["kind:app", "webapp:static"],',
           '    visibility = ["//projects/deployments/..."],',
           ")",
@@ -91,12 +91,12 @@ test("deployment target discovery resolves projects/deployments labels from an i
           "",
           "nixos_shared_host_static_webapp_deployment(",
           '    name = "deploy",',
-          '    component = "//projects/apps/pleomino:app",',
-          '    app_name = "pleomino",',
+          '    component = "//projects/apps/sample-app:app",',
+          '    app_name = "sample-app",',
           "    container_port = 3000,",
-          '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
+          '    lane_policy = "//projects/deployments/sample/shared:lane",',
           '    environment_stage = "dev",',
-          '    admission_policy = "//projects/deployments/pleomino/shared:dev_release",',
+          '    admission_policy = "//projects/deployments/sample/shared:dev_release",',
           ")",
           "",
         ].join("\n"),
@@ -104,7 +104,7 @@ test("deployment target discovery resolves projects/deployments labels from an i
       );
 
       const targets = await listDeploymentTargets(tmp);
-      assert.deepEqual(targets, ["//projects/deployments/pleomino/dev:deploy"]);
+      assert.deepEqual(targets, ["//projects/deployments/sample/dev:deploy"]);
     } finally {
       if (previousIsolation === undefined) delete process.env.BUCK_NESTED_ISO;
       else process.env.BUCK_NESTED_ISO = previousIsolation;

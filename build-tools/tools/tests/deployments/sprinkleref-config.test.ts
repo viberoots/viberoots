@@ -84,7 +84,7 @@ test("resolver config rejects unsupported backends and backend-specific refs", a
     /backend-neutral/,
   );
   assert.throws(
-    () => assertBackendNeutralSecretRef("secret://deployments/pleomino/github/token"),
+    () => assertBackendNeutralSecretRef("secret://deployments/sample-webapp/github/token"),
     /backend-neutral/,
   );
   const dir = await tmp();
@@ -107,7 +107,7 @@ test("resolver config rejects Infisical projectRef and requires projectId", asyn
       main: {
         backend: "infisical",
         host: "http://127.0.0.1:1",
-        projectRef: "secret://deployments/pleomino/project-id",
+        projectRef: "secret://deployments/sample-webapp/project-id",
         defaultEnvironment: "staging",
         clientIdEnv: "INFISICAL_CLIENT_ID",
         clientSecretEnv: "INFISICAL_CLIENT_SECRET",
@@ -146,7 +146,7 @@ test("starter configs are deterministic and contain no secret values", async () 
   assert.match(serialized, /github-actions/);
   assert.match(serialized, /bitbucket-pipelines/);
   assert.doesNotMatch(serialized, /clientSecret":/);
-  assert.doesNotMatch(serialized, /pleomino-project-id|vault-default-placeholder/);
+  assert.doesNotMatch(serialized, /sample-webapp-project-id|vault-default-placeholder/);
   assert.deepEqual(configs, sprinkleRefStarterConfigs("darwin"));
   const dir = await tmp();
   const written = await initSprinkleRefConfigs({ dir, platform: "linux" });

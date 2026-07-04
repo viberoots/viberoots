@@ -313,8 +313,11 @@ async function activeViberootsRootFromWorkspace(): Promise<string> {
 function isGeneratedFilteredViberootsInputPath(value: string): boolean {
   const normalized = String(value || "")
     .split(path.sep)
-    .join("/");
+    .join("/")
+    .replace(/^\.\//, "");
   return (
+    normalized === "viberoots-flake-input" ||
+    normalized.startsWith("viberoots-flake-input/") ||
     normalized.endsWith("/.viberoots/workspace/viberoots-flake-input") ||
     normalized.includes("/.viberoots/workspace/viberoots-flake-input/")
   );

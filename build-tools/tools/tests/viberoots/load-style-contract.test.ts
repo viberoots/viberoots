@@ -13,9 +13,17 @@ async function read(rel: string): Promise<string> {
 
 async function trackedFiles(args: string[]): Promise<string[]> {
   const result = await $({ cwd: repoRoot, stdio: "pipe" })`git ls-files -- ${args}`;
-  return String(result.stdout || "")
+  const files = String(result.stdout || "")
     .split("\n")
     .filter(Boolean);
+  const existing: string[] = [];
+  for (const file of files) {
+    try {
+      await fsp.access(path.join(repoRoot, file));
+      existing.push(file);
+    } catch {}
+  }
+  return existing;
 }
 
 function isViberootsOwnedBzl(file: string): boolean {

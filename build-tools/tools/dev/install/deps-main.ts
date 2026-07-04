@@ -23,6 +23,7 @@ import { pruneNodeModulesHashesJson } from "../update-pnpm-hash/hashes-json";
 import { ensureInstallSecretReadiness } from "./secret-readiness";
 import { prewarmUnifiedPnpmStore } from "./unified-pnpm-prewarm";
 import { importerInstallFreshness } from "./importer-freshness";
+import { withInstallProgress } from "./progress";
 import { writeGlueFingerprint } from "./glue-freshness";
 import { checkBootstrapCompletion } from "../../lib/bootstrap-completion";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
@@ -282,7 +283,9 @@ if (dryRun) {
               NIX_PNPM_FETCH_TIMEOUT: String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"),
             },
           })`zx-wrapper ${absUpdate} --lockfile ${relLock}`;
-          const updateRes = verbose ? await updateCmd : await updateCmd.quiet();
+          const updateRes = verbose
+            ? await updateCmd
+            : await withInstallProgress(`node_modules ${imp} update-pnpm-hash`, updateCmd.quiet());
           if (updateRes.exitCode !== 0) {
             printFailedChildOutput(`update-pnpm-hash ${imp}`, updateRes);
             process.exit(updateRes.exitCode || 1);
@@ -301,7 +304,9 @@ if (dryRun) {
               NIX_PNPM_FETCH_TIMEOUT: String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"),
             },
           })`zx-wrapper ${buildToolPath(repoRoot, "tools/dev/install/link-node.ts")} --importer ${imp} ${force ? "--force" : ""}`;
-          const linkRes = verbose ? await linkCmd : await linkCmd.quiet();
+          const linkRes = verbose
+            ? await linkCmd
+            : await withInstallProgress(`node_modules ${imp} link-node`, linkCmd.quiet());
           if (linkRes.exitCode !== 0) {
             printFailedChildOutput(`link-node ${imp}`, linkRes);
             process.exit(linkRes.exitCode || 1);

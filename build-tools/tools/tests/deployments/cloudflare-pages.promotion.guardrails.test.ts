@@ -64,7 +64,7 @@ async function writeWranglerConfig(root: string) {
   await fsp.writeFile(root, '{\n  "compatibility_date": "2026-03-18"\n}\n', "utf8");
 }
 
-function pleominoDevDeployment() {
+function sampleWebappDevDeployment() {
   const lanePolicy = {
     ...cloudflarePagesDeploymentFixture().lanePolicy,
     promotionCompatibility: {
@@ -72,12 +72,12 @@ function pleominoDevDeployment() {
     },
   };
   return nixosSharedHostDeploymentFixture({
-    deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino/dev:deploy",
+    deploymentId: "sample-webapp-dev",
+    label: "//projects/deployments/sample-webapp/dev:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
-    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
-    runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
+    component: { kind: "static-webapp", target: "//projects/apps/sample-webapp:app" },
+    runtime: { appName: "sample-webapp", containerPort: 3000, healthPath: "/healthz" },
   });
 }
 
@@ -97,8 +97,8 @@ async function createSuccessfulDevRun(
   recordsRoot: string,
   _backendDatabaseUrl: string,
 ): Promise<string> {
-  const deployment = pleominoDevDeployment();
-  const deploymentJson = path.join(tmp, "pleomino-dev.json");
+  const deployment = sampleWebappDevDeployment();
+  const deploymentJson = path.join(tmp, "sample-webapp-dev.json");
   const artifactDir = path.join(tmp, "artifact");
   const hostRoot = path.join(tmp, "host");
   const statePath = path.join(tmp, "platform-state.json");
@@ -166,7 +166,7 @@ test("promotion rejects retained source runs that no longer match source current
   await runInTemp("cloudflare-pages-promotion-source-stage-drift", async (tmp, $) => {
     const recordsRoot = path.join(tmp, "records");
     const backendDatabaseUrl = localHarnessControlPlaneDatabaseUrl(recordsRoot);
-    const source = pleominoDevDeployment();
+    const source = sampleWebappDevDeployment();
     const staging = cloudflarePagesDeploymentFixture({
       lanePolicy: source.lanePolicy,
       lanePolicyRef: source.lanePolicyRef,
@@ -196,7 +196,7 @@ test("promotion rejects attempts to reuse one deployment id instead of promoting
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>staging source</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);

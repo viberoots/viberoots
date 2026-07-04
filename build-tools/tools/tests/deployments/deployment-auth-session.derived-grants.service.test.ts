@@ -22,9 +22,9 @@ async function callback(url: string, loginUrl: string) {
 function deployment(issuer: string) {
   return {
     ...nixosSharedHostDeploymentFixture({
-      deploymentId: "pleomino-dev",
-      label: "//projects/deployments/pleomino/dev:deploy",
-      lanePolicyRef: "//projects/deployments/pleomino/shared:lane",
+      deploymentId: "sample-webapp-dev",
+      label: "//projects/deployments/sample-webapp/dev:deploy",
+      lanePolicyRef: "//projects/deployments/sample-webapp/shared:lane",
       environmentStage: "dev",
     }),
     vaultRuntime: {
@@ -54,10 +54,10 @@ test("auth session status exposes every derived grant for the authenticated depl
         email: "ada@example.com",
         preferred_username: "Ada",
         groups: [
-          "deploy-submitters-pleomino-dev",
-          "deploy-approvers-pleomino-dev",
-          "deploy-admission-reporters-pleomino-dev",
-          "deploy-submitters-pleomino-prod",
+          "deploy-submitters-sample-webapp-dev",
+          "deploy-approvers-sample-webapp-dev",
+          "deploy-admission-reporters-sample-webapp-dev",
+          "deploy-submitters-sample-webapp-prod",
         ],
       },
     });
@@ -84,9 +84,12 @@ test("auth session status exposes every derived grant for the authenticated depl
       });
       assert.equal(status.status, "authenticated");
       assert.deepEqual(status.authorization?.grants, [
-        { role: "submitter", scope: { kind: "deployment_id", value: "pleomino-dev" } },
-        { role: "approver", scope: { kind: "deployment_id", value: "pleomino-dev" } },
-        { role: "admission_reporter", scope: { kind: "deployment_id", value: "pleomino-dev" } },
+        { role: "submitter", scope: { kind: "deployment_id", value: "sample-webapp-dev" } },
+        { role: "approver", scope: { kind: "deployment_id", value: "sample-webapp-dev" } },
+        {
+          role: "admission_reporter",
+          scope: { kind: "deployment_id", value: "sample-webapp-dev" },
+        },
       ]);
     } finally {
       await controlPlane.close();

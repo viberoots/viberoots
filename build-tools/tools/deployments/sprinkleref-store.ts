@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { SprinkleRefInfisicalStore } from "./sprinkleref-infisical";
-import { SprinkleRefMacosKeychainStore } from "./sprinkleref-keychain";
+import { SprinkleRefMacosKeychainStore, type KeychainRunner } from "./sprinkleref-keychain";
 import { SprinkleRefLocalFileStore } from "./sprinkleref-local-file";
 import type {
   SprinkleRefBackendConfig,
@@ -15,11 +15,16 @@ export function createSprinkleRefStore(
     platform?: NodeJS.Platform;
     fetchImpl?: typeof fetch;
     resolverConfig?: SprinkleRefConfig;
+    keychainRunner?: KeychainRunner;
   } = {},
 ): SprinkleRefStore {
   if (backend.backend === "local-file") return new SprinkleRefLocalFileStore(backend.file || "");
   if (backend.backend === "macos-keychain") {
-    return new SprinkleRefMacosKeychainStore(backend.service || "", opts.platform);
+    return new SprinkleRefMacosKeychainStore(
+      backend.service || "",
+      opts.platform,
+      opts.keychainRunner,
+    );
   }
   if (backend.backend === "infisical") {
     return new SprinkleRefInfisicalStore(

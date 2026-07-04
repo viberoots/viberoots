@@ -17,18 +17,18 @@ import {
   fanOutOnlyNode,
   graph,
   graphIn,
-  pleominoContextNode,
+  sampleWebappContextNode,
   promptOnlyFanOutNode,
   writeRepoOnlyResolver,
 } from "./infisical-iac-bootstrap.fanout-helpers";
 
-const staging = "//projects/deployments/pleomino/staging:deploy";
-const prod = "//projects/deployments/pleomino/prod:deploy";
+const staging = "//projects/deployments/sample-webapp/staging:deploy";
+const prod = "//projects/deployments/sample-webapp/prod:deploy";
 
 test("deployment fan-out discovery uses reviewed graph metadata", async () => {
   const graphPath = await graph([
-    deploymentNode(staging, "pleomino"),
-    deploymentNode(prod, "pleomino"),
+    deploymentNode(staging, "sample-webapp"),
+    deploymentNode(prod, "sample-webapp"),
     deploymentNode("//projects/deployments/other-prod:deploy", "other"),
   ]);
   const discovery = await discoverDeploymentBootstrapTargets({ graphPath });
@@ -42,12 +42,12 @@ test("deployment fan-out discovery uses reviewed graph metadata", async () => {
   assert.equal(discovery.source, "graph");
 });
 
-test("deployment fan-out discovery applies Pleomino deployment context defaults", async () => {
+test("deployment fan-out discovery applies Sample webapp deployment context defaults", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-context-fanout-"));
   await writeRepoOnlyResolver(dir);
   const graphPath = await graphIn(dir, [
-    pleominoContextNode(staging, "pleomino-staging"),
-    pleominoContextNode(prod, "pleomino-prod"),
+    sampleWebappContextNode(staging, "sample-webapp-staging"),
+    sampleWebappContextNode(prod, "sample-webapp-prod"),
   ]);
   const discovery = await discoverDeploymentBootstrapTargets({ graphPath, workspaceRoot: dir });
   assert.deepEqual(discovery.offeredTargets, [prod, staging]);
@@ -60,7 +60,7 @@ test("deployment fan-out discovery fails closed on conflicting deployment contex
   await writeRepoOnlyResolver(dir);
   const graphPath = await graphIn(dir, [
     {
-      ...pleominoContextNode(staging, "pleomino-staging"),
+      ...sampleWebappContextNode(staging, "sample-webapp-staging"),
       secret_backend: "vault/default",
     },
   ]);
@@ -111,7 +111,7 @@ test("--yes pre-confirms deployment fan-out and names target failures", async ()
         },
         io: { stderr: () => undefined },
       }),
-    /Repo bootstrap completed[\s\S]*\/\/projects\/deployments\/pleomino\/prod:deploy: tofu apply failed[\s\S]*deployment --target <buck-target>/,
+    /Repo bootstrap completed[\s\S]*\/\/projects\/deployments\/sample-webapp\/prod:deploy: tofu apply failed[\s\S]*deployment --target <buck-target>/,
   );
   assert.deepEqual(seen, [staging, prod]);
 });
@@ -146,7 +146,7 @@ test("confirmed repo bootstrap performs repo setup before deployment fan-out pro
     );
   });
   assert.match(output, /infisical-repo-bootstrap-result@1/);
-  assert.match(output, /Run deployment bootstrap for .*pleomino\/staging:deploy\? \[Y\/n\]/);
+  assert.match(output, /Run deployment bootstrap for .*sample-webapp\/staging:deploy\? \[Y\/n\]/);
   assert.match(output, /Deployment bootstrap fan-out skipped by operator response/);
   assert.ok(output.indexOf("infisical-repo-bootstrap-result@1") < output.indexOf("Run deployment"));
   assert.equal(await fs.readFile(path.join(dir, ".local/bootstrap.json"), "utf8"), "{}\n");

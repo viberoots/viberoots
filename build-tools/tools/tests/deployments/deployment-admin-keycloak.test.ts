@@ -53,7 +53,7 @@ test("deploy admin identity plan stays deterministic and advertises separate adm
   assert.deepEqual(first, second);
   assert.match(first.adminGroupConventions.shapeAdmin[0], /deploy-admin-identity-shape-admin-/);
   assert.match(first.nextSteps.sync, /deploy admin identity sync --deployment/);
-  assert.ok(first.plannedMutations.groups.includes("deploy-submitters-pleomino-staging"));
+  assert.ok(first.plannedMutations.groups.includes("deploy-submitters-sample-webapp-staging"));
   assert.deepEqual(
     first.plannedMutations.clients.map((client) => client.clientId),
     ["deployment-cli", "deployment-runner"],
@@ -97,12 +97,15 @@ test("project and environment scoped deploy admin groups stay narrow", async () 
     lanePolicyRef: "//projects/deployments/demoapp-shared:lane",
   });
   const dev = cloudflarePagesDeploymentFixture({
-    deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino/dev:deploy",
+    deploymentId: "sample-webapp-dev",
+    label: "//projects/deployments/sample-webapp/dev:deploy",
     environmentStage: "dev",
-    admissionPolicyRef: "//projects/deployments/pleomino/shared:dev_release",
+    admissionPolicyRef: "//projects/deployments/sample-webapp/shared:dev_release",
   });
-  const membershipProject = adminGroup("membership_admin", { kind: "project", value: "pleomino" });
+  const membershipProject = adminGroup("membership_admin", {
+    kind: "project",
+    value: "sample-webapp",
+  });
   const membershipEnv = adminGroup("membership_admin", {
     kind: "environment_stage",
     value: "staging",
@@ -162,8 +165,11 @@ test("deploy admin sync and grant-user keep audit provenance and idempotent writ
       cliPublicClientId: "deployment-cli",
     },
   });
-  const shapeAdmin = adminGroup("shape_admin", { kind: "project", value: "pleomino" });
-  const membershipAdmin = adminGroup("membership_admin", { kind: "project", value: "pleomino" });
+  const shapeAdmin = adminGroup("shape_admin", { kind: "project", value: "sample-webapp" });
+  const membershipAdmin = adminGroup("membership_admin", {
+    kind: "project",
+    value: "sample-webapp",
+  });
   await withTempDir("deploy-admin-keycloak-apply", async (tmp) => {
     const realmFile = path.join(tmp, "deployment-auth-realm.json");
     const membershipFile = path.join(tmp, "deployment-auth-memberships.json");
@@ -186,7 +192,7 @@ test("deploy admin sync and grant-user keep audit provenance and idempotent writ
     assert.equal(firstSync.audit.actingPrincipal.principalId, "user:shape-admin");
     assert.equal(firstSync.audit.grantedScope.kind, "project");
     assert.equal(firstSync.audit.requestedMutation.kind, "identity_group_shape_sync");
-    assert.match(await fsp.readFile(realmFile, "utf8"), /deploy-approvers-pleomino-staging/);
+    assert.match(await fsp.readFile(realmFile, "utf8"), /deploy-approvers-sample-webapp-staging/);
     assert.match(await fsp.readFile(realmFile, "utf8"), /"claim\.name": "email"/);
     assert.match(await fsp.readFile(realmFile, "utf8"), /oidc-usermodel-property-mapper/);
     assert.match(await fsp.readFile(realmFile, "utf8"), /oidc-audience-mapper/);
@@ -210,7 +216,7 @@ test("deploy admin sync and grant-user keep audit provenance and idempotent writ
     });
     assert.equal(granted.audit.actingPrincipal.principalId, "user:membership-admin");
     assert.equal(granted.audit.requestedMutation.kind, "identity_membership_grant");
-    assert.equal(granted.grantedUser.group, "deploy-approvers-pleomino-staging");
+    assert.equal(granted.grantedUser.group, "deploy-approvers-sample-webapp-staging");
     assert.match(await fsp.readFile(membershipFile, "utf8"), /reviewer@example\.com/);
   });
 });
@@ -218,12 +224,12 @@ test("deploy admin sync and grant-user keep audit provenance and idempotent writ
 test("deploy admin sync can refresh an authoritative shared realm artifact", async () => {
   const staging = cloudflarePagesDeploymentFixture();
   const dev = cloudflarePagesDeploymentFixture({
-    deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino/dev:deploy",
+    deploymentId: "sample-webapp-dev",
+    label: "//projects/deployments/sample-webapp/dev:deploy",
     environmentStage: "dev",
-    admissionPolicyRef: "//projects/deployments/pleomino/shared:dev_release",
+    admissionPolicyRef: "//projects/deployments/sample-webapp/shared:dev_release",
   });
-  const shapeAdmin = adminGroup("shape_admin", { kind: "project", value: "pleomino" });
+  const shapeAdmin = adminGroup("shape_admin", { kind: "project", value: "sample-webapp" });
   await withTempDir("deploy-admin-keycloak-shared-realm", async (tmp) => {
     const realmFile = path.join(tmp, "deployment-auth-realm.json");
     const synced = await syncDeploymentAdminKeycloakRealm({
@@ -234,7 +240,7 @@ test("deploy admin sync can refresh an authoritative shared realm artifact", asy
       adminGroups: [shapeAdmin],
     });
     assert.equal(synced.renderedDeploymentCount, 2);
-    assert.match(await fsp.readFile(realmFile, "utf8"), /deploy-submitters-pleomino-dev/);
-    assert.match(await fsp.readFile(realmFile, "utf8"), /deploy-submitters-pleomino-staging/);
+    assert.match(await fsp.readFile(realmFile, "utf8"), /deploy-submitters-sample-webapp-dev/);
+    assert.match(await fsp.readFile(realmFile, "utf8"), /deploy-submitters-sample-webapp-staging/);
   });
 });

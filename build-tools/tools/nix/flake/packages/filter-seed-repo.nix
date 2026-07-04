@@ -8,7 +8,9 @@ path:
 let
   root = builtins.toString path;
   rootWithSlash = root + "/";
-  rootDirs = [
+  # Default seed staging is an allowlist, not a broad repo copy. These roots are the
+  # build-system and fixture sources required for test repo initialization.
+  seedRootDirs = [
     ".husky"
     ".viberoots"
     "build-tools"
@@ -24,6 +26,33 @@ let
     "toolchains"
     "types"
     "viberoots"
+  ];
+  seedRootFiles = [
+    ".buckconfig"
+    ".buckroot"
+    ".editorconfig"
+    ".gitattributes"
+    ".gitignore"
+    ".npmrc"
+    ".prettierignore"
+    ".prettierrc"
+    "AGENTS.md"
+    "Jenkinsfile"
+    "LICENSE"
+    "README.md"
+    "TARGETS"
+    "TESTING.md"
+    "abstractions.md"
+    "bootstrap"
+    "eslint.config.js"
+    "flake.lock"
+    "flake.nix"
+    "gomod2nix.toml"
+    "init"
+    "package.json"
+    "pnpm-lock.yaml"
+    "pnpm-workspace.yaml"
+    "tsconfig.json"
   ];
   rootMdKeep = [
     "abstractions.md"
@@ -75,8 +104,22 @@ let
     (lib.hasPrefix ".viberoots/workspace/buck/" rel) ||
     rel == ".viberoots/workspace/.viberoots" ||
     (lib.hasPrefix ".viberoots/workspace/.viberoots/" rel) ||
+    rel == ".viberoots/workspace/backups" ||
+    (lib.hasPrefix ".viberoots/workspace/backups/" rel) ||
+    rel == ".viberoots/workspace/cache" ||
+    (lib.hasPrefix ".viberoots/workspace/cache/" rel) ||
     rel == ".viberoots/workspace/codex-test-logs" ||
     (lib.hasPrefix ".viberoots/workspace/codex-test-logs/" rel) ||
+    rel == ".viberoots/workspace/install-cache" ||
+    (lib.hasPrefix ".viberoots/workspace/install-cache/" rel) ||
+    rel == ".viberoots/workspace/nix-xdg-cache" ||
+    (lib.hasPrefix ".viberoots/workspace/nix-xdg-cache/" rel) ||
+    rel == ".viberoots/workspace/node" ||
+    (lib.hasPrefix ".viberoots/workspace/node/" rel) ||
+    rel == ".viberoots/workspace/pr-logs" ||
+    (lib.hasPrefix ".viberoots/workspace/pr-logs/" rel) ||
+    rel == ".viberoots/workspace/xdg-cache" ||
+    (lib.hasPrefix ".viberoots/workspace/xdg-cache/" rel) ||
     rel == ".viberoots/buck" ||
     (lib.hasPrefix ".viberoots/buck/" rel) ||
     rel == ".viberoots/cache" ||
@@ -118,8 +161,8 @@ let
       base = builtins.baseNameOf rel;
       top = lib.head (lib.splitString "/" rel);
     in
-      (isRootFile rel && !isExcludedRootFile base) ||
-      builtins.any (d: top == d) rootDirs;
+      (isRootFile rel && lib.elem base seedRootFiles && !isExcludedRootFile base) ||
+      builtins.any (d: top == d) seedRootDirs;
 in
 p: _type:
   let

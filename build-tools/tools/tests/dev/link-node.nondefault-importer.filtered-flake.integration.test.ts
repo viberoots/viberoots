@@ -6,7 +6,7 @@ import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 test("link-node builds non-default importers from stable workspace flake ref", async () => {
   const file = viberootsSourcePath("viberoots/build-tools/tools/dev/install/link-node.ts");
   const txt = await fsp.readFile(file, "utf8");
-  if (!txt.includes("makeFilteredFlakeRef(root)")) {
+  if (!txt.includes("makeFilteredFlakeRef(root, importer)")) {
     throw new Error("link-node.ts must use filtered flake snapshot for non-default importers");
   }
   if (!txt.includes("withResolvedExactPrefetchedStore")) {
@@ -31,10 +31,15 @@ test("link-node builds non-default importers from stable workspace flake ref", a
     viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/lockfile.ts"),
     "utf8",
   );
-  if (!compat.includes("export async function makeFilteredFlakeRef(repoRoot: string)")) {
+  if (
+    !/export\s+async\s+function\s+makeFilteredFlakeRef\s*\([^)]*importer\?:\s*string/s.test(compat)
+  ) {
     throw new Error(
       "lockfile.ts must keep the compatibility filtered-flake export for install callers",
     );
+  }
+  if (!compat.includes("importer,")) {
+    throw new Error("lockfile.ts must pass importer scope through to filtered-flake snapshots");
   }
 
   const filtered = await fsp.readFile(
@@ -47,6 +52,10 @@ test("link-node builds non-default importers from stable workspace flake ref", a
 
   const filteredCompat = await fsp.readFile(
     viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/filtered-flake.ts"),
+    "utf8",
+  );
+  const buildFlake = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/build-flake.ts"),
     "utf8",
   );
   if (
@@ -63,6 +72,20 @@ test("link-node builds non-default importers from stable workspace flake ref", a
   ) {
     throw new Error(
       "update-pnpm-hash filtered flake snapshots must canonicalize temp paths before passing them to Nix",
+    );
+  }
+  if (
+    !filteredCompat.includes("findWorkspacePackageRepoDirs") ||
+    !filteredCompat.includes("selectedNodeSnapshotRelPaths(opts.importer, workspacePackageDirs)") ||
+    !filteredCompat.includes("selectedNodeSnapshotRsyncSources")
+  ) {
+    throw new Error(
+      "update-pnpm-hash filtered flakes must include selected node importer and workspace package paths",
+    );
+  }
+  if (!buildFlake.includes("importer: opts.importer")) {
+    throw new Error(
+      "update-pnpm-hash build flake selection must pass the importer into filtered snapshots",
     );
   }
 });

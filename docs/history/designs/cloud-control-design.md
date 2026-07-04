@@ -208,7 +208,7 @@ This work is the prerequisite for later cloud tasks:
 - HTTP MCP expansion
 - monitoring and observability
 - preview deployments and per-change environments
-- Pleomino Infisical cutover work that consumes the credential-directory abstraction
+- Sample webapp Infisical cutover work that consumes the credential-directory abstraction
 
 ## Required Control-Plane Capabilities
 

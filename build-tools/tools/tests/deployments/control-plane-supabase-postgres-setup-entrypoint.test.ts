@@ -189,7 +189,7 @@ function baseInput(overrides: Partial<CloudControlSetupInput> = {}): CloudContro
     artifactRegion: "us-east-1",
     artifactBackend: "aws-s3",
     artifactBackendEvidence: "",
-    deploymentIds: ["pleomino-staging"],
+    deploymentIds: ["sample-webapp-staging"],
     reviewedSourceMode: "ssh",
     authCallbackHost: "deploy-auth.example.test",
     authCallbackPath: "/oidc/callback",

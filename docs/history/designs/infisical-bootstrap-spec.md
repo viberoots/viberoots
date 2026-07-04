@@ -30,12 +30,12 @@ i --machine-label <label>
 
 `i` is the normal first-run and daily-run entrypoint. After dependency setup, it performs a narrow
 local readiness check for the canonical project config in `projects/config/`, the repo bootstrap
-Universal Auth credential, and the Pleomino deployment Universal Auth credentials for this machine.
+Universal Auth credential, and the Sample webapp deployment Universal Auth credentials for this machine.
 It does not run full `sprinkleref --check` and does not require application secrets such as
 Cloudflare tokens to exist.
 
 The readiness phase is capability-gated by checked-out deployment metadata. Partial clones or
-minimized workspaces that do not include `projects/deployments/pleomino/shared/family.bzl` skip
+minimized workspaces that do not include `projects/deployments/sample-webapp/shared/family.bzl` skip
 Infisical readiness automatically and do not need `--without-secrets`. Full checkouts can still use
 `--without-secrets` or `INSTALL_DEPS_WITHOUT_SECRETS=1` as an explicit dependency-only opt-out.
 
@@ -76,10 +76,10 @@ until a later default repo run or an explicit deployment bootstrap succeeds.
 `--force-overwrite-local-credentials` are also forwarded when an operator intentionally invokes them
 through `i`.
 
-On first bootstrap, OpenTofu may create or adopt the Pleomino Infisical project and machine
+On first bootstrap, OpenTofu may create or adopt the Sample webapp Infisical project and machine
 identities while checked-in reviewed metadata still contains first-bootstrap placeholders. That is
 reported as a reviewed metadata handoff, not unexpected drift. The command prints a non-secret patch
-for `projects/deployments/pleomino/shared/family.bzl` covering only `_INFISICAL_SITE_URL`,
+for `projects/deployments/sample-webapp/shared/family.bzl` covering only `_INFISICAL_SITE_URL`,
 `_INFISICAL_PROJECT_ID`, `_INFISICAL_MACHINE_IDENTITY_IDS`, and
 `_INFISICAL_CREDENTIAL_FILE_NAMES`. Local interactive operators can approve the patch at the
 `[Y/n]` gate. Non-interactive runs must pass `--apply-metadata-patch`; `--yes` alone does not apply
@@ -106,9 +106,9 @@ and the `viberoots-bootstrap` macOS Keychain bootstrap/deployment Universal Auth
 not delete Infisical projects, identities, Cloudflare secrets, or application secrets.
 
 `deployment --target <buck-target>` is the explicit deployment provisioning layer. The existing
-Pleomino Infisical OpenTofu project/environment/identity reconciliation and deployment Universal
+Sample webapp Infisical OpenTofu project/environment/identity reconciliation and deployment Universal
 Auth credential lifecycle live behind this mode.
-Pleomino is currently the only checked-in live deployment family; speculative
+Sample webapp is currently the only checked-in live deployment family; speculative
 families should stay in temp fixtures until a product-approved plan PR adds
 their real deployment packages.
 
@@ -152,7 +152,7 @@ Key flags:
 
 `--infisical-host` is the preferred host selector. `--api-url` and `--cli-domain` are
 implementation-level overrides for split API/CLI endpoint testing or future hosted variants; when
-omitted, both default to the reviewed Pleomino Infisical endpoint `https://app.infisical.com`.
+omitted, both default to the reviewed Sample webapp Infisical endpoint `https://app.infisical.com`.
 
 `--yes` means “the operator has pre-confirmed this mutation-capable bootstrap for
 non-interactive execution.” It does not mean “guess.” Non-dry-run bootstrap checks for `--yes` or an
@@ -292,7 +292,7 @@ The OpenTofu module should not manage Universal Auth client secret values when d
 
 Deployment identity client secrets are required so the deployment control plane can access Infisical. These credentials cannot be sourced from Infisical itself without an earlier credential, so they must live in a bootstrap/control-plane credential backend resolved by SprinkleRef.
 
-After OpenTofu apply, the bootstrap command reads non-secret deployment identity outputs, reconciles them with reviewed Pleomino metadata, inspects Universal Auth client-secret record metadata for each deployment identity, and manages deployment access credentials through the selected SprinkleRef `bootstrap` category or explicit compatibility sink.
+After OpenTofu apply, the bootstrap command reads non-secret deployment identity outputs, reconciles them with reviewed Sample webapp metadata, inspects Universal Auth client-secret record metadata for each deployment identity, and manages deployment access credentials through the selected SprinkleRef `bootstrap` category or explicit compatibility sink.
 
 Policy:
 
@@ -363,16 +363,16 @@ Example logical refs:
 ```text
 secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id
 secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret
-secret://deployments/pleomino/staging/infisical-client-id
-secret://deployments/pleomino/staging/infisical-client-secret
-secret://deployments/pleomino/prod/infisical-client-id
-secret://deployments/pleomino/prod/infisical-client-secret
+secret://deployments/sample-webapp/staging/infisical-client-id
+secret://deployments/sample-webapp/staging/infisical-client-secret
+secret://deployments/sample-webapp/prod/infisical-client-id
+secret://deployments/sample-webapp/prod/infisical-client-secret
 ```
 
 Repo-wide backend profiles such as `infisical-default` use the repo-scoped
-`secret://viberoots/bootstrap/...` refs for their Universal Auth client id and secret. Pleomino
+`secret://viberoots/bootstrap/...` refs for their Universal Auth client id and secret. Sample webapp
 deployment bootstrap still owns only the stage-specific managed workload refs under
-`secret://deployments/pleomino/<stage>/...`.
+`secret://deployments/sample-webapp/<stage>/...`.
 
 SprinkleRef should resolve these using a category, for example:
 
@@ -580,9 +580,9 @@ The bootstrap command must not manage application secrets such as:
 Those belong to a general SprinkleRef command:
 
 ```bash
-sprinkleref --add secret://deployments/pleomino/staging/cloudflare-api-token
-sprinkleref --update secret://deployments/pleomino/staging/cloudflare-api-token
-sprinkleref --remove secret://deployments/pleomino/staging/cloudflare-api-token
+sprinkleref --add secret://deployments/sample-webapp/staging/cloudflare-api-token
+sprinkleref --update secret://deployments/sample-webapp/staging/cloudflare-api-token
+sprinkleref --remove secret://deployments/sample-webapp/staging/cloudflare-api-token
 ```
 
 The exact binary path can follow repo conventions, but the user-facing interface should be `sprinkleref --add`, `sprinkleref --update`, and `sprinkleref --remove` or equivalent subcommands. It should operate on stable logical refs and resolve the storage backend through the selected category.
@@ -626,18 +626,18 @@ Examples:
 
 ```bash
 CLOUDFLARE_API_TOKEN=... sprinkleref \
-  --add secret://deployments/pleomino/staging/cloudflare-api-token \
+  --add secret://deployments/sample-webapp/staging/cloudflare-api-token \
   --value-env CLOUDFLARE_API_TOKEN
 
 sprinkleref \
-  --update secret://deployments/pleomino/prod/cloudflare-api-token \
+  --update secret://deployments/sample-webapp/prod/cloudflare-api-token \
   --value-file .local/secrets/cloudflare-prod-token
 
 sprinkleref \
-  --remove secret://deployments/pleomino/staging/cloudflare-api-token
+  --remove secret://deployments/sample-webapp/staging/cloudflare-api-token
 
 sprinkleref \
-  --add secret://deployments/pleomino/staging/infisical-client-secret \
+  --add secret://deployments/sample-webapp/staging/infisical-client-secret \
   --category bootstrap
 ```
 
@@ -664,14 +664,14 @@ Good failure examples:
 
 ```text
 Multiple Infisical organizations are accessible:
-1. Pleomino (org_...)
+1. Sample webapp (org_...)
 2. Sandbox (org_...)
 
 No organization was selected because this terminal is non-interactive.
 No Infisical resources were changed.
 
 Fix:
-  rerun with --org-name "Pleomino" --yes
+  rerun with --org-name "Sample webapp" --yes
   or pass --organization-id <id>.
 ```
 
@@ -687,9 +687,9 @@ Fix:
 
 ```text
 OpenTofu plan failed.
-Working directory: projects/deployments/pleomino/infisical/opentofu
-Saved plan: .local/pleomino-infisical.tfplan
-Retry: cd projects/deployments/pleomino/infisical/opentofu && tofu plan -out=.local/pleomino-infisical.tfplan
+Working directory: projects/deployments/sample-webapp/infisical/opentofu
+Saved plan: .local/sample-webapp-infisical.tfplan
+Retry: cd projects/deployments/sample-webapp/infisical/opentofu && tofu plan -out=.local/sample-webapp-infisical.tfplan
 Cause: provider authorization failed
 ```
 

@@ -82,7 +82,7 @@ Everything cloud-related is blocked on this. The containerized control plane is 
 - HTTP MCP surface (requires the same auth/redaction boundaries that land in PR-5 and PR-6)
 - monitoring and observability (requires stable health/readiness endpoints and audit rows)
 - preview deploys and per-PR environments (require horizontal worker scaling)
-- the Pleomino Infisical cutover (PR-12 in `docs/history/plans/infisical-plan.md` consumes the PR-1
+- the Sample webapp Infisical cutover (PR-12 in `docs/history/plans/infisical-plan.md` consumes the PR-1
   credential-directory abstraction)
 
 Doing this first keeps every downstream task from having to re-litigate the credential contract,
@@ -175,7 +175,7 @@ defaults, the credential wiring, and the nginx gate condition.
 `infisicalClientIdPattern = "{deploymentId}-infisical-client-id"` and
 `infisicalClientSecretPattern = "{deploymentId}-infisical-client-secret"`. PR-1 must implement the
 lookup that substitutes deployment id into these patterns and resolves the resulting filename from
-the credential directory. The Pleomino Infisical cutover (infisical-plan PR-12) will consume this
+the credential directory. The Sample webapp Infisical cutover (infisical-plan PR-12) will consume this
 abstraction directly.
 
 **Artifact store credential names are concrete.** The defaults file already names the three

@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { stableBuckIsolation } from "../../lib/buck-command-env";
+import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 type CommandResult = {
   exitCode: number | null;
@@ -54,8 +55,6 @@ test("dogfood buckconfig routes viberoots-owned cells through current", async ()
     "config",
     "docs",
     "eslint.config.js",
-    "flake.lock",
-    "flake.nix",
     "node_modules",
     "package.json",
     "patches",
@@ -76,6 +75,7 @@ test("dogfood buckconfig routes viberoots-owned cells through current", async ()
     );
   }
   assert.equal((await fsp.stat(path.join(process.cwd(), "AGENTS.md"))).isFile(), true);
+  assert.equal((await fsp.stat(path.join(process.cwd(), "flake.nix"))).isFile(), true);
 
   const sections = buckconfigSections(await fsp.readFile(".buckconfig", "utf8"));
   assert.equal(sections.get("project")?.get("ignore")?.includes(".git"), true);
@@ -134,7 +134,7 @@ test("dogfood workflows use local current source and workspace providers", async
   assert.equal(status.currentPointsToLiveCheckout, true);
 
   try {
-    const projects = await assertSuccess(
+    await assertSuccess(
       await $({
         stdio: "pipe",
         reject: false,
@@ -142,8 +142,6 @@ test("dogfood workflows use local current source and workspace providers", async
       })`buck2 --isolation-dir ${buckIsolation} targets //projects/...`,
       "Buck projects parse",
     );
-    assert.match(projects, /root\/\/projects\/apps\/pleomino:app/);
-    assert.match(projects, /root\/\/projects\/libs\/pleomino-solver-wasm:solver_emscripten/);
 
     await assertSuccess(
       await $({
@@ -163,16 +161,6 @@ test("dogfood workflows use local current source and workspace providers", async
       "workspace provider cell parse",
     );
     assert.match(providers, /workspace_providers\/\/:lf_/);
-
-    const deps = await assertSuccess(
-      await $({
-        stdio: "pipe",
-        reject: false,
-        nothrow: true,
-      })`buck2 --isolation-dir ${buckIsolation} cquery --target-platforms prelude//platforms:default ${"deps(//projects/apps/pleomino:app_raw)"}`,
-      "workspace provider consumption cquery",
-    );
-    assert.match(deps, /workspace_providers\/\/:lf_/);
   } finally {
     await $({
       stdio: "ignore",
@@ -180,4 +168,32 @@ test("dogfood workflows use local current source and workspace providers", async
       nothrow: true,
     })`buck2 --isolation-dir ${buckIsolation} kill`;
   }
+});
+
+test("workspace provider consumption works in a temp consumer repo", async () => {
+  await runInTemp("dogfood-provider-consumption", async (tmp, zx) => {
+    const targetsPath = path.join(tmp, "projects/apps/sample-webapp/TARGETS");
+    await fsp.mkdir(path.dirname(targetsPath), { recursive: true });
+    await fsp.writeFile(
+      targetsPath,
+      [
+        'load("@workspace_providers//:defs_cpp.bzl", "nix_cxx_library")',
+        "",
+        'nix_cxx_library(name = "zlib", attr = "pkgs.zlib")',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const deps = await assertSuccess(
+      await zx({
+        cwd: tmp,
+        stdio: "pipe",
+        reject: false,
+        nothrow: true,
+      })`buck2 --isolation-dir ${inheritedBuckIsolation("dogfood-provider-consumption")} cquery --target-platforms prelude//platforms:default ${"deps(//projects/apps/sample-webapp:zlib)"}`,
+      "workspace provider consumption cquery",
+    );
+    assert.match(deps, /root\/\/projects\/apps\/sample-webapp:zlib/);
+  });
 });

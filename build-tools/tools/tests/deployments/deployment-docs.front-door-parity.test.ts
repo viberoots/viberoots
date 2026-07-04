@@ -34,9 +34,11 @@ function assertBannedFragmentsAbsent(doc: string, label: string) {
   }
 }
 
-function assertNoFlatPleominoPackageLabels(doc: string, label: string) {
-  const stale = doc.match(/(?:\/\/)?projects\/deployments\/pleomino-[A-Za-z0-9_-]+(?::|\/|\b)/g);
-  assert.equal(stale, null, `${label} must not present old flat Pleomino labels: ${stale}`);
+function assertNoFlatSampleWebappPackageLabels(doc: string, label: string) {
+  const stale = doc.match(
+    /(?:\/\/)?projects\/deployments\/sample-webapp-[A-Za-z0-9_-]+(?::|\/|\b)/g,
+  );
+  assert.equal(stale, null, `${label} must not present old flat Sample webapp labels: ${stale}`);
 }
 
 test("deployment design and scenario docs stay aligned with the reviewed front door and authoring surface", async () => {
@@ -72,7 +74,7 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
     [contractDoc, "deployment contract"],
     [providerCapabilitiesDoc, "provider capabilities"],
   ] as const) {
-    assertNoFlatPleominoPackageLabels(doc, label);
+    assertNoFlatSampleWebappPackageLabels(doc, label);
   }
   for (const [doc, label] of [
     [designDoc, "deployment design"],
@@ -85,7 +87,7 @@ test("deployment design and scenario docs stay aligned with the reviewed front d
 
   assert.match(
     designDoc,
-    /deploy --deployment \/\/projects\/deployments\/pleomino\/prod:deploy/,
+    /deploy --deployment \/\/projects\/deployments\/sample-webapp\/prod:deploy/,
     "deployment design must document the reviewed --deployment <label> front door",
   );
   assert.match(

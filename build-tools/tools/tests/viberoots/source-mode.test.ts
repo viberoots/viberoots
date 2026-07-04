@@ -51,6 +51,10 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
     path.join(workspace, ".viberoots", "bootstrap", "direnv-stage0.sh"),
     "utf8",
   );
+  assert.match(stage0, /__vbr_flake_input_is_generated_filtered=0/);
+  assert.match(stage0, /__vbr_flake_input_is_generated_filtered=1/);
+  assert.match(stage0, /if \[\[ "\$\{__vbr_flake_input_is_generated_filtered\}" == "1" \]\]/);
+  assert.match(stage0, /__vbr_flake_args=\(\)/);
   assert.match(
     stage0,
     /__vbr_flake_args=\(--override-input viberoots "path:\$\{__vbr_flake_input_root\}"\)/,

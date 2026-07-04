@@ -75,12 +75,12 @@ test("record helpers preserve known safe smoke diagnostics", () => {
       },
     },
     error:
-      "smoke expected 200 from https://staging.pleomino.com/, got 522. Cloudflare returned 522 for custom domain staging.pleomino.com; the Pages project may be published while Cloudflare custom-domain routing is still activating. The deploy will keep retrying within its smoke budget, and if it still fails, check the Pages custom domain status and the CNAME for staging.pleomino.com -> pleomino-staging-pages.pages.dev.",
+      "smoke expected 200 from https://staging.sample-webapp.com/, got 522. Cloudflare returned 522 for custom domain staging.sample-webapp.com; the Pages project may be published while Cloudflare custom-domain routing is still activating. The deploy will keep retrying within its smoke budget, and if it still fails, check the Pages custom domain status and the CNAME for staging.sample-webapp.com -> sample-webapp-staging-pages.pages.dev.",
   });
 
   assert.match(
     String(cloudflareRecord.error),
-    /smoke expected 200 from https:\/\/staging\.pleomino\.com\/, got 522/,
+    /smoke expected 200 from https:\/\/staging\.sample-webapp\.com\/, got 522/,
   );
   assert.equal(cloudflareRecord.errorFingerprint, undefined);
 });
@@ -110,7 +110,7 @@ test("record helpers preserve known safe Cloudflare publish diagnostics", () => 
       },
     },
     error:
-      "Cloudflare DNS record lookup failed: Authentication error [code: 10000]. Ensure the Cloudflare API token has Zone:DNS Read and Zone:DNS Edit scoped to zone zone-pleomino for pleomino.com.",
+      "Cloudflare DNS record lookup failed: Authentication error [code: 10000]. Ensure the Cloudflare API token has Zone:DNS Read and Zone:DNS Edit scoped to zone zone-sample-webapp for sample-webapp.com.",
   });
 
   assert.match(String(cloudflareRecord.error), /Cloudflare DNS record lookup failed/);
@@ -170,7 +170,7 @@ test("record helpers preserve sanitized Wrangler Cloudflare API diagnostics", ()
       },
     },
     error:
-      "wrangler pages deploy failed: Cloudflare API /accounts/(account)/pages/projects/pleomino-staging-pages/deployments: Authentication error (status: 403) [code: 10000]",
+      "wrangler pages deploy failed: Cloudflare API /accounts/(account)/pages/projects/sample-webapp-staging-pages/deployments: Authentication error (status: 403) [code: 10000]",
   });
 
   assert.match(String(cloudflareRecord.error), /wrangler pages deploy failed/);
@@ -199,7 +199,7 @@ test("record helpers sanitize noisy Wrangler diagnostics before display", () => 
       },
     },
     error:
-      "wrangler pages deploy failed: Cloudflare API /accounts/1b911846f80a89272c0dbaf44f5c810f/pages/projects/pleomino-staging-pages: token does not have Pages write permission!",
+      "wrangler pages deploy failed: Cloudflare API /accounts/1b911846f80a89272c0dbaf44f5c810f/pages/projects/sample-webapp-staging-pages: token does not have Pages write permission!",
   });
 
   assert.match(String(cloudflareRecord.error), /\/accounts\/\(account\)\//);

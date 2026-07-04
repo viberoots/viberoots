@@ -88,6 +88,7 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
       !finalOrphanCleanup.includes('name === ".metadata_never_index"') &&
       finalOrphanCleanup.includes("markMacosMetadataNeverIndex(buckOut)") &&
       finalOrphanCleanup.includes("VBR_VERIFY_BROAD_BUCK_OUT_CLEANUP") &&
+      finalOrphanCleanup.includes("includeOwnerlessEphemeral: true") &&
       finalOrphanCleanup.includes("ownerPid") &&
       finalOrphanCleanup.includes("process.kill(Number(ownerPid), 0)") &&
       finalOrphanCleanup.includes('name === "test-logs"') &&
@@ -103,7 +104,7 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
       finalOrphanCleanup.includes("activeSourceCleanupRoots") &&
       finalOrphanCleanup.includes('path.join(root, "viberoots")') &&
       finalOrphanCleanup.includes('".viberoots", "current"'),
-    "expected final verify cleanup to preserve live owner-encoded isolations and require explicit opt-in before broad Buck cleanup under exact workspace/source roots",
+    "expected final verify cleanup to preserve live owner-encoded isolations, clean stale ownerless ephemeral Buck daemons, and keep broad Buck directory cleanup opt-in under exact workspace/source roots",
   );
   assert.ok(
     vWrapper.includes("cleanup_verify_owned_buck_out_roots") &&

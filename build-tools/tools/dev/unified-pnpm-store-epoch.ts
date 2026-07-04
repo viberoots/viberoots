@@ -18,6 +18,7 @@ export async function unifiedPnpmStoreEpochDigest(repo: string): Promise<string>
   const rels = [
     "build-tools/tools/nix/node-modules.hashes.json",
     "build-tools/tools/dev/require-unified-pnpm-store.ts",
+    "build-tools/tools/dev/unified-pnpm-store-cleanup.ts",
     "build-tools/tools/dev/unified-pnpm-store-epoch.ts",
     "build-tools/tools/dev/update-pnpm-hash/prefetched-store.ts",
     "build-tools/tools/dev/update-pnpm-hash/lockfile.ts",

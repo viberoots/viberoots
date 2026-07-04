@@ -9,7 +9,7 @@ import { runSprinkleRefCli } from "../../deployments/sprinkleref-cli";
 import { startFakeInfisicalServer } from "./infisical.test-server";
 import { writeSprinkleRefConfig } from "./sprinkleref-test-helpers";
 
-const ref = "secret://deployments/pleomino/prod/cloudflare-api-token";
+const ref = "secret://deployments/sample-webapp/prod/cloudflare-api-token";
 
 test("sprinkleref writes ordinary secrets to Infisical main backend through resolver", async () => {
   const server = await startFakeInfisicalServer({
@@ -116,7 +116,7 @@ test("sprinkleref bootstrap category rejects Infisical profile for write and che
 
 test("sprinkleref bootstrap category allows local-file write and check paths", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "sprinkleref-bootstrap-allow-"));
-  const ref = "secret://deployments/pleomino/prod/infisical-client-secret";
+  const ref = "secret://deployments/sample-webapp/prod/infisical-client-secret";
   const store = path.join(dir, "bootstrap.json");
   const configPath = await writeSprinkleRefConfig({
     defaultCategory: "bootstrap",
@@ -167,7 +167,7 @@ test("sprinkleref bootstrap category allows local-file write and check paths", a
 
 async function assertBootstrapRejected(config: unknown, pattern: RegExp) {
   const configPath = await writeSprinkleRefConfig(config);
-  const ref = "secret://deployments/pleomino/prod/infisical-client-secret";
+  const ref = "secret://deployments/sample-webapp/prod/infisical-client-secret";
   for (const argv of [
     ["--config", configPath, "--add", ref, "--category", "bootstrap", "--value-env", "TOKEN"],
     ["--config", configPath, "--update", ref, "--category", "bootstrap", "--value-env", "TOKEN"],

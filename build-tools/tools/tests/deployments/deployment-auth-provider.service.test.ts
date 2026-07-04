@@ -19,9 +19,9 @@ import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 function deployment() {
   return {
     ...nixosSharedHostDeploymentFixture({
-      deploymentId: "pleomino-dev",
-      label: "//projects/deployments/pleomino/dev:deploy",
-      lanePolicyRef: "//projects/deployments/pleomino/shared:lane",
+      deploymentId: "sample-webapp-dev",
+      label: "//projects/deployments/sample-webapp/dev:deploy",
+      lanePolicyRef: "//projects/deployments/sample-webapp/shared:lane",
       environmentStage: "dev",
     }),
     vaultRuntime: { oidcIssuer: "https://auth.example.test", audience: "deployments-vault" },
@@ -187,7 +187,7 @@ test("hosted provider principal is written to durable audit rows", async () => {
         {
           submissionId: "provider-audit-submit",
           submittedAt: "2026-05-01T10:00:00.000Z",
-          deploymentId: "pleomino-dev",
+          deploymentId: "sample-webapp-dev",
           operationKind: "deploy",
           lockScope: "scope",
           executionSnapshotPath: "snapshot",
@@ -197,7 +197,7 @@ test("hosted provider principal is written to durable audit rows", async () => {
         },
         { submissionPath: "submission", executionSnapshotPath: "snapshot" },
       );
-      const audit = await readBackendControlPlaneAuditEvents(backend, "pleomino-dev");
+      const audit = await readBackendControlPlaneAuditEvents(backend, "sample-webapp-dev");
       assert.equal(audit[0]?.actor, "oidc:operator-1");
       assert.equal(audit[0]?.operation, "deploy");
     });

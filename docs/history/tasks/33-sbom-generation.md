@@ -37,7 +37,7 @@ Concretely this means:
    `accepted_sbom_formats: ["cyclonedx-json"]` or `["spdx-json"]` on `shared_nonprod` and
    `production_facing` deployments. The supply-chain evaluator
    (`deployment-admission-supply-chain-evaluator.ts`) already enforces these fields at admission.
-   Enable the policy on the `pleomino` control-plane deployment.
+   Enable the policy on the `sample-webapp` control-plane deployment.
 
 No new infrastructure is required. `pkgs.syft` is available in `nixpkgs-unstable` (the locked
 flake input already at `nixpkgs`). Nix store path introspection via `nix path-info` is already used
@@ -117,7 +117,7 @@ and lets CI handle them as a unit: build image, build SBOM, upload both, submit 
 `string[]` to allow for the possibility of multiple SBOM formats (e.g. both SPDX and CycloneDX).
 For the initial implementation, one format is sufficient. The fixture tests in
 `deployment-ci-admission.test.ts` and `nixos-shared-host.deploy.jenkins.exec.test.ts` already
-exercise the `sbomRefs` field using a synthetic `oci://sbom/pleomino@sha256:beef` ref; the real
+exercise the `sbomRefs` field using a synthetic `oci://sbom/sample-webapp@sha256:beef` ref; the real
 implementation should produce an analogous immutable content-addressed ref.
 
 **The supply-chain evaluator is already implemented.** `deployment-admission-supply-chain-evaluator.ts`

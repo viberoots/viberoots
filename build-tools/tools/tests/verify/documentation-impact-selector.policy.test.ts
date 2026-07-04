@@ -8,7 +8,7 @@ import {
 } from "../../lib/documentation-impact-selector";
 import { resolveDeploymentImpactSelection } from "../../lib/deployment-impact-selector";
 
-const deploymentTargetLabels = ["//projects/deployments/pleomino/dev:deploy"];
+const deploymentTargetLabels = ["//projects/deployments/sample/dev:deploy"];
 
 test("documentation-impact: markdown is documentation, not a build-system trigger", () => {
   const result = resolveDeploymentImpactSelection(

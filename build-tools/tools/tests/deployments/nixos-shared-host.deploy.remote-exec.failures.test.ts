@@ -10,7 +10,7 @@ import {
   installClientProfile,
   prepareRemoteExecFixture,
   remoteExecEnv,
-  REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+  REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
 import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { readRecord, waitFor } from "./nixos-shared-host.control-plane.helpers";
@@ -58,13 +58,13 @@ test("remote deploy fails closed on artifact staging failure and remote transpor
       const stageFailure = await $({
         cwd: tmp,
         env: remoteExecEnv(env, { FAKE_RSYNC_FAIL: "1" }),
-      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
       assert.notEqual(stageFailure.exitCode, 0);
       assert.match(String(stageFailure.stderr), /remote artifact staging failed/);
       const transportFailure = await $({
         cwd: tmp,
         env: remoteExecEnv(env, { FAKE_SSH_FAIL: "1" }),
-      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir}`.nothrow();
       assert.notEqual(transportFailure.exitCode, 0);
       assert.match(String(transportFailure.stderr), /fake ssh transport failure/);
     } finally {
@@ -124,7 +124,7 @@ test("remote deploy propagates remote deploy failures and still writes reviewed 
       const result = await $({
         cwd: tmp,
         env: remoteExecEnv(env),
-      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`.nothrow();
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --admission-evidence-json ${admissionEvidencePath} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`.nothrow();
       assert.notEqual(result.exitCode, 0);
       assert.match(String(result.stderr), /remote service submission/);
       assert.match(String(result.stderr), /smoke expected 200/);

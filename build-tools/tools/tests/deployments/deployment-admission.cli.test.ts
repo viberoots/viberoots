@@ -26,18 +26,18 @@ test("admit-and-deploy infers the current HEAD subject and synthesizes passed ch
       process.chdir(tmp);
       const head = String((await $({ cwd: tmp, stdio: "pipe" })`git rev-parse HEAD`).stdout).trim();
       await withSyntheticArgv(
-        ["--admit-and-deploy=deploy/pleomino-dev, deploy/pleomino-dev"],
+        ["--admit-and-deploy=deploy/sample-webapp-dev, deploy/sample-webapp-dev"],
         async () => {
           const evidence = await resolveDeploymentAdmissionEvidence();
           assert.ok(evidence);
           assert.deepEqual(
             evidence.checks?.map((entry) => entry.name),
-            ["deploy/pleomino-dev"],
+            ["deploy/sample-webapp-dev"],
           );
           assert.equal(evidence.checks?.[0]?.subject, head);
           assert.equal(evidence.checks?.[0]?.status, "passed");
           assert.match(String(evidence.checks?.[0]?.checkedAt), /^\d{4}-\d{2}-\d{2}T/);
-          assert.equal(evidence.checks?.[0]?.recordRef, "manual-check://deploy/pleomino-dev");
+          assert.equal(evidence.checks?.[0]?.recordRef, "manual-check://deploy/sample-webapp-dev");
           assert.equal(evidence.checks?.[0]?.reportingKind, "human_manual");
         },
       );
@@ -54,7 +54,7 @@ test("admit-and-deploy accepts an explicit admit-for-commit override", async () 
       process.chdir(tmp);
       const head = String((await $({ cwd: tmp, stdio: "pipe" })`git rev-parse HEAD`).stdout).trim();
       await withSyntheticArgv(
-        ["--admit-and-deploy=deploy/pleomino-dev", "--admit-for-commit", head],
+        ["--admit-and-deploy=deploy/sample-webapp-dev", "--admit-for-commit", head],
         async () => {
           const evidence = await resolveDeploymentAdmissionEvidence();
           assert.equal(evidence?.checks?.[0]?.subject, head);
@@ -120,7 +120,7 @@ test("admission-evidence-json checks inherit ci_pipeline reporting in CI when ki
         JSON.stringify({
           checks: [
             {
-              name: "deploy/pleomino-dev",
+              name: "deploy/sample-webapp-dev",
               subject: "sha256:head",
               status: "passed",
               checkedAt: "2026-04-23T00:00:00.000Z",
@@ -200,7 +200,7 @@ test("admit-and-deploy merges with admission-evidence-json and overrides duplica
           requestedBy: { principalId: "user:bootstrap" },
           checks: [
             {
-              name: "deploy/pleomino-dev",
+              name: "deploy/sample-webapp-dev",
               subject: head,
               status: "failed",
               checkedAt: "2026-04-23T00:00:00.000Z",
@@ -217,7 +217,7 @@ test("admit-and-deploy merges with admission-evidence-json and overrides duplica
         }),
       );
       await withSyntheticArgv(
-        ["--admission-evidence-json", evidencePath, "--admit-and-deploy=deploy/pleomino-dev"],
+        ["--admission-evidence-json", evidencePath, "--admit-and-deploy=deploy/sample-webapp-dev"],
         async () => {
           const evidence = await resolveDeploymentAdmissionEvidence();
           assert.equal(evidence?.requestedBy?.principalId, "user:bootstrap");
@@ -229,7 +229,12 @@ test("admit-and-deploy merges with admission-evidence-json and overrides duplica
               entry.recordRef,
             ]),
             [
-              ["deploy/pleomino-dev", head, "passed", "manual-check://deploy/pleomino-dev"],
+              [
+                "deploy/sample-webapp-dev",
+                head,
+                "passed",
+                "manual-check://deploy/sample-webapp-dev",
+              ],
               ["deploy/other", "sha256:elsewhere", "passed", "manual://other"],
             ],
           );

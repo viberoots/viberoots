@@ -40,8 +40,8 @@ test("extractKubernetesDeployments reads shared-platform provider target and rol
     kubernetesLanePolicyNodeFixture(),
     nixosSharedHostLaneGovernanceNodeFixture({
       source_ref_policies: [
-        { stage: "dev", allowed_refs: "main", required_checks: "deploy/pleomino-dev" },
-        { stage: "staging", allowed_refs: "main", required_checks: "deploy/pleomino-staging" },
+        { stage: "dev", allowed_refs: "main", required_checks: "deploy/sample-webapp-dev" },
+        { stage: "staging", allowed_refs: "main", required_checks: "deploy/sample-webapp-staging" },
         {
           stage: "prod",
           allowed_refs: "main,refs/tags/release/*",
@@ -70,9 +70,9 @@ test("extractKubernetesDeployments reads shared-platform provider target and rol
       provisioner: "terraform-stack",
       provisioner_config: "terraform/main.tf.json",
       protection_class: "production_facing",
-      lane_policy: "//projects/deployments/pleomino/shared:lane",
+      lane_policy: "//projects/deployments/sample-webapp/shared:lane",
       environment_stage: "prod",
-      admission_policy: "//projects/deployments/pleomino/shared:prod_release",
+      admission_policy: "//projects/deployments/sample-webapp/shared:prod_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       rollout_policy: {
@@ -106,7 +106,7 @@ test("extractKubernetesDeployments accepts first-class web service posture", () 
     serviceComponent("//projects/apps/api:image"),
     kubernetesLanePolicyNodeFixture(),
     nixosSharedHostLaneGovernanceNodeFixture(),
-    kubernetesAdmissionPolicyNodeFixture({ required_checks: ["deploy/pleomino-prod"] }),
+    kubernetesAdmissionPolicyNodeFixture({ required_checks: ["deploy/sample-webapp-prod"] }),
     {
       name: "//projects/deployments/api-prod:deploy",
       provider: "kubernetes",
@@ -115,9 +115,9 @@ test("extractKubernetesDeployments accepts first-class web service posture", () 
       publisher: "helm-release",
       publisher_config: "helm/values.yaml",
       protection_class: "production_facing",
-      lane_policy: "//projects/deployments/pleomino/shared:lane",
+      lane_policy: "//projects/deployments/sample-webapp/shared:lane",
       environment_stage: "prod",
-      admission_policy: "//projects/deployments/pleomino/shared:prod_release",
+      admission_policy: "//projects/deployments/sample-webapp/shared:prod_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       provider_target: {
@@ -144,9 +144,9 @@ test("extractKubernetesDeployments rejects worker public ingress and web without
     publisher: "helm-release",
     publisher_config: "helm/values.yaml",
     protection_class: "production_facing",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "prod",
-    admission_policy: "//projects/deployments/pleomino/shared:prod_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:prod_release",
     secret_requirements: [],
     runtime_config_requirements: [],
   };

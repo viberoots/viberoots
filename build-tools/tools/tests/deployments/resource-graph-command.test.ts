@@ -99,5 +99,5 @@ async function withTempGraph(fn: (workspace: string) => Promise<void>): Promise<
 }
 
 function providerTarget() {
-  return { account: "web-platform", project: "pleomino-staging" };
+  return { account: "web-platform", project: "sample-webapp-staging" };
 }

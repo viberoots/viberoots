@@ -110,7 +110,7 @@ test("extractKubernetesDeployments reads opentofu-stack metadata", () => {
     { name: deployment.component.target, labels: ["kind:app"] },
     kubernetesLanePolicyNodeFixture(),
     nixosSharedHostLaneGovernanceNodeFixture(),
-    kubernetesAdmissionPolicyNodeFixture({ required_checks: ["deploy/pleomino-prod"] }),
+    kubernetesAdmissionPolicyNodeFixture({ required_checks: ["deploy/sample-webapp-prod"] }),
     {
       name: deployment.label,
       provider: "kubernetes",

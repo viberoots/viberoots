@@ -98,7 +98,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     artifactIamRoleArn: "arn:aws:iam::123456789012:role/control-plane-host",
     artifactLeastPrivilegePolicyDigest: "sha256:artifact-policy",
     artifactBackendEvidence: "",
-    deploymentIds: ["pleomino-staging"],
+    deploymentIds: ["sample-webapp-staging"],
     reviewedSourceMode: "ssh",
     authCallbackHost: "deploy-auth.example.test",
     authCallbackPath: "/oidc/callback",

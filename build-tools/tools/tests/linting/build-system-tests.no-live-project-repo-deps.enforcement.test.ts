@@ -95,7 +95,7 @@ test("build-system tests do not depend on live repo projects/ contents", async (
     for (const alias of repoRootAliases(text)) {
       const aliasExpr = alias === "process.cwd()" ? "process\\.cwd\\(\\)" : escapeRegex(alias);
       const fromRepoProjectsRe = new RegExp(
-        String.raw`path\.(?:join|resolve)\(\s*${aliasExpr}\s*,\s*["'\`]projects["'\`]`,
+        String.raw`path\.(?:join|resolve)\(\s*${aliasExpr}\s*,\s*["'\`]projects(?:/|["'\`])`,
         "g",
       );
       const templateProjectsRe = new RegExp(String.raw`\$\{\s*${aliasExpr}\s*\}/projects/`, "g");

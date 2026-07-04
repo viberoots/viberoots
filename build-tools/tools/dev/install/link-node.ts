@@ -135,7 +135,7 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
         console.error("[link-node] preparing filtered flake snapshot for importer", importer);
         tempFlake = await withHeartbeat(
           `importer=${importer} step=prepare-filtered-flake`,
-          makeFilteredFlakeRef(root),
+          makeFilteredFlakeRef(root, importer),
         );
         buildFlakeRefBase = tempFlake.flakeRef.replace(/#pnpm$/, "");
       }

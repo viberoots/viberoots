@@ -26,17 +26,17 @@ test("auth session status exposes reviewed identity admin groups and principal e
         sub: "human-1",
         email: "ada@example.com",
         groups: [
-          "deploy-submitters-pleomino-dev",
-          "deploy-admin-keycloak-membership-admin-project-pleomino",
+          "deploy-submitters-sample-webapp-dev",
+          "deploy-admin-keycloak-membership-admin-project-sample-webapp",
           "deploy-admin-keycloak-shape-admin-global",
         ],
       },
     });
     const deployment = {
       ...nixosSharedHostDeploymentFixture({
-        deploymentId: "pleomino-dev",
-        label: "//projects/deployments/pleomino/dev:deploy",
-        lanePolicyRef: "//projects/deployments/pleomino/shared:lane",
+        deploymentId: "sample-webapp-dev",
+        label: "//projects/deployments/sample-webapp/dev:deploy",
+        lanePolicyRef: "//projects/deployments/sample-webapp/shared:lane",
         environmentStage: "dev",
       }),
       vaultRuntime: {
@@ -70,7 +70,7 @@ test("auth session status exposes reviewed identity admin groups and principal e
       assert.equal(status.principal?.principalId, "oidc:human-1");
       assert.equal(status.principalEmail, "ada@example.com");
       assert.deepEqual(status.reviewedIdentityAdminGroups, [
-        "deploy-admin-identity-membership-admin-project-pleomino",
+        "deploy-admin-identity-membership-admin-project-sample-webapp",
         "deploy-admin-identity-shape-admin-global",
       ]);
     } finally {

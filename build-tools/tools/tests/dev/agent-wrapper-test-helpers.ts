@@ -46,7 +46,7 @@ export function safehouseNixReadOnlyPattern(): string {
 }
 
 export function safehouseLaunchPattern(worktreeRealRoot: string): string {
-  return `safehouse --workdir=${escapeRegExp(worktreeRealRoot)}(?: --add-dirs=[^ ]+)? --add-dirs-ro=${safehouseNixReadOnlyPattern()}(?: --add-dirs-ro=[^ ]+/\\.ssh/known_hosts)? --append-profile=.* --env `;
+  return `safehouse (?:--enable=keychain )?--workdir=${escapeRegExp(worktreeRealRoot)}(?: --add-dirs=[^ ]+)? --add-dirs-ro=${safehouseNixReadOnlyPattern()}(?: --add-dirs-ro=[^ ]+/\\.ssh/known_hosts)? --append-profile=.* --env `;
 }
 
 export async function makeFakeAgentTools(
@@ -204,7 +204,8 @@ while [ "$#" -gt 0 ]; do
       printf 'append-profile-end\\n' >> "${log}"
       shift 2
       ;;
-    --workdir=*|--add-dirs=*|--add-dirs-ro=*|--env) shift ;;
+    --enable=*|--workdir=*|--add-dirs=*|--add-dirs-ro=*|--env) shift ;;
+    --enable) shift 2 ;;
     --workdir|--add-dirs|--add-dirs-ro) shift 2 ;;
     *) exec "$@" ;;
   esac

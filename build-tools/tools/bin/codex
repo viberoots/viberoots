@@ -4,6 +4,36 @@ set -euo pipefail
 SCRIPT_PATH="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)/$(basename -- "${BASH_SOURCE[0]}")"
 SCRIPT_DIR="$(dirname -- "${SCRIPT_PATH}")"
 
+canonical_executable_path() {
+  local file="$1"
+  local target
+  while [[ -L "$file" ]]; do
+    target="$(readlink "$file")" || break
+    case "$target" in
+      /*) file="$target" ;;
+      *) file="$(dirname -- "$file")/$target" ;;
+    esac
+  done
+  printf '%s\n' "$(cd -- "$(dirname -- "$file")" && pwd -P)/$(basename -- "$file")"
+}
+
+is_transient_codex_arg0_path() {
+  local dir="$1"
+  [[ -n "$dir" && -n "${HOME:-}" ]] || return 1
+  local dir_real
+  local home_real
+  dir_real="$(cd -- "$dir" 2>/dev/null && pwd -P || printf '%s' "$dir")"
+  home_real="$(cd -- "$HOME" 2>/dev/null && pwd -P || printf '%s' "$HOME")"
+  case "$dir_real" in
+    "${home_real}/.codex/tmp/arg0"|"${home_real}/.codex/tmp/arg0"/*)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
+VIBEROOTS_SOURCE_ROOT="$(cd -- "${SCRIPT_DIR}/../../.." && pwd -P)"
+
 find_tool_in_path_list_excluding_wrapper_dir() {
   local tool="$1"
   local path_list="${2:-}"
@@ -12,13 +42,45 @@ find_tool_in_path_list_excluding_wrapper_dir() {
   IFS=':'
   for dir in ${path_list}; do
     [[ -n "$dir" ]] || continue
+    is_transient_codex_arg0_path "$dir" && continue
     if [[ "$(cd -- "$dir" 2>/dev/null && pwd -P || printf '%s' "$dir")" == "$SCRIPT_DIR" ]]; then
       continue
     fi
     if [[ -x "$dir/$tool" ]]; then
-      printf '%s\n' "$(cd -- "$(dirname -- "$dir/$tool")" && pwd -P)/$(basename -- "$dir/$tool")"
+      canonical_executable_path "$dir/$tool"
       IFS="$old_ifs"
       return 0
+    fi
+  done
+  IFS="$old_ifs"
+  return 1
+}
+
+managed_codex_path() {
+  local candidate="${VBR_CODEX_MANAGED_PATH_FOR_TEST:-${VIBEROOTS_SOURCE_ROOT}/node_modules/.bin/codex}"
+  [[ -n "$candidate" && -f "$candidate" && -x "$candidate" ]] || return 1
+  canonical_executable_path "$candidate"
+}
+
+find_managed_codex_in_path_list() {
+  local path_list="${1:-}"
+  local managed="$2"
+  local dir
+  local found
+  local old_ifs="$IFS"
+  IFS=':'
+  for dir in ${path_list}; do
+    [[ -n "$dir" ]] || continue
+    is_transient_codex_arg0_path "$dir" && continue
+    if [[ "$(cd -- "$dir" 2>/dev/null && pwd -P || printf '%s' "$dir")" == "$SCRIPT_DIR" ]]; then
+      continue
+    fi
+    if [[ -x "$dir/codex" ]]; then
+      found="$(canonical_executable_path "$dir/codex")"
+      if [[ "$found" == "$managed" ]]; then
+        IFS="$old_ifs"
+        return 0
+      fi
     fi
   done
   IFS="$old_ifs"
@@ -28,7 +90,7 @@ find_tool_in_path_list_excluding_wrapper_dir() {
 captured_host_path() {
   local start
   local dir
-  for start in "${WORKSPACE_ROOT:-}" "${PWD:-}"; do
+  for start in "${PWD:-}" "${WORKSPACE_ROOT:-}"; do
     [[ -n "$start" ]] || continue
     dir="$start"
     while [[ "$dir" != "/" ]]; do
@@ -53,10 +115,45 @@ find_tool_excluding_wrapper_dir() {
   return 1
 }
 
-real_codex="$(find_tool_excluding_wrapper_dir codex || true)"
+find_codex_excluding_wrapper_dir() {
+  local managed
+  managed="$(managed_codex_path || true)"
+  if [[ -z "$managed" ]]; then
+    echo "Error: viberoots-managed Codex is missing or not executable at ${VBR_CODEX_MANAGED_PATH_FOR_TEST:-${VIBEROOTS_SOURCE_ROOT}/node_modules/.bin/codex}" >&2
+    echo "Hint: run the repo install path so Nix materializes the pinned @openai/codex package; do not fall back to /Applications/Codex.app or transient Codex arg0 shims." >&2
+    return 1
+  fi
+  if [[ -n "${CODEX_CLI_PATH:-}" ]]; then
+    local explicit
+    explicit="$(canonical_executable_path "${CODEX_CLI_PATH}" 2>/dev/null || true)"
+    if [[ "$explicit" == "$managed" ]]; then
+      printf '%s\n' "$managed"
+      return 0
+    fi
+    echo "Error: CODEX_CLI_PATH must point to the viberoots-managed Codex at ${managed}" >&2
+    echo "Refusing unmanaged Codex path: ${CODEX_CLI_PATH}" >&2
+    return 1
+  fi
+  if find_managed_codex_in_path_list "${PATH:-}" "$managed"; then
+    printf '%s\n' "$managed"
+    return 0
+  fi
+  echo "Error: viberoots-managed Codex is not on PATH: ${managed}" >&2
+  echo "Hint: enter the Nix dev shell or rerun the repo install path; do not fall back to /Applications/Codex.app or transient Codex arg0 shims." >&2
+  return 1
+}
+
+real_codex="$(find_codex_excluding_wrapper_dir || true)"
 if [[ -z "$real_codex" ]]; then
-  echo "Error: codex binary not found in PATH, captured host path, VBR_HOST_PATH, or HOST_PATH (excluding wrapper directory)" >&2
   exit 1
+fi
+
+if [[ "$(uname -s 2>/dev/null || true)" == "Darwin" ]] && command -v xattr >/dev/null 2>&1; then
+  if xattr -p com.apple.quarantine "$real_codex" >/dev/null 2>&1; then
+    echo "Error: viberoots-managed Codex is quarantined by macOS: $real_codex" >&2
+    echo "Hint: fix the Nix Codex package/signing or quarantine state; refusing app or arg0 fallback." >&2
+    exit 126
+  fi
 fi
 
 real_git="$(find_tool_excluding_wrapper_dir git || true)"
@@ -98,8 +195,17 @@ codex_args_request_sandbox() {
   return 1
 }
 
+codex_args_are_top_level_introspection() {
+  case "${1:-}" in
+    --version|-V|version|--help|-h|help)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 codex_default_sandbox_args() {
-  if codex_args_request_sandbox "$@"; then
+  if codex_args_are_top_level_introspection "$@" || codex_args_request_sandbox "$@"; then
     printf '%s\0' "$@"
   else
     printf '%s\0' --sandbox danger-full-access "$@"
@@ -453,7 +559,7 @@ write_home_deny_profile() {
     printf '(allow file-read-metadata (literal "/Applications") (literal "/Applications/Xcode.app") (literal "/Applications/Xcode.app/Contents") (literal "/Applications/Xcode.app/Contents/Developer"))\n'
     printf '(allow file-read* (literal "/var/db/xcode_select_link") (literal "/private/var/db/xcode_select_link"))\n'
     printf '(allow file-read* (literal "/nix/var/nix/daemon-socket/socket") (literal "/etc/bashrc") (literal "/private/etc/bashrc") (literal "/etc/profile") (literal "/private/etc/profile") (literal "/etc/static/bashrc") (literal "/private/etc/static/bashrc") (literal "/etc/nix") (literal "/private/etc/nix"))\n'
-    printf '(allow mach-lookup (global-name "com.apple.sysmond"))\n'
+    printf '(allow mach-lookup (global-name "com.apple.securityd") (global-name "com.apple.sysmond"))\n'
     printf '(allow process-info*)\n'
     printf '(allow signal)\n'
   } >"$profile"
@@ -575,6 +681,7 @@ run_codex_in_safehouse() {
     BUCK2_REAL_HOME="$safehouse_home" \
     XDG_CACHE_HOME="$safehouse_cache" \
     "$safehouse" \
+    --enable=keychain \
     --workdir="$root_real" \
     ${codex_home_args[@]+"${codex_home_args[@]}"} \
     --add-dirs-ro="$nix_ro_paths" \
@@ -666,7 +773,7 @@ if should_safehouse_codex "$root"; then
     exit 127
   fi
 
-  if is_worker_worktree "$root"; then
+  if is_worker_worktree "$root" && ! codex_args_are_top_level_introspection "$@"; then
     run_codex_in_safehouse "$root" --dangerously-bypass-approvals-and-sandbox "$@"
   fi
 

@@ -71,6 +71,66 @@ test("install secret readiness still treats valid metadata with absent credentia
   });
 });
 
+test("install secret readiness reports inaccessible macOS Keychain distinctly from missing credentials", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot, { backend: "macos-keychain", service: "viberoots-bootstrap" });
+    await writeFamily(repoRoot, validFamilySource());
+    const probe = await probeLocalSecretReadiness(repoRoot, {
+      platform: "darwin",
+      keychainRunner: () => ({
+        status: 44,
+        stderr: [
+          "SecKeychainSearchCreateFromAttributes: A Module Directory Service error has occurred.",
+          "SecKeychainSearchCopyNext: The specified item could not be found in the keychain.",
+        ].join("\n"),
+      }),
+    });
+    assert.equal(probe.ready, false);
+    assert.match(probe.reason, /macOS Keychain service viberoots-bootstrap is inaccessible/);
+    assert.match(probe.reason, /Unlock Keychain/);
+    assert.doesNotMatch(probe.reason, /missing local Universal Auth credentials/);
+    let bootstrapCalls = 0;
+    await assert.rejects(
+      ensureInstallSecretReadiness({
+        repoRoot,
+        dryRun: false,
+        verbose: false,
+        flags: baseFlags,
+        deps: {
+          probe: async () => probe,
+          isInteractive: () => true,
+          prompt: async () => {
+            throw new Error("prompt must not run");
+          },
+          bootstrap: async () => {
+            bootstrapCalls += 1;
+          },
+        },
+      }),
+      /macOS Keychain service viberoots-bootstrap is inaccessible/,
+    );
+    assert.equal(bootstrapCalls, 0);
+  });
+});
+
+test("install secret readiness keeps missing-credential path for absent Keychain items", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot, { backend: "macos-keychain", service: "viberoots-bootstrap" });
+    await writeFamily(repoRoot, validFamilySource());
+    const probe = await probeLocalSecretReadiness(repoRoot, {
+      platform: "darwin",
+      keychainRunner: () => ({
+        status: 44,
+        stderr: "SecKeychainSearchCopyNext: The specified item could not be found in the keychain.",
+      }),
+    });
+    assert.deepEqual(probe, {
+      ready: false,
+      reason: "missing local Universal Auth credentials",
+    });
+  });
+});
+
 async function withRepo(fn: (repoRoot: string) => Promise<void>) {
   const repoRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "install-secret-metadata-"));
   const oldConfig = process.env.SPRINKLEREF_CONFIG;
@@ -84,7 +144,13 @@ async function withRepo(fn: (repoRoot: string) => Promise<void>) {
   }
 }
 
-async function writeResolver(repoRoot: string) {
+async function writeResolver(
+  repoRoot: string,
+  bootstrapBackend: Record<string, string> = {
+    backend: "local-file",
+    file: path.join(repoRoot, ".local/bootstrap.json"),
+  },
+) {
   const config = {
     schemaVersion: "viberoots-project-config@1",
     sprinkleref: {
@@ -92,7 +158,7 @@ async function writeResolver(repoRoot: string) {
       profiles: {},
       categories: {
         main: { backend: "local-file", file: ".local/main.json" },
-        bootstrap: { backend: "local-file", file: path.join(repoRoot, ".local/bootstrap.json") },
+        bootstrap: bootstrapBackend,
       },
     },
   };
@@ -104,7 +170,7 @@ async function writeResolver(repoRoot: string) {
 }
 
 async function writeFamily(repoRoot: string, source: string) {
-  const dir = path.join(repoRoot, "projects/deployments/pleomino/shared");
+  const dir = path.join(repoRoot, "projects/deployments/sample-webapp/shared");
   await fsp.mkdir(dir, { recursive: true });
   await fsp.writeFile(path.join(dir, "family.bzl"), source);
 }
@@ -113,8 +179,8 @@ function validFamilySource() {
   return `
 _INFISICAL_SITE_URL = "https://app.infisical.com"
 _INFISICAL_PROJECT_ID = "project"
-_INFISICAL_PROJECT_NAME = "Pleomino"
-_INFISICAL_PROJECT_SLUG = "pleomino"
+_INFISICAL_PROJECT_NAME = "Sample webapp"
+_INFISICAL_PROJECT_SLUG = "sample-webapp"
 _INFISICAL_ENVIRONMENT_SLUGS = {"staging": "staging", "prod": "prod"}
 _INFISICAL_SECRET_PATH = "/"
 _INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
@@ -122,8 +188,8 @@ _INFISICAL_MACHINE_IDENTITY_IDS = {"staging": "id_staging", "prod": "id_prod"}
 _INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "staging", "prod": "prod"}
 _INFISICAL_CREDENTIAL_FILE_NAMES = {"staging": {"client_id": "staging-client-id", "client_secret": "staging-client-secret"}, "prod": {"client_id": "prod-client-id", "client_secret": "prod-client-secret"}}
 _INFISICAL_CREDENTIAL_REFS = {
-    "staging": {"client_id": "secret://deployments/pleomino/staging/infisical-client-id", "client_secret": "secret://deployments/pleomino/staging/infisical-client-secret"},
-    "prod": {"client_id": "secret://deployments/pleomino/prod/infisical-client-id", "client_secret": "secret://deployments/pleomino/prod/infisical-client-secret"},
+    "staging": {"client_id": "secret://deployments/sample-webapp/staging/infisical-client-id", "client_secret": "secret://deployments/sample-webapp/staging/infisical-client-secret"},
+    "prod": {"client_id": "secret://deployments/sample-webapp/prod/infisical-client-id", "client_secret": "secret://deployments/sample-webapp/prod/infisical-client-secret"},
 }
 `;
 }

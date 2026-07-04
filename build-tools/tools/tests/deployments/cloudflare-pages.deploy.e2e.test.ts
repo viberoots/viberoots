@@ -47,9 +47,9 @@ test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", 
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
-    await writeArtifact(artifactDir, "<html>pleomino staging</html>\n");
+    await writeArtifact(artifactDir, "<html>sample-webapp staging</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -80,16 +80,16 @@ test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", 
       assert.equal(summary.operationKind, "deploy");
       assert.equal(summary.runClassification, "deploy");
       assert.equal(summary.finalOutcome, "succeeded");
-      assert.equal(summary.publicUrl, "https://pleomino-staging-pages.pages.dev/");
+      assert.equal(summary.publicUrl, "https://sample-webapp-staging-pages.pages.dev/");
       assert.equal(
         summary.controlPlane.lockScope,
-        "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+        "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
       );
       const record = JSON.parse(await fsp.readFile(summary.recordPath, "utf8"));
       assert.equal(record.provider, "cloudflare-pages");
       assert.equal(
         record.providerTargetIdentity,
-        "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+        "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
       );
       assert.equal(record.artifact.identity, summary.artifactIdentity);
       assert.equal(record.providerReleaseId, "cloudflare-pages-deployment-01TEST");
@@ -98,9 +98,9 @@ test("cloudflare-pages deploy CLI completes the static-webapp flow end to end", 
       const wranglerLog = JSON.parse(
         (await fsp.readFile(fake.logPath, "utf8")).trim().split(/\r?\n/).at(-1) || "{}",
       );
-      assert.equal(wranglerLog.projectName, "pleomino-staging-pages");
+      assert.equal(wranglerLog.projectName, "sample-webapp-staging-pages");
       assert.equal(wranglerLog.accountId, "1b911846f80a89272c0dbaf44f5c810f");
-      assert.equal(wranglerLog.config.name, "pleomino-staging-pages");
+      assert.equal(wranglerLog.config.name, "sample-webapp-staging-pages");
       assert.equal(wranglerLog.config.account_id, undefined);
       assert.equal(wranglerLog.config.pages_build_output_dir, wranglerLog.artifactDir);
       assert.equal(wranglerLog.args.includes("--config"), false);
@@ -124,7 +124,7 @@ test("cloudflare-pages smoke failure blocks success after publish", async () => 
       "<html>wrong</html>\n",
     );
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -184,7 +184,7 @@ test("cloudflare-pages smoke retries transient readiness failures within the sha
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>retry-me</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);

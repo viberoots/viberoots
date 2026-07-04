@@ -52,16 +52,19 @@ test("deployment credentials honor non-default SprinkleRef access category", asy
 
 function assertDeploymentCredentialRefs(store: Record<string, string>) {
   assert.equal(
-    store["secret://deployments/pleomino/staging/infisical-client-id"],
+    store["secret://deployments/sample-webapp/staging/infisical-client-id"],
     "client-id-staging",
   );
   assert.equal(
-    store["secret://deployments/pleomino/staging/infisical-client-secret"],
+    store["secret://deployments/sample-webapp/staging/infisical-client-secret"],
     "new-secret-staging",
   );
-  assert.equal(store["secret://deployments/pleomino/prod/infisical-client-id"], "client-id-prod");
   assert.equal(
-    store["secret://deployments/pleomino/prod/infisical-client-secret"],
+    store["secret://deployments/sample-webapp/prod/infisical-client-id"],
+    "client-id-prod",
+  );
+  assert.equal(
+    store["secret://deployments/sample-webapp/prod/infisical-client-secret"],
     "new-secret-prod",
   );
 }

@@ -88,28 +88,62 @@ function locksDifferOnlyInViberoots(before: FlakeLock, after: FlakeLock): boolea
   return stableStringify(viberootsNode(before)) !== stableStringify(viberootsNode(after));
 }
 
-function normalizeLocalViberootsNode(lock: FlakeLock, viberootsSource: string): FlakeLock {
+function lockOriginalPathForSource(workspaceFlakeDir: string, viberootsSource: string): string {
+  const filteredInput = path.join(workspaceFlakeDir, "viberoots-flake-input");
+  return canonicalPath(viberootsSource) === canonicalPath(filteredInput)
+    ? "./viberoots-flake-input"
+    : viberootsSource;
+}
+
+function normalizeLocalViberootsNode(
+  lock: FlakeLock,
+  workspaceFlakeDir: string,
+  viberootsSource: string,
+): FlakeLock {
   const normalized = JSON.parse(JSON.stringify(lock)) as FlakeLock;
   const node = normalized.nodes?.viberoots as
     | {
-        locked?: { type?: string; path?: string };
+        locked?: { type?: string; path?: string; narHash?: string; lastModified?: number };
         original?: { type?: string; path?: string };
+        parent?: unknown;
       }
     | undefined;
   if (!node) return normalized;
+  const lockPath = lockOriginalPathForSource(workspaceFlakeDir, viberootsSource);
   if (node.locked?.type === "path") {
-    node.locked.path = viberootsSource;
+    node.locked.path = lockPath;
+    if (lockPath.startsWith(".")) {
+      delete node.locked.narHash;
+      delete node.locked.lastModified;
+      node.parent = [];
+    }
   }
-  node.original = { type: "path", path: viberootsSource };
+  node.original = {
+    type: "path",
+    path: lockPath,
+  };
   return normalized;
 }
 
 function validLocalViberootsSource(workspaceRoot: string): string {
+  const workspaceFlakeDir = path.join(workspaceRoot, ".viberoots", "workspace");
+  const workspaceFlake = path.join(workspaceFlakeDir, "flake.nix");
+  const filteredInput = path.join(workspaceFlakeDir, "viberoots-flake-input");
+  try {
+    const text = fs.readFileSync(workspaceFlake, "utf8");
+    if (
+      text.includes('viberoots.url = "path:./viberoots-flake-input"') &&
+      fs.existsSync(path.join(filteredInput, "flake.nix")) &&
+      fs.existsSync(path.join(filteredInput, "build-tools", "tools", "dev", "zx-init.mjs"))
+    ) {
+      return canonicalPath(filteredInput);
+    }
+  } catch {}
   const candidates = [
-    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
+    path.join(workspaceRoot, "viberoots"),
     process.env.VIBEROOTS_SOURCE_ROOT || "",
     process.env.VIBEROOTS_ROOT || "",
-    path.join(workspaceRoot, "viberoots"),
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
   ]
     .map((candidate) => String(candidate || "").trim())
     .filter(Boolean);
@@ -171,6 +205,12 @@ async function writeLockAtomically(lockFile: string, next: FlakeLock): Promise<v
   await fsp.rename(tmp, lockFile);
 }
 
+async function touchFilteredInputMarker(workspaceFlakeDir: string): Promise<void> {
+  await fsp
+    .writeFile(path.join(workspaceFlakeDir, "viberoots-flake-input", ".source-fingerprint"), "")
+    .catch(() => {});
+}
+
 export async function repairGeneratedWorkspaceLock(
   opts: WorkspaceLockRepairOptions,
 ): Promise<WorkspaceLockRepairResult> {
@@ -217,9 +257,12 @@ export async function repairGeneratedWorkspaceLock(
   if (!candidateRaw?.nodes?.viberoots) {
     return { status: "skipped", reason: "metadata-did-not-return-viberoots-lock-node" };
   }
-  const candidate = normalizeLocalViberootsNode(candidateRaw, viberootsSource);
+  const candidate = normalizeLocalViberootsNode(candidateRaw, workspaceFlakeDir, viberootsSource);
   if (stableStringify(before) === stableStringify(candidate)) {
-    if (flakeRepair === "repaired") return { status: "repaired", changedInput: "viberoots" };
+    if (flakeRepair === "repaired") {
+      await touchFilteredInputMarker(workspaceFlakeDir);
+      return { status: "repaired", changedInput: "viberoots" };
+    }
     return { status: "fresh" };
   }
   if (!locksDifferOnlyInViberoots(before, candidate)) {
@@ -245,6 +288,7 @@ export async function repairGeneratedWorkspaceLock(
       throw new Error("generated workspace lock repair validation failed");
     }
     await fsp.rm(backup, { force: true });
+    await touchFilteredInputMarker(workspaceFlakeDir);
     return { status: "repaired", changedInput: "viberoots" };
   } catch (error) {
     await fsp.writeFile(lockFile, beforeText, "utf8").catch(() => {});

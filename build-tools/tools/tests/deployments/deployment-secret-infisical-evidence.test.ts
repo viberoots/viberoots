@@ -32,7 +32,7 @@ test("Infisical client does not substitute selector identity for missing respons
       selector: {
         projectId: "proj_123",
         environment: "prod",
-        secretPath: "/deployments/pleomino",
+        secretPath: "/deployments/sample-webapp",
         secretName: "cloudflare_api_token",
       },
       viewSecretValue: false,
@@ -76,7 +76,7 @@ test("Infisical admission rejects incomplete provider replay identity evidence",
           error instanceof Error &&
           error.message.includes(`missing Infisical replay identity evidence: ${label}`) &&
           error.message.includes(
-            "requested selector: proj_123:prod:/deployments/pleomino:cloudflare_api_token",
+            "requested selector: proj_123:prod:/deployments/sample-webapp:cloudflare_api_token",
           ),
       );
     } finally {
@@ -106,11 +106,11 @@ test("Infisical client reads v4 workspace object and secretKey replay evidence",
     });
     assert.equal(
       admitted[0]?.referenceId,
-      "infisical:proj_123:prod:/deployments/pleomino:cloudflare_api_token#sec_1@3",
+      "infisical:proj_123:prod:/deployments/sample-webapp:cloudflare_api_token#sec_1@3",
     );
     assert.equal(
       admitted[0]?.selectorRef,
-      "proj_123:prod:/deployments/pleomino:cloudflare_api_token@3",
+      "proj_123:prod:/deployments/sample-webapp:cloudflare_api_token@3",
     );
   } finally {
     await server.close();
@@ -122,7 +122,7 @@ function infisicalSecret(overrides: Partial<FakeInfisicalSecret>): FakeInfisical
     id: "sec_1",
     projectId: "proj_123",
     environment: "prod",
-    secretPath: "/deployments/pleomino",
+    secretPath: "/deployments/sample-webapp",
     secretName: "cloudflare_api_token",
     version: "3",
     secretValue: "runtime-token-v3",

@@ -86,7 +86,7 @@ test("approve run actions require approver-scoped authority", () => {
 test("project and environment scopes authorize only matching deployment families and stages", () => {
   const deployment = cloudflarePagesDeploymentFixture();
   const projectScoped = grantsFor({ principalId: "app:ci-submit" }, [
-    { role: "submitter", scope: { kind: "project", value: "projects/deployments/pleomino" } },
+    { role: "submitter", scope: { kind: "project", value: "projects/deployments/sample-webapp" } },
   ]);
   const projectDecision = authorizeControlPlaneSubmit({
     deployment,

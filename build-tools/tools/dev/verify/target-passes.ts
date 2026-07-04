@@ -1,7 +1,9 @@
 import { spawnSync } from "node:child_process";
 import process from "node:process";
+import { withGitAutoMaintenanceDisabledEnv } from "../../lib/git-auto-maintenance-env";
 import { dropConfigSuffix, normalizeTargetLabel } from "../../lib/labels";
 import { resolveToolPathSync } from "../../lib/tool-paths";
+import { buildBuckProcessEnvForPolicy } from "./buck2-test-remote-env";
 import { buckCqueryArgsForExecutionPolicy, targetPlatformArgsForPolicy } from "./remote-policy";
 import { assertVerifyRemoteTargetsAllowed } from "./remote-target-policy";
 import type { VerifyExecutionPolicy } from "./remote-policy";
@@ -9,6 +11,7 @@ import type { VerifyExecutionPolicy } from "./remote-policy";
 export const VERIFY_ISOLATED_LABEL = "verify:isolated";
 export const VERIFY_BOUNDED_ISOLATED_LABEL = "verify:isolated-bounded";
 export const VERIFY_BOUNDED_ISOLATED_THREADS = 2;
+export const VERIFY_ENFORCEMENT_LABEL = "verify:enforcement";
 export const VERIFY_MANUAL_LABEL = "verify:manual";
 export const VERIFY_RESOURCE_LIMITED_LABEL = "verify:resource-limited";
 export const VERIFY_RESOURCE_LIMITED_THREADS = 4;
@@ -93,6 +96,7 @@ export function planVerifyTargetPasses(
   const sharedTargets: string[] = [];
   const isolatedTargets: string[] = [];
   const boundedIsolatedTargets: string[] = [];
+  const enforcementTargets: string[] = [];
   const resourceLimitedTargets: string[] = [];
 
   for (const entry of targets) {
@@ -102,6 +106,10 @@ export function planVerifyTargetPasses(
     }
     if (entry.labels.includes(VERIFY_BOUNDED_ISOLATED_LABEL)) {
       boundedIsolatedTargets.push(entry.target);
+      continue;
+    }
+    if (entry.labels.includes(VERIFY_ENFORCEMENT_LABEL)) {
+      enforcementTargets.push(entry.target);
       continue;
     }
     if (entry.labels.includes(VERIFY_RESOURCE_LIMITED_LABEL)) {
@@ -145,6 +153,12 @@ export function planVerifyTargetPasses(
           : VERIFY_RESOURCE_LIMITED_THREADS,
     });
   }
+  if (enforcementTargets.length > 0) {
+    passes.push({
+      name: "enforcement",
+      targets: enforcementTargets,
+    });
+  }
   if (sharedTargets.length > 0) {
     passes.push({ name: "shared", targets: sharedTargets });
   }
@@ -183,7 +197,7 @@ function queryVerifyTargetLabels(opts: {
     {
       cwd: opts.root,
       env: {
-        ...process.env,
+        ...withGitAutoMaintenanceDisabledEnv(buildBuckProcessEnvForPolicy(opts.executionPolicy)),
         RUST_LOG:
           (process.env.RUST_LOG || "warn") +
           ",buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off",

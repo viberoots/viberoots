@@ -93,7 +93,7 @@ const FORBIDDEN_SOURCE_STATE = [
   "projects/deployments/example-app/provider-state.json",
   "projects/docs/deployments/example-app.md",
   "projects/bootstrap/example-app.json",
-  "projects/bootstrap/pleomino.json",
+  "projects/bootstrap/sample-webapp.json",
   "projects/runtime/bootstrap-defaults.json",
 ];
 
@@ -280,7 +280,7 @@ test("reusable deployment docs keep parent-specific families out of viberoots ex
   for (const rel of ["README.md", ...reusableDocs]) {
     const text = await fsp.readFile(path.join(REPO_ROOT, rel), "utf8");
     assert.doesNotMatch(text, /\b[Pp]leomino\b/);
-    assert.doesNotMatch(text, /\bPLEOMINO_/);
+    assert.doesNotMatch(text, /\bSAMPLE_WEBAPP_/);
   }
 });
 
@@ -292,7 +292,7 @@ test("reusable deployment bootstrap runtime keeps parent-specific families out o
   for (const rel of reusableSources) {
     const text = await fsp.readFile(path.join(REPO_ROOT, rel), "utf8");
     assert.doesNotMatch(text, /\b[Pp]leomino\b/, rel);
-    assert.doesNotMatch(text, /\bPLEOMINO_/, rel);
+    assert.doesNotMatch(text, /\bSAMPLE_WEBAPP_/, rel);
   }
 });
 

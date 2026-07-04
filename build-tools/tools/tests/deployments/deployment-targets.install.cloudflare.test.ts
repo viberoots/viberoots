@@ -20,7 +20,7 @@ test("Cloudflare target install preserves reviewed vault runtime metadata", asyn
         cliPublicClientId: "deployment-cli",
         serviceAccountClientId: "deployment-runner",
         deploymentEnvironment: "mini",
-        roleName: "deploy-pleomino-read",
+        roleName: "deploy-sample-webapp-read",
         clientSecretEnv: "VBR_DEPLOYER_CLIENT_SECRET",
         jenkinsClientSecretEnv: "JENKINS_DEPLOYMENT_CLIENT_SECRET",
         pkceCallback: {
@@ -39,7 +39,7 @@ test("Cloudflare target install preserves reviewed vault runtime metadata", asyn
     await installCloudflarePagesTargets(tmp, [deployment]);
 
     const targets = await fsp.readFile(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "TARGETS"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "TARGETS"),
       "utf8",
     );
     for (const expected of [

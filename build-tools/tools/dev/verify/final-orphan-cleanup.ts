@@ -121,7 +121,7 @@ export async function runFinalOrphanBuckCleanup(opts: {
           log: async (line) => await appendVerifyLogLine(opts.logFile, line),
           maxKills: 200,
           ignoreLiveOwnerPid: process.pid,
-          includeOwnerlessEphemeral: false,
+          includeOwnerlessEphemeral: true,
         }),
     );
     await appendVerifyLogLine(

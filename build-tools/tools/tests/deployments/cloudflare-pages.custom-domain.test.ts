@@ -29,8 +29,9 @@ async function withFakeCloudflareApi<T>(
         JSON.stringify({
           success: true,
           result:
-            url.searchParams.get("name") === "pleomino.com" && !url.searchParams.has("account.id")
-              ? [{ id: "zone-pleomino", name: "pleomino.com" }]
+            url.searchParams.get("name") === "sample-webapp.com" &&
+            !url.searchParams.has("account.id")
+              ? [{ id: "zone-sample-webapp", name: "sample-webapp.com" }]
               : [],
         }),
       );
@@ -123,7 +124,7 @@ test("cloudflare-pages custom domain provisioning creates missing domains idempo
       providerTarget: {
         ...cloudflarePagesDeploymentFixture().providerTarget,
         accountId: "1b911846f80a89272c0dbaf44f5c810f",
-        customDomain: "staging.pleomino.com",
+        customDomain: "staging.sample-webapp.com",
       },
     });
     const created = await ensureCloudflarePagesCustomDomain({
@@ -132,7 +133,7 @@ test("cloudflare-pages custom domain provisioning creates missing domains idempo
     });
     assert.deepEqual(created, {
       kind: "ready",
-      domain: "staging.pleomino.com",
+      domain: "staging.sample-webapp.com",
       created: true,
       status: "pending",
     });
@@ -142,7 +143,7 @@ test("cloudflare-pages custom domain provisioning creates missing domains idempo
     });
     assert.deepEqual(existing, {
       kind: "ready",
-      domain: "staging.pleomino.com",
+      domain: "staging.sample-webapp.com",
       created: false,
       status: "active",
     });
@@ -183,8 +184,8 @@ test("cloudflare-pages custom domain provisioning explains DNS token scope failu
             providerTarget: {
               ...cloudflarePagesDeploymentFixture().providerTarget,
               accountId: "1b911846f80a89272c0dbaf44f5c810f",
-              customDomain: "staging.pleomino.com",
-              customDomainZoneId: "zone-pleomino",
+              customDomain: "staging.sample-webapp.com",
+              customDomainZoneId: "zone-sample-webapp",
             },
           });
           await ensureCloudflarePagesCustomDomain({
@@ -194,7 +195,7 @@ test("cloudflare-pages custom domain provisioning explains DNS token scope failu
         },
         { dnsRecordAuthFailure: true },
       ),
-    /Zone:DNS Read and Zone:DNS Edit scoped to zone zone-pleomino for staging\.pleomino\.com/,
+    /Zone:DNS Read and Zone:DNS Edit scoped to zone zone-sample-webapp for staging\.sample-webapp\.com/,
   );
 });
 
@@ -204,8 +205,8 @@ test("cloudflare-pages custom domain provisioning can use a configured DNS zone 
       providerTarget: {
         ...cloudflarePagesDeploymentFixture().providerTarget,
         accountId: "1b911846f80a89272c0dbaf44f5c810f",
-        customDomain: "staging.pleomino.com",
-        customDomainZoneId: "zone-pleomino",
+        customDomain: "staging.sample-webapp.com",
+        customDomainZoneId: "zone-sample-webapp",
       },
     });
     const created = await ensureCloudflarePagesCustomDomain({
@@ -214,13 +215,14 @@ test("cloudflare-pages custom domain provisioning can use a configured DNS zone 
     });
     assert.deepEqual(created, {
       kind: "ready",
-      domain: "staging.pleomino.com",
+      domain: "staging.sample-webapp.com",
       created: true,
       status: "pending",
     });
     assert.equal(requests.filter((request) => request.pathname === "/zones").length, 0);
     assert.equal(
-      requests.filter((request) => request.pathname === "/zones/zone-pleomino/dns_records").length,
+      requests.filter((request) => request.pathname === "/zones/zone-sample-webapp/dns_records")
+        .length,
       2,
     );
   });

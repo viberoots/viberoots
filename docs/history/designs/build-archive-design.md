@@ -171,18 +171,18 @@ Use a versioned schema:
   },
   "request": {
     "mode": "buck-patterns|projects|project-closure",
-    "buckPatterns": ["//projects/apps/pleomino/..."],
-    "projects": ["projects/apps/pleomino"],
+    "buckPatterns": ["//projects/apps/sample-webapp/..."],
+    "projects": ["projects/apps/sample-webapp"],
     "systems": ["aarch64-darwin"]
   },
   "selection": {
     "configuredTargets": [
       {
-        "label": "//projects/apps/pleomino:pleomino",
+        "label": "//projects/apps/sample-webapp:sample-webapp",
         "configuration": "prelude//platforms:default",
         "language": "node",
         "kind": "webapp",
-        "package": "projects/apps/pleomino",
+        "package": "projects/apps/sample-webapp",
         "artifactProducing": true
       }
     ],
@@ -213,8 +213,8 @@ Use a versioned schema:
     "node": {
       "importers": [
         {
-          "importer": "projects/apps/pleomino",
-          "lockfile": "projects/apps/pleomino/pnpm-lock.yaml",
+          "importer": "projects/apps/sample-webapp",
+          "lockfile": "projects/apps/sample-webapp/pnpm-lock.yaml",
           "lockfileDigest": "sha256:<hex>",
           "pnpmStoreOutput": "/nix/store/...",
           "nodeModulesOutput": "/nix/store/..."
@@ -281,13 +281,13 @@ Keep implementation modules single-purpose and under the repo's 250-line file gu
 Supported options:
 
 ```text
-archive-build-inputs --target //projects/apps/pleomino:pleomino
-archive-build-inputs --targets //projects/apps/pleomino/... //projects/libs/shared-ui/...
-archive-build-inputs --project projects/apps/pleomino
-archive-build-inputs --projects projects/apps/pleomino,projects/libs/shared-ui
-archive-build-inputs --selector project-closure --project projects/apps/pleomino
+archive-build-inputs --target //projects/apps/sample-webapp:sample-webapp
+archive-build-inputs --targets //projects/apps/sample-webapp/... //projects/libs/shared-ui/...
+archive-build-inputs --project projects/apps/sample-webapp
+archive-build-inputs --projects projects/apps/sample-webapp,projects/libs/shared-ui
+archive-build-inputs --selector project-closure --project projects/apps/sample-webapp
 archive-build-inputs --system aarch64-darwin --system x86_64-linux
-archive-build-inputs --out buck-out/archives/pleomino
+archive-build-inputs --out buck-out/archives/sample-webapp
 archive-build-inputs --to file:///tmp/viberoots-build-cache
 archive-build-inputs --verify=substitute
 archive-build-inputs --verify=import-offline
@@ -367,7 +367,7 @@ All later build and archive phases should run against the normalized archive sou
 For each selected configured target, run:
 
 ```bash
-BUCK_TARGET='//projects/apps/pleomino:pleomino' \
+BUCK_TARGET='//projects/apps/sample-webapp:sample-webapp' \
 BUCK_GRAPH_JSON="$PWD/build-tools/tools/buck/graph.json" \
 WORKSPACE_ROOT="$PWD" \
 nix build --impure --no-write-lock-file --option eval-cache false \
@@ -546,7 +546,7 @@ Supported:
 
 ```text
 restore-build-archive --archive ./viberoots-build-input-archive-<digest>.tar.zst --dest /tmp/vbr-restore --verify=substitute
-restore-build-archive --archive ./archive-dir --dest /tmp/vbr-restore --target //projects/apps/pleomino:pleomino
+restore-build-archive --archive ./archive-dir --dest /tmp/vbr-restore --target //projects/apps/sample-webapp:sample-webapp
 restore-build-archive --archive ./archive-dir --dest /tmp/vbr-restore --import-store --verify=import-offline
 restore-build-archive --archive ./archive-dir --dest /tmp/vbr-restore --verify=rebuild
 ```

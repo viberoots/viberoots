@@ -18,6 +18,7 @@ async function copyCurrentBuckClassificationFiles(tmp: string): Promise<void> {
   const relPaths = [
     "build-tools/tools/tests/defs.bzl",
     "build-tools/tools/tests/deployment_conventions.bzl",
+    "build-tools/tools/tests/enforcement_conventions.bzl",
     "build-tools/tools/tests/isolated_test_conventions.bzl",
     "build-tools/tools/tests/resource_limited_conventions.bzl",
     "build-tools/tools/tests/resource_limited_taxonomy.bzl",

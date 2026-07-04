@@ -31,7 +31,7 @@ test("cloudflare-pages deploy reads Vault directly on the reviewed runtime path"
         deploymentRequirementFixture({
           name: "cloudflare_api_token",
           step: "publish",
-          contractId: "secret://deployments/pleomino/cloudflare_api_token",
+          contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
         }),
       ],
     });
@@ -40,16 +40,16 @@ test("cloudflare-pages deploy reads Vault directly on the reviewed runtime path"
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     const vault = await startFakeVaultServer(
       {
-        "secret://deployments/pleomino/cloudflare_api_token": {
+        "secret://deployments/sample-webapp/cloudflare_api_token": {
           currentVersion: "11",
           versions: { "11": { value: "direct-vault-token" } },
         },
       },
-      { jwtAuth: { role: "deploy-pleomino-read", jwt: "cloudflare.workload.jwt" } },
+      { jwtAuth: { role: "deploy-sample-webapp-read", jwt: "cloudflare.workload.jwt" } },
     );
-    await writeArtifact(artifactDir, "<html>pleomino staging</html>\n");
+    await writeArtifact(artifactDir, "<html>sample-webapp staging</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
     const admissionEvidence = deploymentAdmissionEvidenceFixture({
@@ -75,7 +75,7 @@ test("cloudflare-pages deploy reads Vault directly on the reviewed runtime path"
       credential: {
         kind: "jwt",
         addr: vault.addr,
-        role: "deploy-pleomino-read",
+        role: "deploy-sample-webapp-read",
         workloadJwt: "cloudflare.workload.jwt",
       },
     });

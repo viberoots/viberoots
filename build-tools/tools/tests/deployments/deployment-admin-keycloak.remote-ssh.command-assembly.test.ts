@@ -20,7 +20,7 @@ test("remote SSH transport assembles reviewed deploy admin identity sync command
         deploymentLabel: plan.deploymentLabel,
         realmFile: "/etc/nixos/deployment-host/identity-provider/deployment-auth-realm.json",
         actingPrincipal: "user:shape-admin",
-        adminGroups: ["deploy-admin-identity-shape-admin-project-pleomino"],
+        adminGroups: ["deploy-admin-identity-shape-admin-project-sample-webapp"],
         automationPrincipalIds: ["app:deploy-bot"],
       }),
     );
@@ -49,7 +49,7 @@ test("remote SSH transport assembles reviewed deploy admin identity grant-user c
           "/etc/nixos/deployment-host/identity-provider/deployment-auth-memberships.json",
         realmFile: "/etc/nixos/deployment-host/identity-provider/deployment-auth-realm.json",
         actingPrincipal: "user:membership-admin",
-        adminGroups: ["deploy-admin-identity-membership-admin-project-pleomino"],
+        adminGroups: ["deploy-admin-identity-membership-admin-project-sample-webapp"],
         automationPrincipalIds: ["app:deploy-bot"],
       }),
     );

@@ -118,7 +118,7 @@ export async function writeE2eConfig(configPath: string, port: number) {
 
 export async function submit(port: number, artifactDir: string, submissionId: string) {
   const deployment = containerE2eDeploymentFixture();
-  assert.doesNotMatch(JSON.stringify(deployment), /pleomino/i);
+  assert.doesNotMatch(JSON.stringify(deployment), /sample-webapp/i);
   return await postJson(port, "/api/v1/submissions", {
     schemaVersion: S3_STATIC_CONTROL_PLANE_SUBMIT_REQUEST_SCHEMA,
     submissionId,

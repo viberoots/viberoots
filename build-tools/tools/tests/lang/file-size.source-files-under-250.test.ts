@@ -48,7 +48,4 @@ test("repo-owned code files remain under the 250 LOC methodology gate", async ()
     offenderFiles.filter((file) => !known.has(file)),
     [],
   );
-  assert.deepEqual(offenderFiles, [
-    "projects/apps/pleomino/src/game/solver/static-interesting-solutions.ts",
-  ]);
 });

@@ -20,12 +20,12 @@ function deploymentWithSecrets() {
       deploymentRequirementFixture({
         name: "cloudflare_api_token",
         step: "publish",
-        contractId: "secret://deployments/pleomino/cloudflare_api_token",
+        contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
       }),
       deploymentRequirementFixture({
         name: "preview_basic_auth_password",
         step: "smoke",
-        contractId: "secret://deployments/pleomino/preview_basic_auth_password",
+        contractId: "secret://deployments/sample-webapp/preview_basic_auth_password",
         required: false,
       }),
     ],
@@ -45,13 +45,13 @@ test("deploy --print-vault-bootstrap emits deployment-derived JSON", async () =>
       --issuer-url https://identity.apps.kilty.io/realms/deployments \
       --vault-audience deployments-vault \
       --deployment-client-id deployment-runner \
-      --vault-jwt-role deploy-pleomino-read`;
+      --vault-jwt-role deploy-sample-webapp-read`;
     const payload = JSON.parse(String(result.stdout));
     assert.equal(payload.schemaVersion, "deployment-vault-bootstrap@1");
     assert.equal(payload.deployment.repository, "viberoots/viberoots");
     assert.equal(
       payload.deployment.providerTargetIdentity,
-      "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
     );
     assert.deepEqual(payload.vault.boundClaims, {
       azp: "deployment-runner",
@@ -59,11 +59,13 @@ test("deploy --print-vault-bootstrap emits deployment-derived JSON", async () =>
       repository: "viberoots/viberoots",
     });
     const policyMatches =
-      payload.policyHcl.match(/secret\/data\/deployments\/pleomino\/cloudflare_api_token/g) || [];
+      payload.policyHcl.match(/secret\/data\/deployments\/sample-webapp\/cloudflare_api_token/g) ||
+      [];
     assert.equal(policyMatches.length, 1);
     const metadataPolicyMatches =
-      payload.policyHcl.match(/secret\/metadata\/deployments\/pleomino\/cloudflare_api_token/g) ||
-      [];
+      payload.policyHcl.match(
+        /secret\/metadata\/deployments\/sample-webapp\/cloudflare_api_token/g,
+      ) || [];
     assert.equal(metadataPolicyMatches.length, 1);
   });
 });
@@ -109,13 +111,13 @@ test("secret templates preserve one reviewed template per requirement", () => {
   assert.deepEqual(payload.templates[0]?.content, {
     value: "<fill-me>",
     allowedSteps: ["publish"],
-    targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+    targetScopes: ["cloudflare-pages:web-platform-staging/sample-webapp-staging-pages"],
     refreshMode: "none",
     credentialClass: "routine",
   });
   assert.equal(
     payload.templates[1]?.secretPath,
-    "deployments/pleomino/preview_basic_auth_password",
+    "deployments/sample-webapp/preview_basic_auth_password",
   );
 });
 
@@ -131,7 +133,7 @@ test("secret templates return an explicit no-op document for deployments without
 test("Vault bootstrap fails closed for unsupported secret contract ids", () => {
   const deployment = cloudflarePagesDeploymentFixture({
     secretRequirements: [
-      deploymentRequirementFixture({ contractId: "env://deployments/pleomino/token" }),
+      deploymentRequirementFixture({ contractId: "env://deployments/sample-webapp/token" }),
     ],
   });
   assert.throws(
@@ -153,14 +155,14 @@ test("shell rendering includes auth, policy, role, and runtime exports", () => {
       issuerUrl: "https://identity.apps.kilty.io/realms/deployments",
       audience: "deployments-vault",
       deploymentClientId: "deployment-runner",
-      roleName: "deploy-pleomino-read",
+      roleName: "deploy-sample-webapp-read",
       extraBoundClaims: { deployment_environment: "mini" },
     },
   });
   const rendered = renderVaultBootstrapDocument(payload, "shell");
   assert.match(rendered, /vault write auth\/jwt\/config/);
-  assert.match(rendered, /vault policy write deploy-pleomino-read/);
-  assert.match(rendered, /vault write auth\/jwt\/role\/deploy-pleomino-read/);
+  assert.match(rendered, /vault policy write deploy-sample-webapp-read/);
+  assert.match(rendered, /vault write auth\/jwt\/role\/deploy-sample-webapp-read/);
   assert.match(rendered, /export VBR_VAULT_OIDC_ISSUER=/);
   assert.equal(payload.vault.boundClaims.deployment_environment, "mini");
 });
@@ -174,13 +176,13 @@ test("executable Vault bootstrap output can use deployment vault_runtime metadat
         oidcIssuer: "https://identity.example.net/realms/deployments",
         audience: "deployments-vault",
         deploymentClientId: "deployment-runner",
-        roleName: "deploy-pleomino-read",
+        roleName: "deploy-sample-webapp-read",
       },
     }),
   });
   assert.equal(payload.runtimeEnvironment.VAULT_ADDR, "https://vault.example.net:8200");
   assert.equal(payload.vault.issuerUrl, "https://identity.example.net/realms/deployments");
-  assert.equal(payload.vault.roleName, "deploy-pleomino-read");
+  assert.equal(payload.vault.roleName, "deploy-sample-webapp-read");
   assert.doesNotThrow(() => assertVaultBootstrapExecutableDocument(payload));
 });
 
@@ -195,7 +197,7 @@ test("Vault bootstrap bound claims use vault_runtime deployment environment when
         deploymentClientId: "deployment-runner",
         serviceAccountClientId: "deployment-runner",
         deploymentEnvironment: "mini",
-        roleName: "deploy-pleomino-read",
+        roleName: "deploy-sample-webapp-read",
       },
     }),
   });

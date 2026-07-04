@@ -8,11 +8,15 @@ import { resolveToolPathSync } from "../lib/tool-paths";
 import {
   computeSelectedCppPackageClosure,
   filteredFlakeRsyncExcludeArgs,
+  defaultFilteredFlakeSnapshotRelPaths,
+  defaultFilteredFlakeSnapshotRsyncSources,
   graphNodesFromJson,
   selectedCppSnapshotRsyncSources,
   selectedCppSnapshotRelPaths,
   selectedNodeSnapshotRelPaths,
   selectedNodeSnapshotRsyncSources,
+  selectedPythonSnapshotRelPaths,
+  selectedPythonSnapshotRsyncSources,
 } from "./nix-build-filtered-flake-lib";
 import { targetPackageFromLabel } from "./build-selected-helpers";
 import { prepareExactPnpmStore } from "./update-pnpm-hash/exact-store";
@@ -20,6 +24,7 @@ import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 import { getImporterRootsContract } from "../lib/importer-roots";
 import { sanitizeName } from "../lib/sanitize";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../lib/macos-metadata";
+import { findWorkspacePackageRepoDirs } from "./update-pnpm-hash/importer-workspace-packages";
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -28,6 +33,14 @@ async function pathExists(filePath: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function existingRelPaths(root: string, relPaths: readonly string[]): Promise<string[]> {
+  const present: string[] = [];
+  for (const relPath of relPaths) {
+    if (await pathExists(path.join(root, relPath))) present.push(relPath);
+  }
+  return present;
 }
 
 function executablePath(filePath: string): string {
@@ -242,12 +255,23 @@ async function readSelectedNodeSnapshotSources(
   root: string,
   attr: string,
 ): Promise<{ importer: string; rsyncSources: string[] } | null> {
-  if (!attr.startsWith("node-test.")) return null;
+  const nodeArtifactPrefixes = [
+    "node-cli.",
+    "node-service.",
+    "node-test.",
+    "node-vercel-next.",
+    "node-webapp.",
+  ];
+  if (!nodeArtifactPrefixes.some((prefix) => attr.startsWith(prefix))) return null;
   const importers = await pnpmImportersFromAttrs(root, attr);
   const importer = targetPackageFromLabel(String(process.env.BUCK_TARGET || "")) || importers[0];
   if (!importer || importer === ".") return null;
   if (!(await pathExists(path.join(root, importer, "pnpm-lock.yaml")))) return null;
-  const relPaths = selectedNodeSnapshotRelPaths(importer);
+  const workspacePackageDirs = await findWorkspacePackageRepoDirs({
+    repoRoot: root,
+    importerAbs: path.join(root, importer),
+  });
+  const relPaths = selectedNodeSnapshotRelPaths(importer, workspacePackageDirs);
   const presentRelPaths: string[] = [];
   for (const relPath of relPaths) {
     const absPath = path.resolve(root, relPath);
@@ -257,6 +281,23 @@ async function readSelectedNodeSnapshotSources(
   const rsyncSources = selectedNodeSnapshotRsyncSources(presentRelPaths);
   if (rsyncSources.length === 0) return null;
   return { importer, rsyncSources };
+}
+
+async function readSelectedPythonSnapshotSources(
+  root: string,
+): Promise<{ importer: string; rsyncSources: string[] } | null> {
+  const importer = targetPackageFromLabel(String(process.env.BUCK_TARGET || ""));
+  if (!importer || importer === ".") return null;
+  if (!(await pathExists(path.join(root, importer, "uv.lock")))) return null;
+  const presentRelPaths = await existingRelPaths(root, selectedPythonSnapshotRelPaths(importer));
+  const rsyncSources = selectedPythonSnapshotRsyncSources(presentRelPaths);
+  if (rsyncSources.length === 0) return null;
+  return { importer, rsyncSources };
+}
+
+async function readDefaultSnapshotSources(root: string): Promise<string[]> {
+  const presentRelPaths = await existingRelPaths(root, defaultFilteredFlakeSnapshotRelPaths());
+  return defaultFilteredFlakeSnapshotRsyncSources(presentRelPaths);
 }
 
 async function pnpmImportersFromAttrs(root: string, attr: string): Promise<string[]> {
@@ -351,6 +392,10 @@ async function main(): Promise<void> {
     const selectedCppSources = await readSelectedCppSnapshotSources(root);
     const selectedNodeSources =
       selectedCppSources == null ? await readSelectedNodeSnapshotSources(root, attr) : null;
+    const selectedPythonSources =
+      selectedCppSources == null && selectedNodeSources == null
+        ? await readSelectedPythonSnapshotSources(root)
+        : null;
     const snapshotStart = Date.now();
     if (selectedCppSources != null) {
       console.error(
@@ -384,13 +429,31 @@ async function main(): Promise<void> {
           cwd: root,
         })`rsync -a --delete --relative ${rsyncExcludes} ${selectedNodeSources.rsyncSources} ${snapDir}/`,
       );
-    } else {
-      console.error("[nix-build-filtered-flake] creating filtered snapshot:", snapDir);
+    } else if (selectedPythonSources != null) {
+      console.error(
+        "[nix-build-filtered-flake] creating selected python snapshot:",
+        snapDir,
+        "importer=",
+        selectedPythonSources.importer,
+        "rsyncSources=",
+        String(selectedPythonSources.rsyncSources.length),
+      );
       await withHeartbeat(
         "snapshot-rsync",
         $({
           stdio: "inherit",
-        })`rsync -a --delete ${rsyncExcludes} ${root}/ ${snapDir}/`,
+          cwd: root,
+        })`rsync -a --delete --relative ${rsyncExcludes} ${selectedPythonSources.rsyncSources} ${snapDir}/`,
+      );
+    } else {
+      console.error("[nix-build-filtered-flake] creating filtered snapshot:", snapDir);
+      const defaultSources = await readDefaultSnapshotSources(root);
+      await withHeartbeat(
+        "snapshot-rsync",
+        $({
+          stdio: "inherit",
+          cwd: root,
+        })`rsync -a --delete --relative ${rsyncExcludes} ${defaultSources} ${snapDir}/`,
       );
     }
     await copyWorkspaceGraphIntoSnapshot(root, snapDir);

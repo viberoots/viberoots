@@ -11,13 +11,13 @@ const REQUIRED_APPROVAL_BOUNDARIES = [{ stage: "prod", requiredApprovals: ["rele
 
 export function foundationDeploymentFixture(): OpenTofuDeployment {
   const lanePolicy: any = {
-    ref: "//projects/deployments/pleomino/shared:lane",
+    ref: "//projects/deployments/sample-webapp/shared:lane",
     name: "lane",
     stages: ["dev"],
     sourceRefPolicy: { dev: "main" },
     allowedPromotionEdges: [],
     artifactReuseMode: "same_artifact",
-    governanceRef: "//projects/deployments/pleomino/shared:lane_governance",
+    governanceRef: "//projects/deployments/sample-webapp/shared:lane_governance",
     governance: {
       scmBackend: "github",
       repository: "viberoots/viberoots",
@@ -185,8 +185,8 @@ export function migrationAdapterWithChecks(
 export function appDeploymentFixture(target = foundationDeploymentFixture()): any {
   return {
     ...target,
-    deploymentId: "data-room-web-dev",
-    label: "//projects/deployments/data-room-web-dev:deploy",
+    deploymentId: "example-web-dev",
+    label: "//projects/deployments/example-web-dev:deploy",
     provider: "kubernetes",
     publisher: { type: "helm-release", config: "helm/values.yaml" },
     provisioner: undefined,
@@ -233,10 +233,10 @@ export async function writeMigrationBundleFixture(tmp: string): Promise<string> 
       schema_version: "deployment-migration-bundle@1",
       ordered_migration_sets: [
         { index: 0, target: "//projects/libs/platform-db:migrations" },
-        { index: 1, target: "//projects/libs/data-room-db:migrations" },
+        { index: 1, target: "//projects/libs/example-db:migrations" },
       ],
       dependency_graph_fingerprint:
-        "migration-sets://projects/libs/platform-db:migrations|//projects/libs/data-room-db:migrations",
+        "migration-sets://projects/libs/platform-db:migrations|//projects/libs/example-db:migrations",
     }),
   );
   return bundle;

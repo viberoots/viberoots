@@ -82,6 +82,7 @@ async function chooseFlakeRef(opts: {
       attr: "graph-generator-selected",
       logPrefix: "[build-selected]",
       graphPath: opts.graphPath,
+      target: opts.target,
     });
     return filtered;
   }
@@ -125,6 +126,7 @@ async function chooseFlakeRef(opts: {
       attr: "graph-generator-selected",
       logPrefix: "[build-selected]",
       graphPath: opts.graphPath,
+      target: opts.target,
     });
     return {
       flakeRef: filtered.flakeRef,

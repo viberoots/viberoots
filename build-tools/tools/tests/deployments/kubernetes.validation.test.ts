@@ -24,9 +24,9 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
     provisioner: "cdktf-stack",
     provisioner_config: "cdktf/stack.json",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/pleomino/shared:prod_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:prod_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {
@@ -44,7 +44,7 @@ function policyNodes(): GraphNode[] {
     nixosSharedHostLaneGovernanceNodeFixture(),
     kubernetesAdmissionPolicyNodeFixture({
       allowed_refs: ["main"],
-      required_checks: ["deploy/pleomino-staging"],
+      required_checks: ["deploy/sample-webapp-staging"],
     }),
   ];
 }

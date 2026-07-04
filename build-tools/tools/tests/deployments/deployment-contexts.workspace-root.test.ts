@@ -120,7 +120,7 @@ test("read-only graph options resolve default inputs from workspace root", async
 async function withWorkspace(run: (paths: { root: string; nested: string }) => Promise<void>) {
   const oldCwd = process.cwd();
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "deployment-context-root-"));
-  const nested = path.join(root, "projects", "deployments", "pleomino", "nested");
+  const nested = path.join(root, "projects", "deployments", "sample-webapp", "nested");
   try {
     await fs.mkdir(nested, { recursive: true });
     process.chdir(nested);
@@ -165,11 +165,11 @@ function kubernetesLocalOnlyNodes(): GraphNode[] {
     kubernetesLanePolicyNodeFixture(),
     nixosSharedHostLaneGovernanceNodeFixture({
       source_ref_policies: [
-        { stage: "dev", allowed_refs: "main", required_checks: "deploy/pleomino-dev" },
+        { stage: "dev", allowed_refs: "main", required_checks: "deploy/sample-webapp-dev" },
         {
           stage: "staging",
           allowed_refs: "main,refs/tags/release/*",
-          required_checks: "deploy/pleomino-staging",
+          required_checks: "deploy/sample-webapp-staging",
         },
         {
           stage: "prod",
@@ -187,9 +187,9 @@ function kubernetesLocalOnlyNodes(): GraphNode[] {
       publisher: "helm-release",
       publisher_config: "helm/values.yaml",
       protection_class: "local_only",
-      lane_policy: "//projects/deployments/pleomino/shared:lane",
+      lane_policy: "//projects/deployments/sample-webapp/shared:lane",
       environment_stage: "prod",
-      admission_policy: "//projects/deployments/pleomino/shared:prod_release",
+      admission_policy: "//projects/deployments/sample-webapp/shared:prod_release",
       secret_requirements: [],
       runtime_config_requirements: [],
       provider_target: {

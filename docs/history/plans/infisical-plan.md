@@ -331,7 +331,7 @@ Implement the Infisical backend adapter behind the generic deployment secret run
   imports disabled for the first release.
 - Honor `VBR_DEPLOYMENT_SECRET_FIXTURE_PATH` for Infisical local/test flows, using synthetic
   backend-qualified fixture references such as
-  `infisical:fixture:secret://deployments/pleomino/cloudflare_api_token@fixture-v1`.
+  `infisical:fixture:secret://deployments/sample-webapp/cloudflare_api_token@fixture-v1`.
 - Fail closed on missing, revoked, deleted, unavailable, malformed, or non-exact replay references.
 
 ### 3. External prerequisites
@@ -1064,34 +1064,34 @@ validation time.
 It tightens metadata validation after earlier Infisical conformance work and requires refreshing
 tests or fixtures that accidentally relied on missing env-name metadata.
 
-## PR-12: Pleomino staging and production Infisical cutover
+## PR-12: Sample webapp staging and production Infisical cutover
 
 ### 1. Intent
 
-Move the Pleomino staging and production Cloudflare Pages deployments from Vault-backed deployment
+Move the Sample webapp staging and production Cloudflare Pages deployments from Vault-backed deployment
 secrets to Infisical-backed deployment secrets while keeping the existing `secret_requirements`
 contract ids, lane governance, provider behavior, and replay guarantees intact.
 
 ### 2. Scope of changes
 
-- Update `//projects/deployments/pleomino/staging:deploy` and
-  `//projects/deployments/pleomino/prod:deploy` so they declare `secret_backend = "infisical/default"`.
-- Preserve `//projects/deployments/pleomino/dev:deploy` on the existing Vault-backed shared-host
+- Update `//projects/deployments/sample-webapp/staging:deploy` and
+  `//projects/deployments/sample-webapp/prod:deploy` so they declare `secret_backend = "infisical/default"`.
+- Preserve `//projects/deployments/sample-webapp/dev:deploy` on the existing Vault-backed shared-host
   path unless a separate plan explicitly moves dev as well.
-- Refactor `projects/deployments/pleomino/shared/family.bzl` so the shared family defaults no
+- Refactor `projects/deployments/sample-webapp/shared/family.bzl` so the shared family defaults no
   longer force one Vault runtime onto every stage when staging and production need Infisical
   routing metadata.
 - Depend on the containerized control-plane runtime from
   [Deployment Control Plane Containerization Plan](../plans/control-plane-plan.md). This PR is now sequenced
-  after that plan so Pleomino's first Infisical staging and production rollout uses the
+  after that plan so Sample webapp's first Infisical staging and production rollout uses the
   horizontally scalable containerized control plane.
-- Add an IaC module for Pleomino's Infisical deployment-secret backend before changing deployment
+- Add an IaC module for Sample webapp's Infisical deployment-secret backend before changing deployment
   metadata.
   - Assume no suitable Infisical project exists yet.
   - Parameterize the module by Infisical organization/account, site URL, project name/slug,
     environment slugs, secret path, secret names, machine identity names, and control-plane
-    credential-file names. The `viberoots` organization and `pleomino-deployments` project are
-    Pleomino inputs for this PR, not global Infisical defaults for future deployments.
+    credential-file names. The `viberoots` organization and `sample-webapp-deployments` project are
+    Sample webapp inputs for this PR, not global Infisical defaults for future deployments.
   - Support both Infisical/control-plane topologies: a control plane dedicated to one Infisical
     account and a shared control plane that hosts multiple Infisical accounts. Do not assume either
     topology globally.
@@ -1104,14 +1104,14 @@ contract ids, lane governance, provider behavior, and replay guarantees intact.
 - Add reviewed non-secret `infisical_runtime` metadata for staging and production:
   - `site_url = "https://app.infisical.com"`
   - `project_id`
-  - `environment = "staging"` for `//projects/deployments/pleomino/staging:deploy`
-  - `environment = "prod"` for `//projects/deployments/pleomino/prod:deploy`
+  - `environment = "staging"` for `//projects/deployments/sample-webapp/staging:deploy`
+  - `environment = "prod"` for `//projects/deployments/sample-webapp/prod:deploy`
   - `secret_path = "/"`
   - `preferred_credential_source = "infisical_machine_identity_universal_auth"`
-  - `machine_identity_client_id_env = "PLEOMINO_STAGING_INFISICAL_CLIENT_ID"` and
-    `machine_identity_client_secret_env = "PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET"` for staging
-  - `machine_identity_client_id_env = "PLEOMINO_PROD_INFISICAL_CLIENT_ID"` and
-    `machine_identity_client_secret_env = "PLEOMINO_PROD_INFISICAL_CLIENT_SECRET"` for production
+  - `machine_identity_client_id_env = "SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_ID"` and
+    `machine_identity_client_secret_env = "SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_SECRET"` for staging
+  - `machine_identity_client_id_env = "SAMPLE_WEBAPP_PROD_INFISICAL_CLIENT_ID"` and
+    `machine_identity_client_secret_env = "SAMPLE_WEBAPP_PROD_INFISICAL_CLIENT_SECRET"` for production
   - `machine_identity_id` for the stage-specific deployment identity when the IaC provider exposes
     it as non-secret output
 - Reuse the portable deployment control-plane credential-directory abstraction from
@@ -1135,10 +1135,10 @@ contract ids, lane governance, provider behavior, and replay guarantees intact.
   - Use the deployment's reviewed `infisical_runtime.site_url`, `project_id`, `environment`,
     env-var names, and optional `machine_identity_id` when preparing the runtime. Do not derive
     those values from ambient control-plane defaults.
-- Do not add `infisical_secret_mappings` for Pleomino; store the existing
-  `secret://deployments/pleomino/cloudflare_api_token` contract as the Infisical shared secret
+- Do not add `infisical_secret_mappings` for Sample webapp; store the existing
+  `secret://deployments/sample-webapp/cloudflare_api_token` contract as the Infisical shared secret
   named `cloudflare_api_token` at `/` in each environment.
-- Keep the current Pleomino `secret_requirements` contract ids, steps, and required flags unchanged
+- Keep the current Sample webapp `secret_requirements` contract ids, steps, and required flags unchanged
   so provider code, admission evidence, and existing Vault-admitted replay records remain
   interpretable.
 - Do not persist Infisical Universal Auth client ids, client secrets, access tokens, personal
@@ -1146,9 +1146,9 @@ contract ids, lane governance, provider behavior, and replay guarantees intact.
   test fixtures.
 - Ensure Cloudflare Pages staging and production publish/provision/preview-cleanup flows continue
   to resolve `cloudflare_api_token` through the neutral runtime after the backend switch.
-- Preserve replay semantics so older Vault-admitted Pleomino staging and production runs continue
+- Preserve replay semantics so older Vault-admitted Sample webapp staging and production runs continue
   to replay against recorded Vault references, while new admissions use Infisical references.
-- Use read-only `deploy admin infisical plan`/`check` diagnostics for Pleomino staging and
+- Use read-only `deploy admin infisical plan`/`check` diagnostics for Sample webapp staging and
   production readiness; do not add an Infisical sync or mutation workflow.
 
 ### 3. External setup and rollout work
@@ -1158,46 +1158,46 @@ work that can happen in parallel with implementation and must be complete before
 production can successfully execute live Infisical-backed deploys. Because the selected sequence is
 containerization first, this PR also assumes the containerized control plane from
 [Deployment Control Plane Containerization Plan](../plans/control-plane-plan.md) has already landed and is
-available for Pleomino rollout. The only external setup needed before PR-12 implementation starts is
+available for Sample webapp rollout. The only external setup needed before PR-12 implementation starts is
 confirming that a `viberoots` Infisical organization administrator can bootstrap the IaC runner
 identity in the selected `https://app.infisical.com` Infisical organization.
 
-These instructions assume no Pleomino Infisical project exists yet. Do not manually create durable
+These instructions assume no Sample webapp Infisical project exists yet. Do not manually create durable
 objects that the PR's IaC module is supposed to own; use manual work only for bootstrap access, real
 secret values, runtime credential installation, verification, and provider gaps explicitly
 documented by the implementation PR.
 
 1. Use the settled Infisical tenant details as non-secret IaC inputs.
-   - These values are settled only for the Pleomino staging and production cutover. Future
+   - These values are settled only for the Sample webapp staging and production cutover. Future
      deployments may use different Infisical organizations/accounts, API base URLs, projects,
      environments, paths, and identities through the same parameterized IaC/control-plane shape.
    - Infisical organization: `viberoots`.
    - Infisical API base URL: `https://app.infisical.com`.
    - Infisical product: Secrets Management.
-   - Infisical project name and slug: `pleomino-deployments`.
+   - Infisical project name and slug: `sample-webapp-deployments`.
    - Environment slugs: `staging` and `prod`.
    - Secret path: `/`.
-   - Secret name for `secret://deployments/pleomino/cloudflare_api_token`:
+   - Secret name for `secret://deployments/sample-webapp/cloudflare_api_token`:
      `cloudflare_api_token`.
    - Deployment identity model: one stage-specific machine identity for staging and one
      stage-specific machine identity for production.
    - Live deploy executor model: a deployment control plane is the only runtime that executes live
-     Pleomino staging or production deploys. CI submits through the appropriate control plane and
-     must not hold Pleomino Infisical workload credentials. The implementation must allow future
+     Sample webapp staging or production deploys. CI submits through the appropriate control plane and
+     must not hold Sample webapp Infisical workload credentials. The implementation must allow future
      deployments to use either one control plane per Infisical account or a shared control plane
      that hosts multiple Infisical accounts.
    - Runtime env-var names:
-     `PLEOMINO_STAGING_INFISICAL_CLIENT_ID`, `PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET`,
-     `PLEOMINO_PROD_INFISICAL_CLIENT_ID`, and `PLEOMINO_PROD_INFISICAL_CLIENT_SECRET`.
+     `SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_ID`, `SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_SECRET`,
+     `SAMPLE_WEBAPP_PROD_INFISICAL_CLIENT_ID`, and `SAMPLE_WEBAPP_PROD_INFISICAL_CLIENT_SECRET`.
    - Default deployment credential-file names:
-     `pleomino-staging-infisical-client-id`, `pleomino-staging-infisical-client-secret`,
-     `pleomino-prod-infisical-client-id`, and `pleomino-prod-infisical-client-secret`.
+     `sample-webapp-staging-infisical-client-id`, `sample-webapp-staging-infisical-client-secret`,
+     `sample-webapp-prod-infisical-client-id`, and `sample-webapp-prod-infisical-client-secret`.
    - Record only these non-secret choices in the PR; do not record Cloudflare token values or
      Universal Auth client secrets.
 
 2. Prepare the Infisical identity that will run the IaC apply.
    - Treat this as manual bootstrap work unless the organization already has an approved external
-     bootstrap mechanism outside this repo. The Pleomino Infisical project cannot own the identity
+     bootstrap mechanism outside this repo. The Sample webapp Infisical project cannot own the identity
      that creates itself.
    - An Infisical organization administrator in the `viberoots` organization creates
      `viberoots-iac` in the Infisical UI:
@@ -1267,7 +1267,7 @@ documented by the implementation PR.
      ordinary diagnostic output.
 
 3. Apply the PR's Infisical IaC before entering any production secret values.
-   - Confirm the plan creates, rather than manually assumes, the Pleomino Secrets Management
+   - Confirm the plan creates, rather than manually assumes, the Sample webapp Secrets Management
      project.
    - Confirm the plan owns the `staging` and `prod` environments, root secret path `/`, the
      stage-specific deployment machine identities, Universal Auth configuration, project identity
@@ -1284,19 +1284,19 @@ documented by the implementation PR.
      deployment metadata PR.
 
 4. Enter the real Cloudflare API token values as shared Infisical secrets.
-   - In Infisical, open the new Pleomino project and select the `staging` environment.
+   - In Infisical, open the new Sample webapp project and select the `staging` environment.
    - Navigate to the root path `/`.
    - Add or update the shared secret named `cloudflare_api_token`.
    - Paste the current trusted staging Cloudflare API token value from the approved source of truth.
    - Save the secret as a shared environment secret, not a personal override.
    - Repeat the same steps in the `prod` environment using the production Cloudflare API token
      value.
-   - Do not import a broad `.env` file unless it contains only the intended Pleomino deployment
+   - Do not import a broad `.env` file unless it contains only the intended Sample webapp deployment
      secret and the import process is approved for production secret material.
    - Do not expose either token in commits, PR descriptions, terminal logs, diagnostics,
      screenshots, tickets, or ordinary IaC state.
 
-5. Install the Pleomino deployment Universal Auth credentials in every runtime that can execute live
+5. Install the Sample webapp deployment Universal Auth credentials in every runtime that can execute live
    staging or production deploys.
    - Use the deployment machine identity client IDs and client secrets created or documented by the
      IaC apply, not the separate IaC runner identity from step 2.
@@ -1304,24 +1304,24 @@ documented by the implementation PR.
      host.
    - On systemd/NixOS hosts, use `LoadCredential=` or the repo's NixOS wrapper for systemd
      credentials. Define one credential file per value using the default deployment-derived names:
-     `pleomino-staging-infisical-client-id`,
-     `pleomino-staging-infisical-client-secret`, `pleomino-prod-infisical-client-id`, and
-     `pleomino-prod-infisical-client-secret`. Keep the source files outside the repo and outside the
+     `sample-webapp-staging-infisical-client-id`,
+     `sample-webapp-staging-infisical-client-secret`, `sample-webapp-prod-infisical-client-id`, and
+     `sample-webapp-prod-infisical-client-secret`. Keep the source files outside the repo and outside the
      Nix store, load them only into the control-plane worker, and read them from
      `$CREDENTIALS_DIRECTORY` when preparing the Infisical runtime.
-   - Treat those credential-file names as Pleomino-specific names. Future deployments should default
+   - Treat those credential-file names as Sample webapp-specific names. Future deployments should default
      to `<deployment-id>-infisical-client-id` and `<deployment-id>-infisical-client-secret`, and may
-     use reviewed override names when needed. They must not share Pleomino's bindings.
+     use reviewed override names when needed. They must not share Sample webapp's bindings.
    - On non-systemd hosts, use an equivalent file-backed service credential mechanism with the same
      isolation properties.
    - Configure the control plane to map those credential files to the reviewed in-memory runtime
      bindings named below only for the worker operation that needs them.
    - Do not install the values in local developer shells, local direct-deploy profiles, CI secret
      stores, plaintext env files, process arguments, Nix store outputs, or ordinary service logs.
-   - CI must submit Pleomino deployment requests to the control plane instead of resolving
+   - CI must submit Sample webapp deployment requests to the control plane instead of resolving
      Infisical secrets directly.
-   - Use `PLEOMINO_STAGING_INFISICAL_CLIENT_ID`, `PLEOMINO_STAGING_INFISICAL_CLIENT_SECRET`,
-     `PLEOMINO_PROD_INFISICAL_CLIENT_ID`, and `PLEOMINO_PROD_INFISICAL_CLIENT_SECRET`.
+   - Use `SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_ID`, `SAMPLE_WEBAPP_STAGING_INFISICAL_CLIENT_SECRET`,
+     `SAMPLE_WEBAPP_PROD_INFISICAL_CLIENT_ID`, and `SAMPLE_WEBAPP_PROD_INFISICAL_CLIENT_SECRET`.
    - Keep the staging and production client secrets separate inside the control-plane secret store
      so staging execution cannot read production with the staging credential.
    - Ensure the worker scrubs these bindings from child-process environments that do not need to
@@ -1329,10 +1329,10 @@ documented by the implementation PR.
    - Read-only metadata validation and cquery extraction must not require these credential values.
 
 6. Verify the Infisical setup without printing secret values.
-   - Run `deploy admin infisical plan` for `//projects/deployments/pleomino/staging:deploy` and
+   - Run `deploy admin infisical plan` for `//projects/deployments/sample-webapp/staging:deploy` and
      confirm it reports the expected site URL, project id, `staging` environment, path, secret name,
      and Universal Auth env-var names.
-   - Run `deploy admin infisical plan` for `//projects/deployments/pleomino/prod:deploy` and
+   - Run `deploy admin infisical plan` for `//projects/deployments/sample-webapp/prod:deploy` and
      confirm it reports the expected site URL, project id, `prod` environment, path, secret name,
      and Universal Auth env-var names.
    - Run live `deploy admin infisical check` through the deployment control plane or a documented
@@ -1362,7 +1362,7 @@ documented by the implementation PR.
 
 8. Keep rollback prerequisites available until the cutover is proven stable.
    - Keep existing Vault configuration and credentials long enough to replay old Vault-admitted
-     Pleomino runs.
+     Sample webapp runs.
    - Do not delete or rotate away the Vault value until the team has an explicit post-cutover
      retention decision.
    - Keep the Infisical IaC state and object ids available so operator-created gaps can be imported
@@ -1372,70 +1372,70 @@ documented by the implementation PR.
 
 ### 4. Tests to be added
 
-- Add extraction/cquery tests proving Pleomino staging and production emit:
+- Add extraction/cquery tests proving Sample webapp staging and production emit:
   - `secret_backend = "infisical/default"`
   - reviewed `infisical_runtime` metadata
   - no `infisical_secret_mappings`
   - unchanged `secret_requirements`
-- Add a regression test proving Pleomino dev still emits the existing Vault backend metadata and is
+- Add a regression test proving Sample webapp dev still emits the existing Vault backend metadata and is
   not accidentally moved to Infisical by shared-family refactoring.
-- Add validation tests proving the Pleomino staging and production metadata satisfy the Infisical
+- Add validation tests proving the Sample webapp staging and production metadata satisfy the Infisical
   Universal Auth env-name requirements and do not contain forbidden credential material.
-- Add fake-Infisical Cloudflare Pages tests proving new Pleomino staging and production admissions
+- Add fake-Infisical Cloudflare Pages tests proving new Sample webapp staging and production admissions
   read Infisical metadata with `viewSecretValue=false` and runtime acquire resolves the admitted
   exact version with `viewSecretValue=true`.
-- Add replay/migration coverage proving a previously Vault-admitted Pleomino staging or production
+- Add replay/migration coverage proving a previously Vault-admitted Sample webapp staging or production
   run continues to replay using recorded Vault references after current metadata selects
   Infisical.
-- Add read-only admin diagnostic coverage proving Pleomino staging and production `plan` output is
+- Add read-only admin diagnostic coverage proving Sample webapp staging and production `plan` output is
   non-secret and `check` reports project/environment/secret readiness without exposing secret
   values or Universal Auth credentials.
-- Add portable credential-directory tests proving Pleomino Infisical Universal Auth credentials can
+- Add portable credential-directory tests proving Sample webapp Infisical Universal Auth credentials can
   be read from deployment-scoped credential files, mapped to the reviewed runtime env-var names only
   for the operation that needs them, and kept out of broad process environment injection.
-- Add docs parity or checked-in metadata guardrail tests proving no Pleomino deployment metadata,
+- Add docs parity or checked-in metadata guardrail tests proving no Sample webapp deployment metadata,
   docs example, or fixture contains Infisical client secrets, personal tokens, access tokens, or
   Cloudflare API token values.
 
 ### 5. Docs to be added or updated
 
-- Update Pleomino or deployments usage docs with the reviewed operator steps for the staging and
+- Update Sample webapp or deployments usage docs with the reviewed operator steps for the staging and
   production Infisical cutover.
-- Document the Infisical secret names/paths or the default mapping rule used for the Pleomino
+- Document the Infisical secret names/paths or the default mapping rule used for the Sample webapp
   `cloudflare_api_token` contract, without including secret values.
-- Document the required Universal Auth environment variable names for Pleomino staging and
+- Document the required Universal Auth environment variable names for Sample webapp staging and
   production operators.
-- Add rollback/replay notes explaining that old Vault-admitted Pleomino runs remain replayable and
+- Add rollback/replay notes explaining that old Vault-admitted Sample webapp runs remain replayable and
   new runs admit Infisical references after the metadata change.
 
 ### 5.5. Expected regression scope
 
 - `deployment-and-project-impact`
-- The implementation should stay in deployment-owned Pleomino project metadata, deployment tests,
-  and docs. Do not change shared Infisical runtime logic unless the Pleomino cutover exposes a real
+- The implementation should stay in deployment-owned Sample webapp project metadata, deployment tests,
+  and docs. Do not change shared Infisical runtime logic unless the Sample webapp cutover exposes a real
   generic bug; if it does, update this plan before expanding scope.
 
 ### 6. Acceptance criteria
 
-- `//projects/deployments/pleomino/staging:deploy` and
-  `//projects/deployments/pleomino/prod:deploy` select Infisical as their deployment secret backend.
-- Pleomino dev remains Vault-backed.
-- Pleomino staging and production have reviewed, non-secret Infisical Universal Auth env-name
+- `//projects/deployments/sample-webapp/staging:deploy` and
+  `//projects/deployments/sample-webapp/prod:deploy` select Infisical as their deployment secret backend.
+- Sample webapp dev remains Vault-backed.
+- Sample webapp staging and production have reviewed, non-secret Infisical Universal Auth env-name
   metadata and pass deployment metadata validation.
-- Pleomino staging and production `secret_requirements` remain stable, and any mapping overrides
+- Sample webapp staging and production `secret_requirements` remain stable, and any mapping overrides
   are explicitly reviewed.
-- Fake-Infisical tests prove new Pleomino staging and production admissions and runtime acquire use
+- Fake-Infisical tests prove new Sample webapp staging and production admissions and runtime acquire use
   Infisical without live network access.
 - The portable credential-directory abstraction from the containerization plan is reused, and
-  Pleomino Infisical credentials resolve through deployment-scoped credential files without a
+  Sample webapp Infisical credentials resolve through deployment-scoped credential files without a
   NixOS-only, environment-file-only, or global-tenant credential path.
-- Replay tests prove older Vault-admitted Pleomino runs continue to use recorded Vault references.
+- Replay tests prove older Vault-admitted Sample webapp runs continue to use recorded Vault references.
 - Docs and diagnostics describe the cutover without leaking any secret values or Infisical
   credentials.
 
 ### 7. Risks
 
-- Changing shared Pleomino family defaults could accidentally move dev or future stages to
+- Changing shared Sample webapp family defaults could accidentally move dev or future stages to
   Infisical.
 - Incorrect Infisical project/environment/path metadata could break staging or production deploys
   at admission or runtime acquire.
@@ -1446,7 +1446,7 @@ documented by the implementation PR.
 
 ### 8. Mitigations
 
-- Add explicit cquery tests for all three Pleomino stages so staging/prod move to Infisical while
+- Add explicit cquery tests for all three Sample webapp stages so staging/prod move to Infisical while
   dev stays Vault-backed.
 - Keep `secret_requirements` contract ids unchanged and rely on recorded admitted backend refs for
   replay authority.
@@ -1457,20 +1457,20 @@ documented by the implementation PR.
 
 ### 9. Consequences of not implementing this PR
 
-Pleomino staging and production will continue depending on Vault for Cloudflare deployment secrets,
-leaving the Infisical implementation unused for the concrete Pleomino release lanes that need the
+Sample webapp staging and production will continue depending on Vault for Cloudflare deployment secrets,
+leaving the Infisical implementation unused for the concrete Sample webapp release lanes that need the
 backend migration.
 
 ### 10. Downsides for implementing this PR
 
-It introduces stage-specific Pleomino secret backend metadata and requires coordinated external
+It introduces stage-specific Sample webapp secret backend metadata and requires coordinated external
 Infisical setup before live staging or production deployments can use the new backend.
 
 ## PR-16: Infisical site URL contract and end-range traceability repair
 
 ### 1. Intent
 
-Reconcile the Pleomino Infisical site URL contract with the implemented metadata/IaC defaults and
+Reconcile the Sample webapp Infisical site URL contract with the implemented metadata/IaC defaults and
 restore plan traceability for the post-PR-12 Infisical follow-up range.
 
 Traceability note: PR-16 through PR-18 are assessment-driven follow-up sections created after the
@@ -1479,8 +1479,8 @@ so future plan assessments can map the end-of-range fixes by PR number.
 
 ### 2. Scope of changes
 
-- Decide and document the authoritative Pleomino Infisical site URL for staging and production.
-- If the PR-12 contract remains authoritative, change Pleomino metadata, OpenTofu defaults, tests,
+- Decide and document the authoritative Sample webapp Infisical site URL for staging and production.
+- If the PR-12 contract remains authoritative, change Sample webapp metadata, OpenTofu defaults, tests,
   docs, and diagnostic expectations from `https://us.infisical.com` to
   `https://app.infisical.com`.
 - If `https://us.infisical.com` is the intended endpoint, explicitly amend this plan, the design
@@ -1493,12 +1493,12 @@ so future plan assessments can map the end-of-range fixes by PR number.
 
 ### 3. External prerequisites
 
-- Operators must confirm which Infisical SaaS endpoint the Pleomino project and machine identities
+- Operators must confirm which Infisical SaaS endpoint the Sample webapp project and machine identities
   actually use before any production rollout relies on the reconciled metadata.
 
 ### 4. Tests to be added
 
-- Add metadata extraction and validation tests proving Pleomino staging and production emit the
+- Add metadata extraction and validation tests proving Sample webapp staging and production emit the
   reviewed site URL exactly.
 - Add OpenTofu default and rendered-plan tests proving the IaC path uses the same site URL contract
   as deployment metadata.
@@ -1509,7 +1509,7 @@ so future plan assessments can map the end-of-range fixes by PR number.
 
 ### 5. Docs to be added or updated
 
-- Update Infisical operator docs, Pleomino cutover docs, and any OpenTofu README or variable docs
+- Update Infisical operator docs, Sample webapp cutover docs, and any OpenTofu README or variable docs
   to use the same reviewed site URL.
 - Add a short traceability note explaining that PR-16 through PR-18 are follow-up sections created
   from the completed end-of-range assessments and must remain in sync with their implementation
@@ -1518,16 +1518,16 @@ so future plan assessments can map the end-of-range fixes by PR number.
 ### 5.5. Expected regression scope
 
 - `deployment-and-project-impact`
-- Keep changes to Pleomino deployment metadata, Infisical IaC defaults/tests, deployment docs, and
+- Keep changes to Sample webapp deployment metadata, Infisical IaC defaults/tests, deployment docs, and
   plan traceability. Do not alter generic Infisical runtime behavior unless the site URL
   reconciliation exposes a shared normalization bug; if it does, update this plan before expanding
   scope.
 
 ### 6. Acceptance criteria
 
-- The plan, design references, Pleomino metadata, OpenTofu defaults, tests, and diagnostics agree on
+- The plan, design references, Sample webapp metadata, OpenTofu defaults, tests, and diagnostics agree on
   one reviewed Infisical site URL.
-- Assessments no longer report PR-12 noncompliance for the Pleomino site URL.
+- Assessments no longer report PR-12 noncompliance for the Sample webapp site URL.
 - Future plan assessments can find traceable PR-16, PR-17, and PR-18 sections in this document.
 - No secret values or Infisical credentials are introduced into docs, metadata, IaC defaults, tests,
   or diagnostic output.
@@ -1547,7 +1547,7 @@ so future plan assessments can map the end-of-range fixes by PR number.
 
 ### 9. Consequences of not implementing this PR
 
-Pleomino Infisical metadata and IaC will remain noncompliant with the PR-12 contract, and future
+Sample webapp Infisical metadata and IaC will remain noncompliant with the PR-12 contract, and future
 assessments will continue losing traceability for the implemented post-PR-12 range.
 
 ### 10. Downsides for implementing this PR
@@ -1844,9 +1844,9 @@ reports from documentation examples and test fixtures.
 
 ### 1. Intent
 
-Separate repo-wide Infisical/SprinkleRef backend bootstrap from Pleomino-specific Infisical
+Separate repo-wide Infisical/SprinkleRef backend bootstrap from Sample webapp-specific Infisical
 deployment provisioning so operators can initialize and validate the repository's secret backend
-profile registry without implicitly creating or reconciling Pleomino resources. Preserve support
+profile registry without implicitly creating or reconciling Sample webapp resources. Preserve support
 for mixed backends, including the near-term Vault/Infisical split and future deployments that may
 use different Infisical accounts or different Vault instances.
 
@@ -1878,21 +1878,21 @@ use different Infisical accounts or different Vault instances.
   config owns the account-specific profile details, and admitted run metadata records the concrete
   backend kind/profile/ref used at admission time.
 - Preserve a simple default profile path for current deployments so existing Vault-backed
-  deployments and the Pleomino Infisical cutover do not require unnecessary per-deployment config
+  deployments and the Sample webapp Infisical cutover do not require unnecessary per-deployment config
   churn.
-- Move the current Pleomino-specific OpenTofu module, reviewed metadata reconciliation, project
+- Move the current Sample webapp-specific OpenTofu module, reviewed metadata reconciliation, project
   creation, environment creation, and deployment Universal Auth credential management behind an
   explicit deployment-specific mode or target selection.
 - Require deployment-specific bootstrap to name its scope explicitly with `--target <buck-target>`
   before it can use
-  `projects/deployments/pleomino/infisical/opentofu` or
-  `projects/deployments/pleomino/shared/family.bzl`.
-- Keep existing Pleomino bootstrap behavior available through the new explicit deployment-specific
-  path, without changing the reviewed Pleomino metadata contract.
-- Update dry-run output so repo-wide bootstrap reports no Pleomino paths, projects, or OpenTofu
-  modules unless a Pleomino deployment scope was explicitly selected.
+  `projects/deployments/sample-webapp/infisical/opentofu` or
+  `projects/deployments/sample-webapp/shared/family.bzl`.
+- Keep existing Sample webapp bootstrap behavior available through the new explicit deployment-specific
+  path, without changing the reviewed Sample webapp metadata contract.
+- Update dry-run output so repo-wide bootstrap reports no Sample webapp paths, projects, or OpenTofu
+  modules unless a Sample webapp deployment scope was explicitly selected.
 - Update `sprinkleref --check` guidance so an absent resolver config points operators at repo-wide
-  bootstrap or `sprinkleref --init`, not a Pleomino provisioning command.
+  bootstrap or `sprinkleref --init`, not a Sample webapp provisioning command.
 
 ### 3. External prerequisites
 
@@ -1902,7 +1902,7 @@ use different Infisical accounts or different Vault instances.
 
 ### 4. Tests to be added
 
-- Add repo-wide dry-run tests proving no Pleomino OpenTofu directory, reviewed metadata path, project
+- Add repo-wide dry-run tests proving no Sample webapp OpenTofu directory, reviewed metadata path, project
   slug, or deployment credential names appear unless a deployment-specific scope is selected.
 - Add repo-wide non-dry-run preflight tests proving missing `--yes` fails before resolver config,
   Infisical, OpenTofu, or credential-sink mutation.
@@ -1920,12 +1920,12 @@ use different Infisical accounts or different Vault instances.
   the unified selector or omitted default.
 - Add admission metadata tests proving admitted runs record the concrete backend kind, profile alias,
   and backend reference used at admission time so replays do not silently switch profiles.
-- Add deployment-specific selection tests proving the Pleomino OpenTofu module and reviewed
-  metadata reconciliation run only when the Pleomino deployment scope is explicitly selected.
-- Add regression tests proving the existing Pleomino provisioning path still reconciles against
-  checked-in Pleomino metadata and manages the expected deployment credential refs.
+- Add deployment-specific selection tests proving the Sample webapp OpenTofu module and reviewed
+  metadata reconciliation run only when the Sample webapp deployment scope is explicitly selected.
+- Add regression tests proving the existing Sample webapp provisioning path still reconciles against
+  checked-in Sample webapp metadata and manages the expected deployment credential refs.
 - Add `sprinkleref --check` guidance tests proving missing resolver config diagnostics mention
-  repo-wide bootstrap or `sprinkleref --init`, and do not imply that Pleomino provisioning is
+  repo-wide bootstrap or `sprinkleref --init`, and do not imply that Sample webapp provisioning is
   required for repo-wide validation.
 
 ### 5. Docs to be added or updated
@@ -1940,7 +1940,7 @@ use different Infisical accounts or different Vault instances.
   - `infisical-bootstrap deployment --target <buck-target> --yes`
 - Update `docs/sprinkleref.md` and `docs/sprinkleref-check.md` with the repo-wide initialization
   workflow before running `sprinkleref --check --config ...`.
-- Update `projects/deployments/pleomino/infisical/README.md` so Pleomino instructions call the
+- Update `projects/deployments/sample-webapp/infisical/README.md` so Sample webapp instructions call the
   explicit deployment-specific bootstrap path and no longer appear to be the default repo-wide
   bootstrap.
 - Update `docs/history/designs/infisical-design.md` and deployment metadata docs if needed to clarify that
@@ -1957,13 +1957,13 @@ use different Infisical accounts or different Vault instances.
 
 - `deployment-only`
 - Keep changes in Infisical bootstrap CLI/configuration, SprinkleRef initialization/check guidance,
-  Pleomino Infisical provisioning wiring, docs, and tests. If implementation requires changes to
+  Sample webapp Infisical provisioning wiring, docs, and tests. If implementation requires changes to
   generic deployment admission or runtime secret acquisition, update this plan before expanding
   scope.
 
 ### 6. Acceptance criteria
 
-- Operators can run a repo-wide Infisical/SprinkleRef bootstrap dry-run without seeing Pleomino
+- Operators can run a repo-wide Infisical/SprinkleRef bootstrap dry-run without seeing Sample webapp
   project, OpenTofu, or reviewed metadata paths.
 - Repo-wide bootstrap can initialize and validate the repository backend-profile registry and
   resolver config boundary without provisioning a deployment-specific Infisical project.
@@ -1976,16 +1976,16 @@ use different Infisical accounts or different Vault instances.
   deployment targets.
 - Admitted run metadata records the selected backend kind/profile/ref so replay behavior is stable
   across later profile config changes.
-- Pleomino Infisical provisioning still exists, but requires an explicit deployment-specific
-  `--target` selector before it can touch the Pleomino OpenTofu module or reviewed metadata.
+- Sample webapp Infisical provisioning still exists, but requires an explicit deployment-specific
+  `--target` selector before it can touch the Sample webapp OpenTofu module or reviewed metadata.
 - `sprinkleref --check` absent-config guidance points to repo-wide initialization, and configured
-  checks can distinguish present, missing, unmapped, and unchecked refs without requiring Pleomino
+  checks can distinguish present, missing, unmapped, and unchecked refs without requiring Sample webapp
   provisioning.
 - Bootstrap dry-run and non-dry-run confirmation semantics remain explicit and mutation-safe.
 
 ### 7. Risks
 
-- Splitting command modes could break existing operator muscle memory for the Pleomino bootstrap
+- Splitting command modes could break existing operator muscle memory for the Sample webapp bootstrap
   path.
 - Repo-wide bootstrap could become too abstract if it tries to infer deployment provisioning policy
   that belongs in deployment metadata.
@@ -1996,7 +1996,7 @@ use different Infisical accounts or different Vault instances.
 
 ### 8. Mitigations
 
-- Preserve the current Pleomino behavior behind a compatibility path or a clearly documented
+- Preserve the current Sample webapp behavior behind a compatibility path or a clearly documented
   deployment selector during the migration.
 - Keep repo-wide bootstrap narrowly focused on resolver config, named backend profiles, and
   bootstrap credential sink policy.
@@ -2007,7 +2007,7 @@ use different Infisical accounts or different Vault instances.
 
 ### 9. Consequences of not implementing this PR
 
-Operators will continue seeing Pleomino-specific resources in what appears to be a repo-wide
+Operators will continue seeing Sample webapp-specific resources in what appears to be a repo-wide
 Infisical bootstrap flow, making it unclear whether setting up Infisical for the repo requires
 provisioning a specific deployment family. The repo will also lack an explicit place to model
 future deployments that need a different Infisical account or Vault instance.
@@ -2015,7 +2015,7 @@ future deployments that need a different Infisical account or Vault instance.
 ### 10. Downsides for implementing this PR
 
 The bootstrap CLI surface becomes more explicit and may require a short migration for existing
-Pleomino bootstrap instructions and scripts. Introducing backend profile aliases adds a small
+Sample webapp bootstrap instructions and scripts. Introducing backend profile aliases adds a small
 configuration concept that must be documented carefully.
 
 ## PR-21: Bootstrap operator guardrail completion
@@ -2633,8 +2633,8 @@ independently.
   macOS Keychain services, so root/bootstrap access credentials are stored only through the
   configured non-Infisical bootstrap credential sink category.
 - Remove deployment-specific placeholders from generated repo-wide starter configs. Generated
-  `sprinkleref/base.json` and sibling templates must not mention Pleomino names, Pleomino project
-  ids, Pleomino secret paths, or any other deployment-specific value.
+  `sprinkleref/base.json` and sibling templates must not mention Sample webapp names, Sample webapp project
+  ids, Sample webapp secret paths, or any other deployment-specific value.
 - Keep deployment bootstrap focused on deployment-specific backend resources and application secret
   lifecycle. It should consume repo-level resolver profiles instead of asking every deployment to
   independently establish the shared account/project/Vault/profile/bootstrap-sink boundary.
@@ -2663,7 +2663,7 @@ independently.
   bootstrap sink, including macOS Keychain service names and restrictive local-file paths, without
   routing bootstrap credentials through Infisical.
 - Add starter-template regression tests proving generated resolver configs contain no
-  deployment-specific names, Pleomino placeholders, Pleomino project ids, or example refs.
+  deployment-specific names, Sample webapp placeholders, Sample webapp project ids, or example refs.
 - Add dry-run tests proving repo bootstrap reports planned backend profile and bootstrap sink
   materialization without calling login, writing resolver files, writing credential sinks, or
   mutating backends.
@@ -2695,7 +2695,7 @@ independently.
   `vault-default` performs the necessary backend login/org/project/profile or Vault profile setup,
   or fails with clear remediation.
 - Generated repo-wide starter configs are generic and contain no deployment-specific placeholders
-  such as Pleomino project ids.
+  such as Sample webapp project ids.
 - Resolver config written by repo bootstrap contains real non-secret profile metadata for required
   backend profiles, not fake project ids, fake Vault addresses, or hidden sink assumptions.
 - Repo bootstrap validates or materializes the selected bootstrap credential sink before reporting
@@ -2741,7 +2741,7 @@ dry-run output, and fake-server/fake-sink test coverage.
 
 Close the post-PR-28 assessment gaps so the shipped Infisical resolver and bootstrap surfaces match
 the reviewed first-release model. Infisical resolver profiles should expose only Universal Auth
-workload credentials, repo bootstrap retry/default guidance should not leak Pleomino deployment
+workload credentials, repo bootstrap retry/default guidance should not leak Sample webapp deployment
 paths, and bootstrap docs should consistently distinguish interactive confirmation from
 non-interactive `--yes` automation.
 
@@ -2755,9 +2755,9 @@ non-interactive `--yes` automation.
 - Keep Vault `tokenEnv` support unchanged. This PR only removes raw-token support from Infisical
   resolver profiles.
 - Split repo-mode bootstrap defaults and retry guidance from deployment-mode OpenTofu defaults.
-  Repo-mode retry output must not include `--tofu-dir`, Pleomino paths, or other deployment-only
+  Repo-mode retry output must not include `--tofu-dir`, Sample webapp paths, or other deployment-only
   flags unless a deployment scope is explicitly selected.
-- Ensure repo bootstrap config defaults and dry-run output remain repo-wide and generic; Pleomino
+- Ensure repo bootstrap config defaults and dry-run output remain repo-wide and generic; Sample webapp
   OpenTofu defaults may exist only on the explicit deployment bootstrap path.
 - Update bootstrap documentation so mutation-capable local operator flows may either pass `--yes`
   for non-interactive confirmation or answer the interactive `Y/n` prompt, while CI and
@@ -2779,10 +2779,10 @@ non-interactive `--yes` automation.
 - Add Infisical resolver/runtime tests proving no normal SprinkleRef profile path accepts raw access
   token credentials, while Universal Auth credential acquisition still works.
 - Add bootstrap preflight/retry tests proving repo-mode retry guidance omits `--tofu-dir` and
-  Pleomino deployment paths, while deployment-mode retry guidance keeps explicit deployment
+  Sample webapp deployment paths, while deployment-mode retry guidance keeps explicit deployment
   OpenTofu flags.
 - Add docs or starter regression coverage proving repo-mode dry-run and operator examples do not
-  mention Pleomino unless the explicit deployment mode is selected.
+  mention Sample webapp unless the explicit deployment mode is selected.
 - Keep existing interactive confirmation tests for `Y/n` local operator flows and add docs
   consistency coverage if a suitable docs regression test exists.
 
@@ -2808,7 +2808,7 @@ non-interactive `--yes` automation.
 - Infisical SprinkleRef profiles cannot be configured with raw token credentials.
 - Universal Auth remains the only operator-visible Infisical workload credential source for normal
   resolver profiles.
-- Repo-mode bootstrap retry guidance and dry-run/operator output contain no Pleomino OpenTofu path
+- Repo-mode bootstrap retry guidance and dry-run/operator output contain no Sample webapp OpenTofu path
   or deployment-only flag leakage.
 - Deployment-mode bootstrap still carries the deployment OpenTofu defaults and flags it needs.
 - Bootstrap docs consistently describe `--yes` as non-interactive pre-confirmation and preserve
@@ -2833,7 +2833,7 @@ non-interactive `--yes` automation.
 ### 9. Consequences of not implementing this PR
 
 The repo would continue to expose an unreviewed raw-token Infisical resolver path, repo bootstrap
-guidance would still imply Pleomino/OpenTofu during repo-wide setup, and docs would contradict the
+guidance would still imply Sample webapp/OpenTofu during repo-wide setup, and docs would contradict the
 implemented interactive confirmation behavior.
 
 ### 10. Downsides for implementing this PR
@@ -2950,7 +2950,7 @@ shared infrastructure directories, and future migrations.
   `projects/deployments/<family>/...`.
 - Preserve explicit `deployment_family` as the highest-precedence value. If an explicit family is
   present, use it even when it differs from the inferred directory name.
-- Keep flat legacy deployment packages such as `projects/deployments/pleomino/prod` working with no
+- Keep flat legacy deployment packages such as `projects/deployments/sample-webapp/prod` working with no
   inferred family unless they explicitly pass `deployment_family`.
 - Keep `environment_stage` explicit. Do not infer stages from target names or directories in this
   PR.
@@ -2973,7 +2973,7 @@ shared infrastructure directories, and future migrations.
 - Add tests proving an explicit `deployment_family` overrides the inferred directory family without
   error.
 - Add tests proving flat legacy packages do not accidentally infer a family from names such as
-  `pleomino-prod`.
+  `sample-webapp-prod`.
 - Add SprinkleRef report tests proving missing values show the effective family for both explicit
   and inferred family metadata.
 - Add docs or schema guard coverage for the explicit-overrides-inferred precedence rule if a
@@ -3061,7 +3061,7 @@ of implying that `--yes` is required.
   Infisical, run OpenTofu, write resolver files, write credential sinks, or mutate deployments.
 - Derive deployment bootstrap targets from reviewed deployment metadata or the exported deployment
   graph rather than hardcoding operator command text. It is acceptable for this PR to run only the
-  currently supported Pleomino deployment bootstrap targets, but unsupported targets must be
+  currently supported Sample webapp deployment bootstrap targets, but unsupported targets must be
   reported clearly rather than silently ignored.
 - Ensure failures from a deployment bootstrap run are reported with the target that failed and do
   not claim the repo bootstrap fully cleared managed deployment outputs.
@@ -3194,16 +3194,16 @@ package names.
 
 ### 2. Scope of changes
 
-- Migrate Pleomino deployment packages from flat legacy paths such as
-  `projects/deployments/pleomino-staging`, `projects/deployments/pleomino-prod`,
-  `projects/deployments/pleomino-dev`, `projects/deployments/pleomino-shared`, and
-  `projects/deployments/pleomino-infisical` into canonical family paths under
-  `projects/deployments/pleomino/...`.
+- Migrate Sample webapp deployment packages from flat legacy paths such as
+  `projects/deployments/sample-webapp-staging`, `projects/deployments/sample-webapp-prod`,
+  `projects/deployments/sample-webapp-dev`, `projects/deployments/sample-webapp-shared`, and
+  `projects/deployments/sample-webapp-infisical` into canonical family paths under
+  `projects/deployments/sample-webapp/...`.
 - Preserve stable deployment IDs, environment stages, prerequisite IDs, published records, secret
   contract IDs, and provider-facing resource names. This PR may change Buck labels and source paths,
   but it must not rename live deployment identities unless a specific existing identity is already
   label-derived and the migration documents that exception.
-- Remove explicit `deployment_family = "pleomino"` from canonical Pleomino deployment targets when
+- Remove explicit `deployment_family = "sample-webapp"` from canonical Sample webapp deployment targets when
   directory inference supplies the same effective value. Keep explicit overrides only where the
   package is intentionally non-canonical or where shared/provider helper code needs one during the
   migration.
@@ -3213,9 +3213,9 @@ package names.
 - Keep compatibility aliases out of the public deployment surface unless they are needed as a
   temporary internal migration helper for tests. The canonical labels should be the labels that
   operator-facing docs, bootstrap output, and SprinkleRef reports show.
-- Evaluate other deployment families such as `platform-*` and `data-room-*` during implementation.
+- Evaluate other deployment families such as `platform-*` and `sample-webapp-*` during implementation.
   If they can be migrated with the same mechanical pattern and low risk, include them; otherwise
-  document why this PR intentionally limits the first migration to Pleomino and leaves follow-up
+  document why this PR intentionally limits the first migration to Sample webapp and leaves follow-up
   family migrations explicit.
 
 ### 3. External prerequisites
@@ -3227,29 +3227,29 @@ package names.
 
 ### 4. Tests to be added
 
-- Add cquery tests proving the moved canonical Pleomino targets infer `deployment_family =
-"pleomino"` without explicit metadata and retain their expected `environment_stage` values.
+- Add cquery tests proving the moved canonical Sample webapp targets infer `deployment_family =
+"sample-webapp"` without explicit metadata and retain their expected `environment_stage` values.
 - Add regression tests proving moved targets preserve stable deployment IDs, prerequisite IDs,
   secret requirement IDs, secret paths, and provider-facing identifiers.
 - Add tests proving Infisical repo bootstrap fan-out discovers and reports the new canonical
-  Pleomino labels, and does not keep hardcoded references to the old flat labels.
+  Sample webapp labels, and does not keep hardcoded references to the old flat labels.
 - Add SprinkleRef tests proving missing-value output, `required by:` source details, managed
   bootstrap output grouping, and target filtering use the new canonical labels and inferred family.
 - Add docs/guard tests or stale-name checks that fail if operator-facing docs still reference the
-  old flat Pleomino deployment package paths except in an intentional migration note.
+  old flat Sample webapp deployment package paths except in an intentional migration note.
 - Update existing deployment provider, front-door, promotion, admission, and reviewed-source tests
   whose fixtures or assertions reference the old labels so they validate the canonical labels
   instead of preserving stale paths.
 
 ### 5. Docs to be added or updated
 
-- Update `docs/history/designs/infisical-design.md` to state that the real Pleomino deployments now use canonical
+- Update `docs/history/designs/infisical-design.md` to state that the real Sample webapp deployments now use canonical
   family directories and that flat packages are only legacy support for not-yet-migrated families.
 - Update `docs/infisical-bootstrap.md`, `infisical-bootstrap.md`, `docs/sprinkleref.md`, and
   `docs/sprinkleref-check.md` so command examples, retry guidance, and report examples use the new
   canonical labels.
-- Update any Pleomino deployment README or bootstrap handoff docs that mention
-  `projects/deployments/pleomino-*` paths.
+- Update any Sample webapp deployment README or bootstrap handoff docs that mention
+  `projects/deployments/sample-webapp-*` paths.
 - Add a short migration note documenting old-to-new path and label mapping for operators and future
   code reviewers.
 
@@ -3263,17 +3263,17 @@ package names.
 
 ### 6. Acceptance criteria
 
-- Pleomino deployment targets live under canonical `projects/deployments/pleomino/...` family
+- Sample webapp deployment targets live under canonical `projects/deployments/sample-webapp/...` family
   directories, and operator-facing labels use those canonical paths.
-- Canonical Pleomino targets infer `deployment_family = "pleomino"` without duplicate explicit
+- Canonical Sample webapp targets infer `deployment_family = "sample-webapp"` without duplicate explicit
   family metadata, while `environment_stage` remains explicit.
 - Stable deployment IDs, prerequisite IDs, secret contract IDs, managed bootstrap output paths, and
   provider-facing names remain unchanged unless an exception is explicitly justified in the PR.
 - Infisical repo bootstrap fan-out and explicit `deployment --target` retry guidance use the new
-  canonical Pleomino labels.
+  canonical Sample webapp labels.
 - SprinkleRef missing-value and managed-output reports show the inferred family and canonical
   `required by:` labels.
-- Repo docs no longer present the old flat Pleomino labels as the current command surface.
+- Repo docs no longer present the old flat Sample webapp labels as the current command surface.
 - Focused tests and the repository validation suite pass.
 
 ### 7. Risks
@@ -3286,21 +3286,21 @@ package names.
 
 ### 8. Mitigations
 
-- Start by mapping every old Pleomino path and label to its canonical replacement, then update
+- Start by mapping every old Sample webapp path and label to its canonical replacement, then update
   references mechanically with focused review of any non-mechanical exceptions.
 - Add explicit stable-identity tests before or alongside the move so label churn cannot silently
   change deployment identities or secret contract paths.
 - Prefer direct canonical label updates over compatibility aliases. If a temporary alias is needed,
   keep it internal, tested, documented with a removal condition, and absent from operator-facing
   output.
-- Keep implementation limited to one family if broader `platform-*` or `data-room-*` migration
+- Keep implementation limited to one family if broader `platform-*` or `sample-webapp-*` migration
   exposes unrelated provider-specific risk.
 
 ### 9. Consequences of not implementing this PR
 
 The repository will continue to support family directory inference only in tests and future
 packages, while real deployments remain in the flat legacy layout. Operators will keep seeing
-labels such as `//projects/deployments/pleomino/staging:deploy`, and family membership will remain
+labels such as `//projects/deployments/sample-webapp/staging:deploy`, and family membership will remain
 partly duplicated in shared metadata instead of being expressed by the source tree.
 
 ### 10. Downsides for implementing this PR
@@ -3313,24 +3313,24 @@ updated to the canonical labels.
 
 ### 1. Intent
 
-Remove the remaining Pleomino-specific credential namespace from repo-wide Infisical profile
+Remove the remaining Sample webapp-specific credential namespace from repo-wide Infisical profile
 materialization. Repo bootstrap should be able to create and validate generic repo backend profiles
-without storing normal profile auth refs under `secret://deployments/pleomino/...`, while
-deployment bootstrap remains responsible for Pleomino managed workload credentials.
+without storing normal profile auth refs under `secret://deployments/sample-webapp/...`, while
+deployment bootstrap remains responsible for Sample webapp managed workload credentials.
 
 ### 2. Scope of changes
 
-- Replace the current hardcoded Pleomino bootstrap credential refs used for repo-wide
+- Replace the current hardcoded Sample webapp bootstrap credential refs used for repo-wide
   `infisical-default` profile materialization with a repo-scoped credential namespace such as
   `secret://viberoots/bootstrap/infisical-default/client-id` and
   `secret://viberoots/bootstrap/infisical-default/client-secret`, or another explicit repo-wide
   namespace chosen during implementation.
 - Keep deployment managed outputs, including
-  `secret://deployments/pleomino/<stage>/infisical-client-id` and
-  `secret://deployments/pleomino/<stage>/infisical-client-secret`, owned by deployment bootstrap
+  `secret://deployments/sample-webapp/<stage>/infisical-client-id` and
+  `secret://deployments/sample-webapp/<stage>/infisical-client-secret`, owned by deployment bootstrap
   and grouped as managed deployment outputs in SprinkleRef.
 - Ensure repo-mode bootstrap profile materialization, dry-run JSON, generated resolver config, and
-  operator-facing summaries contain no Pleomino family names, Pleomino project paths, Pleomino
+  operator-facing summaries contain no Sample webapp family names, Sample webapp project paths, Sample webapp
   secret paths, or deployment-only OpenTofu values unless an explicit deployment target is selected.
 - Preserve support for multiple Infisical accounts/projects or Vault instances through separate
   repo profile aliases without requiring those profiles to reuse a deployment family namespace.
@@ -3347,23 +3347,23 @@ deployment bootstrap remains responsible for Pleomino managed workload credentia
 ### 4. Tests to be added
 
 - Add repo-bootstrap profile materialization tests proving `infisical-default` uses repo-scoped
-  credential refs and does not contain `secret://deployments/pleomino/...`.
-- Add regression tests proving deployment bootstrap still reports Pleomino managed workload outputs
+  credential refs and does not contain `secret://deployments/sample-webapp/...`.
+- Add regression tests proving deployment bootstrap still reports Sample webapp managed workload outputs
   under the deployment namespace and does not confuse them with repo profile credentials.
-- Add dry-run and generated-config tests proving repo mode contains no Pleomino-specific values
+- Add dry-run and generated-config tests proving repo mode contains no Sample webapp-specific values
   unless deployment fan-out or an explicit deployment target is selected.
 - Add negative stale-string or guard coverage for the generic profile helper so future repo-wide
   profiles cannot accidentally reintroduce a deployment-family credential namespace.
 - Update any existing SprinkleRef or bootstrap tests whose expected resolver output currently
-  assumes Pleomino-scoped repo profile credentials.
+  assumes Sample webapp-scoped repo profile credentials.
 
 ### 5. Docs to be added or updated
 
 - Update `docs/history/designs/infisical-design.md`, `docs/infisical-bootstrap.md`, and `infisical-bootstrap.md` to
   distinguish repo profile credentials from deployment managed workload credentials.
 - Document the repo-scoped credential namespace and the operator action needed when old local
-  resolver state still points at the previous Pleomino-scoped refs.
-- Keep Pleomino deployment bootstrap docs focused on deployment-created workload credentials, not
+  resolver state still points at the previous Sample webapp-scoped refs.
+- Keep Sample webapp deployment bootstrap docs focused on deployment-created workload credentials, not
   repo-wide profile auth refs.
 
 ### 5.5. Expected regression scope
@@ -3376,10 +3376,10 @@ deployment bootstrap remains responsible for Pleomino managed workload credentia
 ### 6. Acceptance criteria
 
 - Repo-wide `infisical-default` profile materialization no longer references
-  `secret://deployments/pleomino/...`.
+  `secret://deployments/sample-webapp/...`.
 - Repo-mode bootstrap output and generated resolver config remain repo-wide and generic when no
   deployment target is selected.
-- Pleomino deployment bootstrap still owns and reports the stage-specific managed Infisical client
+- Sample webapp deployment bootstrap still owns and reports the stage-specific managed Infisical client
   ID/secret refs under the deployment namespace.
 - Tests cover both the new generic repo credential namespace and the preservation of deployment
   managed outputs.
@@ -3388,7 +3388,7 @@ deployment bootstrap remains responsible for Pleomino managed workload credentia
 
 ### 7. Risks
 
-- Existing local `sprinkleref/selected.local.json` files may still contain the old Pleomino-scoped
+- Existing local `sprinkleref/selected.local.json` files may still contain the old Sample webapp-scoped
   repo profile refs until operators rerun repo bootstrap or update local state.
 - Renaming helper functions could obscure the distinction between profile credentials and managed
   deployment workload credentials if the code remains too implicit.
@@ -3405,9 +3405,9 @@ deployment bootstrap remains responsible for Pleomino managed workload credentia
 
 ### 9. Consequences of not implementing this PR
 
-Repo-wide Infisical bootstrap will remain coupled to Pleomino, contradicting the repo/deployment
-boundary and making future non-Pleomino profiles or alternate Infisical accounts look like they
-belong under a Pleomino deployment namespace.
+Repo-wide Infisical bootstrap will remain coupled to Sample webapp, contradicting the repo/deployment
+boundary and making future non-Sample webapp profiles or alternate Infisical accounts look like they
+belong under a Sample webapp deployment namespace.
 
 ### 10. Downsides for implementing this PR
 
@@ -3438,7 +3438,7 @@ selected repo profile.
   current repo-scoped bootstrap credential refs from PR-34.
 - Preserve the PR-34 boundary: repo-generated profile refs remain under
   `secret://viberoots/bootstrap/...`, while deployment managed workload refs remain under
-  `secret://deployments/pleomino/<stage>/...`.
+  `secret://deployments/sample-webapp/<stage>/...`.
 - Ensure dry-run and result summaries distinguish `validatedExistingProfiles` from
   `materializedProfiles` so operators can tell whether bootstrap preserved existing local state or
   wrote a generated profile.
@@ -3698,11 +3698,11 @@ Some locally edited legacy starter profiles may stop being regenerated automatic
 want regeneration must use the explicit generated marker or recreate the profile through repo
 bootstrap.
 
-## PR-38: Remove speculative non-Pleomino deployment packages
+## PR-38: Remove speculative non-Sample webapp deployment packages
 
 ### 1. Intent
 
-Remove checked-in deployment packages that are not current Pleomino deployments. The repository
+Remove checked-in deployment packages that are not current Sample webapp deployments. The repository
 should not contain speculative Data Room, Phase 0, or platform-foundation deployment targets until
 those projects are explicitly approved as real deployments. Deployment capability tests must use
 temp-repo fixtures or purpose-built hermetic test workspaces instead of polluting
@@ -3710,11 +3710,11 @@ temp-repo fixtures or purpose-built hermetic test workspaces instead of pollutin
 
 ### 2. Scope of changes
 
-- Delete the checked-in non-Pleomino deployment packages under `projects/deployments`, including
-  `data-room-console-*`, `data-room-web-*`, `data-room-worker-*`, `platform-foundation-*`, and
+- Delete the checked-in non-Sample webapp deployment packages under `projects/deployments`, including
+  `example-console-*`, `example-web-*`, `example-worker-*`, `platform-foundation-*`, and
   `platform-shared`.
-- Leave `projects/deployments` containing only active Pleomino deployment packages and shared
-  Pleomino support, plus any repo-root `TARGETS` file needed for package discovery.
+- Leave `projects/deployments` containing only active Sample webapp deployment packages and shared
+  Sample webapp support, plus any repo-root `TARGETS` file needed for package discovery.
 - Remove placeholder OpenTofu files and stack metadata associated with the speculative Phase 0
   packages, including `replace-me` state backend identities, empty `plan.tfplan` placeholders, and
   `*.example.invalid` deployment URLs.
@@ -3724,7 +3724,7 @@ temp-repo fixtures or purpose-built hermetic test workspaces instead of pollutin
   matters for deployment tooling.
 - Remove or rewrite tests whose only purpose is to assert the existence of Data Room or Phase 0
   checked-in deployment packages.
-- Update any code, docs, examples, and guardrails that present `data-room-*` or
+- Update any code, docs, examples, and guardrails that present `sample-webapp-*` or
   `platform-foundation-*` labels as current operator-facing deployments.
 
 ### 3. External prerequisites
@@ -3736,7 +3736,7 @@ temp-repo fixtures or purpose-built hermetic test workspaces instead of pollutin
 ### 4. Tests to be added
 
 - Add a repository guard test proving `projects/deployments` contains only approved live deployment
-  families, initially Pleomino, and fails if future speculative deployment packages are checked in
+  families, initially Sample webapp, and fails if future speculative deployment packages are checked in
   without an explicit allowlist update.
 - Add or update temp-repo fixture tests for deployment capability behavior currently covered by the
   Phase 0 packages, including admission prerequisites, readiness-secret contracts, smoke metadata,
@@ -3746,13 +3746,13 @@ temp-repo fixtures or purpose-built hermetic test workspaces instead of pollutin
   commands.
 - Add regression coverage proving deleted package labels are not selected by repo bootstrap,
   SprinkleRef scans, deployment-family inference tests, or deployment-domain cquery sweeps.
-- Keep Pleomino deployment tests passing and ensure the cleanup does not weaken real Pleomino
+- Keep Sample webapp deployment tests passing and ensure the cleanup does not weaken real Sample webapp
   metadata, secret, bootstrap, or provider coverage.
 
 ### 5. Docs to be added or updated
 
 - Update `docs/history/designs/infisical-design.md`, `docs/infisical-bootstrap.md`, and `infisical-bootstrap.md` to
-  state that the only checked-in live deployment family is Pleomino.
+  state that the only checked-in live deployment family is Sample webapp.
 - Update deployment docs such as `docs/deployments-usage.md`, `docs/history/designs/deployment-adjustment.md`,
   `docs/secrets-usage.md`, `docs/deployments-schema.md`, and troubleshooting docs so Data Room and
   Phase 0 deployment labels are not presented as current operator commands or concrete package
@@ -3768,13 +3768,13 @@ temp-repo fixtures or purpose-built hermetic test workspaces instead of pollutin
 - Expect broad deployment test and docs churn because these packages are referenced by cquery tests,
   release/admission tests, deployment docs, and secret-contract examples. Keep the cleanup focused on
   removing speculative checked-in deployments and relocating required capability coverage to
-  temp-repo fixtures. Do not change Pleomino runtime behavior, Infisical/Vault backend semantics,
-  deployment provider implementations, reviewed-source admission policy, or live Pleomino resource
+  temp-repo fixtures. Do not change Sample webapp runtime behavior, Infisical/Vault backend semantics,
+  deployment provider implementations, reviewed-source admission policy, or live Sample webapp resource
   names.
 
 ### 6. Acceptance criteria
 
-- `projects/deployments` contains only Pleomino deployment packages and any necessary Pleomino/shared
+- `projects/deployments` contains only Sample webapp deployment packages and any necessary Sample webapp/shared
   package discovery files.
 - No checked-in Data Room, Phase 0, or platform-foundation deployment packages, placeholder OpenTofu
   plans, or speculative provider stack configs remain.
@@ -3784,7 +3784,7 @@ temp-repo fixtures or purpose-built hermetic test workspaces instead of pollutin
   deployments or runnable commands.
 - Guard coverage prevents future speculative deployment packages from being added under
   `projects/deployments` without an explicit allowlist change.
-- Pleomino deployment, Infisical bootstrap, SprinkleRef, and deployment-domain validation continue
+- Sample webapp deployment, Infisical bootstrap, SprinkleRef, and deployment-domain validation continue
   to pass.
 - Focused tests and the repository validation suite pass.
 
@@ -3893,7 +3893,7 @@ command forms.
 
 - `deployment-only`
 - Keep changes limited to Infisical secret client/admission replay validation, repo bootstrap
-  resolver profile discovery, targeted deployment tests, and documentation. Do not change Pleomino
+  resolver profile discovery, targeted deployment tests, and documentation. Do not change Sample webapp
   deployment metadata, live resource names, deployment fan-out ordering, generated profile
   materialization semantics, provider publish behavior, or the public backend selector syntax.
 
@@ -3947,7 +3947,7 @@ validation inputs.
 Remove the first-run chicken-and-egg failure where deployment bootstrap successfully creates the
 Infisical project and identities, then fails reconciliation because checked-in reviewed metadata
 still contains placeholders. Provide one top-level operator invocation that can take a fresh repo
-from no local resolver config, no bootstrap credentials, and no Pleomino Infisical project to a
+from no local resolver config, no bootstrap credentials, and no Sample webapp Infisical project to a
 usable reviewed state without requiring operators to reverse-engineer the intermediate outputs.
 
 ### 2. Scope of changes
@@ -3958,7 +3958,7 @@ usable reviewed state without requiring operators to reverse-engineer the interm
   result as a pending reviewed-metadata handoff rather than an unexpected deployment bootstrap
   failure.
 - Generate a deterministic, non-secret metadata patch or patch file for
-  `projects/deployments/pleomino/shared/family.bzl` containing the live Infisical project id,
+  `projects/deployments/sample-webapp/shared/family.bzl` containing the live Infisical project id,
   machine identity ids, site URL, and credential file names returned by OpenTofu.
 - Keep the stable secret refs unchanged during metadata handoff unless the reviewed naming
   convention itself changes.
@@ -4033,13 +4033,13 @@ usable reviewed state without requiring operators to reverse-engineer the interm
 - `deployment-only`
 - Keep changes focused on Infisical repo bootstrap orchestration, deployment fan-out result
   classification, reviewed metadata patch generation, and docs. Do not change public backend
-  selector syntax, Pleomino secret ref naming, Cloudflare deployment semantics, provider publish
+  selector syntax, Sample webapp secret ref naming, Cloudflare deployment semantics, provider publish
   behavior, Vault behavior, or the Infisical OpenTofu resource model except where required for
   idempotent first-bootstrap adoption.
 
 ### 6. Acceptance criteria
 
-- A fresh Infisical bootstrap that creates the Pleomino project and identities no longer ends with a
+- A fresh Infisical bootstrap that creates the Sample webapp project and identities no longer ends with a
   hard reconciliation error solely because reviewed metadata still contains first-bootstrap
   placeholders.
 - The tool generates a deterministic reviewed metadata patch or patch file with the live Infisical
@@ -4092,7 +4092,7 @@ classification path that must be kept narrow so it does not mask real live-resou
 
 Close the PR-40 assessment gap where the reviewed metadata handoff patch is deterministic in
 content but not deterministic in edit target. The handoff patch must update only the intended
-reviewed Infisical constants in `projects/deployments/pleomino/shared/family.bzl`, even when the
+reviewed Infisical constants in `projects/deployments/sample-webapp/shared/family.bzl`, even when the
 same placeholder, empty string, site URL, identity id, or credential file name appears elsewhere in
 the file.
 
@@ -4179,7 +4179,7 @@ to preserve.
 
 ### 10. Downsides for implementing this PR
 
-The patcher becomes more specialized to the current Pleomino reviewed metadata file shape, so future
+The patcher becomes more specialized to the current Sample webapp reviewed metadata file shape, so future
 metadata layout changes may need a deliberate patcher update rather than benefiting from generic
 value replacement.
 
@@ -4293,7 +4293,7 @@ weakening the reviewed metadata boundary.
 
 - Add a fan-out handoff patch consistency check before reporting or applying a repo-level metadata
   patch.
-- For the current Pleomino fan-out, require every metadata handoff target to produce an identical
+- For the current Sample webapp fan-out, require every metadata handoff target to produce an identical
   patch payload before collapsing the handoff into one summary.
 - Fail closed with a clear error naming the divergent targets if fan-out handoff patches differ.
 - Do not apply any metadata patch when divergent handoff patches are detected.
@@ -4315,7 +4315,7 @@ weakening the reviewed metadata boundary.
 - Add tests proving divergent handoff patches from different targets fail closed and name the
   affected targets.
 - Add tests proving the metadata gate does not apply a patch when fan-out handoff patches diverge.
-- Keep repo-flow resume and metadata handoff tests passing for the current identical Pleomino
+- Keep repo-flow resume and metadata handoff tests passing for the current identical Sample webapp
   fan-out.
 
 ### 5. Docs to be added or updated
@@ -4340,7 +4340,7 @@ weakening the reviewed metadata boundary.
 - Divergent handoff patches fail closed before metadata patch application and identify the affected
   targets.
 - Identical multi-target handoffs continue to collapse into one actionable summary.
-- Current Pleomino repo-flow handoff/resume behavior remains unchanged.
+- Current Sample webapp repo-flow handoff/resume behavior remains unchanged.
 - Focused fan-out handoff and repo-flow tests pass.
 - The repository validation suite passes.
 
@@ -4354,7 +4354,7 @@ weakening the reviewed metadata boundary.
 
 - Compare deterministic patch payloads after PR-41 constant-scoped patch generation, not raw console
   text.
-- Prefer fail-closed identical-patch equality for the current Pleomino fan-out; add a future merge
+- Prefer fail-closed identical-patch equality for the current Sample webapp fan-out; add a future merge
   design only if multiple independent deployment families need compatible partial patches.
 - Include target labels in divergence errors so operators can inspect the conflicting OpenTofu
   outputs.
@@ -4466,7 +4466,7 @@ records as a conflict.
 - `deployment-only`
 - Keep changes focused on Universal Auth credential lifecycle, repo/deployment bootstrap
   orchestration, top-level setup idempotency, reporting, and docs. Do not change public backend
-  selector syntax, reviewed metadata handoff patching, Pleomino project/resource definitions,
+  selector syntax, reviewed metadata handoff patching, Sample webapp project/resource definitions,
   Cloudflare secret requirements, Vault behavior, or stable secret ref names except where needed to
   remove the obsolete shared-secret mismatch public behavior.
 
@@ -4623,7 +4623,7 @@ are added.
 
 Close the post-PR-45 assessment gaps by making retry guidance strictly credential-intent-only for
 preserved flags and by proving the top-level per-machine setup path is idempotent across repeated
-runs. Also remove remaining Pleomino Infisical README guidance that still implies operators should
+runs. Also remove remaining Sample webapp Infisical README guidance that still implies operators should
 recover or import old shared local credential values.
 
 ### 2. Scope of changes
@@ -4640,7 +4640,7 @@ recover or import old shared local credential values.
   a second run reuses existing current-machine repo and deployment credentials, creates no new
   remote client-secret records, and leaves mocked other-machine remote records untouched.
 - Keep the lower-level PR-44 credential lifecycle behavior unchanged.
-- Update `projects/deployments/pleomino/infisical/README.md` so missing local deployment
+- Update `projects/deployments/sample-webapp/infisical/README.md` so missing local deployment
   credential guidance matches the per-machine model: rerun top-level setup to create current-machine
   credentials, rotate explicitly when desired, and do not import another user's shared secret.
 - Preserve the PR-45 docs section in `docs/history/plans/infisical-plan.md` and add this PR as the only new plan
@@ -4667,7 +4667,7 @@ recover or import old shared local credential values.
 
 ### 5. Docs to be added or updated
 
-- Update `projects/deployments/pleomino/infisical/README.md` to remove stale import/recover
+- Update `projects/deployments/sample-webapp/infisical/README.md` to remove stale import/recover
   language for missing local Universal Auth credentials.
 - Update `docs/infisical-bootstrap.md` or `infisical-bootstrap.md` only if the implementation
   changes operator-facing retry or rerun guidance beyond what PR-44 and PR-45 already documented.
@@ -4676,7 +4676,7 @@ recover or import old shared local credential values.
 
 - `deployment-only`
 - Keep changes limited to retry command allowlisting, top-level setup idempotency tests, and
-  Pleomino Infisical README cleanup. Do not change Universal Auth credential creation semantics,
+  Sample webapp Infisical README cleanup. Do not change Universal Auth credential creation semantics,
   reviewed metadata handoff, deployment resource definitions, public backend selector syntax,
   stable secret refs, Vault behavior, or Cloudflare secret requirements.
 
@@ -4689,7 +4689,7 @@ recover or import old shared local credential values.
 - Repeated top-level repo bootstrap plus deployment fan-out reuses existing current-machine
   credentials without creating new remote client-secret records.
 - Existing mocked other-machine remote records remain untouched and non-conflicting on rerun.
-- Pleomino Infisical README no longer tells operators to recover/import old shared local credential
+- Sample webapp Infisical README no longer tells operators to recover/import old shared local credential
   values for the per-machine setup path.
 - Focused retry-command, repo-flow, and docs/taxonomy tests pass.
 - The repository validation suite passes.
@@ -4709,7 +4709,7 @@ recover or import old shared local credential values.
   documented as explicit manual rerun options if needed, but should not be copied automatically.
 - Build the repeated setup test around the narrow repo bootstrap and deployment credential fan-out
   seams already used by PR-44 tests.
-- Edit only the Universal Auth local credential guidance in the Pleomino README and leave unrelated
+- Edit only the Universal Auth local credential guidance in the Sample webapp README and leave unrelated
   OpenTofu or application secret guidance intact.
 
 ### 9. Consequences of not implementing this PR
@@ -4739,7 +4739,7 @@ those local prerequisites are missing, and remain fast and non-surprising once t
   dependency setup or at another low-surprise point in the `i` flow.
 - The readiness phase must check only local setup needed for repo/deployment secret resolution:
   `sprinkleref/selected.local.json` or equivalent resolver config, repo bootstrap Universal Auth
-  credentials in the selected local sink, and Pleomino deployment Universal Auth credentials for the
+  credentials in the selected local sink, and Sample webapp deployment Universal Auth credentials for the
   current machine.
 - Do not use full `sprinkleref --check` as the lazy readiness gate. Application secrets such as
   Cloudflare tokens may still be intentionally missing and must not force `i` to fail or bootstrap.
@@ -4871,7 +4871,7 @@ readiness checks.
 
 Close the PR-47 sliceability gap so adding lazy Infisical readiness to `i` does not make dependency
 installation fail in minimized, sparse, or partial-clone workspaces that do not include the
-Pleomino deployment family or Infisical bootstrap implementation files. Secret readiness should be
+Sample webapp deployment family or Infisical bootstrap implementation files. Secret readiness should be
 capability-gated by checked-out deployment metadata: if the checkout does not contain the Infisical
 deployment family, `i` should treat secret readiness as not applicable rather than missing.
 
@@ -4879,7 +4879,7 @@ deployment family, `i` should treat secret readiness as not applicable rather th
 
 - Add an applicability check before any Infisical/deployment-specific readiness imports or file
   reads. The check should use cheap filesystem probes for the deployment metadata needed by PR-47,
-  especially `projects/deployments/pleomino/shared/family.bzl`.
+  especially `projects/deployments/sample-webapp/shared/family.bzl`.
 - If the required deployment metadata is absent, skip the lazy Infisical readiness phase without
   error. In non-verbose mode this should be quiet; in verbose mode it may print a concise
   "not applicable in this checkout" diagnostic.
@@ -4888,7 +4888,7 @@ deployment family, `i` should treat secret readiness as not applicable rather th
 - Convert static deployment/Infisical imports in the install-deps readiness path to dynamic imports
   after the applicability gate, or otherwise isolate them so sparse clones missing deployment-owned
   files do not fail at module load time.
-- Keep full checkout behavior unchanged: when the Pleomino deployment metadata is present,
+- Keep full checkout behavior unchanged: when the Sample webapp deployment metadata is present,
   PR-47 readiness should still check resolver config and current-machine Universal Auth credentials,
   prompt or bootstrap when missing, and ignore application secret completeness.
 - Preserve PR-44 through PR-46 credential lifecycle and retry behavior. This PR is only about making
@@ -4904,7 +4904,7 @@ deployment family, `i` should treat secret readiness as not applicable rather th
 
 ### 4. Tests to be added
 
-- Add a temp partial-clone or minimized-workspace test where `projects/deployments/pleomino/` is
+- Add a temp partial-clone or minimized-workspace test where `projects/deployments/sample-webapp/` is
   absent and `i` or the install-deps secret-readiness phase succeeds without `sprinkleref`,
   Infisical credentials, deployment metadata, or bootstrap files.
 - Add a test proving the absent-deployment-metadata path does not call the readiness probe,
@@ -4921,7 +4921,7 @@ deployment family, `i` should treat secret readiness as not applicable rather th
 
 - Update `docs/infisical-bootstrap.md`, `infisical-bootstrap.md`, or concise onboarding docs to
   state that lazy `i` secret readiness is capability-gated by checked-out deployment metadata.
-- Document that partial clones or minimized workspaces without the Pleomino Infisical deployment
+- Document that partial clones or minimized workspaces without the Sample webapp Infisical deployment
   family skip Infisical readiness automatically and do not require `--without-secrets`.
 - Keep `--without-secrets` documented as an explicit opt-out for full checkouts or automation that
   intentionally wants dependency setup without secret readiness.
@@ -4937,7 +4937,7 @@ deployment family, `i` should treat secret readiness as not applicable rather th
 
 ### 6. Acceptance criteria
 
-- A partial clone or minimized workspace without `projects/deployments/pleomino/shared/family.bzl`
+- A partial clone or minimized workspace without `projects/deployments/sample-webapp/shared/family.bzl`
   can run `i`/install-deps without Infisical readiness errors.
 - The absent-deployment-metadata path is quiet by default and does not prompt, open browser login,
   read credential sinks, or call repo bootstrap.
@@ -4968,7 +4968,7 @@ deployment family, `i` should treat secret readiness as not applicable rather th
 
 ### 9. Consequences of not implementing this PR
 
-PR-47 can make `i` less partial-clone-friendly than the existing install flow by assuming Pleomino
+PR-47 can make `i` less partial-clone-friendly than the existing install flow by assuming Sample webapp
 deployment metadata and Infisical bootstrap modules exist in every checkout. That would break the
 repo's sliceability expectations and force users of minimized workspaces to learn secret-specific
 opt-outs even when deployment secrets are irrelevant to their slice.
@@ -4983,10 +4983,10 @@ deployment workspaces and narrow partial clones.
 
 ### 1. Intent
 
-Close the PR-48 assessment gap where lazy `i` secret readiness correctly gates on absent Pleomino
+Close the PR-48 assessment gap where lazy `i` secret readiness correctly gates on absent Sample webapp
 deployment metadata, but can still collapse malformed present metadata into a generic "missing local
 credentials" state. Once the slice applicability gate has established that
-`projects/deployments/pleomino/shared/family.bzl` is present, parse errors, import errors, and
+`projects/deployments/sample-webapp/shared/family.bzl` is present, parse errors, import errors, and
 malformed reviewed constants must be treated as repository metadata defects rather than as
 not-ready local machine state.
 
@@ -4998,7 +4998,7 @@ not-ready local machine state.
   `build-tools/tools/deployments/infisical-iac-bootstrap-reviewed-metadata.ts` propagate with their
   original error messages after the applicability gate passes.
 - Preserve PR-48 absent-metadata behavior: minimized workspaces missing
-  `projects/deployments/pleomino/shared/family.bzl` still skip readiness quietly by default and
+  `projects/deployments/sample-webapp/shared/family.bzl` still skip readiness quietly by default and
   report a concise not-applicable reason in verbose mode.
 - Preserve PR-47 local readiness behavior for valid full checkouts: missing resolver config or
   missing current-machine Universal Auth credentials should still prompt or fail with the existing
@@ -5017,7 +5017,7 @@ not-ready local machine state.
 ### 4. Tests to be added
 
 - Add an install-deps secret-readiness test with present
-  `projects/deployments/pleomino/shared/family.bzl` containing malformed reviewed metadata, proving
+  `projects/deployments/sample-webapp/shared/family.bzl` containing malformed reviewed metadata, proving
   the original metadata parse error propagates instead of returning `ready: false`.
 - Add or update a test proving valid present metadata with missing local credentials still reports
   missing local credentials and triggers the existing prompt/bootstrap path.
@@ -5068,7 +5068,7 @@ not-ready local machine state.
 
 ### 9. Consequences of not implementing this PR
 
-Malformed checked-in Pleomino Infisical metadata can be masked as a local machine setup problem.
+Malformed checked-in Sample webapp Infisical metadata can be masked as a local machine setup problem.
 That makes repository defects harder to diagnose and can send users into unnecessary bootstrap or
 credential rotation flows.
 
@@ -5083,14 +5083,14 @@ fresh-machine local readiness, and real repository metadata defects.
 ### 1. Intent
 
 Fix the live first-run failure where `i` can successfully create local repo bootstrap credentials
-and then fail during deployment fan-out because the reviewed `pleomino-deployments` Infisical
+and then fail during deployment fan-out because the reviewed `sample-webapp-deployments` Infisical
 project already exists remotely but is not present in the local OpenTofu state. Lazy bootstrap should
 be idempotent for both fresh repos and repos where an operator has already created the reviewed
 Infisical project.
 
 ### 2. Scope of changes
 
-- Before deployment OpenTofu planning, query Infisical for a project matching the reviewed Pleomino
+- Before deployment OpenTofu planning, query Infisical for a project matching the reviewed Sample webapp
   project name or slug in the selected organization.
 - When that project exists, pass its project id into the OpenTofu module and skip creating the
   `infisical_project` resource.
@@ -5122,13 +5122,13 @@ Infisical project.
 ### 5.5. Expected regression scope
 
 - `deployment-only`
-- Changes should be limited to deployment Infisical bootstrap project adoption, the Pleomino
+- Changes should be limited to deployment Infisical bootstrap project adoption, the Sample webapp
   OpenTofu module, and targeted tests.
 
 ### 6. Acceptance criteria
 
-- If `pleomino-deployments` already exists remotely but is absent from local OpenTofu state, `i`
-  does not fail with `A project with the slug "pleomino-deployments" already exists`.
+- If `sample-webapp-deployments` already exists remotely but is absent from local OpenTofu state, `i`
+  does not fail with `A project with the slug "sample-webapp-deployments" already exists`.
 - If reviewed `staging` or `prod` environments already exist, bootstrap does not attempt to create
   duplicates for those environments.
 - If the project does not exist, bootstrap still creates the project and reviewed environments.
@@ -5147,7 +5147,7 @@ Infisical project.
 - Only adopt projects in the selected organization that match the reviewed name or slug.
 - Continue reconciling reviewed deployment metadata after apply so wrong project ids still surface
   as metadata handoff/drift.
-- Keep the adoption path narrow and limited to the reviewed Pleomino bootstrap project and
+- Keep the adoption path narrow and limited to the reviewed Sample webapp bootstrap project and
   environments.
 
 ### 9. Consequences of not implementing this PR

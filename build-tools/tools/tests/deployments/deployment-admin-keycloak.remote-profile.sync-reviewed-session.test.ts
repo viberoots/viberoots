@@ -12,7 +12,7 @@ import {
   installClientProfile,
   prepareRemoteExecFixture,
   remoteExecEnv,
-  REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+  REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
 import {
   completePendingAuthSession,
@@ -30,7 +30,7 @@ test("remote profile sync infers acting principal and admin groups from the revi
       claims: {
         sub: "human-1",
         email: "ada@example.com",
-        groups: ["deploy-admin-keycloak-shape-admin-project-pleomino"],
+        groups: ["deploy-admin-keycloak-shape-admin-project-sample-webapp"],
       },
     });
     const fixture = await prepareRemoteExecFixture({
@@ -63,7 +63,7 @@ test("remote profile sync infers acting principal and admin groups from the revi
         cwd: tmp,
         env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
         stdio: "pipe",
-      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)}`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak sync --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${configRootFor(tmp)}`;
       await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
       const summary = JSON.parse(String((await resultPromise).stdout));
       assert.equal(summary.executionMode, "remote-profile");
@@ -86,7 +86,7 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
       claims: {
         sub: "human-1",
         email: "ada@example.com",
-        groups: ["deploy-admin-keycloak-membership-admin-project-pleomino"],
+        groups: ["deploy-admin-keycloak-membership-admin-project-sample-webapp"],
       },
     });
     const fixture = await prepareRemoteExecFixture({
@@ -124,8 +124,8 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
             realm: "deployments",
             enabled: true,
             groups: [
-              { name: "deploy-submitters-pleomino-dev" },
-              { name: "deploy-approvers-pleomino-dev" },
+              { name: "deploy-submitters-sample-webapp-dev" },
+              { name: "deploy-approvers-sample-webapp-dev" },
             ],
             clients: [],
           },
@@ -137,7 +137,7 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
         cwd: tmp,
         env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
         stdio: "pipe",
-      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${remoteConfigRoot} --action submit`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak grant-user --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${remoteConfigRoot} --action submit`;
       await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
       const selfSummary = JSON.parse(String((await selfPromise).stdout));
       assert.equal(
@@ -154,7 +154,7 @@ test("remote profile grant-user defaults self-service grants to the logged-in em
         cwd: tmp,
         env: freshKeycloakBuckEnv(tmp, remoteExecEnv(fixture.env)),
         stdio: "pipe",
-      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${remoteConfigRoot} --action approve --user-email alice@example.com`;
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin keycloak grant-user --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --remote-config-root ${remoteConfigRoot} --action approve --user-email alice@example.com`;
       await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
       const crossSummary = JSON.parse(String((await crossPromise).stdout));
       assert.equal(

@@ -12,7 +12,7 @@ import { reviewedMetadata } from "./infisical-iac-bootstrap.fixture";
 const args = {
   ...DEFAULT_BOOTSTRAP_ARGS,
   organizationId: "org_1",
-  tofuDir: "projects/deployments/pleomino/infisical/opentofu",
+  tofuDir: "projects/deployments/sample-webapp/infisical/opentofu",
   tofuPlanFile: ".local/test.tfplan",
   yes: true,
 };
@@ -23,8 +23,8 @@ test("OpenTofu init failure includes working directory and retry command", async
     (error) => {
       const message = String((error as Error).message);
       assert.match(message, /OpenTofu init failed/);
-      assert.match(message, /Working directory: .*pleomino\/infisical\/opentofu/);
-      assert.match(message, /Retry: cd .*pleomino\/infisical\/opentofu && tofu init/);
+      assert.match(message, /Working directory: .*sample-webapp\/infisical\/opentofu/);
+      assert.match(message, /Retry: cd .*sample-webapp\/infisical\/opentofu && tofu init/);
       assert.doesNotMatch(
         message,
         /client-secret-value|personal-token-value|resolved-secret|alpha beta|gamma delta/,

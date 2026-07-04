@@ -144,14 +144,18 @@ test("provider and git child launch envs scrub control-plane ambient credentials
     await fsp.mkdir(binDir, { recursive: true });
     await fsp.mkdir(artifactDir, { recursive: true });
     await fsp.writeFile(path.join(artifactDir, "index.html"), "ok\n", "utf8");
-    await fsp.writeFile(configPath, JSON.stringify({ name: "pleomino-staging-pages" }), "utf8");
+    await fsp.writeFile(
+      configPath,
+      JSON.stringify({ name: "sample-webapp-staging-pages" }),
+      "utf8",
+    );
     await fsp.writeFile(
       wranglerPath,
       [
         "#!/usr/bin/env node",
         'import fs from "node:fs";',
         "fs.writeFileSync(process.env.VBR_WRANGLER_ENV_LOG, JSON.stringify(process.env));",
-        'console.log(JSON.stringify({ url: "https://pleomino-staging-pages.pages.dev/" }));',
+        'console.log(JSON.stringify({ url: "https://sample-webapp-staging-pages.pages.dev/" }));',
       ].join("\n"),
       { encoding: "utf8", mode: 0o755 },
     );

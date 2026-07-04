@@ -23,22 +23,22 @@ function staticWebappComponent(label: string): GraphNode {
 
 function cloudflareNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
-    name: "//projects/deployments/pleomino/staging:deploy",
+    name: "//projects/deployments/sample-webapp/staging:deploy",
     provider: "cloudflare-pages",
-    component: "//projects/apps/pleomino:app",
+    component: "//projects/apps/sample-webapp:app",
     component_kind: "static-webapp",
     publisher: "wrangler-pages",
     publisher_config: "wrangler.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {
       account: "web-platform-staging",
-      project: "pleomino-staging-pages",
-      id: "pleomino-staging-pages",
+      project: "sample-webapp-staging-pages",
+      id: "sample-webapp-staging-pages",
     },
     ...overrides,
   };
@@ -53,9 +53,9 @@ function nixosNode(overrides: Partial<GraphNode> = {}): GraphNode {
     publisher: "nixos-shared-host-static-webapp",
     provisioner: "nixos-shared-host-manifest",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "dev",
-    admission_policy: "//projects/deployments/pleomino/shared:dev_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:dev_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     app_name: "demoapp",
@@ -66,7 +66,7 @@ function nixosNode(overrides: Partial<GraphNode> = {}): GraphNode {
 
 test("validation rejects protected/shared smoke exceptions with missing reviewed fields", () => {
   const { errors } = extractCloudflarePagesDeployments([
-    staticWebappComponent("//projects/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/sample-webapp:app"),
     cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
@@ -103,7 +103,7 @@ test("validation rejects smoke exceptions whose review boundary has expired", ()
 
 test("validation preserves reviewed smoke exceptions from authoritative deployment metadata", () => {
   const { deployments, errors } = extractCloudflarePagesDeployments([
-    staticWebappComponent("//projects/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/sample-webapp:app"),
     cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
@@ -124,7 +124,7 @@ test("validation preserves reviewed smoke exceptions from authoritative deployme
 
 test("validation rejects unsupported smoke runner classes and non-positive timeout budgets", () => {
   const { errors } = extractCloudflarePagesDeployments([
-    staticWebappComponent("//projects/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/sample-webapp:app"),
     cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
@@ -143,7 +143,7 @@ test("validation rejects unsupported smoke runner classes and non-positive timeo
 
 test("validation preserves explicit smoke timeout metadata for reviewed static-webapp slices", () => {
   const { deployments, errors } = extractCloudflarePagesDeployments([
-    staticWebappComponent("//projects/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/sample-webapp:app"),
     cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),

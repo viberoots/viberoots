@@ -39,7 +39,7 @@ test("deployment Vault runtime mints a fresh JWT from deployment-derived claims"
           audience: "deployments-vault",
           deploymentClientId: "deployment-runner",
           deploymentEnvironment: "mini",
-          roleName: "deploy-pleomino-read",
+          roleName: "deploy-sample-webapp-read",
         },
       }),
       env,
@@ -54,7 +54,7 @@ test("deployment Vault runtime mints a fresh JWT from deployment-derived claims"
       result.secretContext?.kind === "vault" ? result.secretContext.credential : undefined;
     assert.equal(credential?.kind, "jwt");
     assert.equal(credential?.addr, "https://vault.example.net:8200");
-    assert.equal(credential?.role, "deploy-pleomino-read");
+    assert.equal(credential?.role, "deploy-sample-webapp-read");
     const claims = decodeJwtPayload(credential?.kind === "jwt" ? credential.workloadJwt : "");
     assert.equal(claims.deployment_environment, "mini");
     assert.equal(claims.repository, "viberoots/viberoots");

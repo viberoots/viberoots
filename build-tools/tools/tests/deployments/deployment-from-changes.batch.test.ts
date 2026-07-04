@@ -16,53 +16,53 @@ import {
 function planForBatch(): DeploymentFromChangesPlan {
   const lanePolicy = nixosSharedHostLanePolicyFixture();
   const dev = nixosSharedHostDeploymentFixture({
-    deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino/dev:deploy",
-    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
-    runtime: { appName: "pleomino", containerPort: 3000 },
+    deploymentId: "sample-webapp-dev",
+    label: "//projects/deployments/sample-webapp/dev:deploy",
+    component: { kind: "static-webapp", target: "//projects/apps/sample-webapp:app" },
+    runtime: { appName: "sample-webapp", containerPort: 3000 },
     lanePolicy,
     prerequisites: [],
   });
   const staging = cloudflarePagesDeploymentFixture({
-    deploymentId: "pleomino-staging",
-    label: "//projects/deployments/pleomino/staging:deploy",
+    deploymentId: "sample-webapp-staging",
+    label: "//projects/deployments/sample-webapp/staging:deploy",
     lanePolicy,
-    prerequisites: [{ deploymentId: "pleomino-dev", mode: "ordering_only" }],
+    prerequisites: [{ deploymentId: "sample-webapp-dev", mode: "ordering_only" }],
   });
   const prod = cloudflarePagesDeploymentFixture({
-    deploymentId: "pleomino-prod",
-    label: "//projects/deployments/pleomino/prod:deploy",
+    deploymentId: "sample-webapp-prod",
+    label: "//projects/deployments/sample-webapp/prod:deploy",
     environmentStage: "prod",
     lanePolicy,
     providerTarget: {
       account: "web-platform-prod",
-      project: "pleomino-prod-pages",
-      id: "pleomino-prod-pages",
-      canonicalUrl: "https://pleomino-prod-pages.pages.dev/",
-      providerTargetIdentity: "cloudflare-pages:web-platform-prod/pleomino-prod-pages",
+      project: "sample-webapp-prod-pages",
+      id: "sample-webapp-prod-pages",
+      canonicalUrl: "https://sample-webapp-prod-pages.pages.dev/",
+      providerTargetIdentity: "cloudflare-pages:web-platform-prod/sample-webapp-prod-pages",
     },
-    admissionPolicyRef: "//projects/deployments/pleomino/shared:prod_release",
+    admissionPolicyRef: "//projects/deployments/sample-webapp/shared:prod_release",
     admissionPolicy: {
       ...cloudflarePagesDeploymentFixture().admissionPolicy,
-      ref: "//projects/deployments/pleomino/shared:prod_release",
+      ref: "//projects/deployments/sample-webapp/shared:prod_release",
       name: "prod_release",
       allowedRefs: ["refs/tags/release/*"],
     },
-    prerequisites: [{ deploymentId: "pleomino-staging", mode: "health_gated" }],
+    prerequisites: [{ deploymentId: "sample-webapp-staging", mode: "health_gated" }],
   });
   return {
-    changedPaths: ["projects/apps/pleomino/src/main.tsx"],
-    directDeploymentIds: ["pleomino-dev", "pleomino-staging", "pleomino-prod"],
+    changedPaths: ["projects/apps/sample-webapp/src/main.tsx"],
+    directDeploymentIds: ["sample-webapp-dev", "sample-webapp-staging", "sample-webapp-prod"],
     selectedDeployments: [dev, staging, prod],
     reasonsByDeploymentId: {
-      "pleomino-dev": [
-        { kind: "component-project", paths: [], projects: ["projects/apps/pleomino"] },
+      "sample-webapp-dev": [
+        { kind: "component-project", paths: [], projects: ["projects/apps/sample-webapp"] },
       ],
-      "pleomino-staging": [
-        { kind: "component-project", paths: [], projects: ["projects/apps/pleomino"] },
+      "sample-webapp-staging": [
+        { kind: "component-project", paths: [], projects: ["projects/apps/sample-webapp"] },
       ],
-      "pleomino-prod": [
-        { kind: "component-project", paths: [], projects: ["projects/apps/pleomino"] },
+      "sample-webapp-prod": [
+        { kind: "component-project", paths: [], projects: ["projects/apps/sample-webapp"] },
       ],
     },
   };
@@ -87,7 +87,7 @@ test("grouped from-changes batches keep per-deployment run identity and shared d
   assert.match(result.deployBatchId ?? "", /^batch-/);
   assert.deepEqual(
     result.results.map((entry) => entry.result?.record.deployRunId),
-    ["deploy-pleomino-dev", "deploy-pleomino-staging", "deploy-pleomino-prod"],
+    ["deploy-sample-webapp-dev", "deploy-sample-webapp-staging", "deploy-sample-webapp-prod"],
   );
   for (const entry of result.results) {
     assert.equal(entry.status, "succeeded");
@@ -100,17 +100,17 @@ test("grouped from-changes failures stay attributable to one run and block healt
     plan: planForBatch(),
     group: true,
     runDeployment: async (deployment, extra) => {
-      if (deployment.deploymentId === "pleomino-staging") {
+      if (deployment.deploymentId === "sample-webapp-staging") {
         const error = new Error("staging smoke failed");
         throw Object.assign(error, {
           record: {
-            deployRunId: "deploy-pleomino-staging",
+            deployRunId: "deploy-sample-webapp-staging",
             operationKind: "deploy",
             runClassification: "deploy",
             finalOutcome: "smoke_failed_after_publish",
             deployBatchId: extra.deployBatchId,
           },
-          recordPath: "/tmp/pleomino-staging.json",
+          recordPath: "/tmp/sample-webapp-staging.json",
         });
       }
       return {
@@ -128,9 +128,9 @@ test("grouped from-changes failures stay attributable to one run and block healt
 
   assert.equal(result.results[0]?.status, "succeeded");
   assert.equal(result.results[1]?.status, "failed");
-  assert.equal(result.results[1]?.result?.record.deployRunId, "deploy-pleomino-staging");
+  assert.equal(result.results[1]?.result?.record.deployRunId, "deploy-sample-webapp-staging");
   assert.equal(result.results[2]?.status, "blocked");
-  assert.deepEqual(result.results[2]?.blockedBy, ["pleomino-staging"]);
+  assert.deepEqual(result.results[2]?.blockedBy, ["sample-webapp-staging"]);
 });
 
 test("from-changes CLI remove mode is explicit and allows the grouped removal path", () => {

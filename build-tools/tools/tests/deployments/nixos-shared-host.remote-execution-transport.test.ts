@@ -8,13 +8,13 @@ test("remote service submission error explains when the service requires a diffe
   const deployment = nixosSharedHostDeploymentFixture({
     admissionPolicy: {
       ...nixosSharedHostDeploymentFixture().admissionPolicy,
-      requiredChecks: ["deploy/pleomino-dev"],
+      requiredChecks: ["deploy/sample-webapp-dev"],
     },
   });
   const error = remoteServiceSubmissionError(
     Object.assign(
       new Error(
-        "protected/shared admission requires check deploy/pleomino-dev for subject(s) 85e2c9ee8dd909fc041f693fe8e937e34e7b36ef",
+        "protected/shared admission requires check deploy/sample-webapp-dev for subject(s) 85e2c9ee8dd909fc041f693fe8e937e34e7b36ef",
       ),
       {
         status: {
@@ -35,7 +35,7 @@ test("remote service submission error explains when the service requires a diffe
       admissionEvidence: {
         checks: [
           {
-            name: "deploy/pleomino-dev",
+            name: "deploy/sample-webapp-dev",
             subject: "a6df216710fa35b28fa24475eac69fb24cfa6de7",
             status: "passed",
             checkedAt: "2026-04-25T00:00:00.000Z",
@@ -48,7 +48,7 @@ test("remote service submission error explains when the service requires a diffe
   );
   assert.match(
     String(error.message),
-    /requires check deploy\/pleomino-dev for commit 85e2c9ee8dd909fc041f693fe8e937e34e7b36ef, but this client submitted passed deploy\/pleomino-dev for commit a6df216710fa35b28fa24475eac69fb24cfa6de7/,
+    /requires check deploy\/sample-webapp-dev for commit 85e2c9ee8dd909fc041f693fe8e937e34e7b36ef, but this client submitted passed deploy\/sample-webapp-dev for commit a6df216710fa35b28fa24475eac69fb24cfa6de7/,
   );
   assert.match(String(error.message), /deployment_source_ref: main/);
   assert.match(
@@ -71,19 +71,19 @@ test("remote service submission error explains when the service requires a diffe
 
 test("remote service submission error rewrites legacy human missing-grant admin commands", () => {
   const deployment = nixosSharedHostDeploymentFixture({
-    deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino/dev:deploy",
+    deploymentId: "sample-webapp-dev",
+    label: "//projects/deployments/sample-webapp/dev:deploy",
     environmentStage: "dev",
   });
   const error = remoteServiceSubmissionError(
     new Error(
-      "principal oidc:187bf26e-ee7b-4163-aed3-2440aa706bbf is not authorized to report admission evidence on pleomino-dev: missing admission_reporter grant; expected human group deploy-admission-reporters-pleomino-dev; example admin command: deploy admin identity grant-user --deployment //projects/deployments/pleomino/dev:deploy --action report_checks --user-email <user@example.com> --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json --acting-principal <principal> --admin-group <deploy-admin-identity-membership-admin-...>; inspect deploy auth explain-groups --deployment //projects/deployments/pleomino/dev:deploy --action report_checks",
+      "principal oidc:187bf26e-ee7b-4163-aed3-2440aa706bbf is not authorized to report admission evidence on sample-webapp-dev: missing admission_reporter grant; expected human group deploy-admission-reporters-sample-webapp-dev; example admin command: deploy admin identity grant-user --deployment //projects/deployments/sample-webapp/dev:deploy --action report_checks --user-email <user@example.com> --membership-file ./deployment-host/identity-provider/deployment-auth-memberships.json --acting-principal <principal> --admin-group <deploy-admin-identity-membership-admin-...>; inspect deploy auth explain-groups --deployment //projects/deployments/sample-webapp/dev:deploy --action report_checks",
     ),
     { deployment },
   );
   assert.match(
     String(error.message),
-    /missing admission_reporter grant; expected human group deploy-admission-reporters-pleomino-dev; grant yourself: deploy admin identity grant-user --deployment \/\/projects\/deployments\/pleomino\/dev:deploy --profile mini --action report_checks --apply-host; add --user-email <user@example\.com> to grant another human/,
+    /missing admission_reporter grant; expected human group deploy-admission-reporters-sample-webapp-dev; grant yourself: deploy admin identity grant-user --deployment \/\/projects\/deployments\/sample-webapp\/dev:deploy --profile mini --action report_checks --apply-host; add --user-email <user@example\.com> to grant another human/,
   );
   assert.doesNotMatch(String(error.message), /--membership-file|--acting-principal|--admin-group/);
 });

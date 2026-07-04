@@ -11,6 +11,11 @@ import {
   writeManifest,
   type CacheBackendKind,
 } from "./cache-manifest";
+import {
+  sourcePlanEvidenceFromGraph,
+  sourcePlanEvidenceFromGraphFile,
+  type SourcePlanEvidence,
+} from "../lib/source-plan-evidence";
 
 type ExtraOutputs = { graph?: string[]; targets?: string[] };
 
@@ -52,6 +57,7 @@ async function main() {
       ...selectedTargetAttrs.flatMap((attr) => outputPaths[attr] || []),
       ...(extra.targets || []),
     ],
+    sourcePlans: await readSourcePlans(getFlagStr("source-plan-evidence", "")),
   });
   await mkdirWithMacosMetadataExclusion(path.dirname(out));
   writeManifest(out, manifest);
@@ -99,6 +105,18 @@ async function readJson(proc: ProcessPromise): Promise<unknown> {
 async function readExtraOutputs(file: string): Promise<ExtraOutputs> {
   if (!file) return {};
   return JSON.parse(await fs.readFile(file, "utf8")) as ExtraOutputs;
+}
+
+async function readSourcePlans(file: string): Promise<SourcePlanEvidence[]> {
+  if (file) {
+    const parsed = JSON.parse(await fs.readFile(file, "utf8")) as unknown;
+    if (Array.isArray(parsed)) return parsed as SourcePlanEvidence[];
+    if (parsed && typeof parsed === "object" && Array.isArray((parsed as any).sourcePlans)) {
+      return (parsed as any).sourcePlans as SourcePlanEvidence[];
+    }
+    return sourcePlanEvidenceFromGraph(parsed);
+  }
+  return await sourcePlanEvidenceFromGraphFile(String(process.env.BUCK_GRAPH_JSON || ""));
 }
 
 async function toolVersions(): Promise<Record<string, string>> {

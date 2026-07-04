@@ -28,7 +28,7 @@ What is missing is an end-to-end answer to "what do I do when a credential needs
    what to do when a machine is decommissioned, or how to revoke a leaked credential promptly.
 
 2. **Deployment workload credentials** — Infisical Universal Auth client secrets for each
-   deployment machine identity (e.g. the Pleomino per-stage identities provisioned by
+   deployment machine identity (e.g. the Sample webapp per-stage identities provisioned by
    `infisical-bootstrap.ts deployment`). The bootstrap tool has
    `--rotate-deployment-credentials --force-overwrite-local-credentials` for this. The identity
    config sets `lockoutEnabled: true` with a threshold of 3 and a 300-second lockout duration to

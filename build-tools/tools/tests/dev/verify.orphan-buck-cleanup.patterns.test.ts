@@ -21,20 +21,14 @@ test("orphan buck cleanup: matches ephemeral verify/debug/test isolations only",
     "verify-nested-12345-deadbeefcafe",
     "verify-nested-deadbeefcafe",
     "zxtest-shared-deadbeef12",
+    "exporter-shared-1a82e8dd60",
     "debug-cpp-set-final-1772235882",
     "targeted-scaff-1772219350",
     "parity_19426_1772253747273__build_tools_tools_tests_cpp_sanitize_case1",
     "sanitize_19428",
     "importer_strings_19427",
   ];
-  const no = [
-    "",
-    "v2",
-    "exporter-shared-1a82e8dd60",
-    "devbuild-shared-1a82e8dd60",
-    "viberoots",
-    "debug-manual-no-timestamp",
-  ];
+  const no = ["", "v2", "devbuild-shared-1a82e8dd60", "viberoots", "debug-manual-no-timestamp"];
   for (const iso of yes) assert.equal(isLikelyEphemeralIsolation(iso), true, iso);
   for (const iso of no) assert.equal(isLikelyEphemeralIsolation(iso), false, iso);
 });

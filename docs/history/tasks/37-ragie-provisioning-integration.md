@@ -59,7 +59,7 @@ Gate 1 ACL filter behavior confirmed.
 ## Why Now
 
 The dependency ordering is direct. Task #4 (containerize control plane) is needed because the
-data-room web and worker processes that call Ragie must have a stable container runtime and
+sample-webapp web and worker processes that call Ragie must have a stable container runtime and
 deployment admission path before live Ragie calls are plumbed into production. Task #13 (Supabase
 DB) is needed because `ragie_documents` and `ragie_citation_mappings` are platform-owned tables
 that must exist before the worker can record Ragie document references and webhook states.
@@ -98,7 +98,7 @@ Connect demos are internal-only until the UX is routed through the platform's ow
 product risk that surfaces only with a real account, not during development against mocked clients.
 
 **Throwaway Connect containment.** The architecture mandates that `platform-ragie/connect/` is
-structurally isolated: nothing in `data-room-mcp-tools` may import from it, and every file carries
+structurally isolated: nothing in `sample-webapp-mcp-tools` may import from it, and every file carries
 a throwaway tag. A CI boundary lint rule must enforce this before any Connect code is written.
 Implementing the lint rule after Connect code exists is harder and creates a window where the
 structural boundary is unenforced.
@@ -161,7 +161,7 @@ partners, acceptable; for paying customers, prohibited.
   through the secret runtime fixture, not through environment variables.
 
 - The `ragie_documents` and `ragie_webhook_events` tables are platform-owned (they live in
-  `platform-db`), while `connector_connections` is data-room-owned (it lives in `data-room-db`
+  `platform-db`), while `connector_connections` is sample-webapp-owned (it lives in `example-db`
   because it references `vault_id`). Before any of this code is written, confirm these tables are
   in the placeholder migration SQL and that the RLS design is documented, because the post-apply
   `rls_tenant_isolation` check will run against them.

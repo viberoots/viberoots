@@ -36,14 +36,21 @@ export async function installHarnessClientProfile(
   return profileRoot;
 }
 
-export async function installReviewedPleominoTargets(tmp: string): Promise<void> {
-  const appTargetsPath = path.join(tmp, "projects", "apps", "pleomino", "TARGETS");
-  const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino", "dev", "TARGETS");
+export async function installReviewedSampleWebappTargets(tmp: string): Promise<void> {
+  const appTargetsPath = path.join(tmp, "projects", "apps", "sample-webapp", "TARGETS");
+  const deployTargetsPath = path.join(
+    tmp,
+    "projects",
+    "deployments",
+    "sample-webapp",
+    "dev",
+    "TARGETS",
+  );
   const sharedTargetsPath = path.join(
     tmp,
     "projects",
     "deployments",
-    "pleomino",
+    "sample-webapp",
     "shared",
     "TARGETS",
   );
@@ -58,7 +65,7 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
       "genrule(",
       '    name = "app",',
       '    out = "app.txt",',
-      '    cmd = "printf pleomino > $OUT",',
+      '    cmd = "printf sample-webapp > $OUT",',
       '    labels = ["kind:app", "webapp:static"],',
       '    visibility = ["PUBLIC"],',
       ")",
@@ -77,8 +84,8 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
       '    repository = "viberoots/viberoots",',
       "    source_ref_policies = [",
       '        {"stage": "dev", "allowed_refs": "main", "required_checks": ""},',
-      '        {"stage": "staging", "allowed_refs": "main,refs/tags/release/*", "required_checks": "deploy/pleomino-staging"},',
-      '        {"stage": "prod", "allowed_refs": "refs/tags/release/*", "required_checks": "deploy/pleomino-prod"},',
+      '        {"stage": "staging", "allowed_refs": "main,refs/tags/release/*", "required_checks": "deploy/sample-webapp-staging"},',
+      '        {"stage": "prod", "allowed_refs": "refs/tags/release/*", "required_checks": "deploy/sample-webapp-prod"},',
       "    ],",
       '    trusted_reporter_identities = ["app:deploy-bot"],',
       "    required_approval_boundaries = [",
@@ -107,14 +114,14 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
       "deployment_admission_policy(",
       '    name = "staging_release",',
       '    allowed_refs = ["main", "refs/tags/release/*"],',
-      '    required_checks = ["deploy/pleomino-staging"],',
+      '    required_checks = ["deploy/sample-webapp-staging"],',
       '    visibility = ["PUBLIC"],',
       ")",
       "",
       "deployment_admission_policy(",
       '    name = "prod_release",',
       '    allowed_refs = ["refs/tags/release/*"],',
-      '    required_checks = ["deploy/pleomino-prod"],',
+      '    required_checks = ["deploy/sample-webapp-prod"],',
       '    required_approvals = ["release-owner"],',
       '    visibility = ["PUBLIC"],',
       ")",
@@ -129,11 +136,11 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
       "",
       "nixos_shared_host_static_webapp_deployment(",
       '    name = "deploy",',
-      '    component = "//projects/apps/pleomino:app",',
-      '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
+      '    component = "//projects/apps/sample-webapp:app",',
+      '    lane_policy = "//projects/deployments/sample-webapp/shared:lane",',
       '    environment_stage = "dev",',
-      '    admission_policy = "//projects/deployments/pleomino/shared:dev_release",',
-      '    app_name = "pleomino",',
+      '    admission_policy = "//projects/deployments/sample-webapp/shared:dev_release",',
+      '    app_name = "sample-webapp",',
       "    container_port = 3000,",
       '    health_path = "/healthz",',
       ")",

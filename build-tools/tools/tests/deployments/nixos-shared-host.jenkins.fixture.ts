@@ -9,7 +9,8 @@ import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-govern
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install.fixture";
 
-export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL = "//projects/deployments/pleomino/dev:deploy";
+export const REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL =
+  "//projects/deployments/sample-webapp/dev:deploy";
 
 export function jenkinsExecEnv(env: Record<string, string>, extra: Record<string, string> = {}) {
   return {
@@ -17,18 +18,18 @@ export function jenkinsExecEnv(env: Record<string, string>, extra: Record<string
     VBR_DEPLOY_CONTROL_PLANE_TOKEN: "test-control-plane-token",
     [LOCAL_FIXTURE_SERVICE_ENV]: "1",
     IN_NIX_SHELL: "1",
-    JENKINS_URL: "https://jenkins.example.invalid/job/pleomino",
-    JOB_NAME: "pleomino-deploy",
+    JENKINS_URL: "https://jenkins.example.invalid/job/sample-webapp",
+    JOB_NAME: "sample-webapp-deploy",
     ...extra,
   };
 }
 
-export function pleominoDeploymentFixture() {
+export function sampleWebappDeploymentFixture() {
   return nixosSharedHostDeploymentFixture({
-    deploymentId: "pleomino-dev",
-    label: REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
-    component: { target: "//projects/apps/pleomino:app" },
-    runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
+    deploymentId: "sample-webapp-dev",
+    label: REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
+    component: { target: "//projects/apps/sample-webapp:app" },
+    runtime: { appName: "sample-webapp", containerPort: 3000, healthPath: "/healthz" },
   });
 }
 
@@ -67,14 +68,21 @@ export async function installClientProfile(
   })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/nixos-shared-host-install.ts")} client install --output-root ${profileRoot} --profile mini --destination mini --remote-repo-path ${remoteRepoPath} --remote-state-path ${remoteStatePath} --remote-runtime-root ${remoteRuntimeRoot} --remote-records-root ${remoteRecordsRoot} --ssh-mode ssh --control-plane-url ${controlPlaneUrl}`;
 }
 
-export async function installReviewedPleominoTargets(tmp: string): Promise<void> {
-  const appTargetsPath = path.join(tmp, "projects", "apps", "pleomino", "TARGETS");
-  const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino", "dev", "TARGETS");
+export async function installReviewedSampleWebappTargets(tmp: string): Promise<void> {
+  const appTargetsPath = path.join(tmp, "projects", "apps", "sample-webapp", "TARGETS");
+  const deployTargetsPath = path.join(
+    tmp,
+    "projects",
+    "deployments",
+    "sample-webapp",
+    "dev",
+    "TARGETS",
+  );
   const sharedTargetsPath = path.join(
     tmp,
     "projects",
     "deployments",
-    "pleomino",
+    "sample-webapp",
     "shared",
     "TARGETS",
   );
@@ -89,7 +97,7 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
       "genrule(",
       '    name = "app",',
       '    out = "app.txt",',
-      '    cmd = "printf pleomino > $OUT",',
+      '    cmd = "printf sample-webapp > $OUT",',
       '    labels = ["kind:app", "webapp:static"],',
       '    visibility = ["PUBLIC"],',
       ")",
@@ -108,8 +116,8 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
       '    repository = "viberoots/viberoots",',
       "    source_ref_policies = [",
       '        {"stage": "dev", "allowed_refs": "main", "required_checks": ""},',
-      '        {"stage": "staging", "allowed_refs": "main,refs/tags/release/*", "required_checks": "deploy/pleomino-staging"},',
-      '        {"stage": "prod", "allowed_refs": "refs/tags/release/*", "required_checks": "deploy/pleomino-prod"},',
+      '        {"stage": "staging", "allowed_refs": "main,refs/tags/release/*", "required_checks": "deploy/sample-webapp-staging"},',
+      '        {"stage": "prod", "allowed_refs": "refs/tags/release/*", "required_checks": "deploy/sample-webapp-prod"},',
       "    ],",
       '    trusted_reporter_identities = ["app:deploy-bot"],',
       "    required_approval_boundaries = [",
@@ -145,11 +153,11 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
       "",
       "nixos_shared_host_static_webapp_deployment(",
       '    name = "deploy",',
-      '    component = "//projects/apps/pleomino:app",',
-      '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
+      '    component = "//projects/apps/sample-webapp:app",',
+      '    lane_policy = "//projects/deployments/sample-webapp/shared:lane",',
       '    environment_stage = "dev",',
-      '    admission_policy = "//projects/deployments/pleomino/shared:dev_release",',
-      '    app_name = "pleomino",',
+      '    admission_policy = "//projects/deployments/sample-webapp/shared:dev_release",',
+      '    app_name = "sample-webapp",',
       "    container_port = 3000,",
       '    health_path = "/healthz",',
       ")",
@@ -159,8 +167,15 @@ export async function installReviewedPleominoTargets(tmp: string): Promise<void>
   );
 }
 
-export async function requireServiceAuthForPleomino(tmp: string): Promise<void> {
-  const deployTargetsPath = path.join(tmp, "projects", "deployments", "pleomino", "dev", "TARGETS");
+export async function requireServiceAuthForSampleWebapp(tmp: string): Promise<void> {
+  const deployTargetsPath = path.join(
+    tmp,
+    "projects",
+    "deployments",
+    "sample-webapp",
+    "dev",
+    "TARGETS",
+  );
   await fsp.writeFile(
     deployTargetsPath,
     (await fsp.readFile(deployTargetsPath, "utf8")).replace(
@@ -180,14 +195,14 @@ export async function requireServiceAuthForPleomino(tmp: string): Promise<void> 
   );
 }
 
-export async function writeReviewedPleominoAdmissionEvidence(
+export async function writeReviewedSampleWebappAdmissionEvidence(
   tmp: string,
   $: any,
 ): Promise<{ admissionEvidencePath: string; deployment: NixosSharedHostDeployment }> {
   const deploymentJson = path.join(tmp, "reviewed-deployment.json");
   const deployment = (await resolveDeploymentFromTarget(
     tmp,
-    REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+    REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
   )) as NixosSharedHostDeployment;
   await fsp.writeFile(deploymentJson, JSON.stringify(deployment, null, 2) + "\n", "utf8");
   return {

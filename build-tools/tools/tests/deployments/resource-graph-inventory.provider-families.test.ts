@@ -51,8 +51,8 @@ function basePolicyNodes() {
   return [
     nixosSharedHostLaneGovernanceNodeFixture({
       source_ref_policies: [
-        { stage: "dev", allowed_refs: "main", required_checks: "deploy/pleomino-dev" },
-        { stage: "staging", allowed_refs: "main", required_checks: "deploy/pleomino-staging" },
+        { stage: "dev", allowed_refs: "main", required_checks: "deploy/sample-webapp-dev" },
+        { stage: "staging", allowed_refs: "main", required_checks: "deploy/sample-webapp-staging" },
         {
           stage: "prod",
           allowed_refs: "refs/tags/release/fixture",
@@ -62,12 +62,12 @@ function basePolicyNodes() {
     }),
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture({
-      name: "//projects/deployments/pleomino/shared:dev_release",
+      name: "//projects/deployments/sample-webapp/shared:dev_release",
     }),
     nixosSharedHostAdmissionPolicyNodeFixture({
-      name: "//projects/deployments/pleomino/shared:staging_release",
+      name: "//projects/deployments/sample-webapp/shared:staging_release",
       allowed_refs: ["main"],
-      required_checks: ["deploy/pleomino-staging"],
+      required_checks: ["deploy/sample-webapp-staging"],
     }),
   ];
 }
@@ -87,9 +87,9 @@ function nixosNodes(): GraphNode[] {
       publisher: "nixos-shared-host-static-webapp",
       provisioner: "nixos-shared-host-manifest",
       protection_class: "shared_nonprod",
-      lane_policy: "//projects/deployments/pleomino/shared:lane",
+      lane_policy: "//projects/deployments/sample-webapp/shared:lane",
       environment_stage: "dev",
-      admission_policy: "//projects/deployments/pleomino/shared:dev_release",
+      admission_policy: "//projects/deployments/sample-webapp/shared:dev_release",
       secret_requirements: [],
       runtime_config_requirements: [],
     },
@@ -108,9 +108,9 @@ function cloudflareContainersNodes(): GraphNode[] {
       publisher: "cloudflare-containers-local",
       publisher_config: "wrangler.jsonc",
       protection_class: "shared_nonprod",
-      lane_policy: "//projects/deployments/pleomino/shared:lane",
+      lane_policy: "//projects/deployments/sample-webapp/shared:lane",
       environment_stage: "staging",
-      admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+      admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
       provider_target: {
         account_id: "0123456789abcdef0123456789abcdef",
         worker: "api-staging",
@@ -128,8 +128,8 @@ function kubernetesNodes(): GraphNode[] {
   return [
     nixosSharedHostLaneGovernanceNodeFixture({
       source_ref_policies: [
-        { stage: "dev", allowed_refs: "main", required_checks: "deploy/pleomino-dev" },
-        { stage: "staging", allowed_refs: "main", required_checks: "deploy/pleomino-staging" },
+        { stage: "dev", allowed_refs: "main", required_checks: "deploy/sample-webapp-dev" },
+        { stage: "staging", allowed_refs: "main", required_checks: "deploy/sample-webapp-staging" },
         {
           stage: "prod",
           allowed_refs: "refs/tags/release/fixture",
@@ -148,9 +148,9 @@ function kubernetesNodes(): GraphNode[] {
       publisher: "helm-release",
       publisher_config: "helm/values.yaml",
       protection_class: "production_facing",
-      lane_policy: "//projects/deployments/pleomino/shared:lane",
+      lane_policy: "//projects/deployments/sample-webapp/shared:lane",
       environment_stage: "prod",
-      admission_policy: "//projects/deployments/pleomino/shared:prod_release",
+      admission_policy: "//projects/deployments/sample-webapp/shared:prod_release",
       provider_target: {
         cluster: "prod-us-west",
         namespace: "shared-observability",
@@ -177,9 +177,9 @@ function openTofuNodes(): GraphNode[] {
       provisioner: "opentofu-stack",
       provisioner_config: "opentofu/stack.json",
       protection_class: "local_only",
-      lane_policy: "//projects/deployments/pleomino/shared:lane",
+      lane_policy: "//projects/deployments/sample-webapp/shared:lane",
       environment_stage: "dev",
-      admission_policy: "//projects/deployments/pleomino/shared:dev_release",
+      admission_policy: "//projects/deployments/sample-webapp/shared:dev_release",
       provider_target: {
         stack_identity: "platform-foundation/dev",
         state_backend_identity: "s3://state/dev/platform-foundation",

@@ -25,22 +25,22 @@ const clientSecret = "client-secret-value";
 
 function parsedDeployment(siteUrl: string): CloudflarePagesDeployment {
   const { deployments, errors } = extractCloudflarePagesDeployments([
-    { name: "//projects/apps/pleomino:app", labels: ["kind:app", "webapp:pwa"] },
+    { name: "//projects/apps/sample-webapp:app", labels: ["kind:app", "webapp:pwa"] },
     cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
     {
-      name: "//projects/deployments/pleomino/staging:deploy",
+      name: "//projects/deployments/sample-webapp/staging:deploy",
       provider: "cloudflare-pages",
-      component: "//projects/apps/pleomino:app",
+      component: "//projects/apps/sample-webapp:app",
       component_kind: "static-webapp",
       publisher: "wrangler-pages",
       publisher_config: "wrangler.jsonc",
       protection_class: "shared_nonprod",
-      lane_policy: "//projects/deployments/pleomino/shared:lane",
+      lane_policy: "//projects/deployments/sample-webapp/shared:lane",
       environment_stage: "staging",
-      admission_policy: "//projects/deployments/pleomino/shared:staging_release",
-      provider_target: { account: "web-platform-staging", project: "pleomino-staging-pages" },
+      admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
+      provider_target: { account: "web-platform-staging", project: "sample-webapp-staging-pages" },
       secret_backend: "infisical/regulated",
       secret_requirements: [
         {
@@ -102,7 +102,7 @@ test("unified selector parsing flows into admitted context and secret references
             provenancePath: path.join(recordsRoot, "artifacts", "source-artifact.json"),
           },
           source: {
-            record: { deployRunId: "deploy-source-1", deploymentId: "pleomino-dev" },
+            record: { deployRunId: "deploy-source-1", deploymentId: "sample-webapp-dev" },
             replaySnapshotPath: path.join(
               recordsRoot,
               "replay",

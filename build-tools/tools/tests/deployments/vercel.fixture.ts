@@ -65,9 +65,9 @@ export function vercelPolicyNodes(): GraphNode[] {
     nixosSharedHostLaneGovernanceNodeFixture(),
     nixosSharedHostLanePolicyNodeFixture(),
     nixosSharedHostAdmissionPolicyNodeFixture({
-      name: "//projects/deployments/pleomino/shared:staging_release",
+      name: "//projects/deployments/sample-webapp/shared:staging_release",
       allowed_refs: ["main"],
-      required_checks: ["deploy/pleomino-staging"],
+      required_checks: ["deploy/sample-webapp-staging"],
     }),
   ];
 }

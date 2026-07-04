@@ -26,7 +26,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     artifactRegion: "us-east-1",
     artifactBackend: "aws-s3",
     artifactBackendEvidence: "",
-    deploymentIds: ["pleomino-staging", "pleomino-prod"],
+    deploymentIds: ["sample-webapp-staging", "sample-webapp-prod"],
     reviewedSourceMode: "ssh",
     authCallbackHost: "deploy-auth.example.test",
     authCallbackPath: "/oidc/callback",
@@ -36,7 +36,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     awsTopology: privateLinkAwsTopology(),
     supabasePostgres: privateLinkSupabaseProfile(),
     runtimeInput: reviewedRuntimeInput({
-      deploymentIds: ["pleomino-staging", "pleomino-prod"],
+      deploymentIds: ["sample-webapp-staging", "sample-webapp-prod"],
     }),
     ...overrides,
   };
@@ -60,21 +60,21 @@ test("protected readiness requires paired Infisical id and secret for every conf
   assert.match(
     validateProtectedSharedProfileReadiness(
       withRequiredFiles(files, [
-        "pleomino-staging-infisical-client-secret",
-        "pleomino-prod-infisical-client-secret",
+        "sample-webapp-staging-infisical-client-secret",
+        "sample-webapp-prod-infisical-client-secret",
       ]),
     ).join("\n"),
-    /missing pleomino-staging-infisical-client-id.*missing pleomino-prod-infisical-client-id/s,
+    /missing sample-webapp-staging-infisical-client-id.*missing sample-webapp-prod-infisical-client-id/s,
   );
 
   assert.match(
     validateProtectedSharedProfileReadiness(
       withRequiredFiles(files, [
-        "pleomino-staging-infisical-client-id",
-        "pleomino-prod-infisical-client-id",
+        "sample-webapp-staging-infisical-client-id",
+        "sample-webapp-prod-infisical-client-id",
       ]),
     ).join("\n"),
-    /missing pleomino-staging-infisical-client-secret.*missing pleomino-prod-infisical-client-secret/s,
+    /missing sample-webapp-staging-infisical-client-secret.*missing sample-webapp-prod-infisical-client-secret/s,
   );
 });
 
@@ -83,13 +83,13 @@ test("protected readiness rejects Infisical manifest deployment ids that do not 
   assert.match(
     validateProtectedSharedProfileReadiness(
       withRequiredFiles(files, [
-        "pleomino-staging-infisical-client-id",
-        "pleomino-staging-infisical-client-secret",
+        "sample-webapp-staging-infisical-client-id",
+        "sample-webapp-staging-infisical-client-secret",
         "other-prod-infisical-client-id",
         "other-prod-infisical-client-secret",
       ]),
     ).join("\n"),
-    /missing pleomino-prod-infisical-client-id.*unexpected other-prod-infisical-client-id/s,
+    /missing sample-webapp-prod-infisical-client-id.*unexpected other-prod-infisical-client-id/s,
   );
 });
 

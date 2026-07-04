@@ -32,4 +32,9 @@ test("linting: zx_test forwards pnpm fetch timeout and wraps node --test with co
     /\[zx_test\] timeout target=/,
     "expected zx_test to log the resolved per-target timeout budget",
   );
+  assert.doesNotMatch(
+    txt,
+    /> >\(/,
+    "expected zx_test output capture to avoid process substitution in managed sandboxes",
+  );
 });

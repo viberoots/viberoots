@@ -1,4 +1,5 @@
 import * as fsp from "node:fs/promises";
+import path from "node:path";
 
 export async function alignGeneratedWorkspaceFlakeInput(opts: {
   flakeFile: string;
@@ -12,7 +13,11 @@ export async function alignGeneratedWorkspaceFlakeInput(opts: {
     return "fresh";
   }
 
-  const desired = `viberoots.url = "path:${opts.viberootsSource}";`;
+  const flakeDir = path.dirname(opts.flakeFile);
+  const localFilteredInput = `${flakeDir}/viberoots-flake-input`;
+  const inputPath =
+    opts.viberootsSource === localFilteredInput ? "./viberoots-flake-input" : opts.viberootsSource;
+  const desired = `viberoots.url = "path:${inputPath}";`;
   const next = text.replace(/viberoots\.url\s*=\s*"(?:path|git\+file):[^"]*";/, desired);
   if (next === text) return "fresh";
   if (opts.dryRun) return "would-repair";

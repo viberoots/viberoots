@@ -66,7 +66,7 @@ test("install secret readiness reports not applicable in verbose partial checkou
 
 test("install secret readiness treats metadata access failures as real errors", async () => {
   await withRepo(async (repoRoot) => {
-    const shared = path.join(repoRoot, "projects/deployments/pleomino/shared");
+    const shared = path.join(repoRoot, "projects/deployments/sample-webapp/shared");
     await fsp.mkdir(shared, { recursive: true });
     await fsp.writeFile(path.join(shared, "family.bzl"), "");
     await fsp.chmod(shared, 0o000);

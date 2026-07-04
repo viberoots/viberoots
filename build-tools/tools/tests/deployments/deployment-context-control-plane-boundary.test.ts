@@ -31,7 +31,7 @@ function context(controlPlane: string) {
     controlPlane,
     cloudflare: {
       account: "web-platform",
-      projectName: "pleomino-pages",
+      projectName: "sample-webapp-pages",
     },
   };
 }
@@ -124,7 +124,7 @@ test("malformed local control-plane overrides remain visible to diagnostics and 
 test("app packages cannot declare control-plane selection directly", () => {
   const errors = extractCloudflarePagesDeployments(
     cloudflareNodes([
-      { name: "//projects/apps/pleomino:app", labels: ["kind:app"], controlPlane: "prod" },
+      { name: "//projects/apps/sample-webapp:app", labels: ["kind:app"], controlPlane: "prod" },
     ]),
   ).errors;
   assert.ok(errors.some((entry) => entry.includes("apps cannot declare")));

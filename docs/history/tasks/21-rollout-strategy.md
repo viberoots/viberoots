@@ -30,7 +30,7 @@ appear in none of those provider capability entries' `supportedRolloutModes`.
 This task covers:
 
 1. **Decide the rollout strategy per deployment class.** Map each existing deployment target
-   (pleomino-staging, pleomino-prod, any backend service on cloudflare-containers or kubernetes) to
+   (sample-webapp-staging, sample-webapp-prod, any backend service on cloudflare-containers or kubernetes) to
    the rollout mode it should use. For Cloudflare Pages and static deployments, `all_at_once` is
    the correct and complete answer — Cloudflare Pages performs an atomic swap by design and the
    provider capability entry already reflects this. For any containerized service on

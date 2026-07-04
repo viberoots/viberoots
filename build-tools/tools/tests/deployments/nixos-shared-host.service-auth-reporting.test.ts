@@ -30,7 +30,7 @@ function humanCheckEvidence(deployment: any, subject: string) {
     deployment,
     operationKind: "deploy",
     sourceRevision: subject,
-    requiredChecks: ["deploy/pleomino-dev"],
+    requiredChecks: ["deploy/sample-webapp-dev"],
   });
   return {
     ...evidence,
@@ -44,7 +44,7 @@ function trustedReporter(deployment: any): string {
 
 function manualCheck(deployment: any) {
   return {
-    name: "deploy/pleomino-dev",
+    name: "deploy/sample-webapp-dev",
     subject: "sha256:manual",
     status: "passed",
     checkedAt: "2026-04-23T00:00:00.000Z",
@@ -158,7 +158,7 @@ test("human submitters with submitter and admission_reporter grants persist manu
   await runInTemp("nixos-service-auth-human-reporting-kind", async (tmp, $) => {
     const deployment = authRequiredDeployment({
       admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
-        requiredChecks: ["deploy/pleomino-dev"],
+        requiredChecks: ["deploy/sample-webapp-dev"],
       }),
     });
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -198,7 +198,7 @@ test("automation principals can submit structured evidence only when they also h
   await runInTemp("nixos-service-auth-automation-reporter", async (tmp, $) => {
     const deployment = authRequiredDeployment({
       admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
-        requiredChecks: ["deploy/pleomino-dev"],
+        requiredChecks: ["deploy/sample-webapp-dev"],
       }),
     });
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -225,7 +225,7 @@ test("automation principals can submit structured evidence only when they also h
             ...admissionEvidence,
             checks: admissionEvidence.checks.map((check) => ({
               ...check,
-              recordRef: "check://deploy/pleomino-dev",
+              recordRef: "check://deploy/sample-webapp-dev",
               reportingKind: "ci_pipeline",
               reporterIdentity: trustedReporter(deployment),
             })),

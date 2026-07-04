@@ -77,15 +77,15 @@ The implementation surface that exists today is substantial and covers the full 
 What is missing and must be built to close the provider:
 
 1. **A real `projects/deployments/` package using the Vercel provider.** No deployment package
-   under `projects/deployments/` currently declares `provider = "vercel"`. The `data-room-console`
-   app has a placeholder `vercel_artifact` Buck target in `projects/apps/data-room-console/TARGETS`
+   under `projects/deployments/` currently declares `provider = "vercel"`. The `example-console`
+   app has a placeholder `vercel_artifact` Buck target in `projects/apps/example-console/TARGETS`
    (a `genrule` that writes a stub `.vercel/output`), but no corresponding deployment package
    exists. A first deployment package is needed to exercise the full admission, publish, and record
    path in a real Buck context. Until this exists, the provider is untested end-to-end outside of
    unit fixtures.
 
 2. **A real Next.js Vercel Build Output API artifact target (task #9).** The current
-   `data-room-console` artifact is a stub `genrule`. A real hermetic artifact target is required
+   `example-console` artifact is a stub `genrule`. A real hermetic artifact target is required
    before the publisher can admit and upload meaningful output. Task #9 produces this target; task
    #10 is blocked on it.
 
@@ -126,7 +126,7 @@ The console is the immediate first target.
 
 ## Risks
 
-- **Stub artifact in place of a real build.** The `data-room-console` placeholder `genrule`
+- **Stub artifact in place of a real build.** The `example-console` placeholder `genrule`
   produces a stub `.vercel/output`. Promoting the deployment to `shared_nonprod` before task #9
   delivers a real Next.js artifact would exercise the publish path but deploy meaningless content.
   The real risk is that a stub deploy could be mistaken for a real console in non-prod environments.
@@ -219,5 +219,5 @@ The console is the immediate first target.
 - The control-plane webapp itself is a candidate for the first real Vercel deployment package,
   given that `docs/control-plane-web-ui.md` exists and the console is the stated immediate target.
   If that app becomes the first real deployment, the deployment package should live under
-  `projects/deployments/` alongside the existing `pleomino` deployments and use
+  `projects/deployments/` alongside the existing `sample-webapp` deployments and use
   `vercel_next_webapp_deployment` from `vercel_defs.bzl`.

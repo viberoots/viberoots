@@ -573,13 +573,13 @@ Reviewed overrides are allowed when a host secret store already uses different n
 must remain deployment-scoped. A shared control plane must be able to host deployments that use
 different Infisical organizations, projects, site URLs, and Universal Auth identities.
 
-For the Pleomino PR-12 cutover, the defaults are:
+For the Sample webapp PR-12 cutover, the defaults are:
 
 ```text
-pleomino-staging-infisical-client-id
-pleomino-staging-infisical-client-secret
-pleomino-prod-infisical-client-id
-pleomino-prod-infisical-client-secret
+sample-webapp-staging-infisical-client-id
+sample-webapp-staging-infisical-client-secret
+sample-webapp-prod-infisical-client-id
+sample-webapp-prod-infisical-client-secret
 ```
 
 ## NixOS Host Module
@@ -721,14 +721,14 @@ Host-local import example:
       artifact-store-access-key-id.source = "/run/secrets/deploy-artifact-store-access-key-id";
       artifact-store-secret-access-key.source =
         "/run/secrets/deploy-artifact-store-secret-access-key";
-      pleomino-staging-infisical-client-id.source =
-        "/run/secrets/pleomino-staging-infisical-client-id";
-      pleomino-staging-infisical-client-secret.source =
-        "/run/secrets/pleomino-staging-infisical-client-secret";
-      pleomino-prod-infisical-client-id.source =
-        "/run/secrets/pleomino-prod-infisical-client-id";
-      pleomino-prod-infisical-client-secret.source =
-        "/run/secrets/pleomino-prod-infisical-client-secret";
+      sample-webapp-staging-infisical-client-id.source =
+        "/run/secrets/sample-webapp-staging-infisical-client-id";
+      sample-webapp-staging-infisical-client-secret.source =
+        "/run/secrets/sample-webapp-staging-infisical-client-secret";
+      sample-webapp-prod-infisical-client-id.source =
+        "/run/secrets/sample-webapp-prod-infisical-client-id";
+      sample-webapp-prod-infisical-client-secret.source =
+        "/run/secrets/sample-webapp-prod-infisical-client-secret";
     };
   };
 }
@@ -811,14 +811,14 @@ volumes:
 
 ## PR-12 Alignment
 
-This design is compatible with the Pleomino Infisical cutover plan:
+This design is compatible with the Sample webapp Infisical cutover plan:
 
-- PR-12 keeps Pleomino staging and production on control-plane-only live execution.
+- PR-12 keeps Sample webapp staging and production on control-plane-only live execution.
 - PR-12 requires file-backed service credentials and rejects local, CI, plaintext env-file, process
   arg, and Nix-store secret paths.
 - PR-12's default Infisical credential filenames match this document's deployment-id convention.
-- PR-12's `viberoots` Infisical organization and `pleomino-deployments` project are concrete
-  Pleomino inputs, not global control-plane defaults.
+- PR-12's `viberoots` Infisical organization and `sample-webapp-deployments` project are concrete
+  Sample webapp inputs, not global control-plane defaults.
 - The container runtime contract supports both future topologies required by PR-12: dedicated
   control plane per Infisical account and shared control plane for multiple Infisical accounts.
 - The runtime must use each deployment's reviewed `infisical_runtime` metadata and credential-file
@@ -827,10 +827,10 @@ This design is compatible with the Pleomino Infisical cutover plan:
   worker replicas in v1. Those container runtime requirements land before PR-12 in the selected
   sequence, so PR-12 consumes them rather than implementing them.
 
-The selected implementation sequence is containerization first, then the Pleomino PR-12 Infisical
+The selected implementation sequence is containerization first, then the Sample webapp PR-12 Infisical
 cutover. The containerization plan should provide the generic file-backed credential-directory
 abstraction, OCI image, NixOS container module, Compose/Podman profile, and multi-replica runtime
-foundation before PR-12 switches Pleomino staging and production. PR-12 should consume that
+foundation before PR-12 switches Sample webapp staging and production. PR-12 should consume that
 credential and runtime contract rather than adding a second Infisical credential path. The important
 PR-12 contract remains that no Infisical credential handling is NixOS-only, environment-file-only, or
 tied to one global Infisical account.
@@ -849,14 +849,14 @@ tied to one global Infisical account.
   parameter block with defaults for ports, directories, and credential filename patterns.
 - Parameterized Infisical tenants: covered. The design rejects global tenant/project credentials and
   supports both dedicated and shared control-plane topologies.
-- Pleomino defaults: covered. The default credential filenames match PR-12:
-  `pleomino-staging-infisical-client-id`, `pleomino-staging-infisical-client-secret`,
-  `pleomino-prod-infisical-client-id`, and `pleomino-prod-infisical-client-secret`.
+- Sample webapp defaults: covered. The default credential filenames match PR-12:
+  `sample-webapp-staging-infisical-client-id`, `sample-webapp-staging-infisical-client-secret`,
+  `sample-webapp-prod-infisical-client-id`, and `sample-webapp-prod-infisical-client-secret`.
 - Deployment metadata source of truth: covered. Runtime prep uses reviewed `infisical_runtime`
   metadata rather than ambient control-plane defaults.
 - Remaining scope risk: the full container runtime is planned as its own implementation sequence and
   should land before PR-12. PR-12 should consume the portable credential-directory abstraction from
-  that sequence rather than broadening the Pleomino cutover with container runtime work.
+  that sequence rather than broadening the Sample webapp cutover with container runtime work.
 - Horizontal scaling: covered as a v1 requirement for the containerization plan, not PR-12.
 - Artifact storage: covered. The containerized runtime requires S3-compatible artifact storage for
   production and does not rely on shared POSIX filesystems as artifact authority.
@@ -879,16 +879,16 @@ Selected sequencing:
 2. Use that work to establish the portable credential-directory abstraction, S3-compatible artifact
    storage, multi-replica service/worker runtime, OCI image, NixOS module, Compose/Podman profile,
    minimal web UI, and read-only MCP endpoint.
-3. Implement PR-12 after the containerized control plane is validated. PR-12 should switch Pleomino
+3. Implement PR-12 after the containerized control plane is validated. PR-12 should switch Sample webapp
    staging and production to Infisical on top of the containerized control-plane runtime and should
    consume the already-reviewed portable credential contract.
 
 Rationale:
 
 - Containerization changes packaging, host setup, service lifecycle, artifact storage, horizontal
-  scaling, and operational docs. Doing it first lets the first Pleomino Infisical rollout happen on
+  scaling, and operational docs. Doing it first lets the first Sample webapp Infisical rollout happen on
   the target runtime instead of migrating shortly after the cutover.
-- PR-12 stays focused on Pleomino-specific Infisical IaC, metadata, fake-backend coverage, operator
+- PR-12 stays focused on Sample webapp-specific Infisical IaC, metadata, fake-backend coverage, operator
   rollout steps, and replay/rollback guarantees.
 - Keeping the portable credential contract as the shared boundary prevents PR-12 from adding a
   second credential path.

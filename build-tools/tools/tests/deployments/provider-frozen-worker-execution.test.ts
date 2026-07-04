@@ -33,7 +33,7 @@ async function writeStaticArtifact(root: string, html: string) {
 }
 
 async function writeS3Config(tmp: string) {
-  const configDir = path.join(tmp, "projects", "deployments", "pleomino", "staging-s3");
+  const configDir = path.join(tmp, "projects", "deployments", "sample-webapp", "staging-s3");
   await fsp.mkdir(configDir, { recursive: true });
   await fsp.writeFile(
     path.join(configDir, "aws-s3-sync.jsonc"),
@@ -58,7 +58,7 @@ test("s3-static worker deploy and retry execute from frozen snapshots", async ()
           deploymentRequirementFixture({
             name: "s3_publish_token",
             step: step as "publish" | "smoke",
-            contractId: "secret://deployments/pleomino/s3_publish_token",
+            contractId: "secret://deployments/sample-webapp/s3_publish_token",
           }),
         ),
       }),

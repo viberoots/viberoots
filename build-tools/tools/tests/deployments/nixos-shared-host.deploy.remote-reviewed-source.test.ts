@@ -9,9 +9,9 @@ import { runInTemp } from "../lib/test-helpers";
 import {
   installClientProfile,
   prepareRemoteExecFixture,
-  requirePleominoDevCheck,
+  requireSampleWebappDevCheck,
   remoteExecEnv,
-  REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+  REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
 import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { deploymentSourceRef } from "./nixos-shared-host.fixture";
@@ -34,7 +34,7 @@ test("remote deploy surfaces reviewed-source mismatch guidance when the local ch
       $,
       artifactFiles: { "index.html": "<html>mismatch</html>\n", healthz: "ok\n" },
     });
-    await requirePleominoDevCheck(tmp);
+    await requireSampleWebappDevCheck(tmp);
     const sourceRef = deploymentSourceRef(deployment);
     const serviceRevision = String(
       (await $({ cwd: tmp, stdio: "pipe" })`git rev-parse ${sourceRef}`).stdout,
@@ -72,7 +72,7 @@ test("remote deploy surfaces reviewed-source mismatch guidance when the local ch
       const result = await $({
         cwd: tmp,
         env: remoteExecEnv(env),
-      })`zx-wrapper ${deployScript} --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --admit-and-deploy deploy/pleomino-dev`.nothrow();
+      })`zx-wrapper ${deployScript} --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --admit-and-deploy deploy/sample-webapp-dev`.nothrow();
       assert.notEqual(result.exitCode, 0);
       assert.match(String(result.stderr), new RegExp(`reviewed source mismatch for ${sourceRef}`));
       assert.match(

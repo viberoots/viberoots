@@ -1,6 +1,7 @@
 import path from "node:path";
 import type { DeploymentBootstrapScope } from "../../deployments/infisical-iac-bootstrap-config";
 import { PROJECT_SHARED_CONFIG_PATH } from "../../deployments/project-config";
+import type { KeychainRunner } from "../../deployments/sprinkleref-keychain";
 
 export type BootstrapArgs = Record<string, unknown> & {
   identityName: string;
@@ -28,7 +29,10 @@ export type CredentialSinkSelection = {
 
 type ReadinessModules = {
   LocalFileCredentialSink: new (file: string) => CredentialSink;
-  createSprinkleRefStore: (backend: { backend: string; file?: string }) => MutableCredentialStore;
+  createSprinkleRefStore: (
+    backend: { backend: string; file?: string; service?: string },
+    opts?: { platform?: NodeJS.Platform; keychainRunner?: KeychainRunner },
+  ) => MutableCredentialStore;
   readDeploymentReviewedMetadata: (
     scope: DeploymentBootstrapScope,
     file?: string,
@@ -79,6 +83,7 @@ export async function sinkFromSelection(
   selection: CredentialSinkSelection,
   repoRoot: string,
   modules: ReadinessModules,
+  opts: { platform?: NodeJS.Platform; keychainRunner?: KeychainRunner } = {},
 ): Promise<CredentialSink> {
   if (selection.kind === "local-file") {
     return new modules.LocalFileCredentialSink(args.localCredentialFile);
@@ -95,6 +100,7 @@ export async function sinkFromSelection(
   );
   const store = modules.createSprinkleRefStore(
     absolutizeLocalFileBackend(resolved.backend, repoRoot),
+    { platform: opts.platform, keychainRunner: opts.keychainRunner },
   );
   return {
     describe: () => store.describe(),

@@ -32,7 +32,7 @@ dependency ecosystems that are currently in use:
   `third_party/uv2nix` shim (pinned at version `0.0.3-local`). Python deps are installed into Nix
   derivations at build time; `pip-audit` or `grype` can consume the site directory or a SBOM derived
   from it.
-- **C++/Emscripten and Rust (stubs)** — the C++ solver WASM (`projects/libs/pleomino-solver-wasm`)
+- **C++/Emscripten and Rust (stubs)** — the C++ solver WASM (`projects/libs/sample-webapp-solver-wasm`)
   has no external C++ library dependencies beyond what Emscripten and nixpkgs provide; its toolchain
   (`pkgs.emscripten`, `pkgs.llvmPackages`) is covered by the Nix closure scan. Rust is represented
   in the build graph (`langs.nix` declares `rust` as a language) but no Cargo packages exist yet;

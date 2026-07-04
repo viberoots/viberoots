@@ -5,7 +5,7 @@ import { SprinkleRefInfisicalStore } from "../../deployments/sprinkleref-infisic
 import { runSprinkleRefCli } from "../../deployments/sprinkleref-cli";
 import { writeSprinkleRefConfig } from "./sprinkleref-test-helpers";
 
-const ref = "secret://deployments/pleomino/prod/cloudflare-api-token";
+const ref = "secret://deployments/sample-webapp/prod/cloudflare-api-token";
 
 test("sprinkleref rejects Infisical tokenEnv profiles", async () => {
   const configPath = await writeSprinkleRefConfig({

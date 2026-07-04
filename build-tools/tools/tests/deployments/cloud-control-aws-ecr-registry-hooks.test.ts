@@ -136,7 +136,7 @@ test("control-plane provider-capability emits ECR hook evidence", async () => {
         [
           "provider-capability",
           "--deployment-id",
-          "pleomino-staging",
+          "sample-webapp-staging",
           "--provider-capability",
           "aws-ecr-control-plane-registry",
           "--provider-capability-phase",
@@ -169,7 +169,7 @@ test("control-plane ECR provider-capability requires image publication evidence"
           [
             "provider-capability",
             "--deployment-id",
-            "pleomino-staging",
+            "sample-webapp-staging",
             "--provider-capability",
             "aws-ecr-control-plane-registry",
             "--registry-profile",

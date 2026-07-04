@@ -7,6 +7,14 @@ export type KeychainRunner = (
   args: string[],
 ) => { status: number; stdout?: string; stderr?: string };
 
+export class MacosKeychainInaccessibleError extends Error {
+  constructor(service: string, detail: string) {
+    super(
+      `macOS Keychain service ${service} is inaccessible from this process: ${detail || "security command failed"}`,
+    );
+  }
+}
+
 export function macosKeychainCommand(
   action: "read" | "add" | "update" | "remove",
   service: string,
@@ -41,7 +49,13 @@ export class SprinkleRefMacosKeychainStore implements SprinkleRefStore {
 
   async has(ref: string) {
     this.assertSupported();
-    return this.runner("security", macosKeychainCommand("read", this.service, ref)).status === 0;
+    const result = this.runner("security", macosKeychainCommand("read", this.service, ref));
+    if (result.status === 0) return true;
+    if (isKeychainInaccessible(result)) {
+      throw new MacosKeychainInaccessibleError(this.service, keychainFailureText(result));
+    }
+    if (isKeychainItemNotFound(result)) return false;
+    return false;
   }
 
   async read(ref: string) {
@@ -83,4 +97,23 @@ export class SprinkleRefMacosKeychainStore implements SprinkleRefStore {
 function defaultRunner(command: string, args: string[]) {
   const result = spawnSync(command, args, { encoding: "utf8" });
   return { status: result.status ?? 1, stdout: result.stdout, stderr: result.stderr };
+}
+
+function isKeychainItemNotFound(result: { stdout?: string; stderr?: string }) {
+  return /item could not be found|could not be found in the keychain/i.test(
+    keychainFailureText(result),
+  );
+}
+
+function isKeychainInaccessible(result: { status: number; stdout?: string; stderr?: string }) {
+  return (
+    result.status === 44 &&
+    /Module Directory Service error|A Module Directory Service error has occurred/i.test(
+      keychainFailureText(result),
+    )
+  );
+}
+
+function keychainFailureText(result: { stdout?: string; stderr?: string }) {
+  return [result.stderr, result.stdout].filter(Boolean).join("\n").trim();
 }

@@ -117,7 +117,7 @@ test("admission can synthesize service-owned lane-governance facts", async () =>
     evidence: {
       checks: [
         {
-          name: "deploy/pleomino-dev",
+          name: "deploy/sample-webapp-dev",
           subject: "rev-source-123",
           status: "passed",
           checkedAt: "2026-04-10T12:00:00.000Z",
@@ -162,7 +162,7 @@ test("explicit governance evidence remains valid when automatic verification is 
       ...reviewedLaneAdmissionEvidenceFixture({ deployment }),
       checks: [
         {
-          name: "deploy/pleomino-dev",
+          name: "deploy/sample-webapp-dev",
           subject: "rev-source-123",
           status: "passed",
           checkedAt: "2026-04-10T12:00:00.000Z",

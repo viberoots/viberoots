@@ -21,14 +21,14 @@ function deviceLogin(issuer: string, messages: string[]) {
 
 test("device flow displays verification URI and returns validated human token", async () => {
   const server = await startFakeOidcServer({
-    claims: { groups: ["deploy-submitters-pleomino-dev"] },
+    claims: { groups: ["deploy-submitters-sample-webapp-dev"] },
   });
   const messages: string[] = [];
   try {
     const token = await deviceLogin(server.issuer, messages);
     const claims = decodeJwtPayload(token);
     assert.equal(claims.azp, "deployment-cli");
-    assert.deepEqual(claims.groups, ["deploy-submitters-pleomino-dev"]);
+    assert.deepEqual(claims.groups, ["deploy-submitters-sample-webapp-dev"]);
     assert.match(messages.join("\n"), /ABCD-EFGH/);
   } finally {
     await server.close();
@@ -37,7 +37,7 @@ test("device flow displays verification URI and returns validated human token", 
 
 test("device flow fails closed on denied authorization", async () => {
   const server = await startFakeOidcServer({
-    claims: { groups: ["deploy-submitters-pleomino-dev"] },
+    claims: { groups: ["deploy-submitters-sample-webapp-dev"] },
     device: { firstPollError: "access_denied" },
   });
   try {

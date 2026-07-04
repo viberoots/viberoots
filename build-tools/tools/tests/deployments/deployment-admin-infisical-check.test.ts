@@ -98,7 +98,7 @@ test("Infisical admin check accepts reviewed placeholder approvals", async () =>
         ...deployment,
         infisicalSecretMappings: {
           [infisicalRequirement.contractId]: {
-            secretPath: "/deployments/pleomino",
+            secretPath: "/deployments/sample-webapp",
             secretName: "cloudflare_api_token",
             approvedPlaceholder: true,
             placeholderReason: "operator approved before first live value",

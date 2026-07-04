@@ -7,6 +7,7 @@
 , version
 , releaseTag
 , includeNodeMods ? false
+, nixpkgsRegistryExtension ? { profiles = { }; }
 }:
 let
   workspaceRootPath =
@@ -29,6 +30,10 @@ let
   nixpkgsRegistry = import ../nixpkgs-source-registry.nix {
     inputs = { inherit nixpkgs; };
   };
+  resolvedNixpkgsRegistry =
+    nixpkgsRegistry // {
+      profiles = (nixpkgsRegistry.profiles or { }) // (nixpkgsRegistryExtension.profiles or { });
+    };
 
   zx-wrapper = import ../lib/zx-wrapper.nix { inherit pkgs; };
 
@@ -62,6 +67,7 @@ let
     repoRoot = viberootsRoot;
     repoFsRoot = viberootsRoot;
     hashesPath = ../node-modules.hashes.json;
+    allowLiveHashMap = false;
     prefetchedStorePathGlobal =
       let
         s = builtins.getEnv "LOCAL_PNPM_STORE";
@@ -89,6 +95,7 @@ let
     };
 in
 {
-  inherit pkgs system zx-wrapper devshell prelude uv2nixLib liveFsRoot mkNodeMods repoRoot viberootsRoot viberootsNodeMods version releaseTag nixpkgsRegistry;
+  inherit pkgs system zx-wrapper devshell prelude uv2nixLib liveFsRoot mkNodeMods repoRoot viberootsRoot viberootsNodeMods version releaseTag;
+  nixpkgsRegistry = resolvedNixpkgsRegistry;
   buck2Input = buck2;
 } // (if includeNodeMods then { nodeMods = mkNodeMods { }; } else { })

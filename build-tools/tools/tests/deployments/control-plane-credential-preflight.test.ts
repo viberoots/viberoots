@@ -26,7 +26,7 @@ test("credential preflight accepts exact generated manifest files", async () => 
       env: {},
     });
     assert.equal(result.ok, true);
-    assert.ok(result.checkedFiles.includes("pleomino-staging-infisical-client-secret"));
+    assert.ok(result.checkedFiles.includes("sample-webapp-staging-infisical-client-secret"));
   });
 });
 
@@ -164,7 +164,7 @@ function input(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSet
     artifactRegion: "us-east-1",
     artifactBackend: "aws-s3",
     artifactBackendEvidence: "",
-    deploymentIds: ["pleomino-staging"],
+    deploymentIds: ["sample-webapp-staging"],
     reviewedSourceMode: "ssh",
     authCallbackHost: "deploy-auth.example.test",
     authCallbackPath: "/oidc/callback",
@@ -183,7 +183,7 @@ function runtimeInput(artifactCredentialMode: string) {
     publicUrl: "https://deploy.example.test",
     authCallbackHost: "deploy-auth.example.test",
     authCallbackPath: "/oidc/callback",
-    deploymentIds: ["pleomino-staging"],
+    deploymentIds: ["sample-webapp-staging"],
     supabaseProjectRef: "project-review",
     supabaseConnectionMode: "privatelink",
     awsAccountId: "123456789012",

@@ -15,13 +15,14 @@ import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install
 import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport.fake";
 import {
   installClientProfile,
-  installReviewedPleominoTargets,
+  installReviewedSampleWebappTargets,
   prepareReviewedRemoteHostPaths,
 } from "./nixos-shared-host.remote-exec.install.helpers";
 import { waitFor } from "./nixos-shared-host.control-plane.helpers";
 export { installClientProfile } from "./nixos-shared-host.remote-exec.install.helpers";
 
-export const REVIEWED_PLEOMINO_DEPLOYMENT_LABEL = "//projects/deployments/pleomino/dev:deploy";
+export const REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL =
+  "//projects/deployments/sample-webapp/dev:deploy";
 let buckQueryNonce = 0;
 
 export function freshRemoteExecBuckIsolation(tmp: string): string {
@@ -60,12 +61,12 @@ export type RemoteExecFixture = {
   remoteStatePath: string;
 };
 
-export function pleominoDeploymentFixture(): NixosSharedHostDeployment {
+export function sampleWebappDeploymentFixture(): NixosSharedHostDeployment {
   return nixosSharedHostDeploymentFixture({
-    deploymentId: "pleomino-dev",
-    label: REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
-    component: { target: "//projects/apps/pleomino:app" },
-    runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
+    deploymentId: "sample-webapp-dev",
+    label: REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
+    component: { target: "//projects/apps/sample-webapp:app" },
+    runtime: { appName: "sample-webapp", containerPort: 3000, healthPath: "/healthz" },
     lanePolicy: nixosSharedHostLanePolicyFixture({
       governance: {
         ...nixosSharedHostDeploymentFixture().lanePolicy.governance,
@@ -74,12 +75,12 @@ export function pleominoDeploymentFixture(): NixosSharedHostDeployment {
           {
             stage: "staging",
             allowedRefs: ["main"],
-            requiredChecks: ["deploy/pleomino-staging"],
+            requiredChecks: ["deploy/sample-webapp-staging"],
           },
           {
             stage: "prod",
             allowedRefs: ["refs/tags/release/*"],
-            requiredChecks: ["deploy/pleomino-prod"],
+            requiredChecks: ["deploy/sample-webapp-prod"],
           },
         ],
       },
@@ -115,12 +116,12 @@ export async function listRunRecords(recordsRoot: string): Promise<string[]> {
   }
 }
 
-export async function requirePleominoDevCheck(tmp: string): Promise<void> {
+export async function requireSampleWebappDevCheck(tmp: string): Promise<void> {
   const sharedTargetsPath = path.join(
     tmp,
     "projects",
     "deployments",
-    "pleomino",
+    "sample-webapp",
     "shared",
     "TARGETS",
   );
@@ -128,32 +129,34 @@ export async function requirePleominoDevCheck(tmp: string): Promise<void> {
   const nextSource = source
     .replace(
       /("stage": "dev", "allowed_refs": "main", "required_checks": ")[^"]*(")/,
-      "$1deploy/pleomino-dev$2",
+      "$1deploy/sample-webapp-dev$2",
     )
     .replace(
       /(\s+name = "dev_release",[\s\S]*?\s+allowed_refs = \["main"\],[\s\S]*?\s+required_checks = )\[[^\]]*\](,)/,
-      '$1["deploy/pleomino-dev"]$2',
+      '$1["deploy/sample-webapp-dev"]$2',
     );
   if (nextSource === source) {
-    throw new Error("required checks fixture update did not match pleomino/shared TARGETS");
+    throw new Error("required checks fixture update did not match sample-webapp/shared TARGETS");
   }
   await fsp.writeFile(sharedTargetsPath, nextSource, "utf8");
   const written = await fsp.readFile(sharedTargetsPath, "utf8");
   if (
-    !written.includes('"required_checks": "deploy/pleomino-dev"') ||
-    !written.includes('required_checks = ["deploy/pleomino-dev"]')
+    !written.includes('"required_checks": "deploy/sample-webapp-dev"') ||
+    !written.includes('required_checks = ["deploy/sample-webapp-dev"]')
   ) {
-    throw new Error("required checks fixture update did not persist to pleomino/shared TARGETS");
+    throw new Error(
+      "required checks fixture update did not persist to sample-webapp/shared TARGETS",
+    );
   }
   await waitFor(
     async () => {
       try {
         const deployment = await resolveDeploymentFromTarget(
           tmp,
-          REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+          REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
           { env: freshBuckQueryEnv(tmp) },
         );
-        return deployment.admissionPolicy.requiredChecks.includes("deploy/pleomino-dev")
+        return deployment.admissionPolicy.requiredChecks.includes("deploy/sample-webapp-dev")
           ? deployment
           : null;
       } catch {
@@ -178,10 +181,10 @@ export async function prepareRemoteExecFixture(opts: {
   const remoteRuntimeRoot = path.join(opts.tmp, "remote-runtime");
   const remoteRecordsRoot = path.join(opts.tmp, "remote-records");
   const remoteStatePath = path.join(opts.tmp, "remote-state", "platform-state.json");
-  await installReviewedPleominoTargets(opts.tmp);
+  await installReviewedSampleWebappTargets(opts.tmp);
   const deployment = (await resolveDeploymentFromTarget(
     opts.tmp,
-    REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+    REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
     { env: freshBuckQueryEnv(opts.tmp) },
   )) as NixosSharedHostDeployment;
   await ensureNixosSharedHostReviewedSourceRef(opts.tmp, opts.$, deployment);

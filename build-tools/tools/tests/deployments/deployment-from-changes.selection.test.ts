@@ -32,43 +32,43 @@ async function withTempRoot(fn: (root: string) => Promise<void>) {
   }
 }
 
-function pleominoDeployments() {
+function sampleWebappDeployments() {
   const lanePolicy = nixosSharedHostLanePolicyFixture();
   return [
     nixosSharedHostDeploymentFixture({
-      deploymentId: "pleomino-dev",
-      label: "//projects/deployments/pleomino/dev:deploy",
-      component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
-      runtime: { appName: "pleomino", containerPort: 3000 },
+      deploymentId: "sample-webapp-dev",
+      label: "//projects/deployments/sample-webapp/dev:deploy",
+      component: { kind: "static-webapp", target: "//projects/apps/sample-webapp:app" },
+      runtime: { appName: "sample-webapp", containerPort: 3000 },
       lanePolicy,
       prerequisites: [],
     }),
     cloudflarePagesDeploymentFixture({
-      deploymentId: "pleomino-staging",
-      label: "//projects/deployments/pleomino/staging:deploy",
+      deploymentId: "sample-webapp-staging",
+      label: "//projects/deployments/sample-webapp/staging:deploy",
       lanePolicy,
-      prerequisites: [{ deploymentId: "pleomino-dev", mode: "ordering_only" }],
+      prerequisites: [{ deploymentId: "sample-webapp-dev", mode: "ordering_only" }],
     }),
     cloudflarePagesDeploymentFixture({
-      deploymentId: "pleomino-prod",
-      label: "//projects/deployments/pleomino/prod:deploy",
+      deploymentId: "sample-webapp-prod",
+      label: "//projects/deployments/sample-webapp/prod:deploy",
       environmentStage: "prod",
       providerTarget: {
         account: "web-platform-prod",
-        project: "pleomino-prod-pages",
-        id: "pleomino-prod-pages",
-        canonicalUrl: "https://pleomino-prod-pages.pages.dev/",
-        providerTargetIdentity: "cloudflare-pages:web-platform-prod/pleomino-prod-pages",
+        project: "sample-webapp-prod-pages",
+        id: "sample-webapp-prod-pages",
+        canonicalUrl: "https://sample-webapp-prod-pages.pages.dev/",
+        providerTargetIdentity: "cloudflare-pages:web-platform-prod/sample-webapp-prod-pages",
       },
       lanePolicy,
-      admissionPolicyRef: "//projects/deployments/pleomino/shared:prod_release",
+      admissionPolicyRef: "//projects/deployments/sample-webapp/shared:prod_release",
       admissionPolicy: {
         ...cloudflarePagesDeploymentFixture().admissionPolicy,
-        ref: "//projects/deployments/pleomino/shared:prod_release",
+        ref: "//projects/deployments/sample-webapp/shared:prod_release",
         name: "prod_release",
         allowedRefs: ["refs/tags/release/*"],
       },
-      prerequisites: [{ deploymentId: "pleomino-staging", mode: "ordering_only" }],
+      prerequisites: [{ deploymentId: "sample-webapp-staging", mode: "ordering_only" }],
     }),
   ];
 }
@@ -103,39 +103,39 @@ function sandboxDeployments() {
 test("from-changes selects deployments whose component project is in the impacted Buck closure", async () => {
   await withTempRoot(async (tmp) => {
     await writeGraph(tmp, [
-      { name: "//projects/apps/pleomino:app", deps: ["//projects/libs/shared-ui:lib"] },
+      { name: "//projects/apps/sample-webapp:app", deps: ["//projects/libs/shared-ui:lib"] },
       { name: "//projects/libs/shared-ui:lib", deps: [] },
     ]);
     const plan = await resolveDeploymentsFromChanges({
       workspaceRoot: tmp,
       changedPaths: ["projects/libs/shared-ui/src/index.ts"],
-      deployments: pleominoDeployments(),
+      deployments: sampleWebappDeployments(),
     });
 
     assert.deepEqual(
       plan.selectedDeployments.map((deployment) => deployment.deploymentId),
-      ["pleomino-dev", "pleomino-staging", "pleomino-prod"],
+      ["sample-webapp-dev", "sample-webapp-staging", "sample-webapp-prod"],
     );
-    assert.equal(plan.reasonsByDeploymentId["pleomino-dev"]?.[0]?.kind, "component-project");
+    assert.equal(plan.reasonsByDeploymentId["sample-webapp-dev"]?.[0]?.kind, "component-project");
   });
 });
 
 test("from-changes widens only one direct prerequisite edge from changed deployment metadata", async () => {
   await withTempRoot(async (tmp) => {
-    await writeGraph(tmp, [{ name: "//projects/apps/pleomino:app", deps: [] }]);
+    await writeGraph(tmp, [{ name: "//projects/apps/sample-webapp:app", deps: [] }]);
     const plan = await resolveDeploymentsFromChanges({
       workspaceRoot: tmp,
-      changedPaths: ["projects/deployments/pleomino/dev/TARGETS"],
-      deployments: pleominoDeployments(),
+      changedPaths: ["projects/deployments/sample-webapp/dev/TARGETS"],
+      deployments: sampleWebappDeployments(),
     });
 
-    assert.deepEqual(plan.directDeploymentIds, ["pleomino-dev"]);
+    assert.deepEqual(plan.directDeploymentIds, ["sample-webapp-dev"]);
     assert.deepEqual(
       plan.selectedDeployments.map((deployment) => deployment.deploymentId),
-      ["pleomino-dev", "pleomino-staging"],
+      ["sample-webapp-dev", "sample-webapp-staging"],
     );
     assert.equal(
-      plan.reasonsByDeploymentId["pleomino-staging"]?.some(
+      plan.reasonsByDeploymentId["sample-webapp-staging"]?.some(
         (reason) => reason.kind === "prerequisite-widening",
       ),
       true,

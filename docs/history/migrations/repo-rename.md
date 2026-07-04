@@ -56,7 +56,7 @@ Non-goals:
 - no tests-only PRs
 - no compatibility aliases for old names or old public env vars
 - no blind replacement of ordinary `common` helper names, prose, or shared utility filenames
-- no renaming of unrelated product names such as `pleomino`
+- no renaming of unrelated product names such as `sample-webapp`
 - no generated build output churn unless the source that produces it is also updated in the same PR
 - no broad rewrite of historical plan documents solely to remove `PR-N` section headings
 - no broad replacement of real protocol, package, tool, or third-party version strings such as
@@ -1284,7 +1284,7 @@ reviewed fixture strings:
   lockfile integrity fixture contains `sha512-v2...`, which is package-manager data, not an
   internal `v2` migration label.
 - `build-tools/tools/tests/scaffolding/webapp.module-dep-label-normalization.contract.test.ts`
-- `projects/apps/pleomino/src/game/persistence-state-v1.ts`
+- `projects/apps/sample-webapp/src/game/persistence-state-v1.ts`
 
 The NixOS shared-host install/client manifest paths below are retained because the suffix identifies
 the serialized install/client manifest schema currently written to hosts and parsed by deployment

@@ -30,7 +30,7 @@ test("golden: Node importer provider TARGETS.node.auto is stable for representat
     // The workspace copy may include a repo-root pnpm-lock.yaml used for tooling;
     // remove it here so the golden output remains stable and minimal.
     await fsp.rm(path.join(tmp, "pnpm-lock.yaml"), { force: true });
-    await fsp.rm(path.join(tmp, "projects/apps/pleomino"), { recursive: true, force: true });
+    await fsp.rm(path.join(tmp, "projects/apps/sample-webapp"), { recursive: true, force: true });
 
     const importerDir = path.join(tmp, "projects/apps/web");
     await fsp.mkdir(path.join(importerDir, "patches", "node"), { recursive: true });

@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import type { SourcePlanEvidence } from "../lib/source-plan-evidence";
 
 export type CacheBackendKind = "none" | "nix-copy" | "attic" | "cachix";
 
@@ -16,6 +17,7 @@ export type CacheManifestInput = {
   declaredRemoteExecutables?: string[];
   selectedGraphOutputs?: string[];
   selectedTargetOutputs?: string[];
+  sourcePlans?: SourcePlanEvidence[];
 };
 
 export type CacheManifest = {
@@ -31,6 +33,7 @@ export type CacheManifest = {
   declaredRemoteExecutables: string[];
   selectedGraphOutputs: string[];
   selectedTargetOutputs: string[];
+  sourcePlans: SourcePlanEvidence[];
 };
 
 export const DEFAULT_CACHE_ATTRS = [
@@ -72,6 +75,7 @@ export function buildCacheManifest(input: CacheManifestInput): CacheManifest {
     declaredRemoteExecutables: unique(input.declaredRemoteExecutables || []),
     selectedGraphOutputs,
     selectedTargetOutputs,
+    sourcePlans: normalizeSourcePlans(input.sourcePlans || []),
   };
 }
 
@@ -172,6 +176,24 @@ function requiredOutputPaths(attr: string, values: string[] | undefined): string
   const paths = values || [];
   if (!paths.length) throw new Error(`missing output paths for configured attr ${attr}`);
   return paths;
+}
+
+function normalizeSourcePlans(sourcePlans: SourcePlanEvidence[]): SourcePlanEvidence[] {
+  const byTarget = new Map<string, SourcePlanEvidence>();
+  for (const plan of sourcePlans) {
+    if (!plan.target) continue;
+    byTarget.set(plan.target, {
+      target: plan.target,
+      nixpkgs_profile: plan.nixpkgs_profile || "default",
+      nixpkg_pins: Object.fromEntries(
+        Object.entries(plan.nixpkg_pins || {}).map(([attr, pin]) => [
+          attr,
+          { nixpkgs_profile: pin.nixpkgs_profile || "default" },
+        ]),
+      ),
+    });
+  }
+  return [...byTarget.values()].sort((a, b) => a.target.localeCompare(b.target));
 }
 
 function sha256(value: string): string {

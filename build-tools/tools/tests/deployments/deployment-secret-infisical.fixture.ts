@@ -16,13 +16,14 @@ import type { DeploymentSecretAdmittedReference } from "../../deployments/deploy
 import { deploymentRequirementFixture } from "./deployment-metadata.fixture";
 import type { FakeInfisicalSecret } from "./infisical.test-server";
 
-export const infisicalContractId = "secret://deployments/pleomino/cloudflare_api_token";
-export const infisicalTargetScope = "cloudflare-pages:web-platform-staging/pleomino-staging-pages";
+export const infisicalContractId = "secret://deployments/sample-webapp/cloudflare_api_token";
+export const infisicalTargetScope =
+  "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages";
 export const infisicalRuntime = {
   siteUrl: "http://127.0.0.1",
   projectId: "proj_123",
   environment: "prod",
-  secretPath: "/deployments/pleomino",
+  secretPath: "/deployments/sample-webapp",
 } as const;
 export const infisicalRequirement = deploymentRequirementFixture({
   name: "cloudflare_api_token",
@@ -56,7 +57,7 @@ export function infisicalSecret(overrides: Partial<FakeInfisicalSecret> = {}): F
     id: "sec_1",
     projectId: "proj_123",
     environment: "prod",
-    secretPath: "/deployments/pleomino",
+    secretPath: "/deployments/sample-webapp",
     secretName: "cloudflare_api_token",
     version: "3",
     secretValue: "runtime-token-v3",

@@ -15,7 +15,14 @@ const generatedStatePaths = [
   ".codex-focused-verify.log",
   ".full-test-output.log",
   ".patch-sessions.json",
+  ".viberoots/workspace/backups/backup.json",
   ".viberoots/workspace/buck/graph.json",
+  ".viberoots/workspace/cache/nix-tarballs",
+  ".viberoots/workspace/install-cache/state.json",
+  ".viberoots/workspace/nix-xdg-cache/nix/tarball-cache-v2",
+  ".viberoots/workspace/node/bin/node",
+  ".viberoots/workspace/pr-logs/source-snapshot.log",
+  ".viberoots/workspace/xdg-cache/nix/tarball-cache-v2",
   "viberoots/.DS_Store",
   "viberoots/.codex-logs/session.log",
   "viberoots/.codex-focused-verify.log",
@@ -44,11 +51,41 @@ test("verify seed nix filters mirror split-root generated-state guardrail", asyn
     ".codex-logs",
     ".full-test-output.log",
     ".patch-sessions.json",
+    ".viberoots/workspace/backups",
+    ".viberoots/workspace/buck",
+    ".viberoots/workspace/cache",
+    ".viberoots/workspace/install-cache",
+    ".viberoots/workspace/nix-xdg-cache",
+    ".viberoots/workspace/node",
+    ".viberoots/workspace/pr-logs",
+    ".viberoots/workspace/xdg-cache",
     "viberoots/.DS_Store",
     "viberoots/.codex-",
     "viberoots/build-tools/tmp",
   ]) {
     assert.match(filterSource, new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.match(seedSource, new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+});
+
+test("verify seed nix filter defaults to explicit root allowlist", async () => {
+  const filterSource = await readRepoFile(
+    "build-tools/tools/nix/flake/packages/filter-seed-repo.nix",
+  );
+  assert.match(filterSource, /seedRootDirs = \[/);
+  assert.match(filterSource, /seedRootFiles = \[/);
+  assert.match(filterSource, /lib\.elem base seedRootFiles/);
+  assert.doesNotMatch(filterSource, /isRootFile rel && !isExcludedRootFile base\) \|\|/);
+  for (const required of [
+    '"flake.nix"',
+    '"flake.lock"',
+    '"package.json"',
+    '"pnpm-lock.yaml"',
+    '".buckconfig"',
+    '"TARGETS"',
+    '"build-tools"',
+    '"viberoots"',
+  ]) {
+    assert.match(filterSource, new RegExp(required.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
 });

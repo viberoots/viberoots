@@ -33,6 +33,17 @@ test("cache manifest records attrs, archive paths, exact outputs, and redacted e
     declaredRemoteExecutables: [],
     selectedGraphOutputs: ["/nix/store/selected-graph"],
     selectedTargetOutputs: ["/nix/store/selected-target"],
+    sourcePlans: [
+      {
+        target: "//projects/apps/demo:tool",
+        nixpkgs_profile: "default",
+        nixpkg_pins: {
+          "pkgs.openssl": {
+            nixpkgs_profile: "nixpkgs-23_11",
+          },
+        },
+      },
+    ],
   });
 
   assert.equal(manifest.system, "x86_64-linux");
@@ -50,6 +61,17 @@ test("cache manifest records attrs, archive paths, exact outputs, and redacted e
     "/nix/store/remote-worker-tools",
     "/nix/store/selected-graph",
     "/nix/store/selected-target",
+  ]);
+  assert.deepEqual(manifest.sourcePlans, [
+    {
+      target: "//projects/apps/demo:tool",
+      nixpkgs_profile: "default",
+      nixpkg_pins: {
+        "pkgs.openssl": {
+          nixpkgs_profile: "nixpkgs-23_11",
+        },
+      },
+    },
   ]);
 });
 

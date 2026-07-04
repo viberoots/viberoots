@@ -73,8 +73,22 @@ test("install path selects flake refs by importer scope", async () => {
   if (!importerLockfile.includes('"--override-input", "viberoots", opts.viberootsOverride')) {
     throw new Error("importer lockfile generation must override stale viberoots lock inputs");
   }
+  if (
+    !importerLockfile.includes('viberoots.url = "path:./viberoots-flake-input"') ||
+    !importerLockfile.includes('return "";')
+  ) {
+    throw new Error(
+      "importer lockfile generation must not override the active generated filtered viberoots input",
+    );
+  }
   if (!importerLockfile.includes('path.join(repoRoot, "viberoots")')) {
     throw new Error("importer lockfile generation must prefer the local viberoots checkout");
+  }
+  if (
+    !importerLockfile.includes('resolveRepoNodeBin(opts.repoRoot, "prettier")') ||
+    !importerLockfile.includes("formatImporterLockfile({ repoRoot: opts.repoRoot, importerAbs })")
+  ) {
+    throw new Error("importer lockfile generation must format pnpm-lock.yaml before hashing");
   }
 
   const sharedImporterLockfile = await read("tools/lib/pnpm-importer-lockfile.ts");
@@ -109,8 +123,16 @@ test("install path selects flake refs by importer scope", async () => {
   if (!hashNix.includes('return ["--override-input", "viberoots", `path:${real}`];')) {
     throw new Error("update-pnpm-hash nix builds must override stale viberoots lock inputs");
   }
-  if (!hashNix.includes("...activeViberootsOverride()")) {
+  if (!hashNix.includes("...activeViberootsOverride(opts.flakeRef)")) {
     throw new Error("update-pnpm-hash nix build args must include the local viberoots override");
+  }
+  if (
+    !hashNix.includes("function flakeLocalViberootsSource(") ||
+    !hashNix.includes("if (flakeLocalViberootsSource(flakeRef)) return [];")
+  ) {
+    throw new Error(
+      "update-pnpm-hash nix builds must not override a valid flake-local viberoots input",
+    );
   }
 
   const nodeModulesBuild = await read("tools/dev/node-modules-build.ts");

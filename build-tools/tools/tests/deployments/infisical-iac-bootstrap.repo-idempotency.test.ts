@@ -80,15 +80,18 @@ async function writeInputs(dir: string) {
     path.join(dir, ".viberoots/workspace/buck/graph.json"),
     `${JSON.stringify({ nodes: ["staging", "prod"].map(node) })}\n`,
   );
-  await fs.mkdir(path.join(dir, "projects/deployments/pleomino/shared"), { recursive: true });
-  await fs.writeFile(path.join(dir, "projects/deployments/pleomino/shared/family.bzl"), metadata);
+  await fs.mkdir(path.join(dir, "projects/deployments/sample-webapp/shared"), { recursive: true });
+  await fs.writeFile(
+    path.join(dir, "projects/deployments/sample-webapp/shared/family.bzl"),
+    metadata,
+  );
 }
 
 function node(stage: string) {
   return {
-    name: `//projects/deployments/pleomino/${stage}:deploy`,
+    name: `//projects/deployments/sample-webapp/${stage}:deploy`,
     rule_type: "deployment_target",
-    deployment_family: "pleomino",
+    deployment_family: "sample-webapp",
     environment_stage: stage,
     secret_backend: "infisical/default",
     infisical_runtime: { project_id: "proj_fixture", environment: stage },
@@ -220,13 +223,13 @@ const clientIds = {
 const metadata = `
 _INFISICAL_SITE_URL = "https://app.infisical.com"
 _INFISICAL_PROJECT_ID = "proj_fixture"
-_INFISICAL_PROJECT_NAME = "pleomino-deployments"
-_INFISICAL_PROJECT_SLUG = "pleomino-deployments"
+_INFISICAL_PROJECT_NAME = "sample-webapp-deployments"
+_INFISICAL_PROJECT_SLUG = "sample-webapp-deployments"
 _INFISICAL_SECRET_PATH = "/"
 _INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
 _INFISICAL_ENVIRONMENT_SLUGS = {"staging": "staging", "prod": "prod"}
 _INFISICAL_MACHINE_IDENTITY_IDS = {"staging": "ae854a19-3537-4d40-8730-8314a74c3d04", "prod": "5e302d6c-3ac7-4fbc-a75f-b2312f33809a"}
-_INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "pleomino-staging-deploy", "prod": "pleomino-prod-deploy"}
+_INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "sample-webapp-staging-deploy", "prod": "sample-webapp-prod-deploy"}
 _INFISICAL_CREDENTIAL_FILE_NAMES = {"staging": {"client_id": "sid", "client_secret": "ssec"}, "prod": {"client_id": "pid", "client_secret": "psec"}}
-_INFISICAL_CREDENTIAL_REFS = {"staging": {"client_id": "secret://deployments/pleomino/staging/infisical-client-id", "client_secret": "secret://deployments/pleomino/staging/infisical-client-secret"}, "prod": {"client_id": "secret://deployments/pleomino/prod/infisical-client-id", "client_secret": "secret://deployments/pleomino/prod/infisical-client-secret"}}
+_INFISICAL_CREDENTIAL_REFS = {"staging": {"client_id": "secret://deployments/sample-webapp/staging/infisical-client-id", "client_secret": "secret://deployments/sample-webapp/staging/infisical-client-secret"}, "prod": {"client_id": "secret://deployments/sample-webapp/prod/infisical-client-id", "client_secret": "secret://deployments/sample-webapp/prod/infisical-client-secret"}}
 `;

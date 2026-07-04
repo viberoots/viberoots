@@ -6,16 +6,16 @@ import type {
 
 export function defaultSourceRefPolicies(): DeploymentSourceRefPolicy[] {
   return [
-    { stage: "dev", allowedRefs: ["main"], requiredChecks: ["deploy/pleomino-dev"] },
+    { stage: "dev", allowedRefs: ["main"], requiredChecks: ["deploy/sample-webapp-dev"] },
     {
       stage: "staging",
       allowedRefs: ["main", "refs/tags/release/*"],
-      requiredChecks: ["deploy/pleomino-staging"],
+      requiredChecks: ["deploy/sample-webapp-staging"],
     },
     {
       stage: "prod",
       allowedRefs: ["main", "refs/tags/release/*"],
-      requiredChecks: ["deploy/pleomino-prod"],
+      requiredChecks: ["deploy/sample-webapp-prod"],
     },
   ];
 }

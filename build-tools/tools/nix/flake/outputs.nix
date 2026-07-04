@@ -6,9 +6,10 @@ let
     { workspaceSrc
     , viberootsInput ? self
     , workspaceName ? "viberoots"
+    , nixpkgsRegistryExtension ? { profiles = { }; }
     }:
       import ./workspace.nix {
-        inherit nixpkgs buck2 gomod2nix workspaceSrc viberootsInput workspaceName version releaseTag;
+        inherit nixpkgs buck2 gomod2nix workspaceSrc viberootsInput workspaceName version releaseTag nixpkgsRegistryExtension;
       };
   workspace = mkWorkspace {
     workspaceSrc = ../../../..;
@@ -21,4 +22,3 @@ workspace // {
     inherit mkWorkspace version releaseTag;
   };
 }
-

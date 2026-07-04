@@ -10,7 +10,7 @@ import {
 } from "./cloudflare-pages.fixture";
 import { startFakeInfisicalServer } from "./infisical.test-server";
 
-const TOKEN_REF = "secret://control-plane/pleomino/staging/service-token";
+const TOKEN_REF = "secret://control-plane/sample-webapp/staging/service-token";
 
 test("readonly operator flow resolves selected secret token through Infisical context", async () => {
   const control = await startReadonlyControlPlaneServer();
@@ -20,7 +20,7 @@ test("readonly operator flow resolves selected secret token through Infisical co
   );
   try {
     await withProcessEnv(
-      { PLEOMINO_INFISICAL_CLIENT_ID: "id", PLEOMINO_INFISICAL_CLIENT_SECRET: "secret" },
+      { SAMPLE_WEBAPP_INFISICAL_CLIENT_ID: "id", SAMPLE_WEBAPP_INFISICAL_CLIENT_SECRET: "secret" },
       async () => {
         await withArgv(["--current-stage-state"], async () => {
           const handled = await captureConsoleJson(() =>
@@ -31,7 +31,7 @@ test("readonly operator flow resolves selected secret token through Infisical co
             }),
           );
           assert.equal(handled.result, true);
-          assert.equal(handled.output.deploymentId, "pleomino-staging");
+          assert.equal(handled.output.deploymentId, "sample-webapp-staging");
           assert.doesNotMatch(
             JSON.stringify(handled.output),
             /readonly-operator-token|Bearer readonly-operator-token|clientSecret/,
@@ -54,7 +54,7 @@ test("readonly vault helper status lookup gets selected secret backend context",
   );
   try {
     await withProcessEnv(
-      { PLEOMINO_INFISICAL_CLIENT_ID: "id", PLEOMINO_INFISICAL_CLIENT_SECRET: "secret" },
+      { SAMPLE_WEBAPP_INFISICAL_CLIENT_ID: "id", SAMPLE_WEBAPP_INFISICAL_CLIENT_SECRET: "secret" },
       async () => {
         await withArgv(["--deploy-run-id", "deploy-run-1"], async () => {
           const handled = await captureConsoleJson(() =>
@@ -82,13 +82,13 @@ test("readonly vault helper status lookup gets selected secret backend context",
 
 function deployment(controlPlaneUrl: string, siteUrl: string) {
   const base = cloudflarePagesDeploymentFixture({
-    deploymentId: "pleomino-staging",
+    deploymentId: "sample-webapp-staging",
     controlPlane: {
-      name: "pleomino-staging",
+      name: "sample-webapp-staging",
       serviceClient: { controlPlaneUrl, controlPlaneTokenRef: TOKEN_REF },
       records: { backend: "service" },
     },
-    deploymentContext: { name: "pleomino-staging" },
+    deploymentContext: { name: "sample-webapp-staging" },
     secretRequirements: cloudflarePagesApiTokenRequirements(),
   });
   return {
@@ -100,8 +100,8 @@ function deployment(controlPlaneUrl: string, siteUrl: string) {
       environment: "prod",
       secretPath: "/",
       preferredCredentialSource: "machine_identity_universal_auth" as const,
-      machineIdentityClientIdEnv: "PLEOMINO_INFISICAL_CLIENT_ID",
-      machineIdentityClientSecretEnv: "PLEOMINO_INFISICAL_CLIENT_SECRET",
+      machineIdentityClientIdEnv: "SAMPLE_WEBAPP_INFISICAL_CLIENT_ID",
+      machineIdentityClientSecretEnv: "SAMPLE_WEBAPP_INFISICAL_CLIENT_SECRET",
     },
   };
 }
@@ -130,8 +130,8 @@ async function startReadonlyControlPlaneServer() {
     if (url.pathname.endsWith("/current-stage-state")) {
       response.end(
         JSON.stringify({
-          deploymentId: "pleomino-staging",
-          deploymentLabel: "//projects/deployments/pleomino/staging:deploy",
+          deploymentId: "sample-webapp-staging",
+          deploymentLabel: "//projects/deployments/sample-webapp/staging:deploy",
           environmentStage: "staging",
         }),
       );

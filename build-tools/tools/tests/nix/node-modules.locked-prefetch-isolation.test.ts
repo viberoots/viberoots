@@ -75,5 +75,22 @@ test("node-modules locked derivation ignores broken shared prefetched store inpu
     const out = await $`bash --noprofile --norc -c ${drvCmd}`;
     const drvPath = String(out.stdout || "").trim();
     assert.ok(drvPath.endsWith(".drv"), `expected drvPath, got: ${drvPath}`);
+
+    for (const rel of [
+      ".viberoots/workspace/cache/nix-tarballs/blob",
+      ".viberoots/workspace/nix-xdg-cache/nix/tarball-cache-v2/pack",
+      ".viberoots/workspace/xdg-cache/nix/tarball-cache-v2/pack",
+    ]) {
+      const abs = path.join(tmp, rel);
+      await fsp.mkdir(path.dirname(abs), { recursive: true });
+      await fsp.writeFile(abs, "cache churn\n", "utf8");
+    }
+
+    const afterCacheOut = await $`bash --noprofile --norc -c ${drvCmd}`;
+    assert.equal(
+      String(afterCacheOut.stdout || "").trim(),
+      drvPath,
+      "workspace cache roots must not perturb locked node_modules derivation identity",
+    );
   });
 });

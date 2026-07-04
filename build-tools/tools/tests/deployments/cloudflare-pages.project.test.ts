@@ -70,7 +70,7 @@ test("cloudflare-pages project provisioning creates missing project with source 
       providerTarget: {
         ...cloudflarePagesDeploymentFixture().providerTarget,
         accountId: "1b911846f80a89272c0dbaf44f5c810f",
-        customDomain: "staging.pleomino.com",
+        customDomain: "staging.sample-webapp.com",
       },
     });
     const created = await ensureCloudflarePagesProject({
@@ -79,14 +79,14 @@ test("cloudflare-pages project provisioning creates missing project with source 
     });
     assert.deepEqual(created, {
       kind: "ready",
-      project: "pleomino-staging-pages",
+      project: "sample-webapp-staging-pages",
       created: true,
       productionBranch: "main",
     });
     const createBody = JSON.parse(
       requests.find((request) => request.method === "POST")?.body || "{}",
     );
-    assert.equal(createBody.name, "pleomino-staging-pages");
+    assert.equal(createBody.name, "sample-webapp-staging-pages");
     assert.equal(createBody.production_branch, "main");
   });
 });

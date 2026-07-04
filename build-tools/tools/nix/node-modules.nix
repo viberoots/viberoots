@@ -2,12 +2,13 @@
   # Live filesystem root of the repo (not snapshotted), used to locate importer lockfiles at eval time
   repoFsRoot ? ../../../..,
   hashesPath ? ./node-modules.hashes.json,
-  prefetchedStorePathGlobal ? null
+  prefetchedStorePathGlobal ? null,
+  allowLiveHashMap ? true
 }:
 let
-  common = import ./node-modules/common.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal; };
-  store = import ./node-modules/store.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal; };
-  modules = import ./node-modules/modules.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal; };
+  common = import ./node-modules/common.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal allowLiveHashMap; };
+  store = import ./node-modules/store.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal allowLiveHashMap; };
+  modules = import ./node-modules/modules.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal allowLiveHashMap; };
 
   inherit (common) sanitizeName;
   inherit (store) mkPnpmStore mkPnpmStoreUnfixed;
@@ -34,4 +35,3 @@ in {
   pnpm-store-unfixed = if pnpm-store-unfixed-default == null then (pkgs.runCommand "pnpm-store-unfixed-missing" {} "mkdir -p $out; echo no-root-lockfile > $out/info") else pnpm-store-unfixed-default;
   node-modules = if node-modules-default == null then (pkgs.runCommand "node-modules-missing" {} "mkdir -p $out; echo no-root-lockfile > $out/info") else node-modules-default;
 }
-

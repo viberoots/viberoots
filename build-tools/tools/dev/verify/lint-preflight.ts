@@ -9,6 +9,7 @@ import { runNodeWithZx } from "../../lib/node-run";
 import { repoNodeBinCandidates, resolveRepoNodeBin } from "../../lib/repo-node-bin";
 import { resolveToolPath } from "../../lib/tool-paths";
 import { buildToolsRoot, buildToolPath } from "../dev-build/paths";
+import { filterExistingLintPreflightPaths } from "./lint-preflight-paths";
 
 function verbose(): boolean {
   return isVbrVerbose();
@@ -270,10 +271,14 @@ export async function runVerifyLintPreflight(
   const normalizedChangedPaths = Array.from(
     new Set(rawChangedPaths.map((p) => normalizeRepoPath(p)).filter(Boolean)),
   ).sort();
+  const existingChangedPaths =
+    lintFilters.length > 0
+      ? normalizedChangedPaths
+      : await filterExistingLintPreflightPaths(root, normalizedChangedPaths);
   const changedLintPaths =
-    lintFilters.length > 0 ? [] : normalizedChangedPaths.filter((p) => !shouldIgnoreLintPath(p));
+    lintFilters.length > 0 ? [] : existingChangedPaths.filter((p) => !shouldIgnoreLintPath(p));
   const onlyIgnoredScaffoldChanges =
-    lintFilters.length === 0 && normalizedChangedPaths.length > 0 && changedLintPaths.length === 0;
+    lintFilters.length === 0 && existingChangedPaths.length > 0 && changedLintPaths.length === 0;
   const eslintTargets =
     lintFilters.length > 0 ? lintFilters : changedLintPaths.filter(isEslintPath);
   const prettierTargets =

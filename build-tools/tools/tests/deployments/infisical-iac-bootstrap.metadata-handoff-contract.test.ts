@@ -8,15 +8,15 @@ test("metadata handoff rejects non-contract credential file names", () => {
   const reviewed = parseDeploymentReviewedMetadata(SOURCE);
   assert.throws(
     () => buildMetadataHandoffPatch(LIVE_METADATA, reviewed, SOURCE),
-    /metadata handoff staging client_id file name must be exactly pleomino-staging-infisical-client-id/,
+    /metadata handoff staging client_id file name must be exactly sample-webapp-staging-infisical-client-id/,
   );
 });
 
 const LIVE_METADATA = {
   siteUrl: "https://app.infisical.com",
-  projectName: "pleomino-deployments",
+  projectName: "sample-webapp-deployments",
   projectId: "proj_live",
-  projectSlug: "pleomino-deployments",
+  projectSlug: "sample-webapp-deployments",
   secretPath: "/",
   cloudflareSecretName: "cloudflare_api_token",
   environments: { staging: { slug: "staging" } },
@@ -24,32 +24,32 @@ const LIVE_METADATA = {
     {
       stage: "staging",
       identityId: "identity_live_staging",
-      identityName: "pleomino-staging-deploy",
-      clientIdRef: "secret://deployments/pleomino/staging/infisical-client-id",
-      clientSecretRef: "secret://deployments/pleomino/staging/infisical-client-secret",
-      clientIdFileName: "pleomino-staging-client-id",
-      clientSecretFileName: "pleomino-staging-client-secret",
+      identityName: "sample-webapp-staging-deploy",
+      clientIdRef: "secret://deployments/sample-webapp/staging/infisical-client-id",
+      clientSecretRef: "secret://deployments/sample-webapp/staging/infisical-client-secret",
+      clientIdFileName: "sample-webapp-staging-client-id",
+      clientSecretFileName: "sample-webapp-staging-client-secret",
     },
   ],
 };
 
 const SOURCE = `
 _INFISICAL_SITE_URL = "https://app.infisical.com"
-_INFISICAL_PROJECT_ID = "proj_pleomino_deployments"
-_INFISICAL_PROJECT_NAME = "pleomino-deployments"
-_INFISICAL_PROJECT_SLUG = "pleomino-deployments"
+_INFISICAL_PROJECT_ID = "proj_sample_webapp_deployments"
+_INFISICAL_PROJECT_NAME = "sample-webapp-deployments"
+_INFISICAL_PROJECT_SLUG = "sample-webapp-deployments"
 _INFISICAL_ENVIRONMENT_SLUGS = {"staging": "staging"}
 _INFISICAL_SECRET_PATH = "/"
 _INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
-_INFISICAL_MACHINE_IDENTITY_IDS = {"staging": "identity_pleomino_staging_deploy"}
-_INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "pleomino-staging-deploy"}
+_INFISICAL_MACHINE_IDENTITY_IDS = {"staging": "identity_sample_webapp_staging_deploy"}
+_INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "sample-webapp-staging-deploy"}
 _INFISICAL_CREDENTIAL_FILE_NAMES = {
   "staging": {"client_id": "", "client_secret": ""},
 }
 _INFISICAL_CREDENTIAL_REFS = {
   "staging": {
-    "client_id": "secret://deployments/pleomino/staging/infisical-client-id",
-    "client_secret": "secret://deployments/pleomino/staging/infisical-client-secret",
+    "client_id": "secret://deployments/sample-webapp/staging/infisical-client-id",
+    "client_secret": "secret://deployments/sample-webapp/staging/infisical-client-secret",
   },
 }
 `;

@@ -17,7 +17,7 @@ import {
 import { startFakeInfisicalServer } from "./infisical.test-server";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
-const targetScope = "cloudflare-pages:web-platform-staging/pleomino-staging-pages";
+const targetScope = "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages";
 
 function cloudflareDeployment(siteUrl: string): CloudflarePagesDeployment {
   return {
@@ -68,7 +68,7 @@ function vaultAdmittedReference(): DeploymentSecretAdmittedReference {
     referenceId: `vault:${infisicalRequirement.contractId}`,
     targetScope,
     backendRef: infisicalRequirement.contractId,
-    selectorRef: "vault:v1:secret/deployments/pleomino/cloudflare_api_token",
+    selectorRef: "vault:v1:secret/deployments/sample-webapp/cloudflare_api_token",
     resolvedAt: "2026-05-13T00:00:00.000Z",
     resolvedVersion: "1",
     refreshMode: "renew",

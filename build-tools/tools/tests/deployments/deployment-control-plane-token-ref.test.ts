@@ -13,8 +13,8 @@ import { infisicalTestContext } from "./deployment-secret-infisical.fixture";
 import { startFakeInfisicalServer } from "./infisical.test-server";
 import { startFakeVaultServer } from "./vault.test-server";
 
-const STAGING_REF = "secret://control-plane/pleomino/staging/service-token";
-const PROD_REF = "secret://control-plane/pleomino/prod/service-token";
+const STAGING_REF = "secret://control-plane/sample-webapp/staging/service-token";
+const PROD_REF = "secret://control-plane/sample-webapp/prod/service-token";
 const RUNTIME_REF = "runtime://github-actions/control-plane-token";
 
 test("protected/shared control-plane token ref resolves through selected Infisical context", async () => {
@@ -37,7 +37,7 @@ test("protected/shared control-plane token ref resolves through selected Infisic
   }
 });
 
-test("checked-in Pleomino profile token refs use non-fixture Infisical backend path", async () => {
+test("checked-in Sample webapp profile token refs use non-fixture Infisical backend path", async () => {
   for (const [ref, value] of [
     [STAGING_REF, "staging-control-plane-token"],
     [PROD_REF, "prod-control-plane-token"],
@@ -68,7 +68,7 @@ test("control-plane token ref resolves through selected Vault context", async ()
   const token = await resolveControlPlaneTokenRef({
     tokenRef: STAGING_REF,
     backend: "vault",
-    contextName: "pleomino-staging",
+    contextName: "sample-webapp-staging",
     secretContext: {
       kind: "vault",
       credential: { kind: "token", addr: server.addr, token: server.token },
@@ -124,7 +124,7 @@ test("selection evidence records refs and never token payloads", async () => {
       env: {},
     });
     const evidence = JSON.stringify(serviceClientSelectionEvidence(client));
-    assert.match(evidence, /secret:\/\/control-plane\/pleomino\/staging\/service-token/);
+    assert.match(evidence, /secret:\/\/control-plane\/sample-webapp\/staging\/service-token/);
     assert.doesNotMatch(evidence, /selected-infisical-token|Bearer token|clientSecret/);
   } finally {
     restore();
@@ -164,16 +164,16 @@ test("token resolver redacts backend secret payloads in diagnostics", async () =
 
 function deployment(tokenRef: string, siteUrl: string) {
   const base = cloudflarePagesDeploymentFixture({
-    deploymentId: "pleomino-staging",
+    deploymentId: "sample-webapp-staging",
     controlPlane: {
-      name: "pleomino-staging",
+      name: "sample-webapp-staging",
       serviceClient: {
         controlPlaneUrl: "https://control-plane.example",
         controlPlaneTokenRef: tokenRef,
       },
       records: { backend: "service" },
     },
-    deploymentContext: { name: "pleomino-staging" },
+    deploymentContext: { name: "sample-webapp-staging" },
   });
   return {
     ...base,

@@ -294,7 +294,7 @@ From the workstation:
 export VBR_DEPLOY_CONTROL_PLANE_TOKEN='...'   # value unchanged from BNX_* days
 
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/sample-webapp/dev:deploy \
   --profile mini \
   --plan
 ```
@@ -303,7 +303,7 @@ Then a real deploy:
 
 ```bash
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino/dev:deploy \
+  --deployment //projects/deployments/sample-webapp/dev:deploy \
   --profile mini
 ```
 
@@ -329,8 +329,8 @@ environment variables for the service or workers.
 1. keep `infisical_runtime` in `TARGETS` limited to non-secret routing data and
    reviewed environment variable names
 2. provision deployment-scoped credential files on `mini`, for example
-   `/run/secrets/pleomino-staging-infisical-client-id` and
-   `/run/secrets/pleomino-staging-infisical-client-secret`
+   `/run/secrets/sample-webapp-staging-infisical-client-id` and
+   `/run/secrets/sample-webapp-staging-infisical-client-secret`
 3. wire those files through
    `services.viberoots.deploymentControlPlaneContainer.credentials`
 4. restart the containerized control-plane units after changing credential
@@ -340,7 +340,7 @@ environment variables for the service or workers.
 
    ```bash
    direnv exec . build-tools/tools/bin/deploy \
-     --deployment //projects/deployments/pleomino/staging:deploy \
+     --deployment //projects/deployments/sample-webapp/staging:deploy \
      --profile mini \
      --validate-only
    ```
@@ -350,10 +350,10 @@ environment variables for the service or workers.
 
    ```bash
    sprinkleref --check \
-     --target //projects/deployments/pleomino/staging:deploy
+     --target //projects/deployments/sample-webapp/staging:deploy
 
-   sprinkleref --get secret://deployments/pleomino/cloudflare_api_token \
-     --target //projects/deployments/pleomino/staging:deploy \
+   sprinkleref --get secret://deployments/sample-webapp/cloudflare_api_token \
+     --target //projects/deployments/sample-webapp/staging:deploy \
      --fingerprint
    ```
 
@@ -424,8 +424,8 @@ paths. Provision these before enabling the module:
 - S3-compatible artifact store endpoint, access key id, secret access key, and
   bucket
 - deployment-scoped Infisical credential files, for example
-  `/run/secrets/pleomino-staging-infisical-client-id` and
-  `/run/secrets/pleomino-staging-infisical-client-secret`
+  `/run/secrets/sample-webapp-staging-infisical-client-id` and
+  `/run/secrets/sample-webapp-staging-infisical-client-secret`
 
 Secret values must live in host-local secret files managed by SOPS-nix, agenix,
 manual provisioning, or another reviewed secret system. Do not put secret
@@ -473,10 +473,10 @@ Add the repo-owned module to the `mini` NixOS config:
         "/run/secrets/deploy-artifact-store-access-key-id";
       artifact-store-secret-access-key.source =
         "/run/secrets/deploy-artifact-store-secret-access-key";
-      pleomino-staging-infisical-client-id.source =
-        "/run/secrets/pleomino-staging-infisical-client-id";
-      pleomino-staging-infisical-client-secret.source =
-        "/run/secrets/pleomino-staging-infisical-client-secret";
+      sample-webapp-staging-infisical-client-id.source =
+        "/run/secrets/sample-webapp-staging-infisical-client-id";
+      sample-webapp-staging-infisical-client-secret.source =
+        "/run/secrets/sample-webapp-staging-infisical-client-secret";
     };
   };
 }
@@ -524,12 +524,12 @@ From the workstation, regenerate the local profile if needed, then run:
 export VBR_DEPLOY_CONTROL_PLANE_TOKEN='...'
 
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/sample-webapp/staging:deploy \
   --profile mini \
   --validate-only
 
 direnv exec . build-tools/tools/bin/deploy \
-  --deployment //projects/deployments/pleomino/staging:deploy \
+  --deployment //projects/deployments/sample-webapp/staging:deploy \
   --profile mini \
   --admit-and-deploy deploy/admission \
   --admit-for-commit main

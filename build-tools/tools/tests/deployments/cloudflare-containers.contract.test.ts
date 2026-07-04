@@ -37,9 +37,9 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
     publisher: "cloudflare-containers-local",
     publisher_config: "wrangler.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
     provider_target: {
       account_id: accountId,
       worker: "api-staging",

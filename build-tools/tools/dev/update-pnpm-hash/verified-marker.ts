@@ -4,6 +4,7 @@ import path from "node:path";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { withExclusiveInstallLock } from "../install/lock";
 import { updateNodeModulesHashesJson } from "./hashes-json";
+import type { HashesJsonOwner } from "./hashes-json";
 
 export type PnpmStoreVerifiedMarker = {
   importer: string;
@@ -300,6 +301,7 @@ export async function restoreHashFromSharedCache(opts: {
   existingLockHash: string;
   existingHash: string;
   hasValidExistingHash: boolean;
+  hashOwner?: HashesJsonOwner;
 }): Promise<boolean> {
   const sharedHash = await readSharedHashCache({
     repoRoot: opts.repoRoot,
@@ -308,7 +310,7 @@ export async function restoreHashFromSharedCache(opts: {
   });
   if (!sharedHash) return false;
   if (!opts.hasValidExistingHash || sharedHash !== opts.existingHash) {
-    await updateNodeModulesHashesJson(opts.key, sharedHash);
+    await updateNodeModulesHashesJson(opts.key, sharedHash, { owner: opts.hashOwner });
   }
   await persistVerifiedHash({
     repoRoot: opts.repoRoot,

@@ -60,7 +60,7 @@ because it supports only `static-webapp` and `ssr-webapp` component kinds, not `
 Task #11 produces a `node_service_artifact` with a `service.runtime.json` runtime contract. The
 moment a developer generates that artifact they immediately need somewhere to deploy it. Without
 this template, they write three environment-specific TARGETS files by hand, copy shared governance
-boilerplate from the `pleomino` example, and fill in `secret_requirements` stubs by guessing at
+boilerplate from the `sample-webapp` example, and fill in `secret_requirements` stubs by guessing at
 the `contract_id` convention. Hand-authoring is where lane policy typos, missing admission
 policies, and mismatched `protection_class` values appear. Every such error surfaces only at
 deploy time, not at `buck build` time.
@@ -120,7 +120,7 @@ added to the repo.
   provisioned for the current stack. Making `cloudflare-containers` the primary and `kubernetes`
   the secondary avoids requiring provider infrastructure that is not yet available.
 
-- **Three separate environment directories vs. a family macro.** The `pleomino` deployment uses a
+- **Three separate environment directories vs. a family macro.** The `sample-webapp` deployment uses a
   shared `family.bzl` that encodes provider-specific constants for all stages, with each
   environment's `TARGETS` calling a thin per-stage wrapper. A generated template could follow the
   same pattern and put shared constants in a `shared/family.bzl`, or it could generate three
@@ -169,6 +169,6 @@ added to the repo.
   with the label conventions enforced in `cloudflare_containers_deployment` and
   `kubernetes_service_deployment`.
 
-- The `external-deployments-plan.md` PR-7 scope explicitly excludes data-room-specific content.
+- The `external-deployments-plan.md` PR-7 scope explicitly excludes sample-webapp-specific content.
   Generated templates must remain provider/component-oriented with deterministic placeholder names
   that fail validation until replaced by real values.

@@ -1178,26 +1178,26 @@ viberoots source tree.
 - Normal consumer workflows create generated state in the consumer workspace and do not create
   misplaced workspace state under the reusable viberoots source checkout.
 
-## PR-12: Remove Pleomino-specific runtime/bootstrap assumptions from viberoots
+## PR-12: Remove Sample webapp-specific runtime/bootstrap assumptions from viberoots
 
 ### 1. Intent
 
 Make viberoots runtime and bootstrap tooling reusable across multiple parent repositories by
-removing assumptions tied to this repository's Pleomino project.
+removing assumptions tied to this repository's Sample webapp project.
 
 ### 2. Scope of changes
 
-- Move Pleomino-specific deployment target defaults, family-specific bootstrap state, and project
+- Move Sample webapp-specific deployment target defaults, family-specific bootstrap state, and project
   runtime configuration out of `viberoots/`.
 - Replace project-family constants in reusable tooling with generic extension points, templates, or
   parent-owned configuration.
-- Keep Pleomino docs/config under `projects/` unless they are intentionally generic viberoots
+- Keep Sample webapp docs/config under `projects/` unless they are intentionally generic viberoots
   examples.
 
 ### 3. Acceptance criteria
 
-- A parent repository without Pleomino can consume viberoots without editing viberoots source.
-- Pleomino workflows still work from parent-owned project configuration.
+- A parent repository without Sample webapp can consume viberoots without editing viberoots source.
+- Sample webapp workflows still work from parent-owned project configuration.
 
 ## PR-13: Ownership-boundary enforcement
 

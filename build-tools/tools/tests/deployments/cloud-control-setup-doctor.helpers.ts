@@ -241,7 +241,7 @@ export function setupArgPairs(
     ["--image-inspected-digest", digest],
     ["--public-url", "https://deploy.example.test"],
     ["--auth-callback-host", "deploy-auth.example.test"],
-    ["--deployment-id", "pleomino-staging"],
+    ["--deployment-id", "sample-webapp-staging"],
     ["--artifact-backend", "aws-s3"],
     ["--artifact-bucket", "deployment-control-plane-artifacts"],
     ["--artifact-region", "us-east-1"],

@@ -20,7 +20,7 @@ export function appStoreConnectDeploymentFixture(
   const admissionPolicy =
     overrides.admissionPolicy ||
     nixosSharedHostAdmissionPolicyFixture({
-      ref: `//projects/deployments/pleomino/shared:${environmentStage}_release`,
+      ref: `//projects/deployments/sample-webapp/shared:${environmentStage}_release`,
       name: `${environmentStage}_release`,
       requiredChecks: [],
       allowedRefs: environmentStage === "prod" ? ["refs/tags/release/*"] : ["main"],
@@ -83,9 +83,9 @@ export function appStoreConnectDeploymentNodeFixture(
     publisher: "app-store-connect-mobile-release",
     publisher_config: "app-store-connect.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "dev",
-    admission_policy: "//projects/deployments/pleomino/shared:dev_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:dev_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {
@@ -104,7 +104,7 @@ export function appStoreConnectAdmissionPolicyNodeFixture(
   overrides: Partial<GraphNode> = {},
 ): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
-    name: "//projects/deployments/pleomino/shared:dev_release",
+    name: "//projects/deployments/sample-webapp/shared:dev_release",
     allowed_refs: ["main"],
     required_checks: [],
     ...overrides,

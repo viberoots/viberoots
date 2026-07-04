@@ -217,7 +217,7 @@ operator path.
 ### User Input Points
 
 No input required. The setup smoke tests use synthetic minimal fixtures, which keeps them focused on
-the config model rather than current Pleomino account choices.
+the config model rather than current Sample webapp account choices.
 
 ## Phase 4: Stale File and Config Pruning
 
@@ -693,7 +693,7 @@ The smallest useful coverage expansion should use existing test files:
 - `build-tools/tools/tests/deployments/deployment-service-client-provider-front-doors.test.ts` for
   ambient global control-plane URL rejection on context-selected protected/shared paths.
 
-Use synthetic minimal fixtures rather than real Pleomino config for the setup smoke tests.
+Use synthetic minimal fixtures rather than real Sample webapp config for the setup smoke tests.
 
 ## Immediate Decisions
 

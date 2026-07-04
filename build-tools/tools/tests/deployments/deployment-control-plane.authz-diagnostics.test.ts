@@ -33,7 +33,7 @@ test("authorization diagnostics distinguish missing submitter, admission_reporte
           { role: "submitter", scope: { kind: "deployment_id", value: deployment.deploymentId } },
         ]),
       }),
-    /admission_reporter[\s\S]*deploy-admission-reporters-pleomino-staging[\s\S]*grant yourself: deploy admin identity grant-user --deployment .* --profile mini --action report_checks --apply-host[\s\S]*add --user-email <user@example\.com> to grant another human/,
+    /admission_reporter[\s\S]*deploy-admission-reporters-sample-webapp-staging[\s\S]*grant yourself: deploy admin identity grant-user --deployment .* --profile mini --action report_checks --apply-host[\s\S]*add --user-email <user@example\.com> to grant another human/,
   );
   assert.throws(
     () =>
@@ -44,6 +44,6 @@ test("authorization diagnostics distinguish missing submitter, admission_reporte
           { role: "submitter", scope: { kind: "deployment_id", value: deployment.deploymentId } },
         ]),
       }),
-    /approver[\s\S]*deploy-approvers-pleomino-staging[\s\S]*grant yourself: deploy admin identity grant-user --deployment .* --profile mini --action approve --apply-host[\s\S]*add --user-email <user@example\.com> to grant another human/,
+    /approver[\s\S]*deploy-approvers-sample-webapp-staging[\s\S]*grant yourself: deploy admin identity grant-user --deployment .* --profile mini --action approve --apply-host[\s\S]*add --user-email <user@example\.com> to grant another human/,
   );
 });

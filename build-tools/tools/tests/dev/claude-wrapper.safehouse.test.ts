@@ -35,10 +35,11 @@ test("claude wrapper falls back to captured host path for the real Claude binary
       env: {
         ...process.env,
         PATH: `${path.dirname(wrapper)}:/usr/bin:/bin`,
+        WORKSPACE_ROOT: gitRoot,
         VBR_HOST_PATH: "",
         HOST_PATH: "",
       },
-    })`${wrapper} -p host-path`;
+    })`${wrapper} -p host-path < /dev/null`;
 
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
     const log = await fsp.readFile(fake.log, "utf8");
@@ -298,8 +299,8 @@ test("claude --yolo does not duplicate skip-permissions in worktree safehouse", 
 });
 
 test("claude wrapper refuses unsandboxed worktree agents when safehouse is missing", async () => {
-  await fsp.mkdir(scratchRoot, { recursive: true });
-  const tmp = await fsp.mkdtemp(path.join(scratchRoot, "claude-wrapper-"));
+  await fsp.mkdir(externalScratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "claude-wrapper-"));
   try {
     const worktreeRoot = path.join(tmp, ".claude", "worktrees", "worker-b");
     await fsp.mkdir(worktreeRoot, { recursive: true });
@@ -313,6 +314,7 @@ test("claude wrapper refuses unsandboxed worktree agents when safehouse is missi
       env: {
         ...process.env,
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
+        WORKSPACE_ROOT: worktreeRoot,
         VBR_HOST_PATH: "",
         HOST_PATH: "",
       },

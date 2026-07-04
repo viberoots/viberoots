@@ -7,7 +7,10 @@ import {
 } from "./importer-lockfile";
 import { withResolvedExactPrefetchedStore } from "./realized-store";
 
-export async function makeFilteredFlakeRef(repoRoot: string): Promise<{
+export async function makeFilteredFlakeRef(
+  repoRoot: string,
+  importer?: string,
+): Promise<{
   flakeRef: string;
   workspaceRoot: string;
   cleanup: () => Promise<void>;
@@ -15,6 +18,7 @@ export async function makeFilteredFlakeRef(repoRoot: string): Promise<{
   return await makeScopedFilteredFlakeRef({
     repoRoot,
     attr: "pnpm",
+    importer,
   });
 }
 

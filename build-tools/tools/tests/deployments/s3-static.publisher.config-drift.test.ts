@@ -31,14 +31,14 @@ test("s3-static rejects provider config drift before publish begins", async () =
       tmp,
       "projects",
       "deployments",
-      "pleomino",
+      "sample-webapp",
       "staging-s3",
       "aws-s3-sync.jsonc",
     );
     await fsp.mkdir(path.dirname(configPath), { recursive: true });
     await fsp.writeFile(
       configPath,
-      '{\n  "bucket": "pleomino-prod-site",\n  "region": "us-west-2"\n}\n',
+      '{\n  "bucket": "sample-webapp-prod-site",\n  "region": "us-west-2"\n}\n',
       "utf8",
     );
     await assert.rejects(

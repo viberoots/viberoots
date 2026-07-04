@@ -1,0 +1,37 @@
+load("@prelude//:rules.bzl", "export_file", "sh_test")
+
+export_file(
+    name = "smoke_script",
+    src = "smoke.sh",
+)
+
+sh_test(
+    name = "hash-regression",
+    test = ":smoke_script",
+)
+
+sh_test(
+    name = "latency-guardrail",
+    labels = ["verify:isolated"],
+    test = ":smoke_script",
+)
+
+sh_test(
+    name = "offline-acceptance",
+    test = ":smoke_script",
+)
+
+sh_test(
+    name = "seeded-solver",
+    test = ":smoke_script",
+)
+
+sh_test(
+    name = "static-contracts",
+    test = ":smoke_script",
+)
+
+sh_test(
+    name = "unit",
+    test = ":smoke_script",
+)

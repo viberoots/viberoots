@@ -67,17 +67,17 @@ Build-system scope minimization:
   into one large PR. Combining them would reduce PR count on paper but would make more host/runtime
   work ride through full mixed/build-system validation.
 
-Sequencing with the Pleomino Infisical cutover:
+Sequencing with the Sample webapp Infisical cutover:
 
 - Implement this containerization plan before PR-12 in
   [Infisical Deployment Secrets Plan](infisical-plan.md). The
-  first Pleomino staging and production Infisical rollout should use the containerized,
+  first Sample webapp staging and production Infisical rollout should use the containerized,
   horizontally scalable control plane rather than the current shared-host runtime.
 - PR-1 owns the portable credential-directory abstraction that PR-12 needs for Infisical Universal
   Auth. When PR-12 is implemented later, it should consume this abstraction instead of introducing a
   second credential path.
-- PR-12 remains responsible for Pleomino-specific Infisical IaC, deployment metadata, fake-Infisical
-  Pleomino coverage, operator rollout steps, and replay/rollback guarantees.
+- PR-12 remains responsible for Sample webapp-specific Infisical IaC, deployment metadata, fake-Infisical
+  Sample webapp coverage, operator rollout steps, and replay/rollback guarantees.
 
 ## PR-1: Container runtime configuration and file-backed credential contract
 
@@ -101,7 +101,7 @@ containerized control-plane process will use.
 - Support a mounted YAML config file at `/etc/deployment-control-plane/config.yaml`, with an
   override flag for tests and local fixtures.
 - Add the portable deployment control-plane credential-directory abstraction in
-  deployment/control-plane-owned tooling. This is the credential foundation that the later Pleomino
+  deployment/control-plane-owned tooling. This is the credential foundation that the later Sample webapp
   PR-12 Infisical cutover will consume.
 - Resolve credentials only from reviewed file paths under the configured credential directory or
   explicit reviewed source paths.

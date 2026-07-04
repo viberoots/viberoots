@@ -1,4 +1,4 @@
-import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -31,12 +31,21 @@ export function viberootsSourcePath(rel: string): string {
 export async function copyViberootsSourcePath(rel: string, destination: string): Promise<void> {
   const source = viberootsSourcePath(rel);
   if (path.resolve(source) === path.resolve(destination)) return;
-  if (await fs.pathExists(destination)) {
+  if (await exists(destination)) {
     const [sourceReal, destinationReal] = await Promise.all([
-      fs.realpath(source),
-      fs.realpath(destination),
+      fsp.realpath(source),
+      fsp.realpath(destination),
     ]);
     if (sourceReal === destinationReal) return;
   }
-  await fs.copy(source, destination);
+  await fsp.cp(source, destination, { recursive: true });
+}
+
+async function exists(file: string): Promise<boolean> {
+  try {
+    await fsp.stat(file);
+    return true;
+  } catch {
+    return false;
+  }
 }

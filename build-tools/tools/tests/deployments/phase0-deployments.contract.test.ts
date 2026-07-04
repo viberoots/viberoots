@@ -10,35 +10,37 @@ import { inheritedBuckIsolation } from "../lib/test-helpers";
 const REMOVED_DEPLOYMENT_ROOTS = new Set([
   "platform-foundation",
   "platform-shared",
-  "data-room-console",
-  "data-room-web",
-  "data-room-worker",
+  "example-console",
+  "example-web",
+  "example-worker",
 ]);
+const REMOVED_LEGACY_PREFIX = ["data", "room"].join("-");
+const REMOVED_LEGACY_UNDERSCORE = ["data", "room"].join("_");
 const REMOVED_LABELS = [
   "//projects/deployments/platform-foundation-prod:deploy",
   "//projects/deployments/platform-shared:lane",
-  "//projects/deployments/data-room-console-prod:deploy",
-  "//projects/deployments/data-room-web-prod:deploy",
-  "//projects/deployments/data-room-worker-prod:deploy",
+  "//projects/deployments/example-console-prod:deploy",
+  "//projects/deployments/example-web-prod:deploy",
+  "//projects/deployments/example-worker-prod:deploy",
 ];
 const OPERATOR_DOCS = [
   "docs/deployments-usage.md",
   "docs/history/designs/deployment-adjustment.md",
-  "docs/history/migrations/pleomino-deployment-directory-migration.md",
+  "docs/history/migrations/sample-webapp-deployment-directory-migration.md",
   "docs/secrets-usage.md",
   "docs/deployments-schema.md",
   "docs/history/designs/infisical-design.md",
   "docs/infisical-bootstrap.md",
   "docs/history/migrations/repo-rename.md",
-  "projects/docs/phase_0_architecture.md",
-  "projects/docs/phase_0_build_deployment_companion.md",
-  "projects/docs/phase_0_engineering_companion.md",
   "infisical-bootstrap.md",
 ];
 const REMOVED_DEPLOYMENT_ID_RE =
-  /\b(?:platform-foundation-(?:dev|staging|prod)|platform-shared|data-room-(?:console|web|worker)-(?:dev|staging|prod))\b/;
+  /\b(?:platform-foundation-(?:dev|staging|prod)|platform-shared|example-(?:console|web|worker)-(?:dev|staging|prod))\b/;
 const REMOVED_DEPLOYMENT_TEMPLATE_RE =
-  /\b(?:platform-foundation-(?:\*|\{env\})|data-room-(?:console|web|worker)-(\*|\{env\})|data-room-\{web,worker\}-\{env\})\b/;
+  /\b(?:platform-foundation-(?:\*|\{env\})|example-(?:console|web|worker)-(\*|\{env\})|example-\{web,worker\}-\{env\})\b/;
+const removedLegacyDeploymentIdRe = new RegExp(
+  `\\b(?:${REMOVED_LEGACY_PREFIX}-(?:console|web|worker)(?:-(?:dev|staging|prod))?|${REMOVED_LEGACY_UNDERSCORE})\\b`,
+);
 
 async function removedDeploymentRootEntries(): Promise<string[]> {
   const result = await $({ stdio: "pipe" })`git ls-files -- projects/deployments`;
@@ -65,7 +67,7 @@ test("deleted speculative deployment labels are not resolvable", async () => {
     stdio: "pipe",
   })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-package-guard")} cquery --target-platforms prelude//platforms:default ${`set(${REMOVED_LABELS.join(" ")})`}`.nothrow();
   assert.notEqual(result.exitCode, 0);
-  assert.match(`${String(result.stdout)}\n${String(result.stderr)}`, /data-room|platform/);
+  assert.match(`${String(result.stdout)}\n${String(result.stderr)}`, /example|platform/);
 });
 
 test("repo deployment discovery does not return removed phase-0 deployments", async () => {
@@ -73,7 +75,7 @@ test("repo deployment discovery does not return removed phase-0 deployments", as
   assert.deepEqual(
     deployments
       .map((deployment) => deployment.label)
-      .filter((label) => /data-room|platform-foundation|platform-shared/.test(label)),
+      .filter((label) => /example|platform-foundation|platform-shared/.test(label)),
     [],
   );
 });
@@ -87,16 +89,17 @@ test("operator-facing deployment docs do not advertise removed labels", async ()
     });
     assert.doesNotMatch(
       text,
-      /(?:\/\/)?projects\/deployments\/(?:data-room|platform-foundation|platform-shared)/,
+      /(?:\/\/)?projects\/deployments\/(?:example|platform-foundation|platform-shared)/,
       relPath,
     );
     assert.doesNotMatch(
       text,
-      /(?:platform-\*|data-room-\*)[^.\n]*(?:remain|current|live|inventory|legacy flat package layout)/i,
+      /(?:platform-\*|example-\*)[^.\n]*(?:remain|current|live|inventory|legacy flat package layout)/i,
       relPath,
     );
     assert.doesNotMatch(text, REMOVED_DEPLOYMENT_ID_RE, relPath);
     assert.doesNotMatch(text, REMOVED_DEPLOYMENT_TEMPLATE_RE, relPath);
+    assert.doesNotMatch(text, removedLegacyDeploymentIdRe, relPath);
   }
 });
 
@@ -105,7 +108,12 @@ test("SprinkleRef repository scan does not find removed deployment contracts", a
   assert.deepEqual(
     scanned.refs
       .map((entry) => entry.ref)
-      .filter((ref) => /deployments\/phase0\/|data-room|platform-foundation/.test(ref)),
+      .filter(
+        (ref) =>
+          /deployments\/phase0\/|example|platform-foundation/.test(ref) ||
+          ref.includes(REMOVED_LEGACY_PREFIX) ||
+          ref.includes(REMOVED_LEGACY_UNDERSCORE),
+      ),
     [],
   );
 });

@@ -9,7 +9,7 @@ import { runRepoBootstrap } from "../../deployments/infisical-iac-bootstrap-repo
 import type { MetadataHandoffPatch } from "../../deployments/infisical-iac-bootstrap-metadata-handoff";
 import type { SharedInfisicalSession } from "../../deployments/infisical-iac-bootstrap-repo-credential";
 
-const staging = "//projects/deployments/pleomino/staging:deploy";
+const staging = "//projects/deployments/sample-webapp/staging:deploy";
 
 test("repo bootstrap applies first-bootstrap metadata, resumes fan-out, and runs final checks", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-repo-flow-"));
@@ -70,7 +70,7 @@ async function writeRepoInputs(dir: string) {
       {
         schemaVersion: "viberoots-project-config@1",
         deploymentContexts: {
-          "pleomino-staging": { infisical: { projectId: "proj_old" } },
+          "sample-webapp-staging": { infisical: { projectId: "proj_old" } },
         },
         sprinkleref: {
           version: 1,
@@ -101,7 +101,7 @@ function deploymentNode() {
   return {
     name: staging,
     rule_type: "deployment_target",
-    deployment_family: "pleomino",
+    deployment_family: "sample-webapp",
     environment_stage: "staging",
     secret_backend: "infisical/default",
     infisical_runtime: { project_id: "proj_old", environment: "staging" },
@@ -164,7 +164,7 @@ const patch: MetadataHandoffPatch = {
   path: "projects/config/shared.json",
   replacements: [
     {
-      label: "deploymentContexts.pleomino-staging.infisical.projectId",
+      label: "deploymentContexts.sample-webapp-staging.infisical.projectId",
       before: "proj_old",
       after: "proj_live",
     },

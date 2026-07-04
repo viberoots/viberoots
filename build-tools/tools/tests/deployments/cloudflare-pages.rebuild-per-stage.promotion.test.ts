@@ -29,7 +29,7 @@ test("cloudflare-pages rebuild-per-stage promotion rejects publish-only exact-ar
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     const { summary, backendDatabaseUrl } = await createSourceRun(tmp, $, recordsRoot, fake);
     const staging = rebuildStagingDeployment();
-    const stagingJson = path.join(tmp, "pleomino-rebuild-staging.json");
+    const stagingJson = path.join(tmp, "sample-webapp-rebuild-staging.json");
     await installCloudflarePagesTargets(tmp, [staging]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, staging);
     await writeDeploymentJson(stagingJson, staging);
@@ -58,11 +58,18 @@ test("cloudflare-pages rebuild-per-stage promotion admits a new stage artifact b
       backendDatabaseUrl,
     } = await createSourceRun(tmp, $, recordsRoot, fake);
     const staging = rebuildStagingDeployment();
-    const stagingJson = path.join(tmp, "pleomino-rebuild-staging.json");
+    const stagingJson = path.join(tmp, "sample-webapp-rebuild-staging.json");
     const stagingArtifactDir = path.join(tmp, "staging-artifact");
     await writeCloudflareArtifact(stagingArtifactDir, "<html>stage-specific build</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "rebuild-staging", "wrangler.jsonc"),
+      path.join(
+        tmp,
+        "projects",
+        "deployments",
+        "sample-webapp",
+        "rebuild-staging",
+        "wrangler.jsonc",
+      ),
     );
     await installCloudflarePagesTargets(tmp, [sourceDeployment, staging]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, sourceDeployment);

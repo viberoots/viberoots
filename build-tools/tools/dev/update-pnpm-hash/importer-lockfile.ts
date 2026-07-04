@@ -10,6 +10,7 @@ import {
 import { importerLockfileNeedsRegen } from "../../lib/pnpm-importer-lockfile";
 import { externalPnpmStateDirs, removeLegacyImporterPnpmState } from "../../lib/pnpm-state-paths";
 import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard";
+import { resolveRepoNodeBin } from "../../lib/repo-node-bin";
 import {
   syncLocalPrefetchIntoPnpmStore,
   syncSourcePnpmStoreIntoLocalPrefetch,
@@ -144,10 +145,21 @@ async function runLockfileCommandsWithGcRetry(opts: {
 }
 
 async function activeViberootsOverride(repoRoot: string): Promise<string> {
+  const workspaceFlake = path.join(repoRoot, ".viberoots", "workspace", "flake.nix");
+  const filteredInput = path.join(repoRoot, ".viberoots", "workspace", "viberoots-flake-input");
+  try {
+    const text = await fsp.readFile(workspaceFlake, "utf8");
+    if (
+      text.includes('viberoots.url = "path:./viberoots-flake-input"') &&
+      fs.existsSync(path.join(filteredInput, "flake.nix"))
+    ) {
+      return "";
+    }
+  } catch {}
   const candidates = [
-    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
     path.join(repoRoot, "viberoots"),
     path.join(repoRoot, ".viberoots", "current"),
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
     process.env.VIBEROOTS_SOURCE_ROOT || "",
     process.env.VIBEROOTS_ROOT || "",
   ]
@@ -183,6 +195,17 @@ async function seedImporterLockfileFromRootIfNeeded(opts: {
   } catch {}
 }
 
+async function formatImporterLockfile(opts: { repoRoot: string; importerAbs: string }) {
+  const importerLockfileAbs = path.join(opts.importerAbs, "pnpm-lock.yaml");
+  if (!fs.existsSync(importerLockfileAbs)) return;
+  const prettier = await resolveRepoNodeBin(opts.repoRoot, "prettier");
+  await $({
+    cwd: opts.repoRoot,
+    stdio: "pipe",
+    env: { ...process.env, NODE_OPTIONS: "--no-warnings" },
+  })`${prettier} --write ${importerLockfileAbs}`;
+}
+
 export async function generateImporterLockfile(opts: { repoRoot: string; importer: string }) {
   const importerAbs = path.resolve(opts.repoRoot, opts.importer);
   const workspacePackages = await findWorkspacePackageDirs({
@@ -215,6 +238,7 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   });
   if (!usesSharedPrefetch) await syncSourcePnpmStoreIntoLocalPrefetch(storeDir);
   await seedImporterLockfileFromRootIfNeeded({ repoRoot: opts.repoRoot, importerAbs });
+  await formatImporterLockfile({ repoRoot: opts.repoRoot, importerAbs });
   await cleanupLocalWorkspaceMarker({ workspaceFileAbs, hadLocalWorkspaceFile });
   console.log(`[lockfile] done: ${path.join(opts.importer, "pnpm-lock.yaml")}`);
 }

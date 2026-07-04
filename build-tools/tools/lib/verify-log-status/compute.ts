@@ -11,7 +11,7 @@ import {
   parseVerifyBeginEpochSec,
   parseVerifyStoppedMarker,
 } from "./parsing";
-import { deriveInProgressCounts } from "./derived";
+import { deriveInProgressCounts, normalizeBuckTestLabel } from "./derived";
 import {
   parseExpandedTargetCount,
   parsePassBegins,
@@ -68,7 +68,16 @@ function aggregateVerifyPassStatus(
     ? begins.reduce((sum, begin) => sum + (begin.targetCount || 0), 0)
     : undefined;
   const totalTargets = expandedTargetCount ?? totalFromBegins;
-  const failedAcrossPasses = collectFailedLabels(lines);
+  const knownTargetLabels = new Set<string>();
+  for (const begin of begins) {
+    for (const label of begin.targetLabels || []) knownTargetLabels.add(label);
+  }
+  const canScopeFailedAcrossPasses = knownTargetLabels.size > 0;
+  const failedAcrossPasses = canScopeFailedAcrossPasses
+    ? collectFailedLabels(lines).filter((label) =>
+        knownTargetLabels.has(normalizeBuckTestLabel(label)),
+      )
+    : collectFailedLabels(lines);
   const passGroups: VerifyPassGroupStatus[] = [];
 
   for (const begin of begins) {
@@ -181,7 +190,11 @@ function aggregateVerifyPassStatus(
     buildFailure: buildFailure + interruptedExits.length,
     remaining: done ? 0 : aggregateRemaining,
     failed:
-      failedAcrossPasses.length > 0 ? failedAcrossPasses : failed.length > 0 ? failed : base.failed,
+      canScopeFailedAcrossPasses || failedAcrossPasses.length > 0
+        ? failedAcrossPasses
+        : failed.length > 0
+          ? failed
+          : base.failed,
     done,
     stopped: base.stopped || (!done && allPassesExited && interruptedExits.length > 0),
     stopReason:

@@ -13,6 +13,12 @@ import {
 
 const wrapper = binWrapper("codex");
 const makeFakeTools = (tmp: string, gitRoot: string) => makeFakeAgentTools(tmp, gitRoot, "codex");
+function managedCodexEnv(bin: string): Record<string, string> {
+  return {
+    CODEX_CLI_PATH: "",
+    VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(bin, "codex"),
+  };
+}
 test("codex --remove-all-worktrees removes every valid named worktree", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));
@@ -32,7 +38,8 @@ test("codex --remove-all-worktrees removes every valid named worktree", async ()
       stdio: "pipe",
       env: {
         ...process.env,
-        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
+        ...managedCodexEnv(fake.bin),
+        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin:${process.env.PATH}`,
       },
     })`${wrapper} --remove-all-worktrees`;
 
@@ -66,7 +73,8 @@ test("codex --remove-all-worktrees ignores appended launch arguments", async () 
       stdio: "pipe",
       env: {
         ...process.env,
-        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
+        ...managedCodexEnv(fake.bin),
+        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin:${process.env.PATH}`,
       },
     })`${wrapper} --remove-all-worktrees exec task`;
 

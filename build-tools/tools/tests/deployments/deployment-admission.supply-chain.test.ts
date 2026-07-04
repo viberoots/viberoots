@@ -33,7 +33,7 @@ test("admission policy extraction preserves attestation, SBOM, and supply-chain 
     }),
   ]);
   assert.deepEqual(errors, []);
-  const policy = policies.get("//projects/deployments/pleomino/shared:dev_release");
+  const policy = policies.get("//projects/deployments/sample-webapp/shared:dev_release");
   assert.deepEqual(policy?.attestation?.trustedBuilderIdentities, ["builder:trusted"]);
   assert.equal(policy?.attestation?.signatureRequired, true);
   assert.deepEqual(policy?.sbom, { required: true, acceptedFormats: ["cyclonedx-json"] });

@@ -1,6 +1,6 @@
-{ pkgs, repoRoot, repoFsRoot, hashesPath, prefetchedStorePathGlobal ? null }:
+{ pkgs, repoRoot, repoFsRoot, hashesPath, prefetchedStorePathGlobal ? null, allowLiveHashMap ? true }:
 let
-  common = import ./common.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal; };
+  common = import ./common.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal allowLiveHashMap; };
   lib = common.lib;
   node = pkgs.nodejs_22;
   pnpm = import ../pnpm-11.nix { inherit pkgs; };

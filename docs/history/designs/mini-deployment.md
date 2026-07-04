@@ -97,13 +97,13 @@ For this provider family, `appName` is the authoritative app identity used to de
 
 For example:
 
-- `appName = "pleomino"`
+- `appName = "sample-webapp"`
 
 resolves to:
 
-- hostname: `pleomino.apps.kilty.io`
-- container name: `pleomino`
-- service identity: `pleomino`
+- hostname: `sample-webapp.apps.kilty.io`
+- container name: `sample-webapp`
+- service identity: `sample-webapp`
 
 This is intentionally provider-specific derivation. The same `appName` may be interpreted
 differently by other provider families in the future.
@@ -254,14 +254,14 @@ an explicit source-ref-backed lane and two-stage admission flow.
 
 Current reviewed repo-owned policy refs:
 
-- `lane_policy = "//projects/deployments/pleomino/shared:lane"`
+- `lane_policy = "//projects/deployments/sample-webapp/shared:lane"`
 - `environment_stage = "dev"`
-- `admission_policy = "//projects/deployments/pleomino/shared:dev_release"`
+- `admission_policy = "//projects/deployments/sample-webapp/shared:dev_release"`
 
 For the current `mini` shared-dev deployment path, that means:
 
 - source admission resolves the reviewed source-ref policy for the deployment's lane stage
-  - today that is the protected `main` source line for the concrete `pleomino-dev` deployment
+  - today that is the protected `main` source line for the concrete `sample-webapp-dev` deployment
   - the control plane fetches the reviewed source ref from the configured SCM remote into a
     submission-scoped snapshot ref instead of trusting an ambient local checkout
   - source admission records the fetched commit as the admitted source revision and the exact
@@ -303,12 +303,12 @@ The domain model is:
 
 Example:
 
-- `pleomino.apps.kilty.io` -> nginx on `mini` -> `pleomino` container -> port `3000`
+- `sample-webapp.apps.kilty.io` -> nginx on `mini` -> `sample-webapp` container -> port `3000`
 
 Future rule:
 
 - if the platform later introduces multiple logical target groups on `mini`, that does not by itself
-  require moving to hostnames like `pleomino.group-a.apps.kilty.io`
+  require moving to hostnames like `sample-webapp.group-a.apps.kilty.io`
 - such additional DNS structure should be introduced only when there is a reviewed operational need for
   it rather than as a default encoding of host-internal placement
 
@@ -359,10 +359,10 @@ Conceptually:
   "version": 1,
   "sharedDevApps": [
     {
-      "deploymentId": "pleomino-dev",
-      "appName": "pleomino",
-      "hostname": "pleomino.apps.kilty.io",
-      "containerName": "pleomino",
+      "deploymentId": "sample-webapp-dev",
+      "appName": "sample-webapp",
+      "hostname": "sample-webapp.apps.kilty.io",
+      "containerName": "sample-webapp",
       "containerPort": 3000,
       "healthPath": "/healthz",
       "runtimeKind": "http-service"

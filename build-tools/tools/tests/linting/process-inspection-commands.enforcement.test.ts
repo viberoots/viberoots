@@ -43,8 +43,9 @@ const ALLOWED_PATHS = new Set([
   "build-tools/tools/tests/linting/process-inspection-commands.enforcement.test.ts",
   "TESTING.md",
   "ps.txt",
-  "projects/apps/pleomino/e2e/process-control.ts",
 ]);
+
+const ALLOWED_PATH_PATTERNS = [/^projects\/apps\/[^/]+\/e2e\/process-control\.ts$/];
 
 const PROCESS_INSPECTION_PATTERNS: Array<{ re: RegExp; label: string }> = [
   { re: /resolveToolPath(?:Sync)?\(["']ps["']\)/g, label: "ps tool resolution" },
@@ -104,7 +105,9 @@ test("process inspection commands stay in reviewed helper modules", async () => 
 
   for (const abs of await listRepoFiles(repoRoot)) {
     const rel = normalizeRel(path.relative(repoRoot, abs));
-    if (ALLOWED_PATHS.has(reviewedRel(rel))) continue;
+    const reviewed = reviewedRel(rel);
+    if (ALLOWED_PATHS.has(reviewed)) continue;
+    if (ALLOWED_PATH_PATTERNS.some((pattern) => pattern.test(reviewed))) continue;
 
     let text = "";
     try {

@@ -109,7 +109,7 @@ function input(publicUrl = "https://deploy.example.test") {
     artifactRegion: "us-east-1",
     artifactBackend: "aws-s3" as const,
     artifactBackendEvidence: "",
-    deploymentIds: ["pleomino-staging"],
+    deploymentIds: ["sample-webapp-staging"],
     reviewedSourceMode: "ssh" as const,
     authCallbackHost: "deploy-auth.example.test",
     authCallbackPath: "/oidc/callback",
@@ -185,7 +185,7 @@ function assertHttpEnvelope(value: any, publicUrl: string, file: string) {
   assert.equal(value.expected.host, new URL(publicUrl).host);
   assert.equal(value.expected.hostProfile, "aws-ec2");
   assert.equal(value.expected.profileIdentity, "i-0abc1234");
-  assert.deepEqual(value.expected.deploymentIds, ["pleomino-staging"]);
+  assert.deepEqual(value.expected.deploymentIds, ["sample-webapp-staging"]);
   assert.equal(value.expected.workerCount, 2);
   assert.ok(value.body && typeof value.body === "object");
   if (check === "worker-heartbeats") assert.equal(value.credentialSource.kind, "token_file");

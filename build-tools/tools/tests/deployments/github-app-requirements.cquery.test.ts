@@ -20,7 +20,7 @@ test("github_app_requirements emits profile, secrets, and runtime config", async
       tmp,
       "projects",
       "deployments",
-      "pleomino",
+      "sample-webapp",
       "shared",
       "TARGETS",
     );
@@ -35,9 +35,9 @@ test("github_app_requirements emits profile, secrets, and runtime config", async
         "nixos_shared_host_static_webapp_deployment(",
         '    name = "deploy",',
         '    component = "//projects/apps/demoapp:app",',
-        '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
+        '    lane_policy = "//projects/deployments/sample-webapp/shared:lane",',
         '    environment_stage = "dev",',
-        '    admission_policy = "//projects/deployments/pleomino/shared:dev_release",',
+        '    admission_policy = "//projects/deployments/sample-webapp/shared:dev_release",',
         '    app_name = "demoapp",',
         "    container_port = 3000,",
         '    **github_app_requirements("demoapp-dev", webhooks = True, webhook_config = True)',
@@ -50,10 +50,10 @@ test("github_app_requirements emits profile, secrets, and runtime config", async
     const nodes = await runDeploymentCquery(tmp, _$, "github-app-requirements", [
       "//projects/deployments/demoapp-dev:deploy",
       "//projects/apps/demoapp:app",
-      "//projects/deployments/pleomino/shared:lane",
-      "//projects/deployments/pleomino/shared:defaults",
-      "//projects/deployments/pleomino/shared:lane_governance",
-      "//projects/deployments/pleomino/shared:dev_release",
+      "//projects/deployments/sample-webapp/shared:lane",
+      "//projects/deployments/sample-webapp/shared:defaults",
+      "//projects/deployments/sample-webapp/shared:lane_governance",
+      "//projects/deployments/sample-webapp/shared:dev_release",
     ]);
     const { deployments, errors } = extractNixosSharedHostDeployments(nodes);
     assert.deepEqual(errors, []);

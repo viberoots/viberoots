@@ -42,10 +42,10 @@ async function writeSecretFixture(filePath: string) {
       {
         schemaVersion: DEPLOYMENT_SECRET_FIXTURE_SCHEMA,
         contracts: {
-          "secret://deployments/pleomino/cloudflare_api_token": {
+          "secret://deployments/sample-webapp/cloudflare_api_token": {
             value: "super-secret-cleanup-token",
             allowedSteps: ["publish", "preview_cleanup"],
-            targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+            targetScopes: ["cloudflare-pages:web-platform-staging/sample-webapp-staging-pages"],
           },
         },
       },
@@ -81,10 +81,10 @@ test("cloudflare-pages preview publish and explicit preview cleanup run end to e
     const recordsRoot = path.join(tmp, "records");
     const fixturePath = path.join(tmp, "secret-fixture.json");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
-    await writeArtifact(artifactDir, "<html>pleomino preview</html>\n");
+    await writeArtifact(artifactDir, "<html>sample-webapp preview</html>\n");
     await writeSecretFixture(fixturePath);
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -128,7 +128,7 @@ test("cloudflare-pages preview publish and explicit preview cleanup run end to e
         assert.equal(previewRecord.publishMode, "preview");
         assert.equal(
           previewRecord.providerTargetIdentity,
-          "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+          "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
         );
         assert.equal(
           previewRecord.effectiveRunTarget.providerTargetIdentity,

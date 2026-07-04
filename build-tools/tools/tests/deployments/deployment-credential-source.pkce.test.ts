@@ -35,7 +35,7 @@ function localCallbackUrl(messages: string[]): URL {
 
 test("PKCE login prints URL, validates callback state once, and skips browser in SSH mode", async () => {
   const server = await startFakeOidcServer({
-    claims: { groups: ["deploy-submitters-pleomino-dev"] },
+    claims: { groups: ["deploy-submitters-sample-webapp-dev"] },
   });
   const messages: string[] = [];
   try {
@@ -60,7 +60,7 @@ test("PKCE login prints URL, validates callback state once, and skips browser in
     const token = await login;
     const claims = decodeJwtPayload(token);
     assert.equal(claims.azp, "deployment-cli");
-    assert.deepEqual(claims.groups, ["deploy-submitters-pleomino-dev"]);
+    assert.deepEqual(claims.groups, ["deploy-submitters-sample-webapp-dev"]);
     assert.match(messages.join("\n"), /For SSH, forward/);
   } finally {
     await server.close();
@@ -69,7 +69,7 @@ test("PKCE login prints URL, validates callback state once, and skips browser in
 
 test("PKCE login supports a reviewed reverse-proxied public callback profile", async () => {
   const server = await startFakeOidcServer({
-    claims: { groups: ["deploy-submitters-pleomino-dev"] },
+    claims: { groups: ["deploy-submitters-sample-webapp-dev"] },
   });
   const messages: string[] = [];
   const bindPort = await freePort();

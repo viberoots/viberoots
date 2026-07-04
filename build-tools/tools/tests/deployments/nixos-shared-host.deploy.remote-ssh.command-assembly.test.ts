@@ -32,7 +32,7 @@ test("remote SSH transport assembles reviewed preflight, staging, deploy, and cl
     const remoteArtifactPath = createNixosSharedHostRemoteArtifactPath(plan, "remote-123");
     assert.equal(
       remoteArtifactPath,
-      "/var/lib/deployment-host/runtime/.deploy-artifacts/projects-deployments-pleomino-dev-deploy/remote-123",
+      "/var/lib/deployment-host/runtime/.deploy-artifacts/projects-deployments-sample-webapp-dev-deploy/remote-123",
     );
     const preflight = buildRemoteSshArgv(plan.destination, buildRemoteRepoPreflightScript(plan));
     assert.equal(preflight.at(-2), "mini");

@@ -33,7 +33,7 @@ function assertCloudflareApiTokenSteps(
     }>;
   },
   expectedSteps = ["preview_cleanup", "publish"],
-  expectedContractId = "secret://deployments/pleomino/cloudflare_api_token",
+  expectedContractId = "secret://deployments/sample-webapp/cloudflare_api_token",
 ) {
   const expected = expectedSteps.map((step) => [step, expectedContractId, true]).sort();
   assert.deepEqual(
@@ -63,7 +63,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     const { deployments, errors } = extractCloudflarePagesDeployments(nodesFromCqueryJson(merged));
     assert.deepEqual(errors, []);
     assert.equal(deployments.length, 1);
-    assert.equal(deployments[0]?.label, "//projects/deployments/pleomino/staging:deploy");
+    assert.equal(deployments[0]?.label, "//projects/deployments/sample-webapp/staging:deploy");
     assert.equal(deployments[0]?.lanePolicy.defaultClientProfile, "mini");
     assert.deepEqual(deployments[0]?.lanePolicy.sourceRefPolicy, {
       dev: "main",
@@ -74,7 +74,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
       (policy) => policy.stage === "staging",
     );
     assert.deepEqual(stagingSourcePolicy?.allowedRefs, ["main", "refs/tags/release/*"]);
-    assert.deepEqual(stagingSourcePolicy?.requiredChecks, ["deploy/pleomino-staging"]);
+    assert.deepEqual(stagingSourcePolicy?.requiredChecks, ["deploy/sample-webapp-staging"]);
     assert.deepEqual(deployments[0]?.lanePolicy.governance.trustedReporterIdentities, [
       "app:deploy-bot",
       "ci:jenkins",
@@ -84,10 +84,10 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     ]);
     assert.equal(deployments[0]?.publisher.config, "wrangler.jsonc");
     assert.equal(deployments[0]?.providerTarget.account, "web-platform-staging");
-    assert.equal(deployments[0]?.providerTarget.project, "pleomino-staging-pages");
-    assert.equal(deployments[0]?.providerTarget.customDomain, "staging.pleomino.com");
-    assert.equal(deployments[0]?.providerTarget.customDomainZoneId, "zone-pleomino");
-    assert.equal(deployments[0]?.providerTarget.canonicalUrl, "https://staging.pleomino.com/");
+    assert.equal(deployments[0]?.providerTarget.project, "sample-webapp-staging-pages");
+    assert.equal(deployments[0]?.providerTarget.customDomain, "staging.sample-webapp.com");
+    assert.equal(deployments[0]?.providerTarget.customDomainZoneId, "zone-sample-webapp");
+    assert.equal(deployments[0]?.providerTarget.canonicalUrl, "https://staging.sample-webapp.com/");
     assert.deepEqual(deployments[0]?.prerequisites, []);
     assert.equal(deployments[0]?.preview?.identitySelector, "source_run");
     assertCloudflareApiTokenSteps(deployments[0]!, ["preview_cleanup", "provision", "publish"]);

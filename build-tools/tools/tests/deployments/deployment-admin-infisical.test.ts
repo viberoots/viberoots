@@ -15,6 +15,8 @@ import {
   withDeployArgv,
 } from "./deployment-admin-infisical.fixture";
 import { infisicalRequirement } from "./deployment-secret-infisical.fixture";
+import { runInTemp } from "../lib/test-helpers";
+import { writeCloudflarePagesExtractionFixture } from "./cloudflare-pages.extraction.fixture";
 
 test("Infisical auth diagnostics print only safe backend and identity routing", async () => {
   const deployment = await infisicalAdminDeployment();
@@ -46,34 +48,37 @@ test("Infisical admin plan is local and read-only", async () => {
 });
 
 test("deploy CLI groups expose Infisical auth and admin commands", async () => {
-  const auth = await withDeployArgv(
-    ["auth", "explain-secret-backend", "--deployment", INFISICAL_ADMIN_DEPLOYMENT],
-    async () => await captureDeployCli(() => maybeHandleDeploymentAuthCli(process.cwd())),
-  );
-  assert.equal(auth.schemaVersion, "deployment-auth-secret-backend@1");
-  const identity = await withDeployArgv(
-    ["auth", "explain-infisical-identity", "--deployment", INFISICAL_ADMIN_DEPLOYMENT],
-    async () => await captureDeployCli(() => maybeHandleDeploymentAuthCli(process.cwd())),
-  );
-  assert.equal(identity.schemaVersion, "deployment-auth-infisical-identity@1");
-  const admin = await withDeployArgv(
-    ["admin", "infisical", "plan", "--deployment", INFISICAL_ADMIN_DEPLOYMENT],
-    async () => await captureDeployCli(() => maybeHandleDeploymentAdminCli(process.cwd())),
-  );
-  assert.equal(admin.schemaVersion, "deploy-admin-infisical-plan@1");
-  const check = await withDeployArgv(
-    ["admin", "infisical", "check", "--deployment", INFISICAL_ADMIN_DEPLOYMENT],
-    async () => await captureDeployCli(() => maybeHandleDeploymentAdminCli(process.cwd())),
-  );
-  assert.equal(check.schemaVersion, "deploy-admin-infisical-check@1");
-  await withDeployArgv(
-    ["admin", "infisical", "sync", "--deployment", INFISICAL_ADMIN_DEPLOYMENT],
-    async () => {
-      await assert.rejects(
-        () => maybeHandleDeploymentAdminCli(process.cwd()),
-        /deploy admin infisical command must be one of plan, check/,
-      );
-      return {};
-    },
-  );
+  await runInTemp("deployment-admin-infisical-cli", async (tmp) => {
+    await writeCloudflarePagesExtractionFixture(tmp, { infisical: true });
+    const auth = await withDeployArgv(
+      ["auth", "explain-secret-backend", "--deployment", INFISICAL_ADMIN_DEPLOYMENT],
+      async () => await captureDeployCli(() => maybeHandleDeploymentAuthCli(tmp)),
+    );
+    assert.equal(auth.schemaVersion, "deployment-auth-secret-backend@1");
+    const identity = await withDeployArgv(
+      ["auth", "explain-infisical-identity", "--deployment", INFISICAL_ADMIN_DEPLOYMENT],
+      async () => await captureDeployCli(() => maybeHandleDeploymentAuthCli(tmp)),
+    );
+    assert.equal(identity.schemaVersion, "deployment-auth-infisical-identity@1");
+    const admin = await withDeployArgv(
+      ["admin", "infisical", "plan", "--deployment", INFISICAL_ADMIN_DEPLOYMENT],
+      async () => await captureDeployCli(() => maybeHandleDeploymentAdminCli(tmp)),
+    );
+    assert.equal(admin.schemaVersion, "deploy-admin-infisical-plan@1");
+    const check = await withDeployArgv(
+      ["admin", "infisical", "check", "--deployment", INFISICAL_ADMIN_DEPLOYMENT],
+      async () => await captureDeployCli(() => maybeHandleDeploymentAdminCli(tmp)),
+    );
+    assert.equal(check.schemaVersion, "deploy-admin-infisical-check@1");
+    await withDeployArgv(
+      ["admin", "infisical", "sync", "--deployment", INFISICAL_ADMIN_DEPLOYMENT],
+      async () => {
+        await assert.rejects(
+          () => maybeHandleDeploymentAdminCli(tmp),
+          /deploy admin infisical command must be one of plan, check/,
+        );
+        return {};
+      },
+    );
+  });
 });

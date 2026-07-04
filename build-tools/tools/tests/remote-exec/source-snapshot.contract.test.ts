@@ -32,13 +32,37 @@ test("source snapshot includes declared source and excludes mutable local direct
   await write(path.join(root, "flake.lock"), "{}\n");
   await write(path.join(root, "TARGETS"), "filegroup(name='all')\n");
   await write(path.join(root, "viberoots", "build-tools", "lang", "defs.bzl"), "X = 1\n");
-  await write(path.join(root, DEFAULT_GRAPH_PATH), "[]\n");
+  await write(
+    path.join(root, DEFAULT_GRAPH_PATH),
+    JSON.stringify({
+      nodes: [
+        {
+          name: "//projects/apps/demo:tool",
+          nixpkgs_profile: "default",
+          nixpkg_pins: {
+            "pkgs.OpenSSL": {
+              nixpkgs_profile: "nixpkgs-23_11",
+              rationale: "not needed in remote evidence",
+            },
+          },
+        },
+      ],
+    }),
+  );
   await write(path.join(root, "projects", "apps", "demo", "index.ts"), "export {}\n");
   for (const rel of [
     ".git/config",
     ".direnv/cache",
     "node_modules/pkg/index.js",
     "buck-out/log",
+    ".viberoots/workspace/backups/backup.json",
+    ".viberoots/workspace/buck/log",
+    ".viberoots/workspace/cache/nix-tarballs/blob",
+    ".viberoots/workspace/install-cache/state.json",
+    ".viberoots/workspace/nix-xdg-cache/nix/tarball-cache-v2/pack",
+    ".viberoots/workspace/node/bin/node",
+    ".viberoots/workspace/pr-logs/source-snapshot.log",
+    ".viberoots/workspace/xdg-cache/nix/tarball-cache-v2/pack",
     "tmp/local",
   ]) {
     await write(path.join(root, rel), "forbidden\n");
@@ -62,6 +86,14 @@ test("source snapshot includes declared source and excludes mutable local direct
     ".direnv/cache",
     "node_modules/pkg/index.js",
     "buck-out/log",
+    ".viberoots/workspace/backups/backup.json",
+    ".viberoots/workspace/buck/log",
+    ".viberoots/workspace/cache/nix-tarballs/blob",
+    ".viberoots/workspace/install-cache/state.json",
+    ".viberoots/workspace/nix-xdg-cache/nix/tarball-cache-v2/pack",
+    ".viberoots/workspace/node/bin/node",
+    ".viberoots/workspace/pr-logs/source-snapshot.log",
+    ".viberoots/workspace/xdg-cache/nix/tarball-cache-v2/pack",
     "tmp/local",
   ]) {
     await assert.rejects(fs.access(path.join(out, rel)), undefined, rel);
@@ -71,6 +103,17 @@ test("source snapshot includes declared source and excludes mutable local direct
   assert.equal(data.ambientWorkspaceRoot, root);
   assert.equal(data.declaredSnapshotRoot, out);
   assert.equal(data.graphPathInSnapshot, DEFAULT_GRAPH_PATH);
+  assert.deepEqual(data.sourcePlans, [
+    {
+      target: "//projects/apps/demo:tool",
+      nixpkgs_profile: "default",
+      nixpkg_pins: {
+        "pkgs.openssl": {
+          nixpkgs_profile: "nixpkgs-23_11",
+        },
+      },
+    },
+  ]);
 });
 
 test("source_snapshot rule builds a declared Buck snapshot artifact", async () => {

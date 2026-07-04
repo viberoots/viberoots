@@ -16,19 +16,19 @@ import { scrubDeploymentSecretEnv } from "../../deployments/deployment-secret-en
 import { deploymentRequirementFixture } from "./deployment-metadata.fixture";
 import { startFakeVaultServer } from "./vault.test-server";
 
-function jwtCredential(addr: string, role = "deploy-pleomino-read"): VaultCredentialConfig {
+function jwtCredential(addr: string, role = "deploy-sample-webapp-read"): VaultCredentialConfig {
   return { kind: "jwt", addr, role, workloadJwt: "signed.workload.jwt" };
 }
 
 test("JWT login mints an in-memory token for direct Vault secret reads", async () => {
   const vault = await startFakeVaultServer(
     {
-      "secret://deployments/pleomino/cloudflare_api_token": {
+      "secret://deployments/sample-webapp/cloudflare_api_token": {
         currentVersion: "5",
         versions: { "5": { value: "jwt-vault-token" } },
       },
     },
-    { jwtAuth: { role: "deploy-pleomino-read", jwt: "signed.workload.jwt" } },
+    { jwtAuth: { role: "deploy-sample-webapp-read", jwt: "signed.workload.jwt" } },
   );
   const secretContext: DeploymentSecretContext = {
     kind: "vault",
@@ -40,16 +40,16 @@ test("JWT login mints an in-memory token for direct Vault secret reads", async (
         deploymentRequirementFixture({
           name: "cloudflare_api_token",
           step: "publish",
-          contractId: "secret://deployments/pleomino/cloudflare_api_token",
+          contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
         }),
       ],
-      targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
       secretContext,
     });
     const runtime = createDeploymentSecretRuntime({
       backend: createDeploymentVaultSecretBackend(secretContext),
       admittedReferences,
-      targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
     });
     assert.equal((await runtime.enterStep("publish")).cloudflare_api_token, "jwt-vault-token");
   } finally {
@@ -71,10 +71,10 @@ test("stale ambient Vault variables do not satisfy deployment secret resolution"
             deploymentRequirementFixture({
               name: "cloudflare_api_token",
               step: "publish",
-              contractId: "secret://deployments/pleomino/cloudflare_api_token",
+              contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
             }),
           ],
-          targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+          targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
         }),
       /explicit deployment secret context/,
     );

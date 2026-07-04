@@ -11,7 +11,7 @@ export async function withPnpmStoreBuildFlakeRef<T>(
 
   const filtered = await withHeartbeat(
     `importer=${opts.importer} step=prepare-filtered-flake`,
-    makeFilteredFlakeRef({ repoRoot: opts.repoRoot, attr: "pnpm" }),
+    makeFilteredFlakeRef({ repoRoot: opts.repoRoot, attr: "pnpm", importer: opts.importer }),
   );
   try {
     if (!filtered.flakeRef.endsWith("#pnpm")) {

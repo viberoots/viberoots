@@ -25,8 +25,8 @@ test("repo resolver profile discovery maps context backend requirements before d
   const graphPath = await writeGraph([
     { name: "//deployments/app:build" },
     {
-      name: "//projects/deployments/pleomino/staging:deploy",
-      deployment_context: "pleomino-staging",
+      name: "//projects/deployments/sample-webapp/staging:deploy",
+      deployment_context: "sample-webapp-staging",
       infisical_runtime: {},
       secret_requirements: [{ name: "api_token", contract_id: "secret://deployments/api_token" }],
     },
@@ -47,8 +47,8 @@ test("repo resolver profile discovery reads project config from graph workspace 
     await writeJson(graphPath, {
       nodes: [
         {
-          name: "//projects/deployments/pleomino/prod:deploy",
-          deployment_context: "pleomino-prod",
+          name: "//projects/deployments/sample-webapp/prod:deploy",
+          deployment_context: "sample-webapp-prod",
           secret_requirements: [{ name: "api_token", contract_id: "secret://deployments/api" }],
         },
       ],
@@ -88,8 +88,8 @@ test("repo resolver profile discovery rejects split backend metadata", async () 
 test("repo resolver profile discovery rejects context backend conflicts", async () => {
   const graphPath = await writeGraph([
     {
-      name: "//projects/deployments/pleomino/staging:deploy",
-      deployment_context: "pleomino-staging",
+      name: "//projects/deployments/sample-webapp/staging:deploy",
+      deployment_context: "sample-webapp-staging",
       secret_backend: "vault/default",
       secret_requirements: [{ name: "api_token", contract_id: "secret://deployments/api_token" }],
     },
@@ -102,7 +102,8 @@ test("repo resolver profile discovery rejects context backend conflicts", async 
 
 async function writeGraph(nodes: unknown[]) {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-unified-selector-"));
-  const graphPath = path.join(dir, "graph.json");
+  await writeProjectConfig(dir, "infisical/default");
+  const graphPath = path.join(dir, ".viberoots", "workspace", "buck", "graph.json");
   await writeJson(graphPath, { nodes });
   return graphPath;
 }
@@ -120,7 +121,8 @@ async function writeProjectConfig(root: string, secretBackend: string) {
       },
     },
     deploymentContexts: {
-      "pleomino-prod": { controlPlane: "mini", secretBackend },
+      "sample-webapp-staging": { controlPlane: "mini", secretBackend },
+      "sample-webapp-prod": { controlPlane: "mini", secretBackend },
     },
   });
 }

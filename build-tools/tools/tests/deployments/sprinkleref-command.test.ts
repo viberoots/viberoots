@@ -9,7 +9,7 @@ import { runSprinkleRefCli } from "../../deployments/sprinkleref-cli";
 test("sprinkleref add update remove preserve by default for local-file backend", async () => {
   const dir = await tmp();
   const config = await localConfig(dir);
-  const ref = "secret://deployments/pleomino/staging/cloudflare-api-token";
+  const ref = "secret://deployments/sample-webapp/staging/cloudflare-api-token";
   await run(["--config", config, "--add", ref, "--value-env", "TOKEN"], { TOKEN: "one" });
   await assert.rejects(
     () => run(["--config", config, "--add", ref, "--value-env", "TOKEN"], { TOKEN: "two" }),
@@ -28,7 +28,7 @@ test("sprinkleref add update remove preserve by default for local-file backend",
 test("sprinkleref add and update require explicit collision modes", async () => {
   const dir = await tmp();
   const config = await localConfig(dir);
-  const ref = "secret://deployments/pleomino/staging/collision-token";
+  const ref = "secret://deployments/sample-webapp/staging/collision-token";
   await run(["--config", config, "--add", ref, "--value-env", "TOKEN"], { TOKEN: "one" });
   await assert.rejects(
     () => run(["--config", config, "--add", ref, "--value-env", "TOKEN"], { TOKEN: "two" }),
@@ -38,7 +38,7 @@ test("sprinkleref add and update require explicit collision modes", async () => 
     TOKEN: "two",
   });
   assert.equal((await readStore(dir))[ref], "two");
-  const missing = "secret://deployments/pleomino/staging/new-token";
+  const missing = "secret://deployments/sample-webapp/staging/new-token";
   await assert.rejects(
     () => run(["--config", config, "--update", missing, "--value-env", "TOKEN"], { TOKEN: "new" }),
     /is missing/,
@@ -52,7 +52,7 @@ test("sprinkleref add and update require explicit collision modes", async () => 
 test("sprinkleref prompt fallback and dry-run do not read secret values", async () => {
   const dir = await tmp();
   const config = await localConfig(dir);
-  const ref = "secret://deployments/pleomino/prod/cloudflare-api-token";
+  const ref = "secret://deployments/sample-webapp/prod/cloudflare-api-token";
   const output: string[] = [];
   await runSprinkleRefCli({
     argv: ["--config", config, "--add", ref, "--dry-run"],
@@ -73,7 +73,7 @@ test("sprinkleref prompt fallback and dry-run do not read secret values", async 
 test("sprinkleref get fingerprint prints only digest metadata", async () => {
   const dir = await tmp();
   const config = await localConfig(dir);
-  const ref = "secret://deployments/pleomino/staging/cloudflare-api-token";
+  const ref = "secret://deployments/sample-webapp/staging/cloudflare-api-token";
   const output: string[] = [];
   await run(["--config", config, "--add", ref, "--value-env", "TOKEN"], {
     TOKEN: "hidden-secret",
@@ -95,7 +95,7 @@ test("sprinkleref get fingerprint prints only digest metadata", async () => {
 test("sprinkleref get refuses to print a raw secret", async () => {
   const dir = await tmp();
   const config = await localConfig(dir);
-  const ref = "secret://deployments/pleomino/staging/cloudflare-api-token";
+  const ref = "secret://deployments/sample-webapp/staging/cloudflare-api-token";
   await run(["--config", config, "--add", ref, "--value-env", "TOKEN"], {
     TOKEN: "hidden-secret",
   });
@@ -111,7 +111,12 @@ test("sprinkleref add fails non-interactively when value input is missing", asyn
   await assert.rejects(
     () =>
       runSprinkleRefCli({
-        argv: ["--config", config, "--add", "secret://deployments/pleomino/staging/missing-input"],
+        argv: [
+          "--config",
+          config,
+          "--add",
+          "secret://deployments/sample-webapp/staging/missing-input",
+        ],
         stdout: () => undefined,
       }),
     /missing secret value.*--value-env.*--value-file.*TTY/,

@@ -13,8 +13,8 @@ import type { DeploymentSecretAdmittedReference } from "../../deployments/deploy
 import { deploymentRequirementFixture } from "./deployment-metadata.fixture";
 
 const originalEnv = { ...process.env };
-const targetScope = "cloudflare-pages:web-platform-staging/pleomino-staging-pages";
-const contractId = "secret://deployments/pleomino/cloudflare_api_token";
+const targetScope = "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages";
+const contractId = "secret://deployments/sample-webapp/cloudflare_api_token";
 
 function restoreEnv() {
   process.env = { ...originalEnv };

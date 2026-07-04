@@ -36,13 +36,13 @@ export function cloudflarePagesApiTokenRequirements(): DeploymentRequirement[] {
     {
       name: "cloudflare_api_token",
       step: "publish",
-      contractId: "secret://deployments/pleomino/cloudflare_api_token",
+      contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
       required: true,
     },
     {
       name: "cloudflare_api_token",
       step: "preview_cleanup",
-      contractId: "secret://deployments/pleomino/cloudflare_api_token",
+      contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
       required: true,
     },
   ];
@@ -55,22 +55,22 @@ export function cloudflarePagesDeploymentFixture(
   const admissionPolicy =
     overrides.admissionPolicy ||
     nixosSharedHostAdmissionPolicyFixture({
-      ref: "//projects/deployments/pleomino/shared:staging_release",
+      ref: "//projects/deployments/sample-webapp/shared:staging_release",
       name: "staging_release",
       allowedRefs: ["main", "refs/tags/release/*"],
       requiredChecks: [],
-      fingerprint: "sha256:admission-pleomino-staging",
+      fingerprint: "sha256:admission-sample-webapp-staging",
     });
   const providerTarget = {
     ...deriveCloudflarePagesProviderTarget({
       account: "web-platform-staging",
-      project: "pleomino-staging-pages",
+      project: "sample-webapp-staging-pages",
     }),
     ...(overrides.providerTarget || {}),
   };
   return {
-    deploymentId: overrides.deploymentId || "pleomino-staging",
-    label: overrides.label || "//projects/deployments/pleomino/staging:deploy",
+    deploymentId: overrides.deploymentId || "sample-webapp-staging",
+    label: overrides.label || "//projects/deployments/sample-webapp/staging:deploy",
     name: overrides.name || "deploy",
     provider: CLOUDFLARE_PAGES_PROVIDER,
     protectionClass: overrides.protectionClass || "shared_nonprod",
@@ -91,13 +91,13 @@ export function cloudflarePagesDeploymentFixture(
     ...(overrides.vaultRuntime ? { vaultRuntime: overrides.vaultRuntime } : {}),
     component: {
       kind: STATIC_WEBAPP_COMPONENT,
-      target: overrides.component?.target || "//projects/apps/pleomino:app",
+      target: overrides.component?.target || "//projects/apps/sample-webapp:app",
     },
     components: overrides.components || [
       {
         id: "default",
         kind: STATIC_WEBAPP_COMPONENT,
-        target: overrides.component?.target || "//projects/apps/pleomino:app",
+        target: overrides.component?.target || "//projects/apps/sample-webapp:app",
       },
     ],
     ...(overrides.preview ? { preview: overrides.preview } : {}),
@@ -110,9 +110,9 @@ export function cloudflarePagesAdmissionPolicyNodeFixture(
   overrides: Partial<GraphNode> = {},
 ): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
-    name: "//projects/deployments/pleomino/shared:staging_release",
+    name: "//projects/deployments/sample-webapp/shared:staging_release",
     allowed_refs: ["main", "refs/tags/release/*"],
-    required_checks: ["deploy/pleomino-staging"],
+    required_checks: ["deploy/sample-webapp-staging"],
     ...overrides,
   });
 }

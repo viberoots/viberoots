@@ -68,6 +68,59 @@ function repoRsyncExcludeArgs(): string[] {
   return excludes.map((e) => ["--exclude", e]).flat();
 }
 
+const DEFAULT_RSYNC_ROOT_FILES = [
+  ".buckconfig",
+  ".buckroot",
+  ".editorconfig",
+  ".gitattributes",
+  ".gitignore",
+  ".npmrc",
+  ".prettierignore",
+  ".prettierrc",
+  "AGENTS.md",
+  "Jenkinsfile",
+  "LICENSE",
+  "README.md",
+  "TARGETS",
+  "TESTING.md",
+  "abstractions.md",
+  "bootstrap",
+  "eslint.config.js",
+  "flake.lock",
+  "flake.nix",
+  "gomod2nix.toml",
+  "init",
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "tsconfig.json",
+];
+
+const DEFAULT_RSYNC_ROOTS = [
+  ".husky",
+  ".viberoots",
+  "build-tools",
+  "cpp",
+  "go",
+  "lang",
+  "node",
+  "patches",
+  "prelude",
+  "python",
+  "tools",
+  "third_party",
+  "toolchains",
+  "types",
+  "viberoots",
+];
+
+async function pathExists(file: string): Promise<boolean> {
+  return await fsp
+    .lstat(file)
+    .then(() => true)
+    .catch(() => false);
+}
+
 export async function rsyncRepoTo(tmp: string) {
   await timeAsync(`rsyncRepoTo(${path.basename(tmp)})`, async () => {
     const sourceRoot = path.resolve(process.env.TEST_RSYNC_SOURCE_ROOT || process.cwd());
@@ -115,7 +168,17 @@ export async function rsyncRepoTo(tmp: string) {
       }
       return;
     }
-    await $`rsync -a ${excludeArgs} ${sourceRoot}/ ${tmp}/`;
+    await fsp.mkdir(tmp, { recursive: true });
+    for (const file of DEFAULT_RSYNC_ROOT_FILES) {
+      if (await pathExists(path.join(sourceRoot, file))) {
+        await $({ cwd: sourceRoot })`rsync -a --relative ${excludeArgs} ${file} ${tmp}/`;
+      }
+    }
+    for (const root of DEFAULT_RSYNC_ROOTS) {
+      if (await pathExists(path.join(sourceRoot, root))) {
+        await $({ cwd: sourceRoot })`rsync -a --relative ${excludeArgs} ${root} ${tmp}/`;
+      }
+    }
     const overlayRoot = String(process.env.TEST_RSYNC_OVERLAY_ROOT || "").trim();
     if (overlayRoot) {
       await $`rsync -a ${excludeArgs} ${path.resolve(overlayRoot)}/ ${tmp}/`;

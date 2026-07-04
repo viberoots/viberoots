@@ -67,8 +67,8 @@ test("repo fan-out reuses one operator session while creating per-machine secret
     "viberoots repo-bootstrap Universal Auth identity=viberoots-iac-bootstrap machine=dev-laptop",
   );
   assert.deepEqual(api.createdSecretDescriptions.slice(1).sort(), [
-    "viberoots deployment prod Universal Auth identity=pleomino-prod-deploy machine=dev-laptop",
-    "viberoots deployment staging Universal Auth identity=pleomino-staging-deploy machine=dev-laptop",
+    "viberoots deployment prod Universal Auth identity=sample-webapp-prod-deploy machine=dev-laptop",
+    "viberoots deployment staging Universal Auth identity=sample-webapp-staging-deploy machine=dev-laptop",
   ]);
 });
 
@@ -78,18 +78,18 @@ async function writeInputs(dir: string) {
     path.join(dir, ".viberoots/workspace/buck/graph.json"),
     `${JSON.stringify({ nodes: ["staging", "prod"].map(deploymentNode) }, null, 2)}\n`,
   );
-  await fs.mkdir(path.join(dir, "projects/deployments/pleomino/shared"), { recursive: true });
+  await fs.mkdir(path.join(dir, "projects/deployments/sample-webapp/shared"), { recursive: true });
   await fs.writeFile(
-    path.join(dir, "projects/deployments/pleomino/shared/family.bzl"),
+    path.join(dir, "projects/deployments/sample-webapp/shared/family.bzl"),
     metadataSource,
   );
 }
 
 function deploymentNode(stage: string) {
   return {
-    name: `//projects/deployments/pleomino/${stage}:deploy`,
+    name: `//projects/deployments/sample-webapp/${stage}:deploy`,
     rule_type: "deployment_target",
-    deployment_family: "pleomino",
+    deployment_family: "sample-webapp",
     environment_stage: stage,
     secret_backend: "infisical/default",
     infisical_runtime: { project_id: "proj_fixture", environment: stage },
@@ -199,8 +199,8 @@ const identityClientIds = {
 const metadataSource = `
 _INFISICAL_SITE_URL = "https://app.infisical.com"
 _INFISICAL_PROJECT_ID = "proj_fixture"
-_INFISICAL_PROJECT_NAME = "pleomino-deployments"
-_INFISICAL_PROJECT_SLUG = "pleomino-deployments"
+_INFISICAL_PROJECT_NAME = "sample-webapp-deployments"
+_INFISICAL_PROJECT_SLUG = "sample-webapp-deployments"
 _INFISICAL_SECRET_PATH = "/"
 _INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"
 _INFISICAL_ENVIRONMENT_SLUGS = {"staging": "staging", "prod": "prod"}
@@ -209,27 +209,27 @@ _INFISICAL_MACHINE_IDENTITY_IDS = {
     "prod": "5e302d6c-3ac7-4fbc-a75f-b2312f33809a",
 }
 _INFISICAL_MACHINE_IDENTITY_NAMES = {
-    "staging": "pleomino-staging-deploy",
-    "prod": "pleomino-prod-deploy",
+    "staging": "sample-webapp-staging-deploy",
+    "prod": "sample-webapp-prod-deploy",
 }
 _INFISICAL_CREDENTIAL_FILE_NAMES = {
     "staging": {
-        "client_id": "pleomino-staging-infisical-client-id",
-        "client_secret": "pleomino-staging-infisical-client-secret",
+        "client_id": "sample-webapp-staging-infisical-client-id",
+        "client_secret": "sample-webapp-staging-infisical-client-secret",
     },
     "prod": {
-        "client_id": "pleomino-prod-infisical-client-id",
-        "client_secret": "pleomino-prod-infisical-client-secret",
+        "client_id": "sample-webapp-prod-infisical-client-id",
+        "client_secret": "sample-webapp-prod-infisical-client-secret",
     },
 }
 _INFISICAL_CREDENTIAL_REFS = {
     "staging": {
-        "client_id": "secret://deployments/pleomino/staging/infisical-client-id",
-        "client_secret": "secret://deployments/pleomino/staging/infisical-client-secret",
+        "client_id": "secret://deployments/sample-webapp/staging/infisical-client-id",
+        "client_secret": "secret://deployments/sample-webapp/staging/infisical-client-secret",
     },
     "prod": {
-        "client_id": "secret://deployments/pleomino/prod/infisical-client-id",
-        "client_secret": "secret://deployments/pleomino/prod/infisical-client-secret",
+        "client_id": "secret://deployments/sample-webapp/prod/infisical-client-id",
+        "client_secret": "secret://deployments/sample-webapp/prod/infisical-client-secret",
     },
 }
 `;

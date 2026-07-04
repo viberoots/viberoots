@@ -48,7 +48,7 @@ Verify-scope organization:
 - The Nix-built image and NixOS module PRs are expected to touch Nix support files and should be
   classified as `mixed-build-system` if they affect shared flake/package wiring.
 - Live checks against Supabase, R2, WorkOS, or a cloud container host must be explicitly gated and
-  skipped by default. Unit and fixture tests must not depend on Pleomino, mini, Supabase, R2,
+  skipped by default. Unit and fixture tests must not depend on Sample webapp, mini, Supabase, R2,
   WorkOS, or any live demo project.
 - Each PR below must update this plan if implementation changes invalidate the remaining sequence,
   scope, or assumptions.
@@ -1024,7 +1024,7 @@ reads.
   AWS S3 artifact-store access through the selected endpoint path, and DNS/TLS ingress.
 - Validate that live-smoke evidence is attached to the selected provider-capability declarations
   rather than stored only in provider dashboards or IaC output.
-- Ensure tests do not depend on Pleomino or any demo project.
+- Ensure tests do not depend on Sample webapp or any demo project.
 
 ### 3. External prerequisites
 
@@ -1062,7 +1062,7 @@ reads.
 ### 6. Acceptance criteria
 
 - A full fixture deployment runs through the cloud-shaped service and two workers.
-- The E2E proves no test depends on Pleomino or another demo project.
+- The E2E proves no test depends on Sample webapp or another demo project.
 - Live smoke is gated, documented, and safe for non-production verification.
 - The AWS topology smoke, when explicitly enabled, proves the same service/worker image and runtime
   configuration work from EC2 with the selected managed Postgres and artifact-store paths.

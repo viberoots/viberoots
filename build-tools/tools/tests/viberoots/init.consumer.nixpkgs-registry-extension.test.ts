@@ -1,0 +1,199 @@
+#!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
+import * as fsp from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { test } from "node:test";
+import { promisify } from "node:util";
+
+const execFileAsync = promisify(execFile);
+
+async function findViberootsRoot(): Promise<string> {
+  for (const candidate of [path.join(process.cwd(), "viberoots"), process.cwd()]) {
+    try {
+      await fsp.access(path.join(candidate, "build-tools", "tools", "bin", "viberoots"));
+      return candidate;
+    } catch {}
+  }
+  throw new Error("could not find viberoots root");
+}
+
+async function write(file: string, content: string): Promise<void> {
+  await fsp.mkdir(path.dirname(file), { recursive: true });
+  await fsp.writeFile(file, content, "utf8");
+}
+
+test("init-consumer generated flakes expose nixpkgs registry extension data", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-registry-extension-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    const { stdout, stderr } = await execFileAsync(
+      path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots"),
+      [
+        "init-consumer",
+        "--workspace-root",
+        workspace,
+        "--workspace-name",
+        "registry-extension",
+        "--viberoots-url",
+        `path:${viberootsRoot}`,
+        "--source",
+        viberootsRoot,
+        "--no-lock",
+        "--no-direnv",
+      ],
+      { cwd: workspace, env: { ...process.env, NO_DEV_SHELL: "1" } },
+    );
+
+    assert.match(stdout, /ok\s+workspace initialized/);
+    assert.equal(stderr, "");
+    const hiddenFlake = await fsp.readFile(
+      path.join(workspace, ".viberoots", "workspace", "flake.nix"),
+      "utf8",
+    );
+    assert.match(hiddenFlake, /nixpkgs_23_11\.url = "github:NixOS\/nixpkgs\/nixos-23\.11"/);
+    assert.match(hiddenFlake, /registryExtensionPath = \.\/nixpkgs-source-registry-extension\.nix/);
+    assert.match(hiddenFlake, /import registryExtensionPath \{ inherit inputs; \}/);
+    assert.match(hiddenFlake, /inherit nixpkgsRegistryExtension/);
+
+    const rootFlake = await fsp.readFile(path.join(workspace, "flake.nix"), "utf8");
+    assert.match(rootFlake, /nixpkgs_23_11\.url = "github:NixOS\/nixpkgs\/nixos-23\.11"/);
+    assert.match(
+      rootFlake,
+      /registryExtensionPath = \.\/\.viberoots\/workspace\/nixpkgs-source-registry-extension\.nix/,
+    );
+    assert.match(rootFlake, /inherit nixpkgsRegistryExtension/);
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("consumer registry extension adds a locked input used by a selected target", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-registry-selected-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    await execFileAsync(
+      path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots"),
+      [
+        "init-consumer",
+        "--workspace-root",
+        workspace,
+        "--workspace-name",
+        "registry-selected",
+        "--viberoots-url",
+        `path:${viberootsRoot}`,
+        "--source",
+        viberootsRoot,
+        "--no-lock",
+        "--no-direnv",
+      ],
+      { cwd: workspace, env: { ...process.env, NO_DEV_SHELL: "1" } },
+    );
+
+    await write(
+      path.join(workspace, ".viberoots", "workspace", "nixpkgs-source-registry-extension.nix"),
+      [
+        "{ inputs }: {",
+        "  profiles.nixpkgs-23_11 = {",
+        "    input = inputs.nixpkgs_23_11;",
+        '    rationale = "consumer selected-target fixture profile";',
+        "    supportedSystems = [ ];",
+        "  };",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    const target = "//projects/apps/consumer-profile:tool";
+    await write(
+      path.join(workspace, "projects", "apps", "consumer-profile", "src", "main.cpp"),
+      [
+        "#include <cstdio>",
+        "#include <zlib.h>",
+        "int main() {",
+        '  std::printf("zlib=%s\\n", zlibVersion());',
+        "  return 0;",
+        "}",
+        "",
+      ].join("\n"),
+    );
+    const graphPath = path.join(workspace, ".viberoots", "workspace", "buck", "graph.json");
+    await write(
+      graphPath,
+      JSON.stringify(
+        [
+          {
+            name: target,
+            rule_type: "cxx_binary",
+            labels: ["lang:cpp", "kind:bin", "nixpkg:pkgs.zlib"],
+            srcs: ["projects/apps/consumer-profile/src/main.cpp"],
+            nixpkgs_profile: "default",
+            nixpkg_pins: {
+              "pkgs.zlib": {
+                nixpkgs_profile: "nixpkgs-23_11",
+                rationale: "Use consumer extension profile in selected fixture.",
+              },
+            },
+          },
+        ],
+        null,
+        2,
+      ) + "\n",
+    );
+
+    await execFileAsync(
+      "nix",
+      ["flake", "lock", "--accept-flake-config", "path:.viberoots/workspace"],
+      {
+        cwd: workspace,
+        maxBuffer: 1024 * 1024 * 16,
+      },
+    );
+    const lockText = await fsp.readFile(
+      path.join(workspace, ".viberoots", "workspace", "flake.lock"),
+      "utf8",
+    );
+    assert.match(lockText, /nixpkgs_23_11/);
+
+    const { stdout } = await execFileAsync(
+      "nix",
+      [
+        "build",
+        "--impure",
+        "--accept-flake-config",
+        "path:.viberoots/workspace#graph-generator-selected",
+        "--no-link",
+        "--print-out-paths",
+      ],
+      {
+        cwd: workspace,
+        env: {
+          ...process.env,
+          BUCK_TARGET: target,
+          BUCK_GRAPH_JSON: graphPath,
+          WORKSPACE_ROOT: workspace,
+        },
+        maxBuffer: 1024 * 1024 * 32,
+      },
+    );
+    const outPath =
+      String(stdout || "")
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .at(-1) || "";
+    assert.ok(outPath.startsWith("/nix/store/"), stdout);
+    const buildLog = await fsp.readFile(path.join(outPath, "build.log"), "utf8");
+    assert.match(buildLog, /nixpkgsProfile=default/);
+    assert.match(
+      buildLog,
+      /nixpkgsSourcePlan=pkgs\.zlib -> nixpkgs-23_11 \(nixpkg_pin; rationale=Use consumer extension profile in selected fixture\.\)/,
+    );
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});

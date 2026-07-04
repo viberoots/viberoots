@@ -190,6 +190,38 @@ test("rsync: viberoots source roots exclude generated workspace buck state", asy
   }
 });
 
+test("rsync: default copy uses explicit root allowlist", async () => {
+  const source = await makeViberootsSourceRoot("viberoots-rsync-allow-source-");
+  const dest = await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-rsync-allow-dest-"));
+  try {
+    await fsp.writeFile(path.join(source, "flake.lock"), "{}\n");
+    await fsp.writeFile(path.join(source, "package.json"), "{}\n");
+    await fsp.writeFile(path.join(source, "accidental-root.log"), "must not copy\n");
+    await fsp.writeFile(path.join(source, "quad-alignment-local.md"), "must not copy\n");
+
+    await withEnv(
+      {
+        TEST_RSYNC_SOURCE_ROOT: source,
+        TEST_RSYNC_ROOTS: undefined,
+      },
+      async () => {
+        await rsyncRepoTo(dest);
+      },
+    );
+
+    await fsp.access(path.join(dest, "flake.nix"));
+    await fsp.access(path.join(dest, "flake.lock"));
+    await fsp.access(path.join(dest, "package.json"));
+    await fsp.access(path.join(dest, "build-tools", "keep.txt"));
+    await assertMissing(path.join(dest, "accidental-root.log"));
+    await assertMissing(path.join(dest, "quad-alignment-local.md"));
+    await assertMissing(path.join(dest, ".source-fingerprint"));
+  } finally {
+    await fsp.rm(source, { recursive: true, force: true });
+    await fsp.rm(dest, { recursive: true, force: true });
+  }
+});
+
 test("rsync: excludes nested buck-out directories by name", async () => {
   const marker = `rsync-nested-buck-out-${process.pid}`;
   const nestedBuckOut = path.join("projects", "apps", marker, "nested", "buck-out");

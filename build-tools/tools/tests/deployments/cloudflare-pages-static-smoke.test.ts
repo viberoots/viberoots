@@ -24,8 +24,8 @@ test("cloudflare-pages custom domain smoke explains Cloudflare 522 routing failu
     const deployment = cloudflarePagesDeploymentFixture({
       providerTarget: {
         ...base,
-        customDomain: "staging.pleomino.com",
-        canonicalUrl: "https://staging.pleomino.com/",
+        customDomain: "staging.sample-webapp.com",
+        canonicalUrl: "https://staging.sample-webapp.com/",
       },
     });
     await assert.rejects(
@@ -39,7 +39,7 @@ test("cloudflare-pages custom domain smoke explains Cloudflare 522 routing failu
             port: address.port,
           },
         }),
-      /Cloudflare returned 522 for custom domain staging\.pleomino\.com/,
+      /Cloudflare returned 522 for custom domain staging\.sample-webapp\.com/,
     );
   } finally {
     await new Promise<void>((resolve, reject) =>
@@ -57,7 +57,7 @@ test("cloudflare-pages custom domain smoke checks exact bytes on published Pages
     const host = String(req.headers.host || "").split(":")[0];
     res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
     res.end(
-      host === "pleomino-staging-pages.pages.dev"
+      host === "sample-webapp-staging-pages.pages.dev"
         ? "<html>new deployment</html>\n"
         : "<html>previous deployment</html>\n",
     );
@@ -70,21 +70,21 @@ test("cloudflare-pages custom domain smoke checks exact bytes on published Pages
     const deployment = cloudflarePagesDeploymentFixture({
       providerTarget: {
         ...base,
-        customDomain: "staging.pleomino.com",
-        canonicalUrl: "https://staging.pleomino.com/",
+        customDomain: "staging.sample-webapp.com",
+        canonicalUrl: "https://staging.sample-webapp.com/",
       },
     });
     const result = await smokeCloudflarePagesStaticWebapp({
       deployment,
       indexPath,
-      publishedPublicUrl: "https://pleomino-staging-pages.pages.dev/",
+      publishedPublicUrl: "https://sample-webapp-staging-pages.pages.dev/",
       connectOverride: {
         protocol: "http:",
         hostname: "127.0.0.1",
         port: address.port,
       },
     });
-    assert.equal(result.publicUrl, "https://staging.pleomino.com/");
+    assert.equal(result.publicUrl, "https://staging.sample-webapp.com/");
   } finally {
     await new Promise<void>((resolve, reject) =>
       server.close((error) => (error ? reject(error) : resolve())),

@@ -30,7 +30,7 @@ export function kubernetesDeploymentFixture(
   const admissionPolicy =
     overrides.admissionPolicy ||
     nixosSharedHostAdmissionPolicyFixture({
-      ref: "//projects/deployments/pleomino/shared:prod_release",
+      ref: "//projects/deployments/sample-webapp/shared:prod_release",
       name: "prod_release",
       allowedRefs: ["refs/tags/release/*"],
       requiredChecks: [],
@@ -108,7 +108,7 @@ export function kubernetesAdmissionPolicyNodeFixture(
   overrides: Partial<GraphNode> = {},
 ): GraphNode {
   return nixosSharedHostAdmissionPolicyNodeFixture({
-    name: "//projects/deployments/pleomino/shared:prod_release",
+    name: "//projects/deployments/sample-webapp/shared:prod_release",
     allowed_refs: ["refs/tags/release/*"],
     required_checks: ["deploy/shared-observability-prod"],
     required_approvals: ["release-owner"],

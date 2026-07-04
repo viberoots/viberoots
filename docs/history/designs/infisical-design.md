@@ -95,8 +95,8 @@ Infisical.
 Repo bootstrap profile credentials are not deployment managed workload credentials.
 `infisical-default` and other repo-wide profile aliases use repo-scoped SprinkleRef refs such as
 `secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id` for Universal Auth materialization.
-Pleomino deployment bootstrap remains responsible for stage-specific workload refs such as
-`secret://deployments/pleomino/staging/infisical-client-id`.
+Sample webapp deployment bootstrap remains responsible for stage-specific workload refs such as
+`secret://deployments/sample-webapp/staging/infisical-client-id`.
 Infisical identities are shared repo/deployment principals, but Universal Auth client-secret records
 are local-machine credentials. Bootstrap creates a labeled client-secret record for the current
 machine when the selected local sink is missing a secret, reuses existing local credentials by
@@ -123,16 +123,16 @@ not turn that URI into an Infisical key containing `secret://`:
 
 ```text
 backend: vault
-contractId: secret://deployments/pleomino/cloudflare_api_token
+contractId: secret://deployments/sample-webapp/cloudflare_api_token
 
 backend: infisical
-contractId: secret://deployments/pleomino/cloudflare_api_token
+contractId: secret://deployments/sample-webapp/cloudflare_api_token
 ```
 
 Admitted references should also keep backend-qualified replay identifiers:
 
 ```text
-vault:secret/deployments/pleomino/cloudflare_api_token@3
+vault:secret/deployments/sample-webapp/cloudflare_api_token@3
 infisical:<projectId>/<environment>/<secretPath>/<secretName>@<version>
 ```
 
@@ -188,14 +188,14 @@ to migration history or temp-repo fixtures.
 `environment_stage` remains explicit. Deployment IDs, labels, prerequisites, and
 secret contract IDs stay stable when a family is inferred.
 
-The real Pleomino deployments use canonical family directories:
+The real Sample webapp deployments use canonical family directories:
 
-- `//projects/deployments/pleomino/dev:deploy`
-- `//projects/deployments/pleomino/staging:deploy`
-- `//projects/deployments/pleomino/prod:deploy`
+- `//projects/deployments/sample-webapp/dev:deploy`
+- `//projects/deployments/sample-webapp/staging:deploy`
+- `//projects/deployments/sample-webapp/prod:deploy`
 
-The former flat `projects/deployments/pleomino-*` package paths are migration history only.
-The checked-in live deployment tree is intentionally limited to Pleomino until a
+The former flat `projects/deployments/sample-webapp-*` package paths are migration history only.
+The checked-in live deployment tree is intentionally limited to Sample webapp until a
 future plan explicitly approves another deployment family.
 
 ### Backend Selection
@@ -268,7 +268,7 @@ Repo bootstrap should:
   Keychain services or restrictive local files, while keeping root/bootstrap
   access credentials out of Infisical-backed categories;
 - keep generated starter resolver templates free of
-  deployment-specific names, project ids, paths, and Pleomino examples.
+  deployment-specific names, project ids, paths, and Sample webapp examples.
 
 Infisical SprinkleRef profiles expose only Universal Auth workload credentials. They must use
 `clientIdEnv` and `clientSecretEnv` plus non-secret project/environment metadata; raw-token profile
@@ -282,11 +282,11 @@ secrets, but it should not require each deployment to independently solve
 account login or repo-wide default profile setup.
 
 First bootstrap has an explicit two-phase reviewed metadata handoff. OpenTofu may create or adopt
-live Pleomino Infisical resources before reviewed deployment metadata contains the live project id,
+live Sample webapp Infisical resources before reviewed deployment metadata contains the live project id,
 machine identity ids, site URL, or generated credential file names. If every mismatch is limited to
 known first-bootstrap placeholders or empty reviewed values, bootstrap reports
 `metadata_handoff_required` and emits a deterministic, non-secret patch for
-`projects/deployments/pleomino/shared/family.bzl`. That patch may update only
+`projects/deployments/sample-webapp/shared/family.bzl`. That patch may update only
 `_INFISICAL_SITE_URL`, `_INFISICAL_PROJECT_ID`, `_INFISICAL_MACHINE_IDENTITY_IDS`, and
 `_INFISICAL_CREDENTIAL_FILE_NAMES`; application is scoped by the reviewed constant name and stage
 key rather than by globally replacing matching values. Stable secret refs, environment slugs,
@@ -310,7 +310,7 @@ infisical_runtime = {
     "site_url": "https://app.infisical.com",
     "project_id": "<infisical-project-id>",
     "environment": "staging",
-    "secret_path": "/deployments/pleomino",
+    "secret_path": "/deployments/sample-webapp",
     "machine_identity_client_id_env": "VBR_INFISICAL_CLIENT_ID",
     "machine_identity_client_secret_env": "VBR_INFISICAL_CLIENT_SECRET",
     "preferred_credential_source": "infisical_machine_identity_universal_auth",
@@ -324,7 +324,7 @@ Allowed non-secret keys:
   self-hosted URL. The implementation should validate the configured base URL
   against the exact Infisical endpoints it uses because Infisical's docs show
   different cloud host examples for auth and secret-read paths.
-  Pleomino staging and production use `https://app.infisical.com` as their
+  Sample webapp staging and production use `https://app.infisical.com` as their
   reviewed SaaS endpoint.
 - `project_id`: Infisical project id. This is routing metadata, not a secret.
 - `environment`: Infisical environment slug, such as `dev`, `staging`, or
@@ -375,8 +375,8 @@ the local/test fixture override is active.
 
 The preferred default mapping should be deterministic and reviewable:
 
-- `contractId`: `secret://deployments/pleomino/cloudflare_api_token`
-- `secret_path`: `/deployments/pleomino`
+- `contractId`: `secret://deployments/sample-webapp/cloudflare_api_token`
+- `secret_path`: `/deployments/sample-webapp`
 - `secretName`: `cloudflare_api_token`
 
 The backend adapter should derive:
@@ -393,8 +393,8 @@ reviewed mapping surface:
 
 ```python
 infisical_secret_mappings = {
-    "secret://deployments/pleomino/cloudflare_api_token": {
-        "secret_path": "/cloudflare/pleomino",
+    "secret://deployments/sample-webapp/cloudflare_api_token": {
+        "secret_path": "/cloudflare/sample-webapp",
         "secret_name": "CLOUDFLARE_API_TOKEN",
     },
 }
@@ -453,13 +453,13 @@ Admitted reference example:
 {
   "name": "cloudflare_api_token",
   "step": "publish",
-  "contractId": "secret://deployments/pleomino/cloudflare_api_token",
+  "contractId": "secret://deployments/sample-webapp/cloudflare_api_token",
   "required": true,
   "backend": "infisical",
-  "referenceId": "infisical:proj_123/staging/deployments/pleomino/cloudflare_api_token@17",
-  "targetScope": "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
-  "backendRef": "proj_123/staging/deployments/pleomino/cloudflare_api_token",
-  "selectorRef": "proj_123/staging/deployments/pleomino/cloudflare_api_token@17",
+  "referenceId": "infisical:proj_123/staging/deployments/sample-webapp/cloudflare_api_token@17",
+  "targetScope": "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
+  "backendRef": "proj_123/staging/deployments/sample-webapp/cloudflare_api_token",
+  "selectorRef": "proj_123/staging/deployments/sample-webapp/cloudflare_api_token@17",
   "resolvedVersion": "17",
   "resolvedAt": "2026-05-11T12:00:00.000Z",
   "refreshMode": "none",
@@ -641,7 +641,7 @@ synthetic, but it should use the selected backend kind and a scheme-free
 selector:
 
 ```text
-infisical:fixture:deployments/pleomino/cloudflare_api_token@fixture-v1
+infisical:fixture:deployments/sample-webapp/cloudflare_api_token@fixture-v1
 ```
 
 Protected/shared workers should continue rejecting fixture use except in explicit

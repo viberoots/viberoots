@@ -31,14 +31,14 @@ test("cloudflare-pages rejects wrangler config drift before publish begins", asy
       tmp,
       "projects",
       "deployments",
-      "pleomino",
+      "sample-webapp",
       "staging",
       "wrangler.jsonc",
     );
     await fsp.mkdir(path.dirname(configPath), { recursive: true });
     await fsp.writeFile(
       configPath,
-      '{\n  "name": "pleomino-prod-pages",\n  "compatibility_date": "2026-03-18"\n}\n',
+      '{\n  "name": "sample-webapp-prod-pages",\n  "compatibility_date": "2026-03-18"\n}\n',
       "utf8",
     );
     await assert.rejects(
@@ -73,7 +73,7 @@ test("cloudflare-pages rejects wrangler account_id drift before omitting it for 
       tmp,
       "projects",
       "deployments",
-      "pleomino",
+      "sample-webapp",
       "staging",
       "wrangler.jsonc",
     );

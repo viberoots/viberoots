@@ -64,7 +64,15 @@ test("copySeedStoreToTempRepo publishes a complete forced-CoW seed copy atomical
   await fsp.writeFile(path.join(seed, ".metadata_never_index"), "", "utf8");
   for (const rel of [
     path.join(".viberoots", "codex-logs", "full.log"),
+    path.join(".viberoots", "workspace", "backups", "backup.json"),
+    path.join(".viberoots", "workspace", "buck", "log"),
+    path.join(".viberoots", "workspace", "cache", "nix-tarballs", "blob"),
     path.join(".viberoots", "workspace", "codex-test-logs", "focused.log"),
+    path.join(".viberoots", "workspace", "install-cache", "state.json"),
+    path.join(".viberoots", "workspace", "nix-xdg-cache", "nix", "tarball-cache-v2", "pack"),
+    path.join(".viberoots", "workspace", "node", "bin", "node"),
+    path.join(".viberoots", "workspace", "pr-logs", "pr6.log"),
+    path.join(".viberoots", "workspace", "xdg-cache", "nix", "tarball-cache-v2", "pack"),
     path.join("build-tools", "tmp", "rsync-nested-buck-out-123", "buck-out", "artifact"),
     path.join("viberoots", ".direnv", "flake-profile.rc"),
     path.join("viberoots", ".nix-gcroots", "devshell"),
@@ -104,7 +112,31 @@ test("copySeedStoreToTempRepo publishes a complete forced-CoW seed copy atomical
   await assert.rejects(fsp.access(path.join(tmp, "stale.txt")));
   await assert.rejects(fsp.access(path.join(tmp, ".viberoots", "codex-logs", "full.log")));
   await assert.rejects(
+    fsp.access(path.join(tmp, ".viberoots", "workspace", "backups", "backup.json")),
+  );
+  await assert.rejects(fsp.access(path.join(tmp, ".viberoots", "workspace", "buck", "log")));
+  await assert.rejects(
+    fsp.access(path.join(tmp, ".viberoots", "workspace", "cache", "nix-tarballs", "blob")),
+  );
+  await assert.rejects(
     fsp.access(path.join(tmp, ".viberoots", "workspace", "codex-test-logs", "focused.log")),
+  );
+  await assert.rejects(
+    fsp.access(path.join(tmp, ".viberoots", "workspace", "install-cache", "state.json")),
+  );
+  await assert.rejects(
+    fsp.access(
+      path.join(tmp, ".viberoots", "workspace", "nix-xdg-cache", "nix", "tarball-cache-v2", "pack"),
+    ),
+  );
+  await assert.rejects(
+    fsp.access(path.join(tmp, ".viberoots", "workspace", "node", "bin", "node")),
+  );
+  await assert.rejects(fsp.access(path.join(tmp, ".viberoots", "workspace", "pr-logs", "pr6.log")));
+  await assert.rejects(
+    fsp.access(
+      path.join(tmp, ".viberoots", "workspace", "xdg-cache", "nix", "tarball-cache-v2", "pack"),
+    ),
   );
   await assert.rejects(
     fsp.access(

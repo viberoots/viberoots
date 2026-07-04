@@ -24,27 +24,30 @@ test("human check output groups missing refs by Infisical context", () => {
 test("human check output groups deployment environments for the same missing ref", () => {
   const refs = [
     {
-      ...entry("secret://deployments/pleomino/cloudflare_api_token"),
-      backend: "infisical project proj_123 (pleomino-deployments) environment staging",
-      deploymentFamily: "pleomino",
-      requiredBy: ["//projects/deployments/pleomino/staging:deploy"],
+      ...entry("secret://deployments/sample-webapp/cloudflare_api_token"),
+      backend: "infisical project proj_123 (sample-webapp-deployments) environment staging",
+      deploymentFamily: "sample-webapp",
+      requiredBy: ["//projects/deployments/sample-webapp/staging:deploy"],
     },
     {
-      ...entry("secret://deployments/pleomino/cloudflare_api_token"),
-      backend: "infisical project proj_123 (pleomino-deployments) environment prod",
-      deploymentFamily: "pleomino",
-      requiredBy: ["//projects/deployments/pleomino/prod:deploy"],
+      ...entry("secret://deployments/sample-webapp/cloudflare_api_token"),
+      backend: "infisical project proj_123 (sample-webapp-deployments) environment prod",
+      deploymentFamily: "sample-webapp",
+      requiredBy: ["//projects/deployments/sample-webapp/prod:deploy"],
     },
   ];
   const text = renderReport({ scannedFiles: 1, refs, summary: summarize(refs) });
-  assert.match(text, /family: pleomino/);
-  assert.match(text, /project: pleomino-deployments \(proj_123\)/);
+  assert.match(text, /family: sample-webapp/);
+  assert.match(text, /project: sample-webapp-deployments \(proj_123\)/);
   assert.match(text, /environment: prod, staging/);
-  assert.equal(text.match(/secret:\/\/deployments\/pleomino\/cloudflare_api_token/g)?.length, 1);
+  assert.equal(
+    text.match(/secret:\/\/deployments\/sample-webapp\/cloudflare_api_token/g)?.length,
+    1,
+  );
   assert.doesNotMatch(text, /source secret_requirements/);
   assert.match(
     text,
-    /required by:\n\s+\/\/projects\/deployments\/pleomino\/staging:deploy\n\s+\/\/projects\/deployments\/pleomino\/prod:deploy/,
+    /required by:\n\s+\/\/projects\/deployments\/sample-webapp\/staging:deploy\n\s+\/\/projects\/deployments\/sample-webapp\/prod:deploy/,
   );
 });
 

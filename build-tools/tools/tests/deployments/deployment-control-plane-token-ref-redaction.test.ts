@@ -8,7 +8,7 @@ import { cloudflarePagesDeploymentFixture } from "./cloudflare-pages.fixture";
 import { infisicalTestContext } from "./deployment-secret-infisical.fixture";
 import { startFakeInfisicalServer } from "./infisical.test-server";
 
-const TOKEN_REF = "secret://control-plane/pleomino/staging/service-token";
+const TOKEN_REF = "secret://control-plane/sample-webapp/staging/service-token";
 
 test("service submission evidence omits resolved selected control-plane token payload", async () => {
   const control = await startControlPlaneRecorder();
@@ -35,7 +35,10 @@ test("service submission evidence omits resolved selected control-plane token pa
     });
     assert.deepEqual(control.authHeaders, ["Bearer submission-secret-token"]);
     const serializedBodies = control.bodies.join("\n");
-    assert.match(serializedBodies, /secret:\/\/control-plane\/pleomino\/staging\/service-token/);
+    assert.match(
+      serializedBodies,
+      /secret:\/\/control-plane\/sample-webapp\/staging\/service-token/,
+    );
     assert.match(serializedBodies, /"source":"context"/);
     assert.doesNotMatch(serializedBodies, /submission-secret-token|Bearer token|clientSecret/);
   } finally {
@@ -47,13 +50,13 @@ test("service submission evidence omits resolved selected control-plane token pa
 
 function deployment(siteUrl: string, controlPlaneUrl: string) {
   const base = cloudflarePagesDeploymentFixture({
-    deploymentId: "pleomino-staging",
+    deploymentId: "sample-webapp-staging",
     controlPlane: {
-      name: "pleomino-staging",
+      name: "sample-webapp-staging",
       serviceClient: { controlPlaneUrl, controlPlaneTokenRef: TOKEN_REF },
       records: { backend: "service" },
     },
-    deploymentContext: { name: "pleomino-staging" },
+    deploymentContext: { name: "sample-webapp-staging" },
   });
   return {
     ...base,

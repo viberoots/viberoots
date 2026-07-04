@@ -46,7 +46,7 @@ type OperationKind = "deploy" | "preview" | "preview_cleanup" | "retry" | "rollb
 function protectedVercelDeployment(): VercelDeployment {
   const lanePolicy = nixosSharedHostLanePolicyFixture({ defaultClientProfile: "mini" });
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
-    ref: "//projects/deployments/pleomino/shared:staging_release",
+    ref: "//projects/deployments/sample-webapp/shared:staging_release",
     name: "staging_release",
     allowedRefs: ["main"],
     requiredChecks: [],

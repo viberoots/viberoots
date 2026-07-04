@@ -61,6 +61,6 @@ stages. Add fields to the family wrapper or to `deployment_stage_delta(...)` so
 reviewers can tell whether a value is shared policy or an intentional stage
 difference.
 
-Pleomino follows this boundary: `projects/deployments/pleomino/shared/family.bzl` selects
-`pleomino-staging` or `pleomino-prod`, while `projects/config/shared.json` owns the shared
+Sample webapp follows this boundary: `projects/deployments/sample-webapp/shared/family.bzl` selects
+`sample-webapp-staging` or `sample-webapp-prod`, while `projects/config/shared.json` owns the shared
 Cloudflare and Infisical topology for those contexts.

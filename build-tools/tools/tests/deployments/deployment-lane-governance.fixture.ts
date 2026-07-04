@@ -45,14 +45,14 @@ export function nixosSharedHostLaneGovernanceFixture(
   overrides: Partial<DeploymentLaneGovernance> = {},
 ): DeploymentLaneGovernance {
   return {
-    ref: overrides.ref || "//projects/deployments/pleomino/shared:lane_governance",
+    ref: overrides.ref || "//projects/deployments/sample-webapp/shared:lane_governance",
     name: overrides.name || "lane_governance",
     scmBackend: (overrides.scmBackend || "github") as DeploymentScmBackend,
     repository: overrides.repository || "viberoots/viberoots",
     sourceRefPolicies: overrides.sourceRefPolicies || defaultSourceRefPolicies(),
     trustedReporterIdentities: overrides.trustedReporterIdentities || ["app:deploy-bot"],
     requiredApprovalBoundaries: overrides.requiredApprovalBoundaries || defaultApprovalBoundaries(),
-    fingerprint: overrides.fingerprint || "sha256:lane-governance-pleomino",
+    fingerprint: overrides.fingerprint || "sha256:lane-governance-sample-webapp",
   };
 }
 export function nixosSharedHostLaneGovernanceNodeFixture(

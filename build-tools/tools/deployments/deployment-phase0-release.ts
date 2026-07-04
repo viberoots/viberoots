@@ -23,14 +23,14 @@ function isPhase0Stage(value: string): value is Phase0ReleaseStage {
 
 export function parsePhase0ReleaseMember(deploymentId: string): Phase0ReleaseMember | undefined {
   const match = deploymentId.match(
-    /^((?:platform-foundation)|(?:data-room-worker)|(?:data-room-web)|(?:data-room-console))-(dev|staging|prod)$/,
+    /^((?:platform-foundation)|(?:example-worker)|(?:example-web)|(?:example-console))-(dev|staging|prod)$/,
   );
   if (!match || !isPhase0Stage(match[2])) return undefined;
   const componentByPrefix: Record<string, Phase0ReleaseComponent> = {
     "platform-foundation": "foundation",
-    "data-room-worker": "worker",
-    "data-room-web": "web",
-    "data-room-console": "console",
+    "example-worker": "worker",
+    "example-web": "web",
+    "example-console": "console",
   };
   return {
     deploymentId,
@@ -71,9 +71,9 @@ function expectedComponentPrerequisite(member: Phase0ReleaseMember): string | un
   if (!previous) return undefined;
   const idByComponent: Record<Phase0ReleaseComponent, string> = {
     foundation: "platform-foundation",
-    worker: "data-room-worker",
-    web: "data-room-web",
-    console: "data-room-console",
+    worker: "example-worker",
+    web: "example-web",
+    console: "example-console",
   };
   return `${idByComponent[previous]}-${member.stage}`;
 }
@@ -150,7 +150,7 @@ export function validatePhase0ReleaseContracts(deployments: DeploymentTarget[]):
     if (member.component === "web" && !hasRuntimeConfig(deployment, "web-public-url")) {
       errors.push(`${deployment.deploymentId} must declare web API readiness config`);
     }
-    if (member.component === "console" && !hasRuntimeConfig(deployment, "data-room-web-base-url")) {
+    if (member.component === "console" && !hasRuntimeConfig(deployment, "example-web-base-url")) {
       errors.push(`${deployment.deploymentId} must declare console-to-web base URL config`);
     }
   }

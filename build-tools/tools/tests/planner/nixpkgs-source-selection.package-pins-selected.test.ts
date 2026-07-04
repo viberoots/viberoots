@@ -178,8 +178,26 @@ test("package pins keep tool-and-library packages ordinary and match filtered se
     const filteredPlan = sourcePlanLines(
       await fs.readFile(path.join(filteredOut, "build.log"), "utf8"),
     );
+    const snapshotOut = path.join(path.dirname(tmp), `${path.basename(tmp)}-source-snapshot`);
+    const snapshotManifest = path.join(
+      path.dirname(tmp),
+      `${path.basename(tmp)}-source-snapshot.json`,
+    );
+    await $({
+      stdio: "pipe",
+    })`zx-wrapper ${path.join(sourceRoot, "build-tools", "tools", "dev", "source-snapshot.ts")} --workspace-root ${tmp} --out ${snapshotOut} --manifest ${snapshotManifest} --graph ${path.join(tmp, ".viberoots", "workspace", "buck", "graph.json")}`;
+    const remotePlan = JSON.parse(await fs.readFile(snapshotManifest, "utf8")).sourcePlans[0];
 
     assert.deepEqual(filteredPlan, localPlan);
+    assert.deepEqual(remotePlan, {
+      target,
+      nixpkgs_profile: "default",
+      nixpkg_pins: {
+        "pkgs.toolbundle": {
+          nixpkgs_profile: "alt",
+        },
+      },
+    });
     assert.ok(
       localPlan.includes(
         "nixpkgsSourcePlan=pkgs.toolbundle -> alt (nixpkg_pin; rationale=Use fixture bundle.)",

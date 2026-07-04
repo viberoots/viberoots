@@ -12,6 +12,7 @@ import {
   VERIFY_BOUNDED_ISOLATED_THREADS,
   VERIFY_BROAD_RESOURCE_LIMITED_TARGET_MIN,
   VERIFY_BROAD_RESOURCE_LIMITED_THREADS,
+  VERIFY_ENFORCEMENT_LABEL,
   VERIFY_ISOLATED_LABEL,
   VERIFY_RESOURCE_LIMITED_LABEL,
   VERIFY_RESOURCE_LIMITED_THREADS,
@@ -50,8 +51,8 @@ test("verify target labels preserve non-root Buck cells", () => {
 test("verify target passes can batch isolated targets when explicitly requested", () => {
   const passes = planVerifyTargetPasses(
     [
-      { target: "//projects/apps/pleomino:latency-guardrail", labels: [VERIFY_ISOLATED_LABEL] },
-      { target: "//projects/apps/pleomino:unit", labels: ["kind:test"] },
+      { target: "//projects/apps/sample-app:latency-guardrail", labels: [VERIFY_ISOLATED_LABEL] },
+      { target: "//projects/apps/sample-app:unit", labels: ["kind:test"] },
       {
         target: "//:deployments_nixos_shared_host_reuse_e2e",
         labels: ["kind:test", VERIFY_RESOURCE_LIMITED_LABEL],
@@ -60,6 +61,10 @@ test("verify target passes can batch isolated targets when explicitly requested"
         target: "//:scaffolding_webapp_ssr_next_contracts",
         labels: ["kind:test", VERIFY_BOUNDED_ISOLATED_LABEL],
       },
+      {
+        target: "//:linting_process_inspection_commands_enforcement",
+        labels: ["kind:test", VERIFY_ENFORCEMENT_LABEL],
+      },
     ],
     { isolatedMode: "batch" },
   );
@@ -67,7 +72,7 @@ test("verify target passes can batch isolated targets when explicitly requested"
   assert.deepEqual(passes, [
     {
       name: "isolated",
-      targets: ["//projects/apps/pleomino:latency-guardrail"],
+      targets: ["//projects/apps/sample-app:latency-guardrail"],
       threadsOverride: 1,
     },
     {
@@ -81,16 +86,20 @@ test("verify target passes can batch isolated targets when explicitly requested"
       threadsOverride: VERIFY_RESOURCE_LIMITED_THREADS,
     },
     {
+      name: "enforcement",
+      targets: ["//:linting_process_inspection_commands_enforcement"],
+    },
+    {
       name: "shared",
-      targets: ["//projects/apps/pleomino:unit"],
+      targets: ["//projects/apps/sample-app:unit"],
     },
   ]);
 });
 
 test("verify target passes batch isolated targets by default", () => {
   const passes = planVerifyTargetPasses([
-    { target: "//projects/apps/pleomino:latency-guardrail", labels: [VERIFY_ISOLATED_LABEL] },
-    { target: "//projects/apps/pleomino:unit", labels: ["kind:test"] },
+    { target: "//projects/apps/sample-app:latency-guardrail", labels: [VERIFY_ISOLATED_LABEL] },
+    { target: "//projects/apps/sample-app:unit", labels: ["kind:test"] },
     {
       target: "//:deployments_nixos_shared_host_reuse_e2e",
       labels: ["kind:test", VERIFY_RESOURCE_LIMITED_LABEL],
@@ -99,12 +108,16 @@ test("verify target passes batch isolated targets by default", () => {
       target: "//:scaffolding_webapp_ssr_next_contracts",
       labels: ["kind:test", VERIFY_BOUNDED_ISOLATED_LABEL],
     },
+    {
+      target: "//:linting_process_inspection_commands_enforcement",
+      labels: ["kind:test", VERIFY_ENFORCEMENT_LABEL],
+    },
   ]);
 
   assert.deepEqual(passes, [
     {
       name: "isolated",
-      targets: ["//projects/apps/pleomino:latency-guardrail"],
+      targets: ["//projects/apps/sample-app:latency-guardrail"],
       threadsOverride: 1,
     },
     {
@@ -118,17 +131,26 @@ test("verify target passes batch isolated targets by default", () => {
       threadsOverride: VERIFY_RESOURCE_LIMITED_THREADS,
     },
     {
+      name: "enforcement",
+      targets: ["//:linting_process_inspection_commands_enforcement"],
+    },
+    {
       name: "shared",
-      targets: ["//projects/apps/pleomino:unit"],
+      targets: ["//projects/apps/sample-app:unit"],
     },
   ]);
 });
 
-test("verify target passes keep isolated labels stricter than resource-limited labels", () => {
+test("verify target passes keep isolated labels stricter than concurrent pass labels", () => {
   const passes = planVerifyTargetPasses([
     {
       target: "//:startup_sensitive",
-      labels: [VERIFY_ISOLATED_LABEL, VERIFY_BOUNDED_ISOLATED_LABEL, VERIFY_RESOURCE_LIMITED_LABEL],
+      labels: [
+        VERIFY_ISOLATED_LABEL,
+        VERIFY_BOUNDED_ISOLATED_LABEL,
+        VERIFY_ENFORCEMENT_LABEL,
+        VERIFY_RESOURCE_LIMITED_LABEL,
+      ],
     },
   ]);
 
@@ -144,7 +166,7 @@ test("verify target passes keep isolated labels stricter than resource-limited l
 test("verify target passes can preserve per-target isolated pass mode for debugging", () => {
   const passes = planVerifyTargetPasses(
     [
-      { target: "//projects/apps/pleomino:latency-guardrail", labels: [VERIFY_ISOLATED_LABEL] },
+      { target: "//projects/apps/sample-app:latency-guardrail", labels: [VERIFY_ISOLATED_LABEL] },
       {
         target: "//:scaffolding_webapp_ssr_next_contracts",
         labels: ["kind:test", VERIFY_BOUNDED_ISOLATED_LABEL],
@@ -155,8 +177,8 @@ test("verify target passes can preserve per-target isolated pass mode for debugg
 
   assert.deepEqual(passes, [
     {
-      name: "isolated://projects/apps/pleomino:latency-guardrail",
-      targets: ["//projects/apps/pleomino:latency-guardrail"],
+      name: "isolated://projects/apps/sample-app:latency-guardrail",
+      targets: ["//projects/apps/sample-app:latency-guardrail"],
       threadsOverride: 1,
     },
     {
@@ -167,17 +189,31 @@ test("verify target passes can preserve per-target isolated pass mode for debugg
   ]);
 });
 
-test("verify target pass execution serializes isolated fixture-heavy lanes before shared work", () => {
+test("verify target pass execution starts enforcement beside the first isolated lane", () => {
   const passes = planVerifyTargetPasses([
     { target: "//:startup_sensitive", labels: [VERIFY_ISOLATED_LABEL] },
     { target: "//:fixture_heavy", labels: [VERIFY_BOUNDED_ISOLATED_LABEL] },
     { target: "//:resource_heavy", labels: [VERIFY_RESOURCE_LIMITED_LABEL] },
+    { target: "//:policy_guard", labels: [VERIFY_ENFORCEMENT_LABEL] },
     { target: "//:ordinary", labels: ["kind:test"] },
   ]);
 
   assert.deepEqual(
     groupVerifyPassesForExecution(passes).map((group) => group.map((pass) => pass.name)),
-    [["isolated"], ["isolated-bounded"], ["resource-limited", "shared"]],
+    [["isolated", "enforcement"], ["isolated-bounded"], ["resource-limited", "shared"]],
+  );
+});
+
+test("verify target pass execution keeps enforcement concurrent when there is no isolated lane", () => {
+  const passes = planVerifyTargetPasses([
+    { target: "//:resource_heavy", labels: [VERIFY_RESOURCE_LIMITED_LABEL] },
+    { target: "//:policy_guard", labels: [VERIFY_ENFORCEMENT_LABEL] },
+    { target: "//:ordinary", labels: ["kind:test"] },
+  ]);
+
+  assert.deepEqual(
+    groupVerifyPassesForExecution(passes).map((group) => group.map((pass) => pass.name)),
+    [["resource-limited", "shared", "enforcement"]],
   );
 });
 
@@ -244,6 +280,7 @@ test("broad staged verify groups start shared before delayed resource-limited la
   const staged = splitVerifyPassGroupForStagedStart(
     [
       { name: "resource-limited", targets: Array.from({ length: 50 }, (_, i) => `//:r${i}`) },
+      { name: "enforcement", targets: ["//:policy_guard"] },
       { name: "shared", targets: Array.from({ length: 500 }, (_, i) => `//:s${i}`) },
     ],
     {},
@@ -252,7 +289,7 @@ test("broad staged verify groups start shared before delayed resource-limited la
   assert.equal(staged.delaySeconds, 900);
   assert.deepEqual(
     staged.immediatePasses.map((pass) => pass.name),
-    ["shared"],
+    ["enforcement", "shared"],
   );
   assert.deepEqual(
     staged.delayedPasses.map((pass) => pass.name),

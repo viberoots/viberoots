@@ -138,9 +138,9 @@ test("OpenTofu default path runs init, saved plan, and saved-plan apply", async 
   assert.equal(calls[1].env?.INFISICAL_HOST, "https://app.infisical.com");
   assert.equal(calls[1].env?.TF_VAR_infisical_host, "https://app.infisical.com");
   assert.equal(calls[1].env?.INFISICAL_UNIVERSAL_AUTH_CLIENT_SECRET, "secret");
-  assert.equal(calls[1].env?.TF_VAR_project_slug, "pleomino-deployments");
+  assert.equal(calls[1].env?.TF_VAR_project_slug, "sample-webapp-deployments");
   assert.equal(calls[1].env?.TF_VAR_secret_path, "/");
-  assert.match(String(calls[1].env?.TF_VAR_machine_identity_names), /pleomino-staging-deploy/);
+  assert.match(String(calls[1].env?.TF_VAR_machine_identity_names), /sample-webapp-staging-deploy/);
   assert.ok(!calls[1].args.join(" ").includes("secret"));
 });
 

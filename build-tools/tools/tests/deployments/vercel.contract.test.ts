@@ -18,9 +18,9 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
     publisher: "vercel-prebuilt",
     publisher_config: "vercel-prebuilt.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {

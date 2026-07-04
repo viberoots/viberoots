@@ -44,7 +44,7 @@ Examples:
 ```bash
 scaf new go lib[rary] greeter-utilities
 scaf new go cli-app greeter-cli
-scaf new ts service data-room-worker --yes
+scaf new ts service example-worker --yes
 scaf new ts webapp-ssr-vite demo-vite-ssr --yes
 scaf new ts webapp-static-pwa demo-pwa --yes
 scaf new deployment shared console --repository=example/platform --yes

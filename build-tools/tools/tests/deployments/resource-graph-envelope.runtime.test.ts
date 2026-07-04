@@ -103,7 +103,7 @@ const now = "2026-01-01T00:00:00.000Z";
 const validation = {
   expectedCallbackHost: "deploy-auth.example.test",
   expectedCallbackPath: "/oidc/callback",
-  deploymentIds: ["pleomino-staging"],
+  deploymentIds: ["sample-webapp-staging"],
   production: true,
 };
 

@@ -26,11 +26,11 @@ test("service-backed s3-static deploy fails closed when client source differs fr
   await runInTemp("s3-static-reviewed-source-mismatch", async (tmp, $) => {
     const deployment = s3StaticDeploymentFixture({
       admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
-        ref: "//projects/deployments/pleomino/shared:staging_release",
+        ref: "//projects/deployments/sample-webapp/shared:staging_release",
         name: "staging_release",
         allowedRefs: ["main"],
-        requiredChecks: ["deploy/pleomino-staging-s3"],
-        fingerprint: "sha256:admission-pleomino-s3-staging",
+        requiredChecks: ["deploy/sample-webapp-staging-s3"],
+        fingerprint: "sha256:admission-sample-webapp-s3-staging",
       }),
     });
     await installS3StaticTargets(tmp, [deployment]);

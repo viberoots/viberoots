@@ -33,7 +33,7 @@ async function writeArtifact(root: string, html: string): Promise<void> {
 
 async function writeWranglerConfig(root: string): Promise<void> {
   await fsp.mkdir(path.dirname(root), { recursive: true });
-  await fsp.writeFile(root, '{ "name": "pleomino-staging-pages" }\n', "utf8");
+  await fsp.writeFile(root, '{ "name": "sample-webapp-staging-pages" }\n', "utf8");
 }
 
 function fakeCloudflareOverrides(
@@ -66,12 +66,12 @@ test("Vault-admitted Cloudflare runs remain replayable after Infisical metadata 
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     const vault = await startFakeVaultServer(
       {
-        "secret://deployments/pleomino/cloudflare_api_token": {
+        "secret://deployments/sample-webapp/cloudflare_api_token": {
           currentVersion: "11",
           versions: { "11": { value: "vault-token-v11" } },
         },
       },
-      { jwtAuth: { role: "deploy-pleomino-read", jwt: "cloudflare.workload.jwt" } },
+      { jwtAuth: { role: "deploy-sample-webapp-read", jwt: "cloudflare.workload.jwt" } },
     );
     const infisical = await startFakeInfisicalServer(
       { clientId: "id", clientSecret: "secret", accessToken: "infisical-access" },
@@ -90,7 +90,7 @@ test("Vault-admitted Cloudflare runs remain replayable after Infisical metadata 
     };
     await writeArtifact(artifactDir, "<html>migration replay</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, vaultDeployment);
     const server = await startCloudflarePagesPublicServer({
@@ -105,7 +105,7 @@ test("Vault-admitted Cloudflare runs remain replayable after Infisical metadata 
           credential: {
             kind: "jwt" as const,
             addr: vault.addr,
-            role: "deploy-pleomino-read",
+            role: "deploy-sample-webapp-read",
             workloadJwt: "cloudflare.workload.jwt",
           },
         };

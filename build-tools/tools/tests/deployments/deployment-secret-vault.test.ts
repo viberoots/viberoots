@@ -43,7 +43,7 @@ async function withFixtureFile(
 
 test("direct Vault admission freezes one exact version and runtime reuses it", async () => {
   const vault = await startFakeVaultServer({
-    "secret://deployments/pleomino/cloudflare_api_token": {
+    "secret://deployments/sample-webapp/cloudflare_api_token": {
       currentVersion: "3",
       versions: {
         "3": { value: "vault-token-v3" },
@@ -62,17 +62,17 @@ test("direct Vault admission freezes one exact version and runtime reuses it", a
         deploymentRequirementFixture({
           name: "cloudflare_api_token",
           step: "publish",
-          contractId: "secret://deployments/pleomino/cloudflare_api_token",
+          contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
         }),
       ],
-      targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
       secretContext,
     });
     assert.equal(admittedReferences[0]?.resolvedVersion, "3");
     const runtime = createDeploymentSecretRuntime({
       backend: createDeploymentVaultSecretBackend(secretContext),
       admittedReferences,
-      targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
     });
     const publish = await runtime.enterStep("publish");
     assert.equal(publish.cloudflare_api_token, "vault-token-v3");
@@ -84,7 +84,7 @@ test("direct Vault admission freezes one exact version and runtime reuses it", a
 
 test("direct Vault replay fails closed when the admitted version no longer resolves exactly", async () => {
   const state = {
-    "secret://deployments/pleomino/cloudflare_api_token": {
+    "secret://deployments/sample-webapp/cloudflare_api_token": {
       currentVersion: "7",
       versions: {
         "7": { value: "vault-token-v7" },
@@ -103,21 +103,21 @@ test("direct Vault replay fails closed when the admitted version no longer resol
         deploymentRequirementFixture({
           name: "cloudflare_api_token",
           step: "publish",
-          contractId: "secret://deployments/pleomino/cloudflare_api_token",
+          contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
         }),
       ],
-      targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
       secretContext,
     });
-    state["secret://deployments/pleomino/cloudflare_api_token"].versions["7"].deleted = true;
+    state["secret://deployments/sample-webapp/cloudflare_api_token"].versions["7"].deleted = true;
     const runtime = createDeploymentSecretRuntime({
       backend: createDeploymentVaultSecretBackend(secretContext),
       admittedReferences,
-      targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+      targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
     });
     await assert.rejects(
       async () => await runtime.enterStep("publish"),
-      /required secret contract secret:\/\/deployments\/pleomino\/cloudflare_api_token is missing/,
+      /required secret contract secret:\/\/deployments\/sample-webapp\/cloudflare_api_token is missing/,
     );
   } finally {
     restoreVaultEnv();
@@ -127,18 +127,18 @@ test("direct Vault replay fails closed when the admitted version no longer resol
 
 test("neutral fixture env var intentionally overrides direct Vault env", async () => {
   const vault = await startFakeVaultServer({
-    "secret://deployments/pleomino/cloudflare_api_token": {
+    "secret://deployments/sample-webapp/cloudflare_api_token": {
       currentVersion: "12",
       versions: { "12": { value: "direct-vault-token" } },
     },
   });
   await withFixtureFile(
     {
-      "secret://deployments/pleomino/cloudflare_api_token": {
+      "secret://deployments/sample-webapp/cloudflare_api_token": {
         value: "fixture-token",
         version: "fixture-v1",
         allowedSteps: ["publish"],
-        targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+        targetScopes: ["cloudflare-pages:web-platform-staging/sample-webapp-staging-pages"],
       },
     },
     async (fixturePath) => {
@@ -153,17 +153,17 @@ test("neutral fixture env var intentionally overrides direct Vault env", async (
             deploymentRequirementFixture({
               name: "cloudflare_api_token",
               step: "publish",
-              contractId: "secret://deployments/pleomino/cloudflare_api_token",
+              contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
             }),
           ],
-          targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+          targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
           secretContext,
         });
         assert.equal(admittedReferences[0]?.resolvedVersion, "fixture-v1");
         const runtime = createDeploymentSecretRuntime({
           backend: createDeploymentVaultSecretBackend(secretContext),
           admittedReferences,
-          targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+          targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
         });
         const publish = await runtime.enterStep("publish");
         assert.equal(publish.cloudflare_api_token, "fixture-token");
@@ -178,10 +178,10 @@ test("neutral fixture env var intentionally overrides direct Vault env", async (
 test("retired Vault-named fixture env var is ignored and required secret flows fail closed", async () => {
   await withFixtureFile(
     {
-      "secret://deployments/pleomino/cloudflare_api_token": {
+      "secret://deployments/sample-webapp/cloudflare_api_token": {
         value: "fixture-token",
         allowedSteps: ["publish"],
-        targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+        targetScopes: ["cloudflare-pages:web-platform-staging/sample-webapp-staging-pages"],
       },
     },
     async (fixturePath) => {
@@ -196,10 +196,10 @@ test("retired Vault-named fixture env var is ignored and required secret flows f
             deploymentRequirementFixture({
               name: "cloudflare_api_token",
               step: "publish",
-              contractId: "secret://deployments/pleomino/cloudflare_api_token",
+              contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
             }),
           ],
-          targetScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+          targetScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
         });
         await assert.rejects(
           async () => await runtime.enterStep("publish"),

@@ -565,7 +565,7 @@ resolver path, not through the fixture-only registered deployment secret backend
 - Preserve fixture backend support only for tests or explicitly fixture-scoped contexts; do not let
   fixture fallback mask missing real backend context in protected/shared paths.
 - Resolve checked-in profile token refs such as
-  `secret://control-plane/.../service-token` for `pleomino-prod` and `pleomino-staging` through the
+  `secret://control-plane/.../service-token` for `sample-webapp-prod` and `sample-webapp-staging` through the
   same non-fixture path used by real protected/shared deploys.
 - Fail closed with redacted diagnostics when a `secret://` token ref lacks a selected deployment
   context, cannot construct a `DeploymentSecretContext`, or cannot resolve through the selected
@@ -587,7 +587,7 @@ resolver path, not through the fixture-only registered deployment secret backend
 
 - Add protected/shared token-ref tests proving `secret://control-plane/.../service-token` resolves
   through the selected SprinkleRef backend with a real `DeploymentSecretContext`.
-- Add tests for `pleomino-prod` and `pleomino-staging` profile token refs proving they enter the
+- Add tests for `sample-webapp-prod` and `sample-webapp-staging` profile token refs proving they enter the
   non-fixture backend resolver path instead of `createRegisteredDeploymentSecretBackend` without
   context.
 - Add Infisical/Vault-style backend tests proving selected backend config from project config is
@@ -630,7 +630,7 @@ resolver path, not through the fixture-only registered deployment secret backend
 
 - Protected/shared `secret://` control-plane token refs resolve through the selected
   `DeploymentSecretContext` and SprinkleRef backend.
-- Checked-in profiles such as `pleomino-prod` and `pleomino-staging` can use
+- Checked-in profiles such as `sample-webapp-prod` and `sample-webapp-staging` can use
   `secret://control-plane/.../service-token` refs without relying on fixture-only backend behavior.
 - Fixture backend tests do not mask missing real backend context for protected/shared paths.
 - Infisical/Vault-style non-fixture token refs have direct regression coverage.
@@ -658,7 +658,7 @@ resolver path, not through the fixture-only registered deployment secret backend
 
 Protected/shared deployments can select the right control-plane URL while still failing to
 authenticate for real `secret://` service-token refs used by checked-in profiles such as
-`pleomino-prod` and `pleomino-staging`.
+`sample-webapp-prod` and `sample-webapp-staging`.
 
 ### 10. Downsides for implementing this PR
 

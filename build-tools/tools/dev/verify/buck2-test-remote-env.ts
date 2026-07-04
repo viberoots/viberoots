@@ -122,7 +122,7 @@ export function buildBuckProcessEnvForPolicy(
   env: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
   if (policy.mode === "local") {
-    const localEnv = { ...env };
+    const localEnv = { ...env, HOME: env.BUCK2_REAL_HOME || env.HOME };
     delete localEnv.VBR_VERIFY_REGISTER_PROCESS;
     return localEnv;
   }

@@ -10,6 +10,10 @@ import {
   isSupportedImporterLabel,
 } from "../lib/importers";
 import { unifiedPnpmStoreEpochDigest } from "./unified-pnpm-store-epoch";
+import {
+  pruneStalePnpmStoreVersions,
+  pruneStaleUnifiedPnpmStoreEpochs,
+} from "./unified-pnpm-store-cleanup";
 import { prepareExactPnpmStore } from "./update-pnpm-hash/lockfile";
 import { mergePnpmStore } from "./update-pnpm-hash/prefetched-store";
 import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
@@ -41,34 +45,6 @@ async function mergeExactStorePathIntoUnifiedStore(opts: {
     return;
   }
   await mergePnpmStore(opts.exactStorePath, opts.unifyStore);
-}
-
-function pnpmStoreVersionNumber(name: string): number | null {
-  const match = name.match(/^v(\d+)$/);
-  if (!match) return null;
-  const version = Number(match[1]);
-  return Number.isSafeInteger(version) ? version : null;
-}
-
-async function pruneStalePnpmStoreVersions(unifyStore: string): Promise<void> {
-  let ents: Array<fsp.Dirent>;
-  try {
-    ents = await fsp.readdir(unifyStore, { withFileTypes: true });
-  } catch {
-    return;
-  }
-  const versions = ents
-    .filter((ent) => ent.isDirectory())
-    .flatMap((ent) => {
-      const version = pnpmStoreVersionNumber(ent.name);
-      return version === null ? [] : [{ name: ent.name, version }];
-    });
-  if (versions.length <= 1) return;
-  const currentVersion = Math.max(...versions.map((entry) => entry.version));
-  for (const entry of versions) {
-    if (entry.version >= currentVersion) continue;
-    await fsp.rm(path.join(unifyStore, entry.name), { recursive: true, force: true });
-  }
 }
 
 function unifiedStoreRecoveryMessage(lockPath: string, waitTimeoutMs: number): string {
@@ -199,6 +175,7 @@ async function main() {
     const cur = (await readTextSafe(pathFile)).trim();
     if (isCurrentEpochStore(cur)) {
       await pruneStalePnpmStoreVersions(cur);
+      await pruneStaleUnifiedPnpmStoreEpochs({ stateDir, activeUnifyDir: path.dirname(cur) });
       // Ensure existing store is user-writable so buck-out is removable without sudo
       try {
         await $`bash --noprofile --norc -c ${`chmod -R u+rwX "${cur}" || true`}`;
@@ -214,6 +191,7 @@ async function main() {
       const cur = (await readTextSafe(pathFile)).trim();
       if (isCurrentEpochStore(cur)) {
         await pruneStalePnpmStoreVersions(cur);
+        await pruneStaleUnifiedPnpmStoreEpochs({ stateDir, activeUnifyDir: path.dirname(cur) });
         console.log(cur);
         return;
       }
@@ -251,6 +229,7 @@ async function main() {
     const tmp = path.join(stateDir, `.path.${process.pid}.${Date.now()}`);
     await fsp.writeFile(tmp, unifyStore + "\n", "utf8");
     await fsp.rename(tmp, pathFile);
+    await pruneStaleUnifiedPnpmStoreEpochs({ stateDir, activeUnifyDir: unifyDir });
     console.log(unifyStore);
   });
 }

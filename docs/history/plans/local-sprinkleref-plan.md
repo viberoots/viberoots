@@ -1651,7 +1651,7 @@ and keep apps backend-neutral.
 ### 2. Scope of changes
 
 - Extend `projects/config/shared.json` with a `deploymentContexts` object keyed by names such as
-  `pleomino-prod`, `pleomino-staging`, or `admin-prod`.
+  `sample-webapp-prod`, `sample-webapp-staging`, or `admin-prod`.
 - Each deployment context may contain typed provider sections for shared non-secret topology, for
   example:
   - `aws`: account id, organization id, default region, optional expected role ARN, and other
@@ -1666,7 +1666,7 @@ and keep apps backend-neutral.
   `projects/config` overlay inside each context, and do not split contexts into a graph of reusable
   subprofiles unless real duplication later justifies it.
 - Add deployment metadata support for selecting exactly one context, for example
-  `deployment_context = "pleomino-prod"`.
+  `deployment_context = "sample-webapp-prod"`.
 - Resolve deployment context names by loading `projects/config/shared.json` plus the local overlay.
   Shared config provides repo-wide non-secret topology; local config may fill missing values or
   temporarily override values with the existing active-local-override diagnostics and guardrails.
@@ -1674,7 +1674,7 @@ and keep apps backend-neutral.
   the migration is in progress, but document how it relates to the selected deployment context.
   In this PR, keep explicit `secret_backend` as the authoritative deployment secret-backend
   selector for existing secret runtime paths. A deployment context may include a `secretBackend`
-  default such as `infisical/pleomino-prod`, but that default should only fill an omitted
+  default such as `infisical/sample-webapp-prod`, but that default should only fill an omitted
   deployment `secret_backend`; if both are present and disagree, fail closed rather than silently
   choosing one.
 - Treat deployment context provider sections as shared defaults/constraints for provider topology,
@@ -1685,8 +1685,8 @@ and keep apps backend-neutral.
   documented override rule. Prefer fail-closed mismatch diagnostics over hidden precedence.
 - Keep raw credentials and token values out of deployment metadata, shared config, and local config.
   Deployment contexts may contain logical secret refs such as
-  `secret://bootstrap/pleomino-prod/infisical/client-secret` or
-  `secret://deployments/pleomino/prod/cloudflare-api-token`, but never the secret value itself.
+  `secret://bootstrap/sample-webapp-prod/infisical/client-secret` or
+  `secret://deployments/sample-webapp/prod/cloudflare-api-token`, but never the secret value itself.
 - Route bootstrap secret refs, such as Infisical Universal Auth client id/client secret refs, through
   the selected runtime host/bootstrap lane. These refs are named by the context, but their values
   live in macOS Keychain, CI secret storage, an explicitly selected local file, or another allowed
@@ -1736,7 +1736,7 @@ and keep apps backend-neutral.
 - Add project config schema/loader tests proving multiple named deployment contexts can coexist in
   `projects/config/shared.json`.
 - Add deployment metadata tests proving one deployment can select `deployment_context =
-"pleomino-prod"` and another can select `deployment_context = "admin-prod"`, with each resolving
+"sample-webapp-prod"` and another can select `deployment_context = "admin-prod"`, with each resolving
   distinct typed provider sections.
 - Add tests proving two deployments can use different AWS account ids and different Infisical
   project ids through deployment contexts.
@@ -1889,27 +1889,27 @@ existing Infisical runtime fields. The payoff is a clearer boundary: shared proj
 typed deployment contexts, deployments choose one context, apps stay backend-neutral, and secret
 values remain in secret backends rather than JSON config.
 
-## PR-14: Move Pleomino deployments onto deployment contexts
+## PR-14: Move Sample webapp deployments onto deployment contexts
 
 ### 1. Intent
 
-Finish the PR-13 migration on the checked-in real deployment path by moving Pleomino's deployment
+Finish the PR-13 migration on the checked-in real deployment path by moving Sample webapp's deployment
 family off hand-maintained Infisical resolver topology and onto selected deployment contexts.
-Pleomino should use `deployment_context = "<stage-context>"` for its shared provider topology, with
+Sample webapp should use `deployment_context = "<stage-context>"` for its shared provider topology, with
 concrete Infisical project/environment/path identity derived from the selected context for
 admission/replay evidence rather than duplicated by hand in deployment metadata.
 
 ### 2. Scope of changes
 
-- Update `projects/deployments/pleomino/shared/family.bzl` so staging and prod deployment stages
-  select deployment contexts such as `pleomino-staging` and `pleomino-prod`.
-- Move Pleomino's shared non-secret Infisical topology that currently lives in
-  `_pleomino_infisical_runtime(stage)` into `projects/config/shared.json` deployment context
+- Update `projects/deployments/sample-webapp/shared/family.bzl` so staging and prod deployment stages
+  select deployment contexts such as `sample-webapp-staging` and `sample-webapp-prod`.
+- Move Sample webapp's shared non-secret Infisical topology that currently lives in
+  `_sample_webapp_infisical_runtime(stage)` into `projects/config/shared.json` deployment context
   sections.
 - Move Cloudflare account, zone, project, and custom-domain shared coordinates into the selected
-  Pleomino deployment contexts when those values are shared topology rather than stage-local
+  Sample webapp deployment contexts when those values are shared topology rather than stage-local
   provider target identity.
-- Remove hand-maintained `infisical_runtime = _pleomino_infisical_runtime(stage)` from Pleomino
+- Remove hand-maintained `infisical_runtime = _sample_webapp_infisical_runtime(stage)` from Sample webapp
   stage metadata when the same topology can be derived from the selected deployment context.
 - Keep any exact replay/audit fields that must remain durable as generated/admission-time evidence,
   not as manually duplicated resolver configuration in the deployment family.
@@ -1919,41 +1919,41 @@ admission/replay evidence rather than duplicated by hand in deployment metadata.
 - Ensure context-derived `provider_target` and Infisical runtime values fail closed if a stage still
   declares a conflicting explicit value.
 - Keep logical secret refs, such as Cloudflare API token refs and Infisical bootstrap refs, as refs.
-  Do not write plaintext secret values into Pleomino deployment metadata or project config.
+  Do not write plaintext secret values into Sample webapp deployment metadata or project config.
 - Update any bootstrap, admission, check, or extraction paths that currently assume the real
-  Pleomino deployment family carries explicit `infisical_runtime` fields.
+  Sample webapp deployment family carries explicit `infisical_runtime` fields.
 
 ### 3. External prerequisites
 
-- The existing Pleomino Infisical project id/name/slug, environment slugs, Cloudflare coordinates,
+- The existing Sample webapp Infisical project id/name/slug, environment slugs, Cloudflare coordinates,
   and logical secret refs must be safe to commit as shared non-secret deployment context topology.
-- Existing Pleomino deployment secrets must already live in the selected secret backend under the
+- Existing Sample webapp deployment secrets must already live in the selected secret backend under the
   same logical refs and derived Infisical coordinates, or setup/check commands must clearly report
   what is missing without printing secret values.
 
 ### 4. Tests to be added
 
-- Add tests proving the checked-in Pleomino staging and prod deployment targets select deployment
+- Add tests proving the checked-in Sample webapp staging and prod deployment targets select deployment
   contexts and no longer hand-maintain duplicated Infisical resolver topology.
-- Add tests proving context-derived Pleomino Infisical runtime evidence matches the previous
+- Add tests proving context-derived Sample webapp Infisical runtime evidence matches the previous
   project id, project name/slug, environment, path, credential refs, and machine identity metadata.
-- Add tests proving Pleomino Cloudflare provider target values are filled or checked from the
+- Add tests proving Sample webapp Cloudflare provider target values are filled or checked from the
   selected deployment context without changing provider target identity.
-- Add tests proving a conflict between a Pleomino deployment stage and its selected context fails
+- Add tests proving a conflict between a Sample webapp deployment stage and its selected context fails
   closed with an actionable diagnostic.
-- Add regression tests proving Pleomino secret admission/replay evidence still records concrete
+- Add regression tests proving Sample webapp secret admission/replay evidence still records concrete
   Infisical project/environment/path/secret identity derived from the selected context.
-- Add docs or fixture tests proving Pleomino remains an example of the app/deployment/config
+- Add docs or fixture tests proving Sample webapp remains an example of the app/deployment/config
   boundary: the app declares refs/requirements, the deployment selects a context, and shared config
   defines provider topology.
 
 ### 5. Docs to be added or updated
 
-- Update deployment authoring docs and SprinkleRef docs to use Pleomino as the concrete example for
-  `deployment_context = "pleomino-staging"` / `deployment_context = "pleomino-prod"`.
-- Document where the former Pleomino `infisical_runtime` values now live in
+- Update deployment authoring docs and SprinkleRef docs to use Sample webapp as the concrete example for
+  `deployment_context = "sample-webapp-staging"` / `deployment_context = "sample-webapp-prod"`.
+- Document where the former Sample webapp `infisical_runtime` values now live in
   `projects/config/shared.json` and how admission evidence preserves concrete replay identity.
-- Update any Pleomino or Infisical bootstrap docs that still imply deployment families should define
+- Update any Sample webapp or Infisical bootstrap docs that still imply deployment families should define
   raw Infisical runtime topology directly.
 
 ### 5.5. Expected regression scope
@@ -1961,32 +1961,32 @@ admission/replay evidence rather than duplicated by hand in deployment metadata.
 - `deployment-only`
 - Expected implementation paths:
   - `projects/config/shared.json`
-  - `projects/deployments/pleomino/shared/family.bzl`
+  - `projects/deployments/sample-webapp/shared/family.bzl`
   - deployment extraction/admission helpers under `build-tools/tools/deployments/`
   - `build-tools/tools/tests/deployments/**`
   - `docs/**`
-- Keep the PR focused on migrating the real Pleomino deployment path onto PR-13's deployment context
+- Keep the PR focused on migrating the real Sample webapp deployment path onto PR-13's deployment context
   machinery. Do not introduce new context abstractions or app-level override behavior.
 
 ### 6. Acceptance criteria
 
-- Pleomino staging and prod deployment stages select deployment contexts.
-- Pleomino no longer hand-maintains duplicated Infisical resolver topology in deployment metadata
+- Sample webapp staging and prod deployment stages select deployment contexts.
+- Sample webapp no longer hand-maintains duplicated Infisical resolver topology in deployment metadata
   when that topology is available from the selected context.
-- Pleomino's context-derived Infisical runtime/admission evidence preserves the same concrete
+- Sample webapp's context-derived Infisical runtime/admission evidence preserves the same concrete
   project, environment, path, and secret identity needed for replay.
-- Pleomino Cloudflare provider topology is filled or checked from deployment contexts without
+- Sample webapp Cloudflare provider topology is filled or checked from deployment contexts without
   changing provider target identity.
-- Existing Pleomino secret admission and deployment tests continue to pass.
-- Docs show Pleomino as the real checked-in example of the app/deployment/context boundary.
+- Existing Sample webapp secret admission and deployment tests continue to pass.
+- Docs show Sample webapp as the real checked-in example of the app/deployment/context boundary.
 
 ### 7. Risks
 
-- Removing explicit Pleomino `infisical_runtime` fields too early could weaken exact replay evidence
+- Removing explicit Sample webapp `infisical_runtime` fields too early could weaken exact replay evidence
   if derived context metadata is not recorded in admission outputs.
 - Moving Cloudflare coordinates into contexts could accidentally change provider target identity if
   context-derived fields and stage-specific fields are not compared carefully.
-- Tests that inspect Pleomino metadata may need updates from explicit runtime fields to
+- Tests that inspect Sample webapp metadata may need updates from explicit runtime fields to
   context-derived evidence.
 
 ### 8. Mitigations
@@ -1995,7 +1995,7 @@ admission/replay evidence rather than duplicated by hand in deployment metadata.
   metadata.
 - Preserve concrete Infisical identity in generated/admission-time evidence before removing
   hand-maintained deployment runtime fields.
-- Add targeted Pleomino fixture tests before relying on broad final validation.
+- Add targeted Sample webapp fixture tests before relying on broad final validation.
 
 ### 9. Consequences of not implementing this PR
 
@@ -2005,7 +2005,7 @@ fixture coverage and real deployment usage.
 
 ### 10. Downsides for implementing this PR
 
-This adds a second migration step after PR-13 and touches real Pleomino deployment metadata, but it
+This adds a second migration step after PR-13 and touches real Sample webapp deployment metadata, but it
 keeps the risk focused on one deployment family and proves the deployment-context model on the path
 operators actually use.
 
@@ -2024,28 +2024,28 @@ Infisical profile, not the legacy default backend profile.
 - Update the Infisical IaC bootstrap resolver/profile discovery path so it resolves the same
   deployment-context defaults used by deployment extraction before computing required backend
   profiles.
-- Ensure graph nodes shaped like the checked-in Pleomino deployments, with
-  `deployment_context = "pleomino-staging"` or `deployment_context = "pleomino-prod"`, omitted
+- Ensure graph nodes shaped like the checked-in Sample webapp deployments, with
+  `deployment_context = "sample-webapp-staging"` or `deployment_context = "sample-webapp-prod"`, omitted
   `secret_backend`, and empty raw `infisical_runtime`, materialize the Infisical resolver profile
   from the selected context.
 - Remove stale assumptions or tests that treat omitted deployment `secret_backend` as sufficient to
   choose the legacy default backend when a selected deployment context provides a concrete
   `secretBackend`.
 - Keep the behavior fail-closed when a selected context and an explicit deployment backend conflict.
-- Do not add compatibility shims for old context-less Pleomino metadata shapes. There are no users
+- Do not add compatibility shims for old context-less Sample webapp metadata shapes. There are no users
   yet, so this PR should clean up stale assumptions rather than preserving them.
 
 ### 3. External prerequisites
 
 - `projects/config/shared.json` must contain the checked-in deployment contexts that define the
-  shared Pleomino secret backend and Infisical topology.
+  shared Sample webapp secret backend and Infisical topology.
 - Local user secrets and runtime secret values remain outside the checked-in config files; this PR
   only changes non-secret profile discovery.
 
 ### 4. Tests to be added
 
 - Add a regression test for `requiredBackendProfiles` or the repo bootstrap profile-materialization
-  path using a deployment node shaped like current Pleomino: selected deployment context, secret
+  path using a deployment node shaped like current Sample webapp: selected deployment context, secret
   requirements, omitted `secret_backend`, and empty raw `infisical_runtime`.
 - Assert that the required backend profile is the context-derived Infisical profile, not the legacy
   default backend profile.
@@ -2077,7 +2077,7 @@ Infisical profile, not the legacy default backend profile.
 
 - `repo bootstrap` profile discovery applies selected deployment-context defaults before computing
   required resolver backend profiles.
-- Pleomino-shaped raw graph nodes require the context-derived Infisical backend profile even when
+- Sample webapp-shaped raw graph nodes require the context-derived Infisical backend profile even when
   raw deployment metadata omits `secret_backend`.
 - Legacy default backend selection is no longer applied ahead of an explicit selected deployment
   context.
@@ -2095,7 +2095,7 @@ Infisical profile, not the legacy default backend profile.
 ### 8. Mitigations
 
 - Share the smallest context-resolution helper needed to compute backend profile identity.
-- Add narrow regression tests for the Pleomino-shaped node and the explicit-conflict path before
+- Add narrow regression tests for the Sample webapp-shaped node and the explicit-conflict path before
   relying on broad final validation.
 - Remove stale tests or expectations that encode the pre-context behavior instead of layering
   compatibility around them.
@@ -2104,11 +2104,11 @@ Infisical profile, not the legacy default backend profile.
 
 PR-13/PR-14 deployment contexts would be correct for extraction/admission, but `repo bootstrap`
 could still ask operators for the wrong backend profile or skip the needed Infisical profile for
-context-based Pleomino deployments.
+context-based Sample webapp deployments.
 
 ### 10. Downsides for implementing this PR
 
-This adds one more follow-up PR after moving Pleomino onto contexts, but it closes the last known
+This adds one more follow-up PR after moving Sample webapp onto contexts, but it closes the last known
 bootstrap gap and keeps resolver profile discovery aligned with the canonical deployment model.
 
 ## PR-16: Tighten deployment context provider schemas and stale secret docs
@@ -2211,21 +2211,21 @@ Infisical topology, even when raw deployment metadata omits `secret_backend` and
 
 - Update Infisical bootstrap deployment fan-out discovery so it applies selected deployment context
   defaults before deciding whether a graph node is Infisical-backed.
-- Ensure Pleomino-shaped raw graph nodes with `deployment_context`, omitted `secret_backend`, empty
+- Ensure Sample webapp-shaped raw graph nodes with `deployment_context`, omitted `secret_backend`, empty
   raw `infisical_runtime`, and secret requirements are included in Infisical bootstrap fan-out.
 - Remove stale fan-out fixture assumptions that require non-empty raw `infisical_runtime` for
-  context-based Pleomino deployments.
+  context-based Sample webapp deployments.
 - Keep behavior fail-closed when context resolution reports conflicts or invalid context metadata.
-- Do not add compatibility shims for pre-context Pleomino metadata shapes.
+- Do not add compatibility shims for pre-context Sample webapp metadata shapes.
 
 ### 3. External prerequisites
 
-- Checked-in deployment contexts must continue to define the shared Pleomino Infisical backend and
+- Checked-in deployment contexts must continue to define the shared Sample webapp Infisical backend and
   runtime topology in `projects/config/shared.json`.
 
 ### 4. Tests to be added
 
-- Add or update fan-out tests using a graph node shaped like current Pleomino: selected context,
+- Add or update fan-out tests using a graph node shaped like current Sample webapp: selected context,
   omitted `secret_backend`, empty raw `infisical_runtime`, and secret requirements.
 - Assert that fan-out includes the deployment and derives the Infisical project/environment/path from
   the selected context.
@@ -2251,9 +2251,9 @@ Infisical topology, even when raw deployment metadata omits `secret_backend` and
 
 - Bootstrap fan-out discovery applies selected deployment contexts before classifying Infisical
   deployments.
-- Current Pleomino-shaped graph metadata is included in Infisical bootstrap fan-out without raw
+- Current Sample webapp-shaped graph metadata is included in Infisical bootstrap fan-out without raw
   duplicated `infisical_runtime`.
-- Stale fan-out fixtures no longer encode the pre-context Pleomino shape.
+- Stale fan-out fixtures no longer encode the pre-context Sample webapp shape.
 - Focused fan-out tests and final validation pass.
 
 ### 7. Risks
@@ -2264,11 +2264,11 @@ Infisical topology, even when raw deployment metadata omits `secret_backend` and
 ### 8. Mitigations
 
 - Reuse the smallest existing deployment-context resolution helper needed by fan-out discovery.
-- Add direct regression coverage for the Pleomino-shaped graph node and context error path.
+- Add direct regression coverage for the Sample webapp-shaped graph node and context error path.
 
 ### 9. Consequences of not implementing this PR
 
-Profile discovery would be context-aware, but bootstrap fan-out could still skip the real Pleomino
+Profile discovery would be context-aware, but bootstrap fan-out could still skip the real Sample webapp
 deployments after PR-14 removed raw duplicated `infisical_runtime` metadata.
 
 ### 10. Downsides for implementing this PR

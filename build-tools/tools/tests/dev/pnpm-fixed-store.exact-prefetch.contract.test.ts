@@ -209,6 +209,17 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
       "mkNodeModules must preserve pnpm v11 store metadata when seeding offline installs",
     );
   }
+  if (
+    !modules.includes("lib.optionals pkgs.stdenvNoCC.hostPlatform.isLinux [ pkgs.patchelf ]") ||
+    modules.includes("pkgs.findutils pkgs.patchelf")
+  ) {
+    throw new Error(
+      "mkNodeModules must not add patchelf to Darwin builder inputs for node_modules outputs",
+    );
+  }
+  if (!modules.includes("dontFixup = true;") || !modules.includes("dontPatchShebangs = true;")) {
+    throw new Error("mkNodeModules must skip generic fixup scans across node_modules trees");
+  }
   for (const [label, source] of [
     ["store.nix", store],
     ["modules.nix", modules],

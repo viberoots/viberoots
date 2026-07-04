@@ -9,16 +9,16 @@ import {
 test("cloudflare-pages provider URL fallback ignores custom domains", () => {
   assert.equal(
     cloudflarePagesProviderPublicUrl({
-      project: "pleomino-staging-pages",
+      project: "sample-webapp-staging-pages",
     }),
-    "https://pleomino-staging-pages.pages.dev/",
+    "https://sample-webapp-staging-pages.pages.dev/",
   );
   assert.equal(
     cloudflarePagesProviderPublicUrl({
-      project: "pleomino-staging-pages",
+      project: "sample-webapp-staging-pages",
       previewBranch: "prv-abc123",
     }),
-    "https://prv-abc123.pleomino-staging-pages.pages.dev/",
+    "https://prv-abc123.sample-webapp-staging-pages.pages.dev/",
   );
 });
 
@@ -40,14 +40,14 @@ test("cloudflare-pages deploy summarizes Cloudflare API auth failures safely", (
 
 test("cloudflare-pages deploy strips account ids from Cloudflare API paths", () => {
   const stderr = `
-\u001b[31m✘ [ERROR] A request to the Cloudflare API (/accounts/1b911846f80a89272c0dbaf44f5c810f/pages/projects/pleomino-staging-pages/deployments) failed.\u001b[0m
+\u001b[31m✘ [ERROR] A request to the Cloudflare API (/accounts/1b911846f80a89272c0dbaf44f5c810f/pages/projects/sample-webapp-staging-pages/deployments) failed.\u001b[0m
 
   Authentication error (status: 403) [code: 10000]
 `;
   const summary = summarizeWranglerPagesDeployError("", stderr);
   assert.equal(
     summary,
-    "wrangler pages deploy failed: Cloudflare API /accounts/(account)/pages/projects/pleomino-staging-pages/deployments: Authentication error (status: 403) [code: 10000]",
+    "wrangler pages deploy failed: Cloudflare API /accounts/(account)/pages/projects/sample-webapp-staging-pages/deployments: Authentication error (status: 403) [code: 10000]",
   );
   assert.ok(!summary.includes("1b911846f80a89272c0dbaf44f5c810f"));
 });

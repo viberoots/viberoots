@@ -1,4 +1,4 @@
-{ pkgs, repoRoot, repoFsRoot, hashesPath, prefetchedStorePathGlobal ? null }:
+{ pkgs, repoRoot, repoFsRoot, hashesPath, prefetchedStorePathGlobal ? null, allowLiveHashMap ? true }:
 let
   lib = pkgs.lib;
   sanitizeName = s:
@@ -13,7 +13,7 @@ let
     let
       wr = builtins.getEnv "WORKSPACE_ROOT";
       candidates =
-        if wr == "" then []
+        if (!allowLiveHashMap) || wr == "" then []
         else [
           (builtins.toPath (wr + "/projects/node-modules.hashes.json"))
         ];

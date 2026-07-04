@@ -4,6 +4,10 @@ export function isSerialVerifyPass(name: string): boolean {
   return name === "isolated" || name === "isolated-bounded" || name.startsWith("isolated:");
 }
 
+function isSerialSidecarVerifyPass(name: string): boolean {
+  return name === "enforcement";
+}
+
 const DEFAULT_RESOURCE_LIMITED_START_DELAY_SECS = 900;
 const BROAD_SHARED_DELAY_TARGET_MIN = 500;
 const BROAD_RESOURCE_DELAY_TARGET_MIN = 50;
@@ -64,17 +68,27 @@ export function groupVerifyPassesForExecution<T extends { name: string }>(
 ): T[][] {
   const groups: T[][] = [];
   const concurrent: T[] = [];
+  const serialSidecars: T[] = [];
   for (const pass of passes) {
+    if (isSerialSidecarVerifyPass(pass.name)) {
+      serialSidecars.push(pass);
+    }
+  }
+  let serialSidecarsAttached = false;
+  for (const pass of passes) {
+    if (isSerialSidecarVerifyPass(pass.name)) continue;
     if (isSerialVerifyPass(pass.name)) {
       if (concurrent.length > 0) {
         groups.push([...concurrent]);
         concurrent.length = 0;
       }
-      groups.push([pass]);
+      groups.push(serialSidecarsAttached ? [pass] : [pass, ...serialSidecars]);
+      serialSidecarsAttached = true;
       continue;
     }
     concurrent.push(pass);
   }
+  if (!serialSidecarsAttached) concurrent.push(...serialSidecars);
   if (concurrent.length > 0) groups.push(concurrent);
   return groups;
 }

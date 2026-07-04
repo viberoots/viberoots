@@ -91,7 +91,7 @@ test("cloudflare-pages promotion uses source artifact and fresh target Infisical
         source: {
           record: {
             deployRunId: "deploy-source-1",
-            deploymentId: "pleomino-dev",
+            deploymentId: "sample-webapp-dev",
           },
           replaySnapshotPath: "/records/replay/deploy-source-1/snapshot.json",
         },
@@ -129,7 +129,7 @@ test("cloudflare-pages persisted records and snapshots keep Infisical selectors 
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>infisical deploy</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     const admittedArtifact = await admitStaticWebappArtifact({ recordsRoot, artifactDir });
     const publicServer = await startCloudflarePagesPublicServer({

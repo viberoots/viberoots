@@ -7,6 +7,7 @@ import {
   summarizeVerifyTargetPlan,
   VERIFY_BOUNDED_ISOLATED_THREADS,
   VERIFY_BROAD_RESOURCE_LIMITED_THREADS,
+  VERIFY_ENFORCEMENT_LABEL,
   VERIFY_ISOLATED_LABEL,
   VERIFY_MANUAL_LABEL,
   VERIFY_RESOURCE_LIMITED_LABEL,
@@ -15,62 +16,56 @@ import { parseVerifyExecutionPolicy } from "../../dev/verify/remote-policy";
 import { inheritedBuckIsolation } from "../lib/test-helpers";
 
 const localExecutionPolicy = parseVerifyExecutionPolicy({ env: {} });
+const sampleTargets = [
+  "viberoots//build-tools/tools/tests/fixtures/verify-pass-scope:hash-regression",
+  "viberoots//build-tools/tools/tests/fixtures/verify-pass-scope:latency-guardrail",
+  "viberoots//build-tools/tools/tests/fixtures/verify-pass-scope:offline-acceptance",
+  "viberoots//build-tools/tools/tests/fixtures/verify-pass-scope:seeded-solver",
+  "viberoots//build-tools/tools/tests/fixtures/verify-pass-scope:static-contracts",
+  "viberoots//build-tools/tools/tests/fixtures/verify-pass-scope:unit",
+];
+const isolatedSampleTarget =
+  "viberoots//build-tools/tools/tests/fixtures/verify-pass-scope:latency-guardrail";
 
-test("verify target pass loading expands package scopes before isolating labeled targets", () => {
-  const targets = loadVerifyTargetLabels({
+test("verify target pass loading expands scopes before isolating labeled targets", async () => {
+  const packageTargets = loadVerifyTargetLabels({
     root: process.cwd(),
     iso: inheritedBuckIsolation("verify-target-passes-package-scope"),
-    targets: ["//projects/apps/pleomino/..."],
+    targets: ["viberoots//build-tools/tools/tests/fixtures/verify-pass-scope/..."],
     executionPolicy: localExecutionPolicy,
   });
 
   assert.deepEqual(
-    targets.map((entry) => entry.target),
-    [
-      "//projects/apps/pleomino:hash-regression",
-      "//projects/apps/pleomino:latency-guardrail",
-      "//projects/apps/pleomino:offline-acceptance",
-      "//projects/apps/pleomino:seeded-solver",
-      "//projects/apps/pleomino:static-pwa-contracts",
-      "//projects/apps/pleomino:unit",
-    ],
+    packageTargets.map((entry) => entry.target),
+    sampleTargets,
   );
   assert.ok(
-    targets
-      .find((entry) => entry.target === "//projects/apps/pleomino:latency-guardrail")
+    packageTargets
+      .find((entry) => entry.target === isolatedSampleTarget)
       ?.labels.includes(VERIFY_ISOLATED_LABEL),
     "expected package-scope expansion to preserve verify:isolated labels",
   );
 
-  const passes = planVerifyTargetPasses(targets);
-  assert.deepEqual(passes, [
+  const packagePasses = planVerifyTargetPasses(packageTargets);
+  assert.deepEqual(packagePasses, [
     {
       name: "isolated",
-      targets: ["//projects/apps/pleomino:latency-guardrail"],
+      targets: [isolatedSampleTarget],
       threadsOverride: 1,
     },
     {
       name: "shared",
-      targets: [
-        "//projects/apps/pleomino:hash-regression",
-        "//projects/apps/pleomino:offline-acceptance",
-        "//projects/apps/pleomino:seeded-solver",
-        "//projects/apps/pleomino:static-pwa-contracts",
-        "//projects/apps/pleomino:unit",
-      ],
+      targets: sampleTargets.filter((target) => target !== isolatedSampleTarget),
     },
   ]);
-});
-
-test("verify target pass loading keeps wildcard scope broad while isolating labeled targets", () => {
-  const targets = loadVerifyTargetLabels({
+  const wildcardTargets = loadVerifyTargetLabels({
     root: process.cwd(),
     iso: inheritedBuckIsolation("verify-target-passes-wildcard-scope"),
-    targets: ["//...", "viberoots//..."],
+    targets: ["viberoots//..."],
     executionPolicy: localExecutionPolicy,
   });
 
-  const targetSet = new Set(targets.map((entry) => entry.target));
+  const targetSet = new Set(wildcardTargets.map((entry) => entry.target));
   assert.ok(
     targetSet.has("viberoots//:verify_template_test_scope_policy"),
     "expected wildcard expansion to retain build-system zx tests",
@@ -83,16 +78,16 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
     "expected wildcard expansion to skip provider-only wrapper fixture tests",
   );
   assert.ok(
-    targetSet.has("//projects/apps/pleomino:latency-guardrail"),
-    "expected wildcard expansion to retain isolated project tests",
+    targetSet.has(isolatedSampleTarget),
+    "expected wildcard expansion to retain isolated fixture tests",
   );
 
-  const passes = planVerifyTargetPasses(targets);
+  const passes = planVerifyTargetPasses(wildcardTargets);
   const isolatedPass = passes.find((pass) => pass.name === "isolated");
   assert.ok(isolatedPass, "expected wildcard expansion to keep an isolated serial batch");
   assert.ok(
-    isolatedPass.targets.includes("//projects/apps/pleomino:latency-guardrail"),
-    "expected isolated project test to remain in the isolated batch",
+    isolatedPass.targets.includes(isolatedSampleTarget),
+    "expected isolated fixture test to remain in the isolated batch",
   );
   assert.ok(
     isolatedPass.targets.includes("viberoots//:dev_verify_orphan_owned_process_cleanup"),
@@ -141,21 +136,38 @@ test("verify target pass loading keeps wildcard scope broad while isolating labe
     "expected isolated targets to stay out of the resource-limited pass",
   );
   assert.equal(resourceLimitedPass?.threadsOverride, VERIFY_BROAD_RESOURCE_LIMITED_THREADS);
-  const resourceLimitedLabels = targets.find(
+  const enforcementPass = passes.find((pass) => pass.name === "enforcement");
+  assert.ok(enforcementPass, "expected enforcement tests to run in a dedicated light pass");
+  assert.ok(
+    enforcementPass.targets.includes("viberoots//:linting_process_inspection_commands_enforcement"),
+    "expected enforcement convention to route *.enforcement.test.ts targets",
+  );
+  assert.ok(
+    enforcementPass.targets.every((target) => !isolatedPass.targets.includes(target)),
+    "expected enforcement targets to stay out of the serial isolated pass",
+  );
+  const resourceLimitedLabels = wildcardTargets.find(
     (entry) => entry.target === "viberoots//:deployments_nixos_shared_host_reuse_e2e",
   )?.labels;
   assert.ok(
     resourceLimitedLabels?.includes(VERIFY_RESOURCE_LIMITED_LABEL),
     "expected resource-limited deployment target labels to survive wildcard expansion",
   );
-  const summary = summarizeVerifyTargetPlan({ targetLabels: targets, passes });
-  assert.equal(summary.expandedTargetCount, targets.length);
+  const enforcementLabels = wildcardTargets.find(
+    (entry) => entry.target === "viberoots//:linting_process_inspection_commands_enforcement",
+  )?.labels;
+  assert.ok(
+    enforcementLabels?.includes(VERIFY_ENFORCEMENT_LABEL),
+    "expected enforcement target labels to survive wildcard expansion",
+  );
+  const summary = summarizeVerifyTargetPlan({ targetLabels: wildcardTargets, passes });
+  assert.equal(summary.expandedTargetCount, wildcardTargets.length);
   assert.equal(summary.isolatedPassCount, 2);
   assert.ok(summary.isolatedTargetCount >= 15);
   assert.equal(summary.resourceLimitedPassCount, 1);
   assert.ok(summary.resourceLimitedTargetCount > 0);
   assert.equal(summary.sharedTargetCount, sharedPass?.targets.length ?? 0);
-  assert.equal(summary.passCount, 4);
+  assert.equal(summary.passCount, 5);
 });
 
 test("verify target pass loading keeps manual targets explicit-only", () => {

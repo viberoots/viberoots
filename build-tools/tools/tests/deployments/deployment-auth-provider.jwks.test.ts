@@ -17,9 +17,9 @@ import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
 function deployment() {
   return nixosSharedHostDeploymentFixture({
-    deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino/dev:deploy",
-    lanePolicyRef: "//projects/deployments/pleomino/shared:lane",
+    deploymentId: "sample-webapp-dev",
+    label: "//projects/deployments/sample-webapp/dev:deploy",
+    lanePolicyRef: "//projects/deployments/sample-webapp/shared:lane",
     environmentStage: "dev",
   });
 }
@@ -85,7 +85,7 @@ test("runtime auth provider contract keeps local adapter defaults", () => {
   assert.equal(config.claims.roleClaim, "groups");
   const auth = authenticateLocalAuthProviderClaims({
     deployment: deployment(),
-    claims: { sub: "operator-1", groups: ["deploy-submitters-pleomino-dev"] },
+    claims: { sub: "operator-1", groups: ["deploy-submitters-sample-webapp-dev"] },
   });
   assert.equal(auth.authorization.grants[0]?.role, "submitter");
 });

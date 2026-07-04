@@ -9,7 +9,7 @@ import { runInfisicalIacBootstrap } from "../../deployments/infisical-iac-bootst
 import { buildRepoDryRunMaterializationPlan } from "../../deployments/infisical-iac-bootstrap-dry-run-plan";
 import { resolveCredentialSinkSelection } from "../../deployments/infisical-iac-bootstrap-sink";
 
-test("repo bootstrap dry-run reports resolver profiles without Pleomino provisioning", async () => {
+test("repo bootstrap dry-run reports resolver profiles without Sample webapp provisioning", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
     let fetchCalled = false;
@@ -78,8 +78,8 @@ test("repo bootstrap dry-run reports resolver profiles without Pleomino provisio
     assert.equal(report.browserAutomation, undefined);
     assert.match(output.stderr, /Credential sink: .*starter config not created during dry-run/);
     assert.match(output.stderr, /sprinkleref --check --config projects\/config\/shared\.json/);
-    assert.doesNotMatch(output.stdout, /pleomino|opentofu|cloudflare_api_token/);
-    assert.doesNotMatch(output.stderr, /pleomino|opentofu|--tofu-dir|cloudflare_api_token/i);
+    assert.doesNotMatch(output.stdout, /sample-webapp|opentofu|cloudflare_api_token/);
+    assert.doesNotMatch(output.stderr, /sample-webapp|opentofu|--tofu-dir|cloudflare_api_token/i);
     await assertMissing("projects/config/shared.json");
   });
 });
@@ -91,7 +91,7 @@ test("deployment bootstrap auto credential sink does not create starter resolver
       {
         ...DEFAULT_BOOTSTRAP_ARGS,
         mode: "deployment",
-        target: "//projects/deployments/pleomino/staging:deploy",
+        target: "//projects/deployments/sample-webapp/staging:deploy",
       },
       {
         platform: "linux",

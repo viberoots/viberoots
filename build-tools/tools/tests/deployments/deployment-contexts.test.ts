@@ -1,8 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import * as fs from "node:fs/promises";
-import * as os from "node:os";
-import * as path from "node:path";
 import { test } from "node:test";
 import type { GraphNode } from "../../lib/graph";
 import { extractCloudflarePagesDeployments } from "../../deployments/contract";
@@ -11,9 +8,23 @@ import {
   cloudflarePagesLaneGovernanceNodeFixture,
   cloudflarePagesLanePolicyNodeFixture,
 } from "./cloudflare-pages.fixture";
+import {
+  SAMPLE_CONTEXT_EXPECTED,
+  sampleProjectConfig,
+  withProjectConfig,
+} from "./sample-deployment-context.fixture";
+
+const STAGING_DEPLOY = "//projects/deployments/sample-webapp/staging:deploy";
+const PROD_DEPLOY = "//projects/deployments/sample-webapp/prod:deploy";
+const STAGING_CONTEXT = SAMPLE_CONTEXT_EXPECTED.staging.context;
+const PROD_CONTEXT = SAMPLE_CONTEXT_EXPECTED.prod.context;
 
 function appNode(overrides: Partial<GraphNode> = {}): GraphNode {
-  return { name: "//projects/apps/pleomino:app", labels: ["kind:app", "webapp:pwa"], ...overrides };
+  return {
+    name: "//projects/apps/sample-webapp:app",
+    labels: ["kind:app", "webapp:pwa"],
+    ...overrides,
+  };
 }
 
 function nodes(deployments: GraphNode[]) {
@@ -28,16 +39,16 @@ function nodes(deployments: GraphNode[]) {
 
 function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
-    name: "//projects/deployments/pleomino/staging:deploy",
+    name: STAGING_DEPLOY,
     provider: "cloudflare-pages",
-    component: "//projects/apps/pleomino:app",
+    component: "//projects/apps/sample-webapp:app",
     component_kind: "static-webapp",
     publisher: "wrangler-pages",
     publisher_config: "wrangler.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {},
@@ -45,82 +56,84 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
   };
 }
 
-test("deployment_context resolves distinct shared provider topology", () => {
-  const { deployments, errors } = extractCloudflarePagesDeployments(
-    nodes([
-      deploymentNode({ deployment_context: "pleomino-staging" }),
-      deploymentNode({
-        name: "//projects/deployments/pleomino/prod:deploy",
-        deployment_context: "pleomino-prod",
-      }),
-    ]),
-  );
-  assert.deepEqual(errors, []);
-  const byLabel = new Map(deployments.map((deployment) => [deployment.label, deployment]));
-  assert.equal(
-    byLabel.get("//projects/deployments/pleomino/staging:deploy")?.providerTarget.account,
-    "web-platform-staging",
-  );
-  assert.equal(
-    byLabel.get("//projects/deployments/pleomino/staging:deploy")?.infisicalRuntime?.environment,
-    "staging",
-  );
-  assert.equal(
-    byLabel.get("//projects/deployments/pleomino/prod:deploy")?.providerTarget.account,
-    "web-platform-prod",
-  );
-  assert.equal(
-    byLabel.get("//projects/deployments/pleomino/prod:deploy")?.infisicalRuntime?.environment,
-    "prod",
-  );
+test("deployment_context resolves distinct shared provider topology", async () => {
+  await withProjectConfig(sampleProjectConfig(), async () => {
+    const { deployments, errors } = extractCloudflarePagesDeployments(
+      nodes([
+        deploymentNode({ deployment_context: STAGING_CONTEXT }),
+        deploymentNode({ name: PROD_DEPLOY, deployment_context: PROD_CONTEXT }),
+      ]),
+    );
+    assert.deepEqual(errors, []);
+    const byLabel = new Map(deployments.map((deployment) => [deployment.label, deployment]));
+    const staging = byLabel.get(STAGING_DEPLOY);
+    const prod = byLabel.get(PROD_DEPLOY);
+    assert.equal(staging?.providerTarget.account, SAMPLE_CONTEXT_EXPECTED.staging.account);
+    assert.equal(
+      staging?.infisicalRuntime?.environment,
+      SAMPLE_CONTEXT_EXPECTED.staging.environment,
+    );
+    assert.equal(prod?.providerTarget.account, SAMPLE_CONTEXT_EXPECTED.prod.account);
+    assert.equal(prod?.infisicalRuntime?.environment, SAMPLE_CONTEXT_EXPECTED.prod.environment);
+  });
 });
 
-test("context secretBackend fills omitted secret_backend and rejects disagreement", () => {
-  const filled = extractCloudflarePagesDeployments(
-    nodes([deploymentNode({ deployment_context: "pleomino-staging" })]),
-  );
-  assert.deepEqual(filled.errors, []);
-  assert.equal(filled.deployments[0]?.secretBackendProfile, "infisical-default");
+test("context secretBackend fills omitted secret_backend and rejects disagreement", async () => {
+  await withProjectConfig(sampleProjectConfig(), async () => {
+    const filled = extractCloudflarePagesDeployments(
+      nodes([deploymentNode({ deployment_context: STAGING_CONTEXT })]),
+    );
+    assert.deepEqual(filled.errors, []);
+    assert.equal(filled.deployments[0]?.secretBackendProfile, "infisical-default");
 
-  const mismatch = extractCloudflarePagesDeployments(
-    nodes([
-      deploymentNode({ deployment_context: "pleomino-staging", secret_backend: "vault/default" }),
-    ]),
-  );
-  assert.ok(mismatch.errors.some((entry) => entry.includes("disagrees with deployment_context")));
+    const mismatch = extractCloudflarePagesDeployments(
+      nodes([
+        deploymentNode({
+          deployment_context: STAGING_CONTEXT,
+          secret_backend: "vault/default",
+        }),
+      ]),
+    );
+    assert.ok(mismatch.errors.some((entry) => entry.includes("disagrees with deployment_context")));
+  });
 });
 
-test("context provider defaults fill missing metadata and reject drift", () => {
-  const filled = extractCloudflarePagesDeployments(
-    nodes([
-      deploymentNode({
-        deployment_context: "pleomino-staging",
-        provider_target: { id: "custom-id" },
-      }),
-    ]),
-  );
-  assert.deepEqual(filled.errors, []);
-  assert.equal(filled.deployments[0]?.providerTarget.project, "pleomino-staging-pages");
-  assert.equal(filled.deployments[0]?.providerTarget.id, "custom-id");
+test("context provider defaults fill missing metadata and reject drift", async () => {
+  await withProjectConfig(sampleProjectConfig(), async () => {
+    const filled = extractCloudflarePagesDeployments(
+      nodes([
+        deploymentNode({
+          deployment_context: STAGING_CONTEXT,
+          provider_target: { id: "custom-id" },
+        }),
+      ]),
+    );
+    assert.deepEqual(filled.errors, []);
+    assert.equal(
+      filled.deployments[0]?.providerTarget.project,
+      SAMPLE_CONTEXT_EXPECTED.staging.project,
+    );
+    assert.equal(filled.deployments[0]?.providerTarget.id, "custom-id");
 
-  const drift = extractCloudflarePagesDeployments(
-    nodes([
-      deploymentNode({
-        deployment_context: "pleomino-staging",
-        provider_target: { account: "other" },
-      }),
-    ]),
-  );
-  assert.ok(
-    drift.errors.some((entry) => entry.includes("provider_target.account other disagrees")),
-  );
+    const drift = extractCloudflarePagesDeployments(
+      nodes([
+        deploymentNode({
+          deployment_context: STAGING_CONTEXT,
+          provider_target: { account: "other" },
+        }),
+      ]),
+    );
+    assert.ok(
+      drift.errors.some((entry) => entry.includes("provider_target.account other disagrees")),
+    );
+  });
 });
 
 test("deployment_context selector fails closed for malformed and unknown values", () => {
   for (const [value, expected] of [
     ["Bad Name", "backend-local kebab-case"],
     ["missing-prod", "unknown deployment_context"],
-    [{ name: "pleomino-staging" }, "deployment_context must be a selector string"],
+    [{ name: "sample-webapp-staging" }, "deployment_context must be a selector string"],
   ] as const) {
     const errors = extractCloudflarePagesDeployments(
       nodes([deploymentNode({ deployment_context: value as unknown as string })]),
@@ -190,8 +203,8 @@ test("local project config can fill missing shared context coordinates", async (
         "admin-prod": { controlPlane: "test", cloudflare: { projectName: "admin-prod-pages" } },
       },
     },
-    async () => {
-      await writeJson("projects/config/local.json", {
+    async (tmp) => {
+      await writeJson(tmp, "projects/config/local.json", {
         deploymentContexts: { "admin-prod": { cloudflare: { account: "admin-platform" } } },
       });
       const { deployments, errors } = extractCloudflarePagesDeployments(
@@ -205,30 +218,17 @@ test("local project config can fill missing shared context coordinates", async (
 
 test("app packages cannot declare backend topology fields", () => {
   const errors = extractCloudflarePagesDeployments([
-    appNode({ deployment_context: "pleomino-prod", secret_backend: "infisical/default" }),
+    appNode({ deployment_context: PROD_CONTEXT, secret_backend: "infisical/default" }),
   ]).errors;
   assert.ok(errors.some((entry) => entry.includes("apps cannot declare")));
 });
 
-async function withProjectConfig(shared: Record<string, unknown>, run: () => Promise<void>) {
-  const oldCwd = process.cwd();
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "deployment-contexts-"));
-  try {
-    process.chdir(dir);
-    await writeJson("projects/config/shared.json", {
-      schemaVersion: "viberoots-project-config@1",
-      ...shared,
-    });
-    await run();
-  } finally {
-    process.chdir(oldCwd);
-    await fs.rm(dir, { recursive: true, force: true });
-  }
-}
-
-async function writeJson(relativePath: string, value: unknown) {
-  await fs.mkdir(path.dirname(relativePath), { recursive: true });
-  await fs.writeFile(relativePath, `${JSON.stringify(value, null, 2)}\n`);
+async function writeJson(tmp: string, relativePath: string, value: unknown) {
+  const fs = await import("node:fs/promises");
+  const path = await import("node:path");
+  const target = path.join(tmp, relativePath);
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await fs.writeFile(target, `${JSON.stringify(value, null, 2)}\n`);
 }
 
 function testControlPlanes() {

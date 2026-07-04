@@ -120,7 +120,7 @@ Inspect the current working tree, or pass explicit changed paths:
 ```bash
 zx-wrapper build-tools/tools/dev/inspect-deployment-impact.ts
 zx-wrapper build-tools/tools/dev/inspect-deployment-impact.ts \
-  --changed build-tools/deployments/defs.bzl,projects/deployments/pleomino/dev/TARGETS
+  --changed build-tools/deployments/defs.bzl,projects/deployments/sample-webapp/dev/TARGETS
 ```
 
 ## Deployment-aware verify execution

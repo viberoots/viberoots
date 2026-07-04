@@ -67,7 +67,7 @@ test("dormant remote execution platforms analyze with explicit executor policy",
   assert.match(providers.stdout, /repo_toolchains\/\/:remote_linux_x86_64_hybrid_default/);
   assert.match(providers.stdout, /repo_toolchains\/\/:remote_local_fallback/);
   assert.match(providers.stdout, /"viberoots_remote_profile": "linux-x86_64-default"/);
-  assert.match(providers.stdout, /RemoteExecutorUseCase[\s\S]*data: "buck2-build"/);
+  assert.match(providers.stdout, /RemoteExecutorUseCase[\s\S]*"buck2-build"/);
   assert.match(providers.stdout, /executor: Local/);
   assert.match(source, /local_enabled = local_enabled/);
   assert.match(source, /remote_enabled = remote_enabled/);

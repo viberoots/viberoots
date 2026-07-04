@@ -11,189 +11,217 @@ import {
   repoRoot,
   safehouseLaunchPattern,
   scratchRoot,
+  writeExecutable,
 } from "./agent-wrapper-test-helpers.ts";
 
 const wrapper = binWrapper("codex");
 const makeFakeTools = (tmp: string, gitRoot: string) => makeFakeAgentTools(tmp, gitRoot, "codex");
 
-test("codex wrapper falls back to captured host path for the real Codex binary", async () => {
+function managedCodexEnv(bin: string): Record<string, string> {
+  return {
+    CODEX_CLI_PATH: "",
+    VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(bin, "codex"),
+  };
+}
+
+test("codex wrapper uses only the managed Codex from PATH", async () => {
   await fsp.mkdir(externalScratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "codex-wrapper-"));
   try {
     const gitRoot = path.join(tmp, "repo");
-    await fsp.mkdir(path.join(gitRoot, ".viberoots", "workspace"), { recursive: true });
+    const unmanagedBin = path.join(tmp, "unmanaged-bin");
     const fake = await makeFakeTools(tmp, gitRoot);
-    await fsp.writeFile(
-      path.join(gitRoot, ".viberoots", "workspace", "host-path"),
-      `${fake.bin}\n`,
-      "utf8",
+    await fsp.mkdir(gitRoot, { recursive: true });
+    await fsp.mkdir(unmanagedBin, { recursive: true });
+    await writeExecutable(
+      path.join(unmanagedBin, "codex"),
+      `#!/usr/bin/env bash\nprintf 'unmanaged-codex %s\\n' "$*" >> ${JSON.stringify(fake.log)}\n`,
     );
     const res = await $({
       cwd: gitRoot,
       stdio: "pipe",
       env: {
         ...process.env,
-        PATH: `${path.dirname(wrapper)}:/usr/bin:/bin`,
-        VBR_HOST_PATH: "",
-        HOST_PATH: "",
+        ...managedCodexEnv(fake.bin),
+        PATH: `${path.dirname(wrapper)}:${unmanagedBin}:${fake.bin}:/usr/bin:/bin:${process.env.PATH}`,
       },
     })`${wrapper} exec host-path`;
 
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
     const log = await fsp.readFile(fake.log, "utf8");
     assert.doesNotMatch(log, /safehouse /);
+    assert.doesNotMatch(log, /unmanaged-codex/);
     assert.match(log, /codex --sandbox danger-full-access exec host-path/);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
 });
 
-test("codex --worktree creates through the CoW git wrapper and launches the worker in safehouse", async () => {
-  await fsp.mkdir(scratchRoot, { recursive: true });
-  const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));
+test("codex wrapper accepts CODEX_CLI_PATH only when it is the managed Codex", async () => {
+  await fsp.mkdir(externalScratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "codex-wrapper-"));
+  try {
+    const gitRoot = path.join(tmp, "repo");
+    const fake = await makeFakeTools(tmp, gitRoot);
+    await fsp.mkdir(gitRoot, { recursive: true });
+    const res = await $({
+      cwd: gitRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        CODEX_CLI_PATH: path.join(fake.bin, "codex"),
+        VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(fake.bin, "codex"),
+        PATH: `${path.dirname(wrapper)}:/usr/bin:/bin:${process.env.PATH}`,
+      },
+    })`${wrapper} resume`;
+
+    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
+    const log = await fsp.readFile(fake.log, "utf8");
+    assert.match(log, /codex --sandbox danger-full-access resume/);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("codex wrapper rejects unmanaged CODEX_CLI_PATH instead of redirecting", async () => {
+  await fsp.mkdir(externalScratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "codex-wrapper-"));
+  try {
+    const gitRoot = path.join(tmp, "repo");
+    const unmanagedBin = path.join(tmp, "unmanaged-bin");
+    await fsp.mkdir(gitRoot, { recursive: true });
+    await fsp.mkdir(unmanagedBin, { recursive: true });
+    const fake = await makeFakeTools(tmp, gitRoot);
+    await writeExecutable(
+      path.join(unmanagedBin, "codex"),
+      `#!/usr/bin/env bash\nprintf 'unmanaged-codex %s\\n' "$*" >> ${JSON.stringify(fake.log)}\n`,
+    );
+
+    const res = await $({
+      cwd: gitRoot,
+      stdio: "pipe",
+      nothrow: true,
+      env: {
+        ...process.env,
+        CODEX_CLI_PATH: path.join(unmanagedBin, "codex"),
+        VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(fake.bin, "codex"),
+        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin:${process.env.PATH}`,
+      },
+    })`${wrapper} exec explicit`;
+
+    assert.notEqual(res.exitCode, 0);
+    assert.match(String(res.stderr), /CODEX_CLI_PATH must point to the viberoots-managed Codex/);
+    const log = await fsp.readFile(fake.log, "utf8").catch(() => "");
+    assert.doesNotMatch(log, /unmanaged-codex/);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("codex wrapper rejects app Codex paths instead of falling back", async () => {
+  await fsp.mkdir(externalScratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "codex-wrapper-"));
+  try {
+    const gitRoot = path.join(tmp, "repo");
+    const appCli = path.join(tmp, "Applications", "Codex.app", "Contents", "Resources", "codex");
+    await fsp.mkdir(gitRoot, { recursive: true });
+    await fsp.mkdir(path.dirname(appCli), { recursive: true });
+    const fake = await makeFakeTools(tmp, gitRoot);
+    await writeExecutable(
+      appCli,
+      `#!/usr/bin/env bash\nprintf 'app-codex %s\\n' "$*" >> ${JSON.stringify(fake.log)}\n`,
+    );
+
+    const res = await $({
+      cwd: gitRoot,
+      stdio: "pipe",
+      nothrow: true,
+      env: {
+        ...process.env,
+        CODEX_CLI_PATH: appCli,
+        VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(fake.bin, "codex"),
+        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin:${process.env.PATH}`,
+      },
+    })`${wrapper} exec app`;
+
+    assert.notEqual(res.exitCode, 0);
+    assert.match(String(res.stderr), /Refusing unmanaged Codex path/);
+    const log = await fsp.readFile(fake.log, "utf8").catch(() => "");
+    assert.doesNotMatch(log, /^app-codex /m);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("codex wrapper rejects transient arg0 Codex shims instead of falling back", async () => {
+  await fsp.mkdir(externalScratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "codex-wrapper-"));
   try {
     const gitRoot = path.join(tmp, "repo");
     const home = path.join(tmp, "home");
-    const knownHosts = path.join(home, ".ssh", "known_hosts");
+    const bin = path.join(home, ".codex", "tmp", "arg0", "session", "bin");
+    const managedBin = path.join(tmp, "managed-bin");
+    const log = path.join(tmp, "calls.log");
     await fsp.mkdir(gitRoot, { recursive: true });
-    await fsp.mkdir(path.dirname(knownHosts), { recursive: true });
-    await fsp.writeFile(knownHosts, "github.com ssh-ed25519 AAAATEST\n", "utf8");
-    const fake = await makeFakeTools(tmp, gitRoot);
+    await fsp.mkdir(bin, { recursive: true });
+    await fsp.mkdir(managedBin, { recursive: true });
+    await fsp.writeFile(
+      path.join(bin, ".codex-wrapped"),
+      `#!/usr/bin/env bash\nprintf '%s %s\\n' "$(basename -- "$0")" "$*" >> ${JSON.stringify(log)}\n`,
+      { mode: 0o755 },
+    );
+    await writeExecutable(
+      path.join(bin, "codex"),
+      `#!/usr/bin/env bash\nprintf 'transient-codex %s\\n' "$*" >> ${JSON.stringify(log)}\n`,
+    );
+    await writeExecutable(
+      path.join(managedBin, "codex"),
+      `#!/usr/bin/env bash\nprintf 'managed-codex %s\\n' "$*" >> ${JSON.stringify(log)}\n`,
+    );
+    await fsp.symlink(".codex-wrapped", path.join(bin, "codex-execve-wrapper"));
     const res = await $({
       cwd: gitRoot,
       stdio: "pipe",
+      nothrow: true,
       env: {
         ...process.env,
         HOME: home,
-        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
-        VBR_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
-        CODEX_HOME: path.join(home, ".codex"),
+        CODEX_CLI_PATH: "",
+        VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(managedBin, "codex"),
+        PATH: `${path.dirname(wrapper)}:${bin}:/usr/bin:/bin:${process.env.PATH}`,
       },
-    })`${wrapper} --worktree native-worker exec task`;
+    })`${wrapper} --version`;
 
-    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
-    const worktreeRoot = path.join(gitRoot, ".codex", "worktrees", "native-worker");
-    const worktreeRealRoot = await fsp.realpath(worktreeRoot);
-    const log = await fsp.readFile(fake.log, "utf8");
-    assert.match(log, /git worktree add -b worktree-native-worker /);
-    assert.match(log, new RegExp(escapeRegExp(worktreeRoot)));
-    assert.match(log, new RegExp(safehouseLaunchPattern(worktreeRealRoot)));
-    assert.match(log, /safehouse .* --add-dirs=[^ ]+\/\.codex /);
-    assert.match(log, new RegExp(`--add-dirs-ro=${escapeRegExp(knownHosts)}`));
-    assert.match(
-      log,
-      new RegExp(`\\(allow file-read\\* \\(literal "${escapeRegExp(knownHosts)}"\\)\\)`),
-    );
-    assert.match(
-      log,
-      /\(allow file-read\* .* \(literal "\/etc\/bashrc"\) \(literal "\/private\/etc\/bashrc"\)/,
-    );
-    assert.match(log, /\(allow mach-lookup \(global-name "com\.apple\.sysmond"\)\)/);
-    assert.match(log, /\(allow process-info\*\)/);
-    assert.match(log, /\(allow signal\)/);
-    assert.match(log, /codex --dangerously-bypass-approvals-and-sandbox exec task/);
-    assert.match(log, /HOME=.*\/buck-out\/tmp\/safehouse-home/);
-    assert.match(log, /CODEX_HOME=.*\/\.codex/);
-    assert.doesNotMatch(log, /codex .*--worktree/);
+    assert.notEqual(res.exitCode, 0);
+    assert.match(String(res.stderr), /viberoots-managed Codex is not on PATH/);
+    const calls = await fsp.readFile(log, "utf8").catch(() => "");
+    assert.doesNotMatch(calls, /transient-codex|codex-wrapped|managed-codex/);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
 });
 
-test("codex -w is an alias for the wrapper worktree path", async () => {
-  await fsp.mkdir(scratchRoot, { recursive: true });
-  const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));
+test("codex wrapper fails clearly when managed Codex is missing", async () => {
+  await fsp.mkdir(externalScratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "codex-wrapper-"));
   try {
     const gitRoot = path.join(tmp, "repo");
     await fsp.mkdir(gitRoot, { recursive: true });
-    const fake = await makeFakeTools(tmp, gitRoot);
     const res = await $({
       cwd: gitRoot,
       stdio: "pipe",
+      nothrow: true,
       env: {
         ...process.env,
-        PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin`,
-        VBR_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
+        CODEX_CLI_PATH: "",
+        VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(tmp, "missing", "codex"),
+        PATH: `${path.dirname(wrapper)}:/usr/bin:/bin:${process.env.PATH}`,
       },
-    })`${wrapper} -w shortcut-worker exec task`;
+    })`${wrapper} exec missing`;
 
-    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
-    const worktreeRoot = path.join(gitRoot, ".codex", "worktrees", "shortcut-worker");
-    const worktreeRealRoot = await fsp.realpath(worktreeRoot);
-    const log = await fsp.readFile(fake.log, "utf8");
-    assert.match(log, /git worktree add -b worktree-shortcut-worker /);
-    assert.match(log, new RegExp(safehouseLaunchPattern(worktreeRealRoot)));
-    assert.match(log, /codex --dangerously-bypass-approvals-and-sandbox exec task/);
-    assert.doesNotMatch(log, /^codex .*-w/m);
-  } finally {
-    await fsp.rm(tmp, { recursive: true, force: true });
-  }
-});
-
-test("codex wrapper runs worktree agents through safehouse with unsafe flags", async () => {
-  await fsp.mkdir(scratchRoot, { recursive: true });
-  const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));
-  try {
-    const worktreeRoot = path.join(tmp, ".codex", "worktrees", "worker-a");
-    await fsp.mkdir(worktreeRoot, { recursive: true });
-    const fake = await makeFakeTools(tmp, worktreeRoot);
-    const res = await $({
-      cwd: worktreeRoot,
-      stdio: "pipe",
-      env: { ...process.env, PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin` },
-    })`${wrapper} exec task`;
-
-    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
-    const worktreeRealRoot = await fsp.realpath(worktreeRoot);
-    const log = await fsp.readFile(fake.log, "utf8");
-    assert.match(log, new RegExp(safehouseLaunchPattern(worktreeRealRoot)));
-    assert.match(log, /codex --dangerously-bypass-approvals-and-sandbox exec task/);
-    assert.match(log, /VBR_CODEX_SAFEHOUSE_ACTIVE=1/);
-  } finally {
-    await fsp.rm(tmp, { recursive: true, force: true });
-  }
-});
-
-test("codex wrapper launches the main repo with full-access sandbox by default", async () => {
-  await fsp.mkdir(externalScratchRoot, { recursive: true });
-  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "codex-wrapper-"));
-  try {
-    const gitRoot = path.join(tmp, "repo");
-    await fsp.mkdir(gitRoot, { recursive: true });
-    const fake = await makeFakeTools(tmp, gitRoot);
-    const res = await $({
-      cwd: gitRoot,
-      stdio: "pipe",
-      env: { ...process.env, PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin` },
-    })`${wrapper} exec parent`;
-
-    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
-    const log = await fsp.readFile(fake.log, "utf8");
-    assert.doesNotMatch(log, /safehouse /);
-    assert.match(log, /codex --sandbox danger-full-access exec parent/);
-    assert.doesNotMatch(log, /dangerously-bypass-approvals-and-sandbox/);
-  } finally {
-    await fsp.rm(tmp, { recursive: true, force: true });
-  }
-});
-
-test("codex wrapper preserves an explicit sandbox argument", async () => {
-  await fsp.mkdir(externalScratchRoot, { recursive: true });
-  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "codex-wrapper-"));
-  try {
-    const gitRoot = path.join(tmp, "repo");
-    await fsp.mkdir(gitRoot, { recursive: true });
-    const fake = await makeFakeTools(tmp, gitRoot);
-    const res = await $({
-      cwd: gitRoot,
-      stdio: "pipe",
-      env: { ...process.env, PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin` },
-    })`${wrapper} --sandbox workspace-write exec parent`;
-
-    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
-    const log = await fsp.readFile(fake.log, "utf8");
-    assert.match(log, /codex --sandbox workspace-write exec parent/);
-    assert.doesNotMatch(log, /danger-full-access/);
+    assert.notEqual(res.exitCode, 0);
+    assert.match(String(res.stderr), /viberoots-managed Codex is missing or not executable/);
+    assert.match(String(res.stderr), /pinned @openai\/codex package/);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }

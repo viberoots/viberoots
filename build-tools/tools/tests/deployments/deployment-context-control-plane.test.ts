@@ -28,7 +28,7 @@ function controlPlanes(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function context(controlPlane: string, projectName = "pleomino-pages") {
+function context(controlPlane: string, projectName = "sample-webapp-pages") {
   return {
     controlPlane,
     cloudflare: {
@@ -85,8 +85,8 @@ test("two contexts resolve to different control-plane profiles", async () => {
     {
       controlPlanes: controlPlanes(),
       deploymentContexts: {
-        "app-prod": context("prod", "pleomino-prod-pages"),
-        "app-staging": context("staging", "pleomino-staging-pages"),
+        "app-prod": context("prod", "sample-webapp-prod-pages"),
+        "app-staging": context("staging", "sample-webapp-staging-pages"),
       },
     },
     async () => {
@@ -94,7 +94,7 @@ test("two contexts resolve to different control-plane profiles", async () => {
         cloudflareNodes([
           cloudflareDeployment({ deployment_context: "app-staging" }),
           cloudflareDeployment({
-            name: "//projects/deployments/pleomino/prod:deploy",
+            name: "//projects/deployments/sample-webapp/prod:deploy",
             deployment_context: "app-prod",
           }),
         ]),
@@ -102,13 +102,13 @@ test("two contexts resolve to different control-plane profiles", async () => {
       assert.deepEqual(errors, []);
       const byName = new Map(deployments.map((deployment) => [deployment.label, deployment]));
       assert.equal(
-        byName.get("//projects/deployments/pleomino/staging:deploy")?.deploymentContext
+        byName.get("//projects/deployments/sample-webapp/staging:deploy")?.deploymentContext
           ?.controlPlane?.serviceClient.controlPlaneUrl,
         "https://control.staging.example",
       );
       assert.equal(
-        byName.get("//projects/deployments/pleomino/prod:deploy")?.deploymentContext?.controlPlane
-          ?.serviceClient.controlPlaneUrl,
+        byName.get("//projects/deployments/sample-webapp/prod:deploy")?.deploymentContext
+          ?.controlPlane?.serviceClient.controlPlaneUrl,
         "https://control.prod.example",
       );
     },

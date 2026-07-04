@@ -1,7 +1,7 @@
-{ pkgs, repoRoot, repoFsRoot, hashesPath, prefetchedStorePathGlobal ? null }:
+{ pkgs, repoRoot, repoFsRoot, hashesPath, prefetchedStorePathGlobal ? null, allowLiveHashMap ? true }:
 let
-  common = import ./common.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal; };
-  store = import ./store.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal; };
+  common = import ./common.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal allowLiveHashMap; };
+  store = import ./store.nix { inherit pkgs repoRoot repoFsRoot hashesPath prefetchedStorePathGlobal allowLiveHashMap; };
   lib = common.lib;
   node = pkgs.nodejs_22;
   pnpm = import ../pnpm-11.nix { inherit pkgs; };
@@ -105,9 +105,14 @@ in {
       pname = "node-modules";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
-      nativeBuildInputs = [ node pnpm pkgs.coreutils pkgs.findutils pkgs.patchelf ];
+      nativeBuildInputs = [ node pnpm pkgs.coreutils pkgs.findutils ]
+        ++ lib.optionals pkgs.stdenvNoCC.hostPlatform.isLinux [ pkgs.patchelf ];
+      # node_modules is a dependency tree assembled from the fixed pnpm store, not a
+      # runtime executable output. Avoid generic fixup scans across multi-GB package trees.
+      dontFixup = true;
+      dontPatchShebangs = true;
       # Darwin builders can carry foreign ELF payloads for reproducibility, but they
-      # cannot patch them because patchelf is Linux-only. Keep ELF fixups enabled on Linux.
+      # cannot patch them because patchelf is Linux-only.
       dontPatchELF = !pkgs.stdenvNoCC.hostPlatform.isLinux;
       preferLocalBuild = true;
       allowSubstitutes = false;

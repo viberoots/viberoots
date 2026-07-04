@@ -31,11 +31,11 @@ test("target exception inventory preserves reviewed identity and approval bounda
     cloudflareNodes([
       deploymentTargetExceptionNodeFixture({
         name: exceptionRef,
-        affected_deployments: ["pleomino-staging"],
+        affected_deployments: ["sample-webapp-staging"],
       }),
       cloudflareDeployment({
         target_exceptions: [exceptionRef],
-        deployment_id: "pleomino-staging",
+        deployment_id: "sample-webapp-staging",
         provider_target: providerTarget(),
       }),
     ]),
@@ -43,7 +43,7 @@ test("target exception inventory preserves reviewed identity and approval bounda
   assert.deepEqual(inventory.errors, []);
   const exception = resource(inventory, "DeploymentTargetException");
   assert.equal(exception.id, exceptionRef);
-  assert.equal(exception.refs?.includes("pleomino-staging"), true);
+  assert.equal(exception.refs?.includes("sample-webapp-staging"), true);
   assert.equal(exception.facts?.exceptionKind, "alias");
   assert.equal(exception.facts?.approvalBoundary, "reviewed-target-exception");
   assert.equal(exception.facts?.statusVisibility, "operator_status");
@@ -82,5 +82,5 @@ function resource(inventory: ReturnType<typeof createDeploymentResourceInventory
 }
 
 function providerTarget() {
-  return { account: "web-platform-staging", project: "pleomino-staging" };
+  return { account: "web-platform-staging", project: "sample-webapp-staging" };
 }

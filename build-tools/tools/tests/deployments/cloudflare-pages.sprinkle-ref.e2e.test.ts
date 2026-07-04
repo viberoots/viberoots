@@ -45,7 +45,7 @@ test("cloudflare-pages deploy keeps SprinkleRef-backed Vault values out of recor
         deploymentRequirementFixture({
           name: "cloudflare_api_token",
           step: "publish",
-          contractId: "secret://deployments/pleomino/cloudflare_api_token",
+          contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
         }),
       ],
     });
@@ -53,15 +53,15 @@ test("cloudflare-pages deploy keeps SprinkleRef-backed Vault values out of recor
     const recordsRoot = path.join(tmp, "records");
     const fixturePath = path.join(tmp, "secret-fixture.json");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
-    await writeArtifact(artifactDir, "<html>pleomino staging</html>\n");
+    await writeArtifact(artifactDir, "<html>sample-webapp staging</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await writeSecretFixture(fixturePath, {
-      "secret://deployments/pleomino/cloudflare_api_token": {
+      "secret://deployments/sample-webapp/cloudflare_api_token": {
         value: "super-secret-token",
         allowedSteps: ["publish"],
-        targetScopes: ["cloudflare-pages:web-platform-staging/pleomino-staging-pages"],
+        targetScopes: ["cloudflare-pages:web-platform-staging/sample-webapp-staging-pages"],
       },
     });
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -109,7 +109,7 @@ test("cloudflare-pages deploy keeps SprinkleRef-backed Vault values out of recor
       assert.ok(!rendered.includes("super-secret-token"));
       assert.equal(
         record.admittedContext.secretRequirements[0].contractId,
-        "secret://deployments/pleomino/cloudflare_api_token",
+        "secret://deployments/sample-webapp/cloudflare_api_token",
       );
     } finally {
       process.env.PATH = originalEnv.PATH || "";
@@ -129,7 +129,7 @@ test("cloudflare-pages admission fails closed when a required SprinkleRef contra
         deploymentRequirementFixture({
           name: "cloudflare_api_token",
           step: "publish",
-          contractId: "secret://deployments/pleomino/cloudflare_api_token",
+          contractId: "secret://deployments/sample-webapp/cloudflare_api_token",
         }),
       ],
     });
@@ -137,9 +137,9 @@ test("cloudflare-pages admission fails closed when a required SprinkleRef contra
     const recordsRoot = path.join(tmp, "records");
     const fixturePath = path.join(tmp, "secret-fixture.json");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
-    await writeArtifact(artifactDir, "<html>pleomino staging</html>\n");
+    await writeArtifact(artifactDir, "<html>sample-webapp staging</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await writeSecretFixture(fixturePath, {});
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -166,7 +166,7 @@ test("cloudflare-pages admission fails closed when a required SprinkleRef contra
             recordsRoot,
             admissionEvidence,
           }),
-        /required secret contract secret:\/\/deployments\/pleomino\/cloudflare_api_token is missing/,
+        /required secret contract secret:\/\/deployments\/sample-webapp\/cloudflare_api_token is missing/,
       );
       await assert.rejects(async () => await fsp.readdir(path.join(recordsRoot, "runs")));
     } finally {

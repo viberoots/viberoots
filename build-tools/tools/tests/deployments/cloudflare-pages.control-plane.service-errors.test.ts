@@ -39,7 +39,7 @@ test("public cloudflare-pages deploy requires a control-plane URL for protected/
     const artifactDir = path.join(tmp, "artifact");
     await writeCloudflareServiceArtifact(artifactDir, "<html>service-required</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -66,7 +66,7 @@ test("public cloudflare-pages deploy rejects mixed service and local records fla
     const recordsRoot = path.join(tmp, "records");
     await writeCloudflareServiceArtifact(artifactDir, "<html>mixed-mode</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -142,11 +142,11 @@ test("service terminal admission rejection is reported without deploy-record loo
     submissionId: "cp-test",
     submittedAt: "2026-04-30T00:00:00.000Z",
     completedAt: "2026-04-30T00:00:01.000Z",
-    deploymentId: "pleomino-staging",
-    deploymentLabel: "//projects/deployments/pleomino/staging:deploy",
+    deploymentId: "sample-webapp-staging",
+    deploymentLabel: "//projects/deployments/sample-webapp/staging:deploy",
     operationKind: "deploy",
-    providerTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
-    lockScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    providerTargetIdentity: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
+    lockScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
     lifecycleState: "finished",
     terminationReason: "no_longer_admitted",
     rejectionCode: "no_longer_admitted",
@@ -156,7 +156,7 @@ test("service terminal admission rejection is reported without deploy-record loo
 
   assert.equal(
     message,
-    "shared control-plane mutation rejected for pleomino-staging: no_longer_admitted",
+    "shared control-plane mutation rejected for sample-webapp-staging: no_longer_admitted",
   );
 });
 
@@ -185,21 +185,21 @@ test("service terminal admission rejection includes concrete rejection details",
     submissionId: "cp-test",
     submittedAt: "2026-04-30T00:00:00.000Z",
     completedAt: "2026-04-30T00:00:01.000Z",
-    deploymentId: "pleomino-staging",
-    deploymentLabel: "//projects/deployments/pleomino/staging:deploy",
+    deploymentId: "sample-webapp-staging",
+    deploymentLabel: "//projects/deployments/sample-webapp/staging:deploy",
     operationKind: "deploy",
-    providerTargetIdentity: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
-    lockScope: "cloudflare-pages:web-platform-staging/pleomino-staging-pages",
+    providerTargetIdentity: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
+    lockScope: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
     lifecycleState: "finished",
     terminationReason: "no_longer_admitted",
     rejectionCode: "no_longer_admitted",
-    rejectionMessage: "prerequisite deployment has no successful admitted run: pleomino-dev",
+    rejectionMessage: "prerequisite deployment has no successful admitted run: sample-webapp-dev",
     deployRunId: "deploy-test",
     dedupe: { mode: "created", requestFingerprint: "sha256:test" },
   });
 
   assert.equal(
     message,
-    "shared control-plane mutation rejected for pleomino-staging: no_longer_admitted: prerequisite deployment has no successful admitted run: pleomino-dev",
+    "shared control-plane mutation rejected for sample-webapp-staging: no_longer_admitted: prerequisite deployment has no successful admitted run: sample-webapp-dev",
   );
 });

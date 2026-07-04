@@ -109,8 +109,8 @@ Future edits should not weaken or silently contradict the following invariants w
 
 | Term        | Simple question                              | Meaning                                                  | Example                                      |
 | ----------- | -------------------------------------------- | -------------------------------------------------------- | -------------------------------------------- |
-| Deployment  | "Which release target are we talking about?" | A named deployable system or environment                 | `pleomino-prod`                              |
-| Component   | "What are we shipping?"                      | A deployable project artifact referenced by a deployment | `//projects/apps/pleomino:app`               |
+| Deployment  | "Which release target are we talking about?" | A named deployable system or environment                 | `sample-webapp-prod`                         |
+| Component   | "What are we shipping?"                      | A deployable project artifact referenced by a deployment | `//projects/apps/sample-webapp:app`          |
 | Provider    | "Where does it live?"                        | The destination platform                                 | `cloudflare-pages`                           |
 | Provisioner | "Who sets up the place first?"               | The infra or platform setup step                         | CDKTF creating DNS and a Pages project       |
 | Publisher   | "Who releases the built artifact?"           | The artifact upload or publish step                      | `wrangler pages deploy <resolved-dist>`      |
@@ -148,9 +148,9 @@ A deployment is a named delivered system. It may represent:
 
 Examples:
 
-- `pleomino-prod`
-- `pleomino-staging`
-- `pleomino-acme`
+- `sample-webapp-prod`
+- `sample-webapp-staging`
+- `sample-webapp-acme`
 - `acme-platform-prod`
 
 This matters because the same app may be deployed:
@@ -168,12 +168,12 @@ Deployments belong under `projects/`, not `build-tools/`, because they are proje
 ```text
 projects/
   apps/
-    pleomino/
+    sample-webapp/
     docs-site/
   libs/
     shared-ui/
   deployments/
-    pleomino/
+    sample-webapp/
       prod/
         TARGETS
         wrangler.jsonc
@@ -185,9 +185,9 @@ projects/
       smoke.ts
 ```
 
-The deployment id is the reviewed deployment identity, such as `pleomino-prod`, while
-Pleomino's repo package path is the canonical family/stage path under
-`projects/deployments/pleomino/`.
+The deployment id is the reviewed deployment identity, such as `sample-webapp-prod`, while
+Sample webapp's repo package path is the canonical family/stage path under
+`projects/deployments/sample-webapp/`.
 The `acme-platform-preview` example is illustrative of a local-only or isolated-preview-capable shape;
 protected/shared packages should normally stay closer to declarative metadata plus provider-native config.
 
@@ -200,21 +200,21 @@ Recommended deployment-id style:
 
 Good examples:
 
-- `pleomino-prod`
-- `pleomino-staging`
+- `sample-webapp-prod`
+- `sample-webapp-staging`
 - `shared-observability-prod`
 
 Less good examples:
 
-- `pleomino-wrangler-prod`
-- `pleomino-cloudflare-pages-prod`
+- `sample-webapp-wrangler-prod`
+- `sample-webapp-cloudflare-pages-prod`
 
 Those names leak implementation detail into the identity more than necessary.
 
 I want each deployment package to expose a canonical `:deploy` target:
 
 ```text
-//projects/deployments/pleomino/prod:deploy
+//projects/deployments/sample-webapp/prod:deploy
 ```
 
 That gives us:
@@ -519,7 +519,7 @@ sequenceDiagram
 
     participant PV3 as "Provider APIs"
 
-    Dev->>CLI3: deploy --deployment //projects/deployments/pleomino/prod:deploy
+    Dev->>CLI3: deploy --deployment //projects/deployments/sample-webapp/prod:deploy
     CLI3->>BX3: extract deployment metadata
     BX3->>VAL3: validate shape and policy references
     VAL3-->>CLI3: validated payload
@@ -1019,16 +1019,16 @@ I want one canonical deploy entrypoint for everything under `projects/deployment
 Examples:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy
-deploy --deployment //projects/deployments/pleomino/prod:deploy --preview --source-run-id <deploy-run-id>
-deploy --deployment //projects/deployments/pleomino/dev:deploy --preview --preview-branch <branch-name>
-deploy --deployment //projects/deployments/pleomino/dev:deploy --preview --preview-commit <commit-sha>
-deploy --deployment //projects/deployments/pleomino/prod:deploy --validate-only
-deploy --deployment //projects/deployments/pleomino/prod:deploy --provision-only
-deploy --deployment //projects/deployments/pleomino/prod:deploy --publish-only --source-run-id <deploy-run-id>
-deploy --deployment //projects/deployments/pleomino/prod:deploy --publish-only --source-run-id <deploy-run-id> --rollback
-deploy --deployment //projects/deployments/pleomino/dev:deploy --preview-cleanup --preview-branch <branch-name>
-deploy --deployment //projects/deployments/pleomino/dev:deploy --preview-cleanup --preview-commit <commit-sha>
+deploy --deployment //projects/deployments/sample-webapp/prod:deploy
+deploy --deployment //projects/deployments/sample-webapp/prod:deploy --preview --source-run-id <deploy-run-id>
+deploy --deployment //projects/deployments/sample-webapp/dev:deploy --preview --preview-branch <branch-name>
+deploy --deployment //projects/deployments/sample-webapp/dev:deploy --preview --preview-commit <commit-sha>
+deploy --deployment //projects/deployments/sample-webapp/prod:deploy --validate-only
+deploy --deployment //projects/deployments/sample-webapp/prod:deploy --provision-only
+deploy --deployment //projects/deployments/sample-webapp/prod:deploy --publish-only --source-run-id <deploy-run-id>
+deploy --deployment //projects/deployments/sample-webapp/prod:deploy --publish-only --source-run-id <deploy-run-id> --rollback
+deploy --deployment //projects/deployments/sample-webapp/dev:deploy --preview-cleanup --preview-branch <branch-name>
+deploy --deployment //projects/deployments/sample-webapp/dev:deploy --preview-cleanup --preview-commit <commit-sha>
 deploy --from-changes
 deploy --list
 ```
@@ -1137,7 +1137,7 @@ How to read this map:
 - routine JSON submissions/snapshots under `<records-root>/control-plane/` and protected/shared deploy-record files under `<records-root>/runs/` are no longer the normal operator-readable authority path
 - isolated fixture tests and explicitly local harnesses may use an explicit `pgmem://...` backend URL, but that harness is not the reviewed operator backend
 - provider, provisioner, and release-action modules still hold only vetted built-in execution adapters
-- repo-owned `deployment_lane_policy(...)` and `deployment_admission_policy(...)` rules remain Buck-visible policy-definition objects, typically in shared deployment packages such as `//projects/deployments/pleomino/shared:lane`
+- repo-owned `deployment_lane_policy(...)` and `deployment_admission_policy(...)` rules remain Buck-visible policy-definition objects, typically in shared deployment packages such as `//projects/deployments/sample-webapp/shared:lane`
 - exact filenames may evolve, but these directory boundaries should remain stable so the implementation matches the design's trust and ownership model
 
 CLI/front-door responsibilities:
@@ -1347,8 +1347,8 @@ This distinction needs to stay explicit because it is one of the easiest places 
 
 So:
 
-- `pleomino-prod` and `pleomino-staging` are different deployments
-- `deploy --deployment //projects/deployments/pleomino/prod:deploy --preview --source-run-id <deploy-run-id>` is still operating on `pleomino-prod`
+- `sample-webapp-prod` and `sample-webapp-staging` are different deployments
+- `deploy --deployment //projects/deployments/sample-webapp/prod:deploy --preview --source-run-id <deploy-run-id>` is still operating on `sample-webapp-prod`
 - preview should not silently invent a second deployment id or bypass the deployment package's validation rules
 - for `shared_nonprod` and `production_facing`, preview should not be used from unadmitted revisions or artifacts
 - for `shared_nonprod` and `production_facing`, `--preview` should require an explicit admitted source selector such as `--source-run-id <deploy-run-id>`
@@ -1368,9 +1368,9 @@ This is the simplest reliable distinction:
 
 Examples of lower environments:
 
-- `pleomino-dev`
-- `pleomino-staging`
-- `pleomino-prod`
+- `sample-webapp-dev`
+- `sample-webapp-staging`
+- `sample-webapp-prod`
 
 Examples of previews:
 
@@ -1401,7 +1401,7 @@ Protected/shared clarification:
 
 Good pattern:
 
-- user runs `deploy --deployment //projects/deployments/pleomino/prod:deploy`
+- user runs `deploy --deployment //projects/deployments/sample-webapp/prod:deploy`
 - the repo-level deploy tool resolves the deployment target
 - for `local_only` or isolated-preview flows, the repo-level deploy tool may delegate one step to a deployment-local script if needed
 - for `shared_nonprod` and `production_facing`, the normal path should stay within vetted built-in control-plane code plus declarative metadata and provider-native config
@@ -1522,7 +1522,7 @@ When you would use it:
 Local-only example:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy --validate-only
+deploy --deployment //projects/deployments/sample-webapp/prod:deploy --validate-only
 ```
 
 Plain-language version:
@@ -1550,12 +1550,12 @@ When you would use it:
 Example:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy --provision-only
+deploy --deployment //projects/deployments/sample-webapp/prod:deploy --provision-only
 ```
 
 If a reviewed protected/shared provisioner needs `immutable_resolved_inputs` rather than plain
 `metadata_only`, the operator contract should add an explicit admitted source-run selector such as
-`deploy --deployment //projects/deployments/pleomino/prod:deploy --provision-only --source-run-id <deploy-run-id>`.
+`deploy --deployment //projects/deployments/sample-webapp/prod:deploy --provision-only --source-run-id <deploy-run-id>`.
 
 Even in the default protected/shared `metadata_only` case, the control plane must still admit and record
 one concrete source revision for the provision-only run before mutation begins. The difference is that the
@@ -1604,7 +1604,7 @@ When you would use it:
 Example:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy --publish-only --source-run-id <deploy-run-id>
+deploy --deployment //projects/deployments/sample-webapp/prod:deploy --publish-only --source-run-id <deploy-run-id>
 ```
 
 Plain-language version:
@@ -1708,12 +1708,12 @@ Concrete preview-enabled example:
 ```python
 cloudflare_pages_static_webapp_deployment(
     name = "deploy",
-    component = "//projects/apps/pleomino:app",
+    component = "//projects/apps/sample-webapp:app",
     account = "web-platform-prod",
-    project = "pleomino-prod-pages",
-    lane_policy = "//projects/deployments/pleomino/shared:lane",
+    project = "sample-webapp-prod-pages",
+    lane_policy = "//projects/deployments/sample-webapp/shared:lane",
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
+    admission_policy = "//projects/deployments/sample-webapp/shared:prod_release",
     protection_class = "production_facing",
     preview = {
         "target_derivation": "provider_managed_source_run",
@@ -1751,23 +1751,23 @@ What "explicit" means here:
 Preview lifecycle examples:
 
 - CI-managed preview of an already-admitted production artifact
-  - CI or another automation trigger asks the shared control plane to select an already-admitted `pleomino-prod` run
-  - it runs `deploy --deployment //projects/deployments/pleomino/prod:deploy --preview --source-run-id <deploy-run-id>`
+  - CI or another automation trigger asks the shared control plane to select an already-admitted `sample-webapp-prod` run
+  - it runs `deploy --deployment //projects/deployments/sample-webapp/prod:deploy --preview --source-run-id <deploy-run-id>`
   - the provider adapter derives an isolated target such as `preview-from-run-184`
   - smoke runs against the preview URL
   - when the preview expires, the control plane destroys that isolated target or asks the provider to expire it
 - Branch preview with provider-managed ephemeral target
-  - CI publishes a branch preview for a local-only or explicitly preview-safe deployment by running `deploy --deployment //projects/deployments/pleomino/dev:deploy --preview --preview-branch feature/new-nav`
+  - CI publishes a branch preview for a local-only or explicitly preview-safe deployment by running `deploy --deployment //projects/deployments/sample-webapp/dev:deploy --preview --preview-branch feature/new-nav`
   - the provider owns most of the lifecycle
   - the provider adapter derives the isolated preview target, URL, cleanup identity, and lock scope from that explicit branch selector
   - repo policy still requires that the preview target be isolated from the normal live target
 - Commit preview with provider-managed ephemeral target
-  - CI or a developer publishes a commit preview for a local-only or explicitly preview-safe deployment by running `deploy --deployment //projects/deployments/pleomino/dev:deploy --preview --preview-commit abc1234`
+  - CI or a developer publishes a commit preview for a local-only or explicitly preview-safe deployment by running `deploy --deployment //projects/deployments/sample-webapp/dev:deploy --preview --preview-commit abc1234`
   - the provider adapter derives the isolated preview target, URL, cleanup identity, and lock scope from that explicit commit selector
   - repo policy still requires that the preview target be isolated from the normal live target
 - Manual local preview to a personal isolated target
   - a developer may run preview locally only when the provider adapter supports a clearly isolated local or personal preview target
-  - the request should still use one canonical selector such as `deploy --deployment //projects/deployments/pleomino/dev:deploy --preview --preview-branch feature/new-nav`
+  - the request should still use one canonical selector such as `deploy --deployment //projects/deployments/sample-webapp/dev:deploy --preview --preview-branch feature/new-nav`
   - that preview must not mutate any shared deployment target
   - if isolation cannot be proven, local preview is out of policy
 
@@ -1804,9 +1804,9 @@ Preview cleanup contract:
 - preview cleanup should be modeled as its own audited operation kind:
   - `preview_cleanup`
 - the public operator surface should expose preview cleanup explicitly rather than hiding it behind provider-specific tooling or implicit TTL-only behavior
-  - example protected/shared cleanup: `deploy --deployment //projects/deployments/pleomino/prod:deploy --preview-cleanup --source-run-id <deploy-run-id>`
-  - example preview-safe local cleanup: `deploy --deployment //projects/deployments/pleomino/dev:deploy --preview-cleanup --preview-branch <branch-name>`
-  - example preview-safe local cleanup: `deploy --deployment //projects/deployments/pleomino/dev:deploy --preview-cleanup --preview-commit <commit-sha>`
+  - example protected/shared cleanup: `deploy --deployment //projects/deployments/sample-webapp/prod:deploy --preview-cleanup --source-run-id <deploy-run-id>`
+  - example preview-safe local cleanup: `deploy --deployment //projects/deployments/sample-webapp/dev:deploy --preview-cleanup --preview-branch <branch-name>`
+  - example preview-safe local cleanup: `deploy --deployment //projects/deployments/sample-webapp/dev:deploy --preview-cleanup --preview-commit <commit-sha>`
 - preview cleanup must record at least:
   - the deployment id
   - `publish_mode = preview`
@@ -1911,8 +1911,8 @@ Monorepo clarification:
 
 Concrete examples:
 
-- `pleomino: dev -> staging -> prod`
-  - governs only deployments whose `lane_policy` resolves to the `pleomino` lane
+- `sample-webapp: dev -> staging -> prod`
+  - governs only deployments whose `lane_policy` resolves to the `sample-webapp` lane
 - `shared-observability: dev -> staging -> prod`
   - governs only deployments whose `lane_policy` resolves to the `shared-observability` lane
 - `customer-a-portal: dev -> staging -> prod`
@@ -1921,7 +1921,7 @@ Concrete examples:
 What that means in practice:
 
 - a monorepo revision may be admitted for one lane without being promoted for unrelated lanes
-- if a change only affects `pleomino`, promotion of the `pleomino` staging stage should not trigger deployment of unrelated lanes such as `shared-observability`
+- if a change only affects `sample-webapp`, promotion of the `sample-webapp` staging stage should not trigger deployment of unrelated lanes such as `shared-observability`
 - a lane may still contain more than one deployment id, but the actual deploy set for that lane is selected from authoritative metadata plus change impact, not from "everything in the repo"
 - within one lane, promotion eligibility is evaluated per deployment id by default; coordinated release-set semantics are outside this design
 
@@ -1999,17 +1999,17 @@ They also make the workflow more efficient:
 
 ### Real-World Example: Cloudflare Pages
 
-Suppose `pleomino-prod` uses Cloudflare Pages.
+Suppose `sample-webapp-prod` uses Cloudflare Pages.
 
 Typical uses:
 
-- `deploy --deployment //projects/deployments/pleomino/prod:deploy --validate-only`
+- `deploy --deployment //projects/deployments/sample-webapp/prod:deploy --validate-only`
   - verify that the deployment package, app target, and Wrangler config are wired correctly
-- `deploy --deployment //projects/deployments/pleomino/prod:deploy --provision-only`
+- `deploy --deployment //projects/deployments/sample-webapp/prod:deploy --provision-only`
   - create the Pages project and custom domain configuration if that is repo-owned
-- `deploy --deployment //projects/deployments/pleomino/prod:deploy --publish-only --source-run-id <deploy-run-id>`
+- `deploy --deployment //projects/deployments/sample-webapp/prod:deploy --publish-only --source-run-id <deploy-run-id>`
   - publish one selected previously built immutable artifact to an already-existing Pages project
-- `deploy --deployment //projects/deployments/pleomino/prod:deploy`
+- `deploy --deployment //projects/deployments/sample-webapp/prod:deploy`
   - run the full lifecycle in order
 
 This is one of the main reasons the model separates:
@@ -2038,24 +2038,24 @@ Suggested low-level rule shape:
 deployment_target(
     name = "deploy",
     provider = "cloudflare-pages",
-    component = "//projects/apps/pleomino:app",
+    component = "//projects/apps/sample-webapp:app",
     component_kind = "static-webapp",
     publisher = "wrangler-pages",
     publisher_config = "wrangler.jsonc",
-    lane_policy = "//projects/deployments/pleomino/shared:lane",
+    lane_policy = "//projects/deployments/sample-webapp/shared:lane",
     provider_target = {
-        "project": "pleomino-prod-pages",
+        "project": "sample-webapp-prod-pages",
         "account": "web-platform-prod",
-        "id": "pleomino-prod-pages",
+        "id": "sample-webapp-prod-pages",
     },
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
+    admission_policy = "//projects/deployments/sample-webapp/shared:prod_release",
     protection_class = "production_facing",
     components = [
         {
             "id": "default",
             "kind": "static-webapp",
-            "target": "//projects/apps/pleomino:app",
+            "target": "//projects/apps/sample-webapp:app",
         },
     ],
     smoke = {
@@ -2121,7 +2121,7 @@ Illustrative lane-policy example:
 
 ```python
 deployment_lane_policy(
-    name = "pleomino",
+    name = "sample-webapp",
     stages = ["dev", "staging", "prod"],
     source_ref_policy = {
         "dev": "main",
@@ -2203,7 +2203,7 @@ Policy evaluation order:
     - required for `shared_nonprod` and `production_facing`
     - should be an explicit reference to a centrally defined stable source-ref/check/approval policy object for that deployment
     - should be Buck-visible and repo-owned rather than an opaque free-form string
-    - should normally be represented as a Buck label or equivalent structured repo-owned policy reference, for example `//projects/deployments/pleomino/shared:prod_release`
+    - should normally be represented as a Buck label or equivalent structured repo-owned policy reference, for example `//projects/deployments/sample-webapp/shared:prod_release`
     - keeps the deploy rule authoritative for which admission policy applies, even if the policy definition itself lives outside the deployment package
   - `protection_class`
     - required
@@ -2347,7 +2347,7 @@ It answers:
 
 Example:
 
-- `pleomino-prod`
+- `sample-webapp-prod`
 
 A deployment may also declare explicit prerequisites on other deployments when ordering or health gating
 must be part of the repo-owned release model.
@@ -2403,7 +2403,7 @@ components = [
     {
         "id": "web",
         "kind": "static-webapp",
-        "target": "//projects/apps/pleomino:app",
+        "target": "//projects/apps/sample-webapp:app",
     },
 ]
 ```
@@ -2649,23 +2649,23 @@ The examples below are intentionally simple and repetitive. The goal is to make 
 deployment_target(
     name = "deploy",
     provider = "cloudflare-pages",
-    component = "//projects/apps/pleomino:app",
+    component = "//projects/apps/sample-webapp:app",
     component_kind = "static-webapp",
     publisher = "wrangler-pages",
     publisher_config = "wrangler.jsonc",
     provisioner = "cdktf-stack",
     provisioner_config = "cdktf/stack.json",
     provider_target = {
-        "project": "pleomino-prod-pages",
+        "project": "sample-webapp-prod-pages",
         "account": "web-platform-prod",
-        "id": "pleomino-prod-pages",
+        "id": "sample-webapp-prod-pages",
     },
     protection_class = "local_only",
     components = [
         {
             "id": "default",
             "kind": "static-webapp",
-            "target": "//projects/apps/pleomino:app",
+            "target": "//projects/apps/sample-webapp:app",
         },
     ],
     smoke = {
@@ -2916,7 +2916,7 @@ This is one of the reasons `--publish-only` exists.
 If the deployment has a provisioner but you do not want to run provisioning on a particular release, you can use:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy --publish-only --source-run-id <deploy-run-id>
+deploy --deployment //projects/deployments/sample-webapp/prod:deploy --publish-only --source-run-id <deploy-run-id>
 ```
 
 That is an operational choice for one run.
@@ -3206,8 +3206,8 @@ Choose the named release target.
 
 Examples:
 
-- `pleomino-prod`
-- `pleomino-staging`
+- `sample-webapp-prod`
+- `sample-webapp-staging`
 - `shared-observability-prod`
 
 Create:
@@ -3376,12 +3376,12 @@ load("//build-tools/deployments:defs.bzl", "cloudflare_pages_static_webapp_deplo
 
 cloudflare_pages_static_webapp_deployment(
     name = "deploy",
-    component = "//projects/apps/pleomino:app",
+    component = "//projects/apps/sample-webapp:app",
     account = "web-platform-prod",
-    project = "pleomino-prod-pages",
-    lane_policy = "//projects/deployments/pleomino/shared:lane",
+    project = "sample-webapp-prod-pages",
+    lane_policy = "//projects/deployments/sample-webapp/shared:lane",
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
+    admission_policy = "//projects/deployments/sample-webapp/shared:prod_release",
     protection_class = "production_facing",
     smoke = {
         "type": "http-smoke",
@@ -3398,7 +3398,7 @@ directly to the authoritative lane-policy object rather than rely on implicit re
 Suggested package files:
 
 ```text
-projects/deployments/pleomino/prod/
+projects/deployments/sample-webapp/prod/
   TARGETS
   wrangler.jsonc
 ```
@@ -3431,14 +3431,14 @@ Layer responsibility in this example:
 
 Publish flow:
 
-1. for `local_only`, Buck builds `//projects/apps/pleomino:app`, the local deploy tool resolves the built `dist`, and the local publisher uploads it
+1. for `local_only`, Buck builds `//projects/apps/sample-webapp:app`, the local deploy tool resolves the built `dist`, and the local publisher uploads it
 2. for `shared_nonprod` and `production_facing`, trusted CI builds and attests the artifact, the shared control plane resolves the admitted artifact and recorded snapshot, and the control-plane publisher uploads that exact artifact
 
 ## Multi-Instance Example: Same App, Same Provider
 
 ```text
 projects/deployments/
-  pleomino/
+  sample-webapp/
     prod/
     staging/
     acme/
@@ -3457,7 +3457,7 @@ The deployment id, not the app target, is what gives each release target its ide
 If checked-in provider config files are kept separate per deployment, they should differ only in provider-native settings that are not already derived from deployment metadata:
 
 ```jsonc
-// projects/deployments/pleomino/prod/wrangler.jsonc
+// projects/deployments/sample-webapp/prod/wrangler.jsonc
 {
   "$schema": "../../../node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-03-18",
@@ -3465,7 +3465,7 @@ If checked-in provider config files are kept separate per deployment, they shoul
 ```
 
 ```jsonc
-// projects/deployments/pleomino/staging/wrangler.jsonc
+// projects/deployments/sample-webapp/staging/wrangler.jsonc
 {
   "$schema": "../../../node_modules/wrangler/config-schema.json",
   "compatibility_date": "2026-03-18",
@@ -3474,7 +3474,7 @@ If checked-in provider config files are kept separate per deployment, they shoul
 
 What stays the same across those deployments:
 
-- the app target may still be `//projects/apps/pleomino:app`
+- the app target may still be `//projects/apps/sample-webapp:app`
 - the deployment model still comes from `TARGETS`
 - the deploy CLI still resolves and passes the built artifact path
 
@@ -4033,11 +4033,11 @@ Example non-production smoke exception:
 ```python
 cloudflare_pages_static_webapp_deployment(
     name = "deploy",
-    component = "//projects/apps/pleomino:app",
+    component = "//projects/apps/sample-webapp:app",
     account = "web-platform-dev",
-    project = "pleomino-dev-pages",
-    lane_policy = "//projects/deployments/pleomino/shared:lane",
-    admission_policy = "//projects/deployments/pleomino/shared:dev_release",
+    project = "sample-webapp-dev-pages",
+    lane_policy = "//projects/deployments/sample-webapp/shared:lane",
+    admission_policy = "//projects/deployments/sample-webapp/shared:dev_release",
     environment_stage = "dev",
     protection_class = "shared_nonprod",
     smoke = {
@@ -4204,7 +4204,7 @@ Minimum protected/shared RBAC scope model:
   - operational and emergency authority normally follow live-target or lane blast radius
 - canonical scope values must come from reviewed deployment metadata:
   - `deployment_id` from extracted deployment metadata
-  - `project` from reviewed deployment ownership family such as `projects/deployments/pleomino`
+  - `project` from reviewed deployment ownership family such as `projects/deployments/sample-webapp`
   - `environment_stage` from explicit deployment metadata such as `dev`, `staging`, or `prod`
   - `admission_domain` from closed reviewed values such as `all_deployments`
 - if one implementation stores grants by deployment id and another stores them by target identity, both must still evaluate to these same effective minimum scopes
@@ -4346,17 +4346,17 @@ Why this matters:
 
 ### Example: Lock Scope In The Normal One-Deployment-One-Target Case
 
-Suppose `pleomino-prod` declares:
+Suppose `sample-webapp-prod` declares:
 
 ```python
 cloudflare_pages_static_webapp_deployment(
     name = "deploy",
-    component = "//projects/apps/pleomino:app",
+    component = "//projects/apps/sample-webapp:app",
     account = "web-platform-prod",
-    project = "pleomino-prod-pages",
-    lane_policy = "//projects/deployments/pleomino/shared:lane",
+    project = "sample-webapp-prod-pages",
+    lane_policy = "//projects/deployments/sample-webapp/shared:lane",
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
+    admission_policy = "//projects/deployments/sample-webapp/shared:prod_release",
     protection_class = "production_facing",
     smoke = {
         "type": "http-smoke",
@@ -4372,11 +4372,11 @@ directly to the authoritative lane-policy object rather than rely on implicit re
 
 Normal lock-scope story:
 
-- canonical provider-target identity for this deployment is `provider = cloudflare-pages` plus `provider_target.account = web-platform-prod` and `provider_target.project = pleomino-prod-pages`
-- the derived shared-environment lock scope is therefore conceptually `cloudflare-pages:web-platform-prod/pleomino-prod-pages`
-- `deploy --deployment //projects/deployments/pleomino/prod:deploy`
-- `deploy --deployment //projects/deployments/pleomino/prod:deploy --publish-only --source-run-id <deploy-run-id>`
-- `deploy --deployment //projects/deployments/pleomino/prod:deploy --preview --source-run-id <deploy-run-id>`
+- canonical provider-target identity for this deployment is `provider = cloudflare-pages` plus `provider_target.account = web-platform-prod` and `provider_target.project = sample-webapp-prod-pages`
+- the derived shared-environment lock scope is therefore conceptually `cloudflare-pages:web-platform-prod/sample-webapp-prod-pages`
+- `deploy --deployment //projects/deployments/sample-webapp/prod:deploy`
+- `deploy --deployment //projects/deployments/sample-webapp/prod:deploy --publish-only --source-run-id <deploy-run-id>`
+- `deploy --deployment //projects/deployments/sample-webapp/prod:deploy --preview --source-run-id <deploy-run-id>`
 
 All three runs must contend on that same lock by default unless preview is explicitly configured to publish
 to a fully isolated preview target with a different canonical provider-target identity.
@@ -4579,7 +4579,7 @@ Promotion model:
 - additional stages for that family may extend the lane when needed, but should follow the same admitted-run and approval-boundary policy
 - a later environment should advance only after required checks pass for the earlier environment
 - promotion should preserve artifact identity across environments whenever the workflow is "prove once, promote forward"
-- promotion should operate across distinct deployment ids such as `pleomino-staging` and `pleomino-prod`, not by having one deployment dynamically retarget itself
+- promotion should operate across distinct deployment ids such as `sample-webapp-staging` and `sample-webapp-prod`, not by having one deployment dynamically retarget itself
 
 Plain-language version:
 
@@ -4589,9 +4589,9 @@ Plain-language version:
 Monorepo release-scope clarification:
 
 - in a monorepo, lane stages are not repo-wide release branches
-- an admitted control-plane transition for `pleomino` prod means "the `pleomino` lane may now promote this admitted repo revision"
+- an admitted control-plane transition for `sample-webapp` prod means "the `sample-webapp` lane may now promote this admitted repo revision"
 - it does not mean "deploy every deployment defined anywhere in the repo"
-- deploy automation for that lane should still use authoritative deployment metadata plus impact selection to choose which `pleomino` deployments actually run
+- deploy automation for that lane should still use authoritative deployment metadata plus impact selection to choose which `sample-webapp` deployments actually run
 - unrelated lanes such as `shared-observability` or `customer-a-portal` should remain untouched unless their own lane state advances
 
 Minimum source-policy assumptions:
@@ -4667,17 +4667,17 @@ Why this matters:
 
 Concrete promotion story:
 
-1. CI builds artifact `artifact_ref = nix:sha256-pleomino-web-7f3c2a` from source revision `abc1234` for `pleomino-staging`.
-2. The staging run publishes that exact artifact and records `artifact_lineage_id = pleomino-web/2026-03-19/abc1234`.
-3. Promotion to `pleomino-prod` reuses that same `artifact_ref` and `artifact_lineage_id` rather than rebuilding from `abc1234` on a different machine.
+1. CI builds artifact `artifact_ref = nix:sha256-sample-webapp-web-7f3c2a` from source revision `abc1234` for `sample-webapp-staging`.
+2. The staging run publishes that exact artifact and records `artifact_lineage_id = sample-webapp-web/2026-03-19/abc1234`.
+3. Promotion to `sample-webapp-prod` reuses that same `artifact_ref` and `artifact_lineage_id` rather than rebuilding from `abc1234` on a different machine.
    - the normal operator input for that reuse would be `--source-run-id <staging-run-id>`
    - that source run is valid because it is a compatible run from another deployment in the same authoritative `lane_policy`
 4. The production deployment record differs from the staging record because deployment metadata, approvals, target identity, and publish result are environment-specific, even though artifact identity is unchanged.
 
 Concrete rollback story:
 
-1. `pleomino-prod` later ships a bad artifact from revision `def5678`.
-2. Operators choose an earlier known-good artifact with `artifact_ref = nix:sha256-pleomino-web-7f3c2a`.
+1. `sample-webapp-prod` later ships a bad artifact from revision `def5678`.
+2. Operators choose an earlier known-good artifact with `artifact_ref = nix:sha256-sample-webapp-web-7f3c2a`.
 3. The rollback run records `operation_kind = rollback`, `parent_run_id` pointing at the failed or superseded production run, and the reused `artifact_lineage_id`.
    - the normal operator input for that reuse would be `--source-run-id <known-good-production-run-id> --rollback`
 4. If that artifact is no longer retrievable, the correct behavior is to surface that retention failure explicitly, not to rebuild a lookalike artifact and pretend it is the same release.
@@ -4859,9 +4859,9 @@ Suppose deployment metadata says:
 ```python
 cloudflare_pages_static_webapp_deployment(
     name = "deploy",
-    component = "//projects/apps/pleomino:app",
+    component = "//projects/apps/sample-webapp:app",
     account = "web-platform-prod",
-    project = "pleomino-prod-pages",
+    project = "sample-webapp-prod-pages",
 )
 ```
 
@@ -4869,14 +4869,14 @@ And `wrangler.jsonc` says:
 
 ```jsonc
 {
-  "name": "pleomino-staging-pages",
+  "name": "sample-webapp-staging-pages",
 }
 ```
 
 Expected behavior:
 
 - Buck deployment metadata remains authoritative for the normal live target identity
-- the deploy CLI must not silently publish to `pleomino-staging-pages`
+- the deploy CLI must not silently publish to `sample-webapp-staging-pages`
 - a good implementation either injects the authoritative provider-target identity into provider-native config at runtime or fails validation on the mismatch before any publish begins
 
 This is a mismatch error, not a precedence tie:
@@ -5271,7 +5271,7 @@ Policy:
 
 Examples:
 
-- retiring `pleomino-staging` after the environment is intentionally decommissioned
+- retiring `sample-webapp-staging` after the environment is intentionally decommissioned
 - migrating a deployment from one provider-native target name to another during a controlled cutover
 - transferring ownership of a reviewed alias target from one deployment id to its successor during a short-lived migration window
 
@@ -5385,20 +5385,20 @@ This example uses the canonical `operation_kind`, `lifecycle_state`, `terminatio
 ```json
 {
   "schema_version": "deploy-record@2026-03-01",
-  "deploy_run_id": "dr_2026_03_19_pleomino_prod_00017",
-  "deployment_id": "pleomino-prod",
-  "deployment_label": "//projects/deployments/pleomino/prod:deploy",
+  "deploy_run_id": "dr_2026_03_19_sample-webapp_prod_00017",
+  "deployment_id": "sample-webapp-prod",
+  "deployment_label": "//projects/deployments/sample-webapp/prod:deploy",
   "operation_kind": "promotion",
   "lifecycle_state": "finished",
   "termination_reason": null,
   "source_revision": "abc1234",
   "requested_by": {
     "type": "ci",
-    "id": "jenkins/promote-pleomino-prod/481"
+    "id": "jenkins/promote-sample-webapp-prod/481"
   },
   "submitted_by": {
     "type": "ci",
-    "id": "jenkins/promote-pleomino-prod/481"
+    "id": "jenkins/promote-sample-webapp-prod/481"
   },
   "executed_by": {
     "type": "control-plane-worker",
@@ -5407,24 +5407,24 @@ This example uses the canonical `operation_kind`, `lifecycle_state`, `terminatio
   "publish_mode": "normal",
   "provider": "cloudflare-pages",
   "provider_target": {
-    "project": "pleomino-prod-pages",
+    "project": "sample-webapp-prod-pages",
     "account": "web-platform-prod",
-    "id": "pleomino-prod-pages"
+    "id": "sample-webapp-prod-pages"
   },
   "effective_run_target": {
-    "project": "pleomino-prod-pages",
+    "project": "sample-webapp-prod-pages",
     "account": "web-platform-prod",
-    "id": "pleomino-prod-pages"
+    "id": "sample-webapp-prod-pages"
   },
-  "lock_scope": "cloudflare-pages:web-platform-prod/pleomino-prod-pages",
-  "parent_run_id": "dr_2026_03_19_pleomino_staging_00052",
-  "release_lineage_id": "pleomino/2026-03-19/abc1234",
-  "artifact_lineage_id": "pleomino-web/2026-03-19/abc1234",
-  "execution_snapshot_ref": "snap_2026_03_19_pleomino_prod_00017",
-  "lane_policy_ref": "//projects/deployments/pleomino/shared:lane",
-  "lane_policy_fingerprint": "sha256:lane-pleomino-v4",
-  "admission_policy_ref": "//projects/deployments/pleomino/shared:prod_release",
-  "admission_policy_fingerprint": "sha256:admission-pleomino-prod-v7",
+  "lock_scope": "cloudflare-pages:web-platform-prod/sample-webapp-prod-pages",
+  "parent_run_id": "dr_2026_03_19_sample-webapp_staging_00052",
+  "release_lineage_id": "sample-webapp/2026-03-19/abc1234",
+  "artifact_lineage_id": "sample-webapp-web/2026-03-19/abc1234",
+  "execution_snapshot_ref": "snap_2026_03_19_sample-webapp_prod_00017",
+  "lane_policy_ref": "//projects/deployments/sample-webapp/shared:lane",
+  "lane_policy_fingerprint": "sha256:lane-sample-webapp-v4",
+  "admission_policy_ref": "//projects/deployments/sample-webapp/shared:prod_release",
+  "admission_policy_fingerprint": "sha256:admission-sample-webapp-prod-v7",
   "approval_evidence": {
     "mode": "fresh",
     "approval_record_id": "apr_2026_03_19_prod_0041",
@@ -5439,16 +5439,16 @@ This example uses the canonical `operation_kind`, `lifecycle_state`, `terminatio
     {
       "id": "web",
       "kind": "static-webapp",
-      "target": "//projects/apps/pleomino:app",
+      "target": "//projects/apps/sample-webapp:app",
       "artifact_identity": {
         "type": "content_digest",
         "value": "sha256:7f3c2a9d1b6d7f42"
       },
-      "artifact_ref": "nix:sha256-pleomino-web-7f3c2a"
+      "artifact_ref": "nix:sha256-sample-webapp-web-7f3c2a"
     }
   ],
-  "deployment_metadata_fingerprint": "sha256:meta-pleomino-prod-v3",
-  "provider_config_fingerprint": "sha256:wrangler-pleomino-prod-v2",
+  "deployment_metadata_fingerprint": "sha256:meta-sample-webapp-prod-v3",
+  "provider_config_fingerprint": "sha256:wrangler-sample-webapp-prod-v2",
   "remote_publish_ids": [
     {
       "component_id": "web",
@@ -5457,7 +5457,7 @@ This example uses the canonical `operation_kind`, `lifecycle_state`, `terminatio
   ],
   "smoke_result": {
     "status": "passed",
-    "url": "https://pleomino.example.com/"
+    "url": "https://sample-webapp.example.com/"
   },
   "started_at": "2026-03-19T17:04:11Z",
   "ended_at": "2026-03-19T17:07:42Z",
@@ -5528,12 +5528,12 @@ Better abstraction:
 ```python
 cloudflare_pages_static_webapp_deployment(
     name = "deploy",
-    component = "//projects/apps/pleomino:app",
+    component = "//projects/apps/sample-webapp:app",
     account = "web-platform-prod",
-    project = "pleomino-prod-pages",
-    lane_policy = "//projects/deployments/pleomino/shared:lane",
+    project = "sample-webapp-prod-pages",
+    lane_policy = "//projects/deployments/sample-webapp/shared:lane",
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
+    admission_policy = "//projects/deployments/sample-webapp/shared:prod_release",
     protection_class = "production_facing",
     smoke = {
         "type": "http-smoke",
@@ -5590,7 +5590,7 @@ family.
 
 Examples:
 
-- all Pleomino deployments use the same smoke checks
+- all Sample webapp deployments use the same smoke checks
 - all puzzle-game deployments use the same domain conventions
 - all customer-branded deployments include an extra docs component
 
@@ -5608,7 +5608,7 @@ projects/
 ```text
 projects/
   systems/
-    pleomino/
+    sample-webapp/
       deploy/
         defs.bzl
 ```
@@ -5616,7 +5616,7 @@ projects/
 ```text
 projects/
   apps/
-    pleomino/
+    sample-webapp/
       deploy/
         defs.bzl
 ```
@@ -5739,12 +5739,12 @@ load("//projects/deployment-kits/puzzle-apps:defs.bzl", "puzzle_cloudflare_deplo
 
 puzzle_cloudflare_deployment(
     name = "deploy",
-    component = "//projects/apps/pleomino:app",
+    component = "//projects/apps/sample-webapp:app",
     account = "web-platform-prod",
-    project = "pleomino-prod-pages",
-    lane_policy = "//projects/deployments/pleomino/shared:lane",
+    project = "sample-webapp-prod-pages",
+    lane_policy = "//projects/deployments/sample-webapp/shared:lane",
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
+    admission_policy = "//projects/deployments/sample-webapp/shared:prod_release",
     protection_class = "production_facing",
     smoke = {
         "type": "http-smoke",
@@ -5761,7 +5761,7 @@ Suppose we want:
 
 - one reviewed Cloudflare Pages helper from `//build-tools/deployments:defs.bzl`
 - one puzzle-specific wrapper
-- one concrete Pleomino production deployment
+- one concrete Sample webapp production deployment
 
 ### Step 1: Provider Helper
 
@@ -5775,7 +5775,7 @@ It knows:
 - publisher is `wrangler-pages`
 - component kind should be `static-webapp`
 
-It does not know anything about Pleomino.
+It does not know anything about Sample webapp.
 
 ### Step 2: Puzzle-Specific Helper
 
@@ -5788,12 +5788,12 @@ It knows:
 - use the reviewed Cloudflare Pages helper
 - apply puzzle-family conventions
 
-It does not know about one specific deployment id such as `pleomino-prod`.
+It does not know about one specific deployment id such as `sample-webapp-prod`.
 
 ### Step 3: Concrete Deployment Package
 
 ```text
-projects/deployments/pleomino/prod/
+projects/deployments/sample-webapp/prod/
   TARGETS
   wrangler.jsonc
 ```
@@ -5805,12 +5805,12 @@ load("//projects/deployment-kits/puzzle-apps:defs.bzl", "puzzle_cloudflare_deplo
 
 puzzle_cloudflare_deployment(
     name = "deploy",
-    component = "//projects/apps/pleomino:app",
+    component = "//projects/apps/sample-webapp:app",
     account = "web-platform-prod",
-    project = "pleomino-prod-pages",
-    lane_policy = "//projects/deployments/pleomino/shared:lane",
+    project = "sample-webapp-prod-pages",
+    lane_policy = "//projects/deployments/sample-webapp/shared:lane",
     environment_stage = "prod",
-    admission_policy = "//projects/deployments/pleomino/shared:prod_release",
+    admission_policy = "//projects/deployments/sample-webapp/shared:prod_release",
     protection_class = "production_facing",
     smoke = {
         "type": "http-smoke",
@@ -5825,7 +5825,7 @@ Now the ownership boundaries are clean:
 
 - `build-tools` owns generic deployment machinery
 - `projects/deployment-kits/puzzle-apps` owns puzzle-family conventions
-- `projects/deployments/pleomino/prod` owns the concrete release target
+- `projects/deployments/sample-webapp/prod` owns the concrete release target
 
 ## Third-Party Infrastructure And Sidecars
 
@@ -5950,23 +5950,23 @@ Example:
 deployment_target(
     name = "deploy",
     provider = "cloudflare-pages",
-    component = "//projects/apps/pleomino:app",
+    component = "//projects/apps/sample-webapp:app",
     component_kind = "static-webapp",
     publisher = "wrangler-pages",
     publisher_config = "wrangler.jsonc",
     provisioner = "cdktf-stack",
     provisioner_config = "cdktf/stack.json",
     provider_target = {
-        "project": "pleomino-prod-pages",
+        "project": "sample-webapp-prod-pages",
         "account": "web-platform-prod",
-        "id": "pleomino-prod-pages",
+        "id": "sample-webapp-prod-pages",
     },
     protection_class = "local_only",
     components = [
         {
             "id": "web",
             "kind": "static-webapp",
-            "target": "//projects/apps/pleomino:app",
+            "target": "//projects/apps/sample-webapp:app",
         },
     ],
     smoke = {
@@ -6014,7 +6014,7 @@ projects/
   deployments/
     shared-observability-prod/
       TARGETS
-    pleomino/
+    sample-webapp/
       prod/
         TARGETS
     docs-prod/
@@ -6024,7 +6024,7 @@ projects/
 What this means:
 
 - `shared-observability-prod` owns rollout of the shared observability stack
-- `pleomino-prod` depends on that environment conceptually, but does not redeploy it every time
+- `sample-webapp-prod` depends on that environment conceptually, but does not redeploy it every time
 
 This is often cleaner than stuffing shared platform services into each application deployment.
 
@@ -6090,21 +6090,21 @@ Plain-language version:
 
 ### Example 4: Static App Plus Shared Monitoring
 
-Suppose `pleomino-prod` is a Cloudflare Pages deployment, and the organization also has shared monitoring and alerts managed elsewhere.
+Suppose `sample-webapp-prod` is a Cloudflare Pages deployment, and the organization also has shared monitoring and alerts managed elsewhere.
 
-What belongs in `pleomino-prod`?
+What belongs in `sample-webapp-prod`?
 
 - the static app component
 - maybe provisioning of the Pages project and domain
 - maybe smoke checks against the app's URL
 
-What probably does not belong in `pleomino-prod`?
+What probably does not belong in `sample-webapp-prod`?
 
 - a whole shared observability system reused by many deployments
 
 Plain-language version:
 
-- "Pleomino owns shipping Pleomino. It should not secretly become the owner of shared company monitoring."
+- "Sample webapp owns shipping Sample webapp. It should not secretly become the owner of shared company monitoring."
 
 ## How To Decide Where A Third-Party Thing Belongs
 
@@ -6178,7 +6178,7 @@ projects/
     shared-observability-prod/
       TARGETS
       helm/values.yaml
-    pleomino/
+    sample-webapp/
       prod/
         TARGETS
         wrangler.jsonc
@@ -6279,7 +6279,7 @@ That is the right shape for a complex but disciplined build system.
 For a static PWA, the final developer experience should be simple:
 
 ```bash
-deploy --deployment //projects/deployments/pleomino/prod:deploy
+deploy --deployment //projects/deployments/sample-webapp/prod:deploy
 ```
 
 For a `production_facing` deployment, that command should be read as the one public submission interface,
@@ -6288,7 +6288,7 @@ not as permission for the operator workstation to execute protected mutation loc
 Under the hood that may still mean:
 
 1. the CLI validates the deployment and submits the run to the shared control plane
-2. trusted CI builds `//projects/apps/pleomino:app` and records attested immutable artifact metadata
+2. trusted CI builds `//projects/apps/sample-webapp:app` and records attested immutable artifact metadata
 3. the shared control plane selects the admitted artifact and replays the recorded deployment snapshot needed for this run
 4. the control-plane publisher uploads that exact artifact to Cloudflare Pages
 5. control-plane smoke checks run unless an explicit reviewed `smoke.exception` changes the protected/shared smoke policy

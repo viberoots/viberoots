@@ -45,12 +45,12 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
     });
     const vault = await startFakeVaultServer(
       {
-        "secret://deployments/pleomino/cloudflare_api_token": {
+        "secret://deployments/sample-webapp/cloudflare_api_token": {
           currentVersion: "1",
           versions: { "1": { value: "service-secret-token" } },
         },
       },
-      { jwtAuth: { role: "deploy-pleomino-read", jwt: workerJwt } },
+      { jwtAuth: { role: "deploy-sample-webapp-read", jwt: workerJwt } },
     );
     const deployment = cloudflarePagesDeploymentFixture({
       lanePolicy: nixosSharedHostLanePolicyFixture({ defaultClientProfile: "mini" }),
@@ -62,7 +62,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
         audience: "deployments-vault",
         deploymentClientId: "deployment-runner",
         deploymentEnvironment: "mini",
-        roleName: "deploy-pleomino-read",
+        roleName: "deploy-sample-webapp-read",
         preferredCredentialSource: "external_oidc_token",
         externalOidcTokenEnv: "VBR_WORKER_OIDC_TOKEN",
       },
@@ -76,7 +76,7 @@ test("public cloudflare-pages deploy routes deploy, preview, cleanup, and rollba
     await writeCloudflareServiceArtifact(artifactA, "<html>artifact-a</html>\n");
     await writeCloudflareServiceArtifact(artifactB, "<html>artifact-b</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);

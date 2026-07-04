@@ -64,17 +64,20 @@ async function admittedSelector(opts: {
 test("Infisical selector applies runtime secret path prefix without mapping override", async () => {
   const admitted = await admittedSelector({
     runtimePath: "/deployments",
-    prefix: "/pleomino/",
-    expectedPath: "/deployments/pleomino",
+    prefix: "/sample-webapp/",
+    expectedPath: "/deployments/sample-webapp",
   });
-  assert.equal(admitted.selectorRef, "proj_123:prod:/deployments/pleomino:cloudflare_api_token@7");
+  assert.equal(
+    admitted.selectorRef,
+    "proj_123:prod:/deployments/sample-webapp:cloudflare_api_token@7",
+  );
   assert.equal(
     admitted.backendRef,
-    "proj_123:prod:/deployments/pleomino:cloudflare_api_token#sec_path",
+    "proj_123:prod:/deployments/sample-webapp:cloudflare_api_token#sec_path",
   );
   assert.equal(
     admitted.referenceId,
-    "infisical:proj_123:prod:/deployments/pleomino:cloudflare_api_token#sec_path@7",
+    "infisical:proj_123:prod:/deployments/sample-webapp:cloudflare_api_token#sec_path@7",
   );
 });
 
@@ -92,8 +95,8 @@ test("Infisical selector normalizes empty and duplicate path separators", async 
   for (const [runtimePath, prefix, expectedPath] of [
     ["", "", "/"],
     ["/", "/", "/"],
-    ["/deployments/", "/pleomino/", "/deployments/pleomino"],
-    ["deployments//", "//pleomino/cloudflare//", "/deployments/pleomino/cloudflare"],
+    ["/deployments/", "/sample-webapp/", "/deployments/sample-webapp"],
+    ["deployments//", "//sample-webapp/cloudflare//", "/deployments/sample-webapp/cloudflare"],
   ] as const) {
     const admitted = await admittedSelector({ runtimePath, prefix, expectedPath });
     assert.equal(admitted.selectorRef, `proj_123:prod:${expectedPath}:cloudflare_api_token@7`);
@@ -101,7 +104,7 @@ test("Infisical selector normalizes empty and duplicate path separators", async 
 });
 
 test("Infisical runtime acquire uses admitted prefixed selector and version", async () => {
-  const expectedPath = "/deployments/pleomino";
+  const expectedPath = "/deployments/sample-webapp";
   const server = await startFakeInfisicalServer(auth, [
     {
       id: "sec_prefixed",
@@ -133,17 +136,17 @@ test("Infisical runtime acquire uses admitted prefixed selector and version", as
         ...infisicalRuntime,
         siteUrl: server.siteUrl,
         secretPath: "/deployments",
-        secretPathPrefix: "pleomino",
+        secretPathPrefix: "sample-webapp",
       },
       secretContext: context,
     });
     assert.equal(
       admitted[0]?.backendRef,
-      "proj_123:prod:/deployments/pleomino:cloudflare_api_token#id=sec_prefixed&reference=prefixed-ref",
+      "proj_123:prod:/deployments/sample-webapp:cloudflare_api_token#id=sec_prefixed&reference=prefixed-ref",
     );
     assert.equal(
       admitted[0]?.selectorRef,
-      "proj_123:prod:/deployments/pleomino:cloudflare_api_token@7",
+      "proj_123:prod:/deployments/sample-webapp:cloudflare_api_token@7",
     );
     const runtime = createDeploymentSecretRuntime({
       backend: createDeploymentInfisicalSecretBackend(context),

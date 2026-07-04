@@ -9,8 +9,8 @@ import { runSprinkleRefCheck } from "../../deployments/sprinkleref-check";
 
 test("Infisical deployment bootstrap outputs are managed, not missing", async () => {
   const dir = await gitRepo();
-  const managed = "secret://deployments/pleomino/staging/infisical-client-id";
-  const missing = "secret://deployments/pleomino/cloudflare_api_token";
+  const managed = "secret://deployments/sample-webapp/staging/infisical-client-id";
+  const missing = "secret://deployments/sample-webapp/cloudflare_api_token";
   const config = path.join(dir, "resolver.json");
   const store = path.join(dir, "store.json");
   await writeTracked(dir, "contracts.txt", [managed, missing]);
@@ -39,11 +39,11 @@ test("Infisical deployment bootstrap outputs are managed, not missing", async ()
     output.indexOf("Missing values:"),
     output.indexOf("Managed bootstrap outputs:"),
   );
-  assert.match(missingSection, /secret:\/\/deployments\/pleomino\/cloudflare_api_token/);
+  assert.match(missingSection, /secret:\/\/deployments\/sample-webapp\/cloudflare_api_token/);
   assert.doesNotMatch(missingSection, /infisical-client-id/);
   assert.match(
     output,
-    /Managed bootstrap outputs:[\s\S]*family: pleomino[\s\S]*secret:\/\/deployments\/pleomino\/staging\/infisical-client-id/,
+    /Managed bootstrap outputs:[\s\S]*family: sample-webapp[\s\S]*secret:\/\/deployments\/sample-webapp\/staging\/infisical-client-id/,
   );
 });
 
@@ -52,7 +52,7 @@ test("managed bootstrap outputs do not require a resolver config", async () => {
   await writeTracked(
     dir,
     "contracts.txt",
-    "secret://deployments/pleomino/prod/infisical-client-secret",
+    "secret://deployments/sample-webapp/prod/infisical-client-secret",
   );
   const output = await runInDir(dir, async () => {
     let output = "";
@@ -66,13 +66,13 @@ test("managed bootstrap outputs do not require a resolver config", async () => {
   const report = JSON.parse(output);
   assert.equal(report.summary.managed, 1);
   assert.equal(report.refs[0].status, "managed");
-  assert.equal(report.refs[0].managedFamily, "pleomino");
+  assert.equal(report.refs[0].managedFamily, "sample-webapp");
 });
 
 test("bootstrap category check ignores application secret refs", async () => {
   const dir = await gitRepo();
-  const managed = "secret://deployments/pleomino/prod/infisical-client-id";
-  const appSecret = "secret://deployments/pleomino/cloudflare_api_token";
+  const managed = "secret://deployments/sample-webapp/prod/infisical-client-id";
+  const appSecret = "secret://deployments/sample-webapp/cloudflare_api_token";
   const config = path.join(dir, "resolver.json");
   const store = path.join(dir, "store.json");
   await writeTracked(dir, "contracts.txt", [managed, appSecret]);

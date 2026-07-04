@@ -155,7 +155,7 @@ function errors(resources: DeploymentResourceInventoryEntry[]): string {
 }
 
 function providerTarget() {
-  return { account: "web-platform", project: "pleomino-staging" };
+  return { account: "web-platform", project: "sample-webapp-staging" };
 }
 
 async function writeJson(root: string, relPath: string, value: unknown): Promise<void> {

@@ -11,14 +11,14 @@ import {
 } from "./cloudflare-pages.fixture";
 
 function appNode(): GraphNode {
-  return { name: "//projects/apps/pleomino:app", labels: ["kind:app", "webapp:pwa"] };
+  return { name: "//projects/apps/sample-webapp:app", labels: ["kind:app", "webapp:pwa"] };
 }
 
 function requirement() {
   return {
     name: "cloudflare_api_token",
     step: "publish",
-    contract_id: "secret://deployments/pleomino/cloudflare_api_token",
+    contract_id: "secret://deployments/sample-webapp/cloudflare_api_token",
     required: "true",
   };
 }
@@ -42,24 +42,24 @@ function errorsFor(runtime: Record<string, unknown>, secretRequirements = [requi
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),
     {
-      name: "//projects/deployments/pleomino/staging:deploy",
+      name: "//projects/deployments/sample-webapp/staging:deploy",
       provider: "cloudflare-pages",
-      component: "//projects/apps/pleomino:app",
+      component: "//projects/apps/sample-webapp:app",
       component_kind: "static-webapp",
       publisher: "wrangler-pages",
       publisher_config: "wrangler.jsonc",
       protection_class: "shared_nonprod",
-      lane_policy: "//projects/deployments/pleomino/shared:lane",
+      lane_policy: "//projects/deployments/sample-webapp/shared:lane",
       environment_stage: "staging",
-      admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+      admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
       secret_backend: "infisical/default",
       secret_requirements: secretRequirements,
       runtime_config_requirements: [],
       infisical_runtime: runtime,
       provider_target: {
         account: "web-platform-staging",
-        project: "pleomino-staging-pages",
-        id: "pleomino-staging-pages",
+        project: "sample-webapp-staging-pages",
+        id: "sample-webapp-staging-pages",
       },
     },
   ]).errors;

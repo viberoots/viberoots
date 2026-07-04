@@ -25,7 +25,18 @@ test("selected filtered-flake snapshots preserve the active workspace graph", as
     const graph = {
       $schema: "x",
       version: 1,
-      nodes: [{ name: "//projects/apps/pyapp:pyapp_lib" }],
+      nodes: [
+        {
+          name: "//projects/apps/pyapp:pyapp_lib",
+          nixpkgs_profile: "default",
+          nixpkg_pins: {
+            "pkgs.OpenSSL": {
+              nixpkgs_profile: "nixpkgs-23_11",
+              rationale: "kept in graph for planner diagnostics",
+            },
+          },
+        },
+      ],
     };
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
     await fsp.writeFile(graphPath, JSON.stringify(graph, null, 2) + "\n", "utf8");

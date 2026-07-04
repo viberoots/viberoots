@@ -63,7 +63,7 @@ test("selected cpp filtered-flake snapshots follow the target package closure", 
       snapshotRelPaths.includes("prelude") &&
       snapshotRelPaths.includes("toolchains") &&
       snapshotRelPaths.includes("viberoots"),
-    "expected selected cpp snapshot to retain shared flake and local viberoots roots",
+    "expected selected cpp snapshot to retain registry, planner, and shared flake roots",
   );
   assert.ok(
     snapshotRelPaths.includes("projects/apps/demo") &&
@@ -96,12 +96,14 @@ test("selected cpp snapshot rsync sources keep flake files at the snapshot root"
       "pnpm-lock.yaml",
       ".viberoots/buck/graph.json",
       "build-tools/tools/dev",
+      "build-tools/tools/nix/nixpkgs-source-registry.nix",
+      "build-tools/tools/nix/planner/source-selection.nix",
       "prelude",
       "third_party/providers",
       "toolchains",
       "types",
       "viberoots/flake.nix",
-      "projects/libs/pleomino-solver-wasm",
+      "projects/libs/sample-solver-wasm",
     ]) {
       const abs = path.join(root, rel);
       const isFile = path.extname(rel) !== "" || path.basename(rel).startsWith(".");
@@ -125,13 +127,13 @@ test("selected cpp snapshot rsync sources keep flake files at the snapshot root"
       "third_party",
       "toolchains",
       "viberoots",
-      "projects/libs/pleomino-solver-wasm",
+      "projects/libs/sample-solver-wasm",
     ]);
     await $({ cwd: root, stdio: "pipe" })`rsync -a --delete --relative ${sources} ${out}/`;
 
     assert.equal(await fsp.readFile(path.join(out, "flake.nix"), "utf8"), "flake.nix\n");
     assert.equal(await fsp.readFile(path.join(out, "flake.lock"), "utf8"), "flake.lock\n");
-    await fsp.access(path.join(out, "projects", "libs", "pleomino-solver-wasm"));
+    await fsp.access(path.join(out, "projects", "libs", "sample-solver-wasm"));
     assert.equal(
       await fsp.readFile(path.join(out, ".viberoots", "buck", "graph.json"), "utf8"),
       ".viberoots/buck/graph.json\n",
@@ -150,15 +152,18 @@ test("selected cpp snapshot rsync sources keep flake files at the snapshot root"
 });
 
 test("selected node filtered-flake snapshots keep only the importer and native sidecars", () => {
-  const snapshotRelPaths = selectedNodeSnapshotRelPaths("projects/apps/pleomino");
+  const snapshotRelPaths = selectedNodeSnapshotRelPaths("projects/apps/sample-app", [
+    "projects/libs/shared-ui",
+  ]);
 
-  assert.deepEqual(snapshotRelPaths.slice(0, 7), [
+  assert.deepEqual(snapshotRelPaths.slice(0, 8), [
     ".npmrc",
     "flake.lock",
     "flake.nix",
     "gomod2nix.toml",
     "package.json",
     "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
     "projects/node-modules.hashes.json",
   ]);
   assert.ok(
@@ -169,10 +174,11 @@ test("selected node filtered-flake snapshots keep only the importer and native s
     "expected selected node snapshot to retain shared flake and local viberoots roots",
   );
   assert.ok(
-    snapshotRelPaths.includes("projects/apps/pleomino") &&
-      snapshotRelPaths.includes("projects/apps/pleomino-native") &&
-      snapshotRelPaths.includes("projects/libs/pleomino-go"),
-    "expected selected node snapshot to retain importer and native sidecar paths",
+    snapshotRelPaths.includes("projects/apps/sample-app") &&
+      snapshotRelPaths.includes("projects/libs/shared-ui") &&
+      snapshotRelPaths.includes("projects/apps/sample-app-native") &&
+      snapshotRelPaths.includes("projects/libs/sample-app-go"),
+    "expected selected node snapshot to retain importer, workspace deps, and native sidecars",
   );
   assert.ok(
     !snapshotRelPaths.includes("projects/apps/unrelated"),
@@ -193,9 +199,12 @@ test("filtered-flake rsync excludes generated workspace state that churns source
     ".viberoots/cache",
     ".viberoots/codex-logs",
     ".viberoots/workspace/buck",
+    ".viberoots/workspace/cache",
     ".viberoots/workspace/codex-test-logs",
     ".viberoots/workspace/install-cache",
+    ".viberoots/workspace/nix-xdg-cache",
     ".viberoots/workspace/pr-logs",
+    ".viberoots/workspace/xdg-cache",
     "viberoots/.codex-logs",
     "viberoots/.direnv",
     "viberoots/.nix-gcroots",
@@ -209,4 +218,18 @@ test("filtered-flake rsync excludes generated workspace state that churns source
       `missing filtered-flake exclude: ${rel}`,
     );
   }
+});
+
+test("default filtered-flake snapshots filter missing allowlist paths", async () => {
+  const source = await fsp.readFile(
+    path.resolve("viberoots/build-tools/tools/dev/nix-build-filtered-flake.ts"),
+    "utf8",
+  );
+  assert.match(source, /async function existingRelPaths/);
+  assert.match(source, /readDefaultSnapshotSources[\s\S]*existingRelPaths/);
+  assert.match(source, /nodeArtifactPrefixes[\s\S]*"node-cli\."/);
+  assert.match(source, /nodeArtifactPrefixes[\s\S]*"node-service\."/);
+  assert.match(source, /nodeArtifactPrefixes[\s\S]*"node-test\."/);
+  assert.match(source, /nodeArtifactPrefixes[\s\S]*"node-vercel-next\."/);
+  assert.match(source, /nodeArtifactPrefixes[\s\S]*"node-webapp\."/);
 });

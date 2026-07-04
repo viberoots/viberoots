@@ -20,7 +20,7 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
       tmp,
       "projects",
       "deployments",
-      "pleomino",
+      "sample-webapp",
       "shared",
       "TARGETS",
     );
@@ -35,9 +35,9 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
         "nixos_shared_host_static_webapp_deployment(",
         '    name = "deploy",',
         '    component = "//projects/apps/demoapp:app",',
-        '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
+        '    lane_policy = "//projects/deployments/sample-webapp/shared:lane",',
         '    environment_stage = "dev",',
-        '    admission_policy = "//projects/deployments/pleomino/shared:dev_release",',
+        '    admission_policy = "//projects/deployments/sample-webapp/shared:dev_release",',
         "    secret_requirements = [",
         '        {"name": "source_access_hmac_key", "step": "publish", "contract_id": "secret://deployments/source-access/hmac_key/dev", "required": "true", "source": "secret_runtime"},',
         "    ],",
@@ -54,21 +54,21 @@ test("nixos-shared-host deployment extraction reads canonical metadata from TARG
     const nodes = await runDeploymentCquery(tmp, _$, "deployment-cquery", [
       "//projects/deployments/demoapp-dev:deploy",
       "//projects/apps/demoapp:app",
-      "//projects/deployments/pleomino/shared:lane",
-      "//projects/deployments/pleomino/shared:defaults",
-      "//projects/deployments/pleomino/shared:lane_governance",
-      "//projects/deployments/pleomino/shared:dev_release",
+      "//projects/deployments/sample-webapp/shared:lane",
+      "//projects/deployments/sample-webapp/shared:defaults",
+      "//projects/deployments/sample-webapp/shared:lane_governance",
+      "//projects/deployments/sample-webapp/shared:dev_release",
     ]);
     const { deployments, errors } = extractNixosSharedHostDeployments(nodes);
     assert.deepEqual(errors, []);
     assert.equal(deployments.length, 1);
     assert.equal(deployments[0]?.label, "//projects/deployments/demoapp-dev:deploy");
     assert.equal(deployments[0]?.name, "deploy");
-    assert.equal(deployments[0]?.lanePolicyRef, "//projects/deployments/pleomino/shared:lane");
+    assert.equal(deployments[0]?.lanePolicyRef, "//projects/deployments/sample-webapp/shared:lane");
     assert.equal(deployments[0]?.lanePolicy.defaultClientProfile, "mini");
     assert.equal(
       deployments[0]?.admissionPolicyRef,
-      "//projects/deployments/pleomino/shared:dev_release",
+      "//projects/deployments/sample-webapp/shared:dev_release",
     );
     assert.equal(deployments[0]?.environmentStage, "dev");
     assert.equal(deployments[0]?.runtime.appName, "demoapp");
@@ -91,7 +91,7 @@ test("nixos-shared-host cquery extraction rejects incomplete external requiremen
       tmp,
       "projects",
       "deployments",
-      "pleomino",
+      "sample-webapp",
       "shared",
       "TARGETS",
     );
@@ -106,9 +106,9 @@ test("nixos-shared-host cquery extraction rejects incomplete external requiremen
         "nixos_shared_host_static_webapp_deployment(",
         '    name = "deploy",',
         '    component = "//projects/apps/demoapp:app",',
-        '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
+        '    lane_policy = "//projects/deployments/sample-webapp/shared:lane",',
         '    environment_stage = "dev",',
-        '    admission_policy = "//projects/deployments/pleomino/shared:dev_release",',
+        '    admission_policy = "//projects/deployments/sample-webapp/shared:dev_release",',
         "    secret_requirements = [],",
         "    runtime_config_requirements = [],",
         '    external_requirement_profiles = ["source_access"],',
@@ -123,10 +123,10 @@ test("nixos-shared-host cquery extraction rejects incomplete external requiremen
     const nodes = await runDeploymentCquery(tmp, _$, "deployment-cquery-profile-rejection", [
       "//projects/deployments/demoapp-dev:deploy",
       "//projects/apps/demoapp:app",
-      "//projects/deployments/pleomino/shared:lane",
-      "//projects/deployments/pleomino/shared:defaults",
-      "//projects/deployments/pleomino/shared:lane_governance",
-      "//projects/deployments/pleomino/shared:dev_release",
+      "//projects/deployments/sample-webapp/shared:lane",
+      "//projects/deployments/sample-webapp/shared:defaults",
+      "//projects/deployments/sample-webapp/shared:lane_governance",
+      "//projects/deployments/sample-webapp/shared:dev_release",
     ]);
     const { errors } = extractNixosSharedHostDeployments(nodes);
     assert.ok(
@@ -152,7 +152,7 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
       tmp,
       "projects",
       "deployments",
-      "pleomino",
+      "sample-webapp",
       "shared",
       "TARGETS",
     );
@@ -171,9 +171,9 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
         "",
         "nixos_shared_host_multi_static_webapp_deployment(",
         '    name = "deploy",',
-        '    lane_policy = "//projects/deployments/pleomino/shared:lane",',
+        '    lane_policy = "//projects/deployments/sample-webapp/shared:lane",',
         '    environment_stage = "dev",',
-        '    admission_policy = "//projects/deployments/pleomino/shared:dev_release",',
+        '    admission_policy = "//projects/deployments/sample-webapp/shared:dev_release",',
         "    secret_requirements = [],",
         "    runtime_config_requirements = [],",
         "    components = [",
@@ -191,10 +191,10 @@ test("nixos-shared-host multi-component extraction reads rollout policy and comp
       "//projects/deployments/demo-stack-dev:deploy",
       "//projects/apps/demoapp:app",
       "//projects/apps/demoapi:api",
-      "//projects/deployments/pleomino/shared:lane",
-      "//projects/deployments/pleomino/shared:defaults",
-      "//projects/deployments/pleomino/shared:lane_governance",
-      "//projects/deployments/pleomino/shared:dev_release",
+      "//projects/deployments/sample-webapp/shared:lane",
+      "//projects/deployments/sample-webapp/shared:defaults",
+      "//projects/deployments/sample-webapp/shared:lane_governance",
+      "//projects/deployments/sample-webapp/shared:dev_release",
     ]);
     const { deployments, errors } = extractNixosSharedHostDeployments(nodes);
     assert.deepEqual(errors, []);

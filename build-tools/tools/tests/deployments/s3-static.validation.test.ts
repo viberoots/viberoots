@@ -15,22 +15,22 @@ function staticWebappComponent(label: string): GraphNode {
 
 function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
-    name: "//projects/deployments/pleomino/staging-s3:deploy",
+    name: "//projects/deployments/sample-webapp/staging-s3:deploy",
     provider: "s3-static",
-    component: "//projects/apps/pleomino:app",
+    component: "//projects/apps/sample-webapp:app",
     component_kind: "static-webapp",
     publisher: "aws-s3-sync",
     publisher_config: "aws-s3-sync.jsonc",
     provisioner: "terraform-stack",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {
       account: "web-platform-staging",
-      bucket: "pleomino-staging-site",
+      bucket: "sample-webapp-staging-site",
       region: "us-west-2",
       distribution: "staging.example.test",
     },
@@ -44,7 +44,7 @@ function policyNodes(): GraphNode[] {
 
 test("validation rejects preview and unsupported rollout modes for s3-static", () => {
   const { errors } = extractS3StaticDeployments([
-    staticWebappComponent("//projects/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/sample-webapp:app"),
     ...policyNodes(),
     deploymentNode({
       preview: { target_derivation: "provider_managed_source_run" },
@@ -59,7 +59,7 @@ test("validation rejects preview and unsupported rollout modes for s3-static", (
 
 test("validation rejects unsupported publisher and provisioner", () => {
   const { errors } = extractS3StaticDeployments([
-    staticWebappComponent("//projects/apps/pleomino:app"),
+    staticWebappComponent("//projects/apps/sample-webapp:app"),
     ...policyNodes(),
     deploymentNode({ publisher: "other", provisioner: "custom" }),
   ]);
@@ -70,7 +70,7 @@ test("validation rejects unsupported publisher and provisioner", () => {
 test("validation rejects reviewed non-static kinds until s3-static declares support", () => {
   for (const kind of REVIEWED_NON_STATIC_COMPONENT_KINDS) {
     const { errors } = extractS3StaticDeployments([
-      { name: "//projects/apps/pleomino:app", labels: ["kind:app", "webapp:ssr"] },
+      { name: "//projects/apps/sample-webapp:app", labels: ["kind:app", "webapp:ssr"] },
       ...policyNodes(),
       deploymentNode({ component_kind: kind }),
     ]);

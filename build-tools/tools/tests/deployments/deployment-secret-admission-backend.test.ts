@@ -62,7 +62,7 @@ test("initial admission dispatches to Infisical and records non-secret selectors
         id: "sec_1",
         projectId: "proj_123",
         environment: "prod",
-        secretPath: "/deployments/pleomino",
+        secretPath: "/deployments/sample-webapp",
         secretName: "cloudflare_api_token",
         version: "3",
         secretValue: "runtime-token-v3",

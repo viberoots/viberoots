@@ -96,7 +96,7 @@ export function evidence(overrides: Record<string, unknown> = {}) {
     },
     runtimeConfig: {
       publicUrl: "https://deploy.example.test",
-      deploymentIds: ["pleomino-staging"],
+      deploymentIds: ["sample-webapp-staging"],
       workers: { expectedCount: 2 },
       authProvider: {
         callback: {
@@ -176,7 +176,7 @@ export function runtimeHttpEvidence(check: "health" | "readiness" | "worker-hear
       host: "deploy.example.test",
       hostProfile: "aws-ec2",
       profileIdentity: "aws-ec2-instance-i-123",
-      deploymentIds: ["pleomino-staging"],
+      deploymentIds: ["sample-webapp-staging"],
       workerCount: 2,
     },
     credentialSource:

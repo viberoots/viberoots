@@ -2,30 +2,24 @@ import { normalizeTargetLabel, packagePathFromLabel } from "../lib/labels";
 
 type GraphNodeRecord = Record<string, unknown>;
 
-const SHARED_CPP_SNAPSHOT_ROOTS = [
-  ".viberoots",
-  "build-tools",
-  "prelude",
-  "third_party",
-  "toolchains",
-  "types",
-  "viberoots",
-];
+// prettier-ignore
+const SHARED_CPP_SNAPSHOT_ROOTS = [".viberoots", "build-tools", "prelude", "third_party", "toolchains", "types", "viberoots"];
 
-const SHARED_CPP_SNAPSHOT_ROOT_FILES = [
-  ".npmrc",
-  "flake.lock",
-  "flake.nix",
-  "gomod2nix.toml",
-  "package.json",
-  "pnpm-lock.yaml",
-];
+// prettier-ignore
+const SHARED_CPP_SNAPSHOT_ROOT_FILES = [".npmrc", "flake.lock", "flake.nix", "gomod2nix.toml", "package.json", "pnpm-lock.yaml"];
 
 const SHARED_NODE_SNAPSHOT_ROOTS = SHARED_CPP_SNAPSHOT_ROOTS;
 const SHARED_NODE_SNAPSHOT_ROOT_FILES = [
   ...SHARED_CPP_SNAPSHOT_ROOT_FILES,
+  "pnpm-workspace.yaml",
   "projects/node-modules.hashes.json",
 ];
+
+// prettier-ignore
+export const DEFAULT_FILTERED_FLAKE_ROOT_FILES = [".buckconfig", ".buckroot", ".npmrc", "TARGETS", "eslint.config.js", "flake.lock", "flake.nix", "gomod2nix.toml", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json"];
+
+// prettier-ignore
+export const DEFAULT_FILTERED_FLAKE_ROOTS = [".viberoots", "build-tools", "cpp", "go", "lang", "node", "patches", "prelude", "python", "tools", "third_party", "toolchains", "types", "viberoots"];
 
 export const FILTERED_FLAKE_RSYNC_EXCLUDES = [
   ".git",
@@ -42,10 +36,13 @@ export const FILTERED_FLAKE_RSYNC_EXCLUDES = [
   ".viberoots/workspace/.viberoots",
   ".viberoots/workspace/backups",
   ".viberoots/workspace/buck",
+  ".viberoots/workspace/cache",
   ".viberoots/workspace/codex-test-logs",
   ".viberoots/workspace/install-cache",
+  ".viberoots/workspace/nix-xdg-cache",
   ".viberoots/workspace/node",
   ".viberoots/workspace/pr-logs",
+  ".viberoots/workspace/xdg-cache",
   "viberoots/.viberoots",
   "viberoots/.cache",
   "viberoots/.clinic",
@@ -88,12 +85,27 @@ export function filteredFlakeRsyncExcludeArgs(): string[] {
   return FILTERED_FLAKE_RSYNC_EXCLUDES.map((entry) => ["--exclude", entry]).flat();
 }
 
+export function defaultFilteredFlakeSnapshotRelPaths(): string[] {
+  return [...DEFAULT_FILTERED_FLAKE_ROOT_FILES, ...DEFAULT_FILTERED_FLAKE_ROOTS];
+}
+
+export function defaultFilteredFlakeSnapshotRsyncSources(relPaths: readonly string[]): string[] {
+  return relPaths.map((relPath) => `./${relPath}`);
+}
+
 function isRecord(value: unknown): value is GraphNodeRecord {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
 function graphNodeNameOf(node: GraphNodeRecord): string {
   return normalizeTargetLabel(String(node.name || "").trim());
+}
+
+function normalizeRelPath(value: string): string {
+  return String(value || "")
+    .trim()
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "");
 }
 
 function graphNodeDepsOf(node: GraphNodeRecord): string[] {
@@ -155,9 +167,7 @@ export function selectedCppSnapshotRelPaths(packagePaths: readonly string[]): st
   for (const rel of SHARED_CPP_SNAPSHOT_ROOT_FILES) ordered.add(rel);
   for (const rel of SHARED_CPP_SNAPSHOT_ROOTS) ordered.add(rel);
   for (const rel of packagePaths) {
-    const normalized = String(rel || "")
-      .trim()
-      .replace(/^\/+/, "");
+    const normalized = normalizeRelPath(rel);
     if (!normalized) continue;
     ordered.add(normalized);
   }
@@ -168,16 +178,20 @@ export function selectedCppSnapshotRsyncSources(relPaths: readonly string[]): st
   return relPaths.map((relPath) => `./${relPath}`);
 }
 
-export function selectedNodeSnapshotRelPaths(importerDir: string): string[] {
+export function selectedNodeSnapshotRelPaths(
+  importerDir: string,
+  workspacePackageDirs: readonly string[] = [],
+): string[] {
   const ordered = new Set<string>();
   for (const rel of SHARED_NODE_SNAPSHOT_ROOT_FILES) ordered.add(rel);
   for (const rel of SHARED_NODE_SNAPSHOT_ROOTS) ordered.add(rel);
-  const normalized = String(importerDir || "")
-    .trim()
-    .replace(/^\/+/, "")
-    .replace(/\/+$/, "");
+  const normalized = normalizeRelPath(importerDir);
   if (!normalized || normalized === ".") return [...ordered];
   ordered.add(normalized);
+  for (const rel of workspacePackageDirs) {
+    const workspacePackage = normalizeRelPath(rel);
+    if (workspacePackage && workspacePackage !== ".") ordered.add(workspacePackage);
+  }
   const name = normalized.split("/").pop() || "";
   if (name) {
     ordered.add(`${normalized}-native`);
@@ -187,5 +201,18 @@ export function selectedNodeSnapshotRelPaths(importerDir: string): string[] {
 }
 
 export function selectedNodeSnapshotRsyncSources(relPaths: readonly string[]): string[] {
+  return relPaths.map((relPath) => `./${relPath}`);
+}
+
+export function selectedPythonSnapshotRelPaths(importerDir: string): string[] {
+  const ordered = new Set<string>();
+  for (const rel of SHARED_CPP_SNAPSHOT_ROOT_FILES) ordered.add(rel);
+  for (const rel of SHARED_CPP_SNAPSHOT_ROOTS) ordered.add(rel);
+  const normalized = normalizeRelPath(importerDir);
+  if (normalized && normalized !== ".") ordered.add(normalized);
+  return [...ordered];
+}
+
+export function selectedPythonSnapshotRsyncSources(relPaths: readonly string[]): string[] {
   return relPaths.map((relPath) => `./${relPath}`);
 }

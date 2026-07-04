@@ -22,7 +22,7 @@ Priority goal:
 - get `mini`-based shared dev working end to end for static webapps first
 - keep that path aligned with the final deployment design instead of building a throwaway shortcut
 - after that first milestone, get static-webapp deploys working to Cloudflare Pages with a real
-  `dev -> staging -> prod` flow for Pleomino
+  `dev -> staging -> prod` flow for Sample webapp
 - continue from that first successful path until the broader deployment design is implemented
 
 Non-goals:
@@ -62,7 +62,7 @@ Completion criteria:
 - `mini` shared-dev static webapps work end to end with tested provisioning, publish, ingress, and
   smoke behavior
 - static webapps can deploy to Cloudflare Pages through the shared deployment system with tested
-  promotion-safe `dev -> staging -> prod` behavior for Pleomino
+  promotion-safe `dev -> staging -> prod` behavior for Sample webapp
 - the repo has a coherent implementation of deployment metadata extraction, provider capabilities,
   control-plane authority, immutable artifact handling, retry/rollback/promotion, preview cleanup,
   and authoritative records consistent with
@@ -1086,7 +1086,7 @@ CI to shell into `mini` manually.
 
 ### Acceptance Criteria
 
-- A developer machine can stage a Pleomino artifact to `mini` and run the reviewed direct deploy
+- A developer machine can stage a Sample webapp artifact to `mini` and run the reviewed direct deploy
   flow without an interactive manual SSH session.
 - The remote execution path produces a stable machine-readable result and fails closed on transport,
   staging, or remote deploy errors.
@@ -1184,7 +1184,7 @@ for `mini` while still staying intentionally outside the later shared-control-pl
 
 ### Acceptance Criteria
 
-- A developer machine can complete the current direct Pleomino-to-`mini` flow without a second
+- A developer machine can complete the current direct Sample webapp-to-`mini` flow without a second
   manual SSH step to run `nixos-rebuild switch`.
 - Host apply is explicit, dry-runnable, and fail-closed on unmanaged or drifted hosts.
 - The implementation remains limited to the current managed `nixos-shared-host` slice and does not
@@ -1212,17 +1212,17 @@ partially supersede.
 
 ### Recommendation
 
-Implement third so the interim direct remote flow is actually complete for real Pleomino-to-`mini`
+Implement third so the interim direct remote flow is actually complete for real Sample webapp-to-`mini`
 use.
 
 ---
 
-## PR-4.9: Jenkins-ready direct remote deploy flow for Pleomino `dev` on `mini`
+## PR-4.9: Jenkins-ready direct remote deploy flow for Sample webapp `dev` on `mini`
 
 ### Description
 
 I will package the reviewed direct remote flow into a CI-usable, non-interactive operator surface so
-Pleomino can be deployed to `mini` from Jenkins before the later shared-control-plane path exists.
+Sample webapp can be deployed to `mini` from Jenkins before the later shared-control-plane path exists.
 This PR is intentionally narrow and explicitly interim: it standardizes the current direct remote
 flow for CI without redefining it as the final shared deployment model.
 
@@ -1238,7 +1238,7 @@ flow for CI without redefining it as the final shared deployment model.
   - required SSH credential and host-key expectations
   - required remote repo checkout expectations
 - Add reviewed JSON output suitable for Jenkins parsing and post-step reporting.
-- Add a concrete Pleomino `dev` example flow for `mini`.
+- Add a concrete Sample webapp `dev` example flow for `mini`.
 - Keep scope limited to the current direct path:
   - no shared-control-plane submission
   - no admission or locking
@@ -1252,14 +1252,14 @@ flow for CI without redefining it as the final shared deployment model.
   - missing required credential or host metadata
   - incompatible flag combinations
 - Add fixture-based integration tests proving the CI wrapper can:
-  - stage the Pleomino artifact
+  - stage the Sample webapp artifact
   - run the remote direct deploy
   - optionally run host apply
   - emit stable JSON results
 
 ### Docs (in this PR)
 
-- Document the reviewed Jenkins flow for deploying Pleomino `dev` to `mini`.
+- Document the reviewed Jenkins flow for deploying Sample webapp `dev` to `mini`.
 - Document the minimum CI prerequisites and non-goals.
 - Document that this CI path is an interim direct-mutation route pending the later shared-control-plane
   implementation.
@@ -1272,14 +1272,14 @@ flow for CI without redefining it as the final shared deployment model.
 ### Expected Regression Scope
 
 - `deployment-only`
-- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should package the existing Pleomino
+- Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should package the existing Sample webapp
   `dev` target into a CI-facing deployment wrapper without touching shared build-system paths or new
   project-owned deployment metadata. Under the deployment-only verify policy, default `v` / CI can
   run the reviewed deployment suite instead of the full non-deployment build-system verify scope.
 
 ### Acceptance Criteria
 
-- Jenkins can deploy Pleomino `dev` to `mini` through a reviewed non-interactive flow using the
+- Jenkins can deploy Sample webapp `dev` to `mini` through a reviewed non-interactive flow using the
   direct remote path.
 - The CI-facing contract is explicit, machine-readable, and fail-closed on missing inputs.
 - The documented operator expectations match the implemented CI entrypoint and tests.
@@ -1297,7 +1297,7 @@ same reviewed remote layers instead of creating provider-local CI-only semantics
 ### Consequence of Not Implementing
 
 The current `mini` slice could be used manually or semi-manually, but not through one reviewed CI
-entrypoint for Pleomino.
+entrypoint for Sample webapp.
 
 ### Downsides for Implementing
 
@@ -1306,7 +1306,7 @@ submission path.
 
 ### Recommendation
 
-Implement fourth so teams can use a reviewed Pleomino-to-`mini` CI path while PR-5 and later
+Implement fourth so teams can use a reviewed Sample webapp-to-`mini` CI path while PR-5 and later
 control-plane work are still pending.
 
 ---
@@ -1741,12 +1741,12 @@ Implement before cross-environment promotion and more advanced provider support.
 
 ---
 
-## PR-9: Cloudflare Pages provider slice + Pleomino staging/prod deployment packages
+## PR-9: Cloudflare Pages provider slice + Sample webapp staging/prod deployment packages
 
 ### Description
 
 I will implement the first non-`mini` protected/shared provider slice using Cloudflare Pages and
-land the concrete Pleomino deployment packages needed for a real shared `staging` and `prod` flow.
+land the concrete Sample webapp deployment packages needed for a real shared `staging` and `prod` flow.
 This PR is the first half of the secondary milestone: getting static-webapp deploys to Cloudflare
 Pages in the same deployment system rather than only on `mini`.
 
@@ -1756,10 +1756,10 @@ Pages in the same deployment system rather than only on `mini`.
   - `cloudflare-pages`
 - Implement canonical provider-target identity normalization for Cloudflare Pages.
 - Implement the first built-in Cloudflare Pages publisher and smoke runner.
-- Add concrete deployment packages for Pleomino:
-  - `pleomino-dev` on `nixos-shared-host` remains the shared-dev path
-  - `pleomino-staging` on `cloudflare-pages`
-  - `pleomino-prod` on `cloudflare-pages`
+- Add concrete deployment packages for Sample webapp:
+  - `sample-webapp-dev` on `nixos-shared-host` remains the shared-dev path
+  - `sample-webapp-staging` on `cloudflare-pages`
+  - `sample-webapp-prod` on `cloudflare-pages`
 - Add provider-native config generation or validation rules so Cloudflare target identity stays
   derived from authoritative deployment metadata.
 - Reuse the shared control-plane, artifact, record, and admission machinery from earlier PRs.
@@ -1768,7 +1768,7 @@ Pages in the same deployment system rather than only on `mini`.
 ### Tests (in this PR)
 
 - Add Cloudflare Pages provider-capability contract tests.
-- Add validation tests for Pleomino staging/prod deployment metadata and canonical target identity.
+- Add validation tests for Sample webapp staging/prod deployment metadata and canonical target identity.
 - Add end-to-end deploy tests for the Cloudflare Pages static-webapp path using admitted exact
   artifacts.
 - Add smoke-blocking tests for the Cloudflare Pages public target behavior.
@@ -1778,7 +1778,7 @@ Pages in the same deployment system rather than only on `mini`.
 ### Docs (in this PR)
 
 - Document the Cloudflare Pages provider capability and publisher contract.
-- Document Pleomino's initial `dev -> staging -> prod` topology:
+- Document Sample webapp's initial `dev -> staging -> prod` topology:
   - `dev` on `mini`
   - `staging` and `prod` on Cloudflare Pages
 - Document provider-target identity rules and smoke expectations for Cloudflare Pages.
@@ -1792,7 +1792,7 @@ Pages in the same deployment system rather than only on `mini`.
 
 - `mixed-build-system`
 - Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR is expected to combine new
-  provider/control-plane code with concrete Pleomino `projects/deployments/...` packages and the
+  provider/control-plane code with concrete Sample webapp `projects/deployments/...` packages and the
   reviewed shared build-system surface needed to declare and extract the new provider slice. Under
   the deployment-only verify policy, default `v` / CI must still run the full build-system verify
   scope.
@@ -1800,7 +1800,7 @@ Pages in the same deployment system rather than only on `mini`.
 ### Acceptance Criteria
 
 - One provider beyond `mini` works end to end for the supported shared/protected static-webapp path.
-- Pleomino has concrete `dev`, `staging`, and `prod` deployment packages wired into the deployment
+- Sample webapp has concrete `dev`, `staging`, and `prod` deployment packages wired into the deployment
   system.
 - The implementation reuses the general control-plane machinery instead of provider-local shortcuts.
 - Provider-target identity, smoke, and artifact handling are covered by tests in the same PR.
@@ -1817,7 +1817,7 @@ Keep the provider slice narrow and make capability rules explicit in tests and d
 ### Consequence of Not Implementing
 
 The deployment system would remain unproven as a general multi-provider model and would not support
-the first real Pleomino higher-environment path.
+the first real Sample webapp higher-environment path.
 
 ### Downsides for Implementing
 
@@ -1830,18 +1830,18 @@ milestone lands on the same rails as the first.
 
 ---
 
-## PR-10: Pleomino `dev -> staging -> prod` promotion flow on exact static-webapp artifacts
+## PR-10: Sample webapp `dev -> staging -> prod` promotion flow on exact static-webapp artifacts
 
 ### Description
 
-I will implement promotion across the concrete Pleomino deployment ids so the secondary
+I will implement promotion across the concrete Sample webapp deployment ids so the secondary
 intermediate goal is fully met: one exact static-webapp artifact can move from `dev` evidence
 through `staging` and `prod` using the repository's default `same_artifact` model.
 
 ### Scope & Changes
 
-- Implement promotion classification for Pleomino across distinct deployment ids in compatible lanes.
-- Reuse the exact admitted artifact across Pleomino deployments where lane policy allows
+- Implement promotion classification for Sample webapp across distinct deployment ids in compatible lanes.
+- Reuse the exact admitted artifact across Sample webapp deployments where lane policy allows
   `same_artifact`.
 - Add promotion eligibility checks against current control-plane lane state and reviewed
   source-ref policy.
@@ -1854,7 +1854,7 @@ through `staging` and `prod` using the repository's default `same_artifact` mode
   - `artifact_lineage_id`
 - Ensure promotion uses the source run's artifact and source snapshot evidence while still freezing a
   new target-environment execution snapshot for the promoted deployment.
-- Prove the complete Pleomino `dev -> staging -> prod` operator path through the shared deployment
+- Prove the complete Sample webapp `dev -> staging -> prod` operator path through the shared deployment
   system.
 
 ### Tests (in this PR)
@@ -1863,7 +1863,7 @@ through `staging` and `prod` using the repository's default `same_artifact` mode
   - promotion across incompatible lanes
   - promotion from retained but no-longer-eligible source runs
   - promotion that would retarget one deployment dynamically instead of using a distinct deployment id
-- Add end-to-end promotion tests across Pleomino `dev`, `staging`, and `prod` using one exact
+- Add end-to-end promotion tests across Sample webapp `dev`, `staging`, and `prod` using one exact
   artifact.
 - Add lineage tests proving artifact and release lineage fields are recorded correctly.
 - Add smoke-gated tests proving promotion halts when the staged environment does not satisfy its
@@ -1871,7 +1871,7 @@ through `staging` and `prod` using the repository's default `same_artifact` mode
 
 ### Docs (in this PR)
 
-- Document same-artifact promotion semantics using the concrete Pleomino `dev -> staging -> prod`
+- Document same-artifact promotion semantics using the concrete Sample webapp `dev -> staging -> prod`
   example.
 - Document the distinction between source-run evidence and target-environment admission.
 - Document lineage field meanings for promotion runs.
@@ -1879,19 +1879,19 @@ through `staging` and `prod` using the repository's default `same_artifact` mode
 ### Verification Commands
 
 - `v`
-- Pleomino promotion command flows introduced in this PR
+- Sample webapp promotion command flows introduced in this PR
 
 ### Expected Regression Scope
 
 - `deployment-only`
 - Assuming PR-4.5.1 through PR-4.5.3 are complete, this PR should add promotion logic on top of the
-  Pleomino deployment packages already introduced earlier without touching shared build-system
+  Sample webapp deployment packages already introduced earlier without touching shared build-system
   paths. Under the deployment-only verify policy, default `v` / CI can run the reviewed deployment
   suite instead of the full non-deployment build-system verify scope.
 
 ### Acceptance Criteria
 
-- Pleomino can move through a real `dev -> staging -> prod` flow using exact static-webapp artifacts.
+- Sample webapp can move through a real `dev -> staging -> prod` flow using exact static-webapp artifacts.
 - Promotion respects current lane-policy eligibility and records lineage correctly.
 - Promotion uses `--source-run-id` plus control-plane current stage state, not branch movement or
   pointer-file edits, to decide whether the selected source run is still promotable.
@@ -1907,7 +1907,7 @@ Keep this PR limited to `same_artifact` only and reject any path that looks like
 
 ### Consequence of Not Implementing
 
-The secondary milestone would remain incomplete because Pleomino would still lack a real higher-
+The secondary milestone would remain incomplete because Sample webapp would still lack a real higher-
 environment promotion path.
 
 ### Downsides for Implementing
@@ -1925,7 +1925,7 @@ early as safely possible.
 
 ### Description
 
-I will generalize the Pleomino-specific promotion path into provider-agnostic cross-deployment
+I will generalize the Sample webapp-specific promotion path into provider-agnostic cross-deployment
 promotion support for all compatible lanes using the repository's default `same_artifact` model.
 
 ### Scope & Changes
@@ -5926,7 +5926,7 @@ component, runtime, and rollout semantics for that promotion family.
 - Keep `rebuild_per_stage` semantics unchanged:
   - cross-provider flexibility must not silently turn exact-artifact promotion into rebuild-per-stage
   - lanes that need stage-specific builds must still use the reviewed rebuild-per-stage path
-- Update Pleomino's reviewed `dev -> staging -> prod` model so `dev` on `nixos-shared-host` can
+- Update Sample webapp's reviewed `dev -> staging -> prod` model so `dev` on `nixos-shared-host` can
   promote into Cloudflare Pages staging/prod through the new reviewed compatibility contract.
 
 ### Tests (in this PR)
@@ -5935,9 +5935,9 @@ component, runtime, and rollout semantics for that promotion family.
   reviewed cross-provider promotion contract is declared.
 - Add tests proving reviewed flexible-`dev` lanes allow cross-provider promotion only on the
   declared stage edges and still reject the same mismatch on undeclared edges.
-- Add end-to-end Pleomino promotion tests proving:
-  - `pleomino-dev` on `nixos-shared-host` can promote into `pleomino-staging` on Cloudflare Pages
-  - `pleomino-staging` can promote into `pleomino-prod` under the lane's reviewed higher-environment
+- Add end-to-end Sample webapp promotion tests proving:
+  - `sample-webapp-dev` on `nixos-shared-host` can promote into `sample-webapp-staging` on Cloudflare Pages
+  - `sample-webapp-staging` can promote into `sample-webapp-prod` under the lane's reviewed higher-environment
     compatibility rules
   - lineage fields and exact-artifact reuse semantics remain correct across the flexible `dev`
     boundary
@@ -5966,7 +5966,7 @@ component, runtime, and rollout semantics for that promotion family.
 - Update [Deployment Provider Capabilities](../../deployment-provider-capabilities.md)
   to document which provider families and component/runtime contracts support cross-provider
   promotion and which still fail closed.
-- Update the Pleomino example docs so they describe the reviewed `dev` flexibility and the stricter
+- Update the Sample webapp example docs so they describe the reviewed `dev` flexibility and the stricter
   higher-environment expectations consistently.
 - Document the operator-facing rule of thumb:
   - `dev` may be operationally different
@@ -7057,7 +7057,7 @@ reviewed architecture already used by the current shared-host service path.
 
 - Add integration tests proving reviewed Cloudflare Pages protected/shared submit / status / result
   flows go through the central service / worker / backend path rather than local peer mutation.
-- Add end-to-end Pleomino staging/prod tests proving the reviewed Cloudflare Pages path preserves:
+- Add end-to-end Sample webapp staging/prod tests proving the reviewed Cloudflare Pages path preserves:
   - deploy
   - promotion
   - rollback
@@ -7102,7 +7102,7 @@ reviewed architecture already used by the current shared-host service path.
 
 - Reviewed Cloudflare Pages `shared_nonprod` and `production_facing` mutation no longer bypasses
   the central control-plane service / worker / backend authority.
-- Pleomino staging/prod Cloudflare Pages flows preserve their reviewed semantics while routing
+- Sample webapp staging/prod Cloudflare Pages flows preserve their reviewed semantics while routing
   through the central protected/shared service boundary.
 - Reviewed Cloudflare Pages protected/shared machine-readable outputs align with the backend-native
   control-plane contract rather than local record-path-oriented execution details.
@@ -8729,12 +8729,12 @@ transitional caveat.
    reviewed install / uninstall model.
 3. PR-4.5.1 through PR-4.5.3: add the fail-closed deployment-only verify policy so deployment
    system changes can avoid the heavy non-deployment build-system suite without weakening safety.
-4. PR-4.6 through PR-4.9: add the interim direct remote-execution path so Pleomino can deploy to
+4. PR-4.6 through PR-4.9: add the interim direct remote-execution path so Sample webapp can deploy to
    `mini` from a dev machine and Jenkins before the shared control plane exists.
 5. PR-5 through PR-8: turn that first provider slice into a real shared deployment system with
    control-plane authority, initial shared locking, immutable artifacts, replay, and admission.
 6. PR-9 through PR-10: reach the secondary milestone by adding Cloudflare Pages static-webapp deploys
-   and a full Pleomino `dev -> staging -> prod` flow.
+   and a full Sample webapp `dev -> staging -> prod` flow.
 7. PR-11 through PR-13, with PR-12.1 verify-scope hardening immediately after preview: generalize
    that second milestone across providers, preview, deployment-test ownership cleanup, and
    changed-based orchestration.
@@ -9504,7 +9504,7 @@ the reviewed production deployment credential path.
     deploy records, logs, and operator-visible status
 - Require Cloudflare preview-cleanup submissions to preserve the cleanup admitted secret-reference
   set needed for deterministic execution and replay.
-- Update the concrete Pleomino Cloudflare Pages deployment packages, or a reviewed shared helper if
+- Update the concrete Sample webapp Cloudflare Pages deployment packages, or a reviewed shared helper if
   preferred, so staging/prod declare the Cloudflare API token contract needed by publish and preview
   cleanup instead of depending on ambient wrangler shell state.
 - Make preview-cleanup behavior fail closed when:
@@ -9529,7 +9529,7 @@ the reviewed production deployment credential path.
   - the old ambient `CLOUDFLARE_API_TOKEN` path is rejected for normal protected/shared cleanup
   - any retained break-glass/test token path is explicit, audited, and not selected by default
 - Add deployment requirement validation tests for the new `preview_cleanup` secret step.
-- Add extraction tests proving the concrete Pleomino Cloudflare Pages `TARGETS` emit the required
+- Add extraction tests proving the concrete Sample webapp Cloudflare Pages `TARGETS` emit the required
   Cloudflare API token secret requirements for publish and preview cleanup.
 - Add docs/front-door parity tests proving:
   - the setup guide and usage guide no longer present AppRole as the normal deployment secret path
@@ -9560,7 +9560,7 @@ the reviewed production deployment credential path.
 - targeted deployment-domain tests covering:
   - Cloudflare Pages preview-cleanup secret runtime behavior
   - deployment requirement validation for `preview_cleanup`
-  - Pleomino Cloudflare Pages secret requirement extraction
+  - Sample webapp Cloudflare Pages secret requirement extraction
   - docs/front-door parity for JWT-first operator guidance and AppRole fallback wording
 
 ### Expected Regression Scope
@@ -9577,7 +9577,7 @@ the reviewed production deployment credential path.
   reviewed protected/shared path.
 - Preview-cleanup credentials are declared through `secret_requirements`, admitted as non-secret
   references, and consumed through the reviewed Vault/JWT-backed runtime boundary.
-- Pleomino Cloudflare Pages staging/prod deployments declare the reviewed Cloudflare API token
+- Sample webapp Cloudflare Pages staging/prod deployments declare the reviewed Cloudflare API token
   contracts needed for publish and cleanup.
 - Secret values still never cross into Buck metadata, checked-in files, control-plane payloads,
   replay snapshots, deploy records, logs, or operator-visible status surfaces.
@@ -12219,9 +12219,9 @@ human `groups` membership alone.
 The design supports both narrow human groups and broader automation principals:
 
 - humans may receive deployment-scoped grants such as:
-  - `submitter` for `pleomino-dev`
-  - `approver` for `pleomino-prod`
-  - `admission_reporter` for `pleomino-staging`
+  - `submitter` for `sample-webapp-dev`
+  - `approver` for `sample-webapp-prod`
+  - `admission_reporter` for `sample-webapp-staging`
 - CI may receive broader grants such as:
   - `admission_reporter` for `all_deployments`
   - `submitter` for `environment_stage=dev`

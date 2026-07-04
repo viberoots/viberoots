@@ -48,8 +48,8 @@ function phase0Deployment(
     },
     prerequisites,
     secretRequirements: [],
-    runtimeConfigRequirements: deploymentId.startsWith("data-room-console-")
-      ? [{ name: "data-room-web-base-url", step: "publish", contractId: "runtime://fixture" }]
+    runtimeConfigRequirements: deploymentId.startsWith("example-console-")
+      ? [{ name: "example-web-base-url", step: "publish", contractId: "runtime://fixture" }]
       : [],
     releaseActions: [],
     targetExceptions: [],
@@ -87,7 +87,7 @@ async function expectAdmissionRejects(
 
 test("Phase 0 fixture admission blocks stale foundation migration evidence", async () => {
   const foundation = phase0Deployment("platform-foundation-staging", "opentofu");
-  const worker = phase0Deployment("data-room-worker-staging", "kubernetes", [
+  const worker = phase0Deployment("example-worker-staging", "kubernetes", [
     { deploymentId: foundation.deploymentId, mode: "health_gated" },
   ]);
   await runInTemp("phase0-fixture-foundation-drift", async (tmp) => {
@@ -107,14 +107,14 @@ test("Phase 0 fixture admission blocks stale foundation migration evidence", asy
 test("Phase 0 release records reject source drift without reviewed exception", () => {
   const errors = validatePhase0ReleaseRecords([
     {
-      deploymentId: "data-room-web-prod",
+      deploymentId: "example-web-prod",
       sourceRevision: "rev-a",
       lanePolicyRef: "lane",
       artifactIdentity: "web-artifact",
       providerTargetIdentity: "kubernetes:web",
     },
     {
-      deploymentId: "data-room-console-prod",
+      deploymentId: "example-console-prod",
       sourceRevision: "rev-b",
       lanePolicyRef: "lane",
       artifactIdentity: "console-artifact",
@@ -122,7 +122,7 @@ test("Phase 0 release records reject source drift without reviewed exception", (
     },
   ]);
   assert.ok(
-    errors.includes("data-room-console-prod source revision differs without reviewed exception"),
+    errors.includes("example-console-prod source revision differs without reviewed exception"),
   );
 });
 
@@ -130,14 +130,14 @@ test("Phase 0 release records accept expiring compatibility exceptions", () => {
   assert.deepEqual(
     validatePhase0ReleaseRecords([
       {
-        deploymentId: "data-room-web-staging",
+        deploymentId: "example-web-staging",
         sourceRevision: "rev-a",
         lanePolicyRef: "lane",
         artifactIdentity: "web-artifact",
         providerTargetIdentity: "kubernetes:web",
       },
       {
-        deploymentId: "data-room-console-staging",
+        deploymentId: "example-console-staging",
         sourceRevision: "hotfix",
         lanePolicyRef: "lane",
         artifactIdentity: "console-artifact",

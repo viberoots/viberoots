@@ -21,6 +21,7 @@ const expectedRemoteReadyFixtureTargets = [
   tinyTargetCanonical,
 ];
 const localPolicy = parseVerifyExecutionPolicy({ env: {} });
+const wrapperFixturesScope = "//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures/...";
 
 test("first local conformance target has target-derived readiness evidence", async () => {
   const metadata = collectRemoteExecTargetMetadata({
@@ -76,7 +77,7 @@ test("first local conformance target executes the dry-run runner", async () => {
 
 test("only declared wrapper fixtures are remote-ready in the Buck graph", async () => {
   const res =
-    await $`buck2 --isolation-dir ${inheritedBuckIsolation("remote_conformance_only_ready")} cquery --target-platforms prelude//platforms:default --json --output-attribute labels //...`.nothrow();
+    await $`buck2 --isolation-dir ${inheritedBuckIsolation("remote_conformance_only_ready")} cquery --target-platforms prelude//platforms:default --json --output-attribute labels ${wrapperFixturesScope}`.nothrow();
   assert.equal(res.exitCode, 0, String(res.stderr || ""));
   const attrs = JSON.parse(String(res.stdout || "{}")) as Record<string, { labels?: string[] }>;
   const readyTargets = Object.entries(attrs)

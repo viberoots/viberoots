@@ -4,12 +4,13 @@
 , workspaceSrc
 , viberootsInput
 , workspaceName ? "workspace"
+, nixpkgsRegistryExtension ? { profiles = { }; }
 , version
 , releaseTag
 }:
 let
   sys = import ./for-all-systems.nix {
-    inherit nixpkgs buck2 gomod2nix workspaceSrc viberootsInput version releaseTag;
+    inherit nixpkgs buck2 gomod2nix workspaceSrc viberootsInput version releaseTag nixpkgsRegistryExtension;
   };
 in
 {

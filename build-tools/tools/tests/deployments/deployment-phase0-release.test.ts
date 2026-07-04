@@ -35,17 +35,17 @@ test("Phase 0 removal ordering is applied to grouped execution", async () => {
     deployment("platform-foundation-prod", [
       { deploymentId: "platform-foundation-staging", mode: "ordering_only" },
     ]),
-    deployment("data-room-worker-prod", [
+    deployment("example-worker-prod", [
       { deploymentId: "platform-foundation-prod", mode: "health_gated" },
-      { deploymentId: "data-room-worker-staging", mode: "ordering_only" },
+      { deploymentId: "example-worker-staging", mode: "ordering_only" },
     ]),
-    deployment("data-room-console-prod", [
-      { deploymentId: "data-room-web-prod", mode: "health_gated" },
-      { deploymentId: "data-room-console-staging", mode: "ordering_only" },
+    deployment("example-console-prod", [
+      { deploymentId: "example-web-prod", mode: "health_gated" },
+      { deploymentId: "example-console-staging", mode: "ordering_only" },
     ]),
-    deployment("data-room-web-prod", [
-      { deploymentId: "data-room-worker-prod", mode: "health_gated" },
-      { deploymentId: "data-room-web-staging", mode: "ordering_only" },
+    deployment("example-web-prod", [
+      { deploymentId: "example-worker-prod", mode: "health_gated" },
+      { deploymentId: "example-web-staging", mode: "ordering_only" },
     ]),
   ];
   assert.deepEqual(
@@ -55,22 +55,17 @@ test("Phase 0 removal ordering is applied to grouped execution", async () => {
     ]),
     [
       ["platform-foundation-prod", ["platform-foundation-staging"]],
-      ["data-room-worker-prod", ["data-room-worker-staging", "platform-foundation-prod"].sort()],
-      ["data-room-console-prod", ["data-room-console-staging", "data-room-web-prod"].sort()],
-      ["data-room-web-prod", ["data-room-web-staging", "data-room-worker-prod"].sort()],
+      ["example-worker-prod", ["example-worker-staging", "platform-foundation-prod"].sort()],
+      ["example-console-prod", ["example-console-staging", "example-web-prod"].sort()],
+      ["example-web-prod", ["example-web-staging", "example-worker-prod"].sort()],
     ],
   );
   assert.deepEqual(
     orderPhase0DeploymentsForRemoval(unorderedDeployments).map((entry) => entry.deploymentId),
-    [
-      "data-room-console-prod",
-      "data-room-web-prod",
-      "data-room-worker-prod",
-      "platform-foundation-prod",
-    ],
+    ["example-console-prod", "example-web-prod", "example-worker-prod", "platform-foundation-prod"],
   );
   const plan: DeploymentFromChangesPlan = {
-    changedPaths: ["fixtures/deployments/data-room-console-prod/TARGETS"],
+    changedPaths: ["fixtures/deployments/example-console-prod/TARGETS"],
     directDeploymentIds: unorderedDeployments.map((entry) => entry.deploymentId),
     selectedDeployments: unorderedDeployments,
     reasonsByDeploymentId: {},
@@ -95,9 +90,9 @@ test("Phase 0 removal ordering is applied to grouped execution", async () => {
     },
   });
   assert.deepEqual(executionOrder, [
-    "data-room-console-prod",
-    "data-room-web-prod",
-    "data-room-worker-prod",
+    "example-console-prod",
+    "example-web-prod",
+    "example-worker-prod",
     "platform-foundation-prod",
   ]);
   assert.deepEqual(result.deploymentOrder, executionOrder);
@@ -107,14 +102,12 @@ test("Phase 0 removal ordering is applied to grouped execution", async () => {
 test("Phase 0 prerequisite validation enforces component and lane promotion order", () => {
   const errors = validatePhase0ReleasePrerequisites([
     deployment("platform-foundation-dev"),
-    deployment("data-room-worker-dev", [
+    deployment("example-worker-dev", [
       { deploymentId: "platform-foundation-dev", mode: "health_gated" },
     ]),
-    deployment("data-room-web-dev"),
-    deployment("data-room-console-dev", [
-      { deploymentId: "data-room-web-dev", mode: "health_gated" },
-    ]),
-    deployment("data-room-worker-staging", [
+    deployment("example-web-dev"),
+    deployment("example-console-dev", [{ deploymentId: "example-web-dev", mode: "health_gated" }]),
+    deployment("example-worker-staging", [
       { deploymentId: "platform-foundation-staging", mode: "health_gated" },
     ]),
     deployment("platform-foundation-staging", [
@@ -123,41 +116,39 @@ test("Phase 0 prerequisite validation enforces component and lane promotion orde
   ]);
 
   assert.ok(
-    errors.includes(
-      "data-room-web-dev must health-gate data-room-worker-dev for Phase 0 add order",
-    ),
+    errors.includes("example-web-dev must health-gate example-worker-dev for Phase 0 add order"),
   );
   assert.ok(
     errors.includes(
-      "data-room-worker-staging must order after data-room-worker-dev for Phase 0 lane promotion",
+      "example-worker-staging must order after example-worker-dev for Phase 0 lane promotion",
     ),
   );
 });
 
 test("Phase 0 contract validation requires concrete readiness prerequisites", () => {
   const web = {
-    ...deployment("data-room-web-prod"),
-    component: { kind: "ssr-webapp", target: "//projects/apps/data-room-web:service_artifact" },
+    ...deployment("example-web-prod"),
+    component: { kind: "ssr-webapp", target: "//projects/apps/example-web:service_artifact" },
     runtimeConfigRequirements: [],
   } as DeploymentTarget;
   const console = {
-    ...deployment("data-room-console-prod"),
-    component: { kind: "ssr-webapp", target: "//projects/apps/data-room-console:vercel_artifact" },
+    ...deployment("example-console-prod"),
+    component: { kind: "ssr-webapp", target: "//projects/apps/example-console:vercel_artifact" },
     runtimeConfigRequirements: [{ name: "console-public-url" }],
     smoke: { runner: "http" },
   } as DeploymentTarget;
   const errors = validatePhase0ReleaseContracts([web, console]);
 
-  assert.ok(errors.includes("data-room-web-prod must declare web API readiness config"));
+  assert.ok(errors.includes("example-web-prod must declare web API readiness config"));
   assert.ok(
-    errors.includes("data-room-web-prod must declare Phase 0 smoke or release-health checks"),
+    errors.includes("example-web-prod must declare Phase 0 smoke or release-health checks"),
   );
-  assert.ok(errors.includes("data-room-console-prod must declare console-to-web base URL config"));
+  assert.ok(errors.includes("example-console-prod must declare console-to-web base URL config"));
 });
 
 test("Phase 0 compatibility exception expiration must parse and remain active", () => {
   const record = {
-    deploymentId: "data-room-console-prod",
+    deploymentId: "example-console-prod",
     sourceRevision: "hotfix",
     lanePolicyRef: "lane",
     artifactIdentity: "console-artifact",
@@ -171,11 +162,11 @@ test("Phase 0 compatibility exception expiration must parse and remain active", 
   assert.match(
     validatePhase0ReleaseRecords([
       {
-        deploymentId: "data-room-web-prod",
+        deploymentId: "example-web-prod",
         sourceRevision: "abc",
         lanePolicyRef: "lane",
         artifactIdentity: "web-artifact",
-        providerTargetIdentity: "kubernetes:phase0/data-room-web#prod",
+        providerTargetIdentity: "kubernetes:phase0/example-web#prod",
       },
       record,
     ]).join("\n"),
@@ -184,11 +175,11 @@ test("Phase 0 compatibility exception expiration must parse and remain active", 
   assert.match(
     validatePhase0ReleaseRecords([
       {
-        deploymentId: "data-room-web-prod",
+        deploymentId: "example-web-prod",
         sourceRevision: "abc",
         lanePolicyRef: "lane",
         artifactIdentity: "web-artifact",
-        providerTargetIdentity: "kubernetes:phase0/data-room-web#prod",
+        providerTargetIdentity: "kubernetes:phase0/example-web#prod",
       },
       {
         ...record,

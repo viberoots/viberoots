@@ -197,7 +197,7 @@ main-backed lane governance contract.
   and governance without `stage_branches`.
 - Add validation tests rejecting protected/shared lane metadata that treats `env/...` branches as
   required promotion state.
-- Add fixture migrations for existing platform and Pleomino lane policies.
+- Add fixture migrations for existing platform and Sample webapp lane policies.
 - Add stale-schema tests proving `stage_branches` is not required for protected/shared lane policy.
 
 ### 5. Docs to be added or updated
@@ -555,7 +555,7 @@ Kustomize base/overlay behavior.
   - rollout policy
   - prerequisites
 - Add validation that rejects duplicate or drifted fields that should come from family defaults.
-- Migrate concrete platform and Pleomino deployment packages to the shared-family pattern.
+- Migrate concrete platform and Sample webapp deployment packages to the shared-family pattern.
 - Keep provider-native config below the Buck metadata layer and validate that it does not
   contradict core deployment facts.
 

@@ -66,7 +66,7 @@ test("Infisical replay rejects id mismatch and omitted id", async () => {
         error instanceof Error &&
         error.message.includes("missing Infisical replay identity evidence: provider secret id") &&
         error.message.includes(
-          "requested selector: proj_123:prod:/deployments/pleomino:cloudflare_api_token",
+          "requested selector: proj_123:prod:/deployments/sample-webapp:cloudflare_api_token",
         ),
     );
   });

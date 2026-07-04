@@ -32,7 +32,7 @@ test("resource inventory maps representative provider families to provider targe
       "cloudflare-pages",
       cloudflareNodes([
         cloudflareDeployment({
-          provider_target: { account: "web-platform-staging", project: "pleomino-staging" },
+          provider_target: { account: "web-platform-staging", project: "sample-webapp-staging" },
         }),
       ]),
     ],
@@ -42,7 +42,7 @@ test("resource inventory maps representative provider families to provider targe
         s3Deployment({
           provider_target: {
             account: "web-platform-staging",
-            bucket: "pleomino-staging-site",
+            bucket: "sample-webapp-staging-site",
             region: "us-west-2",
           },
         }),
@@ -100,7 +100,7 @@ test("resource inventory fixtures cover every supported deployment query root", 
       appNode({ name: "//sandbox/libs/shared:app", labels: ["kind:app", "webapp:pwa"] }),
       cloudflareDeployment({
         name: "//projects/deployments/query-root-app:deploy",
-        component: "//projects/apps/pleomino:app",
+        component: "//projects/apps/sample-webapp:app",
         provider_target: { account: "web-platform", project: "query-root-app" },
       }),
       cloudflareDeployment({
@@ -131,13 +131,13 @@ test("resource inventory fails closed for unsupported extracted deployment conce
     {
       name: "//projects/deployments/unknown:deploy",
       provider: "unsupported-provider",
-      component: "//projects/apps/pleomino:app",
+      component: "//projects/apps/sample-webapp:app",
       component_kind: "static-webapp",
       publisher: "unknown",
       protection_class: "shared_nonprod",
-      lane_policy: "//projects/deployments/pleomino/shared:lane",
+      lane_policy: "//projects/deployments/sample-webapp/shared:lane",
       environment_stage: "staging",
-      admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+      admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
       provider_target: {},
     },
   ]);
@@ -174,7 +174,7 @@ test("resource inventory fails closed when source-mode local overrides are disab
       deploymentContexts: {
         app: {
           controlPlane: "prod",
-          cloudflare: { account: "web-platform", projectName: "pleomino-prod" },
+          cloudflare: { account: "web-platform", projectName: "sample-webapp-prod" },
         },
       },
     },
@@ -222,9 +222,9 @@ function vercelNode(): GraphNode {
     publisher: "vercel-prebuilt",
     publisher_config: "vercel-prebuilt.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: { team: "web-platform", project: "console-staging", environment: "staging" },

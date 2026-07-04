@@ -51,7 +51,7 @@ test("deployment service owns PKCE login sessions and public OIDC callback", asy
         sub: "human-1",
         email: "ada@example.com",
         preferred_username: "Ada",
-        groups: ["deploy-submitters-pleomino-dev"],
+        groups: ["deploy-submitters-sample-webapp-dev"],
       },
     });
     const target = deployment(oidc.issuer);
@@ -109,7 +109,7 @@ test("deployment auth sessions fail closed for mismatches, replay, and expiry", 
       claims: {
         sub: "human-1",
         email: "ada@example.com",
-        groups: ["deploy-submitters-pleomino-dev"],
+        groups: ["deploy-submitters-sample-webapp-dev"],
       },
     });
     const target = deployment(oidc.issuer);
@@ -170,7 +170,7 @@ test("deployment auth sessions tolerate IdPs that omit the requested Vault audie
         sub: "human-1",
         email: "ada@example.com",
         preferred_username: "Ada",
-        groups: ["deploy-submitters-pleomino-dev"],
+        groups: ["deploy-submitters-sample-webapp-dev"],
       },
     });
     const target = deployment(oidc.issuer);
@@ -211,7 +211,7 @@ test("deployment auth sessions still reject unrelated audiences", async () => {
         sub: "human-1",
         email: "ada@example.com",
         preferred_username: "Ada",
-        groups: ["deploy-submitters-pleomino-dev"],
+        groups: ["deploy-submitters-sample-webapp-dev"],
       },
     });
     const target = deployment(oidc.issuer);

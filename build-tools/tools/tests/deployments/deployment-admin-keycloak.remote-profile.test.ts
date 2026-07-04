@@ -20,18 +20,18 @@ import {
 } from "./cloudflare-pages.fixture";
 import { runInTemp } from "../lib/test-helpers";
 import {
-  pleominoDeploymentFixture,
+  sampleWebappDeploymentFixture,
   prepareRemoteExecFixture,
   remoteExecEnv,
-  REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+  REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
 
 function shapeAdminGroup() {
-  return "deploy-admin-identity-shape-admin-project-pleomino";
+  return "deploy-admin-identity-shape-admin-project-sample-webapp";
 }
 
 function membershipAdminGroup() {
-  return "deploy-admin-identity-membership-admin-project-pleomino";
+  return "deploy-admin-identity-membership-admin-project-sample-webapp";
 }
 
 function realmFileFor(configRoot: string) {
@@ -66,7 +66,7 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
     const syncResult = await $({
       cwd: tmp,
       env: baseEnv,
-    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin identity sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${syncConfigRoot} --acting-principal user:shape-admin --admin-group ${shapeAdminGroup()}`;
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin identity sync --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${syncConfigRoot} --acting-principal user:shape-admin --admin-group ${shapeAdminGroup()}`;
     const syncSummary = JSON.parse(String(syncResult.stdout));
     assert.equal(syncSummary.executionMode, "remote-profile");
     assert.equal(
@@ -79,14 +79,14 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
     assert.equal(syncSummary.mutation.audit.requestedMutation.remoteProfile, "mini");
     assert.match(
       await fsp.readFile(realmFileFor(syncConfigRoot), "utf8"),
-      /deploy-submitters-pleomino-dev/,
+      /deploy-submitters-sample-webapp-dev/,
     );
 
     const authzConfigRoot = path.join(tmp, "remote-config-root-authz");
     const authzResult = await $({
       cwd: tmp,
       env: baseEnv,
-    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin identity sync --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${authzConfigRoot} --acting-principal user:submitter-only --admin-group ${reviewedHumanGroupName(pleominoDeploymentFixture(), "submitter")}`.nothrow();
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin identity sync --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${authzConfigRoot} --acting-principal user:submitter-only --admin-group ${reviewedHumanGroupName(sampleWebappDeploymentFixture(), "submitter")}`.nothrow();
     assert.notEqual(authzResult.exitCode, 0);
     assert.match(
       String(authzResult.stderr),
@@ -117,7 +117,7 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
           {
             realm: "deployments",
             enabled: true,
-            groups: [{ name: "deploy-submitters-pleomino-dev" }],
+            groups: [{ name: "deploy-submitters-sample-webapp-dev" }],
             clients: [],
           },
           null,
@@ -159,7 +159,7 @@ test("deploy admin identity remote profile reuses one reviewed temp repo across 
         FAKE_NIXOS_REBUILD_LOG: rebuildLog,
         FAKE_SYSTEMCTL_LOG: systemctlLog,
       }),
-    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin identity grant-user --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${hostApplyConfigRoot} --apply-host --action submit --user-email alice@example.com --acting-principal user:membership-admin --admin-group ${membershipAdminGroup()}`;
+    })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} admin identity grant-user --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --profile mini --profile-root ${profileRoot} --remote-config-root ${hostApplyConfigRoot} --apply-host --action submit --user-email alice@example.com --acting-principal user:membership-admin --admin-group ${membershipAdminGroup()}`;
     const hostApplySummary = JSON.parse(String(hostApplyResult.stdout));
     assert.equal(hostApplySummary.hostApply.requestedMode, "switch");
     assert.equal(hostApplySummary.hostApply.result.mode, "switch");

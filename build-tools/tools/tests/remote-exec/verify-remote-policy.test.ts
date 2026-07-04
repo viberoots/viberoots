@@ -6,6 +6,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { parseVerifyExecutionPolicyForArgs } from "../../dev/verify/args";
 import { buildVerifyTestEnvArgs } from "../../dev/verify/buck2-test-env";
+import { buildBuckProcessEnvForPolicy } from "../../dev/verify/buck2-test-remote-env";
 import {
   buckCqueryArgsForExecutionPolicy,
   buckTestArgsForExecutionPolicy,
@@ -49,6 +50,19 @@ test("verify remote policy defaults to local with no remote inputs", () => {
     "--target-platforms",
     "prelude//platforms:default",
   ]);
+});
+
+test("verify local Buck process env uses BUCK2_REAL_HOME as HOME", () => {
+  const policy = parseVerifyExecutionPolicy({ env: {} });
+  const env = buildBuckProcessEnvForPolicy(policy, {
+    HOME: "/host-home",
+    BUCK2_REAL_HOME: "/workspace/buck-home",
+    VBR_VERIFY_REGISTER_PROCESS: "1",
+  });
+
+  assert.equal(env.HOME, "/workspace/buck-home");
+  assert.equal(env.BUCK2_REAL_HOME, "/workspace/buck-home");
+  assert.equal(env.VBR_VERIFY_REGISTER_PROCESS, undefined);
 });
 
 test("verify remote policy parses supported modes and maps systems to profile prefixes", () => {

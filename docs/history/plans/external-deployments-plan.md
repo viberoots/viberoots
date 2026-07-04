@@ -332,7 +332,7 @@ state that deployment records must preserve.
 
 ### 1. Intent
 
-Add a hermetic build artifact path for `data-room-web` and `data-room-worker` service processes,
+Add a hermetic build artifact path for `example-web` and `example-worker` service processes,
 including a scaffolded TypeScript service target and an immutable service artifact or OCI image
 identity suitable for container-runtime deployment.
 
@@ -384,7 +384,7 @@ identity suitable for container-runtime deployment.
 ### 7. Risks
 
 - OCI image builds can add platform-specific complexity across Darwin and Linux.
-- A too-specific service scaffold could drift toward a data-room app template.
+- A too-specific service scaffold could drift toward a sample-webapp app template.
 
 ### 8. Mitigations
 
@@ -394,7 +394,7 @@ identity suitable for container-runtime deployment.
 
 ### 9. Consequences of not implementing this PR
 
-`data-room-web` and `data-room-worker` would not have repo-built immutable service artifacts for
+`example-web` and `example-worker` would not have repo-built immutable service artifacts for
 protected/shared deployment.
 
 ### 10. Downsides for implementing this PR
@@ -499,7 +499,7 @@ inside the existing `scaf` system.
   examples, runtime config requirement examples, and README/runbook snippets.
 - Add resolver defaults for `projects/deployments/<deployment-id>`.
 - Ensure generated templates include labels/test metadata needed by template-only selection.
-- Do not generate a data-room-specific app template or plugin registry.
+- Do not generate a sample-webapp-specific app template or plugin registry.
 
 ### 3. External prerequisites
 
@@ -536,7 +536,7 @@ inside the existing `scaf` system.
 
 ### 8. Mitigations
 
-- Keep templates provider/component-oriented, not data-room-oriented.
+- Keep templates provider/component-oriented, not sample-webapp-oriented.
 - Use deterministic placeholder names that fail validation until replaced.
 - Include generated README guidance focused on required reviewed fields and commands.
 
@@ -950,7 +950,7 @@ The dev-shell half of the hook landed in chore commit `255ee410` (`exec_in_dev_s
   locate `build-tools/tools/dev/zx-init.mjs` and adds `--import` automatically,
 - the four nix derivations that invoke `node` against repo source (`node-webapp`, `node-service`,
   `node-vercel-next`, `planner/node-webapp`),
-- the vite plugin in `projects/apps/pleomino/vite.config.ts` that spawns
+- the vite plugin in `projects/apps/sample-webapp/vite.config.ts` that spawns
   `materialize-static-pwa-precache.ts` via `execFileSync`,
 - the `bulk-move` flake app.
 
@@ -969,7 +969,7 @@ zx-wrapper` invocation in the repo (~99 spawn sites) without per-site edits, inc
   `next-artifact.ts` in hermetic sandboxes that strip `NODE_OPTIONS`, so the env-only hook from
   `devshell.sh` does not reach them.
 - Thread `--import` through the `bulk-move` flake app (`flake/outputs-apps.nix`) and the vite
-  plugin in `projects/apps/pleomino/vite.config.ts` that spawns
+  plugin in `projects/apps/sample-webapp/vite.config.ts` that spawns
   `materialize-static-pwa-precache.ts` via `execFileSync`.
 - Keep the dev-shell `NODE_OPTIONS` export from `devshell.sh` (committed in `255ee410`) as the
   dev-shell side of the contract.
@@ -1547,9 +1547,9 @@ runtime, admission, or policy code and avoid repeatedly forcing full build-syste
 - Create deployment packages under `projects/deployments/` for:
   - `platform-shared`
   - `platform-foundation-dev`, `platform-foundation-staging`, and `platform-foundation-prod`
-  - `data-room-console-dev`, `data-room-console-staging`, and `data-room-console-prod`
-  - `data-room-web-dev`, `data-room-web-staging`, and `data-room-web-prod`
-  - `data-room-worker-dev`, `data-room-worker-staging`, and `data-room-worker-prod`
+  - `example-console-dev`, `example-console-staging`, and `example-console-prod`
+  - `example-web-dev`, `example-web-staging`, and `example-web-prod`
+  - `example-worker-dev`, `example-worker-staging`, and `example-worker-prod`
 - Wire console deployments to the Vercel prebuilt artifact target and `opentofu-stack` provisioner
   for project, domain, and environment-setting configuration.
 - Wire web and worker deployments to admitted service artifacts or image digests and app-attached
@@ -1557,7 +1557,7 @@ runtime, admission, or policy code and avoid repeatedly forcing full build-syste
 - Wire foundation deployments as provision-only OpenTofu targets for shared DNS, Supabase resources,
   object buckets, secret path scaffolding, and OpenTofu state configuration.
 - Add the migration-bundle artifact target that combines `platform-db/migrations/` and
-  `data-room-db/migrations/` in Buck-declared dependency order, and attach that artifact to
+  `example-db/migrations/` in Buck-declared dependency order, and attach that artifact to
   `platform-foundation-*` deployment metadata.
 - Add reviewed placeholder provider identities, lane policy references, protection classes,
   `secret_requirements`, `runtime_config_requirements`, smoke checks, and readiness gate references
@@ -1837,9 +1837,9 @@ foundation deployments without pretending cross-provider releases are atomic.
 
 - Add a shared Phase 0 release group or prerequisite model connecting:
   - `platform-foundation-*`
-  - `data-room-worker-*`
-  - `data-room-web-*`
-  - `data-room-console-*`
+  - `example-worker-*`
+  - `example-web-*`
+  - `example-console-*`
 - Enforce promotion of the same reviewed source revision through dev, staging, and prod unless an
   explicit reviewed compatibility exception is present.
 - Preserve separate artifact identities for console, web, and worker while binding them to the same
@@ -1943,7 +1943,7 @@ not deployment metadata.
 - Keep readiness gates separate from the requirement profile. The profile answers which credentials
   and config a deployment consumes; readiness gates continue to answer which live validations must
   pass before release.
-- Make the helper generic for any server-side GitHub App integration, not specific to data-room
+- Make the helper generic for any server-side GitHub App integration, not specific to sample-webapp
   source ingestion.
 - Include both secret and runtime config declarations:
   - GitHub App ID or equivalent public app identifier as runtime config.
@@ -2019,7 +2019,7 @@ not deployment metadata.
 
 ### 7. Risks
 
-- The helper can overfit to Phase 0 data-room ingestion or accidentally imply that customer
+- The helper can overfit to Phase 0 sample-webapp ingestion or accidentally imply that customer
   repository linking is configured at deployment time.
 - Making webhook support too implicit can require secrets for deployments that do not receive
   webhooks.
@@ -2070,7 +2070,7 @@ real deployments, generated deployments, docs, and tests all agree on one conven
 - Keep `wrangler.jsonc` provider-native and minimal. It should include the Wrangler schema reference
   and `compatibility_date`, while deployment identity such as account, project, provider target,
   lane, smoke, preview, and admission policy stays in `TARGETS`.
-- Migrate the existing `pleomino-staging` and `pleomino-prod` Cloudflare deployment packages to the
+- Migrate the existing `sample-webapp-staging` and `sample-webapp-prod` Cloudflare deployment packages to the
   scaffolded formatting and file shape without changing their provider target identities or
   protected/shared behavior.
 - Update deployment install/scaffold tests so generated Cloudflare deployments include the
@@ -2096,7 +2096,7 @@ real deployments, generated deployments, docs, and tests all agree on one conven
   requirements.
 - Negative tests proving missing or malformed generated `wrangler.jsonc` fails during front-door
   validation with a clear diagnostic.
-- Migration tests or golden assertions proving `pleomino-staging` and `pleomino-prod` match the
+- Migration tests or golden assertions proving `sample-webapp-staging` and `sample-webapp-prod` match the
   scaffolded file shape while preserving their current provider target identities.
 - Docs command-contract tests, if the new scaffold adds active command guidance.
 
@@ -2424,7 +2424,7 @@ and by adding explicit migration golden coverage for the checked-in Pages deploy
 
 After this PR, `deployment/cloudflare-containers` should not hardcode provider-native implementation
 names such as the container class, Durable Object binding, migration tag, or Worker entrypoint path,
-and the real `pleomino-staging` and `pleomino-prod` packages should be proven to match the
+and the real `sample-webapp-staging` and `sample-webapp-prod` packages should be proven to match the
 scaffolded Pages file shape.
 
 ### 2. Scope of changes
@@ -2440,8 +2440,8 @@ scaffolded Pages file shape.
   values.
 - Ensure `wrangler.jsonc`, the generated Worker entrypoint, and any scaffold metadata all reference
   the same derived names.
-- Add migration golden or assertion coverage proving the checked-in `pleomino-staging` and
-  `pleomino-prod` Cloudflare Pages deployment packages match the `deployment/cloudflare-pages`
+- Add migration golden or assertion coverage proving the checked-in `sample-webapp-staging` and
+  `sample-webapp-prod` Cloudflare Pages deployment packages match the `deployment/cloudflare-pages`
   scaffolded file shape while preserving their provider target identities.
 - Include `wrangler.jsonc` in the Pages migration golden/assertion so the provider-native config
   shape is explicitly covered, not only deployment identity extracted through `cquery`.
@@ -2466,7 +2466,7 @@ scaffolded Pages file shape.
   `CONTAINER`, or `src/worker.ts` assumptions.
 - Negative or regression tests proving changing the deployment name changes all derived
   provider-native names consistently rather than leaving any hardcoded value behind.
-- Pages migration golden/assertion tests proving `pleomino-staging` and `pleomino-prod` match the
+- Pages migration golden/assertion tests proving `sample-webapp-staging` and `sample-webapp-prod` match the
   `deployment/cloudflare-pages` scaffolded file shape, including `TARGETS` and `wrangler.jsonc`.
 - Existing `cquery` identity tests must continue proving the migrated Pages packages preserve their
   provider target identities, protected/shared posture, and requirement profiles.
@@ -2490,7 +2490,7 @@ scaffolded Pages file shape.
   derived names and do not contain leftover hardcoded implementation identifiers.
 - Scaffold tests cover the derivation contract for representative deployment names and fail if any
   low-level Cloudflare implementation name stops being derived.
-- `pleomino-staging` and `pleomino-prod` have explicit migration golden/assertion coverage proving
+- `sample-webapp-staging` and `sample-webapp-prod` have explicit migration golden/assertion coverage proving
   they match the `deployment/cloudflare-pages` scaffolded file shape, especially `wrangler.jsonc`,
   while retaining existing identity coverage.
 - Documentation describes the user-facing scaffold contract without asking deployment authors to

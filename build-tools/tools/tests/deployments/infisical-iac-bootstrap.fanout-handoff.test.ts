@@ -10,8 +10,8 @@ import { runDeploymentBootstrapFanOut } from "../../deployments/infisical-iac-bo
 import { applyFanOutMetadataHandoff } from "../../deployments/infisical-iac-bootstrap-metadata-gate";
 import type { MetadataHandoffPatch } from "../../deployments/infisical-iac-bootstrap-metadata-handoff";
 
-const staging = "//projects/deployments/pleomino/staging:deploy";
-const prod = "//projects/deployments/pleomino/prod:deploy";
+const staging = "//projects/deployments/sample-webapp/staging:deploy";
+const prod = "//projects/deployments/sample-webapp/prod:deploy";
 
 test("fan-out aggregates first-bootstrap handoffs separately from hard failures", async () => {
   const logs: string[] = [];
@@ -161,7 +161,7 @@ async function patchInTemp(): Promise<MetadataHandoffPatch> {
   const file = path.join(dir, "shared.json");
   await fs.writeFile(
     file,
-    `${JSON.stringify({ deploymentContexts: { "pleomino-staging": { infisical: { projectId: "proj_old" } } } }, null, 2)}\n`,
+    `${JSON.stringify({ deploymentContexts: { "sample-webapp-staging": { infisical: { projectId: "proj_old" } } } }, null, 2)}\n`,
   );
   return { ...patch, path: file };
 }
@@ -189,7 +189,7 @@ const patch: MetadataHandoffPatch = {
   path: "projects/config/shared.json",
   replacements: [
     {
-      label: "deploymentContexts.pleomino-staging.infisical.projectId",
+      label: "deploymentContexts.sample-webapp-staging.infisical.projectId",
       before: "proj_old",
       after: "proj_new",
     },
@@ -201,7 +201,7 @@ const prodPatch: MetadataHandoffPatch = {
   ...patch,
   replacements: [
     {
-      label: "deploymentContexts.pleomino-staging.infisical.projectId",
+      label: "deploymentContexts.sample-webapp-staging.infisical.projectId",
       before: "proj_old",
       after: "proj_prod",
     },

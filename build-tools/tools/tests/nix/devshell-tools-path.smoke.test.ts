@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import os from "node:os";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -18,8 +19,22 @@ function consumerRoot(): string {
   return process.cwd();
 }
 
-test("devshell exposes user-facing tools from Nix on PATH", async () => {
+test("devshell exposes user-facing tools from Nix on PATH", async (t) => {
   const root = consumerRoot();
+  const direnvHome = await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-direnv-path-smoke-"));
+  t.after(async () => {
+    await fsp.rm(direnvHome, { recursive: true, force: true });
+  });
+  const env = {
+    ...process.env,
+    IN_NIX_SHELL: "",
+    WORKSPACE_ROOT: root,
+    VIBEROOTS_ROOT: "",
+    VIBEROOTS_SOURCE_ROOT: "",
+    _VIBEROOTS_DEVSHELL_ACTIVE: "",
+    _VIBEROOTS_DEVSHELL_ROOT: "",
+    XDG_CONFIG_HOME: path.join(direnvHome, "config"),
+  };
   const currentTarget = await fsp.readlink(path.join(root, ".viberoots", "current"));
   assert.equal(currentTarget, "../viberoots");
   assert.equal(
@@ -29,15 +44,13 @@ test("devshell exposes user-facing tools from Nix on PATH", async () => {
 
   await $({
     cwd: root,
-    env: {
-      ...process.env,
-      IN_NIX_SHELL: "",
-      WORKSPACE_ROOT: root,
-      VIBEROOTS_ROOT: "",
-      VIBEROOTS_SOURCE_ROOT: "",
-      _VIBEROOTS_DEVSHELL_ACTIVE: "",
-      _VIBEROOTS_DEVSHELL_ROOT: "",
-    },
+    env,
+    stdio: "pipe",
+  })`direnv allow .`;
+
+  await $({
+    cwd: root,
+    env,
     stdio: "pipe",
     reject: false,
     nothrow: true,
@@ -45,15 +58,7 @@ test("devshell exposes user-facing tools from Nix on PATH", async () => {
 
   const result = await $({
     cwd: root,
-    env: {
-      ...process.env,
-      IN_NIX_SHELL: "",
-      WORKSPACE_ROOT: root,
-      VIBEROOTS_ROOT: "",
-      VIBEROOTS_SOURCE_ROOT: "",
-      _VIBEROOTS_DEVSHELL_ACTIVE: "",
-      _VIBEROOTS_DEVSHELL_ROOT: "",
-    },
+    env,
     stdio: "pipe",
     reject: false,
     nothrow: true,

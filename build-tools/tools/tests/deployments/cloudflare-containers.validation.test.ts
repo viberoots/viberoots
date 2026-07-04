@@ -19,7 +19,7 @@ import { deploymentTargetExceptionNodeFixture } from "./deployment-metadata.fixt
 
 const accountId = "0123456789abcdef0123456789abcdef";
 const providerTargetIdentity = `cloudflare-containers:${accountId}/api-staging`;
-const workersDevExceptionRef = "//projects/deployments/pleomino/shared:api_workers_dev";
+const workersDevExceptionRef = "//projects/deployments/sample-webapp/shared:api_workers_dev";
 const publicProviderTarget = {
   account_id: accountId,
   worker: "api-staging",
@@ -55,9 +55,9 @@ function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
     publisher: "cloudflare-containers-local",
     publisher_config: "wrangler.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
     provider_target: {
       account_id: accountId,
       worker: "api-staging",

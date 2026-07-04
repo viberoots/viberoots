@@ -195,7 +195,7 @@ function input(outDir: string) {
     artifactRegion: "us-east-1",
     artifactBackend: "aws-s3" as const,
     artifactBackendEvidence: "",
-    deploymentIds: ["pleomino-staging"],
+    deploymentIds: ["sample-webapp-staging"],
     reviewedSourceMode: "ssh" as const,
     authCallbackHost: "deploy-auth.example.test",
     authCallbackPath: "/oidc/callback",

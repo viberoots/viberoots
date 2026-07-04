@@ -54,7 +54,7 @@ test("cloudflare-pages rollback rejects preview source runs and missing exact ar
     await writeArtifact(artifactDir, "<html>preview-source</html>\n");
     await writeArtifact(secondArtifactDir, "<html>current-source</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
@@ -146,8 +146,8 @@ test("cloudflare-pages production rollback requires fresh approval evidence", as
   await runInTemp("cloudflare-pages-rollback-prod-approval", async (tmp, $) => {
     const baseLanePolicy = cloudflarePagesDeploymentFixture().lanePolicy;
     const deployment = cloudflarePagesDeploymentFixture({
-      deploymentId: "pleomino-prod",
-      label: "//projects/deployments/pleomino/prod:deploy",
+      deploymentId: "sample-webapp-prod",
+      label: "//projects/deployments/sample-webapp/prod:deploy",
       protectionClass: "production_facing",
       environmentStage: "prod",
       lanePolicy: {
@@ -172,18 +172,18 @@ test("cloudflare-pages production rollback requires fresh approval evidence", as
       },
       admissionPolicy: {
         ...cloudflarePagesDeploymentFixture().admissionPolicy,
-        ref: "//projects/deployments/pleomino/prod:prod_release",
+        ref: "//projects/deployments/sample-webapp/prod:prod_release",
         allowedRefs: ["main"],
         requiredApprovals: ["prod-approval", "release-owner"],
       },
-      admissionPolicyRef: "//projects/deployments/pleomino/prod:prod_release",
+      admissionPolicyRef: "//projects/deployments/sample-webapp/prod:prod_release",
       providerTarget: {
         ...cloudflarePagesDeploymentFixture().providerTarget,
         account: "web-platform-prod",
-        project: "pleomino-prod-pages",
-        id: "pleomino-prod-pages",
-        providerTargetIdentity: "cloudflare-pages:web-platform-prod/pleomino-prod-pages",
-        canonicalUrl: "https://pleomino-prod-pages.pages.dev/",
+        project: "sample-webapp-prod-pages",
+        id: "sample-webapp-prod-pages",
+        providerTargetIdentity: "cloudflare-pages:web-platform-prod/sample-webapp-prod-pages",
+        canonicalUrl: "https://sample-webapp-prod-pages.pages.dev/",
       },
     });
     const evidenceJson = path.join(tmp, "evidence.json");
@@ -192,7 +192,7 @@ test("cloudflare-pages production rollback requires fresh approval evidence", as
     const fake = await installFakeCloudflarePagesWrangler(tmp);
     await writeArtifact(artifactDir, "<html>prod-good</html>\n");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "prod", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "prod", "wrangler.jsonc"),
     );
     await installCloudflarePagesTargets(tmp, [deployment]);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);

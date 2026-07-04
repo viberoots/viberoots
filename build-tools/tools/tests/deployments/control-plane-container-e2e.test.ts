@@ -48,7 +48,7 @@ import { runInTemp } from "../lib/test-helpers";
 test("container E2E fixture metadata is independent of demo projects", () => {
   const deployment = containerE2eDeploymentFixture();
   assert.equal(deployment.deploymentId, E2E_DEPLOYMENT_ID);
-  assert.doesNotMatch(JSON.stringify(deployment), /pleomino/i);
+  assert.doesNotMatch(JSON.stringify(deployment), /sample-webapp/i);
   assert.match(deployment.label, /cloud-control-fixture/);
 });
 
@@ -231,7 +231,7 @@ test("containerized control plane processes one fixture deployment through servi
       assert.ok(audit.some((event: any) => event.operation === "mcp.tools/list"));
       assert.doesNotMatch(
         JSON.stringify({ queue, detail, mcp, tools }),
-        /pleomino|secret|PRIVATE KEY|postgres/i,
+        /sample-webapp|secret|PRIVATE KEY|postgres/i,
       );
       const awsLog = await fsp.readFile(path.join(tmp, "runtime/aws.log"), "utf8");
       assert.equal(awsLog.trim().split(/\n+/).length, 1);

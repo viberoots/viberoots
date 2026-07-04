@@ -65,7 +65,7 @@ test("service-backed kubernetes deploy fails closed when client source differs f
         },
       },
       admissionPolicy: nixosSharedHostAdmissionPolicyFixture({
-        ref: "//projects/deployments/pleomino/shared:prod_release",
+        ref: "//projects/deployments/sample-webapp/shared:prod_release",
         name: "prod_release",
         allowedRefs: ["main"],
         requiredChecks: ["deploy/shared-observability-prod"],

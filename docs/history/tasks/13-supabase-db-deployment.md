@@ -25,7 +25,7 @@ There are two things this task must accomplish even before writing a line of sch
    describes the latter as acceptable for Phase 0 but the former as the reviewed long-term model.
 
 2. **Wire the migration bundle and apply runtime.** The repo already has the full infrastructure:
-   `platform-db/migrations/` and `data-room-db/migrations/` are Buck `filegroup` targets with
+   `platform-db/migrations/` and `example-db/migrations/` are Buck `filegroup` targets with
    `kind:migrations` and `deployment:migration-set` labels; `migration_bundle_rules.bzl` assembles
    them into a deterministic bundle artifact; `foundation-migration.ts` defines the
    `FoundationMigrationAdapter` interface, `runFoundationMigrationApply`, and the post-apply check
@@ -44,7 +44,7 @@ each successful apply and are recorded in the deployment outcome.
 
 The actual migration SQL is placeholder-only at this point (`select 1;` in both
 `platform-db/migrations/001_platform_foundation.sql` and
-`data-room-db/migrations/001_data_room_foundation.sql`). This task does not require real schema;
+`example-db/migrations/001_sample_webapp_foundation.sql`). This task does not require real schema;
 it establishes the reviewed provisioning path and the wiring so that real schema additions flow
 through the same deployment model.
 
@@ -57,7 +57,7 @@ Without a provisioned and tested Supabase Postgres target, Phase 1 and 2 cannot 
 self-hosted control-plane host cannot be made cloud-shaped, and task #4 (Containerize Control Plane)
 cannot reach its cut-over gates.
 
-On the application side, any service that reads or writes durable state — the data-room web and
+On the application side, any service that reads or writes durable state — the sample-webapp web and
 worker services downstream of this task — cannot be tested against a real schema until the Supabase
 project exists and the migration bundle has been applied at least once to a dev environment.
 

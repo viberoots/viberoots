@@ -28,7 +28,7 @@ function deploymentForVault(addr: string) {
       deploymentClientId: "deployment-runner",
       serviceAccountClientId: "deployment-runner",
       deploymentEnvironment: "mini",
-      roleName: "deploy-pleomino-read",
+      roleName: "deploy-sample-webapp-read",
     },
   });
 }
@@ -54,7 +54,7 @@ async function startFakeVault() {
         deployment_environment: "mini",
         repository: "viberoots/viberoots",
       },
-      token_policies: ["deploy-pleomino-read"],
+      token_policies: ["deploy-sample-webapp-read"],
     },
     policy: "",
     writes: [] as string[],
@@ -77,11 +77,11 @@ async function startFakeVault() {
       res.end();
       return;
     }
-    if (req.method === "GET" && url.pathname === "/v1/auth/jwt/role/deploy-pleomino-read") {
+    if (req.method === "GET" && url.pathname === "/v1/auth/jwt/role/deploy-sample-webapp-read") {
       res.end(JSON.stringify({ data: state.role }));
       return;
     }
-    if (req.method === "POST" && url.pathname === "/v1/auth/jwt/role/deploy-pleomino-read") {
+    if (req.method === "POST" && url.pathname === "/v1/auth/jwt/role/deploy-sample-webapp-read") {
       state.writes.push("role");
       const body = await readJson(req);
       state.role = {
@@ -95,11 +95,11 @@ async function startFakeVault() {
       res.end();
       return;
     }
-    if (req.method === "GET" && url.pathname === "/v1/sys/policies/acl/deploy-pleomino-read") {
+    if (req.method === "GET" && url.pathname === "/v1/sys/policies/acl/deploy-sample-webapp-read") {
       res.end(JSON.stringify({ data: { policy: state.policy } }));
       return;
     }
-    if (req.method === "PUT" && url.pathname === "/v1/sys/policies/acl/deploy-pleomino-read") {
+    if (req.method === "PUT" && url.pathname === "/v1/sys/policies/acl/deploy-sample-webapp-read") {
       state.writes.push("policy");
       state.policy = String((await readJson(req)).policy || "");
       res.writeHead(204);
@@ -128,10 +128,13 @@ test("deploy admin vault desired state derives bound claims from reviewed deploy
       deployment_environment: "mini",
       repository: "viberoots/viberoots",
     });
-    assert.match(desired.policyHcl, /secret\/data\/deployments\/pleomino\/cloudflare_api_token/);
     assert.match(
       desired.policyHcl,
-      /secret\/metadata\/deployments\/pleomino\/cloudflare_api_token/,
+      /secret\/data\/deployments\/sample-webapp\/cloudflare_api_token/,
+    );
+    assert.match(
+      desired.policyHcl,
+      /secret\/metadata\/deployments\/sample-webapp\/cloudflare_api_token/,
     );
   } finally {
     await vault.close();

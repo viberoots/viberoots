@@ -26,6 +26,12 @@ viberoots completion bash
 Generated files are repaired idempotently for the selected mode. Consumer-authored files are
 preserved.
 
+Generated workspace flakes look for
+`.viberoots/workspace/nixpkgs-source-registry-extension.nix` and pass its `profiles` into
+`inputs.viberoots.lib.mkWorkspace`. Generated consumer flakes expose the lockfile-backed
+`nixpkgs_23_11` input so consumers can add reviewed profile entries through that extension file
+without copying viberoots registry files into `projects/`.
+
 ## `viberoots use-submodule`
 
 Switches an existing workspace to local contribution mode.

@@ -32,7 +32,7 @@ test("dev-build keeps shared isolation for non-recursive builds", async () => {
     const missing = await missingOptionalPatchDirsForFreshIsolation({
       root: tmp,
       subcmd: "build",
-      restArgs: ["//projects/apps/pleomino:unit"],
+      restArgs: ["//projects/apps/sample-webapp:unit"],
     });
     assert.deepEqual(missing, []);
   } finally {

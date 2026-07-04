@@ -16,7 +16,7 @@ export async function writeWranglerConfig(root: string) {
   await fsp.writeFile(root, '{\n  "compatibility_date": "2026-03-18"\n}\n', "utf8");
 }
 
-export function pleominoDevDeployment() {
+export function sampleWebappDevDeployment() {
   const lanePolicy = {
     ...cloudflarePagesDeploymentFixture().lanePolicy,
     promotionCompatibility: {
@@ -24,16 +24,16 @@ export function pleominoDevDeployment() {
     },
   };
   return nixosSharedHostDeploymentFixture({
-    deploymentId: "pleomino-dev",
-    label: "//projects/deployments/pleomino/dev:deploy",
+    deploymentId: "sample-webapp-dev",
+    label: "//projects/deployments/sample-webapp/dev:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
-    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
-    runtime: { appName: "pleomino", containerPort: 3000, healthPath: "/healthz" },
+    component: { kind: "static-webapp", target: "//projects/apps/sample-webapp:app" },
+    runtime: { appName: "sample-webapp", containerPort: 3000, healthPath: "/healthz" },
   });
 }
 
-export function pleominoProdDeployment() {
+export function sampleWebappProdDeployment() {
   const lanePolicy = {
     ...cloudflarePagesDeploymentFixture().lanePolicy,
     promotionCompatibility: {
@@ -41,16 +41,16 @@ export function pleominoProdDeployment() {
     },
   };
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
-    ref: "//projects/deployments/pleomino/shared:prod_release",
+    ref: "//projects/deployments/sample-webapp/shared:prod_release",
     name: "prod_release",
     allowedRefs: ["refs/tags/release/*"],
     requiredChecks: [],
     requiredApprovals: ["release-owner"],
-    fingerprint: "sha256:admission-pleomino-prod",
+    fingerprint: "sha256:admission-sample-webapp-prod",
   });
   return cloudflarePagesDeploymentFixture({
-    deploymentId: "pleomino-prod",
-    label: "//projects/deployments/pleomino/prod:deploy",
+    deploymentId: "sample-webapp-prod",
+    label: "//projects/deployments/sample-webapp/prod:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
     protectionClass: "production_facing",
@@ -59,10 +59,10 @@ export function pleominoProdDeployment() {
     admissionPolicy,
     providerTarget: {
       account: "web-platform-prod",
-      project: "pleomino-prod-pages",
-      id: "pleomino-prod-pages",
-      canonicalUrl: "https://pleomino-prod-pages.pages.dev/",
-      providerTargetIdentity: "cloudflare-pages:web-platform-prod/pleomino-prod-pages",
+      project: "sample-webapp-prod-pages",
+      id: "sample-webapp-prod-pages",
+      canonicalUrl: "https://sample-webapp-prod-pages.pages.dev/",
+      providerTargetIdentity: "cloudflare-pages:web-platform-prod/sample-webapp-prod-pages",
     },
   });
 }

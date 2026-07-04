@@ -71,7 +71,7 @@ test("infisical defaults derive deployment-scoped credential files", () => {
   );
   const directory = createControlPlaneCredentialDirectory(config);
   const files = directory.resolveInfisicalCredentialFiles({
-    deploymentId: "pleomino-prod",
+    deploymentId: "sample-webapp-prod",
     siteUrl: "https://infisical.example.test",
     projectId: "project-prod",
     environment: "prod",
@@ -79,11 +79,11 @@ test("infisical defaults derive deployment-scoped credential files", () => {
 
   assert.equal(
     files.clientIdFile,
-    "/run/deployment-control-plane/credentials/pleomino-prod-infisical-client-id",
+    "/run/deployment-control-plane/credentials/sample-webapp-prod-infisical-client-id",
   );
   assert.equal(
     files.clientSecretFile,
-    "/run/deployment-control-plane/credentials/pleomino-prod-infisical-client-secret",
+    "/run/deployment-control-plane/credentials/sample-webapp-prod-infisical-client-secret",
   );
 });
 
@@ -93,43 +93,43 @@ test("reviewed infisical overrides must match exact deployment-scoped filenames"
   );
   const directory = createControlPlaneCredentialDirectory(config);
   const files = directory.resolveInfisicalCredentialFiles({
-    deploymentId: "pleomino-staging",
+    deploymentId: "sample-webapp-staging",
     siteUrl: "https://infisical.example.test",
     projectId: "project-staging",
     environment: "staging",
-    clientIdFileName: "pleomino-staging-infisical-client-id",
-    clientSecretFileName: "pleomino-staging-infisical-client-secret",
+    clientIdFileName: "sample-webapp-staging-infisical-client-id",
+    clientSecretFileName: "sample-webapp-staging-infisical-client-secret",
   });
 
   assert.equal(
     files.clientIdFile,
-    "/run/deployment-control-plane/credentials/pleomino-staging-infisical-client-id",
+    "/run/deployment-control-plane/credentials/sample-webapp-staging-infisical-client-id",
   );
   assert.equal(
     files.clientSecretFile,
-    "/run/deployment-control-plane/credentials/pleomino-staging-infisical-client-secret",
+    "/run/deployment-control-plane/credentials/sample-webapp-staging-infisical-client-secret",
   );
   assert.throws(
     () =>
       directory.resolveInfisicalCredentialFiles({
-        deploymentId: "pleomino-staging",
+        deploymentId: "sample-webapp-staging",
         siteUrl: "https://infisical.example.test",
         projectId: "project",
         environment: "staging",
-        clientIdFileName: "pleomino-staging-client-id",
+        clientIdFileName: "sample-webapp-staging-client-id",
       }),
-    /clientIdFileName must be exactly pleomino-staging-infisical-client-id/,
+    /clientIdFileName must be exactly sample-webapp-staging-infisical-client-id/,
   );
   assert.throws(
     () =>
       directory.resolveInfisicalCredentialFiles({
-        deploymentId: "pleomino-staging",
+        deploymentId: "sample-webapp-staging",
         siteUrl: "https://infisical.example.test",
         projectId: "project",
         environment: "staging",
-        clientSecretFileName: "pleomino-staging-client-secret",
+        clientSecretFileName: "sample-webapp-staging-client-secret",
       }),
-    /clientSecretFileName must be exactly pleomino-staging-infisical-client-secret/,
+    /clientSecretFileName must be exactly sample-webapp-staging-infisical-client-secret/,
   );
   assert.throws(
     () =>
@@ -169,14 +169,14 @@ test("multi-tenant infisical lookup keeps account and project facts per deployme
   assert.match(second.clientSecretFile, /ops-staging-infisical-client-secret$/);
 });
 
-test("Pleomino Infisical credential files stay deployment scoped", () => {
+test("Sample webapp Infisical credential files stay deployment scoped", () => {
   const config = parseControlPlaneRuntimeConfig(
     configYaml("/run/deployment-control-plane/credentials"),
   );
   const directory = createControlPlaneCredentialDirectory(config);
   for (const [deploymentId, environment] of [
-    ["pleomino-staging", "staging"],
-    ["pleomino-prod", "prod"],
+    ["sample-webapp-staging", "staging"],
+    ["sample-webapp-prod", "prod"],
   ] as const) {
     const files = directory.resolveInfisicalCredentialFiles({
       deploymentId,

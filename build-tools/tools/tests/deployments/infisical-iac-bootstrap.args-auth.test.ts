@@ -79,9 +79,9 @@ test("bootstrap deployment args default to reviewed OpenTofu setup", () => {
   const args = parseBootstrapArgs([
     "deployment",
     "--target",
-    "//projects/deployments/pleomino/staging:deploy",
+    "//projects/deployments/sample-webapp/staging:deploy",
   ]);
-  assert.equal(args.tofuDir, "projects/deployments/pleomino/infisical/opentofu");
+  assert.equal(args.tofuDir, "projects/deployments/sample-webapp/infisical/opentofu");
 });
 
 test("bootstrap args support host shorthands and non-interactive controls", () => {
@@ -141,11 +141,11 @@ test("bootstrap args parse explicit repo and deployment modes", () => {
   const deployment = parseBootstrapArgs([
     "deployment",
     "--target",
-    "//projects/deployments/pleomino/staging:deploy",
+    "//projects/deployments/sample-webapp/staging:deploy",
     "--dry-run",
   ]);
   assert.equal(deployment.mode, "deployment");
-  assert.equal(deployment.target, "//projects/deployments/pleomino/staging:deploy");
+  assert.equal(deployment.target, "//projects/deployments/sample-webapp/staging:deploy");
 });
 
 test("bootstrap args reject ambiguous organization selectors", () => {

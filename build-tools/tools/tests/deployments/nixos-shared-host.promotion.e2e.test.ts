@@ -46,7 +46,7 @@ function cloudflareDevDeployment() {
       sourceRefPolicies:
         cloudflarePagesDeploymentFixture().lanePolicy.governance.sourceRefPolicies.map((entry) => ({
           ...entry,
-          requiredChecks: entry.stage === "prod" ? ["deploy/pleomino-prod"] : [],
+          requiredChecks: entry.stage === "prod" ? ["deploy/sample-webapp-prod"] : [],
         })),
     },
     promotionCompatibility: {
@@ -57,8 +57,8 @@ function cloudflareDevDeployment() {
     requiredChecks: [],
   });
   return cloudflarePagesDeploymentFixture({
-    deploymentId: "pleomino-dev-pages",
-    label: "//projects/deployments/pleomino/dev-pages:deploy",
+    deploymentId: "sample-webapp-dev-pages",
+    label: "//projects/deployments/sample-webapp/dev-pages:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
     environmentStage: "dev",
@@ -66,32 +66,32 @@ function cloudflareDevDeployment() {
     admissionPolicy,
     providerTarget: {
       account: "web-platform-dev",
-      project: "pleomino-dev-pages",
-      id: "pleomino-dev-pages",
-      canonicalUrl: "https://pleomino-dev-pages.pages.dev/",
-      providerTargetIdentity: "cloudflare-pages:web-platform-dev/pleomino-dev-pages",
+      project: "sample-webapp-dev-pages",
+      id: "sample-webapp-dev-pages",
+      canonicalUrl: "https://sample-webapp-dev-pages.pages.dev/",
+      providerTargetIdentity: "cloudflare-pages:web-platform-dev/sample-webapp-dev-pages",
     },
   });
 }
 
 function nixosStagingDeployment(lanePolicy = cloudflareDevDeployment().lanePolicy) {
   const admissionPolicy = nixosSharedHostAdmissionPolicyFixture({
-    ref: "//projects/deployments/pleomino/shared:staging_release",
+    ref: "//projects/deployments/sample-webapp/shared:staging_release",
     name: "staging_release",
     allowedRefs: ["main"],
     requiredChecks: [],
-    fingerprint: "sha256:admission-pleomino-staging",
+    fingerprint: "sha256:admission-sample-webapp-staging",
   });
   return nixosSharedHostDeploymentFixture({
-    deploymentId: "pleomino-staging-host",
-    label: "//projects/deployments/pleomino/staging-host:deploy",
+    deploymentId: "sample-webapp-staging-host",
+    label: "//projects/deployments/sample-webapp/staging-host:deploy",
     lanePolicy,
     lanePolicyRef: lanePolicy.ref,
     environmentStage: "staging",
     admissionPolicyRef: admissionPolicy.ref,
     admissionPolicy,
-    component: { kind: "static-webapp", target: "//projects/apps/pleomino:app" },
-    runtime: { appName: "pleomino-staging", containerPort: 3000, healthPath: "/healthz" },
+    component: { kind: "static-webapp", target: "//projects/apps/sample-webapp:app" },
+    runtime: { appName: "sample-webapp-staging", containerPort: 3000, healthPath: "/healthz" },
   });
 }
 
@@ -120,7 +120,7 @@ test("nixos-shared-host allows reviewed cross-provider same-artifact promotion o
     const env = freshRemoteExecBuckEnv(tmp, fakeCloudflareEnv(fake));
     Object.assign(process.env, env);
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "dev-pages", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "dev-pages", "wrangler.jsonc"),
     );
     await installNixosSharedHostTargets(tmp, [target]);
     await installCloudflarePagesTargets(tmp, [source]);
@@ -197,7 +197,7 @@ test("nixos-shared-host promotion keeps retained source-run eligibility independ
     const env = freshRemoteExecBuckEnv(tmp, fakeCloudflareEnv(fake));
     Object.assign(process.env, env);
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "dev-pages", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "dev-pages", "wrangler.jsonc"),
     );
     await installNixosSharedHostTargets(tmp, [target]);
     await installCloudflarePagesTargets(tmp, [source]);

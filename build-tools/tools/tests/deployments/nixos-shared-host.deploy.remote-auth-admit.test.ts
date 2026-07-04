@@ -11,9 +11,9 @@ import {
   freshRemoteExecBuckEnv,
   installClientProfile,
   prepareRemoteExecFixture,
-  requirePleominoDevCheck,
+  requireSampleWebappDevCheck,
   remoteExecEnv,
-  REVIEWED_PLEOMINO_DEPLOYMENT_LABEL,
+  REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
 } from "./nixos-shared-host.deploy.remote-exec.helpers";
 import {
   enableInteractivePkceVaultRuntime,
@@ -47,15 +47,15 @@ test("remote profile admit-and-deploy fails closed when the authenticated submit
         sub: "human-1",
         email: "ada@example.com",
         preferred_username: "Ada",
-        groups: ["deploy-submitters-pleomino-dev"],
+        groups: ["deploy-submitters-sample-webapp-dev"],
       },
     });
     const fixture = await prepareRemoteExecFixture({
       tmp,
       $,
-      artifactFiles: { "index.html": "<html>pleomino</html>\n", healthz: "ok\n" },
+      artifactFiles: { "index.html": "<html>sample-webapp</html>\n", healthz: "ok\n" },
     });
-    await requirePleominoDevCheck(tmp);
+    await requireSampleWebappDevCheck(tmp);
     await enableInteractivePkceVaultRuntime(tmp, oidc.issuer);
     const controlPlane = await startNixosSharedHostControlPlaneServer({
       workspaceRoot: tmp,
@@ -90,7 +90,7 @@ test("remote profile admit-and-deploy fails closed when the authenticated submit
         cwd: tmp,
         env: freshRemoteExecBuckEnv(tmp, remoteExecEnv(fixture.env)),
         stdio: "pipe",
-      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_PLEOMINO_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --artifact-dir ${fixture.artifactDir} --admit-and-deploy deploy/pleomino-dev --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`.nothrow();
+      })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL} --profile mini --profile-root ${fixture.profileRoot} --artifact-dir ${fixture.artifactDir} --admit-and-deploy deploy/sample-webapp-dev --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`.nothrow();
       await completePendingAuthSession(controlPlane.url, fixture.remoteRecordsRoot);
       const result = await resultPromise;
       assert.notEqual(result.exitCode, 0);

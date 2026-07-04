@@ -39,7 +39,7 @@ test("resource inventory maps extracted deployment metadata and runtime facts", 
       deploymentContexts: {
         "app-prod": {
           controlPlane: "prod",
-          cloudflare: { account: "web-platform", projectName: "pleomino-prod" },
+          cloudflare: { account: "web-platform", projectName: "sample-webapp-prod" },
         },
       },
     },
@@ -56,7 +56,7 @@ test("resource inventory maps extracted deployment metadata and runtime facts", 
               {
                 name: "api_token",
                 step: "publish",
-                contract_id: "secret://deployments/pleomino/api-token",
+                contract_id: "secret://deployments/sample-webapp/api-token",
                 required: "true",
               },
             ],
@@ -64,7 +64,7 @@ test("resource inventory maps extracted deployment metadata and runtime facts", 
               {
                 name: "public_url",
                 step: "publish",
-                contract_id: "runtime://deployments/pleomino/public-url",
+                contract_id: "runtime://deployments/sample-webapp/public-url",
                 required: "true",
               },
             ],
@@ -75,20 +75,20 @@ test("resource inventory maps extracted deployment metadata and runtime facts", 
             executionSnapshots: [
               status("run-1:snapshot", {
                 snapshotId: "run-1:snapshot",
-                deploymentId: "pleomino-staging",
+                deploymentId: "sample-webapp-staging",
                 capturedAt: "2026-01-01T00:00:00.000Z",
               }),
             ],
             deployRuns: [
               status("run-1", {
                 runId: "run-1",
-                deploymentId: "pleomino-staging",
+                deploymentId: "sample-webapp-staging",
                 status: "passed",
               }),
             ],
             currentStageStates: [
-              status("pleomino-staging:staging", {
-                deploymentId: "pleomino-staging",
+              status("sample-webapp-staging:staging", {
+                deploymentId: "sample-webapp-staging",
                 stage: "staging",
                 state: "deployed",
               }),
@@ -96,7 +96,7 @@ test("resource inventory maps extracted deployment metadata and runtime facts", 
             artifactChallenges: [
               status("challenge-1", {
                 challengeId: "challenge-1",
-                deploymentId: "pleomino-staging",
+                deploymentId: "sample-webapp-staging",
                 proofKeyId: "key-1",
                 issuedAt: "2026-01-01T00:00:00.000Z",
                 nonceValidationOutcome: "matched-redacted-nonce-digest",
@@ -176,7 +176,7 @@ test("resource inventory reads deployment graph through the composite graph surf
         cloudflareDeployment({
           provider_target: {
             account: "web-platform",
-            project: "pleomino-staging",
+            project: "sample-webapp-staging",
           },
         }),
       ]),

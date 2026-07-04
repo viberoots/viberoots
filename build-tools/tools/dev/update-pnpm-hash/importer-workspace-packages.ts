@@ -3,9 +3,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { packageJsonWorkspaceDeps } from "./workspace-deps";
 
-export async function findWorkspacePackageDirs(opts: {
+async function findWorkspacePackageDirsRelativeTo(opts: {
   repoRoot: string;
   importerAbs: string;
+  relativeTo: string;
 }): Promise<string[]> {
   const pkgPath = path.join(opts.importerAbs, "package.json");
   let wanted: string[] = [];
@@ -49,7 +50,7 @@ export async function findWorkspacePackageDirs(opts: {
       try {
         const childPkg = JSON.parse(await fsp.readFile(childPkgPath, "utf8"));
         const childName = String(childPkg?.name || "").trim();
-        if (remaining.delete(childName)) found.push(path.relative(opts.importerAbs, child) || ".");
+        if (remaining.delete(childName)) found.push(path.relative(opts.relativeTo, child) || ".");
       } catch {}
       await walk(child);
     }
@@ -57,4 +58,24 @@ export async function findWorkspacePackageDirs(opts: {
 
   await walk(opts.repoRoot);
   return found.map((value) => value.split(path.sep).join(path.posix.sep)).sort();
+}
+
+export async function findWorkspacePackageDirs(opts: {
+  repoRoot: string;
+  importerAbs: string;
+}): Promise<string[]> {
+  return await findWorkspacePackageDirsRelativeTo({
+    ...opts,
+    relativeTo: opts.importerAbs,
+  });
+}
+
+export async function findWorkspacePackageRepoDirs(opts: {
+  repoRoot: string;
+  importerAbs: string;
+}): Promise<string[]> {
+  return await findWorkspacePackageDirsRelativeTo({
+    ...opts,
+    relativeTo: opts.repoRoot,
+  });
 }

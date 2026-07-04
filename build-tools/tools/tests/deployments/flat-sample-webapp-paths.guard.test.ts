@@ -5,23 +5,28 @@ import path from "node:path";
 import { test } from "node:test";
 import { viberootsRepoPath } from "./deployment-command";
 
-const repoRoot = process.cwd();
 const scanRoots = [
   { rel: "build-tools", root: viberootsRepoPath("build-tools") },
   { rel: "docs", root: viberootsRepoPath("docs") },
-  { rel: "projects", root: path.join(repoRoot, "projects") },
 ] as const;
 const allowedHistoricalFiles = new Set([
   "docs/history/plans/infisical-plan.md",
-  "docs/history/migrations/pleomino-deployment-directory-migration.md",
+  "docs/history/migrations/sample-webapp-deployment-directory-migration.md",
 ]);
 const stalePatterns = [
-  /(?:\/\/)?projects\/deployments\/pleomino-[A-Za-z0-9_-]+(?::|\/|\b)/g,
-  /projects\\deployments\\pleomino-[A-Za-z0-9_-]+(?:\\|\b)/g,
-  /["']projects["']\s*,\s*["']deployments["']\s*,\s*["']pleomino-[A-Za-z0-9_-]+["']/g,
-  /^\s+pleomino-[A-Za-z0-9_-]+\/\s*$/gm,
+  /(?:\/\/)?projects\/deployments\/sample-webapp-[A-Za-z0-9_-]+(?::|\/|\b)/g,
+  /projects\\deployments\\sample-webapp-[A-Za-z0-9_-]+(?:\\|\b)/g,
+  /["']projects["']\s*,\s*["']deployments["']\s*,\s*["']sample-webapp-[A-Za-z0-9_-]+["']/g,
+  /^\s+sample-webapp-[A-Za-z0-9_-]+\/\s*$/gm,
 ] as const;
-const stalePleominoPackageName = /["']pleomino-(?:dev|staging|prod|shared|infisical)["']/;
+const staleSampleWebappPackageName = /["']sample-webapp-(?:dev|staging|prod|shared|infisical)["']/;
+const bannedProductVocabulary = [
+  ["pleo", "mino"].join(""),
+  ["Pleo", "mino"].join(""),
+  ["PLEO", "MINO"].join(""),
+  ["data", "room"].join("-"),
+  ["data", "room"].join("_"),
+] as const;
 
 async function* walk(
   scanRoot: (typeof scanRoots)[number],
@@ -50,17 +55,17 @@ async function* walk(
 function stalePathJoinVariables(source: string): string[] {
   const staleVariables = new Set<string>();
   for (const match of source.matchAll(
-    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*\[[^\]]*["']pleomino-(?:dev|staging|prod|shared|infisical)["'][^\]]*\]/g,
+    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*\[[^\]]*["']sample-webapp-(?:dev|staging|prod|shared|infisical)["'][^\]]*\]/g,
   )) {
     staleVariables.add(match[1]!);
   }
   for (const match of source.matchAll(
-    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*["']pleomino-(?:dev|staging|prod|shared|infisical)["']/g,
+    /\b(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*["']sample-webapp-(?:dev|staging|prod|shared|infisical)["']/g,
   )) {
     staleVariables.add(match[1]!);
   }
   for (const match of source.matchAll(
-    /\bfor\s*\(\s*const\s+([A-Za-z_$][\w$]*)\s+of\s+\[[^\]]*["']pleomino-(?:dev|staging|prod|shared|infisical)["'][^\]]*\]\s*\)/g,
+    /\bfor\s*\(\s*const\s+([A-Za-z_$][\w$]*)\s+of\s+\[[^\]]*["']sample-webapp-(?:dev|staging|prod|shared|infisical)["'][^\]]*\]\s*\)/g,
   )) {
     staleVariables.add(match[1]!);
   }
@@ -81,7 +86,7 @@ function stalePathJoinVariables(source: string): string[] {
       }
     }
   }
-  if (stalePleominoPackageName.test(source)) {
+  if (staleSampleWebappPackageName.test(source)) {
     for (const match of source.matchAll(/path\.join\(([^)]*)\)/g)) {
       const args = match[1]!;
       if (!/["']projects\/deployments["']|["']projects["']\s*,\s*["']deployments["']/.test(args)) {
@@ -95,7 +100,7 @@ function stalePathJoinVariables(source: string): string[] {
   return stale;
 }
 
-test("active sources do not reference old flat Pleomino deployment package paths", async () => {
+test("active sources do not reference old flat Sample webapp deployment package paths", async () => {
   const stale: string[] = [];
   for (const root of scanRoots) {
     for await (const { rel, abs } of walk(root)) {
@@ -106,9 +111,14 @@ test("active sources do not reference old flat Pleomino deployment package paths
           stale.push(`${rel}: ${match[0]}`);
         }
       }
-      if (stalePleominoPackageName.test(source)) {
+      if (staleSampleWebappPackageName.test(source)) {
         for (const match of stalePathJoinVariables(source)) {
           stale.push(`${rel}: ${match}`);
+        }
+      }
+      for (const banned of bannedProductVocabulary) {
+        if (rel.includes(banned) || source.includes(banned)) {
+          stale.push(`${rel}: stale product vocabulary ${JSON.stringify(banned)}`);
         }
       }
     }

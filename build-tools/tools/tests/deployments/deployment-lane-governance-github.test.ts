@@ -6,7 +6,7 @@ import { nixosSharedHostLaneGovernanceFixture } from "./deployment-lane-governan
 
 function lanePolicyFixture(governance = nixosSharedHostLaneGovernanceFixture()) {
   return {
-    ref: "//projects/deployments/pleomino/shared:lane",
+    ref: "//projects/deployments/sample-webapp/shared:lane",
     name: "lane",
     stages: ["dev", "staging", "prod"],
     sourceRefPolicy: {

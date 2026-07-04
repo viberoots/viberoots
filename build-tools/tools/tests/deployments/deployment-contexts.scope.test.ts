@@ -41,15 +41,15 @@ test("deployment_context differentiates AWS accounts and Infisical projects", as
         s3Nodes([
           s3Deployment({ deployment_context: "aws-staging" }),
           s3Deployment({
-            name: "//projects/deployments/pleomino/prod-s3:deploy",
+            name: "//projects/deployments/sample-webapp/prod-s3:deploy",
             deployment_context: "aws-prod",
           }),
         ]),
       );
       assert.deepEqual(errors, []);
       const byLabel = new Map(deployments.map((deployment) => [deployment.label, deployment]));
-      const staging = byLabel.get("//projects/deployments/pleomino/staging-s3:deploy");
-      const prod = byLabel.get("//projects/deployments/pleomino/prod-s3:deploy");
+      const staging = byLabel.get("//projects/deployments/sample-webapp/staging-s3:deploy");
+      const prod = byLabel.get("//projects/deployments/sample-webapp/prod-s3:deploy");
       assert.equal(staging?.providerTarget.account, "111122223333");
       assert.equal(staging?.infisicalRuntime?.projectId, "proj-staging");
       assert.equal(prod?.providerTarget.account, "444455556666");
@@ -109,7 +109,7 @@ test("context-owned bootstrap and provider secret refs are routed", async () => 
           secretBackend: "vault/default",
           cloudflare: {
             account: "web-platform",
-            projectName: "pleomino-prod-pages",
+            projectName: "sample-webapp-prod-pages",
             apiTokenRef: "secret://providers/cloudflare/api-token",
           },
           infisical: {
@@ -155,7 +155,7 @@ test("context-owned Infisical bootstrap refs resolve through bootstrap SprinkleR
           secretBackend: "infisical/default",
           cloudflare: {
             account: "web-platform",
-            projectName: "pleomino-prod-pages",
+            projectName: "sample-webapp-prod-pages",
             apiTokenRef: "secret://providers/cloudflare/api-token",
           },
           infisical: {
@@ -195,7 +195,7 @@ test("admission evidence carries deployment_context-derived metadata", async () 
           secretBackend: "vault/default",
           cloudflare: {
             account: "web-platform",
-            projectName: "pleomino-prod-pages",
+            projectName: "sample-webapp-prod-pages",
             apiTokenRef: "secret://providers/cloudflare/api-token",
           },
         },
@@ -222,7 +222,7 @@ test("context scenarios reject secret_backend_profile and preserve legacy backen
   const profileErrors = extractCloudflarePagesDeployments(
     cloudflareNodes([
       cloudflareDeployment({
-        deployment_context: "pleomino-staging",
+        deployment_context: "sample-webapp-staging",
         secret_backend_profile: "infisical-default",
       }),
     ]),
@@ -232,7 +232,7 @@ test("context scenarios reject secret_backend_profile and preserve legacy backen
     cloudflareNodes([
       cloudflareDeployment({
         secret_backend: "infisical/default",
-        provider_target: { account: "web-platform", project: "pleomino-pages" },
+        provider_target: { account: "web-platform", project: "sample-webapp-pages" },
       }),
     ]),
   );

@@ -38,7 +38,7 @@ test("generated cutover evidence collector output is accepted by cutover validat
     assert.equal((collected.health?.readiness as any)?.dependencies?.database?.ok, true);
     assert.equal((collected.health?.workerHeartbeats as any)?.body?.workers.length, 2);
     assert.equal(collected.expectedWorkerCount, 2);
-    assert.deepEqual((collected.runtimeConfig as any).deploymentIds, ["pleomino-staging"]);
+    assert.deepEqual((collected.runtimeConfig as any).deploymentIds, ["sample-webapp-staging"]);
     assert.equal((collected.runtimeConfig as any).workers.expectedCount, 2);
     const result = validateCloudControlCutover(collected, {
       operation: "cutover",
@@ -55,7 +55,7 @@ test("generated cutover evidence collector output is accepted by cutover validat
       "utf8",
     );
     const tampered = await collectCutoverEvidence(tmp);
-    assert.deepEqual(tampered.runtimeConfig?.deploymentIds, ["pleomino-staging"]);
+    assert.deepEqual(tampered.runtimeConfig?.deploymentIds, ["sample-webapp-staging"]);
     assert.equal((tampered.runtimeConfig?.workers as any).expectedCount, 2);
   });
 });
@@ -219,7 +219,7 @@ function setupInput(outDir: string) {
     artifactRegion: "us-east-1",
     artifactBackend: "aws-s3" as const,
     artifactBackendEvidence: "",
-    deploymentIds: ["pleomino-staging"],
+    deploymentIds: ["sample-webapp-staging"],
     reviewedSourceMode: "ssh" as const,
     authCallbackHost: "deploy-auth.example.test",
     authCallbackPath: "/oidc/callback",

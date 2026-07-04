@@ -143,7 +143,7 @@ test("shared control plane rejects replay when the current lane policy no longer
       const driftedDeployment = nixosSharedHostDeploymentFixture({
         lanePolicy: {
           ...deployment.lanePolicy,
-          fingerprint: "sha256:lane-pleomino-drifted",
+          fingerprint: "sha256:lane-sample-webapp-drifted",
         },
       });
       await assert.rejects(

@@ -31,7 +31,7 @@ test("deployment bootstrap dry-run with auto sink remains read-only", async () =
         runInfisicalIacBootstrap({
           ...DEFAULT_BOOTSTRAP_ARGS,
           mode: "deployment",
-          target: "//projects/deployments/pleomino/staging:deploy",
+          target: "//projects/deployments/sample-webapp/staging:deploy",
           apiUrl: `http://127.0.0.1:${port}`,
           cliDomain: `http://127.0.0.1:${port}/api`,
           hostOverride: true,
@@ -69,7 +69,7 @@ test("deployment dry-run auto sink reads resolver config from workspace root", a
       runInfisicalIacBootstrap({
         ...DEFAULT_BOOTSTRAP_ARGS,
         mode: "deployment",
-        target: "//projects/deployments/pleomino/staging:deploy",
+        target: "//projects/deployments/sample-webapp/staging:deploy",
         hostOverride: true,
         credentialSink: "auto",
         dryRun: true,
@@ -161,22 +161,22 @@ async function close(server: http.Server) {
 }
 
 async function writeReviewedMetadata(dir: string) {
-  const file = path.join(dir, "projects/deployments/pleomino/shared/family.bzl");
+  const file = path.join(dir, "projects/deployments/sample-webapp/shared/family.bzl");
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(
     file,
     [
       '_INFISICAL_SITE_URL = "https://app.infisical.com"',
-      '_INFISICAL_PROJECT_ID = "proj_pleomino"',
-      '_INFISICAL_PROJECT_NAME = "pleomino-deployments"',
-      '_INFISICAL_PROJECT_SLUG = "pleomino-deployments"',
+      '_INFISICAL_PROJECT_ID = "proj_sample_webapp"',
+      '_INFISICAL_PROJECT_NAME = "sample-webapp-deployments"',
+      '_INFISICAL_PROJECT_SLUG = "sample-webapp-deployments"',
       '_INFISICAL_ENVIRONMENT_SLUGS = {"staging": "staging", "prod": "prod"}',
       '_INFISICAL_SECRET_PATH = "/"',
       '_INFISICAL_CLOUDFLARE_SECRET_NAME = "cloudflare_api_token"',
       '_INFISICAL_MACHINE_IDENTITY_IDS = {"staging": "id_staging", "prod": "id_prod"}',
       '_INFISICAL_MACHINE_IDENTITY_NAMES = {"staging": "staging-deploy", "prod": "prod-deploy"}',
       '_INFISICAL_CREDENTIAL_FILE_NAMES = {"staging": {"client_id": "sid", "client_secret": "ssec"}, "prod": {"client_id": "pid", "client_secret": "psec"}}',
-      '_INFISICAL_CREDENTIAL_REFS = {"staging": {"client_id": "secret://deployments/pleomino/staging/infisical-client-id", "client_secret": "secret://deployments/pleomino/staging/infisical-client-secret"}, "prod": {"client_id": "secret://deployments/pleomino/prod/infisical-client-id", "client_secret": "secret://deployments/pleomino/prod/infisical-client-secret"}}',
+      '_INFISICAL_CREDENTIAL_REFS = {"staging": {"client_id": "secret://deployments/sample-webapp/staging/infisical-client-id", "client_secret": "secret://deployments/sample-webapp/staging/infisical-client-secret"}, "prod": {"client_id": "secret://deployments/sample-webapp/prod/infisical-client-id", "client_secret": "secret://deployments/sample-webapp/prod/infisical-client-secret"}}',
       "",
     ].join("\n"),
   );

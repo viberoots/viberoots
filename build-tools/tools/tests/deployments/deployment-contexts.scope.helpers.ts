@@ -17,7 +17,11 @@ import { nixosSharedHostLaneGovernanceNodeFixture } from "./deployment-lane-gove
 const $ = globalThis.$;
 
 export function appNode(overrides: Partial<GraphNode> = {}): GraphNode {
-  return { name: "//projects/apps/pleomino:app", labels: ["kind:app", "webapp:pwa"], ...overrides };
+  return {
+    name: "//projects/apps/sample-webapp:app",
+    labels: ["kind:app", "webapp:pwa"],
+    ...overrides,
+  };
 }
 
 export function cloudflareNodes(deployments: GraphNode[]) {
@@ -32,16 +36,16 @@ export function cloudflareNodes(deployments: GraphNode[]) {
 
 export function cloudflareDeployment(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
-    name: "//projects/deployments/pleomino/staging:deploy",
+    name: "//projects/deployments/sample-webapp/staging:deploy",
     provider: "cloudflare-pages",
-    component: "//projects/apps/pleomino:app",
+    component: "//projects/apps/sample-webapp:app",
     component_kind: "static-webapp",
     publisher: "wrangler-pages",
     publisher_config: "wrangler.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
     secret_requirements: [],
     runtime_config_requirements: [],
     provider_target: {},
@@ -52,11 +56,11 @@ export function cloudflareDeployment(overrides: Partial<GraphNode> = {}): GraphN
 export function s3Deployment(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
     ...cloudflareDeployment({
-      name: "//projects/deployments/pleomino/staging-s3:deploy",
+      name: "//projects/deployments/sample-webapp/staging-s3:deploy",
       provider: "s3-static",
       publisher: "aws-s3-sync",
       publisher_config: "aws-s3-sync.jsonc",
-      provider_target: { bucket: "pleomino-staging-site" },
+      provider_target: { bucket: "sample-webapp-staging-site" },
     }),
     ...overrides,
   };
@@ -68,12 +72,16 @@ export function s3Nodes(deployments: GraphNode[]) {
     s3StaticLanePolicyNodeFixture(),
     nixosSharedHostLaneGovernanceNodeFixture({
       source_ref_policies: [
-        { stage: "dev", allowed_refs: "main", required_checks: "deploy/pleomino-dev" },
-        { stage: "staging", allowed_refs: "main", required_checks: "deploy/pleomino-staging-s3" },
+        { stage: "dev", allowed_refs: "main", required_checks: "deploy/sample-webapp-dev" },
+        {
+          stage: "staging",
+          allowed_refs: "main",
+          required_checks: "deploy/sample-webapp-staging-s3",
+        },
         {
           stage: "prod",
           allowed_refs: "refs/tags/release/fixture",
-          required_checks: "deploy/pleomino-prod",
+          required_checks: "deploy/sample-webapp-prod",
         },
       ],
     }),

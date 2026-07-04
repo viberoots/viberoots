@@ -9,13 +9,13 @@
 
 ## What
 
-Extend the repo's OpenTofu-based identity provisioning beyond the current Pleomino deployment family
+Extend the repo's OpenTofu-based identity provisioning beyond the current Sample webapp deployment family
 to cover the full set of identity principals that viberoots needs to manage declaratively:
 
 - **WorkOS or Supabase Auth tenant configuration** — organization, application, OIDC issuer,
   redirect URIs, and role/group claim mapping as reviewed code, not ad hoc dashboard state.
 - **Infisical project and environment provisioning for new deployment families** — following the
-  pattern already established in `projects/deployments/pleomino/infisical/opentofu/main.tf`:
+  pattern already established in `projects/deployments/sample-webapp/infisical/opentofu/main.tf`:
   one `infisical_project`, per-stage `infisical_project_environment`, per-stage
   `infisical_identity` with Universal Auth, and `infisical_project_identity` membership with
   a reviewed role.
@@ -43,14 +43,14 @@ alone.
 
 No new IaC framework is introduced. OpenTofu is already the tool for external-infrastructure
 provisioning in this repo (ADR-00007 permits it for provider-native configuration that cannot be
-expressed in NixOS modules). The Infisical OpenTofu provider is already pinned in the Pleomino
+expressed in NixOS modules). The Infisical OpenTofu provider is already pinned in the Sample webapp
 stack. A WorkOS or Supabase Terraform provider would follow the same pattern.
 
 ## Why Now
 
 The current bootstrap flow imperatively creates and reconciles Infisical identities in TypeScript
 (`infisical-iac-bootstrap-identity.ts`, `infisical-iac-bootstrap-tofu.ts`). The OpenTofu state
-file tracks the resources created for Pleomino, but only for that one family. As new deployment
+file tracks the resources created for Sample webapp, but only for that one family. As new deployment
 families are onboarded and as a Supabase or WorkOS tenant is activated, ad hoc provisioning
 accumulates. Provisioning that is not declared in reviewed OpenTofu:
 
@@ -80,11 +80,11 @@ a spreadsheet.
   freshly deleted bootstrap identity breaks the plan/apply path. The imperative `ensureUniversalAuth`
   call in `infisical-iac-bootstrap-identity.ts` is the circuit-breaker for this; it must remain
   operative even if the resource is also declared in `.tf`.
-- **OpenTofu state hygiene** — the existing Pleomino stack uses local `.terraform/` state, ignored
+- **OpenTofu state hygiene** — the existing Sample webapp stack uses local `.terraform/` state, ignored
   by `.gitignore`. Remote state (e.g., Terraform Cloud, S3, Supabase Storage) has not been
   configured. Adding more stacks without a remote state solution increases the risk of state
   divergence between operators.
-- **Credential file name drift** — `control_plane_credential_file_names` in the Pleomino stack is
+- **Credential file name drift** — `control_plane_credential_file_names` in the Sample webapp stack is
   a reviewed constant that must match what the NixOS container module mounts. Adding new stacks
   introduces new file names; drift between the OpenTofu output and the NixOS module is a silent
   runtime failure.
@@ -96,7 +96,7 @@ a spreadsheet.
   where state is lost. The alternative — leaving the bootstrap identity imperative and declaring
   only downstream identities — is safer but leaves the root of the identity tree outside the IaC
   graph.
-- The Pleomino stack currently uses local state. Migrating it to remote state is a prerequisite for
+- The Sample webapp stack currently uses local state. Migrating it to remote state is a prerequisite for
   multi-operator workflows and for Bob setup. Doing that in this task (rather than deferring it)
   keeps the scope honest but adds effort.
 - WorkOS and Supabase each have a Terraform provider maintained by the provider vendor. The
@@ -106,7 +106,7 @@ a spreadsheet.
 
 ## Considerations
 
-- The existing OpenTofu pattern at `projects/deployments/pleomino/infisical/opentofu/main.tf` is
+- The existing OpenTofu pattern at `projects/deployments/sample-webapp/infisical/opentofu/main.tf` is
   the template. New stacks should live in a parallel path: either
   `projects/deployments/<family>/infisical/opentofu/` for deployment-family stacks, or
   `projects/infra/auth/opentofu/` for the cross-cutting auth tenant stack.
@@ -123,7 +123,7 @@ a spreadsheet.
   credential is a `bootstrap`-category secret. It must resolve via macOS Keychain or a restrictive
   local file, not via Infisical. The two-category constraint from ADR-00003 is non-negotiable.
 - Reviewed metadata for each new stack (project IDs, identity IDs, environment slugs) follows the
-  same two-phase handoff model as Pleomino: first-bootstrap placeholders in
+  same two-phase handoff model as Sample webapp: first-bootstrap placeholders in
   `infisical-iac-bootstrap-reviewed-metadata.ts`, then a metadata patch after the first apply.
   Do not hardcode live IDs in the source before they exist.
 - Once remote state is configured, the `.terraform/` directory, `terraform.tfstate*`, and

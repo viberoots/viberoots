@@ -8,8 +8,8 @@ import type { NixosSharedHostRemotePlan } from "../../deployments/nixos-shared-h
 export const remoteSshCommandAssemblyPlan: NixosSharedHostRemotePlan = {
   planMode: true,
   remoteExecutionImplemented: true,
-  deploymentId: "pleomino-dev",
-  deploymentLabel: "//projects/deployments/pleomino/dev:deploy",
+  deploymentId: "sample-webapp-dev",
+  deploymentLabel: "//projects/deployments/sample-webapp/dev:deploy",
   profileName: "mini",
   destination: "mini",
   transportMode: "ssh",

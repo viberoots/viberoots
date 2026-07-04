@@ -11,26 +11,26 @@ import {
 
 function deploymentNode(overrides: Partial<GraphNode> = {}): GraphNode {
   return {
-    name: "//projects/deployments/pleomino/staging:deploy",
+    name: "//projects/deployments/sample-webapp/staging:deploy",
     provider: "cloudflare-pages",
-    component: "//projects/apps/pleomino:app",
+    component: "//projects/apps/sample-webapp:app",
     component_kind: "static-webapp",
     publisher: "wrangler-pages",
     publisher_config: "wrangler.jsonc",
     protection_class: "shared_nonprod",
-    lane_policy: "//projects/deployments/pleomino/shared:lane",
+    lane_policy: "//projects/deployments/sample-webapp/shared:lane",
     environment_stage: "staging",
-    admission_policy: "//projects/deployments/pleomino/shared:staging_release",
+    admission_policy: "//projects/deployments/sample-webapp/shared:staging_release",
     secret_requirements: [],
     runtime_config_requirements: [],
-    provider_target: { account: "staging", project: "pleomino-staging-pages" },
+    provider_target: { account: "staging", project: "sample-webapp-staging-pages" },
     ...overrides,
   };
 }
 
 function extract(overrides: Partial<GraphNode> = {}) {
   return extractCloudflarePagesDeployments([
-    { name: "//projects/apps/pleomino:app", labels: ["kind:app", "webapp:pwa"] },
+    { name: "//projects/apps/sample-webapp:app", labels: ["kind:app", "webapp:pwa"] },
     cloudflarePagesLaneGovernanceNodeFixture(),
     cloudflarePagesLanePolicyNodeFixture(),
     cloudflarePagesAdmissionPolicyNodeFixture(),

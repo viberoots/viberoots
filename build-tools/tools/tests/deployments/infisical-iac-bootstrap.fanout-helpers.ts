@@ -26,28 +26,28 @@ export function deploymentNode(name: string, family: string) {
 }
 
 export function fanOutOnlyNode(name: string) {
-  return pleominoContextNode(name, "pleomino-staging");
+  return sampleWebappContextNode(name, "sample-webapp-staging");
 }
 
 export function promptOnlyFanOutNode(name: string) {
   return {
-    ...deploymentNode(name, "pleomino"),
+    ...deploymentNode(name, "sample-webapp"),
     secret_backend: undefined,
   };
 }
 
-export function pleominoContextNode(name: string, deploymentContext: string) {
+export function sampleWebappContextNode(name: string, deploymentContext: string) {
   const stage = deploymentContext.endsWith("prod") ? "prod" : "staging";
   return {
     name,
     rule_type: "deployment_target",
-    deployment_family: "pleomino",
+    deployment_family: "sample-webapp",
     environment_stage: stage,
     deployment_context: deploymentContext,
     infisical_runtime: {},
     secret_requirements: [
       {
-        ref: `secret://deployments/pleomino/${stage}/cloudflare/api-token`,
+        ref: `secret://deployments/sample-webapp/${stage}/cloudflare/api-token`,
         required: true,
       },
     ],
@@ -70,7 +70,7 @@ export async function writeRepoOnlyResolver(dir: string) {
           },
         },
         controlPlanes: {
-          pleomino: {
+          "sample-webapp": {
             serviceClient: {
               controlPlaneUrl: "https://control.example",
               controlPlaneTokenRef: "runtime://github-actions/control-plane-token",
@@ -78,8 +78,8 @@ export async function writeRepoOnlyResolver(dir: string) {
           },
         },
         deploymentContexts: {
-          "pleomino-staging": pleominoDeploymentContext("staging"),
-          "pleomino-prod": pleominoDeploymentContext("prod"),
+          "sample-webapp-staging": sampleWebappDeploymentContext("staging"),
+          "sample-webapp-prod": sampleWebappDeploymentContext("prod"),
         },
       },
       null,
@@ -88,17 +88,17 @@ export async function writeRepoOnlyResolver(dir: string) {
   );
 }
 
-function pleominoDeploymentContext(stage: "staging" | "prod") {
+function sampleWebappDeploymentContext(stage: "staging" | "prod") {
   return {
-    controlPlane: "pleomino",
+    controlPlane: "sample-webapp",
     secretBackend: "infisical/default",
     infisical: {
       host: "https://app.infisical.com",
-      projectId: "proj_pleomino",
-      projectName: "Pleomino",
-      projectSlug: "pleomino",
+      projectId: "proj_sample_webapp",
+      projectName: "Sample webapp",
+      projectSlug: "sample-webapp",
       environment: stage,
-      defaultPath: `/deployments/pleomino/${stage}`,
+      defaultPath: `/deployments/sample-webapp/${stage}`,
     },
   };
 }

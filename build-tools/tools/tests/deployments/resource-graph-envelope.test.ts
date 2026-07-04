@@ -44,11 +44,13 @@ test("resource envelopes cover extractable and runtime inventory kinds", () => {
         executionSnapshots: [
           status("snapshot-1", {
             snapshotId: "snapshot-1",
-            deploymentId: "pleomino",
+            deploymentId: "sample-webapp",
             capturedAt: "2026-01-01T00:00:00.000Z",
           }),
         ],
-        deployRuns: [status("run-1", { runId: "run-1", deploymentId: "pleomino", status: "ok" })],
+        deployRuns: [
+          status("run-1", { runId: "run-1", deploymentId: "sample-webapp", status: "ok" }),
+        ],
       },
     },
   );
@@ -99,7 +101,7 @@ test("resource envelopes reject secret-bearing runtime facts", () => {
       deployRuns: [
         status("run-1", {
           runId: "run-1",
-          deploymentId: "pleomino",
+          deploymentId: "sample-webapp",
           status: "ok",
           secret: "raw",
           rawToken: "raw",
@@ -142,7 +144,7 @@ function status(id: string, facts: Record<string, unknown>) {
 function providerTarget() {
   return {
     account: "web-platform",
-    project: "pleomino-staging",
+    project: "sample-webapp-staging",
   };
 }
 
@@ -164,9 +166,9 @@ function manualInventory(sourcePath: string): DeploymentResourceInventory {
     resources: [
       {
         kind: "Deployment",
-        id: "pleomino-prod",
+        id: "sample-webapp-prod",
         authority: "reviewed_intent",
-        source: { class: "buck", label: "//projects/apps/pleomino:deploy", path: sourcePath },
+        source: { class: "buck", label: "//projects/apps/sample-webapp:deploy", path: sourcePath },
         refs: ["provider", "lane", "admission"],
         facts: {
           provider: "cloudflare_pages",
@@ -191,7 +193,7 @@ function manualResource(
     kind,
     id,
     authority: "reviewed_intent",
-    source: { class: "buck", label: "//projects/apps/pleomino:deploy", path: sourcePath },
+    source: { class: "buck", label: "//projects/apps/sample-webapp:deploy", path: sourcePath },
   };
 }
 

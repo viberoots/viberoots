@@ -212,6 +212,22 @@ Common causes we’ve seen:
 - **Too many nested Buck/Nix invocations at once** causing resource contention (adjust `VERIFY_BUCK2_THREADS` if needed, but fix avoidable work first).
 - **Buck event-bus failures under full-suite fan-out** can be resource exhaustion, not a flaky assertion. Check verify resource summaries for high `max_buck`/`max_processes`; large local shared passes intentionally use a lower Buck thread cap unless `VERIFY_BUCK2_THREADS` is set.
 
+### 4.1 Disk growth guardrails
+
+Treat unexpected disk growth during `i`, `b`, or `v` like an execution-time regression. Collect evidence before cleanup: capture `df -h / /nix`, `du -sh` for `/private/tmp/viberoots-*`, `.viberoots/workspace`, `buck-out`, and relevant `/nix/store` output families, then preserve the verify log that shows the active pass and target names. Do not run GC or remove temp roots until the first growth pattern is recorded.
+
+Recent fixes prove these guardrails:
+
+- **Generated state must stay out of reviewed and seeded sources**. Source filters, seed filters, temp-repo rsync, and bootstrap repair paths must exclude generated roots consistently. Recent fixes added guardrails for `.viberoots/buck`, `.viberoots/cache`, `.viberoots/workspace/buck`, `.viberoots/workspace/codex-test-logs`, `viberoots/.viberoots`, `viberoots/buck-out`, `viberoots/node_modules`, `.direnv`, `.nix-gcroots`, `result*`, build outputs, and test logs.
+- **Filtered snapshots must not copy mutable app/build outputs**. Repo and flake filters must exclude `node_modules`, `buck-out`, `dist`, `build`, `.vite`, `.next`, `.wasm-producer`, coverage, temp files, and result symlinks so stale local outputs do not enter Nix sources or Buck outputs.
+- **Seed staging must be reusable, bounded, and cleaned by ownership**. Verify should prepare one staged seed per seed key, pin only live seeds, remove stale unlocked stages, and keep cleanup evidence-based so interrupted runs do not accumulate old seeds or kill unrelated concurrent work.
+- **Keep seed inputs complete without broadening copies**. If a temp-repo test needs a new helper or root file, add the minimal required seed/filter coverage or read from `REPO_ROOT` when isolation is not part of the assertion. Do not broaden `TEST_RSYNC_ROOTS` to large trees just to access one file.
+- **Avoid duplicated Nix and pnpm source materialization**. When a fixed-output or importer-scoped store path already determines a build, do not also snapshot a workspace-wide prefetched store or re-copy immutable cache contents. Recent fixes made fixed-output mismatch paths authoritative, refreshed filtered flake snapshots after hash writes, skipped stale speculative fixed-store checks, and deduplicated immutable cache syncs.
+- **Keep local generated shell state out of bootstrap and source-mode snapshots**. Bootstrap and source-selection flows must ignore generated shell/cache state and filtered input noise, so local `.envrc`/direnv/Nix artifacts do not churn source hashes or get copied into seed inputs.
+- **Treat Nix GC and store optimization as maintenance, not normal verify setup**. Do not run `viberoots gc`, `nix store gc`, or `nix store optimise` while verify is active. Use `viberoots gc --dry-run` before cleanup, and treat invalid store-path errors during verify as run-level evidence of concurrent store mutation.
+
+Do not add a new disk-growth guardrail just because a theory is plausible. First prove the path with a before/after measurement, a focused regression test or contract test, and comparable validation evidence that the copied/stored bytes are reduced without hiding required source inputs.
+
 ### 5. Performance guardrails for new PRs
 
 I want performance regressions treated as correctness issues. Use these guardrails while you implement:

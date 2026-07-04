@@ -14,8 +14,8 @@ import {
 import { installFakeCloudflarePagesWrangler } from "./cloudflare-pages.fake-wrangler";
 import {
   fakeCloudflareEnv,
-  pleominoDevDeployment,
-  pleominoProdDeployment,
+  sampleWebappDevDeployment,
+  sampleWebappProdDeployment,
   writeDeploymentJson,
   writeWranglerConfig,
 } from "./cloudflare-pages.promotion.helpers";
@@ -58,26 +58,26 @@ function restoreProcessEnv(snapshot: NodeJS.ProcessEnv): void {
 
 test("cloudflare-pages allows reviewed cross-provider same-artifact promotion only on declared edges", async () => {
   await runInTemp("cloudflare-pages-promotion-e2e", async (tmp, $) => {
-    const dev = pleominoDevDeployment();
+    const dev = sampleWebappDevDeployment();
     const staging = cloudflarePagesDeploymentFixture({
       lanePolicy: dev.lanePolicy,
       lanePolicyRef: dev.lanePolicyRef,
     });
-    const prod = pleominoProdDeployment();
+    const prod = sampleWebappProdDeployment();
     const artifactDir = path.join(tmp, "artifact");
     const recordsRoot = path.join(tmp, "records");
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
-    const devJson = path.join(tmp, "pleomino-dev.json");
-    const stagingJson = path.join(tmp, "pleomino-staging.json");
-    const prodJson = path.join(tmp, "pleomino-prod.json");
-    await writeDemoArtifact(artifactDir, "pleomino release");
+    const devJson = path.join(tmp, "sample-webapp-dev.json");
+    const stagingJson = path.join(tmp, "sample-webapp-staging.json");
+    const prodJson = path.join(tmp, "sample-webapp-prod.json");
+    await writeDemoArtifact(artifactDir, "sample-webapp release");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "prod", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "prod", "wrangler.jsonc"),
     );
     await installNixosSharedHostTargets(tmp, [dev]);
     await installCloudflarePagesTargets(tmp, [staging, prod]);
@@ -151,7 +151,7 @@ test("cloudflare-pages allows reviewed cross-provider same-artifact promotion on
 
 test("cloudflare-pages promotion fails closed when staging smoke blocks the promoted artifact", async () => {
   await runInTemp("cloudflare-pages-promotion-smoke-failure", async (tmp, $) => {
-    const dev = pleominoDevDeployment();
+    const dev = sampleWebappDevDeployment();
     const staging = cloudflarePagesDeploymentFixture({
       lanePolicy: dev.lanePolicy,
       lanePolicyRef: dev.lanePolicyRef,
@@ -161,10 +161,10 @@ test("cloudflare-pages promotion fails closed when staging smoke blocks the prom
     const hostRoot = path.join(tmp, "host");
     const statePath = path.join(tmp, "platform-state.json");
     const fake = await installFakeCloudflarePagesWrangler(tmp);
-    const devJson = path.join(tmp, "pleomino-dev.json");
+    const devJson = path.join(tmp, "sample-webapp-dev.json");
     await writeDemoArtifact(artifactDir, "expected");
     await writeWranglerConfig(
-      path.join(tmp, "projects", "deployments", "pleomino", "staging", "wrangler.jsonc"),
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
     );
     await installNixosSharedHostTargets(tmp, [dev]);
     await installCloudflarePagesTargets(tmp, [staging]);
