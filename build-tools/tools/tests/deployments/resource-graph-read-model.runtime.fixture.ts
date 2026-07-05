@@ -45,7 +45,17 @@ export async function seedRuntimeRows(backend: ReturnType<typeof backendFor>, tm
     "run-1",
     "submission-1",
     path.join(tmp, "record.json"),
-    JSON.stringify({ deployRunId: "run-1", deploymentId: "demo-web", token: "raw-secret" }),
+    JSON.stringify({
+      deployRunId: "run-1",
+      deploymentId: "demo-web",
+      provider: "nixos-shared-host",
+      providerTargetIdentity: "nixos-shared-host:default:demo-web",
+      finalOutcome: "succeeded",
+      publishMode: "normal",
+      smokeOutcome: "passed",
+      admittedContext: { sourcePlanRef: "source-plan:demo" },
+      token: "raw-secret",
+    }),
     "2026-07-05T12:01:00.000Z",
   ]);
   await writeBackendRunActionDoc(backend, runAction("action-a", "2026-07-05T12:01:00.000Z"));
@@ -70,6 +80,19 @@ function fixtureDocuments() {
         },
         spec: {},
         statusRef: "status:deployment",
+        policyRefs: [],
+        source: { class: "buck", label: "//demo:deploy" },
+      } as any,
+      {
+        apiVersion: "deployment.resource.viberoots.dev/v1",
+        kind: "ProviderTarget",
+        metadata: {
+          name: "nixos-shared-host:default:demo-web",
+          uid: "uid:provider",
+          labels: { "viberoots.dev/authority": "reviewed_intent" },
+          ownerReferences: [{ kind: "Deployment", uid: "uid:deployment" }],
+        },
+        spec: {},
         policyRefs: [],
         source: { class: "buck", label: "//demo:deploy" },
       } as any,

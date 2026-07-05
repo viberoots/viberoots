@@ -95,8 +95,11 @@ async function rows(backend: NixosSharedHostControlPlaneBackendTarget, sql: stri
 
 function contextFor(nodes: ResourceGraphNode[]) {
   return {
-    deploymentUidById: new Map(
-      nodes.filter((node) => node.kind === "Deployment").map((node) => [node.name, node.uid]),
-    ),
+    deploymentUidById: uidMap(nodes, "Deployment"),
+    providerTargetUidById: uidMap(nodes, "ProviderTarget"),
   };
+}
+
+function uidMap(nodes: ResourceGraphNode[], kind: string) {
+  return new Map(nodes.filter((node) => node.kind === kind).map((node) => [node.name, node.uid]));
 }

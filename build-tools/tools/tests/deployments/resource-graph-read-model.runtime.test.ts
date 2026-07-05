@@ -21,6 +21,7 @@ test("resource graph read model links admitted runtime facts without leaking sec
 
     const model = await readBackendResourceGraphIndex(backend);
     assertHasNode(model, "DeployRun", "run-1");
+    assertHasNode(model, "ProviderEvidence", "run-1");
     assertHasNode(model, "RunAction", "action-b");
     assertHasNode(model, "ArtifactChallenge", "challenge-1");
     assertHasNode(model, "StaticWebappUploadSession", "upload-1");
@@ -35,6 +36,22 @@ test("resource graph read model links admitted runtime facts without leaking sec
     assert.equal(challenge.proofKeyValidationOutcome, "trusted-key");
     assert.equal(challenge.oneTimeConsumption, "consumed-once");
     assert.equal(challenge.admittedProvenance, "object://artifact-store/artifact-1");
+    const provider = factsFor(model, "ProviderEvidence", "run-1");
+    assert.equal(provider.provider, "nixos-shared-host");
+    assert.equal(provider.liveTargetIdentity, "nixos-shared-host:default:demo-web");
+    assert.equal(provider.partialPublishEvidence.finalOutcome, "succeeded");
+    assert.equal(provider.smokeReadinessEvidence, "passed");
+    assert.equal(provider.sourcePlanRef, "source-plan:demo");
+    assert.deepEqual(provider.retainedRenderEvidence, [
+      { kind: "execution_snapshot", referencePath: "/tmp/execution-snapshot.json" },
+    ]);
+    assert.deepEqual(provider.retainedArtifactEvidence, [
+      {
+        identity: "artifact-1",
+        storedArtifactPath: "/tmp/artifact.tgz",
+        provenancePath: "/tmp/provenance.json",
+      },
+    ]);
     assert.equal(
       factsFor(model, "CleanupEvidence", "cleanup-1").diagnostics,
       "cleanup failed (permission_denied)",
@@ -53,6 +70,30 @@ test("resource graph read model links admitted runtime facts without leaking sec
           edge.kind === "runtime_status" &&
           edge.fromUid === "runtime:DeployRun:run-1" &&
           edge.toUid === "uid:deployment",
+      ),
+    );
+    assert.ok(
+      model.edges.some(
+        (edge: any) =>
+          edge.kind === "provider_target" &&
+          edge.fromUid === "runtime:ProviderEvidence:run-1" &&
+          edge.toUid === "uid:provider",
+      ),
+    );
+    assert.ok(
+      model.edges.some(
+        (edge: any) =>
+          edge.kind === "runtime_status" &&
+          edge.fromUid === "runtime:ProviderEvidence:run-1" &&
+          edge.toUid === "runtime:ExecutionSnapshot:submission-1",
+      ),
+    );
+    assert.ok(
+      model.edges.some(
+        (edge: any) =>
+          edge.kind === "evidence" &&
+          edge.fromUid === "runtime:ProviderEvidence:run-1" &&
+          edge.toUid === "runtime:CurrentStageState:demo-web:staging",
       ),
     );
     assert.doesNotMatch(JSON.stringify(model), /raw-secret|proof-secret|Bearer|token=/);

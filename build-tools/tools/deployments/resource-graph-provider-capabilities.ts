@@ -15,6 +15,7 @@ export function providerCapabilityBindingFacts(
 ): Record<string, unknown> {
   return {
     providerCapabilityId: `provider-capability:${capability.provider}`,
+    providerCapabilityVersion: "provider-capability@1",
     providerCapabilitySource: capabilitySourcePath(capability.provider),
     authorityBoundary: "reviewed-provider-capability-registry",
     supportedComponentKinds: capability.supportedComponentKinds,

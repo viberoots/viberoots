@@ -1,10 +1,15 @@
 #!/usr/bin/env zx-wrapper
 import { publicCurrentStageState } from "./deployment-current-stage-state-public";
 import type { ResourceGraphEdge, ResourceGraphNode } from "./resource-graph-export";
+import { normalizeProviderEvidenceFacts } from "./resource-graph-provider-evidence";
 import { ADMITTED_RUNTIME_SOURCE_LABEL } from "./resource-graph-types";
 import { decodeBackendJson } from "./nixos-shared-host-control-plane-backend-db";
 
 type JsonRow = Record<string, unknown>;
+type RuntimeGraphContext = {
+  deploymentUidById: Map<string, string>;
+  providerTargetUidById: Map<string, string>;
+};
 
 const runtimeSource = { class: "runtime" as const, label: ADMITTED_RUNTIME_SOURCE_LABEL };
 
@@ -12,9 +17,9 @@ export class RuntimeGraph {
   nodes: ResourceGraphNode[] = [];
   edges: ResourceGraphEdge[] = [];
   private submissions: Map<string, any>;
-  private context: { deploymentUidById: Map<string, string> };
+  private context: RuntimeGraphContext;
 
-  constructor(context: { deploymentUidById: Map<string, string> }, submissions: JsonRow[]) {
+  constructor(context: RuntimeGraphContext, submissions: JsonRow[]) {
     this.context = context;
     this.submissions = new Map(
       submissions.map((row) => [String(row.submission_id), decode(row.document_json)]),
@@ -35,6 +40,35 @@ export class RuntimeGraph {
     const doc = decode(row.document_json);
     this.node("DeployRun", runId, { ...doc, recordPath: row.record_path });
     this.edgeToDeployment("DeployRun", runId, doc);
+    if (doc.providerTargetIdentity || doc.provider) {
+      this.node(
+        "ProviderEvidence",
+        runId,
+        normalizeProviderEvidenceFacts({
+          ...doc,
+          executionSnapshotSubmissionId: row.submission_id,
+        }),
+      );
+      this.edge("ProviderEvidence", runId, "DeployRun", runId, "runtime_status");
+      this.edge(
+        "ProviderEvidence",
+        runId,
+        "ExecutionSnapshot",
+        String(row.submission_id),
+        "runtime_status",
+      );
+      this.edgeToDeployment("ProviderEvidence", runId, doc);
+      const targetUid = this.context.providerTargetUidById.get(String(doc.providerTargetIdentity));
+      if (targetUid) {
+        this.edges.push({
+          fromUid: uid("ProviderEvidence", runId),
+          toUid: targetUid,
+          kind: "provider_target",
+          fromKind: "ProviderEvidence",
+          toKind: "ProviderTarget",
+        } as ResourceGraphEdge);
+      }
+    }
   }
 
   runAction(row: JsonRow) {
@@ -54,8 +88,20 @@ export class RuntimeGraph {
     const name = `${row.deployment_id}:${row.environment_stage}`;
     this.node("CurrentStageState", name, doc);
     this.edgeToDeployment("CurrentStageState", name, doc);
+    const providerEvidence = this.providerEvidenceFacts(String(doc.currentRunId || ""));
+    if (providerEvidence) {
+      this.edge(
+        "ProviderEvidence",
+        String(doc.currentRunId),
+        "CurrentStageState",
+        name,
+        "evidence",
+      );
+      providerEvidence.retainedRenderEvidence = retainedRenderEvidence(doc.retainedRenderEvidence);
+      providerEvidence.retainedArtifactEvidence = doc.retainedArtifactEvidence || [];
+    }
     for (const evidence of [
-      ...(doc.retainedRenderEvidence || []),
+      ...retainedRenderEvidence(doc.retainedRenderEvidence),
       ...(doc.retainedArtifactEvidence || []),
     ]) {
       const evidenceId = `${name}:${evidence.kind || evidence.identity}`;
@@ -177,6 +223,10 @@ export class RuntimeGraph {
       toKind,
     } as ResourceGraphEdge);
   }
+
+  private providerEvidenceFacts(runId: string) {
+    return this.nodes.find((node) => node.uid === uid("ProviderEvidence", runId))?.facts;
+  }
 }
 
 function decode(value: unknown): any {
@@ -185,4 +235,14 @@ function decode(value: unknown): any {
 
 function uid(kind: string, name: string) {
   return `runtime:${kind}:${name}`;
+}
+
+function retainedRenderEvidence(evidence: any[] | undefined): any[] {
+  const allowed = "replay_snapshot,provider_config,provisioner_plan,execution_snapshot".split(",");
+  return (evidence || []).map((entry) => {
+    if (!allowed.includes(String(entry.kind))) {
+      throw new Error(`unsupported retained render evidence kind: ${entry.kind}`);
+    }
+    return entry;
+  });
 }

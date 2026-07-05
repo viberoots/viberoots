@@ -40,6 +40,7 @@ test("deployment resource taxonomy names every planned resource concept", () => 
     "StagedArtifact",
     "ArtifactBindingProvenance",
     "CleanupEvidence",
+    "ProviderEvidence",
     "ExecutionSnapshot",
     "DeployRun",
     "RunAction",

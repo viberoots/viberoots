@@ -49,6 +49,21 @@ Secret backend note:
 | multi-component support            | Defines whether multi-component deployments are supported.                                                                                      |
 | protected/shared eligibility       | States whether the provider is in policy for protected/shared use.                                                                              |
 
+## Resource Graph Provider Evidence
+
+The resource graph read model exposes provider observed-state evidence as
+`ProviderEvidence` runtime resources. Provider evidence is normalized through a
+versioned matrix, `provider-evidence-matrix@1`, so each reviewed provider marks
+live target identity, provider release id, drift, preview, partial publish,
+smoke/readiness, and rollback/recovery evidence as `supported`, `unsupported`,
+or `deferred`.
+
+Unsupported or deferred fields must stay explicit in status instead of being
+emulated from unrelated facts. Source-plan links are preserved only when the
+provider record already explains a built artifact or execution snapshot; the
+resource graph does not infer provider compatibility from `nixpkgs_profile` or
+`nixpkg_pins`.
+
 ## Review Questions For Every Provider
 
 - What exact `provider_target` fields determine the normal mutable live target?

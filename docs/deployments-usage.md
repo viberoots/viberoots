@@ -354,7 +354,10 @@ model. Deployment-specific submission, queue, lock, idempotency, artifact,
 stage-state, session, and audit tables remain the mutation authority. Runtime
 graph status is derived from those admitted records and can show run actions,
 artifact challenges, upload sessions, retained evidence, current state, and
-stage history without exposing a generic mutation path.
+stage history without exposing a generic mutation path. Provider observed-state
+evidence appears as `ProviderEvidence` resources with explicit supported,
+unsupported, or deferred semantics for provider release ids, drift, preview,
+partial publish, smoke/readiness, and rollback/recovery fields.
 
 To answer what is currently deployed in a protected/shared stage, use the
 control-plane current-stage helpers rather than Git release-pointer files:
