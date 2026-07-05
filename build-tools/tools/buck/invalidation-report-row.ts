@@ -10,6 +10,12 @@ import type { InvalidationRow } from "./invalidation-report-lib";
 
 type AutoMap = Record<string, string[]>;
 
+const GLOBAL_NIX_INPUT_LABELS = [
+  "//.viberoots/workspace:flake.lock",
+  "@viberoots//build-tools/tools/nix:nixpkgs_source_registry",
+  "//.viberoots/workspace:nixpkgs-source-registry-extension",
+];
+
 export type InvalidationReportNode = {
   name?: string;
   rule_type?: string;
@@ -52,6 +58,10 @@ function providerModelForLang(lang: string): ProviderModel | null {
 
 function hasLabel(labels: string[], want: string): boolean {
   return labels.some((l) => typeof l === "string" && l === want);
+}
+
+function hasGlobalNixInputs(values: string[]): boolean {
+  return GLOBAL_NIX_INPUT_LABELS.every((label) => values.some((v) => v === label));
 }
 
 function prefixKeys(obj: unknown, prefix: string): string[] {
@@ -131,16 +141,16 @@ export function computeInvalidationRow(
   const packageLocalPatchesExpected = patchScope === "package-local";
   const packageLocalPatchesObserved: string[] = [];
 
-  const globalNixLabelsStamped = hasLabel(labels, "//.viberoots/workspace:flake.lock");
+  const globalNixLabelsStamped = GLOBAL_NIX_INPUT_LABELS.every((label) => hasLabel(labels, label));
   const globalNixObserved: string[] = [];
   const globalNixExpected =
-    listValues(n.srcs).some((v) => v === "//.viberoots/workspace:flake.lock") ||
+    hasGlobalNixInputs(listValues(n.srcs)) ||
     prefixKeys(n.srcs, "__global_nix_inputs__/").length > 0 ||
-    listValues(n.nix_inputs).some((v) => v === "//.viberoots/workspace:flake.lock");
+    hasGlobalNixInputs(listValues(n.nix_inputs));
 
   if (Array.isArray(n.srcs)) {
     const srcsList = n.srcs as unknown[];
-    if (srcsList.some((x) => x === "//.viberoots/workspace:flake.lock")) {
+    if (hasGlobalNixInputs(srcsList.filter((x) => typeof x === "string") as string[])) {
       globalNixObserved.push("srcs(list)/global_nix_inputs");
     }
     if (importerLocalPatchesExpected && primaryLang) {
@@ -191,7 +201,7 @@ export function computeInvalidationRow(
 
   if (Array.isArray(n.nix_inputs)) {
     const nixInputs = n.nix_inputs as unknown[];
-    if (nixInputs.some((x) => x === "//.viberoots/workspace:flake.lock")) {
+    if (hasGlobalNixInputs(nixInputs.filter((x) => typeof x === "string") as string[])) {
       globalNixObserved.push("nix_inputs(list)/global_nix_inputs");
     }
   } else if (n.nix_inputs && typeof n.nix_inputs === "object") {

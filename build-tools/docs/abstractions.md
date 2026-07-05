@@ -532,7 +532,10 @@ Some rules and macros call Nix. Those actions must be invalidated by a small set
 ### Contract
 
 - The canonical list is returned by `global_nix_inputs()`.
-- Call sites do not hardcode `//.viberoots/workspace:flake.lock`.
+- The list includes the generated workspace `flake.lock`, the central nixpkgs source registry, and
+  the generated workspace registry extension file. This is coarse invalidation by registry file, not
+  fine-grained invalidation by profile.
+- Call sites do not hardcode individual global input labels.
 - If a macro or rule calls Nix, it should attach global inputs as real action inputs, and may also stamp a label for observability.
 
 ### Canonical implementations
@@ -541,18 +544,19 @@ Some rules and macros call Nix. Those actions must be invalidated by a small set
   - `global_nix_inputs`
   - `attach_global_nix_inputs`
 - **Starlark label stamp**: `build-tools/lang/label_stamping.bzl:stamp_global_nix_inputs` (used only when justified)
-- **Lint**: `build-tools/tools/dev/lint-global-stamping.ts` (fails on direct `//.viberoots/workspace:flake.lock` stamping)
+- **Lint**: `build-tools/tools/dev/lint-global-stamping.ts` (fails on direct global input stamping)
 
 ### Regression guards
 
-There are targeted tests for Node and rule-level shims that assert `//.viberoots/workspace:flake.lock` is present via the helper surface.
+There are targeted tests for Node and rule-level shims that assert the full global input set is
+present via the helper surface.
 
 ### Common leak patterns
 
 These are the usual ways this leaks:
 
 - A macro shells out to Nix but only stamps labels, and forgets to attach `global_nix_inputs()` into action inputs.
-- A macro hardcodes `//.viberoots/workspace:flake.lock`, and then drifts when the policy changes.
+- A macro hardcodes one global input label, and then drifts when the policy changes.
 
 ---
 

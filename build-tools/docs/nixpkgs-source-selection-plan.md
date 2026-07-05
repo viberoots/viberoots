@@ -609,6 +609,58 @@ can regress without focused coverage.
 
 Implement.
 
+## PR-9: Registry Action Input Invalidation
+
+### 1. Intent
+
+Close the final design-assessment gap by making nixpkgs source registry files real Buck action inputs
+for Nix-calling actions, rather than only live workspace files read by Nix evaluation.
+
+### 2. Scope of changes
+
+- Extend the shared global Nix input wiring so it includes:
+  - the generated workspace `flake.lock`
+  - the central nixpkgs source registry
+  - generated workspace registry extension files when present
+- Route Nix-calling Buck rules through the shared helper instead of hardcoding only the lockfile.
+- Ensure local selected builds and filtered selected builds keep the same source-plan behavior while
+  registry and registry-extension files participate in action invalidation.
+- Update source-selection docs or build-system docs to state that registry files are action inputs
+  for Buck-driven Nix actions.
+
+### 3. Tests
+
+- Add focused regression coverage showing a registry or registry-extension change participates in the
+  declared Buck action inputs for at least one Nix-calling rule.
+- Add or update enforcement coverage so new Nix-calling rules cannot bypass the shared global input
+  helper by depending only on `//.viberoots/workspace:flake.lock`.
+- Keep existing filtered snapshot and source-plan parity tests passing.
+
+### 4. Acceptance criteria
+
+- Registry files required to resolve `nixpkgs_profile` and `nixpkg_pins` are declared action inputs
+  where Buck invokes Nix.
+- The implementation uses one shared wiring point for these global Nix inputs.
+- Tests would fail if a future Nix-calling rule drops registry inputs or hardcodes only `flake.lock`.
+- Documentation reflects the invalidation contract without promising fine-grained per-profile
+  invalidation.
+
+### 5. Risks
+
+- A coarse registry-file input may invalidate more actions than strictly necessary when unused
+  profiles change.
+- Generated registry-extension labels must stay optional for strict consumer workspaces that have no
+  extensions.
+
+### 6. Consequence of not implementing
+
+Changing registry profiles or consumer registry extensions can alter Nix resolution without reliably
+invalidating Buck actions that call Nix.
+
+### 7. Recommendation
+
+Implement.
+
 ## Rollout And Sequencing
 
 1. PR-1 establishes the registry and default resolver foundation.
@@ -619,6 +671,7 @@ Implement.
 6. PR-6 makes filtered, remote, cache, and consumer workspace flows source-plan aware.
 7. PR-7 hardens cross-language behavior and final diagnostics.
 8. PR-8 closes design-conformance regression coverage for final assessment findings.
+9. PR-9 makes registry files real Buck action inputs for Nix-calling actions.
 
 The sequence intentionally makes whole-target profile selection the first usable behavior while
 keeping the resolver shape ready for package pins. Each PR should be independently reviewable and

@@ -10,6 +10,12 @@ import {
 } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 
+const GLOBAL_INPUT_LABELS = [
+  "//.viberoots/workspace:flake.lock",
+  "@viberoots//build-tools/tools/nix:nixpkgs_source_registry",
+  "//.viberoots/workspace:nixpkgs-source-registry-extension",
+];
+
 function readLines(txt: string): string[] {
   return txt
     .split("\n")
@@ -117,10 +123,9 @@ test("prepare_importer_nix_calling_genrule_wiring composes patches, provider edg
       listLines.includes(workspaceProviderLabel("prov_a")),
       "expected provider edge present in list-shaped srcs",
     );
-    assert.ok(
-      listLines.includes("//.viberoots/workspace:flake.lock"),
-      "expected global nix input present in list-shaped srcs",
-    );
+    for (const label of GLOBAL_INPUT_LABELS) {
+      assert.ok(listLines.includes(label), `expected ${label} in list-shaped srcs`);
+    }
 
     const dictKeys = readLines(await fsp.readFile(dictOut, "utf8"));
     assert.ok(

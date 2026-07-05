@@ -5,6 +5,12 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
+const GLOBAL_INPUT_MARKERS = [
+  ":flake.lock",
+  ":nixpkgs_source_registry",
+  ":nixpkgs-source-registry-extension",
+];
+
 test("node_webapp includes global Nix inputs as genrule srcs (action inputs)", async () => {
   await runInTemp("node-webapp-global-inputs-srcs", async (tmp, $) => {
     const dir = path.join(tmp, "projects", "apps", "web");
@@ -31,10 +37,9 @@ test("node_webapp includes global Nix inputs as genrule srcs (action inputs)", a
     })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute srcs //projects/apps/web:bundle`;
     if (probe.exitCode !== 0) return;
     const out = String(probe.stdout || "");
-    assert.ok(
-      out.includes(":flake.lock"),
-      "expected //.viberoots/workspace:flake.lock to be present in srcs via global_nix_inputs()",
-    );
+    for (const marker of GLOBAL_INPUT_MARKERS) {
+      assert.ok(out.includes(marker), `expected ${marker} in srcs via global_nix_inputs()`);
+    }
 
     const labelsProbe = await $({
       cwd: tmp,
@@ -47,9 +52,8 @@ test("node_webapp includes global Nix inputs as genrule srcs (action inputs)", a
       return;
     }
     const labelsOut = String(labelsProbe.stdout || "");
-    assert.ok(
-      labelsOut.includes(":flake.lock"),
-      "expected node_webapp to stamp //.viberoots/workspace:flake.lock when stamp=True",
-    );
+    for (const marker of GLOBAL_INPUT_MARKERS) {
+      assert.ok(labelsOut.includes(marker), `expected ${marker} label when stamp=True`);
+    }
   });
 });

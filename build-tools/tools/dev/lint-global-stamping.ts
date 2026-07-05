@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 /**
- * lint-global-stamping.ts — PR‑5 guard
- * Fails if any .bzl macro files directly stamp //.viberoots/workspace:flake.lock
+ * lint-global-stamping.ts
+ * Fails if any .bzl macro files directly stamp global Nix inputs
  * outside the centralized helper allowlist.
  */
 import * as fsp from "node:fs/promises";
@@ -37,9 +37,14 @@ async function fileContainsDirectStamp(file: string): Promise<Violation[]> {
   }
   const lines = data.split(/\r?\n/);
   const viols: Violation[] = [];
+  const globalLabels = [
+    "//.viberoots/workspace:flake.lock",
+    "@viberoots//build-tools/tools/nix:nixpkgs_source_registry",
+    "//.viberoots/workspace:nixpkgs-source-registry-extension",
+  ];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (line.includes("//.viberoots/workspace:flake.lock")) {
+    if (globalLabels.some((label) => line.includes(label))) {
       viols.push({ file, line: i + 1, text: line.trim() });
     }
   }
@@ -63,9 +68,7 @@ async function main() {
     }
   }
   if (viols.length > 0) {
-    console.error(
-      "[lint-global-stamping] Direct //.viberoots/workspace:flake.lock stamping found in:",
-    );
+    console.error("[lint-global-stamping] Direct global Nix input stamping found in:");
     for (const v of viols) {
       console.error(`  ${v.file}:${v.line}: ${v.text}`);
     }

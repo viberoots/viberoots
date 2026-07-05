@@ -89,11 +89,41 @@ async function ensureAutoMapStubIfMissing() {
   );
 }
 
+async function ensureWorkspaceGlobalNixInputTargets() {
+  const wsRoot = await workspaceRoot();
+  const workspaceDir = path.join(wsRoot, ".viberoots", "workspace");
+  await fsp.mkdir(workspaceDir, { recursive: true });
+  const extensionPath = path.join(workspaceDir, "nixpkgs-source-registry-extension.nix");
+  try {
+    await fsp.access(extensionPath);
+  } catch {
+    await writeIfChanged(extensionPath, "{ inputs }: { profiles = { }; }\n");
+  }
+  await writeIfChanged(
+    path.join(workspaceDir, "TARGETS"),
+    [
+      "filegroup(",
+      '    name = "flake.lock",',
+      '    srcs = ["flake.lock"],',
+      '    visibility = ["PUBLIC"],',
+      ")",
+      "",
+      "filegroup(",
+      '    name = "nixpkgs-source-registry-extension",',
+      '    srcs = ["nixpkgs-source-registry-extension.nix"],',
+      '    visibility = ["PUBLIC"],',
+      ")",
+      "",
+    ].join("\n"),
+  );
+}
+
 export async function runGlue(dryRun: boolean, verbose: boolean) {
   const ui = createCommandUi({ verbose });
   const nodeBase = zxNodeBase();
   const nodeBin = process.execPath || "node";
   const wsRoot = await workspaceRoot();
+  await ensureWorkspaceGlobalNixInputTargets();
   const zxImport = zxInitPath(wsRoot);
   type LangConfig = {
     enabled?: string[];

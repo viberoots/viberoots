@@ -42,9 +42,15 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
             "patch_scope:importer-local",
             "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
             "//.viberoots/workspace:flake.lock",
+            "@viberoots//build-tools/tools/nix:nixpkgs_source_registry",
+            "//.viberoots/workspace:nixpkgs-source-registry-extension",
           ],
           srcs: {
             "__global_nix_inputs__/flake_lock": "//.viberoots/workspace:flake.lock",
+            "__global_nix_inputs__/nixpkgs_source_registry":
+              "@viberoots//build-tools/tools/nix:nixpkgs_source_registry",
+            "__global_nix_inputs__/nixpkgs_source_registry_extension":
+              "//.viberoots/workspace:nixpkgs-source-registry-extension",
             "__patch_inputs__/projects_apps_web_patches_node":
               "root//projects/apps/web/patches/node/demo.patch",
           },

@@ -112,7 +112,14 @@ filegroup(
     srcs = ["flake.lock"],
     visibility = ["PUBLIC"],
 )
+
+filegroup(
+    name = "nixpkgs-source-registry-extension",
+    srcs = ["nixpkgs-source-registry-extension.nix"],
+    visibility = ["PUBLIC"],
+)
 EOF
+      test -f .viberoots/workspace/nixpkgs-source-registry-extension.nix || printf '{ inputs }: { profiles = { }; }\n' > .viberoots/workspace/nixpkgs-source-registry-extension.nix
     `}`;
     return true;
   } catch (e) {

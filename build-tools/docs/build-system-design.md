@@ -144,7 +144,9 @@ extra-experimental-features = nix-command flakes
    reach templates. Non-empty `nixpkg_pins` redirect the matching normalized attr through the pin
    profile and keep unpinned attrs on the target profile. Planner inspection reports target,
    profile, attr, resolution kind, and rationale fields, and leaves raw lockfile commits behind the
-   registry/lockfile evidence boundary.
+   registry/lockfile evidence boundary. Buck-driven Nix actions declare the workspace lockfile, the
+   central registry, and the generated registry extension as real action inputs through
+   `global_nix_inputs()`; this is registry-file invalidation, not per-profile invalidation.
 
 - Node alignment: We stamp `global_nix_inputs()` only in Node macros that directly call Nix (`node_webapp`, `node_vercel_next_artifact`, `node_service_artifact`, `nix_node_cli_bin(bundle=True)`, `nix_node_cli_bin(bundle=False)`). Non‑Nix macros remain unstamped at the macro level.
 

@@ -59,6 +59,18 @@ test("init-consumer generated flakes expose nixpkgs registry extension data", as
     assert.match(hiddenFlake, /import registryExtensionPath \{ inherit inputs; \}/);
     assert.match(hiddenFlake, /inherit nixpkgsRegistryExtension/);
 
+    const workspaceTargets = await fsp.readFile(
+      path.join(workspace, ".viberoots", "workspace", "TARGETS"),
+      "utf8",
+    );
+    assert.match(workspaceTargets, /name = "nixpkgs-source-registry-extension"/);
+    assert.match(workspaceTargets, /srcs = \["nixpkgs-source-registry-extension\.nix"\]/);
+    const emptyExtension = await fsp.readFile(
+      path.join(workspace, ".viberoots", "workspace", "nixpkgs-source-registry-extension.nix"),
+      "utf8",
+    );
+    assert.equal(emptyExtension, "{ inputs }: { profiles = { }; }\n");
+
     const rootFlake = await fsp.readFile(path.join(workspace, "flake.nix"), "utf8");
     assert.match(rootFlake, /nixpkgs_23_11\.url = "github:NixOS\/nixpkgs\/nixos-23\.11"/);
     assert.match(

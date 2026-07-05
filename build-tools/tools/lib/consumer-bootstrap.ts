@@ -417,7 +417,17 @@ filegroup(
     srcs = ["flake.lock"],
     visibility = ["PUBLIC"],
 )
+
+filegroup(
+    name = "nixpkgs-source-registry-extension",
+    srcs = ["nixpkgs-source-registry-extension.nix"],
+    visibility = ["PUBLIC"],
+)
 `;
+}
+
+function emptyRegistryExtension(): string {
+  return "{ inputs }: { profiles = { }; }\n";
 }
 
 function consumerReadme(mode: ConsumerSourceMode): string {
@@ -628,6 +638,11 @@ export async function initConsumer(opts: InitConsumerOptions): Promise<void> {
     opts.workspaceRoot,
     ".viberoots/workspace/flake.nix",
     flakeNix(opts, workspaceViberootsUrl(opts)),
+  );
+  await writeIfMissing(
+    opts.workspaceRoot,
+    ".viberoots/workspace/nixpkgs-source-registry-extension.nix",
+    emptyRegistryExtension(),
   );
   await writeGeneratedFile(opts.workspaceRoot, ".viberoots/workspace/TARGETS", workspaceTargets());
   await writeIfMissing(opts.workspaceRoot, "README.md", consumerReadme(sourceMode));

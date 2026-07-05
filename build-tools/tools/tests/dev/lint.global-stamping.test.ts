@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import { buildToolPath } from "../../dev/dev-build/paths";
 
-test("lint-global-stamping passes (no direct //.viberoots/workspace:flake.lock in macros)", async () => {
+test("lint-global-stamping passes (no direct global Nix input labels in macros)", async () => {
   const zxInit = buildToolPath(process.cwd(), "tools/dev/zx-init.mjs");
   const script = buildToolPath(process.cwd(), "tools/dev/lint-global-stamping.ts");
   const res = await $`node --experimental-strip-types --import ${zxInit} ${script}`.nothrow();

@@ -1,6 +1,12 @@
 load("@prelude//:rules.bzl", "filegroup")
 
 filegroup(
+    name = "nixpkgs_source_registry",
+    srcs = ["nixpkgs-source-registry.nix"],
+    visibility = ["PUBLIC"],
+)
+
+filegroup(
     name = "runtime_nix",
     srcs = glob([
         "*.json",
