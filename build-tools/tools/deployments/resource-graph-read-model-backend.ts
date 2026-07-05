@@ -1,7 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
 import type { SourcePlanEvidence } from "../lib/source-plan-evidence";
+import { redactControlPlaneReadModel } from "./deployment-control-plane-read-redaction";
 import { controlPlaneTableClassification } from "./resource-graph-read-model-tables";
+import { readRuntimeResourceGraph } from "./resource-graph-runtime-read-model";
 import type { ResourceGraphEdgeDocument, ResourceGraphNodeDocument } from "./resource-graph-export";
 import {
   decodeBackendJson,
@@ -97,22 +99,21 @@ export async function readBackendResourceGraphIndex(
       "SELECT document_json FROM resource_graph_edges ORDER BY from_uid, kind, to_uid",
     ),
   ]);
-  return {
+  const intentNodes = nodes.rows.map((row) => ({
+    ...decodeBackendJson<Record<string, unknown>>(row.document_json),
+    ...(row.source_selection_json
+      ? { sourceSelection: decodeBackendJson(row.source_selection_json) }
+      : {}),
+  }));
+  const intentEdges = edges.rows.map((row) => decodeBackendJson(row.document_json));
+  const runtime = await readRuntimeResourceGraph(backend, intentNodes as never);
+  return redactControlPlaneReadModel({
     schemaVersion: "control-plane-resource-graph@1",
-    nodes: nodes.rows.map((row) => ({
-      ...decodeBackendJson<Record<string, unknown>>(row.document_json),
-      ...(row.source_selection_json
-        ? { sourceSelection: decodeBackendJson(row.source_selection_json) }
-        : {}),
-    })),
-    edges: edges.rows.map((row) => decodeBackendJson(row.document_json)),
-    runtime: {
-      indexed: false,
-      status: "pre-read-model",
-      note: "Runtime records remain authoritative in deployment tables until PR-4B indexes them.",
-    },
+    nodes: [...intentNodes, ...runtime.nodes],
+    edges: [...intentEdges, ...runtime.edges],
+    runtime: runtime.status,
     tables: controlPlaneTableClassification(),
-  };
+  });
 }
 
 async function writeImport(

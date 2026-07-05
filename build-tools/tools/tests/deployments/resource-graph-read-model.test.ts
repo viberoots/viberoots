@@ -54,8 +54,9 @@ test("resource graph read model indexes intent nodes, edges, and safe source sel
     assert.equal(model.schemaVersion, "control-plane-resource-graph@1");
     assert.equal(model.nodes.length, 3);
     assert.equal(model.edges.length, 3);
-    assert.equal(model.runtime.indexed, false);
-    assert.equal(model.runtime.status, "pre-read-model");
+    assert.equal(model.runtime.indexed, true);
+    assert.equal(model.runtime.status, "runtime-linked");
+    assert.equal(model.runtime.nodeCount, 0);
     const deployment = model.nodes.find((node: any) => node.kind === "Deployment") as any;
     assert.equal(deployment.sourceSelection.nixpkgs_profile, "profile_app");
     assert.deepEqual(deployment.sourceSelection.nixpkg_pins, {
@@ -82,7 +83,7 @@ test("resource graph reads work through web, service, and MCP read surfaces", as
         web.nodes.some((node: any) => node.kind === "Deployment"),
         true,
       );
-      assert.equal(web.runtime.status, "pre-read-model");
+      assert.equal(web.runtime.status, "runtime-linked");
       const directHeaders = {
         authorization: `Bearer ${TOKEN}`,
         "x-request-id": "rg-direct-123",

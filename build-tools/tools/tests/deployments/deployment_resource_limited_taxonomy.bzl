@@ -208,6 +208,7 @@ RESOURCE_LIMITED_DEPLOYMENT_TESTS = {
     "build-tools/tools/tests/deployments/provider-frozen-worker-execution.test.ts": True,
     "build-tools/tools/tests/deployments/provider-submit-idempotency.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-envelope.compat.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-read-model.runtime.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-read-model.test.ts": True,
     "build-tools/tools/tests/deployments/s3-static.control-plane.reviewed-source.test.ts": True,
     "build-tools/tools/tests/deployments/s3-static.control-plane.service.test.ts": True,

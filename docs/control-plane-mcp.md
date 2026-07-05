@@ -104,9 +104,10 @@ fields, provider tokens, Infisical credentials, artifact contents, raw environme
 unredacted errors are redacted before the MCP response is written.
 
 `deployment_resource_graph` exposes the same non-authoritative read model as the HTTP read API. It
-shows extracted intent graph nodes, edges, indexed profile and pin names, and table-classification
-metadata. It does not expose generic mutation tools or raw nixpkgs commits, raw flake URLs, provider
-tokens, proof keys, upload payloads, or runtime secret material.
+shows extracted intent graph nodes, admitted runtime status links, retained evidence references,
+indexed profile and pin names, and table-classification metadata. It does not expose generic
+mutation tools or raw nixpkgs commits, raw flake URLs, provider tokens, proof keys, upload payloads,
+or runtime secret material.
 
 ## Future Mutation Tools
 

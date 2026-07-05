@@ -1,7 +1,11 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
 import { sanitizeName } from "../lib/sanitize";
-import { queryBackend, readJson } from "./nixos-shared-host-control-plane-backend-db";
+import {
+  decodeBackendJson,
+  queryBackend,
+  readJson,
+} from "./nixos-shared-host-control-plane-backend-db";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db";
 
 type LockAbortReason = "cancelled" | "superseded" | "no_longer_admitted";
@@ -81,22 +85,28 @@ export async function syncBackendRunAction(
   return doc;
 }
 
-export async function writeBackendRunActionDoc(
-  backend: NixosSharedHostControlPlaneBackendTarget,
-  doc: { actionId: string; submissionId: string; action: string },
-) {
-  await queryBackend(
-    backend,
-    `INSERT INTO run_actions (action_id, submission_id, action, request_json, updated_at)
+export async function writeBackendRunActionDoc<
+  T extends { actionId: string; submissionId: string; action: string },
+>(backend: NixosSharedHostControlPlaneBackendTarget, doc: T) {
+  const inserted = (
+    await queryBackend<{ request_json: unknown }>(
+      backend,
+      `INSERT INTO run_actions (action_id, submission_id, action, request_json, updated_at)
      VALUES ($1, $2, $3, $4::jsonb, $5)
-     ON CONFLICT(action_id) DO UPDATE SET
-       submission_id = EXCLUDED.submission_id,
-       action = EXCLUDED.action,
-       request_json = EXCLUDED.request_json,
-       updated_at = EXCLUDED.updated_at`,
-    [doc.actionId, doc.submissionId, doc.action, JSON.stringify(doc), new Date().toISOString()],
-  );
-  return doc;
+     ON CONFLICT(action_id) DO NOTHING
+     RETURNING request_json`,
+      [doc.actionId, doc.submissionId, doc.action, JSON.stringify(doc), new Date().toISOString()],
+    )
+  ).rows[0];
+  if (inserted?.request_json) return decodeBackendJson<T>(inserted.request_json);
+  const existing = (
+    await queryBackend<{ request_json: unknown }>(
+      backend,
+      "SELECT request_json FROM run_actions WHERE action_id = $1",
+      [doc.actionId],
+    )
+  ).rows[0];
+  return decodeBackendJson<T>(existing.request_json);
 }
 
 export async function acquireBackendControlPlaneLock(

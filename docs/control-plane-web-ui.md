@@ -10,8 +10,8 @@ from `webUi.basePath` and uses read-only APIs under the same base path:
 - `GET /api/v1/read/deployments/{deploymentId}` returns latest non-secret run state and current
   stage state, recent audit summaries, and artifact references for one deployment.
 - `GET /api/v1/read/resource-graph` lists the non-authoritative resource graph index built from
-  extracted deployment intent, including basic edges and secret-safe source-selection evidence when
-  indexed.
+  extracted deployment intent and admitted runtime facts, including status links, retained
+  evidence references, and secret-safe source-selection evidence when indexed.
 - `GET /api/v1/read/auth-context` returns the authenticated principal and non-secret grant summary.
 
 Read APIs accept the reviewed service bearer token or a durable browser session created by
@@ -51,8 +51,9 @@ as intentionally unavailable rather than as missing data.
 The resource graph read payload is a read model, not a mutation authority. Deployment submission,
 idempotency, queueing, locks, run actions, artifact challenges, upload sessions, deploy records,
 stage state, worker heartbeats, browser sessions, auth sessions, and audit rows remain in their
-deployment-specific authoritative tables. PR-4A indexes extracted intent nodes and edges only;
-runtime records are reported as `pre-read-model` until the runtime linking work indexes them.
+deployment-specific authoritative tables. Runtime graph nodes and edges are derived from those
+tables so operators can inspect admitted runs, actions, challenges, upload sessions, retained
+evidence, and current state without getting a generic mutation path.
 
 ## Troubleshooting
 

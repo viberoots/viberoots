@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 
 const SECRET_KEY_PATTERN =
-  /(secret|token|password|authorization|credential|private.?key|clientSecret)/i;
+  /(secret|token|password|authorization|credential|private.?key|proof.?key(?!id|validationoutcome)|clientSecret)/i;
 const SECRET_VALUE_PATTERN =
   /(bearer\s+\S+|sk_live_\S+|token=\S+|password=\S+|client[_-]?secret=\S+|-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----)/gi;
 const RAW_ENV_KEY_PATTERN =

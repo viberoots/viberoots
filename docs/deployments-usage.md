@@ -351,9 +351,10 @@ deploy --deployment //projects/deployments/example-app/prod:deploy \
 
 This calls `GET /api/v1/resource-graph` and returns the non-authoritative read
 model. Deployment-specific submission, queue, lock, idempotency, artifact,
-stage-state, session, and audit tables remain the mutation authority. PR-4A
-status marks runtime records as `pre-read-model` until a later runtime-linking
-step indexes them.
+stage-state, session, and audit tables remain the mutation authority. Runtime
+graph status is derived from those admitted records and can show run actions,
+artifact challenges, upload sessions, retained evidence, current state, and
+stage history without exposing a generic mutation path.
 
 To answer what is currently deployed in a protected/shared stage, use the
 control-plane current-stage helpers rather than Git release-pointer files:
