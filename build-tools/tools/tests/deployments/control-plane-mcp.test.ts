@@ -9,16 +9,20 @@ import {
   seedMcpSecretBearingState,
 } from "./control-plane-mcp.helpers";
 import { runInTemp } from "../lib/test-helpers";
-
 const TOOL_NAMES = [
   "deployment_control_plane_status",
   "deployment_queue",
   "deployment_detail",
+  "deployment_resource_graph",
   "deployment_auth_context",
 ];
 const RESOURCE_CASES = [
   { name: "deployment_control_plane_status", uri: "mcp://deployment-control-plane/status" },
   { name: "deployment_queue", uri: "mcp://deployment-control-plane/queue" },
+  {
+    name: "deployment_resource_graph",
+    uri: "mcp://deployment-control-plane/resource-graph",
+  },
   {
     name: "deployment_detail",
     uri: "mcp://deployment-control-plane/deployments/demo-mcp",

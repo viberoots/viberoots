@@ -8,6 +8,7 @@ import { readMcpJsonRequest } from "./deployment-control-plane-mcp-request";
 import {
   readControlPlaneDeploymentDetail,
   readControlPlaneQueueSummary,
+  readControlPlaneResourceGraph,
   readControlPlaneRuntimeStatus,
 } from "./deployment-control-plane-read-model";
 import { publicControlPlaneAuthContext } from "./deployment-control-plane-web-session";
@@ -19,6 +20,7 @@ const MCP_TOOLS = [
   "deployment_control_plane_status",
   "deployment_queue",
   "deployment_detail",
+  "deployment_resource_graph",
   "deployment_auth_context",
 ] as const;
 type McpToolName = (typeof MCP_TOOLS)[number];
@@ -110,6 +112,9 @@ async function readMcpTool(mcp: ControlPlaneMcpOptions, name: string, args: any 
   if (name === "deployment_queue") {
     return { tool: name, data: await readControlPlaneQueueSummary(mcp.backend) };
   }
+  if (name === "deployment_resource_graph") {
+    return { tool: name, data: await readControlPlaneResourceGraph(mcp.backend) };
+  }
   if (name === "deployment_auth_context") {
     return { tool: name, data: publicControlPlaneAuthContext(defaultMcpPrincipal()) };
   }
@@ -160,6 +165,8 @@ function toolDescriptor(name: McpToolName) {
 function resourceDescriptor(name: McpToolName) {
   if (name === "deployment_control_plane_status") return { uri: `${RESOURCE_PREFIX}status`, name };
   if (name === "deployment_queue") return { uri: `${RESOURCE_PREFIX}queue`, name };
+  if (name === "deployment_resource_graph")
+    return { uri: `${RESOURCE_PREFIX}resource-graph`, name };
   if (name === "deployment_auth_context") return { uri: `${RESOURCE_PREFIX}auth-context`, name };
   return {
     uriTemplate: `${RESOURCE_PREFIX}deployments/{deploymentId}`,
@@ -186,6 +193,8 @@ function resourceRequest(uri: string): { name: McpToolName; arguments: Record<st
   if (uri === `${RESOURCE_PREFIX}status`)
     return { name: "deployment_control_plane_status", arguments: {} };
   if (uri === `${RESOURCE_PREFIX}queue`) return { name: "deployment_queue", arguments: {} };
+  if (uri === `${RESOURCE_PREFIX}resource-graph`)
+    return { name: "deployment_resource_graph", arguments: {} };
   if (uri === `${RESOURCE_PREFIX}auth-context`)
     return { name: "deployment_auth_context", arguments: {} };
   const deployment = uri.match(/^mcp:\/\/deployment-control-plane\/deployments\/([^/]+)$/);

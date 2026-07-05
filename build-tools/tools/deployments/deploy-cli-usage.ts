@@ -19,4 +19,7 @@ Operator readiness:
   --operator-readiness prints a read-only navigation summary for the selected deployment context,
     control plane, secret backend, existing AWS/Supabase/cache evidence, and exact follow-up
     commands. It does not replace fail-closed setup/check diagnostics.
+  --resource-graph reads the non-authoritative resource graph index from the selected control-plane
+    service. It lists extracted intent nodes, basic edges, and secret-safe source-selection evidence
+    without replacing deployment-specific mutation tables.
 `;

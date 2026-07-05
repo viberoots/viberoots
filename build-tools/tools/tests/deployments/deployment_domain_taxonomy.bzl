@@ -108,5 +108,6 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/resource-graph-inventory.safety.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-inventory.service-client.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-inventory.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-read-model.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-taxonomy.test.ts": True,
 })

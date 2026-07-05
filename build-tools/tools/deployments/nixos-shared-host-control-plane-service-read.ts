@@ -4,6 +4,7 @@ import {
   readBackendDeployRecordBySubmissionId,
   readBackendCurrentStageState,
   readBackendCurrentStageStates,
+  readBackendResourceGraphIndex,
   readBackendRollbackCandidates,
   readBackendStageStateAuditEvents,
   readBackendStageHistory,
@@ -12,6 +13,7 @@ import {
   type NixosSharedHostControlPlaneBackendTarget,
 } from "./nixos-shared-host-control-plane-backend";
 import { statusFromSubmission } from "./deployment-control-plane-status";
+import { redactControlPlaneReadModel } from "./deployment-control-plane-read-redaction";
 
 export async function readControlPlaneStatus(
   backend: NixosSharedHostControlPlaneBackendTarget,
@@ -40,6 +42,12 @@ export async function readControlPlaneRecord(
     : opts.deployRunId
       ? await readBackendDeployRecordByDeployRunId(backend, opts.deployRunId)
       : null;
+}
+
+export async function readControlPlaneResourceGraph(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+) {
+  return redactControlPlaneReadModel(await readBackendResourceGraphIndex(backend));
 }
 
 export async function readControlPlaneCurrentStageState(

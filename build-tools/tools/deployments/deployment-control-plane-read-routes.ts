@@ -1,7 +1,10 @@
 #!/usr/bin/env zx-wrapper
+import { writeBackendControlPlaneReadAuditEvent } from "./deployment-control-plane-audit";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
+import { withBackendClient } from "./nixos-shared-host-control-plane-backend-db";
 import {
   readControlPlaneRecord,
+  readControlPlaneResourceGraph,
   readControlPlaneStatus,
 } from "./nixos-shared-host-control-plane-service-read";
 import { handleCurrentStageStateReadRoute } from "./deployment-current-stage-state-service";
@@ -29,6 +32,7 @@ export function isControlPlaneReadRoute(method: string, pathname: string): boole
       "/api/v1/current-stage-state",
       "/api/v1/stage-history",
       "/api/v1/stage-state-audit",
+      "/api/v1/resource-graph",
     ].includes(pathname)
   );
 }
@@ -38,6 +42,7 @@ export async function handleControlPlaneReadRoute(opts: {
   pathname: string;
   searchParams: URLSearchParams;
   backend: NixosSharedHostControlPlaneBackendTarget;
+  requestId?: string;
 }): Promise<ControlPlaneReadRouteResult> {
   if (opts.method === "GET" && opts.pathname === "/api/v1/status") {
     const status = await readControlPlaneStatus(opts.backend, selector(opts.searchParams));
@@ -51,5 +56,28 @@ export async function handleControlPlaneReadRoute(opts: {
       ? { handled: true, statusCode: 200, body: redactControlPlaneReadModel(record) }
       : { handled: true, statusCode: 404, body: { error: "record not found" } };
   }
+  if (opts.method === "GET" && opts.pathname === "/api/v1/resource-graph") {
+    await writeResourceGraphReadAudit(opts.backend, opts.requestId);
+    return {
+      handled: true,
+      statusCode: 200,
+      body: await readControlPlaneResourceGraph(opts.backend),
+    };
+  }
   return await handleCurrentStageStateReadRoute(opts);
+}
+
+async function writeResourceGraphReadAudit(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  requestId: string | undefined,
+) {
+  if (!requestId) return;
+  await withBackendClient(backend, async (client) => {
+    await writeBackendControlPlaneReadAuditEvent({
+      client,
+      requestId,
+      operation: "read.resource_graph",
+      result: "success",
+    });
+  });
 }

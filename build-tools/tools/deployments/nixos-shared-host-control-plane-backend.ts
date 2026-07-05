@@ -52,6 +52,10 @@ export {
   type DeploymentControlPlaneAuditEvent,
 } from "./deployment-control-plane-audit";
 export {
+  readBackendResourceGraphIndex,
+  syncBackendResourceGraphIndex,
+} from "./resource-graph-read-model-backend";
+export {
   acquireBackendControlPlaneLock,
   resolveBackendIdempotency,
   syncBackendRunAction,

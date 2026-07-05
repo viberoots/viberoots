@@ -6,10 +6,6 @@ import type { NixosSharedHostControlPlanePaths } from "./nixos-shared-host-contr
 import { handleControlPlaneSubmit } from "./nixos-shared-host-control-plane-service-api";
 import { handleControlPlaneArtifactChallenge } from "./nixos-shared-host-control-plane-service-challenge";
 import {
-  handleControlPlaneReadRoute,
-  isControlPlaneReadRoute,
-} from "./deployment-control-plane-read-routes";
-import {
   createDeploymentAuthLoginSession,
   readPublicDeploymentAuthSession,
 } from "./deployment-auth-session-service";
@@ -27,6 +23,7 @@ import { readControlPlaneImageMetadata } from "./control-plane-image-metadata";
 import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
 import type { DeploymentAuthProviderConfig } from "./deployment-auth-provider-config";
 import { handleDeploymentRunActionRoute } from "./deployment-run-action-route";
+import { handleAuthenticatedControlPlaneReadRoute } from "./nixos-shared-host-control-plane-read-server";
 export async function startNixosSharedHostControlPlaneServer(opts: {
   workspaceRoot: string;
   paths: NixosSharedHostControlPlanePaths;
@@ -199,16 +196,15 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         writeJson(response, 200, session);
         return;
       }
-      if (isControlPlaneReadRoute(request.method || "", url.pathname)) {
-        if (!requireReviewedBearerToken(request, response, opts)) return;
-        const route = await handleControlPlaneReadRoute({
-          method: request.method,
-          pathname: url.pathname,
-          searchParams: url.searchParams,
+      if (
+        await handleAuthenticatedControlPlaneReadRoute({
+          request,
+          response,
+          url,
           backend,
-        });
-        if (!route.handled) throw new Error(`unhandled read route: ${url.pathname}`);
-        writeJson(response, route.statusCode, route.body);
+          auth: { token: opts.token, localFixture: opts.localFixture, env: opts.env },
+        })
+      ) {
         return;
       }
       if (

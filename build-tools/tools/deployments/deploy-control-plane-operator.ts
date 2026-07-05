@@ -26,6 +26,7 @@ import {
 import { maybeRunDeployOperatorReadinessCommand } from "./deploy-operator-readiness";
 import { formatDeploymentStageStateAuditEventText } from "./deployment-stage-state-audit-format";
 import { submitNixosSharedHostControlPlaneRunActionViaService } from "./nixos-shared-host-control-plane-client";
+import { runResourceGraphForOperator } from "./deploy-resource-graph-operator";
 import {
   readRecordForOperator,
   readCurrentStageStateForOperator,
@@ -39,7 +40,6 @@ import {
   serviceClientSelectionEvidence,
   type SelectedDeploymentServiceClient,
 } from "./deployment-service-client-selection";
-
 function requestedByFromFlags() {
   const principalId = getFlagStr("requested-by-principal", "").trim();
   const displayName = getFlagStr("requested-by-display-name", "").trim();
@@ -52,7 +52,6 @@ function requestedByFromFlags() {
     ...(displayName ? { displayName } : {}),
   };
 }
-
 function rejectTrustedClientPrincipalFlags() {
   if (getFlagStr("requested-by-principal", "").trim()) {
     throw new Error("auth-required run actions derive the principal from the service session");
@@ -61,7 +60,6 @@ function rejectTrustedClientPrincipalFlags() {
     throw new Error("auth-required run actions derive the principal from the service session");
   }
 }
-
 function serviceAction(action: DeployControlPlaneOperatorAction): DeploymentControlPlaneRunAction {
   return action === "approve"
     ? "approve"
@@ -71,10 +69,8 @@ function serviceAction(action: DeployControlPlaneOperatorAction): DeploymentCont
         ? "resume"
         : "abort";
 }
-
 const operatorToken = (controlPlaneToken?: string) =>
   controlPlaneToken ? { controlPlaneToken } : {};
-
 function buildRunActionRequest(
   action: DeploymentControlPlaneRunAction,
   status: DeploymentControlPlaneStatus,
@@ -117,7 +113,6 @@ function buildRunActionRequest(
     },
   };
 }
-
 async function runActionForOperator(opts: {
   action: Extract<
     DeployControlPlaneOperatorAction,
@@ -144,7 +139,6 @@ async function runActionForOperator(opts: {
   });
   printDeployJson(response);
 }
-
 async function authSessionForRunAction(
   opts: Parameters<typeof runActionForOperator>[0],
   action: DeploymentControlPlaneRunAction,
@@ -157,7 +151,6 @@ async function authSessionForRunAction(
     inputs: opts.vaultRuntimeInputs,
   });
 }
-
 export async function maybeRunDeployControlPlaneOperatorCommand(opts: {
   workspaceRoot: string;
   deployment: DeploymentTarget;
@@ -210,6 +203,10 @@ export async function maybeRunDeployControlPlaneOperatorCommand(opts: {
     if (getFlagBool("text")) {
       console.log(events.map(formatDeploymentStageStateAuditEventText).join("\n\n"));
     } else printDeployJson(events);
+    return true;
+  }
+  if (action === "resource-graph") {
+    await runResourceGraphForOperator(serviceClient);
     return true;
   }
   const selector = requireLookupSelector(actionLabel);

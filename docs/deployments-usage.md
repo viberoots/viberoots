@@ -341,6 +341,20 @@ Use `--status` when you want the full run status JSON, `--print-run-lock-scope`
 when you only need the exact admitted target scope string, and `--approve`
 when the run is waiting for human approval.
 
+To inspect the indexed deployment-intent resource graph from the same service
+client path, use:
+
+```bash
+deploy --deployment //projects/deployments/example-app/prod:deploy \
+  --resource-graph
+```
+
+This calls `GET /api/v1/resource-graph` and returns the non-authoritative read
+model. Deployment-specific submission, queue, lock, idempotency, artifact,
+stage-state, session, and audit tables remain the mutation authority. PR-4A
+status marks runtime records as `pre-read-model` until a later runtime-linking
+step indexes them.
+
 To answer what is currently deployed in a protected/shared stage, use the
 control-plane current-stage helpers rather than Git release-pointer files:
 

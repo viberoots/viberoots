@@ -5,6 +5,7 @@ export type DeployControlPlaneOperatorAction =
   | "operator-readiness"
   | "status"
   | "record"
+  | "resource-graph"
   | "current-stage-state"
   | "stage-history"
   | "stage-state-audit"
@@ -22,6 +23,7 @@ export function selectedDeployControlPlaneOperatorAction():
       ["status", getFlagBool("status")],
       ["operator-readiness", getFlagBool("operator-readiness")],
       ["record", getFlagBool("record")],
+      ["resource-graph", getFlagBool("resource-graph")],
       ["current-stage-state", getFlagBool("current-stage-state")],
       ["stage-history", getFlagBool("stage-history")],
       ["stage-state-audit", getFlagBool("stage-state-audit")],

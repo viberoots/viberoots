@@ -166,4 +166,36 @@ export const NIXOS_SHARED_HOST_CONTROL_PLANE_BACKEND_SCHEMA_SQL = `
   );
   CREATE INDEX IF NOT EXISTS static_webapp_upload_sessions_by_submission
     ON static_webapp_upload_sessions(submission_id);
+  CREATE TABLE IF NOT EXISTS resource_graph_imports (
+    import_id TEXT PRIMARY KEY,
+    source_ref TEXT NOT NULL,
+    node_count INTEGER NOT NULL,
+    edge_count INTEGER NOT NULL,
+    document_json JSONB NOT NULL,
+    imported_at TIMESTAMPTZ NOT NULL
+  );
+  CREATE TABLE IF NOT EXISTS resource_graph_nodes (
+    uid TEXT PRIMARY KEY,
+    import_id TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    source_class TEXT NOT NULL,
+    source_label TEXT,
+    document_json JSONB NOT NULL,
+    source_selection_json JSONB,
+    imported_at TIMESTAMPTZ NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS resource_graph_nodes_by_kind_name
+    ON resource_graph_nodes(kind, name);
+  CREATE TABLE IF NOT EXISTS resource_graph_edges (
+    from_uid TEXT NOT NULL,
+    to_uid TEXT NOT NULL,
+    kind TEXT NOT NULL,
+    from_kind TEXT NOT NULL,
+    to_kind TEXT NOT NULL,
+    import_id TEXT NOT NULL,
+    document_json JSONB NOT NULL,
+    imported_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY(from_uid, to_uid, kind)
+  );
 `;

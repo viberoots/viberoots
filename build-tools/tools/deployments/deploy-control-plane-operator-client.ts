@@ -5,6 +5,7 @@ import {
   readNixosSharedHostControlPlaneRecordViaService,
   readNixosSharedHostControlPlaneStatusViaService,
 } from "./nixos-shared-host-control-plane-client";
+import { readNixosSharedHostResourceGraphViaService } from "./nixos-shared-host-resource-graph-client";
 import {
   readNixosSharedHostCurrentStageStateViaService,
   readNixosSharedHostStageStateAuditViaService,
@@ -128,6 +129,16 @@ export async function readRecordForOperator(opts: {
         ...(opts.controlPlaneToken ? { token: opts.controlPlaneToken } : {}),
         ...opts.selector,
       }),
+  });
+}
+
+export async function readResourceGraphForOperator(opts: {
+  controlPlaneUrl: string;
+  controlPlaneToken?: string;
+}) {
+  return await readNixosSharedHostResourceGraphViaService({
+    controlPlaneUrl: opts.controlPlaneUrl,
+    ...(opts.controlPlaneToken ? { token: opts.controlPlaneToken } : {}),
   });
 }
 

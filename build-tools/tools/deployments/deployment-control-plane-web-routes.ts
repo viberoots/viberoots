@@ -16,6 +16,7 @@ import {
 import {
   readControlPlaneDeploymentDetail,
   readControlPlaneQueueSummary,
+  readControlPlaneResourceGraph,
   readControlPlaneRuntimeStatus,
   readControlPlaneWorkerHeartbeatSummary,
 } from "./deployment-control-plane-read-model";
@@ -97,6 +98,16 @@ async function handleReadApi(opts: {
   if (opts.pathname === "/api/v1/read/auth-context") {
     await writeReadAudit(opts, { operation: "read.auth_context", requestId });
     writeWebJson(opts.response, requestId, 200, await readAuthContext(opts.request, opts.web));
+    return true;
+  }
+  if (opts.pathname === "/api/v1/read/resource-graph") {
+    await writeReadAudit(opts, { operation: "read.resource_graph", requestId });
+    writeWebJson(
+      opts.response,
+      requestId,
+      200,
+      await readControlPlaneResourceGraph(opts.web.backend),
+    );
     return true;
   }
   const deployment = opts.pathname.match(/^\/api\/v1\/read\/deployments\/([^/]+)$/);

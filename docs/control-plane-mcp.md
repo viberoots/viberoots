@@ -21,12 +21,14 @@ The v1 MCP surface has no mutation tools. It exposes these read-only tools and m
 - `deployment_control_plane_status`: database, artifact-store, worker, and instance readiness
 - `deployment_queue`: recent submission summaries
 - `deployment_detail`: latest non-secret state for one `deploymentId`
+- `deployment_resource_graph`: indexed deployment-intent resource graph nodes and basic edges
 - `deployment_auth_context`: authenticated principal and non-secret grants
 
 The matching resources are:
 
 - `mcp://deployment-control-plane/status`
 - `mcp://deployment-control-plane/queue`
+- `mcp://deployment-control-plane/resource-graph`
 - `mcp://deployment-control-plane/deployments/{deploymentId}`
 - `mcp://deployment-control-plane/auth-context`
 
@@ -100,6 +102,11 @@ Example redacted response shape:
 Response payloads are intentionally smaller than internal deployment records. Secret-looking
 fields, provider tokens, Infisical credentials, artifact contents, raw environment dumps, and
 unredacted errors are redacted before the MCP response is written.
+
+`deployment_resource_graph` exposes the same non-authoritative read model as the HTTP read API. It
+shows extracted intent graph nodes, edges, indexed profile and pin names, and table-classification
+metadata. It does not expose generic mutation tools or raw nixpkgs commits, raw flake URLs, provider
+tokens, proof keys, upload payloads, or runtime secret material.
 
 ## Future Mutation Tools
 

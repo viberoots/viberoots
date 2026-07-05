@@ -13,6 +13,7 @@ import {
 import {
   readBackendCurrentStageStates,
   readBackendLatestDeployRecordEnvelopeByDeploymentId,
+  readBackendResourceGraphIndex,
 } from "./nixos-shared-host-control-plane-backend";
 
 type RecentSubmissionRow = {
@@ -87,6 +88,12 @@ export async function readControlPlaneDeploymentDetail(
     artifactReferences: artifactReferencesFor(latestRecord),
     latestRun: latest ? publicDeployRecordSummary(latestRecord || {}, latest.updatedAt) : null,
   });
+}
+
+export async function readControlPlaneResourceGraph(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+) {
+  return redactControlPlaneReadModel(await readBackendResourceGraphIndex(backend));
 }
 
 function publicDeployRecordSummary(record: Record<string, any>, updatedAt: string) {
