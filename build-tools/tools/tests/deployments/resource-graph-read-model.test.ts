@@ -52,14 +52,19 @@ test("resource graph read model indexes intent nodes, edges, and safe source sel
     });
     const model = await readBackendResourceGraphIndex(backend);
     assert.equal(model.schemaVersion, "control-plane-resource-graph@1");
-    assert.equal(model.nodes.length, 3);
-    assert.equal(model.edges.length, 3);
+    assert.equal(model.nodes.length, 4);
+    assert.equal(model.edges.length, 6);
     assert.equal(model.runtime.indexed, true);
     assert.equal(model.runtime.status, "runtime-linked");
     assert.equal(model.runtime.nodeCount, 0);
     const deployment = model.nodes.find((node: any) => node.kind === "Deployment") as any;
     assert.equal(deployment.sourceSelection.nixpkgs_profile, "profile_app");
     assert.deepEqual(deployment.sourceSelection.nixpkg_pins, {
+      "pkgs.zlib": { nixpkgs_profile: "nixpkgs_23_11" },
+    });
+    const provisioner = model.nodes.find((node: any) => node.kind === "Provisioner") as any;
+    assert.equal(provisioner.sourceSelection.nixpkgs_profile, "profile_app");
+    assert.deepEqual(provisioner.sourceSelection.nixpkg_pins, {
       "pkgs.zlib": { nixpkgs_profile: "nixpkgs_23_11" },
     });
     assert.doesNotMatch(JSON.stringify(model), /github:NixOS|0123456789abcdef|rawToken/);
@@ -138,6 +143,10 @@ function fixtureDocuments(): {
     envelopes: [
       envelope("Deployment", "demo-web", "uid:deployment", []),
       envelope("ProviderTarget", "provider-target", "uid:provider", ["uid:deployment"]),
+      envelope("Provisioner", "demo-web:provisioner", "uid:provisioner", [
+        "uid:deployment",
+        "uid:provider",
+      ]),
     ],
   });
   return {

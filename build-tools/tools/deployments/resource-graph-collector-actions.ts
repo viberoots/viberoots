@@ -45,11 +45,51 @@ export function collectActionAndArtifactResources(
 function provisionerResources(deployment: DeploymentTarget): DeploymentResourceInventoryEntry[] {
   if (!("provisioner" in deployment) || !deployment.provisioner) return [];
   return [
-    entry("Provisioner", provisionerResourceId(deployment), deployment.label, [
-      deployment.deploymentId,
-      deployment.providerTarget.identity,
-    ]),
+    entry(
+      "Provisioner",
+      provisionerResourceId(deployment),
+      deployment.label,
+      [deployment.deploymentId, deployment.providerTarget.identity],
+      provisionerFacts(deployment),
+    ),
   ];
+}
+
+function provisionerFacts(deployment: DeploymentTarget): Record<string, unknown> {
+  if (!("provisioner" in deployment) || !deployment.provisioner) return {};
+  const provisioner = deployment.provisioner as any;
+  return {
+    provisionerResourceVersion: "provisioner-resource@1",
+    provisionerType: provisioner.type,
+    ...(provisioner.type === "opentofu-stack"
+      ? {
+          provisionerRole: "durable-cloud-infrastructure-evidence",
+          stackIdentity: provisioner.stackIdentity,
+          stateBackendIdentity: provisioner.stateBackendIdentity,
+          stackDirectory: provisioner.stackDirectory,
+          configPath: provisioner.config,
+          planArtifactRef: { configPath: provisioner.config, configField: "plan_json" },
+          applyArtifactRef: { configPath: provisioner.config, configField: "apply_plan" },
+          evidenceArtifactRefs: ["provisioner_plan"],
+          approvalBinding: {
+            admissionPolicyRef: deployment.admissionPolicyRef,
+            admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
+            lanePolicyRef: deployment.lanePolicyRef,
+            lanePolicyFingerprint: deployment.lanePolicy.fingerprint,
+            requiredApprovals: deployment.admissionPolicy.requiredApprovals || [],
+          },
+          policyEvaluationBinding: {
+            source: "existing-admission-facts",
+            provisionerPlanFingerprintField:
+              "admittedContext.policyEvaluation.binding.provisionerPlanFingerprint",
+          },
+          replayCompatibility: {
+            allowedEnvironmentDifferences: provisioner.allowedEnvironmentDifferences || [],
+          },
+          sourcePlanEvidenceBinding: "resource_graph_node.sourceSelection",
+        }
+      : {}),
+  };
 }
 
 function artifactInput(deployment: DeploymentTarget): DeploymentResourceInventoryEntry {

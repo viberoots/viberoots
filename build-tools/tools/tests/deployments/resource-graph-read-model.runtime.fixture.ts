@@ -53,7 +53,17 @@ export async function seedRuntimeRows(backend: ReturnType<typeof backendFor>, tm
       finalOutcome: "succeeded",
       publishMode: "normal",
       smokeOutcome: "passed",
-      admittedContext: { sourcePlanRef: "source-plan:demo" },
+      provisionerPlan: {
+        artifactPath: "/tmp/opentofu/plan.bin",
+        fingerprint: "sha256:provisioner-plan",
+        mutationClass: "non_destructive",
+      },
+      admittedContext: {
+        sourcePlanRef: "source-plan:demo",
+        policyEvaluation: {
+          binding: { provisionerPlanFingerprint: "sha256:provisioner-plan" },
+        },
+      },
       token: "raw-secret",
     }),
     "2026-07-05T12:01:00.000Z",
@@ -91,6 +101,22 @@ function fixtureDocuments() {
           uid: "uid:provider",
           labels: { "viberoots.dev/authority": "reviewed_intent" },
           ownerReferences: [{ kind: "Deployment", uid: "uid:deployment" }],
+        },
+        spec: {},
+        policyRefs: [],
+        source: { class: "buck", label: "//demo:deploy" },
+      } as any,
+      {
+        apiVersion: "deployment.resource.viberoots.dev/v1",
+        kind: "Provisioner",
+        metadata: {
+          name: "demo-web:provisioner",
+          uid: "uid:provisioner",
+          labels: { "viberoots.dev/authority": "reviewed_intent" },
+          ownerReferences: [
+            { kind: "Deployment", uid: "uid:deployment" },
+            { kind: "ProviderTarget", uid: "uid:provider" },
+          ],
         },
         spec: {},
         policyRefs: [],
@@ -194,7 +220,13 @@ function stageState() {
     currentRunId: "run-1",
     sourceRevision: "git:abc",
     artifactIdentity: "artifact-1",
+    provisionerPlan: {
+      artifactPath: "/tmp/opentofu/plan.bin",
+      fingerprint: "sha256:provisioner-plan",
+      mutationClass: "non_destructive",
+    },
     retainedRenderEvidence: [
+      { kind: "provisioner_plan", referencePath: "/tmp/opentofu/plan.bin" },
       { kind: "execution_snapshot", referencePath: "/tmp/execution-snapshot.json" },
     ],
     retainedArtifactEvidence: [

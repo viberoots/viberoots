@@ -97,9 +97,14 @@ function contextFor(nodes: ResourceGraphNode[]) {
   return {
     deploymentUidById: uidMap(nodes, "Deployment"),
     providerTargetUidById: uidMap(nodes, "ProviderTarget"),
+    provisionerUidByDeploymentId: uidMap(nodes, "Provisioner", (name) =>
+      name.endsWith(":provisioner") ? name.slice(0, -":provisioner".length) : name,
+    ),
   };
 }
 
-function uidMap(nodes: ResourceGraphNode[], kind: string) {
-  return new Map(nodes.filter((node) => node.kind === kind).map((node) => [node.name, node.uid]));
+function uidMap(nodes: ResourceGraphNode[], kind: string, key = (name: string) => name) {
+  return new Map(
+    nodes.filter((node) => node.kind === kind).map((node) => [key(node.name), node.uid]),
+  );
 }

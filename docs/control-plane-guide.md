@@ -161,6 +161,13 @@ and fail closed against IaC outputs. Provider-capability commands must not becom
 imperative infrastructure engine for persistent ECR, RAM, VPC Lattice, IAM, security-group, EC2,
 load-balancer, DNS, or TLS resources.
 
+In the resource graph, OpenTofu appears as a `Provisioner` resource rather than as the sole source of
+deployment intent. The provisioner resource records stack identity, state backend identity, reviewed
+plan/apply artifact refs, evidence artifact refs, approval binding, replay compatibility, and
+source-plan evidence for Nix-provided OpenTofu tooling. It may link to deployments, provider targets,
+execution snapshots, and current stage state, while first-class policy resource IDs remain separate
+policy graph work.
+
 The repo now provides reviewed declarative/IaC paths for the AWS foundation surfaces used by the
 control-plane setup bundle: network and S3 foundation evidence, ECR registry evidence, AWS-side
 Supabase PrivateLink evidence, ingress evidence, and the optional `repo-owned-asg` EC2 launch

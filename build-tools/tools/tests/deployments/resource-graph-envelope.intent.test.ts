@@ -2,12 +2,14 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { collectDeploymentIntentResources } from "../../deployments/resource-graph-collectors";
+import { opentofuPromotionCompatibilityErrors } from "../../deployments/opentofu-stack";
 import { createDeploymentResourceEnvelopes } from "../../deployments/resource-graph-envelope";
 import type { DeploymentResourceInventory } from "../../deployments/resource-graph-types";
 import {
   deploymentReleaseActionFixture,
   deploymentTargetExceptionFixture,
 } from "./deployment-metadata.fixture";
+import { foundationDeploymentFixture } from "./opentofu-foundation-migration.helpers";
 import { s3StaticDeploymentFixture } from "./s3-static.fixture";
 
 test("intent envelopes cover every extractable kind from deployment contracts", () => {
@@ -90,6 +92,54 @@ test("intent envelopes cover every extractable kind from deployment contracts", 
     envelope(envelopes, "RuntimeConfigRequirement").spec.contractId,
     "runtime://deployments/sample-webapp/schema-version",
   );
+});
+
+test("OpenTofu provisioners expose stack evidence without first-class policy refs", () => {
+  const envelopes = createDeploymentResourceEnvelopes(
+    inventory(collectDeploymentIntentResources(foundationDeploymentFixture())),
+  );
+  assert.deepEqual(envelopes.errors, []);
+  const provisioner = envelope(envelopes, "Provisioner");
+  assert.equal(provisioner.spec.provisionerResourceVersion, "provisioner-resource@1");
+  assert.equal(provisioner.spec.provisionerType, "opentofu-stack");
+  assert.equal(provisioner.spec.stackIdentity, ["phase", "0/platform-foundation/dev"].join(""));
+  assert.equal(provisioner.spec.stateBackendIdentity, "s3://state/dev/platform-foundation");
+  assert.deepEqual(provisioner.spec.planArtifactRef, {
+    configPath: "opentofu/stack.json",
+    configField: "plan_json",
+  });
+  assert.deepEqual(provisioner.spec.applyArtifactRef, {
+    configPath: "opentofu/stack.json",
+    configField: "apply_plan",
+  });
+  assert.deepEqual(provisioner.spec.evidenceArtifactRefs, ["provisioner_plan"]);
+  assert.deepEqual(provisioner.spec.approvalBinding, {
+    admissionPolicyRef: "//fixture/deployments/shared:dev_release",
+    admissionPolicyFingerprint: "sha256:admission",
+    lanePolicyRef: "//projects/deployments/sample-webapp/shared:lane",
+    lanePolicyFingerprint: "sha256:lane",
+    requiredApprovals: [],
+  });
+  assert.deepEqual(provisioner.spec.policyEvaluationBinding, {
+    source: "existing-admission-facts",
+    provisionerPlanFingerprintField:
+      "admittedContext.policyEvaluation.binding.provisionerPlanFingerprint",
+  });
+  assert.deepEqual(provisioner.policyRefs, []);
+  assert.equal(provisioner.spec.sourcePlanEvidenceBinding, "resource_graph_node.sourceSelection");
+  assert.doesNotMatch(JSON.stringify(provisioner), /AKIA|BEGIN PRIVATE KEY|raw-secret/);
+});
+
+test("OpenTofu replay compatibility keeps stack and backend differences explicit", () => {
+  const current = foundationDeploymentFixture();
+  const source: any = foundationDeploymentFixture();
+  source.provisioner = {
+    ...source.provisioner,
+    stateBackendIdentity: "s3://state/other/platform-foundation",
+  };
+  assert.match(opentofuPromotionCompatibilityErrors(current, source).join("\n"), /state backend/);
+  current.provisioner.allowedEnvironmentDifferences = ["state_backend_identity"];
+  assert.deepEqual(opentofuPromotionCompatibilityErrors(current, source), []);
 });
 
 function extractableKinds() {

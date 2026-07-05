@@ -2,14 +2,14 @@
 import { publicCurrentStageState } from "./deployment-current-stage-state-public";
 import type { ResourceGraphEdge, ResourceGraphNode } from "./resource-graph-export";
 import { normalizeProviderEvidenceFacts } from "./resource-graph-provider-evidence";
+import {
+  provisionerRuntimeEdges,
+  retainedRenderEvidence,
+} from "./resource-graph-runtime-provisioner";
 import { ADMITTED_RUNTIME_SOURCE_LABEL } from "./resource-graph-types";
 import { decodeBackendJson } from "./nixos-shared-host-control-plane-backend-db";
 
 type JsonRow = Record<string, unknown>;
-type RuntimeGraphContext = {
-  deploymentUidById: Map<string, string>;
-  providerTargetUidById: Map<string, string>;
-};
 
 const runtimeSource = { class: "runtime" as const, label: ADMITTED_RUNTIME_SOURCE_LABEL };
 
@@ -17,9 +17,9 @@ export class RuntimeGraph {
   nodes: ResourceGraphNode[] = [];
   edges: ResourceGraphEdge[] = [];
   private submissions: Map<string, any>;
-  private context: RuntimeGraphContext;
+  private context: any;
 
-  constructor(context: RuntimeGraphContext, submissions: JsonRow[]) {
+  constructor(context: any, submissions: JsonRow[]) {
     this.context = context;
     this.submissions = new Map(
       submissions.map((row) => [String(row.submission_id), decode(row.document_json)]),
@@ -69,6 +69,8 @@ export class RuntimeGraph {
         } as ResourceGraphEdge);
       }
     }
+    this.addProvisionerEdges(doc, "DeployRun", runId);
+    this.addProvisionerEdges(doc, "ExecutionSnapshot", String(row.submission_id));
   }
 
   runAction(row: JsonRow) {
@@ -100,6 +102,7 @@ export class RuntimeGraph {
       providerEvidence.retainedRenderEvidence = retainedRenderEvidence(doc.retainedRenderEvidence);
       providerEvidence.retainedArtifactEvidence = doc.retainedArtifactEvidence || [];
     }
+    this.addProvisionerEdges(doc, "CurrentStageState", name);
     for (const evidence of [
       ...retainedRenderEvidence(doc.retainedRenderEvidence),
       ...(doc.retainedArtifactEvidence || []),
@@ -227,22 +230,19 @@ export class RuntimeGraph {
   private providerEvidenceFacts(runId: string) {
     return this.nodes.find((node) => node.uid === uid("ProviderEvidence", runId))?.facts;
   }
+
+  private addProvisionerEdges(doc: any, toKind: string, to: string) {
+    this.edges.push(
+      ...provisionerRuntimeEdges({
+        doc,
+        toKind,
+        to,
+        provisionerUidByDeploymentId: this.context.provisionerUidByDeploymentId,
+      }),
+    );
+  }
 }
 
-function decode(value: unknown): any {
-  return value ? decodeBackendJson(value) : {};
-}
+const decode = (value: unknown): any => (value ? decodeBackendJson(value) : {});
 
-function uid(kind: string, name: string) {
-  return `runtime:${kind}:${name}`;
-}
-
-function retainedRenderEvidence(evidence: any[] | undefined): any[] {
-  const allowed = "replay_snapshot,provider_config,provisioner_plan,execution_snapshot".split(",");
-  return (evidence || []).map((entry) => {
-    if (!allowed.includes(String(entry.kind))) {
-      throw new Error(`unsupported retained render evidence kind: ${entry.kind}`);
-    }
-    return entry;
-  });
-}
+const uid = (kind: string, name: string) => `runtime:${kind}:${name}`;

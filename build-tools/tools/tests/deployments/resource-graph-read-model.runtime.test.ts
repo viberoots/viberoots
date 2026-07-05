@@ -22,6 +22,7 @@ test("resource graph read model links admitted runtime facts without leaking sec
     const model = await readBackendResourceGraphIndex(backend);
     assertHasNode(model, "DeployRun", "run-1");
     assertHasNode(model, "ProviderEvidence", "run-1");
+    assertHasNode(model, "Provisioner", "demo-web:provisioner");
     assertHasNode(model, "RunAction", "action-b");
     assertHasNode(model, "ArtifactChallenge", "challenge-1");
     assertHasNode(model, "StaticWebappUploadSession", "upload-1");
@@ -43,6 +44,7 @@ test("resource graph read model links admitted runtime facts without leaking sec
     assert.equal(provider.smokeReadinessEvidence, "passed");
     assert.equal(provider.sourcePlanRef, "source-plan:demo");
     assert.deepEqual(provider.retainedRenderEvidence, [
+      { kind: "provisioner_plan", referencePath: "/tmp/opentofu/plan.bin" },
       { kind: "execution_snapshot", referencePath: "/tmp/execution-snapshot.json" },
     ]);
     assert.deepEqual(provider.retainedArtifactEvidence, [
@@ -93,6 +95,30 @@ test("resource graph read model links admitted runtime facts without leaking sec
         (edge: any) =>
           edge.kind === "evidence" &&
           edge.fromUid === "runtime:ProviderEvidence:run-1" &&
+          edge.toUid === "runtime:CurrentStageState:demo-web:staging",
+      ),
+    );
+    assert.ok(
+      model.edges.some(
+        (edge: any) =>
+          edge.kind === "runtime_status" &&
+          edge.fromUid === "uid:provisioner" &&
+          edge.toUid === "runtime:DeployRun:run-1",
+      ),
+    );
+    assert.ok(
+      model.edges.some(
+        (edge: any) =>
+          edge.kind === "runtime_status" &&
+          edge.fromUid === "uid:provisioner" &&
+          edge.toUid === "runtime:ExecutionSnapshot:submission-1",
+      ),
+    );
+    assert.ok(
+      model.edges.some(
+        (edge: any) =>
+          edge.kind === "runtime_status" &&
+          edge.fromUid === "uid:provisioner" &&
           edge.toUid === "runtime:CurrentStageState:demo-web:staging",
       ),
     );
