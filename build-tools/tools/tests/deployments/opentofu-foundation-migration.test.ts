@@ -24,6 +24,16 @@ import {
 } from "./opentofu-foundation-migration.helpers";
 import { assertPostApplyFailure, passedChecks } from "./opentofu-foundation-checks.helpers";
 
+test("OpenTofu admitted context binds policy resource refs and versions", () => {
+  const target = foundationDeploymentFixture();
+  const context = openTofuAdmittedContextFixture(target);
+  const refs = new Map(context.policyResourceRefs.map((ref) => [ref.kind, ref]));
+  assert.equal(refs.get("LanePolicy")?.version, "sha256:lane");
+  assert.equal(refs.get("AdmissionPolicy")?.version, "sha256:admission");
+  assert.equal(refs.get("ProviderCapabilityPolicy")?.resourceId, "provider-capability:opentofu");
+  assert.equal(refs.get("ProviderCapabilityPolicy")?.version, "provider-capability@1");
+});
+
 test("OpenTofu foundation provision records migration apply and post-apply checks", async () => {
   await runInTemp("opentofu-foundation-migration", async (tmp) => {
     const target = foundationDeploymentFixture();

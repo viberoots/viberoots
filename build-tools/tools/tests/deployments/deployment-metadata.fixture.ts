@@ -46,6 +46,7 @@ export function deploymentReleaseActionFixture(
     requiredRuntimeConfigRequirementNames: overrides.requiredRuntimeConfigRequirementNames || [
       "schema_version",
     ],
+    fingerprint: overrides.fingerprint || "sha256:release-action-db-migration",
   };
 }
 

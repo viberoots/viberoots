@@ -31,6 +31,7 @@ export type ResourceGraphNode = {
   labels: Record<string, string>;
   statusRef: string;
   evidenceRef?: string;
+  facts?: Record<string, unknown>;
 };
 
 export type ResourceGraphEdgeKind =
@@ -118,6 +119,7 @@ function resourceNodesFor(envelopes: DeploymentResourceEnvelope[]): ResourceGrap
     labels: envelope.metadata.labels,
     statusRef: envelope.statusRef,
     ...(envelope.evidenceRef ? { evidenceRef: envelope.evidenceRef } : {}),
+    ...(Object.keys(envelope.spec).length > 0 ? { facts: envelope.spec } : {}),
   }));
 }
 

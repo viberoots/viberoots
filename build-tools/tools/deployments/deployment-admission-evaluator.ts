@@ -29,6 +29,7 @@ import { assertCiAdmissionEvidence } from "./deployment-ci-admission";
 import { evaluateReadinessGatePolicies } from "./deployment-readiness-gates";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import { validatePhase0CurrentAdmission } from "./deployment-phase0-admission";
+import { deploymentPolicyResourceBindings } from "./deployment-policy-resources";
 
 export async function evaluateDeploymentAdmission(opts: {
   workspaceRoot: string;
@@ -140,6 +141,7 @@ export async function evaluateDeploymentAdmission(opts: {
     ...(sbom ? { sbom } : {}),
     supplyChainGates,
     readinessGates,
+    policyResourceRefs: deploymentPolicyResourceBindings(opts.deployment),
     ...(opts.evidence?.ciSubmission ? { ciSubmission: opts.evidence.ciSubmission } : {}),
   };
 }

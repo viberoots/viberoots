@@ -11,6 +11,10 @@ import {
   type DeploymentReviewedTargetEnvironmentAdmission,
 } from "./deployment-reviewed-target-environment";
 import type { OpenTofuDeployment } from "./contract";
+import {
+  policyResourceRefFacts,
+  type DeploymentPolicyResourceBinding,
+} from "./deployment-policy-resources";
 
 export type OpenTofuAdmittedContext = {
   lanePolicyRef: string;
@@ -30,6 +34,7 @@ export type OpenTofuAdmittedContext = {
     runtimeConfig: "exact_contract_ids";
   };
   targetExceptionRefs: string[];
+  policyResourceRefs: DeploymentPolicyResourceBinding[];
   policyEvaluation?: DeploymentAdmissionPolicyEvaluation;
   source: {
     mode: "reviewed_source_ref";
@@ -86,6 +91,7 @@ export async function resolveInitialOpenTofuAdmittedContext(opts: {
       runtimeConfig: "exact_contract_ids",
     },
     targetExceptionRefs: opts.deployment.targetExceptions.map((entry) => entry.ref).sort(),
+    ...policyResourceRefFacts(opts.deployment),
     source: {
       mode: "reviewed_source_ref",
       sourceRef: target.targetRef,

@@ -92,6 +92,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
 })
 
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
+    "build-tools/tools/tests/deployments/deployment-admission.policy-resources.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-envelope.compat.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-command.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-envelope.context.test.ts": True,
@@ -108,9 +109,11 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/resource-graph-inventory.safety.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-inventory.service-client.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-inventory.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-policy-resources.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-provider-evidence.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-read-model.runtime.fixture.ts": False,
     "build-tools/tools/tests/deployments/resource-graph-read-model.runtime.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-read-model.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-runtime-policy-links.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-taxonomy.test.ts": True,
 })

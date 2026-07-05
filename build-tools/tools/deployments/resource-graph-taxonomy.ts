@@ -19,6 +19,8 @@ export const DEPLOYMENT_RESOURCE_KINDS = [
   "AttestationPolicy",
   "SbomPolicy",
   "SupplyChainPolicy",
+  "ProviderCapabilityPolicy",
+  "ReleaseActionPolicy",
   "SecretRequirement",
   "RuntimeConfigRequirement",
   "RuntimeInput",

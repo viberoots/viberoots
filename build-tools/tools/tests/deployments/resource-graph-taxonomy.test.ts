@@ -24,6 +24,8 @@ test("deployment resource taxonomy names every planned resource concept", () => 
     "AttestationPolicy",
     "SbomPolicy",
     "SupplyChainPolicy",
+    "ProviderCapabilityPolicy",
+    "ReleaseActionPolicy",
     "SecretRequirement",
     "RuntimeConfigRequirement",
     "RuntimeInput",

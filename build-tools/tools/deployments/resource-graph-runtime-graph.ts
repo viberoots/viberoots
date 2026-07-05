@@ -6,6 +6,13 @@ import {
   provisionerRuntimeEdges,
   retainedRenderEvidence,
 } from "./resource-graph-runtime-provisioner";
+import { policyResourceRefs, policyRuntimeEdges } from "./resource-graph-runtime-policies";
+import {
+  artifactFacts,
+  challengeFacts,
+  cleanupFacts,
+  uploadSessionFacts,
+} from "./resource-graph-runtime-artifact-facts";
 import { ADMITTED_RUNTIME_SOURCE_LABEL } from "./resource-graph-types";
 import { decodeBackendJson } from "./nixos-shared-host-control-plane-backend-db";
 
@@ -28,18 +35,26 @@ export class RuntimeGraph {
 
   snapshot(row: JsonRow) {
     const submissionId = String(row.submission_id);
+    const doc = decode(row.document_json);
     this.node("ExecutionSnapshot", submissionId, {
       submissionId,
       executionSnapshotPath: row.execution_snapshot_path,
+      policyResourceRefs: policyResourceRefs(doc),
     });
     this.edgeToDeployment("ExecutionSnapshot", submissionId, this.submissions.get(submissionId));
+    this.addPolicyEdges(doc, "ExecutionSnapshot", submissionId);
   }
 
   deployRun(row: JsonRow) {
     const runId = String(row.deploy_run_id);
     const doc = decode(row.document_json);
-    this.node("DeployRun", runId, { ...doc, recordPath: row.record_path });
+    this.node("DeployRun", runId, {
+      ...doc,
+      recordPath: row.record_path,
+      policyResourceRefs: policyResourceRefs(doc),
+    });
     this.edgeToDeployment("DeployRun", runId, doc);
+    this.addPolicyEdges(doc, "DeployRun", runId);
     if (doc.providerTargetIdentity || doc.provider) {
       this.node(
         "ProviderEvidence",
@@ -88,8 +103,9 @@ export class RuntimeGraph {
   stageState(row: JsonRow) {
     const doc = publicCurrentStageState(decode(row.document_json) as never);
     const name = `${row.deployment_id}:${row.environment_stage}`;
-    this.node("CurrentStageState", name, doc);
+    this.node("CurrentStageState", name, { ...doc, policyResourceRefs: policyResourceRefs(doc) });
     this.edgeToDeployment("CurrentStageState", name, doc);
+    this.addPolicyEdges(doc, "CurrentStageState", name);
     const providerEvidence = this.providerEvidenceFacts(String(doc.currentRunId || ""));
     if (providerEvidence) {
       this.edge(
@@ -123,39 +139,13 @@ export class RuntimeGraph {
   challenge(row: JsonRow) {
     const id = String(row.challenge_id);
     const binding = decode(row.binding_json);
-    const consumed = Boolean(row.used_at);
-    this.node("ArtifactChallenge", id, {
-      challengeId: id,
-      deploymentId: binding.request?.deployment?.deploymentId || binding.request?.deploymentId,
-      principalId: row.principal_id,
-      proofKeyId: row.key_id,
-      expiresAtMs: row.expires_at_ms,
-      status: consumed ? "accepted" : "issued",
-      nonceValidationOutcome: consumed ? "matched-redacted-nonce-digest" : "pending",
-      proofKeyValidationOutcome: consumed ? "trusted-key" : "pending",
-      oneTimeConsumption: consumed ? "consumed-once" : "not-yet-consumed",
-      admittedProvenance:
-        binding.finalizedStagedArtifactReference || binding.request?.artifactIdentity || "pending",
-      ...(!consumed ? { failureDiagnostics: "not yet consumed" } : {}),
-      binding,
-    });
+    this.node("ArtifactChallenge", id, challengeFacts(id, row, binding));
   }
 
   uploadSession(row: JsonRow) {
     const id = String(row.upload_session_id);
     const doc = decode(row.document_json);
-    this.node("StaticWebappUploadSession", id, {
-      uploadSessionId: id,
-      submissionId: row.submission_id,
-      archiveFormat: doc.archiveFormat,
-      archivePath: doc.archivePath,
-      objectIdentity: doc.archiveObject?.key,
-      digest: doc.archiveDigest || doc.digest,
-      sizeBytes: doc.sizeBytes,
-      expiresAt: row.expires_at,
-      provenance: `upload-session:${id}`,
-      document: doc,
-    });
+    this.node("StaticWebappUploadSession", id, uploadSessionFacts(id, row, doc));
     this.edgeToDeployment(
       "StaticWebappUploadSession",
       id,
@@ -165,30 +155,19 @@ export class RuntimeGraph {
 
   cleanup(row: JsonRow) {
     const id = String(row.record_id);
-    this.node("CleanupEvidence", id, {
-      recordId: id,
-      submissionId: row.submission_id,
-      deploymentId: row.deployment_id,
-      reason: row.reason,
-      status: "rejected",
-      diagnostics: decode(row.document_json).cleanupError,
-      documentJson: decode(row.document_json),
-      createdAt: row.created_at,
-    });
+    const doc = decode(row.document_json);
+    this.node("CleanupEvidence", id, cleanupFacts(id, row, doc));
     const toUid = this.context.deploymentUidById.get(String(row.deployment_id || ""));
     if (toUid) this.edge("CleanupEvidence", id, "Deployment", toUid, "runtime_status", true);
   }
 
   artifact(row: JsonRow) {
     const id = String(row.object_key);
-    this.node("StagedArtifact", id, {
-      objectKey: id,
-      bucket: row.bucket,
-      digest: row.digest,
-      sizeBytes: row.size_bytes,
-      contentType: row.content_type,
-      provenance: decode(row.provenance_json),
-    });
+    this.node(
+      "StagedArtifact",
+      id,
+      artifactFacts(id, { ...row, provenance: decode(row.provenance_json) }),
+    );
   }
 
   private node(kind: string, name: string, facts: Record<string, unknown>) {
@@ -238,6 +217,17 @@ export class RuntimeGraph {
         toKind,
         to,
         provisionerUidByDeploymentId: this.context.provisionerUidByDeploymentId,
+      }),
+    );
+  }
+
+  private addPolicyEdges(doc: any, fromKind: string, name: string) {
+    this.edges.push(
+      ...policyRuntimeEdges({
+        refs: policyResourceRefs(doc),
+        context: this.context,
+        fromUid: uid(fromKind, name),
+        fromKind,
       }),
     );
   }

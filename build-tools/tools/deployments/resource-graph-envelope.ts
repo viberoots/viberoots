@@ -41,20 +41,6 @@ export type DeploymentResourceEnvelopeSet = {
   errors: string[];
 };
 
-const POLICY_KINDS = new Set<DeploymentResourceInventoryEntry["kind"]>([
-  "LanePolicy",
-  "LaneGovernancePolicy",
-  "AdmissionPolicy",
-  "RolloutPolicy",
-  "PreviewPolicy",
-  "SmokePolicy",
-  "SourceRefPolicy",
-  "ReadinessGatePolicy",
-  "AttestationPolicy",
-  "SbomPolicy",
-  "SupplyChainPolicy",
-]);
-
 export async function readDeploymentResourceEnvelopes(
   opts: DeploymentResourceInventoryOptions = {},
 ) {
@@ -124,7 +110,7 @@ function policyRefs(
 ): string[] {
   return refs
     .flatMap((ref) => refsById.get(ref) || [])
-    .filter((ref) => POLICY_KINDS.has(ref.kind))
+    .filter((ref) => ref.kind.endsWith("Policy"))
     .map((ref) => ref.uid)
     .sort();
 }

@@ -100,11 +100,18 @@ function contextFor(nodes: ResourceGraphNode[]) {
     provisionerUidByDeploymentId: uidMap(nodes, "Provisioner", (name) =>
       name.endsWith(":provisioner") ? name.slice(0, -":provisioner".length) : name,
     ),
+    policyUidByResourceId: policyUidMap(nodes),
   };
 }
 
 function uidMap(nodes: ResourceGraphNode[], kind: string, key = (name: string) => name) {
   return new Map(
     nodes.filter((node) => node.kind === kind).map((node) => [key(node.name), node.uid]),
+  );
+}
+
+function policyUidMap(nodes: ResourceGraphNode[]) {
+  return new Map(
+    nodes.filter((node) => node.kind.endsWith("Policy")).map((node) => [node.name, node.uid]),
   );
 }

@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import type { GraphNode } from "../lib/graph";
 import { normalizeTargetLabel } from "../lib/labels";
+import { fingerprintPolicy } from "./deployment-policy-fingerprint";
 
 export const DEPLOYMENT_RELEASE_ACTION_RULE = "deployment_release_action";
 export const DEPLOYMENT_RELEASE_ACTION_PHASES = new Set([
@@ -63,6 +64,7 @@ export type DeploymentReleaseAction = {
   operationKeys: Partial<Record<DeploymentReleaseActionReplayContext, string>>;
   requiredSecretRequirementNames: string[];
   requiredRuntimeConfigRequirementNames: string[];
+  fingerprint: string;
 };
 
 function readString(node: GraphNode, key: string): string {
@@ -127,6 +129,7 @@ export function extractDeploymentReleaseActions(nodes: GraphNode[]): {
         node,
         "required_runtime_config_requirements",
       ),
+      fingerprint: "",
     };
     if (!ref) {
       errors.push("deployment release action missing canonical label");
@@ -191,6 +194,18 @@ export function extractDeploymentReleaseActions(nodes: GraphNode[]): {
       }
     }
     if (errors.some((entry) => entry.startsWith(`${ref}:`))) continue;
+    action.fingerprint = fingerprintPolicy({
+      type: action.type,
+      phase: action.phase,
+      runCondition: action.runCondition,
+      abortBehavior: action.abortBehavior,
+      dataCompatibility: action.dataCompatibility,
+      replayPolicy: action.replayPolicy,
+      duplicateSafety: action.duplicateSafety,
+      operationKeys: action.operationKeys,
+      requiredSecretRequirementNames: action.requiredSecretRequirementNames,
+      requiredRuntimeConfigRequirementNames: action.requiredRuntimeConfigRequirementNames,
+    });
     actions.set(ref, action);
   }
   return { actions, errors };

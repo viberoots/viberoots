@@ -4,6 +4,7 @@ import path from "node:path";
 import type { OpenTofuDeployment } from "../../deployments/contract";
 import type { FoundationMigrationAdapter } from "../../deployments/foundation-migration";
 import { OPENTOFU_STACK_PROVISIONER } from "../../deployments/opentofu-stack";
+import { deploymentPolicyResourceBindings } from "../../deployments/deployment-policy-resources";
 
 const SOURCE_REF_POLICIES = [{ stage: "dev", allowedRefs: ["main"], requiredChecks: [] }];
 const TRUSTED_REPORTER_IDENTITIES = ["app:deploy-bot"];
@@ -133,6 +134,7 @@ export function openTofuAdmittedContextFixture(target: OpenTofuDeployment) {
       runtimeConfig: "exact_contract_ids" as const,
     },
     targetExceptionRefs: [],
+    policyResourceRefs: deploymentPolicyResourceBindings(target),
     source: {
       mode: "reviewed_source_ref" as const,
       sourceRef: "refs/heads/main",

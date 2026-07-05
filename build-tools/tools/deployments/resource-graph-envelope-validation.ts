@@ -26,6 +26,8 @@ const DEPLOYMENT_REF_KINDS = new Set<DeploymentResourceInventoryEntry["kind"]>([
   "AttestationPolicy",
   "SbomPolicy",
   "SupplyChainPolicy",
+  "ProviderCapabilityPolicy",
+  "ReleaseActionPolicy",
   "SecretRequirement",
   "RuntimeConfigRequirement",
   "DeploymentTargetException",

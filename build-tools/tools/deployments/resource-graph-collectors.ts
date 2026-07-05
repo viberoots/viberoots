@@ -10,6 +10,8 @@ import {
   secretRequirementResourceId,
 } from "./resource-graph-collector-refs";
 import { collectActionAndArtifactResources } from "./resource-graph-collector-actions";
+import { deploymentPolicyResourceBindings } from "./deployment-policy-resources";
+import { collectPolicyChildren } from "./resource-graph-collector-policies";
 import type { DeploymentResourceInventoryEntry } from "./resource-graph-types";
 
 function base(label: string) {
@@ -57,6 +59,22 @@ export function collectDeploymentIntentResources(
       },
     ),
   );
+  if (capability) {
+    out.push(
+      entry(
+        "ProviderCapabilityPolicy",
+        `provider-capability:${capability.provider}`,
+        capabilities.providerCapabilitySourceLabel(capability.provider),
+        [deployment.providerTarget.identity],
+        {
+          provider: capability.provider,
+          ...capabilities.providerCapabilityBindingFacts(capability),
+          policyResourceVersion: "provider-capability@1",
+          statusVisibility: "operator_status",
+        },
+      ),
+    );
+  }
   out.push(
     entry(
       "EnvironmentStage",
@@ -86,6 +104,7 @@ export function collectDeploymentIntentResources(
         promotionCompatibility: deployment.lanePolicy.promotionCompatibility,
         defaultClientProfile: deployment.lanePolicy.defaultClientProfile,
         admissionFingerprint: deployment.lanePolicy.fingerprint,
+        policyResourceVersion: deployment.lanePolicy.fingerprint,
         statusVisibility: "operator_status",
       },
     ),
@@ -103,6 +122,7 @@ export function collectDeploymentIntentResources(
         trustedReporterIdentities: deployment.lanePolicy.governance.trustedReporterIdentities,
         requiredApprovalBoundaries: deployment.lanePolicy.governance.requiredApprovalBoundaries,
         admissionFingerprint: deployment.lanePolicy.governance.fingerprint,
+        policyResourceVersion: deployment.lanePolicy.governance.fingerprint,
         statusVisibility: "operator_status",
       },
     ),
@@ -117,6 +137,8 @@ export function collectDeploymentIntentResources(
       artifactAttestationMode: deployment.admissionPolicy.artifactAttestationMode,
       supplyChainGates: deployment.admissionPolicy.supplyChainGates,
       admissionFingerprint: deployment.admissionPolicy.fingerprint,
+      policyResourceVersion: deployment.admissionPolicy.fingerprint,
+      policyResourceRefs: deploymentPolicyResourceBindings(deployment),
       statusVisibility: "operator_status",
     }),
   );
@@ -124,61 +146,6 @@ export function collectDeploymentIntentResources(
   collectRequirements(deployment, out);
   out.push(...collectActionAndArtifactResources(deployment));
   return out;
-}
-
-function collectPolicyChildren(
-  deployment: DeploymentTarget,
-  out: DeploymentResourceInventoryEntry[],
-): void {
-  if (deployment.rolloutPolicy) {
-    out.push(entry("RolloutPolicy", `${deployment.deploymentId}:rollout`, deployment.label));
-  }
-  if (deployment.preview)
-    out.push(entry("PreviewPolicy", `${deployment.deploymentId}:preview`, deployment.label));
-  if (deployment.smoke)
-    out.push(entry("SmokePolicy", `${deployment.deploymentId}:smoke`, deployment.label));
-  for (const gate of deployment.admissionPolicy.readinessGates || []) {
-    out.push(
-      entry(
-        "ReadinessGatePolicy",
-        `${deployment.deploymentId}:readiness:${gate.name}`,
-        deployment.label,
-      ),
-    );
-  }
-  if (deployment.admissionPolicy.attestation) {
-    out.push(
-      entry("AttestationPolicy", `${deployment.deploymentId}:attestation`, deployment.label),
-    );
-  }
-  if (deployment.admissionPolicy.sbom) {
-    out.push(entry("SbomPolicy", `${deployment.deploymentId}:sbom`, deployment.label));
-  }
-  for (const [index] of deployment.admissionPolicy.supplyChainGates.entries()) {
-    out.push(
-      entry(
-        "SupplyChainPolicy",
-        `${deployment.deploymentId}:supply-chain:${index}`,
-        deployment.label,
-      ),
-    );
-  }
-  for (const sourceRef of deployment.lanePolicy.governance.sourceRefPolicies) {
-    out.push(
-      entry(
-        "SourceRefPolicy",
-        `${deployment.lanePolicy.governanceRef}:${sourceRef.stage}`,
-        deployment.lanePolicy.governanceRef,
-        [deployment.lanePolicy.governanceRef],
-        {
-          stage: sourceRef.stage,
-          allowedRefs: sourceRef.allowedRefs,
-          requiredChecks: sourceRef.requiredChecks,
-          trustedReporterIdentities: deployment.lanePolicy.governance.trustedReporterIdentities,
-        },
-      ),
-    );
-  }
 }
 
 function collectRequirements(

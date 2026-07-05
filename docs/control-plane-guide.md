@@ -164,9 +164,10 @@ load-balancer, DNS, or TLS resources.
 In the resource graph, OpenTofu appears as a `Provisioner` resource rather than as the sole source of
 deployment intent. The provisioner resource records stack identity, state backend identity, reviewed
 plan/apply artifact refs, evidence artifact refs, approval binding, replay compatibility, and
-source-plan evidence for Nix-provided OpenTofu tooling. It may link to deployments, provider targets,
-execution snapshots, and current stage state, while first-class policy resource IDs remain separate
-policy graph work.
+source-plan evidence for Nix-provided OpenTofu tooling. It links to deployments, provider targets,
+execution snapshots, current stage state, and first-class policy resource refs. Policy refs identify
+the reviewed policy resource and version used for admission and status traceability; they do not
+permit provider mutations outside the reviewed OpenTofu plan/apply evidence path.
 
 The repo now provides reviewed declarative/IaC paths for the AWS foundation surfaces used by the
 control-plane setup bundle: network and S3 foundation evidence, ECR registry evidence, AWS-side

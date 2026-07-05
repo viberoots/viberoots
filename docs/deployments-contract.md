@@ -224,6 +224,12 @@ indexing and status, not a replacement authoring format.
   so PR-4B can index admitted records without accepting user-authored runtime resources.
 - `metadata.ownerReferences` and `policyRefs` are derived from inventory refs. Producers must not
   choose an incompatible ownership or inline-status shape.
+- Policy resource refs are first-class status facts. Admission snapshots and read-model nodes use
+  `{ kind, resourceId, version }` bindings for lane, governance, admission, readiness gate,
+  attestation, SBOM, supply-chain, rollout, preview, smoke, source-ref, provider-capability, and
+  release-action policy resources. Existing policy fingerprints are the version source for
+  repo-authored policy metadata; the reviewed provider capability registry uses
+  `provider-capability@1`.
 - `source` preserves authority class: reviewed Buck intent, resolved deployment-context inputs,
   workspace/local override evidence recorded on the inventory, and admitted runtime facts remain
   distinguishable for later read models.

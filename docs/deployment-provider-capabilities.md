@@ -64,6 +64,19 @@ provider record already explains a built artifact or execution snapshot; the
 resource graph does not infer provider compatibility from `nixpkgs_profile` or
 `nixpkg_pins`.
 
+Provider capability policy resources use `ProviderCapabilityPolicy` with
+`resourceId = provider-capability:<provider>` and version `provider-capability@1`. This is the
+traceable identity for provider eligibility decisions. Missing or unsupported provider capability
+refs remain fail-closed through the reviewed provider registry and existing protected/shared
+eligibility checks.
+
+Release-action policy resources use `ReleaseActionPolicy` with `resourceId = <release-action Buck
+label>:policy` and the extracted release-action fingerprint as `version`. These resources make
+release-action decisions addressable in snapshots and status while linking back to the release-action
+label as reviewed source. They do not add a new policy language; unsupported, destructive, stale, or
+incompatible release actions still fail through the existing release-action admission and replay
+checks.
+
 ## Review Questions For Every Provider
 
 - What exact `provider_target` fields determine the normal mutable live target?

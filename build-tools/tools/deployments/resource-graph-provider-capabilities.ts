@@ -16,7 +16,7 @@ export function providerCapabilityBindingFacts(
   return {
     providerCapabilityId: `provider-capability:${capability.provider}`,
     providerCapabilityVersion: "provider-capability@1",
-    providerCapabilitySource: capabilitySourcePath(capability.provider),
+    providerCapabilitySource: providerCapabilitySourcePath(capability.provider),
     authorityBoundary: "reviewed-provider-capability-registry",
     supportedComponentKinds: capability.supportedComponentKinds,
     multiComponentKinds: capability.multiComponentKinds,
@@ -37,6 +37,10 @@ export function providerCapabilityBindingFacts(
   };
 }
 
-function capabilitySourcePath(provider: string): string {
+export function providerCapabilitySourcePath(provider: string): string {
   return `build-tools/tools/deployments/provider-capabilities/${provider}.ts`;
+}
+
+export function providerCapabilitySourceLabel(provider: string): string {
+  return `provider-capability:${provider}`;
 }

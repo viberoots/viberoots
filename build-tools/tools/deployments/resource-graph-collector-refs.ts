@@ -1,5 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import type { DeploymentTarget } from "./contract";
+import {
+  deploymentPolicyResourceBindings,
+  policyResourceRefFacts,
+} from "./deployment-policy-resources";
 
 export function deploymentRefs(deployment: DeploymentTarget): string[] {
   return [
@@ -10,6 +14,7 @@ export function deploymentRefs(deployment: DeploymentTarget): string[] {
     deployment.lanePolicyRef,
     deployment.lanePolicy.governanceRef,
     deployment.admissionPolicyRef,
+    ...deploymentPolicyResourceBindings(deployment).map((binding) => binding.resourceId),
     ...policyChildResourceIds(deployment),
     ...requirementResourceIds(deployment),
     ...resolvedInputResourceIds(deployment),
@@ -27,6 +32,7 @@ export function deploymentRefFacts(deployment: DeploymentTarget): Record<string,
     providerTargetIdentity: deployment.providerTarget.identity,
     lanePolicyRef: deployment.lanePolicyRef,
     admissionPolicyRef: deployment.admissionPolicyRef,
+    ...policyResourceRefFacts(deployment),
     secretRequirementRefs: deployment.secretRequirements.map((requirement) =>
       secretRequirementResourceId(deployment, requirement.step, requirement.name),
     ),

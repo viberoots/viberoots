@@ -118,6 +118,7 @@ test("OpenTofu provisioners expose stack evidence without first-class policy ref
     admissionPolicyFingerprint: "sha256:admission",
     lanePolicyRef: "//projects/deployments/sample-webapp/shared:lane",
     lanePolicyFingerprint: "sha256:lane",
+    policyResourceRefs: provisioner.spec.approvalBinding.policyResourceRefs,
     requiredApprovals: [],
   });
   assert.deepEqual(provisioner.spec.policyEvaluationBinding, {
@@ -125,7 +126,7 @@ test("OpenTofu provisioners expose stack evidence without first-class policy ref
     provisionerPlanFingerprintField:
       "admittedContext.policyEvaluation.binding.provisionerPlanFingerprint",
   });
-  assert.deepEqual(provisioner.policyRefs, []);
+  assert.equal(provisioner.policyRefs.length > 0, true);
   assert.equal(provisioner.spec.sourcePlanEvidenceBinding, "resource_graph_node.sourceSelection");
   assert.doesNotMatch(JSON.stringify(provisioner), /AKIA|BEGIN PRIVATE KEY|raw-secret/);
 });

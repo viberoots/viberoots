@@ -5,6 +5,10 @@ import {
   componentResourceId,
   provisionerResourceId,
 } from "./resource-graph-collector-refs";
+import {
+  deploymentPolicyResourceBindings,
+  releaseActionPolicyResourceId,
+} from "./deployment-policy-resources";
 import type { DeploymentResourceInventoryEntry } from "./resource-graph-types";
 
 function base(label: string) {
@@ -28,6 +32,21 @@ export function collectActionAndArtifactResources(
     ...deployment.releaseActions.map((action) =>
       entry("ReleaseAction", action.ref, action.ref, [deployment.deploymentId]),
     ),
+    ...deployment.releaseActions.map((action) =>
+      entry(
+        "ReleaseActionPolicy",
+        releaseActionPolicyResourceId(action.ref),
+        action.ref,
+        [action.ref],
+        {
+          actionType: action.type,
+          phase: action.phase,
+          replayPolicy: action.replayPolicy,
+          policyResourceVersion: action.fingerprint,
+          statusVisibility: "operator_status",
+        },
+      ),
+    ),
     ...deployment.targetExceptions.map((targetException) =>
       entry(
         "DeploymentTargetException",
@@ -49,7 +68,11 @@ function provisionerResources(deployment: DeploymentTarget): DeploymentResourceI
       "Provisioner",
       provisionerResourceId(deployment),
       deployment.label,
-      [deployment.deploymentId, deployment.providerTarget.identity],
+      [
+        deployment.deploymentId,
+        deployment.providerTarget.identity,
+        ...deploymentPolicyResourceBindings(deployment).map((binding) => binding.resourceId),
+      ],
       provisionerFacts(deployment),
     ),
   ];
@@ -76,6 +99,7 @@ function provisionerFacts(deployment: DeploymentTarget): Record<string, unknown>
             admissionPolicyFingerprint: deployment.admissionPolicy.fingerprint,
             lanePolicyRef: deployment.lanePolicyRef,
             lanePolicyFingerprint: deployment.lanePolicy.fingerprint,
+            policyResourceRefs: deploymentPolicyResourceBindings(deployment),
             requiredApprovals: deployment.admissionPolicy.requiredApprovals || [],
           },
           policyEvaluationBinding: {

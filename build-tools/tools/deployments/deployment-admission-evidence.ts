@@ -19,6 +19,7 @@ import type {
   DeploymentReadinessGateFact,
 } from "./deployment-readiness-gates";
 import type { DeploymentCiAdmissionEvidence } from "./deployment-ci-admission";
+import type { DeploymentPolicyResourceBinding } from "./deployment-policy-resources";
 export { normalizeAdmissionEvidence } from "./deployment-admission-evidence-normalize";
 
 export type {
@@ -126,6 +127,7 @@ export type DeploymentAdmissionPolicyEvaluation = {
   sbom?: DeploymentSbomFact;
   supplyChainGates: DeploymentSupplyChainGateFact[];
   readinessGates: DeploymentReadinessGateFact[];
+  policyResourceRefs: DeploymentPolicyResourceBinding[];
   ciSubmission?: DeploymentCiAdmissionEvidence;
 };
 
