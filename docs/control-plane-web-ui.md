@@ -68,6 +68,13 @@ admitted into the backend import. Runtime inventory facts outside that set remai
 they have a durable backend table, object-store reference, or existing authoritative control-plane
 record to link without inventing a mutation path.
 
+The payload also includes `runtime.markers` for read-model age and link diagnostics. Use
+`runtime-linked` for fully linked classifiable runtime rows, `pre-read-model` for rows that existed
+before the backend read model had an import, and `runtime-unlinked` for rows that still lack a
+matching imported Deployment intent node. Marker examples are bounded and redacted. They classify
+existing backend rows, runtime evidence refs, and worker lease claims for operator status, and do
+not backfill or rewrite provider-owned records.
+
 ## Troubleshooting
 
 When `/api/v1/read/status` reports `database.ok: false`, check the service runtime database

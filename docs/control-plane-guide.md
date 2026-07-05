@@ -189,6 +189,18 @@ plane has no durable table, object-store record, or existing authoritative row t
 those facts out of backend status avoids turning export collectors into an unreviewed mutation
 surface.
 
+Runtime status includes read-model markers so operators can tell how much of the backend state is
+linked to imported intent. `runtime-linked` means the classifiable runtime rows point at imported
+Deployment intent nodes. `pre-read-model` means backend runtime rows exist before any resource graph
+import has populated the read model. `runtime-unlinked` means an import exists, but some runtime
+rows cannot be linked because the matching Deployment intent fact is missing. These markers are
+diagnostic and read-only; the read path does not rewrite deploy records, provider evidence, stage
+state, worker evidence, upload sessions, or audit rows. There is no separate operator backfill
+command for PR-11. Re-run the reviewed resource graph import after restoring missing Buck intent
+facts, then inspect the marker counts and bounded examples again. Marker examples can come from
+deployment-id-bearing rows, runtime evidence refs, or worker lease claims that cannot reach imported
+Deployment intent.
+
 The representative protected/shared status workflow is Cloudflare Pages static webapp deployment
 with exact-artifact replay. That path demonstrates selected control-plane metadata, redacted local
 override evidence, source-selection evidence, target-exception effect, provider-capability policy

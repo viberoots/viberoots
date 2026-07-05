@@ -499,6 +499,10 @@ use the setup-shell fallback environment variable for a single run; do not put i
 covers prerequisite checks and the remote-state bootstrap plan/apply path. Later foundation, DNS,
 profile, cutover, and remote build phases are represented in status/evidence as the intended
 sequence, but are still completed with the documented commands in the later sections of this guide.
+Resource graph status may show `pre-read-model` or `runtime-unlinked` markers while those phase
+records predate an imported read model or while the matching reviewed Deployment intent is missing.
+Use those markers to decide whether to re-run the reviewed import or restore missing Buck intent;
+they are read-only diagnostics and do not backfill provider records or remote-build evidence.
 
 The `aws-account` namespace also has small subcommands for resuming, checking, and inspecting
 the setup without rerunning every phase:

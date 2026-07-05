@@ -358,6 +358,11 @@ stage history without exposing a generic mutation path. Provider observed-state
 evidence appears as `ProviderEvidence` resources with explicit supported,
 unsupported, or deferred semantics for provider release ids, drift, preview,
 partial publish, smoke/readiness, and rollback/recovery fields.
+The `runtime.status` and `runtime.markers` fields distinguish linked rows from
+rows that predate the read-model import or rows that cannot link because the
+matching Buck Deployment intent fact is missing. Treat `pre-read-model` and
+`runtime-unlinked` as operator diagnostics. They do not replay runtime state,
+rewrite provider records, or grant mutation authority to the resource graph.
 
 For a protected/shared static webapp, the operator workflow is:
 

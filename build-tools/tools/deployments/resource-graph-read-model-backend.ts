@@ -31,6 +31,7 @@ type ResourceGraphNodeRow = {
 };
 
 type ResourceGraphEdgeRow = { document_json: unknown };
+type ResourceGraphImportCountRow = { count: string | number };
 
 export async function syncBackendResourceGraphIndex(
   backend: NixosSharedHostControlPlaneBackendTarget,
@@ -112,7 +113,7 @@ export async function syncBackendResourceGraphIndex(
 export async function readBackendResourceGraphIndex(
   backend: NixosSharedHostControlPlaneBackendTarget,
 ) {
-  const [nodes, edges] = await Promise.all([
+  const [nodes, edges, imports] = await Promise.all([
     queryBackend<ResourceGraphNodeRow>(
       backend,
       "SELECT document_json, source_selection_json FROM resource_graph_nodes ORDER BY kind, name, uid",
@@ -120,6 +121,10 @@ export async function readBackendResourceGraphIndex(
     queryBackend<ResourceGraphEdgeRow>(
       backend,
       "SELECT document_json FROM resource_graph_edges ORDER BY from_uid, kind, to_uid",
+    ),
+    queryBackend<ResourceGraphImportCountRow>(
+      backend,
+      "SELECT COUNT(*) AS count FROM resource_graph_imports",
     ),
   ]);
   const intentNodes = nodes.rows.map((row) => ({
@@ -129,7 +134,9 @@ export async function readBackendResourceGraphIndex(
       : {}),
   }));
   const intentEdges = edges.rows.map((row) => decodeBackendJson(row.document_json));
-  const runtime = await readRuntimeResourceGraph(backend, intentNodes as never);
+  const runtime = await readRuntimeResourceGraph(backend, intentNodes as never, {
+    intentGraphImported: Number(imports.rows[0]?.count || 0) > 0,
+  });
   return redactControlPlaneReadModel({
     schemaVersion: "control-plane-resource-graph@1",
     nodes: [...intentNodes, ...runtime.nodes],

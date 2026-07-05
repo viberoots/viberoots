@@ -83,7 +83,7 @@ export function runtimeEvidenceGraph(
       labels: { "viberoots.dev/authority": "observed_runtime" },
       statusRef: `status:${uid(row.kind, name)}`,
       evidenceRef: `evidence:${uid(row.kind, name)}`,
-      facts: document.facts,
+      facts: { ...document.facts, resourceGraphRefs: document.refs || [] },
     } as ResourceGraphNode);
     for (const ref of document.refs || []) {
       const deploymentUid = deploymentUidById.get(ref);

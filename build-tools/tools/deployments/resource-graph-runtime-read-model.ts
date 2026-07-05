@@ -1,5 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import type { ResourceGraphEdge, ResourceGraphNode } from "./resource-graph-export";
+import {
+  classifyRuntimeLinkStatus,
+  type RuntimeLinkMarkers,
+  type RuntimeLinkStatus,
+} from "./resource-graph-runtime-link-status";
 import { RuntimeGraph } from "./resource-graph-runtime-graph";
 import { latestRuntimeActions } from "./resource-graph-runtime-latest-actions";
 import { readWorkerEvidence } from "./control-plane-worker-evidence";
@@ -13,8 +18,9 @@ import {
 type JsonRow = Record<string, unknown>;
 
 export type RuntimeReadModel = {
-  indexed: true;
-  status: "runtime-linked";
+  indexed: boolean;
+  status: RuntimeLinkStatus;
+  markers: RuntimeLinkMarkers;
   nodeCount: number;
   edgeCount: number;
   latestActions: Array<{ submissionId: string; actionId: string; submittedAt: string }>;
@@ -25,6 +31,7 @@ export type RuntimeReadModel = {
 export async function readRuntimeResourceGraph(
   backend: NixosSharedHostControlPlaneBackendTarget,
   intentNodes: ResourceGraphNode[],
+  opts: { intentGraphImported?: boolean } = {},
 ): Promise<{ nodes: ResourceGraphNode[]; edges: ResourceGraphEdge[]; status: RuntimeReadModel }> {
   const context = contextFor(intentNodes);
   const [
@@ -90,14 +97,23 @@ export async function readRuntimeResourceGraph(
   cleanup.forEach((row) => graph.cleanup(row));
   const workerGraph = workerRuntimeGraph(workers);
   const evidenceGraph = runtimeEvidenceGraph(runtimeEvidence as never, context.deploymentUidById);
+  const runtimeNodes = [...graph.nodes, ...workerGraph.nodes, ...evidenceGraph.nodes];
+  const runtimeEdges = [...graph.edges, ...workerGraph.edges, ...evidenceGraph.edges];
+  const classified = classifyRuntimeLinkStatus({
+    intentGraphImported: opts.intentGraphImported === true,
+    intentNodeCount: intentNodes.length,
+    runtimeNodes,
+    runtimeEdges,
+  });
   return {
-    nodes: [...graph.nodes, ...workerGraph.nodes, ...evidenceGraph.nodes],
-    edges: [...graph.edges, ...workerGraph.edges, ...evidenceGraph.edges],
+    nodes: runtimeNodes,
+    edges: runtimeEdges,
     status: {
-      indexed: true,
-      status: "runtime-linked",
-      nodeCount: graph.nodes.length + workerGraph.nodes.length + evidenceGraph.nodes.length,
-      edgeCount: graph.edges.length + workerGraph.edges.length + evidenceGraph.edges.length,
+      indexed: classified.status === "runtime-linked",
+      status: classified.status,
+      markers: classified.markers,
+      nodeCount: runtimeNodes.length,
+      edgeCount: runtimeEdges.length,
       latestActions: latestRuntimeActions(actions),
       workerEvidenceCount: workers.length,
       runtimeEvidenceCount: runtimeEvidence.length,

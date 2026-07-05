@@ -112,6 +112,10 @@ shows validator-backed runtime input, auth-provider profile, selected control-pl
 control-plane observability, and mini-migration preflight evidence nodes. If one of those nodes is
 missing, check the import failure diagnostics first; malformed or non-admitted evidence is rejected
 before it reaches MCP status.
+The response also carries `runtime.markers` so agents and operators can distinguish fully linked
+runtime rows from `pre-read-model` rows and `runtime-unlinked` rows. These markers are diagnostic
+read-model facts. MCP does not run a backfill, rewrite provider records, or infer missing Buck
+Deployment intent from runtime status.
 
 ## Future Mutation Tools
 
