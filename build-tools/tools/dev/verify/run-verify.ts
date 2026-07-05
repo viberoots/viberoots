@@ -50,6 +50,13 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
       ui.step("target", "skipped");
     }
   }
+  if (
+    String(process.env.VBR_VERIFY_FORBID_BROAD || "").trim() === "1" &&
+    selection.targets.length === 1 &&
+    selection.targets[0] === "//..."
+  ) {
+    throw new Error("broad verify target //... rejected by VBR_VERIFY_FORBID_BROAD=1");
+  }
   const zxInit = zxInitPath(root);
   await timedPhase(
     "nix-cache-health",
@@ -244,46 +251,50 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
   };
   deps.installVerifySignalHandlers(requestShutdown);
   let status = 1;
-  status = await timedPhase(
-    "buck-test-passes",
-    async () =>
-      await deps.runVerifyBuckPasses({
-        root,
-        iso,
-        logFile: lock.logFile,
-        console: args.console,
-        targets: selection.targets,
-        zxNodeModulesOut,
-        analysisDir,
-        onPgid: (nextPgid) => activePgids.add(nextPgid),
-        onPgidDone: (donePgid) => activePgids.delete(donePgid),
-        onNestedIso: (nestedIso) => activeNestedIsos.add(nestedIso),
-        onNestedIsoDone: (nestedIso) => activeNestedIsos.delete(nestedIso),
-        executionPolicy,
-        suppressFailureOutputTail: () => requestedExitCode !== null,
-        shouldAbort: () => requestedExitCode !== null,
-      }),
-  );
-  if (shutdownPromise) await shutdownPromise;
-  if (requestedExitCode !== null) {
-    ui.warn("verify interrupted");
-    if (lock.logFile) ui.list([`log ${lock.logFile}`], { stream: "stderr", limit: 1 });
-  } else if (status !== 0) {
-    ui.warn("verify failed");
-    if (lock.logFile) ui.list([`log ${lock.logFile}`], { stream: "stderr", limit: 1 });
+  try {
+    status = await timedPhase(
+      "buck-test-passes",
+      async () =>
+        await deps.runVerifyBuckPasses({
+          root,
+          iso,
+          logFile: lock.logFile,
+          console: args.console,
+          targets: selection.targets,
+          zxNodeModulesOut,
+          analysisDir,
+          onPgid: (nextPgid) => activePgids.add(nextPgid),
+          onPgidDone: (donePgid) => activePgids.delete(donePgid),
+          onNestedIso: (nestedIso) => activeNestedIsos.add(nestedIso),
+          onNestedIsoDone: (nestedIso) => activeNestedIsos.delete(nestedIso),
+          executionPolicy,
+          suppressFailureOutputTail: () => requestedExitCode !== null,
+          shouldAbort: () => requestedExitCode !== null,
+        }),
+    );
+    if (shutdownPromise) await shutdownPromise;
+    if (requestedExitCode !== null) {
+      ui.warn("verify interrupted");
+      if (lock.logFile) ui.list([`log ${lock.logFile}`], { stream: "stderr", limit: 1 });
+    } else if (status !== 0) {
+      ui.warn("verify failed");
+      if (lock.logFile) ui.list([`log ${lock.logFile}`], { stream: "stderr", limit: 1 });
+    }
+    await deps.maybeWriteVerifyTimingSummary({ root, logFile: lock.logFile, zxInitPath: zxInit });
+    if (status === 0 && cov.rawDir)
+      await deps.runMergedCoverageReport({ root, rawDir: cov.rawDir });
+    if (status === 0) ui.ok("verify", "passed");
+  } finally {
+    await cleanupRegisteredTempRepoState();
+    if (seedCleanup) {
+      await timedPhase("seed-cleanup", async () => await seedCleanup?.());
+      seedCleanup = null;
+    }
+    await timedPhase(
+      "kill-verify-buck-isolation",
+      async () => await deps.killBuckIsolation(root, iso),
+    );
+    await deps.runFinalOrphanBuckCleanup({ root, logFile: lock.logFile, stateFile, timedPhase });
   }
-  await cleanupRegisteredTempRepoState();
-  await deps.maybeWriteVerifyTimingSummary({ root, logFile: lock.logFile, zxInitPath: zxInit });
-  if (status === 0 && cov.rawDir) await deps.runMergedCoverageReport({ root, rawDir: cov.rawDir });
-  if (status === 0) ui.ok("verify", "passed");
-  if (seedCleanup) {
-    await timedPhase("seed-cleanup", async () => await seedCleanup?.());
-    seedCleanup = null;
-  }
-  await timedPhase(
-    "kill-verify-buck-isolation",
-    async () => await deps.killBuckIsolation(root, iso),
-  );
-  await deps.runFinalOrphanBuckCleanup({ root, logFile: lock.logFile, stateFile, timedPhase });
   deps.exit(requestedExitCode ?? status);
 }

@@ -23,6 +23,17 @@ test("node-test importer snapshots exclude generated and cache directories", asy
     "report",
     "buck-out",
     "pnpm-workspace.yaml",
+    ".codex-logs",
+    "backups",
+    "cache",
+    "codex-test-logs",
+    "install-cache",
+    "nix-xdg-cache",
+    "pr-logs",
+    "result",
+    "test-logs",
+    "viberoots-flake-input",
+    "xdg-cache",
   ]) {
     assert.match(
       file,
@@ -30,6 +41,24 @@ test("node-test importer snapshots exclude generated and cache directories", asy
       `expected node-test importer snapshot to exclude ${dir}`,
     );
   }
+  assert.match(
+    file,
+    /atImporterRoot && builtins\.elem n importerGeneratedRootEntries/,
+    "expected node-test test-file discovery to skip generated dirs only at importer root",
+  );
+  assert.match(
+    file,
+    /importerAbs \+ "\/result-"/,
+    "expected node-test importer snapshot to exclude importer-root result-* symlinks",
+  );
+  assert.match(
+    file,
+    /generatedRootFile/,
+    "expected node-test importer snapshot to exclude importer-root generated log files",
+  );
+  assert.match(file, /\.full-test-output\.log/);
+  assert.match(file, /\.patch-sessions\.json/);
+  assert.match(file, /\.codex-/);
   assert.match(
     file,
     /node_modules\\\\\.lockfile-guard/,

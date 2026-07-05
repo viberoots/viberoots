@@ -28,12 +28,12 @@ test("update-pnpm-hash skips non-default recompute when existing hash is present
       "nondefault.ts must not run speculative verify-existing-hash when marker validation fails",
     );
   }
-  if (nondefaultTxt.includes('verifyExistingHash("skip-existing-hash"')) {
-    throw new Error("nondefault.ts must not rebuild on a matching marker fast-path");
+  if (!nondefaultTxt.includes('verifyExistingHash("skip-existing-hash"')) {
+    throw new Error("nondefault.ts must prove matching marker fast-path hashes with fixed build");
   }
-  if (nondefaultTxt.includes('verifyExistingHash("shared-hash-cache"')) {
+  if (!nondefaultTxt.includes('verifyExistingHash("shared-hash-cache"')) {
     throw new Error(
-      "nondefault.ts must not rebuild while holding the shared hash-cache lock on cache hits",
+      "nondefault.ts must prove shared hash-cache hits before accepting cached hashes",
     );
   }
   if (!nondefaultTxt.includes("restoredHash = await restoreSharedHash()")) {

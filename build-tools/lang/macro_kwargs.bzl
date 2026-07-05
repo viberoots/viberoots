@@ -10,7 +10,8 @@ def _looks_like_raw_commit(value):
     s = str(value).strip().lower()
     if len(s) != 40:
         return False
-    for ch in s:
+    for i in range(len(s)):
+        ch = s[i]
         if ch not in _HEX:
             return False
     return True

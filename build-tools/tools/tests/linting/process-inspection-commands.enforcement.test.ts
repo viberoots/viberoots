@@ -8,6 +8,8 @@ const EXCLUDED_DIRS = new Set([
   ".codex",
   ".git",
   ".viberoots",
+  "backups",
+  "codex-test-logs",
   ".direnv",
   ".nix-zsh",
   "buck-out",
@@ -16,6 +18,7 @@ const EXCLUDED_DIRS = new Set([
   "docs",
   "node_modules",
   "result",
+  "pr-logs",
   "test-logs",
 ]);
 

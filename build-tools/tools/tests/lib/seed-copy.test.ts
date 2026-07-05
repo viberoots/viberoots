@@ -76,8 +76,15 @@ test("copySeedStoreToTempRepo publishes a complete forced-CoW seed copy atomical
     path.join("build-tools", "tmp", "rsync-nested-buck-out-123", "buck-out", "artifact"),
     path.join("viberoots", ".direnv", "flake-profile.rc"),
     path.join("viberoots", ".nix-gcroots", "devshell"),
+    path.join("viberoots", "backups", "snapshot.json"),
     path.join("viberoots", "buck-out", "v2", "cache"),
+    path.join("viberoots", "cache", "pnpm", "blob"),
+    path.join("viberoots", "codex-test-logs", "focused.log"),
+    path.join("viberoots", "install-cache", "state.json"),
+    path.join("viberoots", "nix-xdg-cache", "nix", "tarball-cache-v2", "pack"),
     path.join("viberoots", "node_modules", ".bin", "tool"),
+    path.join("viberoots", "pr-logs", "run.log"),
+    path.join("viberoots", "xdg-cache", "pnpm", "blob"),
   ]) {
     const abs = path.join(seed, rel);
     await fsp.mkdir(path.dirname(abs), { recursive: true });
@@ -145,8 +152,15 @@ test("copySeedStoreToTempRepo publishes a complete forced-CoW seed copy atomical
   );
   await assert.rejects(fsp.access(path.join(tmp, "viberoots", ".direnv")));
   await assert.rejects(fsp.access(path.join(tmp, "viberoots", ".nix-gcroots")));
+  await assert.rejects(fsp.access(path.join(tmp, "viberoots", "backups")));
   await assert.rejects(fsp.access(path.join(tmp, "viberoots", "buck-out")));
+  await assert.rejects(fsp.access(path.join(tmp, "viberoots", "cache")));
+  await assert.rejects(fsp.access(path.join(tmp, "viberoots", "codex-test-logs")));
+  await assert.rejects(fsp.access(path.join(tmp, "viberoots", "install-cache")));
+  await assert.rejects(fsp.access(path.join(tmp, "viberoots", "nix-xdg-cache")));
   await assert.rejects(fsp.access(path.join(tmp, "viberoots", "node_modules")));
+  await assert.rejects(fsp.access(path.join(tmp, "viberoots", "pr-logs")));
+  await assert.rejects(fsp.access(path.join(tmp, "viberoots", "xdg-cache")));
   assert.equal(await fsp.readFile(path.join(seed, "flake.nix"), "utf8"), "flake.nix\n");
 });
 

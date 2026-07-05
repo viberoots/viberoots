@@ -50,21 +50,57 @@ test("source snapshot includes declared source and excludes mutable local direct
     }),
   );
   await write(path.join(root, "projects", "apps", "demo", "index.ts"), "export {}\n");
-  for (const rel of [
+  await write(path.join(root, "projects", "apps", "demo", "src", "cache", "keep.ts"), "keep\n");
+  const generatedRootDirs = [
+    "backups",
+    "cache",
+    "codex-test-logs",
+    "install-cache",
+    "nix-xdg-cache",
+    "pr-logs",
+    "viberoots-flake-input",
+    "xdg-cache",
+  ];
+  const generatedWorkspaceDirs = [
+    ".viberoots/workspace/backups",
+    ".viberoots/workspace/buck",
+    ".viberoots/workspace/cache",
+    ".viberoots/workspace/install-cache",
+    ".viberoots/workspace/nix-xdg-cache",
+    ".viberoots/workspace/node",
+    ".viberoots/workspace/pr-logs",
+    ".viberoots/workspace/viberoots-flake-input",
+    ".viberoots/workspace/xdg-cache",
+  ];
+  const generatedViberootsDirs = [
+    "viberoots/.codex-logs",
+    "viberoots/.viberoots",
+    "viberoots/backups",
+    "viberoots/cache",
+    "viberoots/codex-test-logs",
+    "viberoots/install-cache",
+    "viberoots/nix-xdg-cache",
+    "viberoots/pr-logs",
+    "viberoots/test-logs",
+    "viberoots/xdg-cache",
+  ];
+  const forbiddenRels = [
     ".git/config",
     ".direnv/cache",
     "node_modules/pkg/index.js",
     "buck-out/log",
-    ".viberoots/workspace/backups/backup.json",
-    ".viberoots/workspace/buck/log",
-    ".viberoots/workspace/cache/nix-tarballs/blob",
-    ".viberoots/workspace/install-cache/state.json",
-    ".viberoots/workspace/nix-xdg-cache/nix/tarball-cache-v2/pack",
-    ".viberoots/workspace/node/bin/node",
-    ".viberoots/workspace/pr-logs/source-snapshot.log",
-    ".viberoots/workspace/xdg-cache/nix/tarball-cache-v2/pack",
     "tmp/local",
-  ]) {
+    ".codex-focused-verify.log",
+    ".full-test-output.log",
+    ".patch-sessions.json",
+    "viberoots/.codex-focused-verify.log",
+    "viberoots/.full-test-output.log",
+    "viberoots/.patch-sessions.json",
+    ...generatedRootDirs.map((dir) => `${dir}/sentinel`),
+    ...generatedWorkspaceDirs.map((dir) => `${dir}/sentinel`),
+    ...generatedViberootsDirs.map((dir) => `${dir}/sentinel`),
+  ];
+  for (const rel of forbiddenRels) {
     await write(path.join(root, rel), "forbidden\n");
   }
 
@@ -77,25 +113,12 @@ test("source snapshot includes declared source and excludes mutable local direct
     "flake.lock",
     "TARGETS",
     "viberoots/build-tools/lang/defs.bzl",
+    "projects/apps/demo/src/cache/keep.ts",
     DEFAULT_GRAPH_PATH,
   ]) {
     assert.equal(await fs.readFile(path.join(out, rel), "utf8").then(Boolean), true, rel);
   }
-  for (const rel of [
-    ".git/config",
-    ".direnv/cache",
-    "node_modules/pkg/index.js",
-    "buck-out/log",
-    ".viberoots/workspace/backups/backup.json",
-    ".viberoots/workspace/buck/log",
-    ".viberoots/workspace/cache/nix-tarballs/blob",
-    ".viberoots/workspace/install-cache/state.json",
-    ".viberoots/workspace/nix-xdg-cache/nix/tarball-cache-v2/pack",
-    ".viberoots/workspace/node/bin/node",
-    ".viberoots/workspace/pr-logs/source-snapshot.log",
-    ".viberoots/workspace/xdg-cache/nix/tarball-cache-v2/pack",
-    "tmp/local",
-  ]) {
+  for (const rel of forbiddenRels) {
     await assert.rejects(fs.access(path.join(out, rel)), undefined, rel);
   }
   const data = JSON.parse(await fs.readFile(manifest, "utf8"));

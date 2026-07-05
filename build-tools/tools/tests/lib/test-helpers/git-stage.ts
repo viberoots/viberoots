@@ -28,6 +28,15 @@ const EXCLUDED_DIR_NAMES = new Set([
   "dist",
   "node_modules",
 ]);
+const ROOT_EXCLUDED_DIR_NAMES = new Set([
+  "backups",
+  "cache",
+  "codex-test-logs",
+  "install-cache",
+  "nix-xdg-cache",
+  "pr-logs",
+  "xdg-cache",
+]);
 
 export const DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS = [
   "viberoots/build-tools/lang/importer_roots.bzl",
@@ -59,7 +68,9 @@ function normalizeRelPath(relPath: string): string {
   return relPath.replace(/\\/g, "/").replace(/^\.\//, "").replace(/\/+/g, "/");
 }
 
-function shouldSkipEntry(name: string): boolean {
+function shouldSkipEntry(name: string, relPath: string): boolean {
+  const normalized = normalizeRelPath(relPath);
+  if (!normalized.includes("/") && ROOT_EXCLUDED_DIR_NAMES.has(name)) return true;
   return (
     EXCLUDED_DIR_NAMES.has(name) ||
     name === ".wasm-producer" ||
@@ -95,9 +106,9 @@ async function collectStageableFiles(
   const entries = await fsp.readdir(absPath, { withFileTypes: true }).catch(() => []);
   const files: string[] = [];
   for (const entry of entries) {
-    if (shouldSkipEntry(entry.name)) continue;
     const childAbs = path.join(absPath, entry.name);
     const childRel = path.posix.join(normalizeRelPath(relPath), entry.name);
+    if (shouldSkipEntry(entry.name, childRel)) continue;
     if (entry.isDirectory()) {
       files.push(...(await collectStageableFiles(tmp, childAbs, childRel)));
       continue;

@@ -5,6 +5,32 @@ import path from "node:path";
 import { test } from "node:test";
 import { rsyncRepoTo, runInTemp } from "../lib/test-helpers";
 
+const generatedWorkspaceRoots = [
+  "backups",
+  "buck",
+  "cache",
+  "codex-test-logs",
+  "install-cache",
+  "nix-xdg-cache",
+  "node",
+  "pr-logs",
+  "viberoots-flake-input",
+  "xdg-cache",
+];
+
+const generatedViberootsRoots = [
+  ".codex-logs",
+  ".viberoots",
+  "backups",
+  "cache",
+  "codex-test-logs",
+  "install-cache",
+  "nix-xdg-cache",
+  "pr-logs",
+  "test-logs",
+  "xdg-cache",
+];
+
 async function withDefaultRsyncCopy(fn: () => Promise<void>): Promise<void> {
   const prevGoOnly = process.env.TEST_PARTIAL_CLONE_GO_ONLY;
   process.env.TEST_PARTIAL_CLONE_GO_ONLY = "1";
@@ -68,14 +94,29 @@ async function makeSourceRoot(prefix: string): Promise<string> {
   await fsp.mkdir(path.join(root, "viberoots", "build-tools"), { recursive: true });
   await fsp.writeFile(path.join(root, "viberoots", "flake.nix"), "{}\n");
   await fsp.writeFile(path.join(root, "viberoots", ".live-edit-marker"), "transient\n");
+  await fsp.writeFile(path.join(root, "viberoots", ".codex-focused-verify.log"), "generated\n");
+  await fsp.writeFile(path.join(root, "viberoots", ".full-test-output.log"), "generated\n");
+  await fsp.writeFile(path.join(root, "viberoots", ".patch-sessions.json"), "generated\n");
   await fsp.writeFile(path.join(root, "viberoots", "build-tools", "keep.txt"), "keep\n");
   await fsp.mkdir(path.join(root, "viberoots", ".viberoots", "workspace", "buck"), {
     recursive: true,
   });
-  await fsp.writeFile(
-    path.join(root, "viberoots", ".viberoots", "workspace", "buck", "large-store-blob"),
-    "generated\n",
-  );
+  for (const generatedRoot of generatedWorkspaceRoots) {
+    await fsp.mkdir(path.join(root, "viberoots", ".viberoots", "workspace", generatedRoot), {
+      recursive: true,
+    });
+    await fsp.writeFile(
+      path.join(root, "viberoots", ".viberoots", "workspace", generatedRoot, "large-store-blob"),
+      "generated\n",
+    );
+  }
+  for (const generatedRoot of generatedViberootsRoots) {
+    await fsp.mkdir(path.join(root, "viberoots", generatedRoot), { recursive: true });
+    await fsp.writeFile(
+      path.join(root, "viberoots", generatedRoot, "large-store-blob"),
+      "generated\n",
+    );
+  }
   return root;
 }
 
@@ -84,15 +125,21 @@ async function makeViberootsSourceRoot(prefix: string): Promise<string> {
   await fsp.mkdir(path.join(root, "build-tools"), { recursive: true });
   await fsp.writeFile(path.join(root, "flake.nix"), "{}\n");
   await fsp.writeFile(path.join(root, "build-tools", "keep.txt"), "keep\n");
+  await fsp.writeFile(path.join(root, ".codex-focused-verify.log"), "generated\n");
+  await fsp.writeFile(path.join(root, ".full-test-output.log"), "generated\n");
+  await fsp.writeFile(path.join(root, ".patch-sessions.json"), "generated\n");
   await fsp.mkdir(path.join(root, ".viberoots", "workspace", "buck", "unified-pnpm-store"), {
     recursive: true,
   });
   await fsp.writeFile(path.join(root, ".viberoots", "workspace", "flake.nix"), "{}\n");
   await fsp.writeFile(path.join(root, ".source-fingerprint"), "transient\n");
-  await fsp.writeFile(
-    path.join(root, ".viberoots", "workspace", "buck", "unified-pnpm-store", "large-store-blob"),
-    "generated\n",
-  );
+  for (const generatedRoot of generatedWorkspaceRoots) {
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace", generatedRoot), { recursive: true });
+    await fsp.writeFile(
+      path.join(root, ".viberoots", "workspace", generatedRoot, "large-store-blob"),
+      "generated\n",
+    );
+  }
   return root;
 }
 
@@ -160,6 +207,12 @@ test("rsync: filtered roots exclude nested viberoots generated workspace state",
     );
     await fsp.access(path.join(dest, "viberoots", "build-tools", "keep.txt"));
     await assertMissing(path.join(dest, "viberoots", ".viberoots"));
+    for (const generatedRoot of generatedViberootsRoots) {
+      await assertMissing(path.join(dest, "viberoots", generatedRoot));
+    }
+    await assertMissing(path.join(dest, "viberoots", ".codex-focused-verify.log"));
+    await assertMissing(path.join(dest, "viberoots", ".full-test-output.log"));
+    await assertMissing(path.join(dest, "viberoots", ".patch-sessions.json"));
     await assertMissing(path.join(dest, "viberoots", ".live-edit-marker"));
   } finally {
     await fsp.rm(source, { recursive: true, force: true });
@@ -182,7 +235,12 @@ test("rsync: viberoots source roots exclude generated workspace buck state", asy
     );
     await fsp.access(path.join(dest, "build-tools", "keep.txt"));
     await fsp.access(path.join(dest, ".viberoots", "workspace", "flake.nix"));
-    await assertMissing(path.join(dest, ".viberoots", "workspace", "buck"));
+    for (const generatedRoot of generatedWorkspaceRoots) {
+      await assertMissing(path.join(dest, ".viberoots", "workspace", generatedRoot));
+    }
+    await assertMissing(path.join(dest, ".codex-focused-verify.log"));
+    await assertMissing(path.join(dest, ".full-test-output.log"));
+    await assertMissing(path.join(dest, ".patch-sessions.json"));
     await assertMissing(path.join(dest, ".source-fingerprint"));
   } finally {
     await fsp.rm(source, { recursive: true, force: true });

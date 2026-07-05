@@ -4,11 +4,13 @@ import * as fsp from "node:fs/promises";
 import process from "node:process";
 import { test } from "node:test";
 import { isLikelyEphemeralIsolation } from "../../dev/verify/buck-orphan-cleanup";
+import { duplicateManagedBuckPidsForTest } from "../../dev/verify/final-orphan-cleanup";
 import {
   liveOwnerPidFromEphemeralIsolation,
   ownerPidFromEphemeralIsolation,
   tryTempRepoRootFromBuckDaemonCwd,
 } from "../../dev/verify/buck-orphan-cleanup-lib";
+import { buckIsolationProcessPidsFromLines } from "../../dev/verify/process-control";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 async function readRepoFile(relativePath: string): Promise<string> {
@@ -87,5 +89,35 @@ test("orphan buck cleanup: missing temp-root daemons require cwd root evidence",
       "/private/tmp/viberoots-verify-user.noindex/tmpdir-suffix/repo/buck-out/v2",
     ),
     null,
+  );
+});
+
+test("process-control buck isolation fallback is scoped by repo-root forkserver state", () => {
+  assert.deepEqual(
+    buckIsolationProcessPidsFromLines({
+      root: "/repo",
+      iso: "v-explain-selection",
+      lines: [
+        "101 1 00:01:00 buck2d[common] --isolation-dir v-explain-selection daemon",
+        "102 101 00:01:00 (buck2-forkserver) forkserver --state-dir /repo/buck-out/v-explain-selection/forkserver",
+        "201 1 00:01:00 buck2d[common] --isolation-dir v-explain-selection daemon",
+        "202 201 00:01:00 (buck2-forkserver) forkserver --state-dir /other/buck-out/v-explain-selection/forkserver",
+      ],
+    }),
+    [101, 102],
+  );
+});
+
+test("final orphan cleanup prunes older duplicate repo-local v2 daemons only", () => {
+  assert.deepEqual(
+    duplicateManagedBuckPidsForTest("/repo", [
+      "101 1 00:01:00 buck2d[common] --isolation-dir v2 daemon",
+      "102 101 00:01:00 (buck2-forkserver) forkserver --state-dir /repo/buck-out/v2/forkserver",
+      "201 1 10:00:00 buck2d[common] --isolation-dir v2 daemon",
+      "202 201 10:00:00 (buck2-forkserver) forkserver --state-dir /repo/buck-out/v2/forkserver",
+      "301 1 12:00:00 buck2d[common] --isolation-dir v2 daemon",
+      "302 301 12:00:00 (buck2-forkserver) forkserver --state-dir /other/buck-out/v2/forkserver",
+    ]),
+    [201, 202],
   );
 });

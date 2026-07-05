@@ -4,9 +4,11 @@ import { execFile } from "node:child_process";
 import path from "node:path";
 import { promisify } from "node:util";
 import { markMacosMetadataNeverIndex } from "../../lib/macos-metadata";
+import { buckProcessTableLines } from "../../lib/process-inspection";
 import { cleanupOrphanBuckDaemons } from "./buck-orphan-cleanup";
 import { appendVerifyLogLine } from "./process-control";
 import { cleanupRegisteredBuckIsolations } from "./registered-buck-cleanup";
+import { etimeToSeconds } from "./verify-owned-orphan-cleanup";
 
 const execFileAsync = promisify(execFile);
 
@@ -105,6 +107,59 @@ async function cleanupVerifyRootBuckOut(root: string): Promise<string[]> {
   return removed.sort();
 }
 
+function duplicateManagedBuckPidsFromLines(root: string, lines: string[]): number[] {
+  const repoRoot = path.resolve(root);
+  const daemonIsoByPid = new Map<number, string>();
+  const forksByIso = new Map<string, Array<{ pid: number; ppid: number; ageSec: number }>>();
+  for (const line of lines) {
+    const parsed = line.match(/^(\d+)\s+(\d+)\s+(\S+)\s+(.*)$/);
+    if (!parsed) continue;
+    const pid = Number(parsed[1]);
+    const ppid = Number(parsed[2]);
+    const ageSec = etimeToSeconds(parsed[3] || "");
+    const cmd = parsed[4] || "";
+    if (!Number.isFinite(pid) || !Number.isFinite(ppid)) continue;
+    const isoArg = String(cmd.match(/--isolation-dir\s+([^\s]+)/)?.[1] || "").trim();
+    if (cmd.includes("buck2d[") && isoArg) daemonIsoByPid.set(pid, isoArg);
+    if (!cmd.includes("(buck2-forkserver)")) continue;
+    const stateDir = String(cmd.match(/--state-dir\s+([^\s]+)/)?.[1] || "").trim();
+    const rel = path.relative(path.join(repoRoot, "buck-out"), stateDir);
+    const iso = rel.split(path.sep)[0] || isoArg;
+    if (!stateDir.startsWith(path.join(repoRoot, "buck-out", iso, "forkserver"))) continue;
+    if (iso !== "v2" && !iso.startsWith("devbuild-shared-")) continue;
+    const existing = forksByIso.get(iso) || [];
+    existing.push({ pid, ppid, ageSec });
+    forksByIso.set(iso, existing);
+  }
+  const pids = new Set<number>();
+  for (const [iso, forks] of forksByIso) {
+    if (forks.length <= 1) continue;
+    const staleForks = forks
+      .slice()
+      .sort((a, b) => a.ageSec - b.ageSec)
+      .slice(1);
+    for (const fork of staleForks) {
+      pids.add(fork.pid);
+      if (daemonIsoByPid.get(fork.ppid) === iso) pids.add(fork.ppid);
+    }
+  }
+  return [...pids].sort((a, b) => a - b);
+}
+
+export function duplicateManagedBuckPidsForTest(root: string, lines: string[]): number[] {
+  return duplicateManagedBuckPidsFromLines(root, lines);
+}
+
+async function cleanupDuplicateManagedBuckDaemons(root: string): Promise<number> {
+  const pids = duplicateManagedBuckPidsFromLines(root, await buckProcessTableLines(2000));
+  for (const pid of pids) {
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {}
+  }
+  return pids.length;
+}
+
 export async function runFinalOrphanBuckCleanup(opts: {
   root: string;
   logFile: string | null;
@@ -143,6 +198,16 @@ export async function runFinalOrphanBuckCleanup(opts: {
     );
     const cleanupRoots = await activeSourceCleanupRoots(opts.root);
     for (const cleanupRoot of cleanupRoots) {
+      const duplicateKills = await opts.timedPhase(
+        "final-cleanup-duplicate-root-buck-daemons",
+        async () => await cleanupDuplicateManagedBuckDaemons(cleanupRoot),
+      );
+      if (duplicateKills > 0) {
+        await appendVerifyLogLine(
+          opts.logFile,
+          `[verify] final duplicate root buck daemon cleanup: root=${cleanupRoot} killed_pids=${duplicateKills}`,
+        );
+      }
       const removedRootEntries = await opts.timedPhase(
         "final-cleanup-root-buck-out",
         async () => await cleanupVerifyRootBuckOut(cleanupRoot),

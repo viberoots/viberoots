@@ -111,7 +111,7 @@ test("shared pnpm-store hash cache prefers workspace root over nested repo root"
   }
 });
 
-test("non-default pnpm-store hash refresh restores shared-cache hits without rebuilding", async () => {
+test("non-default pnpm-store hash refresh verifies restored shared-cache hits", async () => {
   const repoRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "pnpm-shared-cache-lock-"));
   const prevRepoRoot = process.env.REPO_ROOT;
   const prevCwd = process.cwd();
@@ -194,6 +194,7 @@ test("non-default pnpm-store hash refresh restores shared-cache hits without reb
     assert.deepEqual(fixedPhases, [
       "importer=projects/libs/demo step=fixed-build attr=pnpm-store.projects-libs-demo",
       "importer=projects/libs/demo step=fixed-build-after-hash attr=pnpm-store.projects-libs-demo",
+      "importer=projects/libs/demo step=shared-hash-cache attr=pnpm-store.projects-libs-demo",
     ]);
     assert.equal(prepareCount, 1);
     assert.equal(await readSharedHashCache({ repoRoot, builderFingerprint, lockHash }), hashValue);
@@ -383,6 +384,7 @@ test("shared pnpm-store hash cache reuses verified identical lockfiles across im
     assert.deepEqual(fixedPhases, [
       "importer=projects/apps/demo-a step=fixed-build attr=pnpm-store.projects-apps-demo-a",
       "importer=projects/apps/demo-a step=fixed-build-after-hash attr=pnpm-store.projects-apps-demo-a",
+      "importer=projects/apps/demo-b step=shared-hash-cache attr=pnpm-store.projects-apps-demo-b",
     ]);
     assert.deepEqual(preparedImporters, ["projects/apps/demo-b"]);
     assert.equal(
@@ -405,7 +407,7 @@ test("shared pnpm-store hash cache reuses verified identical lockfiles across im
   }
 });
 
-test("non-default marker fast path does not rebuild already verified hashes", async () => {
+test("non-default marker fast path proves already verified hashes before accepting them", async () => {
   const repoRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "pnpm-marker-fastpath-"));
   const prevRepoRoot = process.env.REPO_ROOT;
   const prevCwd = process.cwd();
@@ -414,6 +416,7 @@ test("non-default marker fast path does not rebuild already verified hashes", as
   const lockHash = `lock-${path.basename(repoRoot)}`;
   const key = "projects/apps/demo/pnpm-lock.yaml";
   const markerPath = path.join(repoRoot, "buck-out", "tmp", "pnpm-store-verified.demo.json");
+  const fixedPhases: string[] = [];
   let prepared = false;
 
   process.env.REPO_ROOT = repoRoot;
@@ -469,7 +472,8 @@ test("non-default marker fast path does not rebuild already verified hashes", as
         },
         acceptedBuilderFingerprints: [builderFingerprint],
         runFixedBuild: async (phaseLabel) => {
-          throw new Error(`matching marker fast path should not run fixed build: ${phaseLabel}`);
+          fixedPhases.push(phaseLabel);
+          return { ok: true, output: "" };
         },
         runUnfixedBuild: async () => {
           throw new Error("matching marker fast path should not run unfixed build");
@@ -480,6 +484,9 @@ test("non-default marker fast path does not rebuild already verified hashes", as
       }),
       true,
     );
+    assert.deepEqual(fixedPhases, [
+      "importer=projects/apps/demo step=skip-existing-hash attr=pnpm-store.projects-apps-demo",
+    ]);
     assert.equal(prepared, true);
     const marker = await readVerifiedMarker(markerPath);
     assert.equal(marker?.hashValue, verifiedHash);

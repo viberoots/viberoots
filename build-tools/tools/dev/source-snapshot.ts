@@ -10,6 +10,8 @@ const EXCLUDES = [
   "buck-out",
   ".pnpm-store",
   ".pnpm-home",
+  ".codex-logs",
+  ".nix-gcroots",
   "coverage",
   ".cache",
   ".turbo",
@@ -27,11 +29,45 @@ const EXCLUDES = [
   ".viberoots/workspace/nix-xdg-cache",
   ".viberoots/workspace/node",
   ".viberoots/workspace/pr-logs",
+  ".viberoots/workspace/viberoots-flake-input",
   ".viberoots/workspace/xdg-cache",
   ".tmp",
   "tmp",
+  "test-logs",
   "result",
 ];
+const ROOT_FILE_EXCLUDES = new Set([".full-test-output.log", ".patch-sessions.json"]);
+const ROOT_DIR_EXCLUDES = new Set([
+  "backups",
+  "cache",
+  "codex-test-logs",
+  "install-cache",
+  "nix-xdg-cache",
+  "pr-logs",
+  "viberoots-flake-input",
+  "xdg-cache",
+]);
+const VIBEROOTS_ROOT_DIR_EXCLUDES = new Set([
+  ".cache",
+  ".clinic",
+  ".codex-logs",
+  ".direnv",
+  ".nix-gcroots",
+  ".pnpm-store",
+  ".viberoots",
+  "backups",
+  "buck-out",
+  "cache",
+  "codex-test-logs",
+  "coverage",
+  "install-cache",
+  "nix-xdg-cache",
+  "node_modules",
+  "pr-logs",
+  "result",
+  "test-logs",
+  "xdg-cache",
+]);
 const GRAPH_PATH_IN_SNAPSHOT = [".viberoots", "workspace", "buck", "graph.json"].join("/");
 
 type FileArg = { rel: string; src: string };
@@ -72,6 +108,20 @@ function forbidden(rel: string): boolean {
     if (normalized === exclude || normalized.startsWith(`${exclude}/`)) return true;
   }
   const parts = normalized.split("/").filter(Boolean);
+  if (parts.length === 1 && ROOT_FILE_EXCLUDES.has(parts[0])) return true;
+  if (parts.length === 1 && /^\.codex-.+\.log$/.test(parts[0])) return true;
+  if (parts.length === 1 && /^result-.+/.test(parts[0])) return true;
+  if (parts.length > 0 && ROOT_DIR_EXCLUDES.has(parts[0])) return true;
+  if (
+    parts[0] === "viberoots" &&
+    parts.length === 2 &&
+    (ROOT_FILE_EXCLUDES.has(parts[1]) || /^\.codex-.+\.log$/.test(parts[1]))
+  ) {
+    return true;
+  }
+  if (parts[0] === "viberoots" && parts.length > 1 && VIBEROOTS_ROOT_DIR_EXCLUDES.has(parts[1])) {
+    return true;
+  }
   return parts.some(
     (part, index) => EXCLUDES.includes(part) && (part !== "node_modules" || index === 0),
   );

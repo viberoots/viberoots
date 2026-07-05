@@ -94,15 +94,10 @@ export async function handleNonDefaultImporter(opts: {
       },
       async () => {
         restoredHash = await restoreSharedHash();
-        if (restoredHash) {
-          return true;
-        }
+        if (restoredHash) return await verifyExistingHash("shared-hash-cache", restoredHash);
         return await compute();
       },
     );
-    if (restoredHash) {
-      await prepareExactStore({ repoRoot: opts.repoRoot, importer: opts.importer });
-    }
     return result;
   };
   const verifyExistingHash = async (
@@ -149,21 +144,16 @@ export async function handleNonDefaultImporter(opts: {
   };
   if (opts.hasValidExistingHash) {
     if (markerMatchesCurrentBuilder) {
-      await persistHash(opts.existingHash);
-      await prepareExactStore({ repoRoot: opts.repoRoot, importer: opts.importer });
-      console.log(
-        `[update-pnpm-hash] importer=${opts.importer} step=skip-existing-hash attr=${opts.storeAttr} lockfile=${opts.key}`,
-      );
-      return true;
+      return await verifyExistingHash("skip-existing-hash");
     }
     console.log(
       `[update-pnpm-hash] importer=${opts.importer} step=stale-existing-hash attr=${opts.storeAttr} lockfile=${opts.key}`,
     );
     if (opts.existingMarker && !markerMatchesCurrentBuilder) {
-      console.log(
-        `[update-pnpm-hash] importer=${opts.importer} step=stale-builder-recompute attr=${opts.unfixedAttr} timeout=${opts.timeoutSec}s`,
-      );
       return await withSharedHashComputation(async () => {
+        console.log(
+          `[update-pnpm-hash] importer=${opts.importer} step=stale-builder-recompute attr=${opts.unfixedAttr} timeout=${opts.timeoutSec}s`,
+        );
         let pre = await opts.runUnfixedBuild(
           `importer=${opts.importer} step=stale-builder-recompute attr=${opts.unfixedAttr}`,
         );

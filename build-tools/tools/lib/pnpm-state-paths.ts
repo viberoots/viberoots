@@ -111,6 +111,11 @@ export async function removeLegacyImporterPnpmState(importerAbs: string): Promis
   }
 }
 
+export async function removeExternalPnpmStateDir(scopeAbs: string): Promise<void> {
+  const rootDir = path.join(stablePnpmStateBase(), stateKey(scopeAbs));
+  await fsp.rm(rootDir, { recursive: true, force: true }).catch(() => {});
+}
+
 async function pathExists(p: string): Promise<boolean> {
   try {
     await fsp.access(p);

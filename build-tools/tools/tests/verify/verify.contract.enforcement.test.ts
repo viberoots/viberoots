@@ -166,6 +166,11 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
     "expected verify to honor VERIFY_TARGET_FREE_GB (disk gate threshold)",
   );
   assert.ok(
+    runVerify.includes("VBR_VERIFY_FORBID_BROAD") &&
+      runVerify.includes('selection.targets[0] === "//..."'),
+    "expected verify to support an opt-in fail-closed guard against accidental broad runs",
+  );
+  assert.ok(
     housekeeping.includes("emptyDirectoryPreservingMacosMetadataExclusion") &&
       housekeeping.includes('path.join(root, "buck-out", "test-logs")') &&
       !housekeeping.includes('.rm(path.join(root, "buck-out", "test-logs")'),
@@ -191,6 +196,12 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
       signalShutdown.includes("[verify] forcing exit after") &&
       signalShutdown.includes("process.exit(exitCode)"),
     "expected verify signal cleanup to terminate the parent process and release the verify lock",
+  );
+  assert.ok(
+    /finally\s*{[\s\S]*cleanupRegisteredTempRepoState\(\)[\s\S]*kill-verify-buck-isolation[\s\S]*runFinalOrphanBuckCleanup/.test(
+      runVerify,
+    ),
+    "expected verify final cleanup to run from a finally block after interrupted or failed pass execution",
   );
 
   const verifyPasses = await fsp.readFile(

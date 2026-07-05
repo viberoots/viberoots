@@ -27,7 +27,54 @@ let
       p = builtins.toString path;
       base = baseNameOf p;
       rootP = builtins.toString repoRootBase;
+      rel = if lib.hasPrefix (rootP + "/") p then lib.removePrefix (rootP + "/") p else "";
+      relParts = lib.splitString "/" rel;
+      generatedProjectRootNames = [
+        ".codex-logs"
+        "backups"
+        "cache"
+        "codex-test-logs"
+        "install-cache"
+        "nix-xdg-cache"
+        "pr-logs"
+        "result"
+        "test-logs"
+        "viberoots-flake-input"
+        "xdg-cache"
+      ];
+      generatedProjectRootFiles = [
+        ".full-test-output.log"
+        ".patch-sessions.json"
+      ];
       isRoot = p == rootP;
+      isGeneratedRootDir =
+        type == "directory" && (
+          p == rootP + "/.codex-logs" ||
+          p == rootP + "/backups" ||
+          p == rootP + "/cache" ||
+          p == rootP + "/codex-test-logs" ||
+          p == rootP + "/install-cache" ||
+          p == rootP + "/nix-xdg-cache" ||
+          p == rootP + "/pr-logs" ||
+          p == rootP + "/viberoots-flake-input" ||
+          p == rootP + "/xdg-cache"
+        );
+      isGeneratedRootFile =
+        p == rootP + "/.full-test-output.log" ||
+        p == rootP + "/.patch-sessions.json" ||
+        (lib.hasPrefix (rootP + "/.codex-") p && lib.hasSuffix ".log" p);
+      isGeneratedProjectRootDir =
+        type == "directory" &&
+        builtins.length relParts >= 4 &&
+        builtins.elem (builtins.elemAt relParts 0) [ "projects" ] &&
+        builtins.elem (builtins.elemAt relParts 1) [ "apps" "libs" ] &&
+        builtins.elem (builtins.elemAt relParts 3) generatedProjectRootNames;
+      isGeneratedProjectRootFile =
+        builtins.length relParts == 4 &&
+        builtins.elem (builtins.elemAt relParts 0) [ "projects" ] &&
+        builtins.elem (builtins.elemAt relParts 1) [ "apps" "libs" ] &&
+        (builtins.elem (builtins.elemAt relParts 3) generatedProjectRootFiles ||
+          (lib.hasPrefix ".codex-" (builtins.elemAt relParts 3) && lib.hasSuffix ".log" (builtins.elemAt relParts 3)));
       isGeneratedDir =
         type == "directory" && (
           base == "node_modules" ||
@@ -58,7 +105,7 @@ let
       isViberootsBuildToolsTools = lib.hasSuffix "/viberoots/build-tools/tools" p;
       inViberootsBuildToolsTools = lib.hasInfix "/viberoots/build-tools/tools/" p;
     in
-      !isGeneratedDir && (
+      !isGeneratedRootDir && !isGeneratedRootFile && !isGeneratedProjectRootDir && !isGeneratedProjectRootFile && !isGeneratedDir && (
       isRoot || isProjects || isProjectsApps || isProjectsLibs || inProjectsApps || inProjectsLibs
       || isBuildTools || isBuildToolsTools || inBuildToolsTools
       || isViberoots || isViberootsBuildTools || isViberootsBuildToolsTools || inViberootsBuildToolsTools

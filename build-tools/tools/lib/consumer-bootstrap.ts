@@ -354,6 +354,7 @@ function flakeNix(opts: InitConsumerOptions, viberootsUrl = opts.viberootsUrl): 
     "NIX_PNPM_FETCH_TIMEOUT"
     "NIX_NODE_TEST_PATTERNS"
     "COVERAGE"
+    "VBR_VERIFY_LOCK_DIR"
     "WORKSPACE_ROOT"
     "VIBEROOTS_ROOT"
     "VIBEROOTS_SOURCE_ROOT"

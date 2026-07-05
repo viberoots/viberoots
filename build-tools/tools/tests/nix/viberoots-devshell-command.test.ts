@@ -51,6 +51,20 @@ test("devshell wires viberoots as a Nix-provided PATH command", async () => {
   assert.match(devshell, /viberoots init-workspace --shell-entry >\/dev\/null/);
   assert.match(devshell, /vbr_source="\$\(cd "\$PWD\/\.viberoots\/current" && pwd -P\)"/);
   assert.match(devshell, /export VIBEROOTS_ROOT="\$vbr_source"/);
+  const consumerDirenv = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/lib/consumer-direnv.ts"),
+    "utf8",
+  );
+  assert.match(consumerDirenv, /__vbr_stage0_prune_workspace_flake_generated_roots\(\)/);
+  assert.match(
+    consumerDirenv,
+    /for rel in backups cache codex-test-logs install-cache nix-xdg-cache pr-logs xdg-cache/,
+  );
+  assert.match(consumerDirenv, /rm -rf -- "\\\$\{root\}\/\\\$\{rel\}"/);
+  assert.match(
+    consumerDirenv,
+    /__vbr_stage0_prune_workspace_flake_generated_roots\n\nwatch_file \.viberoots\/workspace\/flake\.nix/,
+  );
   const consumerActivation = devshell.indexOf("viberoots init-workspace --shell-entry >/dev/null");
   const finalPathApply = devshell.indexOf("_vbr_prepare_tool_helpers\n      _vbr_apply_dev_path");
   assert.ok(consumerActivation >= 0, "expected consumer workspace activation");

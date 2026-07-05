@@ -61,6 +61,12 @@ function commandEnv(consumer: string, extra: NodeJS.ProcessEnv = {}): NodeJS.Pro
     PATH: `${currentToolBin}:${process.env.PATH || ""}`,
   };
   delete env.BUCK_ISOLATION_DIR;
+  delete env.VBR_BUCK_REAPER_STATE_FILE;
+  for (const key of Object.keys(env)) {
+    if (key.startsWith("VBR_VERIFY_") || key.startsWith("VBR_TEST_SEED_")) {
+      delete env[key];
+    }
+  }
   return env;
 }
 

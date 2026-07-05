@@ -145,6 +145,32 @@ test("source registry fails closed for malformed and missing registry inputs", a
   });
 });
 
+test("filtered snapshots name missing source registry context", async () => {
+  await runInTemp("nixpkgs-source-registry-filtered-missing", async (tmp, $) => {
+    const expr = `
+      let
+        pkgs = import <nixpkgs> {};
+        S = import ./viberoots/build-tools/tools/nix/planner/source-selection.nix {
+          inherit pkgs;
+          lib = pkgs.lib;
+          get = attrs: k: attrs.\${k} or null;
+          registryPath = ./filtered-snapshot/missing-registry.nix;
+          selectedTargetName = "//projects/apps/demo:tool";
+        };
+      in S.nixpkgsRegistry.schemaVersion
+    `;
+    const missing = await $({
+      cwd: tmp,
+      env: { ...process.env, VBR_FILTERED_FLAKE_SNAPSHOT: "1" },
+    })`nix eval --impure --expr ${expr} --json`.nothrow();
+    assert.notEqual(missing.exitCode, 0);
+    const stderr = String(missing.stderr || "");
+    assert.match(stderr, /nixpkgs source registry missing in filtered snapshot/);
+    assert.match(stderr, /\/\/projects\/apps\/demo:tool/);
+    assert.match(stderr, /filtered-snapshot\/missing-registry\.nix/);
+  });
+});
+
 test("source registry diagnostics reject unsupported systems", async () => {
   await runInTemp("nixpkgs-source-registry-unsupported-system", async (tmp, $) => {
     const expr = `

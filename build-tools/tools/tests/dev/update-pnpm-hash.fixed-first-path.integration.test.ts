@@ -49,6 +49,14 @@ test("update-pnpm-hash uses importer-aware fast path and fixed-first root path",
   if (!nondefaultTxt.includes("restoreHashFromSharedCache")) {
     throw new Error("nondefault.ts must consult the shared lock-hash cache before rebuilding");
   }
+  if (
+    nondefaultTxt.indexOf("step=stale-builder-recompute") <
+    nondefaultTxt.indexOf("return await withSharedHashComputation(async () => {")
+  ) {
+    throw new Error(
+      "nondefault.ts must log stale-builder recompute only inside the actual recompute callback",
+    );
+  }
 
   if (!mainTxt.includes("withPnpmStoreBuildFlakeRef")) {
     throw new Error(
@@ -89,6 +97,13 @@ test("update-pnpm-hash uses importer-aware fast path and fixed-first root path",
   if (!mainTxt.includes("restoreHashFromSharedCache")) {
     throw new Error(
       "update-pnpm-hash.ts must consult the shared lock-hash cache for root importer",
+    );
+  }
+  if (
+    mainTxt.indexOf("restoreHashFromSharedCache") > mainTxt.indexOf("step=stale-builder-recompute")
+  ) {
+    throw new Error(
+      "update-pnpm-hash.ts must restore root shared-cache hits before stale-builder recompute",
     );
   }
   if (!nixTxt.includes('"--no-write-lock-file"')) {

@@ -65,11 +65,18 @@ let
     ".nix-gcroots"
     ".pnpm-store"
     ".viberoots"
+    "backups"
     "buck-out"
+    "cache"
+    "codex-test-logs"
     "coverage"
+    "install-cache"
+    "nix-xdg-cache"
     "node_modules"
+    "pr-logs"
     "result"
     "test-logs"
+    "xdg-cache"
   ];
   isRootFile = rel: !(lib.hasInfix "/" rel) && rel != "";
   isExcludedRootFile = base:
@@ -79,6 +86,11 @@ let
     base == ".buck" ||
     base == ".buck2_shim" ||
     base == ".cache" ||
+    base == "cache" ||
+    base == "install-cache" ||
+    base == "nix-xdg-cache" ||
+    base == "viberoots-flake-input" ||
+    base == "xdg-cache" ||
     base == ".direnv" ||
     base == ".pnpm-store" ||
     base == "buck-out" ||
@@ -118,6 +130,8 @@ let
     (lib.hasPrefix ".viberoots/workspace/node/" rel) ||
     rel == ".viberoots/workspace/pr-logs" ||
     (lib.hasPrefix ".viberoots/workspace/pr-logs/" rel) ||
+    rel == ".viberoots/workspace/viberoots-flake-input" ||
+    (lib.hasPrefix ".viberoots/workspace/viberoots-flake-input/" rel) ||
     rel == ".viberoots/workspace/xdg-cache" ||
     (lib.hasPrefix ".viberoots/workspace/xdg-cache/" rel) ||
     rel == ".viberoots/buck" ||

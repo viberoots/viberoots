@@ -1,8 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import type { VerifyScopeDecision } from "../../dev/verify/requested-scope";
 import { runExplainSelection } from "../../dev/verify/explain-selection";
+import { parseVerifyOwnedState } from "../../dev/verify/owned-process-state";
 import { parseVerifyExecutionPolicy } from "../../dev/verify/remote-policy";
 
 function selectionFixture(): VerifyScopeDecision {
@@ -59,4 +63,46 @@ test("runExplainSelection kills the explain-selection isolation when planning fa
     /boom/,
   );
   assert.deepEqual(calls, ["killed:/repo:v-explain-selection"]);
+});
+
+test("runExplainSelection registers explain-selection isolation for orphan cleanup", async () => {
+  const stateFile = path.join(
+    os.tmpdir(),
+    `viberoots-explain-selection-${process.pid}-${Date.now()}.txt`,
+  );
+  const previous = process.env.VBR_VERIFY_PROCESS_STATE_FILE;
+  await fsp.writeFile(stateFile, "", "utf8");
+  try {
+    process.env.VBR_VERIFY_PROCESS_STATE_FILE = stateFile;
+    await runExplainSelection({
+      root: "/repo",
+      selection: selectionFixture(),
+      executionPolicy: parseVerifyExecutionPolicy({ env: {} }),
+      resolvePlan: () => ({
+        targetLabels: [{ target: "@viberoots//build-tools/tools/tests/dev:sample", labels: [] }],
+        passes: [{ name: "shared", targets: ["@viberoots//build-tools/tools/tests/dev:sample"] }],
+      }),
+      printSelection: () => {},
+      killIso: async () => {},
+    });
+    const parsed = parseVerifyOwnedState(await fsp.readFile(stateFile, "utf8"));
+    assert.deepEqual(
+      parsed.isolations.map((entry) => ({
+        iso: entry.iso,
+        repoRoot: entry.repoRoot,
+        kind: entry.kind,
+      })),
+      [
+        {
+          iso: "v-explain-selection",
+          repoRoot: "/repo",
+          kind: "verify-explain-selection",
+        },
+      ],
+    );
+  } finally {
+    if (previous === undefined) delete process.env.VBR_VERIFY_PROCESS_STATE_FILE;
+    else process.env.VBR_VERIFY_PROCESS_STATE_FILE = previous;
+    await fsp.rm(stateFile, { force: true }).catch(() => {});
+  }
 });

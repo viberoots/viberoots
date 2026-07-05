@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -73,6 +74,41 @@ test("buck cleanup: explicit inherited isolation is registered and cleaned", asy
   } finally {
     if (prevState === undefined) delete process.env.VBR_VERIFY_PROCESS_STATE_FILE;
     else process.env.VBR_VERIFY_PROCESS_STATE_FILE = prevState;
+    await fsp.rm(stateFile, { force: true }).catch(() => {});
+  }
+});
+
+test("buck cleanup: standalone helper isolation is registered with repo root", async () => {
+  const stateFile = path.join(
+    os.tmpdir(),
+    `viberoots-standalone-buck-cleanup-${process.pid}-${Date.now()}.txt`,
+  );
+  await fsp.writeFile(stateFile, "", "utf8");
+  try {
+    const env = {
+      ...process.env,
+      BUCK_ISOLATION_DIR: "",
+      BUCK_NESTED_ISO: "",
+      VBR_VERIFY_PROCESS_STATE_FILE: stateFile,
+      WORKSPACE_ROOT: process.cwd(),
+    };
+    const iso = inheritedBuckIsolation("buck_cleanup_standalone_default", env);
+    const parsed = parseVerifyOwnedState(await fsp.readFile(stateFile, "utf8"));
+    assert.deepEqual(
+      parsed.isolations.map((entry) => ({
+        iso: entry.iso,
+        repoRoot: entry.repoRoot,
+        kind: entry.kind,
+      })),
+      [
+        {
+          iso,
+          repoRoot: path.resolve(process.cwd()),
+          kind: "test-helper-inherited-default",
+        },
+      ],
+    );
+  } finally {
     await fsp.rm(stateFile, { force: true }).catch(() => {});
   }
 });

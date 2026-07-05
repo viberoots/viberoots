@@ -560,6 +560,55 @@ The feature may be technically available but uneven across languages and hard to
 
 Implement.
 
+## PR-8: Design Conformance Regression Coverage
+
+### 1. Intent
+
+Close the final design-assessment coverage gaps for source-selection validation, profile overlays,
+and filtered-snapshot diagnostics after the feature is otherwise implemented.
+
+### 2. Scope of changes
+
+- Add focused regression coverage for rejecting raw source references in:
+  - `nixpkgs_profile`
+  - `nixpkg_pins[*].nixpkgs_profile`
+- Add focused planner coverage proving profile-local overlays only affect packages resolved from
+  that profile, including a pinned package whose supplying profile differs from the target profile.
+- Add a filtered-snapshot negative fixture that removes or omits the registry file and verifies the
+  diagnostic names the filtered snapshot context and the registry path.
+- Update source-selection docs or test documentation so these design-conformance cases remain
+  discoverable from the implemented API and validation policy.
+
+### 3. Tests
+
+- Malformed raw commit-looking and raw flake URL profile values fail during Starlark validation.
+- Pinned attrs resolve through only the overlays attached to their declared profile.
+- Filtered snapshot preparation fails closed when the registry evidence is missing.
+
+### 4. Acceptance criteria
+
+- The design-assessment gaps for raw source-ref rejection, overlay isolation, and
+  filtered-snapshot missing-registry diagnostics have direct regression coverage.
+- The added tests exercise the implemented source-selection contract without introducing compatibility
+  shims or alternate resolution paths.
+- Documentation reflects that these cases are part of the supported validation surface.
+
+### 5. Risks
+
+- Filtered-snapshot diagnostics may need a small test-only fixture path to isolate the missing
+  registry condition without weakening normal snapshot parity checks.
+- Overlay fixtures can become hard to read if they encode package behavior instead of source-plan
+  identity.
+
+### 6. Consequence of not implementing
+
+The implemented behavior remains present, but the design's final negative and isolation guarantees
+can regress without focused coverage.
+
+### 7. Recommendation
+
+Implement.
+
 ## Rollout And Sequencing
 
 1. PR-1 establishes the registry and default resolver foundation.
@@ -569,6 +618,7 @@ Implement.
 5. PR-5 enables package pins.
 6. PR-6 makes filtered, remote, cache, and consumer workspace flows source-plan aware.
 7. PR-7 hardens cross-language behavior and final diagnostics.
+8. PR-8 closes design-conformance regression coverage for final assessment findings.
 
 The sequence intentionally makes whole-target profile selection the first usable behavior while
 keeping the resolver shape ready for package pins. Each PR should be independently reviewable and

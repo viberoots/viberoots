@@ -15,7 +15,7 @@ import {
   waitForHealth,
   writeContainerSmokeRuntimeTree,
 } from "./control-plane-container-smoke.helpers";
-import { buildImageTarball } from "./control-plane-oci-image.helpers";
+import { buildImageTarball, requireHeavyOciImage } from "./control-plane-oci-image.helpers";
 import { loadNixosDefaults, loadNixosRenderedConfig } from "./control-plane-host-profile.helpers";
 import { viberootsRepoPath } from "./deployment-command";
 import { runInTemp } from "../lib/test-helpers";
@@ -182,6 +182,7 @@ test("non-NixOS host profile docs preserve Docker and Podman boundaries", async 
 });
 
 test("non-NixOS local smoke profile runs service and workers when OCI runtime is available", async (t) => {
+  if (!requireHeavyOciImage(t)) return;
   const runtime = await findContainerRuntime();
   if (!runtime) {
     t.skip("no usable local Podman or Docker daemon is available");

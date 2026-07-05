@@ -244,6 +244,15 @@ __vbr_stage0_align_workspace_flake_input() {
   ' "\${flake}" > "\${tmp}" && mv "\${tmp}" "\${flake}" && : > "\${PWD}/.viberoots/workspace/viberoots-flake-input/.source-fingerprint" 2>/dev/null || rm -f "\${tmp}"
 }
 
+__vbr_stage0_prune_workspace_flake_generated_roots() {
+  local root="\${PWD}/.viberoots/workspace"
+  [[ -d "\${root}" ]] || return 0
+  local rel
+  for rel in backups cache codex-test-logs install-cache nix-xdg-cache pr-logs xdg-cache; do
+    rm -rf -- "\${root}/\${rel}" 2>/dev/null || true
+  done
+}
+
 __vbr_flake_args=()
 __vbr_flake_input_is_generated_filtered=0
 __vbr_flake_input_root="\${VIBEROOTS_FLAKE_INPUT_ROOT:-}"
@@ -327,6 +336,8 @@ if [[ ! -f .viberoots/workspace/flake.nix ]]; then
   return 1
 fi
 
+__vbr_stage0_prune_workspace_flake_generated_roots
+
 watch_file .viberoots/workspace/flake.nix
 watch_file .viberoots/workspace/flake.lock
 [[ -f viberoots/flake.nix ]] && watch_file viberoots/flake.nix
@@ -343,6 +354,6 @@ if [[ -n "\${__vbr_source_root:-}" && -d "\${PWD}/viberoots" ]]; then
   unset __vbr_source_real __vbr_local_real
 fi
 unset __vbr_flake_input_root __vbr_source_root __vbr_flake_args
-unset -f __vbr_stage0_strip_nix_cache_overrides __vbr_stage0_apply_nix_cache_health __vbr_stage0_filtered_viberoots_input __vbr_stage0_align_workspace_flake_input
+unset -f __vbr_stage0_strip_nix_cache_overrides __vbr_stage0_apply_nix_cache_health __vbr_stage0_filtered_viberoots_input __vbr_stage0_align_workspace_flake_input __vbr_stage0_prune_workspace_flake_generated_roots
 `;
 }

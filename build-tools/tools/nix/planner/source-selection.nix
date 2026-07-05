@@ -17,7 +17,13 @@ let
       in if builtins.isFunction raw then raw { } else raw
     )
     else builtins.throw (
-      "nixpkgs source registry missing for "
+      "nixpkgs source registry missing"
+      + (
+        if (builtins.getEnv "VBR_FILTERED_FLAKE_SNAPSHOT") != ""
+        then " in filtered snapshot"
+        else ""
+      )
+      + " for "
       + (if selectedTargetName == "" then "selected target" else selectedTargetName)
       + ": expected registry at "
       + builtins.toString registryPath

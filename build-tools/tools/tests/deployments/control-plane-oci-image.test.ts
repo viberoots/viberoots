@@ -26,6 +26,7 @@ import {
   buildImageContract,
   buildImageTarball,
   layerPathMatches,
+  requireHeavyOciImage,
 } from "./control-plane-oci-image.helpers";
 import { readJson } from "./nixos-shared-host.control-plane.helpers";
 import { runInTemp } from "../lib/test-helpers";
@@ -33,36 +34,16 @@ import { runInTemp } from "../lib/test-helpers";
 const TOKEN = "oci-image-test-token";
 const execFileAsync = promisify(execFile);
 
-test("control-plane image contract exposes service and worker entrypoints without host secrets", async () => {
+test("control-plane image contract exposes service and worker entrypoints without host secrets", async (t) => {
+  if (!requireHeavyOciImage(t)) return;
   const first = await buildImageContract();
   const second = await buildImageContract();
-  const image = await buildImageTarball();
   assert.equal(first.outPath, second.outPath);
-  assert.deepEqual(image.config.config.Entrypoint, ["/bin/control-plane"]);
-  assert.equal(image.config.config.User, "10001:10001");
-  assert.equal(
-    image.config.config.Labels["org.opencontainers.image.title"],
-    "deployment-control-plane",
-  );
-  assert.equal(
-    image.config.config.Labels["org.opencontainers.image.revision"],
-    first.contract.sourceRevision,
-  );
   assert.match(first.contract.imageBuildIdentity, /^nix-source-[a-f0-9]{64}$/);
   assert.equal(first.contract.digestContract.publication.status, "build-only");
   assert.equal(first.contract.digestContract.publication.productionUsable, false);
-  assert.equal(
-    image.config.config.Labels["org.viberoots.control-plane.image-build-identity"],
-    first.contract.imageBuildIdentity,
-  );
-  assert.equal(
-    image.config.config.Labels["org.viberoots.control-plane.digest-contract"],
-    "build-only",
-  );
-  assert.equal(image.config.config.Labels["org.opencontainers.image.digest"], undefined);
   assert.notEqual(first.contract.imageBuildIdentity, "unknown");
   assert.doesNotMatch(JSON.stringify(first.contract), /unpublished|null|unknown/i);
-  assert.doesNotMatch(JSON.stringify(image.config.config.Labels), /unpublished|null|unknown/i);
   assert.match(first.contract.sourceRevision, /^source-[a-z0-9]{12}$/);
   assert.deepEqual(first.contract.commands, [
     "control-plane service --config /etc/deployment-control-plane/config.yaml",
@@ -84,6 +65,32 @@ test("control-plane image contract exposes service and worker entrypoints withou
   }
   assertNoSecretPayloads(first.contract);
   assertProhibitedPathContract(first.contract);
+});
+
+test("control-plane OCI image tarball matches the contract without host secrets", async (t) => {
+  if (!requireHeavyOciImage(t)) return;
+  const first = await buildImageContract();
+  const image = await buildImageTarball();
+  assert.deepEqual(image.config.config.Entrypoint, ["/bin/control-plane"]);
+  assert.equal(image.config.config.User, "10001:10001");
+  assert.equal(
+    image.config.config.Labels["org.opencontainers.image.title"],
+    "deployment-control-plane",
+  );
+  assert.equal(
+    image.config.config.Labels["org.opencontainers.image.revision"],
+    first.contract.sourceRevision,
+  );
+  assert.equal(
+    image.config.config.Labels["org.viberoots.control-plane.image-build-identity"],
+    first.contract.imageBuildIdentity,
+  );
+  assert.equal(
+    image.config.config.Labels["org.viberoots.control-plane.digest-contract"],
+    "build-only",
+  );
+  assert.equal(image.config.config.Labels["org.opencontainers.image.digest"], undefined);
+  assert.doesNotMatch(JSON.stringify(image.config.config.Labels), /unpublished|null|unknown/i);
   assertNoSecretPayloads(image.config);
   assertNoSecretPayloads(image.layerPaths);
   assert.ok(
@@ -98,7 +105,8 @@ test("control-plane image contract exposes service and worker entrypoints withou
   }
 });
 
-test("control-plane Nix runtime exposes non-mutating service and worker help", async () => {
+test("control-plane Nix runtime exposes non-mutating service and worker help", async (t) => {
+  if (!requireHeavyOciImage(t)) return;
   const runtime = await buildControlPlaneRuntime();
   for (const mode of ["service", "worker"]) {
     const { stdout } = await execFileAsync(runtime.commandPath, [mode, "--help"], {
@@ -111,6 +119,7 @@ test("control-plane Nix runtime exposes non-mutating service and worker help", a
 });
 
 test("control-plane image runs service and worker with mounted config and credentials", async (t) => {
+  if (!requireHeavyOciImage(t)) return;
   const runtime = await findContainerRuntime();
   if (!runtime) {
     t.skip("no usable local Podman or Docker daemon is available");

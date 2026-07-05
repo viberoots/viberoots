@@ -1,3 +1,4 @@
+import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -49,6 +50,11 @@ let cachedPinnedCacertPath: Promise<string> | null = null;
 let cachedUnifiedPnpmStorePath: Promise<string> | null = null;
 let envMutationQueue: Promise<void> = Promise.resolve();
 const preNoindexStableRootCleanup = new Set<string>();
+const TEST_HOME_ACTIVE_PID_FILE = ".viberoots-test-home-pid";
+const TEST_HOME_UNMARKED_STALE_MS = 60 * 60 * 1000;
+const TEST_HOME_UNMARKED_MAX_COUNT = 256;
+let stableTestHomeRootCleanupOnce: Promise<void> | null = null;
+const stableTestHomeExitCleanup = new Set<string>();
 
 async function removeDarwinPreNoindexStableRoot(root: string): Promise<void> {
   if (process.platform !== "darwin" || !root.endsWith(".noindex")) return;
@@ -229,6 +235,30 @@ async function workspaceFlakeLockPath(root: string): Promise<string> {
   return path.join(root, "flake.lock");
 }
 
+async function candidateTempFlakePaths(root: string): Promise<string[]> {
+  const candidates = [
+    path.join(root, "flake.nix"),
+    path.join(root, ".viberoots", "workspace", "flake.nix"),
+  ];
+  const existing: string[] = [];
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) existing.push(candidate);
+  }
+  return existing;
+}
+
+async function candidateTempFlakeLockPaths(root: string): Promise<string[]> {
+  const candidates = [
+    path.join(root, "flake.lock"),
+    path.join(root, ".viberoots", "workspace", "flake.lock"),
+  ];
+  const existing: string[] = [];
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) existing.push(candidate);
+  }
+  return existing;
+}
+
 async function stableTestHomeRoot(): Promise<string> {
   // Keep per-test HOME outside repo-local TMPDIR to avoid flake input churn and rsync/nix races
   // caused by transient tool caches (e.g. pnpm metadata temp files).
@@ -243,7 +273,81 @@ async function stableTestHomeRoot(): Promise<string> {
   const root = path.join(base, `viberoots-test-home${suffix}${noindex}`);
   await removeDarwinPreNoindexStableRoot(root);
   await mkdirWithMacosMetadataExclusion(root).catch(() => {});
+  await cleanupStableTestHomesOnce(root);
   return root;
+}
+
+function pidIsAlive(pid: number): boolean {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function activeTestHomePid(home: string): Promise<number | null> {
+  try {
+    const text = await fsp.readFile(path.join(home, TEST_HOME_ACTIVE_PID_FILE), "utf8");
+    const pid = Number.parseInt(text.trim(), 10);
+    return Number.isInteger(pid) && pid > 0 ? pid : null;
+  } catch {
+    return null;
+  }
+}
+
+async function markActiveTestHome(home: string): Promise<void> {
+  await fsp.writeFile(path.join(home, TEST_HOME_ACTIVE_PID_FILE), `${process.pid}\n`, "utf8");
+}
+
+function registerStableTestHomeExitCleanup(home: string): void {
+  if (stableTestHomeExitCleanup.has(home)) return;
+  stableTestHomeExitCleanup.add(home);
+  process.once("exit", () => {
+    try {
+      fs.rmSync(home, { recursive: true, force: true });
+    } catch {}
+  });
+}
+
+async function cleanupStableTestHomesOnce(root: string): Promise<void> {
+  if (stableTestHomeRootCleanupOnce) return await stableTestHomeRootCleanupOnce;
+  stableTestHomeRootCleanupOnce = cleanupStableTestHomes(root).catch((err) => {
+    console.warn(`warning: failed to clean stale test HOME dirs under ${root}:`, err);
+  });
+  return await stableTestHomeRootCleanupOnce;
+}
+
+async function cleanupStableTestHomes(root: string): Promise<void> {
+  const entries = await fsp.readdir(root, { withFileTypes: true }).catch(() => []);
+  const homes = entries
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith("home-"))
+    .map((entry) => path.join(root, entry.name));
+  const now = Date.now();
+  const unmarked: Array<{ path: string; mtimeMs: number }> = [];
+
+  for (const home of homes) {
+    const pid = await activeTestHomePid(home);
+    if (pid !== null) {
+      if (!pidIsAlive(pid)) await fsp.rm(home, { recursive: true, force: true }).catch(() => {});
+      continue;
+    }
+    const stat = await fsp.stat(home).catch(() => null);
+    if (!stat?.isDirectory()) continue;
+    if (now - stat.mtimeMs >= TEST_HOME_UNMARKED_STALE_MS) {
+      await fsp.rm(home, { recursive: true, force: true }).catch(() => {});
+    } else {
+      unmarked.push({ path: home, mtimeMs: stat.mtimeMs });
+    }
+  }
+
+  if (unmarked.length <= TEST_HOME_UNMARKED_MAX_COUNT) return;
+  unmarked.sort((a, b) => a.mtimeMs - b.mtimeMs);
+  const removeCount = unmarked.length - TEST_HOME_UNMARKED_MAX_COUNT;
+  for (const stale of unmarked.slice(0, removeCount)) {
+    await fsp.rm(stale.path, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 async function stableGoModCacheRoot(): Promise<string> {
@@ -376,19 +480,20 @@ async function rewriteTempViberootsInput(
   activeViberootsRoot: string,
 ): Promise<string[]> {
   const touched: string[] = [];
-  const flakePath = await workspaceFlakePath(tmp);
-  const text = await fsp.readFile(flakePath, "utf8").catch(() => "");
-  if (!text) return [];
-  let next = text.replace(
-    /(\bviberoots\.url\s*=\s*)"[^"]*"/,
-    (_match, prefix: string) => `${prefix}"path:${activeViberootsRoot}"`,
-  );
-  if (!next.includes('"VIBEROOTS_FLAKE_INPUT_ROOT"')) {
-    next = next.replace(/(\s*"VIBEROOTS_SOURCE_ROOT"\n)/, '$1    "VIBEROOTS_FLAKE_INPUT_ROOT"\n');
-  }
-  if (next !== text) {
-    await fsp.writeFile(flakePath, next, "utf8");
-    touched.push(relFromTempRoot(tmp, flakePath));
+  for (const flakePath of await candidateTempFlakePaths(tmp)) {
+    const text = await fsp.readFile(flakePath, "utf8").catch(() => "");
+    if (!text) continue;
+    let next = text.replace(
+      /(\bviberoots\.url\s*=\s*)"[^"]*"/,
+      (_match, prefix: string) => `${prefix}"path:${activeViberootsRoot}"`,
+    );
+    if (!next.includes('"VIBEROOTS_FLAKE_INPUT_ROOT"')) {
+      next = next.replace(/(\s*"VIBEROOTS_SOURCE_ROOT"\n)/, '$1    "VIBEROOTS_FLAKE_INPUT_ROOT"\n');
+    }
+    if (next !== text) {
+      await fsp.writeFile(flakePath, next, "utf8");
+      touched.push(relFromTempRoot(tmp, flakePath));
+    }
   }
   touched.push(...(await rewriteTempViberootsLockInput(tmp, activeViberootsRoot)));
   return uniqueRelPaths(touched);
@@ -469,25 +574,28 @@ async function rewriteTempViberootsLockInput(
   tmp: string,
   activeViberootsRoot: string,
 ): Promise<string[]> {
-  const lockPath = await workspaceFlakeLockPath(tmp);
-  const text = await fsp.readFile(lockPath, "utf8").catch(() => "");
-  if (!text) return [];
-  let lock: any;
-  try {
-    lock = JSON.parse(text);
-  } catch {
-    return [];
-  }
-  const inputName = lock?.nodes?.root?.inputs?.viberoots || "viberoots";
-  const node = lock?.nodes?.[inputName] || lock?.nodes?.viberoots || lock?.nodes?.viberootsInput;
-  if (!node || typeof node !== "object") return [];
   const metadata = await readPathFlakeMetadata(activeViberootsRoot);
-  const lockedChanged = rewriteLocalPathLockEntry(node.locked, activeViberootsRoot, metadata);
-  const originalChanged = rewriteLocalPathLockEntry(node.original, activeViberootsRoot);
-  const changed = lockedChanged || originalChanged;
-  if (!changed) return [];
-  await fsp.writeFile(lockPath, JSON.stringify(lock, null, 2) + "\n", "utf8");
-  return [relFromTempRoot(tmp, lockPath)];
+  const touched: string[] = [];
+  for (const lockPath of await candidateTempFlakeLockPaths(tmp)) {
+    const text = await fsp.readFile(lockPath, "utf8").catch(() => "");
+    if (!text) continue;
+    let lock: any;
+    try {
+      lock = JSON.parse(text);
+    } catch {
+      continue;
+    }
+    const inputName = lock?.nodes?.root?.inputs?.viberoots || "viberoots";
+    const node = lock?.nodes?.[inputName] || lock?.nodes?.viberoots || lock?.nodes?.viberootsInput;
+    if (!node || typeof node !== "object") continue;
+    const lockedChanged = rewriteLocalPathLockEntry(node.locked, activeViberootsRoot, metadata);
+    const originalChanged = rewriteLocalPathLockEntry(node.original, activeViberootsRoot);
+    const changed = lockedChanged || originalChanged;
+    if (!changed) continue;
+    await fsp.writeFile(lockPath, JSON.stringify(lock, null, 2) + "\n", "utf8");
+    touched.push(relFromTempRoot(tmp, lockPath));
+  }
+  return touched;
 }
 
 async function tempViberootsRootIfPresent(tmp: string): Promise<string | null> {
@@ -617,7 +725,10 @@ async function stableTestHomeOncePerWorker(): Promise<string> {
   if (stableTestHomeOnce) return await stableTestHomeOnce;
   stableTestHomeOnce = (async () => {
     const homeBase = await stableTestHomeRoot();
-    return await fsp.mkdtemp(path.join(homeBase, "home-"));
+    const home = await fsp.mkdtemp(path.join(homeBase, "home-"));
+    await markActiveTestHome(home);
+    registerStableTestHomeExitCleanup(home);
+    return home;
   })();
   return await stableTestHomeOnce;
 }
@@ -626,6 +737,7 @@ async function resolveTestHome(): Promise<{ home: string; removeOnExit: boolean 
   if (String(process.env.TEST_HOME_PER_TEST || "").trim() === "1") {
     const homeBase = await stableTestHomeRoot();
     const home = await fsp.mkdtemp(path.join(homeBase, "home-"));
+    await markActiveTestHome(home);
     return { home, removeOnExit: true };
   }
   const home = await stableTestHomeOncePerWorker();
@@ -1067,7 +1179,18 @@ export async function runInTemp<T>(
     await ensureToolchainPathsForTempRepo(tmp, $setup);
   });
   await timeAsync("runInTemp rewriteTempViberootsInput after setup", async () => {
-    await rewriteTempViberootsInput(tmp, viberootsInputPath);
+    const touched = await rewriteTempViberootsInput(tmp, viberootsInputPath);
+    if (!wantGit || touched.length === 0) return;
+    const $tmp = $({ cwd: tmp, stdio: "pipe", env: tempSetupEnv });
+    await gitStageRelPaths($tmp, tmp, touched);
+    const diff = await $tmp`git diff --cached --quiet --exit-code`.nothrow().quiet();
+    if (diff.exitCode === 1) {
+      await $tmp`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m seed-overlay-flake --allow-empty`
+        .nothrow()
+        .quiet();
+    } else if (diff.exitCode !== 0) {
+      throw new Error(String(diff.stderr || "git diff --cached failed"));
+    }
   });
 
   if ((process.env.TEST_NEED_DEV_ENV || "") === "1") {

@@ -1,6 +1,9 @@
 import process from "node:process";
-import "zx/globals";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { parseNixCacheConfigValues } from "../../lib/nix-cache-readiness";
+
+const execFileAsync = promisify(execFile);
 
 const OVERRIDE_KEYS = new Set([
   "substituters",
@@ -53,22 +56,32 @@ function stripOverrideKeys(config: string): string {
 }
 
 async function defaultReadEffectiveConfig(): Promise<string> {
-  const res = await $({
-    stdio: "pipe",
-    reject: false,
-  })`nix config show`;
-  const stdout = String((res as any).stdout || "").trim();
-  if (stdout) return stdout;
+  try {
+    const res = await execFileAsync("nix", ["config", "show"]);
+    const stdout = String(res.stdout || "").trim();
+    if (stdout) return stdout;
+  } catch {
+    // Fall back to the explicit environment override below.
+  }
   return String(process.env.NIX_CONFIG || "");
 }
 
 async function defaultProbeUrl(url: string, timeoutMs: number): Promise<boolean> {
   const connectTimeout = String(Math.max(1, Math.ceil(timeoutMs / 1000)));
-  const nix = await $({
-    stdio: "pipe",
-    reject: false,
-  })`nix store info --store ${url} --option connect-timeout ${connectTimeout}`;
-  if ((nix as any).exitCode === 0) return true;
+  try {
+    await execFileAsync("nix", [
+      "store",
+      "info",
+      "--store",
+      url,
+      "--option",
+      "connect-timeout",
+      connectTimeout,
+    ]);
+    return true;
+  } catch {
+    // Fall through to the unauthenticated HTTP probe.
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);

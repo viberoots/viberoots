@@ -11,7 +11,7 @@ import {
   removeContainer,
   writeContainerSmokeRuntimeTree,
 } from "./control-plane-container-smoke.helpers";
-import { buildImageTarball } from "./control-plane-oci-image.helpers";
+import { buildImageTarball, requireHeavyOciImage } from "./control-plane-oci-image.helpers";
 import {
   corruptFakeS3Objects,
   createNetwork,
@@ -60,6 +60,7 @@ test("container E2E fixture rejects duplicate workers and stale worker authority
 });
 
 test("container runtime fails closed when a required secret file is missing", async (t) => {
+  if (!requireHeavyOciImage(t)) return;
   const runtime = await findContainerRuntime();
   if (!runtime) {
     t.skip("no usable local Podman or Docker daemon is available");
@@ -76,6 +77,7 @@ test("container runtime fails closed when a required secret file is missing", as
 });
 
 test("containerized control plane processes one fixture deployment through service and two workers", async (t) => {
+  if (!requireHeavyOciImage(t)) return;
   const runtime = await findContainerRuntime();
   if (!runtime) {
     t.skip("no usable local Podman or Docker daemon is available");

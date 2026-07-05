@@ -15,6 +15,7 @@ result
 # Local temp artifacts
 .tmp/
 .local/
+codex-test-logs/
 /build-tools/tmp/
 /.viberoots/current
 /.viberoots/workspace/

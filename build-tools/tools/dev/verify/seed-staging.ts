@@ -441,11 +441,6 @@ async function lockIsStale(lockDir: string, seedTtlMs: number): Promise<boolean>
   return !pidAlive(owner.pid) || ageMs > seedTtlMs;
 }
 
-async function stageDirIsStale(stageDir: string, seedTtlMs: number): Promise<boolean> {
-  const ageMs = Date.now() - (await pathMtimeMs(stageDir));
-  return ageMs > seedTtlMs;
-}
-
 async function livePinnedSeedStageDirs(workspaceRoot?: string): Promise<Set<string>> {
   const pinned = new Set<string>();
   if (!workspaceRoot) return pinned;
@@ -475,6 +470,19 @@ async function livePinnedSeedStageDirs(workspaceRoot?: string): Promise<Set<stri
   return pinned;
 }
 
+async function liveLockedSeedStageDirs(seedTtlMs: number): Promise<Set<string>> {
+  const locked = new Set<string>();
+  const root = seedStageRootDir();
+  const entries = await fsp.readdir(root, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    if (!entry.isDirectory() || !entry.name.startsWith("lock-")) continue;
+    const lockDir = path.join(root, entry.name);
+    if (await lockIsStale(lockDir, seedTtlMs)) continue;
+    locked.add(`seed-${entry.name.slice("lock-".length)}`);
+  }
+  return locked;
+}
+
 async function sweepStaleSeedStages(
   seedKey: string,
   seedTtlMs: number,
@@ -484,6 +492,7 @@ async function sweepStaleSeedStages(
   const keepSeedDir = path.basename(seedStageDir(seedKey));
   const keepLockDir = path.basename(seedStageLockDir(seedKey));
   const livePinnedDirs = await livePinnedSeedStageDirs(workspaceRoot);
+  const liveLockedDirs = await liveLockedSeedStageDirs(seedTtlMs);
   const entries = await fsp.readdir(root, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
@@ -496,7 +505,8 @@ async function sweepStaleSeedStages(
     }
     if (!entry.name.startsWith("seed-") || entry.name === keepSeedDir) continue;
     if (livePinnedDirs.has(entry.name)) continue;
-    if (await stageDirIsStale(abs, seedTtlMs)) await removeWritableTree(abs);
+    if (liveLockedDirs.has(entry.name)) continue;
+    await removeWritableTree(abs);
   }
 }
 

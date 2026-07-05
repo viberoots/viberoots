@@ -23,16 +23,41 @@ let
           "report"
           "buck-out"
         ];
+        importerGeneratedRootEntries = [
+          ".codex-logs"
+          "backups"
+          "cache"
+          "codex-test-logs"
+          "install-cache"
+          "nix-xdg-cache"
+          "pr-logs"
+          "result"
+          "test-logs"
+          "viberoots-flake-input"
+          "xdg-cache"
+        ];
         importerSnap = builtins.path {
           path = importerAbs;
           name = "importer";
           filter =
             path: _type:
             let
-              base = builtins.baseNameOf (toString path);
+              p = toString path;
+              base = builtins.baseNameOf p;
+              generatedRoot =
+                (_type == "directory" || _type == "symlink") && (
+                  builtins.any (entry: p == toString (importerAbs + "/${entry}")) importerGeneratedRootEntries ||
+                  pkgs.lib.hasPrefix (toString (importerAbs + "/result-")) p
+                );
+              generatedRootFile =
+                p == toString (importerAbs + "/.full-test-output.log") ||
+                p == toString (importerAbs + "/.patch-sessions.json") ||
+                (pkgs.lib.hasPrefix (toString (importerAbs + "/.codex-")) p && pkgs.lib.hasSuffix ".log" p);
             in
             !(
-              builtins.elem base importerIgnoredEntries
+              generatedRoot
+              || generatedRootFile
+              || builtins.elem base importerIgnoredEntries
               || base == "pnpm-workspace.yaml"
               || builtins.match "\\.node_modules\\.lockfile-guard\\..*" base != null
             );
@@ -52,9 +77,10 @@ let
                     let
                       ty = entries.${n};
                       p = dir + ("/" + n);
+                      atImporterRoot = builtins.toString dir == builtins.toString importerAbs;
                     in
                     if ty == "directory" then
-                      (if builtins.elem n ignored then false else walk p)
+                      (if builtins.elem n ignored || (atImporterRoot && builtins.elem n importerGeneratedRootEntries) then false else walk p)
                     else if ty == "regular" then
                       isTestName n
                     else

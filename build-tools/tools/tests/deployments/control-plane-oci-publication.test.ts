@@ -11,11 +11,39 @@ import {
   controlPlaneImagePublicationPlan,
   validateControlPlaneImagePublicationEvidence,
 } from "../../deployments/control-plane-image-publication";
-import { buildImageContract, buildImageTarball } from "./control-plane-oci-image.helpers";
+import {
+  buildImageContract,
+  buildImageTarball,
+  requireHeavyOciImage,
+} from "./control-plane-oci-image.helpers";
 
 const DIGEST = `sha256:${"a".repeat(64)}`;
 const BUILD_IDENTITY = `nix-source-${"b".repeat(64)}`;
 const execFileAsync = promisify(execFile);
+
+test("control-plane OCI tarball test callers require the heavy opt-in", async () => {
+  const checkedFiles = [
+    "build-tools/tools/tests/deployments/control-plane-oci-image.test.ts",
+    "build-tools/tools/tests/deployments/control-plane-container-e2e.test.ts",
+    "build-tools/tools/tests/deployments/control-plane-host-profile.test.ts",
+    "build-tools/tools/tests/deployments/control-plane-oci-publication.test.ts",
+  ];
+  for (const rel of checkedFiles) {
+    const text = await fsp.readFile(path.join(process.cwd(), "viberoots", rel), "utf8");
+    const heavyBlocks = text
+      .split(/\ntest\(/)
+      .filter((block) =>
+        /await build(?:ImageContract|ImageTarball|ControlPlaneRuntime)\(/.test(block),
+      );
+    for (const block of heavyBlocks) {
+      assert.match(
+        block,
+        /requireHeavyOciImage\(t\)/,
+        `${rel} has unguarded OCI image build calls`,
+      );
+    }
+  }
+});
 
 test("control-plane image publication records immutable digest and source revision", () => {
   const plan = controlPlaneImagePublicationPlan({
@@ -172,6 +200,7 @@ test("control-plane image publication rejects tag or digest repositories", () =>
 });
 
 test("live-gated control-plane image digest verification records inspect evidence", async (t) => {
+  if (!requireHeavyOciImage(t)) return;
   if (process.env.VBR_CONTROL_PLANE_IMAGE_LIVE_DIGEST_VERIFY !== "1") {
     t.skip("set VBR_CONTROL_PLANE_IMAGE_LIVE_DIGEST_VERIFY=1 to push to a live registry");
     return;

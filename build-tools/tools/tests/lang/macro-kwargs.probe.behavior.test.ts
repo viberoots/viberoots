@@ -94,3 +94,122 @@ test("macro kwargs helper probe: defaults, overrides, and tolerant nixpkg_deps p
     assert.deepEqual(b, ["patch_dir:patches/go", "nixpkgs_profile:default", "nixpkg_pins:0"]);
   });
 });
+
+test("macro kwargs helper rejects raw source refs in nixpkgs profile fields", async () => {
+  await runInTemp("macro-kwargs-raw-source-refs", async (tmp, $) => {
+    const rawCommitDir = path.join(tmp, "projects", "apps", "raw_commit");
+    const rawFlakeDir = path.join(tmp, "projects", "apps", "raw_flake");
+    const rawProfileFlakeDir = path.join(tmp, "projects", "apps", "raw_profile_flake");
+    const rawPinCommitDir = path.join(tmp, "projects", "apps", "raw_pin_commit");
+    await fsp.mkdir(rawCommitDir, { recursive: true });
+    await fsp.mkdir(rawFlakeDir, { recursive: true });
+    await fsp.mkdir(rawProfileFlakeDir, { recursive: true });
+    await fsp.mkdir(rawPinCommitDir, { recursive: true });
+    await fsp.writeFile(
+      path.join(rawCommitDir, "TARGETS"),
+      [
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "macro_kwargs_probe")',
+        "",
+        "macro_kwargs_probe(",
+        '  name = "raw_commit_profile",',
+        '  lang = "cpp",',
+        '  nixpkgs_profile = "0123456789abcdef0123456789abcdef01234567",',
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(rawFlakeDir, "TARGETS"),
+      [
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "macro_kwargs_probe")',
+        "",
+        "macro_kwargs_probe(",
+        '  name = "raw_flake_pin",',
+        '  lang = "cpp",',
+        "  nixpkg_pins = {",
+        '    "zlib": {',
+        '      "nixpkgs_profile": "github:NixOS/nixpkgs/0123456789abcdef",',
+        '      "rationale": "Exercise raw source validation.",',
+        "    },",
+        "  },",
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(rawProfileFlakeDir, "TARGETS"),
+      [
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "macro_kwargs_probe")',
+        "",
+        "macro_kwargs_probe(",
+        '  name = "raw_flake_profile",',
+        '  lang = "cpp",',
+        '  nixpkgs_profile = "github:NixOS/nixpkgs/0123456789abcdef",',
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(rawPinCommitDir, "TARGETS"),
+      [
+        'load("@viberoots//build-tools/lang:defs_common.bzl", "macro_kwargs_probe")',
+        "",
+        "macro_kwargs_probe(",
+        '  name = "raw_commit_pin",',
+        '  lang = "cpp",',
+        "  nixpkg_pins = {",
+        '    "zlib": {',
+        '      "nixpkgs_profile": "0123456789abcdef0123456789abcdef01234567",',
+        '      "rationale": "Exercise raw source validation.",',
+        "    },",
+        "  },",
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const rawCommit = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`buck2 build --target-platforms //:no_cgo //projects/apps/raw_commit:raw_commit_profile`.nothrow();
+    assert.notEqual(rawCommit.exitCode, 0);
+    assert.match(
+      `${String(rawCommit.stderr || "")}\n${String(rawCommit.stdout || "")}`,
+      /nixpkgs_profile must name a nixpkgs profile, not a raw commit/,
+    );
+
+    const rawFlakePin = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`buck2 build --target-platforms //:no_cgo //projects/apps/raw_flake:raw_flake_pin`.nothrow();
+    assert.notEqual(rawFlakePin.exitCode, 0);
+    assert.match(
+      `${String(rawFlakePin.stderr || "")}\n${String(rawFlakePin.stdout || "")}`,
+      /nixpkg_pins\[pkgs\.zlib\]\.nixpkgs_profile must name a nixpkgs profile, not a raw flake URL/,
+    );
+
+    const rawProfileFlake = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`buck2 build --target-platforms //:no_cgo //projects/apps/raw_profile_flake:raw_flake_profile`.nothrow();
+    assert.notEqual(rawProfileFlake.exitCode, 0);
+    assert.match(
+      `${String(rawProfileFlake.stderr || "")}\n${String(rawProfileFlake.stdout || "")}`,
+      /nixpkgs_profile must name a nixpkgs profile, not a raw flake URL/,
+    );
+
+    const rawPinCommit = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`buck2 build --target-platforms //:no_cgo //projects/apps/raw_pin_commit:raw_commit_pin`.nothrow();
+    assert.notEqual(rawPinCommit.exitCode, 0);
+    assert.match(
+      `${String(rawPinCommit.stderr || "")}\n${String(rawPinCommit.stdout || "")}`,
+      /nixpkg_pins\[pkgs\.zlib\]\.nixpkgs_profile must name a nixpkgs profile, not a raw commit/,
+    );
+  });
+});

@@ -41,6 +41,9 @@ test("external pnpm state records exact ownership for orphan cleanup", async () 
   if (!statePaths.includes("export async function pruneOrphanExternalPnpmStateDirs")) {
     throw new Error("external pnpm state must expose orphan cleanup");
   }
+  if (!statePaths.includes("export async function removeExternalPnpmStateDir")) {
+    throw new Error("external pnpm state must expose exact-scope cleanup");
+  }
   if (!statePaths.includes("pruneExactPnpmStateDirs(base)")) {
     throw new Error("orphan cleanup must also prune stale exact pnpm caches");
   }
@@ -60,5 +63,8 @@ test("external pnpm state records exact ownership for orphan cleanup", async () 
   const verifyCleanup = await readRepoFile("build-tools/tools/dev/verify/pnpm-state.ts");
   if (!verifyCleanup.includes("pruneOrphanExternalPnpmStateDirs")) {
     throw new Error("verify startup cleanup must prune orphan external pnpm state");
+  }
+  if (!verifyCleanup.includes("removeExternalPnpmStateDir(importerAbs)")) {
+    throw new Error("verify startup cleanup must remove active importer external pnpm state");
   }
 });

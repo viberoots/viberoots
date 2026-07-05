@@ -140,6 +140,46 @@ test("verify seed staging preserves stale stages pinned by live verify runs", as
   await fsp.access(staleStage);
 });
 
+test("verify seed staging prunes fresh unpinned dirty-state stages", async () => {
+  const stageRoot = await mktemp("seed-stage-root-");
+  const seed = await mktemp("seed-stage-prune-source-");
+  await writeRequiredStageFiles(seed);
+  const previousStage = path.join(stageRoot, "seed-previous");
+  await fsp.mkdir(previousStage, { recursive: true });
+  await fsp.writeFile(path.join(previousStage, "old.txt"), "old\n", "utf8");
+
+  await withSeedStageRoot(stageRoot, async () => {
+    const key = `seed-stage-prune-${process.pid}-${Date.now()}`;
+    await stageSeedStore(seed, key, 24 * 60 * 60 * 1000);
+  });
+
+  await assert.rejects(fsp.access(previousStage));
+});
+
+test("verify seed staging preserves fresh stages with live locks", async () => {
+  const stageRoot = await mktemp("seed-stage-root-");
+  const seed = await mktemp("seed-stage-prune-source-");
+  await writeRequiredStageFiles(seed);
+  const hash = "live123";
+  const lockedStage = path.join(stageRoot, `seed-${hash}`);
+  const lockDir = path.join(stageRoot, `lock-${hash}`);
+  await fsp.mkdir(lockedStage, { recursive: true });
+  await fsp.writeFile(path.join(lockedStage, "old.txt"), "old\n", "utf8");
+  await fsp.mkdir(lockDir, { recursive: true });
+  await fsp.writeFile(
+    path.join(lockDir, "owner.json"),
+    JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }) + "\n",
+    "utf8",
+  );
+
+  await withSeedStageRoot(stageRoot, async () => {
+    const key = `seed-stage-prune-${process.pid}-${Date.now()}`;
+    await stageSeedStore(seed, key, 24 * 60 * 60 * 1000);
+  });
+
+  await fsp.access(lockedStage);
+});
+
 test("verify seed staging rebuilds stale ready stages missing required repo files", async () => {
   await withIsolatedSeedStageRoot(async () => {
     const seed = await mktemp("seed-stage-source-");

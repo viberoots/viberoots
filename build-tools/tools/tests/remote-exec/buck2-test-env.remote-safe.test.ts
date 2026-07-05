@@ -150,6 +150,7 @@ test("remote Buck process env keeps only approved process env values", () => {
 test("Nix impure env allowlists classify every value for remote verify policy", () => {
   const all = new Set([
     ...readImpureEnvVars(".viberoots/workspace/flake.nix"),
+    ...readImpureEnvVars("viberoots/flake.nix"),
     ...readImpureEnvVars("viberoots/build-tools/tools/nix/flake/nix-config.nix"),
   ]);
   for (const name of all) assert.doesNotThrow(() => assertClassifiedNixImpureEnv(name));

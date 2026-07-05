@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
+import path from "node:path";
 import { spawnSync } from "node:child_process";
 import process from "node:process";
+import { registerBuckIsolationSync } from "../../dev/verify/owned-process-state";
 import "./test-helpers/worker-init";
 
 export { getTimingCountForLabel } from "./test-helpers/timing";
@@ -14,16 +16,18 @@ export {
   runBuildSelected,
 } from "./test-helpers/selected-build";
 
-const ownedBuckIsolations = new Set<string>();
+const ownedBuckIsolations = new Map<string, string>();
 let buckIsolationCleanupRegistered = false;
 
 function cleanupOwnedBuckIsolationsSync(): void {
-  for (const isolationDir of ownedBuckIsolations) {
+  for (const [isolationDir, repoRoot] of ownedBuckIsolations) {
     try {
       spawnSync("buck2", ["--isolation-dir", isolationDir, "kill"], {
+        cwd: repoRoot,
         stdio: "ignore",
         env: {
           ...process.env,
+          WORKSPACE_ROOT: repoRoot,
           HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
           SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
         },
@@ -44,6 +48,32 @@ function ensureBuckIsolationCleanupRegistered(): void {
   }
 }
 
+function currentBuckRepoRoot(env: NodeJS.ProcessEnv): string {
+  return path.resolve(String(env.WORKSPACE_ROOT || env.BUCK_TEST_SRC || process.cwd()).trim());
+}
+
+function registerOwnedBuckIsolation(isolationDir: string, env: NodeJS.ProcessEnv): void {
+  const repoRoot = currentBuckRepoRoot(env);
+  ownedBuckIsolations.set(isolationDir, repoRoot);
+  ensureBuckIsolationCleanupRegistered();
+
+  const stateFile = String(
+    env.VBR_VERIFY_PROCESS_STATE_FILE || env.VBR_BUCK_REAPER_STATE_FILE || "",
+  ).trim();
+  if (!stateFile) return;
+  const ownerPidRaw = Number(env.VBR_VERIFY_OWNER_PID || process.pid);
+  const ownerPid = Number.isFinite(ownerPidRaw) && ownerPidRaw > 1 ? ownerPidRaw : process.pid;
+  try {
+    registerBuckIsolationSync({
+      stateFile,
+      iso: isolationDir,
+      repoRoot,
+      ownerPid,
+      kind: "test-helper-inherited-default",
+    });
+  } catch {}
+}
+
 export function inheritedBuckIsolation(
   defaultIsolation: string,
   env: NodeJS.ProcessEnv = process.env,
@@ -52,8 +82,7 @@ export function inheritedBuckIsolation(
   if (inherited) return inherited;
   const standalone = String(defaultIsolation || "").trim();
   if (standalone) {
-    ownedBuckIsolations.add(standalone);
-    ensureBuckIsolationCleanupRegistered();
+    registerOwnedBuckIsolation(standalone, env);
   }
   return standalone;
 }

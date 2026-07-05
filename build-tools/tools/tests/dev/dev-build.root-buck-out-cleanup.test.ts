@@ -4,7 +4,10 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { cleanupDevBuildRootBuckOut } from "../../dev/dev-build/root-buck-out-cleanup";
+import {
+  cleanupDevBuildRootBuckOut,
+  duplicateSharedBuckDaemonPidsFromLines,
+} from "../../dev/dev-build/root-buck-out-cleanup";
 
 test("dev-build root cleanup preserves shared state for reused builds", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "dev-build-root-cleanup-"));
@@ -55,4 +58,26 @@ test("dev-build broad root cleanup removes shared isolation locks", async () => 
     }
     await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
   }
+});
+
+test("dev-build duplicate shared cleanup only targets duplicate repo-local daemons", () => {
+  const root = "/repo";
+  assert.deepEqual(
+    duplicateSharedBuckDaemonPidsFromLines(root, [
+      "101 1 00:01:00 buck2d[common] --isolation-dir devbuild-shared-deadbeef00 daemon",
+      "102 101 00:01:00 (buck2-forkserver) forkserver --state-dir /repo/buck-out/devbuild-shared-deadbeef00/forkserver",
+    ]),
+    [],
+  );
+  assert.deepEqual(
+    duplicateSharedBuckDaemonPidsFromLines(root, [
+      "101 1 00:01:00 buck2d[common] --isolation-dir devbuild-shared-deadbeef00 daemon",
+      "102 101 00:01:00 (buck2-forkserver) forkserver --state-dir /repo/buck-out/devbuild-shared-deadbeef00/forkserver",
+      "201 1 00:01:00 buck2d[common] --isolation-dir devbuild-shared-deadbeef00 daemon",
+      "202 201 00:01:00 (buck2-forkserver) forkserver --state-dir /repo/buck-out/devbuild-shared-deadbeef00/forkserver",
+      "301 1 00:01:00 buck2d[common] --isolation-dir devbuild-shared-deadbeef00 daemon",
+      "302 301 00:01:00 (buck2-forkserver) forkserver --state-dir /other/buck-out/devbuild-shared-deadbeef00/forkserver",
+    ]),
+    [101, 102, 201, 202],
+  );
 });

@@ -2,6 +2,7 @@ import path from "node:path";
 import { computeImporterLabel, findImporterLockfiles } from "../../lib/importers";
 import {
   pruneOrphanExternalPnpmStateDirs,
+  removeExternalPnpmStateDir,
   removeLegacyImporterPnpmState,
 } from "../../lib/pnpm-state-paths";
 
@@ -11,6 +12,7 @@ export async function cleanupVerifyLegacyPnpmState(root: string): Promise<void> 
     const importer = computeImporterLabel(lockfile);
     const importerAbs = importer === "." ? root : path.join(root, importer);
     await removeLegacyImporterPnpmState(importerAbs);
+    await removeExternalPnpmStateDir(importerAbs);
   }
   await pruneOrphanExternalPnpmStateDirs();
 }

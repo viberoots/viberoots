@@ -146,6 +146,25 @@ async function inner() {
   }
   if (
     !nonDefaultImporter &&
+    existingLockHash &&
+    (await verifiedMarker.restoreHashFromSharedCache({
+      repoRoot,
+      key,
+      markerPath,
+      importer,
+      storeAttr,
+      builderFingerprint,
+      sharedCacheBuilderFingerprint,
+      existingLockHash,
+      existingHash,
+      hasValidExistingHash,
+      hashOwner,
+    }))
+  ) {
+    return;
+  }
+  if (
+    !nonDefaultImporter &&
     hasValidExistingHash &&
     existingMarker &&
     !markerMatchesCurrentBuilder
@@ -200,24 +219,6 @@ async function inner() {
       });
     }
     console.log("pnpm-store:", storeAttr, "hash updated and build succeeded");
-    return;
-  }
-  if (
-    !nonDefaultImporter &&
-    existingLockHash &&
-    (await verifiedMarker.restoreHashFromSharedCache({
-      repoRoot,
-      key,
-      markerPath,
-      importer,
-      storeAttr,
-      builderFingerprint,
-      sharedCacheBuilderFingerprint,
-      existingLockHash,
-      existingHash,
-      hasValidExistingHash,
-    }))
-  ) {
     return;
   }
   // Fast strict path: verify fixed-output store first. Only compute unfixed hash when needed.

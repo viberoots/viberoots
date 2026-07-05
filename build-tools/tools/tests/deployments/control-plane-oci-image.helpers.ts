@@ -8,6 +8,7 @@ import { prepareExactPnpmStore } from "../../dev/update-pnpm-hash/exact-store";
 import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 const execFileAsync = promisify(execFile);
+export const CONTROL_PLANE_OCI_IMAGE_HEAVY_ENV = "VBR_CONTROL_PLANE_OCI_IMAGE_HEAVY";
 
 export type ControlPlaneImageTarball = {
   outPath: string;
@@ -22,6 +23,16 @@ export type ControlPlaneRuntime = {
   commandPath: string;
 };
 
+export function requireHeavyOciImage(t: { skip(message?: string): void }): boolean {
+  if (process.env[CONTROL_PLANE_OCI_IMAGE_HEAVY_ENV] === "1") return true;
+  t.skip(`set ${CONTROL_PLANE_OCI_IMAGE_HEAVY_ENV}=1 to build and inspect the OCI image tarball`);
+  return false;
+}
+
+const exactStoreByRepo = new Map<string, ReturnType<typeof prepareExactPnpmStore>>();
+const nixBuildOutputByAttr = new Map<string, Promise<string>>();
+const imageTarballByOutputPath = new Map<string, Promise<ControlPlaneImageTarball>>();
+
 export async function buildImageContract() {
   const outPath = await nixBuildOutput("deployment-control-plane-image-contract");
   const raw = await fsp.readFile(path.join(outPath, "contract.json"), "utf8");
@@ -35,6 +46,14 @@ export async function buildControlPlaneRuntime(): Promise<ControlPlaneRuntime> {
 
 export async function buildImageTarball(): Promise<ControlPlaneImageTarball> {
   const outPath = await nixBuildOutput("deployment-control-plane-image");
+  const cached = imageTarballByOutputPath.get(outPath);
+  if (cached) return await cached;
+  const parsed = parseImageTarball(outPath);
+  imageTarballByOutputPath.set(outPath, parsed);
+  return await parsed;
+}
+
+async function parseImageTarball(outPath: string): Promise<ControlPlaneImageTarball> {
   return await runInTemp("control-plane-oci-image", async (tmp) => {
     await execFileAsync("tar", ["-xf", outPath, "-C", tmp], { maxBuffer: 1024 * 1024 });
     const manifest = JSON.parse(await fsp.readFile(path.join(tmp, "manifest.json"), "utf8"))[0];
@@ -101,10 +120,19 @@ export function layerPathMatches(layerPath: string, prohibitedPath: string): boo
 }
 
 async function nixBuildOutput(attr: string) {
-  const repoRoot = process.env.WORKSPACE_ROOT || process.cwd();
+  const repoRoot = path.resolve(process.env.WORKSPACE_ROOT || process.cwd());
+  const key = `${repoRoot}\0${attr}`;
+  const cached = nixBuildOutputByAttr.get(key);
+  if (cached) return await cached;
+  const built = runNixBuildOutput(repoRoot, attr);
+  nixBuildOutputByAttr.set(key, built);
+  return await built;
+}
+
+async function runNixBuildOutput(repoRoot: string, attr: string) {
   const flakeRef = await workspaceFlakeRef(repoRoot);
   const viberootsInput = path.join(repoRoot, "viberoots");
-  const exactStore = await prepareExactPnpmStore({ repoRoot, importer: "viberoots" });
+  const exactStore = requiresExactPnpmStore(attr) ? await exactPnpmStoreForRepo(repoRoot) : null;
   const { stdout } = await execFileAsync(
     "nix",
     [
@@ -122,7 +150,7 @@ async function nixBuildOutput(attr: string) {
       cwd: repoRoot,
       env: {
         ...process.env,
-        NIX_PNPM_EXACT_STORE: exactStore.exactStorePath,
+        ...(exactStore ? { NIX_PNPM_EXACT_STORE: exactStore.exactStorePath } : {}),
       },
       maxBuffer: 1024 * 1024,
     },
@@ -130,6 +158,18 @@ async function nixBuildOutput(attr: string) {
   const outPath = stdout.trim().split(/\s+/).at(-1) || "";
   assert.ok(outPath, "nix build did not return an output path");
   return outPath;
+}
+
+function requiresExactPnpmStore(attr: string): boolean {
+  return attr !== "deployment-control-plane-image-contract";
+}
+
+async function exactPnpmStoreForRepo(repoRoot: string) {
+  const cached = exactStoreByRepo.get(repoRoot);
+  if (cached) return await cached;
+  const prepared = prepareExactPnpmStore({ repoRoot, importer: "viberoots" });
+  exactStoreByRepo.set(repoRoot, prepared);
+  return await prepared;
 }
 
 async function assertNoForbiddenLayerContents(layerPath: string): Promise<void> {

@@ -154,6 +154,9 @@ selected-build, filtered-snapshot, remote source-snapshot, and cache-manifest pa
 normalized `nixpkgs_profile` and `nixpkg_pins` profile evidence. Planner inspection output names the
 target, base profile, normalized attrs, supplying profiles, resolution kind, and pin rationale where
 one applies; raw commits remain in the lockfile or registry evidence instead of default diagnostics.
+Regression coverage also keeps profile-local overlays isolated: an overlay attached to one named
+profile affects only attrs resolved from that profile, including pinned attrs, and filtered snapshots
+fail closed with the registry path when registry evidence is missing.
 
 ## Go macros
 

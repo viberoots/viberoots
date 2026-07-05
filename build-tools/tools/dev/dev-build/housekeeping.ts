@@ -2,6 +2,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
+import { processStartSignature } from "../../lib/process-inspection";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { buildToolPath, nodeBin, zxNodeBase } from "./paths";
 
@@ -42,6 +43,35 @@ async function touch(p: string): Promise<void> {
     await mkdirWithMacosMetadataExclusion(path.dirname(p)).catch(() => {});
     await fsp.writeFile(p, `${Date.now()}`, "utf8");
   } catch {}
+}
+
+async function readText(p: string): Promise<string> {
+  try {
+    return String(await fsp.readFile(p, "utf8")).trim();
+  } catch {
+    return "";
+  }
+}
+
+async function lockDirIsLive(lockDir: string): Promise<boolean> {
+  const pid = Number(await readText(path.join(lockDir, "pid")));
+  if (!Number.isFinite(pid) || pid <= 1) return false;
+  try {
+    process.kill(pid, 0);
+  } catch {
+    return false;
+  }
+  const expectedSig = await readText(path.join(lockDir, "lstart"));
+  if (!expectedSig) return true;
+  const actualSig = await processStartSignature(pid);
+  return !actualSig || actualSig === expectedSig;
+}
+
+async function verifyLockIsLive(root: string): Promise<boolean> {
+  const envLockDir = String(process.env.VBR_VERIFY_LOCK_DIR || "").trim();
+  if (envLockDir && (await lockDirIsLive(envLockDir))) return true;
+  const lockDir = path.join(root, ".viberoots", "workspace", "buck", "verify-lock");
+  return await lockDirIsLive(lockDir);
 }
 
 function optimiseMode(): "auto" | "always" | "off" {
@@ -135,7 +165,11 @@ export async function runHousekeeping(opts: {
       if (verbose) console.log("[housekeeping] optimise: skipped (cooldown)");
     }
 
-    if (gcMode === "auto" && underPressure && (await olderThanMinutes(gcStamp, 10))) {
+    const liveVerifyLock = await verifyLockIsLive(opts.root);
+    if (gcMode === "auto" && underPressure && liveVerifyLock) {
+      if (verbose) console.log("[housekeeping] GC: skipped (verify running)");
+      else ui.warn("low disk space: skipping nix GC while verify is running");
+    } else if (gcMode === "auto" && underPressure && (await olderThanMinutes(gcStamp, 10))) {
       let level = 1;
       try {
         const txt = await fsp.readFile(gcLevelFile, "utf8");

@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { processStartSignature } from "../../lib/process-inspection";
 import { runHousekeeping } from "../../dev/dev-build/housekeeping";
 
 async function writeExecutable(file: string, body: string): Promise<void> {
@@ -144,6 +145,80 @@ test("dev-build housekeeping runs optimise under pressure and respects cooldown"
       VBR_VERBOSE: prevVerbose,
     });
     await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
+test("dev-build housekeeping skips automatic nix GC while verify lock is live", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "dev-build-housekeeping-"));
+  const verifyRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "dev-build-verify-root-"));
+  const bin = path.join(root, "bin");
+  const prevPath = process.env.PATH;
+  const prevGcMode = process.env.VBR_GC_MODE;
+  const prevHousekeeping = process.env.VBR_HOUSEKEEPING;
+  const prevCleanCooldown = process.env.VBR_CLEAN_TEMP_OUTS_COOLDOWN_MINUTES;
+  const prevOptimiseMode = process.env.VBR_OPTIMISE_MODE;
+  const prevVerifyLockDir = process.env.VBR_VERIFY_LOCK_DIR;
+  const prevVerbose = process.env.VBR_VERBOSE;
+  const { logs, restore } = captureLogs();
+  try {
+    await fsp.mkdir(bin, { recursive: true });
+    await writeExecutable(
+      path.join(bin, "timeout"),
+      [
+        "#!/usr/bin/env bash",
+        `echo "$*" >> ${JSON.stringify(path.join(root, "timeout.log"))}`,
+        "exit 0",
+        "",
+      ].join("\n"),
+    );
+    await writeExecutable(
+      path.join(bin, "nix-store"),
+      [
+        "#!/usr/bin/env bash",
+        `echo "$*" >> ${JSON.stringify(path.join(root, "gc.log"))}`,
+        "exit 0",
+        "",
+      ].join("\n"),
+    );
+    const lockDir = path.join(verifyRoot, ".viberoots", "workspace", "buck", "verify-lock");
+    await fsp.mkdir(lockDir, { recursive: true });
+    await fsp.writeFile(path.join(lockDir, "pid"), String(process.pid), "utf8");
+    await fsp.writeFile(
+      path.join(lockDir, "lstart"),
+      (await processStartSignature(process.pid)) || "",
+      "utf8",
+    );
+    process.env.PATH = `${bin}${path.delimiter}${prevPath || ""}`;
+    process.env.VBR_GC_MODE = "auto";
+    process.env.VBR_HOUSEKEEPING = "1";
+    process.env.VBR_OPTIMISE_MODE = "off";
+    process.env.VBR_VERIFY_LOCK_DIR = lockDir;
+    process.env.VBR_VERBOSE = "1";
+
+    await runHousekeeping({
+      cleanTempOuts: async () => true,
+      diskStats: async () => ({ freeBytes: 5 * 1024 * 1024 * 1024, freePct: 5 }),
+      isCI: false,
+      root,
+    });
+
+    await assert.rejects(fsp.stat(path.join(root, "gc.log")));
+    await assert.rejects(fsp.stat(path.join(root, "timeout.log")));
+    await assert.rejects(fsp.stat(path.join(root, "buck-out", ".housekeeping", ".gc-stamp")));
+    assert.ok(logs.includes("[housekeeping] GC: skipped (verify running)"));
+  } finally {
+    restore();
+    restoreEnv({
+      PATH: prevPath,
+      VBR_CLEAN_TEMP_OUTS_COOLDOWN_MINUTES: prevCleanCooldown,
+      VBR_GC_MODE: prevGcMode,
+      VBR_HOUSEKEEPING: prevHousekeeping,
+      VBR_OPTIMISE_MODE: prevOptimiseMode,
+      VBR_VERIFY_LOCK_DIR: prevVerifyLockDir,
+      VBR_VERBOSE: prevVerbose,
+    });
+    await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
+    await fsp.rm(verifyRoot, { recursive: true, force: true }).catch(() => {});
   }
 });
 

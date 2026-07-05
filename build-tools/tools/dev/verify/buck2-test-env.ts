@@ -79,6 +79,8 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     `NIX_PNPM_FETCH_TIMEOUT=${opts.testNixTimeoutSecs}`,
     "--env",
     `NIX_PNPM_INSTALL_TIMEOUT=${opts.testNixTimeoutSecs}`,
+    "--env",
+    "VBR_GC_MODE=off",
     ...gitAutoMaintenanceDisabledTestEnvArgs(),
     ...maybeEnvArg("NIX_CONFIG", nixConfigEnv.NIX_CONFIG),
     ...maybeEnvArg("NIX_CONF_DIR", nixConfigEnv.NIX_CONF_DIR),

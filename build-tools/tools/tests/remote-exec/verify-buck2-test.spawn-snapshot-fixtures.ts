@@ -27,6 +27,8 @@ function commonTestEnvArgs(): string[] {
     "--env",
     "NIX_PNPM_INSTALL_TIMEOUT=1800",
     "--env",
+    "VBR_GC_MODE=off",
+    "--env",
     "GIT_CONFIG_COUNT=3",
     "--env",
     "GIT_CONFIG_KEY_0=maintenance.auto",
