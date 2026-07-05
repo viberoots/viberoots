@@ -2,6 +2,8 @@
 import type { ResourceGraphEdge, ResourceGraphNode } from "./resource-graph-export";
 import { RuntimeGraph } from "./resource-graph-runtime-graph";
 import { latestRuntimeActions } from "./resource-graph-runtime-latest-actions";
+import { readWorkerEvidence } from "./control-plane-worker-evidence";
+import { workerRuntimeGraph } from "./resource-graph-runtime-workers";
 import {
   queryBackend,
   type NixosSharedHostControlPlaneBackendTarget,
@@ -15,6 +17,7 @@ export type RuntimeReadModel = {
   nodeCount: number;
   edgeCount: number;
   latestActions: Array<{ submissionId: string; actionId: string; submittedAt: string }>;
+  workerEvidenceCount: number;
 };
 
 export async function readRuntimeResourceGraph(
@@ -33,6 +36,7 @@ export async function readRuntimeResourceGraph(
     uploads,
     artifacts,
     cleanup,
+    workers,
   ] = await Promise.all([
     rows(backend, "SELECT submission_id, deploy_run_id, document_json FROM submissions"),
     rows(backend, "SELECT submission_id, execution_snapshot_path, document_json FROM snapshots"),
@@ -65,6 +69,7 @@ export async function readRuntimeResourceGraph(
       backend,
       "SELECT record_id, submission_id, deployment_id, reason, document_json, created_at FROM artifact_cleanup_janitor_records",
     ),
+    readWorkerEvidence(backend),
   ]);
   const graph = new RuntimeGraph(context, submissions);
   snapshots.forEach((row) => graph.snapshot(row));
@@ -76,15 +81,17 @@ export async function readRuntimeResourceGraph(
   uploads.forEach((row) => graph.uploadSession(row));
   artifacts.forEach((row) => graph.artifact(row));
   cleanup.forEach((row) => graph.cleanup(row));
+  const workerGraph = workerRuntimeGraph(workers);
   return {
-    nodes: graph.nodes,
-    edges: graph.edges,
+    nodes: [...graph.nodes, ...workerGraph.nodes],
+    edges: [...graph.edges, ...workerGraph.edges],
     status: {
       indexed: true,
       status: "runtime-linked",
-      nodeCount: graph.nodes.length,
-      edgeCount: graph.edges.length,
+      nodeCount: graph.nodes.length + workerGraph.nodes.length,
+      edgeCount: graph.edges.length + workerGraph.edges.length,
       latestActions: latestRuntimeActions(actions),
+      workerEvidenceCount: workers.length,
     },
   };
 }

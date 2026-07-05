@@ -27,6 +27,7 @@ test("resource graph read model links admitted runtime facts without leaking sec
     assertHasNode(model, "ArtifactChallenge", "challenge-1");
     assertHasNode(model, "StaticWebappUploadSession", "upload-1");
     assertHasNode(model, "CleanupEvidence", "cleanup-1");
+    assertHasNode(model, "WorkerEvidence", "worker-1");
     assertHasNode(model, "CurrentStageState", "demo-web:staging");
     assertHasNode(model, "RetainedEvidence", "demo-web:staging:execution_snapshot");
     const challenge = factsFor(model, "ArtifactChallenge", "challenge-1");
@@ -58,7 +59,12 @@ test("resource graph read model links admitted runtime facts without leaking sec
       factsFor(model, "CleanupEvidence", "cleanup-1").diagnostics,
       "cleanup failed (permission_denied)",
     );
+    const worker = factsFor(model, "WorkerEvidence", "worker-1");
+    assert.equal(worker.health.status, "healthy");
+    assert.equal(worker.authorizesWork, false);
+    assert.equal(worker.leaseClaims[0].deployRunId, "run-1");
     assert.equal(model.runtime.status, "runtime-linked");
+    assert.equal(model.runtime.workerEvidenceCount, 1);
     assert.deepEqual(model.runtime.latestActions, [
       {
         submissionId: "submission-1",
@@ -87,6 +93,22 @@ test("resource graph read model links admitted runtime facts without leaking sec
         (edge: any) =>
           edge.kind === "runtime_status" &&
           edge.fromUid === "runtime:ProviderEvidence:run-1" &&
+          edge.toUid === "runtime:ExecutionSnapshot:submission-1",
+      ),
+    );
+    assert.ok(
+      model.edges.some(
+        (edge: any) =>
+          edge.kind === "runtime_status" &&
+          edge.fromUid === "runtime:WorkerEvidence:worker-1" &&
+          edge.toUid === "runtime:DeployRun:run-1",
+      ),
+    );
+    assert.ok(
+      model.edges.some(
+        (edge: any) =>
+          edge.kind === "runtime_status" &&
+          edge.fromUid === "runtime:WorkerEvidence:worker-1" &&
           edge.toUid === "runtime:ExecutionSnapshot:submission-1",
       ),
     );

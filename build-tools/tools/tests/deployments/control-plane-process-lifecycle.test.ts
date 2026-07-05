@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
-import { checkControlPlaneReadiness } from "../../deployments/control-plane-process-health";
+import { queryBackend } from "../../deployments/nixos-shared-host-control-plane-backend-db";
+import {
+  checkControlPlaneReadiness,
+  writeWorkerHeartbeat,
+} from "../../deployments/control-plane-process-health";
+import { buildWorkerEvidence } from "../../deployments/control-plane-worker-evidence";
 import { scrubControlPlaneChildEnv } from "../../deployments/control-plane-process-env";
 import { writeControlPlaneProcessLog } from "../../deployments/control-plane-process-logging";
 import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
@@ -113,3 +118,81 @@ test("worker lifecycle logs share correlation id and child env strips ambient cr
     assert.equal(env.VBR_CONTROL_PLANE_ARTIFACT_STORE_ENDPOINT, undefined);
   });
 });
+
+test("worker evidence reports health, authority, and diagnostic-only boundary", () => {
+  const workers = buildWorkerEvidence({
+    nowMs: Date.parse("2026-07-05T12:01:00.000Z"),
+    staleAfterMs: 30_000,
+    expectedWorkerIds: ["missing-worker"],
+    expectedInstanceId: "control-plane-a",
+    heartbeats: [
+      heartbeat("healthy-worker", "control-plane-a", "running", "2026-07-05T12:00:45.000Z"),
+      heartbeat("expired-worker", "control-plane-a", "running", "2026-07-05T11:59:00.000Z"),
+      heartbeat("wrong-worker", "control-plane-b", "running", "2026-07-05T12:00:45.000Z"),
+    ],
+  });
+  assert.equal(worker(workers, "healthy-worker").health.status, "healthy");
+  assert.equal(worker(workers, "expired-worker").health.status, "expired");
+  assert.equal(worker(workers, "missing-worker").health.status, "missing");
+  assert.equal(worker(workers, "wrong-worker").health.status, "mismatched-authority");
+  assert.equal(worker(workers, "healthy-worker").authorizesWork, false);
+  assert.match(worker(workers, "healthy-worker").authorityBoundary, /claim.*lease.*fencing/i);
+});
+
+test("worker heartbeat probe remains authenticated and secret-safe", async () => {
+  await runInTemp("worker-heartbeat-probe-evidence", async (tmp) => {
+    const backend = { recordsRoot: tmp, databaseUrl: localHarnessControlPlaneDatabaseUrl(tmp) };
+    await writeWorkerHeartbeat(backend, {
+      workerId: "worker-probe",
+      instanceId: "instance-probe",
+      status: "running",
+    });
+    await queryBackend(
+      backend,
+      `UPDATE worker_heartbeats SET evidence_json = $1::jsonb WHERE worker_id = $2`,
+      [
+        JSON.stringify({
+          supportedExecutionModes: ["deployment-control-plane"],
+          token: "raw-secret",
+        }),
+        "worker-probe",
+      ],
+    );
+    const service = await startNixosSharedHostControlPlaneServer({
+      workspaceRoot: tmp,
+      paths: { statePath: path.join(tmp, "state.json"), hostRoot: tmp, recordsRoot: tmp },
+      backendDatabaseUrl: backend.databaseUrl,
+      token: "heartbeat-token",
+      instanceId: "instance-probe",
+      objectStore: memoryControlPlaneArtifactStore(),
+    });
+    try {
+      assert.equal((await fetch(new URL("/api/v1/worker-heartbeats", service.url))).status, 401);
+      const evidence = await readJson<any>(
+        await fetch(new URL("/api/v1/worker-heartbeats", service.url), {
+          headers: { authorization: "Bearer heartbeat-token" },
+        }),
+      );
+      assert.equal(evidence.schemaVersion, "control-plane-worker-heartbeat-probe@1");
+      assert.equal(evidence.evidenceKind, "runtime-http-worker-heartbeats");
+      assert.equal(evidence.workers[0].schemaVersion, "control-plane-worker-evidence@1");
+      assert.equal(evidence.workers[0].health.status, "healthy");
+      assert.doesNotMatch(JSON.stringify(evidence), /raw-secret|heartbeat-token|token=/);
+    } finally {
+      await service.close();
+    }
+  });
+});
+
+function heartbeat(workerId: string, instanceId: string, status: string, lastSeenAt: string) {
+  return {
+    worker_id: workerId,
+    instance_id: instanceId,
+    status,
+    last_seen_at: lastSeenAt,
+  };
+}
+
+function worker(workers: any[], workerId: string) {
+  return workers.find((entry) => entry.workerId === workerId);
+}

@@ -137,8 +137,10 @@ export const NIXOS_SHARED_HOST_CONTROL_PLANE_BACKEND_SCHEMA_SQL = `
     worker_id TEXT PRIMARY KEY,
     instance_id TEXT NOT NULL,
     status TEXT NOT NULL,
-    last_seen_at TIMESTAMPTZ NOT NULL
+    last_seen_at TIMESTAMPTZ NOT NULL,
+    evidence_json JSONB NOT NULL DEFAULT '{}'::jsonb
   );
+  ALTER TABLE worker_heartbeats ADD COLUMN IF NOT EXISTS evidence_json JSONB DEFAULT '{}'::jsonb;
   CREATE TABLE IF NOT EXISTS control_plane_web_sessions (
     session_id TEXT PRIMARY KEY,
     csrf_token TEXT NOT NULL,

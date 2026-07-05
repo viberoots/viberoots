@@ -7,6 +7,7 @@ import {
   syncBackendResourceGraphIndex,
   writeBackendRunActionDoc,
 } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { seedWorkerEvidenceRows } from "../resource-graph-worker.fixture";
 
 export function backendFor(tmp: string) {
   const recordsRoot = path.join(tmp, "records");
@@ -68,6 +69,7 @@ export async function seedRuntimeRows(backend: ReturnType<typeof backendFor>, tm
     }),
     "2026-07-05T12:01:00.000Z",
   ]);
+  await seedWorkerEvidenceRows(backend);
   await writeBackendRunActionDoc(backend, runAction("action-a", "2026-07-05T12:01:00.000Z"));
   await writeBackendRunActionDoc(backend, runAction("action-b", "2026-07-05T12:02:00.000Z"));
   await seedEvidenceRows(backend);

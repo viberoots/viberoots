@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "resource-graph-worker-pool-decision@1",
+  "outcome": "needs-more-evidence",
+  "evidenceInputs": [
+    "control-plane-worker-evidence@1",
+    "control-plane-worker-heartbeat-probe@1",
+    "runtime:DeployRun",
+    "runtime:ExecutionSnapshot"
+  ],
+  "schedulerBoundary": "no-scheduler-authority"
+}

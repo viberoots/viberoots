@@ -43,6 +43,21 @@ database connectivity, artifact-store metadata-read connectivity, and can read w
 state. Worker heartbeat rows are advisory for operators; queue leases and fencing tokens remain the
 mutation authority.
 
+`GET /api/v1/worker-heartbeats` remains the direct authenticated runtime probe for worker heartbeat
+evidence. The response uses `control-plane-worker-heartbeat-probe@1` and contains secret-safe
+`control-plane-worker-evidence@1` entries with worker id, control-plane association, supported
+execution modes, health, and any existing claim links to deploy runs and execution snapshots.
+Status output is diagnostic only: `authorizesWork` is always false, and mutation still requires the
+current queue claim, live lease, and provider fencing token.
+
+WorkerPool remains deferred. The checked decision record
+`build-tools/tools/deployments/resource-graph-worker-pool-decision.fixture.json` must use
+`resource-graph-worker-pool-decision@1`, choose only `defer`, `needs-more-evidence`, or
+`propose-worker-pool`, and name the evidence inputs used. `propose-worker-pool` is valid only for a
+concrete workflow class such as remote builds, deployment-worker capacity, customer-hosted
+execution, or regulated placement, with supporting evidence named in the inputs. The decision record
+does not authorize scheduler work.
+
 If a host uses local fixture mode, file-backed mirrors and local locks are test conveniences only.
 Production container profiles must use the database-backed queue, locks, idempotency, stage-state,
 audit, and artifact records.

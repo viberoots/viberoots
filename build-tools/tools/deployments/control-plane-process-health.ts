@@ -2,6 +2,11 @@
 import { queryBackend } from "./nixos-shared-host-control-plane-backend-db";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
+import {
+  readWorkerEvidence,
+  workerHeartbeatProbeEvidence,
+  type WorkerEvidence,
+} from "./control-plane-worker-evidence";
 
 export type ControlPlaneWorkerHeartbeatStatus = "starting" | "running" | "stopping" | "stopped";
 
@@ -11,38 +16,36 @@ export async function writeWorkerHeartbeat(
 ) {
   await queryBackend(
     backend,
-    `INSERT INTO worker_heartbeats(worker_id, instance_id, status, last_seen_at)
-     VALUES ($1, $2, $3, NOW())
+    `INSERT INTO worker_heartbeats(worker_id, instance_id, status, last_seen_at, evidence_json)
+     VALUES ($1, $2, $3, NOW(), $4::jsonb)
      ON CONFLICT(worker_id) DO UPDATE SET
        instance_id = EXCLUDED.instance_id,
        status = EXCLUDED.status,
-       last_seen_at = EXCLUDED.last_seen_at`,
-    [input.workerId, input.instanceId || "unknown", input.status],
+       last_seen_at = EXCLUDED.last_seen_at,
+       evidence_json = EXCLUDED.evidence_json`,
+    [
+      input.workerId,
+      input.instanceId || "unknown",
+      input.status,
+      JSON.stringify({
+        supportedExecutionModes: ["deployment-control-plane"],
+      }),
+    ],
   );
 }
 
-export async function readWorkerHeartbeats(backend: NixosSharedHostControlPlaneBackendTarget) {
-  return (
-    await queryBackend<{
-      worker_id: string;
-      instance_id: string;
-      status: string;
-      last_seen_at: string;
-    }>(
-      backend,
-      `SELECT worker_id, instance_id, status, last_seen_at
-       FROM worker_heartbeats ORDER BY worker_id`,
-    )
-  ).rows.map((row) => ({
-    workerId: row.worker_id,
-    instanceId: row.instance_id,
-    status: row.status,
-    lastSeenAt: timestampString(row.last_seen_at),
-  }));
+export async function readWorkerHeartbeats(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  opts: { expectedInstanceId?: string } = {},
+): Promise<WorkerEvidence[]> {
+  return await readWorkerEvidence(backend, opts);
 }
 
-function timestampString(value: unknown): string {
-  return value instanceof Date ? value.toISOString() : String(value);
+export async function readWorkerHeartbeatProbe(
+  backend: NixosSharedHostControlPlaneBackendTarget,
+  opts: { expectedInstanceId?: string } = {},
+) {
+  return workerHeartbeatProbeEvidence(await readWorkerHeartbeats(backend, opts));
 }
 
 export async function checkControlPlaneReadiness(opts: {

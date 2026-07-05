@@ -14,16 +14,16 @@ import { redactDeploymentAuthText } from "./deployment-auth-redaction";
 import { createStaticWebappUploadSession } from "./static-webapp-upload-sessions";
 import type { ControlPlaneArtifactStore } from "./control-plane-artifact-store-types";
 import { assertProductionArtifactStore } from "./control-plane-artifact-store";
-import { checkControlPlaneReadiness, readWorkerHeartbeats } from "./control-plane-process-health";
+import { checkControlPlaneReadiness } from "./control-plane-process-health";
 import { assertReviewedServiceTokenConfigured } from "./nixos-shared-host-control-plane-service-auth";
 import { readJsonBody, readRawBody, writeJson } from "./control-plane-http";
 import { handleControlPlanePresentationRoutes } from "./nixos-shared-host-control-plane-presentation-routes";
-import { requireReviewedBearerToken } from "./deployment-control-plane-service-token";
 import { readControlPlaneImageMetadata } from "./control-plane-image-metadata";
 import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
 import type { DeploymentAuthProviderConfig } from "./deployment-auth-provider-config";
 import { handleDeploymentRunActionRoute } from "./deployment-run-action-route";
 import { handleAuthenticatedControlPlaneReadRoute } from "./nixos-shared-host-control-plane-read-server";
+import { handleWorkerHeartbeatRoute } from "./control-plane-worker-heartbeat-route";
 export async function startNixosSharedHostControlPlaneServer(opts: {
   workspaceRoot: string;
   paths: NixosSharedHostControlPlanePaths;
@@ -99,8 +99,13 @@ export async function startNixosSharedHostControlPlaneServer(opts: {
         return;
       }
       if (request.method === "GET" && url.pathname === "/api/v1/worker-heartbeats") {
-        if (!requireReviewedBearerToken(request, response, opts)) return;
-        writeJson(response, 200, { workers: await readWorkerHeartbeats(backend) });
+        await handleWorkerHeartbeatRoute({
+          request,
+          response,
+          backend,
+          auth: opts,
+          expectedInstanceId: opts.instanceId,
+        });
         return;
       }
       if (request.method === "POST" && url.pathname === "/api/v1/submissions") {
