@@ -21,6 +21,7 @@ import { handleControlPlanePresentationRoutes } from "./nixos-shared-host-contro
 import { readControlPlaneImageMetadata } from "./control-plane-image-metadata";
 import type { ReviewedSourceCredentialFiles } from "./nixos-shared-host-reviewed-source-git";
 import type { DeploymentAuthProviderConfig } from "./deployment-auth-provider-config";
+import { requireReviewedBearerToken } from "./deployment-control-plane-service-token";
 import { handleDeploymentRunActionRoute } from "./deployment-run-action-route";
 import { handleAuthenticatedControlPlaneReadRoute } from "./nixos-shared-host-control-plane-read-server";
 import { handleWorkerHeartbeatRoute } from "./control-plane-worker-heartbeat-route";

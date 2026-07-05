@@ -3,8 +3,10 @@ import crypto from "node:crypto";
 import type { SourcePlanEvidence } from "../lib/source-plan-evidence";
 import { redactControlPlaneReadModel } from "./deployment-control-plane-read-redaction";
 import { controlPlaneTableClassification } from "./resource-graph-read-model-tables";
+import { runtimeEvidenceDocuments } from "./resource-graph-runtime-evidence";
 import { readRuntimeResourceGraph } from "./resource-graph-runtime-read-model";
 import type { ResourceGraphEdgeDocument, ResourceGraphNodeDocument } from "./resource-graph-export";
+import type { DeploymentRuntimeInventorySources } from "./resource-graph-types";
 import {
   decodeBackendJson,
   queryBackend,
@@ -18,6 +20,8 @@ export type ResourceGraphReadModelInput = {
   edges: ResourceGraphEdgeDocument;
   sourceRef: string;
   sourcePlans?: SourcePlanEvidence[];
+  runtimeSources?: DeploymentRuntimeInventorySources;
+  requireRuntimeEvidence?: boolean;
   importedAt?: string;
 };
 
@@ -35,10 +39,14 @@ export async function syncBackendResourceGraphIndex(
   const importedAt = input.importedAt || new Date().toISOString();
   const importId = importIdFor(input.sourceRef, input.nodes, input.edges);
   const sourcePlans = sourcePlanIndex(input.sourcePlans || []);
+  const runtimeEvidence = runtimeEvidenceDocuments(input.runtimeSources, {
+    required: input.requireRuntimeEvidence !== false,
+  });
   await withBackendClient(backend, async (client) => {
     await client.query("BEGIN");
     try {
       await writeImport(client, input, importId, importedAt);
+      await client.query("DELETE FROM resource_graph_runtime_evidence");
       await client.query("DELETE FROM resource_graph_edges");
       await client.query("DELETE FROM resource_graph_nodes");
       for (const node of input.nodes.nodes) {
@@ -73,6 +81,21 @@ export async function syncBackendResourceGraphIndex(
             edge.toKind,
             importId,
             JSON.stringify(edge),
+            importedAt,
+          ],
+        );
+      }
+      for (const document of runtimeEvidence) {
+        await client.query(
+          `INSERT INTO resource_graph_runtime_evidence(
+             kind, name, source_class, source_label, document_json, imported_at
+           ) VALUES ($1, $2, $3, $4, $5::jsonb, $6)`,
+          [
+            document.kind,
+            document.id,
+            document.source.class,
+            document.source.label || null,
+            JSON.stringify(document),
             importedAt,
           ],
         );

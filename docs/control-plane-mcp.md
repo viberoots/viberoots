@@ -107,7 +107,11 @@ unredacted errors are redacted before the MCP response is written.
 shows extracted intent graph nodes, admitted runtime status links, retained evidence references,
 indexed profile and pin names, and table-classification metadata. It does not expose generic
 mutation tools or raw nixpkgs commits, raw flake URLs, provider tokens, proof keys, upload payloads,
-or runtime secret material.
+or runtime secret material. When admitted runtime-source evidence has been imported, the graph also
+shows validator-backed runtime input, auth-provider profile, selected control-plane readiness,
+control-plane observability, and mini-migration preflight evidence nodes. If one of those nodes is
+missing, check the import failure diagnostics first; malformed or non-admitted evidence is rejected
+before it reaches MCP status.
 
 ## Future Mutation Tools
 

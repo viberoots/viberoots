@@ -200,4 +200,13 @@ export const NIXOS_SHARED_HOST_CONTROL_PLANE_BACKEND_SCHEMA_SQL = `
     imported_at TIMESTAMPTZ NOT NULL,
     PRIMARY KEY(from_uid, to_uid, kind)
   );
+  CREATE TABLE IF NOT EXISTS resource_graph_runtime_evidence (
+    kind TEXT NOT NULL,
+    name TEXT NOT NULL,
+    source_class TEXT NOT NULL,
+    source_label TEXT,
+    document_json JSONB NOT NULL,
+    imported_at TIMESTAMPTZ NOT NULL,
+    PRIMARY KEY(kind, name)
+  );
 `;

@@ -55,6 +55,19 @@ deployment-specific authoritative tables. Runtime graph nodes and edges are deri
 tables so operators can inspect admitted runs, actions, challenges, upload sessions, retained
 evidence, and current state without getting a generic mutation path.
 
+When the resource graph import includes admitted runtime-source evidence, the same payload also
+links validator-backed `RuntimeInput`, `AuthProviderProfile`,
+`ControlPlaneReadinessEvidence`, `ControlPlaneObservabilityEvidence`, and
+`MiniMigrationPreflightEvidence` nodes. Those nodes expose either durable evidence references or
+the existing validator-backed non-secret evidence shape. Missing, stale, malformed, or
+non-admitted evidence fails the resource graph import and should be fixed at the evidence producer
+or setup/cutover workflow before re-importing. These evidence nodes are read-only status facts;
+they do not add a generic runtime evidence mutation API or replace the deployment-specific tables.
+None of the PR-10 runtime-source evidence kinds remain intentionally export-only once they are
+admitted into the backend import. Runtime inventory facts outside that set remain export-only until
+they have a durable backend table, object-store reference, or existing authoritative control-plane
+record to link without inventing a mutation path.
+
 ## Troubleshooting
 
 When `/api/v1/read/status` reports `database.ok: false`, check the service runtime database

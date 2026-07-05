@@ -3,6 +3,7 @@ import type { ResourceGraphEdge, ResourceGraphNode } from "./resource-graph-expo
 import { RuntimeGraph } from "./resource-graph-runtime-graph";
 import { latestRuntimeActions } from "./resource-graph-runtime-latest-actions";
 import { readWorkerEvidence } from "./control-plane-worker-evidence";
+import { runtimeEvidenceGraph } from "./resource-graph-runtime-evidence";
 import { workerRuntimeGraph } from "./resource-graph-runtime-workers";
 import {
   queryBackend,
@@ -18,6 +19,7 @@ export type RuntimeReadModel = {
   edgeCount: number;
   latestActions: Array<{ submissionId: string; actionId: string; submittedAt: string }>;
   workerEvidenceCount: number;
+  runtimeEvidenceCount: number;
 };
 
 export async function readRuntimeResourceGraph(
@@ -36,6 +38,7 @@ export async function readRuntimeResourceGraph(
     uploads,
     artifacts,
     cleanup,
+    runtimeEvidence,
     workers,
   ] = await Promise.all([
     rows(backend, "SELECT submission_id, deploy_run_id, document_json FROM submissions"),
@@ -69,6 +72,10 @@ export async function readRuntimeResourceGraph(
       backend,
       "SELECT record_id, submission_id, deployment_id, reason, document_json, created_at FROM artifact_cleanup_janitor_records",
     ),
+    rows(
+      backend,
+      "SELECT kind, name, source_class, source_label, document_json FROM resource_graph_runtime_evidence ORDER BY kind, name",
+    ),
     readWorkerEvidence(backend),
   ]);
   const graph = new RuntimeGraph(context, submissions);
@@ -82,16 +89,18 @@ export async function readRuntimeResourceGraph(
   artifacts.forEach((row) => graph.artifact(row));
   cleanup.forEach((row) => graph.cleanup(row));
   const workerGraph = workerRuntimeGraph(workers);
+  const evidenceGraph = runtimeEvidenceGraph(runtimeEvidence as never, context.deploymentUidById);
   return {
-    nodes: [...graph.nodes, ...workerGraph.nodes],
-    edges: [...graph.edges, ...workerGraph.edges],
+    nodes: [...graph.nodes, ...workerGraph.nodes, ...evidenceGraph.nodes],
+    edges: [...graph.edges, ...workerGraph.edges, ...evidenceGraph.edges],
     status: {
       indexed: true,
       status: "runtime-linked",
-      nodeCount: graph.nodes.length + workerGraph.nodes.length,
-      edgeCount: graph.edges.length + workerGraph.edges.length,
+      nodeCount: graph.nodes.length + workerGraph.nodes.length + evidenceGraph.nodes.length,
+      edgeCount: graph.edges.length + workerGraph.edges.length + evidenceGraph.edges.length,
       latestActions: latestRuntimeActions(actions),
       workerEvidenceCount: workers.length,
+      runtimeEvidenceCount: runtimeEvidence.length,
     },
   };
 }

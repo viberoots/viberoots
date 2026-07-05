@@ -4,6 +4,7 @@ export const RESOURCE_GRAPH_READ_MODEL_TABLES = [
   "resource_graph_imports",
   "resource_graph_nodes",
   "resource_graph_edges",
+  "resource_graph_runtime_evidence",
 ] as const;
 
 export const PRESERVED_CONTROL_PLANE_TABLES = [

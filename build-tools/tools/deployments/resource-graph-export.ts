@@ -97,7 +97,7 @@ export function createDeploymentResourceGraphDocuments(
 } {
   const envelopes = sortEnvelopes(envelopeSet.envelopes);
   const sourceNodes = sourceNodesFor(envelopes);
-  return {
+  return jsonSafeDocument({
     envelopes: { ...envelopeSet, envelopes },
     nodes: {
       apiVersion: "viberoots.resource-graph.nodes@1",
@@ -107,7 +107,7 @@ export function createDeploymentResourceGraphDocuments(
       apiVersion: "viberoots.resource-graph.edges@1",
       edges: edgesFor(envelopes, sourceNodes),
     },
-  };
+  });
 }
 
 function resourceNodesFor(envelopes: DeploymentResourceEnvelope[]): ResourceGraphNode[] {
@@ -223,4 +223,8 @@ function outputPaths(workspaceRoot: string) {
 async function writeJson(file: string, value: unknown): Promise<void> {
   await fsp.mkdir(path.dirname(file), { recursive: true });
   await fsp.writeFile(file, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+}
+
+function jsonSafeDocument<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
 }

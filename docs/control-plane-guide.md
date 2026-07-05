@@ -177,6 +177,18 @@ sessions, run actions, deploy records, current stage state, history, worker evid
 secret-safe status graph for operators. Missing or version-mismatched admitted policy refs fail
 closed during graph status construction instead of being silently omitted.
 
+Runtime-source evidence for reviewed runtime input, auth-provider profile, selected control-plane
+readiness, control-plane observability, and mini-migration preflight is imported only after the
+existing validators accept the admitted records. If status lacks one of those evidence nodes, treat
+the resource graph import diagnostics as the first troubleshooting surface; the backend rejects
+missing, stale, malformed, unsupported, or non-admitted evidence instead of publishing a partial
+runtime evidence status.
+The PR-10 evidence set does not remain export-only after it is supplied as admitted runtime-source
+evidence to the backend import. Other inventory-only evidence remains export-only when the control
+plane has no durable table, object-store record, or existing authoritative row to reference; keeping
+those facts out of backend status avoids turning export collectors into an unreviewed mutation
+surface.
+
 The representative protected/shared status workflow is Cloudflare Pages static webapp deployment
 with exact-artifact replay. That path demonstrates selected control-plane metadata, redacted local
 override evidence, source-selection evidence, target-exception effect, provider-capability policy

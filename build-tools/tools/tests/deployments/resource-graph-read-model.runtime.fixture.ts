@@ -29,6 +29,7 @@ export async function seedResourceGraphIntent(backend: ReturnType<typeof backend
   await syncBackendResourceGraphIndex(backend, {
     ...fixtureDocuments(),
     sourceRef: "workspace-resource-graph-export",
+    requireRuntimeEvidence: false,
     sourcePlans: sourcePlans(),
   });
 }

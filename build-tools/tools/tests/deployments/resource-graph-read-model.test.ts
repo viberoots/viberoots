@@ -48,6 +48,7 @@ test("resource graph read model indexes intent nodes, edges, and safe source sel
     await syncBackendResourceGraphIndex(backend, {
       ...fixture,
       sourceRef: "workspace-resource-graph-export",
+      requireRuntimeEvidence: false,
       importedAt: "2026-07-05T12:00:00.000Z",
     });
     const model = await readBackendResourceGraphIndex(backend);
@@ -77,6 +78,7 @@ test("resource graph reads work through web, service, and MCP read surfaces", as
     await syncBackendResourceGraphIndex(backend, {
       ...fixtureDocuments(),
       sourceRef: "workspace-resource-graph-export",
+      requireRuntimeEvidence: false,
     });
     const service = await startService(tmp, backend);
     try {
