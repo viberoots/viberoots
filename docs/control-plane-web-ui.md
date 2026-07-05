@@ -3,6 +3,8 @@
 The service exposes a minimal same-origin browser UI when `webUi.enabled` is true. The UI is served
 from `webUi.basePath` and uses read-only APIs under the same base path:
 
+- `GET /resource-graph` renders the Resource Graph browser view, which reads the indexed graph
+  through the same-origin read API and does not add mutation controls.
 - `GET /api/v1/read/status` reports service instance, database connectivity, artifact-store
   connectivity, and worker heartbeat summaries.
 - `GET /api/v1/read/queue` lists recent queued, running, and completed submissions.
@@ -74,6 +76,14 @@ before the backend read model had an import, and `runtime-unlinked` for rows tha
 matching imported Deployment intent node. Marker examples are bounded and redacted. They classify
 existing backend rows, runtime evidence refs, and worker lease claims for operator status, and do
 not backfill or rewrite provider-owned records.
+
+The representative protected/shared read path is Cloudflare Pages static-webapp deployment through
+the service and worker reconciler, followed by exact-artifact rollback replay. Resource graph reads
+from the direct API, same-origin web API, rendered web UI, MCP endpoint, and CLI should show the same linked
+Deployment, ProviderTarget, artifact challenge, upload session, execution snapshot, provider
+evidence, worker evidence, stage state, stage history, audit, and replay status. Cloudflare Pages
+does not add release-action nodes because that provider does not support release actions; the
+supported release-action fixture remains the reviewed `nixos-shared-host` path.
 
 ## Troubleshooting
 

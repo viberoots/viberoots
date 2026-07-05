@@ -9,6 +9,7 @@ type SelectionSource = "context" | "explicit_override" | "explicit" | "ambient";
 
 export type SelectedDeploymentServiceClient = NixosSharedHostResolvedServiceClient & {
   selectedSource: SelectionSource;
+  requestId?: string;
 };
 
 export type DeploymentServiceClientSelectionEvidence = Pick<

@@ -173,7 +173,7 @@ function serveUiAsset(
   pathname: string,
   requestId: string,
 ): boolean {
-  if (["/", "/status", "/queue", "/deployment"].includes(pathname)) {
+  if (["/", "/status", "/queue", "/deployment", "/resource-graph"].includes(pathname)) {
     response.writeHead(200, webHeaders(requestId, "text/html"));
     response.end(controlPlaneWebUiHtml(basePath));
     return true;

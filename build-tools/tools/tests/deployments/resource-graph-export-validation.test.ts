@@ -88,7 +88,11 @@ test("resource graph export classifies Buck-query fallback outside export scope"
   );
   const docs = await fsp.readFile(path.join(root, "docs", "deployments-contract.md"), "utf8");
 
-  assert.match(exportSource, /ensureDeploymentGraph\(workspaceRoot\)/);
+  assert.match(
+    exportSource,
+    /ensureDeploymentGraph\(workspaceRoot, undefined, \{\s*force: await hasBuckProjectRoot\(workspaceRoot\),\s*\}\)/s,
+  );
+  assert.match(exportSource, /async function hasBuckProjectRoot\(workspaceRoot: string\)/);
   assert.match(exportSource, /readDeploymentResourceEnvelopes\(\{ workspaceRoot \}\)/);
   assert.doesNotMatch(exportSource, /queryDeploymentNodes|resolveDeploymentFromTarget/);
   assert.match(querySource, /buck2 .* cquery/s);

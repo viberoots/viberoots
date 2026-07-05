@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import crypto from "node:crypto";
 import type { DeploymentResourceEnvelope } from "./resource-graph-envelope";
 import type { ResourceGraphEdge, ResourceGraphNode } from "./resource-graph-export";
 
@@ -37,5 +38,5 @@ export function sourceKey(source: DeploymentResourceEnvelope["source"]): string 
 }
 
 function sourceUid(key: string): string {
-  return `uid:source:${Buffer.from(key).toString("base64url").slice(0, 40)}`;
+  return `uid:source:${crypto.createHash("sha256").update(key).digest("hex").slice(0, 32)}`;
 }

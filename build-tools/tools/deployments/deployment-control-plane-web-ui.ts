@@ -13,7 +13,7 @@ export function controlPlaneWebUiHtml(basePath: string): string {
 <body>
 <main>
 <h1>Deployment Control Plane</h1>
-<nav><a href="${prefix}/">Status</a><a href="${prefix}/queue">Queue</a><a href="${prefix}/deployment">Deployment</a></nav>
+<nav><a href="${prefix}/">Status</a><a href="${prefix}/queue">Queue</a><a href="${prefix}/deployment">Deployment</a><a href="${prefix}/resource-graph">Resource Graph</a></nav>
 <section id="app" aria-live="polite">Loading...</section>
 </main>
 <script>window.__CONTROL_PLANE_BASE_PATH__=${JSON.stringify(prefix)};</script>
@@ -70,6 +70,10 @@ async function render() {
     app.innerHTML = deploymentId
       ? panel("Deployment", renderJson(await api("/api/v1/read/deployments/" + encodeURIComponent(deploymentId), renderRequestId)))
       : panel("Deployment", "Select a deployment from a queue entry.");
+    return;
+  }
+  if (route.startsWith("/resource-graph")) {
+    app.innerHTML = panel("Resource Graph", renderJson(await api("/api/v1/read/resource-graph", renderRequestId)));
     return;
   }
   const status = await api("/api/v1/read/status", renderRequestId);

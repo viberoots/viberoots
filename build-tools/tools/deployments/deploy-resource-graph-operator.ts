@@ -10,6 +10,7 @@ export async function runResourceGraphForOperator(serviceClient: SelectedDeploym
       ...(serviceClient.controlPlaneToken
         ? { controlPlaneToken: serviceClient.controlPlaneToken }
         : {}),
+      ...(serviceClient.requestId ? { requestId: serviceClient.requestId } : {}),
     }),
   );
 }

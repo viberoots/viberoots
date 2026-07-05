@@ -85,3 +85,31 @@ test("runtime policy refs fail closed when intent policy version is stale", () =
     /runtime policy ref version mismatch/,
   );
 });
+
+test("runtime provisioner evidence fails closed without an intent provisioner node", () => {
+  const graph = new RuntimeGraph(
+    {
+      deploymentUidById: new Map([["demoapp-dev", "uid:deployment"]]),
+      providerTargetUidById: new Map(),
+      provisionerUidByDeploymentId: new Map(),
+      policyByResourceId: new Map(),
+    },
+    [],
+  );
+  assert.throws(
+    () =>
+      graph.deployRun({
+        deploy_run_id: "run-1",
+        submission_id: "sub-1",
+        record_path: "records/run-1.json",
+        document_json: {
+          deploymentId: "demoapp-dev",
+          provisionerPlan: {
+            artifactPath: "/tmp/plan.bin",
+            fingerprint: "sha256:plan",
+          },
+        },
+      }),
+    /unsupported provisioner runtime evidence/,
+  );
+});

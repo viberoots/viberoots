@@ -46,6 +46,7 @@ export async function ensureGraph(
     target?: string;
     queryRoots?: string[];
     graphPath?: string;
+    force?: boolean;
   } = {},
 ): Promise<void> {
   const verbose = isVbrVerbose();
@@ -86,6 +87,7 @@ export async function ensureGraph(
   await ensureWorkspaceBuckStatePackage(workspaceRoot);
   const wantTargetRaw = (opts.target || process.env.BUCK_TARGET || "").trim();
   const shouldRegenerate = async (): Promise<boolean> => {
+    if (opts.force) return true;
     try {
       const txt = await fsp.readFile(graphPath, "utf8");
       const trimmed = String(txt || "").trim();

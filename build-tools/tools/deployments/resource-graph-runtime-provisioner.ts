@@ -10,6 +10,11 @@ export function provisionerRuntimeEdges(opts: {
   const deploymentId = String(opts.doc?.deploymentId || "");
   if (!opts.doc?.provisionerPlan) return [];
   const fromUid = opts.provisionerUidByDeploymentId.get(deploymentId);
+  if (!fromUid) {
+    throw new Error(
+      `unsupported provisioner runtime evidence for deployment without intent Provisioner: ${deploymentId}`,
+    );
+  }
   return fromUid
     ? [
         {

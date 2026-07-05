@@ -363,6 +363,10 @@ rows that predate the read-model import or rows that cannot link because the
 matching Buck Deployment intent fact is missing. Treat `pre-read-model` and
 `runtime-unlinked` as operator diagnostics. They do not replay runtime state,
 rewrite provider records, or grant mutation authority to the resource graph.
+When the control-plane web UI is enabled, the same read model is available from
+the read-only Resource Graph view under the configured web base path. API, CLI,
+MCP, and same-origin web reads should preserve schema versions, request
+correlation ids, auth grant summaries, redaction, and read-audit rows.
 
 For a protected/shared static webapp, the operator workflow is:
 

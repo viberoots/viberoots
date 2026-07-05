@@ -92,7 +92,7 @@ function isClassifiableRuntimeNode(node: ResourceGraphNode) {
     return typeof (node.facts as any)?.deploymentId === "string";
   }
   if (REF_LINKED_RUNTIME_KINDS.has(node.kind)) return resourceGraphRefs(node).length > 0;
-  if (node.kind === "WorkerEvidence") return Array.isArray((node.facts as any)?.leaseClaims);
+  if (node.kind === "WorkerEvidence") return ((node.facts as any)?.leaseClaims || []).length > 0;
   return false;
 }
 

@@ -93,6 +93,9 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
 
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/deployment-admission.policy-resources.test.ts": True,
+    "build-tools/tools/tests/deployments/cloudflare-pages.resource-graph-e2e.helpers.ts": False,
+    "build-tools/tools/tests/deployments/cloudflare-pages.resource-graph-import.helpers.ts": False,
+    "build-tools/tools/tests/deployments/cloudflare-pages.resource-graph.e2e.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-envelope.compat.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-command.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-envelope.context.test.ts": True,

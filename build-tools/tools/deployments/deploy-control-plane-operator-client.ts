@@ -135,10 +135,12 @@ export async function readRecordForOperator(opts: {
 export async function readResourceGraphForOperator(opts: {
   controlPlaneUrl: string;
   controlPlaneToken?: string;
+  requestId?: string;
 }) {
   return await readNixosSharedHostResourceGraphViaService({
     controlPlaneUrl: opts.controlPlaneUrl,
     ...(opts.controlPlaneToken ? { token: opts.controlPlaneToken } : {}),
+    ...(opts.requestId ? { requestId: opts.requestId } : {}),
   });
 }
 

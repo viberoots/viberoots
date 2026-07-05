@@ -33,8 +33,12 @@ export function deploymentQueryRootsExpr(workspaceRoot: string): string {
   return `set(${roots.map((root) => `//${root}/...`).join(" ")})`;
 }
 
-export async function ensureDeploymentGraph(workspaceRoot: string, target?: string): Promise<void> {
-  await ensureGraph({ workspaceRoot, target, queryRoots: deploymentGraphQueryRoots() });
+export async function ensureDeploymentGraph(
+  workspaceRoot: string,
+  target?: string,
+  opts: { force?: boolean } = {},
+): Promise<void> {
+  await ensureGraph({ workspaceRoot, target, queryRoots: deploymentGraphQueryRoots(), ...opts });
 }
 
 export function deploymentBuckEnv(

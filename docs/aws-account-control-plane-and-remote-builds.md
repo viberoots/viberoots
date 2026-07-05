@@ -187,6 +187,15 @@ Identity rule: humans bootstrap, approve, and break glass; dedicated roles run t
 control plane, deployment execution path, EC2 service/worker runtime, and remote-build lanes must
 not be associated with a personal human AWS user as their normal identity.
 
+Resource graph status stays inside the deployment control-plane authority boundary. The
+representative Cloudflare Pages static-webapp workflow proves that reviewed Buck intent, service
+admission, artifact challenge/upload, worker reconciliation, provider evidence, stage
+state/history, audit, and rollback replay can be read back through the secret-safe graph status
+surfaces. Remote-build workers, Nix builders, and Buck2 RE workers remain separate build-system
+capacity; they may produce remote-build evidence, source snapshots, or cache manifests, but they do
+not become deployment runtime rows and the resource graph does not grant them deployment mutation
+authority.
+
 Automation target:
 
 - Use AWS IAM Identity Center or another reviewed SSO path for the human operator.

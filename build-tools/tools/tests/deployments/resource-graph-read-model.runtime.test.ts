@@ -92,6 +92,16 @@ test("resource graph read model links admitted runtime facts without leaking sec
         actionId: "action-b",
         submittedAt: "2026-07-05T12:02:00.000Z",
       },
+      {
+        submissionId: "submission-2",
+        actionId: "run-2",
+        submittedAt: "2026-07-05T12:00:00.000Z",
+      },
+      {
+        submissionId: "submission-3",
+        actionId: "run-3",
+        submittedAt: "2026-07-05T12:00:00.000Z",
+      },
     ]);
     assert.ok(
       model.edges.some(

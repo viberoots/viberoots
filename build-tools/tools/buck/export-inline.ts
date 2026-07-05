@@ -7,6 +7,7 @@ import { getImporterRootsContract } from "../lib/importer-roots";
 import { normalizeTargetLabel } from "../lib/labels";
 import { resolveWorkspaceRootSync } from "../lib/repo";
 import { normalizeNixpkgPins, normalizeNixpkgsProfile } from "./source-selection";
+import { DEPLOYMENT_CQUERY_ATTRS } from "../deployments/deployment-query-attrs";
 
 type InlineExportOptions = {
   workspaceRoot: string;
@@ -18,39 +19,42 @@ type InlineExportOptions = {
 };
 
 function buildAttrs(): string[] {
-  return [
-    "name",
-    "rule_type",
-    "buck.type",
-    "module",
-    "build_py_deps",
-    "srcs",
-    "buck.srcs",
-    "nix_srcs",
-    "deps",
-    "link_deps",
-    "header_deps",
-    "link_closure",
-    "link_closure_overrides",
-    "link_mode",
-    "nixpkgs_profile",
-    "nixpkg_pins",
-    "buck.link_mode",
-    "buck.link_kind",
-    "buck.deps",
-    "labels",
-    "buck.labels",
-    "args",
-    "env",
-    "cmd",
-    "out",
-    "main",
-    "main_class",
-    "includes",
-    "defines",
-    "cflags",
-    "ldflags",
-  ];
+  return Array.from(
+    new Set([
+      "name",
+      "rule_type",
+      "buck.type",
+      "module",
+      "build_py_deps",
+      "srcs",
+      "buck.srcs",
+      "nix_srcs",
+      "deps",
+      "link_deps",
+      "header_deps",
+      "link_closure",
+      "link_closure_overrides",
+      "link_mode",
+      "nixpkgs_profile",
+      "nixpkg_pins",
+      "buck.link_mode",
+      "buck.link_kind",
+      "buck.deps",
+      "labels",
+      "buck.labels",
+      "args",
+      "env",
+      "cmd",
+      "out",
+      "main",
+      "main_class",
+      "includes",
+      "defines",
+      "cflags",
+      "ldflags",
+      ...DEPLOYMENT_CQUERY_ATTRS,
+    ]),
+  );
 }
 
 function buildIsolationArgs(): { isoArgs: string[]; useIso: boolean; iso: string } {

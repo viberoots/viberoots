@@ -25,6 +25,12 @@ export type DeploymentArtifactChallengeBinding = {
   authorization?: DeploymentArtifactAuthorizationBinding;
 };
 
+function deploymentProviderTargetIdentity(request: DeploymentArtifactChallengeRequest): string {
+  const providerTarget = (request.deployment as any)?.providerTarget;
+  const identity = providerTarget?.identity || providerTarget?.id;
+  return String(identity || nixosSharedHostDeploymentTargetIdentity(request.deployment));
+}
+
 function authorizationBinding(
   decision?: DeploymentControlPlaneAuthorizationDecision,
 ): DeploymentArtifactAuthorizationBinding | undefined {
@@ -41,7 +47,7 @@ export function artifactChallengeBinding(opts: {
   finalizedStagedArtifactReference?: string;
   authorization?: DeploymentControlPlaneAuthorizationDecision;
 }): DeploymentArtifactChallengeBinding {
-  const providerTargetIdentity = nixosSharedHostDeploymentTargetIdentity(opts.request.deployment);
+  const providerTargetIdentity = deploymentProviderTargetIdentity(opts.request);
   return {
     request: baseArtifactChallengeRequest(opts.request),
     providerTargetIdentity,

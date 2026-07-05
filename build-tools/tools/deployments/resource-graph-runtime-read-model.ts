@@ -48,7 +48,10 @@ export async function readRuntimeResourceGraph(
     runtimeEvidence,
     workers,
   ] = await Promise.all([
-    rows(backend, "SELECT submission_id, deploy_run_id, document_json FROM submissions"),
+    rows(
+      backend,
+      "SELECT submission_id, deploy_run_id, document_json, updated_at FROM submissions",
+    ),
     rows(backend, "SELECT submission_id, execution_snapshot_path, document_json FROM snapshots"),
     rows(
       backend,
@@ -114,7 +117,7 @@ export async function readRuntimeResourceGraph(
       markers: classified.markers,
       nodeCount: runtimeNodes.length,
       edgeCount: runtimeEdges.length,
-      latestActions: latestRuntimeActions(actions),
+      latestActions: latestRuntimeActions(actions, submissions),
       workerEvidenceCount: workers.length,
       runtimeEvidenceCount: runtimeEvidence.length,
     },

@@ -5,12 +5,16 @@ const CONTROL_PLANE_REQUEST_TIMEOUT_MS = 60_000;
 export async function readNixosSharedHostResourceGraphViaService(opts: {
   controlPlaneUrl: string;
   token?: string;
+  requestId?: string;
 }) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), CONTROL_PLANE_REQUEST_TIMEOUT_MS);
   try {
     const response = await fetch(new URL("/api/v1/resource-graph", opts.controlPlaneUrl), {
-      headers: opts.token ? { authorization: `Bearer ${opts.token}` } : {},
+      headers: {
+        ...(opts.token ? { authorization: `Bearer ${opts.token}` } : {}),
+        ...(opts.requestId ? { "x-request-id": opts.requestId } : {}),
+      },
       signal: controller.signal,
     });
     if (!response.ok) throw new Error(await response.text());

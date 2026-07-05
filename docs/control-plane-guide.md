@@ -173,9 +173,10 @@ The near-term resource graph contract is read-only. Buck remains the reviewed in
 deployment reconciler remains the mutation authority, and Postgres/object storage remain the durable
 runtime authorities for submissions, snapshots, queueing, locks, idempotency, artifacts, upload
 sessions, run actions, deploy records, current stage state, history, worker evidence, and audit.
-`GET /api/v1/resource-graph` and the matching CLI, MCP, and web read paths join those facts into a
-secret-safe status graph for operators. Missing or version-mismatched admitted policy refs fail
-closed during graph status construction instead of being silently omitted.
+`GET /api/v1/resource-graph` and the matching CLI, MCP, same-origin web API, and rendered web UI
+read paths join those facts into a secret-safe status graph for operators. Missing or
+version-mismatched admitted policy refs, or provisioner runtime evidence without a matching intent
+`Provisioner`, fail closed during graph status construction instead of being silently omitted.
 
 Runtime-source evidence for reviewed runtime input, auth-provider profile, selected control-plane
 readiness, control-plane observability, and mini-migration preflight is imported only after the
@@ -202,13 +203,15 @@ deployment-id-bearing rows, runtime evidence refs, or worker lease claims that c
 Deployment intent.
 
 The representative protected/shared status workflow is Cloudflare Pages static webapp deployment
-with exact-artifact replay. That path demonstrates selected control-plane metadata, redacted local
-override evidence, source-selection evidence, target-exception effect, provider-capability policy
-identity/version binding, artifact challenge and upload-session provenance, provider evidence,
-worker evidence, latest action, stage state, history, and audit. Cloudflare Pages does not support
-release actions, so release-action support is intentionally covered by the separate supported
-`nixos-shared-host` fixture. OpenTofu remains covered by a provisioner-inclusive fixture that links
-provisioner evidence and policy refs through the same status graph.
+with exact-artifact replay through the current deployment service and worker reconciler path. That
+path demonstrates reviewed Buck intent, selected control-plane metadata, redacted local override
+evidence, source-selection evidence, target-exception effect, provider-capability policy
+identity/version binding, artifact challenge and upload-session provenance, immutable execution
+snapshot, queueing, provider evidence, worker evidence, stage state, history, rollback replay, read
+audit, and secret-safe graph status. Cloudflare Pages does not support release actions, so
+release-action support is intentionally covered by the separate supported `nixos-shared-host`
+fixture. OpenTofu remains covered by a provisioner-inclusive fixture that links provisioner
+evidence and policy refs through the same status graph.
 
 The repo now provides reviewed declarative/IaC paths for the AWS foundation surfaces used by the
 control-plane setup bundle: network and S3 foundation evidence, ECR registry evidence, AWS-side
