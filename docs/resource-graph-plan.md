@@ -1527,3 +1527,218 @@ reconciliation workflow.
 ### 10. Downsides for implementing this PR
 
 It is an integration-heavy PR and may require broader validation than the earlier slices.
+
+## PR-10: Backend runtime evidence status ingestion
+
+### 1. Intent
+
+Close the remaining PR-4B/PR-9 gap where rich runtime evidence exists in export-time collectors but
+is not linked into backend operator resource graph status.
+
+### 2. Scope of changes
+
+- Add backend read-model ingestion and status links for the runtime evidence kinds already modeled by
+  the runtime-source inventory path:
+  - runtime input evidence
+  - auth-provider profile evidence
+  - selected control-plane readiness evidence
+  - control-plane observability evidence
+  - mini-migration preflight evidence
+  - cutover readiness evidence
+- Prefer durable references to complete existing evidence objects when available; when embedding is
+  necessary, validate with the existing evidence validators rather than hand-picking fields.
+- Preserve secret redaction and existing provider/control-plane authority boundaries.
+- Keep deployment submissions, queue claims, leases, locks, stage state, audit, and replay tables
+  authoritative.
+- Do not introduce generic runtime evidence mutation APIs.
+
+### 3. External prerequisites
+
+- PR-4B, PR-8, and PR-9 should be complete.
+
+### 4. Tests to be added
+
+- Backend read-model tests proving each evidence kind appears in graph status with complete
+  validator-backed shape or durable reference.
+- Secret-safety tests for every new evidence path.
+- Negative tests proving missing, stale, malformed, or unsupported evidence remains fail-closed where
+  the current control-plane workflow requires that evidence.
+- Read-surface tests proving web/API/MCP/CLI status exposes the new evidence without changing auth,
+  `x-request-id`, schema version, or audit behavior.
+
+### 5. Docs to be added or updated
+
+- Update operator resource graph status docs to describe the new backend evidence links and how to
+  troubleshoot missing evidence.
+- Document which evidence remains export-only, if any, and why.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Include focused control-plane runtime/readiness, managed dependency, mini-migration, cutover, and
+  resource graph read-model tests.
+
+### 6. Acceptance criteria
+
+- Backend graph status includes the rich runtime evidence required by PR-9.
+- Evidence shape is complete enough to be validated by existing contracts or durably referenced.
+- Secret-bearing material is redacted.
+- Existing mutation authority and fail-closed behavior remain unchanged.
+
+### 7. Risks
+
+- Evidence objects may be large or provider-specific.
+- Status may accidentally duplicate secret-bearing request payloads.
+
+### 8. Mitigations
+
+- Use durable references when full objects are too large for routine status.
+- Reuse existing validators and redaction helpers.
+
+### 9. Consequences of not implementing this PR
+
+Operator resource graph status would continue to omit runtime evidence that the plan requires.
+
+### 10. Downsides for implementing this PR
+
+It may require touching several existing evidence producers and read-surface tests.
+
+## PR-11: Pre-read-model and backfill status markers
+
+### 1. Intent
+
+Make resource graph status honest about records created before the read model was imported or
+backfilled.
+
+### 2. Scope of changes
+
+- Add explicit status markers that distinguish:
+  - imported/indexed intent graph facts
+  - runtime rows linked to imported graph facts
+  - runtime rows that predate the read-model import
+  - runtime rows that cannot yet be linked because backfill has not run or required intent facts are
+    missing
+- Add a bounded backfill or classification path for existing backend rows where safe.
+- Preserve current runtime rows without rewriting provider records unless the migration/backfill is
+  explicitly reviewed.
+- Do not silently report all runtime status as fully indexed when intent graph facts are missing.
+
+### 3. External prerequisites
+
+- PR-4A and PR-4B should be complete.
+
+### 4. Tests to be added
+
+- Read-model tests with imported graph facts, missing graph facts, and pre-read-model backend rows.
+- Migration/backfill tests proving old rows are classified or linked without corrupting source
+  authority.
+- Read-surface tests proving operators can see whether status is indexed, pre-read-model, or
+  unlinked.
+- Negative tests proving missing intent graph facts are not silently treated as fully linked status.
+
+### 5. Docs to be added or updated
+
+- Document the status markers and operator meaning of pre-read-model or unlinked runtime rows.
+- Document any supported backfill command or automatic migration behavior.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Include focused backend schema, read-model, migration, and read-surface tests.
+
+### 6. Acceptance criteria
+
+- Operators can distinguish fully linked graph status from pre-read-model or unlinked status.
+- Backfill/classification behavior is tested and secret-safe.
+- Existing runtime records remain authoritative and are not rewritten unsafely.
+
+### 7. Risks
+
+- Backfill semantics could be mistaken for replay or mutation authority.
+
+### 8. Mitigations
+
+- Keep markers diagnostic and read-only.
+- Treat runtime backend tables as authoritative and avoid reconstructing provider facts from status.
+
+### 9. Consequences of not implementing this PR
+
+Graph status would overstate confidence for older or unlinked runtime records.
+
+### 10. Downsides for implementing this PR
+
+It adds migration/status complexity to a read model that otherwise stays append-only.
+
+## PR-12: Real reconciler-path resource graph E2E
+
+### 1. Intent
+
+Replace the remaining seeded-row proof with a true representative deployment-resource graph
+reconciliation test through the current deployment reconciler path.
+
+### 2. Scope of changes
+
+- Add an end-to-end protected/shared Cloudflare Pages static-webapp flow that exercises reviewed
+  Buck intent, service admission, artifact challenge/upload, immutable execution snapshot, queueing,
+  provider evidence, worker/status evidence, run-action history, stage state/history, audit, graph
+  status, and at least one replay path.
+- Keep Cloudflare Pages as the primary representative path unless an equal-coverage path is already
+  recorded.
+- Preserve the separate OpenTofu provisioner-inclusive fixture and supported release-action fixture,
+  but connect them to the same final status assertions where practical.
+- Include read-surface assertions for web base-path reads, direct API reads, deployment client read
+  routes, CLI, MCP, and web UI reads where those surfaces already expose deployment status.
+- Preserve all existing submit, retry, rollback, preview, promotion, queueing, locking,
+  idempotency, approval, and fail-closed behavior.
+- Do not add a generic resource mutation API or scheduler.
+
+### 3. External prerequisites
+
+- PR-10 and PR-11 should be complete or explicitly accounted for in the test fixture.
+
+### 4. Tests to be added
+
+- End-to-end Cloudflare Pages protected/shared deployment test that uses the real submit/admit/worker
+  or service-backed execution path instead of direct SQL seeding.
+- Replay test for retry, promotion, or rollback that proves graph status preserves policy refs,
+  latest actions, provider evidence, stage state/history, and audit.
+- Read-surface tests covering API, CLI, MCP, and web UI reads with schema versions, auth grants,
+  `x-request-id`, redaction, and audit.
+- Negative tests proving unsupported provider/provisioner/policy semantics remain fail-closed.
+- Secret-safety assertions for final graph status output.
+
+### 5. Docs to be added or updated
+
+- Update deployment usage docs with the real operator workflow for graph status during deploy,
+  status inspection, and replay.
+- Document any intentional exclusions from the representative path and the fixtures that cover them.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Include full deployment-domain validation when explicitly authorized.
+
+### 6. Acceptance criteria
+
+- The representative path proves graph status through the real reconciler rather than seeded rows.
+- Replay/status behavior remains compatible with existing deployment operator workflows.
+- Existing authority boundaries remain intact.
+
+### 7. Risks
+
+- A true end-to-end flow may be slower and more brittle than seeded integration tests.
+
+### 8. Mitigations
+
+- Reuse existing fake provider, fake object-store, and local control-plane harnesses.
+- Keep the test focused on one representative path and rely on targeted fixtures for provider
+  variants.
+
+### 9. Consequences of not implementing this PR
+
+The resource graph would remain proven mainly by composition fixtures rather than the real
+deployment reconciler.
+
+### 10. Downsides for implementing this PR
+
+It may require broader validation and careful test-runtime management.
