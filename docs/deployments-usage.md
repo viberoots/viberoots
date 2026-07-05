@@ -359,6 +359,24 @@ evidence appears as `ProviderEvidence` resources with explicit supported,
 unsupported, or deferred semantics for provider release ids, drift, preview,
 partial publish, smoke/readiness, and rollback/recovery fields.
 
+For a protected/shared static webapp, the operator workflow is:
+
+1. Review the Buck deployment target and run the normal submit path.
+2. Upload or bind the exact static-webapp artifact through the artifact
+   challenge and upload-session flow.
+3. Use `--resource-graph` after admission or replay to inspect the traced path
+   from reviewed intent to execution snapshot, provider evidence, worker
+   evidence, latest run action, current stage state, stage history, cleanup
+   records, and audit-backed status links.
+
+Graph status also carries redacted local override evidence, selected
+control-plane profile metadata, source-selection evidence, target-exception
+effects, provider-capability policy bindings, and release-action policy
+bindings when the selected provider supports release actions. Cloudflare Pages
+remains the representative static-webapp path; release actions are unsupported
+there and appear only as negative capability evidence. Supported release-action
+status is covered by the reviewed `nixos-shared-host` release-action path.
+
 To answer what is currently deployed in a protected/shared stage, use the
 control-plane current-stage helpers rather than Git release-pointer files:
 

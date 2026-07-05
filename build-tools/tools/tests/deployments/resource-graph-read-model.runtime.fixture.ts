@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { createDeploymentResourceGraphDocuments } from "../../deployments/resource-graph-export";
 import { queryBackend } from "../../deployments/nixos-shared-host-control-plane-backend-db";
 import {
   localHarnessControlPlaneDatabaseUrl,
@@ -8,6 +7,18 @@ import {
   writeBackendRunActionDoc,
 } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { seedWorkerEvidenceRows } from "../resource-graph-worker.fixture";
+import {
+  POLICY_REFS,
+  PROVISIONER_POLICY_REFS,
+  RELEASE_POLICY_REFS,
+  cloudflareRecord,
+  cloudflareStageState,
+  fixtureDocuments,
+  provisionerRecord,
+  provisionerStageState,
+  releaseActionRecord,
+  sourcePlans,
+} from "./resource-graph-read-model.reconciliation-fixture";
 
 export function backendFor(tmp: string) {
   const recordsRoot = path.join(tmp, "records");
@@ -18,117 +29,106 @@ export async function seedResourceGraphIntent(backend: ReturnType<typeof backend
   await syncBackendResourceGraphIndex(backend, {
     ...fixtureDocuments(),
     sourceRef: "workspace-resource-graph-export",
+    sourcePlans: sourcePlans(),
   });
 }
 
 export async function seedRuntimeRows(backend: ReturnType<typeof backendFor>, tmp: string) {
+  await seedSubmission(backend, tmp, "submission-1", "demo-web", "run-1", "deploy");
+  await seedSnapshot(backend, tmp, "submission-1", "demo-web", POLICY_REFS);
+  await seedRecord(backend, tmp, "submission-1", "run-1", cloudflareRecord());
+  await seedStage(backend, "demo-web", "staging", "run-1", cloudflareStageState());
+  await seedSubmission(backend, tmp, "submission-2", "demo-infra", "run-2", "provision");
+  await seedSnapshot(backend, tmp, "submission-2", "demo-infra", PROVISIONER_POLICY_REFS);
+  await seedRecord(backend, tmp, "submission-2", "run-2", provisionerRecord());
+  await seedStage(backend, "demo-infra", "staging", "run-2", provisionerStageState());
+  await seedSubmission(backend, tmp, "submission-3", "demo-release", "run-3", "rollback");
+  await seedSnapshot(backend, tmp, "submission-3", "demo-release", RELEASE_POLICY_REFS);
+  await seedRecord(backend, tmp, "submission-3", "run-3", releaseActionRecord());
+  await seedWorkerEvidenceRows(backend);
+  await writeBackendRunActionDoc(
+    backend,
+    runAction("action-a", "submission-1", "retry", "2026-07-05T12:01:00.000Z"),
+  );
+  await writeBackendRunActionDoc(
+    backend,
+    runAction("action-b", "submission-1", "rollback", "2026-07-05T12:02:00.000Z"),
+  );
+  await seedArtifactRows(backend);
+}
+
+async function seedSubmission(
+  backend: any,
+  tmp: string,
+  id: string,
+  deployment: string,
+  run: string,
+  op: string,
+) {
   await queryBackend(
     backend,
-    `INSERT INTO submissions VALUES ($1, $2, $3, $4, $5, $6, NULL, $7::jsonb, $8)`,
+    `INSERT INTO submissions VALUES ($1,$2,$3,$4,$5,$6,NULL,$7::jsonb,$8)`,
     [
-      "submission-1",
-      path.join(tmp, "submission.json"),
-      path.join(tmp, "snapshot.json"),
-      "demo-web",
+      id,
+      path.join(tmp, `${id}.json`),
+      path.join(tmp, `${id}-snapshot.json`),
+      deployment,
       "finished",
-      "run-1",
-      JSON.stringify(submissionDoc()),
+      run,
+      JSON.stringify({
+        submissionId: id,
+        deploymentId: deployment,
+        operationKind: op,
+        deployRunId: run,
+      }),
       "2026-07-05T12:00:00.000Z",
     ],
   );
-  await queryBackend(backend, `INSERT INTO snapshots VALUES ($1, $2, $3::jsonb, $4)`, [
-    "submission-1",
-    path.join(tmp, "snapshot.json"),
-    JSON.stringify({ submissionId: "submission-1", deploymentId: "demo-web" }),
+}
+
+async function seedSnapshot(
+  backend: any,
+  tmp: string,
+  id: string,
+  deployment: string,
+  refs: any[],
+) {
+  await queryBackend(backend, `INSERT INTO snapshots VALUES ($1,$2,$3::jsonb,$4)`, [
+    id,
+    path.join(tmp, `${id}-snapshot.json`),
+    JSON.stringify({ submissionId: id, deploymentId: deployment, policyResourceRefs: refs }),
     "2026-07-05T12:00:00.000Z",
   ]);
-  await queryBackend(backend, `INSERT INTO deploy_records VALUES ($1, $2, $3, $4::jsonb, $5)`, [
-    "run-1",
-    "submission-1",
-    path.join(tmp, "record.json"),
-    JSON.stringify({
-      deployRunId: "run-1",
-      deploymentId: "demo-web",
-      provider: "nixos-shared-host",
-      providerTargetIdentity: "nixos-shared-host:default:demo-web",
-      finalOutcome: "succeeded",
-      publishMode: "normal",
-      smokeOutcome: "passed",
-      provisionerPlan: {
-        artifactPath: "/tmp/opentofu/plan.bin",
-        fingerprint: "sha256:provisioner-plan",
-        mutationClass: "non_destructive",
-      },
-      admittedContext: {
-        sourcePlanRef: "source-plan:demo",
-        policyEvaluation: {
-          binding: { provisionerPlanFingerprint: "sha256:provisioner-plan" },
-        },
-      },
-      token: "raw-secret",
-    }),
+}
+
+async function seedRecord(backend: any, tmp: string, submission: string, run: string, doc: any) {
+  await queryBackend(backend, `INSERT INTO deploy_records VALUES ($1,$2,$3,$4::jsonb,$5)`, [
+    run,
+    submission,
+    path.join(tmp, `${run}-record.json`),
+    JSON.stringify(doc),
     "2026-07-05T12:01:00.000Z",
   ]);
-  await seedWorkerEvidenceRows(backend);
-  await writeBackendRunActionDoc(backend, runAction("action-a", "2026-07-05T12:01:00.000Z"));
-  await writeBackendRunActionDoc(backend, runAction("action-b", "2026-07-05T12:02:00.000Z"));
-  await seedEvidenceRows(backend);
 }
 
-function fixtureDocuments() {
-  return createDeploymentResourceGraphDocuments({
-    apiVersion: "deployment-resource-envelope-list@1",
-    inventory: {} as any,
-    errors: [],
-    envelopes: [
-      {
-        apiVersion: "deployment.resource.viberoots.dev/v1",
-        kind: "Deployment",
-        metadata: {
-          name: "demo-web",
-          uid: "uid:deployment",
-          labels: { "viberoots.dev/authority": "reviewed_intent" },
-          ownerReferences: [],
-        },
-        spec: {},
-        statusRef: "status:deployment",
-        policyRefs: [],
-        source: { class: "buck", label: "//demo:deploy" },
-      } as any,
-      {
-        apiVersion: "deployment.resource.viberoots.dev/v1",
-        kind: "ProviderTarget",
-        metadata: {
-          name: "nixos-shared-host:default:demo-web",
-          uid: "uid:provider",
-          labels: { "viberoots.dev/authority": "reviewed_intent" },
-          ownerReferences: [{ kind: "Deployment", uid: "uid:deployment" }],
-        },
-        spec: {},
-        policyRefs: [],
-        source: { class: "buck", label: "//demo:deploy" },
-      } as any,
-      {
-        apiVersion: "deployment.resource.viberoots.dev/v1",
-        kind: "Provisioner",
-        metadata: {
-          name: "demo-web:provisioner",
-          uid: "uid:provisioner",
-          labels: { "viberoots.dev/authority": "reviewed_intent" },
-          ownerReferences: [
-            { kind: "Deployment", uid: "uid:deployment" },
-            { kind: "ProviderTarget", uid: "uid:provider" },
-          ],
-        },
-        spec: {},
-        policyRefs: [],
-        source: { class: "buck", label: "//demo:deploy" },
-      } as any,
-    ],
-  });
+async function seedStage(backend: any, deployment: string, stage: string, run: string, doc: any) {
+  await queryBackend(backend, `INSERT INTO current_stage_state VALUES ($1,$2,$3,$4::jsonb,$5)`, [
+    deployment,
+    stage,
+    run,
+    JSON.stringify(doc),
+    "2026-07-05T12:00:00.000Z",
+  ]);
+  await queryBackend(backend, `INSERT INTO stage_state_history VALUES ($1,$2,$3,$4::jsonb,$5)`, [
+    deployment,
+    stage,
+    run,
+    JSON.stringify(doc),
+    "2026-07-05T12:00:00.000Z",
+  ]);
 }
 
-async function seedEvidenceRows(backend: ReturnType<typeof backendFor>) {
+async function seedArtifactRows(backend: any) {
   await queryBackend(
     backend,
     `INSERT INTO artifact_challenges VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb)`,
@@ -141,7 +141,7 @@ async function seedEvidenceRows(backend: ReturnType<typeof backendFor>) {
       "key-1",
       JSON.stringify({
         finalizedStagedArtifactReference: "object://artifact-store/artifact-1",
-        request: { deployment: { deploymentId: "demo-web" }, proofKey: "proof-secret" },
+        request: { deploymentId: "demo-web", proofKey: "proof-secret" },
       }),
     ],
   );
@@ -151,7 +151,14 @@ async function seedEvidenceRows(backend: ReturnType<typeof backendFor>) {
     [
       "upload-1",
       "submission-1",
-      JSON.stringify({ digest: "sha256:abc", payload: "raw-secret", sizeBytes: 12 }),
+      JSON.stringify({
+        archiveFormat: "tar.gz",
+        archivePath: "uploads/demo.tgz",
+        archiveObject: { key: "artifact-1" },
+        digest: "sha256:abc",
+        sizeBytes: 12,
+        payload: "raw-secret",
+      }),
       "2026-07-06T12:00:00.000Z",
       "2026-07-05T12:00:00.000Z",
     ],
@@ -162,7 +169,7 @@ async function seedEvidenceRows(backend: ReturnType<typeof backendFor>) {
     "sha256:def",
     12,
     "application/gzip",
-    JSON.stringify({ sourcePlanRef: "source-plan:demo", token: "raw-secret" }),
+    JSON.stringify({ sourcePlanRef: "source-plan:local-selected", token: "raw-secret" }),
     "2026-07-05T12:00:00.000Z",
   ]);
   await queryBackend(
@@ -173,70 +180,12 @@ async function seedEvidenceRows(backend: ReturnType<typeof backendFor>) {
       "submission-1",
       "demo-web",
       "rejected_staged_upload",
-      JSON.stringify({
-        schemaVersion: "nixos-shared-host-staged-artifact-janitor@1",
-        reason: "rejected_staged_upload",
-        stagedReference: "object://artifact-store/staged-1",
-        cleanupError: "cleanup failed (permission_denied)",
-      }),
+      JSON.stringify({ cleanupError: "cleanup failed (permission_denied)" }),
       "2026-07-05T12:04:00.000Z",
     ],
   );
-  await queryBackend(backend, `INSERT INTO current_stage_state VALUES ($1,$2,$3,$4::jsonb,$5)`, [
-    "demo-web",
-    "staging",
-    "run-1",
-    JSON.stringify(stageState()),
-    "2026-07-05T12:00:00.000Z",
-  ]);
-  await queryBackend(backend, `INSERT INTO stage_state_history VALUES ($1,$2,$3,$4::jsonb,$5)`, [
-    "demo-web",
-    "staging",
-    "run-1",
-    JSON.stringify(stageState()),
-    "2026-07-05T12:00:00.000Z",
-  ]);
 }
 
-function submissionDoc() {
-  return {
-    submissionId: "submission-1",
-    submittedAt: "2026-07-05T12:00:00.000Z",
-    deploymentId: "demo-web",
-    deploymentLabel: "//demo:deploy",
-    operationKind: "deploy",
-    lockScope: "demo-web",
-    lifecycleState: "finished",
-    deployRunId: "run-1",
-  };
-}
-
-function runAction(actionId: string, submittedAt: string) {
-  return { actionId, submissionId: "submission-1", action: "cancel", submittedAt };
-}
-
-function stageState() {
-  return {
-    deploymentId: "demo-web",
-    environmentStage: "staging",
-    currentRunId: "run-1",
-    sourceRevision: "git:abc",
-    artifactIdentity: "artifact-1",
-    provisionerPlan: {
-      artifactPath: "/tmp/opentofu/plan.bin",
-      fingerprint: "sha256:provisioner-plan",
-      mutationClass: "non_destructive",
-    },
-    retainedRenderEvidence: [
-      { kind: "provisioner_plan", referencePath: "/tmp/opentofu/plan.bin" },
-      { kind: "execution_snapshot", referencePath: "/tmp/execution-snapshot.json" },
-    ],
-    retainedArtifactEvidence: [
-      {
-        identity: "artifact-1",
-        storedArtifactPath: "/tmp/artifact.tgz",
-        provenancePath: "/tmp/provenance.json",
-      },
-    ],
-  };
+function runAction(actionId: string, submissionId: string, action: string, submittedAt: string) {
+  return { actionId, submissionId, action, submittedAt };
 }

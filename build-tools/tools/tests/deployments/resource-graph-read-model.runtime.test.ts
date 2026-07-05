@@ -20,16 +20,34 @@ test("resource graph read model links admitted runtime facts without leaking sec
     await seedRuntimeRows(backend, tmp);
 
     const model = await readBackendResourceGraphIndex(backend);
+    assertHasNode(model, "Deployment", "demo-web");
     assertHasNode(model, "DeployRun", "run-1");
     assertHasNode(model, "ProviderEvidence", "run-1");
-    assertHasNode(model, "Provisioner", "demo-web:provisioner");
+    assertHasNode(model, "DeploymentTargetException", "target-exception:cf-target-migration");
+    assertHasNode(model, "ProviderCapabilityPolicy", "provider-capability:cloudflare-pages");
+    assertHasNode(model, "ProviderCapabilityPolicy", "provider-capability:opentofu");
+    assertHasNode(model, "ReleaseActionPolicy", "//demo:release/cache-warmup:policy");
+    assertHasNode(model, "Provisioner", "demo-infra:provisioner");
     assertHasNode(model, "RunAction", "action-b");
     assertHasNode(model, "ArtifactChallenge", "challenge-1");
     assertHasNode(model, "StaticWebappUploadSession", "upload-1");
     assertHasNode(model, "CleanupEvidence", "cleanup-1");
     assertHasNode(model, "WorkerEvidence", "worker-1");
     assertHasNode(model, "CurrentStageState", "demo-web:staging");
-    assertHasNode(model, "RetainedEvidence", "demo-web:staging:execution_snapshot");
+    assertHasNode(model, "CurrentStageState", "demo-infra:staging");
+    assertHasNode(model, "RetainedEvidence", "demo-infra:staging:execution_snapshot");
+    const deployment = factsFor(model, "Deployment", "demo-web");
+    assert.equal(deployment.selectedControlPlane.profile, "shared-cloudflare");
+    assert.equal(deployment.localOverrideEvidence[0].localToken, "<redacted>");
+    assert.deepEqual(deployment.sourceModeEvidence, [
+      "remote-store",
+      "local-self",
+      "local-sibling-submodule",
+    ]);
+    const sourceSelection = (nodeFor(model, "Deployment", "demo-web") as any).sourceSelection;
+    assert.equal(sourceSelection.nixpkgs_profile, "cloudflare_profile");
+    assert.equal(sourceSelection.sourcePlanRef, "source-plan:local-selected");
+    assert.equal(sourceSelection.cacheManifestRef, "cache-manifest:remote-snapshot");
     const challenge = factsFor(model, "ArtifactChallenge", "challenge-1");
     assert.equal(challenge.deploymentId, "demo-web");
     assert.equal(challenge.proofKeyId, "key-1");
@@ -38,23 +56,26 @@ test("resource graph read model links admitted runtime facts without leaking sec
     assert.equal(challenge.proofKeyValidationOutcome, "trusted-key");
     assert.equal(challenge.oneTimeConsumption, "consumed-once");
     assert.equal(challenge.admittedProvenance, "object://artifact-store/artifact-1");
+    const upload = factsFor(model, "StaticWebappUploadSession", "upload-1");
+    assert.equal(upload.archiveFormat, "tar.gz");
+    assert.equal(upload.archivePath, "uploads/demo.tgz");
+    assert.equal(upload.objectIdentity, "artifact-1");
+    assert.equal(upload.provenance, "upload-session:upload-1");
     const provider = factsFor(model, "ProviderEvidence", "run-1");
-    assert.equal(provider.provider, "nixos-shared-host");
-    assert.equal(provider.liveTargetIdentity, "nixos-shared-host:default:demo-web");
+    assert.equal(provider.provider, "cloudflare-pages");
+    assert.equal(provider.liveTargetIdentity, "cloudflare-pages:web-platform/demo-web");
+    assert.equal(provider.previewTargetEvidence, "https://preview.demo.pages.dev");
     assert.equal(provider.partialPublishEvidence.finalOutcome, "succeeded");
     assert.equal(provider.smokeReadinessEvidence, "passed");
-    assert.equal(provider.sourcePlanRef, "source-plan:demo");
-    assert.deepEqual(provider.retainedRenderEvidence, [
+    assert.equal(provider.sourcePlanRef, "source-plan:local-selected");
+    const provisioner = factsFor(model, "ProviderEvidence", "run-2");
+    assert.equal(provisioner.provider, "opentofu");
+    assert.deepEqual(factsFor(model, "ProviderEvidence", "run-2").retainedRenderEvidence, [
       { kind: "provisioner_plan", referencePath: "/tmp/opentofu/plan.bin" },
       { kind: "execution_snapshot", referencePath: "/tmp/execution-snapshot.json" },
     ]);
-    assert.deepEqual(provider.retainedArtifactEvidence, [
-      {
-        identity: "artifact-1",
-        storedArtifactPath: "/tmp/artifact.tgz",
-        provenancePath: "/tmp/provenance.json",
-      },
-    ]);
+    const release = factsFor(model, "DeployRun", "run-3");
+    assert.equal(release.releaseActionResults[0].status, "succeeded");
     assert.equal(
       factsFor(model, "CleanupEvidence", "cleanup-1").diagnostics,
       "cleanup failed (permission_denied)",
@@ -125,7 +146,7 @@ test("resource graph read model links admitted runtime facts without leaking sec
         (edge: any) =>
           edge.kind === "runtime_status" &&
           edge.fromUid === "uid:provisioner" &&
-          edge.toUid === "runtime:DeployRun:run-1",
+          edge.toUid === "runtime:DeployRun:run-2",
       ),
     );
     assert.ok(
@@ -133,7 +154,7 @@ test("resource graph read model links admitted runtime facts without leaking sec
         (edge: any) =>
           edge.kind === "runtime_status" &&
           edge.fromUid === "uid:provisioner" &&
-          edge.toUid === "runtime:ExecutionSnapshot:submission-1",
+          edge.toUid === "runtime:ExecutionSnapshot:submission-2",
       ),
     );
     assert.ok(
@@ -141,9 +162,11 @@ test("resource graph read model links admitted runtime facts without leaking sec
         (edge: any) =>
           edge.kind === "runtime_status" &&
           edge.fromUid === "uid:provisioner" &&
-          edge.toUid === "runtime:CurrentStageState:demo-web:staging",
+          edge.toUid === "runtime:CurrentStageState:demo-infra:staging",
       ),
     );
+    assertPolicyEdge(model, "runtime:DeployRun:run-1", "ProviderCapabilityPolicy");
+    assertPolicyEdge(model, "runtime:DeployRun:run-3", "ReleaseActionPolicy");
     assert.doesNotMatch(JSON.stringify(model), /raw-secret|proof-secret|Bearer|token=/);
   });
 });
@@ -191,5 +214,17 @@ function assertHasNode(model: any, kind: string, name: string) {
 }
 
 function factsFor(model: any, kind: string, name: string) {
-  return model.nodes.find((node: any) => node.kind === kind && node.name === name)?.facts;
+  return nodeFor(model, kind, name)?.facts;
+}
+
+function nodeFor(model: any, kind: string, name: string) {
+  return model.nodes.find((node: any) => node.kind === kind && node.name === name);
+}
+
+function assertPolicyEdge(model: any, fromUid: string, toKind: string) {
+  assert.ok(
+    model.edges.some(
+      (edge: any) => edge.kind === "policy" && edge.fromUid === fromUid && edge.toKind === toKind,
+    ),
+  );
 }

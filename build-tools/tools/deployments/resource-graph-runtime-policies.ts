@@ -2,7 +2,7 @@
 import type { ResourceGraphEdge } from "./resource-graph-export";
 
 export type RuntimePolicyContext = {
-  policyUidByResourceId: Map<string, string>;
+  policyByResourceId: Map<string, { uid: string; version?: string }>;
 };
 
 export type RuntimePolicyRef = {
@@ -28,17 +28,21 @@ export function policyRuntimeEdges(opts: {
   fromKind: string;
 }): ResourceGraphEdge[] {
   return opts.refs.flatMap((ref) => {
-    const policyUid = opts.context.policyUidByResourceId.get(ref.resourceId);
-    return policyUid
-      ? [
-          {
-            fromUid: opts.fromUid,
-            toUid: policyUid,
-            kind: "policy",
-            fromKind: opts.fromKind,
-            toKind: ref.kind,
-          } as ResourceGraphEdge,
-        ]
-      : [];
+    const policy = opts.context.policyByResourceId.get(ref.resourceId);
+    if (!policy) throw new Error(`runtime policy ref missing resource: ${ref.resourceId}`);
+    if (policy.version && policy.version !== ref.version) {
+      throw new Error(
+        `runtime policy ref version mismatch for ${ref.resourceId}: expected ${policy.version}, got ${ref.version}`,
+      );
+    }
+    return [
+      {
+        fromUid: opts.fromUid,
+        toUid: policy.uid,
+        kind: "policy",
+        fromKind: opts.fromKind,
+        toKind: ref.kind,
+      } as ResourceGraphEdge,
+    ];
   });
 }
