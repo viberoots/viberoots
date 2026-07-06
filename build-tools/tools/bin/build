@@ -1,4 +1,25 @@
 #!/usr/bin/env bash
+set -euo pipefail
+case "${1:-}" in
+	-h|--help)
+		cat <<'EOF'
+usage: b [buck-subcommand|target...] [options]
+       build [buck-subcommand|target...] [options]
+
+Build workspace targets through Buck/Nix.
+
+subcommands:
+  build, test, run, cquery, query, install, kill, server, clean
+
+options:
+  --impure
+  --no-materialize
+  -h, --help
+EOF
+		exit 0
+		;;
+esac
+
 # shell helpers
 # shellcheck source=/dev/null
 . "$(cd "$(dirname "$0")" && pwd)/devshell.sh"

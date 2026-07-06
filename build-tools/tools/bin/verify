@@ -1,5 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
+case "${1:-}" in
+	-h|--help)
+		cat <<'EOF'
+usage: v [options] [target...]
+       verify [options] [target...]
+
+Run workspace verification.
+
+options:
+  --coverage
+  --console <auto|super|simple>
+  --selector <default|project-closure>
+  --project <name>
+  --projects <name[,name...]>
+  --explain-selection
+  -h, --help
+EOF
+		exit 0
+		;;
+esac
 
 # shell helpers
 # shellcheck source=/dev/null

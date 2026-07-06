@@ -1,8 +1,35 @@
 #!/usr/bin/env bash
+set -euo pipefail
+case "${1:-}" in
+	-h|--help)
+		cat <<'EOF'
+usage: i [options]
+       install-deps [options]
+
+Refresh workspace dependencies and generated viberoots glue.
+
+options:
+  --force
+  --dry-run
+  --verbose, -v
+  --skip-glue
+  --glue-only
+  --skip-go-tidy
+  --without-secrets
+  --yes
+  --machine-label <label>
+  --rotate-bootstrap-credentials
+  --rotate-deployment-credentials
+  --force-overwrite-local-credentials
+  -h, --help
+EOF
+		exit 0
+		;;
+esac
+
 # shell helpers
 # shellcheck source=/dev/null
 . "$(cd "$(dirname "$0")" && pwd)/devshell.sh"
 
 run_ts "../dev/install-deps.ts" "$@"
-
 

@@ -4,7 +4,7 @@ import path from "node:path";
 import { parseDevBuildArgs } from "./args";
 import { runBuckCommand } from "./buck";
 import { cleanDevBuildWorkspace, refreshGlueAndExportGraph } from "./glue";
-import { restoreFlakeLock } from "./git";
+import { captureFlakeLockSnapshot, restoreFlakeLock } from "./git";
 import { runHousekeeping } from "./housekeeping";
 import { createIsolation, type Isolation } from "./isolation";
 import { materializePureGraphIfEnabled } from "./materialize-pure";
@@ -63,6 +63,7 @@ export async function runDevBuild(): Promise<void> {
     .access(graphPath)
     .then(() => true)
     .catch(() => false);
+  const flakeLockSnapshot = await captureFlakeLockSnapshot(root);
 
   let iso: Isolation | null = null;
   try {
@@ -246,7 +247,7 @@ export async function runDevBuild(): Promise<void> {
       restArgs: parsed.restArgs,
     });
 
-    await restoreFlakeLock(root);
+    await restoreFlakeLock(root, flakeLockSnapshot);
     await runHousekeeping({ isCI, root });
   } finally {
     if (iso) {
