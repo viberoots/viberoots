@@ -9,7 +9,10 @@ import { runNodeWithZx } from "../../lib/node-run";
 import { repoNodeBinCandidates, resolveRepoNodeBin } from "../../lib/repo-node-bin";
 import { resolveToolPath } from "../../lib/tool-paths";
 import { buildToolsRoot, buildToolPath } from "../dev-build/paths";
-import { filterExistingLintPreflightPaths } from "./lint-preflight-paths";
+import {
+  filterExistingLintPreflightPaths,
+  resolveLintPreflightFilterPaths,
+} from "./lint-preflight-paths";
 
 function verbose(): boolean {
   return isVbrVerbose();
@@ -266,6 +269,13 @@ export async function runVerifyLintPreflight(
   const lintFilters = Array.isArray(opts.lintFilters)
     ? opts.lintFilters.map((x) => String(x || "").trim()).filter(Boolean)
     : [];
+  const explicitLintPaths =
+    lintFilters.length > 0
+      ? (await resolveLintPreflightFilterPaths(root, lintFilters)).filter(
+          (p) => p === "." || !shouldIgnoreLintPath(p),
+        )
+      : [];
+  const fullRepoLintRequested = explicitLintPaths.includes(".");
   const rawChangedPaths =
     lintFilters.length > 0 ? [] : await collectChangedPaths(root, process.env);
   const normalizedChangedPaths = Array.from(
@@ -280,10 +290,20 @@ export async function runVerifyLintPreflight(
   const onlyIgnoredScaffoldChanges =
     lintFilters.length === 0 && existingChangedPaths.length > 0 && changedLintPaths.length === 0;
   const eslintTargets =
-    lintFilters.length > 0 ? lintFilters : changedLintPaths.filter(isEslintPath);
+    lintFilters.length > 0
+      ? fullRepoLintRequested
+        ? ["."]
+        : explicitLintPaths.filter(isEslintPath)
+      : changedLintPaths.filter(isEslintPath);
   const prettierTargets =
-    lintFilters.length > 0 ? lintFilters : changedLintPaths.filter(isPrettierPath);
-  const scoped = lintFilters.length > 0 || changedLintPaths.length > 0;
+    lintFilters.length > 0
+      ? fullRepoLintRequested
+        ? ["."]
+        : explicitLintPaths.filter(isPrettierPath)
+      : changedLintPaths.filter(isPrettierPath);
+  const scoped =
+    (lintFilters.length > 0 && (eslintTargets.length > 0 || prettierTargets.length > 0)) ||
+    changedLintPaths.length > 0;
   if (onlyIgnoredScaffoldChanges) {
     if (verbose()) {
       process.stderr.write(

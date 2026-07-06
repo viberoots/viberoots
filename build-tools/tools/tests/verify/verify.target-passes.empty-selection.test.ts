@@ -7,7 +7,7 @@ test("verify fails fast when explicit selectors resolve to zero concrete targets
   assert.throws(
     () =>
       assertVerifyTargetPlanNotEmpty({
-        requestedTargets: ["@viberoots//build-tools/tools/tests/deployments/..."],
+        requestedTargets: ["//projects/apps/missing:unit"],
         plan: {
           targetLabels: [],
           passes: [],
@@ -43,6 +43,18 @@ test("verify allows empty broad selector scans", () => {
   assert.doesNotThrow(() =>
     assertVerifyTargetPlanNotEmpty({
       requestedTargets: ["//..."],
+      plan: {
+        targetLabels: [],
+        passes: [],
+      },
+    }),
+  );
+});
+
+test("verify allows empty package selector scans", () => {
+  assert.doesNotThrow(() =>
+    assertVerifyTargetPlanNotEmpty({
+      requestedTargets: ["//projects/..."],
       plan: {
         targetLabels: [],
         passes: [],

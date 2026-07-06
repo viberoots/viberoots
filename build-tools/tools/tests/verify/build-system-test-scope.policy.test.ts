@@ -174,19 +174,3 @@ test("non-build-system target scope derives selectors from top-level workspace r
     assert.equal(targets.includes("//third_party/..."), false);
   });
 });
-
-test("non-build-system target scope falls back to local viberoots cell when projects has no targets", async () => {
-  const tmp = await mktemp("build-system-scope-empty-projects-");
-  try {
-    await fsp.mkdir(path.join(tmp, "projects", "config"), { recursive: true });
-    await fsp.mkdir(path.join(tmp, ".viberoots"), { recursive: true });
-    await fsp.mkdir(path.join(tmp, "viberoots"), { recursive: true });
-    await fsp.writeFile(path.join(tmp, "viberoots", "TARGETS"), "# targets\n");
-    await fsp.symlink("../viberoots", path.join(tmp, ".viberoots", "current"));
-
-    const targets = await resolveNonBuildSystemBuckTargets(tmp);
-    assert.deepEqual(targets, ["viberoots//..."]);
-  } finally {
-    await fsp.rm(tmp, { recursive: true, force: true });
-  }
-});

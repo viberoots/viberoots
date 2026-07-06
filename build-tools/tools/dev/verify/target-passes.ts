@@ -77,6 +77,10 @@ export function isBroadVerifyTargetScan(target: string): boolean {
   return String(target || "").trim() === "//...";
 }
 
+export function isVerifyTargetScan(target: string): boolean {
+  return isPatternVerifyTarget(target);
+}
+
 function isManualVerifyTarget(labels: readonly string[]): boolean {
   return labels.includes(VERIFY_MANUAL_LABEL);
 }
@@ -284,7 +288,7 @@ export function assertVerifyTargetPlanNotEmpty(opts: {
   if (
     opts.requestedTargets.length === 0 ||
     opts.plan.targetLabels.length > 0 ||
-    opts.requestedTargets.every(isBroadVerifyTargetScan)
+    opts.requestedTargets.every(isVerifyTargetScan)
   ) {
     return;
   }

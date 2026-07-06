@@ -1,5 +1,4 @@
 import * as fsp from "node:fs/promises";
-import path from "node:path";
 
 function normalizePath(relPath: string): string {
   return String(relPath || "")
@@ -37,47 +36,11 @@ export function isNonBuildSystemScopeRoot(name: string): boolean {
   return !NON_BUILD_SYSTEM_SCOPE_IGNORED_ROOTS.has(root);
 }
 
-async function hasBuckPackage(root: string, relRoot: string): Promise<boolean> {
-  const absRoot = path.join(root, relRoot);
-  const pending = [absRoot];
-  while (pending.length > 0) {
-    const cur = pending.pop()!;
-    const entries = await fsp.readdir(cur, { withFileTypes: true }).catch(() => []);
-    for (const entry of entries) {
-      if (entry.isFile() && (entry.name === "TARGETS" || entry.name === "BUCK")) {
-        return true;
-      }
-      if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules") {
-        pending.push(path.join(cur, entry.name));
-      }
-    }
-  }
-  return false;
-}
-
-async function hasLocalViberootsCell(root: string): Promise<boolean> {
-  const currentTarget = await fsp
-    .readlink(path.join(root, ".viberoots", "current"))
-    .catch(() => "");
-  if (currentTarget !== "../viberoots") return false;
-  return fsp
-    .access(path.join(root, "viberoots", "TARGETS"))
-    .then(() => true)
-    .catch(() => false);
-}
-
 export async function resolveNonBuildSystemBuckTargets(root: string): Promise<string[]> {
   const entries = await fsp.readdir(root, { withFileTypes: true }).catch(() => []);
-  const targets: string[] = [];
-  for (const entry of entries) {
-    if (!entry.isDirectory() || !isNonBuildSystemScopeRoot(entry.name)) continue;
-    if (await hasBuckPackage(root, entry.name)) {
-      targets.push(`//${entry.name}/...`);
-    }
-  }
-  targets.sort();
-  if (targets.length === 0 && (await hasLocalViberootsCell(root))) {
-    return ["viberoots//..."];
-  }
+  const targets = entries
+    .filter((entry) => entry.isDirectory() && isNonBuildSystemScopeRoot(entry.name))
+    .map((entry) => `//${entry.name}/...`)
+    .sort();
   return targets.length > 0 ? targets : ["//..."];
 }
