@@ -78,9 +78,10 @@ logged directly.
   payload content.
 - Record-adjacent artifacts remain inspectable through their stored paths, but the standard
   operator-facing observability surface does not inline their raw contents.
-- Resource graph runtime evidence persists only redacted documents or durable validated references.
-  The backend importer rejects raw or malformed admitted observability evidence before it can appear
-  in graph status.
+- Resource graph runtime evidence persists only redacted documents or references that resolve to a
+  complete validated evidence object or carry a durable validation proof from the owning
+  control-plane evidence authority. The backend importer rejects raw, path-only, or malformed
+  admitted observability evidence before it can appear in graph status.
 
 ## AWS EC2 Observability Evidence
 

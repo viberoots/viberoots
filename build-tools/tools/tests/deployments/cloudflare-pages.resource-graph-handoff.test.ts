@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { syncBackendResourceGraphIndex } from "../../deployments/nixos-shared-host-control-plane-backend";
+import { runtimeEvidenceValidationProof } from "../../deployments/resource-graph-runtime-reference";
 import type { CloudflarePagesRuntimeEvidenceHandoff } from "../../deployments/cloudflare-pages-resource-graph-runtime-evidence";
 import { runtimeEvidenceDocuments } from "../../deployments/resource-graph-runtime-evidence";
 import {
@@ -99,30 +100,41 @@ function validHandoff(): CloudflarePagesRuntimeEvidenceHandoff {
 function validSources(): DeploymentRuntimeInventorySources {
   return {
     runtimeInputs: [
-      source("runtime-input", reference("cloud-control-runtime-input-reference@1", "runtime")),
+      source(
+        "runtime-input",
+        reference("cloud-control-runtime-input-reference@1", "runtimeInputs"),
+      ),
     ],
     authProviderProfiles: [
-      source("auth-profile", reference("auth-provider-profile-reference@1", "auth")),
+      source(
+        "auth-profile",
+        reference("auth-provider-profile-reference@1", "authProviderProfiles"),
+      ),
     ],
     readinessEvidence: [
       source("readiness", {
-        ...reference("control-plane-readiness-reference@1", "readiness"),
+        ...reference("control-plane-readiness-reference@1", "readinessEvidence"),
         operation: "cutover",
       }),
     ],
     observabilityEvidence: [
       source(
         "observability",
-        reference("aws-ec2-control-plane-observability-reference@1", "observability"),
+        reference("aws-ec2-control-plane-observability-reference@1", "observabilityEvidence"),
       ),
     ],
     miniMigrationEvidence: [
-      source("mini-migration", reference("mini-migration-preflight-reference@1", "migration")),
+      source(
+        "mini-migration",
+        reference("mini-migration-preflight-reference@1", "miniMigrationEvidence"),
+      ),
     ],
   };
 }
 
 function source(id: string, value: unknown) {
+  const record = value as Record<string, unknown>;
+  const name = sourceNameFor(String(record.schemaVersion || ""));
   return admitControlPlaneRuntimeRecord({
     id,
     refs: [deploymentId],
@@ -135,20 +147,89 @@ function source(id: string, value: unknown) {
       maxAgeMinutes: 60,
       nowMs: Date.now(),
       operation: "cutover",
+      expectedProvider: "aws-ec2",
+      expectedControlPlaneProfileId: "cloudflare-pages-control-plane",
+      runtimeEvidenceRecords: [
+        proof(
+          String(record.schemaVersion || ""),
+          evidenceKindFor(name),
+          evidenceSchemaFor(name),
+          name,
+        ),
+      ],
     },
   });
 }
 
 function reference(schemaVersion: string, name: string) {
   const submissionId = "cp-runtime-evidence";
+  const evidenceRef = `evidence://control-plane/cloudflare-pages/snapshots/${submissionId}/${name}`;
+  const sourceSnapshot = {
+    submissionId,
+    executionSnapshotPath: `/control-plane/snapshots/${submissionId}.json`,
+  };
   return {
     schemaVersion,
     checkedAt: new Date().toISOString(),
-    evidenceRef: `evidence://control-plane/cloudflare-pages/snapshots/${submissionId}/${name}`,
+    evidenceRef,
     provider: "aws-ec2",
+    controlPlaneProfileId: "cloudflare-pages-control-plane",
+    sourceSnapshot,
+  };
+}
+
+function sourceNameFor(schemaVersion: string) {
+  const names: Record<string, string> = {
+    "cloud-control-runtime-input-reference@1": "runtimeInputs",
+    "auth-provider-profile-reference@1": "authProviderProfiles",
+    "control-plane-readiness-reference@1": "readinessEvidence",
+    "aws-ec2-control-plane-observability-reference@1": "observabilityEvidence",
+    "mini-migration-preflight-reference@1": "miniMigrationEvidence",
+  };
+  return names[schemaVersion] || "runtimeInputs";
+}
+
+function evidenceKindFor(name: string) {
+  const kinds: Record<string, string> = {
+    runtimeInputs: "RuntimeInput",
+    authProviderProfiles: "AuthProviderProfile",
+    readinessEvidence: "ControlPlaneReadinessEvidence",
+    observabilityEvidence: "ControlPlaneObservabilityEvidence",
+    miniMigrationEvidence: "MiniMigrationPreflightEvidence",
+  };
+  return kinds[name] || "RuntimeInput";
+}
+
+function evidenceSchemaFor(name: string) {
+  const schemas: Record<string, string> = {
+    runtimeInputs: "cloud-control-runtime-input@1",
+    authProviderProfiles: "cloud-control-auth-provider-profile@1",
+    readinessEvidence: "cloud-cutover-evidence@1",
+    observabilityEvidence: "aws-ec2-control-plane-observability@1",
+    miniMigrationEvidence: "mini-migration-preflight@1",
+  };
+  return schemas[name] || "cloud-control-runtime-input@1";
+}
+
+function proof(
+  referenceSchemaVersion: string,
+  evidenceKind: string,
+  evidenceSchemaVersion: string,
+  name: string,
+) {
+  const submissionId = "cp-runtime-evidence";
+  return runtimeEvidenceValidationProof({
+    evidenceKind,
+    evidenceSchemaVersion,
+    referenceSchemaVersion,
+    evidenceRef: `evidence://control-plane/cloudflare-pages/snapshots/${submissionId}/${name}`,
+    deploymentId,
     sourceSnapshot: {
       submissionId,
       executionSnapshotPath: `/control-plane/snapshots/${submissionId}.json`,
     },
-  };
+    checkedAt: new Date().toISOString(),
+    provider: "aws-ec2",
+    controlPlaneProfileId: "cloudflare-pages-control-plane",
+  });
 }

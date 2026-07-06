@@ -200,6 +200,10 @@ control-plane evidence requirement. In the representative Cloudflare Pages flow,
 deploy/replay snapshots carry the required runtime-evidence source records before resource graph
 import; graph import binds those records to the persisted execution snapshot path and fails closed if
 they are missing runtime input, auth-provider, readiness, observability, or mini-migration evidence.
+Runtime evidence references also need complete kind-validator acceptance or a durable validation
+proof that matches the deployment, provider or control-plane profile, schema versions, source
+snapshot, execution snapshot path, and validation timestamp. A remote-build artifact path or source
+snapshot path does not satisfy that deployment-control-plane proof by itself.
 
 Automation target:
 

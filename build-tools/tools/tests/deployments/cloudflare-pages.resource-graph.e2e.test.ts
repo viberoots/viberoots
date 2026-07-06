@@ -15,6 +15,7 @@ import {
   assertEvidenceKinds,
   assertEvidenceReferenceShape,
   assertEvidenceReferenceSummary,
+  assertHandoffReferencesResolved,
   assertRenderedEvidenceHtml,
   assertSecretSafe,
   captureStdout,
@@ -57,6 +58,7 @@ test("Cloudflare Pages reconciler path publishes linked resource graph status", 
         path: "cloudflare-pages-control-plane-reconciler",
         deployRunIds: [runs.first.deployRunId, runs.second.deployRunId, runs.rollback.deployRunId],
       });
+      assertHandoffReferencesResolved(runs.runtimeEvidenceHandoff.runtimeSources);
       assertEvidenceKinds(direct);
       const evidenceRefs = evidenceReferenceSummary(direct);
       assertEvidenceReferenceShape(evidenceRefs, ctx.deployment.deploymentId);
@@ -198,14 +200,7 @@ async function renderResourceGraphUi(serviceUrl: string) {
   assert.equal(session.grants.read, true);
   assert.equal(session.grants.mutations, false);
   const app = { innerHTML: "Loading..." };
-  const reads: Array<{
-    requestId: string;
-    responseRequestId: string | null;
-    schemaVersion: string;
-    runtimeStatus: string;
-    evidenceKinds: string[];
-    evidenceRefs: unknown;
-  }> = [];
+  const reads: any[] = [];
   const context = vm.createContext({
     window: {
       __CONTROL_PLANE_BASE_PATH__: "/ops",

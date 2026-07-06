@@ -83,6 +83,13 @@ explicitly admits them through its existing evidence contracts. A remote-build s
 be fixed in the Buck/Nix remote-execution lane; do not patch deployment graph status or add a
 generic runtime evidence mutation path to represent it.
 
+Runtime evidence references are admitted to deployment graph status only after the control-plane
+path provides complete validator-accepted evidence or a durable validation proof from the owning
+evidence authority. The proof must match the deployment, evidence kind, schema versions, source
+snapshot, execution snapshot path, provider or control-plane profile identity, and validation
+timestamp. Remote-build source snapshots and artifact paths are useful build evidence, but path
+presence alone is not deployment runtime evidence.
+
 The flake exports `packages.<system>.remote-worker-tools` and
 `packages.<system>.remote-ci-tools` for declared remote worker and CI helper closures.
 It also exports `apps.<system>.remote-worker-bootstrap` as a local check helper. The bootstrap app

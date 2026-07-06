@@ -17,6 +17,28 @@ export function assertEvidenceReferenceSummary(model: any, expected: unknown) {
   assert.deepEqual(evidenceReferenceSummary(model), expected);
 }
 
+export function assertHandoffReferencesResolved(runtimeSources: any) {
+  for (const values of Object.values(runtimeSources) as any[]) {
+    for (const record of values || []) {
+      const ref = String(record.value?.evidenceRef || "");
+      const durableRecords = record.validation?.runtimeEvidenceRecords || [];
+      const durable = durableRecords.find((item: any) => item.evidenceRef === ref);
+      assert.ok(durable, `expected durable evidence record for ${ref}`);
+      assert.equal(durable.deploymentId, record.refs[0]);
+      assert.equal(
+        durable.sourceSnapshot?.submissionId,
+        record.value?.sourceSnapshot?.submissionId,
+      );
+      assert.equal(
+        durable.sourceSnapshot?.executionSnapshotPath,
+        record.value?.sourceSnapshot?.executionSnapshotPath,
+      );
+      assert.ok(durable.validatedAt);
+      assert.match(String(durable.validatedEvidenceDigest || ""), /^sha256:/);
+    }
+  }
+}
+
 export function assertEvidenceReferenceShape(summary: any[], deploymentId: string) {
   assert.equal(summary.length, RUNTIME_EVIDENCE_KINDS.length);
   for (const item of summary) {

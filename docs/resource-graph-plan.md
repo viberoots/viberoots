@@ -1935,3 +1935,117 @@ operator graph status.
 
 It adds one more targeted E2E hardening PR and may require changing the control-plane test harness,
 graph import helper, and remote-build documentation together.
+
+## PR-15: Runtime evidence reference resolution and durable validation proof
+
+### 1. Intent
+
+Close the post-PR-14 reference-safety gap: runtime evidence references accepted by graph import and
+status validation must either resolve to complete validated evidence objects or prove that they name
+durable evidence already validated by the owning evidence authority.
+
+### 2. Scope of changes
+
+- Replace production snapshot helper behavior that fabricates `*-reference@1` runtime evidence
+  values from only `evidenceRef` strings and source snapshot IDs when no complete validated evidence
+  object or durable validation proof is available.
+- Add a single runtime evidence reference resolution path used by graph import, production snapshot
+  helpers, and validators for runtime input, auth-provider profile, cutover readiness,
+  observability, and mini-migration evidence.
+- For embedded evidence, validate the complete referenced object with the evidence-kind validator
+  before accepting the reference into graph status.
+- For durable references, prove the reference identifies already validated evidence by checking the
+  owning durable evidence record, evidence kind, schema version, deployment identity, provider or
+  control-plane profile identity, source snapshot identity, and validation timestamp or equivalent
+  validation marker.
+- Fail closed when `evidenceRef` is unresolved, resolves to the wrong evidence kind, points at a
+  mismatched deployment/source snapshot/provider/control-plane profile, refers to stale or
+  unvalidated evidence, or only proves path presence.
+- Preserve the read model as non-authoritative. Runtime evidence producers, object storage,
+  provider/control-plane records, queueing, leases, stage state, audit, replay, and validated
+  durable evidence records remain the source of truth.
+- Do not add a generic runtime evidence mutation API or a second runtime evidence importer.
+- Review `resource-graph-envelope.runtime.test.ts` while touching this path. If it remains over the
+  methodology file-size limit and is not covered by an owner-local exception, split the tests along
+  existing responsibility boundaries or add the reviewed exception in the same PR.
+
+### 3. External prerequisites
+
+- PR-14 should be complete.
+
+### 4. Tests to be added
+
+- Validator and importer tests proving each runtime evidence reference kind resolves to a complete
+  validated runtime input, auth-provider profile, cutover readiness, observability, or
+  mini-migration evidence object before graph status accepts it.
+- Durable-reference tests proving accepted references match the owning durable evidence record's
+  evidence kind, schema version, deployment identity, source snapshot identity, provider or
+  control-plane profile identity, and validation marker.
+- Negative tests proving unresolved references, kind mismatches, source snapshot mismatches,
+  deployment mismatches, stale validation markers, missing durable objects, and path-only evidence
+  references fail closed with actionable diagnostics.
+- Representative Cloudflare/control-plane E2E coverage proving production snapshot references are
+  resolved or durably proven before runtime graph status is imported.
+- Regression tests proving fixture-built importer tests can still use explicit complete evidence
+  objects without bypassing reference validation in the production snapshot path.
+- If `resource-graph-envelope.runtime.test.ts` is split, run the focused replacement test files and
+  prove the original coverage remains represented.
+
+### 5. Docs to be added or updated
+
+- Update resource graph and control-plane operator docs to state that runtime evidence references
+  are accepted only after complete evidence validation or durable validation proof.
+- Update any docs that currently imply `evidenceRef` shape, source snapshot ID, and path presence are
+  sufficient evidence guarantees.
+- Keep the combined control-plane/remote-build setup docs current if operator setup,
+  troubleshooting, status output, or replay diagnostics change.
+- Update the canonical remote-build setup doc,
+  [`../build-tools/docs/remote-build-setup.md`](../build-tools/docs/remote-build-setup.md), when the
+  runtime evidence reference boundary affects remote-build operators.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Include focused runtime evidence reference resolver, backend importer, production snapshot helper,
+  Cloudflare/control-plane E2E, read-surface, and documentation validation.
+
+### 6. Acceptance criteria
+
+- Runtime evidence references accepted by graph status resolve to complete validated evidence objects
+  or prove durable validation by the owning evidence authority.
+- `evidenceRef` shape, freshness, source snapshot ID, and path presence are no longer sufficient by
+  themselves for accepting runtime evidence references.
+- Unresolved, mismatched, stale, path-only, or unvalidated references fail closed with diagnostics
+  that identify the rejected evidence kind and reference.
+- The representative Cloudflare/control-plane path proves production snapshot references through the
+  real resolver or durable validation proof path.
+- Control-plane and remote-build documentation describe the implemented reference guarantee without
+  overstating what status validation proves.
+- Any touched runtime envelope test file complies with the methodology file-size rule or has a
+  reviewed owner-local exception.
+
+### 7. Risks
+
+- Existing production snapshot fixtures may rely on path-only references and fail once references
+  must resolve to complete validated evidence.
+- Durable evidence records may not currently expose one common validation marker across all runtime
+  evidence kinds.
+
+### 8. Mitigations
+
+- Reuse PR-13 and PR-14 evidence validators and durable-reference handling instead of adding
+  parallel per-kind shortcuts.
+- Add the smallest shared resolver contract needed for the five runtime evidence kinds, with
+  evidence-kind-specific validation delegated to existing validators.
+- Keep diagnostics concrete so fixture drift is corrected at the evidence producer or durable record
+  boundary.
+
+### 9. Consequences of not implementing this PR
+
+The graph status path could continue accepting runtime evidence references that look well formed but
+do not prove complete validated runtime evidence exists for the deployment.
+
+### 10. Downsides for implementing this PR
+
+It adds another hardening PR after the representative production handoff and may require coordinated
+updates across snapshot helpers, validators, importer tests, E2E fixtures, and operator docs.

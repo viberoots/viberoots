@@ -5,19 +5,28 @@ import {
   type RuntimeSourceRecord,
 } from "./resource-graph-types";
 import { queryBackend } from "./nixos-shared-host-control-plane-backend-db";
+import { proofWithSnapshotPath } from "./cloudflare-pages-resource-graph-runtime-reference";
+import type { RuntimeEvidenceDurableRecord } from "./resource-graph-runtime-reference";
 import type { NixosSharedHostControlPlaneBackendTarget } from "./nixos-shared-host-control-plane-backend-db";
 
-type SnapshotDoc = {
+export { withCloudflarePagesRuntimeEvidenceSources } from "./cloudflare-pages-resource-graph-runtime-snapshot";
+
+type RuntimeEvidenceSnapshotDoc = {
   deploymentId?: string;
   operationKind?: string;
   resourceGraphRuntimeEvidenceSources?: DeploymentRuntimeInventorySources;
+  resourceGraphRuntimeEvidenceRecords?: RuntimeEvidenceDurableRecord[];
 };
 type SnapshotRow = {
   submission_id: string;
   execution_snapshot_path: string;
-  document_json: SnapshotDoc;
+  document_json: RuntimeEvidenceSnapshotDoc;
 };
-type DeployRun = { deployRunId: string };
+type RuntimeEvidenceRunSet = {
+  first: { deployRunId: string };
+  second: { deployRunId: string };
+  rollback: { deployRunId: string };
+};
 export type CloudflarePagesRuntimeEvidenceHandoff = {
   sourceRef: "cloudflare-pages-control-plane-runtime-evidence";
   deploymentId: string;
@@ -28,68 +37,10 @@ export type CloudflarePagesRuntimeEvidenceHandoff = {
   runtimeSources: DeploymentRuntimeInventorySources;
 };
 
-export function withCloudflarePagesRuntimeEvidenceSources<T extends SnapshotDoc>(snapshot: T): T {
-  const deploymentId = String(snapshot.deploymentId || "");
-  const submissionId = snapshotId(snapshot);
-  const submittedAt = String((snapshot as any).submittedAt || new Date().toISOString());
-  const source = (kind: string, value: unknown, operation = "deploy") =>
-    runtimeRecord(
-      `${kind}:${submissionId}`,
-      deploymentId,
-      submittedAt,
-      snapshotReference(value, kind, submissionId),
-      operation,
-    );
-  return {
-    ...snapshot,
-    resourceGraphRuntimeEvidenceSources:
-      snapshot.operationKind === "rollback"
-        ? {
-            readinessEvidence: [
-              source(
-                "cutover-readiness",
-                reference("control-plane-readiness-reference@1", "readiness", submittedAt),
-                "cutover",
-              ),
-            ],
-            observabilityEvidence: [
-              source(
-                "observability",
-                reference(
-                  "aws-ec2-control-plane-observability-reference@1",
-                  "observability",
-                  submittedAt,
-                ),
-              ),
-            ],
-            miniMigrationEvidence: [
-              source(
-                "mini-migration",
-                reference("mini-migration-preflight-reference@1", "mini-migration", submittedAt),
-              ),
-            ],
-          }
-        : {
-            runtimeInputs: [
-              source(
-                "runtime-input",
-                reference("cloud-control-runtime-input-reference@1", "runtime-input", submittedAt),
-              ),
-            ],
-            authProviderProfiles: [
-              source(
-                "auth-profile",
-                reference("auth-provider-profile-reference@1", "auth-provider", submittedAt),
-              ),
-            ],
-          },
-  };
-}
-
 export async function collectCloudflarePagesRuntimeEvidenceHandoff(opts: {
   backend: NixosSharedHostControlPlaneBackendTarget;
   deploymentId: string;
-  runs: { first: DeployRun; second: DeployRun; rollback: DeployRun };
+  runs: RuntimeEvidenceRunSet;
 }): Promise<CloudflarePagesRuntimeEvidenceHandoff> {
   const rows = await queryBackend<SnapshotRow>(
     opts.backend,
@@ -137,6 +88,7 @@ function assertSnapshotRow(row: SnapshotRow) {
 
 function sourcesFromPersistedSnapshot(row: SnapshotRow) {
   const sources = row.document_json.resourceGraphRuntimeEvidenceSources || {};
+  const durableRecords = persistedDurableRecords(row);
   const out: DeploymentRuntimeInventorySources = {};
   for (const key of Object.keys(sources) as Array<keyof DeploymentRuntimeInventorySources>) {
     const records = sources[key] as RuntimeSourceRecord[] | undefined;
@@ -144,6 +96,7 @@ function sourcesFromPersistedSnapshot(row: SnapshotRow) {
       (out as any)[key] = records.map((record) => ({
         ...record,
         value: persistedReference(record.value, row),
+        validation: { ...record.validation, runtimeEvidenceRecords: durableRecords },
       }));
     }
   }
@@ -166,48 +119,8 @@ function persistedReference(value: unknown, row: SnapshotRow) {
   };
 }
 
-function runtimeRecord(
-  id: string,
-  deploymentId: string,
-  checkedAt: string,
-  value: unknown,
-  operation: string,
-) {
-  return {
-    id,
-    refs: [deploymentId],
-    value,
-    validation: {
-      expectedCallbackHost: "deploy-auth.example.test",
-      expectedCallbackPath: "/oidc/callback",
-      deploymentIds: [deploymentId],
-      production: true,
-      maxAgeMinutes: 60,
-      nowMs: Date.parse(checkedAt) + 1000,
-      operation,
-    },
-  };
-}
-
-function reference(schemaVersion: string, kind: string, checkedAt: string) {
-  return {
-    schemaVersion,
-    checkedAt,
-    provider: "aws-ec2",
-    operation: kind === "readiness" ? "cutover" : undefined,
-  };
-}
-
-function snapshotReference(value: unknown, kind: string, submissionId: string) {
-  return {
-    ...(value as Record<string, unknown>),
-    evidenceRef: `evidence://control-plane/cloudflare-pages/snapshots/${encodeURIComponent(
-      submissionId,
-    )}/${kind}`,
-    sourceSnapshot: { submissionId },
-  };
-}
-
-function snapshotId(snapshot: SnapshotDoc) {
-  return String((snapshot as any).submissionId || snapshot.operationKind || "snapshot");
+function persistedDurableRecords(row: SnapshotRow) {
+  return (row.document_json.resourceGraphRuntimeEvidenceRecords || []).map((record) =>
+    proofWithSnapshotPath(record, row.execution_snapshot_path),
+  );
 }

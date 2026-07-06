@@ -1,22 +1,19 @@
 #!/usr/bin/env zx-wrapper
-import { validateAwsEc2ControlPlaneObservability } from "./cloud-control-aws-ec2-observability";
-import { validateAuthProviderProfile } from "./cloud-control-auth-provider-profile";
-import { validateCloudControlCutover } from "./cloud-control-cutover-validate";
-import { validateRuntimeInput } from "./cloud-control-runtime-input";
-import { validateMiniCloudMigrationEvidence } from "./control-plane-mini-migration-preflight";
+import {
+  validateAuthProviderRecord,
+  validateMiniMigrationRecord,
+  validateObservabilityEvidence,
+  validateReadinessEvidence,
+  validateRuntimeInputRecord,
+} from "./resource-graph-runtime-validators";
 import { collectRuntimeArtifactStatus } from "./resource-graph-runtime-artifacts";
 import { collectServiceClientSelectionResources } from "./resource-graph-service-client";
 import { isAdmittedControlPlaneRuntimeRecord } from "./resource-graph-types";
-import {
-  validateEvidenceReference,
-  validateReadinessReference,
-} from "./resource-graph-runtime-reference";
 import type {
   DeploymentResourceInventoryEntry,
   DeploymentRuntimeInventorySources,
   RuntimeSourceRecord,
   RuntimeStatusRecord,
-  RuntimeValidationOptions,
 } from "./resource-graph-types";
 
 type RuntimeCollection = { resources: DeploymentResourceInventoryEntry[]; errors: string[] };
@@ -143,84 +140,6 @@ function collectStatus(
     }
     out.push(runtimeEntry(kind, record.id, record.refs, record.facts, record.source));
   }
-}
-
-function validateRuntimeInputRecord(record: RuntimeSourceRecord): string[] {
-  const referenceErrors = validateEvidenceReference(
-    record.value,
-    record,
-    "cloud-control-runtime-input-reference@1",
-    "runtime input",
-  );
-  if (referenceErrors) return referenceErrors;
-  return validateRuntimeInput(record.value as never, runtimeOptions(record));
-}
-
-function validateAuthProviderRecord(record: RuntimeSourceRecord): string[] {
-  const referenceErrors = validateEvidenceReference(
-    record.value,
-    record,
-    "auth-provider-profile-reference@1",
-    "auth-provider profile",
-  );
-  if (referenceErrors) return referenceErrors;
-  return validateAuthProviderProfile(record.value as never, runtimeOptions(record));
-}
-
-function validateReadinessEvidence(record: RuntimeSourceRecord): string[] {
-  const referenceErrors = validateReadinessReference(record.value, record);
-  if (referenceErrors) return referenceErrors;
-  return validateCloudControlCutover(
-    record.value as never,
-    {
-      ...runtimeOptions(record),
-      maxAgeMinutes: record.validation?.maxAgeMinutes || 60,
-      expectedHostProfile: String(record.validation?.expectedHostProfile || "aws-ec2"),
-      selectedCapabilities: [],
-      expectedImageBuildIdentity: String(record.validation?.expectedImageBuildIdentity || ""),
-      operation: String(record.validation?.operation || "cutover"),
-    } as never,
-  ).errors;
-}
-
-function validateObservabilityEvidence(record: RuntimeSourceRecord): string[] {
-  const referenceErrors = validateEvidenceReference(
-    record.value,
-    record,
-    "aws-ec2-control-plane-observability-reference@1",
-    "observability",
-  );
-  if (referenceErrors) return referenceErrors;
-  return validateAwsEc2ControlPlaneObservability(record.value, {
-    maxAgeMinutes: Number(record.validation?.maxAgeMinutes || 60),
-    nowMs: Number(record.validation?.nowMs || Date.now()),
-    expectedProvider: String(record.validation?.expectedProvider || "aws-ec2"),
-  });
-}
-
-function validateMiniMigrationRecord(record: RuntimeSourceRecord): string[] {
-  const referenceErrors = validateEvidenceReference(
-    record.value,
-    record,
-    "mini-migration-preflight-reference@1",
-    "mini-migration",
-  );
-  if (referenceErrors) return referenceErrors;
-  try {
-    validateMiniCloudMigrationEvidence(record.value as never);
-    return [];
-  } catch (error) {
-    return [error instanceof Error ? error.message : String(error)];
-  }
-}
-
-function runtimeOptions(record: RuntimeSourceRecord): RuntimeValidationOptions {
-  return {
-    expectedCallbackHost: String(record.validation?.expectedCallbackHost || ""),
-    expectedCallbackPath: String(record.validation?.expectedCallbackPath || ""),
-    deploymentIds: record.validation?.deploymentIds || [],
-    production: record.validation?.production !== false,
-  };
 }
 
 function runtimeEntry(

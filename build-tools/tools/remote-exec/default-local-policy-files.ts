@@ -23,7 +23,9 @@ export async function walkFiles(root: string, rel = ""): Promise<string[]> {
   }
   const out: string[] = [];
   for (const entry of entries) {
-    if ([".git", "node_modules", "buck-out", ".direnv"].includes(entry.name)) continue;
+    if ([".git", ".viberoots", "node_modules", "buck-out", ".direnv"].includes(entry.name)) {
+      continue;
+    }
     const next = rel ? `${rel}/${entry.name}` : entry.name;
     if (entry.isDirectory()) out.push(...(await walkFiles(root, next)));
     if (entry.isFile()) out.push(next);

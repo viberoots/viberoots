@@ -190,6 +190,12 @@ references on the deploy/replay snapshots while those snapshots are produced. Th
 consumes those snapshot-carried records only after reading them back from the persisted snapshot row
 and attaching the recorded execution snapshot path; it does not synthesize runtime input, auth
 profile, readiness, observability, or mini-migration evidence from fixtures at import time.
+Reference-shaped runtime evidence is accepted only when it carries complete embedded evidence that
+the existing kind validator accepts, or a durable validation proof from the owning control-plane
+evidence authority. The proof must match the evidence kind, reference schema, evidence schema,
+deployment id, provider or control-plane profile identity, source snapshot id, execution snapshot
+path, and validation timestamp. An `evidenceRef`, a source snapshot id, or a path by itself is a
+diagnostic pointer, not proof that graph status can admit the runtime evidence.
 Control-plane observability evidence uses schema
 `aws-ec2-control-plane-observability@1` and must carry fresh `checkedAt` evidence, provider
 identity, reviewed log sink retention and access-control evidence, unit log routing,
