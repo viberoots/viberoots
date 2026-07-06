@@ -20,6 +20,16 @@ function useColor(stream: ProgressStream, env: NodeJS.ProcessEnv = process.env):
   return Boolean(stream.isTTY) && String(env.NO_COLOR || "").trim() === "";
 }
 
+function supportsCursorRedraw(
+  stream: ProgressStream,
+  env: NodeJS.ProcessEnv = process.env,
+): boolean {
+  if (!stream.isTTY) return false;
+  if (String(env.TERM || "").trim() === "dumb") return false;
+  if (String(env.CI || "").trim()) return false;
+  return true;
+}
+
 function color(code: string, value: string, enabled: boolean): string {
   return enabled ? `\u001b[${code}m${value}\u001b[0m` : value;
 }
@@ -104,6 +114,7 @@ export function createVerifyProgressReporter(opts: {
   passes: Array<{ name: string; total: number }>;
   stream?: ProgressStream;
   now?: () => number;
+  env?: NodeJS.ProcessEnv;
 }): {
   start: () => void;
   update: (passName: string, state: Partial<Omit<VerifyProgressPassState, "name">>) => void;
@@ -112,8 +123,9 @@ export function createVerifyProgressReporter(opts: {
   const stream = opts.stream || process.stdout;
   const hasPasses = opts.passes.length > 0;
   const now = opts.now || (() => Date.now());
-  const isTty = Boolean(stream.isTTY);
-  const shouldColor = useColor(stream);
+  const env = opts.env || process.env;
+  const useCursorRedraw = supportsCursorRedraw(stream, env);
+  const shouldColor = useColor(stream, env);
   const startedAtByPass = new Map<string, number>();
   const elapsedByCompletedPass = new Map<string, number>();
   const states = new Map<string, Omit<VerifyProgressPassState, "name" | "elapsedMs">>();
@@ -129,6 +141,7 @@ export function createVerifyProgressReporter(opts: {
   let renderedLines = 0;
   let lastNonTtyWriteMs = 0;
   let lastRendered = "";
+  const lastStaticRenderedByPass = new Map<string, string>();
 
   const snapshot = (): VerifyProgressPassState[] =>
     opts.passes.map((pass) => {
@@ -148,7 +161,7 @@ export function createVerifyProgressReporter(opts: {
     const rendered = lines.join("\n");
     if (!force && rendered === lastRendered) return;
     lastRendered = rendered;
-    if (isTty) {
+    if (useCursorRedraw) {
       if (renderedLines > 0) stream.write(`\r\u001b[${renderedLines}A`);
       stream.write("\r\u001b[J");
       stream.write(`${rendered}\n`);
@@ -161,11 +174,52 @@ export function createVerifyProgressReporter(opts: {
     lastNonTtyWriteMs = ts;
   };
 
+  const snapshotForPass = (passName: string): VerifyProgressPassState | null => {
+    const pass = opts.passes.find((candidate) => candidate.name === passName);
+    if (!pass) return null;
+    const state = states.get(pass.name);
+    if (!state) return null;
+    const startMs = startedAtByPass.get(pass.name);
+    const completedElapsedMs = elapsedByCompletedPass.get(pass.name);
+    return {
+      name: pass.name,
+      ...state,
+      elapsedMs: completedElapsedMs ?? (startMs === undefined ? 0 : now() - startMs),
+    };
+  };
+
+  const writeStaticPass = (passName: string, force = false) => {
+    if (!opts.enabled || !hasPasses) return;
+    const state = snapshotForPass(passName);
+    if (!state) return;
+    const nameWidth = Math.max(1, ...opts.passes.map((pass) => pass.name.length));
+    const rendered = formatVerifyProgressLine(state, { color: shouldColor, nameWidth });
+    if (!force && rendered === lastStaticRenderedByPass.get(passName)) return;
+    const ts = now();
+    if (!force && ts - lastNonTtyWriteMs < 30_000) return;
+    stream.write(`${rendered}\n`);
+    lastStaticRenderedByPass.set(passName, rendered);
+    lastNonTtyWriteMs = ts;
+  };
+
+  const writeStaticRunningPasses = () => {
+    if (!opts.enabled || !hasPasses) return;
+    const ts = now();
+    if (ts - lastNonTtyWriteMs < 30_000) return;
+    for (const pass of opts.passes) {
+      const state = states.get(pass.name);
+      if (state?.status === "running") writeStaticPass(pass.name, true);
+    }
+  };
+
   return {
     start: () => {
       if (!opts.enabled || !hasPasses || timer) return;
-      write(true);
-      timer = setInterval(() => write(), isTty ? 1000 : 30_000);
+      if (useCursorRedraw) write(true);
+      timer = setInterval(
+        () => (useCursorRedraw ? write() : writeStaticRunningPasses()),
+        useCursorRedraw ? 1000 : 30_000,
+      );
       timer.unref?.();
     },
     update: (passName, next) => {
@@ -186,16 +240,18 @@ export function createVerifyProgressReporter(opts: {
         merged.completed = merged.total;
       }
       states.set(passName, merged);
-      write();
+      const terminal = next.status === "done" || next.status === "failed";
+      if (useCursorRedraw) write(terminal);
+      else writeStaticPass(passName, terminal || next.status === "running");
     },
     stop: (stopOpts) => {
       if (timer) clearInterval(timer);
       timer = null;
       if (!opts.enabled) return;
-      if (isTty && stopOpts?.clear !== false && renderedLines > 0) {
+      if (useCursorRedraw && stopOpts?.clear !== false && renderedLines > 0) {
         stream.write(`\r\u001b[${renderedLines}A`);
         stream.write("\r\u001b[J");
-      } else if (isTty && renderedLines > 0) {
+      } else if (useCursorRedraw && renderedLines > 0) {
         stream.write("\n");
       }
     },

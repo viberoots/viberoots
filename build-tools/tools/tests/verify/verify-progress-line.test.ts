@@ -96,6 +96,7 @@ test("verify progress reporter freezes completed pass elapsed time", () => {
         writes.push(String(chunk));
       },
     },
+    env: { TERM: "xterm-256color" },
   });
 
   reporter.start();
@@ -144,6 +145,7 @@ test("verify progress reporter redraws tty output from column zero", () => {
         writes.push(String(chunk));
       },
     },
+    env: { TERM: "xterm-256color" },
   });
 
   reporter.start();
@@ -168,6 +170,7 @@ test("verify progress reporter renders successful passes complete", () => {
         writes.push(String(chunk));
       },
     },
+    env: { TERM: "xterm-256color" },
   });
 
   reporter.start();
@@ -181,4 +184,72 @@ test("verify progress reporter renders successful passes complete", () => {
   const output = writes.join("");
   assert.match(output, /1505\/1505 done 1:05:10/);
   assert.doesNotMatch(output, /1499\/1505 done/);
+});
+
+test("verify progress reporter redraws in Codex cmux TTY terminals", () => {
+  let now = 0;
+  const writes: string[] = [];
+  const reporter = createVerifyProgressReporter({
+    enabled: true,
+    passes: [{ name: "isolated", total: 1 }],
+    now: () => now,
+    stream: {
+      isTTY: true,
+      write: (chunk) => {
+        writes.push(String(chunk));
+      },
+    },
+    env: {
+      TERM: "xterm-256color",
+      CODEX_CI: "1",
+      CMUX_WORKSPACE_ID: "workspace",
+      NO_COLOR: "1",
+    },
+  });
+
+  reporter.start();
+  reporter.update("isolated", { status: "running" });
+  now = 39_000;
+  reporter.update("isolated", { completed: 1, status: "done" });
+  reporter.stop({ clear: false });
+
+  const output = writes.join("");
+  assert.match(output, /\r\u001b\[1A\r\u001b\[J/);
+  assert.match(output, /1\/1 done 39s/);
+});
+
+test("verify progress reporter only prints changed passes for non-tty output", () => {
+  const writes: string[] = [];
+  const reporter = createVerifyProgressReporter({
+    enabled: true,
+    passes: [
+      { name: "isolated", total: 9 },
+      { name: "enforcement", total: 45 },
+      { name: "shared", total: 1494 },
+    ],
+    now: () => 7_000,
+    stream: {
+      isTTY: false,
+      write: (chunk) => {
+        writes.push(String(chunk));
+      },
+    },
+    env: {
+      TERM: "xterm-256color",
+      CODEX_CI: "1",
+      CMUX_WORKSPACE_ID: "workspace",
+      NO_COLOR: "1",
+    },
+  });
+
+  reporter.start();
+  reporter.update("isolated", { status: "running" });
+  reporter.update("enforcement", { completed: 45, status: "done" });
+  reporter.stop({ clear: false });
+
+  const output = writes.join("");
+  assert.match(output, /isolated\s+\[░{24}\] 0\/9 running 0s/);
+  assert.match(output, /enforcement \[█{24}\] 45\/45 done 0s/);
+  assert.doesNotMatch(output, /shared\s+\[░{24}\] 0\/1494 pending/);
+  assert.equal(output.match(/^  test/gm)?.length, 2);
 });
