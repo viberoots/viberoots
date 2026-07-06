@@ -105,6 +105,8 @@ const validation = {
   expectedCallbackPath: "/oidc/callback",
   deploymentIds: ["sample-webapp-staging"],
   production: true,
+  maxAgeMinutes: 60,
+  nowMs: Date.parse("2026-01-01T00:30:00.000Z"),
 };
 
 function runtimeKinds() {
@@ -184,10 +186,20 @@ const bindingFacts = () => ({
 const cleanupFacts = () => ({ recordId: "cleanup-1", status: "rejected", diagnostics: "expired" });
 const observabilityProfile = () => ({
   schemaVersion: "aws-ec2-control-plane-observability@1",
-  logSink: { kind: "cloudwatch" },
+  checkedAt: now,
+  provider: "aws-ec2",
+  logSink: {
+    kind: "cloudwatch",
+    retentionDays: 30,
+    accessControlDigest: "sha256:reviewed-log-access",
+  },
   unitLogRouting: { api: "deployment-control-plane-api.service" },
   history: { readiness: true, workerHeartbeat: true },
-  alarms: REQUIRED_AWS_EC2_ALARMS.map((id) => ({ id, target: `alarm-${id}` })),
+  alarms: REQUIRED_AWS_EC2_ALARMS.map((id) => ({
+    id,
+    target: `alarm-${id}`,
+    action: "reviewed-notification-hook",
+  })),
 });
 const miniMigrationEvidence = () => ({
   stateSync: { status: "passed", checkedAt: now },

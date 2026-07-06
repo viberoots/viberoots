@@ -194,7 +194,9 @@ state/history, audit, and rollback replay can be read back through the secret-sa
 surfaces. Remote-build workers, Nix builders, and Buck2 RE workers remain separate build-system
 capacity; they may produce remote-build evidence, source snapshots, or cache manifests, but they do
 not become deployment runtime rows and the resource graph does not grant them deployment mutation
-authority.
+authority. Runtime evidence imported into graph status is validator-backed and persisted only in a
+redacted form, including the AWS EC2 observability profile. Remote-build setup does not relax that
+control-plane evidence requirement.
 
 Automation target:
 

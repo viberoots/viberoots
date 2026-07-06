@@ -180,10 +180,15 @@ version-mismatched admitted policy refs, or provisioner runtime evidence without
 
 Runtime-source evidence for reviewed runtime input, auth-provider profile, selected control-plane
 readiness, control-plane observability, and mini-migration preflight is imported only after the
-existing validators accept the admitted records. If status lacks one of those evidence nodes, treat
-the resource graph import diagnostics as the first troubleshooting surface; the backend rejects
-missing, stale, malformed, unsupported, or non-admitted evidence instead of publishing a partial
-runtime evidence status.
+existing validators accept the admitted records. Backend runtime evidence rows store the redacted
+document that status readers use, not raw secret-bearing evidence payloads. If status lacks one of
+those evidence nodes, treat the resource graph import diagnostics as the first troubleshooting
+surface; the backend rejects missing, stale, malformed, unsupported, or non-admitted evidence
+instead of publishing a partial runtime evidence status.
+Control-plane observability evidence uses schema
+`aws-ec2-control-plane-observability@1` and must carry fresh `checkedAt` evidence, provider
+identity, reviewed log sink retention and access-control evidence, unit log routing,
+readiness/worker-heartbeat history, and every required alarm id with target/action detail.
 The PR-10 evidence set does not remain export-only after it is supplied as admitted runtime-source
 evidence to the backend import. Other inventory-only evidence remains export-only when the control
 plane has no durable table, object-store record, or existing authoritative row to reference; keeping

@@ -78,3 +78,23 @@ logged directly.
   payload content.
 - Record-adjacent artifacts remain inspectable through their stored paths, but the standard
   operator-facing observability surface does not inline their raw contents.
+- Resource graph runtime evidence persists only redacted documents or durable validated references.
+  The backend importer rejects raw or malformed admitted observability evidence before it can appear
+  in graph status.
+
+## AWS EC2 Observability Evidence
+
+The resource graph accepts `aws-ec2-control-plane-observability@1` evidence only when it is complete
+enough to remain useful after redaction. The evidence object must include:
+
+- `checkedAt` within the accepted freshness window.
+- `provider: "aws-ec2"`.
+- `logSink.kind` of `cloudwatch` or `reviewed-alternate`, plus `retentionDays` and
+  `accessControlDigest`.
+- `unitLogRouting` entries for the reviewed service/worker units.
+- `history.readiness` and `history.workerHeartbeat` set to `true`.
+- every required AWS EC2 alarm id, with a non-empty `target` and `action`.
+
+If the importer rejects observability evidence, fix the producer or admitted runtime source rather
+than editing the resource graph read model. The read model is non-authoritative and must not become
+the place where operators patch runtime evidence by hand.

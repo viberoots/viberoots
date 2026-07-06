@@ -28,7 +28,9 @@ export type RuntimeValidationOptions = {
   deploymentIds: string[];
   production: boolean;
   maxAgeMinutes?: number;
+  nowMs?: number;
   expectedHostProfile?: string;
+  expectedProvider?: string;
   operation?: string;
 };
 

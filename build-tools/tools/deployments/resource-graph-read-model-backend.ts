@@ -87,6 +87,7 @@ export async function syncBackendResourceGraphIndex(
         );
       }
       for (const document of runtimeEvidence) {
+        const storedDocument = redactControlPlaneReadModel(document);
         await client.query(
           `INSERT INTO resource_graph_runtime_evidence(
              kind, name, source_class, source_label, document_json, imported_at
@@ -96,7 +97,7 @@ export async function syncBackendResourceGraphIndex(
             document.id,
             document.source.class,
             document.source.label || null,
-            JSON.stringify(document),
+            JSON.stringify(storedDocument),
             importedAt,
           ],
         );

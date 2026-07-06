@@ -1,5 +1,5 @@
 #!/usr/bin/env zx-wrapper
-import { REQUIRED_AWS_EC2_ALARMS } from "./cloud-control-aws-ec2-alarms";
+import { validateAwsEc2ControlPlaneObservability } from "./cloud-control-aws-ec2-observability";
 import { validateAuthProviderProfile } from "./cloud-control-auth-provider-profile";
 import { validateCloudControlCutover } from "./cloud-control-cutover-validate";
 import { validateRuntimeInput } from "./cloud-control-runtime-input";
@@ -164,24 +164,11 @@ function validateReadinessEvidence(record: RuntimeSourceRecord): string[] {
 }
 
 function validateObservabilityEvidence(record: RuntimeSourceRecord): string[] {
-  const value = record.value as Record<string, unknown>;
-  const alarms = Array.isArray(value.alarms) ? value.alarms : [];
-  const alarmIds = new Set(
-    alarms.map((entry) =>
-      entry && typeof entry === "object" ? String((entry as Record<string, unknown>).id) : "",
-    ),
-  );
-  return [
-    value.schemaVersion === "aws-ec2-control-plane-observability@1"
-      ? ""
-      : "observability schemaVersion invalid",
-    value.logSink ? "" : "observability logSink is required",
-    value.unitLogRouting ? "" : "observability unitLogRouting is required",
-    value.history ? "" : "observability history is required",
-    ...REQUIRED_AWS_EC2_ALARMS.filter((id) => !alarmIds.has(id)).map(
-      (id) => `observability missing alarm ${id}`,
-    ),
-  ].filter(Boolean);
+  return validateAwsEc2ControlPlaneObservability(record.value, {
+    maxAgeMinutes: Number(record.validation?.maxAgeMinutes || 60),
+    nowMs: Number(record.validation?.nowMs || Date.now()),
+    expectedProvider: String(record.validation?.expectedProvider || "aws-ec2"),
+  });
 }
 
 function validateMiniMigrationRecord(record: RuntimeSourceRecord): string[] {

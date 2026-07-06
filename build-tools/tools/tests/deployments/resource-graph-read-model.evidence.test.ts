@@ -26,6 +26,8 @@ const validation = {
   expectedCallbackPath: "/oidc/callback",
   deploymentIds: ["sample-webapp-staging"],
   production: true,
+  maxAgeMinutes: 60,
+  nowMs: Date.parse("2026-07-05T00:30:00.000Z"),
 };
 
 test("backend resource graph status ingests validator-backed runtime evidence", async () => {
@@ -69,15 +71,23 @@ test("backend resource graph status ingests validator-backed runtime evidence", 
     const service = await startService(tmp, backend);
     try {
       const headers = { authorization: `Bearer ${TOKEN}`, "x-request-id": "rg-evidence-api" };
+      const direct = await readJson<any>(
+        await fetch(new URL("/api/v1/resource-graph", service.url), { headers }),
+      );
+      assert.equal(direct.schemaVersion, "control-plane-resource-graph@1");
+      assert.equal(direct.runtime.runtimeEvidenceCount, 5);
+      assertSecretSafe(direct);
       const api = await readJson<any>(
         await fetch(new URL("/ops/api/v1/read/resource-graph", service.url), { headers }),
       );
       assert.equal(api.schemaVersion, "control-plane-resource-graph@1");
       assert.equal(api.runtime.runtimeEvidenceCount, 5);
       assertHasEvidenceNode(api, "ControlPlaneReadinessEvidence");
+      assertSecretSafe(api);
       const mcp = await callMcp(service.url, "rg-evidence-mcp");
       assert.equal(mcp.result.requestId, "rg-evidence-mcp");
       assertHasEvidenceNode(mcp.result.data, "RuntimeInput");
+      assertSecretSafe(mcp);
     } finally {
       await service.close();
     }
@@ -146,10 +156,21 @@ function source(
 function observability() {
   return {
     schemaVersion: "aws-ec2-control-plane-observability@1",
-    logSink: { kind: "cloudwatch", token: "raw-secret" },
+    checkedAt: "2026-07-05T00:00:00.000Z",
+    provider: "aws-ec2",
+    logSink: {
+      kind: "cloudwatch",
+      retentionDays: 30,
+      accessControlDigest: "sha256:reviewed-log-access",
+      token: "raw-secret",
+    },
     unitLogRouting: { api: "deployment-control-plane-api.service" },
     history: { readiness: true, workerHeartbeat: true },
-    alarms: REQUIRED_AWS_EC2_ALARMS.map((id) => ({ id, target: `alarm-${id}` })),
+    alarms: REQUIRED_AWS_EC2_ALARMS.map((id) => ({
+      id,
+      target: `alarm-${id}`,
+      action: "reviewed-notification-hook",
+    })),
   };
 }
 
@@ -171,6 +192,10 @@ function miniMigration() {
 
 function assertHasEvidenceNode(model: any, kind: string) {
   assert.ok(model.nodes.some((node: any) => node.kind === kind));
+}
+
+function assertSecretSafe(value: unknown) {
+  assert.doesNotMatch(JSON.stringify(value), /Bearer|token=|raw-secret/);
 }
 
 function factsFor(model: any, kind: string, name: string) {

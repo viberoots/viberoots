@@ -1742,3 +1742,101 @@ deployment reconciler.
 ### 10. Downsides for implementing this PR
 
 It may require broader validation and careful test-runtime management.
+
+## PR-13: Runtime evidence persistence hardening and validator-backed observability
+
+### 1. Intent
+
+Close the post-PR-10 evidence-safety gaps found by end-of-range assessment: runtime evidence must
+remain secret-safe at rest, and control-plane observability evidence must be validated or durably
+referenced with the same rigor as the other graph evidence objects.
+
+### 2. Scope of changes
+
+- Replace any backend read-model persistence path that writes raw runtime evidence documents, such
+  as direct `JSON.stringify(document)` writes to `resource_graph_runtime_evidence.document_json`,
+  with one of these reviewed forms:
+  - redacted evidence documents that have passed the same secret-safety helper used by read
+    surfaces; or
+  - durable references to complete validated evidence objects, when storing the object in the read
+    model would duplicate provider/control-plane evidence authority.
+- Ensure runtime-source `facts` copied into backend graph evidence cannot persist raw secret-bearing
+  material, including fixture values such as raw log sink tokens.
+- Add or reuse a complete validator for `aws-ec2-control-plane-observability@1`, covering the full
+  observability evidence object rather than only checking selected field presence.
+- Replace the hand-picked `validateObservabilityEvidence` checks with validator-backed validation
+  or durable-reference validation before evidence is accepted by the backend graph importer.
+- Keep the read model non-authoritative: deployment submissions, runtime provider records,
+  observability producers, queueing, leases, stage state, audit, and replay tables remain the source
+  of truth.
+- Tighten the real reconciler-path E2E fixture so it does not disable runtime evidence requirements
+  when the path is meant to prove PR-10 ingestion.
+- Do not add a generic runtime evidence mutation API.
+
+### 3. External prerequisites
+
+- PR-10 and PR-12 should be complete.
+
+### 4. Tests to be added
+
+- Backend database-level assertion proving `resource_graph_runtime_evidence.document_json` never
+  contains raw secret material, including the existing `logSink.token = "raw-secret"` fixture path.
+- Read-model importer tests proving persisted evidence is either redacted before storage or stored
+  as a durable validated evidence reference.
+- Validator tests for `aws-ec2-control-plane-observability@1`, including negative cases where
+  `logSink`, `unitLogRouting`, `history`, and required alarm IDs are present but nested shape,
+  schema version, provider identity, timestamps, or alarm/detail payloads are malformed.
+- Backend ingestion tests proving malformed but field-present observability objects fail closed.
+- Real reconciler-path test coverage proving runtime evidence ingestion remains required for the
+  representative PR-12 path, with any intentional fixture exclusions documented in the test.
+- Secret-safety read-surface regression tests proving API, CLI, MCP, and web status still expose
+  redacted evidence without leaking persisted raw values.
+
+### 5. Docs to be added or updated
+
+- Update resource graph and control-plane operator docs to state that backend runtime evidence rows
+  store only redacted documents or durable validated references.
+- Update observability documentation to describe the validated
+  `aws-ec2-control-plane-observability@1` evidence shape and troubleshooting for rejected evidence.
+- Update remote-build/control-plane combined setup docs if any runtime evidence requirement,
+  observability evidence reference, or operator status output changes.
+- Close any missed documentation gaps from previous resource graph PRs that affect control-plane or
+  remote-build operators for this evidence path.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Include focused backend schema, runtime-evidence importer, observability validator,
+  reconciler-path E2E, and read-surface redaction tests.
+
+### 6. Acceptance criteria
+
+- No raw secret-bearing runtime evidence is persisted in the backend resource graph read model.
+- Observability evidence accepted by the backend importer is complete validator-backed evidence or a
+  durable reference to complete validated evidence.
+- Malformed but field-present observability evidence fails closed.
+- The representative reconciler-path E2E proves runtime evidence ingestion instead of bypassing it.
+- Control-plane and remote-build operator docs match the implemented evidence storage and
+  validation behavior.
+
+### 7. Risks
+
+- Redacting before persistence could remove fields operators currently rely on for diagnosis.
+- Adding a full observability validator may expose existing fixture drift.
+
+### 8. Mitigations
+
+- Preserve non-secret diagnostic fields and use durable references for complete evidence when
+  operators need detail beyond the redacted read model.
+- Make fixture drift visible through focused negative tests rather than broadening the validator to
+  accept malformed evidence.
+
+### 9. Consequences of not implementing this PR
+
+The graph read model could persist raw secret material and accept observability evidence that only
+looks valid by shallow field presence.
+
+### 10. Downsides for implementing this PR
+
+It adds another hardening PR after the end-to-end slice and may require coordinated updates across
+backend ingestion, evidence validators, fixtures, and operator docs.

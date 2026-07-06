@@ -116,6 +116,7 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/resource-graph-provider-evidence.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-read-model.marker-links.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-read-model.markers.test.ts": True,
+    "build-tools/tools/tests/deployments/resource-graph-read-model.evidence-hardening.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-read-model.evidence-surfaces.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-read-model.evidence.test.ts": True,
     "build-tools/tools/tests/deployments/resource-graph-read-model.reconciliation-fixture.ts": False,
