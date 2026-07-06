@@ -51,6 +51,8 @@ export async function fetchExactPnpmStore(opts: {
       NODE_OPTIONS: "--no-warnings",
       PNPM_HOME: opts.homeDir,
     };
+    delete env.npm_config_store_dir;
+    delete env.NPM_CONFIG_STORE_DIR;
     try {
       await runExactStoreCommand({
         command: opts.pnpmPath,

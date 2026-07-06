@@ -54,7 +54,9 @@ test("generated .envrc delegates to stable stage-0 helper before nix-direnv use 
   assert.match(stage0, /__vbr_current_real.*__vbr_filtered_real/s);
   assert.match(stage0, /__vbr_input_real.*__vbr_filtered_real/s);
   assert.match(stage0, /__vbr_flake_input_root="\$\{PWD\}\/viberoots"/);
-  assert.match(stage0, /ln -sfn \.\.\/viberoots/);
+  assert.match(stage0, /readlink "\$\{PWD\}\/\.viberoots\/current"/);
+  assert.match(stage0, /!= "\.\.\/viberoots"/);
+  assert.match(stage0, /rm -f "\$\{PWD\}\/\.viberoots\/current" && ln -s \.\.\/viberoots/);
   assert.match(stage0, /unset -f __vbr_stage0_filter_host_path/);
   assert.match(stage0, /unset -f .*__vbr_stage0_align_workspace_flake_input/);
 });

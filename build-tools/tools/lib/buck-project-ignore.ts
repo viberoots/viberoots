@@ -5,6 +5,7 @@ export const BUCK_PROJECT_IGNORES = [
   ".viberoots/buck/tmp",
   ".viberoots/workspace/buck/tmp",
   ".viberoots/workspace/viberoots-flake-input",
+  "viberoots",
   "viberoots/.direnv",
   "viberoots/.viberoots",
   "viberoots/buck-out",

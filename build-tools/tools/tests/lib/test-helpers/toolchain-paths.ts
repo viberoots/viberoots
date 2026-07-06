@@ -178,15 +178,39 @@ async function ensureSourceFiles($: any): Promise<{ bzl: string; json: string }>
   return out;
 }
 
-async function copyIfMissing(src: string, dst: string): Promise<void> {
-  if (await pathExists(dst)) return;
+async function copyFile(src: string, dst: string): Promise<void> {
   await fsp.mkdir(path.dirname(dst), { recursive: true });
   await fsp.copyFile(src, dst);
 }
 
+async function copyToolchainTree(src: string, dst: string): Promise<void> {
+  let entries: import("node:fs").Dirent[] = [];
+  try {
+    entries = await fsp.readdir(src, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  await fsp.mkdir(dst, { recursive: true });
+  for (const entry of entries) {
+    const srcPath = path.join(src, entry.name);
+    const dstPath = path.join(dst, entry.name);
+    if (entry.isDirectory()) {
+      await copyToolchainTree(srcPath, dstPath);
+    } else if (entry.isFile()) {
+      await copyFile(srcPath, dstPath);
+    }
+  }
+}
+
 export async function ensureToolchainPathsForTempRepo(tmp: string, $: any): Promise<void> {
   const src = await ensureSourceFiles($);
-  const bzlDst = path.join(tmp, "toolchains", "toolchain_paths.bzl");
+  const root = resolveSourceRoot();
+  const toolSourceRoot = await resolveToolSourceRoot(root);
+  const toolchainSrcDir = path.join(toolSourceRoot, "toolchains");
+  const legacyToolchainsDir = path.join(tmp, "toolchains");
+  const workspaceToolchainsDir = path.join(tmp, ".viberoots", "workspace", "toolchains");
+  const legacyBzlDst = path.join(legacyToolchainsDir, "toolchain_paths.bzl");
+  const workspaceBzlDst = path.join(workspaceToolchainsDir, "toolchain_paths.bzl");
   const jsonDst = path.join(
     tmp,
     "viberoots",
@@ -195,8 +219,11 @@ export async function ensureToolchainPathsForTempRepo(tmp: string, $: any): Prom
     "dev",
     "toolchain-paths.json",
   );
-  await copyIfMissing(src.bzl, bzlDst);
-  await copyIfMissing(src.json, jsonDst);
+  await copyToolchainTree(toolchainSrcDir, legacyToolchainsDir);
+  await copyToolchainTree(toolchainSrcDir, workspaceToolchainsDir);
+  await copyFile(src.bzl, legacyBzlDst);
+  await copyFile(src.bzl, workspaceBzlDst);
+  await copyFile(src.json, jsonDst);
 }
 
 export const __test = {

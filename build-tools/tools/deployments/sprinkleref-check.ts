@@ -36,6 +36,7 @@ export type SprinkleRefCheckDeps = {
 export async function runSprinkleRefCheck(deps: SprinkleRefCheckDeps): Promise<number> {
   const options = parseCheckOptions(deps.argv);
   const config = await maybeReadConfig(options.configPath, deps.env);
+  const resolverError = config ? bootstrapResolverError(config, options.category) : undefined;
   const refs = await collectCheckRefs({
     target: options.target,
     deps: options.deps,
@@ -43,7 +44,10 @@ export async function runSprinkleRefCheck(deps: SprinkleRefCheckDeps): Promise<n
     usageError,
   });
   const filtered = refs.refs.filter((entry) => options.schemes.has(entry.scheme));
-  const entries = await checkRefs(consolidateRefs(filtered), deps, options, config);
+  const entries = [
+    ...resolverErrorEntries(resolverError),
+    ...(resolverError ? [] : await checkRefs(consolidateRefs(filtered), deps, options, config)),
+  ];
   const report = {
     target: options.target,
     deps: options.target ? options.deps : undefined,
@@ -57,6 +61,37 @@ export async function runSprinkleRefCheck(deps: SprinkleRefCheckDeps): Promise<n
   const out = deps.stdout || console.log;
   out(options.format === "json" ? JSON.stringify(report, null, 2) : renderReport(report));
   return exitCodeFor(report);
+}
+
+function bootstrapResolverError(
+  config: NonNullable<Awaited<ReturnType<typeof maybeReadConfig>>>,
+  category: string,
+): string | undefined {
+  if (category !== "bootstrap") return undefined;
+  try {
+    assertBootstrapCategoryCanWrite(resolveSprinkleRefBackend(config, category));
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+}
+
+function resolverErrorEntries(message: string | undefined): SprinkleRefCheckEntry[] {
+  if (!message) return [];
+  return [
+    base(
+      {
+        ref: "secret://bootstrap/resolver",
+        scheme: "secret",
+        scope: "repo",
+        locations: [],
+        requiredBy: [],
+        source: "sprinkleref resolver config",
+      },
+      "unmapped",
+      message,
+    ),
+  ];
 }
 
 function parseCheckOptions(argv: string[]) {

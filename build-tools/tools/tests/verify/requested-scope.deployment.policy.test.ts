@@ -55,6 +55,43 @@ test("deployment-only changes select deployment suite plus safety floor", async 
   ]);
 });
 
+test("viberoots-prefixed deployment-only changes override full build-system base scope", async () => {
+  const result = await resolveRequestedVerifyScope({
+    root: process.cwd(),
+    invocationCwd: process.cwd(),
+    args: defaultArgs,
+    env: {},
+    deps: {
+      resolveTemplateScope: async () =>
+        baseDecision({
+          targets: ["//...", "viberoots//..."],
+          reason: "fallback-build-system-scope",
+        }),
+      collectChangedPaths: async () => [
+        "viberoots/build-tools/deployments/defs.bzl",
+        "viberoots/build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts",
+      ],
+      listDeploymentTargets: async () => ["//projects/deployments/sample/dev:deploy"],
+      queryDeploymentDomainTargets: async () => [
+        "viberoots//:deployment_domain_labels_cquery",
+        "viberoots//:nixos_shared_host_contract",
+      ],
+      deploymentSafetyFloorTargets: [
+        "viberoots//:deployment_domain_labels_cquery",
+        "viberoots//:deployment_verify_scope_boundary",
+      ],
+    },
+  });
+
+  assert.equal(result.selection.selectorMode, "deployment-only");
+  assert.equal(result.selection.reason, "deployment-targeted");
+  assert.deepEqual(result.selection.targets, [
+    "viberoots//:deployment_domain_labels_cquery",
+    "viberoots//:deployment_verify_scope_boundary",
+    "viberoots//:nixos_shared_host_contract",
+  ]);
+});
+
 test("deployment project changes select deployment and project-impact union", async () => {
   const result = await resolveRequestedVerifyScope({
     root: process.cwd(),

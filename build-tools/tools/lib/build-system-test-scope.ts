@@ -12,7 +12,8 @@ type ScopeDecision = {
   hasBuildSystemChanges: boolean;
 };
 
-const AUTO_TARGETS = ["//..."];
+const ROOT_AUTO_TARGETS = ["//..."];
+const VIBEROOTS_AUTO_TARGET = "viberoots//...";
 const AUTO_SCOPE_IGNORED_BUILD_SYSTEM_PATHS = new Set([
   ".buckconfig",
   ".buckroot",
@@ -282,9 +283,34 @@ async function collectNestedViberootsChangedPaths(
   return nestedPaths.map((p) => normalizePath(path.posix.join("viberoots", p))).filter(Boolean);
 }
 
-async function hasBuildSystemChanges(root: string, env: NodeJS.ProcessEnv): Promise<boolean> {
-  const changed = await collectChangedPaths(root, env);
-  return hasRelevantBuildSystemChanges(changed);
+function hasNestedViberootsBuildSystemChanges(paths: string[]): boolean {
+  return paths.some(
+    (p) =>
+      normalizePath(p).startsWith("viberoots/") &&
+      isBuildSystemPath(p) &&
+      !isIgnoredBuildSystemScopePath(p),
+  );
+}
+
+async function hasLocalViberootsCell(root: string): Promise<boolean> {
+  const currentTarget = await fsp
+    .readlink(path.join(root, ".viberoots", "current"))
+    .catch(() => "");
+  if (currentTarget !== "../viberoots") {
+    return false;
+  }
+  return fsp
+    .access(path.join(root, "viberoots", "TARGETS"))
+    .then(() => true)
+    .catch(() => false);
+}
+
+async function autoTargetsForChangedPaths(root: string, changedPaths: string[]): Promise<string[]> {
+  const targets = [...ROOT_AUTO_TARGETS];
+  if (hasNestedViberootsBuildSystemChanges(changedPaths) && (await hasLocalViberootsCell(root))) {
+    targets.push(VIBEROOTS_AUTO_TARGET);
+  }
+  return targets;
 }
 
 export async function resolveBuildSystemBuckTestScope(opts: {
@@ -299,7 +325,13 @@ export async function resolveBuildSystemBuckTestScope(opts: {
   }
 
   if (mode === "always") {
-    return { targets: AUTO_TARGETS, mode, hasBuildSystemChanges: false };
+    return {
+      targets: (await hasLocalViberootsCell(opts.root))
+        ? [...ROOT_AUTO_TARGETS, VIBEROOTS_AUTO_TARGET]
+        : ROOT_AUTO_TARGETS,
+      mode,
+      hasBuildSystemChanges: false,
+    };
   }
   if (mode === "never") {
     return {
@@ -309,9 +341,12 @@ export async function resolveBuildSystemBuckTestScope(opts: {
     };
   }
 
-  const changed = await hasBuildSystemChanges(opts.root, env);
+  const changedPaths = await collectChangedPaths(opts.root, env);
+  const changed = hasRelevantBuildSystemChanges(changedPaths);
   return {
-    targets: changed ? AUTO_TARGETS : await resolveNonBuildSystemBuckTargets(opts.root),
+    targets: changed
+      ? await autoTargetsForChangedPaths(opts.root, changedPaths)
+      : await resolveNonBuildSystemBuckTargets(opts.root),
     mode,
     hasBuildSystemChanges: changed,
   };

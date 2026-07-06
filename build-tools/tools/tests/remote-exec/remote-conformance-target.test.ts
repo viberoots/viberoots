@@ -10,18 +10,18 @@ import { inheritedBuckIsolation } from "../lib/test-helpers";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const tinyTarget =
-  "root//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles";
+  "viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles";
 const tinyTargetCanonical =
-  "//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles";
+  "viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles";
 const expectedRemoteReadyFixtureTargets = [
-  "//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_ready_handles",
-  "//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:go_ready_handles",
-  "//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:node_ready_handles",
-  "//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures:python_ready_handles",
-  tinyTargetCanonical,
+  "//build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_ready_handles",
+  "//build-tools/tools/tests/remote-exec/wrapper-fixtures:go_ready_handles",
+  "//build-tools/tools/tests/remote-exec/wrapper-fixtures:node_ready_handles",
+  "//build-tools/tools/tests/remote-exec/wrapper-fixtures:python_ready_handles",
+  "//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles",
 ];
 const localPolicy = parseVerifyExecutionPolicy({ env: {} });
-const wrapperFixturesScope = "//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures/...";
+const wrapperFixturesScope = "viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures/...";
 
 test("first local conformance target has target-derived readiness evidence", async () => {
   const metadata = collectRemoteExecTargetMetadata({

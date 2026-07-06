@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
-const fixtureRoot = "root//viberoots/build-tools/tools/tests/remote-exec/wrapper-fixtures";
+const fixtureRoot = "viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures";
 const wrappers = ["zx", "node", "go", "python", "cpp"];
 const activationConfig = ["-c", "test.viberoots_remote_profile=linux-x86_64-default"];
 

@@ -487,6 +487,11 @@ async function rewriteTempViberootsInput(
       /(\bviberoots\.url\s*=\s*)"[^"]*"/,
       (_match, prefix: string) => `${prefix}"path:${activeViberootsRoot}"`,
     );
+    next = next.replace(/^\s*viberoots\.ref\s*=\s*"[^"]*";\n/gm, "");
+    next = next.replace(
+      /(inputs\.viberoots\s*=\s*\{\s*url\s*=\s*"path:[^"]*";\n)\s*ref\s*=\s*"[^"]*";\n/g,
+      "$1",
+    );
     if (!next.includes('"VIBEROOTS_FLAKE_INPUT_ROOT"')) {
       next = next.replace(/(\s*"VIBEROOTS_SOURCE_ROOT"\n)/, '$1    "VIBEROOTS_FLAKE_INPUT_ROOT"\n');
     }
@@ -533,7 +538,7 @@ async function readPathFlakeMetadata(inputPath: string): Promise<PathFlakeMetada
   };
 }
 
-function rewriteLocalPathLockEntry(
+function rewriteViberootsLockEntry(
   entry: unknown,
   activeViberootsRoot: string,
   metadata?: PathFlakeMetadata,
@@ -543,17 +548,21 @@ function rewriteLocalPathLockEntry(
   const rawPath =
     node.type === "path"
       ? String(node.path || "")
-      : node.type === "git" && String(node.url || "").startsWith("file:")
+      : node.type === "git"
         ? String(node.url || "").replace(/^file:/, "")
         : "";
-  if (!rawPath) return false;
-  const base = path.basename(rawPath);
-  if (base !== "viberoots" && !isGeneratedFilteredViberootsInputPath(rawPath)) return false;
+  const isRecognized =
+    rawPath === "" ||
+    path.basename(rawPath) === "viberoots" ||
+    isGeneratedFilteredViberootsInputPath(rawPath) ||
+    String(node.url || "").includes("viberoots/viberoots");
+  if (!isRecognized) return false;
   const mutableNode = node as {
     lastModified?: number;
     lastModifiedDate?: string;
     narHash?: string;
     path: unknown;
+    ref?: string;
     rev?: string;
     revCount?: number;
     type: unknown;
@@ -564,6 +573,7 @@ function rewriteLocalPathLockEntry(
   if (metadata?.lastModified) mutableNode.lastModified = metadata.lastModified;
   if (metadata?.narHash) mutableNode.narHash = metadata.narHash;
   delete mutableNode.lastModifiedDate;
+  delete mutableNode.ref;
   delete mutableNode.rev;
   delete mutableNode.revCount;
   delete mutableNode.url;
@@ -588,8 +598,8 @@ async function rewriteTempViberootsLockInput(
     const inputName = lock?.nodes?.root?.inputs?.viberoots || "viberoots";
     const node = lock?.nodes?.[inputName] || lock?.nodes?.viberoots || lock?.nodes?.viberootsInput;
     if (!node || typeof node !== "object") continue;
-    const lockedChanged = rewriteLocalPathLockEntry(node.locked, activeViberootsRoot, metadata);
-    const originalChanged = rewriteLocalPathLockEntry(node.original, activeViberootsRoot);
+    const lockedChanged = rewriteViberootsLockEntry(node.locked, activeViberootsRoot, metadata);
+    const originalChanged = rewriteViberootsLockEntry(node.original, activeViberootsRoot);
     const changed = lockedChanged || originalChanged;
     if (!changed) continue;
     await fsp.writeFile(lockPath, JSON.stringify(lock, null, 2) + "\n", "utf8");

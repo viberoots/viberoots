@@ -11,7 +11,7 @@ test("buck fails fast when toolchain paths are not in /nix/store", async () => {
     process.env.TEST_NEED_DEV_ENV = "1";
     await runInTemp("toolchains-host-path", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "pipe" });
-      const bzl = path.join(tmp, "viberoots", "toolchains", "toolchain_paths.bzl");
+      const bzl = path.join(tmp, ".viberoots", "workspace", "toolchains", "toolchain_paths.bzl");
       await fsp.writeFile(
         bzl,
         [

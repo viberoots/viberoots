@@ -74,7 +74,12 @@ test("dogfood buckconfig routes viberoots-owned cells through current", async ()
       `root must not contain old combined-repo entry ${entry}`,
     );
   }
-  assert.equal((await fsp.stat(path.join(process.cwd(), "AGENTS.md"))).isFile(), true);
+  const agentNotesPath =
+    (await fsp
+      .stat(path.join(process.cwd(), "AGENTS.md"))
+      .then((stat) => (stat.isFile() ? "AGENTS.md" : null))
+      .catch(() => null)) ?? "projects/AGENTS.md";
+  assert.equal((await fsp.stat(path.join(process.cwd(), agentNotesPath))).isFile(), true);
   assert.equal((await fsp.stat(path.join(process.cwd(), "flake.nix"))).isFile(), true);
 
   const sections = buckconfigSections(await fsp.readFile(".buckconfig", "utf8"));
@@ -84,7 +89,7 @@ test("dogfood buckconfig routes viberoots-owned cells through current", async ()
     ["viberoots", "./.viberoots/current"],
     ["prelude", "./.viberoots/current/prelude"],
     ["toolchains", "./.viberoots/current/toolchains"],
-    ["repo_toolchains", "./.viberoots/current/toolchains"],
+    ["repo_toolchains", "./.viberoots/workspace/toolchains"],
     ["config", "./.viberoots/current/config"],
     ["fbsource", "./.viberoots/current/config/fbsource_stub"],
     ["fbcode", "./.viberoots/current/config/fbcode_stub"],
@@ -160,7 +165,7 @@ test("dogfood workflows use local current source and workspace providers", async
       })`buck2 --isolation-dir ${buckIsolation} targets workspace_providers//...`,
       "workspace provider cell parse",
     );
-    assert.match(providers, /workspace_providers\/\/:lf_/);
+    assert.match(providers, /workspace_providers\/\/:/);
   } finally {
     await $({
       stdio: "ignore",

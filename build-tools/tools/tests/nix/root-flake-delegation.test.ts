@@ -22,13 +22,18 @@ test("hidden workspace flake delegates workspace construction through the select
   assert.doesNotMatch(flake, /import\s+\.\/build-tools\/tools\/nix\/flake\/outputs\.nix/);
 });
 
-test("hidden workspace flake lock records a local viberoots path input", async () => {
+test("hidden workspace flake lock records the selected viberoots input", async () => {
   const lock = JSON.parse(
     await fsp.readFile(path.join(".viberoots", "workspace", "flake.lock"), "utf8"),
   );
   assert.equal(lock.nodes.root.inputs.viberoots, "viberoots");
-  assert.equal(lock.nodes.viberoots.locked.type, "path");
-  assert.match(lock.nodes.viberoots.locked.path, /viberoots(?:-flake-input)?$/);
+  const locked = lock.nodes.viberoots.locked;
+  if (locked.type === "path") {
+    assert.match(locked.path, /viberoots(?:-flake-input)?$/);
+  } else {
+    assert.equal(locked.type, "git");
+    assert.match(locked.url, /github\.com\/viberoots\/viberoots\.git$/);
+  }
 });
 
 test("graph planner packages use the workspace source under delegated flakes", async () => {

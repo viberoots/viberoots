@@ -7,9 +7,9 @@ import {
 } from "../../lib/buck-command-env";
 
 const SAFETY_FLOOR_TARGETS = [
-  "root//viberoots:scaffolding_smoke_lib_readme",
-  "root//viberoots:scaffolding_smoke_cli_readme",
-  "root//viberoots:scaffolding_python_wasm_app_scaffold_smoke",
+  "viberoots//:scaffolding_smoke_lib_readme",
+  "viberoots//:scaffolding_smoke_cli_readme",
+  "viberoots//:scaffolding_python_wasm_app_scaffold_smoke",
 ];
 const TARGET_PLATFORM = "prelude//platforms:default";
 

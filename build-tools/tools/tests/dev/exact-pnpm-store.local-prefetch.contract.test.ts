@@ -8,6 +8,10 @@ test("exact pnpm store prep stays importer-scoped while updating the local prefe
     path.resolve(import.meta.dirname, "../../dev/update-pnpm-hash/exact-store.ts"),
     "utf8",
   );
+  const fetchTxt = await fsp.readFile(
+    path.resolve(import.meta.dirname, "../../dev/update-pnpm-hash/exact-store-fetch.ts"),
+    "utf8",
+  );
   if (txt.includes("syncLocalPrefetchIntoPnpmStore(storeDir)") || txt.includes("mergePnpmStore(")) {
     throw new Error(
       "prepareExactPnpmStore must not seed importer-specific exact stores from broader pnpm stores",
@@ -38,5 +42,13 @@ test("exact pnpm store prep stays importer-scoped while updating the local prefe
   }
   if (!txt.includes("await removeRedundantLocalExactStoreDirs({ storeDir, homeDir })")) {
     throw new Error("prepareExactPnpmStore must remove redundant local exact stores after import");
+  }
+  if (
+    !fetchTxt.includes("delete env.npm_config_store_dir") ||
+    !fetchTxt.includes("delete env.NPM_CONFIG_STORE_DIR")
+  ) {
+    throw new Error(
+      "exact-store fetch must ignore shared pnpm store config while fetching into its isolated storeDir",
+    );
   }
 });

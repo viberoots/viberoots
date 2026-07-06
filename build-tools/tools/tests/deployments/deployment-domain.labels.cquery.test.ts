@@ -42,8 +42,8 @@ function autoZxTargetForScript(scriptPath: string): string {
   return `//:${name.replace(/[/.-]/g, "_")}`;
 }
 
-function rootAutoZxTargetForScript(scriptPath: string): string {
-  return `//viberoots:${autoZxTargetForScript(scriptPath).slice("//:".length)}`;
+function viberootsAutoZxTargetForScript(scriptPath: string): string {
+  return `viberoots//:${autoZxTargetForScript(scriptPath).slice("//:".length)}`;
 }
 
 function consumerWorkspaceRoot(): string {
@@ -126,8 +126,8 @@ async function runCqueryWithScopedIsolation(opts: {
 test("deployment-domain label cquery resolves the reviewed deployment test suite", async () => {
   const root = viberootsRepoPath(".");
   const workspaceRoot = consumerWorkspaceRoot();
-  const expected = (await deploymentTestScripts(root)).map(rootAutoZxTargetForScript).sort();
-  const query = `attrfilter(labels, "${DEPLOYMENT_DOMAIN_LABEL}", //viberoots/...)`;
+  const expected = (await deploymentTestScripts(root)).map(autoZxTargetForScript).sort();
+  const query = `attrfilter(labels, "${DEPLOYMENT_DOMAIN_LABEL}", viberoots//...)`;
   const stdout = await runCqueryWithScopedIsolation({
     root: workspaceRoot,
     isolationPrefix: "deployment-domain-label-cquery",
@@ -144,7 +144,7 @@ test("resource-heavy deployment tests receive bounded verify scheduling labels",
     "build-tools/tools/tests/deployments/nixos-shared-host.reuse.e2e.test.ts",
     "build-tools/tools/tests/deployments/deployment-control-plane.bootstrap.test.ts",
   ];
-  const query = `set(${scripts.map(rootAutoZxTargetForScript).join(" ")})`;
+  const query = `set(${scripts.map(viberootsAutoZxTargetForScript).join(" ")})`;
   const stdout = await runCqueryWithScopedIsolation({
     root: workspaceRoot,
     isolationPrefix: "deployment-resource-limited-cquery",
@@ -153,7 +153,7 @@ test("resource-heavy deployment tests receive bounded verify scheduling labels",
   });
   const labelsByTarget = parseCqueryLabels(stdout);
   for (const script of scripts) {
-    const target = rootAutoZxTargetForScript(script);
+    const target = autoZxTargetForScript(script);
     assert.ok(labelsByTarget.has(target), `expected cquery labels for ${target}`);
     assert.ok(
       (labelsByTarget.get(target) || []).includes(VERIFY_RESOURCE_LIMITED_LABEL),
@@ -167,7 +167,7 @@ test("deployment temp-repo tests receive measured bounded verify scheduling labe
   const workspaceRoot = consumerWorkspaceRoot();
   const scripts = await deploymentTempRepoTestScripts(root);
   assert.ok(scripts.length > 100, "expected deployment temp-repo coverage to stay explicit");
-  const query = `set(${scripts.map(rootAutoZxTargetForScript).join(" ")})`;
+  const query = `set(${scripts.map(viberootsAutoZxTargetForScript).join(" ")})`;
   const stdout = await runCqueryWithScopedIsolation({
     root: workspaceRoot,
     isolationPrefix: "deployment-temp-repo-resource-limited-cquery",
@@ -176,7 +176,7 @@ test("deployment temp-repo tests receive measured bounded verify scheduling labe
   });
   const labelsByTarget = parseCqueryLabels(stdout);
   for (const script of scripts) {
-    const target = rootAutoZxTargetForScript(script);
+    const target = autoZxTargetForScript(script);
     assert.ok(labelsByTarget.has(target), `expected cquery labels for ${target}`);
     const hasResourceLimitedLabel = (labelsByTarget.get(target) || []).includes(
       VERIFY_RESOURCE_LIMITED_LABEL,
@@ -201,7 +201,7 @@ test("reviewed non-deployment tests do not acquire the deployment-domain label",
     "build-tools/tools/tests/dev/coverage-policy-doc-check.test.ts",
     "build-tools/tools/tests/lib/providers.patch-filename.policy.test.ts",
   ];
-  const query = `set(${sampleScripts.map(rootAutoZxTargetForScript).join(" ")})`;
+  const query = `set(${sampleScripts.map(viberootsAutoZxTargetForScript).join(" ")})`;
   const stdout = await runCqueryWithScopedIsolation({
     root: workspaceRoot,
     isolationPrefix: "deployment-domain-negative-cquery",
@@ -210,7 +210,7 @@ test("reviewed non-deployment tests do not acquire the deployment-domain label",
   });
   const labelsByTarget = parseCqueryLabels(stdout);
   for (const script of sampleScripts) {
-    const target = rootAutoZxTargetForScript(script);
+    const target = autoZxTargetForScript(script);
     assert.ok(labelsByTarget.has(target), `expected cquery labels for ${target}`);
     assert.ok(
       !(labelsByTarget.get(target) || []).includes(DEPLOYMENT_DOMAIN_LABEL),

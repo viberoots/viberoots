@@ -293,7 +293,11 @@ if [[ -f "\${__vbr_flake_input_root}/flake.nix" ]]; then
   else
     __vbr_flake_args=(--override-input viberoots "path:\${__vbr_flake_input_root}")
   fi
-  [[ "\${__vbr_source_root}" == "\${PWD}/viberoots" && ( -L "\${PWD}/.viberoots/current" || ! -e "\${PWD}/.viberoots/current" ) ]] && ln -sfn ../viberoots "\${PWD}/.viberoots/current"
+  if [[ "\${__vbr_source_root}" == "\${PWD}/viberoots" && ( -L "\${PWD}/.viberoots/current" || ! -e "\${PWD}/.viberoots/current" ) ]]; then
+    if [[ ! -L "\${PWD}/.viberoots/current" || "$(readlink "\${PWD}/.viberoots/current" 2>/dev/null || true)" != "../viberoots" ]]; then
+      rm -f "\${PWD}/.viberoots/current" && ln -s ../viberoots "\${PWD}/.viberoots/current"
+    fi
+  fi
 else
   unset VIBEROOTS_SOURCE_ROOT
   unset VIBEROOTS_FLAKE_INPUT_ROOT
@@ -347,7 +351,11 @@ if [[ -n "\${__vbr_source_root:-}" && -d "\${PWD}/viberoots" ]]; then
   __vbr_source_real="$(cd "\${__vbr_source_root}" && pwd -P 2>/dev/null || true)"
   __vbr_local_real="$(cd "\${PWD}/viberoots" && pwd -P 2>/dev/null || true)"
   if [[ -n "\${__vbr_source_real}" && "\${__vbr_source_real}" == "\${__vbr_local_real}" ]]; then
-    [[ -L "\${PWD}/.viberoots/current" || ! -e "\${PWD}/.viberoots/current" ]] && ln -sfn ../viberoots "\${PWD}/.viberoots/current"
+    if [[ -L "\${PWD}/.viberoots/current" || ! -e "\${PWD}/.viberoots/current" ]]; then
+      if [[ ! -L "\${PWD}/.viberoots/current" || "$(readlink "\${PWD}/.viberoots/current" 2>/dev/null || true)" != "../viberoots" ]]; then
+        rm -f "\${PWD}/.viberoots/current" && ln -s ../viberoots "\${PWD}/.viberoots/current"
+      fi
+    fi
     export VIBEROOTS_ROOT="\${__vbr_source_root}"
     export VIBEROOTS_SOURCE_ROOT="\${__vbr_source_root}"
   fi

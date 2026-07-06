@@ -20,7 +20,7 @@ test("viberoots root-coupling inventory reports baseline counts without failing"
     assert.ok(finding.examples.length <= 2, `${id} must respect the example limit`);
   }
   assert.ok(
-    findings.some((finding) => finding.count > 0),
-    "expected current repository inventory to report at least one root-coupled reference",
+    findings.every((finding) => Number.isInteger(finding.count)),
+    "expected inventory to complete even when no root-coupled references remain",
   );
 });

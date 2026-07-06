@@ -82,6 +82,7 @@ test("dirty nested viberoots repo expands to build-system changed paths", async 
     const toolPath = path.join(nested, "build-tools", "tools", "dev", "verify.ts");
     await fsp.mkdir(path.dirname(toolPath), { recursive: true });
     await fsp.writeFile(toolPath, "export const marker = 1;\n");
+    await fsp.writeFile(path.join(nested, "TARGETS"), "# targets\n");
 
     await $({ cwd: nested })`git init -b main`;
     await $({ cwd: nested })`git add .`;
@@ -106,7 +107,7 @@ test("dirty nested viberoots repo expands to build-system changed paths", async 
       requestedTargets: ["//..."],
       env: {},
     });
-    assert.deepEqual(scope.targets, ["//..."]);
+    assert.deepEqual(scope.targets, ["//...", "viberoots//..."]);
     assert.equal(scope.hasBuildSystemChanges, true);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });

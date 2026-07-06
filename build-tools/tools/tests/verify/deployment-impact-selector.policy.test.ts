@@ -27,6 +27,24 @@ test("deployment-impact: reviewed deployment-owned build-system paths stay deplo
   assert.equal(result.diagnostics.reason, "deployment-owned-build-system-path-changed");
 });
 
+test("deployment-impact: viberoots-prefixed deployment-owned paths stay deployment-only", () => {
+  const result = resolveDeploymentImpactSelection(
+    [
+      "viberoots/build-tools/deployments/defs.bzl",
+      "viberoots/build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts",
+    ],
+    { deploymentTargetLabels },
+  );
+
+  assert.equal(result.mode, "deployment-only");
+  assert.deepEqual(result.diagnostics.deploymentOwnedPaths, [
+    "viberoots/build-tools/deployments/defs.bzl",
+    "viberoots/build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts",
+  ]);
+  assert.deepEqual(result.diagnostics.fullBuildSystemTriggerPaths, []);
+  assert.equal(result.diagnostics.reason, "deployment-owned-build-system-path-changed");
+});
+
 test("deployment-impact: deployment taxonomy-only edits stay deployment-only", () => {
   const result = resolveDeploymentImpactSelection(
     [
