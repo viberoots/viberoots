@@ -159,7 +159,9 @@ test("git helper probes use non-throwing zx calls", async () => {
 test("non-build-system target scope derives selectors from top-level workspace roots", async () => {
   await runInTemp("build-system-scope-non-build-roots", async (tmp) => {
     await fsp.mkdir(path.join(tmp, "workspace", "apps", "demo"), { recursive: true });
+    await fsp.writeFile(path.join(tmp, "workspace", "apps", "demo", "TARGETS"), "# targets\n");
     await fsp.mkdir(path.join(tmp, "docs"), { recursive: true });
+    await fsp.writeFile(path.join(tmp, "docs", "TARGETS"), "# targets\n");
     await fsp.mkdir(path.join(tmp, "build-tools", "tools"), { recursive: true });
     await fsp.mkdir(path.join(tmp, "toolchains", "go"), { recursive: true });
     await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
@@ -171,4 +173,20 @@ test("non-build-system target scope derives selectors from top-level workspace r
     assert.equal(targets.includes("//toolchains/..."), false);
     assert.equal(targets.includes("//third_party/..."), false);
   });
+});
+
+test("non-build-system target scope falls back to local viberoots cell when projects has no targets", async () => {
+  const tmp = await mktemp("build-system-scope-empty-projects-");
+  try {
+    await fsp.mkdir(path.join(tmp, "projects", "config"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, ".viberoots"), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "viberoots"), { recursive: true });
+    await fsp.writeFile(path.join(tmp, "viberoots", "TARGETS"), "# targets\n");
+    await fsp.symlink("../viberoots", path.join(tmp, ".viberoots", "current"));
+
+    const targets = await resolveNonBuildSystemBuckTargets(tmp);
+    assert.deepEqual(targets, ["viberoots//..."]);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
 });
