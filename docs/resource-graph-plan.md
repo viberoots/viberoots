@@ -1788,7 +1788,7 @@ referenced with the same rigor as the other graph evidence objects.
   schema version, provider identity, timestamps, or alarm/detail payloads are malformed.
 - Backend ingestion tests proving malformed but field-present observability objects fail closed.
 - Real reconciler-path test coverage proving runtime evidence ingestion remains required for the
-  representative PR-12 path, with any intentional fixture exclusions documented in the test.
+  representative protected/shared path, with any intentional fixture exclusions documented in the test.
 - Secret-safety read-surface regression tests proving API, CLI, MCP, and web status still expose
   redacted evidence without leaking persisted raw values.
 
@@ -1840,3 +1840,98 @@ looks valid by shallow field presence.
 
 It adds another hardening PR after the end-to-end slice and may require coordinated updates across
 backend ingestion, evidence validators, fixtures, and operator docs.
+
+## PR-14: Runtime evidence production through the representative control-plane path
+
+### 1. Intent
+
+Close the remaining PR-12/PR-13 end-to-end gap: the representative Cloudflare/control-plane path
+must produce or supply the runtime evidence imported into graph status instead of relying on
+fixture-only runtime-source synthesis outside the reconciler path.
+
+### 2. Scope of changes
+
+- Replace the representative E2E handoff where `importExportedGraph(ctx)` receives runtime evidence
+  synthesized from fixture constructors through `runtimeSources(...)` for runtime input, auth
+  profile, cutover readiness, observability, and mini-migration evidence.
+- Add a reviewed evidence handoff from the real deploy/replay control-plane path to graph import,
+  using the evidence objects or durable references produced or selected by that path.
+- Preserve backend importer validation from PR-10 and PR-13, but make the representative test prove
+  the control-plane/reconciler path produced or supplied the evidence that the importer ingests.
+- Keep fixture constructors available for focused unit and importer tests, but prevent the
+  representative E2E from using them as an out-of-band substitute for runtime evidence production.
+- Preserve the read model as non-authoritative. Runtime evidence producers, provider records,
+  queueing, leases, stage state, audit, replay, and validated durable evidence references remain the
+  source of truth.
+- Do not add a generic runtime evidence mutation API or a second importer path.
+
+### 3. External prerequisites
+
+- PR-12 and PR-13 should be complete.
+
+### 4. Tests to be added
+
+- Representative Cloudflare/control-plane E2E test proving graph status imports runtime evidence
+  that was produced or supplied by the real deploy/replay path, not by direct `runtimeSources(...)`
+  synthesis in the import helper.
+- Negative test proving the representative path fails closed when required runtime input, auth
+  profile, cutover readiness, observability, or mini-migration evidence is missing from the
+  control-plane evidence handoff.
+- Regression test proving focused backend importer fixtures may still use fixture constructors
+  without being confused with representative reconciler-path coverage.
+- Read-surface assertions proving API, CLI, MCP, and web status expose the imported evidence or
+  durable references with the same schema, request-id, auth, redaction, and audit behavior as PR-13.
+
+### 5. Docs to be added or updated
+
+- Update resource graph and control-plane operator docs to describe where the representative
+  runtime evidence is produced or supplied during deploy, status import, and replay.
+- Update the combined control-plane/remote-build setup docs if the runtime evidence handoff changes
+  operator setup or troubleshooting.
+- Update the canonical remote-build setup doc,
+  [`../build-tools/docs/remote-build-setup.md`](../build-tools/docs/remote-build-setup.md), with the
+  resource-graph runtime evidence/status boundary when that boundary affects remote-build
+  operators.
+
+### 5.5. Expected regression scope
+
+- `deployment-only`
+- Include focused reconciler/control-plane evidence handoff, backend importer, read-surface, replay,
+  and remote-build documentation validation.
+
+### 6. Acceptance criteria
+
+- The representative Cloudflare/control-plane E2E proves runtime evidence production or supply
+  through the real deploy/replay path before graph import.
+- The representative test no longer proves runtime evidence ingestion by synthesizing runtime
+  sources outside the reconciler/control-plane path.
+- Missing required runtime evidence fails closed with actionable diagnostics.
+- Focused importer tests still cover valid and invalid fixture-built evidence without standing in
+  for representative reconciler-path coverage.
+- Control-plane and remote-build documentation describe the implemented runtime evidence/status
+  boundary.
+
+### 7. Risks
+
+- Wiring the real evidence handoff may expose drift between fixture-built evidence and production
+  deploy/replay evidence.
+- The representative E2E may become broader than needed if it tries to revalidate every evidence
+  producer.
+
+### 8. Mitigations
+
+- Keep the representative E2E focused on one Cloudflare/control-plane path and validate variants in
+  focused importer or producer tests.
+- Reuse PR-13 validators and durable-reference handling so the handoff does not duplicate evidence
+  validation logic.
+
+### 9. Consequences of not implementing this PR
+
+The end-to-end coverage would continue proving backend importer behavior, but not that the
+representative reconciler/control-plane path produces or supplies the runtime evidence required for
+operator graph status.
+
+### 10. Downsides for implementing this PR
+
+It adds one more targeted E2E hardening PR and may require changing the control-plane test harness,
+graph import helper, and remote-build documentation together.

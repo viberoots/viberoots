@@ -196,7 +196,10 @@ capacity; they may produce remote-build evidence, source snapshots, or cache man
 not become deployment runtime rows and the resource graph does not grant them deployment mutation
 authority. Runtime evidence imported into graph status is validator-backed and persisted only in a
 redacted form, including the AWS EC2 observability profile. Remote-build setup does not relax that
-control-plane evidence requirement.
+control-plane evidence requirement. In the representative Cloudflare Pages flow, the control-plane
+deploy/replay snapshots carry the required runtime-evidence source records before resource graph
+import; graph import binds those records to the persisted execution snapshot path and fails closed if
+they are missing runtime input, auth-provider, readiness, observability, or mini-migration evidence.
 
 Automation target:
 

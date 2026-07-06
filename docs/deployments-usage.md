@@ -378,6 +378,13 @@ For a protected/shared static webapp, the operator workflow is:
    evidence, latest run action, current stage state, stage history, cleanup
    records, and audit-backed status links.
 
+The representative Cloudflare Pages resource-graph flow carries required runtime-evidence source
+records on the control-plane deploy/replay snapshots before graph import. The import step validates
+those snapshot-carried references against the persisted snapshot identity and execution snapshot
+path, and fails closed if runtime input, auth-provider profile, readiness, observability, or
+mini-migration evidence is missing. Fixture-only runtime evidence remains for focused importer
+tests, not for the representative protected/shared reconciler-path proof.
+
 Graph status also carries redacted local override evidence, selected
 control-plane profile metadata, source-selection evidence, target-exception
 effects, provider-capability policy bindings, and release-action policy

@@ -185,6 +185,11 @@ document that status readers use, not raw secret-bearing evidence payloads. If s
 those evidence nodes, treat the resource graph import diagnostics as the first troubleshooting
 surface; the backend rejects missing, stale, malformed, unsupported, or non-admitted evidence
 instead of publishing a partial runtime evidence status.
+The representative Cloudflare Pages control-plane workflow stores durable runtime-evidence source
+references on the deploy/replay snapshots while those snapshots are produced. The graph import
+consumes those snapshot-carried records only after reading them back from the persisted snapshot row
+and attaching the recorded execution snapshot path; it does not synthesize runtime input, auth
+profile, readiness, observability, or mini-migration evidence from fixtures at import time.
 Control-plane observability evidence uses schema
 `aws-ec2-control-plane-observability@1` and must carry fresh `checkedAt` evidence, provider
 identity, reviewed log sink retention and access-control evidence, unit log routing,

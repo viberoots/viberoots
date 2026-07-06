@@ -7,6 +7,10 @@ import { validateMiniCloudMigrationEvidence } from "./control-plane-mini-migrati
 import { collectRuntimeArtifactStatus } from "./resource-graph-runtime-artifacts";
 import { collectServiceClientSelectionResources } from "./resource-graph-service-client";
 import { isAdmittedControlPlaneRuntimeRecord } from "./resource-graph-types";
+import {
+  validateEvidenceReference,
+  validateReadinessReference,
+} from "./resource-graph-runtime-reference";
 import type {
   DeploymentResourceInventoryEntry,
   DeploymentRuntimeInventorySources,
@@ -142,14 +146,30 @@ function collectStatus(
 }
 
 function validateRuntimeInputRecord(record: RuntimeSourceRecord): string[] {
+  const referenceErrors = validateEvidenceReference(
+    record.value,
+    record,
+    "cloud-control-runtime-input-reference@1",
+    "runtime input",
+  );
+  if (referenceErrors) return referenceErrors;
   return validateRuntimeInput(record.value as never, runtimeOptions(record));
 }
 
 function validateAuthProviderRecord(record: RuntimeSourceRecord): string[] {
+  const referenceErrors = validateEvidenceReference(
+    record.value,
+    record,
+    "auth-provider-profile-reference@1",
+    "auth-provider profile",
+  );
+  if (referenceErrors) return referenceErrors;
   return validateAuthProviderProfile(record.value as never, runtimeOptions(record));
 }
 
 function validateReadinessEvidence(record: RuntimeSourceRecord): string[] {
+  const referenceErrors = validateReadinessReference(record.value, record);
+  if (referenceErrors) return referenceErrors;
   return validateCloudControlCutover(
     record.value as never,
     {
@@ -164,6 +184,13 @@ function validateReadinessEvidence(record: RuntimeSourceRecord): string[] {
 }
 
 function validateObservabilityEvidence(record: RuntimeSourceRecord): string[] {
+  const referenceErrors = validateEvidenceReference(
+    record.value,
+    record,
+    "aws-ec2-control-plane-observability-reference@1",
+    "observability",
+  );
+  if (referenceErrors) return referenceErrors;
   return validateAwsEc2ControlPlaneObservability(record.value, {
     maxAgeMinutes: Number(record.validation?.maxAgeMinutes || 60),
     nowMs: Number(record.validation?.nowMs || Date.now()),
@@ -172,6 +199,13 @@ function validateObservabilityEvidence(record: RuntimeSourceRecord): string[] {
 }
 
 function validateMiniMigrationRecord(record: RuntimeSourceRecord): string[] {
+  const referenceErrors = validateEvidenceReference(
+    record.value,
+    record,
+    "mini-migration-preflight-reference@1",
+    "mini-migration",
+  );
+  if (referenceErrors) return referenceErrors;
   try {
     validateMiniCloudMigrationEvidence(record.value as never);
     return [];

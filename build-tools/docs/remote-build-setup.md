@@ -72,6 +72,17 @@ policy, such as `inherit_config` smoke for an `inherit_config` action. Because `
 builders for local development, remote-builder smoke and CI lanes must export their intended
 `NIX_CONFIG` before entering the repo.
 
+Remote-build workers are build capacity, not deployment-control-plane runtime authorities. Resource
+graph runtime evidence and status stay inside the deployment control-plane boundary: deployment
+submissions, artifact handoffs, worker reconciliation, provider evidence, stage state/history,
+audit, replay, and snapshot-carried runtime-evidence source records rebound to persisted execution
+snapshot paths are imported by the control-plane graph read model. Remote-build lanes may produce
+source snapshots, cache manifests, remote-builder smoke reports, and build artifacts, but those
+facts do not become deployment runtime rows unless a deployment-specific control-plane path
+explicitly admits them through its existing evidence contracts. A remote-build setup problem should
+be fixed in the Buck/Nix remote-execution lane; do not patch deployment graph status or add a
+generic runtime evidence mutation path to represent it.
+
 The flake exports `packages.<system>.remote-worker-tools` and
 `packages.<system>.remote-ci-tools` for declared remote worker and CI helper closures.
 It also exports `apps.<system>.remote-worker-bootstrap` as a local check helper. The bootstrap app

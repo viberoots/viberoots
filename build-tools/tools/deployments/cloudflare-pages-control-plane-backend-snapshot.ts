@@ -1,7 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import { resolveSourceRunCloudflarePagesAdmittedContext } from "./cloudflare-pages-admission";
-import type { CloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-contract";
-import { CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA } from "./cloudflare-pages-control-plane-contract";
+// prettier-ignore
+import { CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA, type CloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-contract";
 import { createCloudflarePagesControlPlaneSnapshot } from "./cloudflare-pages-control-plane-snapshot";
 import {
   resolveCloudflarePagesArtifactForSubmission,
@@ -16,6 +16,7 @@ import { evaluateDeploymentAdmission } from "./deployment-admission-evaluator";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import type { DeploymentLaneGovernanceResolver } from "./deployment-lane-governance-resolution";
 import { targetTransitionSnapshot } from "./cloudflare-pages-control-plane-backend-transition-snapshot";
+import { withCloudflarePagesRuntimeEvidenceSources } from "./cloudflare-pages-resource-graph-runtime-evidence";
 export type CloudflarePagesBackendSnapshot = Record<string, unknown>;
 async function previewSnapshot(
   resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "preview" }>,
@@ -46,7 +47,7 @@ async function previewSnapshot(
     evidence: resolved.request.admissionEvidence,
     governanceResolver,
   });
-  return {
+  return withCloudflarePagesRuntimeEvidenceSources({
     schemaVersion: CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,
     submissionId: resolved.request.submissionId,
     submittedAt: resolved.request.submittedAt,
@@ -75,7 +76,7 @@ async function previewSnapshot(
     ...(resolved.request.smokeConnectOverride
       ? { smokeConnectOverride: resolved.request.smokeConnectOverride }
       : {}),
-  };
+  });
 }
 async function rollbackSnapshot(
   resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "rollback" }>,
@@ -101,7 +102,7 @@ async function rollbackSnapshot(
     evidence: resolved.request.admissionEvidence,
     governanceResolver,
   });
-  return {
+  return withCloudflarePagesRuntimeEvidenceSources({
     schemaVersion: CLOUDFLARE_PAGES_CONTROL_PLANE_SNAPSHOT_SCHEMA,
     submissionId: resolved.request.submissionId,
     submittedAt: resolved.request.submittedAt,
@@ -127,7 +128,7 @@ async function rollbackSnapshot(
     ...(resolved.request.smokeConnectOverride
       ? { smokeConnectOverride: resolved.request.smokeConnectOverride }
       : {}),
-  };
+  });
 }
 function previewCleanupSnapshot(
   resolved: Extract<ResolvedCloudflarePagesServiceSubmitRequest, { kind: "preview_cleanup" }>,
@@ -184,67 +185,62 @@ export async function buildCloudflarePagesBackendSnapshot(
     governanceResolver?: DeploymentLaneGovernanceResolver;
   },
 ): Promise<CloudflarePagesBackendSnapshot> {
+  const { workspaceRoot, recordsRoot, governanceResolver } = opts;
   if (resolved.kind === "deploy") {
-    return await createCloudflarePagesControlPlaneSnapshot(
-      {
-        workspaceRoot: opts.workspaceRoot,
-        deployment: resolved.request.deployment,
-        recordsRoot: opts.recordsRoot,
-        ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
-        ...(resolved.request.deployBatchId && { deployBatchId: resolved.request.deployBatchId }),
-        artifact: await resolveCloudflarePagesArtifactForSubmission(resolved, opts),
-        expectedSourceRevision: resolved.request.expectedSourceRevision,
-        admissionEvidence: resolved.request.admissionEvidence,
-        ...(resolved.request.smokeConnectOverride
-          ? { smokeConnectOverride: resolved.request.smokeConnectOverride }
-          : {}),
-        deferSecretReferenceResolution: true,
-      },
-      resolved.request.submissionId,
+    return withCloudflarePagesRuntimeEvidenceSources(
+      await createCloudflarePagesControlPlaneSnapshot(
+        {
+          workspaceRoot: opts.workspaceRoot,
+          deployment: resolved.request.deployment,
+          recordsRoot: opts.recordsRoot,
+          ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+          ...(resolved.request.deployBatchId && { deployBatchId: resolved.request.deployBatchId }),
+          artifact: await resolveCloudflarePagesArtifactForSubmission(resolved, opts),
+          expectedSourceRevision: resolved.request.expectedSourceRevision,
+          admissionEvidence: resolved.request.admissionEvidence,
+          ...(resolved.request.smokeConnectOverride
+            ? { smokeConnectOverride: resolved.request.smokeConnectOverride }
+            : {}),
+          deferSecretReferenceResolution: true,
+        },
+        resolved.request.submissionId,
+      ),
     );
   }
   if (resolved.kind === "promotion") {
-    return await createCloudflarePagesControlPlaneSnapshot(
-      {
-        workspaceRoot: opts.workspaceRoot,
-        deployment: resolved.request.deployment,
-        recordsRoot: opts.recordsRoot,
-        ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
-        ...(resolved.request.deployBatchId && { deployBatchId: resolved.request.deployBatchId }),
-        ...(resolved.artifactInput
-          ? { artifact: await resolveCloudflarePagesArtifactForSubmission(resolved, opts) }
-          : {}),
-        ...(resolved.artifact ? { artifact: resolved.artifact } : {}),
-        operationKind: resolved.operationKind,
-        publishBehavior: resolved.request.publishBehavior || "deploy",
-        parentRunId: resolved.parentRunId,
-        releaseLineageId: resolved.releaseLineageId,
-        artifactLineageId: resolved.artifactLineageId,
-        source: resolved.source,
-        admissionEvidence: resolved.request.admissionEvidence,
-        ...(resolved.request.smokeConnectOverride
-          ? { smokeConnectOverride: resolved.request.smokeConnectOverride }
-          : {}),
-        deferSecretReferenceResolution: true,
-      },
-      resolved.request.submissionId,
+    return withCloudflarePagesRuntimeEvidenceSources(
+      await createCloudflarePagesControlPlaneSnapshot(
+        {
+          workspaceRoot: opts.workspaceRoot,
+          deployment: resolved.request.deployment,
+          recordsRoot: opts.recordsRoot,
+          ...(opts.objectStore ? { objectStore: opts.objectStore } : {}),
+          ...(resolved.request.deployBatchId && { deployBatchId: resolved.request.deployBatchId }),
+          ...(resolved.artifactInput
+            ? { artifact: await resolveCloudflarePagesArtifactForSubmission(resolved, opts) }
+            : {}),
+          ...(resolved.artifact ? { artifact: resolved.artifact } : {}),
+          operationKind: resolved.operationKind,
+          publishBehavior: resolved.request.publishBehavior || "deploy",
+          parentRunId: resolved.parentRunId,
+          releaseLineageId: resolved.releaseLineageId,
+          artifactLineageId: resolved.artifactLineageId,
+          source: resolved.source,
+          admissionEvidence: resolved.request.admissionEvidence,
+          ...(resolved.request.smokeConnectOverride
+            ? { smokeConnectOverride: resolved.request.smokeConnectOverride }
+            : {}),
+          deferSecretReferenceResolution: true,
+        },
+        resolved.request.submissionId,
+      ),
     );
   }
   if (resolved.kind === "preview")
-    return await previewSnapshot(
-      resolved,
-      opts.workspaceRoot,
-      opts.recordsRoot,
-      opts.governanceResolver,
-    );
+    return await previewSnapshot(resolved, workspaceRoot, recordsRoot, governanceResolver);
   if (resolved.kind === "rollback")
-    return await rollbackSnapshot(
-      resolved,
-      opts.workspaceRoot,
-      opts.recordsRoot,
-      opts.governanceResolver,
-    );
+    return await rollbackSnapshot(resolved, workspaceRoot, recordsRoot, governanceResolver);
   return resolved.kind === "preview_cleanup"
-    ? previewCleanupSnapshot(resolved, opts.workspaceRoot, opts.recordsRoot)
+    ? previewCleanupSnapshot(resolved, workspaceRoot, recordsRoot)
     : targetTransitionSnapshot(resolved);
 }

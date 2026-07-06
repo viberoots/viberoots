@@ -81,7 +81,9 @@ The representative protected/shared read path is Cloudflare Pages static-webapp 
 the service and worker reconciler, followed by exact-artifact rollback replay. Resource graph reads
 from the direct API, same-origin web API, rendered web UI, MCP endpoint, and CLI should show the same linked
 Deployment, ProviderTarget, artifact challenge, upload session, execution snapshot, provider
-evidence, worker evidence, stage state, stage history, audit, and replay status. Cloudflare Pages
+evidence, worker evidence, stage state, stage history, audit, replay status, and validator-backed
+runtime-evidence references carried by those control-plane snapshots and rebound to the persisted
+execution snapshot path before graph import. Cloudflare Pages
 does not add release-action nodes because that provider does not support release actions; the
 supported release-action fixture remains the reviewed `nixos-shared-host` path.
 

@@ -13,6 +13,7 @@ import {
   createDeploymentArtifactChallenge,
   deploymentServicePrincipalForToken,
 } from "../../deployments/deployment-artifact-challenges";
+import { collectCloudflarePagesRuntimeEvidenceHandoff } from "../../deployments/cloudflare-pages-resource-graph-runtime-evidence";
 import { viberootsToolScript } from "./deployment-command";
 import {
   cloudflarePagesApiTokenRequirements,
@@ -232,5 +233,10 @@ export async function runCloudflarePagesGraphSequence(
     "--control-plane-url",
     ctx.controlPlane.url,
   ]);
-  return { first, second, rollback };
+  const runtimeEvidenceHandoff = await collectCloudflarePagesRuntimeEvidenceHandoff({
+    backend: ctx.backend,
+    deploymentId: ctx.deployment.deploymentId,
+    runs: { first, second, rollback },
+  });
+  return { first, second, rollback, runtimeEvidenceHandoff };
 }
