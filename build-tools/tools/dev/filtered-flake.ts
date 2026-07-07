@@ -130,6 +130,7 @@ async function filteredSnapshotRelPaths(root: string, target: string): Promise<s
     try {
       await fsp.access(path.join(root, importer, lockfile));
       relPaths.add(importer);
+      if (lockfile === "pnpm-lock.yaml") relPaths.add("projects/node-modules.hashes.json");
       break;
     } catch {}
   }
