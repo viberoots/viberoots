@@ -85,7 +85,16 @@ test("wasm producer policy: wasm producer contract keys exist across templates",
     );
     const devScript = await fsp.readFile(path.join(root, "scripts", "dev.mjs.jinja"), "utf8");
     assert.match(devScript, /dev-with-wasm-watch\.ts/, `${contract.id}: dev wrapper mismatch`);
-    assert.match(devScript, /dev:wasm:watch/, `${contract.id}: dev missing watch wiring`);
+    assert.match(
+      devScript,
+      /node scripts\/dev-wasm-watch\.mjs/,
+      `${contract.id}: dev missing direct watch wiring`,
+    );
+    assert.doesNotMatch(
+      devScript,
+      /pnpm run dev:wasm:watch/,
+      `${contract.id}: dev wrapper must not shell through pnpm`,
+    );
     const watchScript = await fsp.readFile(
       path.join(root, "scripts", "dev-wasm-watch.mjs.jinja"),
       "utf8",

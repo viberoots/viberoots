@@ -11,9 +11,9 @@ const child = spawn(
   [
     viberootsTool("dev-with-wasm-watch.ts"),
     "--vite-cmd",
-    "pnpm run dev:ssr:only",
+    "node_modules/.bin/next dev -H 127.0.0.1 -p ${PORT:-4173}",
     "--watch-cmd",
-    "pnpm run dev:wasm:watch",
+    "node scripts/dev-wasm-watch.mjs",
   ],
   { stdio: "inherit", env: { ...process.env, WORKSPACE_ROOT: workspaceRoot } },
 );

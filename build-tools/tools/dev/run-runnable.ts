@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import * as fsp from "node:fs/promises";
+import { fileURLToPath } from "node:url";
 import { getArgvTokens } from "../lib/cli";
 import { findRepoRoot } from "../lib/repo";
 import type { RunnableExec } from "../lib/runnables";
@@ -40,17 +41,40 @@ function commandCwdForSpec(
 async function directImporterDevSpec(
   workspaceRoot: string,
   importer: string,
+  mode: "static" | "ssr",
+  framework: string,
 ): Promise<RunnableExec | null> {
   if (!importer || path.isAbsolute(importer) || importer.startsWith("../")) return null;
   const importerRoot = path.join(workspaceRoot, importer);
+  const watchScript = path.join(importerRoot, "scripts", "dev-wasm-watch.mjs");
   try {
-    const st = await fsp.stat(path.join(importerRoot, "scripts", "dev.mjs"));
+    const st = await fsp.stat(watchScript);
     if (!st.isFile()) return null;
   } catch {
     return null;
   }
+  const viberootsRoot = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "..",
+    "..",
+  );
+  const devTool = path.join(viberootsRoot, "build-tools", "tools", "dev", "dev-with-wasm-watch.ts");
+  const viteCmd =
+    mode === "ssr"
+      ? framework === "next"
+        ? "node_modules/.bin/next dev -H 127.0.0.1 -p ${PORT:-4173}"
+        : "node server/dev.mjs"
+      : "node node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${PORT:-5187} --strictPort --clearScreen false --logLevel info";
   return {
-    argv: ["node", "scripts/dev.mjs"],
+    argv: [
+      "zx-wrapper",
+      devTool,
+      "--vite-cmd",
+      viteCmd,
+      "--watch-cmd",
+      "node scripts/dev-wasm-watch.mjs",
+    ],
     cwd: importerRoot,
   };
 }
@@ -151,7 +175,13 @@ async function main() {
     }
   }
   if (parsed.mode === "dev" && spec && targetHints?.importer && !testManifestPath) {
-    spec = (await directImporterDevSpec(workspaceRoot, targetHints.importer)) || spec;
+    spec =
+      (await directImporterDevSpec(
+        workspaceRoot,
+        targetHints.importer,
+        targetHints.mode,
+        targetHints.framework,
+      )) || spec;
   }
   if (!spec) {
     console.error(`run.${parsed.mode} is not available for ${target}`);

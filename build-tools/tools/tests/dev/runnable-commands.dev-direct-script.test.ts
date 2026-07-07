@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-test("d selected webapp dev runs scripts/dev.mjs directly when available", async () => {
+test("d selected webapp dev bypasses pnpm-backed generated dev scripts", async () => {
   await runInTemp("runnable-dev-direct-script", async (tmp, $) => {
     const target = "//projects/apps/demo:app";
     const importer = "projects/apps/demo";
@@ -15,7 +15,12 @@ test("d selected webapp dev runs scripts/dev.mjs directly when available", async
     await fsp.mkdir(path.join(projectDir, "scripts"), { recursive: true });
     await fsp.writeFile(
       path.join(projectDir, "scripts", "dev.mjs"),
-      "console.log(`direct-dev-ok:${process.cwd()}`);\n",
+      "console.error('stale dev script should not run'); process.exit(78);\n",
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(projectDir, "scripts", "dev-wasm-watch.mjs"),
+      "console.log('watch-ok');\n",
       "utf8",
     );
     await fsp.writeFile(
@@ -44,6 +49,11 @@ test("d selected webapp dev runs scripts/dev.mjs directly when available", async
 
     const stubBin = path.join(tmp, "stub-bin");
     const fakeOut = path.join(tmp, "fake-selected-out");
+    const realZxWrapper = String((await $({ stdio: "pipe" })`command -v zx-wrapper`).stdout || "")
+      .trim()
+      .split("\n")
+      .filter(Boolean)[0];
+    assert.ok(realZxWrapper, "expected zx-wrapper on PATH");
     await fsp.mkdir(stubBin, { recursive: true });
     await fsp.writeFile(
       path.join(stubBin, "nix"),
@@ -69,7 +79,22 @@ test("d selected webapp dev runs scripts/dev.mjs directly when available", async
       "#!/usr/bin/env bash\necho 'pnpm should not run' >&2\nexit 77\n",
       "utf8",
     );
-    await $`chmod +x ${path.join(stubBin, "nix")} ${path.join(stubBin, "pnpm")}`;
+    await fsp.writeFile(
+      path.join(stubBin, "zx-wrapper"),
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        'if [[ "$*" == *"run-runnable.ts"* ]]; then',
+        '  exec "$REAL_ZX_WRAPPER" "$@"',
+        "fi",
+        "printf 'direct-dev-ok:%s\\n' \"$PWD\"",
+        "printf 'args:%s\\n' \"$*\"",
+        "exit 0",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await $`chmod +x ${path.join(stubBin, "nix")} ${path.join(stubBin, "pnpm")} ${path.join(stubBin, "zx-wrapper")}`;
 
     const run = await $({
       cwd: tmp,
@@ -77,14 +102,18 @@ test("d selected webapp dev runs scripts/dev.mjs directly when available", async
       env: {
         ...process.env,
         PATH: `${stubBin}:${process.env.PATH || ""}`,
+        REAL_ZX_WRAPPER: realZxWrapper,
       },
     })`viberoots/build-tools/tools/bin/d ${target}`;
 
     assert.match(String(run.stdout || ""), /direct-dev-ok:/);
+    assert.match(String(run.stdout || ""), /--vite-cmd node server\/dev\.mjs/);
+    assert.match(String(run.stdout || ""), /--watch-cmd node scripts\/dev-wasm-watch\.mjs/);
     assert.match(
       String(run.stdout || ""),
       new RegExp(projectDir.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
     );
     assert.doesNotMatch(String(run.stderr || ""), /pnpm should not run/);
+    assert.doesNotMatch(String(run.stderr || ""), /stale dev script should not run/);
   });
 });

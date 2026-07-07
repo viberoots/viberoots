@@ -78,7 +78,16 @@ test("SSR runtime-consistency: script and path contracts stay deterministic acro
     );
     assert.match(devScript, /dev-with-wasm-watch\.ts/, `${contract.id}: dev wrapper mismatch`);
     assert.match(devScript, /--watch-cmd/, `${contract.id}: missing watcher wiring`);
-    assert.match(devScript, /dev:wasm:watch/, `${contract.id}: missing watcher wiring`);
+    assert.match(
+      devScript,
+      /node scripts\/dev-wasm-watch\.mjs/,
+      `${contract.id}: missing direct watcher wiring`,
+    );
+    assert.doesNotMatch(
+      devScript,
+      /pnpm run dev:wasm:watch/,
+      `${contract.id}: dev wrapper must not shell through pnpm`,
+    );
     assert.match(
       watchScript,
       /watch-wasm-coordinator\.ts/,
