@@ -552,13 +552,31 @@ async function runLocalReset(
 }
 
 async function runBootstrap(repoRoot: string, args: string[]) {
-  await runNodeWithZx({
-    cwd: repoRoot,
-    script: buildToolPath(repoRoot, "tools/deployments/infisical-bootstrap.ts"),
-    args,
-    zxInitPath: zxInitPath(repoRoot),
-    stdio: "inherit",
-  });
+  try {
+    await runNodeWithZx({
+      cwd: repoRoot,
+      script: buildToolPath(repoRoot, "tools/deployments/infisical-bootstrap.ts"),
+      args,
+      zxInitPath: zxInitPath(repoRoot),
+      stdio: "inherit",
+    });
+  } catch (error) {
+    if (isChildProcessExitError(error)) {
+      console.error(
+        `[install-deps] repo bootstrap failed with exit ${error.exitCode}; see the bootstrap message above.`,
+      );
+      process.exit(error.exitCode);
+    }
+    throw error;
+  }
+}
+
+function isChildProcessExitError(error: unknown): error is { exitCode: number } {
+  return (
+    Boolean(error) &&
+    typeof error === "object" &&
+    typeof (error as { exitCode?: unknown }).exitCode === "number"
+  );
 }
 
 function boolFlag(name: string, enabled: boolean) {

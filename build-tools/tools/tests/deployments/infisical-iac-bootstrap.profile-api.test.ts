@@ -15,12 +15,12 @@ test("repo project creation failure explains how to reuse an existing Infisical 
       ),
     (error) => {
       assert.ok(error instanceof Error);
-      assert.match(error.message, /Could not create Infisical project "viberoots-deployments"/);
-      assert.match(error.message, /plan limit reached/);
-      assert.match(error.message, /reuse an existing secret-manager project/);
+      assert.match(error.message, /Infisical plan limit reached/);
+      assert.match(error.message, /Reuse an existing Infisical secret-manager project/);
       assert.match(error.message, /projects\/config\/shared\.json/);
       assert.match(error.message, /VBR_INFISICAL_PROJECT_ID/);
       assert.match(error.message, /shared-secrets id=proj_existing slug=shared-secrets/);
+      assert.doesNotMatch(error.message, /Infisical API POST/);
       assert.doesNotMatch(error.message, /proj_other_org/);
       return true;
     },

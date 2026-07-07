@@ -132,6 +132,16 @@ function repoProjectCreateFailureMessage(
   const visible = visibleProjects.filter((project) =>
     projectMatchesOrganization(project, organizationId),
   );
+  if (isPlanLimitError(error)) {
+    return [
+      `Infisical plan limit reached while creating repo project "${projectName}".`,
+      "Reuse an existing Infisical secret-manager project instead.",
+      visible.length
+        ? `Candidate projects: ${visible.map(formatProject).join("; ")}`
+        : "No existing secret-manager projects were visible to this login.",
+      "Next: set VBR_INFISICAL_PROJECT_ID=<project-id> and rerun `i`, or write that project id into the generated infisical-default profile in projects/config/shared.json.",
+    ].join("\n");
+  }
   return [
     `Could not create Infisical project "${projectName}" for repo bootstrap.`,
     errorMessage(error),
@@ -145,6 +155,10 @@ function repoProjectCreateFailureMessage(
 
 function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
+}
+
+function isPlanLimitError(error: unknown) {
+  return /plan limit reached|Upgrade plan to add more workspaces/i.test(errorMessage(error));
 }
 
 function formatProject(project: InfisicalRepoProject) {
