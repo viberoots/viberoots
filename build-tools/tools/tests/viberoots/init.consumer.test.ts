@@ -435,6 +435,65 @@ test("viberoots init-consumer locks local submodule workspaces through filtered 
   });
 });
 
+test("viberoots init-consumer refreshes and updates remote flake locks", async () => {
+  await withConsumerWorkspace(
+    "viberoots-init-remote-lock-update",
+    async (workspace, viberootsRoot) => {
+      const fakeBin = path.join(workspace, ".fake-bin");
+      const log = path.join(workspace, ".nix.log");
+      const hiddenLock = path.join(workspace, ".viberoots", "workspace", "flake.lock");
+      await fsp.mkdir(fakeBin, { recursive: true });
+      await fsp.writeFile(
+        path.join(fakeBin, "nix"),
+        `#!/usr/bin/env bash
+printf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}
+if [[ "$*" == flake\\ update* ]]; then
+  mkdir -p ${JSON.stringify(path.dirname(hiddenLock))}
+  cat > ${JSON.stringify(hiddenLock)} <<'JSON'
+{"nodes":{"viberoots":{"locked":{"rev":"new-remote-rev"}}},"root":"root","version":7}
+JSON
+fi
+exit 0
+`,
+        { mode: 0o755 },
+      );
+
+      await execFileAsync(
+        path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots"),
+        [
+          "init-consumer",
+          "--workspace-root",
+          workspace,
+          "--workspace-name",
+          "remote-lock-update",
+          "--viberoots-url",
+          "git+https://github.com/viberoots/viberoots.git?ref=main",
+          "--no-direnv",
+        ],
+        {
+          cwd: workspace,
+          env: {
+            ...process.env,
+            PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
+            NO_DEV_SHELL: "1",
+          },
+        },
+      );
+
+      const text = await fsp.readFile(log, "utf8");
+      assert.match(
+        text,
+        /nix flake update viberoots --refresh --accept-flake-config --flake path:.*\.viberoots\/workspace/,
+      );
+      assert.doesNotMatch(text, /nix flake lock/);
+      assert.match(
+        await fsp.readFile(path.join(workspace, "flake.lock"), "utf8"),
+        /new-remote-rev/,
+      );
+    },
+  );
+});
+
 test("curlable bootstrap defaults to flake main and install enabled", async () => {
   const workspace = await fsp.realpath(
     await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-flake-")),
@@ -462,6 +521,10 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
     const text = await fsp.readFile(log, "utf8");
     assert.match(text, /git rev-parse --is-inside-work-tree/);
     assert.match(text, /git init/);
+    assert.match(
+      text,
+      /nix flake metadata --refresh --json --accept-flake-config --no-write-lock-file git\+https:\/\/github\.com\/viberoots\/viberoots\.git\?ref=main/,
+    );
     assert.match(
       text,
       /nix run --refresh --accept-flake-config git\+https:\/\/github\.com\/viberoots\/viberoots\.git\?ref=main#viberoots/,

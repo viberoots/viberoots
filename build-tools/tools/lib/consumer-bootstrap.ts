@@ -577,20 +577,36 @@ async function runInstall(workspaceRoot: string): Promise<void> {
 
 async function runNixFlakeLock(opts: InitConsumerOptions): Promise<void> {
   const filteredViberootsInput = await prepareFilteredViberootsInput(opts.workspaceRoot, opts);
-  const overrideArgs = filteredViberootsInput
-    ? ["--override-input", "viberoots", `path:${filteredViberootsInput}`]
-    : [];
-  await execFileAsync(
-    "nix",
-    [
-      "flake",
-      "lock",
-      "--accept-flake-config",
-      ...overrideArgs,
-      `path:${path.join(opts.workspaceRoot, ".viberoots", "workspace")}`,
-    ],
-    { cwd: opts.workspaceRoot, maxBuffer: 1024 * 1024 * 16 },
-  );
+  const workspaceFlake = `path:${path.join(opts.workspaceRoot, ".viberoots", "workspace")}`;
+  if (filteredViberootsInput) {
+    await execFileAsync(
+      "nix",
+      [
+        "flake",
+        "lock",
+        "--accept-flake-config",
+        "--override-input",
+        "viberoots",
+        `path:${filteredViberootsInput}`,
+        workspaceFlake,
+      ],
+      { cwd: opts.workspaceRoot, maxBuffer: 1024 * 1024 * 16 },
+    );
+  } else {
+    await execFileAsync(
+      "nix",
+      [
+        "flake",
+        "update",
+        "viberoots",
+        "--refresh",
+        "--accept-flake-config",
+        "--flake",
+        workspaceFlake,
+      ],
+      { cwd: opts.workspaceRoot, maxBuffer: 1024 * 1024 * 16 },
+    );
+  }
   const hiddenLock = path.join(opts.workspaceRoot, ".viberoots", "workspace", "flake.lock");
   if (await exists(hiddenLock)) {
     await fsp.copyFile(hiddenLock, path.join(opts.workspaceRoot, "flake.lock"));

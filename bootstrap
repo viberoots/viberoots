@@ -495,7 +495,7 @@ flake_requested_ref() {
 
 resolve_flake_rev() {
   local flake_ref="$1"
-  nix flake metadata --json --accept-flake-config --no-write-lock-file "${flake_ref}" 2>/dev/null |
+  nix flake metadata --refresh --json --accept-flake-config --no-write-lock-file "${flake_ref}" 2>/dev/null |
     sed -n 's/.*"rev":"\([^"]*\)".*/\1/p' |
     head -n 1 || true
 }
