@@ -15,6 +15,7 @@ import { fetchExactPnpmStore } from "./exact-store-fetch";
 import { importExactStoreIntoNixStore } from "./exact-store-import";
 import { cleanupLocalWorkspaceMarker, ensureLocalWorkspaceMarker } from "./lockfile-shared";
 import { syncSourcePnpmStoreIntoLocalPrefetch } from "./prefetched-store";
+import { currentSharedPnpmStoreHashCacheFingerprint } from "./verified-marker";
 
 const EXACT_STORE_CACHE_VERSION = 11;
 
@@ -114,6 +115,7 @@ async function pruneSupersededExactStoreForImporter(
   repoRoot: string,
   importer: string,
   lockHash: string,
+  provisioningFingerprint: string,
 ): Promise<void> {
   const indexPath = sharedExactPnpmStateIndexPath(repoRoot, importer);
   try {
@@ -137,6 +139,7 @@ async function pruneSupersededExactStoreForImporter(
         repoRoot: path.resolve(repoRoot),
         importer,
         lockHash,
+        provisioningFingerprint,
       },
       null,
       2,
@@ -240,8 +243,17 @@ export async function prepareExactPnpmStore(opts: {
   const fetchTimeout = String(process.env.NIX_PNPM_FETCH_TIMEOUT || "").trim() || "600";
   const timeoutMs = (Number.parseInt(fetchTimeout, 10) || 600) * 1000 + 120_000;
   const lockHash = await sha256HexFile(lockfileAbs);
+  const provisioningFingerprint = await currentSharedPnpmStoreHashCacheFingerprint(
+    opts.repoRoot,
+    opts.importer,
+  );
   const cacheDir = await sharedExactPnpmStateRoot(lockHash);
-  await pruneSupersededExactStoreForImporter(opts.repoRoot, opts.importer, lockHash);
+  await pruneSupersededExactStoreForImporter(
+    opts.repoRoot,
+    opts.importer,
+    lockHash,
+    provisioningFingerprint,
+  );
   const storeDir = path.join(cacheDir, "store");
   const homeDir = path.join(cacheDir, "home");
   const markerPath = path.join(cacheDir, "ready.json");
@@ -249,6 +261,7 @@ export async function prepareExactPnpmStore(opts: {
   const readMarker = async (): Promise<{
     version: number;
     lockHash: string;
+    provisioningFingerprint: string;
     nixStorePath: string;
   } | null> => {
     try {
@@ -256,12 +269,14 @@ export async function prepareExactPnpmStore(opts: {
       const parsed = JSON.parse(raw) as {
         version?: number;
         lockHash?: string;
+        provisioningFingerprint?: string;
         nixStorePath?: string;
       };
       const nixStorePath = String(parsed.nixStorePath || "").trim();
       if (
         parsed.version !== EXACT_STORE_CACHE_VERSION ||
         parsed.lockHash !== lockHash ||
+        parsed.provisioningFingerprint !== provisioningFingerprint ||
         !nixStorePath ||
         !fs.existsSync(nixStorePath)
       ) {
@@ -270,6 +285,7 @@ export async function prepareExactPnpmStore(opts: {
       return {
         version: EXACT_STORE_CACHE_VERSION,
         lockHash,
+        provisioningFingerprint,
         nixStorePath,
       };
     } catch {
@@ -319,6 +335,7 @@ export async function prepareExactPnpmStore(opts: {
           {
             version: EXACT_STORE_CACHE_VERSION,
             lockHash,
+            provisioningFingerprint,
             nixStorePath,
           },
           null,
@@ -329,6 +346,7 @@ export async function prepareExactPnpmStore(opts: {
       preparedMarker = {
         version: EXACT_STORE_CACHE_VERSION,
         lockHash,
+        provisioningFingerprint,
         nixStorePath,
       };
     } catch (error) {
@@ -351,10 +369,22 @@ export async function hasPreparedExactPnpmStore(opts: {
   lockHash: string;
 }): Promise<boolean> {
   const indexPath = sharedExactPnpmStateIndexPath(opts.repoRoot, opts.importer);
+  const provisioningFingerprint = await currentSharedPnpmStoreHashCacheFingerprint(
+    opts.repoRoot,
+    opts.importer,
+  );
   try {
     const raw = await fsp.readFile(indexPath, "utf8");
-    const parsed = JSON.parse(raw) as { version?: number; lockHash?: string };
-    if (parsed.version !== EXACT_STORE_CACHE_VERSION || parsed.lockHash !== opts.lockHash) {
+    const parsed = JSON.parse(raw) as {
+      version?: number;
+      lockHash?: string;
+      provisioningFingerprint?: string;
+    };
+    if (
+      parsed.version !== EXACT_STORE_CACHE_VERSION ||
+      parsed.lockHash !== opts.lockHash ||
+      parsed.provisioningFingerprint !== provisioningFingerprint
+    ) {
       return false;
     }
   } catch {
@@ -367,12 +397,14 @@ export async function hasPreparedExactPnpmStore(opts: {
     const parsed = JSON.parse(raw) as {
       version?: number;
       lockHash?: string;
+      provisioningFingerprint?: string;
       nixStorePath?: string;
     };
     const nixStorePath = String(parsed.nixStorePath || "").trim();
     return (
       parsed.version === EXACT_STORE_CACHE_VERSION &&
       parsed.lockHash === opts.lockHash &&
+      parsed.provisioningFingerprint === provisioningFingerprint &&
       nixStorePath.startsWith("/nix/store/") &&
       fs.existsSync(nixStorePath)
     );

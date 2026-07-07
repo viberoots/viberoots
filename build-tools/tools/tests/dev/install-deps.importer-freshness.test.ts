@@ -7,7 +7,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { importerInstallFreshness } from "../../dev/install/importer-freshness";
 import { sanitizeName } from "../../dev/install/common";
-import { currentVerifiedMarkerFingerprint } from "../../dev/update-pnpm-hash/verified-marker";
+import {
+  currentSharedPnpmStoreHashCacheFingerprint,
+  currentVerifiedMarkerFingerprint,
+} from "../../dev/update-pnpm-hash/verified-marker";
 import {
   sharedExactPnpmStateIndexPath,
   sharedExactPnpmStateRootPath,
@@ -88,6 +91,20 @@ async function seedStoreMarker(
 }
 
 async function seedExactStore(repoRoot: string, importer: string, lockHash: string): Promise<void> {
+  await seedExactStoreWithFingerprint(
+    repoRoot,
+    importer,
+    lockHash,
+    await currentSharedPnpmStoreHashCacheFingerprint(repoRoot, importer),
+  );
+}
+
+async function seedExactStoreWithFingerprint(
+  repoRoot: string,
+  importer: string,
+  lockHash: string,
+  provisioningFingerprint: string,
+): Promise<void> {
   const indexPath = sharedExactPnpmStateIndexPath(repoRoot, importer);
   const readyPath = path.join(sharedExactPnpmStateRootPath(lockHash), "ready.json");
   const nixStorePath = process.execPath;
@@ -100,6 +117,7 @@ async function seedExactStore(repoRoot: string, importer: string, lockHash: stri
         repoRoot,
         importer,
         lockHash,
+        provisioningFingerprint,
       },
       null,
       2,
@@ -111,6 +129,7 @@ async function seedExactStore(repoRoot: string, importer: string, lockHash: stri
       {
         version: EXACT_STORE_CACHE_VERSION,
         lockHash,
+        provisioningFingerprint,
         nixStorePath,
       },
       null,
@@ -220,6 +239,30 @@ test("importer freshness rejects stale or incomplete install state", async () =>
         importer: repo.importer,
       }),
       { fresh: false, reason: "stale-store-marker" },
+    );
+  } finally {
+    await repo.cleanup();
+  }
+});
+
+test("importer freshness rejects exact stores from stale provisioning inputs", async () => {
+  const repo = await makeRepo();
+  try {
+    await seedStoreMarker(repo.repoRoot, repo.importer, repo.lockHash);
+    await seedExactStoreWithFingerprint(
+      repo.repoRoot,
+      repo.importer,
+      repo.lockHash,
+      "stale-provisioning-fingerprint",
+    );
+    await seedLinkMarker(repo.repoRoot, repo.importer, repo.lockHash);
+
+    assert.deepEqual(
+      await importerInstallFreshness({
+        repoRoot: repo.repoRoot,
+        importer: repo.importer,
+      }),
+      { fresh: false, reason: "missing-exact-store" },
     );
   } finally {
     await repo.cleanup();

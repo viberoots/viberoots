@@ -145,9 +145,13 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   }
   if (
     !exactStore.includes("pruneSupersededExactStoreForImporter") ||
-    !exactStore.includes("sharedExactPnpmStateIndexPath")
+    !exactStore.includes("sharedExactPnpmStateIndexPath") ||
+    !exactStore.includes("currentSharedPnpmStoreHashCacheFingerprint") ||
+    !exactStore.includes("provisioningFingerprint")
   ) {
-    throw new Error("exact-store prep must prune superseded per-importer lock-hash caches");
+    throw new Error(
+      "exact-store prep must prune superseded per-importer lock-hash caches and reject stale provisioning markers",
+    );
   }
   if (
     !pnpmStatePaths.includes("sharedExactPnpmStateIndexPath(repoRoot: string, importer: string)") ||
