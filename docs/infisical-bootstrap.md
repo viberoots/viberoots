@@ -28,14 +28,14 @@ is unavailable in the current terminal, press Ctrl-C and rerun with
 
 Lazy `i` secret readiness is capability-gated by checked-out project configuration or deployment
 metadata. A bootstrapped workspace with `projects/config/` prompts for repo bootstrap when the local
-resolver config or repo bootstrap credentials are missing, even if no deployment packages are checked
-out yet. Partial clones or minimized workspaces with no `projects/config/` and no deployment metadata
-skip Infisical readiness automatically and do not require `--without-secrets`; full checkouts can
-still use `--without-secrets` or `INSTALL_DEPS_WITHOUT_SECRETS=1` as an explicit dependency-only
-opt-out. When `i` is launched from an interactive terminal through wrappers such as `direnv exec`,
-it may read prompts from the controlling terminal even if the wrapper redirects standard input. True
-non-interactive automation still fails closed unless it passes `--yes`,
-`INSTALL_DEPS_SETUP_SECRETS=1`, or the dependency-only skip options.
+resolver config, generated Infisical profile project ids, or repo bootstrap credentials are missing,
+even if no deployment packages are checked out yet. Partial clones or minimized workspaces with no
+`projects/config/` and no deployment metadata skip Infisical readiness automatically and do not
+require `--without-secrets`; full checkouts can still use `--without-secrets` or
+`INSTALL_DEPS_WITHOUT_SECRETS=1` as an explicit dependency-only opt-out. When `i` is launched from an
+interactive terminal through wrappers such as `direnv exec`, it may read prompts from the controlling
+terminal even if the wrapper redirects standard input. True non-interactive automation still fails
+closed unless it passes `--yes`, `INSTALL_DEPS_SETUP_SECRETS=1`, or the dependency-only skip options.
 Use `i --bootstrap` when you want to inspect/fix generated shared and local resolver config and run
 the repo bootstrap flow explicitly. In interactive shells, `i --bootstrap` first prints the local
 reset plan so the existing refs and files that would be deleted are visible, then asks whether to

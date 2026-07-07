@@ -49,7 +49,17 @@ type SecretReadinessProbeOpts = {
 };
 
 type ReadinessSprinkleRefConfig = {
-  profiles?: Record<string, { backend?: string; clientIdRef?: string; clientSecretRef?: string }>;
+  profiles?: Record<
+    string,
+    {
+      backend?: string;
+      generatedBy?: string;
+      projectId?: string;
+      projectIdEnv?: string;
+      clientIdRef?: string;
+      clientSecretRef?: string;
+    }
+  >;
 };
 
 const deploymentMetadataRoot = path.join("projects", "deployments");
@@ -202,6 +212,13 @@ export async function probeLocalSecretReadiness(
     args,
     repoBootstrapCredentialRefs,
   );
+  const unresolvedProfiles = unresolvedInfisicalProjectProfiles(config);
+  if (unresolvedProfiles.length > 0) {
+    return {
+      ready: false,
+      reason: `missing Infisical project id for profile(s): ${unresolvedProfiles.join(", ")}`,
+    };
+  }
   const requiredRefs = repoRefs.flatMap((refs) => [refs.clientIdRef, refs.clientSecretRef]);
   for (const metadataPath of metadataPaths) {
     const metadata = await readDeploymentReviewedMetadata(
@@ -245,6 +262,15 @@ function repoBootstrapCredentialRefsForReadiness(
     );
   if (configured.length > 0) return uniqueRefPairs(configured);
   return [repoBootstrapCredentialRefs({ name: args.identityName }, args.bootstrapCredentialScope)];
+}
+
+function unresolvedInfisicalProjectProfiles(config: ReadinessSprinkleRefConfig) {
+  return Object.entries(config.profiles || {}).flatMap(([name, profile]) => {
+    if (profile.backend !== "infisical") return [];
+    if (profile.projectId?.trim()) return [];
+    if (profile.projectIdEnv && String(process.env[profile.projectIdEnv] || "").trim()) return [];
+    return [name];
+  });
 }
 
 function uniqueRefPairs(pairs: Array<{ clientIdRef: string; clientSecretRef: string }>) {
