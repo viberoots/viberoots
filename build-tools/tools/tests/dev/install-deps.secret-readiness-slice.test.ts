@@ -78,14 +78,14 @@ test("install secret readiness prompts for repo bootstrap when project config ex
       deps: {
         isInteractive: () => true,
         prompt: async (message) => {
-          assert.match(message, /Infisical local credentials are not ready/);
+          assert.equal(message, "Run repo bootstrap now? [Y/n] ");
           return true;
         },
         bootstrap: async (args) => void calls.push(args),
       },
     });
     assert.equal(await isInstallSecretReadinessApplicable(repoRoot), true);
-    assert.deepEqual(calls, [["repo", "--yes"]]);
+    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
   });
 });
 
@@ -105,7 +105,7 @@ test("install secret readiness explicit bootstrap bypasses deployment metadata a
         isInteractive: () => false,
       },
     });
-    assert.deepEqual(calls, [["repo", "--yes"]]);
+    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
   });
 });
 

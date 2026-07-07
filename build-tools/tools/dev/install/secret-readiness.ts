@@ -96,9 +96,16 @@ export async function ensureInstallSecretReadiness(opts: {
   const interactive = opts.deps?.isInteractive?.() ?? isInteractiveShell();
   if (!allowed && !interactive) throw new Error(nonInteractiveMessage());
   if (!allowed) {
+    console.error(
+      [
+        `Infisical local credentials are not ready: ${probe.reason}.`,
+        `Repo bootstrap will use Infisical ${effectiveLoginMode(opts.flags)} login.`,
+        loginModeHint(opts.flags),
+      ].join(" "),
+    );
     const confirmed =
       (await (opts.deps?.prompt || promptYesNo)(
-        "Infisical local credentials are not ready. Run repo bootstrap now? [Y/n] ",
+        "Run repo bootstrap now? [Y/n] ",
       )) ?? false;
     if (!confirmed) {
       console.error("Infisical setup skipped. Rerun `i` and accept the prompt when ready.");
@@ -347,11 +354,21 @@ function bootstrapArgs(flags: SecretReadinessFlags) {
     "repo",
     "--yes",
     ...valueFlag("machine-label", flags.machineLabel),
-    ...valueFlag("login-mode", flags.infisicalLoginMode),
+    ...valueFlag("login-mode", effectiveLoginMode(flags)),
     ...boolFlag("rotate-bootstrap-credentials", flags.rotateBootstrapCredentials),
     ...boolFlag("rotate-deployment-credentials", flags.rotateDeploymentCredentials),
     ...boolFlag("force-overwrite-local-credentials", flags.forceOverwriteLocalCredentials),
   ];
+}
+
+function effectiveLoginMode(flags: SecretReadinessFlags) {
+  return flags.infisicalLoginMode.trim() || "interactive";
+}
+
+function loginModeHint(flags: SecretReadinessFlags) {
+  return effectiveLoginMode(flags) === "browser"
+    ? "If browser login stalls, press Ctrl-C and rerun with `i --infisical-login-mode interactive`."
+    : "Pass `i --infisical-login-mode browser` to use browser SSO instead.";
 }
 
 function hasRotationRequest(flags: SecretReadinessFlags) {

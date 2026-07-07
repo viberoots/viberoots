@@ -8,6 +8,7 @@ i --yes
 i --bootstrap
 i --without-secrets
 i --machine-label <label>
+i --infisical-login-mode browser
 i --infisical-login-mode interactive
 ```
 
@@ -20,8 +21,9 @@ pre-confirmation, `--without-secrets` for dependency-only automation, and
 can also set `INSTALL_DEPS_WITHOUT_SECRETS=1`; non-interactive setup may be explicitly allowed with
 `INSTALL_DEPS_SETUP_SECRETS=1`.
 Infisical CLI browser login does not expose a stable printable login URL in supported CLI versions.
-If the wrong browser profile opens, no tab opens, or the browser flow is otherwise unsuitable, rerun
-with `i --infisical-login-mode interactive` to make the Infisical CLI prompt in the terminal instead.
+Lazy `i` setup therefore defaults to `i --infisical-login-mode interactive`, which makes the
+Infisical CLI prompt in the terminal. Use `i --infisical-login-mode browser` only when browser SSO is
+preferred and you are prepared to complete the opened browser flow.
 
 Lazy `i` secret readiness is capability-gated by checked-out project configuration or deployment
 metadata. A bootstrapped workspace with `projects/config/` prompts for repo bootstrap when the local

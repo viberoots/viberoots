@@ -69,7 +69,7 @@ test("install secret readiness still treats valid metadata with absent credentia
         bootstrap: async (args) => void calls.push(args),
       },
     });
-    assert.deepEqual(calls, [["repo", "--yes"]]);
+    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
   });
 });
 
