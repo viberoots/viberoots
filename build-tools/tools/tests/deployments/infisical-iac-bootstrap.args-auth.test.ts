@@ -11,7 +11,11 @@ import {
   withRepoInfisicalProjectName,
 } from "../../deployments/infisical-iac-bootstrap-config";
 import { runInfisicalBootstrapMain } from "../../deployments/infisical-iac-bootstrap";
-import { getAccessToken, spawnCommandRunner } from "../../deployments/infisical-iac-bootstrap-auth";
+import {
+  createSpawnCommandRunner,
+  getAccessToken,
+  spawnCommandRunner,
+} from "../../deployments/infisical-iac-bootstrap-auth";
 import {
   orgIdByExactName,
   organizationListReason,
@@ -305,6 +309,27 @@ test("CLI login supports command-line interactive mode when browser login is uns
   );
   assert.deepEqual(ttys, [undefined, true, undefined]);
   assert.match(output, /command-line Infisical login/);
+});
+
+test("interactive command runner restores tty mode after command failure", () => {
+  const calls: string[] = [];
+  const runner = createSpawnCommandRunner({
+    openSync: () => 19,
+    closeSync: (fd) => calls.push(`close ${fd}`),
+    spawnSync: ((command: string, args: string[]) => {
+      calls.push(`${command} ${args.join(" ")}`);
+      if (command === "stty" && args[0] === "-g") {
+        return { status: 0, stdout: "saved-tty-mode\n" };
+      }
+      if (command === "stty") return { status: 0, stdout: "" };
+      return { status: 130, stdout: "", stderr: "interrupted" };
+    }) as never,
+  });
+  assert.throws(
+    () => runner({ command: "infisical", args: ["login"], tty: true }),
+    /infisical login failed with exit 130/,
+  );
+  assert.deepEqual(calls, ["stty -g", "infisical login", "stty saved-tty-mode", "close 19"]);
 });
 
 test("browser login explains empty token prompt failures", async () => {

@@ -1,43 +1,83 @@
 import * as fs from "node:fs/promises";
 import * as syncFs from "node:fs";
 import * as path from "node:path";
-import { spawnSync } from "node:child_process";
+import { spawnSync as defaultSpawnSync } from "node:child_process";
 import type { BootstrapArgs, CommandRunner } from "./infisical-iac-bootstrap-types";
 import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import { mkdtempNoindex } from "../lib/macos-metadata";
 
-export const spawnCommandRunner: CommandRunner = (opts) => {
-  let ttyFd: number | undefined;
-  const stdio = (() => {
-    if (opts.capture) return ["inherit", "pipe", "pipe"] as const;
-    if (!opts.tty) return "inherit" as const;
+type SpawnSyncImpl = typeof defaultSpawnSync;
+
+export function createSpawnCommandRunner(
+  deps: {
+    spawnSync?: SpawnSyncImpl;
+    openSync?: typeof syncFs.openSync;
+    closeSync?: typeof syncFs.closeSync;
+  } = {},
+): CommandRunner {
+  const spawnSync = deps.spawnSync || defaultSpawnSync;
+  const openSync = deps.openSync || syncFs.openSync;
+  const closeSync = deps.closeSync || syncFs.closeSync;
+  return (opts) => {
+    let ttyFd: number | undefined;
+    let ttyMode: string | undefined;
+    const stdio = (() => {
+      if (opts.capture) return ["inherit", "pipe", "pipe"] as const;
+      if (!opts.tty) return "inherit" as const;
+      try {
+        ttyFd = openSync("/dev/tty", "r+");
+        ttyMode = readTtyMode(spawnSync, ttyFd);
+        return [ttyFd, ttyFd, ttyFd] as const;
+      } catch (error) {
+        throw new Error(
+          `command ${opts.command} requires an interactive terminal, but /dev/tty is unavailable: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+      }
+    })();
+    let result: ReturnType<SpawnSyncImpl>;
     try {
-      ttyFd = syncFs.openSync("/dev/tty", "r+");
-      return [ttyFd, ttyFd, ttyFd] as const;
-    } catch (error) {
+      result = spawnSync(opts.command, opts.args, {
+        cwd: opts.cwd,
+        env: scrubControlPlaneChildEnv(opts.env),
+        encoding: "utf8",
+        stdio,
+      });
+    } finally {
+      if (ttyFd !== undefined) {
+        restoreTtyMode(spawnSync, ttyFd, ttyMode);
+        closeSync(ttyFd);
+      }
+    }
+    if (result.error) throw commandSpawnError(opts.command, result.error);
+    if (result.status !== 0) {
+      const stderr = opts.capture && result.stderr ? `\n${result.stderr.trim()}` : "";
       throw new Error(
-        `command ${opts.command} requires an interactive terminal, but /dev/tty is unavailable: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `${opts.command} ${opts.args.join(" ")} failed with exit ${result.status}${stderr}`,
       );
     }
-  })();
-  const result = spawnSync(opts.command, opts.args, {
-    cwd: opts.cwd,
-    env: scrubControlPlaneChildEnv(opts.env),
+    return result.stdout ?? "";
+  };
+}
+
+export const spawnCommandRunner: CommandRunner = createSpawnCommandRunner();
+
+function readTtyMode(spawnSync: SpawnSyncImpl, ttyFd: number) {
+  const result = spawnSync("stty", ["-g"], {
     encoding: "utf8",
-    stdio,
+    stdio: [ttyFd, "pipe", "ignore"],
   });
-  if (ttyFd !== undefined) syncFs.closeSync(ttyFd);
-  if (result.error) throw commandSpawnError(opts.command, result.error);
-  if (result.status !== 0) {
-    const stderr = opts.capture && result.stderr ? `\n${result.stderr.trim()}` : "";
-    throw new Error(
-      `${opts.command} ${opts.args.join(" ")} failed with exit ${result.status}${stderr}`,
-    );
-  }
-  return result.stdout ?? "";
-};
+  return result.status === 0 ? String(result.stdout || "").trim() || undefined : undefined;
+}
+
+function restoreTtyMode(spawnSync: SpawnSyncImpl, ttyFd: number, ttyMode: string | undefined) {
+  if (!ttyMode) return;
+  spawnSync("stty", [ttyMode], {
+    encoding: "utf8",
+    stdio: [ttyFd, "ignore", "ignore"],
+  });
+}
 
 function commandSpawnError(command: string, error: Error) {
   if ((error as NodeJS.ErrnoException).code !== "ENOENT") return error;
