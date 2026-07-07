@@ -54,11 +54,12 @@ const commandMetadata: CommandMeta[] = [
   },
   {
     name: "bootstrap",
-    usage: "viberoots bootstrap [--mode flake|submodule] [--ref <ref>] [--dry-run]",
+    usage: "viberoots bootstrap [--mode flake|submodule] [--ref <ref>] [--rev <sha>] [--dry-run]",
     description: "Run the latest live bootstrap script from GitHub main.",
     options: [
       "--mode",
       "--ref",
+      "--rev",
       "--workspace-root",
       "--run-install",
       "--no-run-install",
@@ -72,11 +73,12 @@ const commandMetadata: CommandMeta[] = [
   },
   {
     name: "update",
-    usage: "viberoots update [--mode flake|submodule] [--ref <ref>] [--dry-run]",
+    usage: "viberoots update [--mode flake|submodule] [--ref <ref>] [--rev <sha>] [--dry-run]",
     description: "Alias for viberoots bootstrap; runs the latest live bootstrap script.",
     options: [
       "--mode",
       "--ref",
+      "--rev",
       "--workspace-root",
       "--run-install",
       "--no-run-install",
@@ -559,9 +561,11 @@ function liveBootstrapEnvOverrides(): Record<string, string> {
   const overrides: Record<string, string> = {};
   const mode = getFlagStr("mode");
   const ref = getFlagStr("ref");
+  const rev = getFlagStr("rev");
   const workspaceRoot = selectedWorkspaceRootForCommand();
   if (mode) overrides.VBR_CONSUMER = mode;
   if (ref) overrides.VBR_REF = ref;
+  if (rev) overrides.VBR_REV = rev;
   overrides.VBR_WORKSPACE_ROOT = workspaceRoot;
   if (getFlagBool("run-install")) overrides.VBR_RUN_INSTALL = "1";
   if (getFlagBool("no-run-install")) overrides.VBR_RUN_INSTALL = "0";

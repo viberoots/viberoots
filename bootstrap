@@ -17,6 +17,11 @@ env_or_default() {
 
 mode="$(env_or_default flake VBR_CONSUMER VBR_CONSUMER_MODE VIBEROOTS_CONSUMER_MODE VIBROOTS_CONSUMER_MODE)"
 ref="$(env_or_default main VBR_REF VIBEROOTS_REF)"
+rev="$(env_or_default "" VBR_REV VIBEROOTS_REV)"
+ref_explicit=0
+if [[ -n "${VBR_REF:-}" || -n "${VIBEROOTS_REF:-}" ]]; then
+  ref_explicit=1
+fi
 workspace_root="$(env_or_default "" VBR_WORKSPACE_ROOT)"
 workspace_name=""
 viberoots_url="$(env_or_default "" VBR_URL VBR_VIBEROOTS_URL VIBEROOTS_URL)"
@@ -45,8 +50,12 @@ falsy() {
 }
 
 default_viberoots_url() {
-  if [[ "${ref}" =~ ^[0-9a-fA-F]{40}$ ]]; then
-    printf 'git+https://github.com/viberoots/viberoots.git?rev=%s' "${ref}"
+  if [[ -n "${rev}" ]]; then
+    if [[ "${ref_explicit}" == "1" ]]; then
+      printf 'git+https://github.com/viberoots/viberoots.git?ref=%s&rev=%s' "${ref}" "${rev}"
+    else
+      printf 'git+https://github.com/viberoots/viberoots.git?rev=%s' "${rev}"
+    fi
   else
     printf 'git+https://github.com/viberoots/viberoots.git?ref=%s' "${ref}"
   fi
@@ -179,7 +188,7 @@ ui_continuation_list() {
 
 usage() {
   cat >&2 <<'EOF'
-usage: bootstrap [--mode flake|submodule] [--ref <ref>] [--workspace-root <dir>]
+usage: bootstrap [--mode flake|submodule] [--ref <ref>] [--rev <sha>] [--workspace-root <dir>]
                  [--workspace-name <name>] [--viberoots-url <flake-ref>]
                  [--submodule-url <git-url>] [--no-run-install] [--run-validate]
                  [--trust-submodule-url] [--no-install-nix] [--no-direnv-allow]
@@ -188,12 +197,13 @@ usage: bootstrap [--mode flake|submodule] [--ref <ref>] [--workspace-root <dir>]
 Defaults:
   --mode flake
   --ref main
+  --rev disabled
   --install-nix
   --run-install
   --run-validate disabled
   --direnv-allow
   --dry-run disabled
-  --viberoots-url git+https://github.com/viberoots/viberoots.git?ref=<ref>
+  --viberoots-url git+https://github.com/viberoots/viberoots.git?ref=<ref> or ?rev=<sha>
   --submodule-url https://github.com/viberoots/viberoots.git
 
 Examples:
@@ -334,10 +344,20 @@ while [[ $# -gt 0 ]]; do
       ;;
     --ref)
       ref="${2:-}"
+      ref_explicit=1
       shift 2
       ;;
     --ref=*)
       ref="${1#--ref=}"
+      ref_explicit=1
+      shift
+      ;;
+    --rev)
+      rev="${2:-}"
+      shift 2
+      ;;
+    --rev=*)
+      rev="${1#--rev=}"
       shift
       ;;
     --workspace-root)
@@ -450,6 +470,10 @@ if [[ "${direnv_allow}" != "0" && "${direnv_allow}" != "1" ]]; then
   echo "error: VBR_DIRENV_ALLOW must be 0 or 1" >&2
   exit 2
 fi
+if [[ -n "${rev}" && ! "${rev}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+  echo "error: --rev must be a full 40-character commit SHA" >&2
+  exit 2
+fi
 if [[ "${run_validate}" == "1" && "${direnv_allow}" != "1" ]]; then
   echo "error: VBR_RUN_VALIDATE=1 requires VBR_DIRENV_ALLOW=1" >&2
   exit 2
@@ -542,6 +566,10 @@ current_source_ref() {
 
 target_source_rev() {
   if [[ "${mode}" == "submodule" ]]; then
+    if [[ -n "${rev}" ]]; then
+      printf '%s' "${rev}"
+      return 0
+    fi
     resolve_submodule_target_rev "${effective_source:-${submodule_url}}" "${ref}"
   elif [[ "${mode}" == "flake" ]]; then
     resolve_flake_rev "${viberoots_url}"
@@ -695,6 +723,9 @@ print_summary() {
   ui_ok "status" "${status}"
   ui_set "mode" "${mode}"
   ui_set "ref" "${ref}"
+  if [[ -n "${rev}" ]]; then
+    ui_set "rev" "${rev}"
+  fi
   ui_set "workspace" "${workspace_root}"
   ui_set "workspace name" "${workspace_name}"
   ui_set "source" "${source}"
@@ -720,6 +751,9 @@ print_summary() {
 ui_heading "viberoots bootstrap"
 ui_set "mode" "${mode}"
 ui_set "ref" "${ref}"
+if [[ -n "${rev}" ]]; then
+  ui_set "rev" "${rev}"
+fi
 ui_set "workspace" "${workspace_root}"
 ui_set "workspace name" "${workspace_name}"
 ui_set "ensure nix" "$([[ "${install_nix}" == "1" ]] && echo yes || echo no)"
@@ -823,7 +857,8 @@ else
   ensure_git_metadata_writable
   if [[ -d viberoots ]] &&
     [[ -n "$(git -C viberoots status --porcelain=v1 2>/dev/null || true)" ]] &&
-    [[ "$(git -C viberoots rev-parse --abbrev-ref HEAD 2>/dev/null || true)" != "${ref}" ]]; then
+    [[ "$(git -C viberoots rev-parse --abbrev-ref HEAD 2>/dev/null || true)" != "${ref}" ]] &&
+    [[ -z "${rev}" || "$(git -C viberoots rev-parse HEAD 2>/dev/null || true)" != "${rev}" ]]; then
     echo "error: viberoots submodule has local changes; commit or stash them before changing refs" >&2
     exit 1
   fi
@@ -844,10 +879,17 @@ else
     git submodule update --init --recursive viberoots
     record_action "updated viberoots submodule"
   fi
-  if git -C viberoots fetch origin "${ref}" >/dev/null 2>&1; then
+  fetch_target="${ref}"
+  if [[ -n "${rev}" && "${ref_explicit}" != "1" ]]; then
+    fetch_target="${rev}"
+  fi
+  if git -C viberoots fetch origin "${fetch_target}" >/dev/null 2>&1; then
     record_action "fetched viberoots ref"
   fi
-  if git -C viberoots rev-parse --verify --quiet "origin/${ref}^{commit}" >/dev/null; then
+  if [[ -n "${rev}" ]] && git -C viberoots rev-parse --verify --quiet "${rev}^{commit}" >/dev/null; then
+    git -C viberoots checkout --quiet "${rev}"
+    record_action "checked out ${rev}"
+  elif git -C viberoots rev-parse --verify --quiet "origin/${ref}^{commit}" >/dev/null; then
     git -C viberoots checkout --quiet "origin/${ref}"
     record_action "checked out origin/${ref}"
   elif git -C viberoots rev-parse --verify --quiet "${ref}^{commit}" >/dev/null; then

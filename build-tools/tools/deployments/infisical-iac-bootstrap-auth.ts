@@ -38,6 +38,7 @@ export function createSpawnCommandRunner(
     })();
     let result: ReturnType<SpawnSyncImpl>;
     try {
+      if (opts.tty) pauseParentStdinForInteractiveChild();
       result = spawnSync(opts.command, opts.args, {
         cwd: opts.cwd,
         env: scrubControlPlaneChildEnv(opts.env),
@@ -69,6 +70,10 @@ function readTtyMode(spawnSync: SpawnSyncImpl, ttyFd: number) {
     stdio: [ttyFd, "pipe", "ignore"],
   });
   return result.status === 0 ? String(result.stdout || "").trim() || undefined : undefined;
+}
+
+function pauseParentStdinForInteractiveChild() {
+  if (process.stdin.isTTY && typeof process.stdin.pause === "function") process.stdin.pause();
 }
 
 function restoreTtyMode(spawnSync: SpawnSyncImpl, ttyFd: number, ttyMode: string | undefined) {

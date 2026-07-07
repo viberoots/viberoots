@@ -37,7 +37,6 @@ export async function promptTerminalSelect(
     });
   };
   const previousRaw = streams.input.isRaw;
-  const wasPaused = streams.input.isPaused();
   streams.input.setRawMode(true);
   streams.input.resume();
   render();
@@ -72,7 +71,7 @@ export async function promptTerminalSelect(
   } finally {
     if (onData) streams.input.off("data", onData);
     streams.input.setRawMode(previousRaw);
-    if (wasPaused) streams.input.pause();
+    pausePromptInput(streams.input);
     streams.close();
   }
 }
@@ -85,6 +84,7 @@ export async function promptTerminalLine(message: string, defaultValue = "") {
     return (await rl.question(`${message}${suffix}: `)).trim() || defaultValue;
   } finally {
     rl.close();
+    pausePromptInput(streams.input);
     streams.close();
   }
 }
@@ -122,6 +122,7 @@ async function promptSelectLine(
     return choices[parsed - 1]?.value || choices[initialIndex]?.value || choices[0]!.value;
   } finally {
     rl.close();
+    pausePromptInput(streams.input);
     streams.close();
   }
 }
@@ -183,4 +184,8 @@ function promptTtyStreams() {
       close: () => undefined,
     };
   }
+}
+
+function pausePromptInput(input: NodeJS.ReadableStream) {
+  if (typeof input.pause === "function") input.pause();
 }

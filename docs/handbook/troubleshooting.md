@@ -20,7 +20,8 @@
   - Either check out the parent-pinned revision with `git submodule update viberoots` or
     intentionally update the parent gitlink after the submodule commit exists. If you are upgrading
     the workspace to a newer viberoots ref, rerun latest-main bootstrap with
-    `VBR_CONSUMER=submodule VBR_REF=<tag-or-commit>`.
+    `VBR_CONSUMER=submodule VBR_REF=<branch-or-tag>` or
+    `VBR_CONSUMER=submodule VBR_REV=<full-commit-sha>`.
 - Old-layout blocker:
   - Root `build-tools/`, `third_party/providers/`, `prelude/`, and `toolchains/` should not exist in the parent workspace.
   - Generated provider and graph state belongs under `.viberoots/workspace/`.

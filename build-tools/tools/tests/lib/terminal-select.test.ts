@@ -4,7 +4,7 @@ import { PassThrough, Writable } from "node:stream";
 import { test } from "node:test";
 import { promptTerminalSelect } from "../../lib/terminal-select";
 
-test("terminal selector restores paused stdin after selection", async () => {
+test("terminal selector pauses stdin after selection", async () => {
   const input = new FakeTtyInput();
   const output = new CaptureOutput();
   const originalStdin = process.stdin;

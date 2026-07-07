@@ -70,7 +70,8 @@ Behavior:
 
 - Reuse `initConsumer(...)` in flake mode.
 - Remove the local source override from generated `.envrc`.
-- Lock consumed viberoots from `--ref`, `VBR_REF`, or the default `main`; alternatively preserve
+- Lock consumed viberoots from `--ref`, `VBR_REF`, or the default `main`; commit pins use
+  bootstrap/update `--rev` or `VBR_REV`; alternatively preserve
   the current locked ref if that becomes the chosen policy.
 - Do not delete or mutate top-level `viberoots/`.
 - If an inactive submodule remains, print:

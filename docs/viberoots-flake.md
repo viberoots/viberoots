@@ -738,7 +738,8 @@ entry. Tracked bootstrap files should be created or upgraded by the canonical co
 ```sh
 curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | bash
 curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_CONSUMER=submodule bash
-curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_REF=<tag-or-commit> bash
+curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_REF=<branch-or-tag> bash
+curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_REV=<full-commit-sha> bash
 ```
 
 `nix develop` may refresh ignored symlinks and caches, but it should not surprise users by changing

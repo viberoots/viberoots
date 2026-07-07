@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
+import { PassThrough } from "node:stream";
 import { test } from "node:test";
 import { parseBootstrapArgs, usage } from "../../deployments/infisical-iac-bootstrap-args";
 import {
@@ -332,6 +333,28 @@ test("interactive command runner restores tty mode after command failure", () =>
   assert.deepEqual(calls, ["stty -g", "infisical login", "stty saved-tty-mode", "close 19"]);
 });
 
+test("interactive command runner pauses parent stdin before child owns tty", () => {
+  const originalStdin = process.stdin;
+  const input = new FakeTtyInput();
+  const runner = createSpawnCommandRunner({
+    openSync: () => 19,
+    closeSync: () => undefined,
+    spawnSync: ((command: string, args: string[]) => {
+      if (command === "stty") return { status: 0, stdout: args[0] === "-g" ? "mode\n" : "" };
+      assert.equal(input.paused, true);
+      return { status: 0, stdout: "", stderr: "" };
+    }) as never,
+  });
+  Object.defineProperty(process, "stdin", { value: input, configurable: true });
+  try {
+    runner({ command: "infisical", args: ["login"], tty: true });
+    assert.equal(input.paused, true);
+  } finally {
+    Object.defineProperty(process, "stdin", { value: originalStdin, configurable: true });
+    input.destroy();
+  }
+});
+
 test("browser login explains empty token prompt failures", async () => {
   const runner: CommandRunner = ({ args }) => {
     if (args.includes("login")) {
@@ -369,6 +392,16 @@ test("missing Infisical CLI reports install and token alternatives", () => {
 
 function fakeOrgApi(orgs: Array<{ id: string; name: string }>) {
   return { request: async () => ({ organizations: orgs }) };
+}
+
+class FakeTtyInput extends PassThrough {
+  isTTY = true;
+  paused = false;
+
+  pause() {
+    this.paused = true;
+    return super.pause();
+  }
 }
 
 async function captureStderr(fn: () => Promise<void>) {

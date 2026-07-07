@@ -672,7 +672,7 @@ test("curlable bootstrap accepts VBR_URL source override", async () => {
   }
 });
 
-test("curlable bootstrap uses rev query for full commit refs", async () => {
+test("curlable bootstrap uses rev query for explicit revision", async () => {
   const workspace = await fsp.realpath(
     await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-rev-url-")),
   );
@@ -686,7 +686,7 @@ test("curlable bootstrap uses rev query for full commit refs", async () => {
         cwd: workspace,
         env: {
           ...process.env,
-          VBR_REF: sha,
+          VBR_REV: sha,
           VIBEROOTS_DRY_RUN: "1",
         },
       },
@@ -695,6 +695,55 @@ test("curlable bootstrap uses rev query for full commit refs", async () => {
     assert.match(
       stdout,
       /set\s+viberoots url git\+https:\/\/github\.com\/viberoots\/viberoots\.git\?rev=0123456789abcdef0123456789abcdef01234567/,
+    );
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("curlable bootstrap keeps full commit-looking --ref values as refs", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-ref-url-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    const sha = "0123456789abcdef0123456789abcdef01234567";
+    const { stdout } = await execFileAsync(
+      path.join(viberootsRoot, "bootstrap"),
+      ["--workspace-root", workspace, "--no-run-install", "--ref", sha],
+      {
+        cwd: workspace,
+        env: {
+          ...process.env,
+          VIBEROOTS_DRY_RUN: "1",
+        },
+      },
+    );
+
+    assert.match(
+      stdout,
+      /set\s+viberoots url git\+https:\/\/github\.com\/viberoots\/viberoots\.git\?ref=0123456789abcdef0123456789abcdef01234567/,
+    );
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("curlable bootstrap rejects short explicit revisions", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-short-rev-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    await assert.rejects(
+      execFileAsync(path.join(viberootsRoot, "bootstrap"), [
+        "--workspace-root",
+        workspace,
+        "--no-run-install",
+        "--rev",
+        "0123456",
+      ]),
+      /--rev must be a full 40-character commit SHA/,
     );
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });

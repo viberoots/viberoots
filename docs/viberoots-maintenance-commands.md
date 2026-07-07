@@ -65,6 +65,7 @@ The launcher should preserve the existing bootstrap environment contract:
 | --------------------- | ----------------------------------------------- |
 | `VBR_CONSUMER`        | `flake` or `submodule` source mode.             |
 | `VBR_REF`             | Target viberoots ref consumed by the workspace. |
+| `VBR_REV`             | Target full viberoots commit SHA.               |
 | `VBR_WORKSPACE_ROOT`  | Consumer workspace root.                        |
 | `VBR_INSTALL_NIX`     | Whether bootstrap may install Nix if missing.   |
 | `VBR_RUN_INSTALL`     | Whether bootstrap runs `i`.                     |
@@ -83,7 +84,8 @@ The launcher should provide a small flag surface that maps to the existing envir
 ```bash
 viberoots bootstrap --mode flake
 viberoots bootstrap --mode submodule
-viberoots bootstrap --ref <tag-or-commit>
+viberoots bootstrap --ref <branch-or-tag>
+viberoots bootstrap --rev <full-commit-sha>
 viberoots bootstrap --workspace-root <path>
 viberoots bootstrap --run-install
 viberoots bootstrap --no-run-install
@@ -166,7 +168,7 @@ bootstrap update gc
 Command-specific completion:
 
 ```text
-bootstrap/update: --mode --ref --workspace-root --run-install --no-run-install --run-validate --no-direnv-allow --dry-run --bootstrap-url --trust-bootstrap-url --help
+bootstrap/update: --mode --ref --rev --workspace-root --run-install --no-run-install --run-validate --no-direnv-allow --dry-run --bootstrap-url --trust-bootstrap-url --help
 gc: --dry-run --aggressive --optimize --nix --no-nix --nix-delete-older-than --keep-current-profile --verbose --help
 ```
 

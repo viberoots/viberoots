@@ -531,6 +531,7 @@ async function promptYesNo(message: string) {
     return answer === "" || answer === "y" || answer === "yes";
   } finally {
     rl.close();
+    pausePromptInput(streams.input);
     streams.close();
   }
 }
@@ -543,6 +544,7 @@ async function promptNoDefault(message: string) {
     return answer === "y" || answer === "yes";
   } finally {
     rl.close();
+    pausePromptInput(streams.input);
     streams.close();
   }
 }
@@ -570,6 +572,10 @@ function promptStreams(): PromptStreams {
       output.end();
     },
   };
+}
+
+function pausePromptInput(input: NodeJS.ReadableStream) {
+  if (typeof input.pause === "function") input.pause();
 }
 
 function nonInteractiveMessage() {

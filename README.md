@@ -4,7 +4,7 @@ viberoots is reusable Buck2 + Nix workspace tooling. It provides the development
 
 ## Quick Start
 
-Run the bootstrap command below to create or upgrade a workspace. Always fetch bootstrap from `main`; use `VBR_REF` only to choose the viberoots ref the workspace consumes. If Nix is not installed yet, bootstrap uses the official [Determinate Nix Installer](https://determinate.systems/nix-installer/) first. See [Options](#options) before running it if you need a submodule checkout, a non-main ref, a dry run, or validation during setup. In the examples below, `my-project` is the workspace root.
+Run the bootstrap command below to create or upgrade a workspace. Always fetch bootstrap from `main`; use `VBR_REF` for branch, tag, or ref names and `VBR_REV` for a full commit SHA when choosing the viberoots source the workspace consumes. If Nix is not installed yet, bootstrap uses the official [Determinate Nix Installer](https://determinate.systems/nix-installer/) first. See [Options](#options) before running it if you need a submodule checkout, a non-main ref, a commit pin, a dry run, or validation during setup. In the examples below, `my-project` is the workspace root.
 
 ```text
 my-project/                         # consumer workspace root
@@ -53,7 +53,7 @@ viberoots bootstrap
 viberoots update
 ```
 
-Both commands fetch the current bootstrap entrypoint from GitHub `main`, then pass through the same `VBR_*` options listed below. Use `bootstrap` for setup/repair language and `update` when the intent is to move the workspace to the current default ref or a `VBR_REF`.
+Both commands fetch the current bootstrap entrypoint from GitHub `main`, then pass through the same `VBR_*` options listed below. Use `bootstrap` for setup/repair language and `update` when the intent is to move the workspace to the current default ref, a `VBR_REF`, or a `VBR_REV`.
 
 `vbr` is a short alias for `viberoots`. Both commands resolve the workspace from any nested directory inside the consumer repo.
 
@@ -62,7 +62,8 @@ Both commands fetch the current bootstrap entrypoint from GitHub `main`, then pa
 | Option                          | Default           | Description                                                                                                                                                                                                |
 | ------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `VBR_CONSUMER=flake\|submodule` | `flake`           | Selects source mode.                                                                                                                                                                                       |
-| `VBR_REF=<tag-or-commit>`       | `main`            | Selects the viberoots ref consumed by the workspace. Keep the bootstrap URL on `main` so upgrade migrations stay current.                                                                                  |
+| `VBR_REF=<branch-or-tag>`       | `main`            | Selects the viberoots ref consumed by the workspace. Keep the bootstrap URL on `main` so upgrade migrations stay current.                                                                                  |
+| `VBR_REV=<full-commit-sha>`     | unset             | Pins the viberoots Git revision consumed by the workspace. Short SHAs are rejected to match Nix flake Git URL behavior.                                                                                    |
 | `VBR_INSTALL_NIX=0\|1`          | `1`               | Installs Nix when it is missing.                                                                                                                                                                           |
 | `VBR_RUN_INSTALL=0\|1`          | `1`               | Runs `i`.                                                                                                                                                                                                  |
 | `VBR_RUN_VALIDATE=0\|1`         | `0`               | Also runs `b && v`.                                                                                                                                                                                        |

@@ -62,6 +62,7 @@ test("viberoots bootstrap and update invoke trusted bootstrap URL with VBR overr
 {
   printf 'VBR_CONSUMER=%s\\n' "\${VBR_CONSUMER:-}"
   printf 'VBR_REF=%s\\n' "\${VBR_REF:-}"
+  printf 'VBR_REV=%s\\n' "\${VBR_REV:-}"
   printf 'VBR_WORKSPACE_ROOT=%s\\n' "\${VBR_WORKSPACE_ROOT:-}"
   printf 'VBR_RUN_INSTALL=%s\\n' "\${VBR_RUN_INSTALL:-}"
   printf 'VBR_RUN_VALIDATE=%s\\n' "\${VBR_RUN_VALIDATE:-}"
@@ -84,6 +85,8 @@ test("viberoots bootstrap and update invoke trusted bootstrap URL with VBR overr
           "submodule",
           "--ref",
           "release-test",
+          "--rev",
+          "0123456789abcdef0123456789abcdef01234567",
           "--workspace-root",
           workspace,
           "--no-run-install",
@@ -104,6 +107,7 @@ test("viberoots bootstrap and update invoke trusted bootstrap URL with VBR overr
       const envText = await fsp.readFile(capture, "utf8");
       assert.match(envText, /VBR_CONSUMER=submodule/);
       assert.match(envText, /VBR_REF=release-test/);
+      assert.match(envText, /VBR_REV=0123456789abcdef0123456789abcdef01234567/);
       assert.match(
         envText,
         new RegExp(`VBR_WORKSPACE_ROOT=${workspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
