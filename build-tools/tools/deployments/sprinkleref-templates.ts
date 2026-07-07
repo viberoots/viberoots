@@ -15,6 +15,11 @@ export const VAULT_DEFAULT = {
   defaultPath: "/deployments",
 };
 
+export const MACOS_KEYCHAIN_MAIN_DEFAULT = {
+  backend: "macos-keychain" as const,
+  service: "viberoots-main",
+};
+
 export function sprinkleRefStarterConfigs(_platform = process.platform) {
   const shared = {
     schemaVersion: "viberoots-project-config@1",

@@ -443,7 +443,8 @@ secret fixture only when an explicit non-production workflow needs it.
 For repo-level resolver setup, `i --bootstrap` offers the supported `main` secret
 backend choices in interactive shells. Automation can pass
 `i --bootstrap --secret-backend vault/default --yes` or
-`i --bootstrap --secret-backend infisical/default --yes`.
+`i --bootstrap --secret-backend infisical/default --yes`. On macOS, local-only
+repo secrets can use `i --bootstrap --secret-backend keychain/default --yes`.
 
 That means:
 

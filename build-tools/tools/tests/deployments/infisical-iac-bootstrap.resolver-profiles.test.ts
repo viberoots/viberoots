@@ -171,6 +171,29 @@ test("repo bootstrap can select Vault as the default main secret backend", async
   });
 });
 
+test("repo bootstrap can select macOS Keychain as the default main secret backend", async () => {
+  const dir = await tmp();
+  await withCwdAndEnv(dir, async () => {
+    const output = await captureConsole(() =>
+      runInfisicalIacBootstrap({
+        ...DEFAULT_BOOTSTRAP_ARGS,
+        credentialSink: "local-file",
+        secretBackend: "keychain/default",
+        yes: true,
+      }),
+    );
+    const report = JSON.parse(output.stdout);
+    assert.deepEqual(report.profiles, ["macos-keychain-default"]);
+    assert.deepEqual(report.bootstrapCredentialSinks, []);
+    assert.equal(report.verification.bootstrap.status, "not-required");
+    assert.equal(report.verification.main.backend, "macos-keychain");
+    const shared = await fs.readFile(sharedConfigPath(), "utf8");
+    assert.match(shared, /"defaultCategory": "main"/);
+    assert.match(shared, /"macos-keychain-default"/);
+    assert.match(shared, /"service": "viberoots-main"/);
+  });
+});
+
 test("repo bootstrap dry-run reports explicit Vault main backend", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
@@ -181,6 +204,21 @@ test("repo bootstrap dry-run reports explicit Vault main backend", async () => {
       secretBackend: "vault/default",
     });
     assert.deepEqual(report.profiles, ["vault-default"]);
+    assert.deepEqual(report.bootstrapCredentialProfiles, []);
+    await assertMissing("projects/config/shared.json");
+  });
+});
+
+test("repo bootstrap dry-run reports explicit Keychain main backend", async () => {
+  const dir = await tmp();
+  await withCwdAndEnv(dir, async () => {
+    const report = await ensureRepoResolverConfig({
+      dryRun: true,
+      workspaceRoot: dir,
+      configPath: sharedConfigPath(),
+      secretBackend: "keychain/default",
+    });
+    assert.deepEqual(report.profiles, ["macos-keychain-default"]);
     assert.deepEqual(report.bootstrapCredentialProfiles, []);
     await assertMissing("projects/config/shared.json");
   });

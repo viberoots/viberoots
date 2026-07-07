@@ -19,6 +19,7 @@ import { resolveBootstrapAccessCredentialSinkBackend } from "./sprinkleref-boots
 import {
   initLocalSprinkleRefValues,
   initSprinkleRefConfigs,
+  MACOS_KEYCHAIN_MAIN_DEFAULT,
   VAULT_DEFAULT,
 } from "./sprinkleref-templates";
 import { starterInfisicalProfile } from "./infisical-iac-bootstrap-profile-kind";
@@ -29,6 +30,8 @@ import type {
 } from "./sprinkleref-types";
 
 const STARTER_CATEGORY_PROFILES = ["infisical-default"];
+const REPO_BACKENDS = new Set(["infisical", "vault", "macos-keychain", "keychain"]);
+const PROFILE_ALIAS = /^[a-z0-9][a-z0-9-]*$/;
 
 export async function ensureRepoResolverConfig(opts: {
   dryRun: boolean;
@@ -178,6 +181,11 @@ function validateRepoProfile(profile: string, config: { backend: string }) {
       `SprinkleRef config profile ${profile} must use infisical backend; run repo bootstrap to materialize Infisical metadata`,
     );
   }
+  if (profile.startsWith("macos-keychain-") && config.backend !== "macos-keychain") {
+    throw new Error(
+      `SprinkleRef config profile ${profile} must use macos-keychain backend; run repo bootstrap to materialize Keychain metadata`,
+    );
+  }
 }
 
 function bootstrapCredentialProfiles(config: SprinkleRefConfig, requiredProfiles: Set<string>) {
@@ -216,15 +224,32 @@ async function selectRepoSecretBackend(configPath: string, secretBackend: string
 }
 
 function normalizeExplicitSecretBackend(secretBackend: string) {
-  const errors = deploymentSecretBackendSelectorErrors({ secretBackend });
+  const [backend = "", alias = ""] = secretBackend.trim().split("/");
+  const errors: string[] = [];
+  if (!backend || !alias || secretBackend.trim().split("/").length !== 2) {
+    errors.push(
+      'secret backend must use "<backend>/<profile-alias>", for example "infisical/default"',
+    );
+  }
+  if (backend && !REPO_BACKENDS.has(backend)) {
+    errors.push(`unsupported repo secret backend "${backend}"`);
+  }
+  if (alias && !PROFILE_ALIAS.test(alias)) {
+    errors.push("secret backend profile alias must be kebab-case, for example default or personal");
+  }
   if (errors.length > 0) throw new Error(errors.join("; "));
-  return normalizeDeploymentSecretBackendSelector({ secretBackend });
+  const normalizedBackend = backend === "keychain" ? "macos-keychain" : backend;
+  return {
+    backend: normalizedBackend as "infisical" | "vault" | "macos-keychain",
+    profile: `${normalizedBackend}-${alias}`,
+  };
 }
 
 function starterProfileForSelector(
-  selector: ReturnType<typeof normalizeDeploymentSecretBackendSelector>,
+  selector: ReturnType<typeof normalizeExplicitSecretBackend>,
 ): SprinkleRefBackendConfig {
   if (selector.backend === "vault") return { ...VAULT_DEFAULT };
+  if (selector.backend === "macos-keychain") return { ...MACOS_KEYCHAIN_MAIN_DEFAULT };
   return starterInfisicalProfile();
 }
 

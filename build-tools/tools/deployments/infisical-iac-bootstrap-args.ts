@@ -71,7 +71,7 @@ Options:
   --bootstrap-scope <name>      First secret:// path segment for repo bootstrap credentials
   --credential-sink <auto|local-file|macos-keychain|sprinkleref>
   --secret-backend <backend/profile>
-                               Select the repo default secret backend, e.g. vault/default
+                               Select the repo default secret backend, e.g. vault/default or keychain/default
   --yes                         Skip confirmation prompts
   --dry-run                     Print non-secret planned operations
   --without-deployments          Skip repo bootstrap deployment fan-out

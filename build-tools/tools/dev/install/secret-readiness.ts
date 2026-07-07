@@ -113,8 +113,9 @@ export async function ensureInstallSecretReadiness(opts: {
   if (!allowed) {
     console.error(
       [
-        `Infisical local credentials are not ready: ${probe.reason}.`,
-        `Repo bootstrap will use Infisical ${effectiveLoginMode(opts.flags)} login.`,
+        `Local secret readiness is not complete: ${probe.reason}.`,
+        "Repo bootstrap can repair resolver setup and local credentials.",
+        `Infisical-backed selections use ${effectiveLoginMode(opts.flags)} login.`,
         loginModeHint(opts.flags),
       ].join(" "),
     );
@@ -128,7 +129,7 @@ export async function ensureInstallSecretReadiness(opts: {
     }
   }
   await selectSecretBackendWhenInteractive(opts, interactive, allowed);
-  console.error("[install-deps] starting Infisical repo bootstrap");
+  console.error("[install-deps] starting repo bootstrap");
   await runRepoBootstrap(opts);
 }
 
@@ -426,6 +427,7 @@ async function promptSecretBackend() {
     [
       { label: "Infisical", value: "infisical/default" },
       { label: "Vault", value: "vault/default" },
+      { label: "macOS Keychain", value: "keychain/default" },
     ],
     0,
   );
@@ -439,9 +441,22 @@ async function promptSelect(
   const streams = promptTtyStreams();
   if (!streams.input.isTTY) return await promptSelectLine(message, choices, initialIndex);
   let index = Math.max(0, Math.min(initialIndex, choices.length - 1));
+  let rendered = false;
   const render = () => {
-    streams.output.write(`\r\x1b[K${message}: ${choices[index]?.label} (${choices[index]?.value})`);
-    streams.output.write("  \x1b[2m↑/↓ then Enter\x1b[0m");
+    if (!rendered) {
+      streams.output.write(`${message}:\n`);
+      rendered = true;
+    } else {
+      streams.output.write(`\x1b[${choices.length}A`);
+    }
+    choices.forEach((choice, idx) => {
+      const selected = idx === index;
+      streams.output.write(
+        `\r\x1b[K${selected ? ">" : " "} ${choice.label} (${choice.value})${
+          selected ? "  Up/Down then Enter" : ""
+        }\n`,
+      );
+    });
   };
   const previousRaw = streams.input.isRaw;
   streams.input.setRawMode(true);

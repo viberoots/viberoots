@@ -64,9 +64,9 @@ test("install secret readiness prompts when credentials are missing and forwards
         },
       });
     });
-    assert.match(stderr, /Infisical local credentials are not ready/);
-    assert.match(stderr, /Repo bootstrap will use Infisical browser login/);
-    assert.match(stderr, /starting Infisical repo bootstrap/);
+    assert.match(stderr, /Local secret readiness is not complete/);
+    assert.match(stderr, /Infisical-backed selections use browser login/);
+    assert.match(stderr, /starting repo bootstrap/);
     assert.deepEqual(calls, [
       [
         "repo",
@@ -118,11 +118,11 @@ test("install secret readiness forwards interactive secret backend selection", a
         isInteractive: () => true,
         prompt: async () => true,
         bootstrap: async (args) => void calls.push(args),
-        selectSecretBackend: async () => "vault/default",
+        selectSecretBackend: async () => "keychain/default",
       },
     });
     assert.deepEqual(calls, [
-      ["repo", "--yes", "--login-mode", "browser", "--secret-backend", "vault/default"],
+      ["repo", "--yes", "--login-mode", "browser", "--secret-backend", "keychain/default"],
     ]);
   });
 });
