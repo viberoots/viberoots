@@ -211,11 +211,13 @@ test("CLI login uses isolated HOME and removes local state after token extractio
   let observedUpdateCheck = "";
   const commands: string[] = [];
   const captures: Array<boolean | undefined> = [];
-  const runner: CommandRunner = ({ args, env, capture }) => {
+  const ttys: Array<boolean | undefined> = [];
+  const runner: CommandRunner = ({ args, env, capture, tty }) => {
     observedHome = String(env?.HOME || "");
     observedUpdateCheck = String(env?.INFISICAL_DISABLE_UPDATE_CHECK || "");
     commands.push(args.join(" "));
     captures.push(capture);
+    ttys.push(tty);
     if (args.includes("login")) return "";
     return "human-token\n";
   };
@@ -227,6 +229,7 @@ test("CLI login uses isolated HOME and removes local state after token extractio
   assert.equal(observedUpdateCheck, "true");
   assert.equal(commands[0], "vault set file --domain https://app.infisical.com/api --silent");
   assert.equal(captures[0], true);
+  assert.deepEqual(ttys, [undefined, false, undefined]);
   assert.match(output, /waiting for Infisical CLI browser login/);
   assert.match(output, /wrong browser opens or no browser tab opens/);
   assert.match(output, /--infisical-login-mode interactive/);
@@ -237,8 +240,10 @@ test("CLI login uses isolated HOME and removes local state after token extractio
 
 test("CLI login supports command-line interactive mode when browser login is unsuitable", async () => {
   const commands: string[] = [];
-  const runner: CommandRunner = ({ args }) => {
+  const ttys: Array<boolean | undefined> = [];
+  const runner: CommandRunner = ({ args, tty }) => {
     commands.push(args.join(" "));
+    ttys.push(tty);
     if (args.includes("login")) return "";
     return "human-token\n";
   };
@@ -254,6 +259,7 @@ test("CLI login supports command-line interactive mode when browser login is uns
     commands.includes("login --domain https://app.infisical.com/api --interactive"),
     "interactive login mode must pass --interactive to the Infisical CLI",
   );
+  assert.deepEqual(ttys, [undefined, true, undefined]);
   assert.match(output, /command-line Infisical login/);
 });
 

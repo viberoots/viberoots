@@ -58,6 +58,7 @@ export type CommandRunner = (opts: {
   env?: NodeJS.ProcessEnv;
   cwd?: string;
   capture?: boolean;
+  tty?: boolean;
 }) => string;
 
 export type CredentialSink = {

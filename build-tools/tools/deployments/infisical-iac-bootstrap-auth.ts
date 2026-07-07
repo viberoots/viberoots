@@ -1,4 +1,5 @@
 import * as fs from "node:fs/promises";
+import * as syncFs from "node:fs";
 import * as path from "node:path";
 import { spawnSync } from "node:child_process";
 import type { BootstrapArgs, CommandRunner } from "./infisical-iac-bootstrap-types";
@@ -6,12 +7,28 @@ import { scrubControlPlaneChildEnv } from "./control-plane-process-env";
 import { mkdtempNoindex } from "../lib/macos-metadata";
 
 export const spawnCommandRunner: CommandRunner = (opts) => {
+  let ttyFd: number | undefined;
+  const stdio = (() => {
+    if (opts.capture) return ["inherit", "pipe", "pipe"] as const;
+    if (!opts.tty) return "inherit" as const;
+    try {
+      ttyFd = syncFs.openSync("/dev/tty", "r+");
+      return [ttyFd, ttyFd, ttyFd] as const;
+    } catch (error) {
+      throw new Error(
+        `command ${opts.command} requires an interactive terminal, but /dev/tty is unavailable: ${
+          error instanceof Error ? error.message : String(error)
+        }`,
+      );
+    }
+  })();
   const result = spawnSync(opts.command, opts.args, {
     cwd: opts.cwd,
     env: scrubControlPlaneChildEnv(opts.env),
     encoding: "utf8",
-    stdio: opts.capture ? ["inherit", "pipe", "pipe"] : "inherit",
+    stdio,
   });
+  if (ttyFd !== undefined) syncFs.closeSync(ttyFd);
   if (result.error) throw commandSpawnError(opts.command, result.error);
   if (result.status !== 0) {
     const stderr = opts.capture && result.stderr ? `\n${result.stderr.trim()}` : "";
@@ -78,6 +95,7 @@ export async function getAccessToken(
         ...(args.loginMode === "interactive" ? ["--interactive"] : []),
       ],
       env: cliEnv,
+      tty: args.loginMode === "interactive",
     });
     console.error("[infisical-bootstrap] Infisical CLI login complete; reading access token");
     const stdout = runner({
