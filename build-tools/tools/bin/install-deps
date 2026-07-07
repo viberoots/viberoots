@@ -16,8 +16,7 @@ options:
   --glue-only
   --skip-go-tidy
   --without-secrets
-  --setup-secrets
-  --reset-secrets
+  --bootstrap
   --yes
   --machine-label <label>
   --rotate-bootstrap-credentials

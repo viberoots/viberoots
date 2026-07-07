@@ -21,8 +21,7 @@ export type SecretReadinessFlags = {
   rotateBootstrapCredentials: boolean;
   rotateDeploymentCredentials: boolean;
   forceOverwriteLocalCredentials: boolean;
-  setupSecrets: boolean;
-  resetSecrets: boolean;
+  bootstrap: boolean;
 };
 
 export type SecretReadinessDeps = {
@@ -57,11 +56,11 @@ export async function ensureInstallSecretReadiness(opts: {
   flags: SecretReadinessFlags;
   deps?: SecretReadinessDeps;
 }) {
-  if (opts.flags.withoutSecrets && (opts.flags.setupSecrets || opts.flags.resetSecrets)) {
-    throw new Error("--without-secrets cannot be combined with --setup-secrets or --reset-secrets");
+  if (opts.flags.withoutSecrets && opts.flags.bootstrap) {
+    throw new Error("--without-secrets cannot be combined with --bootstrap");
   }
-  if (opts.flags.resetSecrets || opts.flags.setupSecrets) {
-    return await runExplicitSecretSetup(opts);
+  if (opts.flags.bootstrap) {
+    return await runExplicitBootstrap(opts);
   }
   if (opts.flags.withoutSecrets || opts.dryRun) {
     if (opts.verbose) console.log("[install-deps] skipping Infisical secret readiness");
@@ -102,7 +101,7 @@ export async function ensureInstallSecretReadiness(opts: {
   await runRepoBootstrap(opts);
 }
 
-async function runExplicitSecretSetup(opts: {
+async function runExplicitBootstrap(opts: {
   repoRoot: string;
   dryRun: boolean;
   verbose: boolean;
@@ -110,22 +109,21 @@ async function runExplicitSecretSetup(opts: {
   deps?: SecretReadinessDeps;
 }) {
   if (opts.dryRun) {
-    if (opts.flags.resetSecrets) await runLocalReset(opts, ["--dry-run"]);
+    await runLocalReset(opts, ["--dry-run"]);
     if (opts.verbose) console.log("[install-deps] dry-run: would run Infisical repo bootstrap");
     return;
   }
   const allowed = opts.flags.yes || process.env.INSTALL_DEPS_SETUP_SECRETS === "1";
   const interactive = opts.deps?.isInteractive?.() ?? isInteractiveShell();
-  if (!allowed && !interactive) throw new Error(nonInteractiveExplicitSetupMessage());
-  if (!allowed) {
-    const confirmed =
-      (await (opts.deps?.prompt || promptYesNo)(explicitSetupPrompt(opts.flags))) ?? false;
-    if (!confirmed) {
-      console.error("Infisical setup skipped. Rerun with `i --setup-secrets` when ready.");
-      return;
-    }
+  if (!allowed && !interactive) throw new Error(nonInteractiveBootstrapMessage());
+  if (interactive && !allowed) {
+    await runLocalReset(opts, ["--dry-run"]);
+    const resetConfirmed =
+      (await (opts.deps?.prompt || promptNoDefault)(
+        "Reset local Infisical bootstrap state before continuing? [y/N] ",
+      )) ?? false;
+    if (resetConfirmed) await runLocalReset(opts, ["--yes"]);
   }
-  if (opts.flags.resetSecrets) await runLocalReset(opts, ["--yes"]);
   await runRepoBootstrap(opts);
 }
 
@@ -389,6 +387,16 @@ async function promptYesNo(message: string) {
   }
 }
 
+async function promptNoDefault(message: string) {
+  const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+  try {
+    const answer = (await rl.question(message)).trim().toLowerCase();
+    return answer === "y" || answer === "yes";
+  } finally {
+    rl.close();
+  }
+}
+
 function nonInteractiveMessage() {
   return [
     "Infisical local credentials are not ready.",
@@ -396,15 +404,9 @@ function nonInteractiveMessage() {
   ].join(" ");
 }
 
-function nonInteractiveExplicitSetupMessage() {
+function nonInteractiveBootstrapMessage() {
   return [
-    "Infisical secret setup requires confirmation in non-interactive mode.",
-    "Rerun with `i --setup-secrets --yes`, or `i --reset-secrets --yes` to reset local bootstrap state first.",
+    "Infisical bootstrap requires confirmation in non-interactive mode.",
+    "Rerun with `i --bootstrap --yes`, or run the lower-level reset command first if local bootstrap state must be deleted.",
   ].join(" ");
-}
-
-function explicitSetupPrompt(flags: SecretReadinessFlags) {
-  return flags.resetSecrets
-    ? "Reset local Infisical bootstrap state and run repo bootstrap now? [Y/n] "
-    : "Run Infisical repo bootstrap now? [Y/n] ";
 }

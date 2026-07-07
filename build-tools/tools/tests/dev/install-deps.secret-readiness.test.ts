@@ -13,8 +13,7 @@ const baseFlags = {
   rotateBootstrapCredentials: false,
   rotateDeploymentCredentials: false,
   forceOverwriteLocalCredentials: false,
-  setupSecrets: false,
-  resetSecrets: false,
+  bootstrap: false,
 };
 
 test("install secret readiness skips bootstrap when local Universal Auth credentials exist", async () => {
@@ -160,23 +159,7 @@ test("install secret readiness --yes and env override allow non-interactive repo
   });
 });
 
-test("install secret readiness explicit setup runs repo bootstrap even when credentials exist", async () => {
-  await withRepo(async (repoRoot) => {
-    await writeResolver(repoRoot);
-    await writeCredentials(repoRoot);
-    const calls: string[][] = [];
-    await ensureInstallSecretReadiness({
-      repoRoot,
-      dryRun: false,
-      verbose: false,
-      flags: { ...baseFlags, setupSecrets: true, yes: true },
-      deps: { bootstrap: async (args) => void calls.push(args), isInteractive: () => false },
-    });
-    assert.deepEqual(calls, [["repo", "--yes"]]);
-  });
-});
-
-test("install secret readiness explicit reset clears local bootstrap state before setup", async () => {
+test("install secret readiness explicit bootstrap runs repo bootstrap even when credentials exist", async () => {
   await withRepo(async (repoRoot) => {
     await writeResolver(repoRoot);
     await writeCredentials(repoRoot);
@@ -186,19 +169,68 @@ test("install secret readiness explicit reset clears local bootstrap state befor
       repoRoot,
       dryRun: false,
       verbose: false,
-      flags: { ...baseFlags, resetSecrets: true, yes: true },
+      flags: { ...baseFlags, bootstrap: true, yes: true },
       deps: {
         resetLocal: async (args) => void resets.push(args),
         bootstrap: async (args) => void calls.push(args),
         isInteractive: () => false,
       },
     });
-    assert.deepEqual(resets, [["--yes"]]);
+    assert.deepEqual(resets, []);
     assert.deepEqual(calls, [["repo", "--yes"]]);
   });
 });
 
-test("install secret readiness explicit setup fails closed in non-interactive mode without yes", async () => {
+test("install secret readiness interactive bootstrap warns and keeps local state by default", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot);
+    await writeCredentials(repoRoot);
+    const resets: string[][] = [];
+    const calls: string[][] = [];
+    await ensureInstallSecretReadiness({
+      repoRoot,
+      dryRun: false,
+      verbose: false,
+      flags: { ...baseFlags, bootstrap: true },
+      deps: {
+        resetLocal: async (args) => void resets.push(args),
+        bootstrap: async (args) => void calls.push(args),
+        prompt: async (message) => {
+          assert.match(message, /Reset local Infisical bootstrap state/);
+          return false;
+        },
+        isInteractive: () => true,
+      },
+    });
+    assert.deepEqual(resets, [["--dry-run"]]);
+    assert.deepEqual(calls, [["repo", "--yes"]]);
+  });
+});
+
+test("install secret readiness interactive bootstrap resets local state when confirmed", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot);
+    await writeCredentials(repoRoot);
+    const resets: string[][] = [];
+    const calls: string[][] = [];
+    await ensureInstallSecretReadiness({
+      repoRoot,
+      dryRun: false,
+      verbose: false,
+      flags: { ...baseFlags, bootstrap: true },
+      deps: {
+        resetLocal: async (args) => void resets.push(args),
+        bootstrap: async (args) => void calls.push(args),
+        prompt: async () => true,
+        isInteractive: () => true,
+      },
+    });
+    assert.deepEqual(resets, [["--dry-run"], ["--yes"]]);
+    assert.deepEqual(calls, [["repo", "--yes"]]);
+  });
+});
+
+test("install secret readiness explicit bootstrap fails closed in non-interactive mode without yes", async () => {
   await withRepo(async (repoRoot) => {
     await writeResolver(repoRoot);
     const calls: string[][] = [];
@@ -207,13 +239,13 @@ test("install secret readiness explicit setup fails closed in non-interactive mo
         repoRoot,
         dryRun: false,
         verbose: false,
-        flags: { ...baseFlags, setupSecrets: true },
+        flags: { ...baseFlags, bootstrap: true },
         deps: {
           bootstrap: async (args) => void calls.push(args),
           isInteractive: () => false,
         },
       }),
-      /--setup-secrets --yes/,
+      /--bootstrap --yes/,
     );
     assert.deepEqual(calls, []);
   });

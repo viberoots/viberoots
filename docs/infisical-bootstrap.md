@@ -5,8 +5,7 @@ The canonical operator entrypoint is:
 ```bash
 i
 i --yes
-i --setup-secrets
-i --reset-secrets
+i --bootstrap
 i --without-secrets
 i --machine-label <label>
 ```
@@ -24,10 +23,12 @@ Lazy `i` secret readiness is capability-gated by checked-out deployment metadata
 minimized workspaces without `projects/deployments/example-app/shared/family.bzl` skip Infisical
 readiness automatically and do not require `--without-secrets`; full checkouts can still use
 `--without-secrets` or `INSTALL_DEPS_WITHOUT_SECRETS=1` as an explicit dependency-only opt-out.
-Use `i --setup-secrets` when you want to inspect/fix generated shared and local resolver config and
-run the repo bootstrap flow even when lazy readiness is not applicable. Use `i --reset-secrets` to
-first delete local bootstrap state and then rerun repo bootstrap from a fresh local credential sink.
-Both flags prompt before mutating state; use `--yes` for non-interactive runs.
+Use `i --bootstrap` when you want to inspect/fix generated shared and local resolver config and run
+the repo bootstrap flow even when lazy readiness is not applicable. In interactive shells,
+`i --bootstrap` first prints the local reset warning so the refs and files that would be deleted are
+visible, then asks whether to reset local bootstrap state before continuing. The default is to keep
+local state and run bootstrap. Use `--yes` for non-interactive runs; `i --bootstrap --yes` also keeps
+local state and runs bootstrap.
 
 Deep bootstrap commands remain available for advanced recovery and debugging:
 
@@ -107,11 +108,14 @@ To intentionally return to a clean local bootstrap state without deleting Infisi
 resources and then bootstrap again, run:
 
 ```bash
-i --reset-secrets
+i --bootstrap
 ```
 
-The lower-level reset utility remains available for recovery when you only want to remove local
-state without immediately rerunning repo bootstrap:
+Review the printed local reset warning. It names local files and Keychain refs that would be deleted.
+Resetting local state deletes local credential copies; Infisical client secrets cannot be recovered
+from Infisical after creation, so make sure any values you still need are backed up elsewhere before
+answering yes. The lower-level reset utility remains available for recovery when you only want to
+remove local state without immediately rerunning repo bootstrap:
 
 ```bash
 build-tools/tools/deployments/infisical-bootstrap-reset-local.ts --dry-run
