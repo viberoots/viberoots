@@ -20,10 +20,11 @@ pre-confirmation, `--without-secrets` for dependency-only automation, and
 `--machine-label <label>` when the hostname is not a useful Infisical revocation label. Automation
 can also set `INSTALL_DEPS_WITHOUT_SECRETS=1`; non-interactive setup may be explicitly allowed with
 `INSTALL_DEPS_SETUP_SECRETS=1`.
-Infisical CLI browser login does not expose a stable printable login URL in supported CLI versions.
-Lazy `i` setup therefore defaults to `i --infisical-login-mode interactive`, which makes the
-Infisical CLI prompt in the terminal. Use `i --infisical-login-mode browser` only when browser SSO is
-preferred and you are prepared to complete the opened browser flow.
+Lazy `i` setup defaults to `i --infisical-login-mode browser` so browser SSO is preferred when the
+Infisical CLI can open a browser. Infisical CLI browser login does not expose a stable printable
+login URL in supported CLI versions. If the browser flow stalls, opens the wrong browser profile, or
+is unavailable in the current terminal, press Ctrl-C and rerun with
+`i --infisical-login-mode interactive` to use the terminal credential prompt fallback.
 
 Lazy `i` secret readiness is capability-gated by checked-out project configuration or deployment
 metadata. A bootstrapped workspace with `projects/config/` prompts for repo bootstrap when the local

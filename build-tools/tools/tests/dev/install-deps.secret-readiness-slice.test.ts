@@ -85,7 +85,7 @@ test("install secret readiness prompts for repo bootstrap when project config ex
       },
     });
     assert.equal(await isInstallSecretReadinessApplicable(repoRoot), true);
-    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
+    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "browser"]]);
   });
 });
 
@@ -105,7 +105,7 @@ test("install secret readiness explicit bootstrap bypasses deployment metadata a
         isInteractive: () => false,
       },
     });
-    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
+    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "browser"]]);
   });
 });
 

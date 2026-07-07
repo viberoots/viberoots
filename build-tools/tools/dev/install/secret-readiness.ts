@@ -363,13 +363,13 @@ function bootstrapArgs(flags: SecretReadinessFlags) {
 }
 
 function effectiveLoginMode(flags: SecretReadinessFlags) {
-  return flags.infisicalLoginMode.trim() || "interactive";
+  return flags.infisicalLoginMode.trim() || "browser";
 }
 
 function loginModeHint(flags: SecretReadinessFlags) {
   return effectiveLoginMode(flags) === "browser"
     ? "If browser login stalls, press Ctrl-C and rerun with `i --infisical-login-mode interactive`."
-    : "Pass `i --infisical-login-mode browser` to use browser SSO instead.";
+    : "Using terminal login fallback because `i --infisical-login-mode interactive` was requested.";
 }
 
 function hasRotationRequest(flags: SecretReadinessFlags) {

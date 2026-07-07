@@ -229,7 +229,7 @@ test("CLI login uses isolated HOME and removes local state after token extractio
   assert.equal(observedUpdateCheck, "true");
   assert.equal(commands[0], "vault set file --domain https://app.infisical.com/api --silent");
   assert.equal(captures[0], true);
-  assert.deepEqual(ttys, [undefined, false, undefined]);
+  assert.deepEqual(ttys, [undefined, true, undefined]);
   assert.match(output, /waiting for Infisical CLI browser login/);
   assert.match(output, /wrong browser opens or no browser tab opens/);
   assert.match(output, /--infisical-login-mode interactive/);

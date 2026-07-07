@@ -95,7 +95,7 @@ export async function getAccessToken(
         ...(args.loginMode === "interactive" ? ["--interactive"] : []),
       ],
       env: cliEnv,
-      tty: args.loginMode === "interactive",
+      tty: true,
     });
     console.error("[infisical-bootstrap] Infisical CLI login complete; reading access token");
     const stdout = runner({

@@ -63,7 +63,7 @@ test("install secret readiness prompts when credentials are missing and forwards
       });
     });
     assert.match(stderr, /Infisical local credentials are not ready/);
-    assert.match(stderr, /Repo bootstrap will use Infisical interactive login/);
+    assert.match(stderr, /Repo bootstrap will use Infisical browser login/);
     assert.match(stderr, /starting Infisical repo bootstrap/);
     assert.deepEqual(calls, [
       [
@@ -72,7 +72,7 @@ test("install secret readiness prompts when credentials are missing and forwards
         "--machine-label",
         "dev-laptop",
         "--login-mode",
-        "interactive",
+        "browser",
         "--rotate-bootstrap-credentials",
         "--rotate-deployment-credentials",
         "--force-overwrite-local-credentials",
@@ -95,7 +95,7 @@ test("install secret readiness prompts when resolver config is missing", async (
         bootstrap: async (args) => void calls.push(args),
       },
     });
-    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
+    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "browser"]]);
   });
 });
 
@@ -188,7 +188,7 @@ test("install secret readiness --yes and env override allow non-interactive repo
       flags: { ...baseFlags, yes: true },
       deps: { bootstrap: async (args) => void calls.push(args), isInteractive: () => false },
     });
-    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
+    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "browser"]]);
     calls.length = 0;
     const old = process.env.INSTALL_DEPS_SETUP_SECRETS;
     process.env.INSTALL_DEPS_SETUP_SECRETS = "1";
@@ -204,7 +204,7 @@ test("install secret readiness --yes and env override allow non-interactive repo
       if (old === undefined) delete process.env.INSTALL_DEPS_SETUP_SECRETS;
       else process.env.INSTALL_DEPS_SETUP_SECRETS = old;
     }
-    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
+    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "browser"]]);
   });
 });
 
@@ -226,7 +226,7 @@ test("install secret readiness explicit bootstrap runs repo bootstrap even when 
       },
     });
     assert.deepEqual(resets, []);
-    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
+    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "browser"]]);
   });
 });
 
@@ -255,7 +255,7 @@ test("install secret readiness interactive bootstrap warns and keeps local state
       },
     });
     assert.deepEqual(resets, [["--dry-run"]]);
-    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
+    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "browser"]]);
   });
 });
 
@@ -281,7 +281,7 @@ test("install secret readiness interactive bootstrap resets local state when con
       },
     });
     assert.deepEqual(resets, [["--dry-run"], ["--yes"]]);
-    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
+    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "browser"]]);
   });
 });
 
@@ -311,7 +311,7 @@ test("install secret readiness interactive bootstrap skips reset prompt when no 
     });
     assert.deepEqual(resets, [["--dry-run"]]);
     assert.equal(prompted, false);
-    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
+    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "browser"]]);
   });
 });
 
