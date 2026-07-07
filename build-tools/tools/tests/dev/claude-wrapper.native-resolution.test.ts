@@ -69,6 +69,57 @@ printf 'native %s\\n' "${platform}"
   }
 });
 
+test("claude wrapper resolves native optional package binaries from VIBEROOTS_NODE_PATH", async () => {
+  await fsp.mkdir(scratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(scratchRoot, "claude-node-path-"));
+  try {
+    const gitRoot = path.join(tmp, "repo");
+    const nodeModules = path.join(tmp, "managed-node", "node_modules");
+    const bin = path.join(nodeModules, ".bin");
+    const nativeDir = path.join(
+      nodeModules,
+      ".pnpm",
+      "@anthropic-ai+claude-code-darwin-arm64@2.1.128",
+      "node_modules",
+      "@anthropic-ai",
+      "claude-code-darwin-arm64",
+    );
+    await fsp.mkdir(gitRoot, { recursive: true });
+    await fsp.mkdir(bin, { recursive: true });
+    await fsp.mkdir(nativeDir, { recursive: true });
+    await writeExecutable(
+      path.join(bin, "claude"),
+      `#!/usr/bin/env bash
+echo stub should not run
+exit 99
+`,
+    );
+    await writeExecutable(
+      path.join(nativeDir, "claude"),
+      `#!/usr/bin/env bash
+printf 'native from node path\\n'
+`,
+    );
+
+    const res = await $({
+      cwd: gitRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        PATH: `${path.dirname(wrapper)}:/usr/bin:/bin`,
+        VIBEROOTS_NODE_PATH: nodeModules,
+        VBR_CLAUDE_PLATFORM_KEY_FOR_TEST: "darwin-arm64",
+        VBR_CLAUDE_SAFEHOUSE: "0",
+      },
+    })`${wrapper} --version`;
+
+    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
+    assert.equal(String(res.stdout).trim(), "native from node path");
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test("claude wrapper skips cmux delegate wrapper when cmux delegates back to viberoots", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "claude-cmux-"));

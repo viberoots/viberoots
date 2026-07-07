@@ -4,7 +4,31 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { formatImporterLockfiles } from "../../scaffolding/scaf/commands/new-helpers";
+import {
+  ensureScaffoldTreeWritable,
+  formatImporterLockfiles,
+} from "../../scaffolding/scaf/commands/new-helpers";
+
+test("ensureScaffoldTreeWritable restores owner write bits on copied template trees", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "scaf-tree-writable-"));
+  const nestedDir = path.join(root, "projects", "apps", "demo", "server");
+  const file = path.join(nestedDir, "index.ts");
+  await fsp.mkdir(nestedDir, { recursive: true });
+  await fsp.writeFile(file, "export {}\n", "utf8");
+  await fsp.chmod(file, 0o444);
+  await fsp.chmod(nestedDir, 0o555);
+
+  try {
+    await ensureScaffoldTreeWritable(root);
+
+    const dirMode = (await fsp.stat(nestedDir)).mode;
+    const fileMode = (await fsp.stat(file)).mode;
+    assert.equal((dirMode & 0o200) !== 0, true);
+    assert.equal((fileMode & 0o200) !== 0, true);
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
 
 test("formatImporterLockfiles makes copied lockfiles writable before prettier", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "scaf-format-writable-"));

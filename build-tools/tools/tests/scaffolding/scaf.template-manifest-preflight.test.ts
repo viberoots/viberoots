@@ -43,7 +43,8 @@ test("scaf templates command ignores stale taxonomy artifacts", async () => {
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     const out = await $`scaf templates ts`;
     const stdout = String(out.stdout || "");
-    assert.match(stdout, /\bts\tcli\t/);
+    assert.match(stdout, /^ts:$/m);
+    assert.match(stdout, /^  cli\s+Node CLI/m);
     assert.doesNotMatch(stdout, /bogus-only/);
 
     const refreshed = await fsp.readFile(generatedPath, "utf8");

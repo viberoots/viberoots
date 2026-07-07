@@ -3,6 +3,7 @@ import type { ScafFlags } from "../types";
 import path from "node:path";
 
 import { readTemplateMeta } from "../templates/meta";
+import { formatHangingLines, formatTemplateListLines } from "../templates/list";
 import { normalizeTemplateName } from "../templates/names";
 import { templateRootPath } from "../templates/paths";
 import { canonicalTemplateLanguage, isCanonicalTypeScriptTemplate } from "../templates/taxonomy";
@@ -15,6 +16,10 @@ function printJsonOrLines(flags: ScafFlags, payload: unknown, lines: string[]) {
     return;
   }
   console.log(lines.join("\n"));
+}
+
+function pushWrapped(lines: string[], text: string, firstPrefix = "", nextPrefix = firstPrefix) {
+  lines.push(...formatHangingLines(text, { firstPrefix, nextPrefix }));
 }
 
 async function helpForCommand(cmd: string, flags: ScafFlags): Promise<boolean> {
@@ -156,7 +161,7 @@ async function helpForNewLanguage(language: string, flags: ScafFlags) {
   lines.push(`# Available ${language} templates:`);
   lines.push("");
   for (const m of metas) {
-    lines.push(`- ${m.template}: ${m.description || ""}`);
+    pushWrapped(lines, `${m.template}: ${m.description || ""}`, "- ", "  ");
   }
   console.log(lines.join("\n"));
 }
@@ -185,7 +190,11 @@ export async function cmdHelp(args: string[], flags: ScafFlags) {
     usage();
     console.log("\nAvailable templates:");
     const metas = await readTemplateMeta(undefined, { tolerateStaleTaxonomy: true });
-    metas.forEach((m) => console.log(`  ${m.language} ${m.template}\t${m.description}`));
+    console.log(
+      formatTemplateListLines(metas)
+        .map((line) => (line ? `  ${line}` : ""))
+        .join("\n"),
+    );
     return;
   }
 
@@ -214,18 +223,18 @@ export async function cmdHelp(args: string[], flags: ScafFlags) {
   }
   const lines: string[] = [];
   if (meta.description) {
-    lines.push(`# ${meta.description}`);
+    pushWrapped(lines, `# ${meta.description}`);
     lines.push("");
   }
-  lines.push(h.usage || `scaf new ${language} ${template} <name>`);
+  pushWrapped(lines, h.usage || `scaf new ${language} ${template} <name>`);
   if (h.notes && Array.isArray(h.notes) && h.notes.length) {
     lines.push("");
-    lines.push(...h.notes);
+    for (const note of h.notes) pushWrapped(lines, String(note), "- ", "  ");
   }
   if (h.examples && Array.isArray(h.examples) && h.examples.length) {
     lines.push("");
     lines.push("Examples:");
-    lines.push(...h.examples.map((e: string) => `  ${e}`));
+    for (const example of h.examples) pushWrapped(lines, String(example), "  ", "    ");
   }
   console.log(lines.join("\n"));
 }

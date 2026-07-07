@@ -41,14 +41,16 @@ async function main() {
     console.error(`[run-runnable] ${parsed.sourceError}`);
     process.exit(2);
   }
-  if (!parsed.target || parsed.target.startsWith("-")) {
+  if (parsed.target.startsWith("-")) {
     console.error("usage: p <target> [--source=auto|git|path] [args...]");
     console.error("   or: d <target> [--source=auto|git|path] [args...]");
     process.exit(2);
   }
   const cwd = process.cwd();
   const workspaceRoot = await findRepoRoot(cwd);
-  const target = await resolveRunnableTargetLabel(workspaceRoot, parsed.target, { baseDir: cwd });
+  const target = await resolveRunnableTargetLabel(workspaceRoot, parsed.target || ".", {
+    baseDir: cwd,
+  });
   let targetHints: { importer: string; mode: "static" | "ssr"; framework: string } | null = null;
   let entry: RunnableManifestEntry | null = null;
   const testManifestPath = String(process.env.RUNNABLE_TEST_MANIFEST || "").trim();

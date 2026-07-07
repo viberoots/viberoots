@@ -5,6 +5,7 @@ import * as path from "node:path";
 import { starterInfisicalProfile } from "./infisical-iac-bootstrap-profile-kind";
 import type { SprinkleRefConfigFile } from "./sprinkleref-types";
 import { LOCAL_VALUES_PATH } from "./aws-account-inputs";
+import { findRepoRoot } from "../lib/repo";
 
 const VAULT_DEFAULT = {
   backend: "vault" as const,
@@ -98,7 +99,8 @@ export async function initSprinkleRefConfigs(opts: {
 }
 
 export async function initLocalSprinkleRefValues(cwd: string) {
-  const file = path.resolve(cwd, LOCAL_VALUES_PATH);
+  const workspaceRoot = await findRepoRoot(cwd);
+  const file = path.resolve(workspaceRoot, LOCAL_VALUES_PATH);
   const existing = await readExistingLocalValues(file);
   const next = mergeLocalValueDefaults(existing, os.platform());
   await fs.mkdir(path.dirname(file), { recursive: true });

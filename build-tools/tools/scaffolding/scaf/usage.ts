@@ -2,7 +2,7 @@ export function usage() {
   console.log(`scaf <command> [...]
 
 Commands:
-  templates [<language>] [--json]
+  templates [<language>] [--details|--json]
   new <language> <template> <name> [--path=DEST] [--key=value ...]
   language <new|plan|doctor|remove> [...]
   update <all|path1 path2 ...>

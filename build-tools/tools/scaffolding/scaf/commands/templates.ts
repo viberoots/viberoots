@@ -12,5 +12,8 @@ export async function cmdTemplates(args: string[], flags: ScafFlags) {
     return;
   }
   const metas = await readTemplateMeta(lang, { tolerateStaleTaxonomy: true });
-  printTemplateList(metas, flags["json"] === "true");
+  printTemplateList(metas, {
+    json: flags["json"] === "true",
+    details: flags["details"] === "true" || flags["verbose"] === "true",
+  });
 }

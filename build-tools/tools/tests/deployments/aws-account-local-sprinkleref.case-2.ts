@@ -240,3 +240,25 @@ test("sprinkleref --init-local preserves values and writes no plaintext token", 
     }
   });
 });
+
+test("sprinkleref --init-local writes project local config from workspace root", async () => {
+  await runInTemp("sprinkleref-init-local-subdir", async (tmp) => {
+    const cwd = process.cwd();
+    const projectsDir = path.join(tmp, "projects");
+    await fsp.mkdir(projectsDir, { recursive: true });
+    process.chdir(projectsDir);
+    try {
+      const out: string[] = [];
+      await runSprinkleRefCli({ argv: ["--init-local"], stdout: (text) => out.push(text) });
+      await fsp.access(path.join(tmp, "projects/config/local.json"));
+      await assert.rejects(
+        fsp.access(path.join(tmp, "projects/projects/config/local.json")),
+        /ENOENT/,
+      );
+      assert.match(out[0] || "", /projects\/config\/local\.json/);
+      assert.doesNotMatch(out[0] || "", /projects\/projects\/config\/local\.json/);
+    } finally {
+      process.chdir(cwd);
+    }
+  });
+});

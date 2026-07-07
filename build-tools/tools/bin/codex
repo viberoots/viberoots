@@ -57,14 +57,62 @@ find_tool_in_path_list_excluding_wrapper_dir() {
 }
 
 managed_codex_path() {
-  local candidate="${VBR_CODEX_MANAGED_PATH_FOR_TEST:-${VIBEROOTS_SOURCE_ROOT}/node_modules/.bin/codex}"
-  [[ -n "$candidate" && -f "$candidate" && -x "$candidate" ]] || return 1
-  canonical_executable_path "$candidate"
+  managed_codex_candidates | head -n 1
+}
+
+managed_codex_candidates() {
+  local candidate
+  local canonical
+  local seen=""
+  if [[ -n "${VBR_CODEX_MANAGED_PATH_FOR_TEST:-}" ]]; then
+    candidate="${VBR_CODEX_MANAGED_PATH_FOR_TEST}"
+    [[ -n "$candidate" && -f "$candidate" && -x "$candidate" ]] || return 0
+    canonical="$(canonical_executable_path "$candidate")"
+    printf '%s\n' "$canonical"
+    return 0
+  fi
+  for candidate in \
+    "${VIBEROOTS_NODE_PATH:-}/.bin/codex" \
+    "${VIBEROOTS_SOURCE_ROOT}/node_modules/.bin/codex"; do
+    [[ -n "$candidate" && -f "$candidate" && -x "$candidate" ]] || continue
+    canonical="$(canonical_executable_path "$candidate")"
+    case ":$seen:" in
+      *":$canonical:"*) ;;
+      *)
+        seen="${seen:+$seen:}$canonical"
+        printf '%s\n' "$canonical"
+        ;;
+    esac
+  done
+}
+
+managed_codex_display_path() {
+  if [[ -n "${VBR_CODEX_MANAGED_PATH_FOR_TEST:-}" ]]; then
+    printf '%s\n' "${VBR_CODEX_MANAGED_PATH_FOR_TEST}"
+  elif [[ -n "${VIBEROOTS_NODE_PATH:-}" ]]; then
+    printf '%s\n' "${VIBEROOTS_NODE_PATH}/.bin/codex"
+  else
+    printf '%s\n' "${VIBEROOTS_SOURCE_ROOT}/node_modules/.bin/codex"
+  fi
+}
+
+is_managed_codex_path() {
+  local candidate="$1"
+  local managed
+  [[ -n "$candidate" ]] || return 1
+  candidate="$(canonical_executable_path "$candidate" 2>/dev/null || true)"
+  [[ -n "$candidate" ]] || return 1
+  while IFS= read -r managed; do
+    [[ -n "$managed" ]] || continue
+    if [[ "$candidate" == "$managed" ]]; then
+      return 0
+    fi
+  done < <(managed_codex_candidates)
+  return 1
 }
 
 find_managed_codex_in_path_list() {
   local path_list="${1:-}"
-  local managed="$2"
   local dir
   local found
   local old_ifs="$IFS"
@@ -77,7 +125,8 @@ find_managed_codex_in_path_list() {
     fi
     if [[ -x "$dir/codex" ]]; then
       found="$(canonical_executable_path "$dir/codex")"
-      if [[ "$found" == "$managed" ]]; then
+      if is_managed_codex_path "$found"; then
+        printf '%s\n' "$found"
         IFS="$old_ifs"
         return 0
       fi
@@ -119,27 +168,29 @@ find_codex_excluding_wrapper_dir() {
   local managed
   managed="$(managed_codex_path || true)"
   if [[ -z "$managed" ]]; then
-    echo "Error: viberoots-managed Codex is missing or not executable at ${VBR_CODEX_MANAGED_PATH_FOR_TEST:-${VIBEROOTS_SOURCE_ROOT}/node_modules/.bin/codex}" >&2
-    echo "Hint: run the repo install path so Nix materializes the pinned @openai/codex package; do not fall back to /Applications/Codex.app or transient Codex arg0 shims." >&2
+    echo "Error: viberoots-managed Codex is missing or not executable at $(managed_codex_display_path)" >&2
+    echo "Hint: reload the viberoots dev shell or run 'i' from the workspace root." >&2
     return 1
   fi
   if [[ -n "${CODEX_CLI_PATH:-}" ]]; then
     local explicit
     explicit="$(canonical_executable_path "${CODEX_CLI_PATH}" 2>/dev/null || true)"
-    if [[ "$explicit" == "$managed" ]]; then
-      printf '%s\n' "$managed"
+    if is_managed_codex_path "$explicit"; then
+      printf '%s\n' "$explicit"
       return 0
     fi
     echo "Error: CODEX_CLI_PATH must point to the viberoots-managed Codex at ${managed}" >&2
     echo "Refusing unmanaged Codex path: ${CODEX_CLI_PATH}" >&2
     return 1
   fi
-  if find_managed_codex_in_path_list "${PATH:-}" "$managed"; then
-    printf '%s\n' "$managed"
+  local path_managed
+  path_managed="$(find_managed_codex_in_path_list "${PATH:-}" || true)"
+  if [[ -n "$path_managed" ]]; then
+    printf '%s\n' "$path_managed"
     return 0
   fi
   echo "Error: viberoots-managed Codex is not on PATH: ${managed}" >&2
-  echo "Hint: enter the Nix dev shell or rerun the repo install path; do not fall back to /Applications/Codex.app or transient Codex arg0 shims." >&2
+  echo "Hint: reload the viberoots dev shell or run 'i' from the workspace root." >&2
   return 1
 }
 

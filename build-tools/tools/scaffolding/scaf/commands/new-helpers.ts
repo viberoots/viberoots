@@ -97,6 +97,20 @@ async function ensureWritableFile(file: string): Promise<void> {
   await fsp.chmod(file, stat.mode | 0o200).catch(() => {});
 }
 
+export async function ensureScaffoldTreeWritable(root: string): Promise<void> {
+  async function walk(target: string) {
+    const stat = await fsp.stat(target).catch(() => null);
+    if (!stat) return;
+    await fsp.chmod(target, stat.mode | 0o200).catch(() => {});
+    if (!stat.isDirectory()) return;
+    const entries = await fsp.readdir(target, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      await walk(path.join(target, entry.name));
+    }
+  }
+  await walk(path.resolve(root));
+}
+
 export async function formatScaffoldPaths(paths: string[]): Promise<void> {
   const unique = Array.from(
     new Set(paths.map((value) => path.resolve(value)).filter((value) => value.length > 0)),

@@ -57,6 +57,86 @@ test("codex wrapper uses only the managed Codex from PATH", async () => {
   }
 });
 
+test("codex wrapper resolves managed Codex from VIBEROOTS_NODE_PATH", async () => {
+  await fsp.mkdir(externalScratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "codex-wrapper-"));
+  try {
+    const gitRoot = path.join(tmp, "repo");
+    const nodeModules = path.join(tmp, "managed-node", "node_modules");
+    const bin = path.join(nodeModules, ".bin");
+    const log = path.join(tmp, "calls.log");
+    await fsp.mkdir(gitRoot, { recursive: true });
+    await fsp.mkdir(bin, { recursive: true });
+    await writeExecutable(
+      path.join(bin, "codex"),
+      `#!/usr/bin/env bash\nprintf 'node-path-codex %s\\n' "$*" >> ${JSON.stringify(log)}\n`,
+    );
+
+    const res = await $({
+      cwd: gitRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        CODEX_CLI_PATH: "",
+        VIBEROOTS_NODE_PATH: nodeModules,
+        PATH: `${path.dirname(wrapper)}:${bin}:/usr/bin:/bin:${process.env.PATH}`,
+      },
+    })`${wrapper} exec node-path`;
+
+    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
+    const calls = await fsp.readFile(log, "utf8");
+    assert.match(calls, /node-path-codex --sandbox danger-full-access exec node-path/);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("codex wrapper accepts source-root managed Codex when VIBEROOTS_NODE_PATH changed in a stale shell", async () => {
+  await fsp.mkdir(externalScratchRoot, { recursive: true });
+  const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "codex-wrapper-"));
+  try {
+    const sourceRoot = path.join(tmp, "source");
+    const wrapperDir = path.join(sourceRoot, "build-tools", "tools", "bin");
+    const wrapperCopy = path.join(wrapperDir, "codex");
+    const sourceNodeModules = path.join(sourceRoot, "node_modules");
+    const sourceBin = path.join(sourceNodeModules, ".bin");
+    const staleNodeModules = path.join(tmp, "stale-node", "node_modules");
+    const staleBin = path.join(staleNodeModules, ".bin");
+    const log = path.join(tmp, "calls.log");
+    await fsp.mkdir(wrapperDir, { recursive: true });
+    await fsp.mkdir(sourceBin, { recursive: true });
+    await fsp.mkdir(staleBin, { recursive: true });
+    await fsp.copyFile(wrapper, wrapperCopy);
+    await fsp.chmod(wrapperCopy, 0o755);
+    await writeExecutable(
+      path.join(sourceBin, "codex"),
+      `#!/usr/bin/env bash\nprintf 'source-managed-codex %s\\n' "$*" >> ${JSON.stringify(log)}\n`,
+    );
+    await writeExecutable(
+      path.join(staleBin, "codex"),
+      `#!/usr/bin/env bash\nprintf 'node-path-codex %s\\n' "$*" >> ${JSON.stringify(log)}\n`,
+    );
+
+    const res = await $({
+      cwd: sourceRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        CODEX_CLI_PATH: "",
+        VIBEROOTS_NODE_PATH: staleNodeModules,
+        PATH: `${wrapperDir}:${sourceBin}:/usr/bin:/bin`,
+      },
+    })`${wrapperCopy} exec stale-shell`;
+
+    assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
+    const calls = await fsp.readFile(log, "utf8");
+    assert.match(calls, /source-managed-codex --sandbox danger-full-access exec stale-shell/);
+    assert.doesNotMatch(calls, /node-path-codex/);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test("codex wrapper accepts CODEX_CLI_PATH only when it is the managed Codex", async () => {
   await fsp.mkdir(externalScratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(externalScratchRoot, "codex-wrapper-"));
@@ -221,7 +301,7 @@ test("codex wrapper fails clearly when managed Codex is missing", async () => {
 
     assert.notEqual(res.exitCode, 0);
     assert.match(String(res.stderr), /viberoots-managed Codex is missing or not executable/);
-    assert.match(String(res.stderr), /pinned @openai\/codex package/);
+    assert.match(String(res.stderr), /reload the viberoots dev shell or run 'i'/);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }

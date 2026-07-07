@@ -179,7 +179,16 @@ resolve_native_claude_from_cwd_node_modules() {
   return 0
 }
 
-real_claude="$(resolve_native_claude_from_cwd_node_modules || resolve_native_claude_from_git_root_node_modules || true)"
+resolve_native_claude_from_viberoots_node_path() {
+  local native
+  [[ -n "${VIBEROOTS_NODE_PATH:-}" ]] || return 1
+  native="$(resolve_native_claude_from_node_modules_bin "${VIBEROOTS_NODE_PATH}/.bin/claude" || true)"
+  [[ -n "$native" ]] || return 1
+  printf '%s\n' "$native"
+  return 0
+}
+
+real_claude="$(resolve_native_claude_from_viberoots_node_path || resolve_native_claude_from_cwd_node_modules || resolve_native_claude_from_git_root_node_modules || true)"
 if [[ -z "$real_claude" ]]; then
   real_claude="$(find_tool_excluding_wrapper_dir claude || true)"
 fi

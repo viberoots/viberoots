@@ -99,7 +99,11 @@ in {
           vbr_node_bin="$PWD/node_modules/.bin"
         elif [ -d "$PWD/.viberoots/current/build-tools/tools/bin" ]; then
           vbr_tools_bin="$PWD/.viberoots/current/build-tools/tools/bin"
-          vbr_node_bin="$PWD/.viberoots/current/node_modules/.bin"
+          if [ -n "${viberootsNodePath}" ]; then
+            vbr_node_bin="${viberootsNodePath}/.bin"
+          else
+            vbr_node_bin="$PWD/.viberoots/current/node_modules/.bin"
+          fi
         fi
         local repo_prefix="$vbr_tools_bin:$PWD/.direnv/bin:$vbr_node_bin"
         local host_tail
@@ -355,7 +359,11 @@ _vbr_update_path() {
       vbr_node_bin="$d/node_modules/.bin"
     elif [[ -d "$d/.viberoots/current/build-tools/tools/bin" ]]; then
       vbr_tools_bin="$d/.viberoots/current/build-tools/tools/bin"
-      vbr_node_bin="$d/.viberoots/current/node_modules/.bin"
+      if [[ -n "${viberootsNodePath}" ]]; then
+        vbr_node_bin="${viberootsNodePath}/.bin"
+      else
+        vbr_node_bin="$d/.viberoots/current/node_modules/.bin"
+      fi
     fi
     if [[ ( -n "''${WORKSPACE_ROOT:-}" || -f "$d/flake.nix" ) && -d "$vbr_tools_bin" ]]; then
       local old_ifs="$IFS"

@@ -235,3 +235,146 @@ test("d resolves current directory path (.) from package cwd", async () => {
     assert.equal(loggedTarget, "//projects/apps/demo:app");
   });
 });
+
+test("d defaults to current directory when target is omitted", async () => {
+  await runInTemp("runnable-default-cwd-resolution", async (tmp, $) => {
+    const graphDir = path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH));
+    await fsp.mkdir(graphDir, { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, DEFAULT_GRAPH_PATH),
+      JSON.stringify(
+        [
+          {
+            name: "//projects/apps/demo:app",
+            rule_type: "node_asset_stage",
+            labels: [
+              "lang:node",
+              "kind:app",
+              "webapp:ssr",
+              "framework:vite",
+              "lockfile:projects/apps/demo/pnpm-lock.yaml#projects/apps/demo",
+            ],
+            srcs: ["projects/apps/demo/src/entry-server.ts"],
+            deps: [],
+          },
+        ],
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
+
+    const appDir = path.join(tmp, "projects", "apps", "demo");
+    await fsp.mkdir(appDir, { recursive: true });
+    const tmpReal = await fsp.realpath(tmp).catch(() => tmp);
+    const stubBin = path.join(tmp, "stub-bin");
+    const fakeOut = path.join(tmp, "fake-selected-out");
+    const targetLog = path.join(tmp, "buck-target-default.log");
+    await fsp.mkdir(stubBin, { recursive: true });
+    await fsp.writeFile(
+      path.join(stubBin, "nix"),
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        `echo \"${"$"}{BUCK_TARGET}\" >> ${JSON.stringify(targetLog)}`,
+        `out=${JSON.stringify(fakeOut)}`,
+        'mkdir -p "$out/bin"',
+        "cat > \"$out/bin/demo\" <<'EOF'",
+        "#!/usr/bin/env bash",
+        "echo default-resolution-build-ok",
+        "EOF",
+        'chmod +x "$out/bin/demo"',
+        'echo "$out"',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(stubBin, "pnpm"),
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        `if [[ "$PWD" != ${JSON.stringify(tmp)} && "$PWD" != ${JSON.stringify(tmpReal)} ]]; then`,
+        '  echo "unexpected-cwd:$PWD" >&2',
+        "  exit 98",
+        "fi",
+        "echo dev-default-ok",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await $`chmod +x ${path.join(stubBin, "nix")} ${path.join(stubBin, "pnpm")}`;
+
+    const run = await $({
+      cwd: appDir,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        PATH: `${stubBin}:${process.env.PATH || ""}`,
+      },
+    })`${path.join(tmp, "viberoots", "build-tools", "tools", "bin", "d")}`;
+    assert.match(String(run.stdout || ""), /dev-default-ok/);
+    const loggedTarget = String(await fsp.readFile(targetLog, "utf8")).trim();
+    assert.equal(loggedTarget, "//projects/apps/demo:app");
+  });
+});
+
+test("p falls back from a directory path to :app when graph data is stale", async () => {
+  await runInTemp("runnable-stale-graph-app-fallback", async (tmp, $) => {
+    const graphDir = path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH));
+    await fsp.mkdir(graphDir, { recursive: true });
+    await fsp.writeFile(path.join(tmp, DEFAULT_GRAPH_PATH), "[]\n", "utf8");
+
+    const appDir = path.join(tmp, "projects", "apps", "demo");
+    await fsp.mkdir(appDir, { recursive: true });
+    await fsp.writeFile(path.join(appDir, "smoke.sh"), "#!/usr/bin/env bash\necho smoke\n", "utf8");
+    await fsp.writeFile(
+      path.join(appDir, "TARGETS"),
+      [
+        'load("@prelude//:rules.bzl", "export_file")',
+        "",
+        "export_file(",
+        '    name = "app",',
+        '    src = "smoke.sh",',
+        ")",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    const stubBin = path.join(tmp, "stub-bin");
+    const fakeOut = path.join(tmp, "fake-selected-out");
+    const targetLog = path.join(tmp, "buck-target-stale.log");
+    await fsp.mkdir(stubBin, { recursive: true });
+    await fsp.writeFile(
+      path.join(stubBin, "nix"),
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        `echo \"${"$"}{BUCK_TARGET}\" >> ${JSON.stringify(targetLog)}`,
+        `out=${JSON.stringify(fakeOut)}`,
+        'mkdir -p "$out/bin"',
+        "cat > \"$out/bin/demo\" <<'EOF'",
+        "#!/usr/bin/env bash",
+        "echo stale-graph-fallback-ok",
+        "EOF",
+        'chmod +x "$out/bin/demo"',
+        'echo "$out"',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await $`chmod +x ${path.join(stubBin, "nix")}`;
+
+    const run = await $({
+      cwd: appDir,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        PATH: `${stubBin}:${process.env.PATH || ""}`,
+      },
+    })`${path.join(tmp, "viberoots", "build-tools", "tools", "bin", "p")} .`;
+    assert.match(String(run.stdout || ""), /stale-graph-fallback-ok/);
+    const loggedTarget = String(await fsp.readFile(targetLog, "utf8")).trim();
+    assert.equal(loggedTarget, "//projects/apps/demo:app");
+  });
+});

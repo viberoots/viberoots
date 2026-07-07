@@ -152,5 +152,5 @@ export async function resolveRunnableTargetLabel(
   } catch (err) {
     if (err instanceof Error && err.message.includes("is ambiguous;")) throw err;
   }
-  return normalized;
+  return `${normalized}:app`;
 }

@@ -10,6 +10,7 @@ import { timeAsyncDetail } from "../../../lib/timing-detail";
 import { confirmOrExit } from "../confirm";
 import { runScafNodeTool } from "../command-runner";
 import {
+  ensureScaffoldTreeWritable,
   formatImporterLockfiles,
   formatScaffoldOutput,
   removeScaffoldTemplateConfig,
@@ -122,6 +123,9 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
   } catch {}
   await timeAsyncDetail("scafNew runCopierCopy", async () => {
     await runCopierCopy(root, dest, data);
+  });
+  await timeAsyncDetail("scafNew ensureScaffoldTreeWritable", async () => {
+    await ensureScaffoldTreeWritable(dest);
   });
   await timeAsyncDetail("scafNew recordSource", async () => {
     await recordSource(dest, canonicalLanguage, template);
