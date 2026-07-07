@@ -8,12 +8,10 @@ export type InfisicalRepoProject = {
   environmentSlugs?: string[];
 };
 
-export const REPO_INFISICAL_PROJECT_NAME = "viberoots-deployments";
-
 export async function ensureInfisicalRepoProject(
   api: InfisicalApi,
   organizationId: string,
-  projectName = REPO_INFISICAL_PROJECT_NAME,
+  projectName: string,
 ) {
   const projects = await listInfisicalProjects(api);
   const existing = projects.find(
@@ -21,12 +19,7 @@ export async function ensureInfisicalRepoProject(
       project.name === projectName && projectMatchesOrganization(project, organizationId),
   );
   if (existing) return { project: existing, changed: false };
-  const created = await createInfisicalRepoProject(
-    api,
-    organizationId,
-    projectName,
-    projects,
-  );
+  const created = await createInfisicalRepoProject(api, organizationId, projectName, projects);
   return { project: created, changed: true };
 }
 
@@ -64,7 +57,7 @@ export async function validateInfisicalRepoProject(
 export async function findInfisicalRepoProject(
   api: InfisicalApi,
   organizationId: string,
-  projectName = REPO_INFISICAL_PROJECT_NAME,
+  projectName: string,
 ) {
   return (await listInfisicalProjects(api)).find(
     (project) =>
@@ -139,14 +132,14 @@ function repoProjectCreateFailureMessage(
       visible.length
         ? `Candidate projects: ${visible.map(formatProject).join("; ")}`
         : "No existing secret-manager projects were visible to this login.",
-      "Next: set VBR_INFISICAL_PROJECT_ID=<project-id> and rerun `i`, or write that project id into the generated infisical-default profile in projects/config/shared.json.",
+      "Next: rerun with `i --bootstrap --infisical-project-name <existing-project-name>`, set VBR_INFISICAL_PROJECT_ID=<project-id>, or write that project id into the generated infisical-default profile in projects/config/shared.json.",
     ].join("\n");
   }
   return [
     `Could not create Infisical project "${projectName}" for repo bootstrap.`,
     errorMessage(error),
     "If the Infisical organization has reached its project/workspace limit, reuse an existing secret-manager project instead of creating a new one.",
-    `Set the generated profile projectId in projects/config/shared.json or export VBR_INFISICAL_PROJECT_ID before rerunning bootstrap.`,
+    "Rerun with `i --bootstrap --infisical-project-name <existing-project-name>`, set the generated profile projectId in projects/config/shared.json, or export VBR_INFISICAL_PROJECT_ID before rerunning bootstrap.",
     visible.length ? `Visible projects: ${visible.map(formatProject).join("; ")}` : undefined,
   ]
     .filter(Boolean)

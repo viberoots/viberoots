@@ -41,6 +41,9 @@ export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   sprinkleCategory: "bootstrap",
   secretBackend: undefined,
   bootstrapCredentialScope: undefined,
+  infisicalProjectName: undefined,
+  bootstrapKeychainServiceName: undefined,
+  keychainServiceName: undefined,
   clientSecretTtl: 0,
   accessTokenTtl: 3600,
 };
@@ -56,8 +59,68 @@ export async function withBootstrapCredentialScope(
   return { ...args, bootstrapCredentialScope: normalizeBootstrapScope(bootstrapCredentialScope) };
 }
 
+export async function withRepoInfisicalProjectName(
+  args: BootstrapArgs,
+  workspaceRoot: string,
+): Promise<BootstrapArgs> {
+  const infisicalProjectName =
+    args.infisicalProjectName ||
+    (await configuredRepoInfisicalProjectName(workspaceRoot)) ||
+    defaultRepoInfisicalProjectName(workspaceRoot);
+  return { ...args, infisicalProjectName: validateRepoInfisicalProjectName(infisicalProjectName) };
+}
+
+export async function withBootstrapKeychainServiceName(
+  args: BootstrapArgs,
+  workspaceRoot: string,
+): Promise<BootstrapArgs> {
+  const serviceName =
+    args.bootstrapKeychainServiceName ||
+    (await configuredBootstrapKeychainServiceName(workspaceRoot)) ||
+    defaultBootstrapKeychainServiceName(workspaceRoot);
+  return {
+    ...args,
+    bootstrapKeychainServiceName: validateKeychainServiceName(
+      serviceName,
+      "bootstrap Keychain service name",
+    ),
+  };
+}
+
+export async function withRepoKeychainServiceName(
+  args: BootstrapArgs,
+  workspaceRoot: string,
+): Promise<BootstrapArgs> {
+  const serviceName =
+    args.keychainServiceName ||
+    (await configuredRepoKeychainServiceName(workspaceRoot)) ||
+    defaultRepoKeychainServiceName(workspaceRoot);
+  return {
+    ...args,
+    keychainServiceName: validateKeychainServiceName(serviceName, "repo Keychain service name"),
+  };
+}
+
 function defaultBootstrapScope(workspaceRoot: string) {
   return normalizeBootstrapScope(path.basename(path.resolve(workspaceRoot)));
+}
+
+export function defaultRepoInfisicalProjectName(workspaceRoot: string) {
+  return validateRepoInfisicalProjectName(path.basename(path.resolve(workspaceRoot)));
+}
+
+export function defaultBootstrapKeychainServiceName(workspaceRoot: string) {
+  return validateKeychainServiceName(
+    `${path.basename(path.resolve(workspaceRoot))}-bootstrap`,
+    "bootstrap Keychain service name",
+  );
+}
+
+export function defaultRepoKeychainServiceName(workspaceRoot: string) {
+  return validateKeychainServiceName(
+    path.basename(path.resolve(workspaceRoot)),
+    "repo Keychain service name",
+  );
 }
 
 async function configuredBootstrapScope(workspaceRoot: string) {
@@ -66,6 +129,48 @@ async function configuredBootstrapScope(workspaceRoot: string) {
     throw error;
   });
   return config?.bootstrapScope;
+}
+
+async function configuredRepoInfisicalProjectName(workspaceRoot: string) {
+  const config = await readSprinkleRefConfig(undefined, workspaceRoot).catch((error: unknown) => {
+    if (isMissingSprinkleRefConfigError(error)) return undefined;
+    throw error;
+  });
+  return config?.repoInfisicalProjectName;
+}
+
+async function configuredBootstrapKeychainServiceName(workspaceRoot: string) {
+  const config = await readSprinkleRefConfig(undefined, workspaceRoot).catch((error: unknown) => {
+    if (isMissingSprinkleRefConfigError(error)) return undefined;
+    throw error;
+  });
+  return config?.bootstrapKeychainServiceName;
+}
+
+async function configuredRepoKeychainServiceName(workspaceRoot: string) {
+  const config = await readSprinkleRefConfig(undefined, workspaceRoot).catch((error: unknown) => {
+    if (isMissingSprinkleRefConfigError(error)) return undefined;
+    throw error;
+  });
+  return config?.repoKeychainServiceName;
+}
+
+function validateRepoInfisicalProjectName(projectName: string) {
+  const trimmed = projectName.trim();
+  if (!trimmed) throw new Error("Infisical repo project name must not be empty");
+  if (/[\r\n\t]/.test(trimmed)) {
+    throw new Error("Infisical repo project name must not contain control whitespace");
+  }
+  return trimmed;
+}
+
+function validateKeychainServiceName(serviceName: string, label: string) {
+  const trimmed = serviceName.trim();
+  if (!trimmed) throw new Error(`${label} must not be empty`);
+  if (/[\r\n\t]/.test(trimmed)) {
+    throw new Error(`${label} must not contain control whitespace`);
+  }
+  return trimmed;
 }
 
 function isMissingSprinkleRefConfigError(error: unknown) {

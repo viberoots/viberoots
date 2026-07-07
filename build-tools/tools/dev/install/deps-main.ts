@@ -45,6 +45,9 @@ type Flags = {
   bootstrap: boolean;
   infisicalLoginMode: string;
   secretBackend: string;
+  infisicalProjectName: string;
+  bootstrapKeychainServiceName: string;
+  keychainServiceName: string;
 };
 
 async function runGeneratedWorkspaceLockRepair(opts: {
@@ -137,6 +140,9 @@ const {
   bootstrap,
   infisicalLoginMode,
   secretBackend,
+  infisicalProjectName,
+  bootstrapKeychainServiceName,
+  keychainServiceName,
 } = {
   force: getFlagBool("force"),
   dryRun: getFlagBool("dry-run") || envDryRun,
@@ -154,6 +160,9 @@ const {
   bootstrap: getFlagBool("bootstrap"),
   infisicalLoginMode: getFlagStr("infisical-login-mode", ""),
   secretBackend: getFlagStr("secret-backend", ""),
+  infisicalProjectName: getFlagStr("infisical-project-name", ""),
+  bootstrapKeychainServiceName: getFlagStr("bootstrap-keychain-service-name", ""),
+  keychainServiceName: getFlagStr("keychain-service-name", ""),
 } satisfies Flags;
 const ui = createCommandUi({ verbose });
 if (verbose) console.log("Installing dependencies...");
@@ -394,6 +403,9 @@ await ensureInstallSecretReadiness({
     bootstrap,
     infisicalLoginMode,
     secretBackend,
+    infisicalProjectName,
+    bootstrapKeychainServiceName,
+    keychainServiceName,
   },
 });
 if (!dryRun && shouldRunFinalWorkspaceLockRepair()) {

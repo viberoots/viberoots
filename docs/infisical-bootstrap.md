@@ -11,6 +11,7 @@ i --bootstrap --secret-backend infisical/default
 i --bootstrap --secret-backend keychain/default
 i --without-secrets
 i --machine-label <label>
+i --infisical-project-name <name>
 i --infisical-login-mode browser
 i --infisical-login-mode interactive
 ```
@@ -49,8 +50,8 @@ When bootstrap needs to choose the repo's default `main` secret backend, interac
 supported choices in a visible selector. Choose Infisical when repo secrets should live in an
 Infisical project managed or adopted by repo bootstrap. Choose Vault when repo secrets should live
 behind the Vault resolver profile. Choose macOS Keychain when local repo secrets should stay in the
-login Keychain under the `viberoots-main` service. Automation can make the same choice without a
-prompt:
+login Keychain under the repo-derived `<workspace-name>` service. Automation can make the same
+choice without a prompt:
 
 ```bash
 i --bootstrap --secret-backend vault/default --yes
@@ -76,6 +77,9 @@ viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --secr
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --secret-backend infisical/default
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --secret-backend keychain/default
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --bootstrap-scope unfairly-common
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --infisical-project-name unfairly-common
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --bootstrap-keychain-service-name unfairly-bootstrap
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --keychain-service-name unfairly
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --apply-metadata-patch
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --without-deployments
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --dry-run
@@ -112,13 +116,25 @@ Universal Auth client-secret records are per operator machine. Existing local cr
 by default; a fresh machine creates its own labeled client-secret record and stores it only in the
 selected local sink. Use `--machine-label <label>` when the hostname is not a useful revocation
 label in Infisical.
+For Infisical-backed repo secrets, repo bootstrap creates or adopts a repo-level Infisical
+secret-manager project. By default that project name is the consumer workspace directory name, so a
+checkout named `unfairly-common` uses an Infisical project named `unfairly-common`. Set
+`sprinkleref.repoInfisicalProjectName` in `projects/config/shared.json` to use a different stable
+project name, or pass `--infisical-project-name <name>` for a one-off bootstrap run.
+For macOS Keychain-backed local storage, bootstrap uses repo-derived services by default:
+`<workspace-name>-bootstrap` for repo bootstrap credentials and `<workspace-name>` for the
+`keychain/default` main backend. Set `sprinkleref.bootstrapKeychainServiceName` or
+`sprinkleref.repoKeychainServiceName` in `projects/config/shared.json` for stable shared overrides,
+or pass `--bootstrap-keychain-service-name <name>` or `--keychain-service-name <name>` for one run.
 Existing operator-authored Infisical profiles are preserved once their `projectId` validates in the
 selected organization.
 If Infisical rejects the default repo project creation because the organization has reached a
 project or workspace plan limit, reuse an existing Infisical secret-manager project. Set
-`sprinkleref.profiles.<profile>.projectId` in `projects/config/shared.json` for the generated
-Infisical profile, or export `VBR_INFISICAL_PROJECT_ID` before rerunning bootstrap. The bootstrap
-error lists visible candidate projects when Infisical returns them.
+`sprinkleref.repoInfisicalProjectName` to the existing project name, pass
+`--infisical-project-name <name>`, set `sprinkleref.profiles.<profile>.projectId` in
+`projects/config/shared.json` for the generated Infisical profile, or export
+`VBR_INFISICAL_PROJECT_ID` before rerunning bootstrap. The bootstrap error lists visible candidate
+projects when Infisical returns them.
 Before reporting success, repo bootstrap reads the generated bootstrap credential refs back from the
 selected local sink, checks they match the machine's repo Universal Auth credential, and performs an
 Infisical Universal Auth login probe. It also validates the default `main` resolver category: for
@@ -176,8 +192,9 @@ build-tools/tools/deployments/infisical-bootstrap-reset-local.ts
 
 The reset utility prints the discovered reset plan, requires typing `RESET` or passing `--yes` when
 there is state to remove, removes only generated local resolver/OpenTofu state, and deletes existing
-repo bootstrap Universal Auth entries from the `viberoots-bootstrap` macOS Keychain service. It does
-not delete Infisical projects, identities, Cloudflare secrets, or application secrets.
+repo bootstrap Universal Auth entries from the repo-derived `<workspace-name>-bootstrap` macOS
+Keychain service. It does not delete Infisical projects, identities, Cloudflare secrets, or
+application secrets.
 
 Troubleshooting:
 

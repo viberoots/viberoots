@@ -17,9 +17,13 @@ import { resolverConfigPath } from "./infisical-iac-bootstrap-preflight";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 import { resolveBootstrapAccessCredentialSinkBackend } from "./sprinkleref-bootstrap-guard";
 import {
+  DEFAULT_BOOTSTRAP_ARGS,
+  withRepoKeychainServiceName,
+} from "./infisical-iac-bootstrap-config";
+import {
   initLocalSprinkleRefValues,
   initSprinkleRefConfigs,
-  MACOS_KEYCHAIN_MAIN_DEFAULT,
+  macosKeychainMainDefault,
   VAULT_DEFAULT,
 } from "./sprinkleref-templates";
 import { starterInfisicalProfile } from "./infisical-iac-bootstrap-profile-kind";
@@ -40,6 +44,7 @@ export async function ensureRepoResolverConfig(opts: {
   workspaceRoot?: string;
   configPath?: string;
   secretBackend?: string;
+  keychainServiceName?: string;
 }) {
   const workspaceRoot = opts.workspaceRoot || (await findRepoRoot(process.cwd()));
   const configPath =
@@ -65,11 +70,18 @@ export async function ensureRepoResolverConfig(opts: {
       dir: path.dirname(configPath),
       platform: opts.platform || process.platform,
       mode: "create",
+      workspaceRoot,
     });
     await initLocalSprinkleRefValues(workspaceRoot);
   }
+  const repoKeychainServiceName = (
+    await withRepoKeychainServiceName(
+      { ...DEFAULT_BOOTSTRAP_ARGS, keychainServiceName: opts.keychainServiceName },
+      workspaceRoot,
+    )
+  ).keychainServiceName;
   if (opts.secretBackend?.trim() && !opts.dryRun) {
-    await selectRepoSecretBackend(configPath, opts.secretBackend);
+    await selectRepoSecretBackend(configPath, opts.secretBackend, repoKeychainServiceName);
   }
   const config = await readSprinkleRefConfig(configPath, workspaceRoot);
   const requiredProfiles = new Set(
@@ -208,7 +220,11 @@ function activeCategoryProfiles(config: SprinkleRefConfig) {
     : [];
 }
 
-async function selectRepoSecretBackend(configPath: string, secretBackend: string) {
+async function selectRepoSecretBackend(
+  configPath: string,
+  secretBackend: string,
+  keychainServiceName?: string,
+) {
   const selector = normalizeExplicitSecretBackend(secretBackend);
   const raw = JSON.parse(await fs.readFile(configPath, "utf8")) as SprinkleRefConfigFile & {
     sprinkleref?: SprinkleRefConfigFile;
@@ -216,7 +232,7 @@ async function selectRepoSecretBackend(configPath: string, secretBackend: string
   const resolver = raw.sprinkleref || raw;
   resolver.profiles = { ...(resolver.profiles || {}) };
   resolver.categories = { ...(resolver.categories || {}) };
-  resolver.profiles[selector.profile] ||= starterProfileForSelector(selector);
+  resolver.profiles[selector.profile] ||= starterProfileForSelector(selector, keychainServiceName);
   resolver.defaultCategory = "main";
   resolver.categories.main = { profile: selector.profile };
   if (raw.sprinkleref) raw.sprinkleref = resolver;
@@ -247,9 +263,13 @@ function normalizeExplicitSecretBackend(secretBackend: string) {
 
 function starterProfileForSelector(
   selector: ReturnType<typeof normalizeExplicitSecretBackend>,
+  keychainServiceName?: string,
 ): SprinkleRefBackendConfig {
   if (selector.backend === "vault") return { ...VAULT_DEFAULT };
-  if (selector.backend === "macos-keychain") return { ...MACOS_KEYCHAIN_MAIN_DEFAULT };
+  if (selector.backend === "macos-keychain")
+    return keychainServiceName
+      ? { backend: "macos-keychain", service: keychainServiceName }
+      : macosKeychainMainDefault();
   return starterInfisicalProfile();
 }
 

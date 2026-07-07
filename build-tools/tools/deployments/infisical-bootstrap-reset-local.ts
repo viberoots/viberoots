@@ -7,12 +7,12 @@ import { askConfirmation } from "./infisical-iac-bootstrap-preflight";
 import {
   DEFAULT_BOOTSTRAP_ARGS,
   withBootstrapCredentialScope,
+  withBootstrapKeychainServiceName,
 } from "./infisical-iac-bootstrap-config";
 import { repoBootstrapCredentialRefs } from "./infisical-iac-bootstrap-identity";
 import { macosKeychainCommand } from "./sprinkleref-keychain";
 import { getArgvTokens } from "../lib/argv";
-
-const KEYCHAIN_SERVICE = "viberoots-bootstrap";
+import { findRepoRoot } from "../lib/repo";
 
 const LOCAL_PATH_CANDIDATES = [
   {
@@ -42,6 +42,7 @@ export type KeychainResetItem = {
 
 export type LocalBootstrapResetPlan = {
   localItems: LocalResetItem[];
+  keychainService: string;
   keychainItems: KeychainResetItem[];
 };
 
@@ -74,12 +75,15 @@ export async function runInfisicalBootstrapResetLocal(argv = getArgvTokens(), io
   const stderr = io.stderr || console.error;
   if (argv.includes("--help") || argv.includes("-h")) {
     stdout(resetLocalUsage());
-    return { localItems: [], keychainItems: [] };
+    return { localItems: [], keychainService: "", keychainItems: [] };
   }
   const args = parseArgs(argv);
+  const root = await resolveResetRoot(io);
+  const keychainService = await resolveBootstrapKeychainService(root);
   const plan = {
-    localItems: await discoverLocalItems(io),
-    keychainItems: await discoverKeychainItems(io),
+    localItems: await discoverLocalItems(root),
+    keychainService,
+    keychainItems: await discoverKeychainItems(io, root, keychainService),
   };
   printResetPlan(stdout, args, plan);
   if (!hasResetPlanItems(plan)) return plan;
@@ -97,8 +101,8 @@ export async function runInfisicalBootstrapResetLocal(argv = getArgvTokens(), io
     }
   }
   if (args.dryRun) return plan;
-  await removeLocalPaths(io, plan.localItems);
-  removeKeychainEntries(io, stderr, plan.keychainItems);
+  await removeLocalPaths(io, root, plan.localItems);
+  removeKeychainEntries(io, stderr, plan.keychainItems, plan.keychainService);
   stdout("Local Infisical bootstrap state reset complete.");
   return plan;
 }
@@ -127,8 +131,8 @@ function printResetPlan(
     ? "Existing local files/directories that would be deleted:"
     : "Existing local files/directories that will be deleted:";
   const keychainHeading = args.dryRun
-    ? `Existing macOS Keychain entries that would be deleted from service ${KEYCHAIN_SERVICE}:`
-    : `Existing macOS Keychain entries that will be deleted from service ${KEYCHAIN_SERVICE}:`;
+    ? `Existing macOS Keychain entries that would be deleted from service ${plan.keychainService}:`
+    : `Existing macOS Keychain entries that will be deleted from service ${plan.keychainService}:`;
   const lines = ["Infisical bootstrap local reset", modeLine, ""];
   if (!hasResetPlanItems(plan)) {
     lines.push("No existing local bootstrap files or Keychain entries were found.", "");
@@ -159,10 +163,13 @@ function printResetPlan(
   );
 }
 
-async function discoverKeychainItems(io: ResetIo): Promise<KeychainResetItem[]> {
+async function discoverKeychainItems(
+  io: ResetIo,
+  root: string,
+  keychainService: string,
+): Promise<KeychainResetItem[]> {
   const platform = io.platform || process.platform;
   if (platform !== "darwin") return [];
-  const root = path.resolve(io.cwd || process.cwd());
   const scopedArgs = await withBootstrapCredentialScope(DEFAULT_BOOTSTRAP_ARGS, root);
   const refs = repoBootstrapCredentialRefs(
     { name: scopedArgs.identityName },
@@ -182,14 +189,18 @@ async function discoverKeychainItems(io: ResetIo): Promise<KeychainResetItem[]> 
   const runner = io.keychainRunner || defaultRunner;
   const discovered: KeychainResetItem[] = [];
   for (const item of candidates) {
-    const result = runner("security", macosKeychainCommand("read", KEYCHAIN_SERVICE, item.account));
+    const result = runner("security", macosKeychainCommand("read", keychainService, item.account));
     if (result.status === 0) discovered.push(item);
   }
   return discovered;
 }
 
-async function discoverLocalItems(io: ResetIo): Promise<LocalResetItem[]> {
-  const root = path.resolve(io.cwd || process.cwd());
+async function resolveBootstrapKeychainService(root: string) {
+  const scopedArgs = await withBootstrapKeychainServiceName(DEFAULT_BOOTSTRAP_ARGS, root);
+  return scopedArgs.bootstrapKeychainServiceName || "";
+}
+
+async function discoverLocalItems(root: string): Promise<LocalResetItem[]> {
   const discovered: LocalResetItem[] = [];
   for (const item of LOCAL_PATH_CANDIDATES) {
     if (await pathExists(path.join(root, item.path))) discovered.push(item);
@@ -217,8 +228,7 @@ async function discoverLocalItems(io: ResetIo): Promise<LocalResetItem[]> {
   return uniqueLocalItems(discovered);
 }
 
-async function removeLocalPaths(io: ResetIo, localItems: LocalResetItem[]) {
-  const root = path.resolve(io.cwd || process.cwd());
+async function removeLocalPaths(io: ResetIo, root: string, localItems: LocalResetItem[]) {
   const removePath =
     io.removePath || ((target: string) => fs.rm(target, { recursive: true, force: true }));
   for (const item of localItems) {
@@ -229,10 +239,16 @@ async function removeLocalPaths(io: ResetIo, localItems: LocalResetItem[]) {
   }
 }
 
+async function resolveResetRoot(io: ResetIo) {
+  if (io.cwd) return path.resolve(io.cwd);
+  return await findRepoRoot(path.resolve(io.cwd || process.cwd()));
+}
+
 function removeKeychainEntries(
   io: ResetIo,
   stderr: (text: string) => void,
   keychainItems: KeychainResetItem[],
+  keychainService: string,
 ) {
   const platform = io.platform || process.platform;
   if (platform !== "darwin") {
@@ -241,7 +257,7 @@ function removeKeychainEntries(
   }
   const runner = io.keychainRunner || defaultRunner;
   for (const item of keychainItems) {
-    runner("security", macosKeychainCommand("remove", KEYCHAIN_SERVICE, item.account));
+    runner("security", macosKeychainCommand("remove", keychainService, item.account));
   }
 }
 

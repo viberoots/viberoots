@@ -16,6 +16,9 @@ const baseFlags = {
   bootstrap: false,
   infisicalLoginMode: "",
   secretBackend: "",
+  infisicalProjectName: "",
+  bootstrapKeychainServiceName: "",
+  keychainServiceName: "",
 };
 
 test("install secret readiness skips bootstrap when local Universal Auth credentials exist", async () => {
@@ -52,6 +55,9 @@ test("install secret readiness prompts when credentials are missing and forwards
           rotateBootstrapCredentials: true,
           rotateDeploymentCredentials: true,
           forceOverwriteLocalCredentials: true,
+          infisicalProjectName: "shared-repo",
+          bootstrapKeychainServiceName: "shared-repo-bootstrap",
+          keychainServiceName: "shared-repo-main",
         },
         deps: {
           isInteractive: () => true,
@@ -75,6 +81,12 @@ test("install secret readiness prompts when credentials are missing and forwards
         "dev-laptop",
         "--login-mode",
         "browser",
+        "--infisical-project-name",
+        "shared-repo",
+        "--bootstrap-keychain-service-name",
+        "shared-repo-bootstrap",
+        "--keychain-service-name",
+        "shared-repo-main",
         "--rotate-bootstrap-credentials",
         "--rotate-deployment-credentials",
         "--force-overwrite-local-credentials",

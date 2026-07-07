@@ -16,6 +16,9 @@ const baseFlags = {
   bootstrap: false,
   infisicalLoginMode: "",
   secretBackend: "",
+  infisicalProjectName: "",
+  bootstrapKeychainServiceName: "",
+  keychainServiceName: "",
 };
 
 test("install secret readiness rotates even when local credentials exist", async () => {

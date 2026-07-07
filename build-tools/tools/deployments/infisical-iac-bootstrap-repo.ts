@@ -1,7 +1,12 @@
 import * as path from "node:path";
 import { findRepoRoot } from "../lib/repo";
 import { defaultDeploymentGraphPath } from "./deployment-graph-read-options";
-import { withBootstrapCredentialScope } from "./infisical-iac-bootstrap-config";
+import {
+  withBootstrapCredentialScope,
+  withBootstrapKeychainServiceName,
+  withRepoInfisicalProjectName,
+  withRepoKeychainServiceName,
+} from "./infisical-iac-bootstrap-config";
 import { InfisicalApi } from "./infisical-iac-bootstrap-api";
 import { runDeploymentBootstrapFanOut } from "./infisical-iac-bootstrap-deployments";
 import { applyFanOutMetadataHandoff } from "./infisical-iac-bootstrap-metadata-gate";
@@ -57,7 +62,16 @@ export async function runRepoBootstrap(
   deps: RepoBootstrapDeps = {},
 ) {
   const workspaceRoot = await findRepoRoot(process.cwd());
-  const scopedArgs = await withBootstrapCredentialScope(args, workspaceRoot);
+  const scopedArgs = await withRepoKeychainServiceName(
+    await withBootstrapKeychainServiceName(
+      await withRepoInfisicalProjectName(
+        await withBootstrapCredentialScope(args, workspaceRoot),
+        workspaceRoot,
+      ),
+      workspaceRoot,
+    ),
+    workspaceRoot,
+  );
   await confirmBootstrapPreflight(scopedArgs);
   const graphPath = defaultDeploymentGraphPath(workspaceRoot);
   const configPath = path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
@@ -67,6 +81,7 @@ export async function runRepoBootstrap(
     graphPath,
     configPath,
     secretBackend: scopedArgs.secretBackend,
+    keychainServiceName: scopedArgs.keychainServiceName,
   });
   const sink = await resolveCredentialSinkSelection(scopedArgs, {
     createMissingResolverConfig: true,

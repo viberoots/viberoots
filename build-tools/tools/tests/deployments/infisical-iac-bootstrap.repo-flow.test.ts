@@ -184,10 +184,10 @@ async function writeBootstrapCredentials(
 
 async function fixtureRequest(method: string, endpoint: string) {
   if (method === "GET" && endpoint.startsWith("/api/v1/projects?")) {
-    return { projects: [{ id: "proj_old", name: "viberoots-deployments", orgId: "org_fixture" }] };
+    return { projects: [{ id: "proj_old", name: "fixture-repo", orgId: "org_fixture" }] };
   }
   if (method === "POST" && endpoint === "/api/v1/projects") {
-    return { project: { id: "proj_repo_fixture", name: "viberoots-deployments" } };
+    return { project: { id: "proj_repo_fixture", name: "fixture-repo" } };
   }
   if (endpoint.includes("/memberships/identities/")) {
     return method === "GET" ? undefined : { ok: true };

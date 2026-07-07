@@ -20,6 +20,9 @@ const baseFlags = {
   bootstrap: false,
   infisicalLoginMode: "",
   secretBackend: "",
+  infisicalProjectName: "",
+  bootstrapKeychainServiceName: "",
+  keychainServiceName: "",
 };
 
 test("install secret readiness is quiet when deployment metadata is absent", async () => {

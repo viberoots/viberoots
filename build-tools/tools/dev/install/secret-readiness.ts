@@ -30,6 +30,9 @@ export type SecretReadinessFlags = {
   bootstrap: boolean;
   infisicalLoginMode: string;
   secretBackend: string;
+  infisicalProjectName: string;
+  bootstrapKeychainServiceName: string;
+  keychainServiceName: string;
 };
 
 export type SecretReadinessDeps = {
@@ -120,9 +123,8 @@ export async function ensureInstallSecretReadiness(opts: {
       ].join(" "),
     );
     const confirmed =
-      (await (opts.deps?.prompt || promptYesNo)(
-        "Run repo bootstrap now? [Y/n, then Enter] ",
-      )) ?? false;
+      (await (opts.deps?.prompt || promptYesNo)("Run repo bootstrap now? [Y/n, then Enter] ")) ??
+      false;
     if (!confirmed) {
       console.error("Infisical setup skipped. Rerun `i` and accept the prompt when ready.");
       return;
@@ -282,9 +284,11 @@ function unresolvedInfisicalProjectProfiles(config: ReadinessSprinkleRefConfig) 
 }
 
 function activeInfisicalProfiles(config: ReadinessSprinkleRefConfig) {
-  const categories = (config as ReadinessSprinkleRefConfig & {
-    categories?: Record<string, { profile?: string }>;
-  }).categories;
+  const categories = (
+    config as ReadinessSprinkleRefConfig & {
+      categories?: Record<string, { profile?: string }>;
+    }
+  ).categories;
   const selected = config.defaultCategory || "main";
   const profileName = categories?.[selected]?.profile?.trim();
   if (!profileName) return [];
@@ -402,6 +406,9 @@ function bootstrapArgs(flags: SecretReadinessFlags) {
     ...valueFlag("machine-label", flags.machineLabel),
     ...valueFlag("login-mode", effectiveLoginMode(flags)),
     ...valueFlag("secret-backend", flags.secretBackend),
+    ...valueFlag("infisical-project-name", flags.infisicalProjectName),
+    ...valueFlag("bootstrap-keychain-service-name", flags.bootstrapKeychainServiceName),
+    ...valueFlag("keychain-service-name", flags.keychainServiceName),
     ...boolFlag("rotate-bootstrap-credentials", flags.rotateBootstrapCredentials),
     ...boolFlag("rotate-deployment-credentials", flags.rotateDeploymentCredentials),
     ...boolFlag("force-overwrite-local-credentials", flags.forceOverwriteLocalCredentials),
@@ -583,8 +590,8 @@ function boolFlag(name: string, enabled: boolean) {
   return enabled ? [`--${name}`] : [];
 }
 
-function valueFlag(name: string, value: string) {
-  return value.trim() ? [`--${name}`, value.trim()] : [];
+function valueFlag(name: string, value: string | undefined) {
+  return value?.trim() ? [`--${name}`, value.trim()] : [];
 }
 
 function isInteractiveShell() {

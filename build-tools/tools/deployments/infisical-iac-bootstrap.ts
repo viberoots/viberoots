@@ -8,7 +8,10 @@ import {
   deploymentScopeFromTarget,
   resolveInfisicalHost,
   withBootstrapCredentialScope,
+  withBootstrapKeychainServiceName,
   withDeploymentBootstrapDefaults,
+  withRepoInfisicalProjectName,
+  withRepoKeychainServiceName,
 } from "./infisical-iac-bootstrap-config";
 import { spawnCommandRunner } from "./infisical-iac-bootstrap-auth";
 import {
@@ -44,7 +47,16 @@ export async function runInfisicalIacBootstrap(
   } = {},
 ) {
   const workspaceRoot = context.workspaceRoot || (await findRepoRoot(process.cwd()));
-  const scopedArgs = await withBootstrapCredentialScope(args, workspaceRoot);
+  const scopedArgs = await withRepoKeychainServiceName(
+    await withBootstrapKeychainServiceName(
+      await withRepoInfisicalProjectName(
+        await withBootstrapCredentialScope(args, workspaceRoot),
+        workspaceRoot,
+      ),
+      workspaceRoot,
+    ),
+    workspaceRoot,
+  );
   const scopedContext = { ...context, workspaceRoot };
   if (scopedArgs.mode === "repo") {
     if (scopedArgs.dryRun) return dryRun(scopedArgs, scopedContext);

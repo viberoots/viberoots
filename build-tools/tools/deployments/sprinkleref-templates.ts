@@ -6,6 +6,10 @@ import { starterInfisicalProfile } from "./infisical-iac-bootstrap-profile-kind"
 import type { SprinkleRefConfigFile } from "./sprinkleref-types";
 import { LOCAL_VALUES_PATH } from "./aws-account-inputs";
 import { findRepoRoot } from "../lib/repo";
+import {
+  defaultBootstrapKeychainServiceName,
+  defaultRepoKeychainServiceName,
+} from "./infisical-iac-bootstrap-config";
 
 export const VAULT_DEFAULT = {
   backend: "vault" as const,
@@ -15,12 +19,17 @@ export const VAULT_DEFAULT = {
   defaultPath: "/deployments",
 };
 
-export const MACOS_KEYCHAIN_MAIN_DEFAULT = {
-  backend: "macos-keychain" as const,
-  service: "viberoots-main",
-};
+export function macosKeychainMainDefault(workspaceRoot = process.cwd()) {
+  return {
+    backend: "macos-keychain" as const,
+    service: defaultRepoKeychainServiceName(workspaceRoot),
+  };
+}
 
-export function sprinkleRefStarterConfigs(_platform = process.platform) {
+export function sprinkleRefStarterConfigs(
+  _platform = process.platform,
+  workspaceRoot = process.cwd(),
+) {
   const shared = {
     schemaVersion: "viberoots-project-config@1",
     environments: {
@@ -28,7 +37,10 @@ export function sprinkleRefStarterConfigs(_platform = process.platform) {
       prod: { infisicalEnvironment: "prod" },
     },
     runtimeHosts: {
-      "local-macos": { backend: "macos-keychain", service: "viberoots-bootstrap" },
+      "local-macos": {
+        backend: "macos-keychain",
+        service: defaultBootstrapKeychainServiceName(workspaceRoot),
+      },
       "local-file": { backend: "local-file" },
       "github-actions": ciBackend("github-actions", "VIBEROOTS_"),
       jenkins: ciBackend("jenkins", "VIBEROOTS_"),
@@ -76,9 +88,13 @@ export async function initSprinkleRefConfigs(opts: {
   dir: string;
   platform?: NodeJS.Platform;
   mode?: "create" | "overwrite";
+  workspaceRoot?: string;
 }) {
   await fs.mkdir(opts.dir, { recursive: true });
-  const configs = sprinkleRefStarterConfigs(opts.platform || os.platform());
+  const configs = sprinkleRefStarterConfigs(
+    opts.platform || os.platform(),
+    opts.workspaceRoot || path.resolve(opts.dir, "..", ".."),
+  );
   const written: string[] = [];
   for (const [name, config] of Object.entries(configs)) {
     const file = path.join(opts.dir, name);

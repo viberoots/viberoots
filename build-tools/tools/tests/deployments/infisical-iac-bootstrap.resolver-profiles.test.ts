@@ -190,7 +190,7 @@ test("repo bootstrap can select macOS Keychain as the default main secret backen
     const shared = await fs.readFile(sharedConfigPath(), "utf8");
     assert.match(shared, /"defaultCategory": "main"/);
     assert.match(shared, /"macos-keychain-default"/);
-    assert.match(shared, /"service": "viberoots-main"/);
+    assert.match(shared, new RegExp(`"service": "${path.basename(dir)}"`));
   });
 });
 

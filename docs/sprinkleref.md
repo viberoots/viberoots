@@ -141,7 +141,7 @@ instances/accounts, while categories name usage lanes:
   "runtimeHosts": {
     "local-macos": {
       "backend": "macos-keychain",
-      "service": "viberoots-bootstrap"
+      "service": "example-app-bootstrap"
     },
     "github-actions": {
       "backend": "github-actions",
@@ -237,7 +237,7 @@ Example runtime host move:
     },
     "local-macos": {
       "backend": "macos-keychain",
-      "service": "viberoots-bootstrap"
+      "service": "example-app-bootstrap"
     }
   }
 }

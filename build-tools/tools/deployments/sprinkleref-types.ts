@@ -50,6 +50,9 @@ export type SprinkleRefConfigFile = {
   version: 1;
   extends?: string;
   bootstrapScope?: string;
+  repoInfisicalProjectName?: string;
+  bootstrapKeychainServiceName?: string;
+  repoKeychainServiceName?: string;
   environments?: Record<string, SprinkleRefEnvironmentConfig>;
   defaultCategory?: string;
   profiles?: Record<string, SprinkleRefBackendConfig>;
@@ -60,6 +63,9 @@ export type SprinkleRefConfig = {
   path?: string;
   defaultCategory: string;
   bootstrapScope?: string;
+  repoInfisicalProjectName?: string;
+  bootstrapKeychainServiceName?: string;
+  repoKeychainServiceName?: string;
   environments?: Record<string, SprinkleRefEnvironmentConfig>;
   profiles: Record<string, SprinkleRefBackendConfig>;
   categories: Record<string, SprinkleRefCategoryConfig>;

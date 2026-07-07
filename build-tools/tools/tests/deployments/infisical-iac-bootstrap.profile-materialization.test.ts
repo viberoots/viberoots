@@ -25,6 +25,7 @@ test("repo profile materialization writes Infisical project id without secret va
   const written = await fs.readFile(configPath, "utf8");
   assert.deepEqual(result.materializedProfiles, ["infisical-default"]);
   assert.match(written, /"projectId": "proj_repo"/);
+  assert.match(written, /"projectName": "fixture-repo"/);
   assert.match(
     written,
     /"clientIdRef": "secret:\/\/bootstrap\/viberoots\/viberoots-iac-bootstrap\/client-id"/,
@@ -93,7 +94,7 @@ test("generated Infisical starter profile with project id is rewritten with repo
     args: DEFAULT_BOOTSTRAP_ARGS,
     configPath,
     requiredProfiles: ["infisical-default"],
-    api: fakeProjectApi([{ id: "proj_existing", name: "viberoots-deployments" }]) as never,
+    api: fakeProjectApi([{ id: "proj_existing", name: "fixture-repo" }]) as never,
     organizationId: "org_1",
     identity: { id: "id_1", name: "viberoots-iac-bootstrap" },
   });
@@ -124,7 +125,7 @@ test("operator-authored Infisical project mismatch fails without rewriting", asy
         args: DEFAULT_BOOTSTRAP_ARGS,
         configPath,
         requiredProfiles: ["infisical-default"],
-        api: fakeProjectApi([{ id: "proj_repo", name: "viberoots-deployments" }]) as never,
+        api: fakeProjectApi([{ id: "proj_repo", name: "fixture-repo" }]) as never,
         organizationId: "org_1",
         identity: { id: "id_1", name: "viberoots-iac-bootstrap" },
       }),
@@ -180,6 +181,7 @@ test("Vault profile validation checks the configured mount", async () => {
 function starterConfig() {
   return {
     version: 1,
+    repoInfisicalProjectName: "fixture-repo",
     defaultCategory: "main",
     profiles: {
       "infisical-default": {
@@ -217,14 +219,21 @@ async function writeJson(file: string, value: unknown) {
 function fakeProjectApi(projects: Array<{ id: string; name: string; orgId?: string }> = []) {
   return {
     calls: [] as string[],
-    async request(method: string, endpoint: string, _body?: unknown, allow404?: boolean) {
+    async request(
+      method: string,
+      endpoint: string,
+      body?: { projectName?: string },
+      allow404?: boolean,
+    ) {
       this.calls.push(`${method} ${endpoint}`);
       if (endpoint.includes("/memberships/identities/")) {
         if (method === "GET" && allow404) return undefined;
         return { identityMembership: { id: "membership_1" } };
       }
       if (method === "GET") return { workspaces: projects };
-      return { project: { id: "proj_repo", name: "viberoots-deployments", orgId: "org_1" } };
+      return {
+        project: { id: "proj_repo", name: body?.projectName || "fixture-repo", orgId: "org_1" },
+      };
     },
   };
 }

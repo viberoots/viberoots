@@ -14,6 +14,7 @@ import {
   validateInfisicalRepoProject,
 } from "./infisical-iac-bootstrap-profile-api";
 import type { BootstrapArgs, Identity } from "./infisical-iac-bootstrap-types";
+import { withRepoInfisicalProjectName } from "./infisical-iac-bootstrap-config";
 import { validateVaultRepoProfile } from "./infisical-iac-bootstrap-vault-profile";
 import { readSprinkleRefConfig, validateConfig } from "./sprinkleref-config";
 import type { SprinkleRefBackendConfig, SprinkleRefConfigFile } from "./sprinkleref-types";
@@ -30,6 +31,14 @@ export async function materializeRepoBackendProfiles(opts: {
   fetchImpl?: typeof fetch;
 }) {
   const config = await readSprinkleRefConfig(opts.configPath, opts.workspaceRoot);
+  const args = await withRepoInfisicalProjectName(
+    {
+      ...opts.args,
+      infisicalProjectName: opts.args.infisicalProjectName || config.repoInfisicalProjectName,
+    },
+    opts.workspaceRoot || path.dirname(opts.configPath),
+  );
+  const effectiveOpts = { ...opts, args };
   const updates: Record<string, SprinkleRefBackendConfig> = {};
   const validatedExistingProfiles: string[] = [];
   const profiles = opts.requiredProfiles.map((name) => [name, config.profiles[name]] as const);
@@ -44,7 +53,7 @@ export async function materializeRepoBackendProfiles(opts: {
       });
     }
     if (profile?.backend === "infisical" || name.startsWith("infisical-")) {
-      const result = await materializeInfisicalProfile(name, profile, opts);
+      const result = await materializeInfisicalProfile(name, profile, effectiveOpts);
       if (result.status === "validated-existing") validatedExistingProfiles.push(name);
       if (result.status === "materialized") updates[name] = result.profile;
     }
@@ -109,7 +118,9 @@ async function materializeInfisicalProfile(
     validateInfisicalProfile(name, profile);
     throw new Error(unresolvedOperatorProfileProjectMessage(name, profile));
   }
-  const { project } = await ensureInfisicalRepoProject(opts.api, opts.organizationId);
+  const projectName = opts.args.infisicalProjectName;
+  if (!projectName) throw new Error("Infisical repo project name was not resolved");
+  const { project } = await ensureInfisicalRepoProject(opts.api, opts.organizationId, projectName);
   await ensureProfileIdentityMembership(opts.api, opts.identity, project.id);
   return {
     profile: validateInfisicalProfile(name, {

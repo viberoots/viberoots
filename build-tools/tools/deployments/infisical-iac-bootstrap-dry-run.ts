@@ -4,7 +4,10 @@ import { defaultDeploymentGraphPath } from "./deployment-graph-read-options";
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 import {
   withBootstrapCredentialScope,
+  withBootstrapKeychainServiceName,
   withDeploymentBootstrapDefaults,
+  withRepoInfisicalProjectName,
+  withRepoKeychainServiceName,
 } from "./infisical-iac-bootstrap-config";
 import { buildDeploymentFanOutDryRunReport } from "./infisical-iac-bootstrap-deployments";
 import { buildRepoDryRunMaterializationPlan } from "./infisical-iac-bootstrap-dry-run-plan";
@@ -18,7 +21,16 @@ export async function buildDryRunReport(
 ) {
   if (args.mode === "repo") {
     const workspaceRoot = context.workspaceRoot || (await findRepoRoot(process.cwd()));
-    const scopedArgs = await withBootstrapCredentialScope(args, workspaceRoot);
+    const scopedArgs = await withRepoKeychainServiceName(
+      await withBootstrapKeychainServiceName(
+        await withRepoInfisicalProjectName(
+          await withBootstrapCredentialScope(args, workspaceRoot),
+          workspaceRoot,
+        ),
+        workspaceRoot,
+      ),
+      workspaceRoot,
+    );
     const graphPath = defaultDeploymentGraphPath(workspaceRoot);
     const configPath =
       context.configPath || path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
@@ -39,6 +51,7 @@ export async function buildDryRunReport(
       },
       credentialSink: sink.kind,
       credentialSinkBackend: sink.backend,
+      infisicalProjectName: scopedArgs.infisicalProjectName,
       bootstrapCredentialRefs: repoBootstrapCredentialRefs(
         { name: scopedArgs.identityName },
         scopedArgs.bootstrapCredentialScope,
@@ -52,7 +65,10 @@ export async function buildDryRunReport(
   }
   const deploymentArgs = withDeploymentBootstrapDefaults(args);
   const workspaceRoot = context.workspaceRoot || (await findRepoRoot(process.cwd()));
-  const scopedArgs = await withBootstrapCredentialScope(deploymentArgs, workspaceRoot);
+  const scopedArgs = await withBootstrapKeychainServiceName(
+    await withBootstrapCredentialScope(deploymentArgs, workspaceRoot),
+    workspaceRoot,
+  );
   const configPath =
     context.configPath || path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
   const sink = await resolveCredentialSinkSelection(scopedArgs, { workspaceRoot, configPath });
@@ -79,7 +95,10 @@ export async function buildDryRunGuidance(
   context: { workspaceRoot?: string; configPath?: string } = {},
 ): Promise<string[]> {
   const workspaceRoot = context.workspaceRoot || (await findRepoRoot(process.cwd()));
-  const scopedArgs = await withBootstrapCredentialScope(args, workspaceRoot);
+  const scopedArgs = await withBootstrapKeychainServiceName(
+    await withBootstrapCredentialScope(args, workspaceRoot),
+    workspaceRoot,
+  );
   const configPath =
     context.configPath || path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
   const sink = await resolveCredentialSinkSelection(scopedArgs, { workspaceRoot, configPath });

@@ -78,6 +78,9 @@ async function readProjectSprinkleRefConfig(cwd: string): Promise<SprinkleRefCon
       path: loaded.localPresent ? `${loaded.sharedPath} + ${loaded.localPath}` : loaded.sharedPath,
       defaultCategory: materialized.defaultCategory || "main",
       bootstrapScope: stringField(materialized.bootstrapScope),
+      repoInfisicalProjectName: stringField(materialized.repoInfisicalProjectName),
+      bootstrapKeychainServiceName: stringField(materialized.bootstrapKeychainServiceName),
+      repoKeychainServiceName: stringField(materialized.repoKeychainServiceName),
       environments: readProjectEnvironments(loaded.config),
       profiles: materialized.profiles || {},
       categories: materialized.categories || {},
@@ -100,6 +103,9 @@ async function loadConfig(file: string): Promise<SprinkleRefConfig> {
       path: file,
       defaultCategory: raw.defaultCategory || "main",
       bootstrapScope: stringField(raw.bootstrapScope),
+      repoInfisicalProjectName: stringField(raw.repoInfisicalProjectName),
+      bootstrapKeychainServiceName: stringField(raw.bootstrapKeychainServiceName),
+      repoKeychainServiceName: stringField(raw.repoKeychainServiceName),
       environments: raw.environments || readProjectEnvironments(parsed),
       profiles: raw.profiles || {},
       categories: raw.categories || {},
@@ -132,6 +138,12 @@ export function validateConfig(config: SprinkleRefConfig, file = "SprinkleRef co
   const categories = config.categories || {};
   if (!config.defaultCategory.trim()) throw new Error(`${file} defaultCategory is required`);
   if (config.bootstrapScope) normalizeBootstrapScope(config.bootstrapScope);
+  if (config.repoInfisicalProjectName)
+    validateRepoInfisicalProjectName(config.repoInfisicalProjectName, file);
+  if (config.bootstrapKeychainServiceName)
+    validateKeychainServiceName(config.bootstrapKeychainServiceName, file, "bootstrap");
+  if (config.repoKeychainServiceName)
+    validateKeychainServiceName(config.repoKeychainServiceName, file, "repo");
   if (!categories[config.defaultCategory]) {
     throw new Error(`${file} missing default category ${config.defaultCategory}`);
   }
@@ -140,6 +152,20 @@ export function validateConfig(config: SprinkleRefConfig, file = "SprinkleRef co
   for (const [name, category] of Object.entries(categories))
     validateCategory(file, name, category, profiles, config.environments || {});
   return config;
+}
+
+function validateRepoInfisicalProjectName(projectName: string, file: string) {
+  if (!projectName.trim()) throw new Error(`${file} repoInfisicalProjectName is required`);
+  if (/[\r\n\t]/.test(projectName)) {
+    throw new Error(`${file} repoInfisicalProjectName must not contain control whitespace`);
+  }
+}
+
+function validateKeychainServiceName(serviceName: string, file: string, label: string) {
+  if (!serviceName.trim()) throw new Error(`${file} ${label}KeychainServiceName is required`);
+  if (/[\r\n\t]/.test(serviceName)) {
+    throw new Error(`${file} ${label}KeychainServiceName must not contain control whitespace`);
+  }
 }
 
 function stringField(value: unknown): string | undefined {

@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import { test } from "node:test";
 import { parseBootstrapArgs, usage } from "../../deployments/infisical-iac-bootstrap-args";
-import { DEFAULT_BOOTSTRAP_ARGS } from "../../deployments/infisical-iac-bootstrap-config";
+import {
+  DEFAULT_BOOTSTRAP_ARGS,
+  defaultBootstrapKeychainServiceName,
+  defaultRepoKeychainServiceName,
+  defaultRepoInfisicalProjectName,
+} from "../../deployments/infisical-iac-bootstrap-config";
 import { runInfisicalBootstrapMain } from "../../deployments/infisical-iac-bootstrap";
 import { getAccessToken, spawnCommandRunner } from "../../deployments/infisical-iac-bootstrap-auth";
 import {
@@ -75,6 +80,18 @@ test("bootstrap repo args support deployment fan-out opt-out", () => {
   assert.equal(parseBootstrapArgs(["repo", "--without-deployments"]).withoutDeployments, true);
 });
 
+test("default repo Infisical project name comes from consumer repo directory", () => {
+  assert.equal(defaultRepoInfisicalProjectName("/tmp/unfairly-common"), "unfairly-common");
+});
+
+test("default Keychain service names come from consumer repo directory", () => {
+  assert.equal(
+    defaultBootstrapKeychainServiceName("/tmp/unfairly-common"),
+    "unfairly-common-bootstrap",
+  );
+  assert.equal(defaultRepoKeychainServiceName("/tmp/unfairly-common"), "unfairly-common");
+});
+
 test("bootstrap deployment args default to reviewed OpenTofu setup", () => {
   const args = parseBootstrapArgs([
     "deployment",
@@ -104,6 +121,12 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
     "ci-builder-1",
     "--bootstrap-scope",
     "fixture-repo",
+    "--infisical-project-name",
+    "shared-repo-secrets",
+    "--bootstrap-keychain-service-name",
+    "shared-repo-bootstrap",
+    "--keychain-service-name",
+    "shared-repo-main",
     "--apply-metadata-patch",
     "--yes",
   ]);
@@ -116,6 +139,9 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
   assert.equal(args.rotateDeploymentCredentials, true);
   assert.equal(args.machineLabel, "ci-builder-1");
   assert.equal(args.bootstrapCredentialScope, "fixture-repo");
+  assert.equal(args.infisicalProjectName, "shared-repo-secrets");
+  assert.equal(args.bootstrapKeychainServiceName, "shared-repo-bootstrap");
+  assert.equal(args.keychainServiceName, "shared-repo-main");
   assert.equal(args.applyMetadataPatch, true);
   assert.equal(args.yes, true);
 });

@@ -685,7 +685,10 @@ Project and application source belongs here.
   await writeIfMissing(opts.workspaceRoot, "projects/AGENTS.md", projectsAgentNotes(sourceMode));
   await writeIfMissing(opts.workspaceRoot, "projects/config/README.md", projectConfigReadme());
   await ensureGitignoreEntries(opts.workspaceRoot);
-  await initSprinkleRefConfigs({ dir: path.join(opts.workspaceRoot, "projects", "config") });
+  await initSprinkleRefConfigs({
+    dir: path.join(opts.workspaceRoot, "projects", "config"),
+    workspaceRoot: opts.workspaceRoot,
+  });
   await initLocalSprinkleRefValues(opts.workspaceRoot);
 
   if (opts.lock !== false) await runNixFlakeLock(opts);

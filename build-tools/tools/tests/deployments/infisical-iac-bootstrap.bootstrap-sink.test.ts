@@ -53,16 +53,14 @@ test("repo bootstrap preserves existing local-file sink contents while fixing mo
   });
 });
 
-test("macOS Keychain bootstrap sink selection exposes the service to validate", () => {
-  const selection = resolveCredentialSinkSelection(
+test("macOS Keychain bootstrap sink selection exposes the repo-derived service to validate", async () => {
+  const dir = await tmp();
+  const resolved = await resolveCredentialSinkSelection(
     { ...DEFAULT_BOOTSTRAP_ARGS, credentialSink: "macos-keychain" },
-    { platform: "darwin" },
+    { platform: "darwin", workspaceRoot: dir },
   );
-  return assert.doesNotReject(async () => {
-    const resolved = await selection;
-    assert.equal(resolved.kind, "macos-keychain");
-    assert.equal(resolved.description, "viberoots-bootstrap");
-  });
+  assert.equal(resolved.kind, "macos-keychain");
+  assert.equal(resolved.description, `${path.basename(dir)}-bootstrap`);
 });
 
 test("repo bootstrap validates macOS Keychain sink through fake security runner", async () => {
@@ -73,7 +71,7 @@ test("repo bootstrap validates macOS Keychain sink through fake security runner"
       kind: "macos-keychain",
       backend: "macos-keychain",
       category: "bootstrap",
-      description: "viberoots-bootstrap",
+      description: "fixture-repo-bootstrap",
     },
     platform: "darwin",
     keychainRunner: (command, args) => {
@@ -84,13 +82,13 @@ test("repo bootstrap validates macOS Keychain sink through fake security runner"
   assert.deepEqual(result, {
     materialized: false,
     kind: "macos-keychain",
-    service: "viberoots-bootstrap",
+    service: "fixture-repo-bootstrap",
   });
   assert.equal(calls[0]?.command, "security");
   assert.deepEqual(calls[0]?.args.slice(0, 4), [
     "find-generic-password",
     "-s",
-    "viberoots-bootstrap",
+    "fixture-repo-bootstrap",
     "-a",
   ]);
   assert.equal(calls[0]?.args[4], "viberoots-bootstrap-keychain-validation");
@@ -105,12 +103,12 @@ test("repo bootstrap reports Keychain remediation when service is unusable", asy
           kind: "macos-keychain",
           backend: "macos-keychain",
           category: "bootstrap",
-          description: "viberoots-bootstrap",
+          description: "fixture-repo-bootstrap",
         },
         platform: "darwin",
         keychainRunner: () => ({ status: 51, stderr: "not allowed" }),
       }),
-    /macOS Keychain service viberoots-bootstrap is not usable/,
+    /macOS Keychain service fixture-repo-bootstrap is not usable/,
   );
 });
 

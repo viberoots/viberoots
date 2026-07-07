@@ -16,6 +16,9 @@ const baseFlags = {
   bootstrap: false,
   infisicalLoginMode: "",
   secretBackend: "",
+  infisicalProjectName: "",
+  bootstrapKeychainServiceName: "",
+  keychainServiceName: "",
 };
 
 test("install secret readiness reruns bootstrap when generated Infisical profiles lack project ids", async () => {

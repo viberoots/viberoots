@@ -112,7 +112,7 @@ test("local reset removes generated paths and keychain entries after confirmatio
   assert.deepEqual(keychainDeletes[0].slice(1, 4), [
     "delete-generic-password",
     "-s",
-    "viberoots-bootstrap",
+    `${path.basename(repo)}-bootstrap`,
   ]);
   assert.ok(
     keychainDeletes.some((entry) =>

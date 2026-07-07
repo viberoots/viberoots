@@ -2,6 +2,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { BootstrapArgs, CredentialSink } from "./infisical-iac-bootstrap-types";
 import { LocalFileCredentialSink } from "./infisical-iac-bootstrap-local-file-sink";
+import { withBootstrapKeychainServiceName } from "./infisical-iac-bootstrap-config";
 import { resolverConfigPath } from "./infisical-iac-bootstrap-preflight";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 import * as bootstrapGuard from "./sprinkleref-bootstrap-guard";
@@ -70,7 +71,7 @@ export async function resolveCredentialSinkSelection(
   if (args.credentialSink === "local-file") {
     return { kind: "local-file", backend: "local-file", description: args.localCredentialFile };
   }
-  if (args.credentialSink === "macos-keychain") return macosSelection(opts.platform);
+  if (args.credentialSink === "macos-keychain") return await macosSelection(args, opts);
   if (args.credentialSink === "sprinkleref") {
     return await sprinklerefSelection(args, opts, createMissingResolverConfig);
   }
@@ -96,7 +97,11 @@ export async function createCredentialSink(
     );
   }
   if (selection.kind === "macos-keychain")
-    return createMacosCredentialSink(args, opts.platform || process.platform);
+    return await createMacosCredentialSink(
+      args,
+      opts.platform || process.platform,
+      opts.workspaceRoot,
+    );
   return new LocalFileCredentialSink(args.localCredentialFile);
 }
 
@@ -119,12 +124,16 @@ function createSprinkleRefCredentialSinkFromBackend(
   return new SprinkleRefCredentialSink(category, createSprinkleRefStore(resolved.backend));
 }
 
-function createMacosCredentialSink(args: BootstrapArgs, platform: NodeJS.Platform) {
-  macosSelection(platform);
+async function createMacosCredentialSink(
+  args: BootstrapArgs,
+  platform: NodeJS.Platform,
+  workspaceRoot?: string,
+) {
+  const selection = await macosSelection(args, { platform, workspaceRoot });
   return new SprinkleRefCredentialSink(
     args.sprinkleCategory || "bootstrap",
     createSprinkleRefStore(
-      { backend: "macos-keychain", service: "viberoots-bootstrap" },
+      { backend: "macos-keychain", service: selection.description },
       { platform },
     ),
   );
@@ -213,22 +222,35 @@ async function ensureResolverConfigPath(
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
     if (!createMissingResolverConfig) return undefined;
-    await initSprinkleRefConfigs({ dir: path.dirname(selected), platform, mode: "create" });
+    await initSprinkleRefConfigs({
+      dir: path.dirname(selected),
+      platform,
+      mode: "create",
+      workspaceRoot,
+    });
     await initLocalSprinkleRefValues(workspaceRoot);
   }
   return selected;
 }
 
-function macosSelection(platform = process.platform): CredentialSinkSelection {
+async function macosSelection(
+  args: BootstrapArgs,
+  opts: { platform?: NodeJS.Platform; workspaceRoot?: string } = {},
+): Promise<CredentialSinkSelection> {
+  const platform = opts.platform || process.platform;
   if (platform !== "darwin") {
     throw new Error(
       "macos-keychain credential sink requires macOS; use --credential-sink local-file or configure SPRINKLEREF_CONFIG for a local-file bootstrap category",
     );
   }
+  const scopedArgs = await withBootstrapKeychainServiceName(
+    args,
+    opts.workspaceRoot || process.cwd(),
+  );
   return {
     kind: "macos-keychain",
     backend: "macos-keychain",
     category: "bootstrap",
-    description: "viberoots-bootstrap",
+    description: scopedArgs.bootstrapKeychainServiceName || "",
   };
 }

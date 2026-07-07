@@ -12,6 +12,7 @@ test("repo project creation failure explains how to reuse an existing Infisical 
           { id: "proj_other_org", name: "other-org", orgId: "org_2" },
         ]) as never,
         "org_1",
+        "fixture-repo",
       ),
     (error) => {
       assert.ok(error instanceof Error);

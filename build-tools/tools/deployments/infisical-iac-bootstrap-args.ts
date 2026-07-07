@@ -24,6 +24,9 @@ const VALUE_FLAGS = new Set([
   "sprinkle-category",
   "secret-backend",
   "bootstrap-scope",
+  "infisical-project-name",
+  "bootstrap-keychain-service-name",
+  "keychain-service-name",
   "machine-label",
   "client-secret-ttl",
   "access-token-ttl",
@@ -69,6 +72,11 @@ Options:
   --rotate-deployment-credentials
   --machine-label <label>       Label created Universal Auth client secrets for this machine
   --bootstrap-scope <name>      First secret:// path segment for repo bootstrap credentials
+  --infisical-project-name <name>
+                                  Infisical repo project name; defaults to the consumer repo name
+  --bootstrap-keychain-service-name <name>
+                                  macOS Keychain service for bootstrap credentials
+  --keychain-service-name <name>  macOS Keychain service for repo main secrets
   --credential-sink <auto|local-file|macos-keychain|sprinkleref>
   --secret-backend <backend/profile>
                                Select the repo default secret backend, e.g. vault/default or keychain/default
@@ -107,6 +115,17 @@ export function parseBootstrapArgs(argv = getArgvTokens()): BootstrapArgs {
   setString(args, "sprinkleCategory", readFlagStrFromTokens("sprinkle-category", "", argv));
   setString(args, "secretBackend", readFlagStrFromTokens("secret-backend", "", argv));
   setString(args, "bootstrapCredentialScope", readFlagStrFromTokens("bootstrap-scope", "", argv));
+  setString(
+    args,
+    "infisicalProjectName",
+    readFlagStrFromTokens("infisical-project-name", "", argv),
+  );
+  setString(
+    args,
+    "bootstrapKeychainServiceName",
+    readFlagStrFromTokens("bootstrap-keychain-service-name", "", argv),
+  );
+  setString(args, "keychainServiceName", readFlagStrFromTokens("keychain-service-name", "", argv));
   setString(args, "machineLabel", readFlagStrFromTokens("machine-label", "", argv));
   args.orgRole = enumFlag("org-role", args.orgRole, ["no-access", "member", "admin"], argv);
   args.credentialSink = enumFlag(

@@ -31,6 +31,9 @@ export type BootstrapArgs = {
   sprinkleCategory: string;
   secretBackend?: string;
   bootstrapCredentialScope?: string;
+  infisicalProjectName?: string;
+  bootstrapKeychainServiceName?: string;
+  keychainServiceName?: string;
   clientSecretTtl: number;
   accessTokenTtl: number;
 };

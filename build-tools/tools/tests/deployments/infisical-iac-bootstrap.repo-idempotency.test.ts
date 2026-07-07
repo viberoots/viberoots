@@ -168,12 +168,20 @@ class CredentialApi {
     Object.keys(clientIds).map((id) => [id, [{ description: `other-machine ${id}` }]]),
   );
 
-  async request(method: string, endpoint: string, body?: { description?: string }) {
+  async request(
+    method: string,
+    endpoint: string,
+    body?: { description?: string; projectName?: string },
+  ) {
     if (method === "GET" && endpoint.startsWith("/api/v1/projects?")) {
       return { projects: this.projects };
     }
     if (method === "POST" && endpoint === "/api/v1/projects") {
-      const project = { id: "proj_fixture", name: "viberoots-deployments", orgId: "org_fixture" };
+      const project = {
+        id: "proj_fixture",
+        name: body?.projectName || "fixture-repo",
+        orgId: "org_fixture",
+      };
       this.projects.push(project);
       return { project };
     }
