@@ -108,7 +108,7 @@ test("process-control buck isolation fallback is scoped by repo-root forkserver 
   );
 });
 
-test("final orphan cleanup prunes older duplicate repo-local v2 daemons only", () => {
+test("final orphan cleanup leaves repo-local v2 daemons alone", () => {
   assert.deepEqual(
     duplicateManagedBuckPidsForTest("/repo", [
       "101 1 00:01:00 buck2d[common] --isolation-dir v2 daemon",
@@ -117,6 +117,20 @@ test("final orphan cleanup prunes older duplicate repo-local v2 daemons only", (
       "202 201 10:00:00 (buck2-forkserver) forkserver --state-dir /repo/buck-out/v2/forkserver",
       "301 1 12:00:00 buck2d[common] --isolation-dir v2 daemon",
       "302 301 12:00:00 (buck2-forkserver) forkserver --state-dir /other/buck-out/v2/forkserver",
+    ]),
+    [],
+  );
+});
+
+test("final orphan cleanup prunes older duplicate managed devbuild-shared daemons", () => {
+  assert.deepEqual(
+    duplicateManagedBuckPidsForTest("/repo", [
+      "101 1 00:01:00 buck2d[common] --isolation-dir devbuild-shared-main daemon",
+      "102 101 00:01:00 (buck2-forkserver) forkserver --state-dir /repo/buck-out/devbuild-shared-main/forkserver",
+      "201 1 10:00:00 buck2d[common] --isolation-dir devbuild-shared-main daemon",
+      "202 201 10:00:00 (buck2-forkserver) forkserver --state-dir /repo/buck-out/devbuild-shared-main/forkserver",
+      "301 1 12:00:00 buck2d[common] --isolation-dir devbuild-shared-main daemon",
+      "302 301 12:00:00 (buck2-forkserver) forkserver --state-dir /other/buck-out/devbuild-shared-main/forkserver",
     ]),
     [201, 202],
   );

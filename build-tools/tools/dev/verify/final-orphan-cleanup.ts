@@ -126,7 +126,7 @@ function duplicateManagedBuckPidsFromLines(root: string, lines: string[]): numbe
     const rel = path.relative(path.join(repoRoot, "buck-out"), stateDir);
     const iso = rel.split(path.sep)[0] || isoArg;
     if (!stateDir.startsWith(path.join(repoRoot, "buck-out", iso, "forkserver"))) continue;
-    if (iso !== "v2" && !iso.startsWith("devbuild-shared-")) continue;
+    if (!iso.startsWith("devbuild-shared-")) continue;
     const existing = forksByIso.get(iso) || [];
     existing.push({ pid, ppid, ageSec });
     forksByIso.set(iso, existing);

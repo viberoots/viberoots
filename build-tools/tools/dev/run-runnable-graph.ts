@@ -101,6 +101,7 @@ async function chooseFlakeRef(opts: {
       workspaceRoot: opts.workspaceRoot,
       attr: opts.attr,
       logPrefix: "[run-runnable]",
+      target: opts.target,
     });
     return {
       flakeRef: filtered.flakeRef,

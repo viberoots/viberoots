@@ -4,7 +4,11 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { seedStageRootDirForTest, stageSeedStore } from "../../dev/verify/seed-staging";
+import {
+  createSharedSeedStagePin,
+  seedStageRootDirForTest,
+  stageSeedStore,
+} from "../../dev/verify/seed-staging";
 import { mktemp } from "../lib/test-helpers";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
@@ -70,12 +74,20 @@ test("verify seed staging stays outside volatile verify TMPDIR", () => {
   }
   if (process.platform === "darwin") {
     assert.ok(root.startsWith("/tmp/viberoots-test-seed"));
-    assert.ok(root.endsWith(".noindex"));
+    assert.ok(root.includes(".noindex"));
+    assert.ok(root.endsWith(path.join(".noindex", "stage-v8")));
     assert.ok(!root.includes("/viberoots-verify"));
     return;
   }
   assert.ok(root.startsWith("/tmp/viberoots-test-seed"));
+  assert.ok(root.endsWith("stage-v8"));
   assert.ok(!root.includes("/viberoots-verify"));
+});
+
+test("verify seed staging uses a protocol-versioned shared root", async () => {
+  const source = await readRepoFile("build-tools/tools/dev/verify/seed-staging.ts");
+  assert.match(source, /STAGE_ROOT_PROTOCOL_DIR = "stage-v8"/);
+  assert.match(source, /return path\.join\(base, STAGE_ROOT_PROTOCOL_DIR\)/);
 });
 
 test("verify seed staging prunes stale shared stage directories", async () => {
@@ -138,6 +150,26 @@ test("verify seed staging preserves stale stages pinned by live verify runs", as
   });
 
   await fsp.access(staleStage);
+});
+
+test("verify seed staging preserves stages pinned by another workspace through shared pins", async () => {
+  const stageRoot = await mktemp("seed-stage-root-");
+  const seed = await mktemp("seed-stage-prune-source-");
+  await writeRequiredStageFiles(seed);
+  const pinnedStage = path.join(stageRoot, "seed-live-shared-pinned");
+  await fsp.mkdir(pinnedStage, { recursive: true });
+  await fsp.writeFile(path.join(pinnedStage, "old.txt"), "old\n", "utf8");
+  const old = new Date("1970-01-01T00:00:00.000Z");
+  await fsp.utimes(pinnedStage, old, old);
+
+  await withSeedStageRoot(stageRoot, async () => {
+    const sharedPin = await createSharedSeedStagePin(pinnedStage, "other-workspace-run");
+    assert.ok(sharedPin);
+    const key = `seed-stage-prune-${process.pid}-${Date.now()}`;
+    await stageSeedStore(seed, key, 24 * 60 * 60 * 1000);
+  });
+
+  await fsp.access(pinnedStage);
 });
 
 test("verify seed staging prunes fresh unpinned dirty-state stages", async () => {

@@ -24,6 +24,7 @@ const REQUIRED_STAGE_FILES = [
   path.join("viberoots", "flake.nix"),
 ];
 const PREPARED_MARKER = ".seed-store-prepared-v7";
+const STAGE_ROOT_PROTOCOL_DIR = "stage-v8";
 
 export function seedStageRootDirForTest(): string {
   const override = String(process.env.VBR_VERIFY_SEED_STAGE_ROOT || "").trim();
@@ -35,9 +36,9 @@ export function seedStageRootDirForTest(): string {
   } catch {}
   const suffix = user ? `-${user}` : "";
   const name = `viberoots-test-seed${suffix}`;
-  return process.platform === "darwin"
-    ? path.join("/tmp", `${name}.noindex`)
-    : path.join("/tmp", name);
+  const base =
+    process.platform === "darwin" ? path.join("/tmp", `${name}.noindex`) : path.join("/tmp", name);
+  return path.join(base, STAGE_ROOT_PROTOCOL_DIR);
 }
 
 function seedStageRootDir(): string {
@@ -470,6 +471,30 @@ async function livePinnedSeedStageDirs(workspaceRoot?: string): Promise<Set<stri
   return pinned;
 }
 
+async function liveSharedPinnedSeedStageDirs(): Promise<Set<string>> {
+  const pinned = new Set<string>();
+  const root = seedStageRootDir();
+  const pinsDir = path.join(root, "pins");
+  const entries = await fsp.readdir(pinsDir, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const pinDir = path.join(pinsDir, entry.name);
+    const owner = await fsp
+      .readFile(path.join(pinDir, "owner.json"), "utf8")
+      .then((txt) => JSON.parse(txt) as { pid?: number })
+      .catch(() => null);
+    if (!owner || !pidAlive(Number(owner.pid || 0))) {
+      await fsp.rm(pinDir, { recursive: true, force: true }).catch(() => {});
+      continue;
+    }
+    const target = await fsp.readlink(path.join(pinDir, "seed")).catch(() => "");
+    if (!target) continue;
+    const resolved = path.resolve(pinDir, target);
+    if (path.dirname(resolved) === root) pinned.add(path.basename(resolved));
+  }
+  return pinned;
+}
+
 async function liveLockedSeedStageDirs(seedTtlMs: number): Promise<Set<string>> {
   const locked = new Set<string>();
   const root = seedStageRootDir();
@@ -492,6 +517,7 @@ async function sweepStaleSeedStages(
   const keepSeedDir = path.basename(seedStageDir(seedKey));
   const keepLockDir = path.basename(seedStageLockDir(seedKey));
   const livePinnedDirs = await livePinnedSeedStageDirs(workspaceRoot);
+  const liveSharedPinnedDirs = await liveSharedPinnedSeedStageDirs();
   const liveLockedDirs = await liveLockedSeedStageDirs(seedTtlMs);
   const entries = await fsp.readdir(root, { withFileTypes: true }).catch(() => []);
   for (const entry of entries) {
@@ -505,9 +531,30 @@ async function sweepStaleSeedStages(
     }
     if (!entry.name.startsWith("seed-") || entry.name === keepSeedDir) continue;
     if (livePinnedDirs.has(entry.name)) continue;
+    if (liveSharedPinnedDirs.has(entry.name)) continue;
     if (liveLockedDirs.has(entry.name)) continue;
     await removeWritableTree(abs);
   }
+}
+
+export async function createSharedSeedStagePin(
+  seedPath: string,
+  iso: string,
+): Promise<string | null> {
+  const root = seedStageRootDir();
+  const resolved = await fsp.realpath(seedPath).catch(() => seedPath);
+  if (path.dirname(resolved) !== root) return null;
+  const pinDir = path.join(root, "pins", iso);
+  await mkdirWithMacosMetadataExclusion(pinDir).catch(() => {});
+  await fsp.writeFile(
+    path.join(pinDir, "owner.json"),
+    JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }) + "\n",
+    "utf8",
+  );
+  const link = path.join(pinDir, "seed");
+  await fsp.rm(link, { recursive: true, force: true }).catch(() => {});
+  await fsp.symlink(resolved, link).catch(() => {});
+  return pinDir;
 }
 
 async function acquireSeedStageLock(
@@ -552,17 +599,21 @@ export async function stageSeedStore(
   seedPath: string,
   seedKey: string,
   seedTtlMs: number,
-  opts: { workspaceRoot?: string } = {},
+  opts: { workspaceRoot?: string; sharedPinIso?: string } = {},
 ): Promise<string> {
   await sweepStaleSeedStages(seedKey, seedTtlMs, opts.workspaceRoot);
   const stageDir = seedStageDir(seedKey);
   const keyFile = path.join(stageDir, "seed.key");
   const readyFile = path.join(stageDir, ".seed-store-ready");
+  const publishReadyStage = async () => {
+    if (opts.sharedPinIso) await createSharedSeedStagePin(stageDir, opts.sharedPinIso);
+    return stageDir;
+  };
   if (await stageReady(stageDir, seedKey)) {
     await ensureWritableTree(stageDir);
     await fsp.rm(path.join(stageDir, ".seed-store-writable"), { force: true }).catch(() => {});
     await mkdirWithMacosMetadataExclusion(stageDir).catch(() => {});
-    return stageDir;
+    return await publishReadyStage();
   }
   const release = await acquireSeedStageLock(seedKey, seedTtlMs);
   try {
@@ -570,7 +621,7 @@ export async function stageSeedStore(
       await ensureWritableTree(stageDir);
       await fsp.rm(path.join(stageDir, ".seed-store-writable"), { force: true }).catch(() => {});
       await mkdirWithMacosMetadataExclusion(stageDir).catch(() => {});
-      return stageDir;
+      return await publishReadyStage();
     }
     await ensureWritableTree(stageDir).catch(() => {});
     await fsp.rm(stageDir, { recursive: true, force: true }).catch(async () => {
@@ -592,7 +643,7 @@ export async function stageSeedStore(
     }
     await fsp.writeFile(keyFile, seedKey + "\n", "utf8");
     await fsp.writeFile(readyFile, "ok\n", "utf8");
-    return stageDir;
+    return await publishReadyStage();
   } finally {
     await release();
   }

@@ -7,7 +7,7 @@ import { writeIfChanged } from "../../lib/fs-helpers";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { runManagedCommand } from "../../lib/managed-command";
 import { verifySeedBuildArgs, type VerifySeedBuildMode } from "./seed-build";
-import { shouldStageSeed, stageSeedStore } from "./seed-staging";
+import { createSharedSeedStagePin, shouldStageSeed, stageSeedStore } from "./seed-staging";
 import { writeVerifySeedRemoteManifest } from "./seed-manifest";
 import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope";
 import { pidAlive } from "./seed-utils";
@@ -235,11 +235,16 @@ export async function prepareVerifySeed(opts: {
     };
   }
   const seedPathForRun = (await shouldStageSeed(seedPath))
-    ? await stageSeedStore(seedPath, seedKey, seedTtlMs, { workspaceRoot: opts.root })
+    ? await stageSeedStore(seedPath, seedKey, seedTtlMs, {
+        workspaceRoot: opts.root,
+        sharedPinIso: opts.iso,
+      })
     : seedPath;
   await writeCurrentSeed(opts.root, seedPathForRun, seedKey);
   const pinDir = await createPin(opts.root, opts.iso, seedPathForRun, seedKey);
+  const sharedPinDir = await createSharedSeedStagePin(seedPathForRun, opts.iso);
   const cleanup = async () => {
+    if (sharedPinDir) await fsp.rm(sharedPinDir, { recursive: true, force: true }).catch(() => {});
     await fsp.rm(pinDir, { recursive: true, force: true }).catch(() => {});
   };
   return { seedKey, seedPath: seedPathForRun, pinDir, cleanup };

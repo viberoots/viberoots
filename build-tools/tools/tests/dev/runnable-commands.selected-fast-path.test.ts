@@ -94,6 +94,12 @@ test("p auto source falls back to path flake for relevant untracked files", asyn
     const projectDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.mkdir(path.join(projectDir, "src"), { recursive: true });
+    await fsp.writeFile(path.join(projectDir, "package.json"), '{"scripts":{}}\n', "utf8");
+    await fsp.writeFile(
+      path.join(projectDir, "pnpm-lock.yaml"),
+      "lockfileVersion: '9.0'\n",
+      "utf8",
+    );
     await fsp.writeFile(path.join(projectDir, "src", "index.ts"), "console.log('ok');\n", "utf8");
     await fsp.writeFile(path.join(projectDir, "NEW_UNTRACKED.txt"), "untracked\n", "utf8");
     await fsp.writeFile(
@@ -164,6 +170,13 @@ test("p auto source falls back to path flake for relevant untracked files", asyn
 
     const logTxt = await fsp.readFile(nixLog, "utf8");
     assert.match(logTxt, /path:.*#graph-generator-selected/);
+    const flakeRef = String(logTxt.match(/(path:[^ ]+#graph-generator-selected)/)?.[1] || "");
+    assert.ok(flakeRef, `expected path flake ref in nix log: ${logTxt}`);
+    const flakeDir = flakeRef.replace(/^path:/, "").replace(/#graph-generator-selected$/, "");
+    const snapshotRoot = flakeDir.endsWith(path.join(".viberoots", "workspace"))
+      ? path.join(flakeDir, "..", "..")
+      : flakeDir;
+    await fsp.access(path.join(snapshotRoot, "projects", "apps", "demo", "pnpm-lock.yaml"));
   });
 });
 
