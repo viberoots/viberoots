@@ -105,13 +105,14 @@ export async function ensureInstallSecretReadiness(opts: {
     );
     const confirmed =
       (await (opts.deps?.prompt || promptYesNo)(
-        "Run repo bootstrap now? [Y/n] ",
+        "Run repo bootstrap now? [Y/n, then Enter] ",
       )) ?? false;
     if (!confirmed) {
       console.error("Infisical setup skipped. Rerun `i` and accept the prompt when ready.");
       return;
     }
   }
+  console.error("[install-deps] starting Infisical repo bootstrap");
   await runRepoBootstrap(opts);
 }
 

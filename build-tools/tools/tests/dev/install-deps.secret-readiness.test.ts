@@ -55,7 +55,7 @@ test("install secret readiness prompts when credentials are missing and forwards
         deps: {
           isInteractive: () => true,
           prompt: async (message) => {
-            assert.equal(message, "Run repo bootstrap now? [Y/n] ");
+            assert.equal(message, "Run repo bootstrap now? [Y/n, then Enter] ");
             return true;
           },
           bootstrap: async (args) => void calls.push(args),
@@ -64,6 +64,7 @@ test("install secret readiness prompts when credentials are missing and forwards
     });
     assert.match(stderr, /Infisical local credentials are not ready/);
     assert.match(stderr, /Repo bootstrap will use Infisical interactive login/);
+    assert.match(stderr, /starting Infisical repo bootstrap/);
     assert.deepEqual(calls, [
       [
         "repo",

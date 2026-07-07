@@ -78,7 +78,7 @@ test("install secret readiness prompts for repo bootstrap when project config ex
       deps: {
         isInteractive: () => true,
         prompt: async (message) => {
-          assert.equal(message, "Run repo bootstrap now? [Y/n] ");
+          assert.equal(message, "Run repo bootstrap now? [Y/n, then Enter] ");
           return true;
         },
         bootstrap: async (args) => void calls.push(args),

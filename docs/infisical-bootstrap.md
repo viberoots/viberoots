@@ -151,7 +151,7 @@ Troubleshooting:
 
 - Fresh machines should run `i` and accept the lazy setup prompt. The command creates this
   machine's repo and ExampleApp deployment Universal Auth credentials without importing another
-  machine's secret.
+  machine's secret. The prompt is line-based: type `y` or press Enter to accept, then press Enter.
 - Stale macOS Keychain bootstrap credentials usually appear as Universal Auth login failures after
   repo metadata still validates. Rerun
   `i --rotate-bootstrap-credentials --force-overwrite-local-credentials` so the lazy setup path
