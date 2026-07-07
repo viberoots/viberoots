@@ -14,11 +14,35 @@ import { getArgvTokens } from "../lib/argv";
 
 const KEYCHAIN_SERVICE = "viberoots-bootstrap";
 
-const LOCAL_PATHS = ["sprinkleref", ".local/infisical-bootstrap-credentials.json"];
+const LOCAL_PATH_CANDIDATES = [
+  {
+    path: "sprinkleref",
+    description: "legacy local SprinkleRef resolver state directory",
+  },
+  {
+    path: ".local/infisical-bootstrap-credentials.json",
+    description: "local-file bootstrap credential store for this checkout",
+  },
+];
 
 type ResetArgs = {
   dryRun: boolean;
   yes: boolean;
+};
+
+export type LocalResetItem = {
+  path: string;
+  description: string;
+};
+
+export type KeychainResetItem = {
+  account: string;
+  description: string;
+};
+
+export type LocalBootstrapResetPlan = {
+  localItems: LocalResetItem[];
+  keychainItems: KeychainResetItem[];
 };
 
 type ResetIo = {
@@ -50,12 +74,15 @@ export async function runInfisicalBootstrapResetLocal(argv = getArgvTokens(), io
   const stderr = io.stderr || console.error;
   if (argv.includes("--help") || argv.includes("-h")) {
     stdout(resetLocalUsage());
-    return;
+    return { localItems: [], keychainItems: [] };
   }
   const args = parseArgs(argv);
-  const localPaths = await discoverLocalPaths(io);
-  const keychainAccounts = await discoverKeychainAccounts(io);
-  printWarning(stdout, args, localPaths, keychainAccounts);
+  const plan = {
+    localItems: await discoverLocalItems(io),
+    keychainItems: await discoverKeychainItems(io),
+  };
+  printResetPlan(stdout, args, plan);
+  if (!hasResetPlanItems(plan)) return plan;
   if (!args.dryRun && !args.yes) {
     if (!io.question && (!process.stdin.isTTY || !process.stdout.isTTY)) {
       throw new Error("local Infisical bootstrap reset requires an interactive terminal or --yes");
@@ -69,10 +96,11 @@ export async function runInfisicalBootstrapResetLocal(argv = getArgvTokens(), io
       );
     }
   }
-  if (args.dryRun) return;
-  await removeLocalPaths(io, localPaths);
-  removeKeychainEntries(io, stderr, keychainAccounts);
+  if (args.dryRun) return plan;
+  await removeLocalPaths(io, plan.localItems);
+  removeKeychainEntries(io, stderr, plan.keychainItems);
   stdout("Local Infisical bootstrap state reset complete.");
+  return plan;
 }
 
 function parseArgs(argv: string[]): ResetArgs {
@@ -83,43 +111,89 @@ function parseArgs(argv: string[]): ResetArgs {
   return { dryRun: argv.includes("--dry-run"), yes: argv.includes("--yes") };
 }
 
-function printWarning(
+export function hasResetPlanItems(plan: LocalBootstrapResetPlan | void) {
+  return Boolean(plan && (plan.localItems.length > 0 || plan.keychainItems.length > 0));
+}
+
+function printResetPlan(
   stdout: (text: string) => void,
   args: ResetArgs,
-  localPaths: string[],
-  keychainAccounts: string[],
+  plan: LocalBootstrapResetPlan,
 ) {
+  const modeLine = args.dryRun
+    ? "Mode: DRY RUN (no files or Keychain entries will be deleted)"
+    : "Mode: RESET (listed files and Keychain entries will be deleted)";
+  const fileHeading = args.dryRun
+    ? "Existing local files/directories that would be deleted:"
+    : "Existing local files/directories that will be deleted:";
+  const keychainHeading = args.dryRun
+    ? `Existing macOS Keychain entries that would be deleted from service ${KEYCHAIN_SERVICE}:`
+    : `Existing macOS Keychain entries that will be deleted from service ${KEYCHAIN_SERVICE}:`;
+  const lines = ["Infisical bootstrap local reset", modeLine, ""];
+  if (!hasResetPlanItems(plan)) {
+    lines.push("No existing local bootstrap files or Keychain entries were found.", "");
+  }
+  if (plan.localItems.length > 0) {
+    lines.push(
+      fileHeading,
+      ...plan.localItems.map((item) => `  - ${item.path} - ${item.description}`),
+      "",
+    );
+  }
+  if (plan.keychainItems.length > 0) {
+    lines.push(
+      keychainHeading,
+      ...plan.keychainItems.map((item) => `  - ${item.account} - ${item.description}`),
+      "",
+    );
+  }
+  lines.push(
+    "Infisical cloud resources, Cloudflare secrets, and application secrets are not deleted.",
+    "Back up any listed local credential values you still need before running the real reset.",
+  );
   stdout(
-    [
-      "WARNING: this deletes local Infisical bootstrap state.",
-      "",
-      "It removes generated local files:",
-      ...localPaths.map((item) => `  - ${item}`),
-      "",
-      `It deletes these macOS Keychain entries from service ${KEYCHAIN_SERVICE}:`,
-      ...keychainAccounts.map((item) => `  - ${item}`),
-      "",
-      "It does not delete Infisical cloud resources, Cloudflare secrets, or application secrets.",
-      args.dryRun ? "Dry run only; nothing will be changed." : "",
-    ]
-      .filter((line) => line !== "")
-      .join("\n"),
+    lines
+      .filter((line, index, all) => !(line === "" && all[index - 1] === ""))
+      .join("\n")
+      .trimEnd(),
   );
 }
 
-async function discoverKeychainAccounts(io: ResetIo) {
+async function discoverKeychainItems(io: ResetIo): Promise<KeychainResetItem[]> {
+  const platform = io.platform || process.platform;
+  if (platform !== "darwin") return [];
   const root = path.resolve(io.cwd || process.cwd());
   const scopedArgs = await withBootstrapCredentialScope(DEFAULT_BOOTSTRAP_ARGS, root);
   const refs = repoBootstrapCredentialRefs(
     { name: scopedArgs.identityName },
     scopedArgs.bootstrapCredentialScope,
   );
-  return [refs.clientIdRef, refs.clientSecretRef];
+  const candidates = [
+    {
+      account: refs.clientIdRef,
+      description: "Infisical Universal Auth client id for this checkout's repo bootstrap identity",
+    },
+    {
+      account: refs.clientSecretRef,
+      description:
+        "Infisical Universal Auth client secret for this machine; Infisical cannot show this secret again after creation",
+    },
+  ];
+  const runner = io.keychainRunner || defaultRunner;
+  const discovered: KeychainResetItem[] = [];
+  for (const item of candidates) {
+    const result = runner("security", macosKeychainCommand("read", KEYCHAIN_SERVICE, item.account));
+    if (result.status === 0) discovered.push(item);
+  }
+  return discovered;
 }
 
-async function discoverLocalPaths(io: ResetIo) {
+async function discoverLocalItems(io: ResetIo): Promise<LocalResetItem[]> {
   const root = path.resolve(io.cwd || process.cwd());
-  const discovered = [...LOCAL_PATHS];
+  const discovered: LocalResetItem[] = [];
+  for (const item of LOCAL_PATH_CANDIDATES) {
+    if (await pathExists(path.join(root, item.path))) discovered.push(item);
+  }
   const deploymentsRoot = path.join(root, "projects", "deployments");
   const families = (await fs.readdir(deploymentsRoot).catch(() => [])).sort();
   for (const family of families) {
@@ -132,19 +206,25 @@ async function discoverLocalPaths(io: ResetIo) {
       "terraform.tfstate",
       "terraform.tfstate.backup",
     ]) {
-      if (entries.has(rel)) discovered.push(path.join(tofuDir, rel));
+      if (entries.has(rel)) {
+        discovered.push({
+          path: path.join(tofuDir, rel),
+          description: localTofuStateDescription(family, rel),
+        });
+      }
     }
   }
-  return [...new Set(discovered)];
+  return uniqueLocalItems(discovered);
 }
 
-async function removeLocalPaths(io: ResetIo, localPaths: string[]) {
+async function removeLocalPaths(io: ResetIo, localItems: LocalResetItem[]) {
   const root = path.resolve(io.cwd || process.cwd());
   const removePath =
     io.removePath || ((target: string) => fs.rm(target, { recursive: true, force: true }));
-  for (const item of localPaths) {
-    const target = path.resolve(root, item);
-    if (!target.startsWith(`${root}${path.sep}`)) throw new Error(`refusing to remove ${item}`);
+  for (const item of localItems) {
+    const target = path.resolve(root, item.path);
+    if (!target.startsWith(`${root}${path.sep}`))
+      throw new Error(`refusing to remove ${item.path}`);
     await removePath(target);
   }
 }
@@ -152,7 +232,7 @@ async function removeLocalPaths(io: ResetIo, localPaths: string[]) {
 function removeKeychainEntries(
   io: ResetIo,
   stderr: (text: string) => void,
-  keychainAccounts: string[],
+  keychainItems: KeychainResetItem[],
 ) {
   const platform = io.platform || process.platform;
   if (platform !== "darwin") {
@@ -160,9 +240,33 @@ function removeKeychainEntries(
     return;
   }
   const runner = io.keychainRunner || defaultRunner;
-  for (const account of keychainAccounts) {
-    runner("security", macosKeychainCommand("remove", KEYCHAIN_SERVICE, account));
+  for (const item of keychainItems) {
+    runner("security", macosKeychainCommand("remove", KEYCHAIN_SERVICE, item.account));
   }
+}
+
+async function pathExists(target: string) {
+  return fs
+    .lstat(target)
+    .then(() => true)
+    .catch(() => false);
+}
+
+function uniqueLocalItems(items: LocalResetItem[]) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    if (seen.has(item.path)) return false;
+    seen.add(item.path);
+    return true;
+  });
+}
+
+function localTofuStateDescription(family: string, rel: string) {
+  if (rel === ".terraform") return `OpenTofu working directory for ${family} deployment bootstrap`;
+  if (rel === ".terraform.lock.hcl")
+    return `OpenTofu provider lock file for ${family} deployment bootstrap`;
+  if (rel === "terraform.tfstate") return `local OpenTofu state for ${family} deployment bootstrap`;
+  return `backup of local OpenTofu state for ${family} deployment bootstrap`;
 }
 
 function defaultRunner(command: string, args: string[]) {

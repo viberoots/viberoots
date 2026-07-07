@@ -10,7 +10,11 @@ import {
 } from "../../deployments/sprinkleref-keychain";
 import { runNodeWithZx } from "../../lib/node-run";
 import { PROJECT_SHARED_CONFIG_PATH } from "../../deployments/project-config";
-import { runInfisicalBootstrapResetLocal } from "../../deployments/infisical-bootstrap-reset-local";
+import {
+  hasResetPlanItems,
+  runInfisicalBootstrapResetLocal,
+  type LocalBootstrapResetPlan,
+} from "../../deployments/infisical-bootstrap-reset-local";
 import { loadDeploymentReadinessModules, sinkFromSelection } from "./secret-readiness-modules";
 import { buildToolPath, zxInitPath } from "../dev-build/paths";
 
@@ -28,7 +32,7 @@ export type SecretReadinessDeps = {
   isInteractive?: () => boolean;
   prompt?: (message: string) => Promise<boolean>;
   bootstrap?: (args: string[]) => Promise<void>;
-  resetLocal?: (args: string[]) => Promise<void>;
+  resetLocal?: (args: string[]) => Promise<LocalBootstrapResetPlan | void>;
   probe?: (repoRoot: string) => Promise<SecretReadinessProbe>;
 };
 
@@ -117,12 +121,14 @@ async function runExplicitBootstrap(opts: {
   const interactive = opts.deps?.isInteractive?.() ?? isInteractiveShell();
   if (!allowed && !interactive) throw new Error(nonInteractiveBootstrapMessage());
   if (interactive && !allowed) {
-    await runLocalReset(opts, ["--dry-run"]);
-    const resetConfirmed =
-      (await (opts.deps?.prompt || promptNoDefault)(
-        "Reset local Infisical bootstrap state before continuing? [y/N] ",
-      )) ?? false;
-    if (resetConfirmed) await runLocalReset(opts, ["--yes"]);
+    const resetPlan = await runLocalReset(opts, ["--dry-run"]);
+    if (hasResetPlanItems(resetPlan)) {
+      const resetConfirmed =
+        (await (opts.deps?.prompt || promptNoDefault)(
+          "Reset local Infisical bootstrap state before continuing? [y/N] ",
+        )) ?? false;
+      if (resetConfirmed) await runLocalReset(opts, ["--yes"]);
+    }
   }
   await runRepoBootstrap(opts);
 }
@@ -346,7 +352,7 @@ async function runLocalReset(
   },
   args: string[],
 ) {
-  await (
+  return await (
     opts.deps?.resetLocal ||
     ((resetArgs) =>
       runInfisicalBootstrapResetLocal(resetArgs, {

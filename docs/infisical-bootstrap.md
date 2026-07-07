@@ -111,21 +111,23 @@ resources and then bootstrap again, run:
 i --bootstrap
 ```
 
-Review the printed local reset warning. It names local files and Keychain refs that would be deleted.
-Resetting local state deletes local credential copies; Infisical client secrets cannot be recovered
-from Infisical after creation, so make sure any values you still need are backed up elsewhere before
-answering yes. The lower-level reset utility remains available for recovery when you only want to
-remove local state without immediately rerunning repo bootstrap:
+Review the printed local reset plan. It starts with an explicit `DRY RUN` or `RESET` mode line and
+lists only existing local files, directories, and Keychain refs that would be deleted. Each item
+includes a short description of what that state is for. Resetting local state deletes local
+credential copies; Infisical client secrets cannot be recovered from Infisical after creation, so
+make sure any listed values you still need are backed up elsewhere before answering yes. The
+lower-level reset utility remains available for recovery when you only want to remove local state
+without immediately rerunning repo bootstrap:
 
 ```bash
 build-tools/tools/deployments/infisical-bootstrap-reset-local.ts --dry-run
 build-tools/tools/deployments/infisical-bootstrap-reset-local.ts
 ```
 
-The reset utility prints a loud warning, requires typing `RESET` or passing `--yes`, removes only
-generated SprinkleRef/OpenTofu local state, and deletes the repo bootstrap plus ExampleApp deployment
-Universal Auth entries from the `viberoots-bootstrap` macOS Keychain service. It does not delete
-Infisical projects, identities, Cloudflare secrets, or application secrets.
+The reset utility prints the discovered reset plan, requires typing `RESET` or passing `--yes` when
+there is state to remove, removes only generated local resolver/OpenTofu state, and deletes existing
+repo bootstrap Universal Auth entries from the `viberoots-bootstrap` macOS Keychain service. It does
+not delete Infisical projects, identities, Cloudflare secrets, or application secrets.
 
 Troubleshooting:
 

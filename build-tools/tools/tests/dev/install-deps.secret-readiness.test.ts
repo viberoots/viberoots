@@ -193,7 +193,10 @@ test("install secret readiness interactive bootstrap warns and keeps local state
       verbose: false,
       flags: { ...baseFlags, bootstrap: true },
       deps: {
-        resetLocal: async (args) => void resets.push(args),
+        resetLocal: async (args) => {
+          resets.push(args);
+          return nonEmptyResetPlan();
+        },
         bootstrap: async (args) => void calls.push(args),
         prompt: async (message) => {
           assert.match(message, /Reset local Infisical bootstrap state/);
@@ -219,13 +222,46 @@ test("install secret readiness interactive bootstrap resets local state when con
       verbose: false,
       flags: { ...baseFlags, bootstrap: true },
       deps: {
-        resetLocal: async (args) => void resets.push(args),
+        resetLocal: async (args) => {
+          resets.push(args);
+          return nonEmptyResetPlan();
+        },
         bootstrap: async (args) => void calls.push(args),
         prompt: async () => true,
         isInteractive: () => true,
       },
     });
     assert.deepEqual(resets, [["--dry-run"], ["--yes"]]);
+    assert.deepEqual(calls, [["repo", "--yes"]]);
+  });
+});
+
+test("install secret readiness interactive bootstrap skips reset prompt when no local state exists", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot);
+    const resets: string[][] = [];
+    const calls: string[][] = [];
+    let prompted = false;
+    await ensureInstallSecretReadiness({
+      repoRoot,
+      dryRun: false,
+      verbose: false,
+      flags: { ...baseFlags, bootstrap: true },
+      deps: {
+        resetLocal: async (args) => {
+          resets.push(args);
+          return { localItems: [], keychainItems: [] };
+        },
+        bootstrap: async (args) => void calls.push(args),
+        prompt: async () => {
+          prompted = true;
+          return true;
+        },
+        isInteractive: () => true,
+      },
+    });
+    assert.deepEqual(resets, [["--dry-run"]]);
+    assert.equal(prompted, false);
     assert.deepEqual(calls, [["repo", "--yes"]]);
   });
 });
@@ -250,6 +286,13 @@ test("install secret readiness explicit bootstrap fails closed in non-interactiv
     assert.deepEqual(calls, []);
   });
 });
+
+function nonEmptyResetPlan() {
+  return {
+    localItems: [{ path: ".local/bootstrap.json", description: "test local credential store" }],
+    keychainItems: [],
+  };
+}
 
 async function captureStderr(fn: () => Promise<void>) {
   const original = process.stderr.write;
