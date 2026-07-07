@@ -29,6 +29,7 @@ Deep bootstrap commands remain available for advanced recovery and debugging:
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --bootstrap-scope unfairly-common
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --apply-metadata-patch
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --without-deployments
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts deployment --target <buck-target> --dry-run
@@ -51,11 +52,15 @@ such as `//projects/deployments/example-app/staging:deploy`. A consuming workspa
 family-specific migration history and should introduce new live families only through an explicit
 product-approved plan PR.
 
-Repo bootstrap materializes backend profile credentials under repo-scoped refs such as
-`secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id`. ExampleApp deployment bootstrap
+Repo bootstrap materializes backend profile credentials under the reserved `bootstrap` namespace. By
+default the next `secret://` path segment is the consumer workspace directory name, so a checkout
+named `unfairly-common` uses refs such as
+`secret://bootstrap/unfairly-common/viberoots-iac-bootstrap/client-id`. Set
+`sprinkleref.bootstrapScope` in `projects/config/shared.json` to use a different stable scope, or
+pass `--bootstrap-scope <name>` for a one-off bootstrap run. ExampleApp deployment bootstrap
 continues to report only stage-specific managed workload refs under
 `secret://deployments/example-app/<stage>/...`. If `projects/config/local.json` overrides profile auth
-to an old ExampleApp bootstrap namespace, remove that local override and rerun
+to another namespace, remove that local override and rerun
 `viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo`.
 Universal Auth client-secret records are per operator machine. Existing local credentials are reused
 by default; a fresh machine creates its own labeled client-secret record and stores it only in the

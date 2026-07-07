@@ -100,6 +100,8 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
     "--rotate-deployment-credentials",
     "--machine-label",
     "ci-builder-1",
+    "--bootstrap-scope",
+    "fixture-repo",
     "--apply-metadata-patch",
     "--yes",
   ]);
@@ -110,6 +112,7 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
   assert.equal(args.noTofuApply, true);
   assert.equal(args.rotateDeploymentCredentials, true);
   assert.equal(args.machineLabel, "ci-builder-1");
+  assert.equal(args.bootstrapCredentialScope, "fixture-repo");
   assert.equal(args.applyMetadataPatch, true);
   assert.equal(args.yes, true);
 });

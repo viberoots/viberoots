@@ -39,6 +39,10 @@ type SecretReadinessProbeOpts = {
   keychainRunner?: KeychainRunner;
 };
 
+type ReadinessSprinkleRefConfig = {
+  profiles?: Record<string, { backend?: string; clientIdRef?: string; clientSecretRef?: string }>;
+};
+
 const deploymentMetadataRoot = path.join("projects", "deployments");
 const familyMetadataSuffix = path.join("shared", "family.bzl");
 
@@ -104,20 +108,25 @@ export async function probeLocalSecretReadiness(
     repoBootstrapCredentialRefs,
     resolveBootstrapAccessCredentialSinkBackend,
     resolveCredentialSinkSelection,
+    withBootstrapCredentialScope,
   } = await loadDeploymentReadinessModules();
   const configPath = process.env.SPRINKLEREF_CONFIG || "";
   const metadataPaths = await discoverDeploymentFamilyMetadataPaths(repoRoot);
+  let config: ReadinessSprinkleRefConfig;
   try {
-    await readSprinkleRefConfig(configPath, repoRoot);
+    config = (await readSprinkleRefConfig(configPath, repoRoot)) as ReadinessSprinkleRefConfig;
   } catch (error) {
     if (!isResolverConfigAbsenceError(error)) throw error;
     return { ready: false, reason: "missing resolver config" };
   }
-  const args = {
-    ...DEFAULT_BOOTSTRAP_ARGS,
-    yes: true,
-    localCredentialFile: path.join(repoRoot, DEFAULT_BOOTSTRAP_ARGS.localCredentialFile),
-  };
+  const args = await withBootstrapCredentialScope(
+    {
+      ...DEFAULT_BOOTSTRAP_ARGS,
+      yes: true,
+      localCredentialFile: path.join(repoRoot, DEFAULT_BOOTSTRAP_ARGS.localCredentialFile),
+    },
+    repoRoot,
+  );
   const selection = await resolveCredentialSinkSelection(args, {
     createMissingResolverConfig: false,
     env: process.env.SPRINKLEREF_CONFIG
@@ -136,8 +145,12 @@ export async function probeLocalSecretReadiness(
     },
     opts,
   );
-  const repoRefs = repoBootstrapCredentialRefs({ name: args.identityName });
-  const requiredRefs = [repoRefs.clientIdRef, repoRefs.clientSecretRef];
+  const repoRefs = repoBootstrapCredentialRefsForReadiness(
+    config,
+    args,
+    repoBootstrapCredentialRefs,
+  );
+  const requiredRefs = repoRefs.flatMap((refs) => [refs.clientIdRef, refs.clientSecretRef]);
   for (const metadataPath of metadataPaths) {
     const metadata = await readDeploymentReviewedMetadata(
       deploymentScopeFromMetadataPath(repoRoot, metadataPath),
@@ -161,6 +174,35 @@ export async function probeLocalSecretReadiness(
     if (!present) return { ready: false, reason: "missing local Universal Auth credentials" };
   }
   return { ready: true, reason: "ready" };
+}
+
+function repoBootstrapCredentialRefsForReadiness(
+  config: ReadinessSprinkleRefConfig,
+  args: { identityName: string; bootstrapCredentialScope?: string },
+  repoBootstrapCredentialRefs: (
+    identity: { name: string },
+    bootstrapScope?: string,
+  ) => { clientIdRef: string; clientSecretRef: string },
+) {
+  const configured = Object.values(config.profiles || {})
+    .filter((profile) => profile.backend === "infisical")
+    .flatMap((profile) =>
+      profile.clientIdRef && profile.clientSecretRef
+        ? [{ clientIdRef: profile.clientIdRef, clientSecretRef: profile.clientSecretRef }]
+        : [],
+    );
+  if (configured.length > 0) return uniqueRefPairs(configured);
+  return [repoBootstrapCredentialRefs({ name: args.identityName }, args.bootstrapCredentialScope)];
+}
+
+function uniqueRefPairs(pairs: Array<{ clientIdRef: string; clientSecretRef: string }>) {
+  const seen = new Set<string>();
+  return pairs.filter((pair) => {
+    const key = `${pair.clientIdRef}\n${pair.clientSecretRef}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function keychainInaccessibleReason(error: MacosKeychainInaccessibleError) {

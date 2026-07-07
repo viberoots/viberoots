@@ -67,8 +67,8 @@ async function writeResolver(repoRoot: string) {
 
 async function writeCredentials(repoRoot: string) {
   const refs = [
-    "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id",
-    "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret",
+    `secret://bootstrap/${path.basename(repoRoot)}/viberoots-iac-bootstrap/client-id`,
+    `secret://bootstrap/${path.basename(repoRoot)}/viberoots-iac-bootstrap/client-secret`,
     "secret://deployments/fixture/staging/infisical-client-id",
     "secret://deployments/fixture/staging/infisical-client-secret",
     "secret://deployments/fixture/prod/infisical-client-id",

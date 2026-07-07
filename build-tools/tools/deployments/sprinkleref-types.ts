@@ -49,6 +49,7 @@ export type SprinkleRefEnvironmentConfig = {
 export type SprinkleRefConfigFile = {
   version: 1;
   extends?: string;
+  bootstrapScope?: string;
   environments?: Record<string, SprinkleRefEnvironmentConfig>;
   defaultCategory?: string;
   profiles?: Record<string, SprinkleRefBackendConfig>;
@@ -58,6 +59,7 @@ export type SprinkleRefConfigFile = {
 export type SprinkleRefConfig = {
   path?: string;
   defaultCategory: string;
+  bootstrapScope?: string;
   environments?: Record<string, SprinkleRefEnvironmentConfig>;
   profiles: Record<string, SprinkleRefBackendConfig>;
   categories: Record<string, SprinkleRefCategoryConfig>;

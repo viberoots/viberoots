@@ -94,7 +94,7 @@ export async function ensureBootstrapCredential(opts: {
   sink: CredentialSink;
 }): Promise<BootstrapCredential> {
   const clientId = await readClientId(opts.api, opts.identity);
-  const refs = repoBootstrapCredentialRefs(opts.identity);
+  const refs = repoBootstrapCredentialRefs(opts.identity, opts.args.bootstrapCredentialScope);
   const remoteSecrets = await listClientSecrets(opts.api, opts.identity.id);
   const remoteSecretSummaries = summarizeClientSecretRecords(remoteSecrets);
   const localSecret = await opts.sink.read(refs.clientSecretRef);
@@ -151,8 +151,11 @@ export async function ensureBootstrapCredential(opts: {
   };
 }
 
-export function repoBootstrapCredentialRefs(identity: Pick<Identity, "name">) {
-  const prefix = `secret://viberoots/bootstrap/${identity.name}`;
+export function repoBootstrapCredentialRefs(
+  identity: Pick<Identity, "name">,
+  bootstrapScope = "viberoots",
+) {
+  const prefix = `secret://bootstrap/${bootstrapScope}/${identity.name}`;
   return {
     clientIdRef: `${prefix}/client-id`,
     clientSecretRef: `${prefix}/client-secret`,

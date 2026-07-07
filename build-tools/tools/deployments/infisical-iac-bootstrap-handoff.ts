@@ -13,7 +13,10 @@ export function buildCredentialHandoffReport(opts: {
   bootstrapIdentity: Identity;
   metadata: DeploymentRuntimeMetadata;
 }) {
-  const bootstrapRefs = repoBootstrapCredentialRefs(opts.bootstrapIdentity);
+  const bootstrapRefs = repoBootstrapCredentialRefs(
+    opts.bootstrapIdentity,
+    opts.args.bootstrapCredentialScope,
+  );
   const targetCategory = opts.sinkSelection.category || opts.args.sprinkleCategory || "bootstrap";
   return {
     schemaVersion: "infisical-iac-bootstrap-handoff@1",

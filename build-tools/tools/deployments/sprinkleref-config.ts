@@ -10,6 +10,7 @@ import type {
 } from "./sprinkleref-types";
 import { stripJsonComments } from "./json-comments";
 import { PROJECT_SHARED_CONFIG_PATH, readProjectConfig } from "./project-config";
+import { normalizeBootstrapScope } from "./infisical-iac-bootstrap-scope";
 import {
   materializeRuntimeHost,
   readProjectEnvironments,
@@ -76,6 +77,7 @@ async function readProjectSprinkleRefConfig(cwd: string): Promise<SprinkleRefCon
     {
       path: loaded.localPresent ? `${loaded.sharedPath} + ${loaded.localPath}` : loaded.sharedPath,
       defaultCategory: materialized.defaultCategory || "main",
+      bootstrapScope: stringField(materialized.bootstrapScope),
       environments: readProjectEnvironments(loaded.config),
       profiles: materialized.profiles || {},
       categories: materialized.categories || {},
@@ -97,6 +99,7 @@ async function loadConfig(file: string): Promise<SprinkleRefConfig> {
     {
       path: file,
       defaultCategory: raw.defaultCategory || "main",
+      bootstrapScope: stringField(raw.bootstrapScope),
       environments: raw.environments || readProjectEnvironments(parsed),
       profiles: raw.profiles || {},
       categories: raw.categories || {},
@@ -128,6 +131,7 @@ export function validateConfig(config: SprinkleRefConfig, file = "SprinkleRef co
   const profiles = config.profiles || {};
   const categories = config.categories || {};
   if (!config.defaultCategory.trim()) throw new Error(`${file} defaultCategory is required`);
+  if (config.bootstrapScope) normalizeBootstrapScope(config.bootstrapScope);
   if (!categories[config.defaultCategory]) {
     throw new Error(`${file} missing default category ${config.defaultCategory}`);
   }
@@ -136,6 +140,10 @@ export function validateConfig(config: SprinkleRefConfig, file = "SprinkleRef co
   for (const [name, category] of Object.entries(categories))
     validateCategory(file, name, category, profiles, config.environments || {});
   return config;
+}
+
+function stringField(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
 }
 
 function validateCategory(

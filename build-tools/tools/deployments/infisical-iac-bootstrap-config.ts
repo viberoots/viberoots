@@ -1,4 +1,7 @@
 import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
+import * as path from "node:path";
+import { readSprinkleRefConfig } from "./sprinkleref-config";
+import { normalizeBootstrapScope } from "./infisical-iac-bootstrap-scope";
 
 export type DeploymentBootstrapScope = {
   target: string;
@@ -35,9 +38,40 @@ export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   credentialSink: "auto",
   localCredentialFile: ".local/infisical-bootstrap-credentials.json",
   sprinkleCategory: "bootstrap",
+  bootstrapCredentialScope: undefined,
   clientSecretTtl: 0,
   accessTokenTtl: 3600,
 };
+
+export async function withBootstrapCredentialScope(
+  args: BootstrapArgs,
+  workspaceRoot: string,
+): Promise<BootstrapArgs> {
+  const bootstrapCredentialScope =
+    args.bootstrapCredentialScope ||
+    (await configuredBootstrapScope(workspaceRoot)) ||
+    defaultBootstrapScope(workspaceRoot);
+  return { ...args, bootstrapCredentialScope: normalizeBootstrapScope(bootstrapCredentialScope) };
+}
+
+function defaultBootstrapScope(workspaceRoot: string) {
+  return normalizeBootstrapScope(path.basename(path.resolve(workspaceRoot)));
+}
+
+async function configuredBootstrapScope(workspaceRoot: string) {
+  const config = await readSprinkleRefConfig(undefined, workspaceRoot).catch((error: unknown) => {
+    if (isMissingSprinkleRefConfigError(error)) return undefined;
+    throw error;
+  });
+  return config?.bootstrapScope;
+}
+
+function isMissingSprinkleRefConfigError(error: unknown) {
+  return (
+    error instanceof Error &&
+    /missing projects\/config\/shared\.json sprinkleref config/.test(error.message)
+  );
+}
 
 export function withDeploymentBootstrapDefaults(args: BootstrapArgs): BootstrapArgs {
   if (args.mode !== "deployment" || args.tofuDir) return args;

@@ -33,11 +33,80 @@ test("repo bootstrap skips unused starter backend profiles", async () => {
     const report = JSON.parse(output.stdout) as { profiles: string[] };
     const config = await fs.readFile(sharedConfigPath(), "utf8");
     const credentials = await fs.readFile(".local/infisical-bootstrap-credentials.json", "utf8");
+    const expectedRef = `secret://bootstrap/${path.basename(dir)}/viberoots-iac-bootstrap`;
     assert.deepEqual(report.profiles, ["infisical-control", "infisical-default"]);
-    assert.match(config, /secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap\/client-id/);
+    assert.match(config, new RegExp(`${escapeRegExp(expectedRef)}/client-id`));
     assert.doesNotMatch(config, /secret:\/\/deployments\/sample-webapp/);
-    assert.match(credentials, /secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap/);
+    assert.match(credentials, new RegExp(escapeRegExp(expectedRef)));
     assert.match(credentials, /client-secret/);
+  });
+});
+
+test("repo bootstrap can use configured bootstrap scope for generated credential refs", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-profile-selection-"));
+  await withRepoEnv(dir, async () => {
+    await writeGraph([{ name: "//deployments/app:build" }]);
+    await writeJson("projects/config/shared.json", {
+      sprinkleref: {
+        version: 1,
+        bootstrapScope: "configured-scope",
+        defaultCategory: "main",
+        profiles: {
+          "infisical-default": generatedInfisicalProfile(),
+        },
+        categories: {
+          main: { profile: "infisical-default" },
+          bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
+        },
+      },
+    });
+    await captureConsole(() =>
+      runInfisicalIacBootstrap({
+        ...DEFAULT_BOOTSTRAP_ARGS,
+        credentialSink: "local-file",
+        yes: true,
+      }),
+    );
+    const credentials = await fs.readFile(".local/infisical-bootstrap-credentials.json", "utf8");
+    assert.match(
+      credentials,
+      /secret:\/\/bootstrap\/configured-scope\/viberoots-iac-bootstrap\/client-secret/,
+    );
+  });
+});
+
+test("repo bootstrap CLI scope overrides configured bootstrap scope", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-bootstrap-profile-selection-"));
+  await withRepoEnv(dir, async () => {
+    await writeGraph([{ name: "//deployments/app:build" }]);
+    await writeJson("projects/config/shared.json", {
+      sprinkleref: {
+        version: 1,
+        bootstrapScope: "configured-scope",
+        defaultCategory: "main",
+        profiles: {
+          "infisical-default": generatedInfisicalProfile(),
+        },
+        categories: {
+          main: { profile: "infisical-default" },
+          bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
+        },
+      },
+    });
+    await captureConsole(() =>
+      runInfisicalIacBootstrap({
+        ...DEFAULT_BOOTSTRAP_ARGS,
+        bootstrapCredentialScope: "cli-scope",
+        credentialSink: "local-file",
+        yes: true,
+      }),
+    );
+    const credentials = await fs.readFile(".local/infisical-bootstrap-credentials.json", "utf8");
+    assert.match(
+      credentials,
+      /secret:\/\/bootstrap\/cli-scope\/viberoots-iac-bootstrap\/client-secret/,
+    );
+    assert.doesNotMatch(credentials, /secret:\/\/bootstrap\/configured-scope/);
   });
 });
 
@@ -204,12 +273,29 @@ function inlineInfisicalProfile() {
   };
 }
 
+function generatedInfisicalProfile() {
+  return {
+    backend: "infisical",
+    generatedBy: "viberoots-repo-bootstrap",
+    host: "https://app.infisical.com",
+    projectIdEnv: "VBR_INFISICAL_PROJECT_ID",
+    defaultEnvironment: "staging",
+    defaultPath: "/",
+    clientIdEnv: "VBR_INFISICAL_CLIENT_ID",
+    clientSecretEnv: "VBR_INFISICAL_CLIENT_SECRET",
+  };
+}
+
 function projectIdEnvInfisicalProfile() {
   return {
     ...inlineInfisicalProfile(),
     projectId: undefined,
     projectIdEnv: "OPERATOR_INFISICAL_PROJECT_ID",
   };
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function writeJson(file: string, value: unknown) {

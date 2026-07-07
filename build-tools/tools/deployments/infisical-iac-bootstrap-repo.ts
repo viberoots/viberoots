@@ -1,6 +1,7 @@
 import * as path from "node:path";
 import { findRepoRoot } from "../lib/repo";
 import { defaultDeploymentGraphPath } from "./deployment-graph-read-options";
+import { withBootstrapCredentialScope } from "./infisical-iac-bootstrap-config";
 import { InfisicalApi } from "./infisical-iac-bootstrap-api";
 import { runDeploymentBootstrapFanOut } from "./infisical-iac-bootstrap-deployments";
 import { applyFanOutMetadataHandoff } from "./infisical-iac-bootstrap-metadata-gate";
@@ -41,8 +42,9 @@ export async function runRepoBootstrap(
   ) => Promise<DeploymentBootstrapExecutionResult | void>,
   deps: RepoBootstrapDeps = {},
 ) {
-  await confirmBootstrapPreflight(args);
   const workspaceRoot = await findRepoRoot(process.cwd());
+  const scopedArgs = await withBootstrapCredentialScope(args, workspaceRoot);
+  await confirmBootstrapPreflight(scopedArgs);
   const graphPath = defaultDeploymentGraphPath(workspaceRoot);
   const configPath = path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
   const resolver = await ensureRepoResolverConfig({
@@ -51,26 +53,33 @@ export async function runRepoBootstrap(
     graphPath,
     configPath,
   });
-  const sink = await resolveCredentialSinkSelection(args, {
+  const sink = await resolveCredentialSinkSelection(scopedArgs, {
     createMissingResolverConfig: true,
     workspaceRoot,
     configPath,
   });
   const credential = (await hasRequiredInfisicalProfile(resolver))
-    ? await (deps.repoCredentialFactory || ensureRepoBootstrapCredential)(args, {
+    ? await (deps.repoCredentialFactory || ensureRepoBootstrapCredential)(scopedArgs, {
         workspaceRoot,
         configPath,
       })
     : undefined;
-  const materialization = await materializeRepoProfiles(args, resolver, credential);
+  const materialization = await materializeRepoProfiles(scopedArgs, resolver, credential);
   const credentialSinkMaterialization = await materializeBootstrapCredentialSink({
-    args,
+    args: scopedArgs,
     selection: sink,
     workspaceRoot,
   });
   console.log(
     JSON.stringify(
-      repoReport(args, resolver, sink, materialization, credentialSinkMaterialization, credential),
+      repoReport(
+        scopedArgs,
+        resolver,
+        sink,
+        materialization,
+        credentialSinkMaterialization,
+        credential,
+      ),
       null,
       2,
     ),
@@ -78,7 +87,7 @@ export async function runRepoBootstrap(
   console.error(`Credential sink: ${sink.description}`);
   printRepoFollowUpCommands(resolver.configPath);
   const fanOut = await runFanOutWithHandoff(
-    args,
+    scopedArgs,
     credential,
     { workspaceRoot, graphPath },
     execute,
@@ -96,7 +105,9 @@ function repoReport(
   credentialSinkMaterialization: unknown,
   credential?: SharedInfisicalSession,
 ) {
-  const refs = credential?.identity && repoBootstrapCredentialRefs(credential.identity);
+  const refs =
+    credential?.identity &&
+    repoBootstrapCredentialRefs(credential.identity, args.bootstrapCredentialScope);
   return {
     schemaVersion: "infisical-repo-bootstrap-result@1",
     mode: "repo",

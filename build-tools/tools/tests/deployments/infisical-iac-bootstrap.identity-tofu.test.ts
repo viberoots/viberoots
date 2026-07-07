@@ -80,11 +80,11 @@ test("bootstrap credential rotation creates and stores a new client secret", asy
   assert.equal(credential.clientSecret, "new-secret");
   assert.equal(credential.status, "rotated");
   assert.equal(
-    sink.values.get("secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id"),
+    sink.values.get("secret://bootstrap/viberoots/viberoots-iac-bootstrap/client-id"),
     "client-id",
   );
   assert.equal(
-    sink.values.get("secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret"),
+    sink.values.get("secret://bootstrap/viberoots/viberoots-iac-bootstrap/client-secret"),
     "new-secret",
   );
 });
@@ -92,7 +92,7 @@ test("bootstrap credential rotation creates and stores a new client secret", asy
 test("bootstrap credential preserve mode reads the existing local secret", async () => {
   const sink = new MemorySink();
   sink.values.set(
-    "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret",
+    "secret://bootstrap/viberoots/viberoots-iac-bootstrap/client-secret",
     "old-secret",
   );
   const credential = await ensureBootstrapCredential({

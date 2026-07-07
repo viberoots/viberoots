@@ -91,7 +91,7 @@ async function materializeInfisicalProfile(
       projectIdEnv: undefined,
       clientIdEnv: undefined,
       clientSecretEnv: undefined,
-      ...bootstrapCredentialProfileRefs(opts.args.identityName),
+      ...bootstrapCredentialProfileRefs(opts.args),
     };
     validateInfisicalProfile(name, materialized);
     return sameProfile(profile, materialized)
@@ -119,7 +119,7 @@ async function materializeInfisicalProfile(
       projectIdEnv: undefined,
       clientIdEnv: undefined,
       clientSecretEnv: undefined,
-      ...bootstrapCredentialProfileRefs(opts.args.identityName),
+      ...bootstrapCredentialProfileRefs(opts.args),
     }),
     status: "materialized" as const,
   };
@@ -193,7 +193,12 @@ async function ensureProfileIdentityMembership(
   await ensureProjectIdentityMembership(api, projectId, identity);
 }
 
-function bootstrapCredentialProfileRefs(identityName: string) {
-  const refs = repoBootstrapCredentialRefs({ name: identityName });
+function bootstrapCredentialProfileRefs(
+  args: Pick<BootstrapArgs, "identityName" | "bootstrapCredentialScope">,
+) {
+  const refs = repoBootstrapCredentialRefs(
+    { name: args.identityName },
+    args.bootstrapCredentialScope,
+  );
   return { clientIdRef: refs.clientIdRef, clientSecretRef: refs.clientSecretRef };
 }

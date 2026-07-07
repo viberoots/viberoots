@@ -259,6 +259,7 @@ Example:
   },
   "sprinkleref": {
     "version": 1,
+    "bootstrapScope": "example-app",
     "defaultCategory": "control",
     "profiles": {
       "control-infisical": {
@@ -285,6 +286,15 @@ not being locally changed.
 The `control` category is a resolver lane for control-plane setup refs. It can currently target the
 same Infisical `prod` environment as other production-ready refs; introduce a separate Infisical
 environment only as a deliberate resolver-profile change.
+
+`sprinkleref.bootstrapScope` controls the workspace segment under the reserved repo-bootstrap
+namespace for credentials that unlock Infisical-backed resolver profiles. When it is omitted,
+bootstrap uses the consumer workspace directory name. For example, a workspace named
+`unfairly-common` stores its repo bootstrap Universal Auth client under
+`secret://bootstrap/unfairly-common/viberoots-iac-bootstrap/client-id` and
+`secret://bootstrap/unfairly-common/viberoots-iac-bootstrap/client-secret`. Operators may override
+the scope for one bootstrap run with `--bootstrap-scope <name>`. The scope is a single path segment
+containing letters, numbers, `.`, `_`, or `-`.
 
 Local values are an implicit local-first resolution surface. They do not need to be listed in
 `projects/config/shared.json`, which lets shared config remain the same for every clone. Resolution

@@ -4,17 +4,17 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { pathToFileURL } from "node:url";
 import { askConfirmation } from "./infisical-iac-bootstrap-preflight";
+import {
+  DEFAULT_BOOTSTRAP_ARGS,
+  withBootstrapCredentialScope,
+} from "./infisical-iac-bootstrap-config";
+import { repoBootstrapCredentialRefs } from "./infisical-iac-bootstrap-identity";
 import { macosKeychainCommand } from "./sprinkleref-keychain";
 import { getArgvTokens } from "../lib/argv";
 
 const KEYCHAIN_SERVICE = "viberoots-bootstrap";
 
 const LOCAL_PATHS = ["sprinkleref", ".local/infisical-bootstrap-credentials.json"];
-
-const KEYCHAIN_ACCOUNTS = [
-  "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id",
-  "secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-secret",
-];
 
 type ResetArgs = {
   dryRun: boolean;
@@ -54,7 +54,8 @@ export async function runInfisicalBootstrapResetLocal(argv = getArgvTokens(), io
   }
   const args = parseArgs(argv);
   const localPaths = await discoverLocalPaths(io);
-  printWarning(stdout, args, localPaths);
+  const keychainAccounts = await discoverKeychainAccounts(io);
+  printWarning(stdout, args, localPaths, keychainAccounts);
   if (!args.dryRun && !args.yes) {
     if (!io.question && (!process.stdin.isTTY || !process.stdout.isTTY)) {
       throw new Error("local Infisical bootstrap reset requires an interactive terminal or --yes");
@@ -70,7 +71,7 @@ export async function runInfisicalBootstrapResetLocal(argv = getArgvTokens(), io
   }
   if (args.dryRun) return;
   await removeLocalPaths(io, localPaths);
-  removeKeychainEntries(io, stderr);
+  removeKeychainEntries(io, stderr, keychainAccounts);
   stdout("Local Infisical bootstrap state reset complete.");
 }
 
@@ -82,7 +83,12 @@ function parseArgs(argv: string[]): ResetArgs {
   return { dryRun: argv.includes("--dry-run"), yes: argv.includes("--yes") };
 }
 
-function printWarning(stdout: (text: string) => void, args: ResetArgs, localPaths: string[]) {
+function printWarning(
+  stdout: (text: string) => void,
+  args: ResetArgs,
+  localPaths: string[],
+  keychainAccounts: string[],
+) {
   stdout(
     [
       "WARNING: this deletes local Infisical bootstrap state.",
@@ -91,7 +97,7 @@ function printWarning(stdout: (text: string) => void, args: ResetArgs, localPath
       ...localPaths.map((item) => `  - ${item}`),
       "",
       `It deletes these macOS Keychain entries from service ${KEYCHAIN_SERVICE}:`,
-      ...KEYCHAIN_ACCOUNTS.map((item) => `  - ${item}`),
+      ...keychainAccounts.map((item) => `  - ${item}`),
       "",
       "It does not delete Infisical cloud resources, Cloudflare secrets, or application secrets.",
       args.dryRun ? "Dry run only; nothing will be changed." : "",
@@ -99,6 +105,16 @@ function printWarning(stdout: (text: string) => void, args: ResetArgs, localPath
       .filter((line) => line !== "")
       .join("\n"),
   );
+}
+
+async function discoverKeychainAccounts(io: ResetIo) {
+  const root = path.resolve(io.cwd || process.cwd());
+  const scopedArgs = await withBootstrapCredentialScope(DEFAULT_BOOTSTRAP_ARGS, root);
+  const refs = repoBootstrapCredentialRefs(
+    { name: scopedArgs.identityName },
+    scopedArgs.bootstrapCredentialScope,
+  );
+  return [refs.clientIdRef, refs.clientSecretRef];
 }
 
 async function discoverLocalPaths(io: ResetIo) {
@@ -133,14 +149,18 @@ async function removeLocalPaths(io: ResetIo, localPaths: string[]) {
   }
 }
 
-function removeKeychainEntries(io: ResetIo, stderr: (text: string) => void) {
+function removeKeychainEntries(
+  io: ResetIo,
+  stderr: (text: string) => void,
+  keychainAccounts: string[],
+) {
   const platform = io.platform || process.platform;
   if (platform !== "darwin") {
     stderr("Skipping macOS Keychain cleanup because this host is not macOS.");
     return;
   }
   const runner = io.keychainRunner || defaultRunner;
-  for (const account of KEYCHAIN_ACCOUNTS) {
+  for (const account of keychainAccounts) {
     runner("security", macosKeychainCommand("remove", KEYCHAIN_SERVICE, account));
   }
 }

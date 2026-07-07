@@ -26,7 +26,7 @@ test("local reset dry-run prints consequences without deleting state", async () 
   assert.match(text, /WARNING: this deletes local Infisical bootstrap state/);
   assert.match(text, /sprinkleref/);
   assert.match(text, /\.local\/infisical-bootstrap-credentials\.json/);
-  assert.match(text, /secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap\/client-secret/);
+  assert.match(text, /secret:\/\/bootstrap\/common\/viberoots-iac-bootstrap\/client-secret/);
   assert.match(text, /does not delete Infisical cloud resources/);
   assert.deepEqual(removed, []);
 });
@@ -83,6 +83,11 @@ test("local reset removes generated paths and keychain entries after confirmatio
     "-s",
     "viberoots-bootstrap",
   ]);
+  assert.ok(
+    keychain.some((entry) =>
+      entry.includes(`secret://bootstrap/${path.basename(repo)}/viberoots-iac-bootstrap/client-id`),
+    ),
+  );
 });
 
 test("local reset supports noninteractive --yes", async () => {

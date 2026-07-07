@@ -140,6 +140,27 @@ test("project local config always overrides shared values and records changed ov
   ]);
 });
 
+test("project config reads and validates bootstrap scope", async () => {
+  const dir = await tmp();
+  await initSprinkleRefConfigs({ dir: path.join(dir, "projects/config"), platform: "darwin" });
+  await writeJson(path.join(dir, "projects/config/local.json"), {
+    sprinkleref: {
+      bootstrapScope: "local-scope",
+    },
+  });
+  const config = await readSprinkleRefConfig(undefined, dir);
+  assert.equal(config.bootstrapScope, "local-scope");
+  await writeJson(path.join(dir, "projects/config/local.json"), {
+    sprinkleref: {
+      bootstrapScope: "bad/scope",
+    },
+  });
+  await assert.rejects(
+    () => readSprinkleRefConfig(undefined, dir),
+    /Infisical bootstrap scope .* must contain only/,
+  );
+});
+
 test("project local config safety guard rejects active overrides but allows fills", async () => {
   const dir = await tmp();
   await writeJson(path.join(dir, "projects/config/shared.json"), {

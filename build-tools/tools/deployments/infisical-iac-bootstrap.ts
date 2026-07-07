@@ -7,6 +7,7 @@ import { findRepoRoot } from "../lib/repo";
 import {
   deploymentScopeFromTarget,
   resolveInfisicalHost,
+  withBootstrapCredentialScope,
   withDeploymentBootstrapDefaults,
 } from "./infisical-iac-bootstrap-config";
 import { spawnCommandRunner } from "./infisical-iac-bootstrap-auth";
@@ -42,16 +43,18 @@ export async function runInfisicalIacBootstrap(
     configPath?: string;
   } = {},
 ) {
-  if (args.mode === "repo") {
-    if (args.dryRun) return dryRun(args, context);
-    return await runRepoBootstrap(args, runInfisicalIacBootstrap);
-  }
-  const deploymentArgs = withDeploymentBootstrapDefaults(args);
-  const scope = deploymentScopeFromTarget(deploymentArgs);
   const workspaceRoot = context.workspaceRoot || (await findRepoRoot(process.cwd()));
+  const scopedArgs = await withBootstrapCredentialScope(args, workspaceRoot);
+  const scopedContext = { ...context, workspaceRoot };
+  if (scopedArgs.mode === "repo") {
+    if (scopedArgs.dryRun) return dryRun(scopedArgs, scopedContext);
+    return await runRepoBootstrap(scopedArgs, runInfisicalIacBootstrap);
+  }
+  const deploymentArgs = withDeploymentBootstrapDefaults(scopedArgs);
+  const scope = deploymentScopeFromTarget(deploymentArgs);
   const configPath =
     context.configPath || path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
-  const rootContext = { ...context, workspaceRoot, configPath };
+  const rootContext = { ...scopedContext, configPath };
   const reviewedSource = await readDeploymentReviewedMetadataSource(
     scope,
     undefined,
@@ -89,7 +92,7 @@ export async function runInfisicalIacBootstrap(
     bootstrapIdentity: identity,
     runner: spawnCommandRunner,
   });
-  if (args.noTofuApply) {
+  if (scopedArgs.noTofuApply) {
     console.log(
       JSON.stringify(
         { schemaVersion: "infisical-iac-bootstrap-preview@1", savedPlan: tofu.savedPlan },

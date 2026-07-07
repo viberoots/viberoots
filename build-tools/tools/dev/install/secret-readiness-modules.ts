@@ -7,6 +7,7 @@ export type BootstrapArgs = Record<string, unknown> & {
   identityName: string;
   localCredentialFile: string;
   sprinkleCategory?: string;
+  bootstrapCredentialScope?: string;
 };
 
 export type CredentialSink = {
@@ -41,6 +42,10 @@ type ReadinessModules = {
     deploymentCredentials: Array<{ clientIdRef: string; clientSecretRef: string }>;
   }>;
   readSprinkleRefConfig: (configPath: string, cwd?: string) => Promise<unknown>;
+  withBootstrapCredentialScope: (
+    args: BootstrapArgs,
+    workspaceRoot: string,
+  ) => Promise<BootstrapArgs>;
   resolveBootstrapAccessCredentialSinkBackend: (
     config: unknown,
     category: string,
@@ -72,6 +77,7 @@ export async function loadDeploymentReadinessModules() {
     readDeploymentReviewedMetadata: reviewedMetadata.readDeploymentReviewedMetadata,
     readSprinkleRefConfig: sprinkleRefConfig.readSprinkleRefConfig,
     repoBootstrapCredentialRefs: identity.repoBootstrapCredentialRefs,
+    withBootstrapCredentialScope: config.withBootstrapCredentialScope,
     resolveBootstrapAccessCredentialSinkBackend:
       sprinkleRefGuard.resolveBootstrapAccessCredentialSinkBackend,
     resolveCredentialSinkSelection: sink.resolveCredentialSinkSelection,
