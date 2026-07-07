@@ -81,6 +81,8 @@ let
   viberootsCommand = import ../../packages/viberoots-command.nix {
     inherit pkgs zx-wrapper version releaseTag;
     viberootsSrc = viberootsRoot;
+    viberootsNodeModules =
+      if viberootsNodeMods != null then viberootsNodeMods.node-modules else null;
   };
 in
 {

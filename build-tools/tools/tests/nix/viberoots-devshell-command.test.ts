@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
@@ -19,6 +20,16 @@ test("devshell wires viberoots as a Nix-provided PATH command", async () => {
   assert.match(packagedCommand, /export VBR_NIX_BIN="''\$\{VBR_NIX_BIN:-\$NIX_BIN\}"/);
   assert.match(packagedCommand, /export GIT_BIN="\$\{pkgs\.git\}\/bin\/git"/);
   assert.match(packagedCommand, /export PATH="\$\{pkgs\.git\}\/bin:\$\{pkgs\.nix\}\/bin:\$PATH"/);
+  assert.match(packagedCommand, /viberootsNodeModules \? null/);
+  assert.match(
+    packagedCommand,
+    /export VIBEROOTS_NODE_PATH="\$\{viberootsNodeModules\}\/node_modules"/,
+  );
+  assert.match(packagedCommand, /export NODE_PATH="\$VIBEROOTS_NODE_PATH/);
+  assert.match(devshell, /viberootsNodeModules \? null/);
+  assert.match(devshell, /viberootsNodePath =/);
+  assert.match(devshell, /export VIBEROOTS_NODE_PATH="\$\{viberootsNodePath\}"/);
+  assert.match(devshell, /export NODE_PATH="\$VIBEROOTS_NODE_PATH/);
   assert.match(devshell, /entry_cwd="\$PWD"/);
   assert.match(devshell, /dev_root="''\$\{WORKSPACE_ROOT:-\$PWD\}"/);
   assert.match(devshell, /dev_root="\$\(cd "\$WORKSPACE_ROOT" && pwd\)"/);
@@ -81,12 +92,12 @@ test("devshell wires viberoots as a Nix-provided PATH command", async () => {
     stdio: "pipe",
     reject: false,
     nothrow: true,
-  })`nix build --accept-flake-config path:${path.resolve("viberoots")}#viberoots --no-link --print-out-paths`;
+  })`nix build --accept-flake-config path:${viberootsSourcePath(".")}#viberoots --no-link --print-out-paths`;
 
   assert.equal(
     built.exitCode,
     0,
-    `expected nix build ./viberoots#viberoots to succeed\nstdout:\n${built.stdout}\nstderr:\n${built.stderr}`,
+    `expected nix build viberoots#viberoots to succeed\nstdout:\n${built.stdout}\nstderr:\n${built.stderr}`,
   );
   const outPath =
     String(built.stdout || "")
@@ -123,8 +134,38 @@ viberoots version --json
   const jsonStart = stdout.indexOf("{");
   assert.ok(jsonStart >= 0, "expected viberoots version --json output");
   const status = JSON.parse(stdout.slice(jsonStart));
-  assert.equal(status.workspaceRoot, process.cwd());
+  const expectedWorkspaceRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+  }).trim();
+  assert.ok(
+    status.workspaceRoot === expectedWorkspaceRoot ||
+      expectedWorkspaceRoot.startsWith(`${status.workspaceRoot}${path.sep}`),
+    `expected workspace root ${status.workspaceRoot} to contain ${expectedWorkspaceRoot}`,
+  );
   assert.equal(status.declaredVersion, "0.0.0-dev");
   assert.equal(status.releaseTag, "v0.0.0-dev");
   assert.ok(["local", "remote"].includes(status.sourceMode));
+
+  const yamlRun = await $({
+    stdio: "pipe",
+    reject: false,
+    nothrow: true,
+    env: {
+      ...process.env,
+      PATH: `${path.join(outPath, "bin")}:/usr/bin:/bin`,
+    },
+  })`bash --noprofile --norc -c ${`set -euo pipefail
+viberoots --help
+viberoots resource-graph --help
+`}`;
+
+  assert.equal(
+    yamlRun.exitCode,
+    0,
+    `expected Nix-provided viberoots to expose packaged node modules for help paths\nstdout:\n${yamlRun.stdout}\nstderr:\n${yamlRun.stderr}`,
+  );
+  assert.match(String(yamlRun.stdout || ""), /viberoots commands:/);
+  assert.match(String(yamlRun.stdout || ""), /viberoots resource-graph export/);
+  assert.doesNotMatch(String(yamlRun.stdout || ""), /source mode:/);
 });

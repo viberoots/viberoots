@@ -1,10 +1,18 @@
-{ pkgs, buck2Input, viberootsRoot ? ../../../.., version ? "0.0.0-dev", releaseTag ? "v${version}" }:
+{ pkgs
+, buck2Input
+, viberootsRoot ? ../../../..
+, viberootsNodeModules ? null
+, version ? "0.0.0-dev"
+, releaseTag ? "v${version}"
+}:
 let
   zx-wrapper = import ./lib/zx-wrapper.nix { inherit pkgs; };
   viberootsCommand = import ./packages/viberoots-command.nix {
-    inherit pkgs zx-wrapper version releaseTag;
+    inherit pkgs zx-wrapper viberootsNodeModules version releaseTag;
     viberootsSrc = viberootsRoot;
   };
+  viberootsNodePath =
+    if viberootsNodeModules == null then "" else "${viberootsNodeModules}/node_modules";
   agent-safehouse = pkgs.stdenvNoCC.mkDerivation {
     pname = "agent-safehouse";
     version = "0.9.0";
@@ -48,6 +56,13 @@ in {
       export SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
       export NIX_SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
       export NODE_EXTRA_CA_CERTS="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt"
+      if [ -n "${viberootsNodePath}" ]; then
+        export VIBEROOTS_NODE_PATH="${viberootsNodePath}"
+        case ":''${NODE_PATH:-}:" in
+          *":$VIBEROOTS_NODE_PATH:"*) ;;
+          *) export NODE_PATH="$VIBEROOTS_NODE_PATH''${NODE_PATH:+:$NODE_PATH}" ;;
+        esac
+      fi
       export BUCK2_REAL_HOME="''${BUCK2_REAL_HOME:-$dev_root/.viberoots/workspace/buck/home}"
       mkdir -p "$BUCK2_REAL_HOME" 2>/dev/null || true
 

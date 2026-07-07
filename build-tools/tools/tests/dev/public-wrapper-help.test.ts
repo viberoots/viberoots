@@ -12,6 +12,8 @@ const binDir = path.resolve(thisDir, "..", "..", "bin");
 const repoRoot = path.resolve(thisDir, "..", "..", "..", "..");
 
 const cases = [
+  { name: "vbr", usage: "viberoots commands:" },
+  { name: "viberoots", usage: "viberoots commands:" },
   { name: "i", usage: "usage: i [options]" },
   { name: "install-deps", usage: "usage: i [options]" },
   { name: "b", usage: "usage: b [buck-subcommand|target...] [options]" },
@@ -27,6 +29,7 @@ for (const entry of cases) {
       cwd: repoRoot,
       env: {
         ...process.env,
+        WORKSPACE_ROOT: repoRoot,
         VIBEROOTS_ROOT: missingSource,
         VIBEROOTS_SOURCE_ROOT: missingSource,
       },
@@ -34,6 +37,10 @@ for (const entry of cases) {
 
     assert.match(stdout, new RegExp(entry.usage.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
     assert.doesNotMatch(stdout, /viberoots (install|build|verify)/);
+    if (entry.name === "vbr" || entry.name === "viberoots") {
+      assert.doesNotMatch(stdout, /source mode:/);
+      assert.match(stdout, /viberoots status \[--json\]/);
+    }
     assert.doesNotMatch(stderr, /No such file or directory|devshell\.sh/);
   });
 }

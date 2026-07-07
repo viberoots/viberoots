@@ -38,7 +38,7 @@ let
   zx-wrapper = import ../lib/zx-wrapper.nix { inherit pkgs; };
 
   devshell = import ../devshell.nix {
-    inherit pkgs viberootsRoot version releaseTag;
+    inherit pkgs viberootsRoot viberootsNodeModules version releaseTag;
     buck2Input = buck2;
   };
 
@@ -74,6 +74,7 @@ let
       in
       if s != "" then (builtins.toPath s) else null;
   };
+  viberootsNodeModules = viberootsNodeMods.node-modules;
 
   prelude = import ../buck-prelude.nix { inherit pkgs; buck2Input = buck2; };
 

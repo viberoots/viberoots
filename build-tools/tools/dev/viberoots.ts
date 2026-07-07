@@ -574,6 +574,10 @@ function liveBootstrapEnvOverrides(): Record<string, string> {
 async function main() {
   const positionals = getPositionals();
   const [command = "version"] = positionals;
+  if (getFlagBool("help") && positionals.length === 0) {
+    printHelp();
+    return;
+  }
   if (getFlagBool("help") && commandMeta(command)) {
     printHelp(positionals.slice(0, 2).join(" "));
     return;

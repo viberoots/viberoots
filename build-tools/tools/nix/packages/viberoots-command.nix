@@ -1,4 +1,19 @@
-{ pkgs, zx-wrapper, viberootsSrc ? ../../../.., version ? "0.0.0-dev", releaseTag ? "v${version}" }:
+{ pkgs
+, zx-wrapper
+, viberootsSrc ? ../../../..
+, viberootsNodeModules ? null
+, version ? "0.0.0-dev"
+, releaseTag ? "v${version}"
+}:
+
+let
+  nodePathExport =
+    if viberootsNodeModules == null then ""
+    else ''
+      export VIBEROOTS_NODE_PATH="${viberootsNodeModules}/node_modules"
+      export NODE_PATH="$VIBEROOTS_NODE_PATH''${NODE_PATH:+:$NODE_PATH}"
+    '';
+in
 
 pkgs.writeShellScriptBin "viberoots" ''
   set -euo pipefail
@@ -16,6 +31,7 @@ pkgs.writeShellScriptBin "viberoots" ''
   export NIX_SSL_CERT_FILE="''${NIX_SSL_CERT_FILE:-$SSL_CERT_FILE}"
   export NODE_EXTRA_CA_CERTS="''${NODE_EXTRA_CA_CERTS:-$SSL_CERT_FILE}"
   export PATH="${pkgs.git}/bin:${pkgs.nix}/bin:$PATH"
+  ${nodePathExport}
   exec ${zx-wrapper}/bin/zx-wrapper \
     --import "${viberootsSrc}/build-tools/tools/dev/zx-init.mjs" \
     "$helper" "$@"
