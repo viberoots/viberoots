@@ -116,6 +116,87 @@ test("viberoots bootstrap and update invoke trusted bootstrap URL with VBR overr
   });
 });
 
+test("viberoots update defaults to the enclosing workspace root from subdirectories", async () => {
+  await withTempWorkspace("viberoots-live-bootstrap-subdir", async (workspace) => {
+    const viberootsRoot = await findViberootsRoot();
+    const bin = path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots");
+    const subdir = path.join(workspace, "projects", "apps");
+    const capture = path.join(workspace, "env.txt");
+    const script = path.join(workspace, "bootstrap.sh");
+    await fsp.mkdir(path.join(workspace, ".viberoots", "workspace"), { recursive: true });
+    await fsp.writeFile(
+      path.join(workspace, ".viberoots", "workspace", "flake.nix"),
+      "{ outputs = _: {}; }\n",
+      "utf8",
+    );
+    await fsp.mkdir(subdir, { recursive: true });
+    await writeExecutable(
+      script,
+      `#!/usr/bin/env bash
+printf 'VBR_WORKSPACE_ROOT=%s\\n' "\${VBR_WORKSPACE_ROOT:-}" > "\${VBR_CAPTURE_ENV}"
+`,
+    );
+
+    await execFileAsync(
+      bin,
+      ["update", "--bootstrap-url", `file://${script}`, "--trust-bootstrap-url", "--dry-run"],
+      {
+        cwd: subdir,
+        env: {
+          ...process.env,
+          NO_DEV_SHELL: "1",
+          VBR_CAPTURE_ENV: capture,
+          WORKSPACE_ROOT: "",
+          _VIBEROOTS_DEVSHELL_ROOT: "",
+          BUCK_TEST_SRC: "",
+          LIVE_ROOT: "",
+        },
+      },
+    );
+
+    const envText = await fsp.readFile(capture, "utf8");
+    assert.match(
+      envText,
+      new RegExp(`VBR_WORKSPACE_ROOT=${workspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+    );
+  });
+});
+
+test("standalone bootstrap discovers the enclosing workspace root from subdirectories", async () => {
+  await withTempWorkspace("viberoots-standalone-bootstrap-subdir", async (workspace) => {
+    const viberootsRoot = await findViberootsRoot();
+    const subdir = path.join(workspace, "projects", "apps");
+    await fsp.mkdir(path.join(workspace, ".viberoots", "workspace"), { recursive: true });
+    await fsp.writeFile(
+      path.join(workspace, ".viberoots", "workspace", "flake.nix"),
+      "{ outputs = _: {}; }\n",
+      "utf8",
+    );
+    await fsp.mkdir(subdir, { recursive: true });
+
+    const run = await execFileAsync("bash", [path.join(viberootsRoot, "bootstrap")], {
+      cwd: subdir,
+      env: {
+        ...process.env,
+        VBR_DRY_RUN: "1",
+        VBR_RUN_INSTALL: "0",
+        VBR_DIRENV_ALLOW: "0",
+        WORKSPACE_ROOT: "",
+        _VIBEROOTS_DEVSHELL_ROOT: "",
+        BUCK_TEST_SRC: "",
+        LIVE_ROOT: "",
+      },
+    });
+
+    assert.match(
+      run.stdout,
+      new RegExp(`workspace\\s+${workspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+    );
+    await assert.rejects(fsp.access(path.join(subdir, ".viberoots", "workspace", "flake.nix")));
+    await assert.rejects(fsp.access(path.join(subdir, ".envrc")));
+  });
+});
+
 test("live bootstrap refuses untrusted custom URL and invalid downloaded content", async () => {
   await assert.rejects(
     runLiveBootstrap({

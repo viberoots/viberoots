@@ -52,6 +52,24 @@ default_viberoots_url() {
   fi
 }
 
+discover_workspace_root() {
+  local dir
+  dir="$(pwd -P)"
+  while true; do
+    if [[ -f "${dir}/.viberoots/workspace/flake.nix" ]] ||
+      [[ -f "${dir}/.buckroot" && -d "${dir}/projects" ]] ||
+      [[ -e "${dir}/.viberoots/current" ]]; then
+      printf '%s' "${dir}"
+      return 0
+    fi
+    local parent
+    parent="$(dirname "${dir}")"
+    [[ "${parent}" != "${dir}" ]] || break
+    dir="${parent}"
+  done
+  pwd -P
+}
+
 ui_init_color() {
   ui_color_enabled=0
   if [[ -n "${NO_COLOR:-}" ]] || falsy "${VBR_COLOR:-}"; then
@@ -437,7 +455,7 @@ if [[ "${run_validate}" == "1" && "${direnv_allow}" != "1" ]]; then
   exit 2
 fi
 
-workspace_root="${workspace_root:-$(pwd -P)}"
+workspace_root="${workspace_root:-$(discover_workspace_root)}"
 workspace_root="$(cd "$(dirname "${workspace_root}")" && pwd)/$(basename "${workspace_root}")"
 workspace_name="${workspace_name:-$(basename "${workspace_root}")}"
 viberoots_url="${viberoots_url:-$(default_viberoots_url)}"

@@ -559,10 +559,10 @@ function liveBootstrapEnvOverrides(): Record<string, string> {
   const overrides: Record<string, string> = {};
   const mode = getFlagStr("mode");
   const ref = getFlagStr("ref");
-  const workspaceRoot = getFlagStr("workspace-root");
+  const workspaceRoot = selectedWorkspaceRootForCommand();
   if (mode) overrides.VBR_CONSUMER = mode;
   if (ref) overrides.VBR_REF = ref;
-  if (workspaceRoot) overrides.VBR_WORKSPACE_ROOT = path.resolve(workspaceRoot);
+  overrides.VBR_WORKSPACE_ROOT = workspaceRoot;
   if (getFlagBool("run-install")) overrides.VBR_RUN_INSTALL = "1";
   if (getFlagBool("no-run-install")) overrides.VBR_RUN_INSTALL = "0";
   if (getFlagBool("run-validate")) overrides.VBR_RUN_VALIDATE = "1";
@@ -628,7 +628,7 @@ async function main() {
       process.exit(2);
     }
     await initConsumer({
-      workspaceRoot: path.resolve(getFlagStr("workspace-root", process.cwd())),
+      workspaceRoot: selectedWorkspaceRootForCommand(),
       viberootsUrl,
       workspaceName: getFlagStr("workspace-name", "viberoots-consumer"),
       sourceMode: mode,
@@ -642,7 +642,7 @@ async function main() {
   }
   if (command === "bootstrap-check") {
     const result = await checkBootstrapCompletion({
-      workspaceRoot: path.resolve(getFlagStr("workspace-root", process.cwd())),
+      workspaceRoot: selectedWorkspaceRootForCommand(),
       repair: getFlagBool("repair-if-needed"),
       verbose: getFlagBool("verbose"),
     });

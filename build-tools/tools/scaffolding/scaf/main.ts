@@ -9,6 +9,7 @@ import { usage } from "./usage";
 
 import { getArgvTokens } from "../../lib/cli";
 import { runNodeWithZx } from "../../lib/node-run";
+import { resolveWorkspaceRootSync } from "../../lib/repo";
 import { validateTemplates } from "../validate";
 
 function repoRootFromScafModuleUrl(): string {
@@ -40,14 +41,14 @@ function repoRootFromScafModuleUrl(): string {
   return fromModule;
 }
 
-function normalizeCwd(repoRoot: string) {
+function normalizeCwd() {
   try {
     const envRoot = (process.env.WORKSPACE_ROOT || process.env.BUCK_TEST_SRC || "").trim();
     if (envRoot) {
       process.chdir(envRoot);
       return;
     }
-    process.chdir(repoRoot);
+    process.chdir(resolveWorkspaceRootSync(process.cwd(), { ...process.env, WORKSPACE_ROOT: "" }));
   } catch {}
 }
 
@@ -98,7 +99,7 @@ export async function runScafCli() {
   const ctx: ScafContext = { originalCwd: process.cwd(), repoRoot: repoRootFromScafModuleUrl() };
   process.env.VIBEROOTS_ROOT = process.env.VIBEROOTS_ROOT || ctx.repoRoot;
 
-  normalizeCwd(ctx.repoRoot);
+  normalizeCwd();
 
   const { positionals, flags } = parseScafArgv(getArgvTokens());
   const [cmd, ...rest] = positionals;

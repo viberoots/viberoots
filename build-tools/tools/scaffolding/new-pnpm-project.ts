@@ -2,6 +2,7 @@
 import path from "node:path";
 import "zx/globals";
 import { getFlagBool, getFlagStr } from "../lib/cli";
+import { resolveWorkspaceRootSync } from "../lib/repo";
 import { liveRepoScaffoldGuardMessage, shouldRefuseLiveRepoScaffold } from "./scaf/live-repo-guard";
 
 function usage(): void {
@@ -23,9 +24,9 @@ async function main(): Promise<void> {
     if (envRoot) {
       process.chdir(path.resolve(envRoot));
     } else {
-      const here = path.dirname(new URL(import.meta.url).pathname);
-      const root = path.resolve(here, "..", "..", "..");
-      process.chdir(root);
+      process.chdir(
+        resolveWorkspaceRootSync(process.cwd(), { ...process.env, WORKSPACE_ROOT: "" }),
+      );
     }
   } catch {}
   // Guard: when invoked under tests/verify, require a sandboxed WORKSPACE_ROOT to avoid mutating live repo
