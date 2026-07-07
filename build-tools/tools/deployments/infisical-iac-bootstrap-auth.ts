@@ -68,11 +68,19 @@ export async function getAccessToken(
       env: cliEnv,
       capture: true,
     });
+    console.error(
+      [
+        `[infisical-bootstrap] waiting for Infisical CLI login at ${args.cliDomain}`,
+        "complete the browser/login flow if one opens.",
+        `For token-based automation, rerun with --no-login --access-token-env ${args.accessTokenEnv} and --org-name or --organization-id.`,
+      ].join(" "),
+    );
     runner({
       command: args.infisicalBin,
       args: ["login", "--domain", args.cliDomain],
       env: cliEnv,
     });
+    console.error("[infisical-bootstrap] Infisical CLI login complete; reading access token");
     const stdout = runner({
       command: args.infisicalBin,
       args: ["user", "get", "token", "--plain", "--silent", "--domain", args.cliDomain],

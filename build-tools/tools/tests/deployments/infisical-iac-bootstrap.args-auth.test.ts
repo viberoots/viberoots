@@ -216,12 +216,17 @@ test("CLI login uses isolated HOME and removes local state after token extractio
     if (args.includes("login")) return "";
     return "human-token\n";
   };
-  const result = await getAccessToken({ ...DEFAULT_BOOTSTRAP_ARGS }, runner, {});
-  assert.equal(result.token, "human-token");
+  const output = await captureStderr(async () => {
+    const result = await getAccessToken({ ...DEFAULT_BOOTSTRAP_ARGS }, runner, {});
+    assert.equal(result.token, "human-token");
+  });
   assert.match(observedHome, /infisical-iac-bootstrap-home-/);
   assert.equal(observedUpdateCheck, "true");
   assert.equal(commands[0], "vault set file --domain https://app.infisical.com/api --silent");
   assert.equal(captures[0], true);
+  assert.match(output, /waiting for Infisical CLI login/);
+  assert.match(output, /token-based automation/);
+  assert.match(output, /Infisical CLI login complete/);
   await assert.rejects(() => fs.stat(observedHome), /ENOENT/);
 });
 
@@ -247,4 +252,19 @@ test("missing Infisical CLI reports install and token alternatives", () => {
 
 function fakeOrgApi(orgs: Array<{ id: string; name: string }>) {
   return { request: async () => ({ organizations: orgs }) };
+}
+
+async function captureStderr(fn: () => Promise<void>) {
+  const originalWrite = process.stderr.write;
+  let output = "";
+  process.stderr.write = ((chunk: unknown) => {
+    output += String(chunk);
+    return true;
+  }) as typeof process.stderr.write;
+  try {
+    await fn();
+  } finally {
+    process.stderr.write = originalWrite;
+  }
+  return output;
 }
