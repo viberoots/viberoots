@@ -4,6 +4,7 @@ import type { Dirent } from "node:fs";
 import * as readline from "node:readline/promises";
 import path from "node:path";
 import process from "node:process";
+import * as tty from "node:tty";
 import type { DeploymentBootstrapScope } from "../../deployments/infisical-iac-bootstrap-config";
 import {
   MacosKeychainInaccessibleError,
@@ -28,11 +29,13 @@ export type SecretReadinessFlags = {
   forceOverwriteLocalCredentials: boolean;
   bootstrap: boolean;
   infisicalLoginMode: string;
+  secretBackend: string;
 };
 
 export type SecretReadinessDeps = {
   isInteractive?: () => boolean;
   prompt?: (message: string) => Promise<boolean>;
+  selectSecretBackend?: () => Promise<string>;
   bootstrap?: (args: string[]) => Promise<void>;
   resetLocal?: (args: string[]) => Promise<LocalBootstrapResetPlan | void>;
   probe?: (repoRoot: string) => Promise<SecretReadinessProbe>;
@@ -49,6 +52,7 @@ type SecretReadinessProbeOpts = {
 };
 
 type ReadinessSprinkleRefConfig = {
+  defaultCategory?: string;
   profiles?: Record<
     string,
     {
@@ -72,6 +76,7 @@ export async function ensureInstallSecretReadiness(opts: {
   flags: SecretReadinessFlags;
   deps?: SecretReadinessDeps;
 }) {
+  opts = { ...opts, flags: { ...opts.flags } };
   if (opts.flags.withoutSecrets && opts.flags.bootstrap) {
     throw new Error("--without-secrets cannot be combined with --bootstrap");
   }
@@ -122,6 +127,7 @@ export async function ensureInstallSecretReadiness(opts: {
       return;
     }
   }
+  await selectSecretBackendWhenInteractive(opts, interactive, allowed);
   console.error("[install-deps] starting Infisical repo bootstrap");
   await runRepoBootstrap(opts);
 }
@@ -150,6 +156,7 @@ async function runExplicitBootstrap(opts: {
         )) ?? false;
       if (resetConfirmed) await runLocalReset(opts, ["--yes"]);
     }
+    await selectSecretBackendWhenInteractive(opts, interactive, allowed);
   }
   await runRepoBootstrap(opts);
 }
@@ -265,12 +272,23 @@ function repoBootstrapCredentialRefsForReadiness(
 }
 
 function unresolvedInfisicalProjectProfiles(config: ReadinessSprinkleRefConfig) {
-  return Object.entries(config.profiles || {}).flatMap(([name, profile]) => {
+  return activeInfisicalProfiles(config).flatMap(([name, profile]) => {
     if (profile.backend !== "infisical") return [];
     if (profile.projectId?.trim()) return [];
     if (profile.projectIdEnv && String(process.env[profile.projectIdEnv] || "").trim()) return [];
     return [name];
   });
+}
+
+function activeInfisicalProfiles(config: ReadinessSprinkleRefConfig) {
+  const categories = (config as ReadinessSprinkleRefConfig & {
+    categories?: Record<string, { profile?: string }>;
+  }).categories;
+  const selected = config.defaultCategory || "main";
+  const profileName = categories?.[selected]?.profile?.trim();
+  if (!profileName) return [];
+  const profile = config.profiles?.[profileName];
+  return profile ? ([[profileName, profile]] as Array<[string, NonNullable<typeof profile>]>) : [];
 }
 
 function uniqueRefPairs(pairs: Array<{ clientIdRef: string; clientSecretRef: string }>) {
@@ -382,10 +400,100 @@ function bootstrapArgs(flags: SecretReadinessFlags) {
     "--yes",
     ...valueFlag("machine-label", flags.machineLabel),
     ...valueFlag("login-mode", effectiveLoginMode(flags)),
+    ...valueFlag("secret-backend", flags.secretBackend),
     ...boolFlag("rotate-bootstrap-credentials", flags.rotateBootstrapCredentials),
     ...boolFlag("rotate-deployment-credentials", flags.rotateDeploymentCredentials),
     ...boolFlag("force-overwrite-local-credentials", flags.forceOverwriteLocalCredentials),
   ];
+}
+
+async function selectSecretBackendWhenInteractive(
+  opts: {
+    flags: SecretReadinessFlags;
+    deps?: SecretReadinessDeps;
+  },
+  interactive: boolean,
+  allowed: boolean,
+) {
+  if (opts.flags.secretBackend.trim() || allowed || !interactive) return;
+  const selected = await (opts.deps?.selectSecretBackend || promptSecretBackend)();
+  opts.flags.secretBackend = selected;
+}
+
+async function promptSecretBackend() {
+  return await promptSelect(
+    "Select main secret backend",
+    [
+      { label: "Infisical", value: "infisical/default" },
+      { label: "Vault", value: "vault/default" },
+    ],
+    0,
+  );
+}
+
+async function promptSelect(
+  message: string,
+  choices: Array<{ label: string; value: string }>,
+  initialIndex: number,
+) {
+  const streams = promptTtyStreams();
+  if (!streams.input.isTTY) return await promptSelectLine(message, choices, initialIndex);
+  let index = Math.max(0, Math.min(initialIndex, choices.length - 1));
+  const render = () => {
+    streams.output.write(`\r\x1b[K${message}: ${choices[index]?.label} (${choices[index]?.value})`);
+    streams.output.write("  \x1b[2m↑/↓ then Enter\x1b[0m");
+  };
+  const previousRaw = streams.input.isRaw;
+  streams.input.setRawMode(true);
+  streams.input.resume();
+  render();
+  let onData: ((chunk: Buffer) => void) | undefined;
+  try {
+    return await new Promise<string>((resolve, reject) => {
+      onData = (chunk: Buffer) => {
+        const text = chunk.toString("utf8");
+        if (text === "\u0003") {
+          streams.output.write("\n");
+          reject(new Error("secret backend selection cancelled"));
+          return;
+        }
+        if (text === "\r" || text === "\n") {
+          streams.output.write("\n");
+          resolve(choices[index]?.value || choices[0]!.value);
+          return;
+        }
+        if (text === "\u001b[A") index = (index + choices.length - 1) % choices.length;
+        if (text === "\u001b[B") index = (index + 1) % choices.length;
+        render();
+      };
+      streams.input.on("data", onData);
+    });
+  } finally {
+    if (onData) streams.input.off("data", onData);
+    streams.input.setRawMode(previousRaw);
+    streams.close();
+  }
+}
+
+async function promptSelectLine(
+  message: string,
+  choices: Array<{ label: string; value: string }>,
+  initialIndex: number,
+) {
+  const streams = promptStreams();
+  const rl = readline.createInterface({ input: streams.input, output: streams.output });
+  try {
+    streams.output.write(`${message}:\n`);
+    choices.forEach((choice, idx) => {
+      streams.output.write(`  ${idx + 1}. ${choice.label} (${choice.value})\n`);
+    });
+    const answer = (await rl.question(`Choose [${initialIndex + 1}]: `)).trim();
+    const parsed = Number(answer || initialIndex + 1);
+    return choices[parsed - 1]?.value || choices[initialIndex]?.value || choices[0]!.value;
+  } finally {
+    rl.close();
+    streams.close();
+  }
 }
 
 function effectiveLoginMode(flags: SecretReadinessFlags) {
@@ -497,6 +605,40 @@ function promptStreams(): PromptStreams {
       output.end();
     },
   };
+}
+
+function promptTtyStreams() {
+  if (process.stdin.isTTY && process.stderr.isTTY) {
+    return {
+      input: process.stdin as tty.ReadStream,
+      output: process.stderr as tty.WriteStream,
+      close: () => undefined,
+    };
+  }
+  let inputFd: number | undefined;
+  let outputFd: number | undefined;
+  try {
+    inputFd = fs.openSync("/dev/tty", "r");
+    outputFd = fs.openSync("/dev/tty", "w");
+    const input = new tty.ReadStream(inputFd);
+    const output = new tty.WriteStream(outputFd);
+    return {
+      input,
+      output,
+      close: () => {
+        input.destroy();
+        output.end();
+      },
+    };
+  } catch {
+    if (inputFd !== undefined) fs.closeSync(inputFd);
+    if (outputFd !== undefined) fs.closeSync(outputFd);
+    return {
+      input: process.stdin as tty.ReadStream,
+      output: process.stderr as tty.WriteStream,
+      close: () => undefined,
+    };
+  }
 }
 
 function hasControllingTerminal() {

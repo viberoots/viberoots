@@ -256,7 +256,7 @@ deployment, from deployment metadata to runtime use.
 We will:
 
 1. declare a secret in deployment metadata
-2. set up a selected Vault or Infisical secret source
+2. select and set up a Vault or Infisical secret source
 3. run the deployment
 4. explain what the system does with that secret at runtime
 
@@ -440,6 +440,10 @@ backend's setup path. Vault-backed deployments use
 [Vault Production Bootstrap Runbook](vault-production-bootstrap.md). Infisical-backed deployments use
 the reviewed `infisical_runtime` metadata and Infisical setup flow. Export the
 secret fixture only when an explicit non-production workflow needs it.
+For repo-level resolver setup, `i --bootstrap` offers the supported `main` secret
+backend choices in interactive shells. Automation can pass
+`i --bootstrap --secret-backend vault/default --yes` or
+`i --bootstrap --secret-backend infisical/default --yes`.
 
 That means:
 

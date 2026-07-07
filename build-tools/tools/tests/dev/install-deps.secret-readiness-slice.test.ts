@@ -19,6 +19,7 @@ const baseFlags = {
   forceOverwriteLocalCredentials: false,
   bootstrap: false,
   infisicalLoginMode: "",
+  secretBackend: "",
 };
 
 test("install secret readiness is quiet when deployment metadata is absent", async () => {
@@ -82,6 +83,7 @@ test("install secret readiness prompts for repo bootstrap when project config ex
           return true;
         },
         bootstrap: async (args) => void calls.push(args),
+        selectSecretBackend: async () => "",
       },
     });
     assert.equal(await isInstallSecretReadinessApplicable(repoRoot), true);

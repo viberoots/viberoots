@@ -6,6 +6,8 @@ The canonical operator entrypoint is:
 i
 i --yes
 i --bootstrap
+i --bootstrap --secret-backend vault/default
+i --bootstrap --secret-backend infisical/default
 i --without-secrets
 i --machine-label <label>
 i --infisical-login-mode browser
@@ -42,6 +44,20 @@ reset plan so the existing refs and files that would be deleted are visible, the
 reset local bootstrap state before continuing. The default is to keep local state and run bootstrap.
 Use `--yes` for non-interactive runs; `i --bootstrap --yes` also keeps local state and runs
 bootstrap.
+When bootstrap needs to choose the repo's default `main` secret backend, interactive shells show a
+small selector for supported backends. Choose Infisical when repo secrets should live in an
+Infisical project managed or adopted by repo bootstrap. Choose Vault when repo secrets should live
+behind the Vault resolver profile. Automation can make the same choice without a prompt:
+
+```bash
+i --bootstrap --secret-backend vault/default --yes
+i --bootstrap --secret-backend infisical/default --yes
+```
+
+Vault selection materializes `vault-default` and points the `main` category at that profile. It does
+not initialize, unseal, or administer Vault. For local validation and secret reads, provide the
+Vault client settings documented in the Vault runbook, including `VBR_VAULT_ADDR` and the selected
+credential source such as `VBR_VAULT_TOKEN`.
 
 Deep bootstrap commands remain available for advanced recovery and debugging:
 
@@ -49,6 +65,8 @@ Deep bootstrap commands remain available for advanced recovery and debugging:
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --dry-run
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --secret-backend vault/default
+viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --secret-backend infisical/default
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --bootstrap-scope unfairly-common
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --yes --apply-metadata-patch
 viberoots/build-tools/tools/deployments/infisical-bootstrap.ts repo --without-deployments

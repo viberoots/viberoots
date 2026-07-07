@@ -17,6 +17,7 @@ options:
   --skip-go-tidy
   --without-secrets
   --bootstrap
+  --secret-backend <backend/profile>
   --yes
   --machine-label <label>
   --rotate-bootstrap-credentials

@@ -66,6 +66,7 @@ export async function runRepoBootstrap(
     workspaceRoot,
     graphPath,
     configPath,
+    secretBackend: scopedArgs.secretBackend,
   });
   const sink = await resolveCredentialSinkSelection(scopedArgs, {
     createMissingResolverConfig: true,

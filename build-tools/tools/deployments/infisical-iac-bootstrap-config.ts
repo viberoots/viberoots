@@ -39,6 +39,7 @@ export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   credentialSink: "auto",
   localCredentialFile: ".local/infisical-bootstrap-credentials.json",
   sprinkleCategory: "bootstrap",
+  secretBackend: undefined,
   bootstrapCredentialScope: undefined,
   clientSecretTtl: 0,
   accessTokenTtl: 3600,

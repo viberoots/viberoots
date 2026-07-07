@@ -15,6 +15,7 @@ const baseFlags = {
   forceOverwriteLocalCredentials: false,
   bootstrap: false,
   infisicalLoginMode: "",
+  secretBackend: "",
 };
 
 test("install secret readiness rotates even when local credentials exist", async () => {
@@ -30,7 +31,14 @@ test("install secret readiness rotates even when local credentials exist", async
       deps: { bootstrap: async (args) => void calls.push(args), isInteractive: () => false },
     });
     assert.deepEqual(calls, [
-      ["repo", "--yes", "--rotate-bootstrap-credentials", "--rotate-deployment-credentials"],
+      [
+        "repo",
+        "--yes",
+        "--login-mode",
+        "browser",
+        "--rotate-bootstrap-credentials",
+        "--rotate-deployment-credentials",
+      ],
     ]);
   });
 });

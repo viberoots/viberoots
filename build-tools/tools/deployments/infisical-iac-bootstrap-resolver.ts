@@ -16,8 +16,17 @@ import {
 import { resolverConfigPath } from "./infisical-iac-bootstrap-preflight";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 import { resolveBootstrapAccessCredentialSinkBackend } from "./sprinkleref-bootstrap-guard";
-import { initLocalSprinkleRefValues, initSprinkleRefConfigs } from "./sprinkleref-templates";
-import type { SprinkleRefConfig } from "./sprinkleref-types";
+import {
+  initLocalSprinkleRefValues,
+  initSprinkleRefConfigs,
+  VAULT_DEFAULT,
+} from "./sprinkleref-templates";
+import { starterInfisicalProfile } from "./infisical-iac-bootstrap-profile-kind";
+import type {
+  SprinkleRefBackendConfig,
+  SprinkleRefConfig,
+  SprinkleRefConfigFile,
+} from "./sprinkleref-types";
 
 const STARTER_CATEGORY_PROFILES = ["infisical-default"];
 
@@ -27,6 +36,7 @@ export async function ensureRepoResolverConfig(opts: {
   graphPath?: string;
   workspaceRoot?: string;
   configPath?: string;
+  secretBackend?: string;
 }) {
   const workspaceRoot = opts.workspaceRoot || (await findRepoRoot(process.cwd()));
   const configPath =
@@ -36,7 +46,8 @@ export async function ensureRepoResolverConfig(opts: {
     const profiles = await repoBootstrapProfiles({
       graphPath: opts.graphPath,
       workspaceRoot,
-      starterCategoryProfiles: true,
+      starterCategoryProfiles: !opts.secretBackend?.trim(),
+      explicitSecretBackend: opts.secretBackend,
     });
     if (opts.dryRun) {
       return {
@@ -54,12 +65,16 @@ export async function ensureRepoResolverConfig(opts: {
     });
     await initLocalSprinkleRefValues(workspaceRoot);
   }
+  if (opts.secretBackend?.trim() && !opts.dryRun) {
+    await selectRepoSecretBackend(configPath, opts.secretBackend);
+  }
   const config = await readSprinkleRefConfig(configPath, workspaceRoot);
   const requiredProfiles = new Set(
     await repoBootstrapProfiles({
       graphPath: opts.graphPath,
       workspaceRoot,
       config,
+      explicitSecretBackend: opts.secretBackend,
     }),
   );
   validateRepoResolverConfig(config, requiredProfiles);
@@ -77,9 +92,14 @@ export async function repoBootstrapProfiles(opts: {
   workspaceRoot?: string;
   config?: SprinkleRefConfig;
   starterCategoryProfiles?: boolean;
+  explicitSecretBackend?: string;
 }) {
   const profiles = await requiredBackendProfiles(opts.graphPath, opts.workspaceRoot);
   if (opts.config) addCategoryProfiles(profiles, opts.config);
+  if (opts.explicitSecretBackend?.trim()) {
+    const selector = normalizeExplicitSecretBackend(opts.explicitSecretBackend);
+    profiles.add(selector.profile);
+  }
   if (opts.starterCategoryProfiles) {
     for (const profile of STARTER_CATEGORY_PROFILES) profiles.add(profile);
   }
@@ -174,9 +194,38 @@ function addCategoryProfiles(profiles: Set<string>, config: SprinkleRefConfig) {
 }
 
 function activeCategoryProfiles(config: SprinkleRefConfig) {
-  return Object.values(config.categories)
-    .map((category) => ("profile" in category ? category.profile.trim() : ""))
-    .filter(Boolean);
+  const category = config.categories[config.defaultCategory || "main"];
+  return category && "profile" in category && category.profile.trim()
+    ? [category.profile.trim()]
+    : [];
+}
+
+async function selectRepoSecretBackend(configPath: string, secretBackend: string) {
+  const selector = normalizeExplicitSecretBackend(secretBackend);
+  const raw = JSON.parse(await fs.readFile(configPath, "utf8")) as SprinkleRefConfigFile & {
+    sprinkleref?: SprinkleRefConfigFile;
+  };
+  const resolver = raw.sprinkleref || raw;
+  resolver.profiles = { ...(resolver.profiles || {}) };
+  resolver.categories = { ...(resolver.categories || {}) };
+  resolver.profiles[selector.profile] ||= starterProfileForSelector(selector);
+  resolver.defaultCategory = "main";
+  resolver.categories.main = { profile: selector.profile };
+  if (raw.sprinkleref) raw.sprinkleref = resolver;
+  await fs.writeFile(configPath, `${JSON.stringify(raw, null, 2)}\n`);
+}
+
+function normalizeExplicitSecretBackend(secretBackend: string) {
+  const errors = deploymentSecretBackendSelectorErrors({ secretBackend });
+  if (errors.length > 0) throw new Error(errors.join("; "));
+  return normalizeDeploymentSecretBackendSelector({ secretBackend });
+}
+
+function starterProfileForSelector(
+  selector: ReturnType<typeof normalizeDeploymentSecretBackendSelector>,
+): SprinkleRefBackendConfig {
+  if (selector.backend === "vault") return { ...VAULT_DEFAULT };
+  return starterInfisicalProfile();
 }
 
 async function fileExists(file: string) {

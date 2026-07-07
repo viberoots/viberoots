@@ -11,6 +11,7 @@ import {
   createCredentialSink,
   resolveCredentialSinkSelection,
 } from "../../deployments/infisical-iac-bootstrap-sink";
+import { ensureRepoResolverConfig } from "../../deployments/infisical-iac-bootstrap-resolver";
 import {
   assertMissing,
   captureConsole,
@@ -145,6 +146,81 @@ test("repo bootstrap materializes missing non-default Infisical profiles", async
       "infisical-default",
     ]);
     assert.match(await fs.readFile(sharedConfigPath(), "utf8"), /"infisical-regulated"/);
+  });
+});
+
+test("repo bootstrap can select Vault as the default main secret backend", async () => {
+  const dir = await tmp();
+  await withCwdAndEnv(dir, async () => {
+    const output = await captureConsole(() =>
+      runInfisicalIacBootstrap({
+        ...DEFAULT_BOOTSTRAP_ARGS,
+        credentialSink: "local-file",
+        secretBackend: "vault/default",
+        yes: true,
+      }),
+    );
+    const report = JSON.parse(output.stdout);
+    assert.deepEqual(report.profiles, ["vault-default"]);
+    assert.deepEqual(report.bootstrapCredentialSinks, []);
+    assert.equal(report.verification.bootstrap.status, "not-required");
+    assert.equal(report.verification.main.backend, "vault");
+    const shared = await fs.readFile(sharedConfigPath(), "utf8");
+    assert.match(shared, /"defaultCategory": "main"/);
+    assert.match(shared, /"main": \{\n\s+"profile": "vault-default"\n\s+\}/);
+  });
+});
+
+test("repo bootstrap dry-run reports explicit Vault main backend", async () => {
+  const dir = await tmp();
+  await withCwdAndEnv(dir, async () => {
+    const report = await ensureRepoResolverConfig({
+      dryRun: true,
+      workspaceRoot: dir,
+      configPath: sharedConfigPath(),
+      secretBackend: "vault/default",
+    });
+    assert.deepEqual(report.profiles, ["vault-default"]);
+    assert.deepEqual(report.bootstrapCredentialProfiles, []);
+    await assertMissing("projects/config/shared.json");
+  });
+});
+
+test("repo bootstrap ignores inactive categories when computing required profiles", async () => {
+  const dir = await tmp();
+  await withCwdAndEnv(dir, async () => {
+    await writeJson("projects/config/shared.json", {
+      sprinkleref: {
+        version: 1,
+        defaultCategory: "main",
+        profiles: {
+          "vault-default": VAULT_PROFILE,
+          "infisical-control": {
+            backend: "infisical",
+            host: "https://app.infisical.com",
+            projectIdEnv: "UNSET_INFISICAL_PROJECT_ID",
+            defaultEnvironment: "prod",
+            clientIdEnv: "INFISICAL_CLIENT_ID",
+            clientSecretEnv: "INFISICAL_CLIENT_SECRET",
+          },
+        },
+        categories: {
+          main: { profile: "vault-default" },
+          control: { profile: "infisical-control" },
+          bootstrap: { backend: "local-file", file: ".local/bootstrap.json" },
+        },
+      },
+    });
+    const output = await captureConsole(() =>
+      runInfisicalIacBootstrap({
+        ...DEFAULT_BOOTSTRAP_ARGS,
+        credentialSink: "local-file",
+        yes: true,
+      }),
+    );
+    const report = JSON.parse(output.stdout);
+    assert.deepEqual(report.profiles, ["vault-default"]);
+    assert.deepEqual(report.bootstrapCredentialSinks, []);
   });
 });
 

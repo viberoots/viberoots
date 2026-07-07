@@ -15,6 +15,7 @@ const baseFlags = {
   forceOverwriteLocalCredentials: false,
   bootstrap: false,
   infisicalLoginMode: "",
+  secretBackend: "",
 };
 
 test("install secret readiness skips bootstrap when local Universal Auth credentials exist", async () => {
@@ -59,6 +60,7 @@ test("install secret readiness prompts when credentials are missing and forwards
             return true;
           },
           bootstrap: async (args) => void calls.push(args),
+          selectSecretBackend: async () => "",
         },
       });
     });
@@ -81,6 +83,50 @@ test("install secret readiness prompts when credentials are missing and forwards
   });
 });
 
+test("install secret readiness forwards explicit secret backend to repo bootstrap", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot);
+    const calls: string[][] = [];
+    await ensureInstallSecretReadiness({
+      repoRoot,
+      dryRun: false,
+      verbose: false,
+      flags: { ...baseFlags, secretBackend: "vault/default" },
+      deps: {
+        isInteractive: () => true,
+        prompt: async () => true,
+        bootstrap: async (args) => void calls.push(args),
+        selectSecretBackend: async () => "",
+      },
+    });
+    assert.deepEqual(calls, [
+      ["repo", "--yes", "--login-mode", "browser", "--secret-backend", "vault/default"],
+    ]);
+  });
+});
+
+test("install secret readiness forwards interactive secret backend selection", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot);
+    const calls: string[][] = [];
+    await ensureInstallSecretReadiness({
+      repoRoot,
+      dryRun: false,
+      verbose: false,
+      flags: baseFlags,
+      deps: {
+        isInteractive: () => true,
+        prompt: async () => true,
+        bootstrap: async (args) => void calls.push(args),
+        selectSecretBackend: async () => "vault/default",
+      },
+    });
+    assert.deepEqual(calls, [
+      ["repo", "--yes", "--login-mode", "browser", "--secret-backend", "vault/default"],
+    ]);
+  });
+});
+
 test("install secret readiness prompts when resolver config is missing", async () => {
   await withRepo(async (repoRoot) => {
     const calls: string[][] = [];
@@ -93,6 +139,7 @@ test("install secret readiness prompts when resolver config is missing", async (
         isInteractive: () => true,
         prompt: async () => true,
         bootstrap: async (args) => void calls.push(args),
+        selectSecretBackend: async () => "",
       },
     });
     assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "browser"]]);
@@ -112,6 +159,7 @@ test("install secret readiness forwards explicit Infisical login mode to repo bo
         isInteractive: () => true,
         prompt: async () => true,
         bootstrap: async (args) => void calls.push(args),
+        selectSecretBackend: async () => "",
       },
     });
     assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
@@ -131,6 +179,7 @@ test("install secret readiness forwards explicit browser login mode to repo boot
         isInteractive: () => true,
         prompt: async () => true,
         bootstrap: async (args) => void calls.push(args),
+        selectSecretBackend: async () => "",
       },
     });
     assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "browser"]]);
@@ -252,6 +301,7 @@ test("install secret readiness interactive bootstrap warns and keeps local state
           return false;
         },
         isInteractive: () => true,
+        selectSecretBackend: async () => "",
       },
     });
     assert.deepEqual(resets, [["--dry-run"]]);
@@ -278,6 +328,7 @@ test("install secret readiness interactive bootstrap resets local state when con
         bootstrap: async (args) => void calls.push(args),
         prompt: async () => true,
         isInteractive: () => true,
+        selectSecretBackend: async () => "",
       },
     });
     assert.deepEqual(resets, [["--dry-run"], ["--yes"]]);
@@ -307,6 +358,7 @@ test("install secret readiness interactive bootstrap skips reset prompt when no 
           return true;
         },
         isInteractive: () => true,
+        selectSecretBackend: async () => "",
       },
     });
     assert.deepEqual(resets, [["--dry-run"]]);

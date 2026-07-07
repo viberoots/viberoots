@@ -29,6 +29,7 @@ export type BootstrapArgs = {
   credentialSink: "auto" | "local-file" | "macos-keychain" | "sprinkleref";
   localCredentialFile: string;
   sprinkleCategory: string;
+  secretBackend?: string;
   bootstrapCredentialScope?: string;
   clientSecretTtl: number;
   accessTokenTtl: number;

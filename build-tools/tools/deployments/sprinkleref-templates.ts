@@ -7,7 +7,7 @@ import type { SprinkleRefConfigFile } from "./sprinkleref-types";
 import { LOCAL_VALUES_PATH } from "./aws-account-inputs";
 import { findRepoRoot } from "../lib/repo";
 
-const VAULT_DEFAULT = {
+export const VAULT_DEFAULT = {
   backend: "vault" as const,
   addressEnv: "VBR_VAULT_ADDR",
   tokenEnv: "VBR_VAULT_TOKEN",

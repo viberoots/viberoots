@@ -18,6 +18,7 @@ const baseFlags = {
   forceOverwriteLocalCredentials: false,
   bootstrap: false,
   infisicalLoginMode: "",
+  secretBackend: "",
 };
 
 test("install secret readiness propagates malformed deployment metadata", async () => {
@@ -67,6 +68,7 @@ test("install secret readiness still treats valid metadata with absent credentia
         isInteractive: () => true,
         prompt: async () => true,
         bootstrap: async (args) => void calls.push(args),
+        selectSecretBackend: async () => "",
       },
     });
     assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "browser"]]);
