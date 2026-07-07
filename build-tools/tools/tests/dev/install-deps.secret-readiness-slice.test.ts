@@ -17,6 +17,8 @@ const baseFlags = {
   rotateBootstrapCredentials: false,
   rotateDeploymentCredentials: false,
   forceOverwriteLocalCredentials: false,
+  setupSecrets: false,
+  resetSecrets: false,
 };
 
 test("install secret readiness is quiet when deployment metadata is absent", async () => {
@@ -61,6 +63,26 @@ test("install secret readiness reports not applicable in verbose partial checkou
       });
     });
     assert.match(output, /not applicable in this checkout/);
+  });
+});
+
+test("install secret readiness explicit setup bypasses deployment metadata applicability gate", async () => {
+  await withRepo(async (repoRoot) => {
+    const calls: string[][] = [];
+    await ensureInstallSecretReadiness({
+      repoRoot,
+      dryRun: false,
+      verbose: false,
+      flags: { ...baseFlags, setupSecrets: true, yes: true },
+      deps: {
+        probe: async () => {
+          throw new Error("probe must not run");
+        },
+        bootstrap: async (args) => void calls.push(args),
+        isInteractive: () => false,
+      },
+    });
+    assert.deepEqual(calls, [["repo", "--yes"]]);
   });
 });
 

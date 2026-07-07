@@ -13,6 +13,8 @@ const baseFlags = {
   rotateBootstrapCredentials: false,
   rotateDeploymentCredentials: false,
   forceOverwriteLocalCredentials: false,
+  setupSecrets: false,
+  resetSecrets: false,
 };
 
 test("install secret readiness skips bootstrap when local Universal Auth credentials exist", async () => {
@@ -155,6 +157,65 @@ test("install secret readiness --yes and env override allow non-interactive repo
       else process.env.INSTALL_DEPS_SETUP_SECRETS = old;
     }
     assert.deepEqual(calls, [["repo", "--yes"]]);
+  });
+});
+
+test("install secret readiness explicit setup runs repo bootstrap even when credentials exist", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot);
+    await writeCredentials(repoRoot);
+    const calls: string[][] = [];
+    await ensureInstallSecretReadiness({
+      repoRoot,
+      dryRun: false,
+      verbose: false,
+      flags: { ...baseFlags, setupSecrets: true, yes: true },
+      deps: { bootstrap: async (args) => void calls.push(args), isInteractive: () => false },
+    });
+    assert.deepEqual(calls, [["repo", "--yes"]]);
+  });
+});
+
+test("install secret readiness explicit reset clears local bootstrap state before setup", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot);
+    await writeCredentials(repoRoot);
+    const resets: string[][] = [];
+    const calls: string[][] = [];
+    await ensureInstallSecretReadiness({
+      repoRoot,
+      dryRun: false,
+      verbose: false,
+      flags: { ...baseFlags, resetSecrets: true, yes: true },
+      deps: {
+        resetLocal: async (args) => void resets.push(args),
+        bootstrap: async (args) => void calls.push(args),
+        isInteractive: () => false,
+      },
+    });
+    assert.deepEqual(resets, [["--yes"]]);
+    assert.deepEqual(calls, [["repo", "--yes"]]);
+  });
+});
+
+test("install secret readiness explicit setup fails closed in non-interactive mode without yes", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot);
+    const calls: string[][] = [];
+    await assert.rejects(
+      ensureInstallSecretReadiness({
+        repoRoot,
+        dryRun: false,
+        verbose: false,
+        flags: { ...baseFlags, setupSecrets: true },
+        deps: {
+          bootstrap: async (args) => void calls.push(args),
+          isInteractive: () => false,
+        },
+      }),
+      /--setup-secrets --yes/,
+    );
+    assert.deepEqual(calls, []);
   });
 });
 

@@ -10,6 +10,7 @@ import {
 } from "../../deployments/sprinkleref-keychain";
 import { runNodeWithZx } from "../../lib/node-run";
 import { PROJECT_SHARED_CONFIG_PATH } from "../../deployments/project-config";
+import { runInfisicalBootstrapResetLocal } from "../../deployments/infisical-bootstrap-reset-local";
 import { loadDeploymentReadinessModules, sinkFromSelection } from "./secret-readiness-modules";
 import { buildToolPath, zxInitPath } from "../dev-build/paths";
 
@@ -20,12 +21,15 @@ export type SecretReadinessFlags = {
   rotateBootstrapCredentials: boolean;
   rotateDeploymentCredentials: boolean;
   forceOverwriteLocalCredentials: boolean;
+  setupSecrets: boolean;
+  resetSecrets: boolean;
 };
 
 export type SecretReadinessDeps = {
   isInteractive?: () => boolean;
   prompt?: (message: string) => Promise<boolean>;
   bootstrap?: (args: string[]) => Promise<void>;
+  resetLocal?: (args: string[]) => Promise<void>;
   probe?: (repoRoot: string) => Promise<SecretReadinessProbe>;
 };
 
@@ -53,6 +57,12 @@ export async function ensureInstallSecretReadiness(opts: {
   flags: SecretReadinessFlags;
   deps?: SecretReadinessDeps;
 }) {
+  if (opts.flags.withoutSecrets && (opts.flags.setupSecrets || opts.flags.resetSecrets)) {
+    throw new Error("--without-secrets cannot be combined with --setup-secrets or --reset-secrets");
+  }
+  if (opts.flags.resetSecrets || opts.flags.setupSecrets) {
+    return await runExplicitSecretSetup(opts);
+  }
   if (opts.flags.withoutSecrets || opts.dryRun) {
     if (opts.verbose) console.log("[install-deps] skipping Infisical secret readiness");
     return;
@@ -89,6 +99,33 @@ export async function ensureInstallSecretReadiness(opts: {
       return;
     }
   }
+  await runRepoBootstrap(opts);
+}
+
+async function runExplicitSecretSetup(opts: {
+  repoRoot: string;
+  dryRun: boolean;
+  verbose: boolean;
+  flags: SecretReadinessFlags;
+  deps?: SecretReadinessDeps;
+}) {
+  if (opts.dryRun) {
+    if (opts.flags.resetSecrets) await runLocalReset(opts, ["--dry-run"]);
+    if (opts.verbose) console.log("[install-deps] dry-run: would run Infisical repo bootstrap");
+    return;
+  }
+  const allowed = opts.flags.yes || process.env.INSTALL_DEPS_SETUP_SECRETS === "1";
+  const interactive = opts.deps?.isInteractive?.() ?? isInteractiveShell();
+  if (!allowed && !interactive) throw new Error(nonInteractiveExplicitSetupMessage());
+  if (!allowed) {
+    const confirmed =
+      (await (opts.deps?.prompt || promptYesNo)(explicitSetupPrompt(opts.flags))) ?? false;
+    if (!confirmed) {
+      console.error("Infisical setup skipped. Rerun with `i --setup-secrets` when ready.");
+      return;
+    }
+  }
+  if (opts.flags.resetSecrets) await runLocalReset(opts, ["--yes"]);
   await runRepoBootstrap(opts);
 }
 
@@ -304,6 +341,22 @@ async function runRepoBootstrap(opts: {
   );
 }
 
+async function runLocalReset(
+  opts: {
+    repoRoot: string;
+    deps?: SecretReadinessDeps;
+  },
+  args: string[],
+) {
+  await (
+    opts.deps?.resetLocal ||
+    ((resetArgs) =>
+      runInfisicalBootstrapResetLocal(resetArgs, {
+        cwd: opts.repoRoot,
+      }))
+  )(args);
+}
+
 async function runBootstrap(repoRoot: string, args: string[]) {
   await runNodeWithZx({
     cwd: repoRoot,
@@ -341,4 +394,17 @@ function nonInteractiveMessage() {
     "Infisical local credentials are not ready.",
     "Rerun `i --yes` to allow local repo bootstrap, or use `i --without-secrets` for dependency-only setup.",
   ].join(" ");
+}
+
+function nonInteractiveExplicitSetupMessage() {
+  return [
+    "Infisical secret setup requires confirmation in non-interactive mode.",
+    "Rerun with `i --setup-secrets --yes`, or `i --reset-secrets --yes` to reset local bootstrap state first.",
+  ].join(" ");
+}
+
+function explicitSetupPrompt(flags: SecretReadinessFlags) {
+  return flags.resetSecrets
+    ? "Reset local Infisical bootstrap state and run repo bootstrap now? [Y/n] "
+    : "Run Infisical repo bootstrap now? [Y/n] ";
 }

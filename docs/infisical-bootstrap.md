@@ -5,6 +5,8 @@ The canonical operator entrypoint is:
 ```bash
 i
 i --yes
+i --setup-secrets
+i --reset-secrets
 i --without-secrets
 i --machine-label <label>
 ```
@@ -22,6 +24,10 @@ Lazy `i` secret readiness is capability-gated by checked-out deployment metadata
 minimized workspaces without `projects/deployments/example-app/shared/family.bzl` skip Infisical
 readiness automatically and do not require `--without-secrets`; full checkouts can still use
 `--without-secrets` or `INSTALL_DEPS_WITHOUT_SECRETS=1` as an explicit dependency-only opt-out.
+Use `i --setup-secrets` when you want to inspect/fix generated shared and local resolver config and
+run the repo bootstrap flow even when lazy readiness is not applicable. Use `i --reset-secrets` to
+first delete local bootstrap state and then rerun repo bootstrap from a fresh local credential sink.
+Both flags prompt before mutating state; use `--yes` for non-interactive runs.
 
 Deep bootstrap commands remain available for advanced recovery and debugging:
 
@@ -98,7 +104,14 @@ Expected local bootstrap artifacts are ignored and should not be committed:
 `projects/config/local.json`, `.local/`, the OpenTofu `.terraform/` directory,
 `terraform.tfstate*`, and `.terraform.lock.hcl`.
 To intentionally return to a clean local bootstrap state without deleting Infisical cloud
-resources, run:
+resources and then bootstrap again, run:
+
+```bash
+i --reset-secrets
+```
+
+The lower-level reset utility remains available for recovery when you only want to remove local
+state without immediately rerunning repo bootstrap:
 
 ```bash
 build-tools/tools/deployments/infisical-bootstrap-reset-local.ts --dry-run
