@@ -4,7 +4,6 @@ import type { Dirent } from "node:fs";
 import * as readline from "node:readline/promises";
 import path from "node:path";
 import process from "node:process";
-import * as tty from "node:tty";
 import type { DeploymentBootstrapScope } from "../../deployments/infisical-iac-bootstrap-config";
 import {
   MacosKeychainInaccessibleError,
@@ -19,6 +18,7 @@ import {
 } from "../../deployments/infisical-bootstrap-reset-local";
 import { loadDeploymentReadinessModules, sinkFromSelection } from "./secret-readiness-modules";
 import { buildToolPath, zxInitPath } from "../dev-build/paths";
+import { hasControllingTerminal, promptTerminalSelect } from "../../lib/terminal-select";
 
 export type SecretReadinessFlags = {
   withoutSecrets: boolean;
@@ -429,7 +429,7 @@ async function selectSecretBackendWhenInteractive(
 }
 
 async function promptSecretBackend() {
-  return await promptSelect(
+  return await promptTerminalSelect(
     "Select main secret backend",
     [
       { label: "Infisical", value: "infisical/default" },
@@ -437,85 +437,8 @@ async function promptSecretBackend() {
       { label: "macOS Keychain", value: "keychain/default" },
     ],
     0,
+    { cancelMessage: "secret backend selection cancelled" },
   );
-}
-
-async function promptSelect(
-  message: string,
-  choices: Array<{ label: string; value: string }>,
-  initialIndex: number,
-) {
-  const streams = promptTtyStreams();
-  if (!streams.input.isTTY) return await promptSelectLine(message, choices, initialIndex);
-  let index = Math.max(0, Math.min(initialIndex, choices.length - 1));
-  let rendered = false;
-  const render = () => {
-    if (!rendered) {
-      streams.output.write(`${message}:\n`);
-      rendered = true;
-    } else {
-      streams.output.write(`\x1b[${choices.length}A`);
-    }
-    choices.forEach((choice, idx) => {
-      const selected = idx === index;
-      streams.output.write(
-        `\r\x1b[K${selected ? ">" : " "} ${choice.label} (${choice.value})${
-          selected ? "  Up/Down then Enter" : ""
-        }\n`,
-      );
-    });
-  };
-  const previousRaw = streams.input.isRaw;
-  streams.input.setRawMode(true);
-  streams.input.resume();
-  render();
-  let onData: ((chunk: Buffer) => void) | undefined;
-  try {
-    return await new Promise<string>((resolve, reject) => {
-      onData = (chunk: Buffer) => {
-        const text = chunk.toString("utf8");
-        if (text === "\u0003") {
-          streams.output.write("\n");
-          reject(new Error("secret backend selection cancelled"));
-          return;
-        }
-        if (text === "\r" || text === "\n") {
-          streams.output.write("\n");
-          resolve(choices[index]?.value || choices[0]!.value);
-          return;
-        }
-        if (text === "\u001b[A") index = (index + choices.length - 1) % choices.length;
-        if (text === "\u001b[B") index = (index + 1) % choices.length;
-        render();
-      };
-      streams.input.on("data", onData);
-    });
-  } finally {
-    if (onData) streams.input.off("data", onData);
-    streams.input.setRawMode(previousRaw);
-    streams.close();
-  }
-}
-
-async function promptSelectLine(
-  message: string,
-  choices: Array<{ label: string; value: string }>,
-  initialIndex: number,
-) {
-  const streams = promptStreams();
-  const rl = readline.createInterface({ input: streams.input, output: streams.output });
-  try {
-    streams.output.write(`${message}:\n`);
-    choices.forEach((choice, idx) => {
-      streams.output.write(`  ${idx + 1}. ${choice.label} (${choice.value})\n`);
-    });
-    const answer = (await rl.question(`Choose [${initialIndex + 1}]: `)).trim();
-    const parsed = Number(answer || initialIndex + 1);
-    return choices[parsed - 1]?.value || choices[initialIndex]?.value || choices[0]!.value;
-  } finally {
-    rl.close();
-    streams.close();
-  }
 }
 
 function effectiveLoginMode(flags: SecretReadinessFlags) {
@@ -645,53 +568,6 @@ function promptStreams(): PromptStreams {
       output.end();
     },
   };
-}
-
-function promptTtyStreams() {
-  if (process.stdin.isTTY && process.stderr.isTTY) {
-    return {
-      input: process.stdin as tty.ReadStream,
-      output: process.stderr as tty.WriteStream,
-      close: () => undefined,
-    };
-  }
-  let inputFd: number | undefined;
-  let outputFd: number | undefined;
-  try {
-    inputFd = fs.openSync("/dev/tty", "r");
-    outputFd = fs.openSync("/dev/tty", "w");
-    const input = new tty.ReadStream(inputFd);
-    const output = new tty.WriteStream(outputFd);
-    return {
-      input,
-      output,
-      close: () => {
-        input.destroy();
-        output.end();
-      },
-    };
-  } catch {
-    if (inputFd !== undefined) fs.closeSync(inputFd);
-    if (outputFd !== undefined) fs.closeSync(outputFd);
-    return {
-      input: process.stdin as tty.ReadStream,
-      output: process.stderr as tty.WriteStream,
-      close: () => undefined,
-    };
-  }
-}
-
-function hasControllingTerminal() {
-  if (process.platform === "win32") return false;
-  let fd: number | undefined;
-  try {
-    fd = fs.openSync("/dev/tty", "r+");
-    return true;
-  } catch {
-    return false;
-  } finally {
-    if (fd !== undefined) fs.closeSync(fd);
-  }
 }
 
 function nonInteractiveMessage() {

@@ -1,4 +1,5 @@
 import type { InfisicalApi } from "./infisical-iac-bootstrap-api";
+import { hasControllingTerminal, promptTerminalSelect } from "../lib/terminal-select";
 
 export type InfisicalRepoProject = {
   id: string;
@@ -8,12 +9,36 @@ export type InfisicalRepoProject = {
   environmentSlugs?: string[];
 };
 
+export type InfisicalRepoProjectSelector = (opts: {
+  projects: InfisicalRepoProject[];
+  defaultProjectName: string;
+}) => Promise<string>;
+
 export async function ensureInfisicalRepoProject(
   api: InfisicalApi,
   organizationId: string,
   projectName: string,
+  opts: {
+    allowInteractiveSelection?: boolean;
+    selectProject?: InfisicalRepoProjectSelector;
+  } = {},
 ) {
   const projects = await listInfisicalProjects(api);
+  const visibleProjects = projects.filter((project) =>
+    projectMatchesOrganization(project, organizationId),
+  );
+  if (opts.selectProject || shouldPromptForProject(opts.allowInteractiveSelection)) {
+    const selected = await selectInfisicalRepoProject(
+      visibleProjects,
+      projectName,
+      opts.selectProject,
+    );
+    if (selected !== CREATE_DEFAULT_PROJECT_VALUE) {
+      const project = visibleProjects.find((candidate) => candidate.id === selected);
+      if (!project) throw new Error(`selected Infisical project ${selected} was not found`);
+      return { project, changed: false };
+    }
+  }
   const existing = projects.find(
     (project) =>
       project.name === projectName && projectMatchesOrganization(project, organizationId),
@@ -157,6 +182,39 @@ function isPlanLimitError(error: unknown) {
 function formatProject(project: InfisicalRepoProject) {
   const slug = project.slug ? ` slug=${project.slug}` : "";
   return `${project.name} id=${project.id}${slug}`;
+}
+
+const CREATE_DEFAULT_PROJECT_VALUE = "__create_default_infisical_project__";
+
+async function selectInfisicalRepoProject(
+  projects: InfisicalRepoProject[],
+  defaultProjectName: string,
+  selectProject?: InfisicalRepoProjectSelector,
+) {
+  if (selectProject) return await selectProject({ projects, defaultProjectName });
+  const choices = [
+    ...projects.map((project) => ({
+      label: projectChoiceLabel(project),
+      value: project.id,
+    })),
+    {
+      label: `Create/use default project "${defaultProjectName}"`,
+      value: CREATE_DEFAULT_PROJECT_VALUE,
+    },
+  ];
+  return await promptTerminalSelect("Select Infisical project", choices, choices.length - 1, {
+    cancelMessage: "Infisical project selection cancelled",
+  });
+}
+
+function shouldPromptForProject(allowInteractiveSelection: boolean | undefined) {
+  if (!allowInteractiveSelection) return false;
+  return Boolean((process.stdin.isTTY && process.stderr.isTTY) || hasControllingTerminal());
+}
+
+function projectChoiceLabel(project: InfisicalRepoProject) {
+  const slug = project.slug && project.slug !== project.name ? ` slug=${project.slug}` : "";
+  return `${project.name}${slug}`;
 }
 
 type ProjectListResponse = {

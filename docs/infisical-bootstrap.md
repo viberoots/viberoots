@@ -120,7 +120,12 @@ For Infisical-backed repo secrets, repo bootstrap creates or adopts a repo-level
 secret-manager project. By default that project name is the consumer workspace directory name, so a
 checkout named `unfairly-common` uses an Infisical project named `unfairly-common`. Set
 `sprinkleref.repoInfisicalProjectName` in `projects/config/shared.json` to use a different stable
-project name, or pass `--infisical-project-name <name>` for a one-off bootstrap run.
+project name, or pass `--infisical-project-name <name>` for a one-off bootstrap run. When that
+project name comes from the generated repo default and the shell is interactive, bootstrap lists
+visible Infisical secret-manager projects before creating anything. Choose an existing project to
+adopt it, or leave the final default option selected to create/use the repo-derived project name.
+Explicit `sprinkleref.repoInfisicalProjectName` and `--infisical-project-name` values skip this
+selector.
 For macOS Keychain-backed local storage, bootstrap uses repo-derived services by default:
 `<workspace-name>-bootstrap` for repo bootstrap credentials and `<workspace-name>` for the
 `keychain/default` main backend. Set `sprinkleref.bootstrapKeychainServiceName` or
@@ -129,12 +134,13 @@ or pass `--bootstrap-keychain-service-name <name>` or `--keychain-service-name <
 Existing operator-authored Infisical profiles are preserved once their `projectId` validates in the
 selected organization.
 If Infisical rejects the default repo project creation because the organization has reached a
-project or workspace plan limit, reuse an existing Infisical secret-manager project. Set
-`sprinkleref.repoInfisicalProjectName` to the existing project name, pass
-`--infisical-project-name <name>`, set `sprinkleref.profiles.<profile>.projectId` in
-`projects/config/shared.json` for the generated Infisical profile, or export
-`VBR_INFISICAL_PROJECT_ID` before rerunning bootstrap. The bootstrap error lists visible candidate
-projects when Infisical returns them.
+project or workspace plan limit, reuse an existing Infisical secret-manager project. In an
+interactive default-name flow, rerun bootstrap and choose that existing project from the selector.
+For non-interactive or explicit-name flows, set `sprinkleref.repoInfisicalProjectName` to the
+existing project name, pass `--infisical-project-name <name>`, set
+`sprinkleref.profiles.<profile>.projectId` in `projects/config/shared.json` for the generated
+Infisical profile, or export `VBR_INFISICAL_PROJECT_ID` before rerunning bootstrap. The bootstrap
+error lists visible candidate projects when Infisical returns them.
 Before reporting success, repo bootstrap reads the generated bootstrap credential refs back from the
 selected local sink, checks they match the machine's repo Universal Auth credential, and performs an
 Infisical Universal Auth login probe. It also validates the default `main` resolver category: for

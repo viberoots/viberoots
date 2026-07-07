@@ -3,6 +3,31 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { ensureInfisicalRepoProject } from "../../deployments/infisical-iac-bootstrap-profile-api";
 
+test("repo project selector can adopt an existing Infisical project", async () => {
+  const result = await ensureInfisicalRepoProject(
+    fakeProjectApi([
+      { id: "proj_existing", name: "shared-secrets", slug: "shared-secrets", orgId: "org_1" },
+      { id: "proj_other_org", name: "other-org", orgId: "org_2" },
+    ]) as never,
+    "org_1",
+    "fixture-repo",
+    {
+      allowInteractiveSelection: true,
+      selectProject: async ({ projects, defaultProjectName }) => {
+        assert.equal(defaultProjectName, "fixture-repo");
+        assert.deepEqual(
+          projects.map((project) => project.name),
+          ["shared-secrets"],
+        );
+        return "proj_existing";
+      },
+    },
+  );
+
+  assert.equal(result.changed, false);
+  assert.equal(result.project.id, "proj_existing");
+});
+
 test("repo project creation failure explains how to reuse an existing Infisical project", async () => {
   await assert.rejects(
     () =>

@@ -63,11 +63,32 @@ export async function withRepoInfisicalProjectName(
   args: BootstrapArgs,
   workspaceRoot: string,
 ): Promise<BootstrapArgs> {
-  const infisicalProjectName =
-    args.infisicalProjectName ||
-    (await configuredRepoInfisicalProjectName(workspaceRoot)) ||
-    defaultRepoInfisicalProjectName(workspaceRoot);
-  return { ...args, infisicalProjectName: validateRepoInfisicalProjectName(infisicalProjectName) };
+  if (args.infisicalProjectName && args.infisicalProjectNameSource) {
+    return {
+      ...args,
+      infisicalProjectName: validateRepoInfisicalProjectName(args.infisicalProjectName),
+    };
+  }
+  if (args.infisicalProjectName) {
+    return {
+      ...args,
+      infisicalProjectName: validateRepoInfisicalProjectName(args.infisicalProjectName),
+      infisicalProjectNameSource: "explicit",
+    };
+  }
+  const configured = await configuredRepoInfisicalProjectName(workspaceRoot);
+  if (configured) {
+    return {
+      ...args,
+      infisicalProjectName: validateRepoInfisicalProjectName(configured),
+      infisicalProjectNameSource: "config",
+    };
+  }
+  return {
+    ...args,
+    infisicalProjectName: defaultRepoInfisicalProjectName(workspaceRoot),
+    infisicalProjectNameSource: "default",
+  };
 }
 
 export async function withBootstrapKeychainServiceName(

@@ -303,7 +303,10 @@ containing letters, numbers, `.`, `_`, or `-`.
 that bootstrap creates or adopts for Infisical-backed `secret://...` refs. When it is omitted,
 bootstrap uses the consumer workspace directory name. For example, a workspace named
 `unfairly-common` uses an Infisical project named `unfairly-common`. Operators may override the
-project name for one bootstrap run with `--infisical-project-name <name>`.
+project name for one bootstrap run with `--infisical-project-name <name>`. If the project name is
+the generated workspace default and the shell is interactive, bootstrap first offers a visible list
+of existing Infisical secret-manager projects, with a final option to create/use the generated
+default. Explicit config and CLI project names skip that selector.
 
 `sprinkleref.bootstrapKeychainServiceName` and `sprinkleref.repoKeychainServiceName` control the
 macOS Keychain service names used for repo bootstrap credentials and the `keychain/default` main

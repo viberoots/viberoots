@@ -32,6 +32,7 @@ export type BootstrapArgs = {
   secretBackend?: string;
   bootstrapCredentialScope?: string;
   infisicalProjectName?: string;
+  infisicalProjectNameSource?: "explicit" | "config" | "default";
   bootstrapKeychainServiceName?: string;
   keychainServiceName?: string;
   clientSecretTtl: number;

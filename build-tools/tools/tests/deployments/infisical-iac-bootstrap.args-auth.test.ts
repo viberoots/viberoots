@@ -8,6 +8,7 @@ import {
   defaultBootstrapKeychainServiceName,
   defaultRepoKeychainServiceName,
   defaultRepoInfisicalProjectName,
+  withRepoInfisicalProjectName,
 } from "../../deployments/infisical-iac-bootstrap-config";
 import { runInfisicalBootstrapMain } from "../../deployments/infisical-iac-bootstrap";
 import { getAccessToken, spawnCommandRunner } from "../../deployments/infisical-iac-bootstrap-auth";
@@ -82,6 +83,21 @@ test("bootstrap repo args support deployment fan-out opt-out", () => {
 
 test("default repo Infisical project name comes from consumer repo directory", () => {
   assert.equal(defaultRepoInfisicalProjectName("/tmp/unfairly-common"), "unfairly-common");
+});
+
+test("repo Infisical project name resolution marks generated defaults", async () => {
+  const args = await withRepoInfisicalProjectName(DEFAULT_BOOTSTRAP_ARGS, "/tmp/unfairly-common");
+  assert.equal(args.infisicalProjectName, "unfairly-common");
+  assert.equal(args.infisicalProjectNameSource, "default");
+});
+
+test("repo Infisical project name resolution preserves explicit names", async () => {
+  const args = await withRepoInfisicalProjectName(
+    { ...DEFAULT_BOOTSTRAP_ARGS, infisicalProjectName: "shared-secrets" },
+    "/tmp/unfairly-common",
+  );
+  assert.equal(args.infisicalProjectName, "shared-secrets");
+  assert.equal(args.infisicalProjectNameSource, "explicit");
 });
 
 test("default Keychain service names come from consumer repo directory", () => {

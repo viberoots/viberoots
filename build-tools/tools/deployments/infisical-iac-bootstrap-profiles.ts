@@ -32,10 +32,7 @@ export async function materializeRepoBackendProfiles(opts: {
 }) {
   const config = await readSprinkleRefConfig(opts.configPath, opts.workspaceRoot);
   const args = await withRepoInfisicalProjectName(
-    {
-      ...opts.args,
-      infisicalProjectName: opts.args.infisicalProjectName || config.repoInfisicalProjectName,
-    },
+    repoProjectNameArgs(opts.args, config),
     opts.workspaceRoot || path.dirname(opts.configPath),
   );
   const effectiveOpts = { ...opts, args };
@@ -64,6 +61,16 @@ export async function materializeRepoBackendProfiles(opts: {
     profiles: opts.requiredProfiles,
     materializedProfiles: Object.keys(updates).sort(),
     validatedExistingProfiles: validatedExistingProfiles.sort(),
+  };
+}
+
+function repoProjectNameArgs(args: BootstrapArgs, config: SprinkleRefConfigFile) {
+  if (args.infisicalProjectName) return args;
+  if (!config.repoInfisicalProjectName) return args;
+  return {
+    ...args,
+    infisicalProjectName: config.repoInfisicalProjectName,
+    infisicalProjectNameSource: "config" as const,
   };
 }
 
@@ -120,7 +127,9 @@ async function materializeInfisicalProfile(
   }
   const projectName = opts.args.infisicalProjectName;
   if (!projectName) throw new Error("Infisical repo project name was not resolved");
-  const { project } = await ensureInfisicalRepoProject(opts.api, opts.organizationId, projectName);
+  const { project } = await ensureInfisicalRepoProject(opts.api, opts.organizationId, projectName, {
+    allowInteractiveSelection: opts.args.infisicalProjectNameSource === "default",
+  });
   await ensureProfileIdentityMembership(opts.api, opts.identity, project.id);
   return {
     profile: validateInfisicalProfile(name, {
