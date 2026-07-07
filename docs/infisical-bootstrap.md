@@ -19,16 +19,19 @@ pre-confirmation, `--without-secrets` for dependency-only automation, and
 can also set `INSTALL_DEPS_WITHOUT_SECRETS=1`; non-interactive setup may be explicitly allowed with
 `INSTALL_DEPS_SETUP_SECRETS=1`.
 
-Lazy `i` secret readiness is capability-gated by checked-out deployment metadata. Partial clones or
-minimized workspaces without `projects/deployments/example-app/shared/family.bzl` skip Infisical
-readiness automatically and do not require `--without-secrets`; full checkouts can still use
-`--without-secrets` or `INSTALL_DEPS_WITHOUT_SECRETS=1` as an explicit dependency-only opt-out.
+Lazy `i` secret readiness is capability-gated by checked-out project configuration or deployment
+metadata. A bootstrapped workspace with `projects/config/` prompts for repo bootstrap when the local
+resolver config or repo bootstrap credentials are missing, even if no deployment packages are checked
+out yet. Partial clones or minimized workspaces with no `projects/config/` and no deployment metadata
+skip Infisical readiness automatically and do not require `--without-secrets`; full checkouts can
+still use `--without-secrets` or `INSTALL_DEPS_WITHOUT_SECRETS=1` as an explicit dependency-only
+opt-out.
 Use `i --bootstrap` when you want to inspect/fix generated shared and local resolver config and run
-the repo bootstrap flow even when lazy readiness is not applicable. In interactive shells,
-`i --bootstrap` first prints the local reset warning so the refs and files that would be deleted are
-visible, then asks whether to reset local bootstrap state before continuing. The default is to keep
-local state and run bootstrap. Use `--yes` for non-interactive runs; `i --bootstrap --yes` also keeps
-local state and runs bootstrap.
+the repo bootstrap flow explicitly. In interactive shells, `i --bootstrap` first prints the local
+reset plan so the existing refs and files that would be deleted are visible, then asks whether to
+reset local bootstrap state before continuing. The default is to keep local state and run bootstrap.
+Use `--yes` for non-interactive runs; `i --bootstrap --yes` also keeps local state and runs
+bootstrap.
 
 Deep bootstrap commands remain available for advanced recovery and debugging:
 

@@ -65,6 +65,29 @@ test("install secret readiness reports not applicable in verbose partial checkou
   });
 });
 
+test("install secret readiness prompts for repo bootstrap when project config exists without deployment metadata", async () => {
+  await withRepo(async (repoRoot) => {
+    await fsp.mkdir(path.join(repoRoot, "projects", "config"), { recursive: true });
+    const calls: string[][] = [];
+    await ensureInstallSecretReadiness({
+      repoRoot,
+      dryRun: false,
+      verbose: false,
+      flags: baseFlags,
+      deps: {
+        isInteractive: () => true,
+        prompt: async (message) => {
+          assert.match(message, /Infisical local credentials are not ready/);
+          return true;
+        },
+        bootstrap: async (args) => void calls.push(args),
+      },
+    });
+    assert.equal(await isInstallSecretReadinessApplicable(repoRoot), true);
+    assert.deepEqual(calls, [["repo", "--yes"]]);
+  });
+});
+
 test("install secret readiness explicit bootstrap bypasses deployment metadata applicability gate", async () => {
   await withRepo(async (repoRoot) => {
     const calls: string[][] = [];

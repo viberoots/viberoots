@@ -70,7 +70,8 @@ export async function ensureInstallSecretReadiness(opts: {
     if (opts.verbose) console.log("[install-deps] skipping Infisical secret readiness");
     return;
   }
-  if (!(await isInstallSecretReadinessApplicable(opts.repoRoot))) {
+  const readinessReason = await discoverInstallSecretReadinessReason(opts.repoRoot);
+  if (!readinessReason) {
     if (opts.verbose) {
       console.log("[install-deps] Infisical secret readiness not applicable in this checkout");
     }
@@ -255,7 +256,16 @@ function isKeychainInaccessibleReason(reason: string) {
 }
 
 export async function isInstallSecretReadinessApplicable(repoRoot = process.cwd()) {
-  return (await discoverDeploymentFamilyMetadataPaths(repoRoot)).length > 0;
+  return Boolean(await discoverInstallSecretReadinessReason(repoRoot));
+}
+
+async function discoverInstallSecretReadinessReason(repoRoot: string) {
+  if (await pathExists(path.join(repoRoot, PROJECT_SHARED_CONFIG_PATH))) return "project config";
+  if ((await discoverDeploymentFamilyMetadataPaths(repoRoot)).length > 0)
+    return "deployment metadata";
+  if (await pathExists(path.join(repoRoot, "projects", "config")))
+    return "project config directory";
+  return "";
 }
 
 async function discoverDeploymentFamilyMetadataPaths(repoRoot: string) {
@@ -318,6 +328,16 @@ function isResolverConfigAbsenceError(error: unknown) {
   if (isFileAbsenceError(error)) return true;
   const message = error instanceof Error ? error.message : String(error);
   return /missing projects\/config\/shared\.json sprinkleref config/.test(message);
+}
+
+async function pathExists(target: string) {
+  try {
+    await fsp.access(target);
+    return true;
+  } catch (error) {
+    if (isFileAbsenceError(error)) return false;
+    throw error;
+  }
 }
 
 function bootstrapArgs(flags: SecretReadinessFlags) {
