@@ -102,6 +102,10 @@ async function writeGeneratedFile(
       await writeIfChanged(file, content);
       return;
     }
+    if (withoutGeneratedMarker(current) === withoutGeneratedMarker(content)) {
+      await writeIfChanged(file, content);
+      return;
+    }
     const backupDir = path.join(workspaceRoot, ".viberoots", "workspace", "backups");
     await fsp.mkdir(backupDir, { recursive: true });
     const backupName = rel.replaceAll("/", "__");
@@ -112,6 +116,14 @@ async function writeGeneratedFile(
     );
   }
   await writeIfChanged(file, content);
+}
+
+function withoutGeneratedMarker(content: string) {
+  return content.replace(new RegExp(`^# ${escapeRegExp(generatedMarker)}\\n`), "");
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 async function writeIfMissing(workspaceRoot: string, rel: string, content: string): Promise<void> {
