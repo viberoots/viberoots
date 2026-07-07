@@ -70,7 +70,8 @@ async function configuredBootstrapScope(workspaceRoot: string) {
 function isMissingSprinkleRefConfigError(error: unknown) {
   return (
     error instanceof Error &&
-    /missing projects\/config\/shared\.json sprinkleref config/.test(error.message)
+    (/missing projects\/config\/shared\.json sprinkleref config/.test(error.message) ||
+      (error as NodeJS.ErrnoException).code === "ENOENT")
   );
 }
 

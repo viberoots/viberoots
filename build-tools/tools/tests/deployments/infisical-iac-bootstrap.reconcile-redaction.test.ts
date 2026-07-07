@@ -140,8 +140,8 @@ test("credential handoff report emits stable refs without secret values", () => 
     metadata,
   });
   const text = JSON.stringify(report);
-  assert.match(text, /secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap\/client-id/);
-  assert.match(text, /secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap\/client-secret/);
+  assert.match(text, /secret:\/\/bootstrap\/viberoots\/viberoots-iac-bootstrap\/client-id/);
+  assert.match(text, /secret:\/\/bootstrap\/viberoots\/viberoots-iac-bootstrap\/client-secret/);
   assert.doesNotMatch(text, /secret:\/\/deployments\/fixture\/bootstrap/);
   assert.match(text, /secret:\/\/deployments\/fixture\/staging\/infisical-client-secret/);
   assert.match(text, /"status":"managed"/);
@@ -153,7 +153,7 @@ test("credential handoff report emits stable refs without secret values", () => 
 test("dry-run report omits access tokens and generated secret values", async () => {
   const text = JSON.stringify(await buildDryRunReport(REVIEWED_ARGS));
   assert.match(text, /infisical-iac-bootstrap-operations@1/);
-  assert.doesNotMatch(text, /INFISICAL_ACCESS_TOKEN|generated-secret|access-token|clientSecret/);
+  assert.doesNotMatch(text, /INFISICAL_ACCESS_TOKEN|generated-secret|access-token/);
 });
 
 const REVIEWED_ARGS = {

@@ -9,13 +9,18 @@ import { confirmBootstrapPreflight } from "./infisical-iac-bootstrap-preflight";
 import { ensureRepoResolverConfig } from "./infisical-iac-bootstrap-resolver";
 import { materializeRepoBackendProfiles } from "./infisical-iac-bootstrap-profiles";
 import { ensureRepoBootstrapCredential } from "./infisical-iac-bootstrap-repo-credential";
-import { resolveCredentialSinkSelection } from "./infisical-iac-bootstrap-sink";
+import {
+  createCredentialSink,
+  resolveCredentialSinkSelection,
+} from "./infisical-iac-bootstrap-sink";
 import { materializeBootstrapCredentialSink } from "./infisical-iac-bootstrap-sink-materialize";
 import { repoBootstrapCredentialRefs } from "./infisical-iac-bootstrap-identity";
-import { readSprinkleRefConfig } from "./sprinkleref-config";
+import { readSprinkleRefConfig, resolveSprinkleRefBackend } from "./sprinkleref-config";
 import { runSprinkleRefCheck } from "./sprinkleref-check";
 import { DEFAULT_SPRINKLEREF_CONFIG_PATH } from "./sprinkleref-config-select";
-import type { BootstrapArgs, Identity } from "./infisical-iac-bootstrap-types";
+import { validateInfisicalRepoProject } from "./infisical-iac-bootstrap-profile-api";
+import { resolveInfisicalAccessToken } from "./deployment-secret-infisical-credentials";
+import type { BootstrapArgs, CredentialSink, Identity } from "./infisical-iac-bootstrap-types";
 import type {
   DeploymentBootstrapExecutionResult,
   DeploymentBootstrapFanOutResult,
@@ -28,6 +33,15 @@ export type RepoBootstrapDeps = {
     args: BootstrapArgs,
     opts?: { workspaceRoot?: string; configPath?: string },
   ) => Promise<SharedInfisicalSession>;
+  verifyUniversalAuth?: (credential: {
+    siteUrl: string;
+    clientId: string;
+    clientSecret: string;
+  }) => Promise<void>;
+  credentialSinkFactory?: (
+    args: BootstrapArgs,
+    opts: { workspaceRoot: string; configPath: string },
+  ) => Promise<CredentialSink>;
 };
 
 export async function runRepoBootstrap(
@@ -70,6 +84,7 @@ export async function runRepoBootstrap(
     selection: sink,
     workspaceRoot,
   });
+  const verification = await verifyRepoBootstrapState(scopedArgs, resolver, credential, deps);
   console.log(
     JSON.stringify(
       repoReport(
@@ -79,6 +94,7 @@ export async function runRepoBootstrap(
         materialization,
         credentialSinkMaterialization,
         credential,
+        verification,
       ),
       null,
       2,
@@ -104,6 +120,7 @@ function repoReport(
   profileMaterialization: unknown,
   credentialSinkMaterialization: unknown,
   credential?: SharedInfisicalSession,
+  verification?: unknown,
 ) {
   const refs =
     credential?.identity &&
@@ -136,8 +153,151 @@ function repoReport(
         : undefined,
     profileMaterialization,
     credentialSinkMaterialization,
+    verification,
     deploymentFanOut: { skipped: args.withoutDeployments, optOutFlag: "--without-deployments" },
   };
+}
+
+async function verifyRepoBootstrapState(
+  args: BootstrapArgs,
+  resolver: Awaited<ReturnType<typeof ensureRepoResolverConfig>>,
+  credential: SharedInfisicalSession | undefined,
+  deps: Pick<RepoBootstrapDeps, "credentialSinkFactory" | "verifyUniversalAuth">,
+) {
+  const config = await readSprinkleRefConfig(resolver.configPath, resolver.workspaceRoot);
+  return {
+    bootstrap:
+      credential?.bootstrapCredential && credential.identity
+        ? await verifyBootstrapCredentials(args, resolver, credential, deps)
+        : { status: "not-required" as const },
+    main: await verifyMainCredentialBackend(args, resolver, credential, deps, config),
+  };
+}
+
+async function verifyBootstrapCredentials(
+  args: BootstrapArgs,
+  resolver: Awaited<ReturnType<typeof ensureRepoResolverConfig>>,
+  credential: SharedInfisicalSession,
+  deps: Pick<RepoBootstrapDeps, "credentialSinkFactory" | "verifyUniversalAuth">,
+) {
+  const sink = await createVerificationCredentialSink(args, resolver, deps);
+  const refs = repoBootstrapCredentialRefs(credential.identity, args.bootstrapCredentialScope);
+  const clientId = await requiredSinkValue(sink, refs.clientIdRef, "bootstrap client id");
+  const clientSecret = await requiredSinkValue(
+    sink,
+    refs.clientSecretRef,
+    "bootstrap client secret",
+  );
+  if (clientId !== credential.bootstrapCredential?.clientId) {
+    throw new Error(`bootstrap credential verification failed: ${refs.clientIdRef} mismatch`);
+  }
+  if (clientSecret !== credential.bootstrapCredential.clientSecret) {
+    throw new Error(`bootstrap credential verification failed: ${refs.clientSecretRef} mismatch`);
+  }
+  await verifyUniversalAuth(deps, {
+    siteUrl: args.apiUrl,
+    clientId,
+    clientSecret,
+  });
+  return {
+    status: "verified" as const,
+    clientIdRef: refs.clientIdRef,
+    clientSecretRef: refs.clientSecretRef,
+    auth: "verified" as const,
+  };
+}
+
+async function verifyMainCredentialBackend(
+  args: BootstrapArgs,
+  resolver: Awaited<ReturnType<typeof ensureRepoResolverConfig>>,
+  credential: SharedInfisicalSession | undefined,
+  deps: Pick<RepoBootstrapDeps, "credentialSinkFactory" | "verifyUniversalAuth">,
+  config: Awaited<ReturnType<typeof readSprinkleRefConfig>>,
+) {
+  const resolved = resolveSprinkleRefBackend(config, config.defaultCategory || "main");
+  if (resolved.backend.backend !== "infisical") {
+    return {
+      status: "not-authenticated" as const,
+      category: resolved.category,
+      backend: resolved.backend.backend,
+      reason: "backend has no Infisical auth probe",
+    };
+  }
+  if (!credential) throw new Error("main Infisical credential verification needs repo session");
+  const projectId = resolved.backend.projectId || envValue(resolved.backend.projectIdEnv);
+  if (!projectId) throw new Error("main Infisical credential verification missing project id");
+  await validateInfisicalRepoProject(credential.api, credential.organizationId, projectId, {
+    requireOrganizationEvidence: false,
+  });
+  const sink = await createVerificationCredentialSink(args, resolver, deps);
+  const clientId = await credentialValue(
+    sink,
+    resolved.backend.clientIdEnv,
+    resolved.backend.clientIdRef,
+    "main Infisical client id",
+  );
+  const clientSecret = await credentialValue(
+    sink,
+    resolved.backend.clientSecretEnv,
+    resolved.backend.clientSecretRef,
+    "main Infisical client secret",
+  );
+  await verifyUniversalAuth(deps, {
+    siteUrl: resolved.backend.host || args.apiUrl,
+    clientId,
+    clientSecret,
+  });
+  return {
+    status: "verified" as const,
+    category: resolved.category,
+    profile: resolved.profile,
+    backend: "infisical" as const,
+    projectId,
+    auth: "verified" as const,
+  };
+}
+
+async function credentialValue(
+  sink: Awaited<ReturnType<typeof createCredentialSink>>,
+  envName: string | undefined,
+  ref: string | undefined,
+  label: string,
+) {
+  const fromEnv = envValue(envName);
+  if (fromEnv) return fromEnv;
+  if (!ref) throw new Error(`${label} is not configured`);
+  return await requiredSinkValue(sink, ref, label);
+}
+
+async function requiredSinkValue(
+  sink: Awaited<ReturnType<typeof createCredentialSink>>,
+  ref: string,
+  label: string,
+) {
+  const value = (await sink.read(ref))?.trim();
+  if (!value) throw new Error(`bootstrap verification failed: missing ${label} at ${ref}`);
+  return value;
+}
+
+async function createVerificationCredentialSink(
+  args: BootstrapArgs,
+  resolver: Awaited<ReturnType<typeof ensureRepoResolverConfig>>,
+  deps: Pick<RepoBootstrapDeps, "credentialSinkFactory">,
+) {
+  const opts = { workspaceRoot: resolver.workspaceRoot, configPath: resolver.configPath };
+  return await (deps.credentialSinkFactory || createCredentialSink)(args, opts);
+}
+
+function envValue(name?: string) {
+  return name ? String(process.env[name] || "").trim() : "";
+}
+
+async function verifyUniversalAuth(
+  deps: Pick<RepoBootstrapDeps, "verifyUniversalAuth">,
+  credential: { siteUrl: string; clientId: string; clientSecret: string },
+) {
+  if (deps.verifyUniversalAuth) return await deps.verifyUniversalAuth(credential);
+  await resolveInfisicalAccessToken({ kind: "universal_auth", ...credential });
 }
 
 async function runFanOutWithHandoff(

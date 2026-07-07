@@ -54,6 +54,8 @@ async function runSetup(dir: string, api: CredentialApi, sink: MemorySink) {
       },
       {
         finalCheckRunner: async () => 0,
+        credentialSinkFactory: async () => sink,
+        verifyUniversalAuth: async () => undefined,
         repoCredentialFactory: async (repoArgs) => {
           const bootstrapCredential = await ensureBootstrapCredential({
             api: api as never,

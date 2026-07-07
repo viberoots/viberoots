@@ -41,6 +41,8 @@ test("repo fan-out reuses one operator session while creating per-machine secret
       },
       {
         finalCheckRunner: async () => 0,
+        credentialSinkFactory: async () => sink,
+        verifyUniversalAuth: async () => undefined,
         repoCredentialFactory: async (args) => {
           session = fixtureSession(api, {
             bootstrapCredential: await ensureBootstrapCredential({
@@ -152,11 +154,16 @@ class MemorySink implements CredentialSink {
 
 class CredentialLifecycleApi {
   createdSecretDescriptions: string[] = [];
+  private readonly projects: Array<{ id: string; name: string; orgId: string }> = [];
 
   async request(method: string, endpoint: string, body?: { description?: string }) {
-    if (method === "GET" && endpoint.startsWith("/api/v1/projects?")) return { projects: [] };
+    if (method === "GET" && endpoint.startsWith("/api/v1/projects?")) {
+      return { projects: this.projects };
+    }
     if (method === "POST" && endpoint === "/api/v1/projects") {
-      return { project: { id: "proj_fixture", name: "viberoots-deployments" } };
+      const project = { id: "proj_fixture", name: "viberoots-deployments", orgId: "org_fixture" };
+      this.projects.push(project);
+      return { project };
     }
     if (endpoint.includes("/memberships/identities/")) {
       return method === "GET" ? undefined : { ok: true };

@@ -5,6 +5,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_BOOTSTRAP_ARGS } from "../../deployments/infisical-iac-bootstrap-config";
+import { repoBootstrapCredentialRefs } from "../../deployments/infisical-iac-bootstrap-identity";
 import { runRepoBootstrap } from "../../deployments/infisical-iac-bootstrap-repo";
 import type { MetadataHandoffPatch } from "../../deployments/infisical-iac-bootstrap-metadata-handoff";
 import type { SharedInfisicalSession } from "../../deployments/infisical-iac-bootstrap-repo-credential";
@@ -17,6 +18,7 @@ test("repo bootstrap applies first-bootstrap metadata, resumes fan-out, and runs
   const finalChecks: string[][] = [];
   const seenTargets: string[] = [];
   const credentialSetups: string[] = [];
+  const verifiedAuth: string[] = [];
   await withCwd(dir, () =>
     runRepoBootstrap(
       {
@@ -37,23 +39,57 @@ test("repo bootstrap applies first-bootstrap metadata, resumes fan-out, and runs
         finalCheckRunner: async (argv) => (finalChecks.push(argv), 0),
         repoCredentialFactory: async (args) => {
           credentialSetups.push(args.identityName);
-          return fixtureSession();
+          const session = fixtureSession();
+          await writeBootstrapCredentials(dir, session, args.bootstrapCredentialScope);
+          return session;
+        },
+        verifyUniversalAuth: async (credential) => {
+          verifiedAuth.push(credential.clientId);
         },
       },
     ),
   );
   assert.deepEqual(seenTargets, [staging, staging]);
   assert.deepEqual(credentialSetups, ["viberoots-iac-bootstrap"]);
-  const sharedConfig = path.join(dir, "projects/config/shared.json");
+  assert.deepEqual(verifiedAuth, ["client_fixture", "client_fixture"]);
+  const sharedConfig = await fs.realpath(path.join(dir, "projects/config/shared.json"));
   assert.deepEqual(finalChecks, [
     ["--check", "--config", sharedConfig],
     ["--check", "--category", "bootstrap", "--config", sharedConfig],
   ]);
   assert.match(await fs.readFile(path.join(dir, patch.path), "utf8"), /proj_live/);
-  assert.equal(await fs.readFile(path.join(dir, ".local/bootstrap.json"), "utf8"), "{}\n");
+  const bootstrapStore = JSON.parse(
+    await fs.readFile(path.join(dir, ".local/bootstrap.json"), "utf8"),
+  ) as Record<string, string>;
+  assert.equal(Object.keys(bootstrapStore).length, 4);
   assert.match(
     await fs.readFile(path.join(dir, "projects/config/shared.json"), "utf8"),
     /infisical-default/,
+  );
+});
+
+test("repo bootstrap fails when reported bootstrap credentials cannot be read back", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-repo-flow-missing-creds-"));
+  await writeRepoInputs(dir);
+  await assert.rejects(
+    withCwd(dir, () =>
+      runRepoBootstrap(
+        {
+          ...DEFAULT_BOOTSTRAP_ARGS,
+          yes: true,
+          applyMetadataPatch: true,
+          credentialSink: "local-file",
+          localCredentialFile: ".local/bootstrap.json",
+          withoutDeployments: true,
+        },
+        async () => ({ reconciliation: { status: "ok" } }),
+        {
+          repoCredentialFactory: async () => fixtureSession(),
+          verifyUniversalAuth: async () => undefined,
+        },
+      ),
+    ),
+    /missing bootstrap client id/,
   );
 });
 
@@ -122,6 +158,28 @@ function fixtureSession(): SharedInfisicalSession {
       remoteClientSecretRecordSummaries: [],
     },
   };
+}
+
+async function writeBootstrapCredentials(
+  dir: string,
+  session: SharedInfisicalSession,
+  bootstrapCredentialScope?: string,
+) {
+  const refs = repoBootstrapCredentialRefs(session.identity, bootstrapCredentialScope);
+  await fs.mkdir(path.join(dir, ".local"), { recursive: true });
+  await fs.writeFile(
+    path.join(dir, ".local/bootstrap.json"),
+    `${JSON.stringify(
+      {
+        [refs.clientIdRef]: session.bootstrapCredential?.clientId,
+        [refs.clientSecretRef]: session.bootstrapCredential?.clientSecret,
+        "secret://bootstrap/client-id": session.bootstrapCredential?.clientId,
+        "secret://bootstrap/client-secret": session.bootstrapCredential?.clientSecret,
+      },
+      null,
+      2,
+    )}\n`,
+  );
 }
 
 async function fixtureRequest(method: string, endpoint: string) {

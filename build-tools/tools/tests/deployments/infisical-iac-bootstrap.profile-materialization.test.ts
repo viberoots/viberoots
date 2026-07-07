@@ -27,7 +27,7 @@ test("repo profile materialization writes Infisical project id without secret va
   assert.match(written, /"projectId": "proj_repo"/);
   assert.match(
     written,
-    /"clientIdRef": "secret:\/\/viberoots\/bootstrap\/viberoots-iac-bootstrap\/client-id"/,
+    /"clientIdRef": "secret:\/\/bootstrap\/viberoots\/viberoots-iac-bootstrap\/client-id"/,
   );
   assert.doesNotMatch(
     written,
@@ -100,7 +100,7 @@ test("generated Infisical starter profile with project id is rewritten with repo
   const written = await fs.readFile(configPath, "utf8");
   assert.deepEqual(result.materializedProfiles, ["infisical-default"]);
   assert.deepEqual(result.validatedExistingProfiles, []);
-  assert.match(written, /"clientIdRef": "secret:\/\/viberoots\/bootstrap\//);
+  assert.match(written, /"clientIdRef": "secret:\/\/bootstrap\//);
   assert.doesNotMatch(written, /VBR_INFISICAL_CLIENT_SECRET/);
 });
 

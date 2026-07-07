@@ -41,6 +41,13 @@ export async function fakeRepoBootstrapFetch(input: string | URL | Request, init
       method === "POST" ? { clientSecret: "client-secret" } : { clientSecrets: [] },
     );
   }
+  if (url.pathname === "/api/v1/auth/universal-auth/login") {
+    return jsonResponse({
+      accessToken: "fixture-universal-auth-token",
+      tokenType: "Bearer",
+      expiresIn: 3600,
+    });
+  }
   if (url.pathname === "/v1/sys/mounts") return jsonResponse({ "secret/": { type: "kv" } });
   return jsonResponse({ error: `unexpected fake fetch path ${url.pathname}` }, 404);
 }

@@ -85,6 +85,12 @@ selected local sink. Use `--machine-label <label>` when the hostname is not a us
 label in Infisical.
 Existing operator-authored Infisical profiles are preserved once their `projectId` validates in the
 selected organization.
+Before reporting success, repo bootstrap reads the generated bootstrap credential refs back from the
+selected local sink, checks they match the machine's repo Universal Auth credential, and performs an
+Infisical Universal Auth login probe. It also validates the default `main` resolver category: for
+Infisical-backed profiles, the configured project must be reachable in the selected organization and
+the profile's client id/client secret must authenticate. Non-Infisical `main` backends are reported
+as not auth-probed because they do not have an Infisical login check.
 Bootstrap rewrites only missing profiles, profiles with `generatedBy: "viberoots-repo-bootstrap"`,
 or untouched legacy starter profiles that exactly match the old `VBR_INFISICAL_*` starter shape.
 That legacy shape is exactly `backend: "infisical"`, `host: "https://app.infisical.com"`,
