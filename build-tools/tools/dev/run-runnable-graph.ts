@@ -5,6 +5,7 @@ import { ensureGraph } from "../buck/glue-run";
 import { runNixBuildWithProgress } from "./run-runnable-nix";
 import { untrackedRequiresImpureForTargets } from "./dev-build/untracked";
 import { makeFilteredFlakeRef } from "./filtered-flake";
+import { prepareExactPnpmStore } from "./update-pnpm-hash/exact-store";
 import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 
 async function withScopedGraphEnv<T>(
@@ -181,6 +182,15 @@ export async function buildSelectedOutPath(
     target,
     attr: "graph-generator-selected",
   });
+  const targetImporter = targetPackageFromLabel(target);
+  const exactStore =
+    targetImporter &&
+    (await fsp
+      .access(path.join(workspaceRoot, targetImporter, "pnpm-lock.yaml"))
+      .then(() => true)
+      .catch(() => false))
+      ? await prepareExactPnpmStore({ repoRoot: workspaceRoot, importer: targetImporter })
+      : null;
   const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
   const selectedEnv: Record<string, string> = {
     ...process.env,
@@ -189,35 +199,36 @@ export async function buildSelectedOutPath(
     BUCK_GRAPH_JSON: graphPath,
     BUCK_TARGET: target,
   };
-  await withScopedGraphEnv(
-    workspaceRoot,
-    { BUCK_GRAPH_JSON: graphPath, BUCK_TARGET: target },
-    async () => {
-      await ensureGraph();
-    },
-  );
-  const stdout = await (async () => {
-    try {
-      return await runNixBuildWithProgress({
-        workspaceRoot,
-        env: selectedEnv,
-        label,
-        args: [
-          "--impure",
-          "--no-write-lock-file",
-          "--option",
-          "eval-cache",
-          "false",
-          source.flakeRef,
-          "--accept-flake-config",
-          "--no-link",
-          "--print-out-paths",
-          "-L",
-        ],
-      });
-    } finally {
-      await source.cleanup?.();
-    }
-  })();
+  if (exactStore) selectedEnv.NIX_PNPM_EXACT_STORE = exactStore.exactStorePath;
+  let stdout = "";
+  try {
+    await withScopedGraphEnv(
+      workspaceRoot,
+      { BUCK_GRAPH_JSON: graphPath, BUCK_TARGET: target },
+      async () => {
+        await ensureGraph();
+      },
+    );
+    stdout = await runNixBuildWithProgress({
+      workspaceRoot,
+      env: selectedEnv,
+      label,
+      args: [
+        "--impure",
+        "--no-write-lock-file",
+        "--option",
+        "eval-cache",
+        "false",
+        source.flakeRef,
+        "--accept-flake-config",
+        "--no-link",
+        "--print-out-paths",
+        "-L",
+      ],
+    });
+  } finally {
+    await exactStore?.cleanup();
+    await source.cleanup?.();
+  }
   return lastOutPath(stdout, `graph-generator-selected produced no out path for ${target}`);
 }

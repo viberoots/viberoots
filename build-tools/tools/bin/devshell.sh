@@ -6,6 +6,9 @@ export ENV_SH_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 env_reexec_from_cwd_repo() {
 	local caller_path="${BASH_SOURCE[1]:-$0}"
+	if [[ "$(basename "$caller_path")" == "devshell.sh" && -n "${BASH_SOURCE[2]:-}" ]]; then
+		caller_path="${BASH_SOURCE[2]}"
+	fi
 	local tool_name
 	tool_name="$(basename "$caller_path")"
 	local script_root

@@ -15,6 +15,7 @@ let
   repoSnapshot = ctx.repoSnapshot or repoRoot;
   repoStoreRoot = ctx.repoStoreRoot or repoSnapshot;
   repoFsRoot = ctx.repoFsRoot or repoStoreRoot;
+  viberootsRoot = ctx.viberootsRoot or null;
   sharedNodeMods = ctx.nodeMods or null;
   labelsOf = L.labelsOf;
   nameOf = L.nameOf;
@@ -80,7 +81,7 @@ in {
   mkLib = name: mkGenLike { inherit name; kind = "lib"; };
   mkBin = name: mkGenLike { inherit name; kind = "bin"; };
   mkWebapp = name: import ./node-webapp.nix {
-    inherit pkgs H repoStoreRoot repoFsRoot sharedNodeMods lockInfoOfName nodeOfName labelsOf name;
+    inherit pkgs H repoStoreRoot repoFsRoot viberootsRoot sharedNodeMods lockInfoOfName nodeOfName labelsOf name;
     frameworkMissingError =
       "node planner: SSR webapp target ${name} missing framework label (framework:express|framework:next|framework:vite)";
   };

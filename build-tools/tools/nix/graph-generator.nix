@@ -6,6 +6,7 @@
 , nodeMods ? null
 , nixpkgsRegistry ? null
 , nixpkgsRegistryPath ? ./nixpkgs-source-registry.nix
+, viberootsRoot ? null
 }:
 let
   lib = pkgs.lib;
@@ -253,6 +254,7 @@ let
     repoSnapshot = src;
     repoStoreRoot = repoStoreRoot;
     repoFsRoot = builtins.toPath repoRootStr;
+    viberootsRoot = viberootsRoot;
     nodeMods = nodeMods;
     # Provide full nodes list so language plugins (e.g., C++) can walk deps
     nodes = nodesList;

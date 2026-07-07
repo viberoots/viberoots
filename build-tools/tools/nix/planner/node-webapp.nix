@@ -2,6 +2,7 @@
 , H
 , repoStoreRoot
 , repoFsRoot
+, viberootsRoot ? null
 , sharedNodeMods
 , lockInfoOfName
 , nodeOfName
@@ -35,7 +36,8 @@ let
   viberootsRootEnv = builtins.getEnv "VIBEROOTS_ROOT";
   nestedViberootsRoot = repoStoreRoot + "/viberoots";
   viberootsStoreRoot =
-    if builtins.pathExists (nestedViberootsRoot + "/build-tools/tools/dev/zx-init.mjs") then nestedViberootsRoot
+    if viberootsRoot != null && builtins.pathExists (viberootsRoot + "/build-tools/tools/dev/zx-init.mjs") then viberootsRoot
+    else if builtins.pathExists (nestedViberootsRoot + "/build-tools/tools/dev/zx-init.mjs") then nestedViberootsRoot
     else if viberootsRootEnv != "" then builtins.toPath viberootsRootEnv
     else repoStoreRoot;
 in

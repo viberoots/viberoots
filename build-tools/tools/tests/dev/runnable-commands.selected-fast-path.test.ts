@@ -4,6 +4,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
+
+async function readRepoFile(rel: string): Promise<string> {
+  return await fsp.readFile(viberootsSourcePath(rel), "utf8");
+}
 
 test("p uses graph-generator-selected and skips full graph-generator for runnable target", async () => {
   await runInTemp("runnable-selected-fast-path", async (tmp, $) => {
@@ -259,4 +264,27 @@ test("p --source=git keeps git flake source even with relevant untracked files",
     assert.doesNotMatch(logTxt, /path:.*#graph-generator-selected/);
     assert.match(logTxt, /#graph-generator-selected/);
   });
+});
+
+test("p selected runnable builds pass exact pnpm stores into filtered Nix builds", async () => {
+  const source = await readRepoFile("build-tools/tools/dev/run-runnable-graph.ts");
+  assert.match(source, /prepareExactPnpmStore/);
+  assert.match(source, /NIX_PNPM_EXACT_STORE/);
+  assert.match(source, /targetPackageFromLabel\(target\)/);
+});
+
+test("p selected webapp builds pass viberoots flake source into the planner", async () => {
+  const packages = await readRepoFile("build-tools/tools/nix/flake/packages/default.nix");
+  const graphPackage = await readRepoFile("build-tools/tools/nix/flake/packages/graph.nix");
+  const graphGenerator = await readRepoFile("build-tools/tools/nix/graph-generator.nix");
+  const nodePlanner = await readRepoFile("build-tools/tools/nix/planner/node.nix");
+  const nodeWebapp = await readRepoFile("build-tools/tools/nix/planner/node-webapp.nix");
+
+  assert.match(packages, /repoRoot viberootsRoot nixpkgsRegistry/);
+  assert.match(graphPackage, /viberootsRoot/);
+  assert.match(graphGenerator, /viberootsRoot \? null/);
+  assert.match(graphGenerator, /viberootsRoot = viberootsRoot;/);
+  assert.match(nodePlanner, /viberootsRoot = ctx\.viberootsRoot or null/);
+  assert.match(nodeWebapp, /if viberootsRoot != null/);
+  assert.match(nodeWebapp, /then viberootsRoot/);
 });

@@ -23,7 +23,7 @@ let
 
   importers = import ./importers.nix { inherit lib filterRepo repoSnapshot repoRoot; };
   graph = import ./graph.nix {
-    inherit pkgs repoSnapshot uv2nixLib repoRoot nixpkgsRegistry;
+    inherit pkgs repoSnapshot uv2nixLib repoRoot viberootsRoot nixpkgsRegistry;
     nodeMods = resolvedNodeMods;
   };
 
