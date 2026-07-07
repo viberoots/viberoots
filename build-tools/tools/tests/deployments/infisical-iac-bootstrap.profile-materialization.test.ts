@@ -105,6 +105,40 @@ test("generated Infisical starter profile with project id is rewritten with repo
   assert.doesNotMatch(written, /VBR_INFISICAL_CLIENT_SECRET/);
 });
 
+test("generated Infisical profile can reselect a repo project", async () => {
+  const dir = await tmp();
+  const configPath = path.join(dir, "operator-config.json");
+  const config = starterConfig();
+  config.profiles["infisical-default"] = {
+    ...config.profiles["infisical-default"],
+    generatedBy: "viberoots-repo-bootstrap",
+    projectId: "proj_old",
+    projectName: "old-repo",
+    projectIdEnv: undefined,
+  };
+  await writeJson(configPath, config);
+  const result = await materializeRepoBackendProfiles({
+    args: {
+      ...DEFAULT_BOOTSTRAP_ARGS,
+      infisicalProjectName: "new-repo",
+      selectInfisicalProject: true,
+    },
+    configPath,
+    requiredProfiles: ["infisical-default"],
+    api: fakeProjectApi([
+      { id: "proj_old", name: "old-repo" },
+      { id: "proj_new", name: "new-repo" },
+    ]) as never,
+    organizationId: "org_1",
+    identity: { id: "id_1", name: "viberoots-iac-bootstrap" },
+  });
+  const written = await fs.readFile(configPath, "utf8");
+  assert.deepEqual(result.materializedProfiles, ["infisical-default"]);
+  assert.match(written, /"projectId": "proj_new"/);
+  assert.match(written, /"projectName": "new-repo"/);
+  assert.doesNotMatch(written, /proj_old/);
+});
+
 test("operator-authored Infisical project mismatch fails without rewriting", async () => {
   const dir = await tmp();
   const configPath = path.join(dir, "operator-config.json");

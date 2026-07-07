@@ -86,17 +86,21 @@ export async function getAccessToken(
       capture: true,
     });
     console.error(loginWaitMessage(args));
-    runner({
-      command: args.infisicalBin,
-      args: [
-        "login",
-        "--domain",
-        args.cliDomain,
-        ...(args.loginMode === "interactive" ? ["--interactive"] : []),
-      ],
-      env: cliEnv,
-      tty: true,
-    });
+    try {
+      runner({
+        command: args.infisicalBin,
+        args: [
+          "login",
+          "--domain",
+          args.cliDomain,
+          ...(args.loginMode === "interactive" ? ["--interactive"] : []),
+        ],
+        env: cliEnv,
+        tty: true,
+      });
+    } catch (error) {
+      throw loginFailureMessage(args, error);
+    }
     console.error("[infisical-bootstrap] Infisical CLI login complete; reading access token");
     const stdout = runner({
       command: args.infisicalBin,
@@ -113,6 +117,21 @@ export async function getAccessToken(
   } finally {
     await fs.rm(tempHome, { recursive: true, force: true });
   }
+}
+
+function loginFailureMessage(args: BootstrapArgs, error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (args.loginMode !== "browser" || !/unexpected end of JSON input/i.test(message)) {
+    return error;
+  }
+  return new Error(
+    [
+      "Infisical browser login did not complete.",
+      "Wait for the browser page to report success; do not press Enter at the CLI Token prompt unless the browser gives you a token to paste.",
+      "Rerun with `i --infisical-login-mode interactive` if browser callback login keeps failing.",
+      `Original Infisical CLI error: ${message}`,
+    ].join("\n"),
+  );
 }
 
 function loginWaitMessage(args: BootstrapArgs) {

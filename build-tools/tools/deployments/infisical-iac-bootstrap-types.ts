@@ -33,6 +33,7 @@ export type BootstrapArgs = {
   bootstrapCredentialScope?: string;
   infisicalProjectName?: string;
   infisicalProjectNameSource?: "explicit" | "config" | "default";
+  selectInfisicalProject: boolean;
   bootstrapKeychainServiceName?: string;
   keychainServiceName?: string;
   clientSecretTtl: number;

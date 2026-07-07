@@ -17,6 +17,7 @@ const baseFlags = {
   infisicalLoginMode: "",
   secretBackend: "",
   infisicalProjectName: "",
+  selectInfisicalProject: false,
   bootstrapKeychainServiceName: "",
   keychainServiceName: "",
 };
@@ -113,6 +114,26 @@ test("install secret readiness forwards explicit secret backend to repo bootstra
     });
     assert.deepEqual(calls, [
       ["repo", "--yes", "--login-mode", "browser", "--secret-backend", "vault/default"],
+    ]);
+  });
+});
+
+test("install secret readiness forwards Infisical project reselection flag", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot);
+    const calls: string[][] = [];
+    await ensureInstallSecretReadiness({
+      repoRoot,
+      dryRun: false,
+      verbose: false,
+      flags: { ...baseFlags, bootstrap: true, yes: true, selectInfisicalProject: true },
+      deps: {
+        isInteractive: () => false,
+        bootstrap: async (args) => void calls.push(args),
+      },
+    });
+    assert.deepEqual(calls, [
+      ["repo", "--yes", "--login-mode", "browser", "--select-infisical-project"],
     ]);
   });
 });

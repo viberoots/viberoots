@@ -87,7 +87,10 @@ async function materializeInfisicalProfile(
 ) {
   const profile = existingProfile || starterInfisicalProfile();
   const generated = isGeneratedInfisicalResolverProfile(profile);
-  const projectId = profile.projectId || envValue(opts.env, profile.projectIdEnv);
+  const forceSelection = opts.args.selectInfisicalProject && generated;
+  const projectId = forceSelection
+    ? ""
+    : profile.projectId || envValue(opts.env, profile.projectIdEnv);
   if (projectId) {
     if (!opts.api || !opts.organizationId) {
       throw new Error(`SprinkleRef profile ${name} requires Infisical project validation`);
@@ -128,7 +131,8 @@ async function materializeInfisicalProfile(
   const projectName = opts.args.infisicalProjectName;
   if (!projectName) throw new Error("Infisical repo project name was not resolved");
   const { project } = await ensureInfisicalRepoProject(opts.api, opts.organizationId, projectName, {
-    allowInteractiveSelection: opts.args.infisicalProjectNameSource === "default",
+    allowInteractiveSelection:
+      opts.args.selectInfisicalProject || opts.args.infisicalProjectNameSource === "default",
   });
   await ensureProfileIdentityMembership(opts.api, opts.identity, project.id);
   return {

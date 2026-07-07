@@ -305,8 +305,13 @@ bootstrap uses the consumer workspace directory name. For example, a workspace n
 `unfairly-common` uses an Infisical project named `unfairly-common`. Operators may override the
 project name for one bootstrap run with `--infisical-project-name <name>`. If the project name is
 the generated workspace default and the shell is interactive, bootstrap first offers a visible list
-of existing Infisical secret-manager projects, with a final option to create/use the generated
-default. Explicit config and CLI project names skip that selector.
+of existing Infisical secret-manager projects, with a final `Create or use another project...`
+option. That option asks for a project name; pressing Enter keeps the generated default, and typing
+another name lets bootstrap create or adopt that project by name. Explicit config and CLI project
+names skip that selector. A generated Infisical profile with a committed `projectId` also skips the
+selector after validation, which lets teammates reuse shared resolver metadata during onboarding.
+Run `i --bootstrap --select-infisical-project` to reopen the chooser for generated Infisical
+profiles; pair it with `--infisical-project-name <name>` to change the default name for that run.
 
 `sprinkleref.bootstrapKeychainServiceName` and `sprinkleref.repoKeychainServiceName` control the
 macOS Keychain service names used for repo bootstrap credentials and the `keychain/default` main

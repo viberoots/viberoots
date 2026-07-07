@@ -143,6 +143,7 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
     "shared-repo-bootstrap",
     "--keychain-service-name",
     "shared-repo-main",
+    "--select-infisical-project",
     "--apply-metadata-patch",
     "--yes",
   ]);
@@ -156,6 +157,7 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
   assert.equal(args.machineLabel, "ci-builder-1");
   assert.equal(args.bootstrapCredentialScope, "fixture-repo");
   assert.equal(args.infisicalProjectName, "shared-repo-secrets");
+  assert.equal(args.selectInfisicalProject, true);
   assert.equal(args.bootstrapKeychainServiceName, "shared-repo-bootstrap");
   assert.equal(args.keychainServiceName, "shared-repo-main");
   assert.equal(args.applyMetadataPatch, true);
@@ -303,6 +305,21 @@ test("CLI login supports command-line interactive mode when browser login is uns
   );
   assert.deepEqual(ttys, [undefined, true, undefined]);
   assert.match(output, /command-line Infisical login/);
+});
+
+test("browser login explains empty token prompt failures", async () => {
+  const runner: CommandRunner = ({ args }) => {
+    if (args.includes("login")) {
+      throw new Error(
+        "infisical login failed: Invalid user credentials provided unexpected end of JSON input",
+      );
+    }
+    return "";
+  };
+  await assert.rejects(
+    () => getAccessToken({ ...DEFAULT_BOOTSTRAP_ARGS }, runner, {}),
+    /Infisical browser login did not complete[\s\S]*do not press Enter[\s\S]*--infisical-login-mode interactive/,
+  );
 });
 
 test("--no-login fails fast when the configured env var is missing", async () => {

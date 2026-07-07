@@ -9,6 +9,7 @@ i --bootstrap
 i --bootstrap --secret-backend vault/default
 i --bootstrap --secret-backend infisical/default
 i --bootstrap --secret-backend keychain/default
+i --bootstrap --select-infisical-project
 i --without-secrets
 i --machine-label <label>
 i --infisical-project-name <name>
@@ -123,9 +124,15 @@ checkout named `unfairly-common` uses an Infisical project named `unfairly-commo
 project name, or pass `--infisical-project-name <name>` for a one-off bootstrap run. When that
 project name comes from the generated repo default and the shell is interactive, bootstrap lists
 visible Infisical secret-manager projects before creating anything. Choose an existing project to
-adopt it, or leave the final default option selected to create/use the repo-derived project name.
-Explicit `sprinkleref.repoInfisicalProjectName` and `--infisical-project-name` values skip this
-selector.
+adopt it, or choose `Create or use another project...`. That option asks for a project name; press
+Enter to keep the repo-derived default or type another name before continuing. Explicit
+`sprinkleref.repoInfisicalProjectName` and `--infisical-project-name` values skip this selector.
+If a generated Infisical profile in `projects/config/shared.json` already has a validated
+`projectId`, bootstrap reuses it and skips project selection so teammates can onboard with only
+their local bootstrap credentials. To intentionally change a generated profile, run
+`i --bootstrap --select-infisical-project`; add `--infisical-project-name <name>` to make a
+specific project name the default for that run. Operator-authored profiles are still preserved and
+must be changed in shared config.
 For macOS Keychain-backed local storage, bootstrap uses repo-derived services by default:
 `<workspace-name>-bootstrap` for repo bootstrap credentials and `<workspace-name>` for the
 `keychain/default` main backend. Set `sprinkleref.bootstrapKeychainServiceName` or
@@ -136,6 +143,8 @@ selected organization.
 If Infisical rejects the default repo project creation because the organization has reached a
 project or workspace plan limit, reuse an existing Infisical secret-manager project. In an
 interactive default-name flow, rerun bootstrap and choose that existing project from the selector.
+If the existing project is not listed by the selector but the name is known, choose
+`Create or use another project...` and enter that project name so bootstrap can adopt it by name.
 For non-interactive or explicit-name flows, set `sprinkleref.repoInfisicalProjectName` to the
 existing project name, pass `--infisical-project-name <name>`, set
 `sprinkleref.profiles.<profile>.projectId` in `projects/config/shared.json` for the generated

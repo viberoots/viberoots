@@ -31,6 +31,7 @@ export type SecretReadinessFlags = {
   infisicalLoginMode: string;
   secretBackend: string;
   infisicalProjectName: string;
+  selectInfisicalProject: boolean;
   bootstrapKeychainServiceName: string;
   keychainServiceName: string;
 };
@@ -407,6 +408,7 @@ function bootstrapArgs(flags: SecretReadinessFlags) {
     ...valueFlag("login-mode", effectiveLoginMode(flags)),
     ...valueFlag("secret-backend", flags.secretBackend),
     ...valueFlag("infisical-project-name", flags.infisicalProjectName),
+    ...boolFlag("select-infisical-project", flags.selectInfisicalProject),
     ...valueFlag("bootstrap-keychain-service-name", flags.bootstrapKeychainServiceName),
     ...valueFlag("keychain-service-name", flags.keychainServiceName),
     ...boolFlag("rotate-bootstrap-credentials", flags.rotateBootstrapCredentials),
@@ -493,7 +495,7 @@ async function runBootstrap(repoRoot: string, args: string[]) {
   } catch (error) {
     if (isChildProcessExitError(error)) {
       console.error(
-        `[install-deps] repo bootstrap failed with exit ${error.exitCode}; see the bootstrap message above.`,
+        `BOOTSTRAP FAILED: repo bootstrap exited ${error.exitCode}. See the nearest BOOTSTRAP ERROR block above.`,
       );
       process.exit(error.exitCode);
     }

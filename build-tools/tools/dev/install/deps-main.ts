@@ -46,6 +46,7 @@ type Flags = {
   infisicalLoginMode: string;
   secretBackend: string;
   infisicalProjectName: string;
+  selectInfisicalProject: boolean;
   bootstrapKeychainServiceName: string;
   keychainServiceName: string;
 };
@@ -141,6 +142,7 @@ const {
   infisicalLoginMode,
   secretBackend,
   infisicalProjectName,
+  selectInfisicalProject,
   bootstrapKeychainServiceName,
   keychainServiceName,
 } = {
@@ -161,6 +163,7 @@ const {
   infisicalLoginMode: getFlagStr("infisical-login-mode", ""),
   secretBackend: getFlagStr("secret-backend", ""),
   infisicalProjectName: getFlagStr("infisical-project-name", ""),
+  selectInfisicalProject: getFlagBool("select-infisical-project"),
   bootstrapKeychainServiceName: getFlagStr("bootstrap-keychain-service-name", ""),
   keychainServiceName: getFlagStr("keychain-service-name", ""),
 } satisfies Flags;
@@ -404,6 +407,7 @@ await ensureInstallSecretReadiness({
     infisicalLoginMode,
     secretBackend,
     infisicalProjectName,
+    selectInfisicalProject,
     bootstrapKeychainServiceName,
     keychainServiceName,
   },

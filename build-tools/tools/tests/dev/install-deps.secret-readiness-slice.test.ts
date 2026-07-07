@@ -21,6 +21,7 @@ const baseFlags = {
   infisicalLoginMode: "",
   secretBackend: "",
   infisicalProjectName: "",
+  selectInfisicalProject: false,
   bootstrapKeychainServiceName: "",
   keychainServiceName: "",
 };

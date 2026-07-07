@@ -44,6 +44,7 @@ const BOOL_FLAGS = new Set([
   "rotate-bootstrap-credentials",
   "rotate-deployment-credentials",
   "force-overwrite-local-credentials",
+  "select-infisical-project",
 ]);
 
 export function usage(command = "build-tools/tools/deployments/infisical-bootstrap.ts") {
@@ -74,6 +75,7 @@ Options:
   --bootstrap-scope <name>      First secret:// path segment for repo bootstrap credentials
   --infisical-project-name <name>
                                   Infisical repo project name; defaults to the consumer repo name
+  --select-infisical-project       Reopen the project chooser for generated Infisical repo profiles
   --bootstrap-keychain-service-name <name>
                                   macOS Keychain service for bootstrap credentials
   --keychain-service-name <name>  macOS Keychain service for repo main secrets
@@ -147,6 +149,7 @@ export function parseBootstrapArgs(argv = getArgvTokens()): BootstrapArgs {
     "force-overwrite-local-credentials",
     argv,
   );
+  args.selectInfisicalProject = readFlagBoolFromTokens("select-infisical-project", argv);
   args.clientSecretTtl = numberFlag("client-secret-ttl", args.clientSecretTtl, 0, argv);
   args.accessTokenTtl = numberFlag("access-token-ttl", args.accessTokenTtl, 1, argv);
   if (args.organizationId && args.orgName)

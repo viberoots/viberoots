@@ -42,6 +42,7 @@ export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   secretBackend: undefined,
   bootstrapCredentialScope: undefined,
   infisicalProjectName: undefined,
+  selectInfisicalProject: false,
   bootstrapKeychainServiceName: undefined,
   keychainServiceName: undefined,
   clientSecretTtl: 0,

@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
 import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
@@ -581,10 +581,30 @@ async function runOptionalDirenvAllow(workspaceRoot: string): Promise<void> {
 }
 
 async function runInstall(workspaceRoot: string): Promise<void> {
-  await execFileAsync("direnv", ["exec", workspaceRoot, "i"], {
-    cwd: workspaceRoot,
-    maxBuffer: 1024 * 1024 * 32,
+  await runInherited("direnv", ["exec", workspaceRoot, "i"], workspaceRoot);
+}
+
+async function runInherited(command: string, args: string[], cwd: string): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(command, args, { cwd, stdio: "inherit" });
+    child.on("error", reject);
+    child.on("exit", (code, signal) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      const suffix = signal ? ` (signal ${signal})` : "";
+      reject(
+        new Error(
+          `install command failed: ${command} ${args.map(shellish).join(" ")} exited ${code ?? "null"}${suffix}`,
+        ),
+      );
+    });
   });
+}
+
+function shellish(value: string) {
+  return /^[A-Za-z0-9_./:=@+-]+$/.test(value) ? value : JSON.stringify(value);
 }
 
 async function runNixFlakeLock(opts: InitConsumerOptions): Promise<void> {

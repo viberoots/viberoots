@@ -5,6 +5,7 @@ import * as tty from "node:tty";
 export type TerminalSelectChoice = {
   label: string;
   value: string;
+  valueLabel?: string | false;
 };
 
 export async function promptTerminalSelect(
@@ -27,8 +28,9 @@ export async function promptTerminalSelect(
     }
     choices.forEach((choice, idx) => {
       const selected = idx === index;
+      const valueLabel = choice.valueLabel === undefined ? choice.value : choice.valueLabel;
       streams.output.write(
-        `\r\x1b[K${selected ? ">" : " "} ${choice.label} (${choice.value})${
+        `\r\x1b[K${selected ? ">" : " "} ${choice.label}${valueLabel === false ? "" : ` (${valueLabel})`}${
           selected ? "  Up/Down then Enter" : ""
         }\n`,
       );
@@ -43,25 +45,44 @@ export async function promptTerminalSelect(
     return await new Promise<string>((resolve, reject) => {
       onData = (chunk: Buffer) => {
         const text = chunk.toString("utf8");
-        if (text === "\u0003") {
+        if (text.includes("\u0003")) {
           streams.output.write("\n");
           reject(new Error(opts.cancelMessage || `${message} cancelled`));
           return;
         }
-        if (text === "\r" || text === "\n") {
+        if (/[\r\n]/.test(text)) {
           streams.output.write("\n");
           resolve(choices[index]?.value || choices[0]!.value);
           return;
         }
-        if (text === "\u001b[A") index = (index + choices.length - 1) % choices.length;
-        if (text === "\u001b[B") index = (index + 1) % choices.length;
-        render();
+        let changed = false;
+        if (text.includes("\u001b[A")) {
+          index = (index + choices.length - 1) % choices.length;
+          changed = true;
+        }
+        if (text.includes("\u001b[B")) {
+          index = (index + 1) % choices.length;
+          changed = true;
+        }
+        if (changed) render();
       };
       streams.input.on("data", onData);
     });
   } finally {
     if (onData) streams.input.off("data", onData);
     streams.input.setRawMode(previousRaw);
+    streams.close();
+  }
+}
+
+export async function promptTerminalLine(message: string, defaultValue = "") {
+  const streams = promptStreams();
+  const rl = readline.createInterface({ input: streams.input, output: streams.output });
+  try {
+    const suffix = defaultValue ? ` [${defaultValue}]` : "";
+    return (await rl.question(`${message}${suffix}: `)).trim() || defaultValue;
+  } finally {
+    rl.close();
     streams.close();
   }
 }
@@ -89,7 +110,10 @@ async function promptSelectLine(
   try {
     streams.output.write(`${message}:\n`);
     choices.forEach((choice, idx) => {
-      streams.output.write(`  ${idx + 1}. ${choice.label} (${choice.value})\n`);
+      const valueLabel = choice.valueLabel === undefined ? choice.value : choice.valueLabel;
+      streams.output.write(
+        `  ${idx + 1}. ${choice.label}${valueLabel === false ? "" : ` (${valueLabel})`}\n`,
+      );
     });
     const answer = (await rl.question(`Choose [${initialIndex + 1}]: `)).trim();
     const parsed = Number(answer || initialIndex + 1);
