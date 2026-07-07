@@ -236,7 +236,9 @@ if (dryRun) {
         const activeLockfiles = importers.map((imp) =>
           imp === "viberoots" ? "pnpm-lock.yaml" : path.join(imp, "pnpm-lock.yaml"),
         );
-        const removedHashEntries = await pruneNodeModulesHashesJson(activeLockfiles);
+        const removedHashEntries = await pruneNodeModulesHashesJson(activeLockfiles, {
+          root: repoRoot,
+        });
         if (verbose && removedHashEntries.length > 0) {
           console.log(
             `[install-deps] pruned stale node-modules hash entries: ${removedHashEntries.join(", ")}`,

@@ -302,6 +302,7 @@ export async function restoreHashFromSharedCache(opts: {
   existingHash: string;
   hasValidExistingHash: boolean;
   hashOwner?: HashesJsonOwner;
+  hashRoot?: string;
 }): Promise<boolean> {
   const sharedHash = await readSharedHashCache({
     repoRoot: opts.repoRoot,
@@ -310,7 +311,10 @@ export async function restoreHashFromSharedCache(opts: {
   });
   if (!sharedHash) return false;
   if (!opts.hasValidExistingHash || sharedHash !== opts.existingHash) {
-    await updateNodeModulesHashesJson(opts.key, sharedHash, { owner: opts.hashOwner });
+    await updateNodeModulesHashesJson(opts.key, sharedHash, {
+      owner: opts.hashOwner,
+      root: opts.hashRoot || opts.repoRoot,
+    });
   }
   await persistVerifiedHash({
     repoRoot: opts.repoRoot,

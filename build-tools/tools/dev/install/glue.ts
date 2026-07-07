@@ -52,8 +52,8 @@ async function workspaceRoot(): Promise<string> {
   return await findRepoRoot(cwd);
 }
 
-export function zxNodeBase(): string {
-  const zxInit = zxInitPath(process.cwd());
+export function zxNodeBase(root: string): string {
+  const zxInit = zxInitPath(root);
   return nodeFlagsWithZx(zxInit).join(" ");
 }
 
@@ -120,9 +120,9 @@ async function ensureWorkspaceGlobalNixInputTargets() {
 
 export async function runGlue(dryRun: boolean, verbose: boolean) {
   const ui = createCommandUi({ verbose });
-  const nodeBase = zxNodeBase();
   const nodeBin = process.execPath || "node";
   const wsRoot = await workspaceRoot();
+  const nodeBase = zxNodeBase(wsRoot);
   await ensureWorkspaceGlobalNixInputTargets();
   const zxImport = zxInitPath(wsRoot);
   type LangConfig = {

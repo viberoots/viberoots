@@ -4,6 +4,7 @@ import path from "node:path";
 import { getImporterRootsContract } from "./importer-roots";
 import { defaultLockfileBasenameForLang, findPnpmLockfiles, findUvLockfiles } from "./lockfiles";
 import { toPosixPath } from "./posix-path";
+import { resolveWorkspaceRootSync } from "./repo";
 
 /**
  * Find importer lockfiles given simple filename globs.
@@ -139,10 +140,7 @@ export async function findPnpmLockfilesWithSyntheticWorkspaceImporters(): Promis
   const real = await findImporterLockfiles([pnpmBasename]);
   const out = new Set(real.map((p) => toPosixPath(p).replace(/^\.\/+/, "")));
 
-  const rootAbs = (() => {
-    const wr = String(process.env.WORKSPACE_ROOT || "").trim();
-    return path.resolve(wr || process.cwd());
-  })();
+  const rootAbs = resolveWorkspaceRootSync(process.cwd());
 
   const { workspaceRoots } = getImporterRootsContract();
   for (const root of workspaceRoots) {
@@ -190,7 +188,7 @@ export async function findNearestLockfileForPackage(
   args: FindNearestLockfileForPackageArgs,
 ): Promise<string | null> {
   const { pkgDir, lockfileBasename } = args;
-  const repoRoot = process.cwd();
+  const repoRoot = resolveWorkspaceRootSync(process.cwd());
   const start = path.resolve(repoRoot, pkgDir || ".");
   const root = path.resolve(repoRoot);
   const inside = (p: string) => p === root || p.startsWith(root + path.sep);

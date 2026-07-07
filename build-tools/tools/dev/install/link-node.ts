@@ -47,18 +47,17 @@ function usesTempRepoFakeNix(root: string, env: NodeJS.ProcessEnv = process.env)
 export async function relinkNodeModules(force: boolean, importerOverride = "") {
   const root = repoRoot();
   await applyNixCacheHealthPolicy(root);
-  const cwd = path.resolve(process.cwd());
   const importer = importerOverride || (await resolveImporterDir(process.cwd()).catch(() => ".")); // POSIX repo-relative
   const attr = !importer || importer === "." ? "default" : sanitizeName(importer);
   let outPath = "";
-  const flakeRoot = (process.env.WORKSPACE_ROOT || process.cwd()).trim();
+  const flakeRoot = (process.env.WORKSPACE_ROOT || root).trim();
   const timeoutSec =
     Number.parseInt(String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"), 10) || 600;
   const nixBuildTimeoutMs = timeoutSec * 1000 + 10000;
   const isDefaultImporter = !importer || importer === ".";
   const lockRel = isDefaultImporter ? "pnpm-lock.yaml" : `${importer}/pnpm-lock.yaml`;
   const lockAbs = path.join(root, lockRel);
-  const importerDir = isDefaultImporter ? process.cwd() : path.join(root, importer);
+  const importerDir = isDefaultImporter ? root : path.join(root, importer);
   const nm = path.join(importerDir, "node_modules");
   const markerKey = isDefaultImporter ? "root" : sanitizeName(importer);
   const markerPath = path.join(

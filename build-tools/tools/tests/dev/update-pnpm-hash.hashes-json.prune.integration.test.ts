@@ -50,6 +50,66 @@ test("pruneNodeModulesHashesJson removes stale lockfile keys", async () => {
   }
 });
 
+test("pruneNodeModulesHashesJson prunes workspace hashes when invoked below root", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "hashes-prune-nested-cwd-"));
+  const prevCwd = process.cwd();
+  try {
+    const projectsDir = path.join(tmp, "projects");
+    await fsp.mkdir(projectsDir, { recursive: true });
+    const hashesPath = path.join(projectsDir, "node-modules.hashes.json");
+    await fsp.writeFile(
+      hashesPath,
+      JSON.stringify(
+        {
+          "projects/apps/deleted/pnpm-lock.yaml": "sha256-deleted",
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
+
+    process.chdir(projectsDir);
+    const removed = await pruneNodeModulesHashesJson([], { root: tmp });
+    assert.deepEqual(removed, ["projects/apps/deleted/pnpm-lock.yaml"]);
+
+    const next = JSON.parse(await fsp.readFile(hashesPath, "utf8")) as Record<string, string>;
+    assert.deepEqual(next, {});
+    await assert.rejects(fsp.stat(path.join(projectsDir, "projects", "node-modules.hashes.json")));
+  } finally {
+    process.chdir(prevCwd);
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("hash JSON reads and writes use explicit workspace root below root", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "hashes-nested-cwd-"));
+  const prevCwd = process.cwd();
+  try {
+    const projectsDir = path.join(tmp, "projects");
+    await fsp.mkdir(projectsDir, { recursive: true });
+
+    process.chdir(projectsDir);
+    await updateNodeModulesHashesJson("projects/apps/demo/pnpm-lock.yaml", "sha256-project", {
+      root: tmp,
+    });
+
+    assert.equal(
+      await readNodeModulesHashForLockfile("projects/apps/demo/pnpm-lock.yaml", { root: tmp }),
+      "sha256-project",
+    );
+
+    const rootHashesPath = path.join(tmp, "projects", "node-modules.hashes.json");
+    const nestedHashesPath = path.join(projectsDir, "projects", "node-modules.hashes.json");
+    const next = JSON.parse(await fsp.readFile(rootHashesPath, "utf8")) as Record<string, string>;
+    assert.equal(next["projects/apps/demo/pnpm-lock.yaml"], "sha256-project");
+    await assert.rejects(fsp.stat(nestedHashesPath));
+  } finally {
+    process.chdir(prevCwd);
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test("pruneNodeModulesHashesJson does not mutate extracted viberoots source hashes", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "hashes-prune-extracted-"));
   const prevCwd = process.cwd();
@@ -299,6 +359,7 @@ test("updateNodeModulesHashesJson writes project hashes to projects ownership", 
   try {
     process.chdir(tmp);
     const viberootsHashesPath = path.join(
+      tmp,
       "viberoots",
       "build-tools",
       "tools",
@@ -306,6 +367,7 @@ test("updateNodeModulesHashesJson writes project hashes to projects ownership", 
       "node-modules.hashes.json",
     );
     await fsp.mkdir(path.dirname(viberootsHashesPath), { recursive: true });
+    await fsp.mkdir(path.join(tmp, "projects"), { recursive: true });
     await fsp.mkdir(path.join("viberoots", "build-tools", "tools", "dev"), { recursive: true });
     await fsp.writeFile(
       path.join("viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),
@@ -325,9 +387,12 @@ test("updateNodeModulesHashesJson writes project hashes to projects ownership", 
       "utf8",
     );
 
-    await updateNodeModulesHashesJson("projects/apps/demo/pnpm-lock.yaml", "sha256-project");
+    process.chdir(path.join(tmp, "projects"));
+    await updateNodeModulesHashesJson("projects/apps/demo/pnpm-lock.yaml", "sha256-project", {
+      root: tmp,
+    });
 
-    const projectsHashesPath = path.join("projects", "node-modules.hashes.json");
+    const projectsHashesPath = path.join(tmp, "projects", "node-modules.hashes.json");
     const projectHashes = JSON.parse(await fsp.readFile(projectsHashesPath, "utf8")) as Record<
       string,
       string

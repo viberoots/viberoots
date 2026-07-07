@@ -39,13 +39,11 @@ function viberootsHashesJsonPaths(root: string): string[] {
   ]);
 }
 
-function hashesJsonPaths(): string[] {
-  const root = process.cwd();
+function hashesJsonPaths(root = process.cwd()): string[] {
   return unique([...viberootsHashesJsonPaths(root), workspaceHashesJsonPath(root)]);
 }
 
-function writableHashesJsonPaths(): string[] {
-  const root = process.cwd();
+function writableHashesJsonPaths(root = process.cwd()): string[] {
   const writable = [workspaceHashesJsonPath(root)];
   if (isStandaloneViberootsSource(root)) {
     writable.unshift(viberootsHashesJsonPaths(root)[0]);
@@ -54,9 +52,13 @@ function writableHashesJsonPaths(): string[] {
 }
 
 export type HashesJsonOwner = "workspace" | "viberoots";
+export type HashesJsonOptions = { owner?: HashesJsonOwner; root?: string };
 
-function ownerHashesJsonPath(lockfileRel: string, owner?: HashesJsonOwner): string {
-  const root = process.cwd();
+function ownerHashesJsonPath(
+  lockfileRel: string,
+  owner?: HashesJsonOwner,
+  root = process.cwd(),
+): string {
   if (owner === "viberoots") return viberootsHashesJsonPaths(root)[0];
   if (owner === "workspace") return workspaceHashesJsonPath(root);
   return lockfileRel.startsWith("projects/") || !isStandaloneViberootsSource(root)
@@ -79,16 +81,18 @@ async function writeJsonFile(candidate: string, obj: Record<string, string>): Pr
   await fsp.writeFile(candidate, payload, "utf8");
 }
 
-async function readHashesJson(): Promise<Record<string, string>> {
+async function readHashesJson(root = process.cwd()): Promise<Record<string, string>> {
   const merged: Record<string, string> = {};
-  for (const candidate of hashesJsonPaths()) {
+  for (const candidate of hashesJsonPaths(root)) {
     Object.assign(merged, await readJsonFile(candidate));
   }
   return merged;
 }
 
-async function readOwnerHashesJson(owner: HashesJsonOwner): Promise<Record<string, string>> {
-  const root = process.cwd();
+async function readOwnerHashesJson(
+  owner: HashesJsonOwner,
+  root = process.cwd(),
+): Promise<Record<string, string>> {
   const candidates =
     owner === "viberoots" ? viberootsHashesJsonPaths(root) : [workspaceHashesJsonPath(root)];
   const merged: Record<string, string> = {};
@@ -98,9 +102,13 @@ async function readOwnerHashesJson(owner: HashesJsonOwner): Promise<Record<strin
   return merged;
 }
 
-async function removeHashFromNonOwnerFiles(lockfileRel: string, owner: string): Promise<void> {
+async function removeHashFromNonOwnerFiles(
+  lockfileRel: string,
+  owner: string,
+  root = process.cwd(),
+): Promise<void> {
   const ownerReal = await fsp.realpath(owner).catch(() => path.resolve(owner));
-  for (const candidate of writableHashesJsonPaths()) {
+  for (const candidate of writableHashesJsonPaths(root)) {
     if (candidate === owner) continue;
     const candidateReal = await fsp.realpath(candidate).catch(() => path.resolve(candidate));
     if (candidateReal === ownerReal) continue;
@@ -114,21 +122,26 @@ async function removeHashFromNonOwnerFiles(lockfileRel: string, owner: string): 
 export async function updateNodeModulesHashesJson(
   lockfileRel: string,
   newHash: string,
-  opts: { owner?: HashesJsonOwner } = {},
+  opts: HashesJsonOptions = {},
 ) {
-  const owner = ownerHashesJsonPath(lockfileRel, opts.owner);
+  const root = opts.root ? path.resolve(opts.root) : process.cwd();
+  const owner = ownerHashesJsonPath(lockfileRel, opts.owner, root);
   const obj = await readJsonFile(owner);
   obj[lockfileRel] = newHash;
   await writeJsonFile(owner, obj);
   if (opts.owner !== "viberoots") {
-    await removeHashFromNonOwnerFiles(lockfileRel, owner);
+    await removeHashFromNonOwnerFiles(lockfileRel, owner, root);
   }
 }
 
-export async function pruneNodeModulesHashesJson(keepLockfiles: string[]): Promise<string[]> {
+export async function pruneNodeModulesHashesJson(
+  keepLockfiles: string[],
+  opts: { root?: string } = {},
+): Promise<string[]> {
   const keep = new Set(keepLockfiles);
   const removed: string[] = [];
-  for (const candidate of writableHashesJsonPaths()) {
+  const root = opts.root ? path.resolve(opts.root) : process.cwd();
+  for (const candidate of writableHashesJsonPaths(root)) {
     const obj = await readJsonFile(candidate);
     let changed = false;
     for (const key of Object.keys(obj)) {
@@ -146,10 +159,13 @@ export async function pruneNodeModulesHashesJson(keepLockfiles: string[]): Promi
 
 export async function readNodeModulesHashForLockfile(
   lockfileRel: string,
-  opts: { owner?: HashesJsonOwner } = {},
+  opts: HashesJsonOptions = {},
 ): Promise<string> {
   try {
-    const obj = opts.owner ? await readOwnerHashesJson(opts.owner) : await readHashesJson();
+    const root = opts.root ? path.resolve(opts.root) : process.cwd();
+    const obj = opts.owner
+      ? await readOwnerHashesJson(opts.owner, root)
+      : await readHashesJson(root);
     const v = String(obj[lockfileRel] || "").trim();
     return v;
   } catch {

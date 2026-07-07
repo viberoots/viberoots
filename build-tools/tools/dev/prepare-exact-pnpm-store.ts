@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import { readImporterArg } from "../lib/cli";
+import { findRepoRoot } from "../lib/repo";
 import { prepareExactPnpmStore } from "./update-pnpm-hash/lockfile";
 
 function parseImporterArg(): string {
@@ -11,7 +12,7 @@ function parseImporterArg(): string {
 
 async function main() {
   const importer = parseImporterArg();
-  const repoRoot = process.cwd();
+  const repoRoot = await findRepoRoot(process.cwd());
   const prepared = await prepareExactPnpmStore({ repoRoot, importer });
   process.stdout.write(path.resolve(prepared.exactStorePath) + "\n");
 }

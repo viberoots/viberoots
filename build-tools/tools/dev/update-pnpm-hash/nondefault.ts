@@ -70,6 +70,7 @@ export async function handleNonDefaultImporter(opts: {
       existingHash: opts.existingHash,
       hasValidExistingHash: opts.hasValidExistingHash,
       hashOwner: opts.hashOwner,
+      hashRoot: opts.repoRoot,
     });
     return restored ? sharedHash : null;
   };
@@ -121,7 +122,10 @@ export async function handleNonDefaultImporter(opts: {
     }
     const suggestedFromExisting = extractHash(String(verifyExisting.output || ""));
     if (suggestedFromExisting) {
-      await updateNodeModulesHashesJson(opts.key, suggestedFromExisting, { owner: opts.hashOwner });
+      await updateNodeModulesHashesJson(opts.key, suggestedFromExisting, {
+        owner: opts.hashOwner,
+        root: opts.repoRoot,
+      });
       console.log(
         `[update-pnpm-hash] importer=${opts.importer} step=${phasePrefix}-after-hash attr=${opts.storeAttr} timeout=${opts.timeoutSec}s`,
       );
@@ -171,7 +175,10 @@ export async function handleNonDefaultImporter(opts: {
           process.exit(1);
           return true;
         }
-        await updateNodeModulesHashesJson(opts.key, pre.sri, { owner: opts.hashOwner });
+        await updateNodeModulesHashesJson(opts.key, pre.sri, {
+          owner: opts.hashOwner,
+          root: opts.repoRoot,
+        });
         const verifyAfterHash = await opts.runFixedBuild(
           `importer=${opts.importer} step=stale-builder-fixed-after-hash attr=${opts.storeAttr}`,
         );
@@ -180,6 +187,7 @@ export async function handleNonDefaultImporter(opts: {
           if (suggestedFromFixed && suggestedFromFixed !== pre.sri) {
             await updateNodeModulesHashesJson(opts.key, suggestedFromFixed, {
               owner: opts.hashOwner,
+              root: opts.repoRoot,
             });
             const retryAfterHash = await opts.runFixedBuild(
               `importer=${opts.importer} step=stale-builder-fixed-after-hash-retry attr=${opts.storeAttr}`,
@@ -265,7 +273,10 @@ export async function handleNonDefaultImporter(opts: {
       return true;
     }
     let sri = sri0;
-    await updateNodeModulesHashesJson(opts.key, sri, { owner: opts.hashOwner });
+    await updateNodeModulesHashesJson(opts.key, sri, {
+      owner: opts.hashOwner,
+      root: opts.repoRoot,
+    });
     console.log(
       `[update-pnpm-hash] importer=${opts.importer} step=fixed-build-after-hash attr=${opts.storeAttr} timeout=${opts.timeoutSec}s`,
     );
@@ -276,7 +287,10 @@ export async function handleNonDefaultImporter(opts: {
       const suggestedFromFixed = extractHash(String(verifyAfterHash.output || ""));
       if (suggestedFromFixed && suggestedFromFixed !== sri) {
         sri = suggestedFromFixed;
-        await updateNodeModulesHashesJson(opts.key, sri, { owner: opts.hashOwner });
+        await updateNodeModulesHashesJson(opts.key, sri, {
+          owner: opts.hashOwner,
+          root: opts.repoRoot,
+        });
         const retryAfterHash = await opts.runFixedBuild(
           `importer=${opts.importer} step=fixed-build-after-hash-retry attr=${opts.storeAttr}`,
         );

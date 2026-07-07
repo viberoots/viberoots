@@ -16,6 +16,7 @@ test("findNearestLockfileForPackage returns nearest ancestor lockfile path withi
 
     await fs.outputFile(path.join(outer, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
 
+    await fs.outputFile(path.join(repo, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
     await fs.outputFile(path.join(repo, "pnpm-lock.yaml"), "lockfileVersion: 9\n", "utf8");
     await fs.outputFile(path.join(repo, "uv.lock"), "# root uv\n", "utf8");
     await fs.outputFile(
@@ -59,6 +60,15 @@ test("findNearestLockfileForPackage returns nearest ancestor lockfile path withi
           lockfileBasename: "pnpm-lock.yaml",
         }),
         null,
+      );
+
+      process.chdir(path.join(repo, "apps"));
+      assert.equal(
+        await findNearestLockfileForPackage({
+          pkgDir: "apps/web/nested",
+          lockfileBasename: "pnpm-lock.yaml",
+        }),
+        "apps/web/pnpm-lock.yaml",
       );
     } finally {
       process.chdir(prevCwd);

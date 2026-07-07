@@ -24,10 +24,11 @@ import {
   repoRelativeLockfilePath,
 } from "./update-pnpm-hash/paths";
 import * as verifiedMarker from "./update-pnpm-hash/verified-marker";
+import { findRepoRoot } from "../lib/repo";
 
 async function inner() {
   const { lockfile, force } = parseUpdatePnpmHashArgs();
-  const repoRoot = process.cwd();
+  const repoRoot = await findRepoRoot(process.cwd());
   const relLock = repoRelativeLockfilePath(repoRoot, lockfile);
   const importer = normalizeImporter(path.posix.dirname(relLock));
   const hashKey = importer === "viberoots" ? "pnpm-lock.yaml" : relLock;
@@ -50,8 +51,14 @@ async function inner() {
   const key = hashKey;
   const placeholderHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
   if (force)
-    await hashesJson.updateNodeModulesHashesJson(key, placeholderHash, { owner: hashOwner });
-  const existingHash = await hashesJson.readNodeModulesHashForLockfile(key, { owner: hashOwner });
+    await hashesJson.updateNodeModulesHashesJson(key, placeholderHash, {
+      owner: hashOwner,
+      root: repoRoot,
+    });
+  const existingHash = await hashesJson.readNodeModulesHashForLockfile(key, {
+    owner: hashOwner,
+    root: repoRoot,
+  });
   const hasValidExistingHash = !force && !!existingHash && existingHash !== placeholderHash;
   if (nonDefaultImporter) {
     await ensureImporterLockfileFresh({ repoRoot, importer });
@@ -159,6 +166,7 @@ async function inner() {
       existingHash,
       hasValidExistingHash,
       hashOwner,
+      hashRoot: repoRoot,
     }))
   ) {
     return;
@@ -190,7 +198,10 @@ async function inner() {
       );
     }
     const nextHash = pre.sri;
-    await hashesJson.updateNodeModulesHashesJson(key, nextHash, { owner: hashOwner });
+    await hashesJson.updateNodeModulesHashesJson(key, nextHash, {
+      owner: hashOwner,
+      root: repoRoot,
+    });
     console.log(
       `[update-pnpm-hash] importer=${importer} step=stale-builder-fixed-after-hash attr=${storeAttr} timeout=${timeoutSec}s`,
     );
@@ -276,7 +287,10 @@ async function inner() {
     );
   }
   const nextHash: string = suggested;
-  await hashesJson.updateNodeModulesHashesJson(key, nextHash, { owner: hashOwner });
+  await hashesJson.updateNodeModulesHashesJson(key, nextHash, {
+    owner: hashOwner,
+    root: repoRoot,
+  });
   console.log(
     `[update-pnpm-hash] importer=${importer} step=fixed-build-after-hash attr=${storeAttr} timeout=${timeoutSec}s`,
   );
