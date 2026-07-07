@@ -1,3 +1,4 @@
+import * as fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import type { Dirent } from "node:fs";
 import * as readline from "node:readline/promises";
@@ -400,26 +401,68 @@ function valueFlag(name: string, value: string) {
 }
 
 function isInteractiveShell() {
-  return Boolean(process.stdin.isTTY && process.stderr.isTTY);
+  return Boolean((process.stdin.isTTY && process.stderr.isTTY) || hasControllingTerminal());
 }
 
 async function promptYesNo(message: string) {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+  const streams = promptStreams();
+  const rl = readline.createInterface({ input: streams.input, output: streams.output });
   try {
     const answer = (await rl.question(message)).trim().toLowerCase();
     return answer === "" || answer === "y" || answer === "yes";
   } finally {
     rl.close();
+    streams.close();
   }
 }
 
 async function promptNoDefault(message: string) {
-  const rl = readline.createInterface({ input: process.stdin, output: process.stderr });
+  const streams = promptStreams();
+  const rl = readline.createInterface({ input: streams.input, output: streams.output });
   try {
     const answer = (await rl.question(message)).trim().toLowerCase();
     return answer === "y" || answer === "yes";
   } finally {
     rl.close();
+    streams.close();
+  }
+}
+
+type PromptStreams = {
+  input: NodeJS.ReadableStream;
+  output: NodeJS.WritableStream;
+  close: () => void;
+};
+
+function promptStreams(): PromptStreams {
+  if (process.stdin.isTTY) {
+    return { input: process.stdin, output: process.stderr, close: () => undefined };
+  }
+  if (!hasControllingTerminal()) {
+    return { input: process.stdin, output: process.stderr, close: () => undefined };
+  }
+  const input = fs.createReadStream("/dev/tty");
+  const output = fs.createWriteStream("/dev/tty");
+  return {
+    input,
+    output,
+    close: () => {
+      input.destroy();
+      output.end();
+    },
+  };
+}
+
+function hasControllingTerminal() {
+  if (process.platform === "win32") return false;
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync("/dev/tty", "r+");
+    return true;
+  } catch {
+    return false;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
   }
 }
 
