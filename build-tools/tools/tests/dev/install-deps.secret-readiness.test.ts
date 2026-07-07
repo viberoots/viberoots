@@ -14,6 +14,7 @@ const baseFlags = {
   rotateDeploymentCredentials: false,
   forceOverwriteLocalCredentials: false,
   bootstrap: false,
+  infisicalLoginMode: "",
 };
 
 test("install secret readiness skips bootstrap when local Universal Auth credentials exist", async () => {
@@ -85,6 +86,25 @@ test("install secret readiness prompts when resolver config is missing", async (
       },
     });
     assert.deepEqual(calls, [["repo", "--yes"]]);
+  });
+});
+
+test("install secret readiness forwards Infisical login mode to repo bootstrap", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot);
+    const calls: string[][] = [];
+    await ensureInstallSecretReadiness({
+      repoRoot,
+      dryRun: false,
+      verbose: false,
+      flags: { ...baseFlags, infisicalLoginMode: "interactive" },
+      deps: {
+        isInteractive: () => true,
+        prompt: async () => true,
+        bootstrap: async (args) => void calls.push(args),
+      },
+    });
+    assert.deepEqual(calls, [["repo", "--yes", "--login-mode", "interactive"]]);
   });
 });
 

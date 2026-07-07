@@ -16,6 +16,7 @@ const VALUE_FLAGS = new Set([
   "org-role",
   "access-token-env",
   "infisical-bin",
+  "login-mode",
   "tofu-dir",
   "tofu-plan-file",
   "credential-sink",
@@ -59,6 +60,8 @@ Options:
   --org-name <name>             Exact organization name to select
   --no-login                    Require an access token from --access-token-env
   --access-token-env <name>     Human/admin token env var
+  --login-mode <browser|interactive>
+                                  Use browser login or Infisical CLI command-line login
   --tofu-plan-file <path>       Saved OpenTofu plan path
   --no-tofu-apply               Stop after saved plan
   --rotate-bootstrap-credentials
@@ -94,6 +97,7 @@ export function parseBootstrapArgs(argv = getArgvTokens()): BootstrapArgs {
   setString(args, "identityName", readFlagStrFromTokens("identity-name", "", argv));
   setString(args, "accessTokenEnv", readFlagStrFromTokens("access-token-env", "", argv));
   setString(args, "infisicalBin", readFlagStrFromTokens("infisical-bin", "", argv));
+  args.loginMode = enumFlag("login-mode", args.loginMode, ["browser", "interactive"], argv);
   setString(args, "tofuDir", readFlagStrFromTokens("tofu-dir", "", argv));
   setString(args, "tofuPlanFile", readFlagStrFromTokens("tofu-plan-file", "", argv));
   setString(args, "localCredentialFile", readFlagStrFromTokens("local-credential-file", "", argv));

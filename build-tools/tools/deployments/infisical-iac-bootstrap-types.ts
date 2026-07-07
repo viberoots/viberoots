@@ -12,6 +12,7 @@ export type BootstrapArgs = {
   orgRole: "no-access" | "member" | "admin";
   accessTokenEnv: string;
   infisicalBin: string;
+  loginMode: "browser" | "interactive";
   noLogin: boolean;
   forceLogin: boolean;
   yes: boolean;

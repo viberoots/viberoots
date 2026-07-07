@@ -23,6 +23,7 @@ export const DEFAULT_BOOTSTRAP_ARGS: BootstrapArgs = {
   orgRole: "admin",
   accessTokenEnv: "INFISICAL_ACCESS_TOKEN",
   infisicalBin: "infisical",
+  loginMode: "browser",
   noLogin: false,
   forceLogin: false,
   yes: false,

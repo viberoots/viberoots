@@ -17,6 +17,7 @@ const baseFlags = {
   rotateDeploymentCredentials: false,
   forceOverwriteLocalCredentials: false,
   bootstrap: false,
+  infisicalLoginMode: "",
 };
 
 test("install secret readiness propagates malformed deployment metadata", async () => {

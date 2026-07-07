@@ -68,16 +68,15 @@ export async function getAccessToken(
       env: cliEnv,
       capture: true,
     });
-    console.error(
-      [
-        `[infisical-bootstrap] waiting for Infisical CLI login at ${args.cliDomain}`,
-        "complete the browser/login flow if one opens.",
-        `For token-based automation, rerun with --no-login --access-token-env ${args.accessTokenEnv} and --org-name or --organization-id.`,
-      ].join(" "),
-    );
+    console.error(loginWaitMessage(args));
     runner({
       command: args.infisicalBin,
-      args: ["login", "--domain", args.cliDomain],
+      args: [
+        "login",
+        "--domain",
+        args.cliDomain,
+        ...(args.loginMode === "interactive" ? ["--interactive"] : []),
+      ],
       env: cliEnv,
     });
     console.error("[infisical-bootstrap] Infisical CLI login complete; reading access token");
@@ -96,6 +95,22 @@ export async function getAccessToken(
   } finally {
     await fs.rm(tempHome, { recursive: true, force: true });
   }
+}
+
+function loginWaitMessage(args: BootstrapArgs) {
+  if (args.loginMode === "interactive") {
+    return [
+      `[infisical-bootstrap] waiting for command-line Infisical login at ${args.cliDomain}.`,
+      "Complete the prompts in this terminal.",
+      `For token-based automation, rerun with --no-login --access-token-env ${args.accessTokenEnv} and --org-name or --organization-id.`,
+    ].join(" ");
+  }
+  return [
+    `[infisical-bootstrap] waiting for Infisical CLI browser login at ${args.cliDomain}.`,
+    "Complete the browser/login flow if one opens.",
+    "If the wrong browser opens or no browser tab opens, press Ctrl-C and rerun with `i --infisical-login-mode interactive` or lower-level `--login-mode interactive`.",
+    `For token-based automation, rerun with --no-login --access-token-env ${args.accessTokenEnv} and --org-name or --organization-id.`,
+  ].join(" ");
 }
 
 export function isolatedCliEnv(tempHome: string, cliDomain: string): NodeJS.ProcessEnv {

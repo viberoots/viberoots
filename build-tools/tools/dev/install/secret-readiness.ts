@@ -27,6 +27,7 @@ export type SecretReadinessFlags = {
   rotateDeploymentCredentials: boolean;
   forceOverwriteLocalCredentials: boolean;
   bootstrap: boolean;
+  infisicalLoginMode: string;
 };
 
 export type SecretReadinessDeps = {
@@ -346,6 +347,7 @@ function bootstrapArgs(flags: SecretReadinessFlags) {
     "repo",
     "--yes",
     ...valueFlag("machine-label", flags.machineLabel),
+    ...valueFlag("login-mode", flags.infisicalLoginMode),
     ...boolFlag("rotate-bootstrap-credentials", flags.rotateBootstrapCredentials),
     ...boolFlag("rotate-deployment-credentials", flags.rotateDeploymentCredentials),
     ...boolFlag("force-overwrite-local-credentials", flags.forceOverwriteLocalCredentials),

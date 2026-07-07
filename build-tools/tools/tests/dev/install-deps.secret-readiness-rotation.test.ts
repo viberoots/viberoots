@@ -14,6 +14,7 @@ const baseFlags = {
   rotateDeploymentCredentials: false,
   forceOverwriteLocalCredentials: false,
   bootstrap: false,
+  infisicalLoginMode: "",
 };
 
 test("install secret readiness rotates even when local credentials exist", async () => {

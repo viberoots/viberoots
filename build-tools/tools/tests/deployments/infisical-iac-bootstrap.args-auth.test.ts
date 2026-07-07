@@ -89,6 +89,8 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
     "repo",
     "--infisical-host",
     "eu",
+    "--login-mode",
+    "interactive",
     "--no-login",
     "--access-token-env",
     "TOKEN_ENV",
@@ -107,6 +109,7 @@ test("bootstrap args support host shorthands and non-interactive controls", () =
   ]);
   assert.equal(args.apiUrl, "https://eu.infisical.com");
   assert.equal(args.cliDomain, "https://eu.infisical.com/api");
+  assert.equal(args.loginMode, "interactive");
   assert.equal(args.accessTokenEnv, "TOKEN_ENV");
   assert.equal(args.organizationId, "org_1");
   assert.equal(args.noTofuApply, true);
@@ -224,10 +227,34 @@ test("CLI login uses isolated HOME and removes local state after token extractio
   assert.equal(observedUpdateCheck, "true");
   assert.equal(commands[0], "vault set file --domain https://app.infisical.com/api --silent");
   assert.equal(captures[0], true);
-  assert.match(output, /waiting for Infisical CLI login/);
+  assert.match(output, /waiting for Infisical CLI browser login/);
+  assert.match(output, /wrong browser opens or no browser tab opens/);
+  assert.match(output, /--infisical-login-mode interactive/);
   assert.match(output, /token-based automation/);
   assert.match(output, /Infisical CLI login complete/);
   await assert.rejects(() => fs.stat(observedHome), /ENOENT/);
+});
+
+test("CLI login supports command-line interactive mode when browser login is unsuitable", async () => {
+  const commands: string[] = [];
+  const runner: CommandRunner = ({ args }) => {
+    commands.push(args.join(" "));
+    if (args.includes("login")) return "";
+    return "human-token\n";
+  };
+  const output = await captureStderr(async () => {
+    const result = await getAccessToken(
+      { ...DEFAULT_BOOTSTRAP_ARGS, loginMode: "interactive" },
+      runner,
+      {},
+    );
+    assert.equal(result.token, "human-token");
+  });
+  assert.ok(
+    commands.includes("login --domain https://app.infisical.com/api --interactive"),
+    "interactive login mode must pass --interactive to the Infisical CLI",
+  );
+  assert.match(output, /command-line Infisical login/);
 });
 
 test("--no-login fails fast when the configured env var is missing", async () => {

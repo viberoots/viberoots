@@ -43,6 +43,7 @@ type Flags = {
   rotateDeploymentCredentials: boolean;
   forceOverwriteLocalCredentials: boolean;
   bootstrap: boolean;
+  infisicalLoginMode: string;
 };
 
 async function runGeneratedWorkspaceLockRepair(opts: {
@@ -133,6 +134,7 @@ const {
   rotateDeploymentCredentials,
   forceOverwriteLocalCredentials,
   bootstrap,
+  infisicalLoginMode,
 } = {
   force: getFlagBool("force"),
   dryRun: getFlagBool("dry-run") || envDryRun,
@@ -148,6 +150,7 @@ const {
   rotateDeploymentCredentials: getFlagBool("rotate-deployment-credentials"),
   forceOverwriteLocalCredentials: getFlagBool("force-overwrite-local-credentials"),
   bootstrap: getFlagBool("bootstrap"),
+  infisicalLoginMode: getFlagStr("infisical-login-mode", ""),
 } satisfies Flags;
 const ui = createCommandUi({ verbose });
 if (verbose) console.log("Installing dependencies...");
@@ -386,6 +389,7 @@ await ensureInstallSecretReadiness({
     rotateDeploymentCredentials,
     forceOverwriteLocalCredentials,
     bootstrap,
+    infisicalLoginMode,
   },
 });
 if (!dryRun && shouldRunFinalWorkspaceLockRepair()) {
