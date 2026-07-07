@@ -46,6 +46,7 @@ function usesTempRepoFakeNix(root: string, env: NodeJS.ProcessEnv = process.env)
 
 export async function relinkNodeModules(force: boolean, importerOverride = "") {
   const root = repoRoot();
+  const invocationCwd = path.resolve(process.cwd());
   await applyNixCacheHealthPolicy(root);
   const importer = importerOverride || (await resolveImporterDir(process.cwd()).catch(() => ".")); // POSIX repo-relative
   const attr = !importer || importer === "." ? "default" : sanitizeName(importer);
@@ -260,7 +261,7 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
     console.error("[link-node] FAILED to link node_modules to", linkTarget, e);
     process.exit(2);
   }
-  if (cwd === root || !isDefaultImporter) {
+  if (invocationCwd === path.resolve(root) || !isDefaultImporter) {
     const hasLock = await pathExists(lockAbs);
     if (hasLock) {
       const buf = await fsp.readFile(lockAbs);

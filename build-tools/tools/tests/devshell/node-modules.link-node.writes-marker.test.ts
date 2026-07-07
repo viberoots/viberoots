@@ -39,6 +39,12 @@ test("link-node writes marker at repo root", async () => {
       ].join("\n"),
       "utf8",
     );
+    await fsp.mkdir(path.join(tmp, ".viberoots", "workspace"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, ".viberoots", "workspace", "flake.nix"),
+      "{ outputs = _: {}; }\n",
+      "utf8",
+    );
     const fakeOut = path.join(tmp, "fake-out");
     await fsp.mkdir(path.join(fakeOut, "node_modules"), { recursive: true });
     const nixArgsLog = path.join(tmp, "nix-args.log");
