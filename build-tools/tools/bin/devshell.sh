@@ -51,12 +51,12 @@ env_init_paths() {
 	if [[ -n "${LIVE_ROOT}" ]]; then
 		LIVE_ROOT="$(cd "${LIVE_ROOT}" && pwd)"
 	fi
-	if [[ -n "${VIBEROOTS_SOURCE_ROOT:-}" && -f "${VIBEROOTS_SOURCE_ROOT}/build-tools/tools/dev/zx-init.mjs" ]]; then
+	if [[ -e "${LIVE_ROOT}/.viberoots/current" && -f "${LIVE_ROOT}/.viberoots/current/build-tools/tools/dev/zx-init.mjs" ]]; then
+		export VIBEROOTS_ROOT="$(cd "${LIVE_ROOT}/.viberoots/current" && pwd)"
+	elif [[ -n "${VIBEROOTS_SOURCE_ROOT:-}" && -f "${VIBEROOTS_SOURCE_ROOT}/build-tools/tools/dev/zx-init.mjs" ]]; then
 		export VIBEROOTS_ROOT="$(cd "${VIBEROOTS_SOURCE_ROOT}" && pwd)"
 	elif [[ -n "${VIBEROOTS_ROOT:-}" && -f "${VIBEROOTS_ROOT}/build-tools/tools/dev/zx-init.mjs" ]]; then
 		export VIBEROOTS_ROOT="$(cd "${VIBEROOTS_ROOT}" && pwd)"
-	elif [[ -e "${LIVE_ROOT}/.viberoots/current" ]]; then
-		export VIBEROOTS_ROOT="$(cd "${LIVE_ROOT}/.viberoots/current" && pwd)"
 	elif [[ -f "${LIVE_ROOT}/viberoots/build-tools/tools/dev/zx-init.mjs" ]]; then
 		export VIBEROOTS_ROOT="$(cd "${LIVE_ROOT}/viberoots" && pwd)"
 	else

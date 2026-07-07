@@ -56,10 +56,10 @@ function isGeneratedRemoteSourceLinkTarget(target: string): boolean {
 function chooseSource(workspaceRoot: string, opts: ActivationOptions): string {
   if (opts.sourcePath) return path.resolve(workspaceRoot, opts.sourcePath);
   if (flakeUsesLocalViberoots(workspaceRoot)) return path.join(workspaceRoot, "viberoots");
-  const envRoot = (opts.env?.VIBEROOTS_ROOT || "").trim();
-  if (envRoot) return path.resolve(envRoot);
   const remotePath = remoteSourcePath(workspaceRoot);
   if (remotePath) return remotePath;
+  const envRoot = (opts.env?.VIBEROOTS_ROOT || "").trim();
+  if (envRoot) return path.resolve(envRoot);
   return workspaceRoot;
 }
 

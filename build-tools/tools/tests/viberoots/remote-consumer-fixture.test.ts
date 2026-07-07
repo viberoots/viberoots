@@ -147,9 +147,12 @@ async function activateAndAssertStatus(
       stdio: "pipe",
     })`nix run --accept-flake-config path:${workspaceFlake}#viberoots -- init-workspace`;
   }
+  const staleEnvSource = path.join(path.dirname(consumer), "stale-env-viberoots");
+  await fsp.mkdir(staleEnvSource, { recursive: true });
+  await fsp.writeFile(path.join(staleEnvSource, "flake.nix"), "{}\n");
   const activation = await activateWorkspace({
     start: consumer,
-    env: { WORKSPACE_ROOT: consumer },
+    env: { WORKSPACE_ROOT: consumer, VIBEROOTS_ROOT: staleEnvSource },
   });
   const status = remoteSourceStatus(consumer);
   assert.ok(status);
