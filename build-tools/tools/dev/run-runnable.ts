@@ -1,7 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
+import * as fsp from "node:fs/promises";
 import { getArgvTokens } from "../lib/cli";
 import { findRepoRoot } from "../lib/repo";
+import type { RunnableExec } from "../lib/runnables";
 import { inferRunnableFromOutPath, type RunnableManifestEntry } from "../lib/runnables";
 import { validateSsrRunnableContract } from "../lib/runnable-contracts";
 import {
@@ -18,7 +20,7 @@ function commandCwdForSpec(
   spec: { argv: string[]; cwd?: string },
   workspaceRoot: string,
 ): string | undefined {
-  if (spec.cwd) return spec.cwd;
+  if (spec.cwd) return path.isAbsolute(spec.cwd) ? spec.cwd : path.join(workspaceRoot, spec.cwd);
   const argv = Array.isArray(spec.argv) ? spec.argv.map((x) => String(x || "")) : [];
   const cmd = String(argv[0] || "")
     .trim()
@@ -33,6 +35,24 @@ function commandCwdForSpec(
     return workspaceRoot;
   }
   return undefined;
+}
+
+async function directImporterDevSpec(
+  workspaceRoot: string,
+  importer: string,
+): Promise<RunnableExec | null> {
+  if (!importer || path.isAbsolute(importer) || importer.startsWith("../")) return null;
+  const importerRoot = path.join(workspaceRoot, importer);
+  try {
+    const st = await fsp.stat(path.join(importerRoot, "scripts", "dev.mjs"));
+    if (!st.isFile()) return null;
+  } catch {
+    return null;
+  }
+  return {
+    argv: ["node", "scripts/dev.mjs"],
+    cwd: importerRoot,
+  };
 }
 
 async function main() {
@@ -129,6 +149,9 @@ async function main() {
         entry.runnable.kind === "webapp-ssr" || hints.mode === "ssr" ? "dev:ssr" : "dev";
       spec = { argv: ["pnpm", "--dir", importer, devScript] };
     }
+  }
+  if (parsed.mode === "dev" && spec && targetHints?.importer && !testManifestPath) {
+    spec = (await directImporterDevSpec(workspaceRoot, targetHints.importer)) || spec;
   }
   if (!spec) {
     console.error(`run.${parsed.mode} is not available for ${target}`);
