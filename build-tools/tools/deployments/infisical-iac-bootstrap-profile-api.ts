@@ -15,9 +15,18 @@ export async function ensureInfisicalRepoProject(
   organizationId: string,
   projectName = REPO_INFISICAL_PROJECT_NAME,
 ) {
-  const existing = await findInfisicalRepoProject(api, organizationId, projectName);
+  const projects = await listInfisicalProjects(api);
+  const existing = projects.find(
+    (project) =>
+      project.name === projectName && projectMatchesOrganization(project, organizationId),
+  );
   if (existing) return { project: existing, changed: false };
-  const created = await createInfisicalRepoProject(api, organizationId, projectName);
+  const created = await createInfisicalRepoProject(
+    api,
+    organizationId,
+    projectName,
+    projects,
+  );
   return { project: created, changed: true };
 }
 
@@ -57,8 +66,7 @@ export async function findInfisicalRepoProject(
   organizationId: string,
   projectName = REPO_INFISICAL_PROJECT_NAME,
 ) {
-  const result = await api.request<ProjectListResponse>("GET", projectListEndpoint());
-  return projectsFromResponse(result).find(
+  return (await listInfisicalProjects(api)).find(
     (project) =>
       project.name === projectName && projectMatchesOrganization(project, organizationId),
   );
@@ -69,8 +77,7 @@ export async function findInfisicalProjectByNameOrSlug(
   organizationId: string,
   opts: { name?: string; slug?: string },
 ) {
-  const result = await api.request<ProjectListResponse>("GET", projectListEndpoint());
-  return projectsFromResponse(result).find((project) => {
+  return (await listInfisicalProjects(api)).find((project) => {
     if (!projectMatchesOrganization(project, organizationId)) return false;
     return Boolean(
       (opts.slug && project.slug === opts.slug) || (opts.name && project.name === opts.name),
@@ -92,15 +99,57 @@ async function createInfisicalRepoProject(
   api: InfisicalApi,
   organizationId: string,
   projectName: string,
+  visibleProjects: InfisicalRepoProject[],
 ) {
-  const result = await api.request<ProjectCreateResponse>("POST", "/api/v1/projects", {
-    projectName,
-    type: "secret-manager",
-    shouldCreateDefaultEnvs: true,
-  });
+  let result: ProjectCreateResponse | undefined;
+  try {
+    result = await api.request<ProjectCreateResponse>("POST", "/api/v1/projects", {
+      projectName,
+      type: "secret-manager",
+      shouldCreateDefaultEnvs: true,
+    });
+  } catch (error) {
+    throw new Error(
+      repoProjectCreateFailureMessage(error, organizationId, projectName, visibleProjects),
+    );
+  }
   const project = projectFromUnknown(result?.workspace || result?.project);
   if (!project) throw new Error("Infisical project create response did not include a project id");
   return project;
+}
+
+async function listInfisicalProjects(api: InfisicalApi) {
+  const result = await api.request<ProjectListResponse>("GET", projectListEndpoint());
+  return projectsFromResponse(result);
+}
+
+function repoProjectCreateFailureMessage(
+  error: unknown,
+  organizationId: string,
+  projectName: string,
+  visibleProjects: InfisicalRepoProject[],
+) {
+  const visible = visibleProjects.filter((project) =>
+    projectMatchesOrganization(project, organizationId),
+  );
+  return [
+    `Could not create Infisical project "${projectName}" for repo bootstrap.`,
+    errorMessage(error),
+    "If the Infisical organization has reached its project/workspace limit, reuse an existing secret-manager project instead of creating a new one.",
+    `Set the generated profile projectId in projects/config/shared.json or export VBR_INFISICAL_PROJECT_ID before rerunning bootstrap.`,
+    visible.length ? `Visible projects: ${visible.map(formatProject).join("; ")}` : undefined,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function formatProject(project: InfisicalRepoProject) {
+  const slug = project.slug ? ` slug=${project.slug}` : "";
+  return `${project.name} id=${project.id}${slug}`;
 }
 
 type ProjectListResponse = {

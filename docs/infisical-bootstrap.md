@@ -88,6 +88,11 @@ selected local sink. Use `--machine-label <label>` when the hostname is not a us
 label in Infisical.
 Existing operator-authored Infisical profiles are preserved once their `projectId` validates in the
 selected organization.
+If Infisical rejects the default repo project creation because the organization has reached a
+project or workspace plan limit, reuse an existing Infisical secret-manager project. Set
+`sprinkleref.profiles.<profile>.projectId` in `projects/config/shared.json` for the generated
+Infisical profile, or export `VBR_INFISICAL_PROJECT_ID` before rerunning bootstrap. The bootstrap
+error lists visible candidate projects when Infisical returns them.
 Before reporting success, repo bootstrap reads the generated bootstrap credential refs back from the
 selected local sink, checks they match the machine's repo Universal Auth credential, and performs an
 Infisical Universal Auth login probe. It also validates the default `main` resolver category: for
