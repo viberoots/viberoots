@@ -37,6 +37,7 @@ export async function promptTerminalSelect(
     });
   };
   const previousRaw = streams.input.isRaw;
+  const wasPaused = streams.input.isPaused();
   streams.input.setRawMode(true);
   streams.input.resume();
   render();
@@ -71,6 +72,7 @@ export async function promptTerminalSelect(
   } finally {
     if (onData) streams.input.off("data", onData);
     streams.input.setRawMode(previousRaw);
+    if (wasPaused) streams.input.pause();
     streams.close();
   }
 }
