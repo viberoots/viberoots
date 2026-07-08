@@ -556,24 +556,40 @@ type PromptStreams = {
 };
 
 function promptStreams(): PromptStreams {
+  return openTtyStreams() || { input: process.stdin, output: process.stderr, close: () => undefined };
+}
+
+function openTtyStreams(): PromptStreams | undefined {
+  let inputFd: number | undefined;
+  let outputFd: number | undefined;
   try {
-    const input = fs.createReadStream("/dev/tty");
-    const output = fs.createWriteStream("/dev/tty");
+    inputFd = fs.openSync("/dev/tty", "r");
+    outputFd = fs.openSync("/dev/tty", "w");
+    const input = new fs.ReadStream("", { fd: inputFd, autoClose: true });
+    const output = new fs.WriteStream("", { fd: outputFd, autoClose: true });
     return {
       input,
       output,
       close: () => {
-        input.destroy();
-        output.end();
+        closePromptStream(input);
+        closePromptStream(output);
       },
     };
   } catch {
-    return { input: process.stdin, output: process.stderr, close: () => undefined };
+    if (inputFd !== undefined) fs.closeSync(inputFd);
+    if (outputFd !== undefined) fs.closeSync(outputFd);
+    return undefined;
   }
 }
 
 function pausePromptInput(input: NodeJS.ReadableStream) {
   if (typeof input.pause === "function") input.pause();
+}
+
+function closePromptStream(stream: NodeJS.ReadableStream | NodeJS.WritableStream) {
+  const close = (stream as { close?: () => void }).close;
+  if (typeof close === "function") close.call(stream);
+  else if (typeof stream.destroy === "function") stream.destroy();
 }
 
 function nonInteractiveMessage() {

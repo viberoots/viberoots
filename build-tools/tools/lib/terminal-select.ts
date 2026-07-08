@@ -134,23 +134,20 @@ type PromptStreams = {
 };
 
 function promptStreams(): PromptStreams {
-  try {
-    const input = fs.createReadStream("/dev/tty");
-    const output = fs.createWriteStream("/dev/tty");
-    return {
-      input,
-      output,
-      close: () => {
-        input.destroy();
-        output.end();
-      },
-    };
-  } catch {
-    return { input: process.stdin, output: process.stderr, close: () => undefined };
-  }
+  return openTtyStreams() || { input: process.stdin, output: process.stderr, close: () => undefined };
 }
 
 function promptTtyStreams() {
+  const streams = openTtyStreams();
+  if (streams) return streams as PromptStreams & { input: tty.ReadStream; output: tty.WriteStream };
+  return {
+    input: process.stdin as tty.ReadStream,
+    output: process.stderr as tty.WriteStream,
+    close: () => undefined,
+  };
+}
+
+function openTtyStreams(): PromptStreams | undefined {
   let inputFd: number | undefined;
   let outputFd: number | undefined;
   try {
@@ -162,21 +159,23 @@ function promptTtyStreams() {
       input,
       output,
       close: () => {
-        input.destroy();
-        output.end();
+        closePromptStream(input);
+        closePromptStream(output);
       },
     };
   } catch {
     if (inputFd !== undefined) fs.closeSync(inputFd);
     if (outputFd !== undefined) fs.closeSync(outputFd);
-    return {
-      input: process.stdin as tty.ReadStream,
-      output: process.stderr as tty.WriteStream,
-      close: () => undefined,
-    };
+    return undefined;
   }
 }
 
 function pausePromptInput(input: NodeJS.ReadableStream) {
   if (typeof input.pause === "function") input.pause();
+}
+
+function closePromptStream(stream: NodeJS.ReadableStream | NodeJS.WritableStream) {
+  const close = (stream as { close?: () => void }).close;
+  if (typeof close === "function") close.call(stream);
+  else if (typeof stream.destroy === "function") stream.destroy();
 }
