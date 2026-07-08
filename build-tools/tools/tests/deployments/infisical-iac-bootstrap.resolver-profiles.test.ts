@@ -194,6 +194,58 @@ test("repo bootstrap can select macOS Keychain as the default main secret backen
   });
 });
 
+test("repo bootstrap repairs legacy bootstrap Keychain service to repo default", async () => {
+  const dir = await tmp();
+  await withCwdAndEnv(dir, async () => {
+    await writeBootstrapKeychainConfig("viberoots-bootstrap");
+    await ensureRepoResolverConfig({
+      dryRun: false,
+      workspaceRoot: dir,
+      configPath: sharedConfigPath(),
+    });
+    const shared = JSON.parse(await fs.readFile(sharedConfigPath(), "utf8"));
+    assert.equal(
+      shared.sprinkleref.categories.bootstrap.service,
+      `${path.basename(dir)}-bootstrap`,
+    );
+  });
+});
+
+test("repo bootstrap repairs legacy runtime host Keychain service to repo default", async () => {
+  const dir = await tmp();
+  await withCwdAndEnv(dir, async () => {
+    process.env.VBR_RUNTIME_HOST = "local-macos";
+    await writeRuntimeHostKeychainConfig("viberoots-bootstrap");
+    await writeJson("projects/config/local.json", {
+      activeRuntimeHost: "local-macos",
+    });
+    await ensureRepoResolverConfig({
+      dryRun: false,
+      workspaceRoot: dir,
+      configPath: sharedConfigPath(),
+    });
+    const shared = JSON.parse(await fs.readFile(sharedConfigPath(), "utf8"));
+    assert.equal(
+      shared.runtimeHosts["local-macos"].service,
+      `${path.basename(dir)}-bootstrap`,
+    );
+  });
+});
+
+test("repo bootstrap preserves custom bootstrap Keychain service", async () => {
+  const dir = await tmp();
+  await withCwdAndEnv(dir, async () => {
+    await writeBootstrapKeychainConfig("custom-bootstrap-service");
+    await ensureRepoResolverConfig({
+      dryRun: false,
+      workspaceRoot: dir,
+      configPath: sharedConfigPath(),
+    });
+    const shared = JSON.parse(await fs.readFile(sharedConfigPath(), "utf8"));
+    assert.equal(shared.sprinkleref.categories.bootstrap.service, "custom-bootstrap-service");
+  });
+});
+
 test("repo bootstrap dry-run reports explicit Vault main backend", async () => {
   const dir = await tmp();
   await withCwdAndEnv(dir, async () => {
@@ -339,6 +391,55 @@ async function withCwdAndEnv(dir: string, run: () => Promise<void>) {
 async function writeJson(file: string, value: unknown) {
   await fs.mkdir(path.dirname(file), { recursive: true });
   await fs.writeFile(file, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+async function writeBootstrapKeychainConfig(service: string) {
+  await writeJson("projects/config/shared.json", {
+    sprinkleref: {
+      version: 1,
+      defaultCategory: "main",
+      profiles: {
+        "infisical-default": {
+          backend: "infisical",
+          host: "https://app.infisical.com",
+          projectId: "project",
+          defaultEnvironment: "staging",
+          clientIdEnv: "INFISICAL_CLIENT_ID",
+          clientSecretEnv: "INFISICAL_CLIENT_SECRET",
+        },
+      },
+      categories: {
+        main: { profile: "infisical-default" },
+        bootstrap: { backend: "macos-keychain", service },
+      },
+    },
+  });
+}
+
+async function writeRuntimeHostKeychainConfig(service: string) {
+  await writeJson("projects/config/shared.json", {
+    schemaVersion: "viberoots-project-config@1",
+    runtimeHosts: {
+      "local-macos": { backend: "macos-keychain", service },
+    },
+    sprinkleref: {
+      version: 1,
+      defaultCategory: "main",
+      profiles: {
+        "infisical-default": {
+          backend: "infisical",
+          host: "https://app.infisical.com",
+          projectId: "project",
+          defaultEnvironment: "staging",
+          clientIdEnv: "INFISICAL_CLIENT_ID",
+          clientSecretEnv: "INFISICAL_CLIENT_SECRET",
+        },
+      },
+      categories: {
+        main: { profile: "infisical-default" },
+      },
+    },
+  });
 }
 async function writeGraph(nodes: unknown[]) {
   await writeJson(DEFAULT_GRAPH_PATH, { nodes });

@@ -18,6 +18,7 @@ import { readSprinkleRefConfig } from "./sprinkleref-config";
 import { resolveBootstrapAccessCredentialSinkBackend } from "./sprinkleref-bootstrap-guard";
 import {
   DEFAULT_BOOTSTRAP_ARGS,
+  withBootstrapKeychainServiceName,
   withRepoKeychainServiceName,
 } from "./infisical-iac-bootstrap-config";
 import {
@@ -45,6 +46,7 @@ export async function ensureRepoResolverConfig(opts: {
   configPath?: string;
   secretBackend?: string;
   keychainServiceName?: string;
+  bootstrapKeychainServiceName?: string;
 }) {
   const workspaceRoot = opts.workspaceRoot || (await findRepoRoot(process.cwd()));
   const configPath =
@@ -80,6 +82,18 @@ export async function ensureRepoResolverConfig(opts: {
       workspaceRoot,
     )
   ).keychainServiceName;
+  const bootstrapKeychainServiceName = (
+    await withBootstrapKeychainServiceName(
+      {
+        ...DEFAULT_BOOTSTRAP_ARGS,
+        bootstrapKeychainServiceName: opts.bootstrapKeychainServiceName,
+      },
+      workspaceRoot,
+    )
+  ).bootstrapKeychainServiceName;
+  if (!opts.dryRun) {
+    await repairBootstrapKeychainService(configPath, bootstrapKeychainServiceName);
+  }
   if (opts.secretBackend?.trim() && !opts.dryRun) {
     await selectRepoSecretBackend(configPath, opts.secretBackend, repoKeychainServiceName);
   }
@@ -237,6 +251,38 @@ async function selectRepoSecretBackend(
   resolver.categories.main = { profile: selector.profile };
   if (raw.sprinkleref) raw.sprinkleref = resolver;
   await fs.writeFile(configPath, `${JSON.stringify(raw, null, 2)}\n`);
+}
+
+async function repairBootstrapKeychainService(
+  configPath: string,
+  bootstrapKeychainServiceName: string,
+) {
+  const raw = JSON.parse(await fs.readFile(configPath, "utf8")) as SprinkleRefConfigFile & {
+    sprinkleref?: SprinkleRefConfigFile;
+    runtimeHosts?: Record<string, SprinkleRefBackendConfig>;
+  };
+  const resolver = raw.sprinkleref || raw;
+  const bootstrap = resolver.categories?.bootstrap;
+  let changed = false;
+  if (bootstrap && !("profile" in bootstrap) && bootstrap.backend === "macos-keychain") {
+    changed = repairKeychainBackendService(bootstrap, bootstrapKeychainServiceName) || changed;
+  }
+  const localMacos = raw.runtimeHosts?.["local-macos"];
+  if (localMacos?.backend === "macos-keychain") {
+    changed = repairKeychainBackendService(localMacos, bootstrapKeychainServiceName) || changed;
+  }
+  if (!changed) return;
+  if (raw.sprinkleref) raw.sprinkleref = resolver;
+  await fs.writeFile(configPath, `${JSON.stringify(raw, null, 2)}\n`);
+}
+
+function repairKeychainBackendService(
+  backend: SprinkleRefBackendConfig,
+  keychainServiceName: string,
+) {
+  if (backend.service && backend.service !== "viberoots-bootstrap") return false;
+  backend.service = keychainServiceName;
+  return true;
 }
 
 function normalizeExplicitSecretBackend(secretBackend: string) {

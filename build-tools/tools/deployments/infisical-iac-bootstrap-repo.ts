@@ -82,6 +82,7 @@ export async function runRepoBootstrap(
     configPath,
     secretBackend: scopedArgs.secretBackend,
     keychainServiceName: scopedArgs.keychainServiceName,
+    bootstrapKeychainServiceName: scopedArgs.bootstrapKeychainServiceName,
   });
   const sink = await resolveCredentialSinkSelection(scopedArgs, {
     createMissingResolverConfig: true,
