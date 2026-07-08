@@ -140,8 +140,18 @@ test("credential handoff report emits stable refs without secret values", () => 
     metadata,
   });
   const text = JSON.stringify(report);
-  assert.match(text, /secret:\/\/bootstrap\/viberoots\/viberoots-iac-bootstrap\/client-id/);
-  assert.match(text, /secret:\/\/bootstrap\/viberoots\/viberoots-iac-bootstrap\/client-secret/);
+  assert.match(
+    text,
+    new RegExp(
+      "secret://bootstrap/viberoots/viberoots-iac-bootstrap/infisical/universal-auth/client-id",
+    ),
+  );
+  assert.match(
+    text,
+    new RegExp(
+      "secret://bootstrap/viberoots/viberoots-iac-bootstrap/infisical/universal-auth/client-secret",
+    ),
+  );
   assert.doesNotMatch(text, /secret:\/\/deployments\/fixture\/bootstrap/);
   assert.match(text, /secret:\/\/deployments\/fixture\/staging\/infisical-client-secret/);
   assert.match(text, /"status":"managed"/);

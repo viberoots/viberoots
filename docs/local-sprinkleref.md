@@ -294,10 +294,10 @@ environment only as a deliberate resolver-profile change.
 namespace for credentials that unlock Infisical-backed resolver profiles. When it is omitted,
 bootstrap uses the consumer workspace directory name. For example, a workspace named
 `unfairly-common` stores its repo bootstrap Universal Auth client under
-`secret://bootstrap/unfairly-common/viberoots-iac-bootstrap/client-id` and
-`secret://bootstrap/unfairly-common/viberoots-iac-bootstrap/client-secret`. Operators may override
-the scope for one bootstrap run with `--bootstrap-scope <name>`. The scope is a single path segment
-containing letters, numbers, `.`, `_`, or `-`.
+`secret://bootstrap/unfairly-common/viberoots-iac-bootstrap/infisical/universal-auth/client-id` and
+`secret://bootstrap/unfairly-common/viberoots-iac-bootstrap/infisical/universal-auth/client-secret`.
+Operators may override the scope for one bootstrap run with `--bootstrap-scope <name>`. The scope is
+a single path segment containing letters, numbers, `.`, `_`, or `-`.
 
 `sprinkleref.repoInfisicalProjectName` controls the repo-level Infisical secret-manager project
 that bootstrap creates or adopts for Infisical-backed `secret://...` refs. When it is omitted,

@@ -94,7 +94,7 @@ Infisical.
 
 Repo bootstrap profile credentials are not deployment managed workload credentials.
 `infisical-default` and other repo-wide profile aliases use repo-scoped SprinkleRef refs such as
-`secret://viberoots/bootstrap/viberoots-iac-bootstrap/client-id` for Universal Auth materialization.
+`secret://viberoots/bootstrap/viberoots-iac-bootstrap/infisical/universal-auth/client-id` for Universal Auth materialization.
 Sample webapp deployment bootstrap remains responsible for stage-specific workload refs such as
 `secret://deployments/sample-webapp/staging/infisical-client-id`.
 Infisical identities are shared repo/deployment principals, but Universal Auth client-secret records

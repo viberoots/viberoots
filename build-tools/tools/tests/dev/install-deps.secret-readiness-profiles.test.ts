@@ -88,8 +88,8 @@ async function writeGeneratedInfisicalResolver(repoRoot: string) {
 async function writeBootstrapCredentials(repoRoot: string) {
   const scope = path.basename(repoRoot);
   await writeJson(path.join(repoRoot, ".local/bootstrap.json"), {
-    [`secret://bootstrap/${scope}/viberoots-iac-bootstrap/client-id`]: "client-id",
-    [`secret://bootstrap/${scope}/viberoots-iac-bootstrap/client-secret`]: "client-secret",
+    [`secret://bootstrap/${scope}/viberoots-iac-bootstrap/infisical/universal-auth/client-id`]: "client-id",
+    [`secret://bootstrap/${scope}/viberoots-iac-bootstrap/infisical/universal-auth/client-secret`]: "client-secret",
   });
 }
 

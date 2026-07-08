@@ -155,7 +155,7 @@ export function repoBootstrapCredentialRefs(
   identity: Pick<Identity, "name">,
   bootstrapScope = "viberoots",
 ) {
-  const prefix = `secret://bootstrap/${bootstrapScope}/${identity.name}`;
+  const prefix = `secret://bootstrap/${bootstrapScope}/${identity.name}/infisical/universal-auth`;
   return {
     clientIdRef: `${prefix}/client-id`,
     clientSecretRef: `${prefix}/client-secret`,

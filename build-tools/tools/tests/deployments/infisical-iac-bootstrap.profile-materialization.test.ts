@@ -28,7 +28,9 @@ test("repo profile materialization writes Infisical project id without secret va
   assert.match(written, /"projectName": "fixture-repo"/);
   assert.match(
     written,
-    /"clientIdRef": "secret:\/\/bootstrap\/viberoots\/viberoots-iac-bootstrap\/client-id"/,
+    new RegExp(
+      '"clientIdRef": "secret://bootstrap/viberoots/viberoots-iac-bootstrap/infisical/universal-auth/client-id"',
+    ),
   );
   assert.doesNotMatch(
     written,

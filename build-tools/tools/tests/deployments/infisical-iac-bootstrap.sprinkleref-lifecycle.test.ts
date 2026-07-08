@@ -9,8 +9,10 @@ import { ensureBootstrapCredential } from "../../deployments/infisical-iac-boots
 import { createCredentialSink } from "../../deployments/infisical-iac-bootstrap-sink";
 
 const identity = { id: "id_1", name: "viberoots-iac-bootstrap" };
-const clientIdRef = "secret://bootstrap/viberoots/viberoots-iac-bootstrap/client-id";
-const clientSecretRef = "secret://bootstrap/viberoots/viberoots-iac-bootstrap/client-secret";
+const clientIdRef =
+  "secret://bootstrap/viberoots/viberoots-iac-bootstrap/infisical/universal-auth/client-id";
+const clientSecretRef =
+  "secret://bootstrap/viberoots/viberoots-iac-bootstrap/infisical/universal-auth/client-secret";
 
 test("SprinkleRef bootstrap category stores IaC client id and secret", async () => {
   const dir = await tmp();

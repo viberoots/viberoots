@@ -106,7 +106,7 @@ product-approved plan PR.
 Repo bootstrap materializes backend profile credentials under the reserved `bootstrap` namespace. By
 default the next `secret://` path segment is the consumer workspace directory name, so a checkout
 named `unfairly-common` uses refs such as
-`secret://bootstrap/unfairly-common/viberoots-iac-bootstrap/client-id`. Set
+`secret://bootstrap/unfairly-common/viberoots-iac-bootstrap/infisical/universal-auth/client-id`. Set
 `sprinkleref.bootstrapScope` in `projects/config/shared.json` to use a different stable scope, or
 pass `--bootstrap-scope <name>` for a one-off bootstrap run. ExampleApp deployment bootstrap
 continues to report only stage-specific managed workload refs under

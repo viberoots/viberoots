@@ -33,8 +33,8 @@ test("repo bootstrap skips unused starter backend profiles", async () => {
     const report = JSON.parse(output.stdout) as { profiles: string[] };
     const config = await fs.readFile(sharedConfigPath(), "utf8");
     const credentials = await fs.readFile(".local/infisical-bootstrap-credentials.json", "utf8");
-    const expectedRef = `secret://bootstrap/${path.basename(dir)}/viberoots-iac-bootstrap`;
-    assert.deepEqual(report.profiles, ["infisical-control", "infisical-default"]);
+    const expectedRef = `secret://bootstrap/${path.basename(dir)}/viberoots-iac-bootstrap/infisical/universal-auth`;
+    assert.deepEqual(report.profiles, ["infisical-control"]);
     assert.match(config, new RegExp(`${escapeRegExp(expectedRef)}/client-id`));
     assert.doesNotMatch(config, /secret:\/\/deployments\/sample-webapp/);
     assert.match(credentials, new RegExp(escapeRegExp(expectedRef)));
@@ -70,7 +70,9 @@ test("repo bootstrap can use configured bootstrap scope for generated credential
     const credentials = await fs.readFile(".local/infisical-bootstrap-credentials.json", "utf8");
     assert.match(
       credentials,
-      /secret:\/\/bootstrap\/configured-scope\/viberoots-iac-bootstrap\/client-secret/,
+      new RegExp(
+        "secret://bootstrap/configured-scope/viberoots-iac-bootstrap/infisical/universal-auth/client-secret",
+      ),
     );
   });
 });
@@ -104,7 +106,9 @@ test("repo bootstrap CLI scope overrides configured bootstrap scope", async () =
     const credentials = await fs.readFile(".local/infisical-bootstrap-credentials.json", "utf8");
     assert.match(
       credentials,
-      /secret:\/\/bootstrap\/cli-scope\/viberoots-iac-bootstrap\/client-secret/,
+      new RegExp(
+        "secret://bootstrap/cli-scope/viberoots-iac-bootstrap/infisical/universal-auth/client-secret",
+      ),
     );
     assert.doesNotMatch(credentials, /secret:\/\/bootstrap\/configured-scope/);
   });

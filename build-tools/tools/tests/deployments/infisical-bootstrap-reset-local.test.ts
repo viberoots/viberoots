@@ -26,7 +26,7 @@ test("local reset dry-run prints consequences without deleting state", async () 
     keychainRunner: (_command, args) => {
       return {
         status: args.includes(
-          `secret://bootstrap/${path.basename(repo)}/viberoots-iac-bootstrap/client-secret`,
+          `secret://bootstrap/${path.basename(repo)}/viberoots-iac-bootstrap/infisical/universal-auth/client-secret`,
         )
           ? 0
           : 44,
@@ -43,10 +43,13 @@ test("local reset dry-run prints consequences without deleting state", async () 
   assert.match(
     text,
     new RegExp(
-      `secret://bootstrap/${path.basename(repo)}/viberoots-iac-bootstrap/client-secret - Infisical Universal Auth client secret`,
+      `secret://bootstrap/${path.basename(repo)}/viberoots-iac-bootstrap/infisical/universal-auth/client-secret - Infisical Universal Auth client secret`,
     ),
   );
-  assert.doesNotMatch(text, /viberoots-iac-bootstrap\/client-id/);
+  assert.doesNotMatch(
+    text,
+    new RegExp("viberoots-iac-bootstrap/infisical/universal-auth/client-id"),
+  );
   assert.match(text, /Infisical cloud resources, Cloudflare secrets, and application secrets/);
   assert.deepEqual(removed, []);
   await fs.rm(repo, { recursive: true, force: true });
@@ -116,7 +119,9 @@ test("local reset removes generated paths and keychain entries after confirmatio
   ]);
   assert.ok(
     keychainDeletes.some((entry) =>
-      entry.includes(`secret://bootstrap/${path.basename(repo)}/viberoots-iac-bootstrap/client-id`),
+      entry.includes(
+        `secret://bootstrap/${path.basename(repo)}/viberoots-iac-bootstrap/infisical/universal-auth/client-id`,
+      ),
     ),
   );
   await fs.rm(repo, { recursive: true, force: true });

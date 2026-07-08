@@ -52,7 +52,7 @@ test("bootstrap credential sink auto uses configured SprinkleRef bootstrap categ
   process.env.SPRINKLEREF_CONFIG = config;
   try {
     const sink = await createCredentialSink({ ...DEFAULT_BOOTSTRAP_ARGS, credentialSink: "auto" });
-    const ref = "secret://bootstrap/viberoots/viberoots-iac-bootstrap/client-secret";
+    const ref = "secret://bootstrap/viberoots/viberoots-iac-bootstrap/infisical/universal-auth/client-secret";
     await sink.write(ref, "value", false);
     assert.equal(await sink.read(ref), "value");
     assert.match(sink.describe(), /SprinkleRef bootstrap/);
