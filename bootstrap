@@ -29,6 +29,7 @@ official_submodule_url="https://github.com/viberoots/viberoots.git"
 submodule_url="$(env_or_default "${official_submodule_url}" VBR_SUBMODULE VBR_SUBMODULE_URL VIBEROOTS_SUBMODULE_URL)"
 trust_submodule_url="$(env_or_default 0 VBR_TRUST_SUBMODULE VBR_TRUST_SUBMODULE_URL VIBEROOTS_TRUST_SUBMODULE_URL)"
 install_nix="$(env_or_default 1 VBR_INSTALL_NIX VIBEROOTS_INSTALL_NIX)"
+allow_nix_install="$(env_or_default 0 VBR_ALLOW_NIX_INSTALL VIBEROOTS_ALLOW_NIX_INSTALL)"
 run_install="$(env_or_default 1 VBR_RUN_INSTALL VIBEROOTS_RUN_INSTALL)"
 run_validate="$(env_or_default 0 VBR_RUN_VALIDATE VIBEROOTS_RUN_VALIDATE)"
 dry_run="$(env_or_default 0 VBR_DRY_RUN VIBEROOTS_DRY_RUN)"
@@ -191,7 +192,7 @@ usage() {
 usage: bootstrap [--mode flake|submodule] [--ref <ref>] [--rev <sha>] [--workspace-root <dir>]
                  [--workspace-name <name>] [--viberoots-url <flake-ref>]
                  [--submodule-url <git-url>] [--no-run-install] [--run-validate]
-                 [--trust-submodule-url] [--no-install-nix] [--no-direnv-allow]
+                 [--trust-submodule-url] [--allow-nix-install] [--no-install-nix] [--no-direnv-allow]
                  [--dry-run]
 
 Defaults:
@@ -199,6 +200,7 @@ Defaults:
   --ref main
   --rev disabled
   --install-nix
+  --allow-nix-install disabled; prompt when interactive
   --run-install
   --run-validate disabled
   --direnv-allow
@@ -210,6 +212,7 @@ Examples:
   curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | bash
   curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_CONSUMER=submodule bash
   curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_INSTALL_NIX=0 bash
+  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_ALLOW_NIX_INSTALL=1 bash
   curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_RUN_INSTALL=0 bash
   curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_RUN_VALIDATE=1 bash
   curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_DIRENV_ALLOW=0 bash
@@ -332,6 +335,29 @@ EOF
   fi
 }
 
+confirm_nix_install() {
+  if [[ "${allow_nix_install}" == "1" ]]; then
+    return 0
+  fi
+  cat >&2 <<'EOF'
+Nix was not found. viberoots can install it with the Determinate Nix installer.
+
+This is a system-level developer tool installation. It may create /nix,
+configure launch services or daemon state, and change shell profile integration.
+EOF
+  if ! { : </dev/tty >/dev/tty; } 2>/dev/null; then
+    echo "error: refusing to install Nix without confirmation; rerun with --allow-nix-install or VBR_ALLOW_NIX_INSTALL=1 if this is intentional" >&2
+    exit 1
+  fi
+  local answer
+  printf 'Install Nix now? Type "yes" to continue: ' >/dev/tty
+  IFS= read -r answer </dev/tty
+  if [[ "${answer}" != "yes" ]]; then
+    echo "error: refusing to install Nix" >&2
+    exit 1
+  fi
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --mode)
@@ -408,6 +434,10 @@ while [[ $# -gt 0 ]]; do
       install_nix=1
       shift
       ;;
+    --allow-nix-install)
+      allow_nix_install=1
+      shift
+      ;;
     --no-install-nix)
       install_nix=0
       shift
@@ -448,6 +478,10 @@ if [[ "${mode}" != "flake" && "${mode}" != "submodule" ]]; then
 fi
 if [[ "${install_nix}" != "0" && "${install_nix}" != "1" ]]; then
   echo "error: VBR_INSTALL_NIX must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "${allow_nix_install}" != "0" && "${allow_nix_install}" != "1" ]]; then
+  echo "error: VBR_ALLOW_NIX_INSTALL must be 0 or 1" >&2
   exit 2
 fi
 if [[ "${trust_submodule_url}" != "0" && "${trust_submodule_url}" != "1" ]]; then
@@ -757,6 +791,9 @@ fi
 ui_set "workspace" "${workspace_root}"
 ui_set "workspace name" "${workspace_name}"
 ui_set "ensure nix" "$([[ "${install_nix}" == "1" ]] && echo yes || echo no)"
+if [[ "${install_nix}" == "1" ]]; then
+  ui_set "allow nix install" "$([[ "${allow_nix_install}" == "1" ]] && echo yes || echo prompt)"
+fi
 ui_set "install" "$([[ "${run_install}" == "1" ]] && echo yes || echo no)"
 ui_set "validate" "$([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
 ui_set "direnv allow" "$([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
@@ -770,7 +807,11 @@ if [[ "${dry_run}" == "1" ]]; then
   echo
   ui_heading "planned actions"
   if ! command -v nix >/dev/null 2>&1 && [[ "${install_nix}" == "1" ]]; then
-    ui_list "install Nix with the Determinate Nix installer"
+    if [[ "${allow_nix_install}" == "1" ]]; then
+      ui_list "install Nix with the Determinate Nix installer"
+    else
+      ui_list "prompt before installing Nix with the Determinate Nix installer"
+    fi
   fi
   ui_list "create workspace directory if missing" "initialize git repository if missing"
   if [[ "${mode}" == "flake" ]]; then
@@ -800,6 +841,7 @@ if ! command -v nix >/dev/null 2>&1; then
     echo "error: nix is required; install Nix or rerun with VBR_INSTALL_NIX=1" >&2
     exit 1
   fi
+  confirm_nix_install
   require_command curl
   echo "Nix not found; installing with the Determinate Nix installer..."
   record_action "installed Nix with the Determinate Nix installer"

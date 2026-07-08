@@ -281,14 +281,16 @@ curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap 
 The bootstrap command writes the canonical consumer `.buckconfig`, `.buckroot`, `.envrc`, and hidden
 workspace flake, locks the requested viberoots input, evaluates `lib.viberootsSourcePath`, refreshes
 `.viberoots/current` to the locked source path, and creates workspace-owned state under
-`.viberoots/workspace/**` and `.viberoots/buck`. If Nix is missing, it runs the Determinate Nix
-installer unless `VBR_INSTALL_NIX=0` is used. It also creates the canonical `projects/` directory,
-runs `direnv allow` unless `VBR_DIRENV_ALLOW=0` is used, and runs `i` unless `VBR_RUN_INSTALL=0` is
-used. It can also run `b && v` when `VBR_RUN_VALIDATE=1` is used. It prints the resolved plan
-before setup, supports `VBR_DRY_RUN=1`, and does not create generated state inside the reusable
-viberoots source. In submodule mode, using any non-default `VBR_SUBMODULE` requires an interactive
-trust confirmation, or `VBR_TRUST_SUBMODULE=1` for non-interactive automation, because that
-repository can run non-viberoots code during setup, install, build, and validation.
+`.viberoots/workspace/**` and `.viberoots/buck`. If Nix is missing, bootstrap can run the
+Determinate Nix installer. Interactive runs ask for confirmation first; non-interactive runs require
+`VBR_ALLOW_NIX_INSTALL=1` or `--allow-nix-install`; `VBR_INSTALL_NIX=0` disables Nix installation
+entirely. It also creates the canonical `projects/` directory, runs `direnv allow` unless
+`VBR_DIRENV_ALLOW=0` is used, and runs `i` unless `VBR_RUN_INSTALL=0` is used. It can also run `b &&
+v` when `VBR_RUN_VALIDATE=1` is used. It prints the resolved plan before setup, supports
+`VBR_DRY_RUN=1`, and does not create generated state inside the reusable viberoots source. In
+submodule mode, using any non-default `VBR_SUBMODULE` requires an interactive trust confirmation, or
+`VBR_TRUST_SUBMODULE=1` for non-interactive automation, because that repository can run
+non-viberoots code during setup, install, build, and validation.
 
 The default automated fixture rewrites the remote input to a temporary `git+file` ref so PR changes
 can be validated before they are published. To prove the real-world GitHub flake import path, run

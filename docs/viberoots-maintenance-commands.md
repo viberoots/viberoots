@@ -61,19 +61,20 @@ Documentation should present the default path only. The override is for tests, d
 
 The launcher should preserve the existing bootstrap environment contract:
 
-| Environment variable  | Purpose                                         |
-| --------------------- | ----------------------------------------------- |
-| `VBR_CONSUMER`        | `flake` or `submodule` source mode.             |
-| `VBR_REF`             | Target viberoots ref consumed by the workspace. |
-| `VBR_REV`             | Target full viberoots commit SHA.               |
-| `VBR_WORKSPACE_ROOT`  | Consumer workspace root.                        |
-| `VBR_INSTALL_NIX`     | Whether bootstrap may install Nix if missing.   |
-| `VBR_RUN_INSTALL`     | Whether bootstrap runs `i`.                     |
-| `VBR_RUN_VALIDATE`    | Whether bootstrap runs `b && v`.                |
-| `VBR_DIRENV_ALLOW`    | Whether bootstrap runs `direnv allow`.          |
-| `VBR_DRY_RUN`         | Preview bootstrap actions.                      |
-| `VBR_SUBMODULE`       | Submodule Git URL.                              |
-| `VBR_TRUST_SUBMODULE` | Trust a non-default submodule URL.              |
+| Environment variable     | Purpose                                                   |
+| ------------------------ | --------------------------------------------------------- |
+| `VBR_CONSUMER`           | `flake` or `submodule` source mode.                       |
+| `VBR_REF`                | Target viberoots ref consumed by the workspace.           |
+| `VBR_REV`                | Target full viberoots commit SHA.                         |
+| `VBR_WORKSPACE_ROOT`     | Consumer workspace root.                                  |
+| `VBR_INSTALL_NIX`        | Whether bootstrap may install Nix if missing.             |
+| `VBR_ALLOW_NIX_INSTALL`  | Consent to install Nix without an interactive prompt.     |
+| `VBR_RUN_INSTALL`        | Whether bootstrap runs `i`.                               |
+| `VBR_RUN_VALIDATE`       | Whether bootstrap runs `b && v`.                          |
+| `VBR_DIRENV_ALLOW`       | Whether bootstrap runs `direnv allow`.                    |
+| `VBR_DRY_RUN`            | Preview bootstrap actions.                                |
+| `VBR_SUBMODULE`          | Submodule Git URL.                                        |
+| `VBR_TRUST_SUBMODULE`    | Trust a non-default submodule URL.                        |
 
 The launcher should not reinterpret most of these options. It should pass the environment through and let the live bootstrap script own semantics.
 
