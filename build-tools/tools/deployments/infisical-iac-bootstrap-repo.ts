@@ -32,8 +32,15 @@ import type {
 } from "./infisical-iac-bootstrap-deployments";
 import type { SharedInfisicalSession } from "./infisical-iac-bootstrap-repo-credential";
 
+type RepoBootstrapIo = {
+  stdin?: NodeJS.ReadStream;
+  stdout?: NodeJS.WriteStream;
+  question?: (prompt: string) => Promise<string>;
+};
+
 export type RepoBootstrapDeps = {
   finalCheckRunner?: (argv: string[]) => Promise<number>;
+  io?: RepoBootstrapIo;
   repoCredentialFactory?: (
     args: BootstrapArgs,
     opts?: { workspaceRoot?: string; configPath?: string },
@@ -72,7 +79,7 @@ export async function runRepoBootstrap(
     ),
     workspaceRoot,
   );
-  await confirmBootstrapPreflight(scopedArgs);
+  await confirmBootstrapPreflight(scopedArgs, deps.io);
   const graphPath = defaultDeploymentGraphPath(workspaceRoot);
   const configPath = path.join(workspaceRoot, DEFAULT_SPRINKLEREF_CONFIG_PATH);
   const resolver = await ensureRepoResolverConfig({
@@ -124,6 +131,7 @@ export async function runRepoBootstrap(
     credential,
     { workspaceRoot, graphPath },
     execute,
+    deps,
   );
   if (fanOut.successes.length > 0) {
     await runFinalSprinkleRefChecks(resolver.configPath, deps.finalCheckRunner);
@@ -325,8 +333,9 @@ async function runFanOutWithHandoff(
     args: BootstrapArgs,
     context: { infisicalSession?: SharedInfisicalSession },
   ) => Promise<DeploymentBootstrapExecutionResult | void>,
+  deps: Pick<RepoBootstrapDeps, "io">,
 ): Promise<DeploymentBootstrapFanOutResult> {
-  const run = () => runFanOut(args, credential, context, execute);
+  const run = () => runFanOut(args, credential, context, execute, deps);
   const fanOut = await run();
   if ((await applyFanOutMetadataHandoff(args, fanOut)).status === "applied") return await run();
   return fanOut;
@@ -340,11 +349,13 @@ async function runFanOut(
     args: BootstrapArgs,
     context: { infisicalSession?: SharedInfisicalSession },
   ) => Promise<DeploymentBootstrapExecutionResult | void>,
+  deps: Pick<RepoBootstrapDeps, "io">,
 ): Promise<DeploymentBootstrapFanOutResult> {
   return await runDeploymentBootstrapFanOut({
     args,
     workspaceRoot: context.workspaceRoot,
     graphPath: context.graphPath,
+    io: deps.io,
     execute: async (deploymentArgs) =>
       execute(deploymentArgs, {
         ...(credential ? { infisicalSession: credential } : {}),

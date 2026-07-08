@@ -92,7 +92,7 @@ test("viberoots-prefixed deployment-only changes override full build-system base
   ]);
 });
 
-test("deployment project changes select deployment and project-impact union", async () => {
+test("deployment project changes select project-impact targets without framework suite", async () => {
   const result = await resolveRequestedVerifyScope({
     root: process.cwd(),
     invocationCwd: process.cwd(),
@@ -110,7 +110,9 @@ test("deployment project changes select deployment and project-impact union", as
         "projects/deployments/sample/dev/TARGETS",
       ],
       listDeploymentTargets: async () => ["//projects/deployments/sample/dev:deploy"],
-      queryDeploymentDomainTargets: async () => ["//:deployment_domain_labels_cquery"],
+      queryDeploymentDomainTargets: async () => {
+        throw new Error("deployment framework suite should not run for project deployment edits");
+      },
       resolveProjectImpactSelection: async () => ({
         mode: "project-impact",
         targets: ["//projects/deployments/sample/dev/..."],
@@ -126,18 +128,22 @@ test("deployment project changes select deployment and project-impact union", as
           reason: "project-impact-selection",
         },
       }),
-      deploymentSafetyFloorTargets: ["//:deployment_verify_scope_boundary"],
+      deploymentSafetyFloorTargets: ["viberoots//:deployments_framework_safety_floor"],
     },
   });
 
   assert.equal(result.selection.selectorMode, "deployment-and-project-impact");
   assert.equal(result.selection.reason, "deployment-and-project-impact-targeted");
   assert.deepEqual(result.selection.targets, [
-    "//:deployment_domain_labels_cquery",
-    "//:deployment_verify_scope_boundary",
     "//projects/apps/sample-app/...",
     "//projects/deployments/sample/dev/...",
   ]);
+  assert.ok(result.selection.diagnostics);
+  assert.equal("deploymentDomainTargets" in result.selection.diagnostics, true);
+  if ("deploymentDomainTargets" in result.selection.diagnostics) {
+    assert.deepEqual(result.selection.diagnostics.deploymentDomainTargets, []);
+    assert.deepEqual(result.selection.diagnostics.deploymentSafetyFloorTargets, []);
+  }
 });
 
 test("mixed build-system deployment impact keeps the existing selection", async () => {

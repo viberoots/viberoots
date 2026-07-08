@@ -173,6 +173,10 @@ async function repairSnapshotViberootsInput(opts: {
     return;
   }
   const flakeLocalViberootsRoot = path.join(opts.flakeDir, "viberoots");
+  if (path.resolve(flakeLocalViberootsRoot) === path.resolve(snapshotViberootsRoot)) {
+    await rewriteViberootsInput(opts.flakeDir, "./viberoots");
+    return;
+  }
   await fsp.rm(flakeLocalViberootsRoot, { recursive: true, force: true }).catch(() => {});
   await $({
     stdio: "pipe",

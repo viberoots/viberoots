@@ -64,6 +64,14 @@ function isLikelyTempWorkspace(workspaceRoot: string): boolean {
   );
 }
 
+async function hasGeneratedWorkspaceViberootsInput(workspaceRoot: string): Promise<boolean> {
+  const flakePath = path.join(workspaceRoot, "flake.nix");
+  const text = await fsp.readFile(flakePath, "utf8").catch(() => "");
+  return /\bviberoots\.url\s*=\s*"path:\.\/\.viberoots\/workspace\/viberoots-flake-input"/.test(
+    text,
+  );
+}
+
 async function chooseFlakeRef(opts: {
   workspaceRoot: string;
   target?: string;
@@ -76,6 +84,23 @@ async function chooseFlakeRef(opts: {
     return { flakeRef: `path:${path.resolve(opts.workspaceRoot)}#${opts.attr}` };
 
   try {
+    if (await hasGeneratedWorkspaceViberootsInput(opts.workspaceRoot)) {
+      console.warn(
+        "[run-runnable] Falling back to filtered flake source because root flake uses generated viberoots workspace input",
+      );
+      const filtered = await makeFilteredFlakeRef({
+        workspaceRoot: opts.workspaceRoot,
+        attr: opts.attr,
+        logPrefix: "[run-runnable]",
+        target: opts.target,
+      });
+      return {
+        flakeRef: filtered.flakeRef,
+        workspaceRoot: filtered.workspaceRoot,
+        cleanup: filtered.cleanup,
+      };
+    }
+
     const { stdout } = await $({
       stdio: "pipe",
       cwd: opts.workspaceRoot,

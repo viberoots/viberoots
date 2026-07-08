@@ -85,17 +85,6 @@ export async function resolveDeploymentOverride(opts: {
     return null;
   }
 
-  const resolveDeploymentTargets =
-    opts.deps?.queryDeploymentDomainTargets || queryDeploymentDomainTargets;
-  const deploymentDomainTargets = await resolveDeploymentTargets(opts.root);
-  if (deploymentDomainTargets.length === 0)
-    guardDeploymentSelection("zero resolved deployment-domain test targets", impact.diagnostics);
-  const safetyFloorTargets = toSortedUnique(
-    opts.deps?.deploymentSafetyFloorTargets || deploymentSafetyFloorTargets(opts.root),
-  );
-  if (safetyFloorTargets.length === 0)
-    guardDeploymentSelection("zero deployment safety-floor targets", impact.diagnostics);
-
   let projectImpactDiagnostics: ProjectImpactSelectorDiagnostics | null = null;
   let projectTargets: string[] = [];
   if (impact.mode === "deployment-and-project-impact") {
@@ -110,6 +99,21 @@ export async function resolveDeploymentOverride(opts: {
     projectImpactDiagnostics = projectImpact.diagnostics;
     projectTargets = deploymentProjectTargets(opts.baseDecision, projectImpact);
   }
+
+  const deploymentDomainTargets =
+    impact.mode === "deployment-only"
+      ? await (opts.deps?.queryDeploymentDomainTargets || queryDeploymentDomainTargets)(opts.root)
+      : [];
+  if (impact.mode === "deployment-only" && deploymentDomainTargets.length === 0)
+    guardDeploymentSelection("zero resolved deployment-domain test targets", impact.diagnostics);
+  const safetyFloorTargets =
+    impact.mode === "deployment-only"
+      ? toSortedUnique(
+          opts.deps?.deploymentSafetyFloorTargets || deploymentSafetyFloorTargets(opts.root),
+        )
+      : [];
+  if (impact.mode === "deployment-only" && safetyFloorTargets.length === 0)
+    guardDeploymentSelection("zero deployment safety-floor targets", impact.diagnostics);
 
   const selectedTargets = toSortedUnique([
     ...deploymentDomainTargets,

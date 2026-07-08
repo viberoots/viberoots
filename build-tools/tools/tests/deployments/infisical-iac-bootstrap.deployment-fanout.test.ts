@@ -6,12 +6,12 @@ import * as path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_BOOTSTRAP_ARGS } from "../../deployments/infisical-iac-bootstrap-config";
 import { runInfisicalIacBootstrap } from "../../deployments/infisical-iac-bootstrap";
+import { runRepoBootstrap } from "../../deployments/infisical-iac-bootstrap-repo";
 import {
   confirmDeploymentFanOut,
   discoverDeploymentBootstrapTargets,
   runDeploymentBootstrapFanOut,
 } from "../../deployments/infisical-iac-bootstrap-deployments";
-import { runRepoBootstrap } from "../../deployments/infisical-iac-bootstrap-repo";
 import {
   deploymentNode,
   fanOutOnlyNode,
@@ -167,6 +167,47 @@ test("confirmed repo bootstrap performs repo setup before deployment fan-out exe
   assert.equal(await fs.readFile(path.join(dir, ".local/bootstrap.json"), "utf8"), "{}\n");
 });
 
+test("interactive repo bootstrap prompts for deployment fan-out after repo setup", async () => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-repo-fanout-prompt-"));
+  await writeRepoOnlyResolver(dir);
+  await fs.mkdir(path.join(dir, ".viberoots/workspace/buck"), { recursive: true });
+  await fs.writeFile(
+    path.join(dir, ".viberoots/workspace/buck/graph.json"),
+    `${JSON.stringify({ nodes: [promptOnlyFanOutNode(staging)] }, null, 2)}\n`,
+  );
+  const answers = ["Y", "n"];
+  const events = await captureConsoleEvents(async (event) => {
+    await withCwd(dir, () =>
+      runRepoBootstrap(
+        {
+          ...DEFAULT_BOOTSTRAP_ARGS,
+          mode: "repo",
+          yes: false,
+          credentialSink: "auto",
+        },
+        async () => undefined,
+        {
+          io: {
+            stdin: { isTTY: true } as NodeJS.ReadStream,
+            stdout: { isTTY: true } as NodeJS.WriteStream,
+            question: async (prompt) => {
+              event(prompt);
+              return answers.shift() || "";
+            },
+          },
+        },
+      ),
+    );
+  });
+  const output = events.join("\n");
+  assert.deepEqual(answers, []);
+  assert.match(output, /infisical-repo-bootstrap-result@1/);
+  assert.match(output, /Run deployment bootstrap for .*sample-webapp\/staging:deploy\? \[Y\/n\]/);
+  assert.match(output, /Deployment bootstrap fan-out skipped by operator response/);
+  assert.ok(output.indexOf("infisical-repo-bootstrap-result@1") < output.indexOf("Run deployment"));
+  assert.equal(await fs.readFile(path.join(dir, ".local/bootstrap.json"), "utf8"), "{}\n");
+});
+
 test("repo dry-run reports non-empty deployment fan-out targets read-only", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-dry-run-fanout-"));
   await writeRepoOnlyResolver(dir);
@@ -214,6 +255,22 @@ async function withCwd<T>(dir: string, run: () => Promise<T>) {
     process.env = oldEnv;
     globalThis.fetch = oldFetch;
   }
+}
+
+async function captureConsoleEvents(run: (event: (text: string) => void) => Promise<void>) {
+  const originalLog = console.log;
+  const originalError = console.error;
+  const events: string[] = [];
+  const event = (value?: unknown) => events.push(String(value));
+  console.log = event;
+  console.error = event;
+  try {
+    await run(event);
+  } finally {
+    console.log = originalLog;
+    console.error = originalError;
+  }
+  return events;
 }
 
 async function captureConsole(

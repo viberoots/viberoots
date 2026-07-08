@@ -89,7 +89,7 @@ test("dogfood buckconfig routes viberoots-owned cells through current", async ()
     ["viberoots", "./.viberoots/current"],
     ["prelude", "./.viberoots/current/prelude"],
     ["toolchains", "./.viberoots/current/toolchains"],
-    ["repo_toolchains", "./.viberoots/current/toolchains"],
+    ["repo_toolchains", "./.viberoots/workspace/toolchains"],
     ["config", "./.viberoots/current/config"],
     ["fbsource", "./.viberoots/current/config/fbsource_stub"],
     ["fbcode", "./.viberoots/current/config/fbcode_stub"],

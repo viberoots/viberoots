@@ -185,6 +185,124 @@ test("p auto source falls back to path flake for relevant untracked files", asyn
   });
 });
 
+test("p auto source uses filtered flake when root viberoots input is generated workspace state", async () => {
+  const repoRoot = process.cwd();
+  const fakeRoot = path.join(
+    repoRoot,
+    "buck-out",
+    `runnable-selected-generated-viberoots-input-${process.pid}-${Date.now()}`,
+  );
+  await fsp.rm(fakeRoot, { recursive: true, force: true }).catch(() => {});
+  try {
+    const target = "//projects/apps/demo:demo";
+    const graphDir = path.join(fakeRoot, ".viberoots", "workspace", "buck");
+    await fsp.mkdir(graphDir, { recursive: true });
+    await fsp.mkdir(path.join(fakeRoot, "projects", "apps", "demo", "src"), {
+      recursive: true,
+    });
+    await fsp.mkdir(path.join(fakeRoot, "viberoots"), { recursive: true });
+    await fsp.writeFile(
+      path.join(fakeRoot, "flake.nix"),
+      [
+        "{",
+        '  inputs.viberoots.url = "path:./.viberoots/workspace/viberoots-flake-input";',
+        "  outputs = { self, viberoots, ... }: {};",
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(fakeRoot, "viberoots", "flake.nix"),
+      "{ outputs = { self, ... }: {}; }\n",
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(fakeRoot, "flake.lock"),
+      JSON.stringify({ nodes: { viberoots: {} }, root: "root", version: 7 }, null, 2) + "\n",
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(fakeRoot, "projects", "apps", "demo", "src", "index.ts"),
+      "console.log('ok');\n",
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(graphDir, "graph.json"),
+      JSON.stringify(
+        [
+          {
+            name: target,
+            rule_type: "nix_node_cli_bin",
+            labels: ["lang:node", "kind:bin"],
+            srcs: ["projects/apps/demo/src/index.ts"],
+            deps: [],
+          },
+        ],
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
+
+    const stubBin = path.join(fakeRoot, "stub-bin");
+    const fakeOut = path.join(fakeRoot, "fake-selected-out");
+    const nixLog = path.join(fakeRoot, "nix-args.log");
+    await fsp.mkdir(stubBin, { recursive: true });
+    await fsp.writeFile(
+      path.join(stubBin, "nix"),
+      [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        `echo "$*" >> ${JSON.stringify(nixLog)}`,
+        'args="$*"',
+        'if [[ "$args" == flake\\ prefetch\\ --json\\ path:* ]]; then',
+        '  printf \'{"locked":{"narHash":"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}}\\n\'',
+        "  exit 0",
+        "fi",
+        `out=${JSON.stringify(fakeOut)}`,
+        'if [[ "$args" == *"path:"*"#graph-generator-selected"* ]]; then',
+        '  mkdir -p "$out/bin"',
+        "  cat > \"$out/bin/demo\" <<'EOF'",
+        "#!/usr/bin/env bash",
+        "echo selected-prod-ok",
+        "EOF",
+        '  chmod +x "$out/bin/demo"',
+        '  echo "$out"',
+        "  exit 0",
+        "fi",
+        'echo "unexpected nix invocation: $args" >&2',
+        "exit 92",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await fsp.chmod(path.join(stubBin, "nix"), 0o755);
+
+    const tool = viberootsSourcePath("build-tools/tools/bin/p");
+    const run = await $({
+      cwd: fakeRoot,
+      stdio: "pipe",
+      env: {
+        ...process.env,
+        PATH: `${stubBin}:${process.env.PATH || ""}`,
+      },
+    })`${tool} ${target}`;
+    assert.match(String(run.stdout || ""), /selected-prod-ok/);
+    assert.match(
+      String(run.stderr || ""),
+      /generated viberoots workspace input/,
+      "clean consumer workspaces with generated local viberoots inputs must not use git flake snapshots",
+    );
+
+    const logTxt = await fsp.readFile(nixLog, "utf8");
+    assert.match(logTxt, /path:.*#graph-generator-selected/);
+    assert.doesNotMatch(logTxt, new RegExp(`${fakeRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}#`));
+  } finally {
+    await fsp.rm(fakeRoot, { recursive: true, force: true }).catch(() => {});
+  }
+});
+
 test("p --source=git keeps git flake source even with relevant untracked files", async () => {
   await runInTemp("runnable-selected-git-source", async (tmp, $) => {
     const target = "//projects/apps/demo:demo";
