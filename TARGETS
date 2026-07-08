@@ -12,6 +12,12 @@ auto_zx_tests(
 )
 
 export_file(
+    name = "bootstrap",
+    src = "bootstrap",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
     name = "flake.lock",
     src = "flake.lock",
     visibility = ["PUBLIC"],
