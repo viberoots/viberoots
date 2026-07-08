@@ -66,7 +66,7 @@ test("repo fan-out reuses one operator session while creating per-machine secret
   );
   assert.equal(
     api.createdSecretDescriptions[0],
-    "viberoots repo-bootstrap Universal Auth identity=viberoots-iac-bootstrap machine=dev-laptop",
+    `${path.basename(dir)} bootstrap on dev-laptop`,
   );
   assert.deepEqual(api.createdSecretDescriptions.slice(1).sort(), [
     "viberoots deployment prod Universal Auth identity=sample-webapp-prod-deploy machine=dev-laptop",

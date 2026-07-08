@@ -52,7 +52,11 @@ test("bootstrap credential creates current-machine secret when local secret is m
   const sink = new MemorySink();
   const credential = await ensureBootstrapCredential({
     api: api as never,
-    args: { ...DEFAULT_BOOTSTRAP_ARGS, machineLabel: "dev-laptop" },
+    args: {
+      ...DEFAULT_BOOTSTRAP_ARGS,
+      bootstrapCredentialScope: "example-repo",
+      machineLabel: "dev-laptop",
+    },
     identity: { id: "id_1", name: "viberoots-iac-bootstrap" },
     sink,
   });
@@ -63,7 +67,7 @@ test("bootstrap credential creates current-machine secret when local secret is m
   ]);
   assert.equal(
     api.descriptions[0],
-    "viberoots repo-bootstrap Universal Auth identity=viberoots-iac-bootstrap machine=dev-laptop",
+    "example-repo bootstrap on dev-laptop",
   );
 });
 
