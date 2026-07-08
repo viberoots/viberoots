@@ -134,32 +134,23 @@ type PromptStreams = {
 };
 
 function promptStreams(): PromptStreams {
-  if (process.stdin.isTTY) {
+  try {
+    const input = fs.createReadStream("/dev/tty");
+    const output = fs.createWriteStream("/dev/tty");
+    return {
+      input,
+      output,
+      close: () => {
+        input.destroy();
+        output.end();
+      },
+    };
+  } catch {
     return { input: process.stdin, output: process.stderr, close: () => undefined };
   }
-  if (!hasControllingTerminal()) {
-    return { input: process.stdin, output: process.stderr, close: () => undefined };
-  }
-  const input = fs.createReadStream("/dev/tty");
-  const output = fs.createWriteStream("/dev/tty");
-  return {
-    input,
-    output,
-    close: () => {
-      input.destroy();
-      output.end();
-    },
-  };
 }
 
 function promptTtyStreams() {
-  if (process.stdin.isTTY && process.stderr.isTTY) {
-    return {
-      input: process.stdin as tty.ReadStream,
-      output: process.stderr as tty.WriteStream,
-      close: () => undefined,
-    };
-  }
   let inputFd: number | undefined;
   let outputFd: number | undefined;
   try {

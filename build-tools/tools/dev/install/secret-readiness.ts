@@ -556,22 +556,20 @@ type PromptStreams = {
 };
 
 function promptStreams(): PromptStreams {
-  if (process.stdin.isTTY) {
+  try {
+    const input = fs.createReadStream("/dev/tty");
+    const output = fs.createWriteStream("/dev/tty");
+    return {
+      input,
+      output,
+      close: () => {
+        input.destroy();
+        output.end();
+      },
+    };
+  } catch {
     return { input: process.stdin, output: process.stderr, close: () => undefined };
   }
-  if (!hasControllingTerminal()) {
-    return { input: process.stdin, output: process.stderr, close: () => undefined };
-  }
-  const input = fs.createReadStream("/dev/tty");
-  const output = fs.createWriteStream("/dev/tty");
-  return {
-    input,
-    output,
-    close: () => {
-      input.destroy();
-      output.end();
-    },
-  };
 }
 
 function pausePromptInput(input: NodeJS.ReadableStream) {
