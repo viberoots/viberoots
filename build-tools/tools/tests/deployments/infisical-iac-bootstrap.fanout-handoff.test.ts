@@ -175,7 +175,7 @@ async function withInteractiveIo<T>(inputText: string, run: () => Promise<T>) {
   Object.assign(output, { isTTY: true });
   Object.defineProperty(process, "stdin", { value: input, configurable: true });
   Object.defineProperty(process, "stdout", { value: output, configurable: true });
-  setTimeout(() => input.end(inputText), 0);
+  input.end(inputText);
   try {
     return await run();
   } finally {

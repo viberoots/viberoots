@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
-import { PassThrough } from "node:stream";
 import { test } from "node:test";
 import { DEFAULT_BOOTSTRAP_ARGS } from "../../deployments/infisical-iac-bootstrap-config";
 import { runInfisicalIacBootstrap } from "../../deployments/infisical-iac-bootstrap";
@@ -12,6 +11,7 @@ import {
   discoverDeploymentBootstrapTargets,
   runDeploymentBootstrapFanOut,
 } from "../../deployments/infisical-iac-bootstrap-deployments";
+import { runRepoBootstrap } from "../../deployments/infisical-iac-bootstrap-repo";
 import {
   deploymentNode,
   fanOutOnlyNode,
@@ -128,7 +128,7 @@ test("interactive deployment fan-out can be declined after repo setup", async ()
   );
 });
 
-test("confirmed repo bootstrap performs repo setup before deployment fan-out prompt", async () => {
+test("confirmed repo bootstrap performs repo setup before deployment fan-out execution", async () => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "infisical-repo-fanout-"));
   await writeRepoOnlyResolver(dir);
   await fs.mkdir(path.join(dir, ".viberoots/workspace/buck"), { recursive: true });
@@ -136,20 +136,34 @@ test("confirmed repo bootstrap performs repo setup before deployment fan-out pro
     path.join(dir, ".viberoots/workspace/buck/graph.json"),
     `${JSON.stringify({ nodes: [promptOnlyFanOutNode(staging)] }, null, 2)}\n`,
   );
-  const output = await withInteractiveIo(["Y\n", "n\n"], async () => {
-    await withCwd(dir, () =>
-      runInfisicalIacBootstrap({
-        ...DEFAULT_BOOTSTRAP_ARGS,
-        mode: "repo",
-        yes: false,
-        credentialSink: "auto",
-      }),
-    );
-  });
-  assert.match(output, /infisical-repo-bootstrap-result@1/);
-  assert.match(output, /Run deployment bootstrap for .*sample-webapp\/staging:deploy\? \[Y\/n\]/);
-  assert.match(output, /Deployment bootstrap fan-out skipped by operator response/);
-  assert.ok(output.indexOf("infisical-repo-bootstrap-result@1") < output.indexOf("Run deployment"));
+  let repoReportSeenBeforeFanOut = false;
+  const output = await captureConsole(
+    async () => {
+      await withCwd(dir, () =>
+        runRepoBootstrap(
+          {
+            ...DEFAULT_BOOTSTRAP_ARGS,
+            mode: "repo",
+            yes: true,
+            credentialSink: "auto",
+          },
+          async (deploymentArgs) => {
+            assert.equal(deploymentArgs.target, staging);
+            assert.equal(repoReportSeenBeforeFanOut, true);
+          },
+          { finalCheckRunner: async () => 0 },
+        ),
+      );
+    },
+    {
+      stdout: (value) => {
+        if (String(value).includes("infisical-repo-bootstrap-result@1")) {
+          repoReportSeenBeforeFanOut = true;
+        }
+      },
+    },
+  );
+  assert.match(output.stdout, /infisical-repo-bootstrap-result@1/);
   assert.equal(await fs.readFile(path.join(dir, ".local/bootstrap.json"), "utf8"), "{}\n");
 });
 
@@ -202,42 +216,22 @@ async function withCwd<T>(dir: string, run: () => Promise<T>) {
   }
 }
 
-async function withInteractiveIo(inputText: string[], run: () => Promise<void>) {
-  const oldStdin = process.stdin;
-  const oldStdout = process.stdout;
-  const originalError = console.error;
-  const input = new PassThrough();
-  const output = new PassThrough();
-  const chunks: string[] = [];
-  Object.assign(input, { isTTY: true });
-  Object.assign(output, { isTTY: true });
-  output.on("data", (chunk) => chunks.push(String(chunk)));
-  console.error = (value?: unknown) => chunks.push(`${String(value)}\n`);
-  Object.defineProperty(process, "stdin", { value: input, configurable: true });
-  Object.defineProperty(process, "stdout", { value: output, configurable: true });
-  inputText.forEach((text, index) => {
-    setTimeout(() => {
-      input.write(text);
-      if (index === inputText.length - 1) input.end();
-    }, index * 200);
-  });
-  try {
-    await run();
-  } finally {
-    Object.defineProperty(process, "stdin", { value: oldStdin, configurable: true });
-    Object.defineProperty(process, "stdout", { value: oldStdout, configurable: true });
-    console.error = originalError;
-  }
-  return chunks.join("");
-}
-
-async function captureConsole(run: () => Promise<void>) {
+async function captureConsole(
+  run: () => Promise<void>,
+  hooks: { stdout?: (value: unknown) => void; stderr?: (value: unknown) => void } = {},
+) {
   const originalLog = console.log;
   const originalError = console.error;
   const stdout: string[] = [];
   const stderr: string[] = [];
-  console.log = (value?: unknown) => stdout.push(String(value));
-  console.error = (value?: unknown) => stderr.push(String(value));
+  console.log = (value?: unknown) => {
+    hooks.stdout?.(value);
+    stdout.push(String(value));
+  };
+  console.error = (value?: unknown) => {
+    hooks.stderr?.(value);
+    stderr.push(String(value));
+  };
   try {
     await run();
   } finally {
