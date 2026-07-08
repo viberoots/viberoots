@@ -174,14 +174,21 @@ test("install deps glue-only exits before secret readiness", async () => {
 });
 
 test("install secret readiness can prompt through the controlling terminal", async () => {
-  const source = await fsp.readFile(
+  const readinessSource = await fsp.readFile(
     viberootsSourcePath("viberoots/build-tools/tools/dev/install/secret-readiness.ts"),
     "utf8",
   );
-  assert.match(source, /hasControllingTerminal/);
-  assert.match(source, /createReadStream\("\/dev\/tty"\)/);
-  assert.match(source, /createWriteStream\("\/dev\/tty"\)/);
-  assert.match(source, /process\.stdin\.isTTY && process\.stderr\.isTTY/);
+  const terminalSelectSource = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/lib/terminal-select.ts"),
+    "utf8",
+  );
+  assert.match(readinessSource, /hasControllingTerminal/);
+  assert.match(readinessSource, /promptTerminalSelect/);
+  assert.match(terminalSelectSource, /fs\.openSync\("\/dev\/tty", "r"\)/);
+  assert.match(terminalSelectSource, /fs\.openSync\("\/dev\/tty", "w"\)/);
+  assert.match(terminalSelectSource, /new tty\.ReadStream\(inputFd\)/);
+  assert.match(terminalSelectSource, /new tty\.WriteStream\(outputFd\)/);
+  assert.match(terminalSelectSource, /process\.stdin/);
 });
 
 async function captureOutput(fn: () => Promise<void>) {

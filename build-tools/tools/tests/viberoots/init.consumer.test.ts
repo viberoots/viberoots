@@ -1106,6 +1106,7 @@ test("curlable bootstrap installs nix when nix is missing", async () => {
         ...process.env,
         HOME: workspace,
         PATH: fakeBin,
+        VBR_ALLOW_NIX_INSTALL: "1",
         VIBEROOTS_NIX_PROFILE_SCRIPT: path.join(
           fakeNixProfile,
           "etc",
