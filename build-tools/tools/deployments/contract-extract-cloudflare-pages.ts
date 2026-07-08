@@ -35,6 +35,7 @@ import { pushCloudflareComponentKindErrors } from "./cloudflare-pages-capability
 import * as cloudflarePagesExtract from "./cloudflare-pages-extract-helpers";
 const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/,
   [SHARED_NONPROD, PRODUCTION_FACING] = ["shared_nonprod", "production_facing"];
+const CLOUDFLARE_PAGES_PROVISION_MODES = new Set(["managed", "manual"]);
 export function extractCloudflarePagesDeploymentsFromContext(
   context: DeploymentExtractionContext,
 ): CloudflarePagesDeployment[] {
@@ -68,6 +69,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
     const accountId = providerTarget.account_id || "";
     const project = providerTarget.project || "";
     const customDomain = providerTarget.custom_domain || "";
+    const provisionMode = providerTarget.provision_mode || "managed";
     const deploymentErrors: string[] = [];
     const secretMetadata = secretMeta(node, label, secretRequirements, deploymentErrors);
     if (!label) {
@@ -109,6 +111,19 @@ export function extractCloudflarePagesDeploymentsFromContext(
         deploymentError(
           label,
           "provider_target.account_id must be a 32-character lowercase Cloudflare account id",
+        ),
+      );
+    }
+    if (!CLOUDFLARE_PAGES_PROVISION_MODES.has(provisionMode)) {
+      deploymentErrors.push(
+        deploymentError(label, 'provider_target.provision_mode must be "managed" or "manual"'),
+      );
+    }
+    if (provisionMode === "managed" && customDomain && !accountId) {
+      deploymentErrors.push(
+        deploymentError(
+          label,
+          "managed cloudflare-pages custom-domain provisioning requires provider_target.account_id",
         ),
       );
     }
@@ -240,6 +255,7 @@ export function extractCloudflarePagesDeploymentsFromContext(
         id: providerTarget.id || project,
         customDomain,
         customDomainZoneId: providerTarget.custom_domain_zone_id || "",
+        provisionMode,
       }),
     });
   }

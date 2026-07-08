@@ -58,7 +58,11 @@ export async function runCloudflarePagesStaticDeploy(
     await opts.progress?.onStepStart?.("publish", {
       ...(opts.timeouts?.publishMs ? { timeoutMs: opts.timeouts.publishMs } : {}),
     });
-    if (publishMode === "normal" && opts.deployment.providerTarget.customDomain) {
+    if (
+      publishMode === "normal" &&
+      opts.deployment.providerTarget.customDomain &&
+      opts.deployment.providerTarget.provisionMode !== "manual"
+    ) {
       const provisionSecrets = await secretRuntime.enterStep("provision");
       await provisionCloudflarePagesTarget({
         deployment: opts.deployment,

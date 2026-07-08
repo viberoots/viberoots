@@ -133,3 +133,71 @@ test("cloudflare-pages publish timeout records the failed step and reports progr
     }
   });
 });
+
+test("cloudflare-pages manual provision mode publishes without account provisioning authority", async () => {
+  await runInTemp("cloudflare-pages-manual-provision", async (tmp, $) => {
+    const deployment = cloudflarePagesDeploymentFixture({
+      providerTarget: {
+        ...cloudflarePagesDeploymentFixture().providerTarget,
+        customDomain: "manual.sample-webapp.com",
+        provisionMode: "manual",
+      },
+      smoke: {
+        exception: {
+          owner: "deployment-tests",
+          reason: "manual-provision mode assertion skips network smoke",
+          scope: "omit manual-provision smoke",
+          reviewBy: "2099-01-01",
+        },
+      },
+    });
+    const artifactDir = path.join(tmp, "artifact");
+    const recordsRoot = path.join(tmp, "records");
+    const fake = await installFakeCloudflarePagesWrangler(tmp);
+    await writeCloudflareServiceArtifact(artifactDir, "<html>manual</html>\n");
+    await writeWranglerConfig(
+      path.join(tmp, "projects", "deployments", "sample-webapp", "staging", "wrangler.jsonc"),
+    );
+    await installCloudflarePagesTargets(tmp, [deployment]);
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
+    const artifact = await admitStaticWebappArtifact({
+      recordsRoot,
+      artifactDir,
+      producer: { producerKind: "local_direct" },
+    });
+    const admittedContext = await resolveInitialCloudflarePagesAdmittedContext({
+      workspaceRoot: tmp,
+      deployment,
+      artifactIdentity: artifact.identity,
+    });
+    const originalEnv = { ...process.env };
+    process.env.PATH = `${fake.binDir}:${originalEnv.PATH || ""}`;
+    process.env.VBR_CLOUDFLARE_FAKE_PUBLISH_ROOT = fake.publishRoot;
+    process.env.VBR_CLOUDFLARE_FAKE_WRANGLER_LOG = fake.logPath;
+    process.env.VBR_CLOUDFLARE_PAGES_WRANGLER_BIN = path.join(fake.binDir, "wrangler");
+    try {
+      const result = await runCloudflarePagesStaticDeploy({
+        workspaceRoot: tmp,
+        deployment,
+        artifact,
+        recordsRoot,
+        admittedContext,
+        authority: {
+          kind: "control-plane-worker",
+          submissionId: "cp-manual",
+          workerId: "worker-manual",
+          lockScope: deployment.providerTarget.providerTargetIdentity,
+          executionSnapshotPath: path.join(tmp, "manual-snapshot.json"),
+        },
+      });
+      const record = JSON.parse(await fsp.readFile(result.recordPath, "utf8"));
+      const wranglerLog = JSON.parse((await fsp.readFile(fake.logPath, "utf8")).trim());
+      assert.equal(record.finalOutcome, "succeeded");
+      assert.equal(record.smokeOutcome, "omitted_by_exception");
+      assert.equal(record.publicUrl, "https://manual.sample-webapp.com/");
+      assert.equal(wranglerLog.accountId, "");
+    } finally {
+      process.env = originalEnv;
+    }
+  });
+});

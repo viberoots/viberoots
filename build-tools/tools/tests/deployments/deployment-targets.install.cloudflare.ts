@@ -88,6 +88,9 @@ export async function installCloudflarePagesTargets(
         ...(deployment.providerTarget.id !== deployment.providerTarget.project
           ? [`    project_id = ${JSON.stringify(deployment.providerTarget.id)},`]
           : []),
+        ...(deployment.providerTarget.provisionMode !== "managed"
+          ? [`    provision_mode = ${JSON.stringify(deployment.providerTarget.provisionMode)},`]
+          : []),
         `    lane_policy = ${JSON.stringify(deployment.lanePolicyRef)},`,
         `    environment_stage = ${JSON.stringify(deployment.environmentStage)},`,
         `    admission_policy = ${JSON.stringify(deployment.admissionPolicyRef)},`,
