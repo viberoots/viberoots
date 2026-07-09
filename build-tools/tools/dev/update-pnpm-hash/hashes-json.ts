@@ -39,6 +39,15 @@ function viberootsHashesJsonPaths(root: string): string[] {
   ]);
 }
 
+function writableViberootsHashesJsonPath(root: string): string | null {
+  if (isStandaloneViberootsSource(root)) return viberootsHashesJsonPaths(root)[0];
+  const extractedTool = path.join(root, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs");
+  if (fs.existsSync(extractedTool)) {
+    return path.join(root, "viberoots", "build-tools", "tools", "nix", "node-modules.hashes.json");
+  }
+  return null;
+}
+
 function hashesJsonPaths(root = process.cwd()): string[] {
   return unique([...viberootsHashesJsonPaths(root), workspaceHashesJsonPath(root)]);
 }
@@ -59,7 +68,8 @@ function ownerHashesJsonPath(
   owner?: HashesJsonOwner,
   root = process.cwd(),
 ): string {
-  if (owner === "viberoots") return viberootsHashesJsonPaths(root)[0];
+  if (owner === "viberoots")
+    return writableViberootsHashesJsonPath(root) || workspaceHashesJsonPath(root);
   if (owner === "workspace") return workspaceHashesJsonPath(root);
   return lockfileRel.startsWith("projects/") || !isStandaloneViberootsSource(root)
     ? workspaceHashesJsonPath(root)
@@ -94,7 +104,12 @@ async function readOwnerHashesJson(
   root = process.cwd(),
 ): Promise<Record<string, string>> {
   const candidates =
-    owner === "viberoots" ? viberootsHashesJsonPaths(root) : [workspaceHashesJsonPath(root)];
+    owner === "viberoots"
+      ? unique([
+          ...viberootsHashesJsonPaths(root),
+          ownerHashesJsonPath("pnpm-lock.yaml", owner, root),
+        ])
+      : [workspaceHashesJsonPath(root)];
   const merged: Record<string, string> = {};
   for (const candidate of candidates) {
     Object.assign(merged, await readJsonFile(candidate));

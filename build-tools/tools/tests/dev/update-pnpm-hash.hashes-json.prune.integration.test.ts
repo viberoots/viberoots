@@ -323,6 +323,62 @@ test("updateNodeModulesHashesJson does not write through activated remote source
   }
 });
 
+test("viberoots-owned hash writes fall back to workspace hashes for activated remote source", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "hashes-remote-current-owner-"));
+  const prevCwd = process.cwd();
+  try {
+    const consumer = path.join(tmp, "consumer");
+    const source = path.join(tmp, "remote-source");
+    const sourceHashesPath = path.join(
+      source,
+      "build-tools",
+      "tools",
+      "nix",
+      "node-modules.hashes.json",
+    );
+    await fsp.mkdir(path.join(consumer, ".viberoots"), { recursive: true });
+    await fsp.mkdir(path.join(consumer, ".viberoots", "workspace"), { recursive: true });
+    await fsp.writeFile(path.join(consumer, ".viberoots", "workspace", "flake.nix"), "{}\n");
+    await fsp.symlink(source, path.join(consumer, ".viberoots", "current"));
+    await fsp.mkdir(path.join(source, "build-tools", "tools", "dev"), { recursive: true });
+    await fsp.writeFile(
+      path.join(source, "build-tools", "tools", "dev", "zx-init.mjs"),
+      "",
+      "utf8",
+    );
+    await fsp.mkdir(path.dirname(sourceHashesPath), { recursive: true });
+    await fsp.writeFile(
+      sourceHashesPath,
+      JSON.stringify({ "pnpm-lock.yaml": "sha256-source" }, null, 2) + "\n",
+      "utf8",
+    );
+
+    process.chdir(consumer);
+    await updateNodeModulesHashesJson("pnpm-lock.yaml", "sha256-consumer", {
+      owner: "viberoots",
+    });
+
+    const consumerHashesPath = path.join(consumer, "projects", "node-modules.hashes.json");
+    const consumerHashes = JSON.parse(await fsp.readFile(consumerHashesPath, "utf8")) as Record<
+      string,
+      string
+    >;
+    const sourceHashes = JSON.parse(await fsp.readFile(sourceHashesPath, "utf8")) as Record<
+      string,
+      string
+    >;
+    assert.equal(consumerHashes["pnpm-lock.yaml"], "sha256-consumer");
+    assert.equal(sourceHashes["pnpm-lock.yaml"], "sha256-source");
+    assert.equal(
+      await readNodeModulesHashForLockfile("pnpm-lock.yaml", { owner: "viberoots" }),
+      "sha256-consumer",
+    );
+  } finally {
+    process.chdir(prevCwd);
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test("updateNodeModulesHashesJson keeps standalone viberoots hashes in tooling ownership", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "hashes-standalone-viberoots-"));
   const prevCwd = process.cwd();
