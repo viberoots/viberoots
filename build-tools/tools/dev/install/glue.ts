@@ -60,11 +60,16 @@ export function zxNodeBase(root: string): string {
 async function ensurePreludeSymlinkIfMissing() {
   const wsRoot = await workspaceRoot();
   await applyNixCacheHealthPolicy(wsRoot);
-  try {
-    await fsp.access(path.join(wsRoot, ".viberoots", "current", "prelude"));
-    return;
-  } catch {}
-  throw new Error("[glue] missing .viberoots/current/prelude; run workspace activation first");
+  for (const preludePath of [
+    path.join(wsRoot, ".viberoots", "workspace", "prelude"),
+    path.join(wsRoot, ".viberoots", "current", "prelude"),
+  ]) {
+    try {
+      await fsp.access(preludePath);
+      return;
+    } catch {}
+  }
+  throw new Error("[glue] missing .viberoots/workspace/prelude; run workspace activation first");
 }
 
 async function ensureAutoMapStubIfMissing() {

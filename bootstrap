@@ -34,6 +34,7 @@ fi
 workspace_root="$(env_or_default "" VBR_WORKSPACE_ROOT)"
 workspace_name=""
 viberoots_url="$(env_or_default "" VBR_URL VBR_VIBEROOTS_URL VIBEROOTS_URL)"
+bootstrap_tool_url="$(env_or_default "" VBR_BOOTSTRAP_TOOL_URL VIBEROOTS_BOOTSTRAP_TOOL_URL)"
 official_submodule_url="https://github.com/viberoots/viberoots.git"
 submodule_url="$(env_or_default "${official_submodule_url}" VBR_SUBMODULE VBR_SUBMODULE_URL VIBEROOTS_SUBMODULE_URL)"
 trust_submodule_url="$(env_or_default 0 VBR_TRUST_SUBMODULE VBR_TRUST_SUBMODULE_URL VIBEROOTS_TRUST_SUBMODULE_URL)"
@@ -253,6 +254,16 @@ load_nix_profile() {
     fi
   done
   return 1
+}
+
+refresh_nix_profile_path() {
+  local __dir
+  for __dir in "${HOME}/.nix-profile/bin" "/nix/var/nix/profiles/default/bin"; do
+    if [[ -d "${__dir}" && ":${PATH}:" != *":${__dir}:"* ]]; then
+      PATH="${PATH}:${__dir}"
+    fi
+  done
+  export PATH
 }
 
 require_command() {
@@ -949,9 +960,12 @@ run_migrations() {
 }
 
 run_nix_init_consumer() {
-  local ref_update_re='^[[:space:]]+[0-9a-f]{7,}\.\.[0-9a-f]{7,}[[:space:]]+main[[:space:]]+->[[:space:]]+main$'
+  local init_tool_url="${viberoots_url}"
+  if [[ "${post_clone}" == "1" ]]; then
+    init_tool_url="${bootstrap_tool_url:-git+https://github.com/viberoots/viberoots.git?ref=main}"
+  fi
   ui_step "source" "fetching viberoots"
-  nix run --refresh --accept-flake-config "${viberoots_url}#viberoots" -- \
+  nix run --refresh --accept-flake-config "${init_tool_url}#viberoots" -- \
     init-consumer \
     --mode flake \
     --workspace-root "${workspace_root}" \
@@ -967,7 +981,9 @@ run_nix_init_consumer() {
         [[ "${line}" == remote:\ Compressing\ objects:* ]] && continue
         [[ "${line}" == remote:\ Total\ * ]] && continue
         [[ "${line}" == From\ *github.com/viberoots/viberoots ]] && continue
-        [[ "${line}" =~ ${ref_update_re} ]] && continue
+        if [[ "${line}" == "   "* && "${line}" == *".."* && "${line}" == *"main"* && "${line}" == *"-> main" ]]; then
+          continue
+        fi
         [[ "${line}" == "this derivation will be built:" ]] && continue
         [[ "${line}" == "  /nix/store/"*"-viberoots.drv" ]] && continue
         [[ "${line}" == "building '/nix/store/"*"-viberoots.drv'..." ]] && continue
@@ -1157,15 +1173,17 @@ if ! command -v nix >/dev/null 2>&1; then
   curl --proto '=https' --tlsv1.2 -sSf -L https://install.determinate.systems/nix |
     sh -s -- install --no-confirm
   load_nix_profile || true
+  refresh_nix_profile_path
 fi
 if ! command -v nix >/dev/null 2>&1; then
   load_nix_profile || true
+  refresh_nix_profile_path
 fi
 require_command nix
 
 if ! git_is_usable; then
   nix profile install nixpkgs#git
-  export PATH="${HOME}/.nix-profile/bin:/nix/var/nix/profiles/default/bin:${PATH}"
+  refresh_nix_profile_path
   record_action "installed Git with nix profile"
 fi
 if ! git_is_usable; then

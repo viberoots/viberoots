@@ -213,10 +213,14 @@ async function requireBuckconfigCells(buckconfig: string): Promise<void> {
 }
 
 async function requirePreludeEntrypoint(): Promise<void> {
-  const hiddenRel = ".viberoots/current/prelude/prelude.bzl";
-  if (await exists(hiddenRel)) return;
+  for (const hiddenRel of [
+    ".viberoots/workspace/prelude/prelude.bzl",
+    ".viberoots/current/prelude/prelude.bzl",
+  ]) {
+    if (await exists(hiddenRel)) return;
+  }
   throw new Error(
-    `[startup-check] invalid Buck prelude: ${hiddenRel} is missing. Re-enter the dev shell or run \`viberoots init-workspace\`.`,
+    "[startup-check] invalid Buck prelude: .viberoots/workspace/prelude/prelude.bzl is missing. Re-enter the dev shell or run `viberoots init-workspace`.",
   );
 }
 

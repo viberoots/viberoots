@@ -297,7 +297,7 @@ name = TARGETS
 [repositories]
 root = .
 viberoots = ./.viberoots/current
-prelude = ./.viberoots/current/prelude
+prelude = ./.viberoots/workspace/prelude
 toolchains = ./.viberoots/current/toolchains
 repo_toolchains = ./.viberoots/workspace/toolchains
 fbsource = ./.viberoots/current/config/fbsource_stub
@@ -309,7 +309,7 @@ workspace_buck = ./.viberoots/workspace/buck
 [cells]
 root = .
 viberoots = ./.viberoots/current
-prelude = ./.viberoots/current/prelude
+prelude = ./.viberoots/workspace/prelude
 toolchains = ./.viberoots/current/toolchains
 repo_toolchains = ./.viberoots/workspace/toolchains
 fbsource = ./.viberoots/current/config/fbsource_stub
@@ -568,6 +568,13 @@ async function runMacosDirenvBootstrap(sourcePath: string): Promise<void> {
   }
   const helper = path.join(sourcePath, "build-tools", "tools", "bootstrap", "macos-direnv.sh");
   await execFileAsync(helper, [], { maxBuffer: 1024 * 1024 * 16 });
+  process.env.PATH = [
+    path.join(process.env.HOME || "", ".nix-profile", "bin"),
+    "/nix/var/nix/profiles/default/bin",
+    process.env.PATH || "",
+  ]
+    .filter(Boolean)
+    .join(path.delimiter);
 }
 
 async function setupDirenvIfNeeded(opts: {

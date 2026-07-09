@@ -254,7 +254,7 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   assertOrder(
     env,
     "env_apply_nix_cache_health || return 1",
-    '[[ -f "${live_root}/.viberoots/current/prelude/prelude.bzl" ]]',
+    '[[ -f "${prelude_path}/prelude.bzl" ]]',
   );
 
   const depsMain = await fsp.readFile(
@@ -273,7 +273,7 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   assertOrder(
     glue,
     "await applyNixCacheHealthPolicy(wsRoot)",
-    "missing .viberoots/current/prelude",
+    "missing .viberoots/workspace/prelude",
   );
 
   const buck = await fsp.readFile(sourceFile("build-tools/lang/nix_cache_health.bzl"), "utf8");

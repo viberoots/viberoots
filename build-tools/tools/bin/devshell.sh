@@ -245,6 +245,11 @@ ensure_buck_prelude() {
 	[[ -f "${live_root}/.buckconfig" ]] || return 0
 	env_apply_nix_cache_health || return 1
 	ensure_viberoots_current "${live_root}" || return 1
+	local prelude_path="${live_root}/.viberoots/workspace/prelude"
+	local legacy_prelude_path="${live_root}/.viberoots/current/prelude"
+	if grep -q '\.viberoots/current/prelude' "${live_root}/.buckconfig" 2>/dev/null; then
+		prelude_path="${legacy_prelude_path}"
+	fi
 	local live_root_real=""
 	local current_root_real=""
 	live_root_real="$(cd "${live_root}" && pwd -P 2>/dev/null || true)"
@@ -253,10 +258,10 @@ ensure_buck_prelude() {
 	if [[ -n "${live_root_real}" && "${current_root_real}" == "${live_root_real}" ]]; then
 		current_is_live_root="1"
 	fi
-	if [[ -L "${live_root}/.viberoots/current/prelude" && ! -e "${live_root}/.viberoots/current/prelude" ]]; then
-		rm -f "${live_root}/.viberoots/current/prelude"
+	if [[ -L "${prelude_path}" && ! -e "${prelude_path}" ]]; then
+		rm -f "${prelude_path}"
 	fi
-	if [[ -f "${live_root}/.viberoots/current/prelude/prelude.bzl" ]]; then
+	if [[ -f "${prelude_path}/prelude.bzl" ]]; then
 		if [[ "${current_is_live_root}" != "1" && -L "${live_root}/prelude" ]]; then
 			rm -f "${live_root}/prelude"
 		fi
@@ -344,18 +349,19 @@ ensure_buck_prelude() {
 		fi
 	fi
 	if [[ -n "${pre_target}" ]]; then
-		if [[ -L "${live_root}/.viberoots/current/prelude" || ! -e "${live_root}/.viberoots/current/prelude" ]]; then
-			rm -f "${live_root}/.viberoots/current/prelude"
-			ln -s "${pre_target}" "${live_root}/.viberoots/current/prelude"
+		if [[ -L "${prelude_path}" || ! -e "${prelude_path}" ]]; then
+			mkdir -p "$(dirname "${prelude_path}")"
+			rm -f "${prelude_path}"
+			ln -s "${pre_target}" "${prelude_path}"
 			if [[ "${current_is_live_root}" != "1" && -L "${live_root}/prelude" ]]; then
 				rm -f "${live_root}/prelude"
 			fi
 		else
-			echo "error: ${live_root}/.viberoots/current/prelude exists but is not a valid symlink; expected prelude/prelude.bzl" 1>&2
+			echo "error: ${prelude_path} exists but is not a valid symlink; expected prelude/prelude.bzl" 1>&2
 			return 1
 		fi
 	fi
-	[[ -f "${live_root}/.viberoots/current/prelude/prelude.bzl" ]]
+	[[ -f "${prelude_path}/prelude.bzl" ]]
 }
 
 devshell_inputs_stale() {

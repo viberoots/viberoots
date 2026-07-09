@@ -64,7 +64,8 @@ test("devshell.sh supports safe direnv bypass fast-path", async () => {
     throw new Error("devshell.sh must only re-exec root build-tools from a viberoots source root");
   }
   if (
-    !txt.includes('[[ -f "${live_root}/.viberoots/current/prelude/prelude.bzl" ]]') ||
+    !txt.includes('local prelude_path="${live_root}/.viberoots/workspace/prelude"') ||
+    !txt.includes('[[ -f "${prelude_path}/prelude.bzl" ]]') ||
     !txt.includes("ensure_viberoots_current") ||
     !txt.includes('target=".."') ||
     !txt.includes('current_is_live_root="1"') ||

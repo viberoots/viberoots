@@ -143,7 +143,7 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     );
     assert.equal(await fsp.readFile(path.join(workspace, ".buckroot"), "utf8"), ".\n");
     const buckconfig = await fsp.readFile(path.join(workspace, ".buckconfig"), "utf8");
-    assert.match(buckconfig, /\.viberoots\/current\/prelude/);
+    assert.match(buckconfig, /\.viberoots\/workspace\/prelude/);
     assert.match(buckconfig, /^ignore = .*\.git/m);
     assert.match(buckconfig, /^ignore = .*\.direnv/m);
     await assertDirenvBootstrap(workspace);
