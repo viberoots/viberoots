@@ -406,3 +406,11 @@ test("p selected webapp builds pass viberoots flake source into the planner", as
   assert.match(nodeWebapp, /if viberootsRoot != null/);
   assert.match(nodeWebapp, /then viberootsRoot/);
 });
+
+test("d static webapp dev prefers direct importer dev entrypoints over pnpm install paths", async () => {
+  const source = await readRepoFile("build-tools/tools/dev/run-runnable.ts");
+  assert.match(source, /directStaticWebappDevSpec/);
+  assert.match(source, /targetHints\.mode === "static"/);
+  assert.match(source, /\["zx-wrapper", "scripts\/dev\.ts"\]/);
+  assert.match(source, /"node_modules\/vite\/bin\/vite\.js"/);
+});

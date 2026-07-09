@@ -310,6 +310,73 @@ is_official_submodule_url() {
   esac
 }
 
+source_git_remote_url() {
+  local source="$1"
+  source="${source#git+}"
+  source="${source%%\?*}"
+  source="${source%%#*}"
+  case "${source}" in
+    github:viberoots/viberoots|github:viberoots/viberoots/*)
+      printf '%s' "${official_submodule_url}"
+      ;;
+    *)
+      printf '%s' "${source}"
+      ;;
+  esac
+}
+
+is_official_viberoots_source() {
+  local remote
+  remote="$(source_git_remote_url "$1")"
+  is_official_submodule_url "${remote}"
+}
+
+probe_ref_for_source_access() {
+  if [[ -n "${rev}" && "${ref_explicit}" != "1" ]]; then
+    printf '%s' HEAD
+  else
+    printf '%s' "${ref}"
+  fi
+}
+
+assert_viberoots_source_access() {
+  local source="$1"
+  local remote ref_probe output status
+  remote="$(source_git_remote_url "${source}")"
+  ref_probe="$(probe_ref_for_source_access)"
+  output="$(git ls-remote --exit-code "${remote}" "${ref_probe}" 2>&1)" || status=$?
+  status="${status:-0}"
+  if [[ "${status}" == "0" ]]; then
+    return 0
+  fi
+  if is_official_viberoots_source "${source}"; then
+    cat >&2 <<EOF
+error: viberoots is currently in closed beta
+
+This bootstrap script needs access to the private viberoots GitHub repository,
+but Git could not read ${remote}.
+
+If you should have access, make sure you are signed in to GitHub for Git over
+HTTPS or SSH, then retry this command. If you do not have access yet, ask for
+an invite to the viberoots closed beta.
+EOF
+  else
+    cat >&2 <<EOF
+error: unable to read the configured viberoots source
+
+Git could not read ${remote}.
+Source: ${source}
+
+Check the repository URL, selected ref, network access, and Git credentials,
+then retry bootstrap.
+EOF
+  fi
+  if [[ -n "${output}" ]]; then
+    printf '\nGit said:\n%s\n' "${output}" >&2
+  fi
+  exit 1
+}
+
 confirm_trusted_submodule_url() {
   local url="$1"
   if is_official_submodule_url "${url}" || [[ "${trust_submodule_url}" == "1" ]]; then
@@ -883,6 +950,8 @@ if [[ "${mode}" == "submodule" ]]; then
     effective_source="${existing_submodule_url:-${submodule_url}}"
   fi
 fi
+
+assert_viberoots_source_access "${effective_source}"
 
 if bootstrap_ready; then
   run_migrations

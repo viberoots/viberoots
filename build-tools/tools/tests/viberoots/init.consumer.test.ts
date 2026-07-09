@@ -647,6 +647,66 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
   }
 });
 
+test("curlable bootstrap reports closed beta when official repo is inaccessible", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-no-access-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    const fakeBin = path.join(workspace, ".fake-bin");
+    const log = path.join(workspace, ".bootstrap.log");
+    await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.writeFile(
+      path.join(fakeBin, "git"),
+      `#!/usr/bin/env bash
+printf 'git %s\\n' "$*" >> ${JSON.stringify(log)}
+case "$*" in
+  "rev-parse --is-inside-work-tree") exit 1 ;;
+  "init --quiet") exit 0 ;;
+  "ls-remote --exit-code https://github.com/viberoots/viberoots.git main")
+    printf 'remote: Repository not found.\\n' >&2
+    printf 'fatal: repository not found\\n' >&2
+    exit 128
+    ;;
+esac
+exit 0
+`,
+      { mode: 0o755 },
+    );
+    await fsp.writeFile(
+      path.join(fakeBin, "nix"),
+      `#!/usr/bin/env bash\nprintf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}\nexit 0\n`,
+      { mode: 0o755 },
+    );
+
+    await assert.rejects(
+      execFileAsync(path.join(viberootsRoot, "bootstrap"), ["--workspace-root", workspace], {
+        cwd: workspace,
+        env: { ...process.env, PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}` },
+      }),
+      (error: unknown) => {
+        const err = error as { stderr?: string; stdout?: string };
+        assert.match(err.stdout || "", /viberoots bootstrap/);
+        assert.match(err.stderr || "", /viberoots is currently in closed beta/);
+        assert.match(err.stderr || "", /needs access to the private viberoots GitHub repository/);
+        assert.match(err.stderr || "", /ask for\s+an invite to the viberoots closed beta/);
+        assert.match(err.stderr || "", /Repository not found/);
+        return true;
+      },
+    );
+
+    const text = await fsp.readFile(log, "utf8");
+    assert.match(
+      text,
+      /git ls-remote --exit-code https:\/\/github\.com\/viberoots\/viberoots\.git main/,
+    );
+    assert.doesNotMatch(text, /nix run/);
+    assert.doesNotMatch(text, /nix flake metadata/);
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});
+
 test("curlable bootstrap accepts VBR_URL source override", async () => {
   const workspace = await fsp.realpath(
     await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-url-override-")),

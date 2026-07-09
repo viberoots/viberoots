@@ -87,6 +87,8 @@ EOF
       VITE_BIN="${nm}/node_modules/.bin/vite"
       TSC_BIN="${nm}/node_modules/.bin/tsc"
       NEXT_BIN="${nm}/node_modules/.bin/next"
+      WEBAPP_FRAMEWORK="${if !hasSsr then "static" else framework}"
+      printf '%s\n' "$WEBAPP_FRAMEWORK" > .viberoots-webapp-framework
       VIBEROOTS_SOURCE_ROOT="${viberootsStoreRoot}"
       SYNC_CONTRACTS_SCRIPT="$VIBEROOTS_SOURCE_ROOT/build-tools/tools/dev/sync-module-contracts.ts"
       requires_module_contracts() {
@@ -191,6 +193,9 @@ EOF
       set -euo pipefail
       mkdir -p "$out"
       cp -R dist "$out/dist"
-      ln -s "${nm}/node_modules" "$out/node_modules"
+      WEBAPP_FRAMEWORK="$(cat .viberoots-webapp-framework 2>/dev/null || printf static)"
+      if [ "$WEBAPP_FRAMEWORK" != "static" ]; then
+        ln -s "${nm}/node_modules" "$out/node_modules"
+      fi
     '';
   }

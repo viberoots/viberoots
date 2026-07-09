@@ -79,6 +79,35 @@ async function directImporterDevSpec(
   };
 }
 
+async function directStaticWebappDevSpec(
+  workspaceRoot: string,
+  importer: string,
+): Promise<RunnableExec | null> {
+  if (!importer || path.isAbsolute(importer) || importer.startsWith("../")) return null;
+  const importerRoot = path.join(workspaceRoot, importer);
+  const devScript = path.join(importerRoot, "scripts", "dev.ts");
+  try {
+    const st = await fsp.stat(devScript);
+    if (st.isFile()) return { argv: ["zx-wrapper", "scripts/dev.ts"], cwd: importerRoot };
+  } catch {}
+  return {
+    argv: [
+      "node",
+      "node_modules/vite/bin/vite.js",
+      "--host",
+      "127.0.0.1",
+      "--port",
+      "${PORT:-5187}",
+      "--strictPort",
+      "--clearScreen",
+      "false",
+      "--logLevel",
+      "info",
+    ],
+    cwd: importerRoot,
+  };
+}
+
 async function main() {
   const parsed = parseArgs(getArgvTokens());
   if (parsed.sourceError) {
@@ -176,12 +205,16 @@ async function main() {
   }
   if (parsed.mode === "dev" && spec && targetHints?.importer && !testManifestPath) {
     spec =
+      (targetHints.mode === "static"
+        ? await directStaticWebappDevSpec(workspaceRoot, targetHints.importer)
+        : null) ||
       (await directImporterDevSpec(
         workspaceRoot,
         targetHints.importer,
         targetHints.mode,
         targetHints.framework,
-      )) || spec;
+      )) ||
+      spec;
   }
   if (!spec) {
     console.error(`run.${parsed.mode} is not available for ${target}`);

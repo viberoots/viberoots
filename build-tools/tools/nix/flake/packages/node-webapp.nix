@@ -106,6 +106,7 @@ let
           else
             WEBAPP_FRAMEWORK="static"
           fi
+          printf '%s\n' "$WEBAPP_FRAMEWORK" > .viberoots-webapp-framework
           phase_log "webapp-framework-$WEBAPP_FRAMEWORK"
           stage_wasm_contract() {
             local wasm_src="$1"
@@ -252,9 +253,12 @@ EOF
           PHASE_STEP_T0="$(phase_diag_begin)"
           if [ -d dist ]; then cp -R dist $out/; else echo "dist missing" >&2; exit 2; fi
           phase_diag_end "install-copy-dist" "$PHASE_STEP_T0"
-          PHASE_STEP_T0="$(phase_diag_begin)"
-          ln -s "${nm}/node_modules" "$out/node_modules"
-          phase_diag_end "install-link-node-modules" "$PHASE_STEP_T0"
+          WEBAPP_FRAMEWORK="$(cat .viberoots-webapp-framework 2>/dev/null || printf static)"
+          if [ "$WEBAPP_FRAMEWORK" != "static" ]; then
+            PHASE_STEP_T0="$(phase_diag_begin)"
+            ln -s "${nm}/node_modules" "$out/node_modules"
+            phase_diag_end "install-link-node-modules" "$PHASE_STEP_T0"
+          fi
           phase_log "install-complete"
         '';
       };
