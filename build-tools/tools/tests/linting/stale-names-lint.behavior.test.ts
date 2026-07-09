@@ -74,6 +74,12 @@ test("stale-names-lint keeps external version strings out of migration-label che
   assert.match(result.stderr, /no stale names found/);
 });
 
+test("stale-names-lint skips opaque binary asset content", async () => {
+  const file = await writeFixture("image.png", "bnx DemoStateV1 PR-7 legacy-helper\n");
+  const result = await execFileAsync("zx-wrapper", [script, file], { cwd: process.cwd() });
+  assert.match(result.stderr, /no stale names found/);
+});
+
 test("stale-names-lint rejects active doc command examples with stale labels", async () => {
   const file = await writeFixture(
     "fixture.md",

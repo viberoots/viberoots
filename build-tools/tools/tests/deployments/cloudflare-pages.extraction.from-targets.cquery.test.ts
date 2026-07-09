@@ -84,6 +84,7 @@ test("cloudflare-pages deployment extraction reads canonical metadata from TARGE
     ]);
     assert.equal(deployments[0]?.publisher.config, "wrangler.jsonc");
     assert.equal(deployments[0]?.providerTarget.account, "web-platform-staging");
+    assert.equal(deployments[0]?.providerTarget.accountId, "11111111111111111111111111111111");
     assert.equal(deployments[0]?.providerTarget.project, "sample-webapp-staging-pages");
     assert.equal(deployments[0]?.providerTarget.customDomain, "staging.sample-webapp.com");
     assert.equal(deployments[0]?.providerTarget.customDomainZoneId, "zone-sample-webapp");

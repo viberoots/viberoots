@@ -14,6 +14,22 @@ viberoots is reusable Buck2 + Nix workspace tooling. It provides the development
 
 Project site: [viberoots.dev](https://viberoots.dev)
 
+## Disclaimers
+
+viberoots is in **active development**. The local workflow is ready for serious experimentation, but breaking changes are likely as the project matures and the public API settles.
+
+| Status               | Scope                                                                                         |
+| -------------------- | --------------------------------------------------------------------------------------------- |
+| Mature enough to try | Local bootstrap, post-clone setup, generated workspace glue, daily install/build/verify loops |
+| Actively evolving    | Language templates, scaffolding coverage, patch flows, source-mode support                    |
+| Early                | Remote builds, deployments, control plane                                                     |
+
+This repository was also built as an **unapologetic experiment in agent-written software**: design descriptions, test output, exploratory behavior, and generated results were reviewed, but raw source was not manually written or reviewed line by line. Build-system work is a useful domain for this experiment: explicit inputs, generated outputs, and repeatable validation gates give both humans and agents concrete feedback. The work is backed by thousands of tests and a strict, consistent workflow with quality gates that have proven useful for producing quality code whether by agent or by hand.
+
+viberoots is **not accepting external pull requests** yet while the core architecture and workflow are still moving quickly. Please [**open Github issues**](https://github.com/viberoots/viberoots/issues) for bugs, reproduction cases, design feedback, and use-case notes; that [**feedback is strongly encouraged**](https://github.com/viberoots/viberoots/discussions) and genuinely useful at this stage.
+
+**Use your normal engineering judgement** before adopting it for critical systems. The MIT license covers the formal warranty terms; there is no hosted-service SLA, support commitment, or promise that experimental integrations will stay stable.
+
 ## Quick Start
 
 Run the bootstrap command below to create or upgrade a workspace. Fetch bootstrap from `https://viberoots.dev/bootstrap`; use `VBR_REF` for branch, tag, or ref names and `VBR_REV` for a full commit SHA when choosing the viberoots source the workspace consumes. If Nix is not installed yet, bootstrap uses the official [Determinate Nix Installer](https://determinate.systems/nix-installer/) first. See [Options](#options) before running it if you need a submodule checkout, a non-main ref, a commit pin, a dry run, or validation during setup. In the examples below, `my-project` is the workspace root.
@@ -71,7 +87,9 @@ Both commands fetch the current bootstrap entrypoint from GitHub `main`, then pa
 
 **Existing Checkout / New Workstation**
 
-Use post-clone for a repo that is already checked in and has an existing `flake.lock`. It reads `nodes.viberoots.locked.rev` from the repo lockfile, repairs ignored local state such as `.viberoots/`, `.direnv/`, shell helper state, `.viberoots/current`, and `.viberoots/workspace/`, then runs `direnv allow` and `i` by default without advancing the pinned viberoots input.
+Use post-clone for a repo that is already checked in and has an existing `flake.lock`. It preserves the workspace's active viberoots source mode, repairs ignored local state such as `.viberoots/`, `.direnv/`, shell helper state, `.viberoots/current`, and `.viberoots/workspace/`, then runs `direnv allow` and `i` by default without advancing checked-in viberoots pins.
+
+Flake-mode workspaces use `nodes.viberoots.locked.rev` from the repo lockfile. Submodule-mode workspaces initialize the checked-in `viberoots/` submodule and keep the parent gitlink as the source of truth; an inactive leftover `viberoots/` submodule does not make a flake-mode workspace switch modes.
 
 ```bash
 git clone <repo>
@@ -95,7 +113,7 @@ curl -fsSL https://viberoots.dev/post-clone | VBR_RUN_INSTALL=0 bash
 i && b && v
 ```
 
-Post-clone is intentionally for existing checked-in workspaces. If `flake.lock` is missing, use normal bootstrap for a new workspace. If `nodes.viberoots.locked.rev` is missing, use normal bootstrap or an explicit `VBR_REV=<full-commit-sha>` with the normal bootstrap flow. In post-clone mode, an explicit `VBR_REV` must match the checked-in lock revision; a different value is rejected because it would no longer be a no-advance repair.
+Post-clone is intentionally for existing checked-in workspaces. If `flake.lock` is missing, use normal bootstrap for a new workspace. If a flake-mode workspace is missing `nodes.viberoots.locked.rev`, use normal bootstrap or an explicit `VBR_REV=<full-commit-sha>` with the normal bootstrap flow. In flake-mode post-clone, an explicit `VBR_REV` must match the checked-in lock revision; in submodule-mode post-clone, explicit `VBR_REV` is rejected because the checked-in gitlink is the source of truth.
 
 Post-clone may change ignored local state. If you need proof that tracked files did not change, run `git diff --exit-code` afterward.
 

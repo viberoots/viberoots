@@ -19,8 +19,12 @@ const EXCLUDED_DIRS = new Set([
 
 const ALLOWED_PATHS = new Set([
   ".git",
+  "build-tools/tools/dev/stale-names-lint-allowlists.ts",
+  "build-tools/tools/dev/stale-names-lint.ts",
+  "build-tools/tools/tests/linting/stale-names-lint.behavior.test.ts",
   "viberoots/build-tools/tools/dev/stale-names-lint-allowlists.ts",
   "viberoots/build-tools/tools/dev/stale-names-lint.ts",
+  "viberoots/build-tools/tools/tests/linting/stale-names-lint.behavior.test.ts",
   "build-tools/tools/tests/deployments/nixos-shared-host.control-plane-service-env.test.ts",
   "build-tools/tools/tests/linting/no-stale-viberoots-names.enforcement.test.ts",
   "docs/contributor-naming-conventions.md",
@@ -66,6 +70,25 @@ function normalizeRel(p: string): string {
 
 function isAllowedFile(rel: string): boolean {
   return ALLOWED_PATHS.has(rel) || ALLOWED_PREFIXES.some((prefix) => rel.startsWith(prefix));
+}
+
+const OPAQUE_BINARY_EXTENSIONS = new Set([
+  ".gif",
+  ".ico",
+  ".jpeg",
+  ".jpg",
+  ".otf",
+  ".pdf",
+  ".png",
+  ".ttf",
+  ".wasm",
+  ".webp",
+  ".woff",
+  ".woff2",
+]);
+
+function isOpaqueBinaryAsset(rel: string): boolean {
+  return OPAQUE_BINARY_EXTENSIONS.has(path.extname(rel).toLowerCase());
 }
 
 function isExcludedDir(relDir: string): boolean {
@@ -122,10 +145,12 @@ test("active source has no stale bucknix repository names", async () => {
     if (isAllowedFile(rel)) continue;
 
     let text = "";
-    try {
-      text = await fsp.readFile(abs, "utf8");
-    } catch {
-      continue;
+    if (!isOpaqueBinaryAsset(rel)) {
+      try {
+        text = await fsp.readFile(abs, "utf8");
+      } catch {
+        continue;
+      }
     }
 
     for (const pattern of STALE_PATTERNS) {

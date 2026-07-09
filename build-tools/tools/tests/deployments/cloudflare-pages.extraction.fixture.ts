@@ -86,6 +86,7 @@ export async function writeCloudflarePagesExtractionFixture(
       '    name = "deploy",',
       '    component = "//projects/apps/sample-webapp:app",',
       '    account = "web-platform-staging",',
+      '    account_id = "11111111111111111111111111111111",',
       '    custom_domain = "staging.sample-webapp.com",',
       '    custom_domain_zone_id = "zone-sample-webapp",',
       '    project = "sample-webapp-staging-pages",',

@@ -271,6 +271,10 @@ test("standalone post-clone reads checked-in locked rev from nested directories"
       cwd: subdir,
       env: {
         ...process.env,
+        VBR_CONSUMER: "",
+        VBR_CONSUMER_MODE: "",
+        VIBEROOTS_CONSUMER_MODE: "",
+        VIBROOTS_CONSUMER_MODE: "",
         VBR_POST_CLONE: "1",
         VBR_DRY_RUN: "1",
         VBR_RUN_INSTALL: "0",
@@ -286,6 +290,120 @@ test("standalone post-clone reads checked-in locked rev from nested directories"
     assert.match(run.stdout, new RegExp(`rev\\s+${lockedRev}`));
     assert.match(run.stdout, /use locked viberoots revision/);
     assert.match(run.stdout, /i && b && v/);
+  });
+});
+
+test("standalone post-clone keeps flake mode when a viberoots submodule is inactive", async () => {
+  await withTempWorkspace("viberoots-post-clone-inactive-submodule", async (workspace) => {
+    const viberootsRoot = await findViberootsRoot();
+    const lockedRev = "0123456789abcdef0123456789abcdef01234567";
+    await fsp.writeFile(
+      path.join(workspace, "flake.lock"),
+      JSON.stringify({ nodes: { viberoots: { locked: { rev: lockedRev } } } }, null, 2),
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(workspace, ".gitmodules"),
+      '[submodule "viberoots"]\n\tpath = viberoots\n\turl = https://github.com/viberoots/viberoots.git\n',
+      "utf8",
+    );
+
+    const run = await execFileAsync("bash", [path.join(viberootsRoot, "bootstrap")], {
+      cwd: workspace,
+      env: {
+        ...process.env,
+        VBR_CONSUMER: "",
+        VBR_CONSUMER_MODE: "",
+        VIBEROOTS_CONSUMER_MODE: "",
+        VIBROOTS_CONSUMER_MODE: "",
+        VBR_POST_CLONE: "1",
+        VBR_DRY_RUN: "1",
+        VBR_RUN_INSTALL: "0",
+        VBR_DIRENV_ALLOW: "0",
+      },
+    });
+
+    assert.match(run.stdout, /mode\s+flake/);
+    assert.match(run.stdout, /mode source\s+default/);
+    assert.match(run.stdout, new RegExp(`use locked viberoots revision ${lockedRev}`));
+    assert.doesNotMatch(run.stdout, /initialize checked-in viberoots submodule/);
+  });
+});
+
+test("standalone post-clone detects active submodule mode from tracked source config", async () => {
+  await withTempWorkspace("viberoots-post-clone-active-submodule", async (workspace) => {
+    const viberootsRoot = await findViberootsRoot();
+    await fsp.writeFile(
+      path.join(workspace, "flake.lock"),
+      JSON.stringify({ nodes: { viberoots: { locked: { narHash: "sha256-test" } } } }, null, 2),
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(workspace, ".envrc"),
+      'use flake "path:${PWD}/.viberoots/workspace#default" --override-input viberoots "path:${PWD}/viberoots"\n',
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(workspace, ".gitmodules"),
+      '[submodule "viberoots"]\n\tpath = viberoots\n\turl = https://github.com/viberoots/viberoots.git\n',
+      "utf8",
+    );
+
+    const run = await execFileAsync("bash", [path.join(viberootsRoot, "bootstrap")], {
+      cwd: workspace,
+      env: {
+        ...process.env,
+        VBR_CONSUMER: "",
+        VBR_CONSUMER_MODE: "",
+        VIBEROOTS_CONSUMER_MODE: "",
+        VIBROOTS_CONSUMER_MODE: "",
+        VBR_POST_CLONE: "1",
+        VBR_DRY_RUN: "1",
+        VBR_RUN_INSTALL: "0",
+        VBR_DIRENV_ALLOW: "0",
+      },
+    });
+
+    assert.match(run.stdout, /mode\s+submodule/);
+    assert.match(run.stdout, /mode source\s+\.envrc/);
+    assert.match(run.stdout, /initialize checked-in viberoots submodule/);
+    assert.doesNotMatch(run.stdout, /use locked viberoots revision/);
+  });
+});
+
+test("standalone post-clone lets explicit flake mode override local source config", async () => {
+  await withTempWorkspace("viberoots-post-clone-explicit-flake", async (workspace) => {
+    const viberootsRoot = await findViberootsRoot();
+    const lockedRev = "0123456789abcdef0123456789abcdef01234567";
+    await fsp.writeFile(
+      path.join(workspace, "flake.lock"),
+      JSON.stringify({ nodes: { viberoots: { locked: { rev: lockedRev } } } }, null, 2),
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(workspace, ".envrc"),
+      'use flake "path:${PWD}/.viberoots/workspace#default" --override-input viberoots "path:${PWD}/viberoots"\n',
+      "utf8",
+    );
+
+    const run = await execFileAsync("bash", [path.join(viberootsRoot, "bootstrap")], {
+      cwd: workspace,
+      env: {
+        ...process.env,
+        VBR_CONSUMER_MODE: "",
+        VIBEROOTS_CONSUMER_MODE: "",
+        VIBROOTS_CONSUMER_MODE: "",
+        VBR_POST_CLONE: "1",
+        VBR_CONSUMER: "flake",
+        VBR_DRY_RUN: "1",
+        VBR_RUN_INSTALL: "0",
+        VBR_DIRENV_ALLOW: "0",
+      },
+    });
+
+    assert.match(run.stdout, /mode\s+flake/);
+    assert.match(run.stdout, /mode source\s+explicit/);
+    assert.match(run.stdout, new RegExp(`use locked viberoots revision ${lockedRev}`));
   });
 });
 

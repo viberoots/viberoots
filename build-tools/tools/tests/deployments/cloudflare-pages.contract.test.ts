@@ -31,6 +31,7 @@ test("deriveCloudflarePagesProviderTarget normalizes canonical url and lock iden
     account: "web-platform-staging",
     project: "sample-webapp-staging-pages",
     id: "sample-webapp-staging-pages",
+    provisionMode: "managed",
     canonicalUrl: "https://sample-webapp-staging-pages.pages.dev/",
     providerTargetIdentity: "cloudflare-pages:web-platform-staging/sample-webapp-staging-pages",
   });
@@ -39,10 +40,12 @@ test("deriveCloudflarePagesProviderTarget normalizes canonical url and lock iden
 test("deriveCloudflarePagesProviderTarget uses custom domain as canonical url", () => {
   const target = deriveCloudflarePagesProviderTarget({
     account: "web-platform-staging",
+    accountId: "11111111111111111111111111111111",
     project: "sample-webapp-staging-pages",
     customDomain: "staging.sample-webapp.com",
     customDomainZoneId: "zone-sample-webapp",
   });
+  assert.equal(target.accountId, "11111111111111111111111111111111");
   assert.equal(target.customDomain, "staging.sample-webapp.com");
   assert.equal(target.customDomainZoneId, "zone-sample-webapp");
   assert.equal(target.canonicalUrl, "https://staging.sample-webapp.com/");
@@ -105,6 +108,7 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
       prerequisites: [{ deployment_id: "sample-webapp-dev", mode: "ordering_only" }],
       provider_target: {
         account: "web-platform-staging",
+        account_id: "11111111111111111111111111111111",
         custom_domain: "staging.sample-webapp.com",
         custom_domain_zone_id: "zone-sample-webapp",
         project: "sample-webapp-staging-pages",
@@ -121,6 +125,7 @@ test("extractCloudflarePagesDeployments reads provider target and publisher conf
     { deploymentId: "sample-webapp-dev", mode: "ordering_only" },
   ]);
   assert.equal(deployments[1]?.providerTarget.id, "sample-webapp-staging-pages");
+  assert.equal(deployments[1]?.providerTarget.accountId, "11111111111111111111111111111111");
   assert.equal(deployments[1]?.providerTarget.customDomain, "staging.sample-webapp.com");
   assert.equal(deployments[1]?.providerTarget.customDomainZoneId, "zone-sample-webapp");
   assert.equal(deployments[1]?.providerTarget.canonicalUrl, "https://staging.sample-webapp.com/");

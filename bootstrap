@@ -16,8 +16,16 @@ env_or_default() {
 }
 
 mode="$(env_or_default flake VBR_CONSUMER VBR_CONSUMER_MODE VIBEROOTS_CONSUMER_MODE VIBROOTS_CONSUMER_MODE)"
+mode_explicit=0
+if [[ -n "${VBR_CONSUMER:-}" || -n "${VBR_CONSUMER_MODE:-}" || -n "${VIBEROOTS_CONSUMER_MODE:-}" || -n "${VIBROOTS_CONSUMER_MODE:-}" ]]; then
+  mode_explicit=1
+fi
 ref="$(env_or_default main VBR_REF VIBEROOTS_REF)"
 rev="$(env_or_default "" VBR_REV VIBEROOTS_REV)"
+rev_explicit=0
+if [[ -n "${VBR_REV:-}" || -n "${VIBEROOTS_REV:-}" ]]; then
+  rev_explicit=1
+fi
 post_clone="$(env_or_default 0 VBR_POST_CLONE VIBEROOTS_POST_CLONE)"
 ref_explicit=0
 if [[ -n "${VBR_REF:-}" || -n "${VIBEROOTS_REF:-}" ]]; then
@@ -433,10 +441,12 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --mode)
       mode="${2:-}"
+      mode_explicit=1
       shift 2
       ;;
     --mode=*)
       mode="${1#--mode=}"
+      mode_explicit=1
       shift
       ;;
     --ref)
@@ -451,10 +461,12 @@ while [[ $# -gt 0 ]]; do
       ;;
     --rev)
       rev="${2:-}"
+      rev_explicit=1
       shift 2
       ;;
     --rev=*)
       rev="${1#--rev=}"
+      rev_explicit=1
       shift
       ;;
     --workspace-root)
@@ -596,7 +608,7 @@ workspace_root="${workspace_root:-$(discover_workspace_root)}"
 workspace_root="$(cd "$(dirname "${workspace_root}")" && pwd)/$(basename "${workspace_root}")"
 workspace_name="${workspace_name:-$(basename "${workspace_root}")}"
 
-checked_in_locked_rev() {
+checked_in_lock_file() {
   local lock_file="${workspace_root}/flake.lock"
   if [[ ! -f "${lock_file}" ]]; then
     cat >&2 <<EOF
@@ -608,6 +620,12 @@ new workspace, use normal bootstrap:
 EOF
     exit 1
   fi
+  printf '%s' "${lock_file}"
+}
+
+extract_checked_in_locked_rev() {
+  local lock_file="${1:-}"
+  [[ -n "${lock_file}" && -f "${lock_file}" ]] || return 0
   local locked_rev
   locked_rev="$(
     awk '
@@ -633,6 +651,14 @@ EOF
       }
     ' "${lock_file}" 2>/dev/null || true
   )"
+  printf '%s' "${locked_rev}"
+}
+
+checked_in_locked_rev() {
+  local lock_file locked_rev
+  lock_file="$(checked_in_lock_file)"
+  [[ -n "${lock_file}" ]] || exit 1
+  locked_rev="$(extract_checked_in_locked_rev "${lock_file}")"
   if [[ -z "${locked_rev}" ]]; then
     cat >&2 <<EOF
 error: post-clone could not find nodes.viberoots.locked.rev in ${lock_file}
@@ -650,9 +676,89 @@ EOF
   printf '%s' "${locked_rev}"
 }
 
+valid_full_rev_or_empty() {
+  local rev_value="$1"
+  [[ -z "${rev_value}" || "${rev_value}" =~ ^[0-9a-fA-F]{40}$ ]]
+}
+
+tracked_file_contains_local_viberoots_source() {
+  local file="$1"
+  [[ -f "${file}" ]] || return 1
+  grep -Eq 'viberoots\.url[[:space:]]*=[[:space:]]*"(path|git\+file):(\./)?(\.\./\.\./)?(\.viberoots/workspace/)?viberoots(|-flake-input)"' "${file}" ||
+    grep -Fq -- '--override-input viberoots' "${file}"
+}
+
+detect_post_clone_mode() {
+  local current_path="${workspace_root}/.viberoots/current"
+  local local_source="${workspace_root}/viberoots"
+  local filtered_source="${workspace_root}/.viberoots/workspace/viberoots-flake-input"
+  local current_real local_real filtered_real link_target
+
+  if [[ -L "${current_path}" ]]; then
+    link_target="$(readlink "${current_path}" 2>/dev/null || true)"
+    if [[ "${link_target}" == "../viberoots" ]]; then
+      printf '%s\n%s' "submodule" ".viberoots/current"
+      return 0
+    fi
+  fi
+
+  if [[ -e "${current_path}" ]]; then
+    current_real="$(cd "${current_path}" && pwd -P 2>/dev/null || true)"
+    local_real=""
+    filtered_real=""
+    [[ -d "${local_source}" ]] && local_real="$(cd "${local_source}" && pwd -P 2>/dev/null || true)"
+    [[ -d "${filtered_source}" ]] && filtered_real="$(cd "${filtered_source}" && pwd -P 2>/dev/null || true)"
+    if [[ -n "${current_real}" && -n "${local_real}" && "${current_real}" == "${local_real}" ]]; then
+      printf '%s\n%s' "submodule" ".viberoots/current"
+      return 0
+    fi
+    if [[ -n "${current_real}" && -n "${filtered_real}" && "${current_real}" == "${filtered_real}" ]]; then
+      printf '%s\n%s' "submodule" ".viberoots/current"
+      return 0
+    fi
+    if [[ "${current_real}" == /nix/store/* ]]; then
+      printf '%s\n%s' "flake" ".viberoots/current"
+      return 0
+    fi
+  fi
+
+  if tracked_file_contains_local_viberoots_source "${workspace_root}/.envrc"; then
+    printf '%s\n%s' "submodule" ".envrc"
+    return 0
+  fi
+  if tracked_file_contains_local_viberoots_source "${workspace_root}/flake.nix"; then
+    printf '%s\n%s' "submodule" "flake.nix"
+    return 0
+  fi
+  if tracked_file_contains_local_viberoots_source "${workspace_root}/.viberoots/workspace/flake.nix"; then
+    printf '%s\n%s' "submodule" ".viberoots/workspace/flake.nix"
+    return 0
+  fi
+
+  printf '%s\n%s' "flake" "default"
+}
+
+post_clone_mode_source=""
 if [[ "${post_clone}" == "1" ]]; then
-  locked_rev="$(checked_in_locked_rev)"
-  if [[ -n "${rev}" && "${rev}" != "${locked_rev}" ]]; then
+  if [[ "${mode_explicit}" != "1" ]]; then
+    post_clone_mode_detection="$(detect_post_clone_mode)"
+    mode="$(printf '%s\n' "${post_clone_mode_detection}" | sed -n '1p')"
+    post_clone_mode_source="$(printf '%s\n' "${post_clone_mode_detection}" | sed -n '2p')"
+  else
+    post_clone_mode_source="explicit"
+  fi
+  if [[ "${mode}" == "flake" ]]; then
+    locked_rev="$(checked_in_locked_rev)"
+  else
+    lock_file="$(checked_in_lock_file)"
+    [[ -n "${lock_file}" ]] || exit 1
+    locked_rev="$(extract_checked_in_locked_rev "${lock_file}")"
+    if ! valid_full_rev_or_empty "${locked_rev}"; then
+      echo "error: post-clone requires nodes.viberoots.locked.rev to be a full 40-character commit SHA when present; got: ${locked_rev}" >&2
+      exit 1
+    fi
+  fi
+  if [[ "${mode}" == "flake" && -n "${rev}" && "${rev}" != "${locked_rev}" ]]; then
     cat >&2 <<EOF
 error: VBR_REV conflicts with checked-in flake.lock for post-clone
 
@@ -665,9 +771,23 @@ pin.
 EOF
     exit 2
   fi
-  rev="${locked_rev}"
-  ref_explicit=0
-  ref="locked"
+  if [[ "${mode}" == "flake" ]]; then
+    rev="${locked_rev}"
+    ref_explicit=0
+    ref="locked"
+  elif [[ "${rev_explicit}" == "1" ]]; then
+    cat >&2 <<EOF
+error: VBR_REV conflicts with submodule-mode post-clone
+
+VBR_REV: ${rev}
+
+post-clone in submodule mode uses the checked-in submodule gitlink as the
+source of truth. Use normal bootstrap or update when you intend to change pins.
+EOF
+    exit 2
+  else
+    rev=""
+  fi
 fi
 viberoots_url="${viberoots_url:-$(default_viberoots_url)}"
 
@@ -736,6 +856,10 @@ resolve_submodule_target_rev() {
   git ls-remote "${url}" "${desired_ref}" 2>/dev/null | awk 'NR == 1 {print $1}' || true
 }
 
+gitlink_revision() {
+  git ls-files -s viberoots 2>/dev/null | awk '$1 == "160000" {print $2; exit}'
+}
+
 current_source_rev() {
   if [[ "${mode}" == "submodule" && -d viberoots ]]; then
     git -C viberoots rev-parse HEAD 2>/dev/null || true
@@ -754,6 +878,10 @@ current_source_ref() {
 
 target_source_rev() {
   if [[ "${mode}" == "submodule" ]]; then
+    if [[ "${post_clone}" == "1" ]]; then
+      gitlink_revision
+      return 0
+    fi
     if [[ -n "${rev}" ]]; then
       printf '%s' "${rev}"
       return 0
@@ -953,6 +1081,9 @@ ui_set "install" "$([[ "${run_install}" == "1" ]] && echo yes || echo no)"
 ui_set "validate" "$([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
 ui_set "direnv allow" "$([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
 ui_set "post-clone" "$([[ "${post_clone}" == "1" ]] && echo yes || echo no)"
+if [[ "${post_clone}" == "1" ]]; then
+  ui_set "mode source" "${post_clone_mode_source:-explicit}"
+fi
 ui_set "viberoots url" "${viberoots_url}"
 if [[ "${post_clone}" == "1" ]]; then
   ui_warn "local state" "post-clone may repair ignored .viberoots, .direnv, shell helper, current, and workspace state"
@@ -981,7 +1112,14 @@ if [[ "${dry_run}" == "1" ]]; then
       ui_list "run viberoots init-consumer from ${viberoots_url}#viberoots"
     fi
   else
-    ui_list "add or update viberoots submodule at ./viberoots"
+    if [[ "${post_clone}" == "1" ]]; then
+      ui_list "initialize checked-in viberoots submodule at ./viberoots without moving the gitlink"
+      if [[ -n "${locked_rev:-}" ]]; then
+        ui_list "compare checked-in flake.lock revision ${locked_rev} with the submodule gitlink"
+      fi
+    else
+      ui_list "add or update viberoots submodule at ./viberoots"
+    fi
     if ! is_official_submodule_url "${submodule_url}" && [[ "${trust_submodule_url}" != "1" ]]; then
       ui_list "require confirmation before using non-default submodule URL"
     fi
@@ -1073,6 +1211,11 @@ elif [[ "${mode}" == "flake" ]]; then
 else
   confirm_trusted_submodule_url "${effective_source}"
   ensure_git_metadata_writable
+  if [[ "${post_clone}" == "1" && -z "$(gitlink_revision)" ]]; then
+    echo "error: post-clone detected submodule mode but viberoots is not a checked-in gitlink" >&2
+    echo "Use normal bootstrap when you intend to add or change source mode." >&2
+    exit 1
+  fi
   if [[ -d viberoots ]] &&
     [[ -n "$(git -C viberoots status --porcelain=v1 2>/dev/null || true)" ]] &&
     [[ "$(git -C viberoots rev-parse --abbrev-ref HEAD 2>/dev/null || true)" != "${ref}" ]] &&
@@ -1097,22 +1240,50 @@ else
     git submodule update --init --recursive viberoots
     record_action "updated viberoots submodule"
   fi
-  fetch_target="${ref}"
-  if [[ -n "${rev}" && "${ref_explicit}" != "1" ]]; then
-    fetch_target="${rev}"
-  fi
-  if git -C viberoots fetch origin "${fetch_target}" >/dev/null 2>&1; then
-    record_action "fetched viberoots ref"
-  fi
-  if [[ -n "${rev}" ]] && git -C viberoots rev-parse --verify --quiet "${rev}^{commit}" >/dev/null; then
-    git -C viberoots checkout --quiet "${rev}"
-    record_action "checked out ${rev}"
-  elif git -C viberoots rev-parse --verify --quiet "origin/${ref}^{commit}" >/dev/null; then
-    git -C viberoots checkout --quiet "origin/${ref}"
-    record_action "checked out origin/${ref}"
-  elif git -C viberoots rev-parse --verify --quiet "${ref}^{commit}" >/dev/null; then
-    git -C viberoots checkout --quiet "${ref}"
-    record_action "checked out ${ref}"
+  if [[ "${post_clone}" == "1" ]]; then
+    submodule_rev="$(git -C viberoots rev-parse HEAD 2>/dev/null || true)"
+    gitlink_rev="$(gitlink_revision)"
+    if [[ -z "${submodule_rev}" || "${submodule_rev}" != "${gitlink_rev}" ]]; then
+      cat >&2 <<EOF
+error: post-clone could not initialize viberoots to the checked-in gitlink
+
+gitlink:   ${gitlink_rev:-unknown}
+submodule: ${submodule_rev:-unknown}
+
+Run git submodule update --init --recursive viberoots and retry post-clone.
+EOF
+      exit 1
+    fi
+    if [[ -n "${locked_rev:-}" && "${locked_rev}" != "${gitlink_rev}" ]]; then
+      cat >&2 <<EOF
+error: post-clone found mismatched viberoots pins
+
+flake.lock: ${locked_rev}
+gitlink:    ${gitlink_rev}
+
+This repo is in submodule mode, so post-clone will not move the checked-in
+gitlink. Use normal bootstrap or update when you intend to change pins.
+EOF
+      exit 1
+    fi
+  else
+    fetch_target="${ref}"
+    if [[ -n "${rev}" && "${ref_explicit}" != "1" ]]; then
+      fetch_target="${rev}"
+    fi
+    if git -C viberoots fetch origin "${fetch_target}" >/dev/null 2>&1; then
+      record_action "fetched viberoots ref"
+    fi
+    if [[ -n "${rev}" ]] && git -C viberoots rev-parse --verify --quiet "${rev}^{commit}" >/dev/null; then
+      git -C viberoots checkout --quiet "${rev}"
+      record_action "checked out ${rev}"
+    elif git -C viberoots rev-parse --verify --quiet "origin/${ref}^{commit}" >/dev/null; then
+      git -C viberoots checkout --quiet "origin/${ref}"
+      record_action "checked out origin/${ref}"
+    elif git -C viberoots rev-parse --verify --quiet "${ref}^{commit}" >/dev/null; then
+      git -C viberoots checkout --quiet "${ref}"
+      record_action "checked out ${ref}"
+    fi
   fi
   ./viberoots/init \
     --mode submodule \

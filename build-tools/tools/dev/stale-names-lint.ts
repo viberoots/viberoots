@@ -89,6 +89,25 @@ function isAllowedFile(rel: string): boolean {
   );
 }
 
+const OPAQUE_BINARY_EXTENSIONS = new Set([
+  ".gif",
+  ".ico",
+  ".jpeg",
+  ".jpg",
+  ".otf",
+  ".pdf",
+  ".png",
+  ".ttf",
+  ".wasm",
+  ".webp",
+  ".woff",
+  ".woff2",
+]);
+
+function isOpaqueBinaryAsset(rel: string): boolean {
+  return OPAQUE_BINARY_EXTENSIONS.has(path.extname(rel).toLowerCase());
+}
+
 function lineNumberForOffset(text: string, offset: number): number {
   return text.slice(0, offset).split("\n").length;
 }
@@ -192,6 +211,8 @@ function scanPath(rel: string): Hit[] {
 }
 
 async function scanFile(repoRoot: string, rel: string): Promise<Hit[]> {
+  if (isOpaqueBinaryAsset(rel)) return [];
+
   let text = "";
   try {
     text = await fsp.readFile(path.join(repoRoot, rel), "utf8");
