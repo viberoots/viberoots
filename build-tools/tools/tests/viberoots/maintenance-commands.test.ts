@@ -120,6 +120,60 @@ test("viberoots bootstrap and update invoke trusted bootstrap URL with VBR overr
   });
 });
 
+test("viberoots post-clone invokes shared bootstrap with locked-mode preset", async () => {
+  await withTempWorkspace("viberoots-live-post-clone", async (workspace) => {
+    const viberootsRoot = await findViberootsRoot();
+    const bin = path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots");
+    const capture = path.join(workspace, "env.txt");
+    const script = path.join(workspace, "bootstrap.sh");
+    await writeExecutable(
+      script,
+      `#!/usr/bin/env bash
+{
+  printf 'VBR_POST_CLONE=%s\\n' "\${VBR_POST_CLONE:-}"
+  printf 'VBR_WORKSPACE_ROOT=%s\\n' "\${VBR_WORKSPACE_ROOT:-}"
+  printf 'VBR_RUN_INSTALL=%s\\n' "\${VBR_RUN_INSTALL:-}"
+  printf 'VBR_DIRENV_ALLOW=%s\\n' "\${VBR_DIRENV_ALLOW:-}"
+  printf 'VBR_DRY_RUN=%s\\n' "\${VBR_DRY_RUN:-}"
+} > "\${VBR_CAPTURE_ENV}"
+`,
+    );
+
+    await execFileAsync(
+      bin,
+      [
+        "post-clone",
+        "--bootstrap-url",
+        `file://${script}`,
+        "--trust-bootstrap-url",
+        "--workspace-root",
+        workspace,
+        "--no-install",
+        "--no-direnv-allow",
+        "--dry-run",
+      ],
+      {
+        cwd: workspace,
+        env: {
+          ...process.env,
+          NO_DEV_SHELL: "1",
+          VBR_CAPTURE_ENV: capture,
+        },
+      },
+    );
+
+    const envText = await fsp.readFile(capture, "utf8");
+    assert.match(envText, /VBR_POST_CLONE=1/);
+    assert.match(
+      envText,
+      new RegExp(`VBR_WORKSPACE_ROOT=${workspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+    );
+    assert.match(envText, /VBR_RUN_INSTALL=0/);
+    assert.match(envText, /VBR_DIRENV_ALLOW=0/);
+    assert.match(envText, /VBR_DRY_RUN=1/);
+  });
+});
+
 test("viberoots update defaults to the enclosing workspace root from subdirectories", async () => {
   await withTempWorkspace("viberoots-live-bootstrap-subdir", async (workspace) => {
     const viberootsRoot = await findViberootsRoot();
@@ -198,6 +252,81 @@ test("standalone bootstrap discovers the enclosing workspace root from subdirect
     );
     await assert.rejects(fsp.access(path.join(subdir, ".viberoots", "workspace", "flake.nix")));
     await assert.rejects(fsp.access(path.join(subdir, ".envrc")));
+  });
+});
+
+test("standalone post-clone reads checked-in locked rev from nested directories", async () => {
+  await withTempWorkspace("viberoots-standalone-post-clone", async (workspace) => {
+    const viberootsRoot = await findViberootsRoot();
+    const subdir = path.join(workspace, "projects", "apps");
+    const lockedRev = "0123456789abcdef0123456789abcdef01234567";
+    await fsp.mkdir(subdir, { recursive: true });
+    await fsp.writeFile(
+      path.join(workspace, "flake.lock"),
+      JSON.stringify({ nodes: { viberoots: { locked: { rev: lockedRev } } } }, null, 2),
+      "utf8",
+    );
+
+    const run = await execFileAsync("bash", [path.join(viberootsRoot, "bootstrap")], {
+      cwd: subdir,
+      env: {
+        ...process.env,
+        VBR_POST_CLONE: "1",
+        VBR_DRY_RUN: "1",
+        VBR_RUN_INSTALL: "0",
+        VBR_DIRENV_ALLOW: "0",
+        WORKSPACE_ROOT: "",
+        _VIBEROOTS_DEVSHELL_ROOT: "",
+        BUCK_TEST_SRC: "",
+        LIVE_ROOT: "",
+      },
+    });
+
+    assert.match(run.stdout, /post-clone\s+yes/);
+    assert.match(run.stdout, new RegExp(`rev\\s+${lockedRev}`));
+    assert.match(run.stdout, /use locked viberoots revision/);
+    assert.match(run.stdout, /i && b && v/);
+  });
+});
+
+test("standalone post-clone fails clearly for missing and invalid lock state", async () => {
+  const viberootsRoot = await findViberootsRoot();
+  await withTempWorkspace("viberoots-post-clone-missing-lock", async (workspace) => {
+    await assert.rejects(
+      execFileAsync("bash", [path.join(viberootsRoot, "bootstrap")], {
+        cwd: workspace,
+        env: { ...process.env, VBR_POST_CLONE: "1", VBR_DRY_RUN: "1" },
+      }),
+      /post-clone requires an existing checked-in flake\.lock/,
+    );
+  });
+  await withTempWorkspace("viberoots-post-clone-missing-node", async (workspace) => {
+    await fsp.writeFile(
+      path.join(workspace, "flake.lock"),
+      JSON.stringify({ nodes: {} }, null, 2),
+      "utf8",
+    );
+    await assert.rejects(
+      execFileAsync("bash", [path.join(viberootsRoot, "bootstrap")], {
+        cwd: workspace,
+        env: { ...process.env, VBR_POST_CLONE: "1", VBR_DRY_RUN: "1" },
+      }),
+      /could not find nodes\.viberoots\.locked\.rev/,
+    );
+  });
+  await withTempWorkspace("viberoots-post-clone-invalid-rev", async (workspace) => {
+    await fsp.writeFile(
+      path.join(workspace, "flake.lock"),
+      JSON.stringify({ nodes: { viberoots: { locked: { rev: "abc123" } } } }, null, 2),
+      "utf8",
+    );
+    await assert.rejects(
+      execFileAsync("bash", [path.join(viberootsRoot, "bootstrap")], {
+        cwd: workspace,
+        env: { ...process.env, VBR_POST_CLONE: "1", VBR_DRY_RUN: "1" },
+      }),
+      /full 40-character commit SHA/,
+    );
   });
 });
 

@@ -69,16 +69,47 @@ Both commands fetch the current bootstrap entrypoint from GitHub `main`, then pa
 
 `vbr` is a short alias for `viberoots`. Both commands resolve the workspace from any nested directory inside the consumer repo.
 
+**Existing Checkout / New Workstation**
+
+Use post-clone for a repo that is already checked in and has an existing `flake.lock`. It reads `nodes.viberoots.locked.rev` from the repo lockfile, repairs ignored local state such as `.viberoots/`, `.direnv/`, shell helper state, `.viberoots/current`, and `.viberoots/workspace/`, then runs `direnv allow` and `i` by default without advancing the pinned viberoots input.
+
+```bash
+git clone <repo>
+cd <repo>
+curl -fsSL https://viberoots.dev/post-clone | bash
+b && v
+```
+
+After the CLI is available, the equivalent command is:
+
+```bash
+viberoots post-clone
+b && v
+```
+
+Skip the default install when you only want to repair local setup:
+
+```bash
+viberoots post-clone --no-install
+curl -fsSL https://viberoots.dev/post-clone | VBR_RUN_INSTALL=0 bash
+i && b && v
+```
+
+Post-clone is intentionally for existing checked-in workspaces. If `flake.lock` is missing, use normal bootstrap for a new workspace. If `nodes.viberoots.locked.rev` is missing, use normal bootstrap or an explicit `VBR_REV=<full-commit-sha>` with the normal bootstrap flow. In post-clone mode, an explicit `VBR_REV` must match the checked-in lock revision; a different value is rejected because it would no longer be a no-advance repair.
+
+Post-clone may change ignored local state. If you need proof that tracked files did not change, run `git diff --exit-code` afterward.
+
 **Options**
 
 | Option                          | Default           | Description                                                                                                                                                                                                |
 | ------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `VBR_CONSUMER=flake\|submodule` | `flake`           | Selects source mode.                                                                                                                                                                                       |
-| `VBR_REF=<branch-or-tag>`       | `main`            | Selects the viberoots ref consumed by the workspace. Keep the bootstrap URL on `https://viberoots.dev/bootstrap` so upgrade migrations stay current.                                                        |
+| `VBR_REF=<branch-or-tag>`       | `main`            | Selects the viberoots ref consumed by the workspace. Keep the bootstrap URL on `https://viberoots.dev/bootstrap` so upgrade migrations stay current.                                                       |
 | `VBR_REV=<full-commit-sha>`     | unset             | Pins the viberoots Git revision consumed by the workspace. Short SHAs are rejected to match Nix flake Git URL behavior.                                                                                    |
-| `VBR_INSTALL_NIX=0\|1`          | `1`               | Allows bootstrap to manage missing Nix. If Nix is missing, interactive runs prompt before installing and non-interactive runs fail unless install consent is explicit.                                      |
-| `VBR_ALLOW_NIX_INSTALL=0\|1`    | `0`               | Confirms bootstrap may install Nix with the Determinate Nix installer when Nix is missing. Equivalent CLI flag: `--allow-nix-install`.                                                                      |
+| `VBR_INSTALL_NIX=0\|1`          | `1`               | Allows bootstrap to manage missing Nix. If Nix is missing, interactive runs prompt before installing and non-interactive runs fail unless install consent is explicit.                                     |
+| `VBR_ALLOW_NIX_INSTALL=0\|1`    | `0`               | Confirms bootstrap may install Nix with the Determinate Nix installer when Nix is missing. Equivalent CLI flag: `--allow-nix-install`.                                                                     |
 | `VBR_RUN_INSTALL=0\|1`          | `1`               | Runs `i`.                                                                                                                                                                                                  |
+| `VBR_POST_CLONE=0\|1`           | `0`               | Uses the checked-in `nodes.viberoots.locked.rev` for setup repair without advancing viberoots. Prefer `https://viberoots.dev/post-clone` or `viberoots post-clone` for this mode.                          |
 | `VBR_RUN_VALIDATE=0\|1`         | `0`               | Also runs `b && v`.                                                                                                                                                                                        |
 | `VBR_DIRENV_ALLOW=0\|1`         | `1`               | Runs `direnv allow`.                                                                                                                                                                                       |
 | `VBR_DRY_RUN=0\|1`              | `0`               | Previews the plan without writing files.                                                                                                                                                                   |

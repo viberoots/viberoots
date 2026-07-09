@@ -18,6 +18,7 @@ env_or_default() {
 mode="$(env_or_default flake VBR_CONSUMER VBR_CONSUMER_MODE VIBEROOTS_CONSUMER_MODE VIBROOTS_CONSUMER_MODE)"
 ref="$(env_or_default main VBR_REF VIBEROOTS_REF)"
 rev="$(env_or_default "" VBR_REV VIBEROOTS_REV)"
+post_clone="$(env_or_default 0 VBR_POST_CLONE VIBEROOTS_POST_CLONE)"
 ref_explicit=0
 if [[ -n "${VBR_REF:-}" || -n "${VIBEROOTS_REF:-}" ]]; then
   ref_explicit=1
@@ -67,6 +68,7 @@ discover_workspace_root() {
   dir="$(pwd -P)"
   while true; do
     if [[ -f "${dir}/.viberoots/workspace/flake.nix" ]] ||
+      [[ -f "${dir}/flake.lock" ]] ||
       [[ -f "${dir}/.buckroot" && -d "${dir}/projects" ]] ||
       [[ -e "${dir}/.viberoots/current" ]]; then
       printf '%s' "${dir}"
@@ -193,7 +195,7 @@ usage: bootstrap [--mode flake|submodule] [--ref <ref>] [--rev <sha>] [--workspa
                  [--workspace-name <name>] [--viberoots-url <flake-ref>]
                  [--submodule-url <git-url>] [--no-run-install] [--run-validate]
                  [--trust-submodule-url] [--allow-nix-install] [--no-install-nix] [--no-direnv-allow]
-                 [--dry-run]
+                 [--post-clone] [--dry-run]
 
 Defaults:
   --mode flake
@@ -204,6 +206,7 @@ Defaults:
   --run-install
   --run-validate disabled
   --direnv-allow
+  --post-clone disabled
   --dry-run disabled
   --viberoots-url git+https://github.com/viberoots/viberoots.git?ref=<ref> or ?rev=<sha>
   --submodule-url https://github.com/viberoots/viberoots.git
@@ -217,6 +220,7 @@ Examples:
   curl -fsSL https://viberoots.dev/bootstrap | VBR_RUN_VALIDATE=1 bash
   curl -fsSL https://viberoots.dev/bootstrap | VBR_DIRENV_ALLOW=0 bash
   curl -fsSL https://viberoots.dev/bootstrap | VBR_DRY_RUN=1 bash
+  curl -fsSL https://viberoots.dev/post-clone | bash
 EOF
   exit 2
 }
@@ -529,6 +533,10 @@ while [[ $# -gt 0 ]]; do
       dry_run=1
       shift
       ;;
+    --post-clone)
+      post_clone=1
+      shift
+      ;;
     -h|--help)
       usage
       ;;
@@ -571,6 +579,10 @@ if [[ "${direnv_allow}" != "0" && "${direnv_allow}" != "1" ]]; then
   echo "error: VBR_DIRENV_ALLOW must be 0 or 1" >&2
   exit 2
 fi
+if [[ "${post_clone}" != "0" && "${post_clone}" != "1" ]]; then
+  echo "error: VBR_POST_CLONE must be 0 or 1" >&2
+  exit 2
+fi
 if [[ -n "${rev}" && ! "${rev}" =~ ^[0-9a-fA-F]{40}$ ]]; then
   echo "error: --rev must be a full 40-character commit SHA" >&2
   exit 2
@@ -583,6 +595,80 @@ fi
 workspace_root="${workspace_root:-$(discover_workspace_root)}"
 workspace_root="$(cd "$(dirname "${workspace_root}")" && pwd)/$(basename "${workspace_root}")"
 workspace_name="${workspace_name:-$(basename "${workspace_root}")}"
+
+checked_in_locked_rev() {
+  local lock_file="${workspace_root}/flake.lock"
+  if [[ ! -f "${lock_file}" ]]; then
+    cat >&2 <<EOF
+error: post-clone requires an existing checked-in flake.lock
+
+This command repairs an already checked-in viberoots consumer workspace. For a
+new workspace, use normal bootstrap:
+  curl -fsSL https://viberoots.dev/bootstrap | bash
+EOF
+    exit 1
+  fi
+  local locked_rev
+  locked_rev="$(
+    awk '
+      /"nodes"[[:space:]]*:/ { inNodes=1 }
+      inNodes && /"viberoots"[[:space:]]*:/ { inNode=1; depth=0 }
+      inNode {
+        for (i = 1; i <= length($0); i++) {
+          c = substr($0, i, 1)
+          if (c == "{") depth++
+          if (c == "}") {
+            depth--
+            if (depth <= 0 && $0 !~ /"rev"[[:space:]]*:/) inNode=0
+          }
+        }
+      }
+      inNode && /"locked"[[:space:]]*:/ { inLocked=1 }
+      inNode && inLocked && /"rev"[[:space:]]*:/ {
+        line=$0
+        sub(/^.*"rev"[[:space:]]*:[[:space:]]*"/, "", line)
+        sub(/".*$/, "", line)
+        print line
+        exit
+      }
+    ' "${lock_file}" 2>/dev/null || true
+  )"
+  if [[ -z "${locked_rev}" ]]; then
+    cat >&2 <<EOF
+error: post-clone could not find nodes.viberoots.locked.rev in ${lock_file}
+
+Use normal bootstrap for a new workspace, or rerun bootstrap with an explicit
+VBR_REV=<full-commit-sha> if this workspace intentionally uses a different
+flake input name.
+EOF
+    exit 1
+  fi
+  if [[ ! "${locked_rev}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    echo "error: post-clone requires nodes.viberoots.locked.rev to be a full 40-character commit SHA; got: ${locked_rev}" >&2
+    exit 1
+  fi
+  printf '%s' "${locked_rev}"
+}
+
+if [[ "${post_clone}" == "1" ]]; then
+  locked_rev="$(checked_in_locked_rev)"
+  if [[ -n "${rev}" && "${rev}" != "${locked_rev}" ]]; then
+    cat >&2 <<EOF
+error: VBR_REV conflicts with checked-in flake.lock for post-clone
+
+VBR_REV: ${rev}
+locked:  ${locked_rev}
+
+post-clone is for repairing local ignored state without advancing the checked-in
+viberoots input. Use normal bootstrap or update when you intend to change the
+pin.
+EOF
+    exit 2
+  fi
+  rev="${locked_rev}"
+  ref_explicit=0
+  ref="locked"
+fi
 viberoots_url="${viberoots_url:-$(default_viberoots_url)}"
 
 run_install_flag=""
@@ -603,6 +689,7 @@ transaction_dir=".viberoots/bootstrap/transactions"
 transaction_file="${transaction_dir}/current.json"
 transaction_id=""
 transaction_active=0
+install_handled_by_setup=0
 
 json_escape() {
   local value="$1"
@@ -834,6 +921,7 @@ print_summary() {
   ui_set "install" "$([[ "${run_install}" == "1" ]] && echo yes || echo no)"
   ui_set "validate" "$([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
   ui_set "direnv allow" "$([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
+  ui_set "post-clone" "$([[ "${post_clone}" == "1" ]] && echo yes || echo no)"
   if [[ "${mode}" == "submodule" ]]; then
     ui_set "trust custom submodule" "$([[ "${trust_submodule_url}" == "1" ]] && echo yes || echo no)"
   fi
@@ -864,7 +952,12 @@ fi
 ui_set "install" "$([[ "${run_install}" == "1" ]] && echo yes || echo no)"
 ui_set "validate" "$([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
 ui_set "direnv allow" "$([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
+ui_set "post-clone" "$([[ "${post_clone}" == "1" ]] && echo yes || echo no)"
 ui_set "viberoots url" "${viberoots_url}"
+if [[ "${post_clone}" == "1" ]]; then
+  ui_warn "local state" "post-clone may repair ignored .viberoots, .direnv, shell helper, current, and workspace state"
+  ui_step "tracked proof" "run git diff --exit-code afterward if you need proof no tracked files changed"
+fi
 if [[ "${mode}" == "submodule" ]]; then
   ui_set "submodule url" "${submodule_url}"
   ui_set "trust custom submodule url" "$([[ "${trust_submodule_url}" == "1" ]] && echo yes || echo no)"
@@ -882,7 +975,11 @@ if [[ "${dry_run}" == "1" ]]; then
   fi
   ui_list "create workspace directory if missing" "initialize git repository if missing"
   if [[ "${mode}" == "flake" ]]; then
-    ui_list "run viberoots init-consumer from ${viberoots_url}#viberoots"
+    if [[ "${post_clone}" == "1" ]]; then
+      ui_list "read checked-in flake.lock" "use locked viberoots revision ${rev}" "run viberoots init-consumer from ${viberoots_url}#viberoots without advancing the pin"
+    else
+      ui_list "run viberoots init-consumer from ${viberoots_url}#viberoots"
+    fi
   else
     ui_list "add or update viberoots submodule at ./viberoots"
     if ! is_official_submodule_url "${submodule_url}" && [[ "${trust_submodule_url}" != "1" ]]; then
@@ -899,6 +996,13 @@ if [[ "${dry_run}" == "1" ]]; then
   fi
   if [[ "${run_validate}" == "1" ]]; then
     ui_list "run b && v"
+  fi
+  if [[ "${post_clone}" == "1" ]]; then
+    if [[ "${run_install}" == "1" ]]; then
+      ui_list "next validation command: b && v"
+    else
+      ui_list "next validation command: i && b && v"
+    fi
   fi
   exit 0
 fi
@@ -961,6 +1065,9 @@ elif [[ "${mode}" == "flake" ]]; then
   run_migrations
   record_action "ran viberoots init-consumer"
   run_nix_init_consumer
+  if [[ "${run_install}" == "1" ]]; then
+    install_handled_by_setup=1
+  fi
   complete_transaction
   print_summary "bootstrapped" "${effective_source}"
 else
@@ -1013,8 +1120,17 @@ else
     ${run_install_flag:+"${run_install_flag}"} \
     ${direnv_allow_flag:+"${direnv_allow_flag}"}
   record_action "ran ./viberoots/init"
+  if [[ "${run_install}" == "1" ]]; then
+    install_handled_by_setup=1
+  fi
   complete_transaction
   print_summary "bootstrapped" "${effective_source}"
+fi
+
+if [[ "${post_clone}" == "1" && "${run_install}" == "1" && "${install_handled_by_setup}" != "1" ]]; then
+  ui_step "install" "running i"
+  direnv exec "${workspace_root}" sh -lc 'i'
+  ui_ok "install" "complete"
 fi
 
 if [[ "${run_validate}" == "1" ]]; then
@@ -1022,9 +1138,18 @@ if [[ "${run_validate}" == "1" ]]; then
   ui_ok "validation" "complete"
   ui_step "devshell" "direnv may load ${workspace_root}/.envrc now"
 elif [[ "${direnv_allow}" == "1" ]]; then
-  ui_ok "next" "cd ${workspace_root} && direnv exec . sh -lc 'i && b && v'"
+  if [[ "${post_clone}" == "1" && "${run_install}" == "1" ]]; then
+    ui_ok "next" "cd ${workspace_root} && direnv exec . sh -lc 'b && v'"
+  else
+    ui_ok "next" "cd ${workspace_root} && direnv exec . sh -lc 'i && b && v'"
+  fi
   ui_step "devshell" "direnv may load ${workspace_root}/.envrc now"
 else
-  ui_ok "next" "cd ${workspace_root} && direnv allow && direnv exec . sh -lc 'i && b && v'"
+  if [[ "${post_clone}" == "1" && "${run_install}" == "1" ]]; then
+    ui_ok "next" "cd ${workspace_root} && direnv allow && direnv exec . sh -lc 'b && v'"
+  else
+    ui_ok "next" "cd ${workspace_root} && direnv allow && direnv exec . sh -lc 'i && b && v'"
+  fi
   ui_step "devshell" "run direnv allow before loading the dev shell"
 fi
+ui_step "tracked proof" "local ignored state may change; run git diff --exit-code afterward if you need proof no tracked files changed"

@@ -18,6 +18,12 @@ export_file(
 )
 
 export_file(
+    name = "post-clone",
+    src = "post-clone",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
     name = "flake.lock",
     src = "flake.lock",
     visibility = ["PUBLIC"],

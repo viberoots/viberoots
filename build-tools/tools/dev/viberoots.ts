@@ -91,6 +91,23 @@ const commandMetadata: CommandMeta[] = [
     ],
   },
   {
+    name: "post-clone",
+    usage: "viberoots post-clone [--no-install] [--dry-run]",
+    description:
+      "Repair ignored local state for an existing checkout using its locked viberoots revision.",
+    options: [
+      "--workspace-root",
+      "--no-install",
+      "--run-install",
+      "--no-run-install",
+      "--no-direnv-allow",
+      "--dry-run",
+      "--bootstrap-url",
+      "--trust-bootstrap-url",
+      "--help",
+    ],
+  },
+  {
     name: "gc",
     usage: "viberoots gc [--dry-run] [--aggressive] [--optimize] [--nix|--no-nix] [--verbose]",
     description: "Conservatively clean Nix and viberoots-owned generated local state.",
@@ -575,6 +592,18 @@ function liveBootstrapEnvOverrides(): Record<string, string> {
   return overrides;
 }
 
+function postCloneEnvOverrides(): Record<string, string> {
+  const overrides: Record<string, string> = {
+    VBR_POST_CLONE: "1",
+    VBR_WORKSPACE_ROOT: selectedWorkspaceRootForCommand(),
+  };
+  if (getFlagBool("no-install") || getFlagBool("no-run-install")) overrides.VBR_RUN_INSTALL = "0";
+  if (getFlagBool("run-install")) overrides.VBR_RUN_INSTALL = "1";
+  if (getFlagBool("no-direnv-allow")) overrides.VBR_DIRENV_ALLOW = "0";
+  if (getFlagBool("dry-run")) overrides.VBR_DRY_RUN = "1";
+  return overrides;
+}
+
 async function main() {
   const positionals = getPositionals();
   const [command = "version"] = positionals;
@@ -659,6 +688,15 @@ async function main() {
       bootstrapUrl: getFlagStr("bootstrap-url", ""),
       trustBootstrapUrl: getFlagBool("trust-bootstrap-url"),
       envOverrides: liveBootstrapEnvOverrides(),
+    });
+    return;
+  }
+  if (command === "post-clone") {
+    await runLiveBootstrap({
+      command,
+      bootstrapUrl: getFlagStr("bootstrap-url", ""),
+      trustBootstrapUrl: getFlagBool("trust-bootstrap-url"),
+      envOverrides: postCloneEnvOverrides(),
     });
     return;
   }

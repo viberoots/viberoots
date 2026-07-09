@@ -459,6 +459,17 @@ ${sourceLine}
 - \`projects/\`: application and project source.
 
 ${docsLine}
+
+## Existing Checkout / New Workstation
+
+Use viberoots' post-clone script after cloning this already-initialized workspace on a new
+machine. It repairs local ignored workspace state from the checked-in lock, runs the initial
+install step, and does not advance the pinned viberoots input.
+
+\`\`\`bash
+curl -fsSL https://viberoots.dev/post-clone | bash
+b && v
+\`\`\`
 `;
 }
 

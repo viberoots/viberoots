@@ -3,10 +3,10 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-export const officialBootstrapUrl =
-  "https://viberoots.dev/bootstrap";
+export const officialBootstrapUrl = "https://viberoots.dev/bootstrap";
+export const officialPostCloneUrl = "https://viberoots.dev/post-clone";
 
-export type LiveBootstrapCommand = "bootstrap" | "update";
+export type LiveBootstrapCommand = "bootstrap" | "update" | "post-clone";
 
 export type LiveBootstrapOptions = {
   command: LiveBootstrapCommand;
@@ -26,7 +26,7 @@ export type LiveBootstrapDeps = {
 };
 
 function isOfficialUrl(url: string): boolean {
-  return url === officialBootstrapUrl;
+  return url === officialBootstrapUrl || url === officialPostCloneUrl;
 }
 
 async function defaultFetchText(url: string): Promise<string> {

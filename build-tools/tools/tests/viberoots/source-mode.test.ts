@@ -147,6 +147,7 @@ test("viberoots help and bash completion are generated from command metadata", a
     "bootstrap-check",
     "bootstrap",
     "update",
+    "post-clone",
     "gc",
     "resource-graph",
     "init-consumer",
@@ -163,7 +164,7 @@ test("viberoots help and bash completion are generated from command metadata", a
   assert.match(completion.stdout, /_viberoots\(\)/);
   assert.match(
     completion.stdout,
-    /status develop init-workspace bootstrap-check bootstrap update gc resource-graph init-consumer use-submodule use-flake remove-submodule completion help/,
+    /status develop init-workspace bootstrap-check bootstrap update post-clone gc resource-graph init-consumer use-submodule use-flake remove-submodule completion help/,
   );
   assert.match(completion.stdout, /complete -F _viberoots viberoots/);
   assert.match(completion.stdout, /complete -F _viberoots vbr/);

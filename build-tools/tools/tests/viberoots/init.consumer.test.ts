@@ -160,10 +160,15 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
       /builtins\.getEnv "WORKSPACE_ROOT"/,
     );
-    assert.match(
-      await fsp.readFile(path.join(workspace, "README.md"), "utf8"),
-      /viberoots\/README\.md/,
-    );
+    const readme = await fsp.readFile(path.join(workspace, "README.md"), "utf8");
+    assert.match(readme, /viberoots\/README\.md/);
+    assert.match(readme, /Existing Checkout \/ New Workstation/);
+    assert.match(readme, /Use viberoots' post-clone script/);
+    assert.match(readme, /repairs local ignored workspace state from the checked-in lock/);
+    assert.match(readme, /runs the initial\s+install step/);
+    assert.match(readme, /does not advance the pinned viberoots input/);
+    assert.match(readme, /curl -fsSL https:\/\/viberoots\.dev\/post-clone \| bash/);
+    assert.match(readme, /b && v/);
     assert.match(
       await fsp.readFile(path.join(workspace, "projects", "README.md"), "utf8"),
       /Project and application source/,

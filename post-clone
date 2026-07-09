@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export VBR_POST_CLONE="${VBR_POST_CLONE:-1}"
+exec bash -s "$@" < <(curl -fsSL https://viberoots.dev/bootstrap)
