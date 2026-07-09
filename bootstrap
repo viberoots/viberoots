@@ -277,6 +277,56 @@ git_is_usable() {
   command -v git >/dev/null 2>&1 && git --version >/dev/null 2>&1
 }
 
+is_macos() {
+  [[ "$(uname -s 2>/dev/null || true)" == "Darwin" ]]
+}
+
+macos_developer_tools_ready() {
+  command -v xcode-select >/dev/null 2>&1 || return 1
+  command -v xcrun >/dev/null 2>&1 || return 1
+  xcode-select -p >/dev/null 2>&1 || return 1
+  xcrun --find clang >/dev/null 2>&1 || return 1
+  xcrun --sdk macosx --show-sdk-path >/dev/null 2>&1 || return 1
+}
+
+ensure_macos_developer_tools() {
+  is_macos || return 0
+  if macos_developer_tools_ready; then
+    ui_ok "xcode" "developer tools ready"
+    return 0
+  fi
+  if ! command -v xcode-select >/dev/null 2>&1; then
+    cat >&2 <<'EOF'
+error: macOS developer tools are required, but xcode-select is not available.
+
+Install Xcode or the Xcode Command Line Tools, then rerun bootstrap.
+EOF
+    exit 1
+  fi
+
+  ui_warn "xcode" "developer tools missing"
+  if xcode-select --install >/dev/null 2>&1; then
+    cat >&2 <<'EOF'
+Started the Xcode Command Line Tools installer.
+
+Complete the Apple installer prompt, then rerun this viberoots command.
+If you prefer full Xcode, install it from the App Store or Apple Developer,
+run `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer`,
+then rerun this command.
+EOF
+    exit 1
+  fi
+
+  cat >&2 <<'EOF'
+error: macOS developer tools are required, but viberoots could not start the installer.
+
+If an Apple installer prompt is already open, complete it, then rerun this command.
+Otherwise run `xcode-select --install` manually, or install full Xcode and select it
+with `sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer`.
+EOF
+  exit 1
+}
+
 ensure_git_metadata_writable() {
   local git_probe
   git_probe="$(git rev-parse --git-path viberoots-bootstrap-write-test 2>/dev/null || true)"
@@ -1138,6 +1188,9 @@ if [[ "${dry_run}" == "1" ]]; then
   ui_set "dry run" "yes"
   echo
   ui_heading "planned actions"
+  if is_macos; then
+    ui_list "verify Xcode Command Line Tools or full Xcode developer tools"
+  fi
   if ! command -v nix >/dev/null 2>&1 && [[ "${install_nix}" == "1" ]]; then
     if [[ "${allow_nix_install}" == "1" ]]; then
       ui_list "install Nix with the Determinate Nix installer"
@@ -1185,6 +1238,8 @@ if [[ "${dry_run}" == "1" ]]; then
   fi
   exit 0
 fi
+
+ensure_macos_developer_tools
 
 if ! command -v nix >/dev/null 2>&1; then
   if [[ "${install_nix}" != "1" ]]; then

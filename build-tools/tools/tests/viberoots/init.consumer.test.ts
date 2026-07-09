@@ -1298,6 +1298,128 @@ test("curlable bootstrap can refuse automatic nix installation", async () => {
   }
 });
 
+test("curlable bootstrap accepts configured macOS developer tools", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-xcode-ready-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    const fakeBin = path.join(workspace, ".fake-bin");
+    const log = path.join(workspace, ".bootstrap.log");
+    await fsp.mkdir(fakeBin, { recursive: true });
+    for (const [name, real] of [
+      ["bash", "/bin/bash"],
+      ["cat", "/bin/cat"],
+      ["mkdir", "/bin/mkdir"],
+      ["mv", "/bin/mv"],
+      ["date", "/bin/date"],
+      ["grep", "/usr/bin/grep"],
+      ["awk", "/usr/bin/awk"],
+      ["sed", "/usr/bin/sed"],
+      ["head", "/usr/bin/head"],
+      ["dirname", "/usr/bin/dirname"],
+      ["basename", "/usr/bin/basename"],
+      ["sh", "/bin/sh"],
+    ]) {
+      await fsp.symlink(real, path.join(fakeBin, name));
+    }
+    await fsp.writeFile(path.join(fakeBin, "uname"), "#!/usr/bin/env bash\nprintf 'Darwin\\n'\n", {
+      mode: 0o755,
+    });
+    await fsp.writeFile(
+      path.join(fakeBin, "xcode-select"),
+      `#!/usr/bin/env bash\nprintf 'xcode-select %s\\n' "$*" >> ${JSON.stringify(log)}\nif [[ "\${1:-}" == "-p" ]]; then printf '/Applications/Xcode.app/Contents/Developer\\n'; exit 0; fi\nif [[ "\${1:-}" == "--install" ]]; then exit 42; fi\nexit 0\n`,
+      { mode: 0o755 },
+    );
+    await fsp.writeFile(
+      path.join(fakeBin, "xcrun"),
+      `#!/usr/bin/env bash\nprintf 'xcrun %s\\n' "$*" >> ${JSON.stringify(log)}\ncase "$*" in\n  "--find clang") printf '/usr/bin/clang\\n'; exit 0 ;;\n  "--sdk macosx --show-sdk-path") printf '/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\\n'; exit 0 ;;\nesac\nexit 1\n`,
+      { mode: 0o755 },
+    );
+    await fsp.writeFile(
+      path.join(fakeBin, "nix"),
+      `#!/usr/bin/env bash\nprintf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}\nexit 0\n`,
+      { mode: 0o755 },
+    );
+    await fsp.writeFile(
+      path.join(fakeBin, "git"),
+      `#!/usr/bin/env bash\nprintf 'git %s\\n' "$*" >> ${JSON.stringify(log)}\nif [[ "$*" == "rev-parse --is-inside-work-tree" ]]; then exit 1; fi\nexit 0\n`,
+      { mode: 0o755 },
+    );
+
+    const { stdout } = await execFileAsync(
+      path.join(viberootsRoot, "bootstrap"),
+      ["--no-run-install"],
+      {
+        cwd: workspace,
+        env: { ...process.env, PATH: fakeBin },
+      },
+    );
+
+    const text = await fsp.readFile(log, "utf8");
+    assert.match(stdout, /ok\s+xcode developer tools ready/);
+    assert.match(text, /xcode-select -p/);
+    assert.match(text, /xcrun --find clang/);
+    assert.doesNotMatch(text, /xcode-select --install/);
+    assert.match(text, /nix run --refresh --accept-flake-config/);
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("curlable bootstrap starts macOS developer tools installer when missing", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-xcode-install-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    const fakeBin = path.join(workspace, ".fake-bin");
+    const log = path.join(workspace, ".bootstrap.log");
+    await fsp.mkdir(fakeBin, { recursive: true });
+    for (const [name, real] of [
+      ["bash", "/bin/bash"],
+      ["cat", "/bin/cat"],
+      ["dirname", "/usr/bin/dirname"],
+      ["basename", "/usr/bin/basename"],
+    ]) {
+      await fsp.symlink(real, path.join(fakeBin, name));
+    }
+    await fsp.writeFile(path.join(fakeBin, "uname"), "#!/usr/bin/env bash\nprintf 'Darwin\\n'\n", {
+      mode: 0o755,
+    });
+    await fsp.writeFile(
+      path.join(fakeBin, "xcode-select"),
+      `#!/usr/bin/env bash\nprintf 'xcode-select %s\\n' "$*" >> ${JSON.stringify(log)}\nif [[ "\${1:-}" == "-p" ]]; then exit 1; fi\nif [[ "\${1:-}" == "--install" ]]; then exit 0; fi\nexit 1\n`,
+      { mode: 0o755 },
+    );
+    await fsp.writeFile(
+      path.join(fakeBin, "xcrun"),
+      `#!/usr/bin/env bash\nprintf 'xcrun %s\\n' "$*" >> ${JSON.stringify(log)}\nexit 1\n`,
+      { mode: 0o755 },
+    );
+    await fsp.writeFile(
+      path.join(fakeBin, "nix"),
+      `#!/usr/bin/env bash\nprintf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}\nexit 0\n`,
+      { mode: 0o755 },
+    );
+
+    await assert.rejects(
+      execFileAsync(path.join(viberootsRoot, "bootstrap"), ["--no-run-install"], {
+        cwd: workspace,
+        env: { ...process.env, PATH: fakeBin },
+      }),
+      /Started the Xcode Command Line Tools installer/,
+    );
+
+    const text = await fsp.readFile(log, "utf8");
+    assert.match(text, /xcode-select -p/);
+    assert.match(text, /xcode-select --install/);
+    assert.doesNotMatch(text, /nix /);
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});
+
 test("curlable bootstrap can drive the submodule mode through the same entrypoint", async () => {
   const workspace = await fsp.realpath(
     await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-submodule-")),
