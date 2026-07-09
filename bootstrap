@@ -209,14 +209,14 @@ Defaults:
   --submodule-url https://github.com/viberoots/viberoots.git
 
 Examples:
-  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | bash
-  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_CONSUMER=submodule bash
-  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_INSTALL_NIX=0 bash
-  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_ALLOW_NIX_INSTALL=1 bash
-  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_RUN_INSTALL=0 bash
-  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_RUN_VALIDATE=1 bash
-  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_DIRENV_ALLOW=0 bash
-  curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_DRY_RUN=1 bash
+  curl -fsSL https://viberoots.dev/bootstrap | bash
+  curl -fsSL https://viberoots.dev/bootstrap | VBR_CONSUMER=submodule bash
+  curl -fsSL https://viberoots.dev/bootstrap | VBR_INSTALL_NIX=0 bash
+  curl -fsSL https://viberoots.dev/bootstrap | VBR_ALLOW_NIX_INSTALL=1 bash
+  curl -fsSL https://viberoots.dev/bootstrap | VBR_RUN_INSTALL=0 bash
+  curl -fsSL https://viberoots.dev/bootstrap | VBR_RUN_VALIDATE=1 bash
+  curl -fsSL https://viberoots.dev/bootstrap | VBR_DIRENV_ALLOW=0 bash
+  curl -fsSL https://viberoots.dev/bootstrap | VBR_DRY_RUN=1 bash
 EOF
   exit 2
 }

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 128" role="img" aria-labelledby="title desc">
+  <title id="title">viberoots</title>
+  <desc id="desc">Static gradient viberoots wordmark.</desc>
+  <defs>
+    <linearGradient id="viberoots-wordmark-gradient" x1="0" x2="760" y1="0" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#2f6bff" />
+      <stop offset="42%" stop-color="#7b3ff2" />
+      <stop offset="72%" stop-color="#b84be3" />
+      <stop offset="100%" stop-color="#f0449a" />
+    </linearGradient>
+  </defs>
+  <rect width="760" height="128" fill="none" />
+  <text
+    x="380"
+    y="92"
+    fill="url(#viberoots-wordmark-gradient)"
+    font-family="JetBrains Mono, Fira Code, SFMono-Regular, Consolas, Liberation Mono, Menlo, monospace"
+    font-size="92"
+    font-weight="800"
+    letter-spacing="-2"
+    text-anchor="middle">viberoots</text>
+</svg>

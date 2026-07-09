@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 
 export const officialBootstrapUrl =
-  "https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap";
+  "https://viberoots.dev/bootstrap";
 
 export type LiveBootstrapCommand = "bootstrap" | "update";
 
@@ -97,7 +97,7 @@ export async function runLiveBootstrap(opts: LiveBootstrapOptions): Promise<void
 
   const source =
     url === officialBootstrapUrl
-      ? "latest bootstrap script from GitHub main"
+      ? "official bootstrap script from viberoots.dev"
       : `bootstrap script from ${url}`;
   console.error(`viberoots ${opts.command}: running ${source}`);
 
@@ -107,7 +107,7 @@ export async function runLiveBootstrap(opts: LiveBootstrapOptions): Promise<void
   } catch (error) {
     if (url === officialBootstrapUrl) {
       throw new Error(
-        `error: could not fetch viberoots bootstrap from GitHub main: ${error instanceof Error ? error.message : String(error)}`,
+        `error: could not fetch viberoots bootstrap from viberoots.dev: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
     throw error;

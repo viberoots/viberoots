@@ -1,10 +1,22 @@
-# viberoots
+<p align="center">
+  <a href="https://viberoots.dev">
+    <img src="https://viberoots.dev/viberoots-logo.svg" alt="viberoots logo" width="220" />
+  </a>
+</p>
+
+<p align="center">
+  <a href="https://viberoots.dev">
+    <img src="docs/assets/viberoots-wordmark.svg" alt="viberoots" width="520" />
+  </a>
+</p>
 
 viberoots is reusable Buck2 + Nix workspace tooling. It provides the development shell, build macros, tool wrappers, scaffolding, templates, deployment helpers, and verification flow consumed by project repositories.
 
+Project site: [viberoots.dev](https://viberoots.dev)
+
 ## Quick Start
 
-Run the bootstrap command below to create or upgrade a workspace. Always fetch bootstrap from `main`; use `VBR_REF` for branch, tag, or ref names and `VBR_REV` for a full commit SHA when choosing the viberoots source the workspace consumes. If Nix is not installed yet, bootstrap uses the official [Determinate Nix Installer](https://determinate.systems/nix-installer/) first. See [Options](#options) before running it if you need a submodule checkout, a non-main ref, a commit pin, a dry run, or validation during setup. In the examples below, `my-project` is the workspace root.
+Run the bootstrap command below to create or upgrade a workspace. Fetch bootstrap from `https://viberoots.dev/bootstrap`; use `VBR_REF` for branch, tag, or ref names and `VBR_REV` for a full commit SHA when choosing the viberoots source the workspace consumes. If Nix is not installed yet, bootstrap uses the official [Determinate Nix Installer](https://determinate.systems/nix-installer/) first. See [Options](#options) before running it if you need a submodule checkout, a non-main ref, a commit pin, a dry run, or validation during setup. In the examples below, `my-project` is the workspace root.
 
 ```text
 my-project/                         # consumer workspace root
@@ -31,7 +43,7 @@ Use this when the project mostly consumes viberoots rather than contributing ups
 
 ```bash
 mkdir my-project && cd my-project
-curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | bash
+curl -fsSL https://viberoots.dev/bootstrap | bash
 ```
 
 **Preferred for upstream contributors: top-level submodule**
@@ -40,7 +52,7 @@ Use this when contributors are likely to patch viberoots and project code togeth
 
 ```bash
 mkdir my-project && cd my-project
-curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | \
+curl -fsSL https://viberoots.dev/bootstrap | \
   VBR_CONSUMER=submodule bash
 ```
 
@@ -62,7 +74,7 @@ Both commands fetch the current bootstrap entrypoint from GitHub `main`, then pa
 | Option                          | Default           | Description                                                                                                                                                                                                |
 | ------------------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `VBR_CONSUMER=flake\|submodule` | `flake`           | Selects source mode.                                                                                                                                                                                       |
-| `VBR_REF=<branch-or-tag>`       | `main`            | Selects the viberoots ref consumed by the workspace. Keep the bootstrap URL on `main` so upgrade migrations stay current.                                                                                  |
+| `VBR_REF=<branch-or-tag>`       | `main`            | Selects the viberoots ref consumed by the workspace. Keep the bootstrap URL on `https://viberoots.dev/bootstrap` so upgrade migrations stay current.                                                        |
 | `VBR_REV=<full-commit-sha>`     | unset             | Pins the viberoots Git revision consumed by the workspace. Short SHAs are rejected to match Nix flake Git URL behavior.                                                                                    |
 | `VBR_INSTALL_NIX=0\|1`          | `1`               | Allows bootstrap to manage missing Nix. If Nix is missing, interactive runs prompt before installing and non-interactive runs fail unless install consent is explicit.                                      |
 | `VBR_ALLOW_NIX_INSTALL=0\|1`    | `0`               | Confirms bootstrap may install Nix with the Determinate Nix installer when Nix is missing. Equivalent CLI flag: `--allow-nix-install`.                                                                      |

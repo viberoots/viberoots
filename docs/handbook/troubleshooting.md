@@ -9,7 +9,7 @@
 
 - Missing or uninitialized submodule:
   - Prefer rerunning bootstrap in submodule mode:
-    `curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_CONSUMER=submodule bash`
+    `curl -fsSL https://viberoots.dev/bootstrap | VBR_CONSUMER=submodule bash`
   - This initializes the submodule when needed, points `.viberoots/current` at `../viberoots`,
     repairs hidden workspace/devshell files, and runs any current bootstrap migration checks.
 - Dirty submodule:

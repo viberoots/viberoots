@@ -262,7 +262,7 @@ mode:
 An external consumer should keep `viberoots/` as a submodule during the private extraction phase:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | \
+curl -fsSL https://viberoots.dev/bootstrap | \
   VBR_CONSUMER=submodule bash
 ```
 
@@ -275,7 +275,7 @@ Remote mode bootstraps through the same latest-main bootstrap entrypoint because
 viberoots source checkout:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | bash
+curl -fsSL https://viberoots.dev/bootstrap | bash
 ```
 
 The bootstrap command writes the canonical consumer `.buckconfig`, `.buckroot`, `.envrc`, and hidden
@@ -738,10 +738,10 @@ The activation step should be idempotent and should not rewrite tracked files du
 entry. Tracked bootstrap files should be created or upgraded by the canonical consumer bootstrap:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | bash
-curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_CONSUMER=submodule bash
-curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_REF=<branch-or-tag> bash
-curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_REV=<full-commit-sha> bash
+curl -fsSL https://viberoots.dev/bootstrap | bash
+curl -fsSL https://viberoots.dev/bootstrap | VBR_CONSUMER=submodule bash
+curl -fsSL https://viberoots.dev/bootstrap | VBR_REF=<branch-or-tag> bash
+curl -fsSL https://viberoots.dev/bootstrap | VBR_REV=<full-commit-sha> bash
 ```
 
 `nix develop` may refresh ignored symlinks and caches, but it should not surprise users by changing

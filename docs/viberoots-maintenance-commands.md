@@ -29,7 +29,7 @@ viberoots gc --nix-delete-older-than 7d
 
 ### User Contract
 
-Both commands invoke the latest bootstrap script from GitHub `main`, regardless of the currently installed or checked-out viberoots version.
+Both commands invoke the official bootstrap script from `https://viberoots.dev/bootstrap`, regardless of the currently installed or checked-out viberoots version.
 
 ```bash
 viberoots bootstrap
@@ -45,7 +45,7 @@ The current local CLI should act only as a downloader/launcher. It should not tr
 Default script URL:
 
 ```text
-https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap
+https://viberoots.dev/bootstrap
 ```
 
 The command should allow a test-only or advanced override for local validation:
@@ -118,7 +118,7 @@ Avoid piping directly from `curl` to `bash` inside the implementation. A temp fi
 The command should print a short preflight line before execution:
 
 ```text
-viberoots bootstrap: running latest bootstrap script from GitHub main
+viberoots bootstrap: running official bootstrap script from viberoots.dev
 ```
 
 For non-default `--bootstrap-url`, print:
@@ -131,7 +131,7 @@ viberoots bootstrap: running bootstrap script from <url>
 
 `viberoots bootstrap` intentionally runs code fetched from the bootstrap URL. The default URL is controlled by the viberoots project.
 
-If `--bootstrap-url` is not the official GitHub main URL, require explicit acknowledgement:
+If `--bootstrap-url` is not the official viberoots.dev bootstrap URL, require explicit acknowledgement:
 
 ```bash
 viberoots bootstrap --bootstrap-url <url> --trust-bootstrap-url
@@ -146,7 +146,7 @@ This mirrors the existing submodule URL trust posture.
 If the latest bootstrap script cannot be fetched, fail closed with remediation:
 
 ```text
-error: could not fetch viberoots bootstrap from GitHub main
+error: could not fetch viberoots bootstrap from viberoots.dev
 next: check network access, or run the documented curl command manually when connectivity returns
 ```
 
@@ -508,7 +508,7 @@ viberoots help gc
 - `viberoots bootstrap --dry-run` downloads or resolves the live script path and invokes it with `VBR_DRY_RUN=1`.
 - `viberoots update --dry-run` produces the same launcher behavior as `bootstrap`.
 - CLI flags override environment variables for the launched process.
-- Default URL is GitHub main.
+- Default URL is `https://viberoots.dev/bootstrap`.
 - Custom URL without `--trust-bootstrap-url` is refused.
 - Custom URL with trust is accepted.
 - Fetch failure fails closed and does not fall back to local bootstrap.

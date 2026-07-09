@@ -5,8 +5,8 @@ This guide helps a new contributor land any PR in this plan successfully, follow
 ### 1. Environment setup (direnv + dev shell)
 
 - Prepare or repair viberoots workspace state with the current bootstrap entrypoint:
-  - default remote-flake consumer mode: `curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | bash`
-  - submodule contributor mode: `curl -fsSL https://raw.githubusercontent.com/viberoots/viberoots/main/bootstrap | VBR_CONSUMER=submodule bash`
+  - default remote-flake consumer mode: `curl -fsSL https://viberoots.dev/bootstrap | bash`
+  - submodule contributor mode: `curl -fsSL https://viberoots.dev/bootstrap | VBR_CONSUMER=submodule bash`
   - Always fetch bootstrap from `main`; use `VBR_REF=<branch-or-tag>` for named refs or `VBR_REV=<full-commit-sha>` for commit pins when choosing the viberoots source consumed by the workspace.
   - The bootstrap command is idempotent, runs `direnv allow` and `i` by default, and records crash-safe upgrade intent under `.viberoots/bootstrap/transactions/`.
 - Ensure direnv loads automatically in new shells after bootstrap. If you intentionally skipped the default `VBR_DIRENV_ALLOW=1` path, run `direnv allow` once for the checkout.
