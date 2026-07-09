@@ -599,12 +599,20 @@ async function runOptionalDirenvAllow(workspaceRoot: string): Promise<void> {
 }
 
 async function runInstall(workspaceRoot: string): Promise<void> {
-  await runInherited("direnv", ["exec", workspaceRoot, "i"], workspaceRoot);
+  await runInherited("direnv", ["exec", workspaceRoot, "i"], workspaceRoot, {
+    ...process.env,
+    NIX_PNPM_ALLOW_GENERATE: "1",
+  });
 }
 
-async function runInherited(command: string, args: string[], cwd: string): Promise<void> {
+async function runInherited(
+  command: string,
+  args: string[],
+  cwd: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<void> {
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(command, args, { cwd, stdio: "inherit" });
+    const child = spawn(command, args, { cwd, env, stdio: "inherit" });
     child.on("error", reject);
     child.on("exit", (code, signal) => {
       if (code === 0) {

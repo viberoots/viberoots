@@ -695,7 +695,7 @@ valid_full_rev_or_empty() {
 tracked_file_contains_local_viberoots_source() {
   local file="$1"
   [[ -f "${file}" ]] || return 1
-  grep -Eq 'viberoots\.url[[:space:]]*=[[:space:]]*"(path|git\+file):(\./)?(\.\./\.\./)?(\.viberoots/workspace/)?viberoots(|-flake-input)"' "${file}" ||
+  grep -Eq 'viberoots\.url[[:space:]]*=[[:space:]]*"(path|git\+file):(\./)?(\.\./\.\./)?(\.viberoots/workspace/)?viberoots(-flake-input)?"' "${file}" ||
     grep -Fq -- '--override-input viberoots' "${file}"
 }
 
@@ -1318,12 +1318,12 @@ fi
 
 if [[ "${post_clone}" == "1" && "${run_install}" == "1" && "${install_handled_by_setup}" != "1" ]]; then
   ui_step "install" "running i"
-  direnv exec "${workspace_root}" sh -lc 'i'
+  NIX_PNPM_ALLOW_GENERATE=1 direnv exec "${workspace_root}" sh -lc 'i'
   ui_ok "install" "complete"
 fi
 
 if [[ "${run_validate}" == "1" ]]; then
-  direnv exec "${workspace_root}" sh -lc 'i && b && v'
+  NIX_PNPM_ALLOW_GENERATE=1 direnv exec "${workspace_root}" sh -lc 'i && b && v'
   ui_ok "validation" "complete"
   ui_step "devshell" "direnv may load ${workspace_root}/.envrc now"
 elif [[ "${direnv_allow}" == "1" ]]; then
