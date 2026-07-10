@@ -1625,7 +1625,11 @@ elif [[ "${direnv_allow}" == "1" ]]; then
     fi
     ui_step "terminal" "the shell that ran post-clone may not have Nix, direnv, or viberoots on PATH yet"
   else
-    ui_ok "next" "cd ${workspace_root} && direnv exec . sh -lc 'i && b && v'"
+    if [[ "${run_install}" == "1" ]]; then
+      ui_ok "next" "cd ${workspace_root} && b && v"
+    else
+      ui_ok "next" "cd ${workspace_root} && i && b && v"
+    fi
     ui_step "devshell" "direnv may load ${workspace_root}/.envrc now"
   fi
 else

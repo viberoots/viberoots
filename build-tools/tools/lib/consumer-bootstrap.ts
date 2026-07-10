@@ -12,6 +12,7 @@ import { createCommandUi } from "./command-ui";
 import { direnvStage0, envrc, filterCapturedHostPath } from "./consumer-direnv";
 import { writeIfChanged } from "./fs-helpers";
 import { activateWorkspace } from "./workspace-activation";
+import { repairGeneratedWorkspaceLock } from "./workspace-lock-repair";
 import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 
 const execFileAsync = promisify(execFile);
@@ -257,6 +258,53 @@ function gitLockUrl(url: string): string {
   return url.startsWith("git+") ? url.slice("git+".length) : url;
 }
 
+function normalizeHiddenSubmoduleWorkspaceLockText(
+  opts: InitConsumerOptions,
+  text: string,
+): string {
+  const lock = JSON.parse(text) as {
+    nodes?: Record<
+      string,
+      {
+        locked?: {
+          lastModified?: number;
+          lastModifiedDate?: string;
+          narHash?: string;
+          path?: string;
+          type?: string;
+        };
+        original?: { path?: string; type?: string };
+        parent?: unknown;
+      }
+    >;
+  };
+  const node = lock.nodes?.viberoots;
+  const filteredInput = path.join(
+    opts.workspaceRoot,
+    ".viberoots",
+    "workspace",
+    "viberoots-flake-input",
+  );
+  if (node?.locked?.type === "path" && node.locked.path) {
+    const lockedPath = path.resolve(
+      opts.workspaceRoot,
+      ".viberoots",
+      "workspace",
+      node.locked.path,
+    );
+    if (path.resolve(lockedPath) === path.resolve(filteredInput)) {
+      node.locked.path = "./viberoots-flake-input";
+      delete node.locked.lastModified;
+      delete node.locked.lastModifiedDate;
+      delete node.locked.narHash;
+      node.original = { path: "./viberoots-flake-input", type: "path" };
+      node.parent = [];
+      return `${JSON.stringify(lock, null, 2)}\n`;
+    }
+  }
+  return text;
+}
+
 async function writePortableRootLockForSubmodule(opts: InitConsumerOptions): Promise<boolean> {
   const hiddenLock = path.join(opts.workspaceRoot, ".viberoots", "workspace", "flake.lock");
   if (!(await exists(hiddenLock))) return false;
@@ -295,7 +343,11 @@ async function writePortableRootLockForSubmodule(opts: InitConsumerOptions): Pro
       "utf8",
     );
   } finally {
-    await fsp.writeFile(hiddenLock, hiddenLockText, "utf8");
+    await fsp.writeFile(
+      hiddenLock,
+      normalizeHiddenSubmoduleWorkspaceLockText(opts, hiddenLockText),
+      "utf8",
+    );
   }
   return true;
 }
@@ -863,7 +915,10 @@ Project and application source belongs here.
   });
   await initLocalSprinkleRefValues(opts.workspaceRoot);
 
-  if (opts.lock !== false) await runNixFlakeLock(opts);
+  if (opts.lock !== false) {
+    await runNixFlakeLock(opts);
+    await repairGeneratedWorkspaceLock({ workspaceRoot: opts.workspaceRoot });
+  }
   await markBootstrapScaffoldVisibleToGit(opts.workspaceRoot);
   await repairCurrentSymlinkForBootstrap(opts.workspaceRoot, opts.sourcePath);
   const activation = await activateWorkspace({

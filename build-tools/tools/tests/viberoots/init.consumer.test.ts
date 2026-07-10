@@ -514,16 +514,65 @@ test("viberoots init-consumer locks local submodule workspaces through filtered 
       path.join(fakeBin, "nix"),
       `#!/usr/bin/env bash
 printf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}
+if [[ "\${1:-}" == "flake" && "\${2:-}" == "metadata" ]]; then
+  cat <<'JSON'
+{
+  "locks": {
+    "nodes": {
+      "viberoots": {
+        "locked": {
+          "lastModified": 1,
+          "path": ${JSON.stringify(path.join(workspace, ".viberoots", "workspace", "viberoots-flake-input"))},
+          "type": "path"
+        },
+        "original": {
+          "path": ${JSON.stringify(path.join(workspace, ".viberoots", "workspace", "viberoots-flake-input"))},
+          "type": "path"
+        }
+      }
+    },
+    "root": "root",
+    "version": 7
+  }
+}
+JSON
+  exit 0
+fi
 mkdir -p ${JSON.stringify(path.dirname(hiddenLock))}
+if [[ "$*" == *"git+"*"?rev="* ]]; then
 cat > ${JSON.stringify(hiddenLock)} <<'JSON'
 {
   "nodes": {
     "viberoots": {
       "locked": {
-        "rev": ${JSON.stringify(rev)}
+        "rev": ${JSON.stringify(rev)},
+        "type": "git",
+        "url": "https://github.com/viberoots/viberoots.git"
       },
       "original": {
-        "path": "./viberoots-flake-input",
+        "rev": ${JSON.stringify(rev)},
+        "type": "git",
+        "url": "https://github.com/viberoots/viberoots.git"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
+JSON
+exit 0
+fi
+cat > ${JSON.stringify(hiddenLock)} <<'JSON'
+{
+  "nodes": {
+    "viberoots": {
+      "locked": {
+        "lastModified": 1,
+        "path": ${JSON.stringify(path.join(workspace, ".viberoots", "workspace", "viberoots-flake-input"))},
+        "type": "path"
+      },
+      "original": {
+        "path": ${JSON.stringify(path.join(workspace, ".viberoots", "workspace", "viberoots-flake-input"))},
         "type": "path"
       }
     }
@@ -574,6 +623,8 @@ exit 0
     assert.equal(rootLock.nodes.viberoots.original.type, "git");
     assert.equal(rootLock.nodes.viberoots.original.rev, rev);
     const workspaceLock = JSON.parse(await fsp.readFile(hiddenLock, "utf8"));
+    assert.equal(workspaceLock.nodes.viberoots.locked.path, "./viberoots-flake-input");
+    assert.equal(workspaceLock.nodes.viberoots.locked.lastModified, undefined);
     assert.equal(workspaceLock.nodes.viberoots.original.type, "path");
     assert.equal(workspaceLock.nodes.viberoots.original.path, "./viberoots-flake-input");
     await fsp.stat(
@@ -751,7 +802,7 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
     assert.match(stdout, /ok\s+status bootstrapped/);
     assert.match(stdout, /run\s+source fetching viberoots/);
     assert.match(stdout, /set\s+actions\n\s+- initialized git repository/);
-    assert.match(stdout, /ok\s+next cd .* && direnv exec \. sh -lc 'i && b && v'/);
+    assert.match(stdout, /ok\s+next cd .* && b && v/);
     assert.match(stdout, /run\s+devshell direnv may load .*\/\.envrc now/);
     assert.doesNotMatch(stderr, /fetching Git repository/);
     assert.doesNotMatch(stderr, /remote: Enumerating objects/);
