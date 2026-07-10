@@ -105,6 +105,32 @@ NODE
       validate_exact_store_shape "$out/store"
     }
   '';
+  normalizePnpmStoreScript = ''
+    normalize_pnpm_store_for_fod() {
+      local store_root="$1"
+      [ -d "$store_root" ] || return 0
+      for index_db in "$store_root"/v*/index.db; do
+        [ -f "$index_db" ] || continue
+        echo "[nix] pnpm-store: normalizing sqlite index $index_db" >&2
+        local normalized_db="$TMPDIR/pnpm-store-index.$$.db"
+        local normalized_sql="$TMPDIR/pnpm-store-index.$$.sql"
+        rm -f "$normalized_db" "$normalized_sql"
+        sqlite3 "file:$index_db?mode=ro&immutable=1" <<'SQL' > "$normalized_sql"
+SELECT 'PRAGMA page_size=4096;';
+SELECT 'PRAGMA encoding="UTF-8";';
+SELECT 'CREATE TABLE package_index (key TEXT PRIMARY KEY, data BLOB NOT NULL) WITHOUT ROWID;';
+SELECT 'INSERT INTO package_index(key,data) VALUES(' || quote(key) || ',X' || char(39) || hex(data) || char(39) || ');'
+  FROM package_index
+  ORDER BY key;
+SQL
+        sqlite3 "$normalized_db" < "$normalized_sql"
+        sqlite3 "$normalized_db" 'ANALYZE; VACUUM;'
+        cp "$normalized_db" "$index_db"
+        rm -f "$normalized_db" "$normalized_sql"
+        touch -h -t 197001010000 "$index_db" >/dev/null 2>&1 || true
+      done
+    }
+  '';
   inherit repoRoot repoFsRoot prefetchedStorePathGlobal;
 in {
   mkPnpmStore = { lockfilePath, importerDir, npmrcPath ? null, packageJsonPath ? null, prefetchedStorePath ? prefetchedStorePathGlobal }:
@@ -167,7 +193,7 @@ in {
       pname = "pnpm-store";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
-      nativeBuildInputs = [ node pnpm pnpm10 pkgs.coreutils ];
+      nativeBuildInputs = [ node pnpm pnpm10 pkgs.coreutils pkgs.sqlite ];
       # These outputs are package-cache snapshots, not runtime executables, so generic
       # fixup spends time scanning vendored payloads without improving correctness.
       dontFixup = true;
@@ -319,6 +345,8 @@ in {
             }
             if (root && fs.existsSync(root)) walk(root);
           ' || true
+          ${normalizePnpmStoreScript}
+          normalize_pnpm_store_for_fod "$out/store"
         fi
         # Export lockfile (if present) so downstream consumers can use it without regenerating
         mkdir -p "$out/lockfile"
@@ -378,7 +406,7 @@ in {
       pname = "pnpm-store-unfixed";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
-      nativeBuildInputs = [ node pnpm pnpm10 pkgs.coreutils ];
+      nativeBuildInputs = [ node pnpm pnpm10 pkgs.coreutils pkgs.sqlite ];
       # This unfixed cache output has the same package-store shape as mkPnpmStore above.
       dontFixup = true;
       preferLocalBuild = true;
@@ -533,6 +561,8 @@ in {
             }
             if (root && fs.existsSync(root)) walk(root);
           ' || true
+          ${normalizePnpmStoreScript}
+          normalize_pnpm_store_for_fod "$out/store"
         fi
         # Export lockfile (if present) so downstream consumers can use it without regenerating
         if [ -f pnpm-lock.yaml ]; then

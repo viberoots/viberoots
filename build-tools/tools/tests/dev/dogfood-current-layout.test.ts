@@ -47,7 +47,7 @@ async function assertCommandOnPath(command: string): Promise<string> {
   return assertSuccess(result, `${command} path lookup`);
 }
 
-test("dogfood buckconfig routes viberoots-owned cells through current", async () => {
+test("dogfood buckconfig routes source cells through current and generated cells through workspace", async () => {
   const disallowedOldLayoutPaths = [
     "TESTING.md",
     "TARGETS",
@@ -87,13 +87,14 @@ test("dogfood buckconfig routes viberoots-owned cells through current", async ()
   assert.equal(sections.get("project")?.get("ignore")?.includes(".direnv"), true);
   const expected = new Map([
     ["viberoots", "./.viberoots/current"],
-    ["prelude", "./.viberoots/current/prelude"],
+    ["prelude", "./.viberoots/workspace/prelude"],
     ["toolchains", "./.viberoots/current/toolchains"],
     ["repo_toolchains", "./.viberoots/workspace/toolchains"],
     ["config", "./.viberoots/current/config"],
     ["fbsource", "./.viberoots/current/config/fbsource_stub"],
     ["fbcode", "./.viberoots/current/config/fbcode_stub"],
     ["workspace_providers", "./.viberoots/workspace/providers"],
+    ["workspace_buck", "./.viberoots/workspace/buck"],
   ]);
 
   for (const sectionName of ["repositories", "cells"]) {

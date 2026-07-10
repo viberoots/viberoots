@@ -209,6 +209,20 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (dontFixupMatches.length < 2) {
     throw new Error("store.nix must skip generic fixup work for both pnpm-store cache derivations");
   }
+  const sqliteInputMatches = store.match(/pkgs\.sqlite/g) ?? [];
+  if (sqliteInputMatches.length < 2) {
+    throw new Error("store.nix must make sqlite available to both pnpm-store cache derivations");
+  }
+  if (
+    !store.includes("normalize_pnpm_store_for_fod") ||
+    !store.includes("file:$index_db?mode=ro&immutable=1") ||
+    !store.includes("FROM package_index") ||
+    !store.includes("ORDER BY key") ||
+    !store.includes("ANALYZE; VACUUM;") ||
+    !store.includes('normalize_pnpm_store_for_fod "$out/store"')
+  ) {
+    throw new Error("store.nix must normalize pnpm sqlite index.db for stable FOD hashes");
+  }
   if (!modules.includes('"$verDir/index.db"') || !modules.includes('"$verDir/projects"')) {
     throw new Error(
       "mkNodeModules must preserve pnpm v11 store metadata when seeding offline installs",

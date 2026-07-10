@@ -14,7 +14,7 @@ export type TerminalPromptStreams = {
     isRaw?: boolean;
     setRawMode?: (mode: boolean) => unknown;
   };
-  output: NodeJS.WritableStream;
+  output: NodeJS.WritableStream & { columns?: number };
   close: () => void;
 };
 
@@ -29,22 +29,31 @@ export async function promptTerminalSelect(
   if (!streams.input.isTTY) return await promptSelectLine(message, choices, initialIndex);
   let index = Math.max(0, Math.min(initialIndex, choices.length - 1));
   let rendered = false;
+  let renderedChoiceRows = choices.length;
+  const terminalColumns = () =>
+    typeof streams.output.columns === "number" && streams.output.columns > 0
+      ? streams.output.columns
+      : undefined;
+  const renderedRows = (text: string) => {
+    const columns = terminalColumns();
+    return columns ? Math.max(1, Math.ceil(text.length / columns)) : 1;
+  };
   const render = () => {
     if (!rendered) {
-      streams.output.write(`${message}:\n`);
+      streams.output.write(`${message}:  Up/Down then Enter\n`);
       rendered = true;
     } else {
-      streams.output.write(`\x1b[${choices.length}A`);
+      streams.output.write(`\x1b[${renderedChoiceRows}A`);
     }
+    let nextRenderedChoiceRows = 0;
     choices.forEach((choice, idx) => {
       const selected = idx === index;
       const valueLabel = choice.valueLabel === undefined ? choice.value : choice.valueLabel;
-      streams.output.write(
-        `\r\x1b[K${selected ? ">" : " "} ${choice.label}${valueLabel === false ? "" : ` (${valueLabel})`}${
-          selected ? "  Up/Down then Enter" : ""
-        }\n`,
-      );
+      const line = `${selected ? ">" : " "} ${choice.label}${valueLabel === false ? "" : ` (${valueLabel})`}`;
+      nextRenderedChoiceRows += renderedRows(line);
+      streams.output.write(`\r\x1b[K${line}\n`);
     });
+    renderedChoiceRows = nextRenderedChoiceRows;
   };
   const previousRaw = Boolean(streams.input.isRaw);
   if (typeof streams.input.setRawMode !== "function") {
@@ -53,28 +62,58 @@ export async function promptTerminalSelect(
   let onData: ((chunk: Buffer) => void) | undefined;
   try {
     const selected = new Promise<string>((resolve, reject) => {
+      let pending = "";
+      let settled = false;
+      const finish = (value: string) => {
+        if (settled) return;
+        settled = true;
+        streams.output.write("\n");
+        resolve(value);
+      };
+      const cancel = () => {
+        if (settled) return;
+        settled = true;
+        streams.output.write("\n");
+        reject(new Error(opts.cancelMessage || `${message} cancelled`));
+      };
+      const move = (offset: number) => {
+        index = (index + choices.length + offset) % choices.length;
+        render();
+      };
       onData = (chunk: Buffer) => {
-        const text = chunk.toString("utf8");
-        if (text.includes("\u0003")) {
-          streams.output.write("\n");
-          reject(new Error(opts.cancelMessage || `${message} cancelled`));
-          return;
+        pending += chunk.toString("utf8");
+        while (pending.length > 0) {
+          if (pending.includes("\u0003")) {
+            cancel();
+            return;
+          }
+          const enterIndex = pending.search(/[\r\n]/);
+          const escapeIndex = pending.indexOf("\u001b");
+          if (enterIndex !== -1 && (escapeIndex === -1 || enterIndex < escapeIndex)) {
+            finish(choices[index]?.value || choices[0]!.value);
+            return;
+          }
+          if (pending[0] !== "\u001b") {
+            pending = pending.slice(1);
+            continue;
+          }
+          if (pending === "\u001b" || pending === "\u001b[" || pending === "\u001bO") return;
+          if (pending.startsWith("\u001b[A") || pending.startsWith("\u001bOA")) {
+            pending = pending.slice(3);
+            move(-1);
+            continue;
+          }
+          if (pending.startsWith("\u001b[B") || pending.startsWith("\u001bOB")) {
+            pending = pending.slice(3);
+            move(1);
+            continue;
+          }
+          if (/^\u001b\[[0-9;]*[~A-Za-z]/.test(pending)) {
+            pending = pending.replace(/^\u001b\[[0-9;]*[~A-Za-z]/, "");
+            continue;
+          }
+          pending = pending.slice(1);
         }
-        if (/[\r\n]/.test(text)) {
-          streams.output.write("\n");
-          resolve(choices[index]?.value || choices[0]!.value);
-          return;
-        }
-        let changed = false;
-        if (text.includes("\u001b[A")) {
-          index = (index + choices.length - 1) % choices.length;
-          changed = true;
-        }
-        if (text.includes("\u001b[B")) {
-          index = (index + 1) % choices.length;
-          changed = true;
-        }
-        if (changed) render();
       };
       streams.input.on("data", onData);
     });
@@ -144,7 +183,9 @@ async function promptSelectLine(
 type PromptStreams = TerminalPromptStreams;
 
 function promptStreams(): PromptStreams {
-  return openTtyStreams() || { input: process.stdin, output: process.stderr, close: () => undefined };
+  return (
+    openTtyStreams() || { input: process.stdin, output: process.stderr, close: () => undefined }
+  );
 }
 
 function promptTtyStreams() {
