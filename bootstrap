@@ -1358,20 +1358,40 @@ append_trusted_nix_user() {
   local user="$1"
   local custom_conf="/etc/nix/nix.custom.conf"
   local conf="/etc/nix/nix.conf"
-  local target="${custom_conf}"
-  if [[ -e "${conf}" && ! -e "${custom_conf}" ]] && ! grep -Eq '^[[:space:]]*!include[[:space:]]+nix\.custom\.conf([[:space:]]|$)' "${conf}" 2>/dev/null; then
-    target="${conf}"
-  fi
   local script
   script="$(cat <<'PY'
 import pathlib
 import sys
 
-path = pathlib.Path(sys.argv[1])
-user = sys.argv[2]
-path.parent.mkdir(parents=True, exist_ok=True)
-text = path.read_text() if path.exists() else ""
-lines = text.splitlines()
+conf = pathlib.Path(sys.argv[1])
+custom_conf = pathlib.Path(sys.argv[2])
+user = sys.argv[3]
+
+def read_text(path):
+    return path.read_text() if path.exists() else ""
+
+def write_if_changed(path, text):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    old_text = read_text(path)
+    if text != old_text:
+        path.write_text(text)
+
+def split_lines(text):
+    return text.splitlines()
+
+conf_text = read_text(conf)
+conf_lines = split_lines(conf_text)
+has_custom_include = any(
+    line.strip().split()[:2] == ["!include", "nix.custom.conf"] for line in conf_lines
+)
+if not has_custom_include:
+    if conf_lines and conf_lines[-1].strip():
+        conf_lines.append("")
+    conf_lines.append("!include nix.custom.conf")
+    write_if_changed(conf, "\n".join(conf_lines) + "\n")
+
+custom_text = read_text(custom_conf)
+lines = split_lines(custom_text)
 for i, line in enumerate(lines):
     stripped = line.strip()
     if stripped.startswith("extra-trusted-users") and "=" in stripped:
@@ -1386,11 +1406,10 @@ else:
         lines.append("")
     lines.append(f"extra-trusted-users = {user}")
 new_text = "\n".join(lines) + "\n"
-if new_text != text:
-    path.write_text(new_text)
+write_if_changed(custom_conf, new_text)
 PY
 )"
-  printf '%s\n' "${script}" | sudo python3 - "${target}" "${user}"
+  printf '%s\n' "${script}" | sudo python3 - "${conf}" "${custom_conf}" "${user}"
 }
 
 restart_nix_daemon() {

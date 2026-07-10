@@ -287,8 +287,9 @@ Determinate Nix installer. Interactive runs ask for confirmation first; non-inte
 entirely. Bootstrap can also add the current user to Nix trusted users with
 `VBR_TRUST_NIX_USER=1` or `--trust-nix-user`, and defaults to prompting in interactive sessions so
 viberoots' generated `NIX_CONFIG` can use restricted settings such as an empty `build-hook` without
-daemon warnings. It writes local Determinate Nix changes to `/etc/nix/nix.custom.conf` when that file
-is included by `/etc/nix/nix.conf`. It also creates the canonical `projects/` directory, runs
+daemon warnings. It writes bootstrap-managed local Nix changes to `/etc/nix/nix.custom.conf` and
+adds `!include nix.custom.conf` to `/etc/nix/nix.conf` when needed. It also creates the canonical
+`projects/` directory, runs
 `direnv allow` unless
 `VBR_DIRENV_ALLOW=0` is used, and runs `i` unless `VBR_RUN_INSTALL=0` is used. It can also run `b &&
 v` when `VBR_RUN_VALIDATE=1` is used. It prints the resolved plan before setup, supports
