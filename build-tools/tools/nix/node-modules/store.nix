@@ -73,6 +73,38 @@ NODE
       printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
     }
   '';
+  bootstrapExactStoreFetchScript = label: ''
+    fetch_exact_store_for_bootstrap() {
+      echo "[nix] ${label}: exact prefetched store missing but allow-generate=1; fetching store from lockfile" >&2
+      mkdir -p "$out/store"
+      local pnpm_log="$TMPDIR/${label}-bootstrap-exact-store.log"
+      set +e
+      timeout "$IT"s env CI="1" NODE_OPTIONS="--no-warnings" PNPM_HOME="$PNPM_HOME" "$PNPM_BIN" install \
+        --force \
+        --frozen-lockfile \
+        --ignore-scripts \
+        --ignore-pnpmfile \
+        --prefer-offline \
+        --network-concurrency 1 \
+        --child-concurrency 1 \
+        --prod=false \
+        --lockfile-dir "." \
+        --dir "." \
+        --store-dir "$out/store" \
+        --reporter=append-only \
+        --color never \
+        $PNPM_TRUST_LOCKFILE_ARG >"$pnpm_log" 2>&1
+      local status="$?"
+      set -e
+      if [ "$status" -ne 0 ]; then
+        echo "[nix] ${label}: bootstrap exact-store fetch failed with status $status" >&2
+        cat "$pnpm_log" >&2 || true
+        exit "$status"
+      fi
+      rm -rf node_modules
+      validate_exact_store_shape "$out/store"
+    }
+  '';
   inherit repoRoot repoFsRoot prefetchedStorePathGlobal;
 in {
   mkPnpmStore = { lockfilePath, importerDir, npmrcPath ? null, packageJsonPath ? null, prefetchedStorePath ? prefetchedStorePathGlobal }:
@@ -114,12 +146,15 @@ in {
       ftVal = let v = builtins.getEnv "NIX_PNPM_FETCH_TIMEOUT"; in if v != "" then v else "600";
       installTimeoutVal = let v = builtins.getEnv "NIX_PNPM_INSTALL_TIMEOUT"; in if v != "" then v else "1800";
       # Choose FOD hashing strategy:
-      # - When a lockfile is present (in live FS or flake snapshot), fix the output hash to the lockfile hash.
-      # - When lockfile is missing and generation is allowed, do NOT fix the output hash (non-FOD) to avoid hash mismatch.
+      # - When a lockfile is present and an exact store is supplied, fix the output hash to the lockfile hash.
+      # - When bootstrap generation is allowed without an exact store, do NOT fix the output hash
+      #   because the derivation may have to synthesize the missing store.
       # - When lockfile is missing and generation is not allowed, keep a placeholder FOD digest to preserve previous behavior.
       genAllowed = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
       fixHashAttrs =
-        if (hasLockFs || hasLockStore) then {
+        if genAllowed && exactPrefetchedInput == null then {
+          # Non-FOD during first-run bootstrap provisioning.
+        } else if (hasLockFs || hasLockStore) then {
           outputHashMode = "recursive";
           outputHash = outHash;
         } else if genAllowed then {
@@ -247,6 +282,9 @@ in {
           echo "[nix] mkPnpmStore: validating exact prefetched store shape after prior pnpm install (offline exact-store)"
           validate_exact_store_shape "$out/store"
           echo "[nix] mkPnpmStore: exact prefetched store validated"
+        elif [ "${if genAllowed then "1" else "0"}" = "1" ]; then
+          ${bootstrapExactStoreFetchScript "mkPnpmStore"}
+          fetch_exact_store_for_bootstrap
         else
           echo "[nix] mkPnpmStore: missing exact prefetched store for locked offline build. Run 'i' to refresh pnpm hashes and prewarm exact pnpm stores." >&2
           exit 5
@@ -458,6 +496,9 @@ in {
           cp -R "$LOCAL_STORE/." "$out/store/"
           chmod -R u+rwX "$out/store" || true
           echo "[nix] mkPnpmStoreUnfixed: exact prefetched store validated"
+        elif [ "${builtins.getEnv "NIX_PNPM_ALLOW_GENERATE"}" = "1" ]; then
+          ${bootstrapExactStoreFetchScript "mkPnpmStoreUnfixed"}
+          fetch_exact_store_for_bootstrap
         else
           echo "[nix] mkPnpmStoreUnfixed: missing exact prefetched store for locked offline build. Run 'i' to refresh pnpm hashes and prewarm exact pnpm stores." >&2
           exit 5
