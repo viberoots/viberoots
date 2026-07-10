@@ -216,6 +216,21 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
       await fsp.readFile(direnvLog, "utf8"),
       `NIX_PNPM_ALLOW_GENERATE=1 allow ${workspace}\nNIX_PNPM_ALLOW_GENERATE=1 exec ${workspace} i\n`,
     );
+    await fsp.writeFile(direnvLog, "", "utf8");
+    await execFileAsync(path.join(workspace, "viberoots", "init"), ["--run-install"], {
+      cwd: workspace,
+      env: {
+        ...process.env,
+        PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
+        HOME: fakeHome,
+        NO_DEV_SHELL: "1",
+        VBR_INIT_USE_LOCAL_COMMAND: "1",
+      },
+    });
+    assert.equal(
+      await fsp.readFile(direnvLog, "utf8"),
+      `NIX_PNPM_ALLOW_GENERATE= allow ${workspace}\nNIX_PNPM_ALLOW_GENERATE= exec ${workspace} i\n`,
+    );
     assert.deepEqual(await visibleRootEntries(workspace), [
       "README.md",
       "flake.nix",

@@ -1034,12 +1034,8 @@ run_migrations() {
   fi
 }
 
-run_nix_init_consumer() {
-  local init_tool_url="${viberoots_url}"
-  if [[ "${post_clone}" == "1" ]]; then
-    init_tool_url="${bootstrap_tool_url:-git+https://github.com/viberoots/viberoots.git?ref=main}"
-  fi
-  ui_step "source" "fetching viberoots"
+run_nix_init_consumer_command() {
+  local init_tool_url="$1"
   nix run --refresh --accept-flake-config "${init_tool_url}#viberoots" -- \
     init-consumer \
     --mode flake \
@@ -1065,6 +1061,19 @@ run_nix_init_consumer() {
         printf '%s\n' "${line}" >&2
       done
     )
+}
+
+run_nix_init_consumer() {
+  local init_tool_url="${viberoots_url}"
+  if [[ "${post_clone}" == "1" ]]; then
+    init_tool_url="${bootstrap_tool_url:-git+https://github.com/viberoots/viberoots.git?ref=main}"
+  fi
+  ui_step "source" "fetching viberoots"
+  if [[ "${post_clone}" == "1" ]]; then
+    VBR_BOOTSTRAP_PNPM_GENERATE=1 run_nix_init_consumer_command "${init_tool_url}"
+  else
+    run_nix_init_consumer_command "${init_tool_url}"
+  fi
 }
 
 required_bootstrap_files_present() {
@@ -1383,11 +1392,19 @@ EOF
       record_action "checked out ${ref}"
     fi
   fi
-  ./viberoots/init \
-    --mode submodule \
-    --workspace-name "${workspace_name}" \
-    ${run_install_flag:+"${run_install_flag}"} \
-    ${direnv_allow_flag:+"${direnv_allow_flag}"}
+  if [[ "${post_clone}" == "1" ]]; then
+    VBR_BOOTSTRAP_PNPM_GENERATE=1 ./viberoots/init \
+      --mode submodule \
+      --workspace-name "${workspace_name}" \
+      ${run_install_flag:+"${run_install_flag}"} \
+      ${direnv_allow_flag:+"${direnv_allow_flag}"}
+  else
+    ./viberoots/init \
+      --mode submodule \
+      --workspace-name "${workspace_name}" \
+      ${run_install_flag:+"${run_install_flag}"} \
+      ${direnv_allow_flag:+"${direnv_allow_flag}"}
+  fi
   record_action "ran ./viberoots/init"
   if [[ "${run_install}" == "1" ]]; then
     install_handled_by_setup=1
