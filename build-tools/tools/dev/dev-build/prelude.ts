@@ -22,7 +22,7 @@ export async function ensureBuckPreludeConfig(root: string): Promise<boolean> {
     try {
       const rootCfgPath = path.join(root, ".buckconfig");
       const preludeFileExists = await pathExists(
-        path.join(root, ".viberoots", "current", "prelude", "prelude.bzl"),
+        path.join(root, ".viberoots", "workspace", "prelude", "prelude.bzl"),
       );
       const rootCfgExists = await pathExists(rootCfgPath);
       const workspaceProvidersCfgExists = await pathExists(
@@ -66,7 +66,7 @@ name = TARGETS
 [repositories]
 root = .
 viberoots = ./.viberoots/current
-prelude = ./.viberoots/current/prelude
+prelude = ./.viberoots/workspace/prelude
 toolchains = ./.viberoots/current/toolchains
 repo_toolchains = ./.viberoots/workspace/toolchains
 fbsource = ./.viberoots/current/config/fbsource_stub
@@ -78,7 +78,7 @@ workspace_buck = ./.viberoots/workspace/buck
 [cells]
 root = .
 viberoots = ./.viberoots/current
-prelude = ./.viberoots/current/prelude
+prelude = ./.viberoots/workspace/prelude
 toolchains = ./.viberoots/current/toolchains
 repo_toolchains = ./.viberoots/workspace/toolchains
 fbsource = ./.viberoots/current/config/fbsource_stub
