@@ -589,7 +589,10 @@ async function setupDirenvIfNeeded(opts: {
 async function runOptionalDirenvAllow(workspaceRoot: string): Promise<void> {
   const ui = createCommandUi();
   try {
-    await execFileAsync("direnv", ["allow", workspaceRoot], { cwd: workspaceRoot });
+    await execFileAsync("direnv", ["allow", workspaceRoot], {
+      cwd: workspaceRoot,
+      env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
+    });
     ui.ok("direnv allowed", workspaceRoot);
   } catch {
     console.error("direnv is not installed or not on PATH, or direnv allow failed.");
