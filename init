@@ -29,11 +29,14 @@ init_args=(
   --workspace-root "${workspace_root}"
   --viberoots-url "path:${viberoots_flake_input_dir}"
   --source "${viberoots_dir}"
-  --no-lock
 )
 
 if [[ "${has_workspace_name}" != "1" ]]; then
   init_args+=(--workspace-name "${workspace_name}")
+fi
+
+if [[ "${VBR_POST_CLONE:-0}" == "1" || "${VIBEROOTS_POST_CLONE:-0}" == "1" ]]; then
+  init_args+=(--no-lock)
 fi
 
 init_args+=("$@")

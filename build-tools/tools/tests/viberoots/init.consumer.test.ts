@@ -234,6 +234,7 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     );
     assert.deepEqual(await visibleRootEntries(workspace), [
       "README.md",
+      "flake.lock",
       "flake.nix",
       "projects",
       "viberoots",
@@ -322,6 +323,7 @@ test("viberoots/init uses the flake command before host node is available", asyn
     assert.match(text, /--workspace-root .*viberoots-init-nix-command-/);
     assert.match(text, /--source .*\/viberoots/);
     assert.match(text, /--setup-direnv never/);
+    assert.doesNotMatch(text, /--no-lock/);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }
@@ -502,10 +504,36 @@ test("viberoots init-consumer locks local submodule workspaces through filtered 
   await withConsumerWorkspace("viberoots-init-filtered-lock", async (workspace, viberootsRoot) => {
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".nix.log");
+    const hiddenLock = path.join(workspace, ".viberoots", "workspace", "flake.lock");
+    const { stdout: revStdout } = await execFileAsync("git", ["rev-parse", "HEAD"], {
+      cwd: viberootsRoot,
+    });
+    const rev = revStdout.trim();
     await fsp.mkdir(fakeBin, { recursive: true });
     await fsp.writeFile(
       path.join(fakeBin, "nix"),
-      `#!/usr/bin/env bash\nprintf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}\nexit 0\n`,
+      `#!/usr/bin/env bash
+printf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}
+mkdir -p ${JSON.stringify(path.dirname(hiddenLock))}
+cat > ${JSON.stringify(hiddenLock)} <<'JSON'
+{
+  "nodes": {
+    "viberoots": {
+      "locked": {
+        "rev": ${JSON.stringify(rev)}
+      },
+      "original": {
+        "path": "./viberoots-flake-input",
+        "type": "path"
+      }
+    }
+  },
+  "root": "root",
+  "version": 7
+}
+JSON
+exit 0
+`,
       { mode: 0o755 },
     );
 
@@ -541,6 +569,13 @@ test("viberoots init-consumer locks local submodule workspaces through filtered 
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
       /viberoots\.url = "path:\.\/viberoots-flake-input";/,
     );
+    const rootLock = JSON.parse(await fsp.readFile(path.join(workspace, "flake.lock"), "utf8"));
+    assert.equal(rootLock.nodes.viberoots.locked.rev, rev);
+    assert.equal(rootLock.nodes.viberoots.original.type, "git");
+    assert.equal(rootLock.nodes.viberoots.original.rev, rev);
+    const workspaceLock = JSON.parse(await fsp.readFile(hiddenLock, "utf8"));
+    assert.equal(workspaceLock.nodes.viberoots.original.type, "path");
+    assert.equal(workspaceLock.nodes.viberoots.original.path, "./viberoots-flake-input");
     await fsp.stat(
       path.join(workspace, ".viberoots", "workspace", "viberoots-flake-input", "flake.nix"),
     );
@@ -2221,6 +2256,7 @@ test("viberoots/init handles missing direnv before devshell activation", async (
     await fsp.mkdir(fakeBin, { recursive: true });
     await fsp.symlink("/bin/bash", path.join(fakeBin, "bash"));
     await fsp.symlink(process.execPath, path.join(fakeBin, "node"));
+    await fsp.writeFile(path.join(fakeBin, "nix"), "#!/bin/bash\nexit 0\n", { mode: 0o755 });
     const pathWithoutDirenv = [fakeBin, "/bin", "/usr/bin"].join(path.delimiter);
 
     const { stdout, stderr } = await execFileAsync(

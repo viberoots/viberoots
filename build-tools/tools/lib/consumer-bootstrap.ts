@@ -216,6 +216,90 @@ async function prepareFilteredViberootsInput(
   return filtered;
 }
 
+async function gitOutput(args: string[], cwd: string): Promise<string> {
+  try {
+    const { stdout } = await execFileAsync("git", args, { cwd });
+    return String(stdout || "").trim();
+  } catch {
+    return "";
+  }
+}
+
+async function localViberootsRevision(opts: InitConsumerOptions): Promise<string> {
+  const sourcePath = opts.sourcePath ? path.resolve(opts.workspaceRoot, opts.sourcePath) : "";
+  if (!sourcePath) return "";
+  return gitOutput(["rev-parse", "HEAD"], sourcePath);
+}
+
+async function submoduleRemoteUrl(opts: InitConsumerOptions): Promise<string> {
+  return (
+    (await gitOutput(
+      ["config", "-f", ".gitmodules", "--get", "submodule.viberoots.url"],
+      opts.workspaceRoot,
+    )) ||
+    (opts.sourcePath
+      ? await gitOutput(
+          ["remote", "get-url", "origin"],
+          path.resolve(opts.workspaceRoot, opts.sourcePath),
+        )
+      : "") ||
+    "https://github.com/viberoots/viberoots.git"
+  );
+}
+
+function gitFlakeUrl(url: string, rev: string): string {
+  const base = url.startsWith("git+") ? url : `git+${url}`;
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}rev=${rev}`;
+}
+
+function gitLockUrl(url: string): string {
+  return url.startsWith("git+") ? url.slice("git+".length) : url;
+}
+
+async function writePortableRootLockForSubmodule(opts: InitConsumerOptions): Promise<boolean> {
+  const hiddenLock = path.join(opts.workspaceRoot, ".viberoots", "workspace", "flake.lock");
+  if (!(await exists(hiddenLock))) return false;
+  const hiddenLockText = await fsp.readFile(hiddenLock, "utf8");
+  const rev = await localViberootsRevision(opts);
+  if (!/^[0-9a-f]{40}$/i.test(rev)) return false;
+  const remoteUrl = await submoduleRemoteUrl(opts);
+  const workspaceFlake = `path:${path.join(opts.workspaceRoot, ".viberoots", "workspace")}`;
+  await execFileAsync(
+    "nix",
+    [
+      "flake",
+      "lock",
+      "--accept-flake-config",
+      "--override-input",
+      "viberoots",
+      gitFlakeUrl(remoteUrl, rev),
+      workspaceFlake,
+    ],
+    { cwd: opts.workspaceRoot, maxBuffer: 1024 * 1024 * 16 },
+  );
+  try {
+    const portableLock = JSON.parse(await fsp.readFile(hiddenLock, "utf8")) as {
+      nodes?: Record<string, { original?: Record<string, unknown> }>;
+    };
+    const node = portableLock.nodes?.viberoots;
+    if (!node) return false;
+    node.original = {
+      rev,
+      type: "git",
+      url: gitLockUrl(remoteUrl),
+    };
+    await fsp.writeFile(
+      path.join(opts.workspaceRoot, "flake.lock"),
+      `${JSON.stringify(portableLock, null, 2)}\n`,
+      "utf8",
+    );
+  } finally {
+    await fsp.writeFile(hiddenLock, hiddenLockText, "utf8");
+  }
+  return true;
+}
+
 async function ensureGitignoreEntries(workspaceRoot: string): Promise<void> {
   const file = path.join(workspaceRoot, ".gitignore");
   let current = "";
@@ -703,6 +787,9 @@ async function runNixFlakeLock(opts: InitConsumerOptions): Promise<void> {
   }
   const hiddenLock = path.join(opts.workspaceRoot, ".viberoots", "workspace", "flake.lock");
   if (!isPostCloneBootstrap(opts) && (await exists(hiddenLock))) {
+    if (usesLocalSubmoduleSource(opts)) {
+      if (await writePortableRootLockForSubmodule(opts)) return;
+    }
     await fsp.copyFile(hiddenLock, path.join(opts.workspaceRoot, "flake.lock"));
   }
 }
