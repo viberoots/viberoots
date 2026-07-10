@@ -50,8 +50,6 @@ export async function promptTerminalSelect(
   if (typeof streams.input.setRawMode !== "function") {
     return await promptSelectLine(message, choices, initialIndex);
   }
-  streams.input.setRawMode(true);
-  streams.input.resume();
   let onData: ((chunk: Buffer) => void) | undefined;
   try {
     const selected = new Promise<string>((resolve, reject) => {
@@ -80,6 +78,8 @@ export async function promptTerminalSelect(
       };
       streams.input.on("data", onData);
     });
+    streams.input.setRawMode(true);
+    streams.input.resume();
     render();
     return await selected;
   } finally {

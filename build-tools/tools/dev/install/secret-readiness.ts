@@ -72,6 +72,11 @@ type ReadinessSprinkleRefConfig = {
 
 const deploymentMetadataRoot = path.join("projects", "deployments");
 const familyMetadataSuffix = path.join("shared", "family.bzl");
+const bootstrapFailureMarkerRel = path.join(
+  ".viberoots",
+  "bootstrap",
+  "install-secret-readiness-failed.json",
+);
 
 export async function ensureInstallSecretReadiness(opts: {
   repoRoot: string;
@@ -171,6 +176,13 @@ export async function probeLocalSecretReadiness(
 ) {
   if (!(await isInstallSecretReadinessApplicable(repoRoot))) {
     return { ready: true, reason: "not applicable in this checkout" };
+  }
+  const previousFailure = await readBootstrapFailureMarker(repoRoot);
+  if (previousFailure) {
+    return {
+      ready: false,
+      reason: `previous repo bootstrap failed at ${previousFailure.failedAt}; rerun setup after resolving the failure`,
+    };
   }
   const {
     DEFAULT_BOOTSTRAP_ARGS,
@@ -462,9 +474,88 @@ async function runRepoBootstrap(opts: {
   flags: SecretReadinessFlags;
   deps?: SecretReadinessDeps;
 }) {
-  await (opts.deps?.bootstrap || ((args) => runBootstrap(opts.repoRoot, args)))(
-    bootstrapArgs(opts.flags),
-  );
+  const args = bootstrapArgs(opts.flags);
+  try {
+    await (opts.deps?.bootstrap || ((bootstrapArgv) => runBootstrap(opts.repoRoot, bootstrapArgv)))(
+      args,
+    );
+    await clearBootstrapFailureMarker(opts.repoRoot);
+  } catch (error) {
+    await writeBootstrapFailureMarker(opts.repoRoot, error);
+    throw error;
+  }
+}
+
+type BootstrapFailureMarker = {
+  schemaVersion: "viberoots-install-bootstrap-failure@1";
+  failedAt: string;
+  message: string;
+};
+
+async function readBootstrapFailureMarker(
+  repoRoot: string,
+): Promise<BootstrapFailureMarker | undefined> {
+  try {
+    const parsed = JSON.parse(
+      await fsp.readFile(path.join(repoRoot, bootstrapFailureMarkerRel), "utf8"),
+    ) as Partial<BootstrapFailureMarker>;
+    if (parsed.schemaVersion !== "viberoots-install-bootstrap-failure@1" || !parsed.failedAt) {
+      return {
+        schemaVersion: "viberoots-install-bootstrap-failure@1",
+        failedAt: "unknown time",
+        message: "",
+      };
+    }
+    return {
+      schemaVersion: parsed.schemaVersion,
+      failedAt: parsed.failedAt,
+      message: parsed.message || "",
+    };
+  } catch (error) {
+    if (isFileAbsenceError(error)) return undefined;
+    return {
+      schemaVersion: "viberoots-install-bootstrap-failure@1",
+      failedAt: "unknown time",
+      message: "",
+    };
+  }
+}
+
+async function writeBootstrapFailureMarker(repoRoot: string, error: unknown) {
+  const markerPath = path.join(repoRoot, bootstrapFailureMarkerRel);
+  const marker: BootstrapFailureMarker = {
+    schemaVersion: "viberoots-install-bootstrap-failure@1",
+    failedAt: new Date().toISOString(),
+    message: bootstrapFailureMessage(error),
+  };
+  try {
+    await fsp.mkdir(path.dirname(markerPath), { recursive: true });
+    await fsp.writeFile(markerPath, `${JSON.stringify(marker, null, 2)}\n`);
+  } catch {
+    // Preserve the original bootstrap failure as the actionable error.
+  }
+}
+
+async function clearBootstrapFailureMarker(repoRoot: string) {
+  try {
+    await fsp.rm(path.join(repoRoot, bootstrapFailureMarkerRel), { force: true });
+  } catch {
+    // A stale marker is inconvenient but should not fail a successful bootstrap.
+  }
+}
+
+function bootstrapFailureMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return redactBootstrapFailureMessage(message).slice(0, 1000);
+}
+
+function redactBootstrapFailureMessage(message: string) {
+  return message
+    .replace(
+      /(access[_-]?token|client[_-]?secret|token|secret)(["'\s:=]+)[^"'\s,}]+/gi,
+      "$1$2[redacted]",
+    )
+    .replace(/Bearer\s+[A-Za-z0-9._~+/-]+=*/gi, "Bearer [redacted]");
 }
 
 async function runLocalReset(

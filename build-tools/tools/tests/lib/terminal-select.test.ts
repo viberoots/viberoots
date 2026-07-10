@@ -70,11 +70,38 @@ test("terminal selector handles first arrow key typed during initial render", as
   }
 });
 
+test("terminal selector handles input emitted while resuming raw input", async () => {
+  const input = new FakeTtyInput("\r");
+  const output = new CaptureOutput();
+  try {
+    const selected = promptTerminalSelect(
+      "Select item",
+      [
+        { label: "First", value: "first" },
+        { label: "Second", value: "second" },
+      ],
+      0,
+      { streams: { input, output, close: () => undefined } },
+    );
+    assert.equal(await withTimeout(selected), "first");
+    assert.equal(input.rawMode, false);
+    assert.equal(input.paused, true);
+  } finally {
+    input.destroy();
+  }
+});
+
 class FakeTtyInput extends PassThrough {
   isTTY = true;
   isRaw = false;
   paused = true;
   rawMode = false;
+  private readonly resumeData?: string;
+
+  constructor(resumeData?: string) {
+    super();
+    this.resumeData = resumeData;
+  }
 
   setRawMode(value: boolean) {
     this.isRaw = value;
@@ -84,6 +111,7 @@ class FakeTtyInput extends PassThrough {
 
   resume() {
     this.paused = false;
+    if (this.resumeData) this.emit("data", Buffer.from(this.resumeData));
     return super.resume();
   }
 
@@ -94,6 +122,20 @@ class FakeTtyInput extends PassThrough {
 
   isPaused() {
     return this.paused;
+  }
+}
+
+async function withTimeout<T>(promise: Promise<T>): Promise<T> {
+  let timeout: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error("selection timed out")), 100);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
 }
 

@@ -160,6 +160,65 @@ test("install secret readiness forwards interactive secret backend selection", a
   });
 });
 
+test("install secret readiness retries after a failed bootstrap even when partial credentials exist", async () => {
+  await withRepo(async (repoRoot) => {
+    await writeResolver(repoRoot);
+    const calls: string[][] = [];
+    await assert.rejects(
+      ensureInstallSecretReadiness({
+        repoRoot,
+        dryRun: false,
+        verbose: false,
+        flags: baseFlags,
+        deps: {
+          isInteractive: () => true,
+          prompt: async () => true,
+          bootstrap: async (args) => {
+            calls.push(args);
+            throw new Error("Infisical project test-project was not found");
+          },
+          selectSecretBackend: async () => "infisical/default",
+        },
+      }),
+      /Infisical project test-project was not found/,
+    );
+    await writeCredentials(repoRoot);
+    calls.length = 0;
+    const prompts: string[] = [];
+    await ensureInstallSecretReadiness({
+      repoRoot,
+      dryRun: false,
+      verbose: false,
+      flags: baseFlags,
+      deps: {
+        isInteractive: () => true,
+        prompt: async (message) => {
+          prompts.push(message);
+          return true;
+        },
+        bootstrap: async (args) => void calls.push(args),
+        selectSecretBackend: async () => "infisical/default",
+      },
+    });
+    assert.deepEqual(prompts, ["Run repo bootstrap now? [Y/n, then Enter] "]);
+    assert.deepEqual(calls, [
+      ["repo", "--yes", "--login-mode", "browser", "--secret-backend", "infisical/default"],
+    ]);
+    calls.length = 0;
+    await ensureInstallSecretReadiness({
+      repoRoot,
+      dryRun: false,
+      verbose: false,
+      flags: baseFlags,
+      deps: {
+        isInteractive: () => false,
+        bootstrap: async (args) => void calls.push(args),
+      },
+    });
+    assert.deepEqual(calls, []);
+  });
+});
+
 test("install secret readiness prompts when resolver config is missing", async () => {
   await withRepo(async (repoRoot) => {
     const calls: string[][] = [];
