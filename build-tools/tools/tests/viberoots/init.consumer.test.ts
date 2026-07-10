@@ -751,6 +751,58 @@ exit 0
   });
 });
 
+test("viberoots init-consumer repairs submodule current before locking", async () => {
+  await withConsumerWorkspace("viberoots-init-submodule-current-before-lock", async (workspace) => {
+    const fakeBin = path.join(workspace, ".fake-bin");
+    const log = path.join(workspace, ".nix.log");
+    const hiddenLock = path.join(workspace, ".viberoots", "workspace", "flake.lock");
+    await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.writeFile(path.join(workspace, "flake.nix"), "checked-in root flake\n", "utf8");
+    await fsp.writeFile(path.join(workspace, "flake.lock"), "checked-in root lock\n", "utf8");
+    await fsp.writeFile(
+      path.join(fakeBin, "nix"),
+      `#!/usr/bin/env bash
+printf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}
+if [[ "$(readlink .viberoots/current 2>/dev/null || true)" != "../viberoots" ]]; then
+  echo ".viberoots/current was not repaired before nix lock" >&2
+  exit 42
+fi
+mkdir -p ${JSON.stringify(path.dirname(hiddenLock))}
+cat > ${JSON.stringify(hiddenLock)} <<'JSON'
+{"nodes":{"viberoots":{"locked":{"rev":"local-submodule-rev"}}},"root":"root","version":7}
+JSON
+exit 0
+`,
+      { mode: 0o755 },
+    );
+
+    const oldPath = process.env.PATH;
+    const oldNoDevShell = process.env.NO_DEV_SHELL;
+    try {
+      process.env.PATH = `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`;
+      process.env.NO_DEV_SHELL = "1";
+      await initConsumer({
+        workspaceRoot: workspace,
+        workspaceName: "submodule-current-before-lock",
+        viberootsUrl: "path:viberoots",
+        sourceMode: "submodule",
+        sourcePath: "viberoots",
+        allowDirenv: false,
+        postClone: true,
+      });
+    } finally {
+      if (oldPath === undefined) delete process.env.PATH;
+      else process.env.PATH = oldPath;
+      if (oldNoDevShell === undefined) delete process.env.NO_DEV_SHELL;
+      else process.env.NO_DEV_SHELL = oldNoDevShell;
+    }
+
+    assert.match(await fsp.readFile(log, "utf8"), /nix flake lock/);
+    assert.equal(await fsp.readlink(path.join(workspace, ".viberoots", "current")), "../viberoots");
+    assert.match(await fsp.readFile(hiddenLock, "utf8"), /local-submodule-rev/);
+  });
+});
+
 test("curlable bootstrap defaults to flake main and install enabled", async () => {
   const workspace = await fsp.realpath(
     await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-flake-")),

@@ -406,25 +406,31 @@ async function repairCurrentSymlinkForBootstrap(
     path.dirname(currentPath),
     path.resolve(workspaceRoot, sourcePath),
   );
+  let shouldReportRepair = false;
   try {
     const stat = await fsp.lstat(currentPath);
     if (stat.isSymbolicLink()) {
       if ((await fsp.readlink(currentPath)) === target) return;
       await fsp.unlink(currentPath);
-      await fsp.symlink(target, currentPath);
-      console.error(`repair: .viberoots/current now points to ${target}`);
-      return;
+      shouldReportRepair = true;
+    } else {
+      const backupDir = path.join(workspaceRoot, ".viberoots", "workspace", "backups");
+      await fsp.mkdir(backupDir, { recursive: true });
+      const backupFile = path.join(
+        backupDir,
+        `.viberoots__current.${Date.now()}.${process.pid}.bak`,
+      );
+      await fsp.rename(currentPath, backupFile);
+      console.error(
+        `repair: .viberoots/current existed and was not a symlink; moved to ${backupFile}`,
+      );
+      shouldReportRepair = true;
     }
-    const backupDir = path.join(workspaceRoot, ".viberoots", "workspace", "backups");
-    await fsp.mkdir(backupDir, { recursive: true });
-    const backupFile = path.join(backupDir, `.viberoots__current.${Date.now()}.${process.pid}.bak`);
-    await fsp.rename(currentPath, backupFile);
-    console.error(
-      `repair: .viberoots/current existed and was not a symlink; moved to ${backupFile}`,
-    );
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
+  await fsp.symlink(target, currentPath);
+  if (shouldReportRepair) console.error(`repair: .viberoots/current now points to ${target}`);
 }
 
 function buckconfig(mode: ConsumerSourceMode): string {
@@ -915,12 +921,12 @@ Project and application source belongs here.
   });
   await initLocalSprinkleRefValues(opts.workspaceRoot);
 
+  await repairCurrentSymlinkForBootstrap(opts.workspaceRoot, opts.sourcePath);
   if (opts.lock !== false) {
     await runNixFlakeLock(opts);
     await repairGeneratedWorkspaceLock({ workspaceRoot: opts.workspaceRoot });
   }
   await markBootstrapScaffoldVisibleToGit(opts.workspaceRoot);
-  await repairCurrentSymlinkForBootstrap(opts.workspaceRoot, opts.sourcePath);
   const activation = await activateWorkspace({
     start: opts.workspaceRoot,
     env: { ...process.env, WORKSPACE_ROOT: opts.workspaceRoot },
