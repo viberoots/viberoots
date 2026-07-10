@@ -289,6 +289,11 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
       "update-pnpm-hash nix helpers must support explicit streaming of nix builder logs",
     );
   }
+  if (!nixBuildHelpers.includes("withSanitizedInheritedNixConfig")) {
+    throw new Error(
+      "update-pnpm-hash nix helpers must sanitize inherited Nix config before spawning nix",
+    );
+  }
   if (!nixBuildHelpers.includes('VBR_STREAM_NIX_BUILD_LOGS || "").trim() === "1"')) {
     throw new Error(
       "update-pnpm-hash nix helpers must keep install-time nix build logs compact by default; set VBR_STREAM_NIX_BUILD_LOGS=1 to stream them",
@@ -297,6 +302,15 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (nixBuildHelpers.includes('"substituters"')) {
     throw new Error(
       "update-pnpm-hash fixed-store builds must not disable substituters; local builders are controlled separately",
+    );
+  }
+  const exactStoreHelper = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
+    "utf8",
+  );
+  if (!exactStoreHelper.includes("withSanitizedInheritedNixConfig")) {
+    throw new Error(
+      "update-pnpm-hash exact-store helper must sanitize inherited Nix config before spawning nix",
     );
   }
   const verifiedMarker = await fsp.readFile(

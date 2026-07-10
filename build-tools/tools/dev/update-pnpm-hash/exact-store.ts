@@ -9,6 +9,7 @@ import {
   sharedExactPnpmStateRoot,
   sharedExactPnpmStateRootPath,
 } from "../../lib/pnpm-state-paths";
+import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { resolveWorkspaceRootsSync } from "../../lib/repo";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { fetchExactPnpmStore } from "./exact-store-fetch";
@@ -44,6 +45,7 @@ function resolveFlakePnpmProgram(repoRoot: string, timeoutMs: number): string {
   const system = currentHostSystem();
   console.error(`[update-pnpm-hash] resolving flake pnpm program for ${system}`);
   const nixBin = resolveToolPathSync("nix");
+  const nixEnv = withSanitizedInheritedNixConfig({ ...process.env });
   const program = execFileSync(
     nixBin,
     [
@@ -57,6 +59,7 @@ function resolveFlakePnpmProgram(repoRoot: string, timeoutMs: number): string {
     ],
     {
       encoding: "utf8",
+      env: nixEnv,
       timeout: evalTimeoutMs,
     },
   ).trim();
@@ -76,6 +79,7 @@ function resolveFlakePnpmProgram(repoRoot: string, timeoutMs: number): string {
       ],
       {
         encoding: "utf8",
+        env: nixEnv,
         timeout: evalTimeoutMs,
         stdio: "pipe",
       },

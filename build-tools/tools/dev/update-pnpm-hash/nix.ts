@@ -4,6 +4,7 @@ import path from "node:path";
 import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
 import { localOnlyNixBuilderArgs } from "../../lib/nix-builder-policy";
+import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 
 export function extractHash(text: string): string | null {
@@ -19,13 +20,13 @@ function resolvedFetchTimeoutSec(): number {
 }
 
 function envWithFetchTimeout(timeoutSec: number, extraEnv?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  return {
+  return withSanitizedInheritedNixConfig({
     ...process.env,
     // Keep nix-evaluated derivation timeout aligned with managed-process timeout.
     NIX_PNPM_FETCH_TIMEOUT: String(timeoutSec),
     NIX_PNPM_INSTALL_TIMEOUT: String(timeoutSec),
     ...(extraEnv || {}),
-  };
+  });
 }
 
 function exactStoreSandboxArgs(extraEnv?: NodeJS.ProcessEnv): string[] {
