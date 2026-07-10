@@ -7,10 +7,6 @@ import { promptTerminalSelect } from "../../lib/terminal-select";
 test("terminal selector pauses stdin after selection", async () => {
   const input = new FakeTtyInput();
   const output = new CaptureOutput();
-  const originalStdin = process.stdin;
-  const originalStderr = process.stderr;
-  Object.defineProperty(process, "stdin", { value: input, configurable: true });
-  Object.defineProperty(process, "stderr", { value: output, configurable: true });
   try {
     const selected = promptTerminalSelect(
       "Select item",
@@ -19,6 +15,7 @@ test("terminal selector pauses stdin after selection", async () => {
         { label: "Second", value: "second" },
       ],
       0,
+      { streams: { input, output, close: () => undefined } },
     );
     input.write("\u001b[B");
     input.write("\r\n");
@@ -26,8 +23,49 @@ test("terminal selector pauses stdin after selection", async () => {
     assert.equal(input.rawMode, false);
     assert.equal(input.paused, true);
   } finally {
-    Object.defineProperty(process, "stdin", { value: originalStdin, configurable: true });
-    Object.defineProperty(process, "stderr", { value: originalStderr, configurable: true });
+    input.destroy();
+  }
+});
+
+test("terminal selector accepts enter typed during initial render", async () => {
+  const input = new FakeTtyInput();
+  const output = new CaptureOutput(() => input.write("\r"));
+  try {
+    const selected = promptTerminalSelect(
+      "Select item",
+      [
+        { label: "First", value: "first" },
+        { label: "Second", value: "second" },
+      ],
+      0,
+      { streams: { input, output, close: () => undefined } },
+    );
+    assert.equal(await selected, "first");
+    assert.equal(input.rawMode, false);
+    assert.equal(input.paused, true);
+  } finally {
+    input.destroy();
+  }
+});
+
+test("terminal selector handles first arrow key typed during initial render", async () => {
+  const input = new FakeTtyInput();
+  const output = new CaptureOutput(() => input.write("\u001b[B"));
+  try {
+    const selected = promptTerminalSelect(
+      "Select item",
+      [
+        { label: "First", value: "first" },
+        { label: "Second", value: "second" },
+      ],
+      0,
+      { streams: { input, output, close: () => undefined } },
+    );
+    input.write("\r");
+    assert.equal(await selected, "second");
+    assert.equal(input.rawMode, false);
+    assert.equal(input.paused, true);
+  } finally {
     input.destroy();
   }
 });
@@ -61,8 +99,19 @@ class FakeTtyInput extends PassThrough {
 
 class CaptureOutput extends Writable {
   isTTY = true;
+  private wrote = false;
+  private readonly onFirstWrite?: () => void;
+
+  constructor(onFirstWrite?: () => void) {
+    super();
+    this.onFirstWrite = onFirstWrite;
+  }
 
   _write(_chunk: Buffer, _encoding: BufferEncoding, callback: (error?: Error | null) => void) {
+    if (!this.wrote) {
+      this.wrote = true;
+      this.onFirstWrite?.();
+    }
     callback();
   }
 }

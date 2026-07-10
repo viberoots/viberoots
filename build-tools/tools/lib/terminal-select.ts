@@ -8,14 +8,24 @@ export type TerminalSelectChoice = {
   valueLabel?: string | false;
 };
 
+export type TerminalPromptStreams = {
+  input: NodeJS.ReadableStream & {
+    isTTY?: boolean;
+    isRaw?: boolean;
+    setRawMode?: (mode: boolean) => unknown;
+  };
+  output: NodeJS.WritableStream;
+  close: () => void;
+};
+
 export async function promptTerminalSelect(
   message: string,
   choices: TerminalSelectChoice[],
   initialIndex: number,
-  opts: { cancelMessage?: string } = {},
+  opts: { cancelMessage?: string; streams?: TerminalPromptStreams } = {},
 ) {
   if (choices.length === 0) throw new Error(`${message} has no choices`);
-  const streams = promptTtyStreams();
+  const streams = opts.streams || promptTtyStreams();
   if (!streams.input.isTTY) return await promptSelectLine(message, choices, initialIndex);
   let index = Math.max(0, Math.min(initialIndex, choices.length - 1));
   let rendered = false;
@@ -36,13 +46,15 @@ export async function promptTerminalSelect(
       );
     });
   };
-  const previousRaw = streams.input.isRaw;
+  const previousRaw = Boolean(streams.input.isRaw);
+  if (typeof streams.input.setRawMode !== "function") {
+    return await promptSelectLine(message, choices, initialIndex);
+  }
   streams.input.setRawMode(true);
   streams.input.resume();
-  render();
   let onData: ((chunk: Buffer) => void) | undefined;
   try {
-    return await new Promise<string>((resolve, reject) => {
+    const selected = new Promise<string>((resolve, reject) => {
       onData = (chunk: Buffer) => {
         const text = chunk.toString("utf8");
         if (text.includes("\u0003")) {
@@ -68,6 +80,8 @@ export async function promptTerminalSelect(
       };
       streams.input.on("data", onData);
     });
+    render();
+    return await selected;
   } finally {
     if (onData) streams.input.off("data", onData);
     streams.input.setRawMode(previousRaw);
@@ -127,11 +141,7 @@ async function promptSelectLine(
   }
 }
 
-type PromptStreams = {
-  input: NodeJS.ReadableStream;
-  output: NodeJS.WritableStream;
-  close: () => void;
-};
+type PromptStreams = TerminalPromptStreams;
 
 function promptStreams(): PromptStreams {
   return openTtyStreams() || { input: process.stdin, output: process.stderr, close: () => undefined };
