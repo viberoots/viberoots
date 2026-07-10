@@ -153,6 +153,7 @@ const commandMetadata: CommandMeta[] = [
       "--no-direnv",
       "--setup-direnv",
       "--run-install",
+      "--post-clone",
       "--help",
     ],
   },
@@ -670,6 +671,11 @@ async function main() {
       allowDirenv: !getFlagBool("no-direnv"),
       setupDirenv: setupDirenv as "auto" | "always" | "never",
       runInstall: getFlagBool("run-install"),
+      postClone:
+        getFlagBool("post-clone") ||
+        getFlagBool("postClone") ||
+        process.env.VBR_POST_CLONE === "1" ||
+        process.env.VIBEROOTS_POST_CLONE === "1",
     });
     return;
   }

@@ -902,6 +902,10 @@ direnv_allow_flag=""
 if [[ "${direnv_allow}" == "0" ]]; then
   direnv_allow_flag="--no-direnv"
 fi
+post_clone_flag=""
+if [[ "${post_clone}" == "1" ]]; then
+  post_clone_flag="--post-clone"
+fi
 
 actions=()
 record_action() {
@@ -1084,6 +1088,7 @@ run_nix_init_consumer_command() {
     --workspace-root "${workspace_root}" \
     --workspace-name "${workspace_name}" \
     --viberoots-url "${viberoots_url}" \
+    ${post_clone_flag:+"${post_clone_flag}"} \
     ${run_install_flag:+"${run_install_flag}"} \
     ${direnv_allow_flag:+"${direnv_allow_flag}"} \
     2> >(
@@ -1112,7 +1117,7 @@ run_nix_init_consumer() {
   fi
   ui_step "source" "fetching viberoots"
   if [[ "${post_clone}" == "1" ]]; then
-    VBR_BOOTSTRAP_PNPM_GENERATE=1 run_nix_init_consumer_command "${init_tool_url}"
+    VBR_POST_CLONE=1 VBR_BOOTSTRAP_PNPM_GENERATE=1 run_nix_init_consumer_command "${init_tool_url}"
   else
     run_nix_init_consumer_command "${init_tool_url}"
   fi
@@ -1576,7 +1581,7 @@ EOF
     fi
   fi
   if [[ "${post_clone}" == "1" ]]; then
-    VBR_BOOTSTRAP_PNPM_GENERATE=1 ./viberoots/init \
+    VBR_POST_CLONE=1 VBR_BOOTSTRAP_PNPM_GENERATE=1 ./viberoots/init \
       --mode submodule \
       --workspace-name "${workspace_name}" \
       ${run_install_flag:+"${run_install_flag}"} \
@@ -1605,20 +1610,34 @@ fi
 if [[ "${run_validate}" == "1" ]]; then
   NIX_PNPM_ALLOW_GENERATE=1 direnv exec "${workspace_root}" sh -lc 'i && b && v'
   ui_ok "validation" "complete"
-  ui_step "devshell" "direnv may load ${workspace_root}/.envrc now"
+  if [[ "${post_clone}" == "1" ]]; then
+    ui_step "terminal" "open a fresh terminal before using viberoots or direnv; this shell may not have updated PATH setup"
+  else
+    ui_step "devshell" "direnv may load ${workspace_root}/.envrc now"
+  fi
 elif [[ "${direnv_allow}" == "1" ]]; then
-  if [[ "${post_clone}" == "1" && "${run_install}" == "1" ]]; then
-    ui_ok "next" "cd ${workspace_root} && direnv exec . sh -lc 'b && v'"
+  if [[ "${post_clone}" == "1" ]]; then
+    if [[ "${run_install}" == "1" ]]; then
+      ui_ok "next" "open a fresh terminal, then cd ${workspace_root} && b && v"
+    else
+      ui_ok "next" "open a fresh terminal, then cd ${workspace_root} && i && b && v"
+    fi
+    ui_step "terminal" "the shell that ran post-clone may not have Nix, direnv, or viberoots on PATH yet"
   else
     ui_ok "next" "cd ${workspace_root} && direnv exec . sh -lc 'i && b && v'"
+    ui_step "devshell" "direnv may load ${workspace_root}/.envrc now"
   fi
-  ui_step "devshell" "direnv may load ${workspace_root}/.envrc now"
 else
-  if [[ "${post_clone}" == "1" && "${run_install}" == "1" ]]; then
-    ui_ok "next" "cd ${workspace_root} && direnv allow && direnv exec . sh -lc 'b && v'"
+  if [[ "${post_clone}" == "1" ]]; then
+    if [[ "${run_install}" == "1" ]]; then
+      ui_ok "next" "open a fresh terminal, then cd ${workspace_root} && direnv allow && direnv exec . sh -lc 'b && v'"
+    else
+      ui_ok "next" "open a fresh terminal, then cd ${workspace_root} && direnv allow && direnv exec . sh -lc 'i && b && v'"
+    fi
+    ui_step "terminal" "the shell that ran post-clone may not have Nix, direnv, or viberoots on PATH yet"
   else
     ui_ok "next" "cd ${workspace_root} && direnv allow && direnv exec . sh -lc 'i && b && v'"
+    ui_step "devshell" "run direnv allow before loading the dev shell"
   fi
-  ui_step "devshell" "run direnv allow before loading the dev shell"
 fi
 ui_step "tracked proof" "local ignored state may change; run git diff --exit-code afterward if you need proof no tracked files changed"

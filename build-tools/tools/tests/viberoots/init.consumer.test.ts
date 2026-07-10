@@ -7,6 +7,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
+import { initConsumer } from "../../lib/consumer-bootstrap";
 
 const execFileAsync = promisify(execFile);
 
@@ -606,6 +607,62 @@ exit 0
       );
     },
   );
+});
+
+test("viberoots init-consumer post-clone preserves checked-in flake files", async () => {
+  await withConsumerWorkspace("viberoots-init-post-clone-preserve-flake", async (workspace) => {
+    const fakeBin = path.join(workspace, ".fake-bin");
+    const log = path.join(workspace, ".nix.log");
+    const hiddenLock = path.join(workspace, ".viberoots", "workspace", "flake.lock");
+    await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.writeFile(path.join(workspace, "flake.nix"), "checked-in root flake\n", "utf8");
+    await fsp.writeFile(path.join(workspace, "flake.lock"), "checked-in root lock\n", "utf8");
+    await fsp.writeFile(
+      path.join(fakeBin, "nix"),
+      `#!/usr/bin/env bash
+printf 'VBR_POST_CLONE=%s nix %s\\n' "\${VBR_POST_CLONE:-}" "$*" >> ${JSON.stringify(log)}
+if [[ "$*" == flake\\ update* ]]; then
+  mkdir -p ${JSON.stringify(path.dirname(hiddenLock))}
+  cat > ${JSON.stringify(hiddenLock)} <<'JSON'
+{"nodes":{"viberoots":{"locked":{"rev":"new-remote-rev"}}},"root":"root","version":7}
+JSON
+fi
+exit 0
+`,
+      { mode: 0o755 },
+    );
+
+    const oldPath = process.env.PATH;
+    const oldNoDevShell = process.env.NO_DEV_SHELL;
+    try {
+      process.env.PATH = `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`;
+      process.env.NO_DEV_SHELL = "1";
+      await initConsumer({
+        workspaceRoot: workspace,
+        workspaceName: "post-clone-preserve-flake",
+        viberootsUrl: "git+https://github.com/viberoots/viberoots.git?ref=main",
+        allowDirenv: false,
+        postClone: true,
+      });
+    } finally {
+      if (oldPath === undefined) delete process.env.PATH;
+      else process.env.PATH = oldPath;
+      if (oldNoDevShell === undefined) delete process.env.NO_DEV_SHELL;
+      else process.env.NO_DEV_SHELL = oldNoDevShell;
+    }
+
+    const text = await fsp.readFile(log, "utf8");
+    assert.match(text, /nix flake update viberoots/);
+    assert.equal(
+      await fsp.readFile(path.join(workspace, "flake.nix"), "utf8"),
+      "checked-in root flake\n",
+    );
+    assert.equal(
+      await fsp.readFile(path.join(workspace, "flake.lock"), "utf8"),
+      "checked-in root lock\n",
+    );
+    assert.match(await fsp.readFile(hiddenLock, "utf8"), /new-remote-rev/);
+  });
 });
 
 test("curlable bootstrap defaults to flake main and install enabled", async () => {
