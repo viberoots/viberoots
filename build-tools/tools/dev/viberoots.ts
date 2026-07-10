@@ -10,7 +10,12 @@ import { activateWorkspace } from "../lib/workspace-activation";
 import { remoteSourceStatus } from "../lib/workspace-remote-source";
 import { initConsumer } from "../lib/consumer-bootstrap";
 import { checkBootstrapCompletion } from "../lib/bootstrap-completion";
-import { removeSubmodule, useFlake, useSubmodule } from "../lib/consumer-source-mode";
+import {
+  inferBootstrapConsumerModeSync,
+  removeSubmodule,
+  useFlake,
+  useSubmodule,
+} from "../lib/consumer-source-mode";
 import { runLiveBootstrap } from "../lib/live-bootstrap";
 import { runViberootsGc } from "../lib/maintenance-gc";
 import { resolveToolPathSync } from "../lib/tool-paths";
@@ -581,7 +586,7 @@ function liveBootstrapEnvOverrides(): Record<string, string> {
   const ref = getFlagStr("ref");
   const rev = getFlagStr("rev");
   const workspaceRoot = selectedWorkspaceRootForCommand();
-  if (mode) overrides.VBR_CONSUMER = mode;
+  overrides.VBR_CONSUMER = mode || inferBootstrapConsumerModeSync(workspaceRoot);
   if (ref) overrides.VBR_REF = ref;
   if (rev) overrides.VBR_REV = rev;
   overrides.VBR_WORKSPACE_ROOT = workspaceRoot;

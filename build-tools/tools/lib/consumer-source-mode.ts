@@ -215,6 +215,28 @@ export async function currentPointsAtSubmodule(workspaceRoot: string): Promise<b
   );
 }
 
+export function inferBootstrapConsumerModeSync(workspaceRoot: string): "flake" | "submodule" {
+  try {
+    const flake = fs.readFileSync(path.join(workspaceRoot, "flake.nix"), "utf8");
+    if (
+      /\bviberoots\.url\s*=\s*"path:\.\/\.viberoots\/workspace\/viberoots-flake-input"/.test(flake)
+    ) {
+      return "submodule";
+    }
+    if (/\bviberoots\.url\s*=\s*"(?:git\+|github:|https?:)/.test(flake)) {
+      return "flake";
+    }
+  } catch {}
+
+  try {
+    if (fs.readlinkSync(path.join(workspaceRoot, ".viberoots", "current")) === "../viberoots") {
+      return "submodule";
+    }
+  } catch {}
+
+  return "flake";
+}
+
 function currentModeFromTarget(target: string): string {
   return target === "../viberoots" ? "submodule" : target ? "flake" : "unknown";
 }

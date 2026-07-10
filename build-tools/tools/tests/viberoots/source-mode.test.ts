@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
+import { inferBootstrapConsumerModeSync } from "../../lib/consumer-source-mode";
 
 const execFileAsync = promisify(execFile);
 
@@ -217,6 +218,29 @@ test("use-submodule adds a missing submodule and repairs current symlink", async
     );
     assert.equal(await fsp.readlink(path.join(workspace, ".viberoots", "current")), "../viberoots");
     await assertDirenvBootstrap(workspace);
+  });
+});
+
+test("bootstrap mode inference preserves existing source mode", async () => {
+  await withTempWorkspace("viberoots-source-bootstrap-mode", async (workspace) => {
+    await fsp.writeFile(
+      path.join(workspace, "flake.nix"),
+      'inputs.viberoots.url = "path:./.viberoots/workspace/viberoots-flake-input";\n',
+      "utf8",
+    );
+    assert.equal(inferBootstrapConsumerModeSync(workspace), "submodule");
+
+    await fsp.writeFile(
+      path.join(workspace, "flake.nix"),
+      'inputs.viberoots.url = "git+https://github.com/viberoots/viberoots.git?ref=main";\n',
+      "utf8",
+    );
+    assert.equal(inferBootstrapConsumerModeSync(workspace), "flake");
+
+    await fsp.rm(path.join(workspace, "flake.nix"));
+    await fsp.mkdir(path.join(workspace, ".viberoots"), { recursive: true });
+    await fsp.symlink("../viberoots", path.join(workspace, ".viberoots", "current"));
+    assert.equal(inferBootstrapConsumerModeSync(workspace), "submodule");
   });
 });
 

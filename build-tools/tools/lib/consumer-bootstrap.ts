@@ -291,7 +291,9 @@ async function repairCurrentSymlinkForBootstrap(
   }
 }
 
-function buckconfig(): string {
+function buckconfig(mode: ConsumerSourceMode): string {
+  const preludePath =
+    mode === "submodule" ? "./.viberoots/current/prelude" : "./.viberoots/workspace/prelude";
   return `# ${generatedMarker}
 [buildfile]
 name = TARGETS
@@ -299,7 +301,7 @@ name = TARGETS
 [repositories]
 root = .
 viberoots = ./.viberoots/current
-prelude = ./.viberoots/workspace/prelude
+prelude = ${preludePath}
 toolchains = ./.viberoots/current/toolchains
 repo_toolchains = ./.viberoots/workspace/toolchains
 fbsource = ./.viberoots/current/config/fbsource_stub
@@ -311,7 +313,7 @@ workspace_buck = ./.viberoots/workspace/buck
 [cells]
 root = .
 viberoots = ./.viberoots/current
-prelude = ./.viberoots/workspace/prelude
+prelude = ${preludePath}
 toolchains = ./.viberoots/current/toolchains
 repo_toolchains = ./.viberoots/workspace/toolchains
 fbsource = ./.viberoots/current/config/fbsource_stub
@@ -735,7 +737,7 @@ export async function initConsumer(opts: InitConsumerOptions): Promise<void> {
   await writeHostPathIfUseful(opts.workspaceRoot);
 
   await writeBuckroot(opts.workspaceRoot);
-  await writeGeneratedFile(opts.workspaceRoot, ".buckconfig", buckconfig());
+  await writeGeneratedFile(opts.workspaceRoot, ".buckconfig", buckconfig(sourceMode));
   await writeGeneratedFile(opts.workspaceRoot, ".envrc", envrc());
   await writeGeneratedFile(
     opts.workspaceRoot,
