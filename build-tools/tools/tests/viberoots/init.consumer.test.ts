@@ -303,10 +303,24 @@ test("viberoots/init uses the flake command before host node is available", asyn
     await fsp.copyFile(path.join(viberootsRoot, "init"), path.join(checkout, "init"));
     await fsp.chmod(path.join(checkout, "init"), 0o755);
     await fsp.symlink("/bin/bash", path.join(fakeBin, "bash"));
+    await fsp.symlink("/bin/ln", path.join(fakeBin, "ln"));
+    await fsp.symlink("/bin/mkdir", path.join(fakeBin, "mkdir"));
+    await fsp.symlink("/bin/rm", path.join(fakeBin, "rm"));
     await fsp.symlink("/usr/bin/dirname", path.join(fakeBin, "dirname"));
+    await fsp.symlink("/usr/bin/readlink", path.join(fakeBin, "readlink"));
     await fsp.writeFile(
       path.join(fakeBin, "nix"),
-      `#!/usr/bin/env bash\nprintf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}\n`,
+      `#!/usr/bin/env bash
+if [[ ! -L ${JSON.stringify(path.join(workspace, ".viberoots", "current"))} ]]; then
+  printf 'missing current symlink\\n' >&2
+  exit 1
+fi
+if [[ "$(readlink ${JSON.stringify(path.join(workspace, ".viberoots", "current"))})" != "../viberoots" ]]; then
+  printf 'wrong current symlink\\n' >&2
+  exit 1
+fi
+printf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}
+`,
       { mode: 0o755 },
     );
 
@@ -314,11 +328,13 @@ test("viberoots/init uses the flake command before host node is available", asyn
       cwd: workspace,
       env: {
         PATH: fakeBin,
+        VIBEROOTS_FLAKE_INPUT_ROOT: path.join(workspace, "stale-generated-input"),
       },
     });
 
     const text = await fsp.readFile(log, "utf8");
-    assert.match(text, /nix run path:.*\/viberoots#viberoots -- init-consumer/);
+    assert.match(text, /nix run --accept-flake-config path:.*\/viberoots#viberoots -- init-consumer/);
+    assert.doesNotMatch(text, /stale-generated-input/);
     assert.match(text, /--mode submodule/);
     assert.match(text, /--workspace-root .*viberoots-init-nix-command-/);
     assert.match(text, /--source .*\/viberoots/);

@@ -4,7 +4,7 @@ set -euo pipefail
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 workspace_root="$(cd -- "${script_dir}/.." && pwd)"
 viberoots_dir="${workspace_root}/viberoots"
-viberoots_flake_input_dir="${VIBEROOTS_FLAKE_INPUT_ROOT:-${viberoots_dir}}"
+viberoots_flake_input_dir="${viberoots_dir}"
 workspace_name="${workspace_root##*/}"
 
 if [[ "${script_dir}" != "${viberoots_dir}" ]]; then
@@ -12,6 +12,23 @@ if [[ "${script_dir}" != "${viberoots_dir}" ]]; then
   echo "expected: ${viberoots_dir}" >&2
   echo "actual:   ${script_dir}" >&2
   exit 1
+fi
+
+mkdir -p "${workspace_root}/.viberoots"
+current_path="${workspace_root}/.viberoots/current"
+current_target="../viberoots"
+if [[ -L "${current_path}" ]]; then
+  if [[ "$(readlink "${current_path}")" != "${current_target}" ]]; then
+    rm -f "${current_path}"
+    ln -s "${current_target}" "${current_path}"
+  fi
+elif [[ ! -e "${current_path}" ]]; then
+  ln -s "${current_target}" "${current_path}"
+else
+  backup_dir="${workspace_root}/.viberoots/workspace/backups"
+  mkdir -p "${backup_dir}"
+  mv "${current_path}" "${backup_dir}/current.$(date +%s).$$.bak"
+  ln -s "${current_target}" "${current_path}"
 fi
 
 has_workspace_name=0
@@ -50,6 +67,6 @@ else
     echo "error: nix is required to initialize a submodule workspace before the dev shell is available" >&2
     exit 127
   fi
-  WORKSPACE_ROOT="${workspace_root}" "${nix_bin}" run "path:${viberoots_flake_input_dir}#viberoots" -- \
+  WORKSPACE_ROOT="${workspace_root}" "${nix_bin}" run --accept-flake-config "path:${viberoots_flake_input_dir}#viberoots" -- \
     "${init_args[@]}"
 fi
