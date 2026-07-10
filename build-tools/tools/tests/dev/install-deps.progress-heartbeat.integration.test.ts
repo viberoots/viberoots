@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
-test("install-deps reports quiet node_modules progress during long child work", async () => {
+test("install-deps reports node_modules progress during long child work", async () => {
   const depsMain = await fsp.readFile(
     "viberoots/build-tools/tools/dev/install/deps-main.ts",
     "utf8",
@@ -20,8 +20,14 @@ test("install-deps reports quiet node_modules progress during long child work", 
   if (!progress.includes("[install-deps] waiting on")) {
     throw new Error("progress.ts must print an install progress heartbeat");
   }
-  if (!progress.includes("output=quiet-unless-failed")) {
-    throw new Error("install progress heartbeat must explain suppressed child output");
+  if (!progress.includes('opts.outputMode || "quiet-unless-failed"')) {
+    throw new Error("install progress heartbeat must support explicit child output modes");
+  }
+  if (!depsMain.includes('outputMode: "compact-progress"')) {
+    throw new Error("install-deps must expose update-pnpm-hash compact progress during waits");
+  }
+  if (depsMain.includes("node_modules ${imp} update-pnpm-hash`, updateCmd.quiet()")) {
+    throw new Error("install-deps must not suppress update-pnpm-hash heartbeat output");
   }
   for (const label of ["update-pnpm-hash", "link-node"]) {
     if (!depsMain.includes(`node_modules \${imp} ${label}`)) {

@@ -308,7 +308,9 @@ if (dryRun) {
           })`zx-wrapper ${absUpdate} --lockfile ${relLock}`;
           const updateRes = verbose
             ? await updateCmd
-            : await withInstallProgress(`node_modules ${imp} update-pnpm-hash`, updateCmd.quiet());
+            : await withInstallProgress(`node_modules ${imp} update-pnpm-hash`, updateCmd, {
+                outputMode: "compact-progress",
+              });
           if (updateRes.exitCode !== 0) {
             printFailedChildOutput(`update-pnpm-hash ${imp}`, updateRes);
             process.exit(updateRes.exitCode || 1);
