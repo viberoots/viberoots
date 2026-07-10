@@ -52,10 +52,6 @@ if [[ "${has_workspace_name}" != "1" ]]; then
   init_args+=(--workspace-name "${workspace_name}")
 fi
 
-if [[ "${VBR_POST_CLONE:-0}" == "1" || "${VIBEROOTS_POST_CLONE:-0}" == "1" ]]; then
-  init_args+=(--no-lock)
-fi
-
 init_args+=("$@")
 
 if [[ "${VBR_INIT_USE_LOCAL_COMMAND:-0}" == "1" ]]; then

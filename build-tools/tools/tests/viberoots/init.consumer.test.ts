@@ -345,6 +345,51 @@ printf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}
   }
 });
 
+test("viberoots/init post-clone still generates hidden workspace lock", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-init-post-clone-lock-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    const fakeBin = path.join(workspace, ".fake-bin");
+    const checkout = path.join(workspace, "viberoots");
+    const log = path.join(workspace, ".nix-run.log");
+    await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.mkdir(checkout, { recursive: true });
+    await fsp.copyFile(path.join(viberootsRoot, "init"), path.join(checkout, "init"));
+    await fsp.chmod(path.join(checkout, "init"), 0o755);
+    for (const [name, target] of [
+      ["bash", "/bin/bash"],
+      ["ln", "/bin/ln"],
+      ["mkdir", "/bin/mkdir"],
+      ["rm", "/bin/rm"],
+      ["dirname", "/usr/bin/dirname"],
+      ["readlink", "/usr/bin/readlink"],
+    ]) {
+      await fsp.symlink(target, path.join(fakeBin, name));
+    }
+    await fsp.writeFile(
+      path.join(fakeBin, "nix"),
+      `#!/usr/bin/env bash\nprintf 'VBR_POST_CLONE=%s nix %s\\n' "\${VBR_POST_CLONE:-}" "$*" >> ${JSON.stringify(log)}\n`,
+      { mode: 0o755 },
+    );
+
+    await execFileAsync(path.join(checkout, "init"), ["--setup-direnv", "never"], {
+      cwd: workspace,
+      env: {
+        PATH: fakeBin,
+        VBR_POST_CLONE: "1",
+      },
+    });
+
+    const text = await fsp.readFile(log, "utf8");
+    assert.match(text, /VBR_POST_CLONE=1/);
+    assert.doesNotMatch(text, /--no-lock/);
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});
+
 test("viberoots init-consumer bootstraps a remote-flake consumer workspace", async () => {
   const workspace = await fsp.realpath(
     await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-init-remote-consumer-")),
