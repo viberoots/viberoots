@@ -154,10 +154,9 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     assert.match(buckconfig, /^ignore = .*\.git/m);
     assert.match(buckconfig, /^ignore = .*\.direnv/m);
     await assertDirenvBootstrap(workspace);
-    assert.match(
-      await fsp.readFile(path.join(workspace, "flake.nix"), "utf8"),
-      /if root != "" then builtins\.toPath root else \.\/\.;/,
-    );
+    const rootFlake = await fsp.readFile(path.join(workspace, "flake.nix"), "utf8");
+    assert.match(rootFlake, /if root != "" then builtins\.toPath root else \.\/\.;/);
+    assert.match(rootFlake, new RegExp(`workspaceName = "${path.basename(workspace)}";`));
     await assert.rejects(fsp.lstat(path.join(workspace, "buck-out")));
     assert.match(
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),

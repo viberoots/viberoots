@@ -666,10 +666,14 @@ async function main() {
       console.error("error: init-consumer --setup-direnv must be auto, always, or never");
       process.exit(2);
     }
+    const workspaceRoot = selectedWorkspaceRootForCommand();
     await initConsumer({
-      workspaceRoot: selectedWorkspaceRootForCommand(),
+      workspaceRoot,
       viberootsUrl,
-      workspaceName: getFlagStr("workspace-name", "viberoots-consumer"),
+      workspaceName: getFlagStr(
+        "workspace-name",
+        path.basename(workspaceRoot) || "viberoots-consumer",
+      ),
       sourceMode: mode,
       sourcePath: getFlagStr("source") || (mode === "submodule" ? "viberoots" : undefined),
       lock: !getFlagBool("no-lock"),

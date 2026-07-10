@@ -5,6 +5,7 @@ script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 workspace_root="$(cd -- "${script_dir}/.." && pwd)"
 viberoots_dir="${workspace_root}/viberoots"
 viberoots_flake_input_dir="${VIBEROOTS_FLAKE_INPUT_ROOT:-${viberoots_dir}}"
+workspace_name="${workspace_root##*/}"
 
 if [[ "${script_dir}" != "${viberoots_dir}" ]]; then
   echo "error: viberoots/init must be run from a checkout mounted at ./viberoots" >&2
@@ -13,16 +14,29 @@ if [[ "${script_dir}" != "${viberoots_dir}" ]]; then
   exit 1
 fi
 
+has_workspace_name=0
+for arg in "$@"; do
+  case "${arg}" in
+    --workspace-name | --workspace-name=*)
+      has_workspace_name=1
+      ;;
+  esac
+done
+
 init_args=(
   init-consumer
   --mode submodule
   --workspace-root "${workspace_root}"
-  --workspace-name "viberoots-consumer"
   --viberoots-url "path:${viberoots_flake_input_dir}"
   --source "${viberoots_dir}"
   --no-lock
-  "$@"
 )
+
+if [[ "${has_workspace_name}" != "1" ]]; then
+  init_args+=(--workspace-name "${workspace_name}")
+fi
+
+init_args+=("$@")
 
 if [[ "${VBR_INIT_USE_LOCAL_COMMAND:-0}" == "1" ]]; then
   NO_DEV_SHELL=1 WORKSPACE_ROOT="${workspace_root}" "${viberoots_dir}/build-tools/tools/bin/viberoots" \
