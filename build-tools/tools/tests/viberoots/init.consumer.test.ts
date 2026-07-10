@@ -149,8 +149,8 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     );
     assert.equal(await fsp.readFile(path.join(workspace, ".buckroot"), "utf8"), ".\n");
     const buckconfig = await fsp.readFile(path.join(workspace, ".buckconfig"), "utf8");
-    assert.match(buckconfig, /\.viberoots\/current\/prelude/);
-    assert.doesNotMatch(buckconfig, /\.viberoots\/workspace\/prelude/);
+    assert.match(buckconfig, /\.viberoots\/workspace\/prelude/);
+    assert.doesNotMatch(buckconfig, /\.viberoots\/current\/prelude/);
     assert.match(buckconfig, /^ignore = .*\.git/m);
     assert.match(buckconfig, /^ignore = .*\.direnv/m);
     await assertDirenvBootstrap(workspace);
@@ -1160,7 +1160,7 @@ prelude = ./.viberoots/current/prelude
   }
 });
 
-test("curlable bootstrap preserves generated submodule buckconfig prelude path", async () => {
+test("curlable bootstrap migrates generated submodule buckconfig prelude path", async () => {
   const workspace = await fsp.realpath(
     await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-submodule-buckconfig-")),
   );
@@ -1226,11 +1226,11 @@ prelude = ./.viberoots/current/prelude
       },
     );
 
-    assert.doesNotMatch(stdout, /migration refreshed \.buckconfig prelude path/);
-    assert.doesNotMatch(stdout, /migrated \.buckconfig prelude path/);
+    assert.match(stdout, /migration refreshed \.buckconfig prelude path/);
+    assert.match(stdout, /migrated \.buckconfig prelude path/);
     const buckconfig = await fsp.readFile(path.join(workspace, ".buckconfig"), "utf8");
-    assert.match(buckconfig, /\.viberoots\/current\/prelude/);
-    assert.doesNotMatch(buckconfig, /\.viberoots\/workspace\/prelude/);
+    assert.match(buckconfig, /\.viberoots\/workspace\/prelude/);
+    assert.doesNotMatch(buckconfig, /\.viberoots\/current\/prelude/);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }

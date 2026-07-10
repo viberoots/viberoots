@@ -434,8 +434,7 @@ async function repairCurrentSymlinkForBootstrap(
 }
 
 function buckconfig(mode: ConsumerSourceMode): string {
-  const preludePath =
-    mode === "submodule" ? "./.viberoots/current/prelude" : "./.viberoots/workspace/prelude";
+  const preludePath = "./.viberoots/workspace/prelude";
   return `# ${generatedMarker}
 [buildfile]
 name = TARGETS
