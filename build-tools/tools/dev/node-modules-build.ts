@@ -6,7 +6,7 @@ import path from "node:path";
 import process from "node:process";
 import { nixBuilderPolicyShellArgs } from "../lib/nix-builder-policy";
 import { sharedExactPnpmStateRootPath } from "../lib/pnpm-state-paths";
-import { resolveToolPathSync } from "../lib/tool-paths";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
 import { buildToolPath } from "./dev-build/paths";
 import {
   findNearestImporterLock,
@@ -179,11 +179,11 @@ const activeViberootsSourceRoot = activeViberootsRoot();
 const viberootsOverrideArgs = activeViberootsSourceRoot
   ? ["--override-input", "viberoots", `path:${activeViberootsSourceRoot}`]
   : [];
-const nixWorkspaceEnv = {
+const nixWorkspaceEnv = envWithResolvedNixBin({
   ...process.env,
   WORKSPACE_ROOT: repoRoot,
   ...(activeViberootsSourceRoot ? { VIBEROOTS_SOURCE_ROOT: activeViberootsSourceRoot } : {}),
-};
+});
 
 function liveMarkerRepoRoot(): string {
   const liveRoot = String(process.env.REPO_ROOT || "").trim();
@@ -326,9 +326,10 @@ await requireFreshPnpmStoreState(lockfileRel, hashKey);
 outPath = await recoverOutPathFromLinkMarker(importer, lockfileRel);
 try {
   if (!outPath) {
+    const nixBin = resolveToolPathSync("nix", nixWorkspaceEnv);
     const pi = await $({
       env: nixWorkspaceEnv,
-    })`nix path-info ${flakeRef}#${fullAttr} --accept-flake-config ${viberootsOverrideArgs}`;
+    })`${nixBin} path-info ${flakeRef}#${fullAttr} --accept-flake-config ${viberootsOverrideArgs}`;
     const cand =
       String(pi.stdout || "")
         .trim()
@@ -345,6 +346,7 @@ try {
 } catch {}
 async function tryBuild(extraEnv: NodeJS.ProcessEnv): Promise<string> {
   const timeoutPath = resolveToolPathSync("timeout");
+  const nixBin = resolveToolPathSync("nix", nixWorkspaceEnv);
   const overrideShellArgs = viberootsOverrideArgs
     .map((arg) => `'${arg.replace(/'/g, "'\\''")}'`)
     .join(" ");
@@ -353,16 +355,17 @@ async function tryBuild(extraEnv: NodeJS.ProcessEnv): Promise<string> {
     'TIMEOUT_PATH="$1";',
     'FLAKE_REF="$2";',
     'FULL_ATTR="$3";',
+    'NIX_BIN="$4";',
     'MJ="${NIX_MAX_JOBS:-0}";',
     'CR="${NIX_CORES:-0}";',
     'TS="${NIX_PNPM_FETCH_TIMEOUT:-900}";',
     'JOBS_FLAG=""; if [ -n "$MJ" ] && [ "$MJ" != "0" ]; then JOBS_FLAG="--max-jobs $MJ"; fi;',
     'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
-    `"$TIMEOUT_PATH" -k 10s "\${TS}s" nix build "\${FLAKE_REF}#\${FULL_ATTR}" --impure --no-link --accept-flake-config ${overrideShellArgs} ${nixBuilderPolicyShellArgs("local_only")} --print-out-paths $JOBS_FLAG $CORES_FLAG`,
+    `"$TIMEOUT_PATH" -k 10s "\${TS}s" "$NIX_BIN" build "\${FLAKE_REF}#\${FULL_ATTR}" --impure --no-link --accept-flake-config ${overrideShellArgs} ${nixBuilderPolicyShellArgs("local_only")} --print-out-paths $JOBS_FLAG $CORES_FLAG`,
   ].join(" ");
   const built = await $({
-    env: { ...nixWorkspaceEnv, ...extraEnv },
-  })`bash --noprofile --norc -c ${cmd} -- ${timeoutPath} ${flakeRef} ${fullAttr}`.nothrow();
+    env: envWithResolvedNixBin({ ...nixWorkspaceEnv, ...extraEnv }),
+  })`bash --noprofile --norc -c ${cmd} -- ${timeoutPath} ${flakeRef} ${fullAttr} ${nixBin}`.nothrow();
   const txt = String(built.stdout || "").trim();
   if (built.exitCode === 0 && txt) {
     return txt.split("\n").filter(Boolean).pop() || "";

@@ -11,6 +11,7 @@ import { importerLockfileNeedsRegen } from "../../lib/pnpm-importer-lockfile";
 import { externalPnpmStateDirs, removeLegacyImporterPnpmState } from "../../lib/pnpm-state-paths";
 import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard";
 import { resolveRepoNodeBin } from "../../lib/repo-node-bin";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import {
   syncLocalPrefetchIntoPnpmStore,
   syncSourcePnpmStoreIntoLocalPrefetch,
@@ -43,19 +44,21 @@ async function runLockfileCommandsWithGcRetry(opts: {
     "--no-write-lock-file",
     ...viberootsOverrideArgs,
   ];
+  const nixEnv = envWithResolvedNixBin({
+    ...process.env,
+    NIX_PNPM_ALLOW_GENERATE: "1",
+    NIX_PNPM_FETCH_TIMEOUT: opts.fetchTimeout,
+    NODE_OPTIONS: "--no-warnings",
+    PNPM_HOME: opts.homeDir,
+  });
+  const nixBin = resolveToolPathSync("nix", nixEnv);
   const runPnpm = async (...args: string[]) =>
     await $({
       cwd: opts.importerAbs,
       stdio: "inherit",
       timeout: opts.timeoutMs,
-      env: {
-        ...process.env,
-        NIX_PNPM_ALLOW_GENERATE: "1",
-        NIX_PNPM_FETCH_TIMEOUT: opts.fetchTimeout,
-        NODE_OPTIONS: "--no-warnings",
-        PNPM_HOME: opts.homeDir,
-      },
-    })`nix ${nixRunPrefix} ${opts.flakeRef} -- ${args}`;
+      env: nixEnv,
+    })`${nixBin} ${nixRunPrefix} ${opts.flakeRef} -- ${args}`;
 
   const runCommands = async () => {
     const cfg = gcWaitConfig();

@@ -8,7 +8,7 @@ import { writeIfChanged } from "../../lib/fs-helpers";
 import { resolveImporterDir } from "../../lib/lockfiles";
 import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
-import { resolveToolPathSync } from "../../lib/tool-paths";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { pathExists, repoRoot } from "../../lib/repo";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
@@ -163,9 +163,13 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
         stdoutBytes: 0,
         stderrBytes: 0,
       };
-      const nixBin = resolveToolPathSync("nix");
-      const buildWithEnv = async (exactStoreEnv: NodeJS.ProcessEnv) =>
-        await withHeartbeat(
+      const fakeNix = usesTempRepoFakeNix(root);
+      const buildWithEnv = async (exactStoreEnv: NodeJS.ProcessEnv) => {
+        const buildEnv = fakeNix ? exactStoreEnv : envWithResolvedNixBin(exactStoreEnv);
+        const nixBin = fakeNix
+          ? firstExecutableOnPath("nix") || resolveToolPathSync("nix")
+          : resolveToolPathSync("nix", buildEnv);
+        return await withHeartbeat(
           `importer=${importer} step=build attr=node-modules.${attr}`,
           runManagedCommand({
             command: nixBin,
@@ -185,15 +189,14 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
               "--print-out-paths",
             ],
             cwd: root,
-            env: tempFlake
-              ? { ...exactStoreEnv, WORKSPACE_ROOT: tempFlake.workspaceRoot }
-              : exactStoreEnv,
+            env: tempFlake ? { ...buildEnv, WORKSPACE_ROOT: tempFlake.workspaceRoot } : buildEnv,
             timeoutMs: nixBuildTimeoutMs,
             activity,
           }),
           { activity },
         );
-      const built = usesTempRepoFakeNix(root)
+      };
+      const built = fakeNix
         ? await buildWithEnv(process.env)
         : await withResolvedExactPrefetchedStore(
             {

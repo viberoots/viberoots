@@ -270,6 +270,32 @@ refresh_nix_profile_path() {
   export PATH
 }
 
+select_nix_bin() {
+  local candidate
+  if [[ -n "${VBR_NIX_BIN:-}" && -x "${VBR_NIX_BIN}" ]]; then
+    export VBR_NIX_BIN
+    return 0
+  fi
+  if [[ -x "/nix/var/nix/profiles/default/bin/nix" ]]; then
+    export VBR_NIX_BIN="/nix/var/nix/profiles/default/bin/nix"
+    return 0
+  fi
+  candidate="$(command -v nix 2>/dev/null || true)"
+  if [[ -n "${candidate}" ]]; then
+    export VBR_NIX_BIN="${candidate}"
+    return 0
+  fi
+  return 1
+}
+
+nix_cmd() {
+  select_nix_bin || {
+    echo "error: nix is required but no usable nix binary was found" >&2
+    exit 1
+  }
+  "${VBR_NIX_BIN}" "$@"
+}
+
 require_command() {
   if ! command -v "$1" >/dev/null 2>&1; then
     echo "error: required command not found: $1" >&2
@@ -952,7 +978,7 @@ flake_requested_ref() {
 
 resolve_flake_rev() {
   local flake_ref="$1"
-  nix flake metadata --refresh --json --accept-flake-config --no-write-lock-file "${flake_ref}" 2>/dev/null |
+  nix_cmd flake metadata --refresh --json --accept-flake-config --no-write-lock-file "${flake_ref}" 2>/dev/null |
     sed -n 's/.*"rev":"\([^"]*\)".*/\1/p' |
     head -n 1 || true
 }
@@ -1082,7 +1108,7 @@ run_migrations() {
 
 run_nix_init_consumer_command() {
   local init_tool_url="$1"
-  nix run --refresh --accept-flake-config "${init_tool_url}#viberoots" -- \
+  nix_cmd run --refresh --accept-flake-config "${init_tool_url}#viberoots" -- \
     init-consumer \
     --mode flake \
     --workspace-root "${workspace_root}" \
@@ -1249,7 +1275,7 @@ if [[ "${dry_run}" == "1" ]]; then
   if is_macos; then
     ui_list "verify Xcode Command Line Tools or full Xcode developer tools"
   fi
-  if ! command -v nix >/dev/null 2>&1 && [[ "${install_nix}" == "1" ]]; then
+  if ! select_nix_bin >/dev/null 2>&1 && [[ "${install_nix}" == "1" ]]; then
     if [[ "${allow_nix_install}" == "1" ]]; then
       ui_list "install Nix with the Determinate Nix installer"
     else
@@ -1304,7 +1330,7 @@ fi
 
 ensure_macos_developer_tools
 
-if ! command -v nix >/dev/null 2>&1; then
+if ! select_nix_bin >/dev/null 2>&1; then
   if [[ "${install_nix}" != "1" ]]; then
     echo "error: nix is required; install Nix or rerun with VBR_INSTALL_NIX=1" >&2
     exit 1
@@ -1318,11 +1344,14 @@ if ! command -v nix >/dev/null 2>&1; then
   load_nix_profile || true
   refresh_nix_profile_path
 fi
-if ! command -v nix >/dev/null 2>&1; then
+if ! select_nix_bin >/dev/null 2>&1; then
   load_nix_profile || true
   refresh_nix_profile_path
 fi
-require_command nix
+select_nix_bin || {
+  echo "error: nix is required but no usable nix binary was found after loading profile paths" >&2
+  exit 1
+}
 
 nix_config_value() {
   local key="$1"
@@ -1434,7 +1463,7 @@ ensure_nix_trusted_user() {
   [[ "${trust_nix_user}" != "0" ]] || return 0
   local user config refreshed
   user="$(id -un 2>/dev/null || printf '%s' "${USER:-${LOGNAME:-unknown}}")"
-  config="$(nix config show 2>/dev/null || true)"
+  config="$(nix_cmd config show 2>/dev/null || true)"
   if nix_user_is_trusted "${user}" "${config}"; then
     ui_ok "nix trust" "${user} already trusted"
     return 0
@@ -1445,7 +1474,7 @@ ensure_nix_trusted_user() {
   append_trusted_nix_user "${user}"
   record_action "added ${user} to Nix trusted users"
   if restart_nix_daemon; then
-    refreshed="$(nix config show 2>/dev/null || true)"
+    refreshed="$(nix_cmd config show 2>/dev/null || true)"
     if nix_user_is_trusted "${user}" "${refreshed}"; then
       ui_ok "nix trust" "trusted ${user}"
     else
@@ -1459,7 +1488,7 @@ ensure_nix_trusted_user() {
 ensure_nix_trusted_user
 
 if ! git_is_usable; then
-  nix profile install nixpkgs#git
+  nix_cmd profile install nixpkgs#git
   refresh_nix_profile_path
   record_action "installed Git with nix profile"
 fi

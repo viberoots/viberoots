@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runNixBuildWithTransientRetry } from "./build-selected-nix-retry";
 import { getFlagBool, getFlagStr } from "../lib/cli";
-import { resolveToolPathSync } from "../lib/tool-paths";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
 import {
   computeSelectedCppPackageClosure,
   filteredFlakeRsyncExcludeArgs,
@@ -41,23 +41,6 @@ async function existingRelPaths(root: string, relPaths: readonly string[]): Prom
     if (await pathExists(path.join(root, relPath))) present.push(relPath);
   }
   return present;
-}
-
-function executablePath(filePath: string): string {
-  const candidate = filePath.trim();
-  if (!candidate || !path.isAbsolute(candidate)) return "";
-  try {
-    fs.accessSync(candidate, fs.constants.X_OK);
-    return candidate;
-  } catch {
-    return "";
-  }
-}
-
-function resolveNixBin(): string {
-  const fromEnv = executablePath(String(process.env.NIX_BIN || ""));
-  if (fromEnv) return fromEnv;
-  return resolveToolPathSync("nix");
 }
 
 async function resolveActiveViberootsRoot(root: string): Promise<string> {
@@ -154,10 +137,12 @@ async function rewriteSnapshotViberootsInput(
 }
 
 async function lockPathInput(inputPath: string): Promise<Record<string, unknown>> {
-  const nixBin = resolveNixBin();
+  const nixEnv = envWithResolvedNixBin(process.env);
+  const nixBin = resolveToolPathSync("nix", nixEnv);
   const canonicalInputPath = await fsp.realpath(inputPath).catch(() => inputPath);
   const prefetched = await $({
     stdio: "pipe",
+    env: nixEnv,
   })`${nixBin} flake prefetch --json ${`path:${canonicalInputPath}`}`.nothrow();
   if (prefetched.exitCode === 0) {
     try {
@@ -176,6 +161,7 @@ async function lockPathInput(inputPath: string): Promise<Record<string, unknown>
   }
   const hashed = await $({
     stdio: "pipe",
+    env: nixEnv,
   })`${nixBin} hash path --sri ${canonicalInputPath}`;
   const narHash = String(hashed.stdout || "").trim();
   if (!/^sha256-[A-Za-z0-9+/=_-]+$/.test(narHash)) {
@@ -471,7 +457,6 @@ async function main(): Promise<void> {
     const flakeDir = await resolveSnapshotFlakeDir(snapDir);
     const flakeRef = `path:${flakeDir}#${attr}`;
     console.error("[nix-build-filtered-flake] building attr:", attr);
-    const nixBin = resolveNixBin();
     const activeViberootsRoot = await resolveActiveViberootsRoot(root);
     const snapshotViberootsInput = await repairSnapshotViberootsInput(snapDir);
     if (snapshotViberootsInput) {
@@ -480,7 +465,7 @@ async function main(): Promise<void> {
         snapshotViberootsInput,
       );
     }
-    const nixEnv = {
+    const nixEnv = envWithResolvedNixBin({
       ...process.env,
       ...(await exactStoreEnvForTarget(root, attr)),
       WORKSPACE_ROOT: snapDir,
@@ -492,7 +477,8 @@ async function main(): Promise<void> {
             BUCK_TEST_SRC: snapDir,
           }
         : {}),
-    };
+    });
+    const nixBin = resolveToolPathSync("nix", nixEnv);
     const buildStart = Date.now();
     const nixArgs = [
       "build",

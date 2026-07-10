@@ -14,6 +14,24 @@ if [[ "${script_dir}" != "${viberoots_dir}" ]]; then
   exit 1
 fi
 
+select_nix_bin() {
+  local candidate
+  if [[ -n "${VBR_NIX_BIN:-}" && -x "${VBR_NIX_BIN}" ]]; then
+    printf '%s\n' "${VBR_NIX_BIN}"
+    return 0
+  fi
+  if [[ -x "/nix/var/nix/profiles/default/bin/nix" ]]; then
+    printf '%s\n' "/nix/var/nix/profiles/default/bin/nix"
+    return 0
+  fi
+  candidate="$(command -v nix 2>/dev/null || true)"
+  if [[ -n "${candidate}" ]]; then
+    printf '%s\n' "${candidate}"
+    return 0
+  fi
+  return 1
+}
+
 mkdir -p "${workspace_root}/.viberoots"
 current_path="${workspace_root}/.viberoots/current"
 current_target="../viberoots"
@@ -58,11 +76,13 @@ if [[ "${VBR_INIT_USE_LOCAL_COMMAND:-0}" == "1" ]]; then
   NO_DEV_SHELL=1 WORKSPACE_ROOT="${workspace_root}" "${viberoots_dir}/build-tools/tools/bin/viberoots" \
     "${init_args[@]}"
 else
-  nix_bin="${VBR_NIX_BIN:-nix}"
-  if ! command -v "${nix_bin}" >/dev/null 2>&1; then
+  nix_bin="$(select_nix_bin || true)"
+  if [[ -z "${nix_bin}" || ! -x "${nix_bin}" ]]; then
     echo "error: nix is required to initialize a submodule workspace before the dev shell is available" >&2
     exit 127
   fi
-  WORKSPACE_ROOT="${workspace_root}" "${nix_bin}" run --accept-flake-config "path:${viberoots_flake_input_dir}#viberoots" -- \
+  VBR_NIX_BIN="${nix_bin}" \
+    WORKSPACE_ROOT="${workspace_root}" \
+    "${nix_bin}" run --accept-flake-config "path:${viberoots_flake_input_dir}#viberoots" -- \
     "${init_args[@]}"
 fi

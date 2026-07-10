@@ -35,7 +35,8 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     !exactStore.includes('path.basename(abs) === "flake.nix"') ||
     !exactStore.includes("fs.realpathSync.native(flakeDir)") ||
     !exactStore.includes("const flakeRoot = canonicalFlakeRoot(repoRoot)") ||
-    !exactStore.includes('const nixBin = resolveToolPathSync("nix")') ||
+    !exactStore.includes('const nixBin = resolveToolPathSync("nix", nixEnv)') ||
+    !exactStore.includes("envWithResolvedNixBin") ||
     !exactStore.includes("process.env.VIBEROOTS_FLAKE_INPUT_ROOT") ||
     !exactStore.includes(
       "opts.viberootsRoot || tempViberootsRootFromEnv() || roots.viberootsRoot",
@@ -289,9 +290,9 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
       "update-pnpm-hash nix helpers must support explicit streaming of nix builder logs",
     );
   }
-  if (!nixBuildHelpers.includes("withSanitizedInheritedNixConfig")) {
+  if (!nixBuildHelpers.includes("envWithResolvedNixBin")) {
     throw new Error(
-      "update-pnpm-hash nix helpers must sanitize inherited Nix config before spawning nix",
+      "update-pnpm-hash nix helpers must export the selected Nix binary before spawning nix",
     );
   }
   if (!nixBuildHelpers.includes('VBR_STREAM_NIX_BUILD_LOGS || "").trim() === "1"')) {
@@ -308,9 +309,9 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
     "utf8",
   );
-  if (!exactStoreHelper.includes("withSanitizedInheritedNixConfig")) {
+  if (!exactStoreHelper.includes("envWithResolvedNixBin")) {
     throw new Error(
-      "update-pnpm-hash exact-store helper must sanitize inherited Nix config before spawning nix",
+      "update-pnpm-hash exact-store helper must export the selected Nix binary before spawning nix",
     );
   }
   const verifiedMarker = await fsp.readFile(

@@ -14,27 +14,10 @@ import {
 } from "./nix-build-filtered-flake-lib";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 import { emitTimingDetail } from "../lib/timing-detail";
-import { resolveToolPathSync } from "../lib/tool-paths";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../lib/macos-metadata";
 import { targetPackageFromLabel } from "./build-selected-helpers";
 import { findWorkspacePackageRepoDirs } from "./update-pnpm-hash/importer-workspace-packages";
-
-function executablePath(filePath: string): string {
-  const candidate = filePath.trim();
-  if (!candidate || !path.isAbsolute(candidate)) return "";
-  try {
-    fs.accessSync(candidate, fs.constants.X_OK);
-    return candidate;
-  } catch {
-    return "";
-  }
-}
-
-function resolveNixBin(): string {
-  const fromEnv = executablePath(String(process.env.NIX_BIN || ""));
-  if (fromEnv) return fromEnv;
-  return resolveToolPathSync("nix");
-}
 
 async function existingRelPaths(root: string, relPaths: readonly string[]): Promise<string[]> {
   const present: string[] = [];
@@ -212,10 +195,12 @@ async function rewriteViberootsInput(flakeDir: string, inputPath: string): Promi
 }
 
 async function lockPathInput(inputPath: string): Promise<Record<string, unknown>> {
-  const nixBin = resolveNixBin();
+  const nixEnv = envWithResolvedNixBin(process.env);
+  const nixBin = resolveToolPathSync("nix", nixEnv);
   const canonicalInputPath = await fsp.realpath(inputPath).catch(() => inputPath);
   const prefetched = await $({
     stdio: "pipe",
+    env: nixEnv,
   })`${nixBin} flake prefetch --json ${`path:${canonicalInputPath}`}`.nothrow();
   if (prefetched.exitCode === 0) {
     try {
@@ -234,6 +219,7 @@ async function lockPathInput(inputPath: string): Promise<Record<string, unknown>
   }
   const hashed = await $({
     stdio: "pipe",
+    env: nixEnv,
   })`${nixBin} hash path --sri ${canonicalInputPath}`;
   const narHash = String(hashed.stdout || "").trim();
   if (!/^sha256-[A-Za-z0-9+/=_-]+$/.test(narHash)) {

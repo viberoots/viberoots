@@ -4,7 +4,11 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { ensureNixStoreToolPathSync, resolveToolPathSync } from "../../lib/tool-paths";
+import {
+  ensureNixStoreToolPathSync,
+  envWithResolvedNixBin,
+  resolveToolPathSync,
+} from "../../lib/tool-paths";
 import { viberootsSourcePath } from "./test-helpers/source-paths";
 
 test("resolveToolPathSync prefers nix store binaries before host PATH entries", async () => {
@@ -81,6 +85,26 @@ test("resolveToolPathSync honors explicit VBR_NIX_BIN override", async () => {
       }),
       customNix,
     );
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("envWithResolvedNixBin exports the selected nix binary", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "tool-paths-"));
+  try {
+    const customDir = path.join(tmp, "custom");
+    await fsp.mkdir(customDir, { recursive: true });
+    const customNix = path.join(customDir, "nix");
+    await fsp.writeFile(customNix, "#!/bin/sh\nexit 0\n", "utf8");
+    await fsp.chmod(customNix, 0o755);
+
+    const env = envWithResolvedNixBin({
+      ...process.env,
+      PATH: "",
+      VBR_NIX_BIN: customNix,
+    });
+    assert.equal(env.VBR_NIX_BIN, customNix);
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }

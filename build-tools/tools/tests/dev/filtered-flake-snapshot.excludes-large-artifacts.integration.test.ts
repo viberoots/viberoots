@@ -175,9 +175,22 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
   if (!helper.includes('path.join(abs, "flake.nix")')) {
     throw new Error("nix-build-filtered-flake must require active viberoots roots to be flakes");
   }
-  if (!helper.includes("process.env.NIX_BIN") || !helper.includes('resolveToolPathSync("nix")')) {
+  for (const [name, source] of [
+    ["update-pnpm-hash filtered snapshot", updaterHelper],
+    ["selected-build filtered snapshot", selectedHelper],
+    ["nix-build-filtered-flake snapshot", helper],
+  ] as const) {
+    if (
+      source.includes("process.env.NIX_BIN") ||
+      source.includes('resolveToolPathSync("nix")') ||
+      !source.includes("envWithResolvedNixBin")
+    ) {
+      throw new Error(`${name} must invoke nix through the selected VBR_NIX_BIN environment`);
+    }
+  }
+  if (!helper.includes('resolveToolPathSync("nix", nixEnv)')) {
     throw new Error(
-      "nix-build-filtered-flake must invoke an explicit nix binary path so minimal Buck test PATHs work",
+      "nix-build-filtered-flake must resolve the nix command from the same env passed to nix",
     );
   }
 });

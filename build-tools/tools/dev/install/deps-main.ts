@@ -28,6 +28,7 @@ import { writeGlueFingerprint } from "./glue-freshness";
 import { checkBootstrapCompletion } from "../../lib/bootstrap-completion";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { repairGeneratedWorkspaceLock } from "../../lib/workspace-lock-repair";
+import { envWithResolvedNixBin } from "../../lib/tool-paths";
 
 type Flags = {
   force: boolean;
@@ -269,7 +270,7 @@ if (dryRun) {
         const activeZxInit = zxInitPath(repoRoot);
         for (const imp of importers) {
           const commandCwd = repoRoot;
-          const commandEnv = process.env;
+          const commandEnv = envWithResolvedNixBin(process.env);
           const relLock = path.join(imp, "pnpm-lock.yaml");
           const freshness = await importerInstallFreshness({
             repoRoot,
@@ -355,7 +356,7 @@ try {
   const patchesLintAbs = buildToolPath(repoRoot, "tools/dev/patches-lint.ts");
   await $({
     stdio: "inherit",
-    env: { ...process.env, ZX_INIT: zxInitPath(repoRoot) },
+    env: envWithResolvedNixBin({ ...process.env, ZX_INIT: zxInitPath(repoRoot) }),
   })`zx-wrapper ${patchesLintAbs}`.nothrow();
 } catch {}
 // Generate gomod2nix.toml at repo root (if present) and per project (projects/apps/*, projects/libs/*)

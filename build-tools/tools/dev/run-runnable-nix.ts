@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { processTableLines } from "../lib/process-inspection";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
 
 function runnableBuildTimeoutSec(): number {
   const raw = String(process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC || "").trim();
@@ -78,9 +79,11 @@ export async function runNixBuildWithProgress(opts: {
   label: string;
 }): Promise<string> {
   const timeoutSec = runnableBuildTimeoutSec();
-  const child = spawn("nix", ["build", ...opts.args], {
+  const env = envWithResolvedNixBin((opts.env as NodeJS.ProcessEnv | undefined) ?? process.env);
+  const nixBin = resolveToolPathSync("nix", env);
+  const child = spawn(nixBin, ["build", ...opts.args], {
     cwd: opts.workspaceRoot,
-    env: (opts.env as NodeJS.ProcessEnv | undefined) ?? process.env,
+    env,
     stdio: ["ignore", "pipe", "pipe"],
     detached: true,
   });

@@ -61,6 +61,13 @@ export function resolveToolPathSync(tool: string, env: NodeJS.ProcessEnv = proce
   return preferredCandidate(tool, env);
 }
 
+export function envWithResolvedNixBin(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  return {
+    ...env,
+    VBR_NIX_BIN: resolveToolPathSync("nix", env),
+  };
+}
+
 export function ensureNixStoreToolPathSync(
   tool: string,
   env: NodeJS.ProcessEnv = process.env,

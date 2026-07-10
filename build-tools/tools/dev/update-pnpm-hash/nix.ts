@@ -4,8 +4,7 @@ import path from "node:path";
 import { gcWaitConfig, nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
 import { type ManagedCommandActivity, runManagedCommand } from "../../lib/managed-command";
 import { localOnlyNixBuilderArgs } from "../../lib/nix-builder-policy";
-import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
-import { resolveToolPathSync } from "../../lib/tool-paths";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 
 export function extractHash(text: string): string | null {
   const mismatchGot = text.match(/got:\s*(sha256-[A-Za-z0-9+/=\-_]{43,})/);
@@ -20,7 +19,7 @@ function resolvedFetchTimeoutSec(): number {
 }
 
 function envWithFetchTimeout(timeoutSec: number, extraEnv?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
-  return withSanitizedInheritedNixConfig({
+  return envWithResolvedNixBin({
     ...process.env,
     // Keep nix-evaluated derivation timeout aligned with managed-process timeout.
     NIX_PNPM_FETCH_TIMEOUT: String(timeoutSec),
@@ -147,7 +146,8 @@ export async function buildStore(
   const cores = String(process.env.NIX_CORES || "").trim() || "0";
   const timeoutSec = resolvedFetchTimeoutSec();
   const streamBuildLogs = String(process.env.VBR_STREAM_NIX_BUILD_LOGS || "").trim() === "1";
-  const nixBin = resolveToolPathSync("nix");
+  const commandEnv = envWithFetchTimeout(timeoutSec, extraEnv);
+  const nixBin = resolveToolPathSync("nix", commandEnv);
   console.error(
     `[update-pnpm-hash] nix build ${attrPath} (timeout=${timeoutSec}s, logs=${streamBuildLogs ? "stream" : "compact"})`,
   );
@@ -155,7 +155,7 @@ export async function buildStore(
     command: nixBin,
     args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores, extraEnv }),
     cwd: process.cwd(),
-    env: envWithFetchTimeout(timeoutSec, extraEnv),
+    env: commandEnv,
     timeoutMs: timeoutSec * 1000,
     activity,
     onStderr: streamBuildLogs ? (chunk) => process.stderr.write(chunk) : undefined,
@@ -199,7 +199,8 @@ export async function buildUnfixedAndHash(
   const cores = String(process.env.NIX_CORES || "").trim() || "0";
   const timeoutSec = resolvedFetchTimeoutSec();
   const streamBuildLogs = String(process.env.VBR_STREAM_NIX_BUILD_LOGS || "").trim() === "1";
-  const nixBin = resolveToolPathSync("nix");
+  const commandEnv = envWithFetchTimeout(timeoutSec, extraEnv);
+  const nixBin = resolveToolPathSync("nix", commandEnv);
   console.error(
     `[update-pnpm-hash] nix build ${attrPath} and hash result (timeout=${timeoutSec}s, logs=${streamBuildLogs ? "stream" : "compact"})`,
   );
@@ -207,7 +208,7 @@ export async function buildUnfixedAndHash(
     command: nixBin,
     args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores, extraEnv }),
     cwd: process.cwd(),
-    env: envWithFetchTimeout(timeoutSec, extraEnv),
+    env: commandEnv,
     timeoutMs: timeoutSec * 1000,
     activity,
     onStderr: streamBuildLogs ? (chunk) => process.stderr.write(chunk) : undefined,
@@ -233,11 +234,12 @@ export async function buildUnfixedAndHash(
   if (!outPath) {
     return { ok: false, output: "nix build returned no out path for " + attrPath };
   }
+  const hashEnv = envWithResolvedNixBin(process.env);
   const hashed = await runManagedCommand({
-    command: nixBin,
+    command: resolveToolPathSync("nix", hashEnv),
     args: ["hash", "path", "--sri", outPath],
     cwd: process.cwd(),
-    env: process.env,
+    env: hashEnv,
     timeoutMs: 120_000,
   });
   if (!hashed.ok) {
@@ -255,8 +257,12 @@ export async function buildUnfixedAndHash(
 
 async function currentSystem(): Promise<string> {
   try {
-    const nixBin = resolveToolPathSync("nix");
-    const res = await $({ stdio: "pipe" })`${nixBin} eval --impure --expr builtins.currentSystem`;
+    const nixEnv = envWithResolvedNixBin(process.env);
+    const nixBin = resolveToolPathSync("nix", nixEnv);
+    const res = await $({
+      stdio: "pipe",
+      env: nixEnv,
+    })`${nixBin} eval --impure --expr builtins.currentSystem`;
     return String(res.stdout || "")
       .trim()
       .replace(/^"|"$/g, "");
@@ -273,9 +279,11 @@ export async function flakeAttrExists(
   try {
     const sys = await currentSystem();
     if (!sys) return false;
-    const nixBin = resolveToolPathSync("nix");
+    const nixEnv = envWithResolvedNixBin(process.env);
+    const nixBin = resolveToolPathSync("nix", nixEnv);
     const out = await $({
       stdio: "pipe",
+      env: nixEnv,
     })`${nixBin} eval --impure ${flakeRef}#packages.${sys}.${attrset} --apply ${`builtins.hasAttr "${key}"`} --accept-flake-config`;
     const val = String(out.stdout || "").trim();
     return val === "true";
