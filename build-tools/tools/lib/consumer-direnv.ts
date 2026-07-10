@@ -346,6 +346,10 @@ watch_file .viberoots/workspace/flake.nix
 watch_file .viberoots/workspace/flake.lock
 [[ -f viberoots/flake.nix ]] && watch_file viberoots/flake.nix
 
+if [[ "\${NIX_PNPM_ALLOW_GENERATE:-}" == "1" ]]; then
+  __vbr_flake_args+=(--impure)
+fi
+
 use flake "path:\${PWD}/.viberoots/workspace#default" --accept-flake-config --no-write-lock-file "\${__vbr_flake_args[@]}"
 if [[ -n "\${__vbr_source_root:-}" && -d "\${PWD}/viberoots" ]]; then
   __vbr_source_real="$(cd "\${__vbr_source_root}" && pwd -P 2>/dev/null || true)"

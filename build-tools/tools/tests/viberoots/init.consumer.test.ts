@@ -35,6 +35,8 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
     stage0,
     /use flake "path:\$\{PWD\}\/\.viberoots\/workspace#default" --accept-flake-config --no-write-lock-file "\$\{__vbr_flake_args\[@\]\}"/,
   );
+  assert.match(stage0, /if \[\[ "\$\{NIX_PNPM_ALLOW_GENERATE:-\}" == "1" \]\]/);
+  assert.match(stage0, /__vbr_flake_args\+=\(--impure\)/);
   assert.match(stage0, /! -f "\$\{__vbr_flake_input_root\}\/flake\.nix"/);
   assert.match(
     stage0,

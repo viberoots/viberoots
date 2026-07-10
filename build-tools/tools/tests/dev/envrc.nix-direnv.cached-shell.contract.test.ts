@@ -32,6 +32,8 @@ test("generated .envrc delegates to stable stage-0 helper before nix-direnv use 
     stage0,
     /use flake "path:\$\{PWD\}\/\.viberoots\/workspace#default" --accept-flake-config --no-write-lock-file "\$\{__vbr_flake_args\[@\]\}"/,
   );
+  assert.match(stage0, /if \[\[ "\$\{NIX_PNPM_ALLOW_GENERATE:-\}" == "1" \]\]/);
+  assert.match(stage0, /__vbr_flake_args\+=\(--impure\)/);
   assert.match(stage0, /__vbr_stage0_apply_nix_cache_health \|\| return 1/);
   assert.match(stage0, /\[env\] nix cache health: disabled unreachable substituter\(s\):/);
   assert.match(stage0, /error: viberoots workspace flake is missing\./);
