@@ -34,11 +34,11 @@ async function sourceRoot(): Promise<string> {
   return process.cwd();
 }
 
-async function repairLocalBuckPrelude(source: string): Promise<void> {
-  if (!(await pathExists(sourcePath(source, "build-tools/tools/nix/buck-prelude.nix")))) return;
-  if (await pathExists(sourcePath(source, "prelude/prelude.bzl"))) return;
-
-  const preludeLink = sourcePath(source, "prelude");
+async function materializeBuckPrelude(
+  flakeRoot: string,
+  preludeLink: string,
+  sourceLabel: string,
+): Promise<void> {
   let canReplace = false;
   try {
     const stat = await fsp.lstat(preludeLink);
@@ -52,9 +52,20 @@ async function repairLocalBuckPrelude(source: string): Promise<void> {
   }
 
   const built = await $({
-    cwd: source,
+    cwd: flakeRoot,
     stdio: "pipe",
-  })`nix build --impure ${`path:${source}#buck2-prelude`} --no-link --no-write-lock-file --accept-flake-config --print-out-paths`;
+  })`nix build --impure ${`path:${flakeRoot}#buck2-prelude`} --no-link --no-write-lock-file --accept-flake-config --print-out-paths`.nothrow();
+  if (built.exitCode !== 0) {
+    const stderr = String(built.stderr || "").trim();
+    throw new Error(
+      [
+        `[startup-check] failed to build Buck prelude from ${sourceLabel}`,
+        stderr ? `nix stderr:\n${stderr}` : "",
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    );
+  }
   const outPath =
     String(built.stdout || "")
       .trim()
@@ -63,12 +74,30 @@ async function repairLocalBuckPrelude(source: string): Promise<void> {
       .pop() || "";
   const target = path.join(outPath, "prelude");
   if (!(await pathExists(path.join(target, "prelude.bzl")))) {
-    throw new Error("[startup-check] failed to materialize Buck prelude from #buck2-prelude");
+    throw new Error(`[startup-check] failed to materialize Buck prelude from ${sourceLabel}`);
   }
+  await fsp.mkdir(path.dirname(preludeLink), { recursive: true });
   await fsp.unlink(preludeLink).catch((e) => {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
   });
   await fsp.symlink(target, preludeLink);
+}
+
+async function repairBuckPrelude(workspaceRoot: string, source: string): Promise<void> {
+  const workspaceFlake = path.join(workspaceRoot, ".viberoots", "workspace");
+  if (await pathExists(path.join(workspaceFlake, "flake.nix"))) {
+    if (await pathExists(path.join(workspaceFlake, "prelude", "prelude.bzl"))) return;
+    await materializeBuckPrelude(
+      workspaceFlake,
+      path.join(workspaceFlake, "prelude"),
+      ".viberoots/workspace#buck2-prelude",
+    );
+    return;
+  }
+
+  if (!(await pathExists(sourcePath(source, "build-tools/tools/nix/buck-prelude.nix")))) return;
+  if (await pathExists(sourcePath(source, "prelude/prelude.bzl"))) return;
+  await materializeBuckPrelude(source, sourcePath(source, "prelude"), "#buck2-prelude");
 }
 
 function sourcePath(root: string, ...parts: string[]): string {
@@ -260,7 +289,7 @@ async function main() {
   // No overlayfs requirement: patch workspaces use cp -cR on macOS when available, else cp -a.
 
   try {
-    await repairLocalBuckPrelude(source);
+    await repairBuckPrelude(process.cwd(), source);
   } catch (e) {
     console.error(e instanceof Error ? e.message : String(e));
     process.exit(1);

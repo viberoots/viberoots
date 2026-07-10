@@ -284,7 +284,12 @@ workspace flake, locks the requested viberoots input, evaluates `lib.viberootsSo
 `.viberoots/workspace/**` and `.viberoots/buck`. If Nix is missing, bootstrap can run the
 Determinate Nix installer. Interactive runs ask for confirmation first; non-interactive runs require
 `VBR_ALLOW_NIX_INSTALL=1` or `--allow-nix-install`; `VBR_INSTALL_NIX=0` disables Nix installation
-entirely. It also creates the canonical `projects/` directory, runs `direnv allow` unless
+entirely. Bootstrap can also add the current user to Nix trusted users with
+`VBR_TRUST_NIX_USER=1` or `--trust-nix-user`, and defaults to prompting in interactive sessions so
+viberoots' generated `NIX_CONFIG` can use restricted settings such as an empty `build-hook` without
+daemon warnings. It writes local Determinate Nix changes to `/etc/nix/nix.custom.conf` when that file
+is included by `/etc/nix/nix.conf`. It also creates the canonical `projects/` directory, runs
+`direnv allow` unless
 `VBR_DIRENV_ALLOW=0` is used, and runs `i` unless `VBR_RUN_INSTALL=0` is used. It can also run `b &&
 v` when `VBR_RUN_VALIDATE=1` is used. It prints the resolved plan before setup, supports
 `VBR_DRY_RUN=1`, and does not create generated state inside the reusable viberoots source. In

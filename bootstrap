@@ -40,6 +40,7 @@ submodule_url="$(env_or_default "${official_submodule_url}" VBR_SUBMODULE VBR_SU
 trust_submodule_url="$(env_or_default 0 VBR_TRUST_SUBMODULE VBR_TRUST_SUBMODULE_URL VIBEROOTS_TRUST_SUBMODULE_URL)"
 install_nix="$(env_or_default 1 VBR_INSTALL_NIX VIBEROOTS_INSTALL_NIX)"
 allow_nix_install="$(env_or_default 0 VBR_ALLOW_NIX_INSTALL VIBEROOTS_ALLOW_NIX_INSTALL)"
+trust_nix_user="$(env_or_default prompt VBR_TRUST_NIX_USER VIBEROOTS_TRUST_NIX_USER)"
 run_install="$(env_or_default 1 VBR_RUN_INSTALL VIBEROOTS_RUN_INSTALL)"
 run_validate="$(env_or_default 0 VBR_RUN_VALIDATE VIBEROOTS_RUN_VALIDATE)"
 dry_run="$(env_or_default 0 VBR_DRY_RUN VIBEROOTS_DRY_RUN)"
@@ -203,7 +204,8 @@ usage() {
 usage: bootstrap [--mode flake|submodule] [--ref <ref>] [--rev <sha>] [--workspace-root <dir>]
                  [--workspace-name <name>] [--viberoots-url <flake-ref>]
                  [--submodule-url <git-url>] [--no-run-install] [--run-validate]
-                 [--trust-submodule-url] [--allow-nix-install] [--no-install-nix] [--no-direnv-allow]
+                 [--trust-submodule-url] [--allow-nix-install] [--trust-nix-user]
+                 [--no-install-nix] [--no-trust-nix-user] [--no-direnv-allow]
                  [--post-clone] [--dry-run]
 
 Defaults:
@@ -212,6 +214,7 @@ Defaults:
   --rev disabled
   --install-nix
   --allow-nix-install disabled; prompt when interactive
+  --trust-nix-user prompt when interactive
   --run-install
   --run-validate disabled
   --direnv-allow
@@ -225,6 +228,7 @@ Examples:
   curl -fsSL https://viberoots.dev/bootstrap | VBR_CONSUMER=submodule bash
   curl -fsSL https://viberoots.dev/bootstrap | VBR_INSTALL_NIX=0 bash
   curl -fsSL https://viberoots.dev/bootstrap | VBR_ALLOW_NIX_INSTALL=1 bash
+  curl -fsSL https://viberoots.dev/bootstrap | VBR_TRUST_NIX_USER=1 bash
   curl -fsSL https://viberoots.dev/bootstrap | VBR_RUN_INSTALL=0 bash
   curl -fsSL https://viberoots.dev/bootstrap | VBR_RUN_VALIDATE=1 bash
   curl -fsSL https://viberoots.dev/bootstrap | VBR_DIRENV_ALLOW=0 bash
@@ -498,6 +502,32 @@ EOF
   fi
 }
 
+confirm_trust_nix_user() {
+  if [[ "${trust_nix_user}" == "1" ]]; then
+    return 0
+  fi
+  cat >&2 <<'EOF'
+viberoots can add the current user to Nix trusted users.
+
+This is a system-level Nix daemon configuration change. Trusted users can set
+restricted Nix options such as build hooks, trusted caches, and remote builders.
+Only continue on a personal or administered development machine where this is
+intentional.
+EOF
+  if ! { : </dev/tty >/dev/tty; } 2>/dev/null; then
+    ui_warn "nix trust" "skipped; no interactive terminal for confirmation"
+    return 1
+  fi
+  local answer
+  printf 'Trust the current user for Nix now? Type "yes" to continue: ' >/dev/tty
+  IFS= read -r answer </dev/tty
+  if [[ "${answer}" != "yes" ]]; then
+    ui_warn "nix trust" "skipped by user"
+    return 1
+  fi
+  return 0
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --mode)
@@ -582,8 +612,16 @@ while [[ $# -gt 0 ]]; do
       allow_nix_install=1
       shift
       ;;
+    --trust-nix-user)
+      trust_nix_user=1
+      shift
+      ;;
     --no-install-nix)
       install_nix=0
+      shift
+      ;;
+    --no-trust-nix-user)
+      trust_nix_user=0
       shift
       ;;
     --run-validate)
@@ -630,6 +668,10 @@ if [[ "${install_nix}" != "0" && "${install_nix}" != "1" ]]; then
 fi
 if [[ "${allow_nix_install}" != "0" && "${allow_nix_install}" != "1" ]]; then
   echo "error: VBR_ALLOW_NIX_INSTALL must be 0 or 1" >&2
+  exit 2
+fi
+if [[ "${trust_nix_user}" != "0" && "${trust_nix_user}" != "1" && "${trust_nix_user}" != "prompt" ]]; then
+  echo "error: VBR_TRUST_NIX_USER must be 0, 1, or prompt" >&2
   exit 2
 fi
 if [[ "${trust_submodule_url}" != "0" && "${trust_submodule_url}" != "1" ]]; then
@@ -1146,6 +1188,7 @@ print_summary() {
   ui_set "workspace name" "${workspace_name}"
   ui_set "source" "${source}"
   ui_set "ensure nix" "$([[ "${install_nix}" == "1" ]] && echo yes || echo no)"
+  ui_set "trust nix user" "${trust_nix_user}"
   ui_set "install" "$([[ "${run_install}" == "1" ]] && echo yes || echo no)"
   ui_set "validate" "$([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
   ui_set "direnv allow" "$([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
@@ -1178,6 +1221,7 @@ if [[ "${install_nix}" == "1" ]]; then
   ui_set "allow nix install" "$([[ "${allow_nix_install}" == "1" ]] && echo yes || echo prompt)"
 fi
 ui_set "install" "$([[ "${run_install}" == "1" ]] && echo yes || echo no)"
+ui_set "trust nix user" "${trust_nix_user}"
 ui_set "validate" "$([[ "${run_validate}" == "1" ]] && echo yes || echo no)"
 ui_set "direnv allow" "$([[ "${direnv_allow}" == "1" ]] && echo yes || echo no)"
 ui_set "post-clone" "$([[ "${post_clone}" == "1" ]] && echo yes || echo no)"
@@ -1206,6 +1250,11 @@ if [[ "${dry_run}" == "1" ]]; then
     else
       ui_list "prompt before installing Nix with the Determinate Nix installer"
     fi
+  fi
+  if [[ "${trust_nix_user}" == "1" ]]; then
+    ui_list "add the current user to Nix trusted users if needed"
+  elif [[ "${trust_nix_user}" == "prompt" ]]; then
+    ui_list "prompt before adding the current user to Nix trusted users if needed"
   fi
   ui_list "create workspace directory if missing" "initialize git repository if missing"
   if [[ "${mode}" == "flake" ]]; then
@@ -1269,6 +1318,121 @@ if ! command -v nix >/dev/null 2>&1; then
   refresh_nix_profile_path
 fi
 require_command nix
+
+nix_config_value() {
+  local key="$1"
+  awk -v wanted="${key}" '
+    $1 == wanted && $2 == "=" {
+      for (i = 3; i <= NF; i++) {
+        printf "%s%s", (i == 3 ? "" : " "), $i
+      }
+      printf "\n"
+    }
+  '
+}
+
+nix_user_is_trusted() {
+  local user="$1"
+  local config="$2"
+  local groups token trusted
+  groups="$(id -Gn "${user}" 2>/dev/null || true)"
+  trusted="$(
+    {
+      printf '%s\n' "${config}" | nix_config_value trusted-users
+      printf '%s\n' "${config}" | nix_config_value extra-trusted-users
+    } | tr ' ' '\n'
+  )"
+  while IFS= read -r token; do
+    [[ -n "${token}" ]] || continue
+    [[ "${token}" == "*" || "${token}" == "${user}" ]] && return 0
+    if [[ "${token}" == @* ]]; then
+      case " ${groups} " in
+        *" ${token#@} "*) return 0 ;;
+      esac
+    fi
+  done <<<"${trusted}"
+  return 1
+}
+
+append_trusted_nix_user() {
+  local user="$1"
+  local custom_conf="/etc/nix/nix.custom.conf"
+  local conf="/etc/nix/nix.conf"
+  local target="${custom_conf}"
+  if [[ -e "${conf}" && ! -e "${custom_conf}" ]] && ! grep -Eq '^[[:space:]]*!include[[:space:]]+nix\.custom\.conf([[:space:]]|$)' "${conf}" 2>/dev/null; then
+    target="${conf}"
+  fi
+  local script
+  script="$(cat <<'PY'
+import pathlib
+import sys
+
+path = pathlib.Path(sys.argv[1])
+user = sys.argv[2]
+path.parent.mkdir(parents=True, exist_ok=True)
+text = path.read_text() if path.exists() else ""
+lines = text.splitlines()
+for i, line in enumerate(lines):
+    stripped = line.strip()
+    if stripped.startswith("extra-trusted-users") and "=" in stripped:
+        prefix, value = line.split("=", 1)
+        users = value.split()
+        if user not in users:
+            users.append(user)
+        lines[i] = f"{prefix.rstrip()} = {' '.join(users)}"
+        break
+else:
+    if lines and lines[-1].strip():
+        lines.append("")
+    lines.append(f"extra-trusted-users = {user}")
+new_text = "\n".join(lines) + "\n"
+if new_text != text:
+    path.write_text(new_text)
+PY
+)"
+  printf '%s\n' "${script}" | sudo python3 - "${target}" "${user}"
+}
+
+restart_nix_daemon() {
+  if is_macos && command -v launchctl >/dev/null 2>&1; then
+    sudo launchctl kickstart -k system/org.nixos.nix-daemon >/dev/null 2>&1 ||
+      sudo launchctl kickstart -k system/systems.determinate.nix-daemon >/dev/null 2>&1 ||
+      return 1
+    return 0
+  fi
+  if command -v systemctl >/dev/null 2>&1; then
+    sudo systemctl restart nix-daemon.service >/dev/null 2>&1 && return 0
+  fi
+  return 1
+}
+
+ensure_nix_trusted_user() {
+  [[ "${trust_nix_user}" != "0" ]] || return 0
+  local user config refreshed
+  user="$(id -un)"
+  config="$(nix config show 2>/dev/null || true)"
+  if nix_user_is_trusted "${user}" "${config}"; then
+    ui_ok "nix trust" "${user} already trusted"
+    return 0
+  fi
+  if ! confirm_trust_nix_user; then
+    return 0
+  fi
+  append_trusted_nix_user "${user}"
+  record_action "added ${user} to Nix trusted users"
+  if restart_nix_daemon; then
+    refreshed="$(nix config show 2>/dev/null || true)"
+    if nix_user_is_trusted "${user}" "${refreshed}"; then
+      ui_ok "nix trust" "trusted ${user}"
+    else
+      ui_warn "nix trust" "updated config; open a new shell or retry if Nix has not reloaded it yet"
+    fi
+  else
+    ui_warn "nix trust" "updated config; restart nix-daemon or open a new shell if needed"
+  fi
+}
+
+ensure_nix_trusted_user
 
 if ! git_is_usable; then
   nix profile install nixpkgs#git
