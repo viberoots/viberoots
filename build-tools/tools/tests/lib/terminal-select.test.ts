@@ -140,11 +140,37 @@ test("terminal selector handles input emitted while resuming raw input", async (
   }
 });
 
+test("terminal selector enters raw mode before subscribing to data", async () => {
+  const input = new FakeTtyInput();
+  const output = new CaptureOutput();
+  try {
+    input.assertRawBeforeDataListener = true;
+    const selected = promptTerminalSelect(
+      "Select item",
+      [
+        { label: "First", value: "first" },
+        { label: "Second", value: "second" },
+      ],
+      0,
+      { streams: { input, output, close: () => undefined } },
+    );
+    input.write("\r");
+    assert.equal(await selected, "first");
+    assert.equal(input.rawBeforeDataListenerChecked, true);
+    assert.equal(input.rawMode, false);
+    assert.equal(input.paused, true);
+  } finally {
+    input.destroy();
+  }
+});
+
 class FakeTtyInput extends PassThrough {
   isTTY = true;
   isRaw = false;
   paused = true;
   rawMode = false;
+  assertRawBeforeDataListener = false;
+  rawBeforeDataListenerChecked = false;
   private readonly resumeData?: string;
 
   constructor(resumeData?: string) {
@@ -171,6 +197,14 @@ class FakeTtyInput extends PassThrough {
 
   isPaused() {
     return this.paused;
+  }
+
+  on(eventName: string | symbol, listener: (...args: any[]) => void) {
+    if (eventName === "data" && this.assertRawBeforeDataListener) {
+      this.rawBeforeDataListenerChecked = true;
+      assert.equal(this.rawMode, true);
+    }
+    return super.on(eventName, listener);
   }
 }
 

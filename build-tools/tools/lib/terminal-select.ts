@@ -61,6 +61,7 @@ export async function promptTerminalSelect(
   }
   let onData: ((chunk: Buffer) => void) | undefined;
   try {
+    streams.input.setRawMode(true);
     const selected = new Promise<string>((resolve, reject) => {
       let pending = "";
       let settled = false;
@@ -117,7 +118,6 @@ export async function promptTerminalSelect(
       };
       streams.input.on("data", onData);
     });
-    streams.input.setRawMode(true);
     streams.input.resume();
     render();
     return await selected;
@@ -127,15 +127,6 @@ export async function promptTerminalSelect(
     pausePromptInput(streams.input);
     streams.close();
   }
-}
-
-export async function promptTerminalSelectLine(
-  message: string,
-  choices: TerminalSelectChoice[],
-  initialIndex: number,
-) {
-  if (choices.length === 0) throw new Error(`${message} has no choices`);
-  return await promptSelectLine(message, choices, initialIndex);
 }
 
 export async function promptTerminalLine(message: string, defaultValue = "") {

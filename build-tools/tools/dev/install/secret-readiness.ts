@@ -18,7 +18,7 @@ import {
 } from "../../deployments/infisical-bootstrap-reset-local";
 import { loadDeploymentReadinessModules, sinkFromSelection } from "./secret-readiness-modules";
 import { buildToolPath, zxInitPath } from "../dev-build/paths";
-import { hasControllingTerminal, promptTerminalSelectLine } from "../../lib/terminal-select";
+import { hasControllingTerminal, promptTerminalSelect } from "../../lib/terminal-select";
 
 export type SecretReadinessFlags = {
   withoutSecrets: boolean;
@@ -443,7 +443,7 @@ async function selectSecretBackendWhenInteractive(
 }
 
 async function promptSecretBackend() {
-  return await promptTerminalSelectLine(
+  return await promptTerminalSelect(
     "Select main secret backend",
     [
       { label: "Infisical", value: "infisical/default" },
@@ -451,6 +451,7 @@ async function promptSecretBackend() {
       { label: "macOS Keychain", value: "keychain/default" },
     ],
     0,
+    { cancelMessage: "secret backend selection cancelled" },
   );
 }
 
