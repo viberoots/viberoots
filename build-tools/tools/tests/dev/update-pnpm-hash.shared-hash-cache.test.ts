@@ -196,7 +196,7 @@ test("non-default pnpm-store hash refresh verifies restored shared-cache hits", 
       "importer=projects/libs/demo step=fixed-build-after-hash attr=pnpm-store.projects-libs-demo",
       "importer=projects/libs/demo step=shared-hash-cache attr=pnpm-store.projects-libs-demo",
     ]);
-    assert.equal(prepareCount, 1);
+    assert.equal(prepareCount, 2);
     assert.equal(await readSharedHashCache({ repoRoot, builderFingerprint, lockHash }), hashValue);
   } finally {
     process.chdir(prevCwd);
@@ -386,7 +386,7 @@ test("shared pnpm-store hash cache reuses verified identical lockfiles across im
       "importer=projects/apps/demo-a step=fixed-build-after-hash attr=pnpm-store.projects-apps-demo-a",
       "importer=projects/apps/demo-b step=shared-hash-cache attr=pnpm-store.projects-apps-demo-b",
     ]);
-    assert.deepEqual(preparedImporters, ["projects/apps/demo-b"]);
+    assert.deepEqual(preparedImporters, ["projects/apps/demo-a", "projects/apps/demo-b"]);
     assert.equal(
       await readSharedHashCache({
         repoRoot,

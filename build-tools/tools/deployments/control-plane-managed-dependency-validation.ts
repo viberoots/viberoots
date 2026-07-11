@@ -41,6 +41,9 @@ export async function validateManagedDependencyProfile(
   profile: ControlPlaneManagedDependencyProfile,
   runtimeFacts: ManagedRuntimePathFacts = {},
 ): Promise<ManagedDependencyEvidence> {
+  await withRedactedErrors("managed Postgres", () =>
+    validateManagedPostgresRuntimePathProfile(profile),
+  );
   const [postgres, artifactStore] = await Promise.all([
     withRedactedErrors("managed Postgres", () =>
       validateManagedPostgresProfile(profile, runtimeFacts),
@@ -154,6 +157,13 @@ export async function validateManagedPostgresProfile(
     client.release();
     await pool.end();
   }
+}
+
+async function validateManagedPostgresRuntimePathProfile(
+  profile: ControlPlaneManagedDependencyProfile,
+): Promise<void> {
+  const databaseUrl = await readManagedDependencyCredential(profile.postgres.urlFile);
+  assertPostgresMatchesRuntimePath(profile, postgresConnectionFacts(databaseUrl));
 }
 
 export async function validateManagedArtifactStoreProfile(

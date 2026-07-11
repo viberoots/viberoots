@@ -18,7 +18,8 @@ import {
 } from "../lib/consumer-source-mode";
 import { runLiveBootstrap } from "../lib/live-bootstrap";
 import { runViberootsGc } from "../lib/maintenance-gc";
-import { resolveToolPathSync } from "../lib/tool-paths";
+import { withSanitizedInheritedNixConfig } from "../lib/nix-config-env";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
 import { repairGeneratedWorkspaceLock } from "../lib/workspace-lock-repair";
 import { exportDeploymentResourceGraph } from "../deployments/resource-graph-export";
 
@@ -507,8 +508,16 @@ function developCommand(): {
   const workspaceFlake = `${relativePathRef(cwd, roots.viberootsWorkspace)}#default`;
   const viberootsInput = relativePathRef(cwd, selectedInputRoot);
   const toolsBin = path.join(roots.viberootsRoot, "build-tools", "tools", "bin");
+  const env = withSanitizedInheritedNixConfig(
+    envWithResolvedNixBin({
+      ...process.env,
+      PATH: `${toolsBin}${path.delimiter}${process.env.PATH || ""}`,
+      WORKSPACE_ROOT: roots.workspaceRoot,
+      VIBEROOTS_FLAKE_INPUT_ROOT: selectedInputRoot,
+    }),
+  );
   return {
-    command: "nix",
+    command: resolveToolPathSync("nix", env),
     args: [
       "develop",
       "--no-write-lock-file",
@@ -519,12 +528,7 @@ function developCommand(): {
       `path:${viberootsInput}`,
       ...developPassthroughArgs(),
     ],
-    env: {
-      ...process.env,
-      PATH: `${toolsBin}${path.delimiter}${process.env.PATH || ""}`,
-      WORKSPACE_ROOT: roots.workspaceRoot,
-      VIBEROOTS_FLAKE_INPUT_ROOT: selectedInputRoot,
-    },
+    env,
     selectedInputRoot,
     workspaceRoot: roots.workspaceRoot,
   };

@@ -8,6 +8,7 @@ import { test } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
 import { initConsumer } from "../../lib/consumer-bootstrap";
+import { envWithoutSelectedNix } from "../lib/test-helpers";
 
 const execFileAsync = promisify(execFile);
 
@@ -93,6 +94,100 @@ async function withConsumerWorkspace(
   }
 }
 
+async function writeFakeMacosDeveloperTools(fakeBin: string, log?: string): Promise<void> {
+  await fsp.writeFile(
+    path.join(fakeBin, "xcode-select"),
+    [
+      "#!/usr/bin/env bash",
+      log ? `printf 'xcode-select %s\\n' "$*" >> ${JSON.stringify(log)}` : "",
+      'if [[ "${1:-}" == "-p" ]]; then printf "/Applications/Xcode.app/Contents/Developer\\n"; exit 0; fi',
+      'if [[ "${1:-}" == "--install" ]]; then exit 42; fi',
+      "exit 0",
+      "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    { mode: 0o755 },
+  );
+  await fsp.writeFile(
+    path.join(fakeBin, "xcrun"),
+    [
+      "#!/usr/bin/env bash",
+      log ? `printf 'xcrun %s\\n' "$*" >> ${JSON.stringify(log)}` : "",
+      'case "$*" in',
+      '  "--find clang") printf "/usr/bin/clang\\n"; exit 0 ;;',
+      '  "--sdk macosx --show-sdk-path") printf "/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk\\n"; exit 0 ;;',
+      "esac",
+      "exit 1",
+      "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    { mode: 0o755 },
+  );
+}
+
+function envWithFakeNix(
+  fakeBin: string,
+  extraEnv: NodeJS.ProcessEnv = {},
+  pathValue = `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
+): NodeJS.ProcessEnv {
+  const nixBin = path.join(fakeBin, "nix");
+  return {
+    ...process.env,
+    ...extraEnv,
+    PATH: pathValue,
+    VBR_NIX_BIN: nixBin,
+    NIX_BIN: nixBin,
+  };
+}
+
+async function writeFakeWorkspaceLockNix(fakeBin: string, log?: string): Promise<void> {
+  await fsp.writeFile(
+    path.join(fakeBin, "nix"),
+    [
+      "#!/usr/bin/env bash",
+      "set -euo pipefail",
+      log ? `printf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}` : "",
+      'if [[ "${1:-}" == "--version" ]]; then exit 0; fi',
+      'if [[ "${1:-}" == "flake" && "${2:-}" == "metadata" ]]; then',
+      '  input_path="${PWD}/.viberoots/workspace/viberoots-flake-input"',
+      "  cat <<JSON",
+      '{"locks":{"nodes":{"root":{"inputs":{"viberoots":"viberoots"}},"viberoots":{"locked":{"lastModified":1,"path":"${input_path}","type":"path"},"original":{"path":"${input_path}","type":"path"}}},"root":"root","version":7}}',
+      "JSON",
+      "  exit 0",
+      "fi",
+      'if [[ "${1:-}" == "flake" && ("${2:-}" == "lock" || "${2:-}" == "update") ]]; then',
+      "  mkdir -p .viberoots/workspace",
+      '  override=""',
+      '  prev=""',
+      '  for arg in "$@"; do',
+      '    if [[ "${prev}" == "viberoots" ]]; then override="${arg}"; break; fi',
+      '    prev="${arg}"',
+      "  done",
+      '  if [[ "${override}" == git+* ]]; then',
+      '    rev="${override##*rev=}"',
+      '    if [[ ! "${rev}" =~ ^[0-9a-fA-F]{40}$ ]]; then rev="0123456789abcdef0123456789abcdef01234567"; fi',
+      "    cat > .viberoots/workspace/flake.lock <<JSON",
+      '{"nodes":{"root":{"inputs":{"viberoots":"viberoots"}},"viberoots":{"locked":{"lastModified":1,"narHash":"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","rev":"${rev}","type":"git","url":"https://github.com/viberoots/viberoots.git"},"original":{"rev":"${rev}","type":"git","url":"https://github.com/viberoots/viberoots.git"}}},"root":"root","version":7}',
+      "JSON",
+      "  else",
+      "    cat > .viberoots/workspace/flake.lock <<'JSON'",
+      '{"nodes":{"root":{"inputs":{"viberoots":"viberoots"}},"viberoots":{"locked":{"path":"./viberoots-flake-input","type":"path"},"original":{"path":"./viberoots-flake-input","type":"path"},"parent":[]}},"root":"root","version":7}',
+      "JSON",
+      "  fi",
+      "  exit 0",
+      "fi",
+      'echo "unexpected nix invocation: $*" >&2',
+      "exit 92",
+      "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    { mode: 0o755 },
+  );
+}
+
 test("viberoots/init bootstraps and can install a bare consumer workspace", async () => {
   await withConsumerWorkspace("viberoots-init-consumer", async (workspace) => {
     const fakeBin = path.join(workspace, ".fake-bin");
@@ -107,6 +202,7 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
       "",
       "utf8",
     );
+    await writeFakeWorkspaceLockNix(fakeBin);
     await fsp.writeFile(
       path.join(fakeBin, "direnv"),
       `#!/usr/bin/env bash\nif [[ "\${1:-}" == "--version" ]]; then exit 0; fi\nprintf 'NIX_PNPM_ALLOW_GENERATE=%s %s\\n' "\${NIX_PNPM_ALLOW_GENERATE:-}" "$*" >> ${JSON.stringify(direnvLog)}\n`,
@@ -118,13 +214,11 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
       ["--run-install"],
       {
         cwd: workspace,
-        env: {
-          ...process.env,
-          PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
+        env: envWithFakeNix(fakeBin, {
           HOME: fakeHome,
           NO_DEV_SHELL: "1",
           VBR_INIT_USE_LOCAL_COMMAND: "1",
-        },
+        }),
       },
     );
 
@@ -220,13 +314,11 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     await fsp.writeFile(direnvLog, "", "utf8");
     await execFileAsync(path.join(workspace, "viberoots", "init"), ["--run-install"], {
       cwd: workspace,
-      env: {
-        ...process.env,
-        PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
+      env: envWithFakeNix(fakeBin, {
         HOME: fakeHome,
         NO_DEV_SHELL: "1",
         VBR_INIT_USE_LOCAL_COMMAND: "1",
-      },
+      }),
     });
     assert.equal(
       await fsp.readFile(direnvLog, "utf8"),
@@ -255,6 +347,7 @@ test("viberoots/init reports install failure without buffered direnv command dum
       "",
       "utf8",
     );
+    await writeFakeWorkspaceLockNix(fakeBin);
     await fsp.writeFile(
       path.join(fakeBin, "direnv"),
       [
@@ -270,13 +363,11 @@ test("viberoots/init reports install failure without buffered direnv command dum
       () =>
         execFileAsync(path.join(workspace, "viberoots", "init"), ["--run-install"], {
           cwd: workspace,
-          env: {
-            ...process.env,
-            PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
+          env: envWithFakeNix(fakeBin, {
             HOME: fakeHome,
             NO_DEV_SHELL: "1",
             VBR_INIT_USE_LOCAL_COMMAND: "1",
-          },
+          }),
         }),
       (error) => {
         const stderr = String((error as { stderr?: unknown }).stderr || "");
@@ -301,6 +392,7 @@ test("viberoots/init uses the flake command before host node is available", asyn
     await fsp.mkdir(fakeBin, { recursive: true });
     await fsp.mkdir(checkout, { recursive: true });
     await fsp.copyFile(path.join(viberootsRoot, "init"), path.join(checkout, "init"));
+    await fsp.copyFile(path.join(viberootsRoot, "flake.nix"), path.join(checkout, "flake.nix"));
     await fsp.chmod(path.join(checkout, "init"), 0o755);
     await fsp.symlink("/bin/bash", path.join(fakeBin, "bash"));
     await fsp.symlink("/bin/ln", path.join(fakeBin, "ln"));
@@ -328,12 +420,16 @@ printf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}
       cwd: workspace,
       env: {
         PATH: fakeBin,
+        VBR_NIX_BIN: path.join(fakeBin, "nix"),
         VIBEROOTS_FLAKE_INPUT_ROOT: path.join(workspace, "stale-generated-input"),
       },
     });
 
     const text = await fsp.readFile(log, "utf8");
-    assert.match(text, /nix run --accept-flake-config path:.*\/viberoots#viberoots -- init-consumer/);
+    assert.match(
+      text,
+      /nix run --accept-flake-config path:.*\/viberoots#viberoots -- init-consumer/,
+    );
     assert.doesNotMatch(text, /stale-generated-input/);
     assert.match(text, /--mode submodule/);
     assert.match(text, /--workspace-root .*viberoots-init-nix-command-/);
@@ -357,6 +453,7 @@ test("viberoots/init post-clone still generates hidden workspace lock", async ()
     await fsp.mkdir(fakeBin, { recursive: true });
     await fsp.mkdir(checkout, { recursive: true });
     await fsp.copyFile(path.join(viberootsRoot, "init"), path.join(checkout, "init"));
+    await fsp.copyFile(path.join(viberootsRoot, "flake.nix"), path.join(checkout, "flake.nix"));
     await fsp.chmod(path.join(checkout, "init"), 0o755);
     for (const [name, target] of [
       ["bash", "/bin/bash"],
@@ -378,6 +475,7 @@ test("viberoots/init post-clone still generates hidden workspace lock", async ()
       cwd: workspace,
       env: {
         PATH: fakeBin,
+        VBR_NIX_BIN: path.join(fakeBin, "nix"),
         VBR_POST_CLONE: "1",
       },
     });
@@ -663,11 +761,9 @@ exit 0
       ],
       {
         cwd: workspace,
-        env: {
-          ...process.env,
-          PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
+        env: envWithFakeNix(fakeBin, {
           NO_DEV_SHELL: "1",
-        },
+        }),
       },
     );
 
@@ -734,11 +830,9 @@ exit 0
         ],
         {
           cwd: workspace,
-          env: {
-            ...process.env,
-            PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
+          env: envWithFakeNix(fakeBin, {
             NO_DEV_SHELL: "1",
-          },
+          }),
         },
       );
 
@@ -781,9 +875,13 @@ exit 0
 
     const oldPath = process.env.PATH;
     const oldNoDevShell = process.env.NO_DEV_SHELL;
+    const oldVbrNixBin = process.env.VBR_NIX_BIN;
+    const oldNixBin = process.env.NIX_BIN;
     try {
       process.env.PATH = `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`;
       process.env.NO_DEV_SHELL = "1";
+      process.env.VBR_NIX_BIN = path.join(fakeBin, "nix");
+      process.env.NIX_BIN = path.join(fakeBin, "nix");
       await initConsumer({
         workspaceRoot: workspace,
         workspaceName: "post-clone-preserve-flake",
@@ -796,6 +894,10 @@ exit 0
       else process.env.PATH = oldPath;
       if (oldNoDevShell === undefined) delete process.env.NO_DEV_SHELL;
       else process.env.NO_DEV_SHELL = oldNoDevShell;
+      if (oldVbrNixBin === undefined) delete process.env.VBR_NIX_BIN;
+      else process.env.VBR_NIX_BIN = oldVbrNixBin;
+      if (oldNixBin === undefined) delete process.env.NIX_BIN;
+      else process.env.NIX_BIN = oldNixBin;
     }
 
     const text = await fsp.readFile(log, "utf8");
@@ -839,9 +941,13 @@ exit 0
 
     const oldPath = process.env.PATH;
     const oldNoDevShell = process.env.NO_DEV_SHELL;
+    const oldVbrNixBin = process.env.VBR_NIX_BIN;
+    const oldNixBin = process.env.NIX_BIN;
     try {
       process.env.PATH = `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`;
       process.env.NO_DEV_SHELL = "1";
+      process.env.VBR_NIX_BIN = path.join(fakeBin, "nix");
+      process.env.NIX_BIN = path.join(fakeBin, "nix");
       await initConsumer({
         workspaceRoot: workspace,
         workspaceName: "submodule-current-before-lock",
@@ -856,6 +962,10 @@ exit 0
       else process.env.PATH = oldPath;
       if (oldNoDevShell === undefined) delete process.env.NO_DEV_SHELL;
       else process.env.NO_DEV_SHELL = oldNoDevShell;
+      if (oldVbrNixBin === undefined) delete process.env.VBR_NIX_BIN;
+      else process.env.VBR_NIX_BIN = oldVbrNixBin;
+      if (oldNixBin === undefined) delete process.env.NIX_BIN;
+      else process.env.NIX_BIN = oldNixBin;
     }
 
     assert.match(await fsp.readFile(log, "utf8"), /nix flake lock/);
@@ -873,6 +983,7 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await writeFakeMacosDeveloperTools(fakeBin, log);
     await fsp.writeFile(
       path.join(fakeBin, "git"),
       `#!/usr/bin/env bash\nprintf 'git %s\\n' "$*" >> ${JSON.stringify(log)}\nif [[ "$*" == "rev-parse --is-inside-work-tree" ]]; then exit 1; fi\nexit 0\n`,
@@ -885,7 +996,7 @@ test("curlable bootstrap defaults to flake main and install enabled", async () =
     );
     const { stdout, stderr } = await execFileAsync(path.join(viberootsRoot, "bootstrap"), [], {
       cwd: workspace,
-      env: { ...process.env, PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}` },
+      env: envWithFakeNix(fakeBin),
     });
 
     const text = await fsp.readFile(log, "utf8");
@@ -937,6 +1048,7 @@ test("curlable bootstrap reports closed beta when official repo is inaccessible"
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await writeFakeMacosDeveloperTools(fakeBin, log);
     await fsp.writeFile(
       path.join(fakeBin, "git"),
       `#!/usr/bin/env bash
@@ -963,7 +1075,7 @@ exit 0
     await assert.rejects(
       execFileAsync(path.join(viberootsRoot, "bootstrap"), ["--workspace-root", workspace], {
         cwd: workspace,
-        env: { ...process.env, PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}` },
+        env: envWithFakeNix(fakeBin),
       }),
       (error: unknown) => {
         const err = error as { stderr?: string; stdout?: string };
@@ -1100,6 +1212,7 @@ test("curlable bootstrap can run validation internally", async () => {
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await writeFakeMacosDeveloperTools(fakeBin);
     await fsp.writeFile(
       path.join(fakeBin, "git"),
       `#!/usr/bin/env bash\nprintf 'git %s\\n' "$*" >> ${JSON.stringify(log)}\nif [[ "$*" == "rev-parse --is-inside-work-tree" ]]; then exit 1; fi\nexit 0\n`,
@@ -1118,11 +1231,9 @@ test("curlable bootstrap can run validation internally", async () => {
 
     const { stdout } = await execFileAsync(path.join(viberootsRoot, "bootstrap"), [], {
       cwd: workspace,
-      env: {
-        ...process.env,
-        PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
+      env: envWithFakeNix(fakeBin, {
         VIBEROOTS_RUN_VALIDATE: "1",
-      },
+      }),
     });
 
     const text = await fsp.readFile(log, "utf8");
@@ -1144,6 +1255,7 @@ test("curlable bootstrap migrates generated buckconfig with legacy prelude path"
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(path.join(workspace, ".viberoots", "workspace"), { recursive: true });
     await fsp.mkdir(fakeBin, { recursive: true });
+    await writeFakeMacosDeveloperTools(fakeBin, log);
     await fsp.writeFile(path.join(workspace, ".buckroot"), ".\n", "utf8");
     await fsp.writeFile(
       path.join(workspace, ".buckconfig"),
@@ -1191,7 +1303,7 @@ prelude = ./.viberoots/current/prelude
       ["--workspace-root", workspace, "--no-run-install"],
       {
         cwd: workspace,
-        env: { ...process.env, PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}` },
+        env: envWithFakeNix(fakeBin),
       },
     );
 
@@ -1215,6 +1327,7 @@ test("curlable bootstrap migrates generated submodule buckconfig prelude path", 
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(path.join(workspace, ".viberoots", "workspace"), { recursive: true });
     await fsp.mkdir(fakeBin, { recursive: true });
+    await writeFakeMacosDeveloperTools(fakeBin, log);
     await fsp.mkdir(path.join(workspace, ".git"), { recursive: true });
     await fsp.mkdir(path.join(workspace, "viberoots"), { recursive: true });
     await fsp.writeFile(path.join(workspace, "viberoots", "init"), "#!/usr/bin/env bash\n", {
@@ -1267,7 +1380,7 @@ prelude = ./.viberoots/current/prelude
       ["--mode", "submodule", "--workspace-root", workspace, "--no-run-install"],
       {
         cwd: workspace,
-        env: { ...process.env, PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}` },
+        env: envWithFakeNix(fakeBin),
       },
     );
 
@@ -1416,6 +1529,7 @@ test("curlable bootstrap resumes and completes an interrupted transaction", asyn
     const log = path.join(workspace, ".bootstrap.log");
     const transactionDir = path.join(workspace, ".viberoots", "bootstrap", "transactions");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await writeFakeMacosDeveloperTools(fakeBin, log);
     await fsp.mkdir(transactionDir, { recursive: true });
     await fsp.writeFile(
       path.join(transactionDir, "current.json"),
@@ -1452,7 +1566,7 @@ test("curlable bootstrap resumes and completes an interrupted transaction", asyn
       ["--workspace-root", workspace, "--workspace-name", "resume-demo", "--no-run-install"],
       {
         cwd: workspace,
-        env: { ...process.env, PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}` },
+        env: envWithFakeNix(fakeBin),
       },
     );
 
@@ -1497,6 +1611,9 @@ test("curlable bootstrap installs git through nix when git is missing", async ()
     await fsp.symlink("/usr/bin/head", path.join(fakeBin, "head"));
     await fsp.symlink("/usr/bin/dirname", path.join(fakeBin, "dirname"));
     await fsp.symlink("/usr/bin/basename", path.join(fakeBin, "basename"));
+    await fsp.symlink("/usr/bin/tr", path.join(fakeBin, "tr"));
+    await fsp.symlink("/usr/bin/uname", path.join(fakeBin, "uname"));
+    await writeFakeMacosDeveloperTools(fakeBin, log);
     await fsp.writeFile(
       path.join(fakeBin, "nix"),
       `#!/usr/bin/env bash\nprintf 'nix %s\\n' "$*" >> ${JSON.stringify(log)}\nexit 0\n`,
@@ -1522,6 +1639,9 @@ test("curlable bootstrap installs git through nix when git is missing", async ()
           ...process.env,
           HOME: fakeHome,
           PATH: fakeBin,
+          VBR_NIX_BIN: path.join(fakeBin, "nix"),
+          NIX_BIN: path.join(fakeBin, "nix"),
+          VIBEROOTS_TEST_IGNORE_HOST_PROFILE_NIX: "1",
           VIBEROOTS_DIRENV_ALLOW: "0",
         },
       },
@@ -1563,9 +1683,12 @@ test("curlable bootstrap installs nix when nix is missing", async () => {
       ["dirname", "/usr/bin/dirname"],
       ["basename", "/usr/bin/basename"],
       ["sh", "/bin/sh"],
+      ["tr", "/usr/bin/tr"],
+      ["uname", "/usr/bin/uname"],
     ]) {
       await fsp.symlink(real, path.join(fakeBin, name));
     }
+    await writeFakeMacosDeveloperTools(fakeBin, log);
     await fsp.writeFile(
       path.join(fakeBin, "curl"),
       `#!/usr/bin/env bash\nprintf 'curl %s\\n' "$*" >> ${JSON.stringify(log)}\nprintf '#!/usr/bin/env sh\\nexit 0\\n'\n`,
@@ -1590,18 +1713,18 @@ test("curlable bootstrap installs nix when nix is missing", async () => {
 
     await execFileAsync(path.join(viberootsRoot, "bootstrap"), ["--no-run-install"], {
       cwd: workspace,
-      env: {
-        ...process.env,
+      env: envWithoutSelectedNix({
         HOME: workspace,
         PATH: fakeBin,
         VBR_ALLOW_NIX_INSTALL: "1",
+        VIBEROOTS_TEST_IGNORE_HOST_PROFILE_NIX: "1",
         VIBEROOTS_NIX_PROFILE_SCRIPT: path.join(
           fakeNixProfile,
           "etc",
           "profile.d",
           "nix-daemon.sh",
         ),
-      },
+      }),
     });
 
     const text = await fsp.readFile(log, "utf8");
@@ -1631,17 +1754,20 @@ test("curlable bootstrap can refuse automatic nix installation", async () => {
       ["cat", "/bin/cat"],
       ["dirname", "/usr/bin/dirname"],
       ["basename", "/usr/bin/basename"],
+      ["tr", "/usr/bin/tr"],
+      ["uname", "/usr/bin/uname"],
     ]) {
       await fsp.symlink(real, path.join(fakeBin, name));
     }
+    await writeFakeMacosDeveloperTools(fakeBin);
 
     await assert.rejects(
       execFileAsync(path.join(viberootsRoot, "bootstrap"), ["--no-install-nix"], {
         cwd: workspace,
-        env: {
-          ...process.env,
+        env: envWithoutSelectedNix({
           PATH: fakeBin,
-        },
+          VIBEROOTS_TEST_IGNORE_HOST_PROFILE_NIX: "1",
+        }),
       }),
       /nix is required/,
     );
@@ -1704,7 +1830,7 @@ test("curlable bootstrap accepts configured macOS developer tools", async () => 
       ["--no-run-install"],
       {
         cwd: workspace,
-        env: { ...process.env, PATH: fakeBin },
+        env: envWithFakeNix(fakeBin, {}, fakeBin),
       },
     );
 
@@ -1758,7 +1884,11 @@ test("curlable bootstrap starts macOS developer tools installer when missing", a
     await assert.rejects(
       execFileAsync(path.join(viberootsRoot, "bootstrap"), ["--no-run-install"], {
         cwd: workspace,
-        env: { ...process.env, PATH: fakeBin },
+        env: {
+          ...process.env,
+          PATH: fakeBin,
+          VIBEROOTS_TEST_IGNORE_HOST_PROFILE_NIX: "1",
+        },
       }),
       /Started the Xcode Command Line Tools installer/,
     );
@@ -1781,6 +1911,7 @@ test("curlable bootstrap can drive the submodule mode through the same entrypoin
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await writeFakeMacosDeveloperTools(fakeBin, log);
     await fsp.mkdir(path.join(workspace, ".git"), { recursive: true });
     await fsp.mkdir(path.join(workspace, "viberoots"), { recursive: true });
     await fsp.writeFile(
@@ -1813,7 +1944,7 @@ test("curlable bootstrap can drive the submodule mode through the same entrypoin
       ],
       {
         cwd: workspace,
-        env: { ...process.env, PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}` },
+        env: envWithFakeNix(fakeBin),
       },
     );
 
@@ -1835,6 +1966,7 @@ test("curlable bootstrap skips setup when already bootstrapped", async () => {
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await writeFakeMacosDeveloperTools(fakeBin, log);
     await fsp.mkdir(path.join(workspace, ".git"), { recursive: true });
     await fsp.mkdir(path.join(workspace, "viberoots"), { recursive: true });
     await fsp.writeFile(
@@ -1867,7 +1999,7 @@ ln -s ../viberoots .viberoots/current
       ["--mode", "submodule", "--workspace-root", workspace, "--workspace-name", "demo"],
       {
         cwd: workspace,
-        env: { ...process.env, PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}` },
+        env: envWithFakeNix(fakeBin),
       },
     );
     const second = await execFileAsync(
@@ -1875,7 +2007,7 @@ ln -s ../viberoots .viberoots/current
       ["--mode", "submodule", "--workspace-root", workspace, "--workspace-name", "demo"],
       {
         cwd: workspace,
-        env: { ...process.env, PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}` },
+        env: envWithFakeNix(fakeBin),
       },
     );
 
@@ -2027,6 +2159,7 @@ test("curlable bootstrap refuses an untrusted custom submodule URL non-interacti
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await writeFakeMacosDeveloperTools(fakeBin, log);
     await fsp.mkdir(path.join(workspace, ".git"), { recursive: true });
     await fsp.writeFile(
       path.join(fakeBin, "git"),
@@ -2052,7 +2185,7 @@ test("curlable bootstrap refuses an untrusted custom submodule URL non-interacti
         ],
         {
           cwd: workspace,
-          env: { ...process.env, PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}` },
+          env: envWithFakeNix(fakeBin),
         },
       ),
       /refusing non-default submodule URL without confirmation/,
@@ -2074,6 +2207,7 @@ test("curlable bootstrap can explicitly trust a custom submodule URL", async () 
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await writeFakeMacosDeveloperTools(fakeBin, log);
     await fsp.mkdir(path.join(workspace, ".git"), { recursive: true });
     await fsp.writeFile(
       path.join(fakeBin, "git"),
@@ -2117,11 +2251,9 @@ exit 0
       ],
       {
         cwd: workspace,
-        env: {
-          ...process.env,
-          PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
+        env: envWithFakeNix(fakeBin, {
           VIBEROOTS_TRUST_SUBMODULE_URL: "1",
-        },
+        }),
       },
     );
 
@@ -2143,6 +2275,7 @@ test("curlable bootstrap initializes an existing viberoots submodule", async () 
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".bootstrap.log");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await writeFakeMacosDeveloperTools(fakeBin, log);
     await fsp.mkdir(path.join(workspace, ".git"), { recursive: true });
     await fsp.writeFile(
       path.join(workspace, ".gitmodules"),
@@ -2184,7 +2317,7 @@ exit 0
       ["--mode", "submodule", "--workspace-root", workspace, "--workspace-name", "existing-demo"],
       {
         cwd: workspace,
-        env: { ...process.env, PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}` },
+        env: envWithFakeNix(fakeBin),
       },
     );
 
@@ -2294,6 +2427,9 @@ async function visibleRootEntries(workspace: string): Promise<string[]> {
 
 test("viberoots/init preserves existing edited docs", async () => {
   await withConsumerWorkspace("viberoots-init-preserve", async (workspace) => {
+    const fakeBin = path.join(workspace, ".fake-bin");
+    await fsp.mkdir(fakeBin, { recursive: true });
+    await writeFakeWorkspaceLockNix(fakeBin);
     await fsp.mkdir(path.join(workspace, "projects"), { recursive: true });
     await fsp.mkdir(path.join(workspace, "projects", "config"), { recursive: true });
     await fsp.writeFile(path.join(workspace, "README.md"), "custom root\n", "utf8");
@@ -2324,12 +2460,10 @@ test("viberoots/init preserves existing edited docs", async () => {
 
     await execFileAsync(path.join(workspace, "viberoots", "init"), [], {
       cwd: workspace,
-      env: {
-        ...process.env,
-        PATH: process.env.PATH ?? "",
+      env: envWithFakeNix(fakeBin, {
         NO_DEV_SHELL: "1",
         VBR_INIT_USE_LOCAL_COMMAND: "1",
-      },
+      }),
     });
 
     assert.equal(await fsp.readFile(path.join(workspace, "README.md"), "utf8"), "custom root\n");
@@ -2360,6 +2494,9 @@ test("viberoots/init preserves existing edited docs", async () => {
 
 test("viberoots/init repairs stale generated workspace files", async () => {
   await withConsumerWorkspace("viberoots-init-repair", async (workspace) => {
+    const fakeBin = path.join(workspace, ".fake-bin");
+    await fsp.mkdir(fakeBin, { recursive: true });
+    await writeFakeWorkspaceLockNix(fakeBin);
     await fsp.mkdir(path.join(workspace, ".viberoots", "workspace"), { recursive: true });
     await fsp.mkdir(path.join(workspace, ".viberoots", "bootstrap"), { recursive: true });
     await fsp.mkdir(path.join(workspace, "wrong-viberoots"), { recursive: true });
@@ -2384,12 +2521,10 @@ test("viberoots/init repairs stale generated workspace files", async () => {
 
     const { stderr } = await execFileAsync(path.join(workspace, "viberoots", "init"), [], {
       cwd: workspace,
-      env: {
-        ...process.env,
-        PATH: process.env.PATH ?? "",
+      env: envWithFakeNix(fakeBin, {
         NO_DEV_SHELL: "1",
         VBR_INIT_USE_LOCAL_COMMAND: "1",
-      },
+      }),
     });
 
     assert.match(stderr, /repair: \.viberoots\/current now points to \.\.\/viberoots/);
@@ -2420,7 +2555,7 @@ test("viberoots/init handles missing direnv before devshell activation", async (
     await fsp.mkdir(fakeBin, { recursive: true });
     await fsp.symlink("/bin/bash", path.join(fakeBin, "bash"));
     await fsp.symlink(process.execPath, path.join(fakeBin, "node"));
-    await fsp.writeFile(path.join(fakeBin, "nix"), "#!/bin/bash\nexit 0\n", { mode: 0o755 });
+    await writeFakeWorkspaceLockNix(fakeBin);
     const pathWithoutDirenv = [fakeBin, "/bin", "/usr/bin"].join(path.delimiter);
 
     const { stdout, stderr } = await execFileAsync(
@@ -2431,6 +2566,8 @@ test("viberoots/init handles missing direnv before devshell activation", async (
         env: {
           ...process.env,
           PATH: pathWithoutDirenv,
+          VBR_NIX_BIN: path.join(fakeBin, "nix"),
+          NIX_BIN: path.join(fakeBin, "nix"),
           NO_DEV_SHELL: "",
           VBR_INIT_USE_LOCAL_COMMAND: "1",
         },

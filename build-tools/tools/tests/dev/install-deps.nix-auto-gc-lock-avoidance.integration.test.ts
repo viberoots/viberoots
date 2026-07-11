@@ -3,6 +3,10 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
+function generatedShellSource(source: string): string {
+  return source.replace(/\\"/g, '"');
+}
+
 test("install deps nix calls disable per-invocation auto-GC lock waits", async () => {
   const hashNix = await fsp.readFile(
     viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/nix.ts"),
@@ -11,11 +15,19 @@ test("install deps nix calls disable per-invocation auto-GC lock waits", async (
   if (!hashNix.includes('"min-free"') || !hashNix.includes('"max-free"')) {
     throw new Error("update-pnpm-hash/nix.ts must disable min-free/max-free for nix build calls");
   }
-  if (!hashNix.includes("waitForNoActiveNixGc")) {
-    throw new Error("update-pnpm-hash/nix.ts must wait briefly for active nix store gc to finish");
+  if (!hashNix.includes("activeNixGcPids")) {
+    throw new Error(
+      "update-pnpm-hash/nix.ts must inspect active nix store gc after nix build failures",
+    );
   }
   if (!hashNix.includes("gcWaitConfig()")) {
     throw new Error("update-pnpm-hash/nix.ts must use bounded nix gc wait configuration");
+  }
+  if (
+    !hashNix.includes("return await buildStore(attrPath, flakeRef, activity, extraEnv)") ||
+    !hashNix.includes("return await buildUnfixedAndHash(attrPath, flakeRef, activity, extraEnv)")
+  ) {
+    throw new Error("update-pnpm-hash/nix.ts must retry once after active nix store gc clears");
   }
 
   const depsMain = await fsp.readFile(
@@ -55,10 +67,13 @@ test("install deps nix calls disable per-invocation auto-GC lock waits", async (
     viberootsSourcePath("viberoots/build-tools/lang/nix_shell.bzl"),
     "utf8",
   );
-  if (!nixShell.includes("--option min-free 0 --option max-free 0")) {
+  const nixShellGenerated = generatedShellSource(nixShell);
+  if (!nixShellGenerated.includes("--option min-free 0 --option max-free 0")) {
     throw new Error("nix_shell.bzl nix build helper must disable min-free/max-free");
   }
-  if (!nixShell.includes("nix build %s --no-write-lock-file --accept-flake-config")) {
+  if (
+    !nixShellGenerated.includes('"$NIX_BIN" build %s --no-write-lock-file --accept-flake-config')
+  ) {
     throw new Error("nix_shell.bzl nix build helper must avoid lock-file write attempts");
   }
 });

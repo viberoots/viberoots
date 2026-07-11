@@ -118,8 +118,8 @@ export async function promptTerminalSelect(
       };
       streams.input.on("data", onData);
     });
-    streams.input.resume();
     render();
+    streams.input.resume();
     return await selected;
   } finally {
     if (onData) streams.input.off("data", onData);

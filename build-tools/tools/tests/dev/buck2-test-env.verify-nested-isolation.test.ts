@@ -6,6 +6,11 @@ import {
   previewVerifyNestedBuckIsolation,
 } from "../../dev/verify/buck2-test-env";
 
+function envValue(envArgs: string[], name: string): string | undefined {
+  const prefix = `${name}=`;
+  return envArgs.find((arg) => arg.startsWith(prefix))?.slice(prefix.length);
+}
+
 test("verify child env reuses a shared nested buck isolation per pass", () => {
   const shared = previewVerifyNestedBuckIsolation("v-123", "shared");
   const isolated = previewVerifyNestedBuckIsolation("v-123", "isolated://foo:bar");
@@ -32,6 +37,12 @@ test("verify child env reuses a shared nested buck isolation per pass", () => {
     "verify should pass an absolute nix path into Buck test actions",
   );
   assert.ok(
+    envArgs.some((arg) => arg.startsWith("VBR_NIX_BIN=")),
+    "verify should pass the viberoots-selected nix path into Buck test actions",
+  );
+  assert.equal(envValue(envArgs, "VBR_NIX_BIN"), envValue(envArgs, "NIX_BIN"));
+  assert.equal(envValue(envArgs, "PATH"), undefined);
+  assert.ok(
     envArgs.some((arg) => arg.startsWith("PATCH_BIN=")),
     "verify should pass an absolute patch path into Buck test actions",
   );
@@ -42,9 +53,15 @@ test("verify child env reuses a shared nested buck isolation per pass", () => {
 });
 
 test("verify child env preserves explicit nix binary path", () => {
-  const prev = process.env.NIX_BIN;
+  const prev = {
+    NIX_BIN: process.env.NIX_BIN,
+    VBR_NIX_BIN: process.env.VBR_NIX_BIN,
+    PATH: process.env.PATH,
+  };
   try {
+    delete process.env.VBR_NIX_BIN;
     process.env.NIX_BIN = "/nix/store/demo-nix/bin/nix";
+    process.env.PATH = "/usr/bin:/bin";
     const envArgs = buildVerifyTestEnvArgs({
       iso: "v-123",
       passName: "shared",
@@ -53,9 +70,13 @@ test("verify child env preserves explicit nix binary path", () => {
       testNixTimeoutSecs: 1800,
     });
     assert.ok(envArgs.includes("NIX_BIN=/nix/store/demo-nix/bin/nix"));
+    assert.ok(envArgs.includes("VBR_NIX_BIN=/nix/store/demo-nix/bin/nix"));
+    assert.equal(envValue(envArgs, "PATH"), undefined);
   } finally {
-    if (typeof prev === "string") process.env.NIX_BIN = prev;
-    else delete process.env.NIX_BIN;
+    for (const [key, value] of Object.entries(prev)) {
+      if (typeof value === "string") process.env[key] = value;
+      else delete process.env[key];
+    }
   }
 });
 

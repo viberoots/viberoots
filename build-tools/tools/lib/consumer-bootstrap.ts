@@ -11,9 +11,11 @@ import { BUCK_PROJECT_IGNORE_LINE } from "./buck-project-ignore";
 import { createCommandUi } from "./command-ui";
 import { direnvStage0, envrc, filterCapturedHostPath } from "./consumer-direnv";
 import { writeIfChanged } from "./fs-helpers";
+import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
+import { withSanitizedInheritedNixConfig } from "./nix-config-env";
+import { envWithResolvedNixBin, resolveToolPathSync } from "./tool-paths";
 import { activateWorkspace } from "./workspace-activation";
 import { repairGeneratedWorkspaceLock } from "./workspace-lock-repair";
-import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 
 const execFileAsync = promisify(execFile);
 
@@ -313,8 +315,9 @@ async function writePortableRootLockForSubmodule(opts: InitConsumerOptions): Pro
   if (!/^[0-9a-f]{40}$/i.test(rev)) return false;
   const remoteUrl = await submoduleRemoteUrl(opts);
   const workspaceFlake = `path:${path.join(opts.workspaceRoot, ".viberoots", "workspace")}`;
+  const { nixBin, nixEnv } = selectedNixCommand();
   await execFileAsync(
-    "nix",
+    nixBin,
     [
       "flake",
       "lock",
@@ -324,7 +327,7 @@ async function writePortableRootLockForSubmodule(opts: InitConsumerOptions): Pro
       gitFlakeUrl(remoteUrl, rev),
       workspaceFlake,
     ],
-    { cwd: opts.workspaceRoot, maxBuffer: 1024 * 1024 * 16 },
+    { cwd: opts.workspaceRoot, env: nixEnv, maxBuffer: 1024 * 1024 * 16 },
   );
   try {
     const portableLock = JSON.parse(await fsp.readFile(hiddenLock, "utf8")) as {
@@ -810,12 +813,21 @@ function shellish(value: string) {
   return /^[A-Za-z0-9_./:=@+-]+$/.test(value) ? value : JSON.stringify(value);
 }
 
+function selectedNixCommand(): { nixBin: string; nixEnv: NodeJS.ProcessEnv } {
+  const nixEnv = withSanitizedInheritedNixConfig(envWithResolvedNixBin({ ...process.env }));
+  return {
+    nixBin: resolveToolPathSync("nix", nixEnv),
+    nixEnv,
+  };
+}
+
 async function runNixFlakeLock(opts: InitConsumerOptions): Promise<void> {
   const filteredViberootsInput = await prepareFilteredViberootsInput(opts.workspaceRoot, opts);
   const workspaceFlake = `path:${path.join(opts.workspaceRoot, ".viberoots", "workspace")}`;
+  const { nixBin, nixEnv } = selectedNixCommand();
   if (filteredViberootsInput) {
     await execFileAsync(
-      "nix",
+      nixBin,
       [
         "flake",
         "lock",
@@ -825,11 +837,11 @@ async function runNixFlakeLock(opts: InitConsumerOptions): Promise<void> {
         `path:${filteredViberootsInput}`,
         workspaceFlake,
       ],
-      { cwd: opts.workspaceRoot, maxBuffer: 1024 * 1024 * 16 },
+      { cwd: opts.workspaceRoot, env: nixEnv, maxBuffer: 1024 * 1024 * 16 },
     );
   } else {
     await execFileAsync(
-      "nix",
+      nixBin,
       [
         "flake",
         "update",
@@ -839,7 +851,7 @@ async function runNixFlakeLock(opts: InitConsumerOptions): Promise<void> {
         "--flake",
         workspaceFlake,
       ],
-      { cwd: opts.workspaceRoot, maxBuffer: 1024 * 1024 * 16 },
+      { cwd: opts.workspaceRoot, env: nixEnv, maxBuffer: 1024 * 1024 * 16 },
     );
   }
   const hiddenLock = path.join(opts.workspaceRoot, ".viberoots", "workspace", "flake.lock");

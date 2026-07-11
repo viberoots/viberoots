@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
-import { runInTemp } from "../lib/test-helpers";
+import { envWithStubbedNix, runInTemp } from "../lib/test-helpers";
 
 test("p resolves package label to runnable target label", async () => {
   await runInTemp("runnable-package-label-resolution", async (tmp, $) => {
@@ -62,10 +62,7 @@ test("p resolves package label to runnable target label", async () => {
     const run = await $({
       cwd: tmp,
       stdio: "pipe",
-      env: {
-        ...process.env,
-        PATH: `${stubBin}:${process.env.PATH || ""}`,
-      },
+      env: envWithStubbedNix(stubBin),
     })`viberoots/build-tools/tools/bin/p //projects/apps/demo`;
     assert.match(String(run.stdout || ""), /package-resolution-ok/);
 
@@ -127,10 +124,7 @@ test("p resolves relative and absolute directory paths to runnable target label"
     );
     await $`chmod +x ${path.join(stubBin, "nix")}`;
 
-    const commonEnv = {
-      ...process.env,
-      PATH: `${stubBin}:${process.env.PATH || ""}`,
-    };
+    const commonEnv = envWithStubbedNix(stubBin);
     const relativeRun = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -225,10 +219,7 @@ test("d resolves current directory path (.) from package cwd", async () => {
     const run = await $({
       cwd: appDir,
       stdio: "pipe",
-      env: {
-        ...process.env,
-        PATH: `${stubBin}:${process.env.PATH || ""}`,
-      },
+      env: envWithStubbedNix(stubBin),
     })`${path.join(tmp, "viberoots", "build-tools", "tools", "bin", "d")} .`;
     assert.match(String(run.stdout || ""), /dev-dot-ok/);
     const loggedTarget = String(await fsp.readFile(targetLog, "utf8")).trim();
@@ -308,10 +299,7 @@ test("d defaults to current directory when target is omitted", async () => {
     const run = await $({
       cwd: appDir,
       stdio: "pipe",
-      env: {
-        ...process.env,
-        PATH: `${stubBin}:${process.env.PATH || ""}`,
-      },
+      env: envWithStubbedNix(stubBin),
     })`${path.join(tmp, "viberoots", "build-tools", "tools", "bin", "d")}`;
     assert.match(String(run.stdout || ""), /dev-default-ok/);
     const loggedTarget = String(await fsp.readFile(targetLog, "utf8")).trim();
@@ -368,10 +356,7 @@ test("p falls back from a directory path to :app when graph data is stale", asyn
     const run = await $({
       cwd: appDir,
       stdio: "pipe",
-      env: {
-        ...process.env,
-        PATH: `${stubBin}:${process.env.PATH || ""}`,
-      },
+      env: envWithStubbedNix(stubBin),
     })`${path.join(tmp, "viberoots", "build-tools", "tools", "bin", "p")} .`;
     assert.match(String(run.stdout || ""), /stale-graph-fallback-ok/);
     const loggedTarget = String(await fsp.readFile(targetLog, "utf8")).trim();

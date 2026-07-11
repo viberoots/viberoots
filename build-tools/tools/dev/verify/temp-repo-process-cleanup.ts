@@ -22,7 +22,7 @@ function commandContainsRoot(cmd: string, root: string): boolean {
   return c.includes(r + "/") || c.includes(`${r} `) || c.endsWith(r);
 }
 
-function isScopedTempDevProcess(cmd: string): boolean {
+export function isScopedTempDevProcess(cmd: string): boolean {
   const c = String(cmd || "");
   if (c.includes("buck2d[") || c.includes("(buck2-forkserver)")) return false;
   if (c.includes("/esbuild") && c.includes("--service=")) return true;
@@ -30,9 +30,14 @@ function isScopedTempDevProcess(cmd: string): boolean {
   if (c.includes("next/dist/bin/next") && c.includes(" dev")) return true;
   if (c.includes("next-server")) return true;
   if (c.includes("watch-wasm-producer.ts")) return true;
+  if (c.includes("watch-wasm-coordinator.ts")) return true;
   if (c.includes("wasm-watch-coordinator-daemon.ts")) return true;
   if (c.includes("dev-with-wasm-watch.ts")) return true;
+  if (c.includes("run-runnable.ts") && c.includes("--mode dev")) return true;
+  if (c.includes("/scripts/dev.ts")) return true;
   if (c.includes("/scripts/dev-wasm-watch.mjs")) return true;
+  if (c.includes("/scripts/dev-wasm-watch.ts")) return true;
+  if (c.includes("tail-log.ts") && c.includes("--status") && c.includes("-w")) return true;
   if (c.includes("pnpm exec vite")) return true;
   if (c.includes("pnpm run dev:ssr:only")) return true;
   if (c.includes("pnpm run dev:wasm:watch")) return true;

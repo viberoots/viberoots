@@ -11,6 +11,7 @@ import { importerLockfileNeedsRegen } from "../../lib/pnpm-importer-lockfile";
 import { externalPnpmStateDirs, removeLegacyImporterPnpmState } from "../../lib/pnpm-state-paths";
 import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard";
 import { resolveRepoNodeBin } from "../../lib/repo-node-bin";
+import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import {
   syncLocalPrefetchIntoPnpmStore,
@@ -44,13 +45,15 @@ async function runLockfileCommandsWithGcRetry(opts: {
     "--no-write-lock-file",
     ...viberootsOverrideArgs,
   ];
-  const nixEnv = envWithResolvedNixBin({
-    ...process.env,
-    NIX_PNPM_ALLOW_GENERATE: "1",
-    NIX_PNPM_FETCH_TIMEOUT: opts.fetchTimeout,
-    NODE_OPTIONS: "--no-warnings",
-    PNPM_HOME: opts.homeDir,
-  });
+  const nixEnv = withSanitizedInheritedNixConfig(
+    envWithResolvedNixBin({
+      ...process.env,
+      NIX_PNPM_ALLOW_GENERATE: "1",
+      NIX_PNPM_FETCH_TIMEOUT: opts.fetchTimeout,
+      NODE_OPTIONS: "--no-warnings",
+      PNPM_HOME: opts.homeDir,
+    }),
+  );
   const nixBin = resolveToolPathSync("nix", nixEnv);
   const runPnpm = async (...args: string[]) =>
     await $({
@@ -61,14 +64,6 @@ async function runLockfileCommandsWithGcRetry(opts: {
     })`${nixBin} ${nixRunPrefix} ${opts.flakeRef} -- ${args}`;
 
   const runCommands = async () => {
-    const cfg = gcWaitConfig();
-    const gcPids = await waitForNoActiveNixGc({
-      timeoutMs: cfg.timeoutMs,
-      pollMs: cfg.pollMs,
-    });
-    if (gcPids.length > 0) {
-      throw new Error(nixGcLockMessage("lockfile generation", gcPids));
-    }
     await runPnpmCommandWithRetry(
       "install",
       () =>

@@ -55,7 +55,7 @@ def _zx_test_impl(ctx):
             + "  PRELUDE_PATH=\"\"; "
             + "  if [ -n \"${VBR_SHARED_PRELUDE_PATH:-}\" ] && [ -e \"$VBR_SHARED_PRELUDE_PATH\" ]; then PRELUDE_PATH=\"$VBR_SHARED_PRELUDE_PATH\"; fi; "
             + "  if [ -d \"$WORKSPACE_ROOT/prelude\" ] || [ -L \"$WORKSPACE_ROOT/prelude\" ]; then PRELUDE_PATH=\"$WORKSPACE_ROOT/prelude\"; fi; "
-            + "  if [ -z \"$PRELUDE_PATH\" ]; then PRE_OUT=$(nix build \"$WORKSPACE_ROOT\"#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null | tail -1); fi; "
+            + "  if [ -z \"$PRELUDE_PATH\" ]; then PRE_OUT=$(\"$NIX_BIN\" build \"$WORKSPACE_ROOT\"#buck2-prelude --no-link --accept-flake-config --print-out-paths 2>/dev/null | tail -1); fi; "
             + "  if [ -z \"$PRELUDE_PATH\" ] && [ -n \"$PRE_OUT\" ]; then PRELUDE_PATH=\"$PRE_OUT/prelude\"; fi; "
             + "  printf '.\\n' > \"$WORKSPACE_ROOT/.buckroot\"; "
             + "  mkdir -p \"$WORKSPACE_ROOT/.viberoots\"; "

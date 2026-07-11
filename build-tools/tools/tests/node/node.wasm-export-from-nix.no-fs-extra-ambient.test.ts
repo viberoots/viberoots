@@ -98,6 +98,7 @@ echo "${fakeOut}"
 `,
     );
 
+    const nixBin = path.join(fakeBin, "nix");
     const outPath = path.join(tmp, "buck-out", "tmp", "top.wasm");
     await runNodeWithZx({
       script,
@@ -107,7 +108,8 @@ echo "${fakeOut}"
       env: {
         ...process.env,
         PATH: `${fakeBin}:${process.env.PATH || ""}`,
-        NIX_BIN: path.join(fakeBin, "nix"),
+        VBR_NIX_BIN: nixBin,
+        NIX_BIN: nixBin,
         VIBEROOTS_ROOT: viberootsRoot,
         WASM_TARGET: "//projects/libs/demo-wasm:wasm",
         WASM_DIR: "lib",
@@ -175,6 +177,7 @@ echo "${fakeOut}"
 `,
     );
 
+    const nixBin = path.join(fakeBin, "nix");
     const outPath = path.join(tmp, "buck-out", "tmp", "_native.wasm");
     try {
       await runNodeWithZx({
@@ -185,7 +188,8 @@ echo "${fakeOut}"
         env: {
           ...process.env,
           PATH: `${fakeBin}:${process.env.PATH || ""}`,
-          NIX_BIN: path.join(fakeBin, "nix"),
+          VBR_NIX_BIN: nixBin,
+          NIX_BIN: nixBin,
           VIBEROOTS_ROOT: viberootsRoot,
           WASM_TARGET: "//projects/libs/demo-py-wasm:pyext",
           WASM_DIR: "site/pyext",

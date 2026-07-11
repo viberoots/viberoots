@@ -141,6 +141,7 @@ export async function runHousekeeping(opts: {
     const diskStats = opts.diskStats || (() => getDiskStats(opts.root));
     const { freePct: beforePct, freeBytes: beforeBytes } = await diskStats();
     const underPressure = beforePct < 12 || beforeBytes < 8 * 1024 * 1024 * 1024;
+    const liveVerifyLock = await verifyLockIsLive(opts.root);
     if (verbose || underPressure) {
       const detail = `free=${beforePct.toFixed(0)}% (${fmtBytes(beforeBytes)})`;
       if (verbose) console.log(`[housekeeping] disk status: ${detail}`);
@@ -153,6 +154,9 @@ export async function runHousekeeping(opts: {
       if (verbose) console.log("[housekeeping] optimise: skipped (off)");
     } else if (!shouldOptimise) {
       if (verbose) console.log("[housekeeping] optimise: skipped (sufficient free space)");
+    } else if (liveVerifyLock) {
+      if (verbose) console.log("[housekeeping] optimise: skipped (verify running)");
+      else ui.warn("low disk space: skipping nix store optimise while verify is running");
     } else if (await olderThanMinutes(optStamp, optimiseCooldownMinutes())) {
       if (verbose) console.log("[housekeeping] optimise: running (<=60s)...");
       else ui.step("housekeeping", "optimising nix store");
@@ -165,7 +169,6 @@ export async function runHousekeeping(opts: {
       if (verbose) console.log("[housekeeping] optimise: skipped (cooldown)");
     }
 
-    const liveVerifyLock = await verifyLockIsLive(opts.root);
     if (gcMode === "auto" && underPressure && liveVerifyLock) {
       if (verbose) console.log("[housekeeping] GC: skipped (verify running)");
       else ui.warn("low disk space: skipping nix GC while verify is running");

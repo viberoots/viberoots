@@ -2,6 +2,8 @@ import process from "node:process";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { parseNixCacheConfigValues } from "../../lib/nix-cache-readiness";
+import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 
 const execFileAsync = promisify(execFile);
 
@@ -56,8 +58,10 @@ function stripOverrideKeys(config: string): string {
 }
 
 async function defaultReadEffectiveConfig(): Promise<string> {
+  const nixEnv = withSanitizedInheritedNixConfig(envWithResolvedNixBin({ ...process.env }));
+  const nixBin = resolveToolPathSync("nix", nixEnv);
   try {
-    const res = await execFileAsync("nix", ["config", "show"]);
+    const res = await execFileAsync(nixBin, ["config", "show"], { env: nixEnv });
     const stdout = String(res.stdout || "").trim();
     if (stdout) return stdout;
   } catch {
@@ -68,16 +72,14 @@ async function defaultReadEffectiveConfig(): Promise<string> {
 
 async function defaultProbeUrl(url: string, timeoutMs: number): Promise<boolean> {
   const connectTimeout = String(Math.max(1, Math.ceil(timeoutMs / 1000)));
+  const nixEnv = withSanitizedInheritedNixConfig(envWithResolvedNixBin({ ...process.env }));
+  const nixBin = resolveToolPathSync("nix", nixEnv);
   try {
-    await execFileAsync("nix", [
-      "store",
-      "info",
-      "--store",
-      url,
-      "--option",
-      "connect-timeout",
-      connectTimeout,
-    ]);
+    await execFileAsync(
+      nixBin,
+      ["store", "info", "--store", url, "--option", "connect-timeout", connectTimeout],
+      { env: nixEnv },
+    );
     return true;
   } catch {
     // Fall through to the unauthenticated HTTP probe.

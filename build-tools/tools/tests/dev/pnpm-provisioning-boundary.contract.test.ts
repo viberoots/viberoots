@@ -36,7 +36,7 @@ test("build consumers do not repair pnpm provisioning state", async () => {
   );
   assert.match(
     nodeModulesBuild,
-    /nix build .*--impure/,
+    /--impure --no-link --accept-flake-config/,
     "node-modules-build.ts must pass --impure so NIX_PNPM_EXACT_STORE reaches Nix",
   );
 });
@@ -52,7 +52,11 @@ test("locked Nix pnpm build paths are offline-only", async () => {
     /validating exact prefetched store shape after prior pnpm install \(offline exact-store\)/,
     "locked Nix pnpm paths must validate prewarmed exact stores instead of fetching packages",
   );
-  const pnpmInstallCommands = storeNix
+  const lockedBuildStoreNix = storeNix.replace(
+    /bootstrapExactStoreFetchScript = label: ''[\s\S]*?^  '';/m,
+    "",
+  );
+  const pnpmInstallCommands = lockedBuildStoreNix
     .split("\n")
     .map((line) => line.trim())
     .filter((line) => /\$PNPM_BIN"? install\b/.test(line))

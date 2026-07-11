@@ -85,8 +85,8 @@ def nix_bootstrap_env_pnpm_store():
         + "  if [ -z \"${LOCAL_PNPM_STORE:-}\" ] && [ ! -f \"$FLK_ROOT/buck-out/.unified-pnpm-store/path\" ]; then "
         + "    if command -v node >/dev/null 2>&1; then "
         + "      (cd \"$VIBEROOTS_ROOT\" && node \"$VIBEROOTS_ROOT/build-tools/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
-        + "    elif command -v nix >/dev/null 2>&1; then "
-        + "      (cd \"$VIBEROOTS_ROOT\" && nix run --accept-flake-config \"path:$VIBEROOTS_ROOT#zx-wrapper\" -- \"$VIBEROOTS_ROOT/build-tools/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
+        + "    elif [ -n \"${NIX_BIN:-}\" ] && [ -x \"$NIX_BIN\" ]; then "
+        + "      (cd \"$VIBEROOTS_ROOT\" && \"$NIX_BIN\" run --accept-flake-config \"path:$VIBEROOTS_ROOT#zx-wrapper\" -- \"$VIBEROOTS_ROOT/build-tools/tools/dev/require-unified-pnpm-store.ts\" >/dev/null 2>&1 || true); "
         + "    fi; "
         + "  fi; "
         + "fi; "
@@ -183,7 +183,7 @@ def nix_calling_genrule_nix_build_out_path_prefix(
         debug_env_var = "VBR_NIX_CALL_DEBUG"):
     """
     Convenience helper for the common pattern:
-      <bootstrap> + outPath=$$($TIMEOUT nix build ... --no-link --print-out-paths | tail -n1)
+      <bootstrap> + outPath=$$($TIMEOUT "$NIX_BIN" build ... --no-link --print-out-paths | tail -n1)
     """
     return nix_calling_genrule_bootstrap(
         timeout_var = timeout_var,
@@ -222,7 +222,7 @@ def nix_build_out_path_cmd(flake_attr, timeout_var = "TIMEOUT", impure = False, 
         "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
         + (
             tout +
-            ("%snix build %s --no-write-lock-file --accept-flake-config --option min-free 0 --option max-free 0 %s--no-link --print-out-paths > \"$OUT_PATHS_FILE\"; " % (prefix, flake_attr, imp))
+            ("%s\"$NIX_BIN\" build %s --no-write-lock-file --accept-flake-config --option min-free 0 --option max-free 0 %s--no-link --print-out-paths > \"$OUT_PATHS_FILE\"; " % (prefix, flake_attr, imp))
         )
         + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
         + "tail -n1 \"$OUT_PATHS_FILE\" > \"$OUT_LAST_FILE\"; "

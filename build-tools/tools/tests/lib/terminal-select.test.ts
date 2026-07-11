@@ -29,6 +29,7 @@ test("terminal selector pauses stdin after selection", async () => {
 
 test("terminal selector accepts enter typed during initial render", async () => {
   const input = new FakeTtyInput();
+  input.dropWritesWithoutDataListener = true;
   const output = new CaptureOutput(() => input.write("\r"));
   try {
     const selected = promptTerminalSelect(
@@ -40,7 +41,7 @@ test("terminal selector accepts enter typed during initial render", async () => 
       0,
       { streams: { input, output, close: () => undefined } },
     );
-    assert.equal(await selected, "first");
+    assert.equal(await withTimeout(selected), "first");
     assert.equal(input.rawMode, false);
     assert.equal(input.paused, true);
   } finally {
@@ -50,6 +51,7 @@ test("terminal selector accepts enter typed during initial render", async () => 
 
 test("terminal selector handles first arrow key typed during initial render", async () => {
   const input = new FakeTtyInput();
+  input.dropWritesWithoutDataListener = true;
   const output = new CaptureOutput(() => input.write("\u001b[B"));
   try {
     const selected = promptTerminalSelect(
@@ -62,7 +64,7 @@ test("terminal selector handles first arrow key typed during initial render", as
       { streams: { input, output, close: () => undefined } },
     );
     input.write("\r");
-    assert.equal(await selected, "second");
+    assert.equal(await withTimeout(selected), "second");
     assert.equal(input.rawMode, false);
     assert.equal(input.paused, true);
   } finally {
@@ -140,6 +142,31 @@ test("terminal selector handles input emitted while resuming raw input", async (
   }
 });
 
+test("terminal selector renders before resuming raw input", async () => {
+  const input = new FakeTtyInput("\r");
+  const output = new CaptureOutput();
+  try {
+    input.onResume = () => {
+      assert.match(output.text, /Select item:  Up\/Down then Enter/);
+      assert.match(output.text, /> First/);
+    };
+    const selected = promptTerminalSelect(
+      "Select item",
+      [
+        { label: "First", value: "first" },
+        { label: "Second", value: "second" },
+      ],
+      0,
+      { streams: { input, output, close: () => undefined } },
+    );
+    assert.equal(await withTimeout(selected), "first");
+    assert.equal(input.rawMode, false);
+    assert.equal(input.paused, true);
+  } finally {
+    input.destroy();
+  }
+});
+
 test("terminal selector enters raw mode before subscribing to data", async () => {
   const input = new FakeTtyInput();
   const output = new CaptureOutput();
@@ -157,6 +184,7 @@ test("terminal selector enters raw mode before subscribing to data", async () =>
     input.write("\r");
     assert.equal(await selected, "first");
     assert.equal(input.rawBeforeDataListenerChecked, true);
+    assert.equal(input.dataListenerViaOnCount, 1);
     assert.equal(input.rawMode, false);
     assert.equal(input.paused, true);
   } finally {
@@ -171,11 +199,21 @@ class FakeTtyInput extends PassThrough {
   rawMode = false;
   assertRawBeforeDataListener = false;
   rawBeforeDataListenerChecked = false;
+  dropWritesWithoutDataListener = false;
+  dataListenerViaOnCount = 0;
+  onResume?: () => void;
   private readonly resumeData?: string;
+  private subscribingDataListener = false;
 
   constructor(resumeData?: string) {
     super();
     this.resumeData = resumeData;
+    super.on("newListener", (eventName) => {
+      if (eventName === "data" && this.assertRawBeforeDataListener) {
+        this.rawBeforeDataListenerChecked = true;
+        assert.equal(this.rawMode, true);
+      }
+    });
   }
 
   setRawMode(value: boolean) {
@@ -184,8 +222,22 @@ class FakeTtyInput extends PassThrough {
     return this;
   }
 
+  override write(
+    chunk: any,
+    encoding?: BufferEncoding | ((error?: Error | null) => void),
+    callback?: (error?: Error | null) => void,
+  ): boolean {
+    if (this.dropWritesWithoutDataListener && this.listenerCount("data") === 0) {
+      if (typeof encoding === "function") encoding();
+      if (typeof callback === "function") callback();
+      return true;
+    }
+    return super.write(chunk, encoding as BufferEncoding, callback);
+  }
+
   resume() {
     this.paused = false;
+    if (!this.subscribingDataListener) this.onResume?.();
     if (this.resumeData) this.emit("data", Buffer.from(this.resumeData));
     return super.resume();
   }
@@ -199,12 +251,27 @@ class FakeTtyInput extends PassThrough {
     return this.paused;
   }
 
+  override emit(eventName: string | symbol, ...args: any[]) {
+    if (eventName === "newListener" && args[0] === "data" && this.assertRawBeforeDataListener) {
+      this.rawBeforeDataListenerChecked = true;
+      assert.equal(this.rawMode, true);
+    }
+    return super.emit(eventName, ...args);
+  }
+
   on(eventName: string | symbol, listener: (...args: any[]) => void) {
+    if (eventName === "data") this.dataListenerViaOnCount += 1;
     if (eventName === "data" && this.assertRawBeforeDataListener) {
       this.rawBeforeDataListenerChecked = true;
       assert.equal(this.rawMode, true);
     }
-    return super.on(eventName, listener);
+    if (eventName !== "data") return super.on(eventName, listener);
+    this.subscribingDataListener = true;
+    try {
+      return super.on(eventName, listener);
+    } finally {
+      this.subscribingDataListener = false;
+    }
   }
 }
 

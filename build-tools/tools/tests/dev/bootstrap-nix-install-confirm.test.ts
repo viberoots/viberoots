@@ -4,6 +4,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { test } from "node:test";
+import { envWithoutSelectedNix } from "../lib/test-helpers";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const bootstrap = viberootsSourcePath("viberoots/bootstrap");
@@ -28,7 +29,10 @@ test("bootstrap refuses noninteractive Nix install without explicit allow", asyn
   const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "viberoots-nix-confirm-"));
   const pathWithoutNix = await noNixPathWithDeveloperTools();
   const result = await $({
-    env: { ...process.env, PATH: pathWithoutNix },
+    env: envWithoutSelectedNix({
+      PATH: pathWithoutNix,
+      VIBEROOTS_TEST_IGNORE_HOST_PROFILE_NIX: "1",
+    }),
   })`/bin/bash ${bootstrap} --workspace-root ${workspace} --no-run-install`.nothrow();
   assert.notEqual(result.exitCode, 0);
   assert.match(String(result.stderr), /refusing to install Nix without confirmation/);
@@ -39,7 +43,10 @@ test("bootstrap dry-run distinguishes prompt from explicit Nix install consent",
   const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "viberoots-nix-dry-run-"));
   const pathWithoutNix = await noNixPathWithDeveloperTools();
   const prompt = await $({
-    env: { ...process.env, PATH: pathWithoutNix },
+    env: envWithoutSelectedNix({
+      PATH: pathWithoutNix,
+      VIBEROOTS_TEST_IGNORE_HOST_PROFILE_NIX: "1",
+    }),
   })`/bin/bash ${bootstrap} --workspace-root ${workspace} --dry-run`.text();
   assert.match(prompt, /allow nix install prompt/);
   assert.match(prompt, /trust nix user prompt/);
@@ -47,12 +54,12 @@ test("bootstrap dry-run distinguishes prompt from explicit Nix install consent",
   assert.match(prompt, /prompt before adding the current user to Nix trusted users/);
 
   const allowed = await $({
-    env: {
-      ...process.env,
+    env: envWithoutSelectedNix({
       PATH: pathWithoutNix,
+      VIBEROOTS_TEST_IGNORE_HOST_PROFILE_NIX: "1",
       VBR_ALLOW_NIX_INSTALL: "1",
       VBR_TRUST_NIX_USER: "1",
-    },
+    }),
   })`/bin/bash ${bootstrap} --workspace-root ${workspace} --dry-run`.text();
   assert.match(allowed, /allow nix install yes/);
   assert.match(allowed, /trust nix user 1/);
@@ -65,7 +72,11 @@ test("bootstrap validates Nix trust mode", async () => {
   const workspace = await fs.mkdtemp(path.join(os.tmpdir(), "viberoots-nix-trust-mode-"));
   const pathWithoutNix = await noNixPathWithDeveloperTools();
   const result = await $({
-    env: { ...process.env, PATH: pathWithoutNix, VBR_TRUST_NIX_USER: "maybe" },
+    env: envWithoutSelectedNix({
+      PATH: pathWithoutNix,
+      VBR_TRUST_NIX_USER: "maybe",
+      VIBEROOTS_TEST_IGNORE_HOST_PROFILE_NIX: "1",
+    }),
   })`/bin/bash ${bootstrap} --workspace-root ${workspace} --dry-run`.nothrow();
   assert.notEqual(result.exitCode, 0);
   assert.match(String(result.stderr), /VBR_TRUST_NIX_USER must be 0, 1, or prompt/);

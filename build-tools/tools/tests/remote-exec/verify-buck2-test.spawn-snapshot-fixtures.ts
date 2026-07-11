@@ -8,6 +8,7 @@ export function normalizeSpawnArg(arg: string): string {
   if (arg.startsWith("SSL_CERT_FILE=")) return "SSL_CERT_FILE=<cert>";
   if (arg.startsWith("NODE_EXTRA_CA_CERTS=")) return "NODE_EXTRA_CA_CERTS=<cert>";
   if (arg.startsWith("NIX_CONF_DIR=")) return "NIX_CONF_DIR=<nix-conf-dir>";
+  if (arg.startsWith("VBR_NIX_BIN=")) return "VBR_NIX_BIN=<nix>";
   if (arg.startsWith("NIX_BIN=")) return "NIX_BIN=<nix>";
   if (arg.startsWith("PATCH_BIN=")) return "PATCH_BIN=<patch>";
   if (arg.startsWith("GIT_BIN=")) return "GIT_BIN=<git>";
@@ -88,6 +89,8 @@ function commonTestEnvArgs(): string[] {
     "NIX_DAEMON_SOCKET_PATH=/var/run/nix-daemon.socket",
     "--env",
     "NIX_REMOTE=daemon",
+    "--env",
+    "VBR_NIX_BIN=<nix>",
     "--env",
     "NIX_BIN=<nix>",
     "--env",

@@ -131,19 +131,19 @@ export async function scaffoldAndPrepareWorkspace(
   await _$({
     cwd: tmp,
     stdio: "inherit",
+    env: tempWorkspaceEnv(tmp, { BUCK_TARGET: appLabel }),
+  })`zx-wrapper ${viberootsDevTool("install/deps-main.ts", tmp)} --verbose --glue-only`;
+  await _$({
+    cwd: tmp,
+    stdio: "inherit",
     env: tempWorkspaceEnv(tmp, { NIX_PNPM_ALLOW_GENERATE: "1" }),
   })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts", tmp)} --lockfile ${`${appRel}/pnpm-lock.yaml`}`;
   await stageTempRepoPaths({
     tmp,
     _$,
     recursiveRoots: [appRel],
-    explicitPaths: ["projects/node-modules.hashes.json"],
+    explicitPaths: ["projects/node-modules.hashes.json", ...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS],
   });
-  await _$({
-    cwd: tmp,
-    stdio: "inherit",
-    env: tempWorkspaceEnv(tmp, { BUCK_TARGET: appLabel }),
-  })`zx-wrapper ${viberootsDevTool("install/deps-main.ts", tmp)} --verbose --glue-only`;
   await fsp.rm(graphJsonAbs, { force: true });
   await _$({
     cwd: tmp,

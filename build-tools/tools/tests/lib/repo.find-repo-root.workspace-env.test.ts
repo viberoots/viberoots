@@ -312,8 +312,9 @@ test("vbr develop prints relative workspace flake refs from nested consumer dire
       },
     });
     const command = String(stdout).trim();
+    const normalizedCommand = command.replace(/^\/\S+\/bin\/nix /, "nix ");
     assert.equal(
-      command,
+      normalizedCommand,
       "nix develop --no-write-lock-file --accept-flake-config path:../../../.viberoots/workspace#default --override-input viberoots path:../../../viberoots --command true",
     );
     assert.doesNotMatch(command, new RegExp(tmp.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

@@ -224,15 +224,21 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
     throw new Error("store.nix must normalize pnpm sqlite index.db for stable FOD hashes");
   }
   if (
-    !store.includes('SELECT hex(CAST(key AS BLOB)) || char(9) || hex(data)') ||
+    !store.includes("removing path-local pnpm project links") ||
+    !store.includes('rm -rf "$out/store"/v*/projects')
+  ) {
+    throw new Error(
+      "store.nix must remove pnpm project symlinks so fixed-store hashes do not depend on checkout paths",
+    );
+  }
+  if (
+    !store.includes("SELECT hex(CAST(key AS BLOB)) || char(9) || hex(data)") ||
     !store.includes("normalizePnpmMetadataBlob") ||
     !store.includes("data.readDoubleBE(i + 1)") ||
     !store.includes("canonicalDouble.writeDoubleBE(0, 0)") ||
     !store.includes("checkedAt")
   ) {
-    throw new Error(
-      "store.nix must normalize volatile pnpm metadata blobs inside index.db rows",
-    );
+    throw new Error("store.nix must normalize volatile pnpm metadata blobs inside index.db rows");
   }
   if (!modules.includes('"$verDir/index.db"') || !modules.includes('"$verDir/projects"')) {
     throw new Error(

@@ -14,6 +14,10 @@ function sourceFile(rel: string): string {
   return path.join(VIBEROOTS_ROOT, rel);
 }
 
+function generatedShellSource(source: string): string {
+  return source.replace(/\\"/g, '"');
+}
+
 async function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => Promise<T>): Promise<T> {
   const prev = { ...process.env };
   Object.assign(process.env, env);
@@ -164,6 +168,8 @@ test("nix cache health default probe uses Nix credentials", async () => {
   await withEnv(
     {
       PATH: `${tmp}:${process.env.PATH || ""}`,
+      VBR_NIX_BIN: nixPath,
+      NIX_BIN: nixPath,
       NIX_PROBE_LOG: logPath,
       VBR_NIX_CACHE_POLICY: "auto",
       VBR_NIX_CACHE_HEALTH_APPLIED: "",
@@ -277,20 +283,24 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   );
 
   const buck = await fsp.readFile(sourceFile("build-tools/lang/nix_cache_health.bzl"), "utf8");
+  const buckShell = generatedShellSource(buck);
   assert.match(buck, /VBR_NIX_CACHE_HEALTH_APPLIED/);
   assert.match(buck, /printf -v NIX_CONFIG '%s\\nsubstituters =%s\\nextra-substituters =%s/);
   assert.match(buck, /nix-cache-info/);
   assert.match(buck, /curl -fsS --connect-timeout 3 --max-time 5/);
   assert.match(buck, /if curl -fsS --connect-timeout 3 --max-time 5/);
-  assert.match(buck, /if nix store info --store/);
-  assert.ok(buck.indexOf("if nix store info --store") < buck.indexOf("elif command -v curl"));
+  assert.match(buckShell, /if "\$NIX_BIN" store info --store/);
+  assert.ok(
+    buckShell.indexOf('if "$NIX_BIN" store info --store') <
+      buckShell.indexOf("elif command -v curl"),
+  );
   assert.match(buck, /viberoots-nix-cache\.noindex/);
   assert.match(buck, /NIX_CACHE_TMPDIR\/\.metadata_never_index/);
   assert.doesNotMatch(
     buck,
     /curl -fsS --connect-timeout 3 --max-time 5[^;]+; NIX_CACHE_PROBE_STATUS/,
   );
-  assert.doesNotMatch(buck, /nix store info --store[^;]+; NIX_CACHE_PROBE_STATUS/);
+  assert.doesNotMatch(buck, /"\$NIX_BIN" store info --store[^;]+; NIX_CACHE_PROBE_STATUS/);
   assert.doesNotMatch(buck, /\$\(cat/);
   assert.doesNotMatch(buck, /\$\(printf/);
   assert.doesNotMatch(buck, /export NIX_CONFIG="[^"]*\\\\n/);

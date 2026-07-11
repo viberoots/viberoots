@@ -57,7 +57,7 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
   const nodeExtraCaCerts = process.env.NODE_EXTRA_CA_CERTS || sslCertFile;
   const nixDaemonSocketPath = process.env.NIX_DAEMON_SOCKET_PATH || "/var/run/nix-daemon.socket";
   const nixRemote = process.env.NIX_REMOTE || "daemon";
-  const nixBin = process.env.NIX_BIN || resolveOptionalToolPath("nix");
+  const nixBin = process.env.VBR_NIX_BIN || process.env.NIX_BIN || resolveOptionalToolPath("nix");
   const patchBin = process.env.PATCH_BIN || resolveOptionalToolPath("patch");
   const gitBin = process.env.GIT_BIN || resolveOptionalToolPath("git");
   const nixConfigEnv = withSanitizedInheritedNixConfig({
@@ -131,6 +131,7 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     `NIX_DAEMON_SOCKET_PATH=${nixDaemonSocketPath}`,
     "--env",
     `NIX_REMOTE=${nixRemote}`,
+    ...maybeEnvArg("VBR_NIX_BIN", nixBin),
     ...maybeEnvArg("NIX_BIN", nixBin),
     ...maybeEnvArg("PATCH_BIN", patchBin),
     ...maybeEnvArg("GIT_BIN", gitBin),

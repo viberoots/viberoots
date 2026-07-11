@@ -232,7 +232,7 @@ test("broad resource-limited passes lower concurrency for deployment fanout", ()
   );
 });
 
-test("resource-limited pass start delay only applies to broad resource-limited runs", () => {
+test("resource-limited pass start delay defaults to no timed overlap", () => {
   assert.equal(
     resourceLimitedStartDelaySeconds(
       [
@@ -241,7 +241,7 @@ test("resource-limited pass start delay only applies to broad resource-limited r
       ],
       {},
     ),
-    900,
+    0,
   );
 
   assert.equal(
@@ -276,7 +276,7 @@ test("resource-limited pass start delay honors explicit overrides", () => {
   );
 });
 
-test("broad staged verify groups start shared before delayed resource-limited lane", () => {
+test("broad staged verify groups finish bounded lanes before shared by default", () => {
   const staged = splitVerifyPassGroupForStagedStart(
     [
       { name: "resource-limited", targets: Array.from({ length: 50 }, (_, i) => `//:r${i}`) },
@@ -286,15 +286,55 @@ test("broad staged verify groups start shared before delayed resource-limited la
     {},
   );
 
-  assert.equal(staged.delaySeconds, 900);
+  assert.equal(staged.delaySeconds, 0);
+  assert.equal(staged.waitForImmediatePassesBeforeDelayed, true);
   assert.deepEqual(
     staged.immediatePasses.map((pass) => pass.name),
-    ["enforcement", "shared"],
+    ["resource-limited", "enforcement"],
+  );
+  assert.deepEqual(
+    staged.delayedPasses.map((pass) => pass.name),
+    ["shared"],
+  );
+});
+
+test("explicit resource-limited pass start delay preserves timed overlap", () => {
+  const staged = splitVerifyPassGroupForStagedStart(
+    [
+      { name: "resource-limited", targets: Array.from({ length: 50 }, (_, i) => `//:r${i}`) },
+      { name: "shared", targets: Array.from({ length: 500 }, (_, i) => `//:s${i}`) },
+    ],
+    { VBR_VERIFY_RESOURCE_LIMITED_START_DELAY_SECS: "17" },
+  );
+
+  assert.equal(staged.delaySeconds, 17);
+  assert.equal(staged.waitForImmediatePassesBeforeDelayed, false);
+  assert.deepEqual(
+    staged.immediatePasses.map((pass) => pass.name),
+    ["shared"],
   );
   assert.deepEqual(
     staged.delayedPasses.map((pass) => pass.name),
     ["resource-limited"],
   );
+});
+
+test("explicit zero resource-limited pass delay keeps immediate concurrent scheduling", () => {
+  const staged = splitVerifyPassGroupForStagedStart(
+    [
+      { name: "resource-limited", targets: Array.from({ length: 50 }, (_, i) => `//:r${i}`) },
+      { name: "shared", targets: Array.from({ length: 500 }, (_, i) => `//:s${i}`) },
+    ],
+    { VBR_VERIFY_RESOURCE_LIMITED_START_DELAY_SECS: "0" },
+  );
+
+  assert.equal(staged.delaySeconds, 0);
+  assert.equal(staged.waitForImmediatePassesBeforeDelayed, false);
+  assert.deepEqual(
+    staged.immediatePasses.map((pass) => pass.name),
+    ["resource-limited", "shared"],
+  );
+  assert.deepEqual(staged.delayedPasses, []);
 });
 
 test("concurrent verify passes use dedicated Buck isolations", () => {

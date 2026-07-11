@@ -201,6 +201,7 @@ export async function handleNonDefaultImporter(opts: {
               return true;
             }
             await persistHash(suggestedFromFixed);
+            await prepareExactStore({ repoRoot: opts.repoRoot, importer: opts.importer });
             console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");
             return true;
           }
@@ -212,6 +213,7 @@ export async function handleNonDefaultImporter(opts: {
           return true;
         }
         await persistHash(pre.sri);
+        await prepareExactStore({ repoRoot: opts.repoRoot, importer: opts.importer });
         console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");
         return true;
       });
@@ -310,6 +312,7 @@ export async function handleNonDefaultImporter(opts: {
       }
     }
     await persistHash(sri);
+    await prepareExactStore({ repoRoot: opts.repoRoot, importer: opts.importer });
     console.log("pnpm-store:", opts.storeAttr, "hash updated and build succeeded");
     return true;
   });

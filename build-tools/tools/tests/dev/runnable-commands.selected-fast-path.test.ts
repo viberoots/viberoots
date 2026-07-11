@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { envWithStubbedNix, runInTemp } from "../lib/test-helpers";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 async function readRepoFile(rel: string): Promise<string> {
@@ -74,10 +74,7 @@ test("p uses graph-generator-selected and skips full graph-generator for runnabl
     const run = await $({
       cwd: tmp,
       stdio: "pipe",
-      env: {
-        ...process.env,
-        PATH: `${stubBin}:${process.env.PATH || ""}`,
-      },
+      env: envWithStubbedNix(stubBin),
     })`viberoots/build-tools/tools/bin/p ${target}`;
     assert.match(String(run.stdout || ""), /selected-prod-ok/);
     assert.doesNotMatch(
@@ -100,11 +97,6 @@ test("p auto source falls back to path flake for relevant untracked files", asyn
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.mkdir(path.join(projectDir, "src"), { recursive: true });
     await fsp.writeFile(path.join(projectDir, "package.json"), '{"scripts":{}}\n', "utf8");
-    await fsp.writeFile(
-      path.join(projectDir, "pnpm-lock.yaml"),
-      "lockfileVersion: '9.0'\n",
-      "utf8",
-    );
     await fsp.writeFile(path.join(projectDir, "src", "index.ts"), "console.log('ok');\n", "utf8");
     await fsp.writeFile(path.join(projectDir, "NEW_UNTRACKED.txt"), "untracked\n", "utf8");
     await fsp.writeFile(
@@ -166,10 +158,7 @@ test("p auto source falls back to path flake for relevant untracked files", asyn
     const run = await $({
       cwd: tmp,
       stdio: "pipe",
-      env: {
-        ...process.env,
-        PATH: `${stubBin}:${process.env.PATH || ""}`,
-      },
+      env: envWithStubbedNix(stubBin),
     })`viberoots/build-tools/tools/bin/p ${target}`;
     assert.match(String(run.stdout || ""), /selected-prod-ok/);
 
@@ -181,7 +170,7 @@ test("p auto source falls back to path flake for relevant untracked files", asyn
     const snapshotRoot = flakeDir.endsWith(path.join(".viberoots", "workspace"))
       ? path.join(flakeDir, "..", "..")
       : flakeDir;
-    await fsp.access(path.join(snapshotRoot, "projects", "apps", "demo", "pnpm-lock.yaml"));
+    await fsp.access(path.join(snapshotRoot, "projects", "apps", "demo", "NEW_UNTRACKED.txt"));
   });
 });
 
@@ -283,10 +272,7 @@ test("p auto source uses filtered flake when root viberoots input is generated w
     const run = await $({
       cwd: fakeRoot,
       stdio: "pipe",
-      env: {
-        ...process.env,
-        PATH: `${stubBin}:${process.env.PATH || ""}`,
-      },
+      env: envWithStubbedNix(stubBin),
     })`${tool} ${target}`;
     assert.match(String(run.stdout || ""), /selected-prod-ok/);
     assert.match(
@@ -371,10 +357,7 @@ test("p --source=git keeps git flake source even with relevant untracked files",
     const run = await $({
       cwd: tmp,
       stdio: "pipe",
-      env: {
-        ...process.env,
-        PATH: `${stubBin}:${process.env.PATH || ""}`,
-      },
+      env: envWithStubbedNix(stubBin),
     })`viberoots/build-tools/tools/bin/p ${target} --source=git`;
     assert.match(String(run.stdout || ""), /selected-prod-ok/);
 

@@ -381,6 +381,8 @@ in {
             }
             if (root && fs.existsSync(root)) walk(root);
           ' || true
+          echo "[nix] mkPnpmStore: removing path-local pnpm project links" >&2
+          rm -rf "$out/store"/v*/projects >/dev/null 2>&1 || true
           ${normalizePnpmStoreScript}
           normalize_pnpm_store_for_fod "$out/store"
         fi
@@ -597,6 +599,8 @@ in {
             }
             if (root && fs.existsSync(root)) walk(root);
           ' || true
+          echo "[nix] mkPnpmStoreUnfixed: removing path-local pnpm project links" >&2
+          rm -rf "$out/store"/v*/projects >/dev/null 2>&1 || true
           ${normalizePnpmStoreScript}
           normalize_pnpm_store_for_fod "$out/store"
         fi

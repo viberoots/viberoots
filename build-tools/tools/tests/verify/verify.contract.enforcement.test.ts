@@ -180,6 +180,14 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
     housekeeping.includes("refused to start"),
     "expected verify to refuse to start when free space remains below the target threshold",
   );
+  assert.ok(
+    !housekeeping.includes("nix-store --gc --max-freed") && !housekeeping.includes("nix store gc"),
+    "expected verify housekeeping not to start automatic Nix GC during verify",
+  );
+  assert.ok(
+    housekeeping.includes("skipping automatic Nix GC during verify"),
+    "expected verify housekeeping to direct operators to run Nix GC outside verify",
+  );
 
   assert.ok(
     coverage.includes("NODE_V8_COVERAGE") && coverage.includes("enabled"),

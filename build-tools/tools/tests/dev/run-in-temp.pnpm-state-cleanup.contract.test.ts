@@ -68,3 +68,25 @@ test("external pnpm state records exact ownership for orphan cleanup", async () 
     throw new Error("verify startup cleanup must remove active importer external pnpm state");
   }
 });
+
+test("runInTemp preserves managed viberoots node_modules for temp child commands", async () => {
+  const helper = await readRepoFile("build-tools/tools/tests/lib/test-helpers/run-in-temp.ts");
+
+  if (!helper.includes("function applyTempNodePath(")) {
+    throw new Error("runInTemp must centralize temp child NODE_PATH construction");
+  }
+  const managedPathIndex = helper.indexOf("env.VIBEROOTS_NODE_PATH");
+  const guessedPathIndex = helper.indexOf('path.join(process.cwd(), "node_modules")');
+  if (managedPathIndex < 0) {
+    throw new Error("runInTemp must include VIBEROOTS_NODE_PATH in temp child NODE_PATH");
+  }
+  if (guessedPathIndex < 0) {
+    throw new Error("runInTemp must still include workspace node_modules in temp child NODE_PATH");
+  }
+  if (managedPathIndex > guessedPathIndex) {
+    throw new Error("VIBEROOTS_NODE_PATH must precede guessed node_modules paths");
+  }
+  if (!helper.includes("process.env.VIBEROOTS_NODE_PATH")) {
+    throw new Error("runInTemp must preserve inherited managed node_modules if env is overwritten");
+  }
+});

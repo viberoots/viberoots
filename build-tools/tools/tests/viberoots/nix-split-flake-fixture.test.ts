@@ -75,17 +75,35 @@ test("viberoots Nix fixture receives workspaceSrc outside viberoots source", asy
 
 test("real viberoots mkWorkspace exposes metadata for external workspace source", async () => {
   await runInNixTemp("viberoots-real-mkworkspace", async (tmp) => {
-    const viberootsRoot = viberootsSourcePath(".");
+    const viberootsRoot = await fsp.realpath(viberootsSourcePath("."));
     await writeFile(path.join(tmp, "workspace-marker"), "workspace\n");
+    await writeFile(
+      path.join(tmp, "flake.nix"),
+      `{
+  inputs.viberoots.url = "path:${viberootsRoot}";
+  outputs = { self, viberoots }: {
+    probe = (viberoots.lib.mkWorkspace {
+      workspaceSrc = ./.;
+      viberootsInput = viberoots;
+      workspaceName = "external-probe";
+    }).lib;
+  };
+}
+`,
+    );
 
+    const nixBin = process.env.VBR_NIX_BIN || process.env.NIX_BIN || "nix";
     const result = await $({
-      cwd: viberootsRoot,
+      cwd: tmp,
       stdio: "pipe",
-    })`nix eval --json --accept-flake-config ${`path:${viberootsRoot}#lib.mkWorkspace`} --apply ${`mk: (mk { workspaceSrc = ${tmp}; viberootsInput = { outPath = ./.; }; workspaceName = "external-probe"; }).lib`}`;
+    })`${nixBin} eval --json --accept-flake-config ${`path:${await workspaceFlakeRef(tmp)}#probe`}`;
     const probe = JSON.parse(String(result.stdout || "{}"));
     assert.equal(probe.workspaceName, "external-probe");
     assert.equal(probe.version, "0.0.0-dev");
     assert.equal(probe.releaseTag, "v0.0.0-dev");
-    assert.equal(probe.viberootsSourcePath, viberootsRoot);
+    assert.match(probe.viberootsSourcePath, /^\/nix\/store\/[^/]+-source$/);
+    assert.notEqual(probe.viberootsSourcePath, tmp);
+    assert.notEqual(probe.viberootsSourcePath, viberootsRoot);
+    await fsp.access(path.join(probe.viberootsSourcePath, "flake.nix"));
   });
 });

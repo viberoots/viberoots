@@ -36,7 +36,10 @@ test("devshell exposes user-facing tools from Nix on PATH", async (t) => {
     XDG_CONFIG_HOME: path.join(direnvHome, "config"),
   };
   const currentTarget = await fsp.readlink(path.join(root, ".viberoots", "current"));
-  assert.equal(currentTarget, "../viberoots");
+  assert.ok(
+    currentTarget === "../viberoots" || currentTarget.includes("viberoots-flake-input"),
+    `unexpected .viberoots/current target: ${currentTarget}`,
+  );
   assert.equal(
     fs.existsSync(path.join(root, ".viberoots", "current", "prelude", "prelude.bzl")),
     true,

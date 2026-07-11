@@ -204,12 +204,12 @@ export async function runVerifyBuckPasses(opts: {
         `[verify] target pass group begin mode=concurrent isolation=per-pass passes=${group.map((pass) => pass.name).join(",")}`,
       );
     }
-    const { delaySeconds, immediatePasses, delayedPasses } =
+    const { delaySeconds, immediatePasses, delayedPasses, waitForImmediatePassesBeforeDelayed } =
       splitVerifyPassGroupForStagedStart(group);
     if (delayedPasses.length > 0) {
       await appendVerifyPassLog(
         opts.logFile,
-        `[verify] target pass group staged start delay_s=${delaySeconds} immediate=${immediatePasses.map((pass) => pass.name).join(",")} delayed=${delayedPasses.map((pass) => pass.name).join(",")}`,
+        `[verify] target pass group staged start delay_s=${delaySeconds} wait_for_immediate=${waitForImmediatePassesBeforeDelayed ? "true" : "false"} immediate=${immediatePasses.map((pass) => pass.name).join(",")} delayed=${delayedPasses.map((pass) => pass.name).join(",")}`,
       );
     }
     let firstFailure = 0;
@@ -239,7 +239,11 @@ export async function runVerifyBuckPasses(opts: {
         if (run) trackRun(run);
       }
     }
-    if (delayedPasses.length > 0 && !shouldAbort()) {
+    const waitForRunning = async () =>
+      await Promise.all(running.map(async (run) => await run.status));
+    if (delayedPasses.length > 0 && waitForImmediatePassesBeforeDelayed && !shouldAbort()) {
+      await waitForRunning();
+    } else if (delayedPasses.length > 0 && !shouldAbort()) {
       await waitOrAbort(delaySeconds * 1000);
     }
     if (delayedPasses.length > 0 && !shouldAbort()) {
@@ -258,7 +262,7 @@ export async function runVerifyBuckPasses(opts: {
         if (run) trackRun(run);
       }
     }
-    const statuses = await Promise.all(running.map(async (run) => await run.status));
+    const statuses = await waitForRunning();
     const status = firstFailure || statuses.find((value) => value !== 0) || 0;
     if (status !== 0 && aggregateStatus === 0) aggregateStatus = status;
     if (group.length > 1) {

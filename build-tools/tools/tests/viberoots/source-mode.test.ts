@@ -7,6 +7,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
 import { inferBootstrapConsumerModeSync } from "../../lib/consumer-source-mode";
+import { envWithStubbedNix } from "../lib/test-helpers";
 
 const execFileAsync = promisify(execFile);
 
@@ -41,6 +42,16 @@ async function writeMinimalSourceTree(root: string): Promise<void> {
   await fsp.mkdir(path.join(root, "config", "fbcode_stub"), { recursive: true });
   await fsp.writeFile(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"), "", "utf8");
   await fsp.writeFile(path.join(root, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
+}
+
+function fakeNixForRemoteSource(remoteSource: string): string {
+  return `#!/usr/bin/env bash
+case "$*" in
+  flake\\ update*|flake\\ lock*) exit 0 ;;
+  eval*) printf '%s\\n' ${JSON.stringify(remoteSource)}; exit 0 ;;
+esac
+exit 0
+`;
 }
 
 async function assertDirenvBootstrap(workspace: string): Promise<void> {
@@ -307,22 +318,16 @@ test("use-flake switches generated files and leaves inactive submodule by defaul
     await writeMinimalSourceTree(remoteSource);
     await writeMinimalSourceTree(path.join(workspace, "viberoots"));
     const { fakeBin } = await writeFakeGit(workspace, { submodule: true, gitlink: true });
-    await fsp.writeFile(
-      path.join(fakeBin, "nix"),
-      `#!/usr/bin/env bash\nif [[ "$*" == eval* ]]; then printf '%s\\n' ${JSON.stringify(remoteSource)}; fi\n`,
-      { mode: 0o755 },
-    );
+    await fsp.writeFile(path.join(fakeBin, "nix"), fakeNixForRemoteSource(remoteSource), {
+      mode: 0o755,
+    });
 
     await execFileAsync(
       path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots"),
       ["use-flake", "--workspace-root", workspace, "--ref", "v1.2.3", "--no-direnv"],
       {
         cwd: workspace,
-        env: {
-          ...process.env,
-          PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
-          NO_DEV_SHELL: "1",
-        },
+        env: envWithStubbedNix(fakeBin, { NO_DEV_SHELL: "1" }),
       },
     );
 
@@ -347,22 +352,16 @@ test("use-flake preserves ssh transport from official submodule remote", async (
       gitlink: true,
       submoduleUrl: "git@github.com:viberoots/viberoots.git",
     });
-    await fsp.writeFile(
-      path.join(fakeBin, "nix"),
-      `#!/usr/bin/env bash\nif [[ "$*" == eval* ]]; then printf '%s\\n' ${JSON.stringify(remoteSource)}; fi\n`,
-      { mode: 0o755 },
-    );
+    await fsp.writeFile(path.join(fakeBin, "nix"), fakeNixForRemoteSource(remoteSource), {
+      mode: 0o755,
+    });
 
     await execFileAsync(
       path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots"),
       ["use-flake", "--workspace-root", workspace, "--ref", "main", "--no-direnv"],
       {
         cwd: workspace,
-        env: {
-          ...process.env,
-          PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
-          NO_DEV_SHELL: "1",
-        },
+        env: envWithStubbedNix(fakeBin, { NO_DEV_SHELL: "1" }),
       },
     );
 
@@ -390,25 +389,21 @@ test("use-flake defaults to enclosing workspace root when run from a subdirector
     );
     await fsp.mkdir(subdir, { recursive: true });
     const { fakeBin } = await writeFakeGit(workspace, { submodule: true, gitlink: true });
-    await fsp.writeFile(
-      path.join(fakeBin, "nix"),
-      `#!/usr/bin/env bash\nif [[ "$*" == eval* ]]; then printf '%s\\n' ${JSON.stringify(remoteSource)}; fi\n`,
-      { mode: 0o755 },
-    );
+    await fsp.writeFile(path.join(fakeBin, "nix"), fakeNixForRemoteSource(remoteSource), {
+      mode: 0o755,
+    });
 
     await execFileAsync(
       path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots"),
       ["use-flake", "--ref", "v1.2.3", "--no-direnv"],
       {
         cwd: subdir,
-        env: {
-          ...process.env,
-          PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
+        env: envWithStubbedNix(fakeBin, {
           NO_DEV_SHELL: "1",
           WORKSPACE_ROOT: "",
           _VIBEROOTS_DEVSHELL_ROOT: "",
           LIVE_ROOT: "",
-        },
+        }),
       },
     );
 
@@ -430,11 +425,9 @@ test("use-flake --remove-submodule switches first, then cleans up the inactive s
     await writeMinimalSourceTree(path.join(workspace, "viberoots"));
     await fsp.mkdir(path.join(workspace, ".git", "modules", "viberoots"), { recursive: true });
     const { fakeBin, log } = await writeFakeGit(workspace, { submodule: true, gitlink: true });
-    await fsp.writeFile(
-      path.join(fakeBin, "nix"),
-      `#!/usr/bin/env bash\nif [[ "$*" == eval* ]]; then printf '%s\\n' ${JSON.stringify(remoteSource)}; fi\n`,
-      { mode: 0o755 },
-    );
+    await fsp.writeFile(path.join(fakeBin, "nix"), fakeNixForRemoteSource(remoteSource), {
+      mode: 0o755,
+    });
 
     await execFileAsync(
       path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots"),
@@ -449,11 +442,7 @@ test("use-flake --remove-submodule switches first, then cleans up the inactive s
       ],
       {
         cwd: workspace,
-        env: {
-          ...process.env,
-          PATH: `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`,
-          NO_DEV_SHELL: "1",
-        },
+        env: envWithStubbedNix(fakeBin, { NO_DEV_SHELL: "1" }),
       },
     );
 

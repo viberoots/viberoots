@@ -6,6 +6,8 @@ import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { writeIfChanged } from "../../lib/fs-helpers";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { runManagedCommand } from "../../lib/managed-command";
+import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import { verifySeedBuildArgs, type VerifySeedBuildMode } from "./seed-build";
 import { createSharedSeedStagePin, shouldStageSeed, stageSeedStore } from "./seed-staging";
 import { writeVerifySeedRemoteManifest } from "./seed-manifest";
@@ -133,16 +135,20 @@ async function buildSeedStorePath(
   } else {
     ui.step("seed", "checking test fixture store");
   }
-  const cmd = await runManagedCommand({
-    command: "nix",
-    args: verifySeedBuildArgs({ root, mode, gcRootPath }),
-    cwd: root,
-    env: {
+  const seedEnv = withSanitizedInheritedNixConfig(
+    envWithResolvedNixBin({
       ...process.env,
       IN_NIX_SHELL: process.env.IN_NIX_SHELL || "1",
       WORKSPACE_ROOT: root,
       BUCK_TEST_SRC: root,
-    },
+    }),
+  );
+  const nixBin = resolveToolPathSync("nix", seedEnv);
+  const cmd = await runManagedCommand({
+    command: nixBin,
+    args: verifySeedBuildArgs({ root, mode, gcRootPath }),
+    cwd: root,
+    env: seedEnv,
     timeoutMs: timeoutSec * 1000,
     killGraceMs: 5000,
   });

@@ -86,3 +86,32 @@ export function inheritedBuckIsolation(
   }
   return standalone;
 }
+
+export function envWithStubbedNix(
+  binDir: string,
+  extraEnv: NodeJS.ProcessEnv = {},
+  baseEnv: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...baseEnv,
+    ...extraEnv,
+  };
+  env.PATH = `${binDir}${path.delimiter}${env.PATH || ""}`;
+  const nixBin = path.join(binDir, "nix");
+  env.VBR_NIX_BIN = nixBin;
+  env.NIX_BIN = nixBin;
+  return env;
+}
+
+export function envWithoutSelectedNix(
+  extraEnv: NodeJS.ProcessEnv = {},
+  baseEnv: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...baseEnv,
+    ...extraEnv,
+  };
+  delete env.VBR_NIX_BIN;
+  delete env.NIX_BIN;
+  return env;
+}

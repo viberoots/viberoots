@@ -276,7 +276,7 @@ select_nix_bin() {
     export VBR_NIX_BIN
     return 0
   fi
-  if [[ -x "/nix/var/nix/profiles/default/bin/nix" ]]; then
+  if [[ "${VIBEROOTS_TEST_IGNORE_HOST_PROFILE_NIX:-0}" != "1" && -x "/nix/var/nix/profiles/default/bin/nix" ]]; then
     export VBR_NIX_BIN="/nix/var/nix/profiles/default/bin/nix"
     return 0
   fi

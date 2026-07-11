@@ -40,7 +40,9 @@ test("materialize impure selected targets use hidden workspace flake in extracte
     await fsp.chmod(stubNix, 0o755);
 
     const prevPath = process.env.PATH || "";
+    const prevVbrNixBin = process.env.VBR_NIX_BIN;
     process.env.PATH = `${stubBin}:${prevPath}`;
+    process.env.VBR_NIX_BIN = stubNix;
     try {
       await maybePrintImpureMaterializedBins({
         root: tmp,
@@ -50,6 +52,8 @@ test("materialize impure selected targets use hidden workspace flake in extracte
       });
     } finally {
       process.env.PATH = prevPath;
+      if (typeof prevVbrNixBin === "string") process.env.VBR_NIX_BIN = prevVbrNixBin;
+      else delete process.env.VBR_NIX_BIN;
     }
 
     const args = await fsp.readFile(argsLog, "utf8");

@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import type { ChildProcess } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
@@ -103,6 +104,17 @@ export async function readManifestEntry(
   }
 }
 
+function signalChildGroup(child: ChildProcess, signal: NodeJS.Signals): void {
+  if (!child.pid) return;
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    try {
+      child.kill(signal);
+    } catch {}
+  }
+}
+
 export async function runCommand(argv: string[], extra: string[], cwd?: string): Promise<number> {
   const cmd = String(argv[0] || "").trim();
   if (!cmd) return 2;
@@ -111,12 +123,38 @@ export async function runCommand(argv: string[], extra: string[], cwd?: string):
     cwd: cwd || process.cwd(),
     stdio: "inherit",
     env: process.env,
+    detached: true,
   });
+  let stopping = false;
+  let forcedKillTimer: NodeJS.Timeout | null = null;
+  const forwardSignal = (signal: NodeJS.Signals) => {
+    stopping = true;
+    signalChildGroup(child, signal);
+    if (!forcedKillTimer) {
+      forcedKillTimer = setTimeout(() => signalChildGroup(child, "SIGKILL"), 10_000);
+      forcedKillTimer.unref?.();
+    }
+  };
+  process.once("SIGINT", () => forwardSignal("SIGINT"));
+  process.once("SIGTERM", () => forwardSignal("SIGTERM"));
+  process.once("SIGHUP", () => forwardSignal("SIGHUP"));
   return await new Promise<number>((resolve) => {
     child.once("close", (code, signal) => {
+      process.off("SIGINT", forwardSignal);
+      process.off("SIGTERM", forwardSignal);
+      process.off("SIGHUP", forwardSignal);
+      if (forcedKillTimer) clearTimeout(forcedKillTimer);
       if (typeof code === "number") resolve(code);
+      else if (stopping && signal === "SIGINT") resolve(130);
+      else if (stopping && signal) resolve(143);
       else resolve(signal ? 130 : 1);
     });
-    child.once("error", () => resolve(1));
+    child.once("error", () => {
+      process.off("SIGINT", forwardSignal);
+      process.off("SIGTERM", forwardSignal);
+      process.off("SIGHUP", forwardSignal);
+      if (forcedKillTimer) clearTimeout(forcedKillTimer);
+      resolve(1);
+    });
   });
 }

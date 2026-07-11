@@ -8,7 +8,6 @@ function isSerialSidecarVerifyPass(name: string): boolean {
   return name === "enforcement";
 }
 
-const DEFAULT_RESOURCE_LIMITED_START_DELAY_SECS = 900;
 const BROAD_SHARED_DELAY_TARGET_MIN = 500;
 const BROAD_RESOURCE_DELAY_TARGET_MIN = 50;
 
@@ -20,6 +19,13 @@ function parseNonNegativeInteger(raw: string | undefined): number | null {
   return Math.floor(parsed);
 }
 
+function explicitResourceLimitedStartDelaySeconds(env: NodeJS.ProcessEnv): number | null {
+  return parseNonNegativeInteger(
+    env.VBR_VERIFY_RESOURCE_LIMITED_START_DELAY_SECS ||
+      env.VERIFY_RESOURCE_LIMITED_START_DELAY_SECS,
+  );
+}
+
 export function resourceLimitedStartDelaySeconds<
   T extends { name: string; targets: readonly unknown[] },
 >(group: readonly T[], env: NodeJS.ProcessEnv = process.env): number {
@@ -27,19 +33,23 @@ export function resourceLimitedStartDelaySeconds<
   const sharedPass = group.find((pass) => pass.name === "shared");
   if (!resourceLimitedPass || !sharedPass) return 0;
 
-  const override = parseNonNegativeInteger(
-    env.VBR_VERIFY_RESOURCE_LIMITED_START_DELAY_SECS ||
-      env.VERIFY_RESOURCE_LIMITED_START_DELAY_SECS,
-  );
+  const override = explicitResourceLimitedStartDelaySeconds(env);
   if (override != null) return override;
 
-  if (
-    sharedPass.targets.length >= BROAD_SHARED_DELAY_TARGET_MIN &&
-    resourceLimitedPass.targets.length >= BROAD_RESOURCE_DELAY_TARGET_MIN
-  ) {
-    return DEFAULT_RESOURCE_LIMITED_START_DELAY_SECS;
-  }
   return 0;
+}
+
+function isBroadSharedResourceLimitedGroup<T extends { name: string; targets: readonly unknown[] }>(
+  group: readonly T[],
+): boolean {
+  const resourceLimitedPass = group.find((pass) => pass.name === "resource-limited");
+  const sharedPass = group.find((pass) => pass.name === "shared");
+  return Boolean(
+    resourceLimitedPass &&
+      sharedPass &&
+      sharedPass.targets.length >= BROAD_SHARED_DELAY_TARGET_MIN &&
+      resourceLimitedPass.targets.length >= BROAD_RESOURCE_DELAY_TARGET_MIN,
+  );
 }
 
 export function splitVerifyPassGroupForStagedStart<
@@ -51,15 +61,39 @@ export function splitVerifyPassGroupForStagedStart<
   delaySeconds: number;
   immediatePasses: T[];
   delayedPasses: T[];
+  waitForImmediatePassesBeforeDelayed: boolean;
 } {
+  const override = explicitResourceLimitedStartDelaySeconds(env);
+  if (override === 0) {
+    return {
+      delaySeconds: 0,
+      immediatePasses: [...group],
+      delayedPasses: [],
+      waitForImmediatePassesBeforeDelayed: false,
+    };
+  }
   const delaySeconds = resourceLimitedStartDelaySeconds(group, env);
-  if (delaySeconds <= 0) {
-    return { delaySeconds: 0, immediatePasses: [...group], delayedPasses: [] };
+  if (delaySeconds > 0) {
+    return {
+      delaySeconds,
+      immediatePasses: group.filter((pass) => pass.name !== "resource-limited"),
+      delayedPasses: group.filter((pass) => pass.name === "resource-limited"),
+      waitForImmediatePassesBeforeDelayed: false,
+    };
+  }
+  if (isBroadSharedResourceLimitedGroup(group)) {
+    return {
+      delaySeconds: 0,
+      immediatePasses: group.filter((pass) => pass.name !== "shared"),
+      delayedPasses: group.filter((pass) => pass.name === "shared"),
+      waitForImmediatePassesBeforeDelayed: true,
+    };
   }
   return {
-    delaySeconds,
-    immediatePasses: group.filter((pass) => pass.name !== "resource-limited"),
-    delayedPasses: group.filter((pass) => pass.name === "resource-limited"),
+    delaySeconds: 0,
+    immediatePasses: [...group],
+    delayedPasses: [],
+    waitForImmediatePassesBeforeDelayed: false,
   };
 }
 

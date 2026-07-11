@@ -3,7 +3,8 @@ import * as fsp from "node:fs/promises";
 import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
-import { resolveToolPathSync } from "./tool-paths";
+import { withSanitizedInheritedNixConfig } from "./nix-config-env";
+import { envWithResolvedNixBin, resolveToolPathSync } from "./tool-paths";
 import { alignGeneratedWorkspaceFlakeInput } from "./workspace-flake-repair";
 
 const execFileAsync = promisify(execFile);
@@ -179,7 +180,11 @@ async function metadataLocks(opts: {
   viberootsSource: string;
   execFileImpl: typeof execFileAsync;
 }): Promise<FlakeLock | null> {
-  const command = opts.execFileImpl === execFileAsync ? resolveToolPathSync("nix") : "nix";
+  const nixEnv =
+    opts.execFileImpl === execFileAsync
+      ? withSanitizedInheritedNixConfig(envWithResolvedNixBin({ ...process.env }))
+      : undefined;
+  const command = nixEnv ? resolveToolPathSync("nix", nixEnv) : "nix";
   const { stdout } = await opts.execFileImpl(
     command,
     [
@@ -193,7 +198,7 @@ async function metadataLocks(opts: {
       "viberoots",
       `path:${opts.viberootsSource}`,
     ],
-    { maxBuffer: 1024 * 1024 * 64 },
+    { env: nixEnv, maxBuffer: 1024 * 1024 * 64 },
   );
   const parsed = JSON.parse(String(stdout || "{}")) as MetadataResult;
   return parsed.locks || null;

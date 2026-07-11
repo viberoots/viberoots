@@ -71,6 +71,7 @@ await runInTemp("startup-check-buck-prelude", async (tmp, $) => {
   );
   await fs.outputFile(path.join(tmp, ".viberoots/workspace/flake.nix"), "{ outputs = _: {}; }\n");
   await fs.remove(path.join(tmp, ".viberoots/current"));
+  await fs.remove(path.join(tmp, ".viberoots/workspace/prelude"));
   await fs.remove(path.join(tmp, "prelude"));
   failed = false;
   try {
@@ -81,6 +82,7 @@ await runInTemp("startup-check-buck-prelude", async (tmp, $) => {
   if (!failed) throw new Error("startup-check should fail when prelude/prelude.bzl is missing");
 
   await fs.outputFile(path.join(tmp, "prelude/prelude.bzl"), "# legacy prelude\n", "utf8");
+  await fs.remove(path.join(tmp, ".viberoots/workspace/prelude"));
   failed = false;
   try {
     await $({ cwd: tmp })`zx-wrapper ${startupCheckScript}`;

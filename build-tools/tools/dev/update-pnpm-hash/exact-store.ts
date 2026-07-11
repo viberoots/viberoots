@@ -9,6 +9,7 @@ import {
   sharedExactPnpmStateRoot,
   sharedExactPnpmStateRootPath,
 } from "../../lib/pnpm-state-paths";
+import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { resolveWorkspaceRootsSync } from "../../lib/repo";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import { fetchExactPnpmStore } from "./exact-store-fetch";
@@ -43,7 +44,7 @@ function resolveFlakePnpmProgram(repoRoot: string, timeoutMs: number): string {
   const evalTimeoutMs = Math.max(timeoutMs, 120_000);
   const system = currentHostSystem();
   console.error(`[update-pnpm-hash] resolving flake pnpm program for ${system}`);
-  const nixEnv = envWithResolvedNixBin(process.env);
+  const nixEnv = withSanitizedInheritedNixConfig(envWithResolvedNixBin(process.env));
   const nixBin = resolveToolPathSync("nix", nixEnv);
   const program = execFileSync(
     nixBin,
@@ -423,10 +424,12 @@ export async function withExactPrefetchedStore<T>(
   const prepared = await prepareExactPnpmStore(opts);
   try {
     return await fn(
-      envWithResolvedNixBin({
-        ...process.env,
-        NIX_PNPM_EXACT_STORE: prepared.exactStorePath,
-      }),
+      withSanitizedInheritedNixConfig(
+        envWithResolvedNixBin({
+          ...process.env,
+          NIX_PNPM_EXACT_STORE: prepared.exactStorePath,
+        }),
+      ),
     );
   } finally {
     await prepared.cleanup();

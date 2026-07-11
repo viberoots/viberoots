@@ -915,6 +915,17 @@ function prependPath(env: Record<string, string>, dir: string): void {
   env.PATH = [dir, env.PATH || process.env.PATH || ""].filter(Boolean).join(path.delimiter);
 }
 
+function applyTempNodePath(env: Record<string, string>, paths: Array<string | undefined>): void {
+  env.NODE_PATH = [
+    env.VIBEROOTS_NODE_PATH,
+    process.env.VIBEROOTS_NODE_PATH,
+    ...paths,
+    env.NODE_PATH || "",
+  ]
+    .filter(Boolean)
+    .join(path.delimiter);
+}
+
 async function prependTempRepoBin(env: Record<string, string>, tmp: string): Promise<void> {
   const candidates = [
     path.join(tmp, "viberoots", "build-tools", "tools", "bin"),
@@ -984,6 +995,10 @@ export async function runInTemp<T>(
     );
     await rewriteTempViberootsInput(tmp, activeViberootsRoot);
     await prependTempRepoBin(exportEnv, tmp);
+    applyTempNodePath(exportEnv, [
+      path.join(process.cwd(), "node_modules"),
+      path.join(activeViberootsRoot, "node_modules"),
+    ]);
     withSanitizedInheritedNixConfig(exportEnv);
     const nodeOpts = [
       "--experimental-strip-types",
@@ -1266,15 +1281,12 @@ export async function runInTemp<T>(
     const activeViberootsNodeModules = path.join(activeViberootsRoot, "node_modules");
     const viberootsSourceNodeModules = path.join(viberootsSourceRoot, "node_modules");
     const viberootsInputNodeModules = path.join(viberootsInputPath, "node_modules");
-    exportEnv.NODE_PATH = [
+    applyTempNodePath(exportEnv, [
       wsNodeModules,
       activeViberootsNodeModules,
       viberootsSourceNodeModules,
       viberootsInputNodeModules,
-      exportEnv.NODE_PATH || "",
-    ]
-      .filter(Boolean)
-      .join(path.delimiter);
+    ]);
   } catch {}
   exportEnv.WORKSPACE_ROOT = tmp;
   exportEnv.BUCK_TEST_SRC = tmp;

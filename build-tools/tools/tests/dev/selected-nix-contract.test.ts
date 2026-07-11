@@ -10,6 +10,10 @@ async function readSource(rel: string): Promise<string> {
   return await fsp.readFile(`viberoots/${rel}`, "utf8");
 }
 
+function generatedShellSource(source: string): string {
+  return source.replace(/\\"/g, '"');
+}
+
 test("bootstrap and submodule init export the selected nix binary", async () => {
   const bootstrap = await readSource("bootstrap");
   const init = await readSource("init");
@@ -80,6 +84,12 @@ test("install-time node module builders propagate selected nix to child processe
   const realizedStore = await readSource(
     "build-tools/tools/dev/update-pnpm-hash/realized-store.ts",
   );
+  const consumerBootstrap = await readSource("build-tools/tools/lib/consumer-bootstrap.ts");
+  const workspaceLockRepair = await readSource("build-tools/tools/lib/workspace-lock-repair.ts");
+  const verifySeed = await readSource("build-tools/tools/dev/verify/seed.ts");
+  const nixCacheHealth = await readSource("build-tools/tools/dev/verify/nix-cache-health.ts");
+  const viberootsCli = await readSource("build-tools/tools/dev/viberoots.ts");
+  const startupCheck = await readSource("build-tools/tools/dev/startup-check.ts");
 
   for (const [label, source] of [
     ["deps-main", depsMain],
@@ -93,19 +103,32 @@ test("install-time node module builders propagate selected nix to child processe
     ["nix-build-filtered-flake", nixBuildFilteredFlake],
     ["update-pnpm-hash/importer-lockfile", importerLockfile],
     ["update-pnpm-hash/realized-store", realizedStore],
+    ["consumer-bootstrap", consumerBootstrap],
+    ["workspace-lock-repair", workspaceLockRepair],
+    ["verify/seed", verifySeed],
+    ["verify/nix-cache-health", nixCacheHealth],
+    ["viberoots-cli", viberootsCli],
+    ["startup-check", startupCheck],
   ] as const) {
     if (!source.includes("envWithResolvedNixBin")) {
       throw new Error(`${label} must propagate VBR_NIX_BIN to child Nix processes`);
     }
   }
 
-  if (updateNix.includes("withSanitizedInheritedNixConfig")) {
-    throw new Error(
-      "update-pnpm-hash/nix must not hide selected-Nix problems with config sanitization",
-    );
-  }
-  if (exactStore.includes("withSanitizedInheritedNixConfig")) {
-    throw new Error("exact-store must not hide selected-Nix problems with config sanitization");
+  for (const [label, source] of [
+    ["update-pnpm-hash/nix", updateNix],
+    ["update-pnpm-hash/exact-store", exactStore],
+    ["update-pnpm-hash/importer-lockfile", importerLockfile],
+    ["consumer-bootstrap", consumerBootstrap],
+    ["workspace-lock-repair", workspaceLockRepair],
+    ["verify/seed", verifySeed],
+    ["verify/nix-cache-health", nixCacheHealth],
+    ["viberoots-cli", viberootsCli],
+    ["startup-check", startupCheck],
+  ] as const) {
+    if (!source.includes("withSanitizedInheritedNixConfig")) {
+      throw new Error(`${label} must sanitize inherited NIX_CONFIG for child Nix processes`);
+    }
   }
   for (const [label, source] of [
     ["update-pnpm-hash/nix", updateNix],
@@ -115,6 +138,12 @@ test("install-time node module builders propagate selected nix to child processe
     ["nix-build-filtered-flake", nixBuildFilteredFlake],
     ["update-pnpm-hash/importer-lockfile", importerLockfile],
     ["update-pnpm-hash/realized-store", realizedStore],
+    ["consumer-bootstrap", consumerBootstrap],
+    ["workspace-lock-repair", workspaceLockRepair],
+    ["verify/seed", verifySeed],
+    ["verify/nix-cache-health", nixCacheHealth],
+    ["viberoots-cli", viberootsCli],
+    ["startup-check", startupCheck],
   ] as const) {
     if (source.includes('resolveToolPathSync("nix")')) {
       throw new Error(`${label} must resolve nix from the exact env passed to the child process`);
@@ -128,6 +157,27 @@ test("install-time node module builders propagate selected nix to child processe
   }
   if (!linkNode.includes('resolveToolPathSync("nix", buildEnv)')) {
     throw new Error("link-node must resolve nix from the same env passed to nix");
+  }
+  if (!startupCheck.includes('resolveToolPathSync("nix", nixEnv)')) {
+    throw new Error("startup-check must resolve nix from the same env passed to nix");
+  }
+  if (!consumerBootstrap.includes('resolveToolPathSync("nix", nixEnv)')) {
+    throw new Error("consumer-bootstrap must resolve nix from the same env passed to nix");
+  }
+  if (!workspaceLockRepair.includes('resolveToolPathSync("nix", nixEnv)')) {
+    throw new Error("workspace-lock-repair must resolve nix from the same env passed to nix");
+  }
+  if (!verifySeed.includes('resolveToolPathSync("nix", seedEnv)')) {
+    throw new Error("verify seed must resolve nix from the same env passed to nix");
+  }
+  if (!nixCacheHealth.includes('resolveToolPathSync("nix", nixEnv)')) {
+    throw new Error("nix cache health must resolve nix from the same env passed to nix");
+  }
+  if (!viberootsCli.includes('resolveToolPathSync("nix", env)')) {
+    throw new Error("viberoots develop must resolve nix from the same env passed to nix");
+  }
+  if (/execFileAsync\(\s*["']nix["']/.test(consumerBootstrap)) {
+    throw new Error("consumer-bootstrap must not invoke ambient nix by command name");
   }
   if (filteredFlake.includes("process.env.NIX_BIN")) {
     throw new Error("filtered-flake must not let NIX_BIN bypass the selected VBR_NIX_BIN");
@@ -146,5 +196,62 @@ test("install-time node module builders propagate selected nix to child processe
   }
   if (importerLockfile.includes("}`nix ${")) {
     throw new Error("importer-lockfile must invoke the selected nix binary");
+  }
+});
+
+test("Buck-generated shell wrappers invoke the selected nix binary", async () => {
+  const nixCacheHealth = await readSource("build-tools/lang/nix_cache_health.bzl");
+  const nixShell = await readSource("build-tools/lang/nix_shell.bzl");
+  const zxTest = await readSource("build-tools/tools/buck/zx_test.bzl");
+  const buck2TestEnv = await readSource("build-tools/tools/dev/verify/buck2-test-env.ts");
+  const nixCacheHealthShell = generatedShellSource(nixCacheHealth);
+  const nixShellGenerated = generatedShellSource(nixShell);
+  const zxTestGenerated = generatedShellSource(zxTest);
+
+  if (!nixCacheHealthShell.includes('"$NIX_BIN" config show')) {
+    throw new Error("nix cache health shell must read config through the selected nix binary");
+  }
+  if (!nixCacheHealthShell.includes('"$NIX_BIN" store info --store')) {
+    throw new Error("nix cache health shell must probe caches through the selected nix binary");
+  }
+  if (!nixShellGenerated.includes('"$NIX_BIN" run --accept-flake-config')) {
+    throw new Error("nix shell bootstrap must run helper tools through the selected nix binary");
+  }
+  if (
+    !nixShellGenerated.includes('"$NIX_BIN" build %s --no-write-lock-file --accept-flake-config')
+  ) {
+    throw new Error("nix build helper must build through the selected nix binary");
+  }
+  if (!zxTestGenerated.includes('PRE_OUT=$("$NIX_BIN" build')) {
+    throw new Error("zx_test prelude materialization must build through the selected nix binary");
+  }
+  if (!buck2TestEnv.includes("process.env.VBR_NIX_BIN || process.env.NIX_BIN")) {
+    throw new Error("verify child env must prefer VBR_NIX_BIN before NIX_BIN");
+  }
+  if (buck2TestEnv.includes("path.dirname(nixBin)")) {
+    throw new Error("verify child env must not depend on PATH for selected nix");
+  }
+  if (!buck2TestEnv.includes('maybeEnvArg("VBR_NIX_BIN", nixBin)')) {
+    throw new Error("verify child env must export VBR_NIX_BIN");
+  }
+  if (!buck2TestEnv.includes('maybeEnvArg("NIX_BIN", nixBin)')) {
+    throw new Error("verify child env must export NIX_BIN for compatibility");
+  }
+  if (buck2TestEnv.includes('maybeEnvArg("PATH"')) {
+    throw new Error(
+      "verify child env must pass selected tools explicitly instead of forwarding PATH",
+    );
+  }
+
+  for (const [label, source] of [
+    ["nix_cache_health.bzl", nixCacheHealth],
+    ["nix_shell.bzl", nixShell],
+    ["zx_test.bzl", zxTest],
+  ] as const) {
+    const raw = source
+      .split("\n")
+      .filter((line) => /\bnix (?:build|run|config show|store info)\b/.test(line))
+      .filter((line) => !line.includes("$NIX_BIN"));
+    assert.deepEqual(raw, [], `${label} must not invoke ambient nix:\n${raw.join("\n")}`);
   }
 });

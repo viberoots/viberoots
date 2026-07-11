@@ -20,7 +20,7 @@ select_nix_bin() {
     printf '%s\n' "${VBR_NIX_BIN}"
     return 0
   fi
-  if [[ -x "/nix/var/nix/profiles/default/bin/nix" ]]; then
+  if [[ "${VIBEROOTS_TEST_IGNORE_HOST_PROFILE_NIX:-0}" != "1" && -x "/nix/var/nix/profiles/default/bin/nix" ]]; then
     printf '%s\n' "/nix/var/nix/profiles/default/bin/nix"
     return 0
   fi
@@ -39,6 +39,7 @@ if [[ -L "${current_path}" ]]; then
   if [[ "$(readlink "${current_path}")" != "${current_target}" ]]; then
     rm -f "${current_path}"
     ln -s "${current_target}" "${current_path}"
+    echo "repair: .viberoots/current now points to ${current_target}" >&2
   fi
 elif [[ ! -e "${current_path}" ]]; then
   ln -s "${current_target}" "${current_path}"
@@ -47,6 +48,7 @@ else
   mkdir -p "${backup_dir}"
   mv "${current_path}" "${backup_dir}/current.$(date +%s).$$.bak"
   ln -s "${current_target}" "${current_path}"
+  echo "repair: .viberoots/current now points to ${current_target}" >&2
 fi
 
 has_workspace_name=0
@@ -72,15 +74,19 @@ fi
 
 init_args+=("$@")
 
+nix_bin="$(select_nix_bin || true)"
+if [[ -z "${nix_bin}" || ! -x "${nix_bin}" ]]; then
+  echo "error: nix is required to initialize a submodule workspace before the dev shell is available" >&2
+  exit 127
+fi
+
 if [[ "${VBR_INIT_USE_LOCAL_COMMAND:-0}" == "1" ]]; then
-  NO_DEV_SHELL=1 WORKSPACE_ROOT="${workspace_root}" "${viberoots_dir}/build-tools/tools/bin/viberoots" \
+  VBR_NIX_BIN="${nix_bin}" \
+    NO_DEV_SHELL=1 \
+    WORKSPACE_ROOT="${workspace_root}" \
+    "${viberoots_dir}/build-tools/tools/bin/viberoots" \
     "${init_args[@]}"
 else
-  nix_bin="$(select_nix_bin || true)"
-  if [[ -z "${nix_bin}" || ! -x "${nix_bin}" ]]; then
-    echo "error: nix is required to initialize a submodule workspace before the dev shell is available" >&2
-    exit 127
-  fi
   VBR_NIX_BIN="${nix_bin}" \
     WORKSPACE_ROOT="${workspace_root}" \
     "${nix_bin}" run --accept-flake-config "path:${viberoots_flake_input_dir}#viberoots" -- \

@@ -107,24 +107,40 @@ async function main() {
   );
 
   const watch = spawnShell("wasm-watch", watchCmd, cwd, childEnv);
-  await waitForInitialWasmSync(cwd, synced.contractsDir, watch);
-  const vite = spawnShell("vite", viteCmd, cwd, childEnv);
+  let vite: ChildProcess | null = null;
   let stopping = false;
   let sawFailure = false;
 
   const stopAll = (signal: NodeJS.Signals) => {
     if (stopping) return;
     stopping = true;
-    killGroup(vite, signal);
+    if (vite) killGroup(vite, signal);
     killGroup(watch, signal);
     setTimeout(() => {
-      killGroup(vite, "SIGKILL");
+      if (vite) killGroup(vite, "SIGKILL");
       killGroup(watch, "SIGKILL");
     }, 3000).unref();
   };
 
   process.once("SIGINT", () => stopAll("SIGINT"));
   process.once("SIGTERM", () => stopAll("SIGTERM"));
+  process.once("SIGHUP", () => stopAll("SIGHUP"));
+  process.once("exit", () => {
+    if (stopping) return;
+    if (vite) killGroup(vite, "SIGTERM");
+    killGroup(watch, "SIGTERM");
+  });
+
+  try {
+    await waitForInitialWasmSync(cwd, synced.contractsDir, watch);
+    vite = spawnShell("vite", viteCmd, cwd, childEnv);
+  } catch (error) {
+    stopAll("SIGTERM");
+    throw error;
+  }
+
+  const startedVite = vite;
+  if (!startedVite) throw new Error("vite process was not started");
 
   const onExit = (name: string, code: number | null, signal: NodeJS.Signals | null) => {
     const codeStr = code == null ? "null" : String(code);
@@ -135,7 +151,7 @@ async function main() {
     process.exitCode = sawFailure ? 1 : 0;
   };
 
-  vite.once("exit", (code, signal) => onExit("vite", code, signal));
+  startedVite.once("exit", (code, signal) => onExit("vite", code, signal));
   watch.once("exit", (code, signal) => onExit("wasm-watch", code, signal));
 }
 

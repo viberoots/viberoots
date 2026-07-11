@@ -6,6 +6,8 @@ import { isNixStorePath, resolvePreferredCmdPath } from "./startup-check/cmd-pat
 import { validateStartupWorkspaceState } from "./startup-check/workspace-state";
 import { isVbrVerbose } from "../lib/command-ui";
 import { DEV_OVERRIDE_LANGS, devOverrideEnvNameForLang } from "../lib/dev-override-envs";
+import { withSanitizedInheritedNixConfig } from "../lib/nix-config-env";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
 
 async function which(cmd: string) {
   try {
@@ -23,6 +25,15 @@ async function pathExists(p: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+function selectedNixEnv(extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  return withSanitizedInheritedNixConfig(
+    envWithResolvedNixBin({
+      ...process.env,
+      ...extraEnv,
+    }),
+  );
 }
 
 async function sourceRoot(): Promise<string> {
@@ -51,10 +62,13 @@ async function materializeBuckPrelude(
     throw new Error(`[startup-check] invalid Buck prelude: ${preludeLink} is not a symlink`);
   }
 
+  const nixEnv = selectedNixEnv();
+  const nixBin = resolveToolPathSync("nix", nixEnv);
   const built = await $({
     cwd: flakeRoot,
     stdio: "pipe",
-  })`nix build --impure ${`path:${flakeRoot}#buck2-prelude`} --no-link --no-write-lock-file --accept-flake-config --print-out-paths`.nothrow();
+    env: nixEnv,
+  })`${nixBin} build --impure ${`path:${flakeRoot}#buck2-prelude`} --no-link --no-write-lock-file --accept-flake-config --print-out-paths`.nothrow();
   if (built.exitCode !== 0) {
     const stderr = String(built.stderr || "").trim();
     throw new Error(
@@ -106,13 +120,11 @@ function sourcePath(root: string, ...parts: string[]): string {
 
 async function requireImpureEnvPassthrough() {
   const probe = "__vbr_impure_env_probe__";
+  const env = selectedNixEnv({ BUCK_TARGET: probe });
   const res = await $({
     stdio: "pipe",
-    env: {
-      ...process.env,
-      BUCK_TARGET: probe,
-    },
-  })`nix eval --impure --raw --expr ${'builtins.getEnv "BUCK_TARGET"'}`.nothrow();
+    env,
+  })`${resolveToolPathSync("nix", env)} eval --impure --raw --expr ${'builtins.getEnv "BUCK_TARGET"'}`.nothrow();
   if (res.exitCode !== 0) {
     console.error(
       "[startup-check] failed to verify impure env passthrough via `nix eval --impure`",
@@ -247,7 +259,9 @@ async function main() {
   } catch {}
 
   try {
-    const { stdout } = await $`nix config show`;
+    const nixEnv = selectedNixEnv();
+    const nixBin = resolveToolPathSync("nix", nixEnv);
+    const { stdout } = await $({ env: nixEnv })`${nixBin} config show`;
     const configText = String(stdout).toLowerCase();
     const envText = (process.env.NIX_CONFIG || "").toLowerCase();
     const configFeatureParts = Array.from(
@@ -263,7 +277,7 @@ async function main() {
     // `nix config show` itself requires the modern CLI path.
     features.add("nix-command");
     if (!features.has("flakes")) {
-      const flakeHelp = await $`nix flake metadata --help`.nothrow();
+      const flakeHelp = await $({ env: nixEnv })`${nixBin} flake metadata --help`.nothrow();
       if (flakeHelp.exitCode === 0) {
         features.add("flakes");
       }

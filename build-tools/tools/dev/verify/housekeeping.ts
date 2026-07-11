@@ -61,18 +61,6 @@ export function shouldRunNixStoreOptimizeForRequestedTargets(
   return raw === "1" || raw === "true" || raw === "yes";
 }
 
-async function runBoundedGc(root: string, maxFreed: string, secs: number): Promise<void> {
-  const timeoutPath = await resolveToolPath("timeout");
-  await $({
-    stdio: "ignore",
-    cwd: root,
-  })`bash --noprofile --norc -c ${`set -euo pipefail
-set +e
-${timeoutPath} -k 5s ${secs}s nix-store --gc --max-freed ${maxFreed} >/dev/null 2>&1
-exit 0
-`}`.nothrow();
-}
-
 export async function runVerifyHousekeeping(opts: {
   root: string;
   targetFreeGiB: number;
@@ -124,13 +112,9 @@ export async function runVerifyHousekeeping(opts: {
   }
 
   if (free < target) {
-    process.stderr.write("[verify] low disk free detected; running bounded nix-store GC...\n");
-    for (const cap of ["2G", "4G", "8G", "16G", "32G"]) {
-      await runBoundedGc(root, cap, 45);
-      free = await freeGiBAtPath(root);
-      process.stderr.write(`[verify] post-GC(${cap}) disk free: ~${free}GiB\n`);
-      if (free >= target) break;
-    }
+    process.stderr.write(
+      "[verify] low disk free detected; skipping automatic Nix GC during verify. Run maintenance GC outside verify if more store space is needed.\n",
+    );
   }
 
   return { freeGiB: free };

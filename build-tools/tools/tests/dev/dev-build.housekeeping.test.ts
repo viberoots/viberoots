@@ -41,6 +41,7 @@ test("dev-build housekeeping skips optimise by default when disk is healthy", as
   const prevHousekeeping = process.env.VBR_HOUSEKEEPING;
   const prevCleanCooldown = process.env.VBR_CLEAN_TEMP_OUTS_COOLDOWN_MINUTES;
   const prevOptimiseMode = process.env.VBR_OPTIMISE_MODE;
+  const prevVerifyLockDir = process.env.VBR_VERIFY_LOCK_DIR;
   const prevVerbose = process.env.VBR_VERBOSE;
   const { logs, restore } = captureLogs();
   let cleanCount = 0;
@@ -60,6 +61,7 @@ test("dev-build housekeeping skips optimise by default when disk is healthy", as
     process.env.VBR_HOUSEKEEPING = "1";
     process.env.VBR_VERBOSE = "1";
     delete process.env.VBR_OPTIMISE_MODE;
+    delete process.env.VBR_VERIFY_LOCK_DIR;
 
     await runHousekeeping({
       cleanTempOuts: async () => {
@@ -85,6 +87,7 @@ test("dev-build housekeeping skips optimise by default when disk is healthy", as
       VBR_GC_MODE: prevGcMode,
       VBR_HOUSEKEEPING: prevHousekeeping,
       VBR_OPTIMISE_MODE: prevOptimiseMode,
+      VBR_VERIFY_LOCK_DIR: prevVerifyLockDir,
       VBR_VERBOSE: prevVerbose,
     });
     await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
@@ -99,6 +102,7 @@ test("dev-build housekeeping runs optimise under pressure and respects cooldown"
   const prevHousekeeping = process.env.VBR_HOUSEKEEPING;
   const prevCleanCooldown = process.env.VBR_CLEAN_TEMP_OUTS_COOLDOWN_MINUTES;
   const prevOptimiseMode = process.env.VBR_OPTIMISE_MODE;
+  const prevVerifyLockDir = process.env.VBR_VERIFY_LOCK_DIR;
   const prevVerbose = process.env.VBR_VERBOSE;
   const { logs, restore } = captureLogs();
   let cleanCount = 0;
@@ -118,6 +122,7 @@ test("dev-build housekeeping runs optimise under pressure and respects cooldown"
     process.env.VBR_HOUSEKEEPING = "1";
     process.env.VBR_VERBOSE = "1";
     delete process.env.VBR_OPTIMISE_MODE;
+    delete process.env.VBR_VERIFY_LOCK_DIR;
 
     const pressureStats = async () => ({ freeBytes: 5 * 1024 * 1024 * 1024, freePct: 5 });
     const cleanTempOuts = async () => {
@@ -142,6 +147,7 @@ test("dev-build housekeeping runs optimise under pressure and respects cooldown"
       VBR_GC_MODE: prevGcMode,
       VBR_HOUSEKEEPING: prevHousekeeping,
       VBR_OPTIMISE_MODE: prevOptimiseMode,
+      VBR_VERIFY_LOCK_DIR: prevVerifyLockDir,
       VBR_VERBOSE: prevVerbose,
     });
     await fsp.rm(root, { recursive: true, force: true }).catch(() => {});
@@ -191,7 +197,7 @@ test("dev-build housekeeping skips automatic nix GC while verify lock is live", 
     process.env.PATH = `${bin}${path.delimiter}${prevPath || ""}`;
     process.env.VBR_GC_MODE = "auto";
     process.env.VBR_HOUSEKEEPING = "1";
-    process.env.VBR_OPTIMISE_MODE = "off";
+    delete process.env.VBR_OPTIMISE_MODE;
     process.env.VBR_VERIFY_LOCK_DIR = lockDir;
     process.env.VBR_VERBOSE = "1";
 
@@ -205,6 +211,7 @@ test("dev-build housekeeping skips automatic nix GC while verify lock is live", 
     await assert.rejects(fsp.stat(path.join(root, "gc.log")));
     await assert.rejects(fsp.stat(path.join(root, "timeout.log")));
     await assert.rejects(fsp.stat(path.join(root, "buck-out", ".housekeeping", ".gc-stamp")));
+    assert.ok(logs.includes("[housekeeping] optimise: skipped (verify running)"));
     assert.ok(logs.includes("[housekeeping] GC: skipped (verify running)"));
   } finally {
     restore();

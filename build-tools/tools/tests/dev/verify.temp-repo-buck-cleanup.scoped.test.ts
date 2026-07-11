@@ -11,6 +11,7 @@ import {
   cleanupRegisteredTempRepos,
   registeredTempRootOwnsBuckRepoRoot,
 } from "../../dev/verify/buck-orphan-cleanup";
+import { isScopedTempDevProcess } from "../../dev/verify/temp-repo-process-cleanup";
 import { pathStartsWithRootVariant } from "../../dev/verify/buck-orphan-cleanup-lib";
 import { registeredIsolationProcessPidsFromLines } from "../../dev/verify/registered-buck-cleanup";
 import { parseVerifyOwnedState } from "../../dev/verify/owned-process-state";
@@ -156,6 +157,27 @@ test("verify cleanup: process tree termination reaps node grandchildren without 
     await killAndWait(parent);
     await fsp.rm(tmp, { recursive: true, force: true }).catch(() => {});
   }
+});
+
+test("verify cleanup: scoped temp process recognizer covers long-lived dev helpers", () => {
+  const commands = [
+    "node --experimental-strip-types /repo/build-tools/tools/dev/run-runnable.ts --mode dev //app:dev",
+    "node --experimental-strip-types /repo/projects/apps/site/scripts/dev.ts",
+    "node --experimental-strip-types /repo/build-tools/tools/dev/watch-wasm-coordinator.ts",
+    "node --experimental-strip-types /repo/build-tools/tools/dev/tail-log.ts --status -w 2",
+    "node --experimental-strip-types /repo/build-tools/tools/dev/dev-with-wasm-watch.ts",
+    "node --experimental-strip-types /repo/build-tools/tools/dev/wasm-watch-coordinator-daemon.ts --poll-ms 300",
+  ];
+  for (const command of commands) {
+    assert.equal(isScopedTempDevProcess(command), true, command);
+  }
+  assert.equal(
+    isScopedTempDevProcess(
+      "node --experimental-strip-types /repo/build-tools/tools/dev/run-runnable.ts //app:prod",
+    ),
+    false,
+  );
+  assert.equal(isScopedTempDevProcess("buck2d[/repo] --isolation-dir v2"), false);
 });
 
 test(

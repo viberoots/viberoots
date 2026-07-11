@@ -392,6 +392,22 @@ devshell_stale_reload_allowed() {
 	return 0
 }
 
+devshell_help_only() {
+	[[ "${VBR_DEVSHELL_HELP_ONLY:-}" == "1" ]]
+}
+
+viberoots_ts_help_only_args() {
+	local arg
+	for arg in "$@"; do
+		case "${arg}" in
+			--help|-h|help)
+				return 0
+				;;
+		esac
+	done
+	return 1
+}
+
 exec_in_dev_shell() {
 	local live_root="$1"; shift
 	local fastpath_enabled="${BUCK_DEV_SHELL_FASTPATH:-1}"
@@ -424,7 +440,7 @@ exec_in_dev_shell() {
 			exit 127
 		fi
 	fi
-	if [[ "${can_bypass_direnv}" == "1" ]] && ! ensure_buck_prelude "${live_root}"; then
+	if [[ "${can_bypass_direnv}" == "1" ]] && ! devshell_help_only && ! ensure_buck_prelude "${live_root}"; then
 		can_bypass_direnv="0"
 	fi
 	if [[ -n "${NO_DEV_SHELL:-}" ]]; then
@@ -438,6 +454,9 @@ exec_in_dev_shell() {
 		fi
 		BUCK_CONFIG_LOCK=1 exec direnv exec "$live_root" "$@"
 	else
+		if devshell_help_only; then
+			exec "$@"
+		fi
 		if ! ensure_buck_prelude "${live_root}"; then
 			echo "error: failed to materialize Buck prelude at ${live_root}/.viberoots/current/prelude/prelude.bzl" 1>&2
 			exit 1
@@ -461,16 +480,24 @@ node_ts() {
 	local live_root="$1"; shift
 	local target_ts="$1"; shift
 	local node_bin="${NODE_BIN:-node}"
+	local help_only="0"
+	case "${target_ts}" in
+		*/build-tools/tools/dev/viberoots.ts)
+			if viberoots_ts_help_only_args "$@"; then
+				help_only="1"
+			fi
+			;;
+	esac
 	# Prefer explicit ZX_INIT if provided (e.g., tests), else viberoots source path.
 	local zx_init_path="${ZX_INIT:-${VIBEROOTS_ROOT}/build-tools/tools/dev/zx-init.mjs}"
 	# If zx-wrapper is available, prefer it to guarantee zx globals ($) are provided
 	if command -v zx-wrapper >/dev/null 2>&1; then
-		exec_in_dev_shell "$live_root" \
+		VBR_DEVSHELL_HELP_ONLY="${help_only}" exec_in_dev_shell "$live_root" \
 			zx-wrapper \
 			--import "${zx_init_path}" \
 			"$target_ts" "$@"
 	else
-		exec_in_dev_shell "$live_root" \
+		VBR_DEVSHELL_HELP_ONLY="${help_only}" exec_in_dev_shell "$live_root" \
 			"$node_bin" \
 			--experimental-top-level-await \
 			--disable-warning=ExperimentalWarning \

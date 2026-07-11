@@ -61,13 +61,27 @@ test("cpp present: validator passes and diagnose enables cpp", async () => {
       path.join(tmp, "viberoots/build-tools/tools/dev/langs-diagnose.ts"),
     );
 
+    const tempViberootsRoot = path.join(tmp, "viberoots");
+    const tempToolEnv = {
+      ...process.env,
+      VIBEROOTS_ROOT: tempViberootsRoot,
+      VIBEROOTS_SOURCE_ROOT: tempViberootsRoot,
+      NODE_PATH: [path.join(process.cwd(), "node_modules"), process.env.NODE_PATH || ""]
+        .filter(Boolean)
+        .join(path.delimiter),
+    };
+
     // Validate manifest
-    const vres = await $({ cwd: tmp })`node viberoots/build-tools/tools/dev/validate-langs.ts`;
+    const vres = await $({
+      cwd: tmp,
+      env: tempToolEnv,
+    })`node viberoots/build-tools/tools/dev/validate-langs.ts`;
     assert.match(String(vres.stdout), /langs\.json: OK/);
 
     // Diagnose should enable cpp
     const dres = await $({
       cwd: tmp,
+      env: tempToolEnv,
     })`node viberoots/build-tools/tools/dev/langs-diagnose.ts --json --lang cpp`;
     const obj = JSON.parse(String(dres.stdout || "{}"));
     assert.ok(Array.isArray(obj.enabled));

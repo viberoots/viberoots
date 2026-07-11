@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { envWithStubbedNix, runInTemp } from "../lib/test-helpers";
 
 test("d selected webapp dev bypasses pnpm-backed generated dev scripts", async () => {
   await runInTemp("runnable-dev-direct-script", async (tmp, $) => {
@@ -99,11 +99,9 @@ test("d selected webapp dev bypasses pnpm-backed generated dev scripts", async (
     const run = await $({
       cwd: tmp,
       stdio: "pipe",
-      env: {
-        ...process.env,
-        PATH: `${stubBin}:${process.env.PATH || ""}`,
+      env: envWithStubbedNix(stubBin, {
         REAL_ZX_WRAPPER: realZxWrapper,
-      },
+      }),
     })`viberoots/build-tools/tools/bin/d ${target}`;
 
     assert.match(String(run.stdout || ""), /direct-dev-ok:/);
