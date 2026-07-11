@@ -18,8 +18,10 @@ Treat validation as already complete before `cc` is invoked. Inspect the whole c
 3. Choose the most representative conventional commit type and summary.
 4. If the change set includes modified submodules or nested Git repositories, commit those
    repositories first.
-5. Stage all tracked, deleted, and untracked files in the current repository.
-6. Create one commit for the entire local change set immediately, without running extra tests or waiting for additional validation.
+5. For viberoots consumer repositories, confirm the viberoots submodule gitlink and root
+   `flake.lock` metadata point at the same viberoots revision before staging.
+6. Stage all tracked, deleted, and untracked files in the current repository.
+7. Create one commit for the entire local change set immediately, without running extra tests or waiting for additional validation.
 
 ## Inspect The Change Set
 
@@ -47,6 +49,34 @@ repositories before committing the parent repository.
   gitlink along with any parent-repo changes.
 - Do not commit the parent repo pointer while the submodule still has uncommitted local changes,
   unless the user explicitly asks to leave those submodule changes uncommitted.
+
+## Sync Viberoots Pins
+
+Before staging a commit in a viberoots consumer repository, make sure checked-in viberoots pins are
+coherent. This prevents committing only the submodule gitlink and leaving root flake metadata to
+change on the user's next `viberoots update`.
+
+Treat a repository as a viberoots consumer when it has a `viberoots` submodule or a `.viberoots`
+workspace directory. In that case:
+
+- If both `viberoots/` and root `flake.lock` exist, compare the submodule revision with the
+  root lockfile's `nodes.viberoots.locked.rev`.
+- Use a structured parser, for example:
+
+  ```sh
+  submodule_rev="$(git -C viberoots rev-parse HEAD)"
+  lock_rev="$(jq -r '.nodes.viberoots.locked.rev // empty' flake.lock)"
+  ```
+
+- If both values are present and differ, run the repo's normal pin-sync path, usually
+  `viberoots update`, then inspect the resulting diff and include the updated `flake.lock` in the
+  same parent commit.
+- Re-check the revisions after syncing. Do not commit if the values still differ or if the sync
+  command failed.
+- If the repository has only flake-mode viberoots metadata and no `viberoots/` submodule, do not
+  invent a submodule check; commit the existing flake changes as part of the normal change set.
+- If the repository has a viberoots submodule but no root `flake.lock`, no flake metadata sync is
+  needed.
 
 ## Write The Commit Message
 
