@@ -133,13 +133,16 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (!exactStoreImport.includes('"store", "add-path"')) {
     throw new Error("exact-store helpers must import prepared stores into /nix/store");
   }
-  if (!exactStoreImport.includes('"store.tar"')) {
+  if (!exactStoreImport.includes("opts.storeDir")) {
     throw new Error(
-      "exact-store helpers must archive prepared stores before importing them into /nix/store",
+      "exact-store helpers must import prepared store directories directly into /nix/store",
     );
   }
-  if (!exactStoreImport.includes("await fsp.rm(archiveDir, { recursive: true, force: true })")) {
-    throw new Error("exact-store helpers must remove transient archive dirs after Nix import");
+  if (exactStoreImport.includes('"store.tar"')) {
+    throw new Error("exact-store helpers must not introduce tar metadata before Nix import");
+  }
+  if (!exactStoreImport.includes("await fsp.rm(opts.storeDir, { recursive: true, force: true })")) {
+    throw new Error("exact-store helpers must remove transient local stores after Nix import");
   }
   if (!exactStore.includes("removeRedundantLocalExactStoreDirs")) {
     throw new Error("exact-store prep must remove redundant local fetched stores after Nix import");
@@ -215,6 +218,8 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   }
   if (
     !store.includes("normalize_pnpm_store_for_fod") ||
+    !store.includes("normalizing modes in store") ||
+    !store.includes("-name '*-exec'") ||
     !store.includes("file:$index_db?mode=ro&immutable=1") ||
     !store.includes("FROM package_index") ||
     !store.includes("ORDER BY key") ||
@@ -424,10 +429,10 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (
     !unified.includes("mergeExactStorePathIntoUnifiedStore") ||
     !unified.includes('"store.tar"') ||
-    !unified.includes("tar -xf")
+    !unified.includes("mergePnpmStore(opts.exactStorePath, opts.unifyStore)")
   ) {
     throw new Error(
-      "require-unified-pnpm-store.ts must assemble unified prewarm from archived exact stores",
+      "require-unified-pnpm-store.ts must assemble unified prewarm from exact store directories and legacy archives",
     );
   }
   if (unified.includes("nix build --impure")) {

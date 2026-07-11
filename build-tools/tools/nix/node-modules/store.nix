@@ -356,6 +356,10 @@ in {
         if [ -d "$out/store" ]; then
           echo "[nix] mkPnpmStore: normalizing timestamps in store" >&2
           find "$out/store" -exec touch -h -t 197001010000 {} + >/dev/null 2>&1 || true
+          echo "[nix] mkPnpmStore: normalizing modes in store" >&2
+          find "$out/store" -type d -exec chmod 755 {} + >/dev/null 2>&1 || true
+          find "$out/store" -type f ! -name '*-exec' -exec chmod 644 {} + >/dev/null 2>&1 || true
+          find "$out/store" -type f -name '*-exec' -exec chmod 755 {} + >/dev/null 2>&1 || true
           echo "[nix] mkPnpmStore: scrubbing volatile JSON fields" >&2
           OUT_STORE="$out/store" node -e '
             const fs=require("fs"); const path=require("path");
@@ -574,6 +578,10 @@ in {
         if [ -d "$out/store" ]; then
           echo "[nix] mkPnpmStoreUnfixed: normalizing timestamps in store" >&2
           find "$out/store" -exec touch -h -t 197001010000 {} + >/dev/null 2>&1 || true
+          echo "[nix] mkPnpmStoreUnfixed: normalizing modes in store" >&2
+          find "$out/store" -type d -exec chmod 755 {} + >/dev/null 2>&1 || true
+          find "$out/store" -type f ! -name '*-exec' -exec chmod 644 {} + >/dev/null 2>&1 || true
+          find "$out/store" -type f -name '*-exec' -exec chmod 755 {} + >/dev/null 2>&1 || true
           echo "[nix] mkPnpmStoreUnfixed: scrubbing volatile JSON fields" >&2
           OUT_STORE="$out/store" node -e '
             const fs=require("fs"); const path=require("path");

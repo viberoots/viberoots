@@ -25,10 +25,10 @@ test("require-unified-pnpm-store assembles from exact prefetched stores", async 
   if (
     !txt.includes("mergeExactStorePathIntoUnifiedStore") ||
     !txt.includes('"store.tar"') ||
-    !txt.includes("tar -xf")
+    !txt.includes("mergePnpmStore(opts.exactStorePath, opts.unifyStore)")
   ) {
     throw new Error(
-      "require-unified-pnpm-store must merge archived exact prefetched stores into unifyStore",
+      "require-unified-pnpm-store must merge exact store directories and legacy archives into unifyStore",
     );
   }
   if (txt.includes("nix build --impure")) {

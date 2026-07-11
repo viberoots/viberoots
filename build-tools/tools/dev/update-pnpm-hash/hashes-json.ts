@@ -91,6 +91,21 @@ async function writeJsonFile(candidate: string, obj: Record<string, string>): Pr
   await fsp.writeFile(candidate, payload, "utf8");
 }
 
+function postCloneHashesReadonly(): boolean {
+  if (String(process.env.VBR_PNPM_HASHES_READONLY || "").trim() === "1") return true;
+  return String(process.env.VBR_POST_CLONE || "").trim() === "1";
+}
+
+function readonlyMutationError(action: string, file: string, detail: string): Error {
+  return new Error(
+    [
+      `refusing to ${action} during post-clone: ${path.relative(process.cwd(), file) || file}`,
+      detail,
+      "post-clone must not mutate tracked pnpm hash metadata; run normal viberoots update in a development checkout and commit the deterministic hash fix.",
+    ].join("\n"),
+  );
+}
+
 async function readHashesJson(root = process.cwd()): Promise<Record<string, string>> {
   const merged: Record<string, string> = {};
   for (const candidate of hashesJsonPaths(root)) {
@@ -142,6 +157,14 @@ export async function updateNodeModulesHashesJson(
   const root = opts.root ? path.resolve(opts.root) : process.cwd();
   const owner = ownerHashesJsonPath(lockfileRel, opts.owner, root);
   const obj = await readJsonFile(owner);
+  const previousHash = String(obj[lockfileRel] || "").trim();
+  if (postCloneHashesReadonly() && previousHash !== newHash) {
+    throw readonlyMutationError(
+      "update pnpm hash metadata",
+      owner,
+      `${lockfileRel}: ${previousHash || "(missing)"} -> ${newHash}`,
+    );
+  }
   obj[lockfileRel] = newHash;
   await writeJsonFile(owner, obj);
   if (opts.owner !== "viberoots") {
@@ -166,6 +189,13 @@ export async function pruneNodeModulesHashesJson(
       changed = true;
     }
     if (changed) {
+      if (postCloneHashesReadonly()) {
+        throw readonlyMutationError(
+          "prune pnpm hash metadata",
+          candidate,
+          `stale entries: ${removed.join(", ")}`,
+        );
+      }
       await writeJsonFile(candidate, obj).catch(() => {});
     }
   }

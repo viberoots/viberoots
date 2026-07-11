@@ -466,3 +466,71 @@ test("updateNodeModulesHashesJson writes project hashes to projects ownership", 
     await fsp.rm(tmp, { recursive: true, force: true });
   }
 });
+
+test("post-clone refuses pnpm hash metadata updates", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "hashes-post-clone-readonly-"));
+  const prevCwd = process.cwd();
+  const prevPostClone = process.env.VBR_POST_CLONE;
+  try {
+    process.chdir(tmp);
+    process.env.VBR_POST_CLONE = "1";
+    const hashesPath = path.join("projects", "node-modules.hashes.json");
+    await fsp.mkdir(path.dirname(hashesPath), { recursive: true });
+    await fsp.writeFile(
+      hashesPath,
+      JSON.stringify({ "projects/apps/demo/pnpm-lock.yaml": "sha256-old" }, null, 2) + "\n",
+      "utf8",
+    );
+
+    await updateNodeModulesHashesJson("projects/apps/demo/pnpm-lock.yaml", "sha256-old");
+    await assert.rejects(
+      updateNodeModulesHashesJson("projects/apps/demo/pnpm-lock.yaml", "sha256-new"),
+      /refusing to update pnpm hash metadata during post-clone/,
+    );
+
+    const next = JSON.parse(await fsp.readFile(hashesPath, "utf8")) as Record<string, string>;
+    assert.equal(next["projects/apps/demo/pnpm-lock.yaml"], "sha256-old");
+  } finally {
+    process.chdir(prevCwd);
+    if (prevPostClone === undefined) delete process.env.VBR_POST_CLONE;
+    else process.env.VBR_POST_CLONE = prevPostClone;
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("post-clone refuses pnpm hash metadata pruning", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "hashes-post-clone-prune-"));
+  const prevCwd = process.cwd();
+  const prevPostClone = process.env.VBR_POST_CLONE;
+  try {
+    process.chdir(tmp);
+    process.env.VBR_POST_CLONE = "1";
+    const hashesPath = path.join("projects", "node-modules.hashes.json");
+    await fsp.mkdir(path.dirname(hashesPath), { recursive: true });
+    await fsp.writeFile(
+      hashesPath,
+      JSON.stringify(
+        {
+          "projects/apps/alive/pnpm-lock.yaml": "sha256-alive",
+          "projects/apps/deleted/pnpm-lock.yaml": "sha256-deleted",
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
+
+    await assert.rejects(
+      pruneNodeModulesHashesJson(["projects/apps/alive/pnpm-lock.yaml"]),
+      /refusing to prune pnpm hash metadata during post-clone/,
+    );
+
+    const next = JSON.parse(await fsp.readFile(hashesPath, "utf8")) as Record<string, string>;
+    assert.equal(next["projects/apps/deleted/pnpm-lock.yaml"], "sha256-deleted");
+  } finally {
+    process.chdir(prevCwd);
+    if (prevPostClone === undefined) delete process.env.VBR_POST_CLONE;
+    else process.env.VBR_POST_CLONE = prevPostClone;
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
