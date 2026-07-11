@@ -183,7 +183,8 @@ test("install secret readiness can prompt through the controlling terminal", asy
     "utf8",
   );
   assert.match(readinessSource, /hasControllingTerminal/);
-  assert.match(readinessSource, /promptTerminalSelect/);
+  assert.match(readinessSource, /promptTerminalSelectLine/);
+  assert.doesNotMatch(readinessSource, /promptTerminalSelect\(/);
   assert.match(terminalSelectSource, /fs\.openSync\("\/dev\/tty", "r"\)/);
   assert.match(terminalSelectSource, /fs\.openSync\("\/dev\/tty", "w"\)/);
   assert.match(terminalSelectSource, /new tty\.ReadStream\(inputFd\)/);

@@ -129,6 +129,15 @@ export async function promptTerminalSelect(
   }
 }
 
+export async function promptTerminalSelectLine(
+  message: string,
+  choices: TerminalSelectChoice[],
+  initialIndex: number,
+) {
+  if (choices.length === 0) throw new Error(`${message} has no choices`);
+  return await promptSelectLine(message, choices, initialIndex);
+}
+
 export async function promptTerminalLine(message: string, defaultValue = "") {
   const streams = promptStreams();
   const rl = readline.createInterface({ input: streams.input, output: streams.output });

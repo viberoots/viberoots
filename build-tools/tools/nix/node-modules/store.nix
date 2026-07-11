@@ -113,20 +113,56 @@ NODE
         [ -f "$index_db" ] || continue
         echo "[nix] pnpm-store: normalizing sqlite index $index_db" >&2
         local normalized_db="$TMPDIR/pnpm-store-index.$$.db"
+        local normalized_rows="$TMPDIR/pnpm-store-index.$$.rows"
         local normalized_sql="$TMPDIR/pnpm-store-index.$$.sql"
-        rm -f "$normalized_db" "$normalized_sql"
-        sqlite3 "file:$index_db?mode=ro&immutable=1" <<'SQL' > "$normalized_sql"
-SELECT 'PRAGMA page_size=4096;';
-SELECT 'PRAGMA encoding="UTF-8";';
-SELECT 'CREATE TABLE package_index (key TEXT PRIMARY KEY, data BLOB NOT NULL) WITHOUT ROWID;';
-SELECT 'INSERT INTO package_index(key,data) VALUES(' || quote(key) || ',X' || char(39) || hex(data) || char(39) || ');'
-  FROM package_index
-  ORDER BY key;
-SQL
+        rm -f "$normalized_db" "$normalized_rows" "$normalized_sql"
+        sqlite3 "file:$index_db?mode=ro&immutable=1" \
+          "SELECT hex(CAST(key AS BLOB)) || char(9) || hex(data) FROM package_index ORDER BY key;" \
+          > "$normalized_rows"
+        node - "$normalized_rows" <<'NODE' > "$normalized_sql"
+const fs = require("fs");
+const input = process.argv[2];
+const minTimestampMs = Date.parse("2020-01-01T00:00:00.000Z");
+const maxTimestampMs = Date.parse("2100-01-01T00:00:00.000Z");
+const canonicalDouble = Buffer.alloc(8);
+canonicalDouble.writeDoubleBE(0, 0);
+
+function normalizePnpmMetadataBlob(hex) {
+  const data = Buffer.from(hex, "hex");
+  // pnpm v11 stores msgpack metadata blobs in package_index.data. `checkedAt`
+  // values are encoded as float64 millisecond timestamps and otherwise make
+  // fixed-output pnpm store hashes depend on when the exact store was fetched.
+  for (let i = 0; i + 8 < data.length; i += 1) {
+    if (data[i] !== 0xcb) continue;
+    const value = data.readDoubleBE(i + 1);
+    if (Number.isFinite(value) && value >= minTimestampMs && value <= maxTimestampMs) {
+      canonicalDouble.copy(data, i + 1);
+    }
+  }
+  return data.toString("hex");
+}
+
+console.log("PRAGMA page_size=4096;");
+console.log("PRAGMA encoding=\"UTF-8\";");
+console.log("CREATE TABLE package_index (key TEXT PRIMARY KEY, data BLOB NOT NULL) WITHOUT ROWID;");
+for (const line of fs.readFileSync(input, "utf8").trimEnd().split("\n")) {
+  if (!line) continue;
+  const [keyHex, dataHex] = line.split("\t");
+  if (!keyHex || !dataHex) throw new Error("malformed package_index row: " + line);
+  const normalizedDataHex = normalizePnpmMetadataBlob(dataHex);
+  console.log(
+    "INSERT INTO package_index(key,data) VALUES(CAST(X'" +
+      keyHex +
+      "' AS TEXT),X'" +
+      normalizedDataHex +
+      "');",
+  );
+}
+NODE
         sqlite3 "$normalized_db" < "$normalized_sql"
         sqlite3 "$normalized_db" 'ANALYZE; VACUUM;'
         cp "$normalized_db" "$index_db"
-        rm -f "$normalized_db" "$normalized_sql"
+        rm -f "$normalized_db" "$normalized_rows" "$normalized_sql"
         touch -h -t 197001010000 "$index_db" >/dev/null 2>&1 || true
       done
     }
