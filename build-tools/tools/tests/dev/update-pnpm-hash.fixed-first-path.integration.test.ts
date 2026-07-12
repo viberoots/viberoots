@@ -32,6 +32,18 @@ test("update-pnpm-hash uses importer-aware fast path and fixed-first root path",
   if (!mainTxt.includes("handleNonDefaultImporter")) {
     throw new Error("update-pnpm-hash.ts must route non-default importers through dedicated flow");
   }
+  if (!mainTxt.includes("readOnly") || !mainTxt.includes("update-pnpm-hash --read-only")) {
+    throw new Error("update-pnpm-hash.ts must support read-only materialization");
+  }
+  if (!mainTxt.includes("if (readOnly && suggested)")) {
+    throw new Error("read-only update-pnpm-hash must refuse suggested hash rewrites");
+  }
+  if (!mainTxt.includes("if (!readOnly) await ensureImporterLockfileFresh")) {
+    throw new Error("read-only update-pnpm-hash must not regenerate importer lockfiles");
+  }
+  if (!nondefaultTxt.includes("readOnly") || !nondefaultTxt.includes("failReadOnly")) {
+    throw new Error("nondefault importers must honor read-only pnpm metadata materialization");
+  }
   if (!mainTxt.includes("withExactPrefetchedStore({ repoRoot, importer }")) {
     throw new Error(
       "update-pnpm-hash.ts must prepare an exact pnpm store for fixed-first verification",

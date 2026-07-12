@@ -88,5 +88,9 @@ test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in
         outPnpm.includes(".unified-pnpm-store/path"),
       "expected pnpm bootstrap to include unified PNPM store handling",
     );
+    assert.ok(
+      outPnpm.includes(".viberoots/workspace/buck/unified-pnpm-store/path"),
+      "expected pnpm bootstrap to prefer the hidden unified PNPM store marker",
+    );
   });
 });

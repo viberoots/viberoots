@@ -15,7 +15,8 @@ import { untrackedRequiresImpureForTargets } from "./dev-build/untracked";
 import { targetPackageFromLabel } from "./build-selected-helpers";
 import { parseSelectedBuildOutPath, selectedNixBuildArgs } from "./build-selected-nix-command";
 import { makeFilteredFlakeRef } from "./filtered-flake";
-import { prepareExactPnpmStore } from "./update-pnpm-hash/exact-store";
+import { resolveExactPrefetchedStore } from "./update-pnpm-hash/realized-store";
+import { pnpmStoreAttrFromImporter } from "./update-pnpm-hash/paths";
 import { withSanitizedInheritedNixConfig } from "../lib/nix-config-env";
 import { resolveSelectedTargetLabel } from "./target-label-resolver";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
@@ -232,24 +233,23 @@ async function main() {
   for (const envName of allDevOverrideEnvNames()) {
     sanitizedEnv[envName] = "";
   }
-  const targetImporter = targetPackageFromLabel(target);
-  if (
-    targetImporter &&
-    (await pathExists(path.join(workspaceRoot, targetImporter, "pnpm-lock.yaml")))
-  ) {
-    const prepared = await prepareExactPnpmStore({
-      repoRoot: workspaceRoot,
-      importer: targetImporter,
-    });
-    sanitizedEnv.NIX_PNPM_EXACT_STORE = prepared.exactStorePath;
-  }
-
   const flakeSource = await chooseFlakeRef({
     workspaceRoot,
     target,
     sourceMode: parsedSource.sourceMode,
     graphPath,
   });
+  const targetImporter = targetPackageFromLabel(target);
+  const exactStore =
+    targetImporter && (await pathExists(path.join(workspaceRoot, targetImporter, "pnpm-lock.yaml")))
+      ? await resolveExactPrefetchedStore({
+          repoRoot: workspaceRoot,
+          importer: targetImporter,
+          flakeRef: flakeSource.flakeRef,
+          attrPath: pnpmStoreAttrFromImporter(targetImporter),
+        })
+      : null;
+  if (exactStore) sanitizedEnv.NIX_PNPM_EXACT_STORE = exactStore.exactStorePath;
   const nixTrace = exporterDebug === "1" ? "--show-trace" : "";
   const runOnce = async () => {
     const env = flakeSource.workspaceRoot
@@ -269,6 +269,7 @@ async function main() {
   try {
     attempt = await runNixBuildWithTransientRetry({ runOnce });
   } finally {
+    await exactStore?.cleanup();
     await flakeSource.cleanup?.();
   }
   const { stdout, exitCode } = attempt;

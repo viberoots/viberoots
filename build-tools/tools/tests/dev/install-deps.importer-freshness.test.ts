@@ -7,16 +7,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { importerInstallFreshness } from "../../dev/install/importer-freshness";
 import { sanitizeName } from "../../dev/install/common";
-import {
-  currentSharedPnpmStoreHashCacheFingerprint,
-  currentVerifiedMarkerFingerprint,
-} from "../../dev/update-pnpm-hash/verified-marker";
-import {
-  sharedExactPnpmStateIndexPath,
-  sharedExactPnpmStateRootPath,
-} from "../../lib/pnpm-state-paths";
-
-const EXACT_STORE_CACHE_VERSION = 11;
+import { currentVerifiedMarkerFingerprint } from "../../dev/update-pnpm-hash/verified-marker";
 
 async function writeFile(filePath: string, content: string): Promise<void> {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });
@@ -51,12 +42,6 @@ async function makeRepo(importer = "projects/apps/app"): Promise<{
     lockHash,
     cleanup: async () => {
       await fsp.rm(repoRoot, { recursive: true, force: true }).catch(() => {});
-      await fsp
-        .rm(sharedExactPnpmStateRootPath(lockHash), { recursive: true, force: true })
-        .catch(() => {});
-      await fsp
-        .rm(sharedExactPnpmStateIndexPath(repoRoot, importer), { force: true })
-        .catch(() => {});
     },
   };
 }
@@ -83,54 +68,6 @@ async function seedStoreMarker(
         lockHash,
         hashValue: "sha256-fixture",
         builderFingerprint: await currentVerifiedMarkerFingerprint(repoRoot, importer),
-      },
-      null,
-      2,
-    ) + "\n",
-  );
-}
-
-async function seedExactStore(repoRoot: string, importer: string, lockHash: string): Promise<void> {
-  await seedExactStoreWithFingerprint(
-    repoRoot,
-    importer,
-    lockHash,
-    await currentSharedPnpmStoreHashCacheFingerprint(repoRoot, importer),
-  );
-}
-
-async function seedExactStoreWithFingerprint(
-  repoRoot: string,
-  importer: string,
-  lockHash: string,
-  provisioningFingerprint: string,
-): Promise<void> {
-  const indexPath = sharedExactPnpmStateIndexPath(repoRoot, importer);
-  const readyPath = path.join(sharedExactPnpmStateRootPath(lockHash), "ready.json");
-  const nixStorePath = process.execPath;
-  assert.ok(nixStorePath.startsWith("/nix/store/"), "test must run with a Nix-provided node");
-  await writeFile(
-    indexPath,
-    JSON.stringify(
-      {
-        version: EXACT_STORE_CACHE_VERSION,
-        repoRoot,
-        importer,
-        lockHash,
-        provisioningFingerprint,
-      },
-      null,
-      2,
-    ) + "\n",
-  );
-  await writeFile(
-    readyPath,
-    JSON.stringify(
-      {
-        version: EXACT_STORE_CACHE_VERSION,
-        lockHash,
-        provisioningFingerprint,
-        nixStorePath,
       },
       null,
       2,
@@ -167,11 +104,10 @@ async function seedLinkMarker(repoRoot: string, importer: string, lockHash: stri
   );
 }
 
-test("importer freshness accepts only fully verified install state", async () => {
+test("importer freshness accepts verified linked install state", async () => {
   const repo = await makeRepo();
   try {
     await seedStoreMarker(repo.repoRoot, repo.importer, repo.lockHash);
-    await seedExactStore(repo.repoRoot, repo.importer, repo.lockHash);
     await seedLinkMarker(repo.repoRoot, repo.importer, repo.lockHash);
 
     assert.deepEqual(
@@ -190,7 +126,6 @@ test("importer freshness supports the viberoots importer hash key", async () => 
   const repo = await makeRepo("viberoots");
   try {
     await seedStoreMarker(repo.repoRoot, repo.importer, repo.lockHash);
-    await seedExactStore(repo.repoRoot, repo.importer, repo.lockHash);
     await seedLinkMarker(repo.repoRoot, repo.importer, repo.lockHash);
 
     assert.deepEqual(
@@ -216,10 +151,9 @@ test("importer freshness rejects stale or incomplete install state", async () =>
         repoRoot: repo.repoRoot,
         importer: repo.importer,
       }),
-      { fresh: false, reason: "missing-exact-store" },
+      { fresh: true },
     );
 
-    await seedExactStore(repo.repoRoot, repo.importer, repo.lockHash);
     await fsp.rm(path.join(repo.repoRoot, repo.importer, "node_modules"));
     assert.deepEqual(
       await importerInstallFreshness({
@@ -239,30 +173,6 @@ test("importer freshness rejects stale or incomplete install state", async () =>
         importer: repo.importer,
       }),
       { fresh: false, reason: "stale-store-marker" },
-    );
-  } finally {
-    await repo.cleanup();
-  }
-});
-
-test("importer freshness rejects exact stores from stale provisioning inputs", async () => {
-  const repo = await makeRepo();
-  try {
-    await seedStoreMarker(repo.repoRoot, repo.importer, repo.lockHash);
-    await seedExactStoreWithFingerprint(
-      repo.repoRoot,
-      repo.importer,
-      repo.lockHash,
-      "stale-provisioning-fingerprint",
-    );
-    await seedLinkMarker(repo.repoRoot, repo.importer, repo.lockHash);
-
-    assert.deepEqual(
-      await importerInstallFreshness({
-        repoRoot: repo.repoRoot,
-        importer: repo.importer,
-      }),
-      { fresh: false, reason: "missing-exact-store" },
     );
   } finally {
     await repo.cleanup();

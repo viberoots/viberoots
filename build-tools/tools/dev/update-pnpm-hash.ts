@@ -27,7 +27,7 @@ import * as verifiedMarker from "./update-pnpm-hash/verified-marker";
 import { findRepoRoot } from "../lib/repo";
 
 async function inner() {
-  const { lockfile, force } = parseUpdatePnpmHashArgs();
+  const { lockfile, force, readOnly } = parseUpdatePnpmHashArgs();
   const repoRoot = await findRepoRoot(process.cwd());
   const relLock = repoRelativeLockfilePath(repoRoot, lockfile);
   const importer = normalizeImporter(path.posix.dirname(relLock));
@@ -50,6 +50,19 @@ async function inner() {
     await verifiedMarker.currentVerifiedMarkerFingerprintCandidates(repoRoot, importer);
   const key = hashKey;
   const placeholderHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+  const failReadOnly = (detail: string): never => {
+    throw new Error(
+      [
+        `pnpm hash metadata is stale for ${key}`,
+        detail,
+        "repair: viberoots update",
+        `or: zx-wrapper viberoots/build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${relLock}`,
+      ].join("\n"),
+    );
+  };
+  if (force && readOnly) {
+    throw new Error("update-pnpm-hash --read-only cannot be combined with --force");
+  }
   if (force)
     await hashesJson.updateNodeModulesHashesJson(key, placeholderHash, {
       owner: hashOwner,
@@ -61,9 +74,9 @@ async function inner() {
   });
   const hasValidExistingHash = !force && !!existingHash && existingHash !== placeholderHash;
   if (nonDefaultImporter) {
-    await ensureImporterLockfileFresh({ repoRoot, importer });
+    if (!readOnly) await ensureImporterLockfileFresh({ repoRoot, importer });
   } else {
-    await ensureImporterLockfileFreshIfAllowed({ repoRoot, importer });
+    if (!readOnly) await ensureImporterLockfileFreshIfAllowed({ repoRoot, importer });
   }
   const existingLockHash = await verifiedMarker.sha256File(lockAbs);
   const existingMarker = await verifiedMarker.readVerifiedMarker(markerPath);
@@ -118,6 +131,7 @@ async function inner() {
       unfixedAttr,
       timeoutSec,
       force,
+      readOnly,
       markerPath,
       hasValidExistingHash,
       existingHash,
@@ -152,6 +166,7 @@ async function inner() {
     }
   }
   if (
+    !readOnly &&
     !nonDefaultImporter &&
     existingLockHash &&
     (await verifiedMarker.restoreHashFromSharedCache({
@@ -263,6 +278,12 @@ async function inner() {
     return;
   }
   let suggested = extractHash(verify.output || "");
+  if (readOnly && suggested) {
+    failReadOnly(`${existingHash || "(missing)"} -> ${suggested}`);
+  }
+  if (readOnly && !suggested) {
+    failReadOnly("fixed pnpm-store build failed without a suggested replacement hash");
+  }
   if (!suggested) {
     console.log(
       `[update-pnpm-hash] importer=${importer} step=unfixed-build attr=${unfixedAttr} timeout=${timeoutSec}s`,
@@ -287,6 +308,9 @@ async function inner() {
     );
   }
   const nextHash: string = suggested;
+  if (readOnly) {
+    failReadOnly(`${existingHash || "(missing)"} -> ${nextHash}`);
+  }
   await hashesJson.updateNodeModulesHashesJson(key, nextHash, {
     owner: hashOwner,
     root: repoRoot,

@@ -369,7 +369,8 @@ test("p --source=git keeps git flake source even with relevant untracked files",
 
 test("p selected runnable builds pass exact pnpm stores into filtered Nix builds", async () => {
   const source = await readRepoFile("build-tools/tools/dev/run-runnable-graph.ts");
-  assert.match(source, /prepareExactPnpmStore/);
+  assert.match(source, /resolveExactPrefetchedStore/);
+  assert.doesNotMatch(source, /import \{ prepareExactPnpmStore \}/);
   assert.match(source, /NIX_PNPM_EXACT_STORE/);
   assert.match(source, /targetPackageFromLabel\(target\)/);
 });

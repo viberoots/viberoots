@@ -18,7 +18,7 @@ import { cleanupLocalWorkspaceMarker, ensureLocalWorkspaceMarker } from "./lockf
 import { syncSourcePnpmStoreIntoLocalPrefetch } from "./prefetched-store";
 import { currentSharedPnpmStoreHashCacheFingerprint } from "./verified-marker";
 
-const EXACT_STORE_CACHE_VERSION = 11;
+const EXACT_STORE_CACHE_VERSION = 13;
 
 function canonicalFlakeRoot(root: string): string {
   const abs = path.resolve(root);

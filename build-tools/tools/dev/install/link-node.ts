@@ -14,7 +14,6 @@ import { pathExists, repoRoot } from "../../lib/repo";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
 import {
   makeFilteredFlakeRef,
-  prepareExactPnpmStore,
   withResolvedExactPrefetchedStore,
 } from "../update-pnpm-hash/lockfile";
 import { flakeRefForImporter, sanitizeName } from "./common";
@@ -227,9 +226,6 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
     throw new Error(
       `[link-node] failed to resolve outPath for importer '${importer}' attr node-modules.${attr}`,
     );
-  }
-  if (!usesTempRepoFakeNix(root) && (await pathExists(lockAbs))) {
-    await prepareExactPnpmStore({ repoRoot: root, importer });
   }
   await ensureNodeModulesGcRoot(root, markerKey, outPath);
   try {

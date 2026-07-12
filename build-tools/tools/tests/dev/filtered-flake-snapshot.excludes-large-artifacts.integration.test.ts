@@ -193,4 +193,14 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
       "nix-build-filtered-flake must resolve the nix command from the same env passed to nix",
     );
   }
+  if (!helper.includes("resolveExactPrefetchedStore")) {
+    throw new Error(
+      "nix-build-filtered-flake must reuse realized fixed pnpm stores before exact-store prep",
+    );
+  }
+  if (helper.includes("import { prepareExactPnpmStore }")) {
+    throw new Error(
+      "nix-build-filtered-flake must not directly prepare exact stores on selected build paths",
+    );
+  }
 });

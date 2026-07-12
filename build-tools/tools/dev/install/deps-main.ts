@@ -175,6 +175,9 @@ else ui.heading("viberoots install");
 const effSkipGoTidy =
   skipGoTidy || (glueOnly && String(process.env.INSTALL_DEPS_SKIP_GO_TIDY || "") !== "0");
 const repoRoot = await resolveWorkspaceRoot();
+const refreshPnpmHashes =
+  String(process.env.VBR_INSTALL_REFRESH_PNPM_HASHES || "").trim() === "1" ||
+  String(process.env.VBR_BOOTSTRAP_PNPM_GENERATE || "").trim() === "1";
 await checkBootstrapCompletion({
   workspaceRoot: repoRoot,
   repair: !dryRun,
@@ -258,13 +261,15 @@ if (dryRun) {
         const activeLockfiles = importers.map((imp) =>
           imp === "viberoots" ? "pnpm-lock.yaml" : path.join(imp, "pnpm-lock.yaml"),
         );
-        const removedHashEntries = await pruneNodeModulesHashesJson(activeLockfiles, {
-          root: repoRoot,
-        });
-        if (verbose && removedHashEntries.length > 0) {
-          console.log(
-            `[install-deps] pruned stale node-modules hash entries: ${removedHashEntries.join(", ")}`,
-          );
+        if (refreshPnpmHashes) {
+          const removedHashEntries = await pruneNodeModulesHashesJson(activeLockfiles, {
+            root: repoRoot,
+          });
+          if (verbose && removedHashEntries.length > 0) {
+            console.log(
+              `[install-deps] pruned stale node-modules hash entries: ${removedHashEntries.join(", ")}`,
+            );
+          }
         }
         const absUpdate = buildToolPath(repoRoot, "tools/dev/update-pnpm-hash.ts");
         const activeZxInit = zxInitPath(repoRoot);
@@ -294,7 +299,9 @@ if (dryRun) {
           } else {
             ui.step("node_modules", `${imp} refreshing`);
           }
-          // Update the FOD hash for this importer lockfile
+          // Ordinary install materializes ignored local state from committed metadata.
+          // Bootstrap/update enables refreshPnpmHashes for the intentional mutation path.
+          const updateArgs = refreshPnpmHashes ? [] : ["--read-only"];
           const updateCmd = $({
             stdio: verbose ? "inherit" : "pipe",
             cwd: commandCwd,
@@ -306,14 +313,14 @@ if (dryRun) {
               // Keep a bounded timeout, but avoid prematurely killing healthy runs.
               NIX_PNPM_FETCH_TIMEOUT: String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"),
             },
-          })`zx-wrapper ${absUpdate} --lockfile ${relLock}`;
+          })`zx-wrapper ${absUpdate} --lockfile ${relLock} ${updateArgs}`;
           const updateRes = verbose
             ? await updateCmd
             : await withInstallProgress(`node_modules ${imp} update-pnpm-hash`, updateCmd, {
                 outputMode: "compact-progress",
               });
           if (updateRes.exitCode !== 0) {
-            printFailedChildOutput(`update-pnpm-hash ${imp}`, updateRes);
+            printFailedChildOutput(`materialize pnpm metadata ${imp}`, updateRes);
             process.exit(updateRes.exitCode || 1);
           }
           // Realize and link importer node_modules via link-node (single strict path).

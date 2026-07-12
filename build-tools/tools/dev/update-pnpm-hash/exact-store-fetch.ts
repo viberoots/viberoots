@@ -43,16 +43,32 @@ export async function fetchExactPnpmStore(opts: {
   pnpmPath: string;
 }): Promise<void> {
   await withHiddenNodeModules(opts.importerAbs, async () => {
+    const xdgConfigHome = path.join(opts.homeDir, ".config");
+    const xdgCacheHome = path.join(opts.homeDir, ".cache");
+    const xdgDataHome = path.join(opts.homeDir, ".local", "share");
     const env = {
       ...process.env,
+      CI: "1",
+      COREPACK_ENABLE: "0",
+      COREPACK_ENABLE_AUTO_PIN: "0",
+      HOME: opts.homeDir,
       NIX_PNPM_ALLOW_GENERATE: "1",
       NIX_PNPM_FETCH_TIMEOUT: opts.fetchTimeout,
       NIX_PNPM_INSTALL_TIMEOUT: opts.fetchTimeout,
       NODE_OPTIONS: "--no-warnings",
       PNPM_HOME: opts.homeDir,
+      SOURCE_DATE_EPOCH: "1",
+      TZ: "UTC",
+      XDG_CACHE_HOME: xdgCacheHome,
+      XDG_CONFIG_HOME: xdgConfigHome,
+      XDG_DATA_HOME: xdgDataHome,
     };
     delete env.npm_config_store_dir;
     delete env.NPM_CONFIG_STORE_DIR;
+    delete env.npm_config_cache;
+    delete env.NPM_CONFIG_CACHE;
+    delete env.npm_config_userconfig;
+    delete env.NPM_CONFIG_USERCONFIG;
     try {
       await runExactStoreCommand({
         command: opts.pnpmPath,

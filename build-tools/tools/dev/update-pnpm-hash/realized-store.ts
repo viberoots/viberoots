@@ -2,8 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { runManagedCommand } from "../../lib/managed-command";
+import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
-import { withExactPrefetchedStore } from "./exact-store";
+import { prepareExactPnpmStore } from "./exact-store";
 
 const REALIZED_FIXED_STORE_TIMEOUT_MS = 30_000;
 
@@ -33,21 +34,42 @@ async function realizedFixedStoreRoot(opts: {
   return fs.existsSync(path.join(outPath, "store")) ? outPath : null;
 }
 
-export async function withResolvedExactPrefetchedStore<T>(
-  opts: { repoRoot: string; importer: string; flakeRef: string; attrPath: string },
-  fn: (env: NodeJS.ProcessEnv) => Promise<T>,
-): Promise<T> {
-  const realizedStoreRoot = await realizedFixedStoreRoot(opts);
+function baseFlakeRef(flakeRef: string): string {
+  return String(flakeRef || "").replace(/#.*$/, "");
+}
+
+export async function resolveExactPrefetchedStore(opts: {
+  repoRoot: string;
+  importer: string;
+  flakeRef: string;
+  attrPath: string;
+}): Promise<{ exactStorePath: string; cleanup: () => Promise<void> }> {
+  const flakeRef = baseFlakeRef(opts.flakeRef);
+  const realizedStoreRoot = await realizedFixedStoreRoot({ ...opts, flakeRef });
   if (realizedStoreRoot) {
     console.log(
       `[update-pnpm-hash] importer=${opts.importer} step=realized-fixed-store attr=${opts.attrPath} exact-store=${realizedStoreRoot}`,
     );
-    return await fn(
-      envWithResolvedNixBin({
-        ...process.env,
-        NIX_PNPM_EXACT_STORE: realizedStoreRoot,
-      }),
-    );
+    return { exactStorePath: realizedStoreRoot, cleanup: async () => {} };
   }
-  return await withExactPrefetchedStore({ repoRoot: opts.repoRoot, importer: opts.importer }, fn);
+  return await prepareExactPnpmStore({ repoRoot: opts.repoRoot, importer: opts.importer });
+}
+
+export async function withResolvedExactPrefetchedStore<T>(
+  opts: { repoRoot: string; importer: string; flakeRef: string; attrPath: string },
+  fn: (env: NodeJS.ProcessEnv) => Promise<T>,
+): Promise<T> {
+  const resolved = await resolveExactPrefetchedStore(opts);
+  try {
+    return await fn(
+      withSanitizedInheritedNixConfig(
+        envWithResolvedNixBin({
+          ...process.env,
+          NIX_PNPM_EXACT_STORE: resolved.exactStorePath,
+        }),
+      ),
+    );
+  } finally {
+    await resolved.cleanup();
+  }
 }

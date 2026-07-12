@@ -124,5 +124,9 @@ test("link-node writes marker at repo root", async () => {
       logged.includes("--no-write-lock-file"),
       "expected root importer build to avoid rewriting temp workspace flake.lock",
     );
+    assert.ok(
+      !logged.includes("store add-path"),
+      "link-node must not import exact pnpm stores after resolving node_modules",
+    );
   });
 });

@@ -16,4 +16,17 @@ test("install-deps passes bounded but non-flaky default timeout to update-pnpm-h
       "deps-main.ts must default NIX_PNPM_FETCH_TIMEOUT to 600s for update-pnpm-hash",
     );
   }
+  if (!depsMain.includes("const refreshPnpmHashes =")) {
+    throw new Error("deps-main.ts must distinguish ordinary install from hash refresh mode");
+  }
+  if (!depsMain.includes('const updateArgs = refreshPnpmHashes ? [] : ["--read-only"];')) {
+    throw new Error(
+      "ordinary install must materialize pnpm metadata with update-pnpm-hash --read-only",
+    );
+  }
+  if (!depsMain.includes("if (refreshPnpmHashes) {")) {
+    throw new Error(
+      "install-deps must only prune/refresh tracked pnpm hash metadata in refresh mode",
+    );
+  }
 });

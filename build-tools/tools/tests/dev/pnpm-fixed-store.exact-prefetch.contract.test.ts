@@ -133,6 +133,17 @@ test("fixed pnpm-store builds use exact prefetched stores for offline validation
   if (!exactStoreImport.includes('"store", "add-path"')) {
     throw new Error("exact-store helpers must import prepared stores into /nix/store");
   }
+  if (
+    !exactStoreImport.includes("normalizeExactStoreForImport") ||
+    !exactStoreImport.includes('path.join(versionDir, "projects")') ||
+    !exactStoreImport.includes("normalizeSqliteIndex") ||
+    !exactStoreImport.includes("CANONICAL_TIMESTAMP") ||
+    !exactStoreImport.includes("touch -h -t")
+  ) {
+    throw new Error(
+      "exact-store helpers must strip path-local project links and normalize sqlite/timestamps before Nix import",
+    );
+  }
   if (!exactStoreImport.includes("opts.storeDir")) {
     throw new Error(
       "exact-store helpers must import prepared store directories directly into /nix/store",

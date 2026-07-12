@@ -36,6 +36,7 @@ import { resolveToolPathSync } from "../../../lib/tool-paths";
 import { pathExists } from "../../../lib/repo";
 import { mkdirWithMacosMetadataExclusion } from "../../../lib/macos-metadata";
 import { ensureWorkspaceProvidersPackage } from "../../../lib/workspace-providers-package";
+import { resolveExactPrefetchedStore } from "../../../dev/update-pnpm-hash/realized-store";
 
 const LOCAL_FIXTURE_SERVICE_ENV = "VBR_DEPLOY_LOCAL_FIXTURE_SERVICE";
 const PREPARED_SEED_MARKER = ".seed-store-prepared-v7";
@@ -110,6 +111,12 @@ async function exportDevEnvOncePerWorker($: any): Promise<string> {
 
 async function exportDevEnvWithRetry($: any): Promise<string> {
   const devEnvRoot = await activeViberootsRootFromWorkspace();
+  const exactStore = await resolveExactPrefetchedStore({
+    repoRoot: devEnvRoot,
+    importer: ".",
+    flakeRef: `path:${devEnvRoot}`,
+    attrPath: "pnpm-store",
+  });
   const runOnce = async () => {
     // Avoid direnv here: it can be slow and re-run per temp repo, while nix develop is deterministic.
     const nixOut = await $({
@@ -123,8 +130,9 @@ async function exportDevEnvWithRetry($: any): Promise<string> {
         VIBEROOTS_ROOT: devEnvRoot,
         VIBEROOTS_SOURCE_ROOT: devEnvRoot,
         VIBEROOTS_FLAKE_INPUT_ROOT: devEnvRoot,
+        NIX_PNPM_EXACT_STORE: exactStore.exactStorePath,
       }),
-    })`nix develop --no-write-lock-file --accept-flake-config -c env -0`;
+    })`nix develop --impure --no-write-lock-file --accept-flake-config -c env -0`;
     if (Number(nixOut.exitCode || 0) !== 127) return nixOut;
     return await $({
       cwd: devEnvRoot,
@@ -137,24 +145,29 @@ async function exportDevEnvWithRetry($: any): Promise<string> {
         VIBEROOTS_ROOT: devEnvRoot,
         VIBEROOTS_SOURCE_ROOT: devEnvRoot,
         VIBEROOTS_FLAKE_INPUT_ROOT: devEnvRoot,
+        NIX_PNPM_EXACT_STORE: exactStore.exactStorePath,
       }),
     })`bash --noprofile --norc -c 'if command -v direnv >/dev/null 2>&1; then eval "$(direnv export bash)"; env -0; else printf ""; fi'`;
   };
-  let out = await runOnce();
-  if (
-    Number(out.exitCode || 0) !== 0 &&
-    transientNixStoreError(`${out.stdout || ""}\n${out.stderr || ""}`)
-  ) {
-    console.error("[runInTemp] transient nix store error while exporting dev env; retrying once");
-    await new Promise((resolve) => setTimeout(resolve, 750));
-    out = await runOnce();
+  try {
+    let out = await runOnce();
+    if (
+      Number(out.exitCode || 0) !== 0 &&
+      transientNixStoreError(`${out.stdout || ""}\n${out.stderr || ""}`)
+    ) {
+      console.error("[runInTemp] transient nix store error while exporting dev env; retrying once");
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      out = await runOnce();
+    }
+    if (Number(out.exitCode || 0) !== 0) {
+      throw new Error(
+        String(out.stderr || out.stdout || "nix develop failed while exporting dev env"),
+      );
+    }
+    return String((out as any).stdout || "");
+  } finally {
+    await exactStore.cleanup();
   }
-  if (Number(out.exitCode || 0) !== 0) {
-    throw new Error(
-      String(out.stderr || out.stdout || "nix develop failed while exporting dev env"),
-    );
-  }
-  return String((out as any).stdout || "");
 }
 
 async function retryTransientNixStoreFailure<T>(

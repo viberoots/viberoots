@@ -737,7 +737,9 @@ async function setupDirenvIfNeeded(opts: {
 async function shouldAllowPnpmGenerateDuringBootstrap(opts: InitConsumerOptions): Promise<boolean> {
   if (opts.allowPnpmGenerateDuringBootstrap) return true;
   if (process.env.VBR_BOOTSTRAP_PNPM_GENERATE === "1") return true;
-  if (process.env.VBR_POST_CLONE === "1" || process.env.VIBEROOTS_POST_CLONE === "1") return true;
+  if (process.env.VBR_POST_CLONE === "1" || process.env.VIBEROOTS_POST_CLONE === "1") {
+    return false;
+  }
   if (!(await exists(path.join(opts.workspaceRoot, ".envrc")))) return true;
   if (!(await exists(path.join(opts.workspaceRoot, ".viberoots", "workspace", "flake.nix")))) {
     return true;
@@ -747,7 +749,11 @@ async function shouldAllowPnpmGenerateDuringBootstrap(opts: InitConsumerOptions)
 
 function maybePnpmGenerateEnv(allowGenerate: boolean): NodeJS.ProcessEnv {
   if (!allowGenerate) return process.env;
-  return { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" };
+  return {
+    ...process.env,
+    NIX_PNPM_ALLOW_GENERATE: "1",
+    VBR_INSTALL_REFRESH_PNPM_HASHES: "1",
+  };
 }
 
 function isPostCloneBootstrap(opts?: InitConsumerOptions): boolean {

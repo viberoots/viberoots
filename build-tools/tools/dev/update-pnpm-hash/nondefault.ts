@@ -20,6 +20,7 @@ export async function handleNonDefaultImporter(opts: {
   unfixedAttr: string;
   timeoutSec: string;
   force: boolean;
+  readOnly?: boolean;
   markerPath: string;
   hasValidExistingHash: boolean;
   existingHash: string;
@@ -34,6 +35,16 @@ export async function handleNonDefaultImporter(opts: {
   if (opts.importer === ".") return false;
   let suggestedHash: string | null = null;
   const prepareExactStore = opts.prepareExactStore || prepareExactPnpmStore;
+  const failReadOnly = (detail: string): never => {
+    throw new Error(
+      [
+        `pnpm hash metadata is stale for ${opts.key}`,
+        detail,
+        "repair: viberoots update",
+        `or: zx-wrapper ${opts.repoRoot}/viberoots/build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${opts.key}`,
+      ].join("\n"),
+    );
+  };
   const persistHash = async (hashValue: string) => {
     if (!opts.existingLockHash) return;
     await persistVerifiedHash({
@@ -122,6 +133,9 @@ export async function handleNonDefaultImporter(opts: {
     }
     const suggestedFromExisting = extractHash(String(verifyExisting.output || ""));
     if (suggestedFromExisting) {
+      if (opts.readOnly) {
+        failReadOnly(`${opts.existingHash || "(missing)"} -> ${suggestedFromExisting}`);
+      }
       await updateNodeModulesHashesJson(opts.key, suggestedFromExisting, {
         owner: opts.hashOwner,
         root: opts.repoRoot,
@@ -154,6 +168,9 @@ export async function handleNonDefaultImporter(opts: {
       `[update-pnpm-hash] importer=${opts.importer} step=stale-existing-hash attr=${opts.storeAttr} lockfile=${opts.key}`,
     );
     if (opts.existingMarker && !markerMatchesCurrentBuilder) {
+      if (opts.readOnly) {
+        return await verifyExistingHash("stale-existing-hash-read-only");
+      }
       return await withSharedHashComputation(async () => {
         console.log(
           `[update-pnpm-hash] importer=${opts.importer} step=stale-builder-recompute attr=${opts.unfixedAttr} timeout=${opts.timeoutSec}s`,
@@ -243,6 +260,12 @@ export async function handleNonDefaultImporter(opts: {
       return true;
     }
     suggestedHash = extractHash(String(verify.output || ""));
+    if (opts.readOnly && suggestedHash) {
+      failReadOnly(`${opts.existingHash || "(missing)"} -> ${suggestedHash}`);
+    }
+    if (opts.readOnly && !suggestedHash) {
+      failReadOnly("fixed pnpm-store build failed without a suggested replacement hash");
+    }
     if (!suggestedHash) {
       console.log(
         `[update-pnpm-hash] importer=${opts.importer} step=unfixed-build attr=${opts.unfixedAttr} timeout=${opts.timeoutSec}s`,
@@ -273,6 +296,9 @@ export async function handleNonDefaultImporter(opts: {
       console.error("pnpm-store hash suggestion unexpectedly missing for non-default importer");
       process.exit(1);
       return true;
+    }
+    if (opts.readOnly) {
+      failReadOnly(`${opts.existingHash || "(missing)"} -> ${sri0}`);
     }
     let sri = sri0;
     await updateNodeModulesHashesJson(opts.key, sri, {

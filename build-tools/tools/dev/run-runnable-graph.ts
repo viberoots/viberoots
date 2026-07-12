@@ -5,7 +5,8 @@ import { ensureGraph } from "../buck/glue-run";
 import { runNixBuildWithProgress } from "./run-runnable-nix";
 import { untrackedRequiresImpureForTargets } from "./dev-build/untracked";
 import { makeFilteredFlakeRef } from "./filtered-flake";
-import { prepareExactPnpmStore } from "./update-pnpm-hash/exact-store";
+import { resolveExactPrefetchedStore } from "./update-pnpm-hash/realized-store";
+import { pnpmStoreAttrFromImporter } from "./update-pnpm-hash/paths";
 import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 
 async function withScopedGraphEnv<T>(
@@ -214,7 +215,12 @@ export async function buildSelectedOutPath(
       .access(path.join(workspaceRoot, targetImporter, "pnpm-lock.yaml"))
       .then(() => true)
       .catch(() => false))
-      ? await prepareExactPnpmStore({ repoRoot: workspaceRoot, importer: targetImporter })
+      ? await resolveExactPrefetchedStore({
+          repoRoot: workspaceRoot,
+          importer: targetImporter,
+          flakeRef: source.flakeRef,
+          attrPath: pnpmStoreAttrFromImporter(targetImporter),
+        })
       : null;
   const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
   const selectedEnv: Record<string, string> = {

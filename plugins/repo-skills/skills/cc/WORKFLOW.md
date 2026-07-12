@@ -18,8 +18,9 @@ Treat validation as already complete before `cc` is invoked. Inspect the whole c
 3. Choose the most representative conventional commit type and summary.
 4. If the change set includes modified submodules or nested Git repositories, commit those
    repositories first.
-5. For viberoots consumer repositories, confirm the viberoots submodule gitlink and root
-   `flake.lock` metadata point at the same viberoots revision before staging.
+5. For viberoots consumer repositories, run the consistency guard before staging. Stop rather than
+   committing if viberoots pins, source mode, pnpm hash metadata, or post-clone cleanliness are
+   stale.
 6. Stage all tracked, deleted, and untracked files in the current repository.
 7. Create one commit for the entire local change set immediately, without running extra tests or waiting for additional validation.
 
@@ -50,29 +51,60 @@ repositories before committing the parent repository.
 - Do not commit the parent repo pointer while the submodule still has uncommitted local changes,
   unless the user explicitly asks to leave those submodule changes uncommitted.
 
-## Sync Viberoots Pins
+## Guard Viberoots Consumers
 
-Before staging a commit in a viberoots consumer repository, make sure checked-in viberoots pins are
-coherent. This prevents committing only the submodule gitlink and leaving root flake metadata to
-change on the user's next `viberoots update`.
+Before staging a commit in a viberoots consumer repository, make sure checked-in viberoots pins and
+tracked generated metadata are coherent. This prevents committing only one side of the source pin
+or leaving stale pnpm hash metadata for the user's next `viberoots update` or post-clone run.
 
 Treat a repository as a viberoots consumer when it has a `viberoots` submodule or a `.viberoots`
 workspace directory. In that case:
 
-- If both `viberoots/` and root `flake.lock` exist, compare the submodule revision with the
-  root lockfile's `nodes.viberoots.locked.rev`.
-- Use a structured parser, for example:
+- Run the repo consistency check when available:
 
   ```sh
-  submodule_rev="$(git -C viberoots rev-parse HEAD)"
-  lock_rev="$(jq -r '.nodes.viberoots.locked.rev // empty' flake.lock)"
+  zx-wrapper viberoots/build-tools/tools/dev/consumer-consistency-check.ts
   ```
 
-- If both values are present and differ, run the repo's normal pin-sync path, usually
-  `viberoots update`, then inspect the resulting diff and include the updated `flake.lock` in the
-  same parent commit.
-- Re-check the revisions after syncing. Do not commit if the values still differ or if the sync
-  command failed.
+- If the consistency check is not available, perform these checks manually:
+
+  ```sh
+  gitlink_rev="$(git ls-files -s viberoots | awk '$1 == "160000" { print $2; exit }')"
+  submodule_rev="$(git -C viberoots rev-parse HEAD 2>/dev/null || true)"
+  lock_rev="$(jq -r '.nodes.viberoots.locked.rev // empty' flake.lock 2>/dev/null || true)"
+  ```
+
+- If both `gitlink_rev` and `lock_rev` are present and differ, stop and tell the user to run:
+
+  ```sh
+  viberoots update
+  git status
+  ```
+
+- If `gitlink_rev` and `submodule_rev` are present and differ, stop and tell the user to run:
+
+  ```sh
+  git submodule update --init --recursive viberoots
+  viberoots update
+  ```
+
+- If `.viberoots/current`, `.envrc`, or checked-in flake metadata indicate submodule mode but the
+  `viberoots` gitlink is absent, or indicate flake mode while an active `viberoots` gitlink is being
+  committed, stop and tell the user to run either `viberoots use-submodule --run-install` or
+  `viberoots use-flake --run-install`, whichever mode they intend.
+- Verify committed pnpm hash metadata by running the read-only materialization path for each
+  importer with a `pnpm-lock.yaml`, for example:
+
+  ```sh
+  find projects viberoots -name pnpm-lock.yaml -print
+  zx-wrapper viberoots/build-tools/tools/dev/update-pnpm-hash.ts --lockfile <lockfile> --read-only
+  ```
+
+  If this reports stale metadata, stop and tell the user to run `viberoots update`.
+
+- If any consistency check dirties tracked files, stop. Do not include that dirt in the commit as an
+  incidental fix. Tell the user to run `viberoots update`, inspect the resulting diff, and rerun the
+  guard before committing.
 - If the repository has only flake-mode viberoots metadata and no `viberoots/` submodule, do not
   invent a submodule check; commit the existing flake changes as part of the normal change set.
 - If the repository has a viberoots submodule but no root `flake.lock`, no flake metadata sync is

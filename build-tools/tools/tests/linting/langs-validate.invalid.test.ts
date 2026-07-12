@@ -29,15 +29,20 @@ test("langs.json invalid fails validator with message", async () => {
       "viberoots/build-tools/tools/dev/validate-langs.ts",
       path.join(tmp, "viberoots/build-tools/tools/dev/validate-langs.ts"),
     );
+    const tempViberootsRoot = path.join(tmp, "viberoots");
+    const tempToolEnv = {
+      ...process.env,
+      VIBEROOTS_ROOT: tempViberootsRoot,
+      VIBEROOTS_SOURCE_ROOT: tempViberootsRoot,
+      NODE_PATH: [path.join(process.cwd(), "node_modules"), process.env.NODE_PATH || ""]
+        .filter(Boolean)
+        .join(path.delimiter),
+    };
     let code = 0;
     try {
       await $({
         cwd: tmp,
-        env: {
-          ...process.env,
-          VIBEROOTS_ROOT: path.join(tmp, "viberoots"),
-          VIBEROOTS_SOURCE_ROOT: path.join(tmp, "viberoots"),
-        },
+        env: tempToolEnv,
       })`node viberoots/build-tools/tools/dev/validate-langs.ts`;
     } catch (e: any) {
       code = e.exitCode || 1;

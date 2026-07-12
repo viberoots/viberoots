@@ -6,7 +6,6 @@ import {
   readVerifiedMarker,
   currentVerifiedMarkerFingerprintCandidates,
 } from "../update-pnpm-hash/verified-marker";
-import { hasPreparedExactPnpmStore } from "../update-pnpm-hash/exact-store";
 import { sanitizeName } from "./common";
 
 export type ImporterInstallFreshness =
@@ -18,8 +17,7 @@ export type ImporterInstallFreshness =
         | "missing-lockfile"
         | "missing-hash"
         | "stale-store-marker"
-        | "stale-link-marker"
-        | "missing-exact-store";
+        | "stale-link-marker";
     };
 
 const PLACEHOLDER_HASH = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
@@ -181,9 +179,6 @@ export async function importerInstallFreshness(opts: {
     }))
   ) {
     return { fresh: false, reason: "stale-store-marker" };
-  }
-  if (!(await hasPreparedExactPnpmStore({ repoRoot: opts.repoRoot, importer, lockHash }))) {
-    return { fresh: false, reason: "missing-exact-store" };
   }
   if (!(await hasFreshLinkMarker({ repoRoot: opts.repoRoot, importer, lockHash }))) {
     return { fresh: false, reason: "stale-link-marker" };

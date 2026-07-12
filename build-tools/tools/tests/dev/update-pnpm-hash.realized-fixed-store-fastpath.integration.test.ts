@@ -22,7 +22,7 @@ test("update-pnpm-hash reuses realized fixed pnpm-store outputs before exact-sto
   if (
     !helperTxt.includes('"path-info"') ||
     !helperTxt.includes("step=realized-fixed-store") ||
-    !helperTxt.includes("NIX_PNPM_EXACT_STORE: realizedStoreRoot")
+    !helperTxt.includes("NIX_PNPM_EXACT_STORE: resolved.exactStorePath")
   ) {
     throw new Error(
       "realized-store.ts must probe realized fixed-store outputs and pass them through exact-store env",

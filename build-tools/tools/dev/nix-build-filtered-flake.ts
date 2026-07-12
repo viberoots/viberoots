@@ -19,12 +19,13 @@ import {
   selectedPythonSnapshotRsyncSources,
 } from "./nix-build-filtered-flake-lib";
 import { targetPackageFromLabel } from "./build-selected-helpers";
-import { prepareExactPnpmStore } from "./update-pnpm-hash/exact-store";
+import { resolveExactPrefetchedStore } from "./update-pnpm-hash/realized-store";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 import { getImporterRootsContract } from "../lib/importer-roots";
 import { sanitizeName } from "../lib/sanitize";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../lib/macos-metadata";
 import { findWorkspacePackageRepoDirs } from "./update-pnpm-hash/importer-workspace-packages";
+import { pnpmStoreAttrFromImporter } from "./update-pnpm-hash/paths";
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -308,13 +309,27 @@ async function pnpmImportersFromAttrs(root: string, attr: string): Promise<strin
   return out.sort((a, b) => a.localeCompare(b));
 }
 
-async function exactStoreEnvForTarget(root: string, attr: string): Promise<Record<string, string>> {
+async function exactStoreEnvForTarget(
+  root: string,
+  attr: string,
+  flakeRef: string,
+): Promise<{ env: Record<string, string>; cleanup: () => Promise<void> }> {
   const targetImporter = targetPackageFromLabel(String(process.env.BUCK_TARGET || ""));
   const attrImporters = await pnpmImportersFromAttrs(root, attr);
   const importer = targetImporter || attrImporters[0] || "";
-  if (!importer || !(await pathExists(path.join(root, importer, "pnpm-lock.yaml")))) return {};
-  const prepared = await prepareExactPnpmStore({ repoRoot: root, importer });
-  return { NIX_PNPM_EXACT_STORE: prepared.exactStorePath };
+  if (!importer || !(await pathExists(path.join(root, importer, "pnpm-lock.yaml")))) {
+    return { env: {}, cleanup: async () => {} };
+  }
+  const prepared = await resolveExactPrefetchedStore({
+    repoRoot: root,
+    importer,
+    flakeRef,
+    attrPath: pnpmStoreAttrFromImporter(importer),
+  });
+  return {
+    env: { NIX_PNPM_EXACT_STORE: prepared.exactStorePath },
+    cleanup: prepared.cleanup,
+  };
 }
 
 function formatDuration(ms: number): string {
@@ -360,6 +375,7 @@ async function main(): Promise<void> {
   });
   const snapDir = path.join(workDir, "src");
   let keepSnapshot = snapshotOnly;
+  let exactStoreCleanup: (() => Promise<void>) | null = null;
   const withHeartbeat = async <T>(label: string, p: Promise<T>): Promise<T> => {
     const started = Date.now();
     const timer = setInterval(() => {
@@ -457,6 +473,8 @@ async function main(): Promise<void> {
     const flakeDir = await resolveSnapshotFlakeDir(snapDir);
     const flakeRef = `path:${flakeDir}#${attr}`;
     console.error("[nix-build-filtered-flake] building attr:", attr);
+    const exactStore = await exactStoreEnvForTarget(root, attr, flakeRef);
+    exactStoreCleanup = exactStore.cleanup;
     const activeViberootsRoot = await resolveActiveViberootsRoot(root);
     const snapshotViberootsInput = await repairSnapshotViberootsInput(snapDir);
     if (snapshotViberootsInput) {
@@ -467,7 +485,7 @@ async function main(): Promise<void> {
     }
     const nixEnv = envWithResolvedNixBin({
       ...process.env,
-      ...(await exactStoreEnvForTarget(root, attr)),
+      ...exactStore.env,
       WORKSPACE_ROOT: snapDir,
       ...(activeViberootsRoot ? { VIBEROOTS_SOURCE_ROOT: activeViberootsRoot } : {}),
       VBR_FILTERED_FLAKE_SNAPSHOT: "1",
@@ -525,6 +543,7 @@ async function main(): Promise<void> {
     }
     process.stdout.write(`${outPath}\n`);
   } finally {
+    await exactStoreCleanup?.();
     if (!keepSnapshot) {
       await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
     }

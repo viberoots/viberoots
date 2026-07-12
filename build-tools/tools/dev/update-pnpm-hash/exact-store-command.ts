@@ -6,6 +6,7 @@ import { withHeartbeat } from "./heartbeat";
 
 export async function runExactStoreCommand(opts: {
   command?: string;
+  echoStdout?: boolean;
   label: string;
   cwd: string;
   env: NodeJS.ProcessEnv;
@@ -27,7 +28,7 @@ export async function runExactStoreCommand(opts: {
   );
   const stdout = String(result.stdout || "");
   const stderr = String(result.stderr || "");
-  if (stdout) process.stderr.write(stdout);
+  if (stdout && opts.echoStdout !== false) process.stderr.write(stdout);
   if (stderr) process.stderr.write(stderr);
   if (result.ok) return { stdout, stderr };
   const reason = result.timedOut

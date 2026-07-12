@@ -174,6 +174,30 @@ test("viberoots post-clone invokes shared bootstrap with locked-mode preset", as
   });
 });
 
+test("bootstrap keeps post-clone read-only and update as the pnpm metadata mutation path", async () => {
+  const bootstrap = await fsp.readFile(path.join(await findViberootsRoot(), "bootstrap"), "utf8");
+  assert.doesNotMatch(
+    bootstrap,
+    /VBR_POST_CLONE=1\s+VBR_BOOTSTRAP_PNPM_GENERATE=1/,
+    "post-clone must not authorize pnpm metadata generation",
+  );
+  assert.doesNotMatch(
+    bootstrap,
+    /NIX_PNPM_ALLOW_GENERATE=1\s+direnv exec/,
+    "post-clone install/validate must not authorize pnpm metadata generation",
+  );
+  assert.match(
+    bootstrap,
+    /VBR_BOOTSTRAP_PNPM_GENERATE=1 run_nix_init_consumer_command/,
+    "normal bootstrap/update must explicitly mark the pnpm metadata mutation path",
+  );
+  assert.match(
+    bootstrap,
+    /assert_post_clone_tracked_clean/,
+    "post-clone must assert tracked files stayed clean before succeeding",
+  );
+});
+
 test("viberoots update defaults to the enclosing workspace root from subdirectories", async () => {
   await withTempWorkspace("viberoots-live-bootstrap-subdir", async (workspace) => {
     const viberootsRoot = await findViberootsRoot();
