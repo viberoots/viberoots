@@ -46,8 +46,12 @@ repositories before committing the parent repository.
 - If the submodule has local changes, create the submodule commit first using the same `cc` rules:
   inspect the submodule change set, choose a representative conventional commit message, stage the
   submodule's local changes, and commit them inside the submodule.
-- After the submodule commit exists, return to the parent repository and stage the updated submodule
-  gitlink along with any parent-repo changes.
+- After every submodule commit exists, return to the parent repository and re-check the parent
+  working tree before staging anything. The parent repository now sees a new submodule gitlink, so
+  any viberoots consumer checks performed before the submodule commit are stale and must not be
+  reused.
+- Only after that post-submodule re-check should you stage the updated submodule gitlink along with
+  any parent-repo changes.
 - Do not commit the parent repo pointer while the submodule still has uncommitted local changes,
   unless the user explicitly asks to leave those submodule changes uncommitted.
 
@@ -60,6 +64,9 @@ or leaving stale pnpm hash metadata for the user's next `viberoots update` or po
 Treat a repository as a viberoots consumer when it has a `viberoots` submodule or a `.viberoots`
 workspace directory. In that case:
 
+- Run this guard after all nested `viberoots` submodule commits are complete and before staging the
+  parent repository. Do not rely on a guard result captured before committing the submodule, because
+  the submodule `HEAD` and parent gitlink changed after that check.
 - Run the repo consistency check when available:
 
   ```sh
