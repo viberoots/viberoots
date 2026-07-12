@@ -96,6 +96,44 @@ test("runInTemp dev-env export prewarms exact store before locked materializatio
   }
 });
 
+test("stage-0 devshell export prewarms exact stores before locked materialization", async () => {
+  const commandTxt = await fsp.readFile(
+    path.resolve(import.meta.dirname, "../../dev/viberoots.ts"),
+    "utf8",
+  );
+  if (!commandTxt.includes('name: "exact-pnpm-store-env"')) {
+    throw new Error("viberoots CLI must expose a read-only exact-store env prewarm command");
+  }
+  if (
+    !commandTxt.includes("discoverImportersWithLock") ||
+    !commandTxt.includes("prepareExactPnpmStore({") ||
+    !commandTxt.includes("NIX_PNPM_EXACT_STORE_MAP")
+  ) {
+    throw new Error(
+      "exact-pnpm-store-env must prewarm committed importer lockfiles and print the exact-store map",
+    );
+  }
+
+  const stage0Txt = await fsp.readFile(
+    path.resolve(import.meta.dirname, "../../lib/consumer-direnv.ts"),
+    "utf8",
+  );
+  const prewarmIndex = stage0Txt.indexOf("__vbr_stage0_prewarm_exact_pnpm_stores || return 1");
+  const useFlakeIndex = stage0Txt.indexOf('use flake "path:\\${PWD}/.viberoots/workspace#default"');
+  if (prewarmIndex < 0 || useFlakeIndex < 0 || prewarmIndex > useFlakeIndex) {
+    throw new Error("stage-0 must prewarm exact pnpm stores before nix-direnv use flake");
+  }
+  if (!stage0Txt.includes('exact-pnpm-store-env --workspace-root "\\${PWD}"')) {
+    throw new Error("stage-0 must use the read-only exact-store env command");
+  }
+  if (!stage0Txt.includes('[[ "\\${NIX_PNPM_ALLOW_GENERATE:-}" != "1" ]] || return 0')) {
+    throw new Error("stage-0 exact prewarm must not run on the intentional generation path");
+  }
+  if (!stage0Txt.includes("__vbr_flake_args+=(--impure)")) {
+    throw new Error("stage-0 must pass exact-store env through impure flake evaluation");
+  }
+});
+
 test("locked pnpm-store materialization remains fail-closed without exact prefetch", async () => {
   const txt = await fsp.readFile(
     path.resolve(import.meta.dirname, "../../nix/node-modules/store.nix"),

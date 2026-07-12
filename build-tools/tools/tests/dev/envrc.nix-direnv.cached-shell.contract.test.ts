@@ -34,6 +34,16 @@ test("generated .envrc delegates to stable stage-0 helper before nix-direnv use 
   );
   assert.match(stage0, /if \[\[ "\$\{NIX_PNPM_ALLOW_GENERATE:-\}" == "1" \]\]/);
   assert.match(stage0, /__vbr_flake_args\+=\(--impure\)/);
+  assert.match(stage0, /__vbr_stage0_prewarm_exact_pnpm_stores \|\| return 1/);
+  assert.match(stage0, /exact-pnpm-store-env --workspace-root "\$\{PWD\}"/);
+  assert.match(stage0, /eval "\$\{exact_env\}"/);
+  assert.match(stage0, /failed to prewarm exact pnpm stores/);
+  assert.match(stage0, /NIX_PNPM_EXACT_STORE_MAP/);
+  assert.match(stage0, /NIX_PNPM_EXACT_STORE/);
+  assert.match(
+    stage0,
+    /if \[\[ -n "\$\{NIX_PNPM_EXACT_STORE_MAP:-\}" \|\| -n "\$\{NIX_PNPM_EXACT_STORE:-\}" \]\]/,
+  );
   assert.match(stage0, /__vbr_stage0_apply_nix_cache_health \|\| return 1/);
   assert.match(stage0, /\[env\] nix cache health: disabled unreachable substituter\(s\):/);
   assert.match(stage0, /error: viberoots workspace flake is missing\./);
@@ -61,6 +71,7 @@ test("generated .envrc delegates to stable stage-0 helper before nix-direnv use 
   assert.match(stage0, /rm -f "\$\{PWD\}\/\.viberoots\/current" && ln -s \.\.\/viberoots/);
   assert.match(stage0, /unset -f __vbr_stage0_filter_host_path/);
   assert.match(stage0, /unset -f .*__vbr_stage0_align_workspace_flake_input/);
+  assert.match(stage0, /unset -f .*__vbr_stage0_prewarm_exact_pnpm_stores/);
 });
 
 test("captured host path filtering removes transient Codex arg0 shim directories", async () => {

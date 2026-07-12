@@ -39,6 +39,13 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
   );
   assert.match(stage0, /if \[\[ "\$\{NIX_PNPM_ALLOW_GENERATE:-\}" == "1" \]\]/);
   assert.match(stage0, /__vbr_flake_args\+=\(--impure\)/);
+  assert.match(stage0, /__vbr_stage0_prewarm_exact_pnpm_stores \|\| return 1/);
+  assert.match(stage0, /exact-pnpm-store-env --workspace-root "\$\{PWD\}"/);
+  assert.match(stage0, /NIX_PNPM_EXACT_STORE_MAP/);
+  assert.match(
+    stage0,
+    /if \[\[ -n "\$\{NIX_PNPM_EXACT_STORE_MAP:-\}" \|\| -n "\$\{NIX_PNPM_EXACT_STORE:-\}" \]\]/,
+  );
   assert.match(stage0, /! -f "\$\{__vbr_flake_input_root\}\/flake\.nix"/);
   assert.match(
     stage0,
