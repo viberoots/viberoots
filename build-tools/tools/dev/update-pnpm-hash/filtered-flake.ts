@@ -148,7 +148,7 @@ async function rewriteViberootsInput(flakeDir: string, inputPath: string): Promi
     };
     const node = lock.nodes?.viberoots;
     if (node) {
-      node.locked = lockedInput;
+      node.locked = { ...lockedInput, path: originalPath };
       node.original = { type: "path", path: originalPath };
       await fsp.writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8");
     }

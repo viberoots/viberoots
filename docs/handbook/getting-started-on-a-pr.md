@@ -75,6 +75,12 @@ When adding or materially editing scaffold command guidance:
 
 ### 3. Commands cheat sheet
 
+- Dependency manifest edit: run `u`, then `i && b && v`.
+- Intentional pnpm dependency upgrade: run `u --upgrade`, then `i && b && v`.
+- `u` conservatively repairs pnpm, Go, Python/uv, and deterministic C++ provider/glue metadata.
+  Neither update mode changes the viberoots submodule, flake pin, or source mode; use
+  `viberoots update` for that separate operation.
+
 - Build/test:
   - Install/update dependencies and generated glue: `i`
   - Recursive build: `b`
@@ -229,6 +235,7 @@ Recent fixes prove these guardrails:
 - **Keep the pnpm fetch output store-only**. The reconciliation fetch uses a temporary modules directory only as pnpm plumbing, removes it before registration, and verifies that the candidate contains content-addressed store files but no `node_modules` tree.
 - **Use measured pnpm checkpoints when changing this path**. Focused evidence for the current root lock recorded: a small native fixture at 26.83s and under 500 MiB; root reconciliation at 106.13s with a 5.19 GiB clean-baseline peak; an identical forced rebuild at 95.71s with a 9.66 GiB peak and no persistent new large output; a warm realized-output probe at 3.29s with zero new paths; and devshell materialization at 31.99s with one expected 5.278 GB node-modules output, followed by a 2.50s warm build with zero new paths.
 - **Keep local generated shell state out of bootstrap and source-mode snapshots**. Bootstrap and source-selection flows must ignore generated shell/cache state and filtered input noise, so local `.envrc`/direnv/Nix artifacts do not churn source hashes or get copied into seed inputs.
+- **Short-circuit fresh relative generated-workspace inputs before Nix metadata**. When the generated workspace flake and lock already use the normalized `./viberoots-flake-input` node, lock repair must return from that structural fresh state instead of running `nix flake metadata` on the enclosing generated workspace. The redundant metadata call imported a new 25,536,336-byte workspace source on each invocation; after the focused fast path, two consecutive warm `u` runs completed in 8.09s and 7.90s with zero new Nix store paths.
 - **Treat Nix GC and store optimization as maintenance, not normal verify setup**. Do not run `viberoots gc`, `nix store gc`, or `nix store optimise` while verify is active. Use `viberoots gc --dry-run` before cleanup, and treat invalid store-path errors during verify as run-level evidence of concurrent store mutation.
 
 Do not add a new disk-growth guardrail just because a theory is plausible. First prove the path with a before/after measurement, a focused regression test or contract test, and comparable validation evidence that the copied/stored bytes are reduced without hiding required source inputs.

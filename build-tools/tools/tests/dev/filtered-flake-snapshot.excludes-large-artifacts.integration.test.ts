@@ -23,6 +23,7 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     ".viberoots/buck",
     ".viberoots/buck/tmp",
     ".viberoots/cache",
+    ".viberoots/current",
     ".codex-*.log",
     ".viberoots/workspace/.viberoots",
     ".viberoots/workspace/backups",
@@ -31,6 +32,7 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     ".viberoots/workspace/install-cache",
     ".viberoots/workspace/nix-xdg-cache",
     ".viberoots/workspace/node",
+    ".viberoots/workspace/prelude",
     ".viberoots/workspace/pr-logs",
     ".viberoots/workspace/xdg-cache",
     "viberoots/.viberoots",
@@ -53,6 +55,7 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     "viberoots/install-cache",
     "viberoots/nix-xdg-cache",
     "viberoots/pr-logs",
+    "viberoots/prelude",
     "viberoots/test-logs",
     "viberoots/xdg-cache",
     ".turbo",
@@ -118,6 +121,7 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     }
     if (
       !source.includes("const originalPath = path.isAbsolute") ||
+      !source.includes("node.locked = { ...lockedInput, path: originalPath }") ||
       !source.includes('node.original = { type: "path", path: originalPath }')
     ) {
       throw new Error(

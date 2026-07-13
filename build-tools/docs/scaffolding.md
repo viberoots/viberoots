@@ -18,6 +18,11 @@ This document describes the scaffolding system used in this repository: how temp
    - update: apply template changes into an existing scaffold dir.
 4. Run post-generation steps (formatting, dependency bootstrapping, metadata updates).
 
+When a generated scaffold creates or changes dependency inputs (`package.json`, `go.mod`, or
+`pyproject.toml`), run `u` from the workspace root to refresh its lock and deterministic provider
+metadata, then run `i && b && v`. Use `u --upgrade` only when pnpm dependency versions should move;
+Go, Python/uv, and C++ upgrades remain unsupported and fail closed.
+
 ### CLI UX (intended)
 
 We will expose a single entrypoint `scaf` that provides a consistent, discoverable CLI to operate on templates across languages.

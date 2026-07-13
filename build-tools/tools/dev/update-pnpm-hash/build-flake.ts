@@ -17,6 +17,7 @@ export async function withPnpmStoreBuildFlakeRef<T>(
     }
     return await fn(filtered.flakeRef.slice(0, -"#pnpm".length), {
       WORKSPACE_ROOT: filtered.workspaceRoot,
+      VBR_PNPM_FILTERED_SNAPSHOT_ROOT: filtered.workspaceRoot,
     });
   } finally {
     await filtered.cleanup();

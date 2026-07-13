@@ -17,6 +17,10 @@ stale file, and reports `repair: run u`. Source-mode or viberoots pin drift inst
 `repair: run viberoots update`. A scaffold that creates dependency inputs must complete its
 intentional prewarm/reconciliation step before read-only installation.
 
+After an ordinary project dependency edit, run `u`, then `i && b && v`. Use `u --upgrade` only for
+an intentional project dependency upgrade. Go, Python/uv, and C++ upgrades fail closed until those
+ecosystems have a reviewed bounded upgrade policy; neither mode changes the viberoots pin.
+
 - [`build-system-design.md`](build-system-design.md): main Buck2/Nix architecture reference.
 - [`nixpkgs-source-selection-design.md`](nixpkgs-source-selection-design.md): design for
   target-scoped nixpkgs profiles and package-level nixpkgs pins.

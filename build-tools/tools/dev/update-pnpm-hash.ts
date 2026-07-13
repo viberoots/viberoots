@@ -80,13 +80,14 @@ async function inner() {
   const probe = async (): Promise<string> =>
     await withPnpmStoreBuildFlakeRef(
       { repoRoot, importer, baseFlakeRef: flakeRef },
-      async (buildFlakeRef) =>
+      async (buildFlakeRef, filteredEnv) =>
         (
           await resolveFinalPnpmStore({
             repoRoot,
             importer,
             flakeRef: buildFlakeRef,
             attrPath: storeAttr,
+            env: { ...process.env, ...filteredEnv },
           })
         ).fixedStorePath,
     );
@@ -94,13 +95,14 @@ async function inner() {
   const inspectForRebuild = async (): Promise<"realized" | "absent" | "invalid"> =>
     await withPnpmStoreBuildFlakeRef(
       { repoRoot, importer, baseFlakeRef: flakeRef },
-      async (buildFlakeRef) =>
+      async (buildFlakeRef, filteredEnv) =>
         (
           await inspectCommittedFinalPnpmStore({
             repoRoot,
             importer,
             flakeRef: buildFlakeRef,
             attrPath: storeAttr,
+            env: { ...process.env, ...filteredEnv },
           })
         ).status,
     );

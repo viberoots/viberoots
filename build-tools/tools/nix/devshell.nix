@@ -330,6 +330,10 @@ if [[ -o interactive ]]; then
   if command -v vbr >/dev/null 2>&1; then
     eval "$(vbr completion zsh)"
   fi
+  _u() {
+    _arguments -S '--upgrade[intentionally upgrade pnpm dependency versions]' '--verbose[show reconciliation steps]' '(-h --help)'{-h,--help}'[show help]'
+  }
+  compdef _u u
 fi
 EOF
       export ZDOTDIR="$PWD/.nix-zsh"
@@ -394,6 +398,10 @@ fi
 if command -v vbr >/dev/null 2>&1; then
   eval "$(vbr completion zsh)"
 fi
+_u() {
+  _arguments -S '--upgrade[intentionally upgrade pnpm dependency versions]' '--verbose[show reconciliation steps]' '(-h --help)'{-h,--help}'[show help]'
+}
+compdef _u u
 EOF
 
       if [ -n "$BASH_VERSION" ] && [ "$is_interactive" = "1" ]; then
@@ -404,6 +412,11 @@ EOF
         if command -v vbr >/dev/null 2>&1; then
           eval "$(vbr completion bash)"
         fi
+        _vbr_u() {
+          local cur="''${COMP_WORDS[COMP_CWORD]}"
+          COMPREPLY=( $(compgen -W "--upgrade --verbose --help" -- "$cur") )
+        }
+        complete -F _vbr_u u
       fi
 
       if [ -n "$ZSH_VERSION" ] && [ "$is_interactive" = "1" ]; then
@@ -415,6 +428,10 @@ EOF
         if command -v vbr >/dev/null 2>&1; then
           eval "$(vbr completion zsh)"
         fi
+        _u() {
+          _arguments -S '--upgrade[intentionally upgrade pnpm dependency versions]' '--verbose[show reconciliation steps]' '(-h --help)'{-h,--help}'[show help]'
+        }
+        compdef _u u
       fi
       cd "$entry_cwd"
 

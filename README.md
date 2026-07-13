@@ -213,7 +213,9 @@ Consumer repositories keep application source under their own `projects/` direct
 After setup, the repo shell provides short wrappers for normal local work:
 
 ```bash
-i        # install/link dependencies and refresh generated glue
+i        # materialize/link dependencies from committed metadata
+u        # repair locks and derived metadata after dependency edits
+u --upgrade # intentionally move project dependency versions, then reconcile
 b        # build the full default repo scope
 v        # run impacted tests and verification checks
 ```
@@ -233,6 +235,17 @@ The usual local check is:
 ```bash
 i && b && v
 ```
+
+After editing a project dependency manifest, reconcile tracked state intentionally before the
+read-only install:
+
+```bash
+u
+i && b && v
+```
+
+Use `u --upgrade` instead when project dependency versions should move. Neither command updates the
+viberoots source pin; that remains the responsibility of `viberoots update`.
 
 Run dev servers and other dev runnables with `d`:
 

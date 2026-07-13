@@ -228,3 +228,27 @@ test("probe validates the literal evaluated path with a sanitized environment", 
     assert.doesNotMatch(commands, /forbidden-(?:exact|index|lock)|generate=1/);
   });
 });
+
+test("filtered consumer probe uses only its marked bounded snapshot root", async () => {
+  const present = existingStorePath();
+  await withFakeNix("success", present, async (log) => {
+    const previous = {
+      workspace: process.env.WORKSPACE_ROOT,
+      filtered: process.env.VBR_PNPM_FILTERED_SNAPSHOT_ROOT,
+    };
+    try {
+      process.env.WORKSPACE_ROOT = "/tmp/filtered";
+      process.env.VBR_PNPM_FILTERED_SNAPSHOT_ROOT = "/tmp/filtered";
+      assert.equal(await probe(present), present);
+      assert.match(
+        await fsp.readFile(log, "utf8"),
+        /args=eval --impure --raw .*path:\/tmp\/filtered#pnpm-store/,
+      );
+    } finally {
+      if (previous.workspace === undefined) delete process.env.WORKSPACE_ROOT;
+      else process.env.WORKSPACE_ROOT = previous.workspace;
+      if (previous.filtered === undefined) delete process.env.VBR_PNPM_FILTERED_SNAPSHOT_ROOT;
+      else process.env.VBR_PNPM_FILTERED_SNAPSHOT_ROOT = previous.filtered;
+    }
+  });
+});

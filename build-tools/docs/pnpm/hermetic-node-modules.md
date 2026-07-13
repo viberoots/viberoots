@@ -156,7 +156,7 @@ devShells.default = pkgs.mkShell {
 Explicit helper to reconcile the FOD hash and realized output when the lockfile changes:
 
 ```bash
-build-tools/tools/dev/update-pnpm-hash.ts
+u
 ```
 
 Ordinary `i` materialization invokes this helper in read-only mode. It may realize and link ignored
@@ -166,6 +166,10 @@ names the stale input, and reports `repair: run u`. Intentional reconciliation o
 fixed-store hash and realized output authority. It accepts one targeted Nix hash mismatch, refreshes
 the filtered input after the hash write, and verifies the result before success. Scaffold flows must
 run that reconciliation before their first locked/offline materialization.
+
+Plain `u` conservatively refreshes importer lockfiles from current manifests before reconciliation.
+Use `u --upgrade` when pnpm dependency versions should intentionally move. Both paths share the
+same fixed-output reconciliation and leave the viberoots source pin unchanged.
 
 ---
 
@@ -180,12 +184,11 @@ pnpm patch-commit /path/to/temp/dir
 # commit patches/*, package.json, pnpm-lock.yaml
 ```
 
-Rebuild:
+Reconcile and validate:
 
 ```bash
-nix build .#pnpm-store --no-link      # update FOD hash if prompted (or run build-tools/tools/dev/update-pnpm-hash.ts)
-nix build .#node-modules
-nix develop                            # links node_modules automatically
+u
+i && b && v
 ```
 
 ---

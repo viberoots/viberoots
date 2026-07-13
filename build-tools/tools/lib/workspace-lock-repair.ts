@@ -80,6 +80,26 @@ function viberootsNode(lock: FlakeLock): unknown {
   return lock.nodes?.viberoots;
 }
 
+function usesNormalizedFilteredInput(lock: FlakeLock): boolean {
+  const node = viberootsNode(lock) as
+    | {
+        locked?: { type?: string; path?: string; narHash?: string; lastModified?: number };
+        original?: { type?: string; path?: string };
+        parent?: unknown;
+      }
+    | undefined;
+  return Boolean(
+    node?.locked?.type === "path" &&
+      node.locked.path === "./viberoots-flake-input" &&
+      node.locked.narHash === undefined &&
+      node.locked.lastModified === undefined &&
+      node.original?.type === "path" &&
+      node.original.path === "./viberoots-flake-input" &&
+      Array.isArray(node.parent) &&
+      node.parent.length === 0,
+  );
+}
+
 function locksDifferOnlyInViberoots(before: FlakeLock, after: FlakeLock): boolean {
   if (
     stableStringify(cloneWithoutViberoots(before)) !== stableStringify(cloneWithoutViberoots(after))
@@ -253,6 +273,13 @@ export async function repairGeneratedWorkspaceLock(
   }
   if (flakeRepair === "repaired" && opts.verbose) {
     console.error("[install-deps] refreshing generated workspace viberoots flake input");
+  }
+  if (usesNormalizedFilteredInput(before)) {
+    if (flakeRepair === "repaired") {
+      await touchFilteredInputMarker(workspaceFlakeDir);
+      return { status: "repaired", changedInput: "viberoots" };
+    }
+    return { status: "fresh" };
   }
   const candidateRaw = await metadataLocks({
     workspaceFlakeDir,

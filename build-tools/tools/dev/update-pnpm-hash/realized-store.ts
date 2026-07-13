@@ -11,8 +11,8 @@ import { sha256File } from "./verified-marker";
 const execFileAsync = promisify(execFile);
 const REALIZED_FINAL_STORE_PROBE_TIMEOUT_MS = 30_000;
 
-function finalStoreProbeEnv(): NodeJS.ProcessEnv {
-  const env = withSanitizedInheritedNixConfig(envWithResolvedNixBin({ ...process.env }));
+function finalStoreProbeEnv(baseEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env = withSanitizedInheritedNixConfig(envWithResolvedNixBin({ ...baseEnv }));
   for (const key of [
     "NIX_PNPM_ALLOW_GENERATE",
     "NIX_PNPM_RECONCILE",
@@ -36,6 +36,17 @@ function commandOutput(stdout: string): string {
 
 function resolveNixStoreBin(env: NodeJS.ProcessEnv): string {
   return String(env.VBR_NIX_STORE_BIN || "").trim() || resolveToolPathSync("nix-store", env);
+}
+
+function filteredSnapshotEvalArgs(env: NodeJS.ProcessEnv, flakeRef: string): string[] {
+  const markedRoot = String(env.VBR_PNPM_FILTERED_SNAPSHOT_ROOT || "").trim();
+  const workspaceRoot = String(env.WORKSPACE_ROOT || "").trim();
+  const flakePath = flakeRef.startsWith("path:") ? flakeRef.slice("path:".length) : "";
+  if (!markedRoot || !workspaceRoot || !flakePath) return [];
+  const root = path.resolve(markedRoot);
+  if (path.resolve(workspaceRoot) !== root) return [];
+  const flakeDir = path.resolve(flakePath);
+  return flakeDir === root || flakeDir.startsWith(`${root}${path.sep}`) ? ["--impure"] : [];
 }
 
 export type FinalPnpmStoreInspection =
@@ -73,8 +84,9 @@ export async function inspectFinalPnpmStore(opts: {
   flakeRef: string;
   attrPath: string;
   expectedPath: string;
+  env?: NodeJS.ProcessEnv;
 }): Promise<FinalPnpmStoreInspection> {
-  const env = finalStoreProbeEnv();
+  const env = finalStoreProbeEnv(opts.env);
   const nixBin = resolveToolPathSync("nix", env);
   const flakeRef = opts.flakeRef.split("#", 1)[0] || opts.flakeRef;
   const evaluated = commandOutput(
@@ -83,6 +95,7 @@ export async function inspectFinalPnpmStore(opts: {
         nixBin,
         [
           "eval",
+          ...filteredSnapshotEvalArgs(env, flakeRef),
           "--raw",
           "--no-write-lock-file",
           "--accept-flake-config",
@@ -158,6 +171,7 @@ export async function inspectCommittedFinalPnpmStore(opts: {
   importer: string;
   flakeRef: string;
   attrPath: string;
+  env?: NodeJS.ProcessEnv;
 }): Promise<FinalPnpmStoreInspection> {
   const committed = await committedFinalStore({
     repoRoot: opts.repoRoot,
@@ -173,6 +187,7 @@ export async function resolveFinalPnpmStore(opts: {
   importer: string;
   flakeRef: string;
   attrPath: string;
+  env?: NodeJS.ProcessEnv;
 }): Promise<{ fixedStorePath: string; cleanup: () => Promise<void> }> {
   const inspected = await inspectCommittedFinalPnpmStore(opts);
   if (inspected.status !== "realized") {

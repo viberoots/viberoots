@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-}" in
+	-h|--help)
+		cat <<'EOF'
+usage: u [--upgrade] [--verbose]
+
+Make project dependency and generated metadata consistent after source edits.
+
+options:
+  --upgrade  intentionally upgrade pnpm dependency versions before reconciliation
+  --verbose  show each reconciliation step
+  -h, --help
+
+After ordinary dependency edits, run:
+  u
+  i && b && v
+
+Use u --upgrade only when dependency versions should move.
+EOF
+		exit 0
+		;;
+esac
+
+# shellcheck source=/dev/null
+. "$(cd "$(dirname "$0")" && pwd)/devshell.sh"
+
+run_ts "../dev/update.ts" "$@"
