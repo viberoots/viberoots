@@ -132,7 +132,6 @@ const expectedReadyHandles = new Map<string, string[]>([
       "remote-ready-runner.sh",
       "zx-init.mjs",
       "command-heartbeat.ts",
-      "prepare-exact-pnpm-store.ts",
       "nix-build-filtered-flake.ts",
       "graph.json",
       "workspace-root.env",
@@ -208,6 +207,9 @@ test("remote-ready wrapper command providers carry declared input handles in gen
       const providerText = await auditProviders(readyTarget(wrapper), [], tmp);
       expectProjectRelative(providerText);
       expectDeclaredHandles(providerText, handles);
+      if (wrapper === "node") {
+        assert.doesNotMatch(providerText, /prepare-(?:exact|final)-pnpm-store\.ts/);
+      }
       assert.match(providerText, /"remote:ready"/);
       assert.doesNotMatch(providerText, /"remote:local-only"/);
     }

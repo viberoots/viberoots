@@ -218,11 +218,15 @@ function isPrettierPath(relPath: string): boolean {
   );
 }
 
-async function resolveVerifyNodeBin(root: string, name: string): Promise<string> {
+async function resolveVerifyNodeBin(
+  root: string,
+  name: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string> {
   try {
-    return await resolveRepoNodeBin(root, name);
+    return await resolveRepoNodeBin(root, name, env);
   } catch {}
-  const candidates = await repoNodeBinCandidates(root, name);
+  const candidates = await repoNodeBinCandidates(root, name, env);
   process.stderr.write(
     `error: verify lint preflight requires ${name}; checked ${candidates.join(", ")} and PATH. Run 'i' to provision repo dev tools before re-running 'v'\n`,
   );
@@ -327,10 +331,13 @@ export async function runVerifyLintPreflight(
     ui.step("preflight", `lint/format ${eslintTargets.length + prettierTargets.length} files`);
   }
   const timeoutPath = await resolveToolPath("timeout");
+  const binEnv = envWithZxNodeModules(opts.zxNodeModulesOut);
   const eslintPath =
-    scoped && eslintTargets.length > 0 ? await resolveVerifyNodeBin(root, "eslint") : "";
+    scoped && eslintTargets.length > 0 ? await resolveVerifyNodeBin(root, "eslint", binEnv) : "";
   const prettierPath =
-    scoped && prettierTargets.length > 0 ? await resolveVerifyNodeBin(root, "prettier") : "";
+    scoped && prettierTargets.length > 0
+      ? await resolveVerifyNodeBin(root, "prettier", binEnv)
+      : "";
 
   const eslintRes =
     scoped && eslintTargets.length > 0

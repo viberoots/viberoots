@@ -74,13 +74,6 @@ export function pnpmStoreAttrFromImporter(importer: string): string {
   return `pnpm-store.${sanitized}`;
 }
 
-export function pnpmStoreUnfixedAttrFromImporter(importer: string): string {
-  const normImp = normalizeImporter(importer);
-  if (!normImp || normImp === ".") return "pnpm-store-unfixed.default";
-  const sanitized = sanitizeName(normImp);
-  return `pnpm-store-unfixed.${sanitized}`;
-}
-
 export function repoRelativeLockfilePath(repoRoot: string, lockfileArg?: string): string {
   // Normalize lockfile to be repo-root relative to avoid absolute importer names
   const lf = lockfileArg ? lockfileArg : "pnpm-lock.yaml";

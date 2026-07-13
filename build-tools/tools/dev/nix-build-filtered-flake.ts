@@ -19,7 +19,7 @@ import {
   selectedPythonSnapshotRsyncSources,
 } from "./nix-build-filtered-flake-lib";
 import { targetPackageFromLabel } from "./build-selected-helpers";
-import { resolveExactPrefetchedStore } from "./update-pnpm-hash/realized-store";
+import { resolveFinalPnpmStore } from "./update-pnpm-hash/realized-store";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 import { getImporterRootsContract } from "../lib/importer-roots";
 import { sanitizeName } from "../lib/sanitize";
@@ -309,7 +309,7 @@ async function pnpmImportersFromAttrs(root: string, attr: string): Promise<strin
   return out.sort((a, b) => a.localeCompare(b));
 }
 
-async function exactStoreEnvForTarget(
+async function prewarmFinalStoreForTarget(
   root: string,
   attr: string,
   flakeRef: string,
@@ -320,14 +320,14 @@ async function exactStoreEnvForTarget(
   if (!importer || !(await pathExists(path.join(root, importer, "pnpm-lock.yaml")))) {
     return { env: {}, cleanup: async () => {} };
   }
-  const prepared = await resolveExactPrefetchedStore({
+  const prepared = await resolveFinalPnpmStore({
     repoRoot: root,
     importer,
     flakeRef,
     attrPath: pnpmStoreAttrFromImporter(importer),
   });
   return {
-    env: { NIX_PNPM_EXACT_STORE: prepared.exactStorePath },
+    env: {},
     cleanup: prepared.cleanup,
   };
 }
@@ -473,8 +473,8 @@ async function main(): Promise<void> {
     const flakeDir = await resolveSnapshotFlakeDir(snapDir);
     const flakeRef = `path:${flakeDir}#${attr}`;
     console.error("[nix-build-filtered-flake] building attr:", attr);
-    const exactStore = await exactStoreEnvForTarget(root, attr, flakeRef);
-    exactStoreCleanup = exactStore.cleanup;
+    const fixedStore = await prewarmFinalStoreForTarget(root, attr, flakeRef);
+    exactStoreCleanup = fixedStore.cleanup;
     const activeViberootsRoot = await resolveActiveViberootsRoot(root);
     const snapshotViberootsInput = await repairSnapshotViberootsInput(snapDir);
     if (snapshotViberootsInput) {
@@ -485,7 +485,6 @@ async function main(): Promise<void> {
     }
     const nixEnv = envWithResolvedNixBin({
       ...process.env,
-      ...exactStore.env,
       WORKSPACE_ROOT: snapDir,
       ...(activeViberootsRoot ? { VIBEROOTS_SOURCE_ROOT: activeViberootsRoot } : {}),
       VBR_FILTERED_FLAKE_SNAPSHOT: "1",

@@ -49,10 +49,6 @@
       "justification": "Pre-existing oversized exact-store helper pending focused decomposition outside the remote-consumer final checkpoint."
     },
     {
-      "path": "dev/update-pnpm-hash/nondefault.ts",
-      "justification": "Pre-existing oversized non-default importer hash helper pending focused decomposition outside the remote-consumer final checkpoint."
-    },
-    {
       "path": "dev/update-pnpm-hash/verified-marker.ts",
       "justification": "Pre-existing oversized pnpm verified-marker helper pending focused decomposition; current change only renames validation terminology without expanding behavior."
     },

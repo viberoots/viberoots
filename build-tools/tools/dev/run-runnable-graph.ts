@@ -5,7 +5,7 @@ import { ensureGraph } from "../buck/glue-run";
 import { runNixBuildWithProgress } from "./run-runnable-nix";
 import { untrackedRequiresImpureForTargets } from "./dev-build/untracked";
 import { makeFilteredFlakeRef } from "./filtered-flake";
-import { resolveExactPrefetchedStore } from "./update-pnpm-hash/realized-store";
+import { resolveFinalPnpmStore } from "./update-pnpm-hash/realized-store";
 import { pnpmStoreAttrFromImporter } from "./update-pnpm-hash/paths";
 import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 
@@ -209,13 +209,13 @@ export async function buildSelectedOutPath(
     attr: "graph-generator-selected",
   });
   const targetImporter = targetPackageFromLabel(target);
-  const exactStore =
+  const fixedStore =
     targetImporter &&
     (await fsp
       .access(path.join(workspaceRoot, targetImporter, "pnpm-lock.yaml"))
       .then(() => true)
       .catch(() => false))
-      ? await resolveExactPrefetchedStore({
+      ? await resolveFinalPnpmStore({
           repoRoot: workspaceRoot,
           importer: targetImporter,
           flakeRef: source.flakeRef,
@@ -230,7 +230,6 @@ export async function buildSelectedOutPath(
     BUCK_GRAPH_JSON: graphPath,
     BUCK_TARGET: target,
   };
-  if (exactStore) selectedEnv.NIX_PNPM_EXACT_STORE = exactStore.exactStorePath;
   let stdout = "";
   try {
     await withScopedGraphEnv(
@@ -258,7 +257,7 @@ export async function buildSelectedOutPath(
       ],
     });
   } finally {
-    await exactStore?.cleanup();
+    await fixedStore?.cleanup();
     await source.cleanup?.();
   }
   return lastOutPath(stdout, `graph-generator-selected produced no out path for ${target}`);

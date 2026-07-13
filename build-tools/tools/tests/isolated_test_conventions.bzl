@@ -2,6 +2,7 @@ VERIFY_ISOLATED_LABEL = "verify:isolated"
 
 ISOLATED_TESTS = {
     "build-tools/tools/tests/dev/dogfood-current-layout.test.ts": True,
+    "build-tools/tools/tests/dev/pnpm-fixed-store.native-reconcile.integration.test.ts": True,
     "build-tools/tools/tests/dev/verify.orphan-owned-process-cleanup.test.ts": True,
     "build-tools/tools/tests/dev/verify.temp-repo-buck-cleanup.scoped.test.ts": True,
     "build-tools/tools/tests/lib/buck-daemon-cleanup.interrupted.test.ts": True,

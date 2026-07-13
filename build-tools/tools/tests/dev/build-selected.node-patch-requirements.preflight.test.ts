@@ -51,8 +51,8 @@ test("build-selected runs node patch requirement preflight", async () => {
   if (txt.includes('if (!(await pathExists(path.join(workspaceRoot, "flake.nix"))))')) {
     throw new Error(`${file} must not require a visible root flake.nix`);
   }
-  if (!txt.includes("resolveExactPrefetchedStore")) {
-    throw new Error(`${file} must reuse realized fixed pnpm stores before exact-store prep`);
+  if (!txt.includes("resolveFinalPnpmStore")) {
+    throw new Error(`${file} must materialize committed final pnpm stores before Nix builds`);
   }
   if (txt.includes("import { prepareExactPnpmStore }")) {
     throw new Error(`${file} must not directly prepare exact stores on the selected build path`);

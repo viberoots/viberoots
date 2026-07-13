@@ -12,10 +12,7 @@ import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { pathExists, repoRoot } from "../../lib/repo";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
-import {
-  makeFilteredFlakeRef,
-  withResolvedExactPrefetchedStore,
-} from "../update-pnpm-hash/lockfile";
+import { makeFilteredFlakeRef, withResolvedFinalPnpmStore } from "../update-pnpm-hash/lockfile";
 import { flakeRefForImporter, sanitizeName } from "./common";
 import {
   ensureNodeModulesGcRoot,
@@ -197,7 +194,7 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
       };
       const built = fakeNix
         ? await buildWithEnv(process.env)
-        : await withResolvedExactPrefetchedStore(
+        : await withResolvedFinalPnpmStore(
             {
               repoRoot: root,
               importer,

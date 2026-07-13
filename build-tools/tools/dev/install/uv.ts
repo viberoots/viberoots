@@ -2,9 +2,14 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import crypto from "node:crypto";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { findUvLockfiles } from "../../lib/lockfiles";
 import { repoRoot } from "../../lib/repo";
 import { absenceCacheFresh, writeAbsenceCache } from "./absence-cache";
+import { staleMetadataError } from "./metadata-mode";
+
+const execFileAsync = promisify(execFile);
 
 async function sha256File(file: string): Promise<string> {
   try {
@@ -20,7 +25,7 @@ async function sha256File(file: string): Promise<string> {
  * For now, we surface deterministic diagnostics and a stable place to hook
  * a future uv2nix conversion without changing callers.
  */
-export async function runUvRefreshAll(dryRun: boolean, verbose: boolean) {
+export async function runUvRefreshAll(dryRun: boolean, verbose: boolean, readOnly = false) {
   const envRoot = String(process.env.WORKSPACE_ROOT || "").trim();
   const root = envRoot ? path.resolve(envRoot) : repoRoot();
   const scanRoots = ["."];
@@ -41,6 +46,19 @@ export async function runUvRefreshAll(dryRun: boolean, verbose: boolean) {
     return;
   }
   for (const lf of locks) {
+    if (readOnly) {
+      const lockPath = path.join(root, lf);
+      const manifestPath = path.join(path.dirname(lockPath), "pyproject.toml");
+      try {
+        await fsp.access(manifestPath);
+        await execFileAsync(process.env.INSTALL_DEPS_UV_BIN || "uv", ["lock", "--check"], {
+          cwd: path.dirname(lockPath),
+        });
+      } catch (error) {
+        const detail = String((error as { stderr?: unknown }).stderr || error);
+        throw staleMetadataError(lf, `uv lock consistency check failed: ${detail}`);
+      }
+    }
     const hash = await sha256File(lf);
     if (verbose) console.log(`[uv2nix] lock ${lf} sha256=${hash || "(unreadable)"}`);
     // Placeholder for future pinned helper invocation (uv/uv2nix):

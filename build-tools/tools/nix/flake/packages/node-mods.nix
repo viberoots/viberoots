@@ -20,14 +20,6 @@ let
     };
   }) importerDirs);
 
-  perImporterStoreUnfixed = builtins.listToAttrs (map (imp: {
-    name = (nodeMods.sanitizeName imp);
-    value = nodeMods.mkPnpmStoreUnfixed {
-      lockfilePath = imp + "/pnpm-lock.yaml";
-      importerDir = imp;
-      prefetchedStorePath = localPnpmStore;
-    };
-  }) importerDirs);
 in
 {
   pnpm-store =
@@ -38,15 +30,6 @@ in
         prefetchedStorePath = localPnpmStore;
       };
     } else {}) // (if viberootsNodeMods != null then { viberoots = viberootsNodeMods.pnpm-store; } else {}) // perImporterStore);
-
-  pnpm-store-unfixed =
-    ({} // (if haveRootLock then {
-      default = nodeMods.mkPnpmStoreUnfixed {
-        lockfilePath = "pnpm-lock.yaml";
-        importerDir = ".";
-        prefetchedStorePath = localPnpmStore;
-      };
-    } else {}) // (if viberootsNodeMods != null then { viberoots = viberootsNodeMods.pnpm-store-unfixed; } else {}) // perImporterStoreUnfixed);
 
   node-modules =
     ({}

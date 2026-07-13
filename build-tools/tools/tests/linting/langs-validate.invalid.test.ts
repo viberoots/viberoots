@@ -30,11 +30,20 @@ test("langs.json invalid fails validator with message", async () => {
       path.join(tmp, "viberoots/build-tools/tools/dev/validate-langs.ts"),
     );
     const tempViberootsRoot = path.join(tmp, "viberoots");
+    const testNodeModules = String(process.env.ZX_TEST_NODE_MODULES_OUT || "").trim();
     const tempToolEnv = {
       ...process.env,
       VIBEROOTS_ROOT: tempViberootsRoot,
       VIBEROOTS_SOURCE_ROOT: tempViberootsRoot,
-      NODE_PATH: [path.join(process.cwd(), "node_modules"), process.env.NODE_PATH || ""]
+      NODE_PATH: [
+        path.join(process.cwd(), "node_modules"),
+        testNodeModules
+          ? testNodeModules.endsWith("node_modules")
+            ? testNodeModules
+            : path.join(testNodeModules, "node_modules")
+          : "",
+        process.env.NODE_PATH || "",
+      ]
         .filter(Boolean)
         .join(path.delimiter),
     };

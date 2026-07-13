@@ -11,14 +11,10 @@ import { ensureWorkspaceBuckStatePackage } from "../lib/workspace-buck-state";
 import { DEFAULT_AUTO_MAP_PATH } from "../lib/workspace-state-paths";
 import { buildToolPath, zxInitPath } from "../dev/dev-build/paths";
 import { isVbrVerbose } from "../lib/command-ui";
+import { runCommand } from "./run-command";
 
 async function buck2Present(): Promise<boolean> {
-  try {
-    const res = await $({ stdio: "pipe" })`buck2 --version`.nothrow();
-    return res.exitCode === 0;
-  } catch {
-    return false;
-  }
+  return (await runCommand("buck2", ["--version"], { stdio: "ignore" })).exitCode === 0;
 }
 
 // ensureGraph: writes build-tools/tools/buck/graph.json if missing by invoking the exporter
@@ -226,9 +222,15 @@ export async function ensureGraph(
   }
 
   // Buck2 is not available; try running via nix (still uses the same exporter script).
-  await $({
-    env: passEnv,
-  })`nix run --accept-flake-config ${repoRoot}#zx-wrapper -- ${exportScript} ${exporterArgs}`;
+  const nixBin = process.env.NIX_BIN || process.env.VBR_NIX_BIN || "nix";
+  const nixRun = await runCommand(
+    nixBin,
+    ["run", "--accept-flake-config", `${repoRoot}#zx-wrapper`, "--", exportScript, ...exporterArgs],
+    { cwd: workspaceRoot, env: passEnv, stdio: "inherit" },
+  );
+  if (nixRun.exitCode !== 0) {
+    throw new Error(`nix run zx-wrapper failed while exporting graph (exit ${nixRun.exitCode})`);
+  }
   await fsp.access(graphPath);
   if (!(await isParseableJsonFile(graphPath))) {
     throw new Error(`export-graph produced invalid JSON at ${graphPath}`);

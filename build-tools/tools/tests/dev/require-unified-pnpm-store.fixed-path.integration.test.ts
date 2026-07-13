@@ -6,7 +6,7 @@ import { test } from "node:test";
 import { pruneStaleUnifiedPnpmStoreEpochs } from "../../dev/unified-pnpm-store-cleanup";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
-test("require-unified-pnpm-store assembles from exact prefetched stores", async () => {
+test("require-unified-pnpm-store assembles from final fixed stores", async () => {
   const txt = await fsp.readFile(
     viberootsSourcePath("viberoots/build-tools/tools/dev/require-unified-pnpm-store.ts"),
     "utf8",
@@ -19,16 +19,15 @@ test("require-unified-pnpm-store assembles from exact prefetched stores", async 
     viberootsSourcePath("viberoots/build-tools/tools/dev/unified-pnpm-store-epoch.ts"),
     "utf8",
   );
-  if (!txt.includes("prepareExactPnpmStore")) {
-    throw new Error("require-unified-pnpm-store must prepare exact prefetched stores");
+  if (!txt.includes("resolveFinalPnpmStore") || txt.includes("prepareFinalPnpmStore")) {
+    throw new Error("require-unified-pnpm-store must only probe realized final fixed stores");
   }
   if (
-    !txt.includes("mergeExactStorePathIntoUnifiedStore") ||
-    !txt.includes('"store.tar"') ||
-    !txt.includes("mergePnpmStore(opts.exactStorePath, opts.unifyStore)")
+    !txt.includes("mergeFixedStoreIntoUnifiedStore") ||
+    !txt.includes('path.join(fixedStorePath, "store")')
   ) {
     throw new Error(
-      "require-unified-pnpm-store must merge exact store directories and legacy archives into unifyStore",
+      "require-unified-pnpm-store must merge final store directories into unifyStore",
     );
   }
   if (txt.includes("nix build --impure")) {

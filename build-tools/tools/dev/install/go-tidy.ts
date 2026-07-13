@@ -2,11 +2,13 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { mkdtempNoindex } from "../../lib/macos-metadata";
+import { staleMetadataError } from "./metadata-mode";
 
 export async function runGoModTidyForMissingSum(
   root: string,
   dryRun: boolean,
   verbose: boolean,
+  readOnly = false,
 ): Promise<void> {
   const bases = [".", path.join("projects", "apps"), path.join("projects", "libs")];
   for (const base of bases) {
@@ -26,6 +28,9 @@ export async function runGoModTidyForMissingSum(
         .then(() => true)
         .catch(() => false);
       if (hasRootMod && !hasRootSum) {
+        if (readOnly) {
+          throw staleMetadataError("go.sum", "go.mod exists but go.sum is missing");
+        }
         if (dryRun) {
           console.log(`[go] dry-run: (missing go.sum) in .: go mod tidy (isolated)`);
         } else {
@@ -69,6 +74,9 @@ export async function runGoModTidyForMissingSum(
         .catch(() => false);
       if (!hasMod || hasSum) continue;
       const rel = path.relative(root, dir) || ".";
+      if (readOnly) {
+        throw staleMetadataError(`${rel}/go.sum`, `${rel}/go.mod exists but go.sum is missing`);
+      }
       if (dryRun) {
         console.log(`[go] dry-run: (missing go.sum) in ${rel}: go mod tidy`);
       } else {

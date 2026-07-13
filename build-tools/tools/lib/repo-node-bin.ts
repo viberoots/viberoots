@@ -26,10 +26,20 @@ export async function repoNodeBinCandidates(
 ): Promise<string[]> {
   const toolsRoot = await buildToolsRoot(root);
   const envNodeBin = String(env.VIBEROOTS_NODE_BIN || "").trim();
+  const zxTestNodeModulesOut = String(env.ZX_TEST_NODE_MODULES_OUT || "").trim();
+  const zxTestNodeBin = zxTestNodeModulesOut
+    ? path.join(
+        zxTestNodeModulesOut.endsWith("node_modules")
+          ? zxTestNodeModulesOut
+          : path.join(zxTestNodeModulesOut, "node_modules"),
+        ".bin",
+      )
+    : "";
   return Array.from(
     new Set([
       path.join(root, "node_modules", ".bin", name),
       path.join(path.dirname(toolsRoot), "node_modules", ".bin", name),
+      ...(zxTestNodeBin ? [path.join(zxTestNodeBin, name)] : []),
       ...(envNodeBin ? [path.join(envNodeBin, name)] : []),
       path.join(root, "viberoots", "node_modules", ".bin", name),
     ]),

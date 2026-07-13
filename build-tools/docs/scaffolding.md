@@ -587,10 +587,16 @@ Conventions:
 
 For Node/TS scaffolds, `scaf new` ensures the importer lockfile is **real and consistent with `package.json`** (because Nix builds run with a frozen-lockfile policy).
 
+That scaffold step is an intentional reconciliation boundary: it must establish the importer lock,
+committed fixed-store hash authority, and realized fixed output before invoking ordinary
+materialization. `i` is read-only and will not repair a newly generated importer or fetch packages.
+If committed scaffold metadata is stale or its fixed output is absent or invalid, run `u`, then
+rerun `i`; use `u --upgrade` only when dependency versions should move.
+
 If you change dependencies in an importer, update the lockfile and then run:
 
-- `i` (updates hashes, builds Nix `node_modules`, links outputs, and refreshes glue as needed)
-- or, for just updating the hash: `node build-tools/tools/dev/update-pnpm-hash.ts --lockfile <importer>/pnpm-lock.yaml`
+- `u` to reconcile the lock, committed fixed-store hash/output, provider, and glue metadata intentionally.
+- `i` afterward to materialize and link dependencies from committed metadata without rewriting it.
 
 ### Wasm asset staging for Node webapps
 

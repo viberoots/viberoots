@@ -512,6 +512,7 @@ function flakeNix(opts: InitConsumerOptions, viberootsUrl = opts.viberootsUrl): 
     "PLANNER_TRACE"
     "NIX_PNPM_ALLOW_GENERATE"
     "NIX_PNPM_FETCH_TIMEOUT"
+    "NIX_PNPM_INSTALL_TIMEOUT"
     "NIX_NODE_TEST_PATTERNS"
     "COVERAGE"
     "VBR_VERIFY_LOCK_DIR"

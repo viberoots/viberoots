@@ -5,7 +5,7 @@ import process from "node:process";
 import { printSkip } from "../../lib/errors";
 import { createCommandUi } from "../../lib/command-ui";
 import { writeIfChanged } from "../../lib/fs-helpers";
-import { nodeFlagsWithZx, nodeOptionsWithoutZxInit } from "../../lib/node-run";
+import { nodeFlagsWithZx, runNodeWithZx } from "../../lib/node-run";
 import { findRepoRoot } from "../../lib/repo";
 import { ensureWorkspaceProvidersPackage } from "../../lib/workspace-providers-package";
 import { DEFAULT_AUTO_MAP_PATH } from "../../lib/workspace-state-paths";
@@ -139,10 +139,7 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   const caps = new Map<string, Record<string, boolean>>();
   const langsJson = buildToolPath(wsRoot, "tools/nix/langs.json");
   try {
-    const { stdout } = await $({
-      stdio: "pipe",
-    })`bash --noprofile --norc -c ${`test -f ${langsJson} && cat ${langsJson}`}`;
-    const cfg = JSON.parse(String(stdout || "{}")) as LangConfig;
+    const cfg = JSON.parse(await fsp.readFile(langsJson, "utf8")) as LangConfig;
     for (const l of cfg.enabled || []) enabledLangs.add(l);
     for (const l of cfg.languages || [])
       caps.set(String(l.id), (l.capabilities || {}) as Record<string, boolean>);
@@ -150,10 +147,8 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
   if (enabledLangs.size === 0) {
     const tplDir = buildToolPath(wsRoot, "tools/nix/templates");
     try {
-      const { stdout } = await $({
-        stdio: "pipe",
-      })`bash --noprofile --norc -c ${`test -d ${tplDir} && ls -1 ${tplDir}`}`;
-      for (const n of String(stdout || "").split(/\r?\n/)) {
+      const entries = await fsp.readdir(tplDir);
+      for (const n of entries) {
         const base = n.trim().replace(/\.nix$/, "");
         if (base) enabledLangs.add(base);
       }
@@ -203,33 +198,29 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
 
   const cmds: Array<{
     label: string;
-    cmd: string;
-    withZx?: boolean;
+    script: string;
+    args?: string[];
     when?: boolean;
     skipReason?: string;
   }> = [
     {
       label: "gen-importer-roots",
-      cmd: `${nodeBin} ${nodeBase} ${buildToolPath(wsRoot, "tools/dev/gen-importer-roots-bzl.ts")}`,
-      withZx: true,
+      script: buildToolPath(wsRoot, "tools/dev/gen-importer-roots-bzl.ts"),
       when: true,
     },
     {
       label: "gen-langs",
-      cmd: `${nodeBin} ${nodeBase} ${buildToolPath(wsRoot, "tools/dev/gen-langs.ts")}`,
-      withZx: true,
+      script: buildToolPath(wsRoot, "tools/dev/gen-langs.ts"),
       when: true,
     },
     {
       label: "gen-nix-attr-aliases",
-      cmd: `${nodeBin} ${nodeBase} ${buildToolPath(wsRoot, "tools/dev/gen-nix-attr-aliases-bzl.ts")}`,
-      withZx: true,
+      script: buildToolPath(wsRoot, "tools/dev/gen-nix-attr-aliases-bzl.ts"),
       when: true,
     },
     {
       label: "glue-pipeline",
-      cmd: `${nodeBin} ${nodeBase} ${buildToolPath(wsRoot, "tools/buck/glue-pipeline.ts")}`,
-      withZx: true,
+      script: buildToolPath(wsRoot, "tools/buck/glue-pipeline.ts"),
       when: true,
     },
   ];
@@ -256,33 +247,34 @@ export async function runGlue(dryRun: boolean, verbose: boolean) {
       continue;
     }
     if (dryRun) {
-      console.log(`[dry-run] ${c.cmd}`);
+      console.log(
+        `[dry-run] ${nodeBin} ${nodeBase} ${c.script} ${(c.args || []).join(" ")}`.trim(),
+      );
       continue;
     }
-    if (verbose) console.log(`[run] ${c.cmd}`);
-    const baseEnv: Record<string, string> = {
+    if (verbose) console.log(`[run] ${c.script} ${(c.args || []).join(" ")}`.trim());
+    const env: Record<string, string> = {
       ...process.env,
       WORKSPACE_ROOT: wsRoot,
       BUCK_TEST_SRC: wsRoot,
     };
-    const env = c.withZx
-      ? {
-          ...baseEnv,
-          NODE_OPTIONS: [`--import ${zxImport}`, nodeOptionsWithoutZxInit(process.env.NODE_OPTIONS)]
-            .filter(Boolean)
-            .join(" "),
-        }
-      : baseEnv;
-    const child = $({
-      stdio: verbose ? "inherit" : "pipe",
-      cwd: wsRoot,
-      env,
-      reject: false,
-    })`bash --noprofile --norc -c ${c.cmd}`;
-    const res = verbose ? await child : await child.quiet();
-    if (res.exitCode !== 0) {
-      printGlueFailure(c.label, res);
-      process.exit(res.exitCode || 1);
+    try {
+      await runNodeWithZx({
+        nodeBin,
+        zxInitPath: zxImport,
+        script: c.script,
+        args: c.args || [],
+        cwd: wsRoot,
+        env,
+        stdio: verbose ? "inherit" : "pipe",
+      });
+    } catch (error) {
+      printGlueFailure(c.label, error);
+      const exitCode =
+        typeof (error as { exitCode?: unknown }).exitCode === "number"
+          ? (error as { exitCode: number }).exitCode || 1
+          : 1;
+      process.exit(exitCode);
     }
   }
   if (!dryRun) {

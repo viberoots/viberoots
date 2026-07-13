@@ -9,12 +9,20 @@ test("link-node builds non-default importers from stable workspace flake ref", a
   if (!txt.includes("makeFilteredFlakeRef(root, importer)")) {
     throw new Error("link-node.ts must use filtered flake snapshot for non-default importers");
   }
-  if (!txt.includes("withResolvedExactPrefetchedStore")) {
-    throw new Error("link-node.ts must pass exact prefetched stores into node_modules builds");
+  if (!txt.includes("withResolvedFinalPnpmStore")) {
+    throw new Error("link-node.ts must materialize final stores before node_modules builds");
   }
-  if (!txt.includes('"--impure"')) {
-    throw new Error("link-node.ts must use --impure for the NIX_PNPM_EXACT_STORE env handoff");
+  if (
+    !txt.includes('VBR_RUN_IN_TEMP_REPO || "").trim() !== "1"') ||
+    !txt.includes('VBR_LINK_NODE_FAKE_NIX || "").trim() === "1"') ||
+    !txt.includes("nixPath.startsWith(`${path.resolve(root)}${path.sep}`)")
+  ) {
+    throw new Error(
+      "link-node.ts must only bypass final-store handling for fake Nix inside temp-repo tests",
+    );
   }
+  if (txt.includes("NIX_PNPM_EXACT_STORE"))
+    throw new Error("link-node.ts must not use exact env handoff");
   if (!txt.includes("buildFlakeRefBase")) {
     throw new Error("link-node.ts must select build flake base for non-default importer builds");
   }

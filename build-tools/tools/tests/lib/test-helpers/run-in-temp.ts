@@ -36,7 +36,7 @@ import { resolveToolPathSync } from "../../../lib/tool-paths";
 import { pathExists } from "../../../lib/repo";
 import { mkdirWithMacosMetadataExclusion } from "../../../lib/macos-metadata";
 import { ensureWorkspaceProvidersPackage } from "../../../lib/workspace-providers-package";
-import { resolveExactPrefetchedStore } from "../../../dev/update-pnpm-hash/realized-store";
+import { resolveFinalPnpmStore } from "../../../dev/update-pnpm-hash/realized-store";
 
 const LOCAL_FIXTURE_SERVICE_ENV = "VBR_DEPLOY_LOCAL_FIXTURE_SERVICE";
 const PREPARED_SEED_MARKER = ".seed-store-prepared-v7";
@@ -111,7 +111,7 @@ async function exportDevEnvOncePerWorker($: any): Promise<string> {
 
 async function exportDevEnvWithRetry($: any): Promise<string> {
   const devEnvRoot = await activeViberootsRootFromWorkspace();
-  const exactStore = await resolveExactPrefetchedStore({
+  const fixedStore = await resolveFinalPnpmStore({
     repoRoot: devEnvRoot,
     importer: ".",
     flakeRef: `path:${devEnvRoot}`,
@@ -130,9 +130,8 @@ async function exportDevEnvWithRetry($: any): Promise<string> {
         VIBEROOTS_ROOT: devEnvRoot,
         VIBEROOTS_SOURCE_ROOT: devEnvRoot,
         VIBEROOTS_FLAKE_INPUT_ROOT: devEnvRoot,
-        NIX_PNPM_EXACT_STORE: exactStore.exactStorePath,
       }),
-    })`nix develop --impure --no-write-lock-file --accept-flake-config -c env -0`;
+    })`nix develop --no-write-lock-file --accept-flake-config -c env -0`;
     if (Number(nixOut.exitCode || 0) !== 127) return nixOut;
     return await $({
       cwd: devEnvRoot,
@@ -145,7 +144,6 @@ async function exportDevEnvWithRetry($: any): Promise<string> {
         VIBEROOTS_ROOT: devEnvRoot,
         VIBEROOTS_SOURCE_ROOT: devEnvRoot,
         VIBEROOTS_FLAKE_INPUT_ROOT: devEnvRoot,
-        NIX_PNPM_EXACT_STORE: exactStore.exactStorePath,
       }),
     })`bash --noprofile --norc -c 'if command -v direnv >/dev/null 2>&1; then eval "$(direnv export bash)"; env -0; else printf ""; fi'`;
   };
@@ -166,7 +164,7 @@ async function exportDevEnvWithRetry($: any): Promise<string> {
     }
     return String((out as any).stdout || "");
   } finally {
-    await exactStore.cleanup();
+    await fixedStore.cleanup();
   }
 }
 

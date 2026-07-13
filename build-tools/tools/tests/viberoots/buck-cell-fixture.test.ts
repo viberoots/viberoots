@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { BUCK_PROJECT_IGNORE_LINE } from "../../lib/buck-project-ignore";
 import { runInScratchTemp } from "../lib/test-helpers";
 
 async function writeFile(file: string, text: string): Promise<void> {
@@ -27,6 +28,9 @@ workspace_providers = ./.viberoots/workspace/providers
 root = .
 viberoots = ./.viberoots/current
 workspace_providers = ./.viberoots/workspace/providers
+
+[project]
+${BUCK_PROJECT_IGNORE_LINE}
 `,
     );
     await writeFile(

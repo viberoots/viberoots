@@ -10,8 +10,13 @@ test("verify lint preflight resolves formatter tools from devshell PATH", async 
   if (!source.includes('from "../../lib/repo-node-bin"')) {
     throw new Error("lint preflight must use repo node-bin resolution");
   }
-  if (!source.includes("return await resolveRepoNodeBin(root, name);")) {
-    throw new Error("lint preflight must delegate node-bin lookup to the PATH-capable resolver");
+  if (!source.includes("return await resolveRepoNodeBin(root, name, env);")) {
+    throw new Error(
+      "lint preflight must delegate node-bin lookup to the PATH- and ZX_TEST_NODE_MODULES_OUT-capable resolver",
+    );
+  }
+  if (!source.includes("const binEnv = envWithZxNodeModules(opts.zxNodeModulesOut)")) {
+    throw new Error("lint preflight must resolve formatter tools from stable verify node_modules");
   }
   if (!source.includes("and PATH")) {
     throw new Error("missing-tool message should mention the PATH fallback");

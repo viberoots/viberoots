@@ -11,14 +11,22 @@ function workspaceHashesJsonPath(root: string): string {
   return path.join(root, "projects", "node-modules.hashes.json");
 }
 
-function isStandaloneViberootsSource(root: string): boolean {
+function canonicalPath(candidate: string): string {
+  try {
+    return fs.realpathSync.native(candidate);
+  } catch {
+    return path.resolve(candidate);
+  }
+}
+
+export function isStandaloneViberootsSource(root: string): boolean {
   const rootTool = path.join(root, "build-tools", "tools", "dev", "zx-init.mjs");
   return (
     path.basename(root) !== "workspace" &&
     !root.endsWith(path.join(".viberoots", "workspace")) &&
     !root.includes(`${path.sep}.viberoots${path.sep}workspace`) &&
     fs.existsSync(rootTool) &&
-    path.resolve(buildToolPath(root, "tools/dev/zx-init.mjs")) === path.resolve(rootTool)
+    canonicalPath(buildToolPath(root, "tools/dev/zx-init.mjs")) === canonicalPath(rootTool)
   );
 }
 
@@ -63,6 +71,17 @@ function writableHashesJsonPaths(root = process.cwd()): string[] {
 export type HashesJsonOwner = "workspace" | "viberoots";
 export type HashesJsonOptions = { owner?: HashesJsonOwner; root?: string };
 
+export function hashOwnerForLockfile(
+  lockfileRel: string,
+  root = process.cwd(),
+  importer = "",
+): HashesJsonOwner {
+  if (importer === "viberoots") return "viberoots";
+  return lockfileRel.startsWith("projects/") || !isStandaloneViberootsSource(root)
+    ? "workspace"
+    : "viberoots";
+}
+
 function ownerHashesJsonPath(
   lockfileRel: string,
   owner?: HashesJsonOwner,
@@ -71,9 +90,35 @@ function ownerHashesJsonPath(
   if (owner === "viberoots")
     return writableViberootsHashesJsonPath(root) || workspaceHashesJsonPath(root);
   if (owner === "workspace") return workspaceHashesJsonPath(root);
-  return lockfileRel.startsWith("projects/") || !isStandaloneViberootsSource(root)
+  return hashOwnerForLockfile(lockfileRel, root) === "workspace"
     ? workspaceHashesJsonPath(root)
     : viberootsHashesJsonPaths(root)[0];
+}
+
+export async function snapshotNodeModulesHashesJson(
+  lockfileRel: string,
+  opts: HashesJsonOptions = {},
+): Promise<{ restore: () => Promise<void> }> {
+  const root = opts.root ? path.resolve(opts.root) : process.cwd();
+  const owner = ownerHashesJsonPath(lockfileRel, opts.owner, root);
+  const candidates = unique([owner, ...writableHashesJsonPaths(root)]);
+  const before = new Map<string, Buffer | null>();
+  for (const candidate of candidates) {
+    before.set(candidate, await fsp.readFile(candidate).catch(() => null));
+  }
+  return {
+    restore: async () => {
+      for (const [candidate, contents] of before) {
+        if (contents === null) {
+          await fsp.rm(candidate, { force: true });
+          await fsp.rmdir(path.dirname(candidate)).catch(() => {});
+          continue;
+        }
+        await fsp.mkdir(path.dirname(candidate), { recursive: true });
+        await fsp.writeFile(candidate, contents);
+      }
+    },
+  };
 }
 
 async function readJsonFile(candidate: string): Promise<Record<string, string>> {

@@ -14,16 +14,7 @@ test("build consumers do not repair pnpm provisioning state", async () => {
     /update-pnpm-hash\.ts|runPnpmHashUpdater|forceRefreshPnpmStoreHash|git add/,
     "node-modules-build.ts must not invoke update-pnpm-hash, force hash refreshes, or stage lock metadata",
   );
-  assert.match(
-    nodeModulesBuild,
-    /run `i` to refresh pnpm hashes and prewarm exact pnpm stores/,
-    "node-modules-build.ts must fail clearly with a run `i` diagnostic for missing or stale state",
-  );
-  assert.match(
-    nodeModulesBuild,
-    /preparedExactStoreEnv\(lockfileRel\)/,
-    "node-modules-build.ts must consume exact stores already warmed by provisioning",
-  );
+  assert.doesNotMatch(nodeModulesBuild, /prepareFinalPnpmStore|fetchExactPnpmStore|add-fixed/);
   assert.match(
     nodeModulesBuild,
     /verifiedMarkerPath\(liveMarkerRepoRoot\(\), importer\)/,
@@ -34,11 +25,32 @@ test("build consumers do not repair pnpm provisioning state", async () => {
     /recoverOutPathFromLinkMarker\(importer, lockfileRel\)/,
     "node-modules-build.ts must reuse already-provisioned node_modules outputs before Nix builds",
   );
-  assert.match(
-    nodeModulesBuild,
-    /--impure --no-link --accept-flake-config/,
-    "node-modules-build.ts must pass --impure so NIX_PNPM_EXACT_STORE reaches Nix",
+  assert.doesNotMatch(nodeModulesBuild, /NIX_PNPM_EXACT_STORE/);
+});
+
+test("ordinary pnpm consumers only probe realized committed stores", async () => {
+  const ordinaryFiles = [
+    "build-tools/tools/dev/node-modules-build.ts",
+    "build-tools/tools/dev/require-unified-pnpm-store.ts",
+    "build-tools/tools/dev/dev-build/materialize-pure.ts",
+    "build-tools/tools/dev/build-selected.ts",
+    "build-tools/tools/dev/run-runnable-graph.ts",
+    "build-tools/tools/dev/nix-build-filtered-flake.ts",
+    "build-tools/tools/dev/install/link-node.ts",
+  ];
+  for (const file of ordinaryFiles) {
+    const source = await fsp.readFile(`viberoots/${file}`, "utf8");
+    assert.doesNotMatch(source, /prepareFinalPnpmStore|fetchExactPnpmStore|add-fixed/, file);
+  }
+
+  const probe = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/realized-store.ts",
+    "utf8",
   );
+  assert.match(probe, /"eval"/);
+  assert.match(probe, /"path-info"/);
+  assert.match(probe, /probeRealizedFinalPnpmStore\(/);
+  assert.doesNotMatch(probe, /prepareFinalPnpmStore|fetchExactPnpmStore|add-fixed/);
 });
 
 test("locked Nix pnpm build paths are offline-only", async () => {
@@ -47,11 +59,7 @@ test("locked Nix pnpm build paths are offline-only", async () => {
     "utf8",
   );
 
-  assert.match(
-    storeNix,
-    /validating exact prefetched store shape after prior pnpm install \(offline exact-store\)/,
-    "locked Nix pnpm paths must validate prewarmed exact stores instead of fetching packages",
-  );
+  assert.match(storeNix, /final fixed pnpm store is missing/);
   const lockedBuildStoreNix = storeNix.replace(
     /bootstrapExactStoreFetchScript = label: ''[\s\S]*?^  '';/m,
     "",
@@ -65,11 +73,6 @@ test("locked Nix pnpm build paths are offline-only", async () => {
     pnpmInstallCommands,
     [],
     "locked Nix pnpm paths must not run pnpm install; exact stores must already be provisioned",
-  );
-  assert.match(
-    storeNix,
-    /Run 'i' to refresh pnpm hashes and prewarm exact pnpm stores\./,
-    "locked Nix pnpm paths must tell operators to run i when prewarmed state is missing",
   );
 });
 

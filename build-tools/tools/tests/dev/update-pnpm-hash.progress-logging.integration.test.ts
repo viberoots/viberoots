@@ -3,16 +3,16 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
-test("update-pnpm-hash logs fixed and unfixed phase progress", async () => {
+test("update-pnpm-hash logs native fixed reconciliation progress", async () => {
   const file = viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash.ts");
   const txt = await fsp.readFile(file, "utf8");
-  if (!txt.includes("step=fixed-build")) {
-    throw new Error("update-pnpm-hash.ts must log fixed-build phase");
+  if (!txt.includes("step=fixed-reconcile")) {
+    throw new Error("update-pnpm-hash.ts must log fixed reconciliation phase");
   }
-  if (!txt.includes("step=unfixed-build")) {
-    throw new Error("update-pnpm-hash.ts must log unfixed-build phase");
+  if (!txt.includes("withPnpmStoreBuildFlakeRef")) {
+    throw new Error("update-pnpm-hash.ts must recreate filtered inputs around native builds");
   }
-  if (!txt.includes("step=fixed-build-after-hash")) {
-    throw new Error("update-pnpm-hash.ts must log fixed-build-after-hash phase");
+  if (/unfixed-build|exact-store-(fetch|import)/.test(txt)) {
+    throw new Error("update-pnpm-hash.ts must not log retired external reconciliation phases");
   }
 });

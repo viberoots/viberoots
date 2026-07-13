@@ -5,7 +5,6 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { nixBuilderPolicyShellArgs } from "../lib/nix-builder-policy";
-import { sharedExactPnpmStateRootPath } from "../lib/pnpm-state-paths";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
 import { buildToolPath } from "./dev-build/paths";
 import {
@@ -281,7 +280,7 @@ async function recoverOutPathFromLinkMarker(
 function runInstallDiagnostic(lockfileRel: string, reason: string): string {
   return [
     `node-modules-build: pnpm-store state for ${lockfileRel} is ${reason}.`,
-    "node-modules-build: run `i` to refresh pnpm hashes and prewarm exact pnpm stores, then rerun `b`.",
+    "node-modules-build: run `u` to refresh pnpm hashes and materialize final pnpm stores, then rerun `b`.",
   ].join("\n");
 }
 
@@ -297,29 +296,6 @@ async function requireFreshPnpmStoreState(lockfileRel: string, hashKey: string):
   }
 }
 
-async function preparedExactStoreEnv(lockfileRel: string): Promise<NodeJS.ProcessEnv | null> {
-  const lockHash = await sha256File(path.join(repoRoot, lockfileRel));
-  if (!lockHash) return null;
-  const cacheDir = sharedExactPnpmStateRootPath(lockHash);
-  const markerPath = path.join(cacheDir, "ready.json");
-  try {
-    const raw = await fsp.readFile(markerPath, "utf8");
-    const marker = JSON.parse(raw) as {
-      version?: number;
-      lockHash?: string;
-      nixStorePath?: string;
-    };
-    const nixStorePath = String(marker.nixStorePath || "").trim();
-    if (marker.lockHash !== lockHash || !nixStorePath.startsWith("/nix/store/")) return null;
-    await fsp.access(nixStorePath);
-    return {
-      ...process.env,
-      NIX_PNPM_EXACT_STORE: nixStorePath,
-    };
-  } catch {
-    return null;
-  }
-}
 // Fast path: if output is already realized in the store, prefer path-info
 let outPath = "";
 await requireFreshPnpmStoreState(lockfileRel, hashKey);
@@ -344,7 +320,7 @@ try {
     }
   }
 } catch {}
-async function tryBuild(extraEnv: NodeJS.ProcessEnv): Promise<string> {
+async function tryBuild(): Promise<string> {
   const timeoutPath = resolveToolPathSync("timeout");
   const nixBin = resolveToolPathSync("nix", nixWorkspaceEnv);
   const overrideShellArgs = viberootsOverrideArgs
@@ -361,10 +337,10 @@ async function tryBuild(extraEnv: NodeJS.ProcessEnv): Promise<string> {
     'TS="${NIX_PNPM_FETCH_TIMEOUT:-900}";',
     'JOBS_FLAG=""; if [ -n "$MJ" ] && [ "$MJ" != "0" ]; then JOBS_FLAG="--max-jobs $MJ"; fi;',
     'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
-    `"$TIMEOUT_PATH" -k 10s "\${TS}s" "$NIX_BIN" build "\${FLAKE_REF}#\${FULL_ATTR}" --impure --no-link --accept-flake-config ${overrideShellArgs} ${nixBuilderPolicyShellArgs("local_only")} --print-out-paths $JOBS_FLAG $CORES_FLAG`,
+    `"$TIMEOUT_PATH" -k 10s "\${TS}s" "$NIX_BIN" build "\${FLAKE_REF}#\${FULL_ATTR}" --no-link --accept-flake-config ${overrideShellArgs} ${nixBuilderPolicyShellArgs("local_only")} --print-out-paths $JOBS_FLAG $CORES_FLAG`,
   ].join(" ");
   const built = await $({
-    env: envWithResolvedNixBin({ ...nixWorkspaceEnv, ...extraEnv }),
+    env: nixWorkspaceEnv,
   })`bash --noprofile --norc -c ${cmd} -- ${timeoutPath} ${flakeRef} ${fullAttr} ${nixBin}`.nothrow();
   const txt = String(built.stdout || "").trim();
   if (built.exitCode === 0 && txt) {
@@ -374,12 +350,7 @@ async function tryBuild(extraEnv: NodeJS.ProcessEnv): Promise<string> {
 }
 
 if (!outPath) {
-  const extraEnv = await preparedExactStoreEnv(lockfileRel);
-  if (!extraEnv) {
-    console.error(runInstallDiagnostic(lockfileRel, "missing prepared exact store"));
-    process.exit(2);
-  }
-  outPath = await tryBuild(extraEnv);
+  outPath = await tryBuild();
 }
 if (!outPath) {
   console.error("node-modules-build: nix build produced no output path");

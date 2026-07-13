@@ -5,6 +5,7 @@ import path from "node:path";
 import { getImporterRootsContract } from "../../../lib/importer-roots";
 import { withSharedBuckIsolationStartupLock } from "../../../lib/shared-buck-isolation-lock";
 import { registerBuckIsolationSync } from "../../../dev/verify/owned-process-state";
+import { runManagedCommand } from "../../../lib/managed-command";
 import { isRetryableCqueryError, resetBuckDaemon } from "./retry";
 
 export type CqueryRunnerOptions = {
@@ -123,14 +124,17 @@ async function withBuckCleanup<T>(iso: string, ownsIso: boolean, fn: () => Promi
       const cwd = String(
         process.env.BUCK_TEST_SRC || process.env.WORKSPACE_ROOT || process.cwd(),
       ).trim();
-      await $({
+      await runManagedCommand({
+        command: "buck2",
+        args: ["--isolation-dir", iso, "kill"],
         cwd,
         env: {
           ...process.env,
           HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
           SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
         },
-      })`buck2 --isolation-dir ${iso} kill`;
+        timeoutMs: 30_000,
+      });
     } catch {}
     process.exit(130);
   };
@@ -146,14 +150,17 @@ async function withBuckCleanup<T>(iso: string, ownsIso: boolean, fn: () => Promi
       const cwd = String(
         process.env.BUCK_TEST_SRC || process.env.WORKSPACE_ROOT || process.cwd(),
       ).trim();
-      await $({
+      await runManagedCommand({
+        command: "buck2",
+        args: ["--isolation-dir", iso, "kill"],
         cwd,
         env: {
           ...process.env,
           HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
           SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
         },
-      })`buck2 --isolation-dir ${iso} kill`;
+        timeoutMs: 30_000,
+      });
     } catch {}
   }
 }
@@ -186,12 +193,25 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
       SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
     };
     const runBuck = async () => {
-      const { stdout } = await $({
+      const result = await runManagedCommand({
+        command: "buck2",
+        args: [
+          ...quietFlags,
+          ...isolationFlags,
+          "cquery",
+          ...platformFlags,
+          query,
+          "--json",
+          ...flags,
+        ],
         cwd,
-        stdio: "pipe",
         env: buckEnv,
-      })`buck2 ${quietFlags} ${isolationFlags} cquery ${platformFlags} ${query} --json ${flags}`.quiet();
-      return stdout;
+        timeoutMs: 120_000,
+      });
+      if (!result.ok) {
+        throw new Error(String(result.stderr || result.stdout || "buck2 cquery failed"));
+      }
+      return result.stdout;
     };
     const stdout = await withSharedBuckIsolationStartupLock(cwd, iso, runBuck);
     return JSON.parse(String(stdout)) as Record<string, any>;

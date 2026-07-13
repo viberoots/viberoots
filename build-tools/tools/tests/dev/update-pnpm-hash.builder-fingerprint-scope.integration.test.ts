@@ -30,10 +30,9 @@ test("update-pnpm-hash separates verified marker and shared-cache fingerprints",
   }
   for (const rel of [
     "viberoots/build-tools/tools/dev/update-pnpm-hash.ts",
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/nondefault.ts",
     "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-fetch.ts",
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-import.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/fixed-store-reconcile.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/nix.ts",
     "viberoots/build-tools/tools/dev/update-pnpm-hash/prefetched-store.ts",
     "viberoots/build-tools/tools/lib/pnpm-state-paths.ts",
   ]) {
@@ -41,6 +40,23 @@ test("update-pnpm-hash separates verified marker and shared-cache fingerprints",
       throw new Error(
         `verified-marker.ts builder fingerprint must not include updater helper ${rel}`,
       );
+    }
+  }
+  const provisioningList = txt.match(
+    /const exactStoreProvisioningFingerprintFiles = \[([\s\S]*?)\] as const;/,
+  )?.[1];
+  if (
+    !provisioningList ||
+    !provisioningList.includes("fixed-store-reconcile.ts") ||
+    !provisioningList.includes("update-pnpm-hash/nix.ts")
+  ) {
+    throw new Error(
+      "shared-cache fingerprints must include the native fixed-output reconciliation helpers",
+    );
+  }
+  for (const deleted of ["nondefault.ts", "exact-store-fetch.ts", "exact-store-import.ts"]) {
+    if (txt.includes(`update-pnpm-hash/${deleted}`)) {
+      throw new Error(`verified-marker.ts must not fingerprint deleted helper ${deleted}`);
     }
   }
   const currentFingerprintBody = txt.match(

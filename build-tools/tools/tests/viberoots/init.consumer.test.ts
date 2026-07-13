@@ -39,13 +39,8 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
   );
   assert.match(stage0, /if \[\[ "\$\{NIX_PNPM_ALLOW_GENERATE:-\}" == "1" \]\]/);
   assert.match(stage0, /__vbr_flake_args\+=\(--impure\)/);
-  assert.match(stage0, /__vbr_stage0_prewarm_exact_pnpm_stores \|\| return 1/);
-  assert.match(stage0, /exact-pnpm-store-env --workspace-root "\$\{PWD\}"/);
-  assert.match(stage0, /NIX_PNPM_EXACT_STORE_MAP/);
-  assert.match(
-    stage0,
-    /if \[\[ -n "\$\{NIX_PNPM_EXACT_STORE_MAP:-\}" \|\| -n "\$\{NIX_PNPM_EXACT_STORE:-\}" \]\]/,
-  );
+  assert.doesNotMatch(stage0, /__vbr_stage0_prepare_final_pnpm_stores|prepare-final-pnpm-store/);
+  assert.doesNotMatch(stage0, /NIX_PNPM_EXACT_STORE/);
   assert.match(stage0, /! -f "\$\{__vbr_flake_input_root\}\/flake\.nix"/);
   assert.match(
     stage0,
@@ -85,6 +80,16 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
   assert.match(stage0, /__vbr_stage0_apply_nix_cache_health \|\| return 1/);
   assert.match(stage0, /error: viberoots workspace flake is missing\./);
   assert.match(stage0, /run: viberoots bootstrap-check --repair-if-needed/);
+}
+
+function assertConsumerFlakeAllowsPnpmProvisioningEnv(flake: string): void {
+  for (const name of [
+    "NIX_PNPM_ALLOW_GENERATE",
+    "NIX_PNPM_FETCH_TIMEOUT",
+    "NIX_PNPM_INSTALL_TIMEOUT",
+  ]) {
+    assert.match(flake, new RegExp(`"${name}"`));
+  }
 }
 
 async function withConsumerWorkspace(
@@ -256,17 +261,17 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     assert.match(buckconfig, /^ignore = .*\.direnv/m);
     await assertDirenvBootstrap(workspace);
     const rootFlake = await fsp.readFile(path.join(workspace, "flake.nix"), "utf8");
+    assertConsumerFlakeAllowsPnpmProvisioningEnv(rootFlake);
     assert.match(rootFlake, /if root != "" then builtins\.toPath root else \.\/\.;/);
     assert.match(rootFlake, new RegExp(`workspaceName = "${path.basename(workspace)}";`));
     await assert.rejects(fsp.lstat(path.join(workspace, "buck-out")));
-    assert.match(
-      await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
-      /path:\.\/viberoots-flake-input/,
+    const workspaceFlake = await fsp.readFile(
+      path.join(workspace, ".viberoots", "workspace", "flake.nix"),
+      "utf8",
     );
-    assert.match(
-      await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
-      /builtins\.getEnv "WORKSPACE_ROOT"/,
-    );
+    assertConsumerFlakeAllowsPnpmProvisioningEnv(workspaceFlake);
+    assert.match(workspaceFlake, /path:\.\/viberoots-flake-input/);
+    assert.match(workspaceFlake, /builtins\.getEnv "WORKSPACE_ROOT"/);
     const readme = await fsp.readFile(path.join(workspace, "README.md"), "utf8");
     assert.match(readme, /viberoots\/README\.md/);
     assert.match(readme, /Existing Checkout \/ New Workstation/);
@@ -2435,7 +2440,16 @@ async function visibleRootEntries(workspace: string): Promise<string[]> {
 test("viberoots/init preserves existing edited docs", async () => {
   await withConsumerWorkspace("viberoots-init-preserve", async (workspace) => {
     const fakeBin = path.join(workspace, ".fake-bin");
+    const fakeHome = path.join(workspace, ".fake-home");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.mkdir(path.join(fakeHome, ".nix-profile", "share", "nix-direnv"), {
+      recursive: true,
+    });
+    await fsp.writeFile(
+      path.join(fakeHome, ".nix-profile", "share", "nix-direnv", "direnvrc"),
+      "",
+      "utf8",
+    );
     await writeFakeWorkspaceLockNix(fakeBin);
     await fsp.mkdir(path.join(workspace, "projects"), { recursive: true });
     await fsp.mkdir(path.join(workspace, "projects", "config"), { recursive: true });
@@ -2468,6 +2482,7 @@ test("viberoots/init preserves existing edited docs", async () => {
     await execFileAsync(path.join(workspace, "viberoots", "init"), [], {
       cwd: workspace,
       env: envWithFakeNix(fakeBin, {
+        HOME: fakeHome,
         NO_DEV_SHELL: "1",
         VBR_INIT_USE_LOCAL_COMMAND: "1",
       }),
@@ -2502,7 +2517,16 @@ test("viberoots/init preserves existing edited docs", async () => {
 test("viberoots/init repairs stale generated workspace files", async () => {
   await withConsumerWorkspace("viberoots-init-repair", async (workspace) => {
     const fakeBin = path.join(workspace, ".fake-bin");
+    const fakeHome = path.join(workspace, ".fake-home");
     await fsp.mkdir(fakeBin, { recursive: true });
+    await fsp.mkdir(path.join(fakeHome, ".nix-profile", "share", "nix-direnv"), {
+      recursive: true,
+    });
+    await fsp.writeFile(
+      path.join(fakeHome, ".nix-profile", "share", "nix-direnv", "direnvrc"),
+      "",
+      "utf8",
+    );
     await writeFakeWorkspaceLockNix(fakeBin);
     await fsp.mkdir(path.join(workspace, ".viberoots", "workspace"), { recursive: true });
     await fsp.mkdir(path.join(workspace, ".viberoots", "bootstrap"), { recursive: true });
@@ -2529,6 +2553,7 @@ test("viberoots/init repairs stale generated workspace files", async () => {
     const { stderr } = await execFileAsync(path.join(workspace, "viberoots", "init"), [], {
       cwd: workspace,
       env: envWithFakeNix(fakeBin, {
+        HOME: fakeHome,
         NO_DEV_SHELL: "1",
         VBR_INIT_USE_LOCAL_COMMAND: "1",
       }),

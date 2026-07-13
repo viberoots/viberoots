@@ -35,7 +35,25 @@ test("langs.json valid passes validator", async () => {
       "viberoots/build-tools/tools/dev/validate-langs.ts",
       path.join(tmp, "viberoots/build-tools/tools/dev/validate-langs.ts"),
     );
-    const res = await $({ cwd: tmp })`node viberoots/build-tools/tools/dev/validate-langs.ts`;
+    const testNodeModules = String(process.env.ZX_TEST_NODE_MODULES_OUT || "").trim();
+    const tempToolEnv = {
+      ...process.env,
+      NODE_PATH: [
+        path.join(process.cwd(), "node_modules"),
+        testNodeModules
+          ? testNodeModules.endsWith("node_modules")
+            ? testNodeModules
+            : path.join(testNodeModules, "node_modules")
+          : "",
+        process.env.NODE_PATH || "",
+      ]
+        .filter(Boolean)
+        .join(path.delimiter),
+    };
+    const res = await $({
+      cwd: tmp,
+      env: tempToolEnv,
+    })`node viberoots/build-tools/tools/dev/validate-langs.ts`;
     assert.match(String(res.stdout), /langs\.json: OK/);
   });
 });

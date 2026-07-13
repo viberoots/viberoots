@@ -43,9 +43,10 @@ test("install path selects flake refs by importer scope", async () => {
 
   const linkNode = await read("tools/dev/install/link-node.ts");
   if (!linkNode.includes("const flakeRef = flakeRefForImporter(flakeRoot, importer);")) {
-    throw new Error(
-      "link-node.ts must derive flakeRef via flakeRefForImporter(flakeRoot, importer)",
-    );
+    throw new Error("link-node.ts must resolve the workspace flake by importer scope");
+  }
+  if (!linkNode.includes("makeFilteredFlakeRef(root, importer)")) {
+    throw new Error("link-node.ts must use an importer-scoped filtered snapshot for builds");
   }
   if (!linkNode.includes("buildFlakeRefBase")) {
     throw new Error("link-node.ts must choose importer-scoped build flake base");
@@ -136,8 +137,8 @@ test("install path selects flake refs by importer scope", async () => {
   }
 
   const nodeModulesBuild = await read("tools/dev/node-modules-build.ts");
-  if (!nodeModulesBuild.includes('".viberoots", "workspace", "flake.nix"')) {
-    throw new Error("node-modules-build.ts must detect strict hidden workspace flakes");
+  if (!nodeModulesBuild.includes("workspaceFlakeRoot")) {
+    throw new Error("node-modules-build.ts must prefer the generated workspace flake");
   }
   if (!nodeModulesBuild.includes('"projects", "node-modules.hashes.json"')) {
     throw new Error("node-modules-build.ts must read project-owned node module hashes");

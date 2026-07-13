@@ -23,11 +23,11 @@ test("node-modules-build reuses verified markers even when temp lockfiles are gi
   if (txt.includes("update-pnpm-hash.ts") || txt.includes("runPnpmHashUpdater")) {
     throw new Error("node-modules-build.ts must not invoke update-pnpm-hash from build paths");
   }
-  if (!txt.includes("run `i` to refresh pnpm hashes and prewarm exact pnpm stores")) {
-    throw new Error("node-modules-build.ts must tell operators to run `i` for stale state");
+  if (!txt.includes("run `u` to refresh pnpm hashes and materialize final pnpm stores")) {
+    throw new Error("node-modules-build.ts must tell operators to run `u` for stale state");
   }
-  if (!txt.includes("preparedExactStoreEnv(lockfileRel)")) {
-    throw new Error("node-modules-build.ts must consume exact stores prewarmed by `i`");
+  if (txt.includes("prepareFinalPnpmStore") || txt.includes("fetchExactPnpmStore")) {
+    throw new Error("node-modules-build.ts must not prewarm or import a candidate pnpm store");
   }
   if (
     !txt.includes("recoverOutPathFromLinkMarker(importer, lockfileRel)") ||

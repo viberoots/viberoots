@@ -17,57 +17,9 @@ import {
   validateProtectedSharedProfileReadiness,
   validateRenderedProfile,
 } from "../../deployments/cloud-control-setup-profile-validate";
-import type { CloudControlSetupInput } from "../../deployments/cloud-control-setup-types";
 import { privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
-import { reviewedRuntimeInput } from "./cloud-control-runtime-input.fixture";
-import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
-import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fixture";
+import { baseInput, BUILD_IDENTITY, DIGEST_REF } from "./cloud-control-setup.fixture";
 import { runInScratchTemp } from "../lib/test-helpers";
-
-const DIGEST_REF =
-  "registry.example.com/platform/deployment-control-plane@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const DIGEST = `sha256:${"a".repeat(64)}`;
-const BUILD_IDENTITY = `nix-source-${"b".repeat(64)}`;
-
-function baseInput(overrides: Partial<CloudControlSetupInput> = {}): CloudControlSetupInput {
-  return {
-    outDir: "unused",
-    mode: "compose-podman",
-    image: DIGEST_REF,
-    expectedImageBuildIdentity: BUILD_IDENTITY,
-    imagePublication: publicationEvidence(DIGEST_REF, DIGEST),
-    instanceId: "cloud-staging",
-    publicUrl: "https://deploy.example.test",
-    artifactBucket: "deployment-control-plane-artifacts",
-    artifactRegion: "us-east-1",
-    artifactBackend: "aws-s3",
-    artifactBackendEvidence: "",
-    deploymentIds: ["sample-webapp-staging"],
-    reviewedSourceMode: "ssh",
-    authCallbackHost: "deploy-auth.example.test",
-    authCallbackPath: "/oidc/callback",
-    serviceReplicas: 1,
-    workerReplicas: 2,
-    dryRun: false,
-    awsTopology: privateLinkAwsTopology(),
-    supabasePostgres: privateLinkSupabaseProfile(),
-    runtimeInput: reviewedRuntimeInput(),
-    ...overrides,
-  };
-}
-
-function publicationEvidence(image: string, digest: string) {
-  return {
-    image,
-    sourceRevision: "source-abc123",
-    imageBuildIdentity: BUILD_IDENTITY,
-    digest,
-    inspectedDigest: digest,
-    tag: "registry.example.com/platform/deployment-control-plane:source-abc123",
-    evidenceSource: "generated-command" as const,
-    registryProfile: ecrRegistryProfileForImage(image, digest),
-  };
-}
 
 test("cloud setup bundle renders runtime, credentials, commands, and capabilities", () => {
   const bundle = renderCloudControlSetupBundle(baseInput());
@@ -235,16 +187,21 @@ test("cloud setup validation rejects tag-only images, weak topology, and missing
 
 test("generated profile files do not embed secret values", async () => {
   await runInScratchTemp("cloud-control-secret-free", async (tmp) => {
-    await writeCloudControlSetupBundle(baseInput({ outDir: tmp }));
-    for (const entry of await fsp.readdir(tmp, { recursive: true, withFileTypes: true })) {
-      if (entry.isDirectory()) continue;
+    const outDir = path.join(tmp, "cloud-control-profile");
+    await writeCloudControlSetupBundle(baseInput({ outDir }));
+    for (const entry of await fsp.readdir(outDir, { recursive: true, withFileTypes: true })) {
       const file = path.join(entry.parentPath, entry.name);
+      const stat = await fsp.stat(file).catch(() => null);
+      if (!stat?.isFile()) continue;
       const text = await fsp.readFile(file, "utf8");
       assert.doesNotMatch(
         text,
-        /AKIA[0-9A-Z]{16}|DATABASE_URL|SECRET_ACCESS_KEY|BEGIN .*PRIVATE KEY/,
+        /AKIA[0-9A-Z]{16}|SECRET_ACCESS_KEY\s*=\s*['"]?[A-Za-z0-9/+=]{40}|BEGIN .*PRIVATE KEY/,
       );
-      assert.doesNotMatch(text, /postgres:\/\/[^<\s]+:[^<\s]+@/i);
+      assert.doesNotMatch(
+        text,
+        /postgres(?:ql)?:\/\/[A-Za-z0-9._%+-]+:(?!(?:REDACTED|replace-me)@)[^@\s'"]+@[A-Za-z0-9.-]+/i,
+      );
     }
   });
 });

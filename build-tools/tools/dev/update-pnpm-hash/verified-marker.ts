@@ -34,10 +34,8 @@ const pnpmStoreBuilderFingerprintFiles = [
 
 const exactStoreProvisioningFingerprintFiles = [
   ...pnpmStoreBuilderFingerprintFiles,
-  "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
-  "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-fetch.ts",
-  "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-import.ts",
-  "viberoots/build-tools/tools/dev/update-pnpm-hash/prefetched-store.ts",
+  "viberoots/build-tools/tools/dev/update-pnpm-hash/fixed-store-reconcile.ts",
+  "viberoots/build-tools/tools/dev/update-pnpm-hash/nix.ts",
 ] as const;
 
 async function readFingerprintFile(repoRoot: string, rel: string): Promise<string> {

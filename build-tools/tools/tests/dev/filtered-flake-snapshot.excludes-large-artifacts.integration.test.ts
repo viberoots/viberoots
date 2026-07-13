@@ -13,7 +13,10 @@ async function readTool(rel: string): Promise<string> {
 
 test("filtered flake snapshot excludes large generated artifacts", async () => {
   const updaterHelper = await readTool("tools/dev/update-pnpm-hash/filtered-flake.ts");
-  const selectedHelper = await readTool("tools/dev/filtered-flake.ts");
+  const selectedHelper = [
+    await readTool("tools/dev/filtered-flake.ts"),
+    await readTool("tools/dev/filtered-flake-viberoots-input.ts"),
+  ].join("\n");
   const helper = await readTool("tools/dev/nix-build-filtered-flake.ts");
   const required = [
     "coverage",
@@ -99,11 +102,15 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     ["selected-build filtered snapshot", selectedHelper],
     ["nix-build-filtered-flake snapshot", helper],
   ] as const) {
+    const usesPrefetch =
+      source.includes("flake prefetch --json") || source.includes('"flake", "prefetch", "--json"');
+    const usesHashPath =
+      source.includes("hash path --sri") || source.includes('"hash", "path", "--sri"');
     if (
       !source.includes("lockPathInput") ||
       !source.includes("narHash") ||
-      !source.includes("flake prefetch --json") ||
-      !source.includes("hash path --sri")
+      !usesPrefetch ||
+      !usesHashPath
     ) {
       throw new Error(
         `${name} must prefetch and write hash-bearing path locks for local-file verification`,
@@ -193,9 +200,9 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
       "nix-build-filtered-flake must resolve the nix command from the same env passed to nix",
     );
   }
-  if (!helper.includes("resolveExactPrefetchedStore")) {
+  if (!helper.includes("resolveFinalPnpmStore")) {
     throw new Error(
-      "nix-build-filtered-flake must reuse realized fixed pnpm stores before exact-store prep",
+      "nix-build-filtered-flake must materialize committed final pnpm stores before Nix builds",
     );
   }
   if (helper.includes("import { prepareExactPnpmStore }")) {

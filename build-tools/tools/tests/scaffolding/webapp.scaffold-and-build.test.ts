@@ -8,6 +8,7 @@ import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
 } from "../lib/test-helpers/git-stage";
+import { resolveFinalPnpmStore } from "../../dev/update-pnpm-hash/realized-store";
 import { viberootsDevTool } from "./lib/viberoots-tools";
 
 const TEST_TIMEOUT_MS =
@@ -49,7 +50,6 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
         await fsp.rm(path.join(appAbs, "node_modules"), { recursive: true, force: true });
       } catch {}
       const lockfile = path.join(importer, "pnpm-lock.yaml");
-      // No pnpm prefetch; Nix FOD handles it hermetically
       const sanitized = importer
         .replace(/\/\//g, "")
         .replace(/:/g, "-")
@@ -63,25 +63,36 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
         stdio: "inherit",
         env: { ...envWithPrefetch },
       })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${lockfile}`;
+      const flakeRef = await workspaceFlakeRef(tmp);
+      const fixedStore = await resolveFinalPnpmStore({
+        repoRoot: tmp,
+        importer,
+        flakeRef: `path:${flakeRef}`,
+        attrPath: `pnpm-store.${sanitized}`,
+      });
       const nixOut = await (async () => {
-        const mj = String(process.env.NIX_MAX_JOBS || "0");
-        const cr = String(process.env.NIX_CORES || "0");
-        const cmd = [
-          "set -euo pipefail;",
-          "nix build",
-          `"path:${await workspaceFlakeRef(tmp)}#node-webapp.${sanitized}"`,
-          '--impure --no-link --accept-flake-config --builders "" --print-build-logs',
-          mj && mj !== "0" ? `--max-jobs ${mj}` : "",
-          cr && cr !== "0" ? `--option cores ${cr}` : "",
-          "--print-out-paths",
-        ]
-          .filter(Boolean)
-          .join(" ");
-        return await $({
-          stdio: "pipe",
-          cwd: tmp,
-          env: envWithPrefetch,
-        })`bash --noprofile --norc -c ${cmd}`;
+        try {
+          const mj = String(process.env.NIX_MAX_JOBS || "0");
+          const cr = String(process.env.NIX_CORES || "0");
+          const cmd = [
+            "set -euo pipefail;",
+            "nix build",
+            `"path:${flakeRef}#node-webapp.${sanitized}"`,
+            '--no-link --accept-flake-config --builders "" --print-build-logs',
+            mj && mj !== "0" ? `--max-jobs ${mj}` : "",
+            cr && cr !== "0" ? `--option cores ${cr}` : "",
+            "--print-out-paths",
+          ]
+            .filter(Boolean)
+            .join(" ");
+          return await $({
+            stdio: "pipe",
+            cwd: tmp,
+            env: process.env,
+          })`bash --noprofile --norc -c ${cmd}`;
+        } finally {
+          await fixedStore.cleanup();
+        }
       })();
       const outPath =
         String(nixOut.stdout || "")

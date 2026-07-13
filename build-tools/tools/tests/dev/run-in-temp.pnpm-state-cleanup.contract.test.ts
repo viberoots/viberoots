@@ -44,17 +44,11 @@ test("external pnpm state records exact ownership for orphan cleanup", async () 
   if (!statePaths.includes("export async function removeExternalPnpmStateDir")) {
     throw new Error("external pnpm state must expose exact-scope cleanup");
   }
-  if (!statePaths.includes("pruneExactPnpmStateDirs(base)")) {
-    throw new Error("orphan cleanup must also prune stale exact pnpm caches");
+  if (!statePaths.includes('if (entry.name === "final-fod") continue')) {
+    throw new Error("orphan cleanup must leave transient final-FOD lock state to its owner");
   }
-  if (!statePaths.includes("liveLockHashes") || !statePaths.includes("exact-index")) {
-    throw new Error("exact pnpm cache pruning must account for live exact-index ownership");
-  }
-  if (!statePaths.includes('nixStorePath.startsWith("/nix/store/")')) {
-    throw new Error("exact pnpm cache pruning must drop markers for GC'd Nix store paths");
-  }
-  if (!statePaths.includes("VBR_EXACT_PNPM_INCOMPLETE_TTL_MS")) {
-    throw new Error("exact pnpm cache pruning must bound stale incomplete preparations");
+  if (statePaths.includes("exact-index") || statePaths.includes("ready.json")) {
+    throw new Error("pnpm state cleanup must not retain the retired exact-store index protocol");
   }
   if (!statePaths.includes("pathExists(scopeAbs)")) {
     throw new Error("orphan cleanup must preserve state whose exact scopeAbs still exists");

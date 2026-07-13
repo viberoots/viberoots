@@ -253,30 +253,6 @@ __vbr_stage0_prune_workspace_flake_generated_roots() {
   done
 }
 
-__vbr_stage0_prewarm_exact_pnpm_stores() {
-  [[ -z "\${NIX_PNPM_EXACT_STORE_MAP:-}" && -z "\${NIX_PNPM_EXACT_STORE:-}" ]] || return 0
-  [[ "\${NIX_PNPM_ALLOW_GENERATE:-}" != "1" ]] || return 0
-  [[ -f "\${PWD}/.viberoots/workspace/flake.nix" ]] || return 0
-  command -v nix >/dev/null 2>&1 || return 0
-
-  local app_ref
-  if [[ -n "\${__vbr_flake_input_root:-}" && -f "\${__vbr_flake_input_root}/flake.nix" ]]; then
-    app_ref="path:\${__vbr_flake_input_root}#viberoots"
-  else
-    app_ref="path:\${PWD}/.viberoots/workspace#viberoots"
-  fi
-
-  local exact_env
-  if ! exact_env="$(nix run --quiet --accept-flake-config --no-write-lock-file "\${app_ref}" -- exact-pnpm-store-env --workspace-root "\${PWD}")"; then
-    echo "error: failed to prewarm exact pnpm stores for locked devshell materialization." 1>&2
-    echo "repair: run viberoots update in a development checkout and commit any deterministic metadata changes." 1>&2
-    return 1
-  fi
-  if [[ -n "\${exact_env}" ]]; then
-    eval "\${exact_env}"
-  fi
-}
-
 __vbr_flake_args=()
 __vbr_flake_input_is_generated_filtered=0
 __vbr_flake_input_root="\${VIBEROOTS_FLAKE_INPUT_ROOT:-}"
@@ -370,15 +346,9 @@ watch_file .viberoots/workspace/flake.nix
 watch_file .viberoots/workspace/flake.lock
 [[ -f viberoots/flake.nix ]] && watch_file viberoots/flake.nix
 
-__vbr_stage0_prewarm_exact_pnpm_stores || return 1
-
 if [[ "\${NIX_PNPM_ALLOW_GENERATE:-}" == "1" ]]; then
   __vbr_flake_args+=(--impure)
 fi
-if [[ -n "\${NIX_PNPM_EXACT_STORE_MAP:-}" || -n "\${NIX_PNPM_EXACT_STORE:-}" ]]; then
-  __vbr_flake_args+=(--impure)
-fi
-
 use flake "path:\${PWD}/.viberoots/workspace#default" --accept-flake-config --no-write-lock-file "\${__vbr_flake_args[@]}"
 if [[ -n "\${__vbr_source_root:-}" && -d "\${PWD}/viberoots" ]]; then
   __vbr_source_real="$(cd "\${__vbr_source_root}" && pwd -P 2>/dev/null || true)"
@@ -395,6 +365,6 @@ if [[ -n "\${__vbr_source_root:-}" && -d "\${PWD}/viberoots" ]]; then
   unset __vbr_source_real __vbr_local_real
 fi
 unset __vbr_flake_input_root __vbr_source_root __vbr_flake_args
-unset -f __vbr_stage0_strip_nix_cache_overrides __vbr_stage0_apply_nix_cache_health __vbr_stage0_filtered_viberoots_input __vbr_stage0_align_workspace_flake_input __vbr_stage0_prune_workspace_flake_generated_roots __vbr_stage0_prewarm_exact_pnpm_stores
+unset -f __vbr_stage0_strip_nix_cache_overrides __vbr_stage0_apply_nix_cache_health __vbr_stage0_filtered_viberoots_input __vbr_stage0_align_workspace_flake_input __vbr_stage0_prune_workspace_flake_generated_roots
 `;
 }

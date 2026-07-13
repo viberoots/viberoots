@@ -27,8 +27,6 @@ test("direct buck-out tmp helper writers use macOS metadata exclusion helper", a
     "build-tools/tools/dev/run-runnable-graph.ts",
     "build-tools/tools/dev/run-runnable-nix.ts",
     "build-tools/tools/dev/sync-module-contracts-core.ts",
-    "build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
-    "build-tools/tools/dev/update-pnpm-hash/exact-store-import.ts",
     "build-tools/tools/dev/update-pnpm-hash/filtered-flake.ts",
     "build-tools/tools/dev/update-pnpm-hash/prefetched-store.ts",
     "build-tools/tools/dev/update-pnpm-hash/verified-marker.ts",

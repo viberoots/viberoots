@@ -24,7 +24,7 @@ export async function withHeartbeat<T>(
     const elapsed = Math.floor((Date.now() - started) / 1000);
     const activity = opts?.activity;
     if (!activity) {
-      console.log(`[update-pnpm-hash] phase=${label} elapsed=${elapsed}s`);
+      console.error(`[update-pnpm-hash] phase=${label} elapsed=${elapsed}s`);
       return;
     }
     const now = Date.now();
@@ -36,7 +36,7 @@ export async function withHeartbeat<T>(
     if (bytes > lastBytes) {
       lastBytes = bytes;
       const last = activity.lastEventSnippet || "<activity>";
-      console.log(
+      console.error(
         `[update-pnpm-hash] phase=${label} elapsed=${elapsed}s status=progress child_pid=${childPid} child_alive=${childAlive} bytes=${bytes} last_event_ago=${silentForSec}s last_event="${last}"`,
       );
       return;
@@ -48,7 +48,7 @@ export async function withHeartbeat<T>(
     if (bucket <= lastNoOutputBucket) return;
     lastNoOutputBucket = bucket;
     const stall = silentForSec >= noOutputWarnSec ? " no_output_window_exceeded=true" : "";
-    console.log(
+    console.error(
       `[update-pnpm-hash] phase=${label} elapsed=${elapsed}s status=waiting-for-output child_pid=${childPid} child_alive=${childAlive} bytes=${bytes} no_output_for=${silentForSec}s${stall}`,
     );
   }, 15000);

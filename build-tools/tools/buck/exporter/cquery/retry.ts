@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { runManagedCommand } from "../../../lib/managed-command";
 
 export function isRetryableCqueryError(msg: string): boolean {
   const text = String(msg || "");
@@ -23,14 +24,16 @@ export function isRetryableCqueryError(msg: string): boolean {
 export async function resetBuckDaemon(cwd: string, iso: string): Promise<void> {
   if (!iso) return;
   try {
-    await $({
+    await runManagedCommand({
+      command: "buck2",
+      args: ["--isolation-dir", iso, "kill"],
       cwd,
-      stdio: "pipe",
       env: {
         ...process.env,
         HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
         SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
       },
-    })`buck2 --isolation-dir ${iso} kill`.nothrow();
+      timeoutMs: 30_000,
+    });
   } catch {}
 }

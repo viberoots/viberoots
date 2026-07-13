@@ -62,12 +62,6 @@ def _node_nix_test_impl(ctx):
         + "export VBR_SKIP_REQUIRE_UNIFIED_PNPM_STORE=0; "
         + "export VBR_STREAM_NIX_BUILD_LOGS=\"${VBR_STREAM_NIX_BUILD_LOGS:-1}\"; "
         + nix_bootstrap_env_pnpm_store()
-        + ("echo '[node_nix_test] phase=prepare-exact-store target=%s importer=%s' >&2; " % (target_label, imp))
-        + ("EXACT_PNPM_STORE_RAW=$(cd \"$WORKSPACE_ROOT\" && node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$VIBEROOTS_ROOT/build-tools/tools/dev/prepare-exact-pnpm-store.ts\" --importer \"%s\"); " % imp)
-        + "EXACT_PNPM_STORE=$(printf '%s\\n' \"$EXACT_PNPM_STORE_RAW\" | awk '/^\\/nix\\/store\\// { found=$0 } END { print found }'); "
-        + "export NIX_PNPM_EXACT_STORE=\"$EXACT_PNPM_STORE\"; "
-        + "echo '[node_nix_test] exact-store='$NIX_PNPM_EXACT_STORE >&2; "
-        + "case \"$NIX_PNPM_EXACT_STORE\" in /nix/store/*) ;; *) echo '[node_nix_test] exact-store must be a /nix/store path' >&2; exit 2 ;; esac; "
         + "NIX_MAXJ=\"${NIX_MAX_JOBS:-0}\"; NIX_CORES=\"${NIX_CORES:-0}\"; "
         + "JOBS_FLAG=\"\"; if [ -n \"$NIX_MAXJ\" ] && [ \"$NIX_MAXJ\" != \"0\" ]; then JOBS_FLAG=\"--max-jobs $NIX_MAXJ\"; fi; "
         + "CORES_FLAG=\"\"; if [ -n \"$NIX_CORES\" ] && [ \"$NIX_CORES\" != \"0\" ]; then CORES_FLAG=\"--option cores $NIX_CORES\"; fi; "
@@ -95,7 +89,6 @@ def _node_nix_test_impl(ctx):
         ctx.attrs._command_heartbeat,
         ctx.attrs._graph_json,
         ctx.attrs._nix_build_filtered_flake,
-        ctx.attrs._prepare_exact_pnpm_store,
         ctx.attrs._workspace_root_env,
         ctx.attrs._zx_init,
     ]
@@ -109,7 +102,6 @@ def _node_nix_test_impl(ctx):
             ctx.attrs._command_heartbeat,
             ctx.attrs._graph_json,
             ctx.attrs._nix_build_filtered_flake,
-            ctx.attrs._prepare_exact_pnpm_store,
             ctx.attrs._workspace_root_env,
             ctx.attrs._zx_init,
         ] + snapshot_inputs,
@@ -158,7 +150,6 @@ _NODE_NIX_TEST_ATTRS = {
         "_command_heartbeat": attrs.source(default = "@viberoots//build-tools/tools/dev:command-heartbeat.ts"),
         "_graph_json": attrs.source(default = "workspace_buck//:graph.json"),
         "_nix_build_filtered_flake": attrs.source(default = "@viberoots//build-tools/tools/dev:nix-build-filtered-flake.ts"),
-        "_prepare_exact_pnpm_store": attrs.source(default = "@viberoots//build-tools/tools/dev:prepare-exact-pnpm-store.ts"),
         "_workspace_root_env": attrs.source(default = "workspace_buck//:workspace-root.env"),
         "_zx_init": attrs.source(default = "@viberoots//build-tools/tools/dev:zx-init.mjs"),
     }

@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runNixBuildWithTransientRetry } from "./build-selected-nix-retry";
@@ -15,12 +16,55 @@ import { untrackedRequiresImpureForTargets } from "./dev-build/untracked";
 import { targetPackageFromLabel } from "./build-selected-helpers";
 import { parseSelectedBuildOutPath, selectedNixBuildArgs } from "./build-selected-nix-command";
 import { makeFilteredFlakeRef } from "./filtered-flake";
-import { resolveExactPrefetchedStore } from "./update-pnpm-hash/realized-store";
+import { resolveFinalPnpmStore } from "./update-pnpm-hash/realized-store";
 import { pnpmStoreAttrFromImporter } from "./update-pnpm-hash/paths";
 import { withSanitizedInheritedNixConfig } from "../lib/nix-config-env";
 import { resolveSelectedTargetLabel } from "./target-label-resolver";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 import { buildToolPath, zxInitPath } from "./dev-build/paths";
+
+async function runCommand(opts: {
+  command: string;
+  args: string[];
+  cwd?: string;
+  env?: NodeJS.ProcessEnv;
+  allowFailure?: boolean;
+}): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  return await new Promise((resolve, reject) => {
+    const proc = spawn(opts.command, opts.args, {
+      cwd: opts.cwd,
+      env: opts.env || process.env,
+      stdio: "pipe",
+    });
+    let stdout = "";
+    let stderr = "";
+    proc.stdout?.on("data", (chunk) => (stdout += String(chunk)));
+    proc.stderr?.on("data", (chunk) => (stderr += String(chunk)));
+    proc.on("error", reject);
+    proc.on("exit", (code, signal) => {
+      const exitCode = code ?? 1;
+      if (exitCode === 0 || opts.allowFailure) {
+        resolve({ exitCode, stdout, stderr });
+        return;
+      }
+      const suffix = signal ? ` (signal ${signal})` : "";
+      const details = [stderr, stdout]
+        .map((value) => value.trim())
+        .filter(Boolean)
+        .join("\n");
+      reject(
+        Object.assign(
+          new Error(
+            `${path.basename(opts.command)} exited with code ${exitCode}${suffix}${
+              details ? `\n${details}` : ""
+            }`,
+          ),
+          { exitCode, stdout, stderr },
+        ),
+      );
+    });
+  });
+}
 
 async function workspaceFlakeDir(workspaceRoot: string): Promise<string> {
   const hidden = path.join(workspaceRoot, ".viberoots", "workspace");
@@ -98,23 +142,27 @@ async function chooseFlakeRef(opts: {
   if (opts.sourceMode === "git")
     return { flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected") };
   try {
-    const { stdout } = await $({
-      stdio: "pipe",
+    const { stdout } = await runCommand({
+      command: "git",
+      args: ["ls-files", "--others", "--exclude-standard"],
       cwd: opts.workspaceRoot,
-    })`git ls-files --others --exclude-standard`
-      .nothrow()
-      .quiet();
+      allowFailure: true,
+    });
     const untracked = String(stdout || "")
       .trim()
       .split("\n")
       .map((x) => x.trim())
       .filter(Boolean);
     if (untracked.length === 0)
-      return { flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected") };
+      return {
+        flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected"),
+      };
     const targetPackages = [targetPackageFromLabel(opts.target)].filter(Boolean);
     const decision = untrackedRequiresImpureForTargets({ untracked, targetPackages });
     if (!decision.requiresImpure)
-      return { flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected") };
+      return {
+        flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected"),
+      };
     console.error(
       "[build-selected] Falling back to path flake source due to relevant untracked files:",
     );
@@ -240,16 +288,15 @@ async function main() {
     graphPath,
   });
   const targetImporter = targetPackageFromLabel(target);
-  const exactStore =
+  const fixedStore =
     targetImporter && (await pathExists(path.join(workspaceRoot, targetImporter, "pnpm-lock.yaml")))
-      ? await resolveExactPrefetchedStore({
+      ? await resolveFinalPnpmStore({
           repoRoot: workspaceRoot,
           importer: targetImporter,
           flakeRef: flakeSource.flakeRef,
           attrPath: pnpmStoreAttrFromImporter(targetImporter),
         })
       : null;
-  if (exactStore) sanitizedEnv.NIX_PNPM_EXACT_STORE = exactStore.exactStorePath;
   const nixTrace = exporterDebug === "1" ? "--show-trace" : "";
   const runOnce = async () => {
     const env = flakeSource.workspaceRoot
@@ -259,23 +306,34 @@ async function main() {
           BUCK_GRAPH_JSON: path.join(flakeSource.workspaceRoot, DEFAULT_GRAPH_PATH),
         }
       : sanitizedEnv;
-    return await $({
+    const args = selectedNixBuildArgs({
+      flakeRef: flakeSource.flakeRef,
+      showTrace: Boolean(nixTrace),
+    });
+    const command = args[0] || "nix";
+    return await runCommand({
+      command,
+      args: args.slice(1),
       env,
-      reject: false,
-      nothrow: true,
-    })`${selectedNixBuildArgs({ flakeRef: flakeSource.flakeRef, showTrace: Boolean(nixTrace) })}`;
+      allowFailure: true,
+    });
   };
   let attempt: any;
   try {
     attempt = await runNixBuildWithTransientRetry({ runOnce });
   } finally {
-    await exactStore?.cleanup();
+    await fixedStore?.cleanup();
     await flakeSource.cleanup?.();
   }
-  const { stdout, exitCode } = attempt;
+  const { stdout, stderr, exitCode } = attempt;
   if (exitCode !== 0) {
+    const detail = [stderr, stdout]
+      .map((value) => String(value || "").trim())
+      .filter(Boolean)
+      .join("\n");
     console.error(
       "[build-selected] nix build failed.\n" +
+        (detail ? `${detail}\n` : "") +
         `Ensure ${graphPath} includes the requested target and re-run glue export.`,
     );
     process.exit(exitCode || 1);

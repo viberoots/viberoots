@@ -29,6 +29,12 @@ import { checkBootstrapCompletion } from "../../lib/bootstrap-completion";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { repairGeneratedWorkspaceLock } from "../../lib/workspace-lock-repair";
 import { envWithResolvedNixBin } from "../../lib/tool-paths";
+import { glueFingerprintFresh } from "./glue-freshness";
+import {
+  assertCppTrackedMetadataReady,
+  installMetadataMode,
+  staleMetadataError,
+} from "./metadata-mode";
 
 type Flags = {
   force: boolean;
@@ -175,9 +181,9 @@ else ui.heading("viberoots install");
 const effSkipGoTidy =
   skipGoTidy || (glueOnly && String(process.env.INSTALL_DEPS_SKIP_GO_TIDY || "") !== "0");
 const repoRoot = await resolveWorkspaceRoot();
-const refreshPnpmHashes =
-  String(process.env.VBR_INSTALL_REFRESH_PNPM_HASHES || "").trim() === "1" ||
-  String(process.env.VBR_BOOTSTRAP_PNPM_GENERATE || "").trim() === "1";
+const metadataMode = installMetadataMode();
+const refreshPnpmHashes = metadataMode === "reconcile";
+const readOnlyMetadata = metadataMode === "read-only";
 await checkBootstrapCompletion({
   workspaceRoot: repoRoot,
   repair: !dryRun,
@@ -257,7 +263,21 @@ if (dryRun) {
         console.log("[install-deps] lock acquired");
       }
       try {
-        await runGeneratedWorkspaceLockRepair({ repoRoot, dryRun, verbose, phase: "initial" });
+        if (readOnlyMetadata) {
+          const lockState = await repairGeneratedWorkspaceLock({
+            workspaceRoot: repoRoot,
+            dryRun: true,
+            verbose,
+          });
+          if (lockState.status === "would-repair") {
+            throw staleMetadataError(
+              ".viberoots/workspace/flake.lock",
+              "generated workspace viberoots lock input requires reconciliation",
+            );
+          }
+        } else {
+          await runGeneratedWorkspaceLockRepair({ repoRoot, dryRun, verbose, phase: "initial" });
+        }
         const activeLockfiles = importers.map((imp) =>
           imp === "viberoots" ? "pnpm-lock.yaml" : path.join(imp, "pnpm-lock.yaml"),
         );
@@ -368,18 +388,50 @@ try {
 } catch {}
 // Generate gomod2nix.toml at repo root (if present) and per project (projects/apps/*, projects/libs/*)
 if (!skipGoTidy) {
-  await runGoModTidyForMissingSum(repoRoot, dryRun, verbose);
+  await runGoModTidyForMissingSum(repoRoot, dryRun, verbose, readOnlyMetadata);
 } else if (verbose) {
   console.log("[skip] go mod tidy for missing go.sum");
 }
 // Invoke root gomod2nix regardless; the generator prints a clear skip or dry-run line
 try {
-  await runGomod2nixGenerate(dryRun, verbose);
-} catch {}
-await runGomod2nixScanAll(dryRun, verbose);
+  await runGomod2nixGenerate(dryRun, verbose, readOnlyMetadata);
+} catch (error) {
+  if (readOnlyMetadata) throw error;
+}
+await runGomod2nixScanAll(dryRun, verbose, readOnlyMetadata);
 // Best-effort Python lock refresh (uv). No-ops if no uv.lock present.
-await runUvRefreshAll(dryRun, verbose);
-if (!skipGlue) {
+await runUvRefreshAll(dryRun, verbose, readOnlyMetadata);
+if (!skipGlue && readOnlyMetadata) {
+  await assertCppTrackedMetadataReady(repoRoot);
+  const freshness = await glueFingerprintFresh(repoRoot);
+  const trackedGlueOutputs = [
+    buildToolPath(repoRoot, "lang/importer_roots.bzl"),
+    buildToolPath(repoRoot, "tools/nix/langs.nix"),
+    buildToolPath(repoRoot, "lang/nix_attr_aliases.bzl"),
+  ];
+  const trackedGlueOutputsPresent = (
+    await Promise.all(
+      trackedGlueOutputs.map((file) =>
+        fsp.access(file).then(
+          () => true,
+          () => false,
+        ),
+      ),
+    )
+  ).every(Boolean);
+  if (
+    freshness.reason === "missing-or-invalid-fingerprint" ||
+    (freshness.reason === "missing-output" && trackedGlueOutputsPresent)
+  ) {
+    if (!dryRun) await writeGlueFingerprint(repoRoot);
+    if (verbose) console.log("[install-deps] recorded committed provider/glue baseline");
+  } else if (!freshness.fresh) {
+    throw staleMetadataError(
+      "generated provider/glue metadata",
+      `provider/glue metadata requires reconciliation (${freshness.reason})`,
+    );
+  }
+} else if (!skipGlue) {
   const prevSkipPnpmHash = process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
   process.env.INSTALL_GLUE_SKIP_PNPM_HASH = "1";
   try {
@@ -394,7 +446,9 @@ if (!skipGlue) {
 } else if (verbose) {
   console.log("[skip] glue regeneration");
 }
-await syncModuleContractsForWebapps(repoRoot, importers, dryRun, verbose);
+if (!readOnlyMetadata) {
+  await syncModuleContractsForWebapps(repoRoot, importers, dryRun, verbose);
+}
 if (!skipGlue) {
   await warnNodeDepsInLocal(repoRoot);
   await warnNodePatchRequirementsInLocal(repoRoot);
@@ -422,7 +476,7 @@ await ensureInstallSecretReadiness({
     keychainServiceName,
   },
 });
-if (!dryRun && shouldRunFinalWorkspaceLockRepair()) {
+if (!dryRun && !readOnlyMetadata && shouldRunFinalWorkspaceLockRepair()) {
   await withExclusiveInstallLock(
     "workspace-lock-repair",
     async () => {

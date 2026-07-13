@@ -3,7 +3,8 @@ import fs from "fs-extra";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { resolveFinalPnpmStore } from "../../dev/update-pnpm-hash/realized-store";
 import { viberootsDevTool } from "./lib/viberoots-tools";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
@@ -51,10 +52,19 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
     await $`bash --noprofile --norc -c 'test -f projects/libs/demo/pnpm-lock.yaml'`;
 
     // Align the fixed-output hash mapping for this importer before running nix_node_test.
+    const importer = "projects/libs/demo";
     await $({
       stdio: "inherit",
       env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
-    })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile projects/libs/demo/pnpm-lock.yaml`;
+    })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${importer}/pnpm-lock.yaml`;
+    const flakeRef = await workspaceFlakeRef(tmp);
+    const fixedStore = await resolveFinalPnpmStore({
+      repoRoot: tmp,
+      importer,
+      flakeRef: `path:${flakeRef}`,
+      attrPath: "pnpm-store.projects-libs-demo",
+    });
+    const fixedStoreEnv = { ...process.env };
 
     // Confirm Nix sees the importer lockfile path
     await $({
@@ -69,11 +79,17 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
     await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
 
     // Target should exist and test should pass (no tests matched → success)
-    await $({
-      stdio: "inherit",
-    })`buck2 targets --target-platforms prelude//platforms:default //projects/libs/demo:unit`;
-    await $({
-      stdio: "inherit",
-    })`buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit`;
+    try {
+      await $({
+        stdio: "inherit",
+        env: fixedStoreEnv,
+      })`buck2 targets --target-platforms prelude//platforms:default //projects/libs/demo:unit`;
+      await $({
+        stdio: "inherit",
+        env: fixedStoreEnv,
+      })`buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit`;
+    } finally {
+      await fixedStore.cleanup();
+    }
   });
 });

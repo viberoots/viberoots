@@ -5,10 +5,6 @@ export async function withPnpmStoreBuildFlakeRef<T>(
   opts: { repoRoot: string; importer: string; baseFlakeRef: string },
   fn: (buildFlakeRef: string, filteredEnv?: Record<string, string>) => Promise<T>,
 ): Promise<T> {
-  if (opts.importer === ".") {
-    return await fn(opts.baseFlakeRef);
-  }
-
   const filtered = await withHeartbeat(
     `importer=${opts.importer} step=prepare-filtered-flake`,
     makeFilteredFlakeRef({ repoRoot: opts.repoRoot, attr: "pnpm", importer: opts.importer }),

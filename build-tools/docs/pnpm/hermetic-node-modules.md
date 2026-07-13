@@ -14,8 +14,9 @@ This document captures the exact approach we use to make `node_modules` immutabl
 ## Architecture
 
 - **pnpm-store (fixed‑output derivation, FOD)**
-  - Runs `pnpm fetch --frozen-lockfile` to prefetch all tarballs referenced by `pnpm-lock.yaml` into `$out/store`.
+  - Explicit reconciliation runs pinned `pnpm fetch --frozen-lockfile` inside the FOD to prefetch all tarballs referenced by `pnpm-lock.yaml` into `$out/store`.
   - Uses a fixed `outputHash` keyed by the lockfile to make the store content‑addressed and cacheable.
+  - Ordinary install, post-clone, link, and devshell paths only validate the committed realized FOD; they never enable fetch or reconciliation.
 
 - **node-modules (derivation)**
   - Uses the prefetched store via `pnpm install --offline --frozen-lockfile` to materialize `node_modules` and `.pnpm`.
@@ -152,11 +153,19 @@ devShells.default = pkgs.mkShell {
 };
 ```
 
-Helper to auto‑update the FOD hash when the lockfile changes:
+Explicit helper to reconcile the FOD hash and realized output when the lockfile changes:
 
 ```bash
 build-tools/tools/dev/update-pnpm-hash.ts
 ```
+
+Ordinary `i` materialization invokes this helper in read-only mode. It may realize and link ignored
+local state, but it does not regenerate a lockfile or rewrite pnpm hash metadata. If the committed
+lock or hash metadata is stale, or its fixed store output is absent, installation fails closed,
+names the stale input, and reports `repair: run u`. Intentional reconciliation owns the committed
+fixed-store hash and realized output authority. It accepts one targeted Nix hash mismatch, refreshes
+the filtered input after the hash write, and verifies the result before success. Scaffold flows must
+run that reconciliation before their first locked/offline materialization.
 
 ---
 

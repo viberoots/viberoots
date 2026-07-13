@@ -1,11 +1,10 @@
-import { prepareExactPnpmStore, withExactPrefetchedStore } from "./exact-store";
 import { makeFilteredFlakeRef as makeScopedFilteredFlakeRef } from "./filtered-flake";
 import {
   ensureImporterLockfileFresh,
   ensureImporterLockfileFreshIfAllowed,
   generateImporterLockfile,
 } from "./importer-lockfile";
-import { withResolvedExactPrefetchedStore } from "./realized-store";
+import { withResolvedFinalPnpmStore } from "./realized-store";
 
 export async function makeFilteredFlakeRef(
   repoRoot: string,
@@ -26,7 +25,5 @@ export {
   ensureImporterLockfileFresh,
   ensureImporterLockfileFreshIfAllowed,
   generateImporterLockfile,
-  prepareExactPnpmStore,
-  withExactPrefetchedStore,
-  withResolvedExactPrefetchedStore,
+  withResolvedFinalPnpmStore,
 };

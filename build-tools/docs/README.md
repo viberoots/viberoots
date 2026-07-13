@@ -11,11 +11,21 @@ owning package under [`../../projects/`](../../projects/).
 
 ## Current References
 
+Ordinary `i` and post-clone materialize from committed metadata without changing tracked files.
+Stale pnpm, Go, uv, C++ provider/glue, or generated workspace-lock state fails closed, names the
+stale file, and reports `repair: run u`. Source-mode or viberoots pin drift instead reports
+`repair: run viberoots update`. A scaffold that creates dependency inputs must complete its
+intentional prewarm/reconciliation step before read-only installation.
+
 - [`build-system-design.md`](build-system-design.md): main Buck2/Nix architecture reference.
 - [`nixpkgs-source-selection-design.md`](nixpkgs-source-selection-design.md): design for
   target-scoped nixpkgs profiles and package-level nixpkgs pins.
 - [`nixpkgs-source-selection-plan.md`](nixpkgs-source-selection-plan.md): implementation plan for
   target-scoped nixpkgs profiles and package-level nixpkgs pins.
+- [`update-command-design.md`](update-command-design.md): design for `i`, `u`, `u --upgrade`, and
+  `viberoots update` command authority.
+- [`update-command-plan.md`](update-command-plan.md): implementation plan for the update command
+  model.
 - [`scaffolding.md`](scaffolding.md): scaffolding behavior and supported generators.
 - [`remote-build-setup.md`](remote-build-setup.md): remote-builder, cache, and Buck2 remote
   execution readiness guide.

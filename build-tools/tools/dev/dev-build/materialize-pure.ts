@@ -9,9 +9,6 @@ import {
   inferRunnableFromOutPath,
   parseRunnableManifest,
 } from "../../lib/runnables";
-import { getImporterRootsContract } from "../../lib/importer-roots";
-import { discoverImportersWithLock } from "../install/importers";
-import { prepareExactPnpmStore } from "../update-pnpm-hash/exact-store";
 
 function materializeTimeoutSec(defaultSec: number): number {
   const raw = String(process.env.VBR_MATERIALIZE_TIMEOUT_SEC || "").trim();
@@ -38,20 +35,6 @@ async function viberootsOverrideArgs(root: string): Promise<string> {
     return ` --override-input viberoots path:${local}`;
   }
   return "";
-}
-
-async function exactStoreMapEnv(root: string): Promise<Record<string, string>> {
-  const { workspaceRoots } = getImporterRootsContract();
-  const importers = (await discoverImportersWithLock(root, { cwd: root })).filter((importer) =>
-    workspaceRoots.some((workspaceRoot) => importer.startsWith(`${workspaceRoot}/`)),
-  );
-  const map: Record<string, string> = {};
-  for (const importer of importers) {
-    const prepared = await prepareExactPnpmStore({ repoRoot: root, importer });
-    map[importer] = prepared.exactStorePath;
-  }
-  if (Object.keys(map).length === 0) return {};
-  return { NIX_PNPM_EXACT_STORE_MAP: JSON.stringify(map) };
 }
 
 async function nixBuildPrintOutPaths(opts: {
@@ -155,10 +138,8 @@ export async function materializePureGraphIfEnabled(opts: {
   await mkdirWithMacosMetadataExclusion(linkDir);
   const linkName = path.join(linkDir, `buck-go-${Date.now()}`);
 
-  const exactEnv = await exactStoreMapEnv(opts.root);
   const envPure = {
     ...process.env,
-    ...exactEnv,
     WORKSPACE_ROOT: opts.root,
     BUCK_GRAPH_JSON: path.join(opts.root, DEFAULT_GRAPH_PATH),
   } as any;
@@ -172,7 +153,6 @@ export async function materializePureGraphIfEnabled(opts: {
       try {
         const envSel = {
           ...process.env,
-          ...exactEnv,
           WORKSPACE_ROOT: opts.root,
           BUCK_TARGET: sel,
           BUCK_GRAPH_JSON: path.join(opts.root, DEFAULT_GRAPH_PATH),
@@ -212,7 +192,6 @@ export async function materializePureGraphIfEnabled(opts: {
 
   const envFull = {
     ...process.env,
-    ...exactEnv,
     WORKSPACE_ROOT: opts.root,
     BUCK_GRAPH_JSON: path.join(opts.root, DEFAULT_GRAPH_PATH),
   } as any;

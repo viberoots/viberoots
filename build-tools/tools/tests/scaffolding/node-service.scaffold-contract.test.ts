@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { prepareExactPnpmStore } from "../../dev/update-pnpm-hash/exact-store";
+import { reconcilePnpmStore } from "../../dev/intentional-pnpm-store-reconcile";
 import { runInTemp } from "../lib/test-helpers";
 import { viberootsDevTool } from "./lib/viberoots-tools";
 
@@ -77,7 +77,7 @@ test(
           await $`git add projects/node-modules.hashes.json`;
           await $`git commit -m update-hashes`.nothrow();
           const flakeRef = await workspaceFlakeRef(tmp);
-          const exactStore = await prepareExactPnpmStore({ repoRoot: tmp, importer });
+          await reconcilePnpmStore({ repoRoot: tmp, importer });
           const viberootsInputRoot = String(
             process.env.VIBEROOTS_SOURCE_ROOT ||
               process.env.VIBEROOTS_ROOT ||
@@ -89,13 +89,12 @@ test(
             : "";
 
           const buildAttr = async (name: string) => {
-            const cmd = `set -euo pipefail; timeout ${timeoutSecs}s nix build "path:${flakeRef}#${name}.${attr}"${viberootsOverrideArgs} --impure --no-link --no-write-lock-file --accept-flake-config --builders "" --print-out-paths`;
+            const cmd = `set -euo pipefail; timeout ${timeoutSecs}s nix build "path:${flakeRef}#${name}.${attr}"${viberootsOverrideArgs} --no-link --no-write-lock-file --accept-flake-config --builders "" --print-out-paths`;
             const result = await $({
               stdio: "pipe",
               env: {
                 ...process.env,
                 WORKSPACE_ROOT: tmp,
-                NIX_PNPM_EXACT_STORE: exactStore.exactStorePath,
               },
             })`bash --noprofile --norc -c ${cmd}`;
             const outPath = String(result.stdout || "")

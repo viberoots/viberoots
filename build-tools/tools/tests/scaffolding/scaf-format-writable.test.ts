@@ -34,7 +34,7 @@ test("formatImporterLockfiles makes copied lockfiles writable before prettier", 
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "scaf-format-writable-"));
   const importer = path.join("projects", "libs", "demo");
   const lockfile = path.join(root, importer, "pnpm-lock.yaml");
-  const fakeBin = path.join(root, ".fake-bin");
+  const fakeBin = path.join(root, "node_modules", ".bin");
   const prettier = path.join(fakeBin, "prettier");
   await fsp.mkdir(path.dirname(lockfile), { recursive: true });
   await fsp.mkdir(fakeBin, { recursive: true });
@@ -55,14 +55,7 @@ test("formatImporterLockfiles makes copied lockfiles writable before prettier", 
   );
   await fsp.chmod(prettier, 0o755);
 
-  const prevPath = process.env.PATH;
-  try {
-    process.env.PATH = fakeBin;
-    await formatImporterLockfiles(root, [importer]);
-  } finally {
-    if (prevPath === undefined) delete process.env.PATH;
-    else process.env.PATH = prevPath;
-  }
+  await formatImporterLockfiles(root, [importer]);
 
   const formatted = await fsp.readFile(lockfile, "utf8");
   assert.match(formatted, /# formatted/);

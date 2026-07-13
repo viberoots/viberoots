@@ -4,7 +4,7 @@ import { execFile, spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import { prepareExactPnpmStore } from "../../dev/update-pnpm-hash/exact-store";
+import { reconcilePnpmStore } from "../../dev/intentional-pnpm-store-reconcile";
 import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 const execFileAsync = promisify(execFile);
@@ -29,7 +29,7 @@ export function requireHeavyOciImage(t: { skip(message?: string): void }): boole
   return false;
 }
 
-const exactStoreByRepo = new Map<string, ReturnType<typeof prepareExactPnpmStore>>();
+const fixedStoreByRepo = new Map<string, ReturnType<typeof reconcilePnpmStore>>();
 const nixBuildOutputByAttr = new Map<string, Promise<string>>();
 const imageTarballByOutputPath = new Map<string, Promise<ControlPlaneImageTarball>>();
 
@@ -132,12 +132,11 @@ async function nixBuildOutput(attr: string) {
 async function runNixBuildOutput(repoRoot: string, attr: string) {
   const flakeRef = await workspaceFlakeRef(repoRoot);
   const viberootsInput = path.join(repoRoot, "viberoots");
-  const exactStore = requiresExactPnpmStore(attr) ? await exactPnpmStoreForRepo(repoRoot) : null;
+  if (requiresFinalPnpmStore(attr)) await finalPnpmStoreForRepo(repoRoot);
   const { stdout } = await execFileAsync(
     "nix",
     [
       "build",
-      "--impure",
       `path:${flakeRef}#${attr}`,
       "--override-input",
       "viberoots",
@@ -148,10 +147,7 @@ async function runNixBuildOutput(repoRoot: string, attr: string) {
     ],
     {
       cwd: repoRoot,
-      env: {
-        ...process.env,
-        ...(exactStore ? { NIX_PNPM_EXACT_STORE: exactStore.exactStorePath } : {}),
-      },
+      env: process.env,
       maxBuffer: 1024 * 1024,
     },
   );
@@ -160,15 +156,15 @@ async function runNixBuildOutput(repoRoot: string, attr: string) {
   return outPath;
 }
 
-function requiresExactPnpmStore(attr: string): boolean {
+function requiresFinalPnpmStore(attr: string): boolean {
   return attr !== "deployment-control-plane-image-contract";
 }
 
-async function exactPnpmStoreForRepo(repoRoot: string) {
-  const cached = exactStoreByRepo.get(repoRoot);
+async function finalPnpmStoreForRepo(repoRoot: string) {
+  const cached = fixedStoreByRepo.get(repoRoot);
   if (cached) return await cached;
-  const prepared = prepareExactPnpmStore({ repoRoot, importer: "viberoots" });
-  exactStoreByRepo.set(repoRoot, prepared);
+  const prepared = reconcilePnpmStore({ repoRoot, importer: "viberoots" });
+  fixedStoreByRepo.set(repoRoot, prepared);
   return await prepared;
 }
 

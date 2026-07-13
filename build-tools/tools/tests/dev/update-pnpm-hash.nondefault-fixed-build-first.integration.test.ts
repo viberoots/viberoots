@@ -1,71 +1,20 @@
-#!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
+import assert from "node:assert/strict";
+import fsp from "node:fs/promises";
 import { test } from "node:test";
-import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
-test("update-pnpm-hash nondefault importer verifies fixed build before unfixed rebuild", async () => {
-  const mainTxt = await fsp.readFile(
-    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash.ts"),
+test("nondefault reconciliation recreates filtered input after a hash update", async () => {
+  const main = await fsp.readFile("build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
+  const state = await fsp.readFile(
+    "build-tools/tools/dev/update-pnpm-hash/fixed-store-reconcile.ts",
     "utf8",
   );
-  const txt = await fsp.readFile(
-    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/nondefault.ts"),
-    "utf8",
+  assert.match(
+    main,
+    /const runBuild = async \(rebuild: boolean\) =>\s*await withPnpmStoreBuildFlakeRef/,
   );
-  if (!txt.includes("step=fixed-build attr=${opts.storeAttr}")) {
-    throw new Error("nondefault importer path must verify fixed build before unfixed rebuild");
-  }
-  if (!mainTxt.includes("withExactPrefetchedStore({ repoRoot, importer }")) {
-    throw new Error(
-      "root updater must prepare an exact pnpm store before fixed-build verification",
-    );
-  }
-  if (!mainTxt.includes("withPnpmStoreBuildFlakeRef")) {
-    throw new Error(
-      "root updater must choose an importer-safe build flake before fixed verification",
-    );
-  }
-  if (!mainTxt.includes("withResolvedExactPrefetchedStore")) {
-    throw new Error(
-      "root updater must reuse realized pnpm-store outputs before exact prefetch on fixed builds",
-    );
-  }
-  if (!mainTxt.includes("const nixEnv = { ...extraEnv, ...filteredEnv };")) {
-    throw new Error("root updater must merge exact-store env into the filtered nix environment");
-  }
-  if (!mainTxt.includes("buildStore(storeAttr, buildFlakeRef, activity, nixEnv)")) {
-    throw new Error(
-      "root updater fixed-build verification must pass exact-store env into buildStore",
-    );
-  }
-  if (!txt.includes("opts.runFixedBuild(")) {
-    throw new Error("nondefault importer fixed-build verification must use the injected runner");
-  }
-  if (!txt.includes("const suggestedFromExisting = extractHash")) {
-    throw new Error(
-      "nondefault importer path must extract suggested hash from fixed-build failures",
-    );
-  }
-  if (!txt.includes('suggestedHash = extractHash(String(verify.output || ""))')) {
-    throw new Error(
-      "nondefault importer path must extract a suggested hash from the first fixed-build failure",
-    );
-  }
-  const fixedIdx = txt.indexOf(
-    "step=fixed-build attr=${opts.storeAttr} timeout=${opts.timeoutSec}s",
+  assert.match(
+    state,
+    /try \{\s*await opts\.updateHash\(suggested\);\s*second = await opts\.runBuild\(false\);\s*\} catch \(error\) \{\s*await restoreMetadataOrThrow\(opts\.restoreMetadata, error\)/,
   );
-  const unfixedIdx = txt.indexOf(
-    "step=unfixed-build attr=${opts.unfixedAttr} timeout=${opts.timeoutSec}s",
-  );
-  if (fixedIdx === -1 || unfixedIdx === -1 || fixedIdx > unfixedIdx) {
-    throw new Error(
-      "nondefault importer path must try the fixed build before falling back to the unfixed build",
-    );
-  }
-  if (!txt.includes("opts.runUnfixedBuild(")) {
-    throw new Error("nondefault importer path must use the injected unfixed-build runner");
-  }
-  if (!txt.includes("step=fixed-build-after-hash attr=${opts.storeAttr}")) {
-    throw new Error("nondefault importer path must retry fixed build after updating the hash");
-  }
+  assert.doesNotMatch(main + state, /unfixed|add-fixed/);
 });

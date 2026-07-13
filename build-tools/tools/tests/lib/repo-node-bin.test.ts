@@ -43,6 +43,38 @@ test("resolveRepoNodeBin finds devshell viberoots node binary path", async () =>
   );
 });
 
+test("resolveRepoNodeBin finds verify node_modules output binaries", async () => {
+  const root = await tempRoot("repo-node-bin-zx-test");
+  const out = path.join(root, "nix-out");
+  const prettier = path.join(out, "node_modules", ".bin", "prettier");
+  await fsp.mkdir(path.dirname(prettier), { recursive: true });
+  await fsp.writeFile(prettier, "#!/usr/bin/env bash\n", "utf8");
+
+  assert.equal(
+    await resolveRepoNodeBin(root, "prettier", {
+      PATH: "",
+      ZX_TEST_NODE_MODULES_OUT: out,
+    }),
+    prettier,
+  );
+});
+
+test("resolveRepoNodeBin accepts node_modules as verify output root", async () => {
+  const root = await tempRoot("repo-node-bin-zx-test-node-modules");
+  const nodeModules = path.join(root, "out", "node_modules");
+  const prettier = path.join(nodeModules, ".bin", "prettier");
+  await fsp.mkdir(path.dirname(prettier), { recursive: true });
+  await fsp.writeFile(prettier, "#!/usr/bin/env bash\n", "utf8");
+
+  assert.equal(
+    await resolveRepoNodeBin(root, "prettier", {
+      PATH: "",
+      ZX_TEST_NODE_MODULES_OUT: nodeModules,
+    }),
+    prettier,
+  );
+});
+
 test("requireRepoNodeBin explains missing managed formatter setup", async () => {
   const root = await tempRoot("repo-node-bin-missing");
   await assert.rejects(

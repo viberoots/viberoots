@@ -30,12 +30,6 @@ export_file(
 )
 
 export_file(
-    name = "prepare-exact-pnpm-store.ts",
-    src = "prepare-exact-pnpm-store.ts",
-    visibility = ["PUBLIC"],
-)
-
-export_file(
     name = "source-snapshot.ts",
     src = "source-snapshot.ts",
     visibility = ["PUBLIC"],

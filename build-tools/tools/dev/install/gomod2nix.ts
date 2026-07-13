@@ -5,6 +5,7 @@ import { mkdtempNoindex } from "../../lib/macos-metadata";
 import { repoRoot } from "../../lib/repo";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { absenceCacheFresh, writeAbsenceCache } from "./absence-cache";
+import { staleMetadataError } from "./metadata-mode";
 
 async function exists(p: string): Promise<boolean> {
   try {
@@ -59,11 +60,16 @@ function installWorkspaceRoot(): string {
   return envRoot ? path.resolve(envRoot) : repoRoot();
 }
 
-export async function runGomod2nixGenerate(dryRun: boolean, verbose: boolean) {
-  await runGomod2nixGenerateIn(installWorkspaceRoot(), dryRun, verbose);
+export async function runGomod2nixGenerate(dryRun: boolean, verbose: boolean, readOnly = false) {
+  await runGomod2nixGenerateIn(installWorkspaceRoot(), dryRun, verbose, readOnly);
 }
 
-export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbose: boolean) {
+export async function runGomod2nixGenerateIn(
+  dir: string,
+  dryRun: boolean,
+  verbose: boolean,
+  readOnly = false,
+) {
   const root = installWorkspaceRoot();
   const hasGoMod = await exists(path.join(dir, "go.mod"));
   const hasGoSum = await exists(path.join(dir, "go.sum"));
@@ -96,6 +102,11 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
     // Always emit a concise dry-run command line (tests depend on exact prefix)
     console.log(`[gomod2nix] dry-run: ${cmd}`);
     return;
+  }
+
+  if (readOnly && (await needsGomod2nixRefresh(dir))) {
+    const rel = path.relative(root, path.join(dir, "gomod2nix.toml")) || "gomod2nix.toml";
+    throw staleMetadataError(rel, "Go module metadata requires gomod2nix reconciliation");
   }
 
   // If go.mod exists but go.sum is missing, avoid attempting generation which may hang
@@ -192,7 +203,7 @@ export async function runGomod2nixGenerateIn(dir: string, dryRun: boolean, verbo
     console.log(`[gomod2nix] hash (${path.relative(root, dir)}): ${afterHash || "(none)"}`);
 }
 
-export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean) {
+export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean, readOnly = false) {
   // Scan for go.mod+go.sum under projects/apps/* and projects/libs/* and generate per-module gomod2nix.toml
   const root = installWorkspaceRoot();
   const scanRoots = ["projects/apps", "projects/libs"];
@@ -225,6 +236,6 @@ export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean) {
       if (verbose) console.log(`[gomod2nix] up-to-date: ${path.relative(root, d) || "."}`);
       continue;
     }
-    await runGomod2nixGenerateIn(d, dryRun, verbose);
+    await runGomod2nixGenerateIn(d, dryRun, verbose, readOnly);
   }
 }

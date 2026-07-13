@@ -12,12 +12,38 @@ import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { localOnlyNixBuilderArgs } from "../../lib/nix-builder-policy";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 
-export function extractHash(text: string): string | null {
-  const mismatchGot = text.match(/got:\s*(sha256-[A-Za-z0-9+/=\-_]{43,})/);
-  if (mismatchGot?.[1]) return mismatchGot[1];
-  const all = Array.from(text.matchAll(/sha256-[A-Za-z0-9+/=\-_]{43,}/g)).map((m) => m[0]);
-  if (all.length) return all[all.length - 1];
-  return null;
+export function extractHash(
+  text: string,
+  expectedDerivationName: string,
+  expectedSpecifiedHash: string,
+): string | null {
+  if (!/^pnpm-store-lock-[a-f0-9]{64}$/.test(expectedDerivationName)) return null;
+  if (!/^sha256-[A-Za-z0-9+/]{43}=$/.test(expectedSpecifiedHash)) return null;
+  const headers = Array.from(
+    text.matchAll(/^error: hash mismatch in fixed-output derivation '([^']+)':\s*$/gm),
+  );
+  const matches: string[] = [];
+  for (let index = 0; index < headers.length; index += 1) {
+    const header = headers[index];
+    const drvPath = header[1];
+    if (
+      !new RegExp(`^[a-z0-9]{32}-${expectedDerivationName}\\.drv$`).test(path.basename(drvPath))
+    ) {
+      continue;
+    }
+    const start = (header.index || 0) + header[0].length;
+    const remainder = text.slice(start);
+    const nextError = remainder.search(/^error:/m);
+    const block = nextError === -1 ? remainder : remainder.slice(0, nextError);
+    const specified = Array.from(
+      block.matchAll(/^\s*specified:\s*(sha256-[A-Za-z0-9+/]{43}=)\s*$/gm),
+    );
+    const got = Array.from(block.matchAll(/^\s*got:\s*(sha256-[A-Za-z0-9+/]{43}=)\s*$/gm));
+    if (specified.length === 1 && specified[0][1] === expectedSpecifiedHash && got.length === 1) {
+      matches.push(got[0][1]);
+    }
+  }
+  return matches.length === 1 ? matches[0] : null;
 }
 
 function resolvedFetchTimeoutSec(): number {
@@ -34,15 +60,6 @@ function envWithFetchTimeout(timeoutSec: number, extraEnv?: NodeJS.ProcessEnv): 
       ...(extraEnv || {}),
     }),
   );
-}
-
-function exactStoreSandboxArgs(extraEnv?: NodeJS.ProcessEnv): string[] {
-  const exactStorePath = String(extraEnv?.NIX_PNPM_EXACT_STORE || "").trim();
-  if (!exactStorePath) return [];
-  if (!exactStorePath.startsWith("/nix/store/")) {
-    throw new Error("NIX_PNPM_EXACT_STORE must be a /nix/store path");
-  }
-  return [];
 }
 
 function validViberootsSource(candidate: string): string {
@@ -108,11 +125,11 @@ function nixBuildArgs(opts: {
   maxJobs: string;
   cores: string;
   extraEnv?: NodeJS.ProcessEnv;
+  rebuild?: boolean;
 }): string[] {
   const args = [
     "build",
     `${opts.flakeRef}#${opts.attrPath}`,
-    "--impure",
     "--no-link",
     "--no-write-lock-file",
     "--accept-flake-config",
@@ -125,8 +142,17 @@ function nixBuildArgs(opts: {
     "--option",
     "max-free",
     "0",
+    "--option",
+    "keep-failed",
+    "false",
   ];
-  args.push(...exactStoreSandboxArgs(opts.extraEnv));
+  if (
+    String(opts.extraEnv?.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1" ||
+    String(opts.extraEnv?.NIX_PNPM_RECONCILE || "").trim() === "1"
+  ) {
+    args.splice(2, 0, "--impure");
+  }
+  if (opts.rebuild) args.push("--rebuild");
   if (opts.printOutPaths) args.push("--print-out-paths");
   if (opts.maxJobs && opts.maxJobs !== "0") args.push("--max-jobs", opts.maxJobs);
   if (opts.cores && opts.cores !== "0") args.push("--option", "cores", opts.cores);
@@ -138,6 +164,7 @@ export async function buildStore(
   flakeRef: string,
   activity?: ManagedCommandActivity,
   extraEnv?: NodeJS.ProcessEnv,
+  opts: { rebuild?: boolean } = {},
 ): Promise<{ ok: boolean; output: string; outPath?: string }> {
   const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim() || "0";
   const cores = String(process.env.NIX_CORES || "").trim() || "0";
@@ -150,7 +177,15 @@ export async function buildStore(
   );
   const res = await runManagedCommand({
     command: nixBin,
-    args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores, extraEnv }),
+    args: nixBuildArgs({
+      flakeRef,
+      attrPath,
+      printOutPaths: true,
+      maxJobs,
+      cores,
+      extraEnv,
+      rebuild: opts.rebuild,
+    }),
     cwd: process.cwd(),
     env: commandEnv,
     timeoutMs: timeoutSec * 1000,
@@ -172,7 +207,7 @@ export async function buildStore(
           output: output + "\n" + nixGcLockMessage("update-pnpm-hash buildStore", remaining),
         };
       }
-      return await buildStore(attrPath, flakeRef, activity, extraEnv);
+      return await buildStore(attrPath, flakeRef, activity, extraEnv, opts);
     }
   }
   if (res.timedOut) {
@@ -190,88 +225,6 @@ export async function buildStore(
       .filter(Boolean)
       .pop() || undefined;
   return { ok: res.ok, output, outPath };
-}
-
-export async function buildUnfixedAndHash(
-  attrPath: string,
-  flakeRef: string,
-  activity?: ManagedCommandActivity,
-  extraEnv?: NodeJS.ProcessEnv,
-): Promise<{ ok: boolean; sri?: string; output?: string }> {
-  const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim() || "0";
-  const cores = String(process.env.NIX_CORES || "").trim() || "0";
-  const timeoutSec = resolvedFetchTimeoutSec();
-  const streamBuildLogs = String(process.env.VBR_STREAM_NIX_BUILD_LOGS || "").trim() === "1";
-  const commandEnv = envWithFetchTimeout(timeoutSec, extraEnv);
-  const nixBin = resolveToolPathSync("nix", commandEnv);
-  console.error(
-    `[update-pnpm-hash] nix build ${attrPath} and hash result (timeout=${timeoutSec}s, logs=${streamBuildLogs ? "stream" : "compact"})`,
-  );
-  const built = await runManagedCommand({
-    command: nixBin,
-    args: nixBuildArgs({ flakeRef, attrPath, printOutPaths: true, maxJobs, cores, extraEnv }),
-    cwd: process.cwd(),
-    env: commandEnv,
-    timeoutMs: timeoutSec * 1000,
-    activity,
-    onStderr: streamBuildLogs ? (chunk) => process.stderr.write(chunk) : undefined,
-  });
-  if (!built.ok) {
-    const output = String(built.stdout || "") + String(built.stderr || "");
-    const gcPids = await activeNixGcPids();
-    if (gcPids.length > 0) {
-      const gcCfg = gcWaitConfig();
-      const remaining = await waitForNoActiveNixGc({
-        timeoutMs: gcCfg.timeoutMs,
-        pollMs: gcCfg.pollMs,
-      });
-      if (remaining.length > 0) {
-        return {
-          ok: false,
-          output:
-            output + "\n" + nixGcLockMessage("update-pnpm-hash buildUnfixedAndHash", remaining),
-        };
-      }
-      return await buildUnfixedAndHash(attrPath, flakeRef, activity, extraEnv);
-    }
-    if (built.timedOut) {
-      return {
-        ok: false,
-        output:
-          output +
-          `\nupdate-pnpm-hash: timed out building ${attrPath} after ${timeoutSec}s (descendants terminated)`,
-      };
-    }
-    return { ok: false, output };
-  }
-  const outPath =
-    String(built.stdout || "")
-      .trim()
-      .split(/\r?\n/)
-      .filter(Boolean)
-      .pop() || "";
-  if (!outPath) {
-    return { ok: false, output: "nix build returned no out path for " + attrPath };
-  }
-  const hashEnv = withSanitizedInheritedNixConfig(envWithResolvedNixBin(process.env));
-  const hashed = await runManagedCommand({
-    command: resolveToolPathSync("nix", hashEnv),
-    args: ["hash", "path", "--sri", outPath],
-    cwd: process.cwd(),
-    env: hashEnv,
-    timeoutMs: 120_000,
-  });
-  if (!hashed.ok) {
-    return {
-      ok: false,
-      output: String(hashed.stdout || "") + String(hashed.stderr || ""),
-    };
-  }
-  const sri = String(hashed.stdout || "").trim();
-  if (!/^sha256-[A-Za-z0-9+/=_-]+$/.test(sri)) {
-    return { ok: false, output: "unexpected hash-path output: " + sri };
-  }
-  return { ok: true, sri };
 }
 
 async function currentSystem(): Promise<string> {

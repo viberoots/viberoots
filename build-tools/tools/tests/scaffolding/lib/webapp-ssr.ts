@@ -10,7 +10,7 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { formatRunnableLine, inferRunnableFromOutPath } from "../../../lib/runnables";
 import { DEFAULT_GRAPH_PATH } from "../../../lib/workspace-state-paths";
-import { prepareExactPnpmStore } from "../../../dev/update-pnpm-hash/exact-store";
+import { reconcilePnpmStore } from "../../../dev/intentional-pnpm-store-reconcile";
 import { terminateChildTree } from "../../lib/process-tree";
 import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
@@ -175,18 +175,16 @@ export async function buildSelectedSsr(
     explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS, "projects/node-modules.hashes.json"],
   });
   const flakeRef = await workspaceFlakeRef(tmp);
-  const exactStore = await prepareExactPnpmStore({ repoRoot: tmp, importer });
+  await reconcilePnpmStore({ repoRoot: tmp, importer });
   const built = await _$({
     cwd: tmp,
     stdio: "pipe",
     env: tempWorkspaceEnv(tmp, {
       BUCK_TEST_SRC: tmp,
-      NIX_PNPM_ALLOW_GENERATE: "1",
-      NIX_PNPM_EXACT_STORE: exactStore.exactStorePath,
       BUCK_GRAPH_JSON: graphJson,
       BUCK_TARGET: label,
     }),
-  })`bash --noprofile --norc -c ${`set -euo pipefail; nix build "path:${flakeRef}#graph-generator-pure-selected" --impure --no-link --no-write-lock-file --accept-flake-config --builders "" --print-build-logs --print-out-paths`}`;
+  })`bash --noprofile --norc -c ${`set -euo pipefail; nix build "path:${flakeRef}#graph-generator-pure-selected" --no-link --no-write-lock-file --accept-flake-config --builders "" --print-build-logs --print-out-paths`}`;
   const outPath =
     String(built.stdout || "")
       .trim()

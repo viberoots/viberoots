@@ -22,8 +22,6 @@ import { withSanitizedInheritedNixConfig } from "../lib/nix-config-env";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
 import { repairGeneratedWorkspaceLock } from "../lib/workspace-lock-repair";
 import { exportDeploymentResourceGraph } from "../deployments/resource-graph-export";
-import { discoverImportersWithLock } from "./install/importers";
-import { prepareExactPnpmStore } from "./update-pnpm-hash/exact-store";
 
 type VersionStatus = ReturnType<typeof buildVersionStatus>;
 type CommandMeta = {
@@ -131,13 +129,6 @@ const commandMetadata: CommandMeta[] = [
       "--workspace-root",
       "--help",
     ],
-  },
-  {
-    name: "exact-pnpm-store-env",
-    usage: "viberoots exact-pnpm-store-env [--workspace-root <path>]",
-    description:
-      "Prewarm exact pnpm stores from committed lockfiles and print shell exports for locked devshell materialization.",
-    options: ["--workspace-root", "--help"],
   },
   {
     name: "resource-graph",
@@ -558,25 +549,6 @@ function selectedWorkspaceRootForCommand(): string {
   return resolveWorkspaceRootsSync().workspaceRoot;
 }
 
-function shellSingleQuote(value: string): string {
-  return `'${value.replaceAll("'", "'\\''")}'`;
-}
-
-async function printExactPnpmStoreEnv(): Promise<void> {
-  const workspaceRoot = selectedWorkspaceRootForCommand();
-  const importers = await discoverImportersWithLock(workspaceRoot, { cwd: workspaceRoot });
-  const map: Record<string, string> = {};
-  for (const importer of importers) {
-    const prepared = await prepareExactPnpmStore({
-      repoRoot: workspaceRoot,
-      importer,
-    });
-    map[importer] = prepared.exactStorePath;
-  }
-  if (Object.keys(map).length === 0) return;
-  console.log(`export NIX_PNPM_EXACT_STORE_MAP=${shellSingleQuote(JSON.stringify(map))}`);
-}
-
 function printShellCommand(command: string, args: string[]): void {
   const quote = (arg: string) =>
     /^[A-Za-z0-9_./:=+#@%,-]+$/.test(arg) ? arg : `'${arg.replaceAll("'", "'\\''")}'`;
@@ -758,10 +730,6 @@ async function main() {
       nixDeleteOlderThan: getFlagStr("nix-delete-older-than", ""),
       keepCurrentProfile: getFlagBool("keep-current-profile"),
     });
-    return;
-  }
-  if (command === "exact-pnpm-store-env") {
-    await printExactPnpmStoreEnv();
     return;
   }
   if (command === "resource-graph") {

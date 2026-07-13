@@ -14,8 +14,10 @@ import {
   pruneStalePnpmStoreVersions,
   pruneStaleUnifiedPnpmStoreEpochs,
 } from "./unified-pnpm-store-cleanup";
-import { prepareExactPnpmStore } from "./update-pnpm-hash/lockfile";
+import { makeFilteredFlakeRef } from "./update-pnpm-hash/lockfile";
 import { mergePnpmStore } from "./update-pnpm-hash/prefetched-store";
+import { pnpmStoreAttrFromImporter } from "./update-pnpm-hash/paths";
+import { resolveFinalPnpmStore } from "./update-pnpm-hash/realized-store";
 import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 
 function sha256Hex(s: string) {
@@ -34,17 +36,17 @@ async function ensureDir(p: string) {
   await mkdirWithMacosMetadataExclusion(p);
 }
 
-async function mergeExactStorePathIntoUnifiedStore(opts: {
-  exactStorePath: string;
+async function mergeFixedStoreIntoUnifiedStore(opts: {
+  fixedStoreDir: string;
   unifyStore: string;
 }): Promise<void> {
-  const archive = path.join(opts.exactStorePath, "store.tar");
+  const archive = path.join(opts.fixedStoreDir, "store.tar");
   if (fs.existsSync(archive)) {
     await ensureDir(opts.unifyStore);
     await $`tar -xf ${archive} -C ${opts.unifyStore}`;
     return;
   }
-  await mergePnpmStore(opts.exactStorePath, opts.unifyStore);
+  await mergePnpmStore(opts.fixedStoreDir, opts.unifyStore);
 }
 
 function unifiedStoreRecoveryMessage(lockPath: string, waitTimeoutMs: number): string {
@@ -207,13 +209,24 @@ async function main() {
     // Always include repo-root importer '.' if lockfile present there
     const uniq = Array.from(new Set(importers));
 
-    // Build the local unified prewarm directly from exact prefetched stores.
-    // install-deps has already refreshed hashes and prefetched these stores,
-    // so avoid re-running fixed-output validation inside Nix just to assemble
-    // a shared writable cache for future local pnpm operations.
+    // Assemble only from already-realized committed fixed stores. Ordinary install
+    // paths must never fetch or import candidate pnpm stores.
     for (const imp of uniq) {
-      const { exactStorePath } = await prepareExactPnpmStore({ repoRoot: repo, importer: imp });
-      await mergeExactStorePathIntoUnifiedStore({ exactStorePath, unifyStore });
+      const filtered = await makeFilteredFlakeRef(repo, imp);
+      try {
+        const { fixedStorePath } = await resolveFinalPnpmStore({
+          repoRoot: repo,
+          importer: imp,
+          flakeRef: filtered.flakeRef,
+          attrPath: pnpmStoreAttrFromImporter(imp),
+        });
+        await mergeFixedStoreIntoUnifiedStore({
+          fixedStoreDir: path.join(fixedStorePath, "store"),
+          unifyStore,
+        });
+      } finally {
+        await filtered.cleanup();
+      }
     }
     await pruneStalePnpmStoreVersions(unifyStore);
 

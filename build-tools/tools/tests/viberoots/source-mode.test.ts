@@ -198,6 +198,7 @@ test("viberoots help and bash completion are generated from command metadata", a
   assert.match(zshCompletion.stdout, /compdef _viberoots viberoots/);
   assert.match(zshCompletion.stdout, /compdef _viberoots vbr/);
   assert.match(zshCompletion.stdout, /commands=\(status develop init-workspace bootstrap-check/);
+  assert.doesNotMatch(zshCompletion.stdout, /prepare-final-pnpm-store/);
   assert.match(zshCompletion.stdout, /develop\) _arguments -S .*--command\[--command\]/);
 
   await assert.rejects(
