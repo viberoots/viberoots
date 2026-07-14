@@ -9,7 +9,7 @@ import {
 } from "../../scaffolding/webapp-module-manifests";
 import { resolveModuleContractsPaths } from "../../dev/module-contract-paths";
 import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core";
-import { runInTemp } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 import { pnpmInstallForDevTest, spawnStaticViteDevServer } from "./lib/dev-node-modules";
 import { httpGet, pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
 
@@ -223,10 +223,12 @@ test(
         });
 
         await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-web`;
+        await reconcileTempDependencyInputs(tmp, $);
         await pnpmInstallForDevTest({
           tmp,
           _$,
           filter: "./projects/apps/demo-web...",
+          frozenLockfile: true,
         });
 
         const port = await pickFreePort();

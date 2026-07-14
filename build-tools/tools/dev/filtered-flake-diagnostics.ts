@@ -28,13 +28,13 @@ export async function readSnapshotStats(
   dir: string,
 ): Promise<{ fileCount: number; dirCount: number; kb: number }> {
   const [{ stdout: files }, { stdout: dirs }, { stdout: kb }] = await Promise.all([
-    $({ stdio: "pipe" })`find ${dir} -type f | wc -l`,
-    $({ stdio: "pipe" })`find ${dir} -type d | wc -l`,
-    $({ stdio: "pipe" })`du -sk ${dir}`,
+    runCommand({ command: "find", args: [dir, "-type", "f", "-print"] }),
+    runCommand({ command: "find", args: [dir, "-type", "d", "-print"] }),
+    runCommand({ command: "du", args: ["-sk", dir] }),
   ]);
   return {
-    fileCount: readInt(files),
-    dirCount: readInt(dirs),
+    fileCount: files.trim() ? files.trimEnd().split("\n").length : 0,
+    dirCount: dirs.trim() ? dirs.trimEnd().split("\n").length : 0,
     kb: readInt(String(kb || "").split(/\s+/)[0]),
   };
 }
@@ -44,12 +44,12 @@ export async function readDirtyGitStats(workspaceRoot: string): Promise<{
   sample: string[];
 } | null> {
   if (!diagnosticsEnabled()) return null;
-  const status = await $({
+  const status = await runCommand({
+    command: "git",
+    args: ["status", "--porcelain", "--untracked-files=normal"],
     cwd: workspaceRoot,
-    stdio: "pipe",
-    reject: false,
-    nothrow: true,
-  })`git status --porcelain --untracked-files=normal`;
+    allowFailure: true,
+  });
   if (Number(status.exitCode || 0) !== 0) return null;
   const entries = String(status.stdout || "")
     .split("\n")
@@ -60,3 +60,4 @@ export async function readDirtyGitStats(workspaceRoot: string): Promise<{
     sample: diagnosticsDetailEnabled() ? entries.slice(0, 8) : [],
   };
 }
+import { runCommand } from "./filtered-flake-command";

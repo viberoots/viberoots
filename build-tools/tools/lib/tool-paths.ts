@@ -26,6 +26,11 @@ function candidateToolPaths(tool: string, env: NodeJS.ProcessEnv): string[] {
   return Array.from(new Set(candidates));
 }
 
+function isViberootsToolWrapper(candidate: string): boolean {
+  const parts = path.normalize(candidate).split(path.sep);
+  return parts.slice(-4, -1).join("/") === "build-tools/tools/bin";
+}
+
 export function isNixStorePath(candidate: string): boolean {
   const isRootedStorePath = (value: string) =>
     path.resolve(value).startsWith(`${path.sep}nix${path.sep}store${path.sep}`);
@@ -54,7 +59,9 @@ function preferredCandidate(tool: string, env: NodeJS.ProcessEnv): string {
     if (isExecutable(hostProfileNix)) return hostProfileNix;
   }
 
-  const candidates = candidateToolPaths(tool, env);
+  const candidates = candidateToolPaths(tool, env).filter(
+    (candidate) => !isViberootsToolWrapper(candidate),
+  );
   for (const candidate of candidates) {
     if (isNixStorePath(candidate) && isExecutable(candidate)) return candidate;
   }

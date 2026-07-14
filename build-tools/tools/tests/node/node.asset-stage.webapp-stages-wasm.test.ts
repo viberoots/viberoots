@@ -7,7 +7,7 @@ import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
 } from "../lib/test-helpers/git-stage";
-import { runInTemp } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -119,16 +119,7 @@ node_asset_stage(
           explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS],
         });
 
-        const lockfile = path.join("projects", "apps", "demo-web", "pnpm-lock.yaml");
-        const envWithPrefetch = { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" } as Record<
-          string,
-          string
-        >;
-        await $({
-          cwd: tmp,
-          stdio: "inherit",
-          env: { ...envWithPrefetch },
-        })`zx-wrapper viberoots/build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${lockfile}`;
+        await reconcileTempDependencyInputs(tmp, $);
         const baseEnv =
           typeof ($ as any).env === "object" && ($ as any).env
             ? { ...($ as any).env }

@@ -13,6 +13,7 @@ import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard";
 import { resolveRepoNodeBin } from "../../lib/repo-node-bin";
 import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { staleMetadataError } from "../install/metadata-mode";
+import { runCommand } from "../filtered-flake-command";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import { makeFilteredFlakeRef } from "./filtered-flake";
 import {
@@ -58,13 +59,15 @@ async function runLockfileCommandsWithGcRetry(opts: {
     }),
   );
   const nixBin = resolveToolPathSync("nix", nixEnv);
-  const runPnpm = async (...args: string[]) =>
-    await $({
+  const runPnpm = async (...args: string[]) => {
+    await runCommand({
+      command: nixBin,
+      args: [...nixRunPrefix, opts.flakeRef, "--", ...args],
       cwd: opts.importerAbs,
-      stdio: "inherit",
-      timeout: opts.timeoutMs,
       env: nixEnv,
-    })`${nixBin} ${nixRunPrefix} ${opts.flakeRef} -- ${args}`;
+      timeoutMs: opts.timeoutMs,
+    });
+  };
 
   const runCommands = async () => {
     await runPnpmCommandWithRetry(
@@ -163,11 +166,12 @@ async function formatImporterLockfile(opts: { repoRoot: string; importerAbs: str
   const importerLockfileAbs = path.join(opts.importerAbs, "pnpm-lock.yaml");
   if (!fs.existsSync(importerLockfileAbs)) return;
   const prettier = await resolveRepoNodeBin(opts.repoRoot, "prettier");
-  await $({
+  await runCommand({
+    command: prettier,
+    args: ["--write", importerLockfileAbs],
     cwd: opts.repoRoot,
-    stdio: "pipe",
     env: { ...process.env, NODE_OPTIONS: "--no-warnings" },
-  })`${prettier} --write ${importerLockfileAbs}`;
+  });
 }
 
 export async function generateImporterLockfile(opts: { repoRoot: string; importer: string }) {

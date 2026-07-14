@@ -19,6 +19,7 @@ import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../lib/macos-me
 import { targetPackageFromLabel } from "./build-selected-helpers";
 import { findWorkspacePackageRepoDirs } from "./update-pnpm-hash/importer-workspace-packages";
 import { repairSnapshotViberootsInput } from "./filtered-flake-viberoots-input";
+import { removeOwnedTempTree, rethrowAfterOwnedTempCleanup } from "../lib/owned-temp-cleanup";
 
 async function existingRelPaths(root: string, relPaths: readonly string[]): Promise<string[]> {
   const present: string[] = [];
@@ -108,13 +109,10 @@ export async function makeFilteredFlakeRef(opts: {
     return {
       flakeRef: `path:${flakeDir}#${opts.attr}`,
       workspaceRoot: snapDirReal,
-      cleanup: async () => {
-        await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
-      },
+      cleanup: async () => await removeOwnedTempTree(workDir),
     };
   } catch (error) {
-    await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
-    throw error;
+    await rethrowAfterOwnedTempCleanup(error, [async () => await removeOwnedTempTree(workDir)]);
   }
 }
 

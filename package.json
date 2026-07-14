@@ -42,7 +42,7 @@
   "devDependencies": {
     "@anthropic-ai/claude-code": "2.1.128",
     "@modelcontextprotocol/sdk": "^1.17.4",
-    "@openai/codex": "0.142.5",
+    "@openai/codex": "0.144.1",
     "@sinclair/typebox": "^0.32.35",
     "@types/fs-extra": "^11.0.4",
     "@types/node": "^22.0.0",

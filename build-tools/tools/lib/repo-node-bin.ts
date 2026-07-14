@@ -19,9 +19,8 @@ async function buildToolsRoot(root: string): Promise<string> {
   return path.resolve(root, "build-tools");
 }
 
-export async function repoNodeBinCandidates(
+export async function repoNodeBinDirectories(
   root: string,
-  name: string,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<string[]> {
   const toolsRoot = await buildToolsRoot(root);
@@ -37,13 +36,21 @@ export async function repoNodeBinCandidates(
     : "";
   return Array.from(
     new Set([
-      path.join(root, "node_modules", ".bin", name),
-      path.join(path.dirname(toolsRoot), "node_modules", ".bin", name),
-      ...(zxTestNodeBin ? [path.join(zxTestNodeBin, name)] : []),
-      ...(envNodeBin ? [path.join(envNodeBin, name)] : []),
-      path.join(root, "viberoots", "node_modules", ".bin", name),
+      path.join(root, "node_modules", ".bin"),
+      path.join(path.dirname(toolsRoot), "node_modules", ".bin"),
+      ...(zxTestNodeBin ? [zxTestNodeBin] : []),
+      ...(envNodeBin ? [envNodeBin] : []),
+      path.join(root, "viberoots", "node_modules", ".bin"),
     ]),
   );
+}
+
+export async function repoNodeBinCandidates(
+  root: string,
+  name: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string[]> {
+  return (await repoNodeBinDirectories(root, env)).map((dir) => path.join(dir, name));
 }
 
 export async function resolveRepoNodeBin(

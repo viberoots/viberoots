@@ -6,7 +6,7 @@ import { after, test } from "node:test";
 import { resolveModuleContractsPaths } from "../../dev/module-contract-paths";
 import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core";
 import { assertStaticPwaServiceWorkerReady } from "../../lib/static-pwa-precache";
-import { runInTemp } from "../lib/test-helpers/run-in-temp";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers/run-in-temp";
 import { pnpmInstallForDevTest } from "./lib/dev-node-modules";
 import { createStaticPwaServiceWorkerHarness } from "./lib/static-pwa-service-worker";
 
@@ -43,10 +43,12 @@ test(
           appTargetLabel: contracts.appTargetLabel,
           root: tmp,
         });
+        await reconcileTempDependencyInputs(tmp, $);
         await pnpmInstallForDevTest({
           tmp,
           _$,
           filter: "./projects/apps/demo-pwa...",
+          frozenLockfile: true,
         });
         await _$({ cwd: appAbs, stdio: "inherit" })`node scripts/build.mjs`;
         const distDir = path.join(appAbs, "dist");

@@ -16,6 +16,8 @@ import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
 } from "../../lib/test-helpers/git-stage";
+import { reconcileTempDependencyInputs } from "../../lib/test-helpers/run-in-temp";
+import { buildSelectedOutPath } from "../../lib/test-helpers/selected-build";
 
 export const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -103,15 +105,6 @@ export async function withTempRoots<T>(run: () => Promise<T>): Promise<T> {
   }
 }
 
-async function workspaceFlakeRef(root: string): Promise<string> {
-  const hidden = path.join(root, ".viberoots", "workspace", "flake.nix");
-  const hasHidden = await fsp
-    .access(hidden)
-    .then(() => true)
-    .catch(() => false);
-  return hasHidden ? path.dirname(hidden) : root;
-}
-
 export async function scaffoldAndPrepareWorkspace(
   tmp: string,
   _$: any,
@@ -133,11 +126,7 @@ export async function scaffoldAndPrepareWorkspace(
     stdio: "inherit",
     env: tempWorkspaceEnv(tmp, { BUCK_TARGET: appLabel }),
   })`zx-wrapper ${viberootsDevTool("install/deps-main.ts", tmp)} --verbose --glue-only`;
-  await _$({
-    cwd: tmp,
-    stdio: "inherit",
-    env: tempWorkspaceEnv(tmp, { NIX_PNPM_ALLOW_GENERATE: "1" }),
-  })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts", tmp)} --lockfile ${`${appRel}/pnpm-lock.yaml`}`;
+  await reconcileTempDependencyInputs(tmp, $);
   await stageTempRepoPaths({
     tmp,
     _$,
@@ -166,7 +155,6 @@ export async function buildSelectedSsr(
   label: string,
   framework: "express" | "next" | "vite",
 ): Promise<{ outPath: string; importer: string }> {
-  const graphJson = path.join(tmp, DEFAULT_GRAPH_PATH);
   const importer = label.replace(/^\/\//, "").replace(/:app$/, "");
   await stageTempRepoPaths({
     tmp,
@@ -174,22 +162,8 @@ export async function buildSelectedSsr(
     recursiveRoots: [importer],
     explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS, "projects/node-modules.hashes.json"],
   });
-  const flakeRef = await workspaceFlakeRef(tmp);
   await reconcilePnpmStore({ repoRoot: tmp, importer });
-  const built = await _$({
-    cwd: tmp,
-    stdio: "pipe",
-    env: tempWorkspaceEnv(tmp, {
-      BUCK_TEST_SRC: tmp,
-      BUCK_GRAPH_JSON: graphJson,
-      BUCK_TARGET: label,
-    }),
-  })`bash --noprofile --norc -c ${`set -euo pipefail; nix build "path:${flakeRef}#graph-generator-pure-selected" --no-link --no-write-lock-file --accept-flake-config --builders "" --print-build-logs --print-out-paths`}`;
-  const outPath =
-    String(built.stdout || "")
-      .trim()
-      .split("\n")
-      .pop() || "";
+  const outPath = await buildSelectedOutPath({ tmp, $: _$, target: label });
   assert.ok(outPath, `expected selected graph out path for ${label}`);
 
   const runnable = await inferRunnableFromOutPath({

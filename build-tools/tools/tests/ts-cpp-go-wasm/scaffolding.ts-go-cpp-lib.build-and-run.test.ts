@@ -15,7 +15,7 @@ test("scaffold ts go-cpp-lib; build addon + wasm; both return 5", { skip: SKIP_P
     const sh = $({ cwd: tmp, stdio: "inherit" });
 
     // 1) Scaffold the library
-    await sh`node ${viberootsTool("viberoots/build-tools/tools/scaffolding/scaf.ts")} new ts go-cpp-lib demo --yes`;
+    await sh`node ${viberootsTool("viberoots/build-tools/tools/scaffolding/scaf.ts")} new ts go-cpp-lib demo --yes --skip-store-hash-refresh`;
 
     // 2) Ensure workspace-root build files are available in the temp repo.
     await fs.mkdirp(path.join(tmp, "build-tools/tools/nix"));

@@ -54,6 +54,29 @@ test("build-selected runs node patch requirement preflight", async () => {
   if (!txt.includes("resolveFinalPnpmStore")) {
     throw new Error(`${file} must materialize committed final pnpm stores before Nix builds`);
   }
+  if (
+    !txt.includes("const flakeEnv = flakeSource.workspaceRoot") ||
+    !txt.includes("VBR_PNPM_FILTERED_SNAPSHOT_ROOT: flakeSource.workspaceRoot") ||
+    (txt.match(/env: flakeEnv/g) || []).length !== 2
+  ) {
+    throw new Error(
+      `${file} must use one marked filtered-snapshot environment for the final-store probe and build`,
+    );
+  }
+  const flakeSourceIndex = txt.indexOf("const flakeSource = await chooseFlakeRef");
+  const cleanupTryIndex = txt.indexOf("try {", flakeSourceIndex);
+  const finalStoreProbeIndex = txt.indexOf("await resolveFinalPnpmStore", flakeSourceIndex);
+  const cleanupFinallyIndex = txt.indexOf("finally {", finalStoreProbeIndex);
+  const snapshotCleanupIndex = txt.indexOf("await flakeSource.cleanup?.()", cleanupFinallyIndex);
+  if (
+    flakeSourceIndex < 0 ||
+    cleanupTryIndex < flakeSourceIndex ||
+    finalStoreProbeIndex < cleanupTryIndex ||
+    cleanupFinallyIndex < finalStoreProbeIndex ||
+    snapshotCleanupIndex < cleanupFinallyIndex
+  ) {
+    throw new Error(`${file} must clean the filtered snapshot when the final-store probe rejects`);
+  }
   if (txt.includes("import { prepareExactPnpmStore }")) {
     throw new Error(`${file} must not directly prepare exact stores on the selected build path`);
   }

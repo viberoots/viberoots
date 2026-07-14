@@ -682,7 +682,7 @@ test("standalone post-clone fails clearly for missing and invalid lock state", a
         cwd: workspace,
         env: { ...process.env, VBR_POST_CLONE: "1", VBR_DRY_RUN: "1" },
       }),
-      /post-clone requires an existing checked-in flake\.lock/,
+      /post-clone requires an existing checked-in flake\.lock[\s\S]*no tracked files were modified[\s\S]*repair: run viberoots update/,
     );
   });
   await withTempWorkspace("viberoots-post-clone-missing-node", async (workspace) => {
@@ -696,7 +696,7 @@ test("standalone post-clone fails clearly for missing and invalid lock state", a
         cwd: workspace,
         env: { ...process.env, VBR_POST_CLONE: "1", VBR_DRY_RUN: "1" },
       }),
-      /could not find nodes\.viberoots\.locked\.rev/,
+      /could not find nodes\.viberoots\.locked\.rev[\s\S]*no tracked files were modified[\s\S]*repair: run viberoots update/,
     );
   });
   await withTempWorkspace("viberoots-post-clone-invalid-rev", async (workspace) => {
@@ -710,7 +710,26 @@ test("standalone post-clone fails clearly for missing and invalid lock state", a
         cwd: workspace,
         env: { ...process.env, VBR_POST_CLONE: "1", VBR_DRY_RUN: "1" },
       }),
-      /full 40-character commit SHA/,
+      /full 40-character commit SHA[\s\S]*no tracked files were modified[\s\S]*repair: run viberoots update/,
+    );
+  });
+  await withTempWorkspace("viberoots-post-clone-invalid-submodule-rev", async (workspace) => {
+    await fsp.writeFile(
+      path.join(workspace, "flake.lock"),
+      JSON.stringify({ nodes: { viberoots: { locked: { rev: "abc123" } } } }, null, 2),
+      "utf8",
+    );
+    await assert.rejects(
+      execFileAsync("bash", [path.join(viberootsRoot, "bootstrap")], {
+        cwd: workspace,
+        env: {
+          ...process.env,
+          VBR_POST_CLONE: "1",
+          VBR_DRY_RUN: "1",
+          VBR_CONSUMER: "submodule",
+        },
+      }),
+      /full 40-character commit SHA when present[\s\S]*no tracked files were modified[\s\S]*repair: run viberoots update/,
     );
   });
   await withTempWorkspace("viberoots-post-clone-conflicting-flake-rev", async (workspace) => {

@@ -80,7 +80,21 @@ workspace directory. In that case:
   submodule_rev="$(git -C viberoots rev-parse HEAD 2>/dev/null || true)"
   prospective_gitlink_rev="${submodule_rev:-${gitlink_rev}}"
   lock_rev="$(jq -r '.nodes.viberoots.locked.rev // empty' flake.lock 2>/dev/null || true)"
+  test "$(cat .buckroot 2>/dev/null)" = "."
+  for path in .buckroot .buckconfig .envrc .gitignore; do
+    git ls-files --error-unmatch -- "$path" >/dev/null
+  done
+  for entry in .viberoots/ buck-out/ .direnv/ .nix-zsh/ .nix-gcroots/ node_modules node_modules/ projects/config/local.json .local/; do
+    grep -Fxq -- "$entry" .gitignore
+  done
+  if git ls-files --error-unmatch -- projects/config/local.json >/dev/null 2>&1; then
+    echo "error: projects/config/local.json must remain untracked" >&2
+    exit 1
+  fi
   ```
+
+  If any required tracked input is missing or stale, or `projects/config/local.json` is tracked, stop
+  and tell the user to run exactly `viberoots update`.
 
 - In submodule mode, treat `submodule_rev` as the prospective gitlink because this guard runs after
   the submodule commit and before the parent stages its updated gitlink. Fall back to the indexed

@@ -9,6 +9,7 @@ import {
   waitForNoActiveNixGc,
 } from "../../lib/nix-gc-lock";
 import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
+import { runCommand } from "../filtered-flake-command";
 import { isCanonicalSha256SRI } from "../../lib/nix-sri";
 import { localOnlyNixBuilderArgs } from "../../lib/nix-builder-policy";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
@@ -275,10 +276,11 @@ async function currentSystem(): Promise<string> {
   try {
     const nixEnv = withSanitizedInheritedNixConfig(envWithResolvedNixBin(process.env));
     const nixBin = resolveToolPathSync("nix", nixEnv);
-    const res = await $({
-      stdio: "pipe",
+    const res = await runCommand({
+      command: nixBin,
+      args: ["eval", "--impure", "--expr", "builtins.currentSystem"],
       env: nixEnv,
-    })`${nixBin} eval --impure --expr builtins.currentSystem`;
+    });
     return String(res.stdout || "")
       .trim()
       .replace(/^"|"$/g, "");
@@ -297,10 +299,18 @@ export async function flakeAttrExists(
     if (!sys) return false;
     const nixEnv = withSanitizedInheritedNixConfig(envWithResolvedNixBin(process.env));
     const nixBin = resolveToolPathSync("nix", nixEnv);
-    const out = await $({
-      stdio: "pipe",
+    const out = await runCommand({
+      command: nixBin,
+      args: [
+        "eval",
+        "--impure",
+        `${flakeRef}#packages.${sys}.${attrset}`,
+        "--apply",
+        `builtins.hasAttr "${key}"`,
+        "--accept-flake-config",
+      ],
       env: nixEnv,
-    })`${nixBin} eval --impure ${flakeRef}#packages.${sys}.${attrset} --apply ${`builtins.hasAttr "${key}"`} --accept-flake-config`;
+    });
     const val = String(out.stdout || "").trim();
     return val === "true";
   } catch {

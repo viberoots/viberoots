@@ -8,7 +8,7 @@ import net from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { after, test } from "node:test";
-import { exists, runInTemp } from "../lib/test-helpers";
+import { exists, reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 import { pnpmInstallForDevTest } from "./lib/dev-node-modules";
 
 const TEST_TIMEOUT_MS =
@@ -117,6 +117,7 @@ async function runNextRuntimeSmoke(
     tmp,
     _$,
     filter: `./projects/apps/${appName}...`,
+    frozenLockfile: true,
   });
   await _$({ cwd: appAbs, stdio: "inherit" })`node scripts/build-ssr.mjs`;
   const port = await pickFreePort();
@@ -157,6 +158,7 @@ test(
       await $`scaf new ts webapp-ssr-next ${nextApp} --yes --no-tests --skip-lockfile-gen`;
       await assertNextContractFiles(tmp, nextApp);
       await assertPackageScriptsAndLabels(tmp, "webapp-ssr-next", "next", nextApp);
+      await reconcileTempDependencyInputs(tmp, $);
       await runNextRuntimeSmoke(tmp, 'data-ssr-marker="next"', _$, nextApp);
     });
   },

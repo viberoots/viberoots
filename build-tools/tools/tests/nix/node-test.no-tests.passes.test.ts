@@ -2,7 +2,12 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp, exists, workspaceFlakeRef } from "../lib/test-helpers";
+import {
+  reconcileTempDependencyInputs,
+  runInTemp,
+  exists,
+  workspaceFlakeRef,
+} from "../lib/test-helpers";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -31,16 +36,12 @@ test(
       );
       // runInTemp initializes a git repo; stage generated files so Nix git-flake evaluation sees them.
       await $({ cwd: tmp, stdio: "pipe" })`git add -A ${importer}`;
-      // Allow lockfile generation and compute/update pnpm-store FOD hash
+      // Keep the Nix build environment explicit after the intentional dependency update.
       const env = {
         ...process.env,
         NIX_PNPM_ALLOW_GENERATE: "1",
       } as Record<string, string>;
-      await $({
-        cwd: tmp,
-        stdio: "inherit",
-        env,
-      })`zx-wrapper viberoots/build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${path.join(importer, "pnpm-lock.yaml")}`;
+      await reconcileTempDependencyInputs(tmp, $);
       await $({ cwd: tmp, stdio: "pipe" })`git add -A ${importer}`;
       // Do NOT prebuild pnpm-store/node-modules here: the purpose of this test is to ensure
       // node-test can succeed quickly when no tests exist, without forcing heavyweight deps.

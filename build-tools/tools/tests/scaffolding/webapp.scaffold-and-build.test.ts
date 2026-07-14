@@ -3,13 +3,12 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { exists, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { exists, reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
+import { buildSelectedOutPath } from "../lib/test-helpers/selected-build";
 import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
 } from "../lib/test-helpers/git-stage";
-import { resolveFinalPnpmStore } from "../../dev/update-pnpm-hash/realized-store";
-import { viberootsDevTool } from "./lib/viberoots-tools";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -37,10 +36,6 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
         recursiveRoots: ["projects/apps/demo-web"],
         explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS],
       });
-      // No longer modify flake envs for LOCAL_PNPM_STORE; pure Nix path only
-      // Build via Nix directly to avoid nested buck invocations from within a buck test
-      const importer = "projects/apps/demo-web";
-      // Prefetch removed: rely on pure Nix fetch inside FOD
       const appAbs = path.join(tmp, "projects", "apps", "demo-web");
       // Ensure no pre-existing node_modules links before pnpm ops (do not create writable dirs)
       try {
@@ -49,56 +44,13 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
       try {
         await fsp.rm(path.join(appAbs, "node_modules"), { recursive: true, force: true });
       } catch {}
-      const lockfile = path.join(importer, "pnpm-lock.yaml");
-      const sanitized = importer
-        .replace(/\/\//g, "")
-        .replace(/:/g, "-")
-        .replace(/[\/\s]+/g, "-");
-      const envWithPrefetch = { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" } as Record<
-        string,
-        string
-      >;
-      await $({
-        cwd: tmp,
-        stdio: "inherit",
-        env: { ...envWithPrefetch },
-      })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${lockfile}`;
-      const flakeRef = await workspaceFlakeRef(tmp);
-      const fixedStore = await resolveFinalPnpmStore({
-        repoRoot: tmp,
-        importer,
-        flakeRef: `path:${flakeRef}`,
-        attrPath: `pnpm-store.${sanitized}`,
+      await reconcileTempDependencyInputs(tmp, $);
+      // Keep the fixture on the production filtered-snapshot build path.
+      const outPath = await buildSelectedOutPath({
+        tmp,
+        $: _$,
+        target: "//projects/apps/demo-web:app",
       });
-      const nixOut = await (async () => {
-        try {
-          const mj = String(process.env.NIX_MAX_JOBS || "0");
-          const cr = String(process.env.NIX_CORES || "0");
-          const cmd = [
-            "set -euo pipefail;",
-            "nix build",
-            `"path:${flakeRef}#node-webapp.${sanitized}"`,
-            '--no-link --accept-flake-config --builders "" --print-build-logs',
-            mj && mj !== "0" ? `--max-jobs ${mj}` : "",
-            cr && cr !== "0" ? `--option cores ${cr}` : "",
-            "--print-out-paths",
-          ]
-            .filter(Boolean)
-            .join(" ");
-          return await $({
-            stdio: "pipe",
-            cwd: tmp,
-            env: process.env,
-          })`bash --noprofile --norc -c ${cmd}`;
-        } finally {
-          await fixedStore.cleanup();
-        }
-      })();
-      const outPath =
-        String(nixOut.stdout || "")
-          .trim()
-          .split("\n")
-          .pop() || "";
       const index = path.join(outPath, "dist", "index.html");
       if (!(await exists(index))) throw new Error("dist/index.html missing in Nix webapp output");
       const stagedWasm = path.join(outPath, "dist", "top.wasm");

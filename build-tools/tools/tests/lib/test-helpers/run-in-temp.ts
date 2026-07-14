@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { ensureBuckConfigForTempRepo, ensureWorkspaceRootEnvFile } from "./buck-config";
+import { rethrowAfterAsyncCleanup, runAsyncCleanupSteps, withAsyncCleanup } from "./async-cleanup";
 import {
   buckCleanupRootsForRepo,
   killBuckDaemonsForRepo,
@@ -15,10 +16,10 @@ import { cleanupTempRepoProcesses } from "../../../dev/verify/temp-repo-process-
 import { registerBuckIsolationSync } from "../../../dev/verify/owned-process-state";
 import { rsyncRepoTo } from "./rsync";
 import { initTempRepoFromSeedStore } from "./seed-store";
-import { shSingleQuote } from "./shell-quote";
 import { timeAsync } from "./timing";
 import { ensureToolchainPathsForTempRepo } from "./toolchain-paths";
 import { mktemp } from "./tmp";
+import { removeTreeWithWritableFallback } from "./remove-tree";
 import { ensureSharedNixTarballCacheRepo } from "./xdg-cache";
 import "./worker-init";
 import { ensureZxInitProbedOnce } from "./zx-init-probe";
@@ -34,6 +35,7 @@ import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths";
 import { stableBuckIsolation } from "../../../lib/buck-command-env";
 import { resolveToolPathSync } from "../../../lib/tool-paths";
 import { pathExists } from "../../../lib/repo";
+import { repoNodeBinDirectories } from "../../../lib/repo-node-bin";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../../../lib/macos-metadata";
 import { ensureWorkspaceProvidersPackage } from "../../../lib/workspace-providers-package";
 import { resolveFinalPnpmStore } from "../../../dev/update-pnpm-hash/realized-store";
@@ -50,7 +52,6 @@ import {
 const LOCAL_FIXTURE_SERVICE_ENV = "VBR_DEPLOY_LOCAL_FIXTURE_SERVICE";
 const PREPARED_SEED_MARKER = ".seed-store-prepared-v7";
 
-let cachedDevEnvExport: Promise<string> | null = null;
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
 let cachedPinnedCacertPath: Promise<string> | null = null;
 let cachedUnifiedPnpmStorePath: Promise<string> | null = null;
@@ -110,15 +111,6 @@ type TempViberootsRoles = {
   consumerSnapshotRoot: string;
   flakeInput: MaterializedPathInput;
 };
-
-async function exportDevEnvOncePerWorker($: any, roles: TempViberootsRoles): Promise<string> {
-  if (cachedDevEnvExport) return await cachedDevEnvExport;
-  cachedDevEnvExport = exportDevEnvWithRetry($, roles).catch((err) => {
-    cachedDevEnvExport = null;
-    throw err;
-  });
-  return await cachedDevEnvExport;
-}
 
 async function exportDevEnvWithRetry($: any, roles: TempViberootsRoles): Promise<string> {
   const consumerFlakeRoot = await workspaceFlakeRef(roles.consumerSnapshotRoot);
@@ -499,11 +491,10 @@ async function prepareFilteredConsumerSnapshot(
     }
     return {
       root: snapshotRoot,
-      cleanup: async () => await fsp.rm(workDir, { recursive: true, force: true }),
+      cleanup: async () => await removeTreeWithWritableFallback(workDir, $),
     };
   } catch (error) {
-    await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
-    throw error;
+    await rethrowAfterAsyncCleanup(error, async () => removeTreeWithWritableFallback(workDir, $));
   }
 }
 
@@ -814,27 +805,6 @@ async function resolveTestHome(): Promise<{ home: string; removeOnExit: boolean 
   }
   const home = await stableTestHomeOncePerWorker();
   return { home, removeOnExit: false };
-}
-
-async function removeTreeWithWritableFallback(target: string, $: any): Promise<void> {
-  try {
-    await fsp.rm(target, { recursive: true, force: true });
-    return;
-  } catch {
-    // Only pay the recursive chmod cost when deletion actually fails.
-    try {
-      const q = shSingleQuote(target);
-      await $({
-        stdio: "ignore",
-        cwd: process.cwd(),
-        reject: false,
-        nothrow: true,
-      })`bash --noprofile --norc -c ${`chmod -R u+w ${q} >/dev/null 2>&1 || true`}`;
-    } catch {}
-    await fsp.rm(target, { recursive: true, force: true }).catch((err) => {
-      console.warn("warning: failed to remove temp test dir:", err);
-    });
-  }
 }
 
 async function createTempBuck2Shim(tmp: string, iso: string): Promise<string> {
@@ -1300,278 +1270,309 @@ export async function runInTemp<T>(
     });
   }
 
+  let consumerSnapshot: Awaited<ReturnType<typeof prepareFilteredConsumerSnapshot>> | null = null;
   let envOut: any = { stdout: "" };
-  if ((process.env.TEST_NEED_DEV_ENV || "") === "1") {
-    const consumerSnapshot = await timeAsync(
-      "runInTemp prepareFilteredConsumerSnapshot",
-      async () => prepareFilteredConsumerSnapshot(tmp),
-    );
-    try {
-      const flakeRef = await workspaceFlakeRef(consumerSnapshot.root);
-      const snapshotEnv = {
-        ...tempSetupEnv,
-        WORKSPACE_ROOT: consumerSnapshot.root,
-        BUCK_TEST_SRC: consumerSnapshot.root,
-        VBR_FILTERED_FLAKE_SNAPSHOT: "1",
-        VBR_PNPM_FILTERED_SNAPSHOT_ROOT: consumerSnapshot.root,
-      };
-      const $snapshot = $({ cwd: consumerSnapshot.root, env: snapshotEnv, stdio: "pipe" });
-      const chk = await retryTransientNixStoreFailure(
-        "checking temp repo buck2-prelude",
-        async () =>
-          await $snapshot`nix build ${`path:${flakeRef}#buck2-prelude`} --no-link --no-write-lock-file --accept-flake-config --print-build-logs`.nothrow(),
-        (out) => `${(out as any).stdout || ""}\n${(out as any).stderr || ""}`,
-        (out) => Number((out as any).exitCode || 0) !== 0,
-      );
-      if (chk.exitCode !== 0) {
-        const detail = `${String(chk.stdout || "")}\n${String(chk.stderr || "")}`.trim();
-        throw new Error(
-          [
-            "dev-shell check failed: nix build path:<filtered-temp>#buck2-prelude did not succeed; ensure direnv/dev shell is active",
-            detail,
-          ]
-            .filter(Boolean)
-            .join("\n"),
-        );
-      }
-      envOut = await timeAsync(`devEnvExport(${path.basename(tmp)})`, async () => {
-        return {
-          stdout: await exportDevEnvOncePerWorker($, {
-            commandSourceRoot: viberootsSourceRoot,
-            consumerSnapshotRoot: consumerSnapshot.root,
-            flakeInput: viberootsInput,
-          }),
-        };
-      });
-    } finally {
-      await consumerSnapshot.cleanup();
-    }
-  }
-
-  let exportEnv: Record<string, string> = {};
-  for (const [k, v] of Object.entries(process.env)) {
-    if (typeof v === "string") exportEnv[k] = v;
-  }
-  withSanitizedInheritedNixConfig(exportEnv);
-  const allowDevOverrides = String(process.env.TEST_ALLOW_DEV_OVERRIDES || "").trim() === "1";
-  if (!allowDevOverrides) {
-    // Avoid leaking local dev overrides into temp-repo commands unless explicitly allowed.
-    for (const key of [
-      "NIX_CPP_DEV_OVERRIDE_JSON",
-      "NIX_GO_DEV_OVERRIDE_JSON",
-      "NIX_PY_DEV_OVERRIDE_JSON",
-    ]) {
-      delete exportEnv[key];
-    }
-  }
-  exportEnv.REPO_ROOT = process.cwd();
-  exportEnv.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = process.cwd();
-  exportEnv.CGO_ENABLED = String(exportEnv.CGO_ENABLED || "").trim() || "0";
-
-  const injected = String((envOut as any).stdout || "");
-  for (const entry of injected ? injected.split("\0") : []) {
-    if (!entry) continue;
-    const idx = entry.indexOf("=");
-    if (idx > 0) exportEnv[entry.slice(0, idx)] = entry.slice(idx + 1);
-  }
-
-  exportEnv.IN_NIX_SHELL = exportEnv.IN_NIX_SHELL || "1";
-  try {
-    const wsNodeModules = path.join(process.cwd(), "node_modules");
-    const activeViberootsNodeModules = path.join(activeViberootsRoot, "node_modules");
-    const viberootsSourceNodeModules = path.join(viberootsSourceRoot, "node_modules");
-    const viberootsInputNodeModules = path.join(viberootsInput.storePath, "node_modules");
-    applyTempNodePath(exportEnv, [
-      wsNodeModules,
-      activeViberootsNodeModules,
-      viberootsSourceNodeModules,
-      viberootsInputNodeModules,
-    ]);
-  } catch {}
-  exportEnv.WORKSPACE_ROOT = tmp;
-  exportEnv.BUCK_TEST_SRC = tmp;
-  exportEnv.VIBEROOTS_ROOT = viberootsSourceRoot;
-  exportEnv.VIBEROOTS_SOURCE_ROOT = viberootsSourceRoot;
-  exportEnv.VIBEROOTS_FLAKE_INPUT_ROOT = viberootsInput.storePath;
-  exportEnv.VBR_RUN_IN_TEMP_REPO = "1";
-  exportEnv.SCAF_ALLOW_LIVE_REPO = "1";
-  exportEnv.BUCK_ISOLATION_DIR = tempNestedIso;
-  exportEnv.BUCK_NESTED_ISO = tempNestedIso;
-  exportEnv.TEST_NO_BROWSER = exportEnv.TEST_NO_BROWSER || "1";
-  exportEnv[LOCAL_FIXTURE_SERVICE_ENV] = exportEnv[LOCAL_FIXTURE_SERVICE_ENV] || "1";
-  exportEnv.BUCK_EXPORTER_REUSE_DAEMON = exportEnv.BUCK_EXPORTER_REUSE_DAEMON || "1";
-  exportEnv.BUCKD_STARTUP_TIMEOUT = exportEnv.BUCKD_STARTUP_TIMEOUT || "300";
-  exportEnv.BUCKD_STARTUP_INIT_TIMEOUT =
-    exportEnv.BUCKD_STARTUP_INIT_TIMEOUT || exportEnv.BUCKD_STARTUP_TIMEOUT;
-  exportEnv.HOME = home;
-  exportEnv.XDG_CACHE_HOME = exportEnv.XDG_CACHE_HOME || xdgCacheHome;
-  if (!exportEnv.BUCK2_REAL_HOME && realHome) {
-    exportEnv.BUCK2_REAL_HOME = realHome;
-  }
-  if (!exportEnv.XDG_CONFIG_HOME) {
-    exportEnv.XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
-  }
-
-  exportEnv.GOPROXY = exportEnv.GOPROXY || "https://proxy.golang.org,direct";
-  exportEnv.GOSUMDB = exportEnv.GOSUMDB || "sum.golang.org";
-  exportEnv.GOMODCACHE = exportEnv.GOMODCACHE || goModCacheRoot;
-  try {
-    if (!nixPathHasNixpkgsEntry(exportEnv.NIX_PATH || "")) {
-      const pinnedNixpkgs = await timeAsync("runInTemp pinnedNixpkgsPath", async () => {
-        return await pinnedNixpkgsPathOncePerWorker($);
-      });
-      if (pinnedNixpkgs) {
-        const nixPathEntries = String(exportEnv.NIX_PATH || "")
-          .split(":")
-          .map((entry) => entry.trim())
-          .filter(Boolean)
-          .filter((entry) => !entry.startsWith("nixpkgs="));
-        exportEnv.NIX_PATH = [`nixpkgs=${pinnedNixpkgs}`, ...nixPathEntries].join(":");
-      }
-    }
-  } catch {}
-  if (!exportEnv.SSL_CERT_FILE && exportEnv.NIX_SSL_CERT_FILE) {
-    exportEnv.SSL_CERT_FILE = exportEnv.NIX_SSL_CERT_FILE;
-  }
-  if (!exportEnv.SSL_CERT_FILE) {
-    try {
-      const pinnedCacert = await timeAsync("runInTemp pinnedCacertPath", async () => {
-        return await pinnedCacertPathOncePerWorker($);
-      });
-      if (pinnedCacert) {
-        exportEnv.SSL_CERT_FILE = pinnedCacert;
-        exportEnv.NIX_SSL_CERT_FILE = pinnedCacert;
-        exportEnv.NODE_EXTRA_CA_CERTS = exportEnv.NODE_EXTRA_CA_CERTS || pinnedCacert;
-      }
-    } catch {}
-  }
-  if (!exportEnv.SSL_CERT_FILE) {
-    const defaultCert = "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt";
-    try {
-      await fsp.access(defaultCert);
-      exportEnv.SSL_CERT_FILE = defaultCert;
-    } catch {}
-  }
-  if (!exportEnv.SSL_CERT_DIR && exportEnv.NIX_SSL_CERT_DIR) {
-    exportEnv.SSL_CERT_DIR = exportEnv.NIX_SSL_CERT_DIR;
-  }
-  exportEnv.DIRENV_LOG_FORMAT = "";
-  exportEnv.ZX_INIT = path.join(viberootsSourceRoot, "build-tools", "tools", "dev", "zx-init.mjs");
-  prependPath(exportEnv, buck2ShimDir);
-  await prependTempRepoBin(exportEnv, tmp);
-  prependPath(exportEnv, buck2ShimDir);
-  const wantsUnifiedPnpmStore =
-    String(process.env.TEST_DISABLE_UNIFIED_PNPM_STORE || "").trim() !== "1";
   let tempPnpmStateRoot: string | null = null;
-  if (wantsUnifiedPnpmStore) {
-    const unified = await timeAsync("runInTemp ensureUnifiedPnpmStore", async () => {
-      return await ensureUnifiedPnpmStoreOncePerWorker($);
-    });
-    const pnpmState = await timeAsync("runInTemp externalPnpmStateDirs", async () => {
-      return await externalPnpmStateDirs(tmp);
-    });
-    tempPnpmStateRoot = pnpmState.rootDir;
-    exportEnv.PNPM_HOME = exportEnv.PNPM_HOME || pnpmState.homeDir;
-    if (unified) {
-      exportEnv.LOCAL_PNPM_STORE = exportEnv.LOCAL_PNPM_STORE || unified;
-      exportEnv.NIX_USE_PREFETCHED_PNPM_STORE = "1";
-      exportEnv.npm_config_store_dir = exportEnv.npm_config_store_dir || unified;
-      exportEnv.NPM_CONFIG_STORE_DIR = exportEnv.NPM_CONFIG_STORE_DIR || unified;
-      exportEnv.npm_config_ignore_pnpmfile = exportEnv.npm_config_ignore_pnpmfile || "true";
-      exportEnv.NPM_CONFIG_IGNORE_PNPMFILE = exportEnv.NPM_CONFIG_IGNORE_PNPMFILE || "true";
-    }
-  }
-
-  const nodeOpts = [
-    "--experimental-strip-types",
-    "--disable-warning=ExperimentalWarning",
-    `--import ${exportEnv.ZX_INIT}`,
-  ];
-  exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
-    .filter(Boolean)
-    .join(" ");
-  exportEnv = withGitAutoMaintenanceDisabledEnv(exportEnv);
-
-  const needCgo =
-    exportEnv.CGO_ENABLED === "1" || String(process.env.TEST_ENABLE_CGO || "").trim() === "1";
-  if (needCgo) {
-    try {
-      const sdk = await getDarwinSdkPathOncePerWorker($);
-      const tc = await getCgoToolchainPathsOncePerWorker($);
-      if (sdk && process.platform === "darwin") {
-        exportEnv.SDKROOT = exportEnv.SDKROOT || sdk;
-        const base = `-isysroot ${sdk}`;
-        exportEnv.CGO_CPPFLAGS = [base, exportEnv.CGO_CPPFLAGS || ""].filter(Boolean).join(" ");
-        exportEnv.CGO_CFLAGS = [base, exportEnv.CGO_CFLAGS || ""].filter(Boolean).join(" ");
-        const inc = `${sdk}/usr/include`;
-        const lib = `${sdk}/usr/lib`;
-        exportEnv.CPATH = [inc, exportEnv.CPATH || ""].filter(Boolean).join(path.delimiter);
-        exportEnv.LIBRARY_PATH = [lib, exportEnv.LIBRARY_PATH || ""]
-          .filter(Boolean)
-          .join(path.delimiter);
-        exportEnv.CC = exportEnv.CC || "xcrun --sdk macosx clang";
+  let cleanupCommand: any = null;
+  return await withAsyncCleanup(
+    async () => {
+      if ((process.env.TEST_NEED_DEV_ENV || "") === "1") {
+        consumerSnapshot = await timeAsync("runInTemp prepareFilteredConsumerSnapshot", async () =>
+          prepareFilteredConsumerSnapshot(tmp),
+        );
+        const snapshot = consumerSnapshot;
+        const flakeRef = await workspaceFlakeRef(snapshot.root);
+        const snapshotEnv = {
+          ...tempSetupEnv,
+          WORKSPACE_ROOT: snapshot.root,
+          BUCK_TEST_SRC: snapshot.root,
+          VBR_FILTERED_FLAKE_SNAPSHOT: "1",
+          VBR_PNPM_FILTERED_SNAPSHOT_ROOT: snapshot.root,
+        };
+        const $snapshot = $({ cwd: snapshot.root, env: snapshotEnv, stdio: "pipe" });
+        const chk = await retryTransientNixStoreFailure(
+          "checking temp repo buck2-prelude",
+          async () =>
+            await $snapshot`nix build ${`path:${flakeRef}#buck2-prelude`} --no-link --no-write-lock-file --accept-flake-config --print-build-logs`.nothrow(),
+          (out) => `${(out as any).stdout || ""}\n${(out as any).stderr || ""}`,
+          (out) => Number((out as any).exitCode || 0) !== 0,
+        );
+        if (chk.exitCode !== 0) {
+          const detail = `${String(chk.stdout || "")}\n${String(chk.stderr || "")}`.trim();
+          throw new Error(
+            [
+              "dev-shell check failed: nix build path:<filtered-temp>#buck2-prelude did not succeed; ensure direnv/dev shell is active",
+              detail,
+            ]
+              .filter(Boolean)
+              .join("\n"),
+          );
+        }
+        envOut = await timeAsync(`devEnvExport(${path.basename(tmp)})`, async () => {
+          return {
+            stdout: await exportDevEnvWithRetry($, {
+              commandSourceRoot: viberootsSourceRoot,
+              consumerSnapshotRoot: snapshot.root,
+              flakeInput: viberootsInput,
+            }),
+          };
+        });
       }
-      if (tc) {
-        const isNix = (p: string) => !!p && p.startsWith("/nix/store/");
-        if (isNix(tc.clang) && isNix(tc.clangxx)) {
-          if (process.platform === "darwin") {
-            if (isNix(tc.xcrun)) {
-              exportEnv.CC = `${tc.xcrun} --sdk macosx ${tc.clang}`;
-              exportEnv.CXX = `${tc.xcrun} --sdk macosx ${tc.clangxx}`;
-            }
-          } else {
-            exportEnv.CC = tc.clang;
-            exportEnv.CXX = tc.clangxx;
-          }
+
+      let exportEnv: Record<string, string> = {};
+      for (const [k, v] of Object.entries(process.env)) {
+        if (typeof v === "string") exportEnv[k] = v;
+      }
+      withSanitizedInheritedNixConfig(exportEnv);
+      const allowDevOverrides = String(process.env.TEST_ALLOW_DEV_OVERRIDES || "").trim() === "1";
+      if (!allowDevOverrides) {
+        // Avoid leaking local dev overrides into temp-repo commands unless explicitly allowed.
+        for (const key of [
+          "NIX_CPP_DEV_OVERRIDE_JSON",
+          "NIX_GO_DEV_OVERRIDE_JSON",
+          "NIX_PY_DEV_OVERRIDE_JSON",
+        ]) {
+          delete exportEnv[key];
         }
       }
-    } catch {}
-  }
+      exportEnv.REPO_ROOT = process.cwd();
+      exportEnv.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = process.cwd();
+      exportEnv.CGO_ENABLED = String(exportEnv.CGO_ENABLED || "").trim() || "0";
 
-  const forceZxProbe = String(process.env.TEST_FORCE_ZX_INIT_PROBE || "").trim() === "1";
-  if ((process.env.TEST_NEED_DEV_ENV || "") === "1" || forceZxProbe) {
-    await timeAsync("runInTemp ensureZxInitProbedOnce", async () => {
-      await ensureZxInitProbedOnce({ tmp, $, exportEnv });
-    });
-  }
-  const _$ = $({ cwd: tmp, env: exportEnv });
-  await timeAsync("buck-daemon-reaper setup", async () => await ensureBuckReaperStarted(tmp, _$));
-
-  try {
-    return await timeAsync("runInTemp testBody", async () => {
-      return await withTempProcessEnv(exportEnv, async () => await fn(tmp, _$));
-    });
-  } finally {
-    await timeAsync("temp process cleanup", async () => {
-      await cleanupTempRepoProcesses({ roots: [tmp] }).catch(() => {});
-    });
-    await timeAsync("buck-daemon cleanup", async () => await killBuckDaemonsForRepo(tmp, _$));
-    if ((process.env.TEST_REWRITE_COVERAGE_TMP || "") === "1") {
-      await timeAsync(`rewriteCoverageUrls(${path.basename(tmp)})`, async () =>
-        rewriteCoverageUrls(tmp).catch(() => {}),
-      );
-    }
-    if (process.env.TEST_KEEP_TMP === "1") {
-      try {
-        console.error(`KEEP_TMP ${tmp}`);
-        await fsp
-          .appendFile(path.join(process.cwd(), "test-tmp-paths.log"), tmp + "\n", "utf8")
-          .catch(() => {});
-      } catch {}
-    } else {
-      const postRemoveBuckCleanupRoots = await buckCleanupRootsForRepo(tmp);
-      await removeTreeWithWritableFallback(tmp, $);
-      if (tempPnpmStateRoot) {
-        await removeTreeWithWritableFallback(tempPnpmStateRoot, $);
+      const injected = String((envOut as any).stdout || "");
+      for (const entry of injected ? injected.split("\0") : []) {
+        if (!entry) continue;
+        const idx = entry.indexOf("=");
+        if (idx > 0) exportEnv[entry.slice(0, idx)] = entry.slice(idx + 1);
       }
-      await timeAsync("post-remove buck-daemon cleanup", async () => {
-        await killBuckDaemonsForRoots(postRemoveBuckCleanupRoots, _$);
+
+      exportEnv.IN_NIX_SHELL = exportEnv.IN_NIX_SHELL || "1";
+      try {
+        const wsNodeModules = path.join(process.cwd(), "node_modules");
+        const activeViberootsNodeModules = path.join(activeViberootsRoot, "node_modules");
+        const viberootsSourceNodeModules = path.join(viberootsSourceRoot, "node_modules");
+        const viberootsInputNodeModules = path.join(viberootsInput.storePath, "node_modules");
+        applyTempNodePath(exportEnv, [
+          wsNodeModules,
+          activeViberootsNodeModules,
+          viberootsSourceNodeModules,
+          viberootsInputNodeModules,
+        ]);
+        const nodeBinDirs = await repoNodeBinDirectories(process.cwd(), exportEnv);
+        for (const binDir of nodeBinDirs.reverse()) {
+          if ((await fsp.stat(binDir).catch(() => null))?.isDirectory()) {
+            prependPath(exportEnv, binDir);
+          }
+        }
+      } catch {}
+      exportEnv.WORKSPACE_ROOT = tmp;
+      exportEnv.BUCK_TEST_SRC = tmp;
+      exportEnv.VIBEROOTS_ROOT = viberootsSourceRoot;
+      exportEnv.VIBEROOTS_SOURCE_ROOT = viberootsSourceRoot;
+      exportEnv.VIBEROOTS_FLAKE_INPUT_ROOT = viberootsInput.storePath;
+      exportEnv.VBR_RUN_IN_TEMP_REPO = "1";
+      exportEnv.SCAF_ALLOW_LIVE_REPO = "1";
+      exportEnv.BUCK_ISOLATION_DIR = tempNestedIso;
+      exportEnv.BUCK_NESTED_ISO = tempNestedIso;
+      exportEnv.TEST_NO_BROWSER = exportEnv.TEST_NO_BROWSER || "1";
+      exportEnv[LOCAL_FIXTURE_SERVICE_ENV] = exportEnv[LOCAL_FIXTURE_SERVICE_ENV] || "1";
+      exportEnv.BUCK_EXPORTER_REUSE_DAEMON = exportEnv.BUCK_EXPORTER_REUSE_DAEMON || "1";
+      exportEnv.BUCKD_STARTUP_TIMEOUT = exportEnv.BUCKD_STARTUP_TIMEOUT || "300";
+      exportEnv.BUCKD_STARTUP_INIT_TIMEOUT =
+        exportEnv.BUCKD_STARTUP_INIT_TIMEOUT || exportEnv.BUCKD_STARTUP_TIMEOUT;
+      exportEnv.HOME = home;
+      exportEnv.XDG_CACHE_HOME = exportEnv.XDG_CACHE_HOME || xdgCacheHome;
+      if (!exportEnv.BUCK2_REAL_HOME && realHome) {
+        exportEnv.BUCK2_REAL_HOME = realHome;
+      }
+      if (!exportEnv.XDG_CONFIG_HOME) {
+        exportEnv.XDG_CONFIG_HOME =
+          process.env.XDG_CONFIG_HOME || path.join(os.homedir(), ".config");
+      }
+
+      exportEnv.GOPROXY = exportEnv.GOPROXY || "https://proxy.golang.org,direct";
+      exportEnv.GOSUMDB = exportEnv.GOSUMDB || "sum.golang.org";
+      exportEnv.GOMODCACHE = exportEnv.GOMODCACHE || goModCacheRoot;
+      try {
+        if (!nixPathHasNixpkgsEntry(exportEnv.NIX_PATH || "")) {
+          const pinnedNixpkgs = await timeAsync("runInTemp pinnedNixpkgsPath", async () => {
+            return await pinnedNixpkgsPathOncePerWorker($);
+          });
+          if (pinnedNixpkgs) {
+            const nixPathEntries = String(exportEnv.NIX_PATH || "")
+              .split(":")
+              .map((entry) => entry.trim())
+              .filter(Boolean)
+              .filter((entry) => !entry.startsWith("nixpkgs="));
+            exportEnv.NIX_PATH = [`nixpkgs=${pinnedNixpkgs}`, ...nixPathEntries].join(":");
+          }
+        }
+      } catch {}
+      if (!exportEnv.SSL_CERT_FILE && exportEnv.NIX_SSL_CERT_FILE) {
+        exportEnv.SSL_CERT_FILE = exportEnv.NIX_SSL_CERT_FILE;
+      }
+      if (!exportEnv.SSL_CERT_FILE) {
+        try {
+          const pinnedCacert = await timeAsync("runInTemp pinnedCacertPath", async () => {
+            return await pinnedCacertPathOncePerWorker($);
+          });
+          if (pinnedCacert) {
+            exportEnv.SSL_CERT_FILE = pinnedCacert;
+            exportEnv.NIX_SSL_CERT_FILE = pinnedCacert;
+            exportEnv.NODE_EXTRA_CA_CERTS = exportEnv.NODE_EXTRA_CA_CERTS || pinnedCacert;
+          }
+        } catch {}
+      }
+      if (!exportEnv.SSL_CERT_FILE) {
+        const defaultCert = "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt";
+        try {
+          await fsp.access(defaultCert);
+          exportEnv.SSL_CERT_FILE = defaultCert;
+        } catch {}
+      }
+      if (!exportEnv.SSL_CERT_DIR && exportEnv.NIX_SSL_CERT_DIR) {
+        exportEnv.SSL_CERT_DIR = exportEnv.NIX_SSL_CERT_DIR;
+      }
+      exportEnv.DIRENV_LOG_FORMAT = "";
+      exportEnv.ZX_INIT = path.join(
+        viberootsSourceRoot,
+        "build-tools",
+        "tools",
+        "dev",
+        "zx-init.mjs",
+      );
+      prependPath(exportEnv, buck2ShimDir);
+      await prependTempRepoBin(exportEnv, tmp);
+      prependPath(exportEnv, buck2ShimDir);
+      const wantsUnifiedPnpmStore =
+        String(process.env.TEST_DISABLE_UNIFIED_PNPM_STORE || "").trim() !== "1";
+      if (wantsUnifiedPnpmStore) {
+        const unified = await timeAsync("runInTemp ensureUnifiedPnpmStore", async () => {
+          return await ensureUnifiedPnpmStoreOncePerWorker($);
+        });
+        const pnpmState = await timeAsync("runInTemp externalPnpmStateDirs", async () => {
+          return await externalPnpmStateDirs(tmp);
+        });
+        tempPnpmStateRoot = pnpmState.rootDir;
+        exportEnv.PNPM_HOME = exportEnv.PNPM_HOME || pnpmState.homeDir;
+        if (unified) {
+          exportEnv.LOCAL_PNPM_STORE = exportEnv.LOCAL_PNPM_STORE || unified;
+          exportEnv.NIX_USE_PREFETCHED_PNPM_STORE = "1";
+          exportEnv.npm_config_store_dir = exportEnv.npm_config_store_dir || unified;
+          exportEnv.NPM_CONFIG_STORE_DIR = exportEnv.NPM_CONFIG_STORE_DIR || unified;
+          exportEnv.npm_config_ignore_pnpmfile = exportEnv.npm_config_ignore_pnpmfile || "true";
+          exportEnv.NPM_CONFIG_IGNORE_PNPMFILE = exportEnv.NPM_CONFIG_IGNORE_PNPMFILE || "true";
+        }
+      }
+
+      const nodeOpts = [
+        "--experimental-strip-types",
+        "--disable-warning=ExperimentalWarning",
+        `--import ${exportEnv.ZX_INIT}`,
+      ];
+      exportEnv.NODE_OPTIONS = [nodeOpts.join(" "), exportEnv.NODE_OPTIONS || ""]
+        .filter(Boolean)
+        .join(" ");
+      exportEnv = withGitAutoMaintenanceDisabledEnv(exportEnv);
+
+      const needCgo =
+        exportEnv.CGO_ENABLED === "1" || String(process.env.TEST_ENABLE_CGO || "").trim() === "1";
+      if (needCgo) {
+        try {
+          const sdk = await getDarwinSdkPathOncePerWorker($);
+          const tc = await getCgoToolchainPathsOncePerWorker($);
+          if (sdk && process.platform === "darwin") {
+            exportEnv.SDKROOT = exportEnv.SDKROOT || sdk;
+            const base = `-isysroot ${sdk}`;
+            exportEnv.CGO_CPPFLAGS = [base, exportEnv.CGO_CPPFLAGS || ""].filter(Boolean).join(" ");
+            exportEnv.CGO_CFLAGS = [base, exportEnv.CGO_CFLAGS || ""].filter(Boolean).join(" ");
+            const inc = `${sdk}/usr/include`;
+            const lib = `${sdk}/usr/lib`;
+            exportEnv.CPATH = [inc, exportEnv.CPATH || ""].filter(Boolean).join(path.delimiter);
+            exportEnv.LIBRARY_PATH = [lib, exportEnv.LIBRARY_PATH || ""]
+              .filter(Boolean)
+              .join(path.delimiter);
+            exportEnv.CC = exportEnv.CC || "xcrun --sdk macosx clang";
+          }
+          if (tc) {
+            const isNix = (p: string) => !!p && p.startsWith("/nix/store/");
+            if (isNix(tc.clang) && isNix(tc.clangxx)) {
+              if (process.platform === "darwin") {
+                if (isNix(tc.xcrun)) {
+                  exportEnv.CC = `${tc.xcrun} --sdk macosx ${tc.clang}`;
+                  exportEnv.CXX = `${tc.xcrun} --sdk macosx ${tc.clangxx}`;
+                }
+              } else {
+                exportEnv.CC = tc.clang;
+                exportEnv.CXX = tc.clangxx;
+              }
+            }
+          }
+        } catch {}
+      }
+
+      const forceZxProbe = String(process.env.TEST_FORCE_ZX_INIT_PROBE || "").trim() === "1";
+      if ((process.env.TEST_NEED_DEV_ENV || "") === "1" || forceZxProbe) {
+        await timeAsync("runInTemp ensureZxInitProbedOnce", async () => {
+          await ensureZxInitProbedOnce({ tmp, $, exportEnv });
+        });
+      }
+      cleanupCommand = $({ cwd: tmp, env: exportEnv });
+      await timeAsync(
+        "buck-daemon-reaper setup",
+        async () => await ensureBuckReaperStarted(tmp, cleanupCommand),
+      );
+
+      return await timeAsync("runInTemp testBody", async () => {
+        return await withTempProcessEnv(exportEnv, async () => await fn(tmp, cleanupCommand));
       });
-    }
-    if (removeHome) {
-      await removeTreeWithWritableFallback(home, $);
-    }
-  }
+    },
+    async () => {
+      const cleanup$ = cleanupCommand || $setup;
+      let postRemoveBuckCleanupRoots: string[] = [];
+      const steps: Array<() => Promise<void>> = [
+        async () =>
+          await timeAsync("temp process cleanup", async () => {
+            await cleanupTempRepoProcesses({ roots: [tmp] });
+          }),
+        async () =>
+          await timeAsync(
+            "buck-daemon cleanup",
+            async () => await killBuckDaemonsForRepo(tmp, cleanup$),
+          ),
+        async () => await consumerSnapshot?.cleanup(),
+      ];
+      if ((process.env.TEST_REWRITE_COVERAGE_TMP || "") === "1") {
+        steps.push(async () =>
+          timeAsync(`rewriteCoverageUrls(${path.basename(tmp)})`, async () =>
+            rewriteCoverageUrls(tmp),
+          ),
+        );
+      }
+      if (process.env.TEST_KEEP_TMP === "1") {
+        steps.push(async () => {
+          console.error(`KEEP_TMP ${tmp}`);
+          await fsp.appendFile(path.join(process.cwd(), "test-tmp-paths.log"), tmp + "\n", "utf8");
+        });
+      } else {
+        steps.push(
+          async () => {
+            postRemoveBuckCleanupRoots = await buckCleanupRootsForRepo(tmp);
+          },
+          async () => await removeTreeWithWritableFallback(tmp, $),
+          async () => {
+            if (tempPnpmStateRoot) await removeTreeWithWritableFallback(tempPnpmStateRoot, $);
+          },
+          async () =>
+            await timeAsync("post-remove buck-daemon cleanup", async () => {
+              await killBuckDaemonsForRoots(postRemoveBuckCleanupRoots, cleanup$);
+            }),
+        );
+      }
+      if (removeHome) steps.push(async () => await removeTreeWithWritableFallback(home, $));
+      await runAsyncCleanupSteps(steps);
+    },
+  );
 }
 
 function registerRunInTempBuckIsolation(iso: string, repoRoot: string): void {

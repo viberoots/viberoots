@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 import { viberootsTool } from "./lib/viberoots-tools";
 
 async function buckOutPath(args: {
@@ -81,7 +81,7 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`node ${viberootsTool("viberoots/build-tools/tools/scaffolding/scaf.ts")} new ts wasm-linking-app ${name} --yes`;
+    })`node ${viberootsTool("viberoots/build-tools/tools/scaffolding/scaf.ts")} new ts wasm-linking-app ${name} --yes --skip-store-hash-refresh`;
 
     const appTargets = path.join(tmp, "projects", "apps", name, "TARGETS");
     const cliTargets = path.join(tmp, "projects", "apps", `${name}-cli`, "TARGETS");
@@ -147,6 +147,7 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
       apiTargetsText.includes('link_closure = "transitive"'),
       'expected tinygo wasm target to set link_closure = "transitive"',
     );
+    await reconcileTempDependencyInputs(tmp, $);
     await $({
       cwd: tmp,
       stdio: "inherit",

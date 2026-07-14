@@ -287,39 +287,43 @@ async function main() {
     sourceMode: parsedSource.sourceMode,
     graphPath,
   });
+  const flakeEnv = flakeSource.workspaceRoot
+    ? {
+        ...sanitizedEnv,
+        WORKSPACE_ROOT: flakeSource.workspaceRoot,
+        BUCK_GRAPH_JSON: path.join(flakeSource.workspaceRoot, DEFAULT_GRAPH_PATH),
+        VBR_PNPM_FILTERED_SNAPSHOT_ROOT: flakeSource.workspaceRoot,
+      }
+    : sanitizedEnv;
   const targetImporter = targetPackageFromLabel(target);
-  const fixedStore =
-    targetImporter && (await pathExists(path.join(workspaceRoot, targetImporter, "pnpm-lock.yaml")))
-      ? await resolveFinalPnpmStore({
-          repoRoot: workspaceRoot,
-          importer: targetImporter,
-          flakeRef: flakeSource.flakeRef,
-          attrPath: pnpmStoreAttrFromImporter(targetImporter),
-        })
-      : null;
-  const nixTrace = exporterDebug === "1" ? "--show-trace" : "";
-  const runOnce = async () => {
-    const env = flakeSource.workspaceRoot
-      ? {
-          ...sanitizedEnv,
-          WORKSPACE_ROOT: flakeSource.workspaceRoot,
-          BUCK_GRAPH_JSON: path.join(flakeSource.workspaceRoot, DEFAULT_GRAPH_PATH),
-        }
-      : sanitizedEnv;
-    const args = selectedNixBuildArgs({
-      flakeRef: flakeSource.flakeRef,
-      showTrace: Boolean(nixTrace),
-    });
-    const command = args[0] || "nix";
-    return await runCommand({
-      command,
-      args: args.slice(1),
-      env,
-      allowFailure: true,
-    });
-  };
+  let fixedStore: Awaited<ReturnType<typeof resolveFinalPnpmStore>> | null = null;
   let attempt: any;
   try {
+    fixedStore =
+      targetImporter &&
+      (await pathExists(path.join(workspaceRoot, targetImporter, "pnpm-lock.yaml")))
+        ? await resolveFinalPnpmStore({
+            repoRoot: workspaceRoot,
+            importer: targetImporter,
+            flakeRef: flakeSource.flakeRef,
+            attrPath: pnpmStoreAttrFromImporter(targetImporter),
+            env: flakeEnv,
+          })
+        : null;
+    const nixTrace = exporterDebug === "1" ? "--show-trace" : "";
+    const runOnce = async () => {
+      const args = selectedNixBuildArgs({
+        flakeRef: flakeSource.flakeRef,
+        showTrace: Boolean(nixTrace),
+      });
+      const command = args[0] || "nix";
+      return await runCommand({
+        command,
+        args: args.slice(1),
+        env: flakeEnv,
+        allowFailure: true,
+      });
+    };
     attempt = await runNixBuildWithTransientRetry({ runOnce });
   } finally {
     await fixedStore?.cleanup();

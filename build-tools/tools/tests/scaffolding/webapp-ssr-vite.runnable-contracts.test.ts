@@ -60,6 +60,7 @@ test(
           tmp,
           _$,
           filter: `./${importer}...`,
+          frozenLockfile: true,
         });
 
         const runtimeRoot = path.join(tmp, "docker-runtime-vite");

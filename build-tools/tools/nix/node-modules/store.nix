@@ -113,8 +113,12 @@ NODE
         fi
       done
       if [ -z "$populated" ]; then
-        echo "[nix] ${label}: pnpm fetch produced no content-addressed files" >&2
-        exit 6
+        if yq -e '(.packages // {}) | length == 0' pnpm-lock.yaml >/dev/null; then
+          echo "[nix] ${label}: lockfile has no external packages; empty fixed store is valid" >&2
+        else
+          echo "[nix] ${label}: pnpm fetch produced no content-addressed files for a lockfile with external packages" >&2
+          exit 6
+        fi
       fi
     }
   '';
@@ -221,7 +225,7 @@ in {
       pname = "pnpm-store";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
-      nativeBuildInputs = [ node pnpm pkgs.coreutils pkgs.sqlite ];
+      nativeBuildInputs = [ node pnpm pkgs.coreutils pkgs.sqlite pkgs.yq-go ];
       # These outputs are package-cache snapshots, not runtime executables, so generic
       # fixup spends time scanning vendored payloads without improving correctness.
       dontFixup = true;

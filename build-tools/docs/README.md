@@ -30,6 +30,10 @@ ecosystems have a reviewed bounded upgrade policy; neither mode changes the vibe
   `viberoots update` command authority.
 - [`update-command-plan.md`](update-command-plan.md): implementation plan for the update command
   model.
+- [`project-enforcement-pass-design.md`](project-enforcement-pass-design.md): design for early,
+  consumer-scoped policy enforcement over `projects/`.
+- [`project-enforcement-pass-plan.md`](project-enforcement-pass-plan.md): implementation plan for
+  the project enforcement pass.
 - [`scaffolding.md`](scaffolding.md): scaffolding behavior and supported generators.
 - [`remote-build-setup.md`](remote-build-setup.md): remote-builder, cache, and Buck2 remote
   execution readiness guide.

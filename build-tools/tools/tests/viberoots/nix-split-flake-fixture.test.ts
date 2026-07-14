@@ -43,7 +43,7 @@ async function materializeRealFilteredViberoots(tmp: string): Promise<string> {
   await $({
     cwd: liveRoot,
     stdio: "pipe",
-  })`rsync -a --delete --relative ${filteredFlakeRsyncExcludeArgs()} ${defaultFilteredFlakeSnapshotRsyncSources(relPaths)} ${filteredRoot}/`;
+  })`rsync -a --chmod=Du+rwx,Dgo+rx,Fu+rw,Fgo+r --delete --relative ${filteredFlakeRsyncExcludeArgs()} ${defaultFilteredFlakeSnapshotRsyncSources(relPaths)} ${filteredRoot}/`;
   return (await materializeFilteredViberootsSource(filteredRoot)).storePath;
 }
 

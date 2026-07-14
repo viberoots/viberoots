@@ -18,7 +18,7 @@ test("runInTemp locks a filtered viberoots input instead of the live source root
   assert.match(source, /rewriteTempViberootsInput\(tmp, viberootsInput\)/);
   assert.match(source, /type TempViberootsRoles = \{/);
   assert.match(source, /commandSourceRoot: viberootsSourceRoot/);
-  assert.match(source, /consumerSnapshotRoot: consumerSnapshot\.root/);
+  assert.match(source, /consumerSnapshotRoot: snapshot\.root/);
   assert.match(source, /flakeInput: viberootsInput/);
   assert.match(source, /prepareFilteredConsumerSnapshot\(tmp\)/);
   assert.match(source, /VBR_FILTERED_FLAKE_SNAPSHOT: "1"/);
@@ -54,5 +54,24 @@ test("runInTemp locks a filtered viberoots input instead of the live source root
       source.indexOf("prepareFilteredConsumerSnapshot(tmp)"),
     "consumer snapshot must be created after dependency reconciliation",
   );
-  assert.match(source, /await consumerSnapshot\.cleanup\(\)/);
+  assert.doesNotMatch(source, /cachedDevEnvExport/);
+  const bodyIndex = source.lastIndexOf("runInTemp testBody");
+  const processCleanupIndex = source.lastIndexOf('timeAsync("temp process cleanup"');
+  const snapshotCleanupIndex = source.indexOf("await consumerSnapshot?.cleanup()");
+  assert.ok(bodyIndex >= 0, "runInTemp body marker must exist");
+  assert.ok(processCleanupIndex >= 0, "temp process cleanup marker must exist");
+  assert.ok(snapshotCleanupIndex >= 0, "consumer snapshot cleanup marker must exist");
+  assert.ok(
+    bodyIndex < processCleanupIndex && processCleanupIndex < snapshotCleanupIndex,
+    "consumer snapshot must remain alive through the callback and temp process cleanup",
+  );
+  assert.ok(
+    source.indexOf("return await withAsyncCleanup(") >= 0 &&
+      source.indexOf("return await withAsyncCleanup(") <
+        source.indexOf("prepareFilteredConsumerSnapshot(tmp)"),
+    "consumer snapshot cleanup must cover snapshot preparation and every later setup step",
+  );
+  assert.match(source, /repoNodeBinDirectories\(process\.cwd\(\), exportEnv\)/);
+  assert.match(source, /runAsyncCleanupSteps\(steps\)/);
+  assert.match(source, /await consumerSnapshot\?\.cleanup\(\)/);
 });

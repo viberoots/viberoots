@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 test("node nix runner: minimal importer with no tests passes", async () => {
   await runInTemp("node-nix-runner-smoke", async (tmp, _$) => {
@@ -47,8 +47,7 @@ test("node nix runner: minimal importer with no tests passes", async () => {
       "",
     ].join("\n");
     await fsp.writeFile(path.join(app, "TARGETS"), targets, "utf8");
-    // Update pnpm-store FOD hash mapping for this importer lockfile
-    await $`zx-wrapper viberoots/build-tools/tools/dev/update-pnpm-hash.ts --lockfile projects/apps/mini/pnpm-lock.yaml`;
+    await reconcileTempDependencyInputs(tmp, $);
     await $`buck2 cquery --target-platforms prelude//platforms:default "kind(nix_node_test, //projects/apps/mini:node_tests)"`;
     await $`buck2 test --target-platforms prelude//platforms:default //projects/apps/mini:node_tests`;
     // Supplemental no-link policy coverage for the Nix runner attr invoked by nix_node_test.

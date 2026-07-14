@@ -7,7 +7,7 @@ import { after, test } from "node:test";
 import { resolveModuleContractsPaths } from "../../dev/module-contract-paths";
 import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core";
 import { parseWasmModuleManifest } from "../../scaffolding/webapp-module-manifests";
-import { runInTemp } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 import { pnpmInstallForDevTest, spawnViteSsrDevServer } from "./lib/dev-node-modules";
 import { pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
 import { removeDefaultWasmFiles, toZeroWasmTargets } from "./lib/zero-wasm";
@@ -46,10 +46,12 @@ test(
       );
       assert.equal(wasmManifest.modules.length, 0);
       assert.equal(wasmManifest.defaultModuleKey, "");
+      await reconcileTempDependencyInputs(tmp, $);
       await pnpmInstallForDevTest({
         tmp,
         _$,
         filter: "./projects/apps/demo-vite...",
+        frozenLockfile: true,
       });
       await _$({ cwd: appAbs, stdio: "inherit" })`node scripts/build-ssr.mjs`;
 

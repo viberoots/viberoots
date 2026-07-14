@@ -1,107 +1,17 @@
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { directorySizeKib, runGuardedCommand } from "./pnpm-fixed-store-native-run";
 
 const PLACEHOLDER = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 const MAX_KIB = 500 * 1024;
 const COMMAND_TIMEOUT_MS = 150_000;
 
-type CommandResult = { status: number | null; stdout: string; stderr: string };
-
 function repoRoot(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
-}
-
-async function run(
-  command: string,
-  args: string[],
-  opts: {
-    cwd: string;
-    env?: NodeJS.ProcessEnv;
-    fixtureRoot: string;
-  },
-): Promise<CommandResult> {
-  const beforeDisk = await diskUsedKib(opts.fixtureRoot);
-  return await new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
-      cwd: opts.cwd,
-      env: { ...process.env, ...(opts.env || {}) },
-      stdio: ["ignore", "pipe", "pipe"],
-      detached: process.platform !== "win32",
-    });
-    let stdout = "";
-    let stderr = "";
-    let stopped = false;
-    child.stdout.on("data", (chunk) => (stdout += String(chunk)));
-    child.stderr.on("data", (chunk) => (stderr += String(chunk)));
-
-    const stop = (reason: Error) => {
-      if (stopped) return;
-      stopped = true;
-      if (child.pid) {
-        try {
-          process.kill(process.platform === "win32" ? child.pid : -child.pid, "SIGTERM");
-        } catch {}
-      }
-      reject(reason);
-    };
-    const timeout = setTimeout(
-      () => stop(new Error(`command exceeded ${COMMAND_TIMEOUT_MS}ms: ${command}`)),
-      COMMAND_TIMEOUT_MS,
-    );
-    const sampler = setInterval(async () => {
-      try {
-        const [fixtureKib, diskKib] = await Promise.all([
-          directorySizeKib(opts.fixtureRoot),
-          diskUsedKib(opts.fixtureRoot),
-        ]);
-        if (fixtureKib > MAX_KIB || diskKib - beforeDisk > MAX_KIB) {
-          stop(
-            new Error(
-              `native reconcile exceeded 500 MiB guard: fixture=${fixtureKib}KiB diskDelta=${diskKib - beforeDisk}KiB`,
-            ),
-          );
-        }
-      } catch (error) {
-        stop(error instanceof Error ? error : new Error(String(error)));
-      }
-    }, 1_000);
-    child.on("error", stop);
-    child.on("close", (status) => {
-      clearTimeout(timeout);
-      clearInterval(sampler);
-      if (!stopped) resolve({ status, stdout, stderr });
-    });
-  });
-}
-
-async function directorySizeKib(target: string): Promise<number> {
-  const output = await shellOutputUnbounded("du", ["-sk", target]);
-  return Number.parseInt(output.split(/\s+/)[0] || "0", 10);
-}
-
-async function diskUsedKib(target: string): Promise<number> {
-  const output = await shellOutputUnbounded("df", ["-k", target]);
-  const fields = output.trim().split("\n").at(-1)?.trim().split(/\s+/) || [];
-  return Number.parseInt(fields[2] || "0", 10);
-}
-
-async function shellOutputUnbounded(command: string, args: string[]): Promise<string> {
-  return await new Promise((resolve, reject) => {
-    const child = spawn(command, args, { stdio: ["ignore", "pipe", "pipe"] });
-    let stdout = "";
-    let stderr = "";
-    child.stdout.on("data", (chunk) => (stdout += String(chunk)));
-    child.stderr.on("data", (chunk) => (stderr += String(chunk)));
-    child.on("error", reject);
-    child.on("close", (status) =>
-      status === 0 ? resolve(stdout.trim()) : reject(new Error(stderr || `${command} failed`)),
-    );
-  });
 }
 
 function strictGot(stderr: string): string {
@@ -230,7 +140,7 @@ test(
       const lockedRef = `github:${locked.owner}/${locked.repo}/${locked.rev}`;
       const setupHome = path.join(root, "setup-home");
       await fsp.mkdir(setupHome, { recursive: true });
-      const archive = await run(nix, ["flake", "archive", "--json", lockedRef], {
+      const archive = await runGuardedCommand(nix, ["flake", "archive", "--json", lockedRef], {
         cwd: root,
         env: nixEnv(setupHome),
         fixtureRoot: root,
@@ -245,7 +155,7 @@ test(
       for (const [index, fixture] of fixtures.entries()) {
         const home = path.join(root, `home-${index}`);
         await fsp.mkdir(home, { recursive: true });
-        const result = await run(nix, buildArgs(), {
+        const result = await runGuardedCommand(nix, buildArgs(), {
           cwd: fixture,
           env: nixEnv(home),
           fixtureRoot: root,
@@ -259,7 +169,7 @@ test(
         path.join(fixtures[0], "hashes.json"),
         JSON.stringify({ "pnpm-lock.yaml": candidates[0] }) + "\n",
       );
-      const final = await run(nix, buildArgs(true), {
+      const final = await runGuardedCommand(nix, buildArgs(true), {
         cwd: fixtures[0],
         env: nixEnv(path.join(root, "home-0")),
         fixtureRoot: root,
@@ -268,7 +178,7 @@ test(
       const outPath = final.stdout.trim().split(/\s+/).at(-1) || "";
       assert.match(outPath, /^\/nix\/store\/[a-z0-9]+-pnpm-store-lock-[a-f0-9]{64}$/);
 
-      const pinnedPnpm = await run(
+      const pinnedPnpm = await runGuardedCommand(
         nix,
         ["eval", "--impure", "--no-write-lock-file", "--raw", ".#pinnedPnpm.outPath"],
         { cwd: fixtures[0], env: nixEnv(path.join(root, "home-0")), fixtureRoot: root },
@@ -285,7 +195,7 @@ test(
         ),
         fsp.cp(path.join(outPath, "store"), path.join(consume, "store"), { recursive: true }),
       ]);
-      const offline = await run(
+      const offline = await runGuardedCommand(
         "bash",
         [
           "--noprofile",

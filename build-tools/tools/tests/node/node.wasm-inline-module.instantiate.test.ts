@@ -4,8 +4,8 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
-import { viberootsDevTool, viberootsTool } from "../scaffolding/lib/viberoots-tools";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
+import { viberootsTool } from "../scaffolding/lib/viberoots-tools";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -257,10 +257,7 @@ nix_node_cli_bin(
 )
 `,
         );
-        await $({
-          cwd: tmp,
-          stdio: "inherit",
-        })`node ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile projects/apps/demo-cli/pnpm-lock.yaml`;
+        await reconcileTempDependencyInputs(tmp, $);
         await $({
           cwd: tmp,
           stdio: "inherit",

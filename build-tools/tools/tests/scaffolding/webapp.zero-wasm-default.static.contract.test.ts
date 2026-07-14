@@ -7,7 +7,7 @@ import { after, test } from "node:test";
 import { resolveModuleContractsPaths } from "../../dev/module-contract-paths";
 import { syncModuleContractsForApp } from "../../dev/sync-module-contracts-core";
 import { parseWasmModuleManifest } from "../../scaffolding/webapp-module-manifests";
-import { runInTemp } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 import { pnpmInstallForDevTest, spawnStaticViteDevServer } from "./lib/dev-node-modules";
 import { pickFreePort, stopServer, waitForHttpOk } from "./lib/webapp-static-hmr";
 import { removeDefaultWasmFiles, toZeroWasmTargets } from "./lib/zero-wasm";
@@ -56,10 +56,12 @@ test(
         await fsp.readFile(contracts.tsManifestPath, "utf8"),
         "utf8",
       );
+      await reconcileTempDependencyInputs(tmp, $);
       await pnpmInstallForDevTest({
         tmp,
         _$,
         filter: "./projects/apps/demo-web...",
+        frozenLockfile: true,
       });
       await _$({ cwd: appAbs, stdio: "inherit" })`node scripts/build.mjs`;
 
