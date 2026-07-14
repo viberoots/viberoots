@@ -702,6 +702,23 @@ test("viberoots init-consumer locks local submodule workspaces through filtered 
       cwd: viberootsRoot,
     });
     const rev = revStdout.trim();
+    await fsp.writeFile(
+      path.join(workspace, "flake.lock"),
+      `${JSON.stringify(
+        {
+          nodes: {
+            root: { inputs: { nixpkgs: "nixpkgs", viberoots: "viberoots" } },
+            nixpkgs: { locked: { rev: "preserve-project-nixpkgs", type: "github" } },
+            viberoots: { locked: { rev: "old-viberoots", type: "git" } },
+          },
+          root: "root",
+          version: 7,
+        },
+        null,
+        2,
+      )}\n`,
+      "utf8",
+    );
     await fsp.mkdir(fakeBin, { recursive: true });
     await fsp.writeFile(
       path.join(fakeBin, "nix"),
@@ -747,6 +764,12 @@ cat > ${JSON.stringify(hiddenLock)} <<'JSON'
         "type": "git",
         "url": "https://github.com/viberoots/viberoots.git"
       }
+    },
+    "nixpkgs": {
+      "locked": {
+        "rev": "candidate-must-not-replace-project-nixpkgs",
+        "type": "github"
+      }
     }
   },
   "root": "root",
@@ -779,27 +802,21 @@ exit 0
       { mode: 0o755 },
     );
 
-    await execFileAsync(
-      path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots"),
-      [
-        "init-consumer",
-        "--workspace-root",
-        workspace,
-        "--workspace-name",
-        "filtered-lock",
-        "--viberoots-url",
-        `path:${path.join(workspace, "viberoots")}`,
-        "--source",
-        path.join(workspace, "viberoots"),
-        "--no-direnv",
-      ],
-      {
-        cwd: workspace,
-        env: envWithFakeNix(fakeBin, {
-          NO_DEV_SHELL: "1",
-        }),
-      },
-    );
+    const command = path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots");
+    const args = [
+      "init-consumer",
+      "--workspace-root",
+      workspace,
+      "--workspace-name",
+      "filtered-lock",
+      "--viberoots-url",
+      `path:${path.join(workspace, "viberoots")}`,
+      "--source",
+      path.join(workspace, "viberoots"),
+      "--no-direnv",
+    ];
+    const env = envWithFakeNix(fakeBin, { NO_DEV_SHELL: "1" });
+    await execFileAsync(command, args, { cwd: workspace, env });
 
     const text = await fsp.readFile(log, "utf8");
     assert.match(text, /nix flake lock --accept-flake-config --override-input viberoots path:/);
@@ -813,6 +830,7 @@ exit 0
     assert.equal(rootLock.nodes.viberoots.locked.rev, rev);
     assert.equal(rootLock.nodes.viberoots.original.type, "git");
     assert.equal(rootLock.nodes.viberoots.original.rev, rev);
+    assert.equal(rootLock.nodes.nixpkgs.locked.rev, "preserve-project-nixpkgs");
     const workspaceLock = JSON.parse(await fsp.readFile(hiddenLock, "utf8"));
     assert.equal(workspaceLock.nodes.viberoots.locked.path, "./viberoots-flake-input");
     assert.equal(workspaceLock.nodes.viberoots.locked.lastModified, undefined);
@@ -824,6 +842,11 @@ exit 0
     await assert.rejects(
       fsp.stat(path.join(workspace, ".viberoots", "workspace", "viberoots-flake-input", ".git")),
     );
+
+    const malformedRootLock = "{ malformed root lock\n";
+    await fsp.writeFile(path.join(workspace, "flake.lock"), malformedRootLock, "utf8");
+    await assert.rejects(execFileAsync(command, args, { cwd: workspace, env }), /JSON/);
+    assert.equal(await fsp.readFile(path.join(workspace, "flake.lock"), "utf8"), malformedRootLock);
   });
 });
 

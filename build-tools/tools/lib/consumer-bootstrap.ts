@@ -22,7 +22,11 @@ import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 import { withSanitizedInheritedNixConfig } from "./nix-config-env";
 import { envWithResolvedNixBin, resolveToolPathSync } from "./tool-paths";
 import { activateWorkspace } from "./workspace-activation";
-import { repairGeneratedWorkspaceLock } from "./workspace-lock-repair";
+import {
+  mergeViberootsLockNode,
+  repairGeneratedWorkspaceLock,
+  type FlakeLock,
+} from "./workspace-lock-repair";
 
 const execFileAsync = promisify(execFile);
 
@@ -341,6 +345,13 @@ async function writePortableRootLockForSubmodule(opts: InitConsumerOptions): Pro
   const hiddenLock = path.join(opts.workspaceRoot, ".viberoots", "workspace", "flake.lock");
   if (!(await exists(hiddenLock))) return false;
   const hiddenLockText = await fsp.readFile(hiddenLock, "utf8");
+  const rootLockPath = path.join(opts.workspaceRoot, "flake.lock");
+  let existingRootLock: FlakeLock | null = null;
+  try {
+    existingRootLock = JSON.parse(await fsp.readFile(rootLockPath, "utf8")) as FlakeLock;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
   const rev = await localViberootsRevision(opts);
   if (!/^[0-9a-f]{40}$/i.test(rev)) return false;
   const remoteUrl = await submoduleRemoteUrl(opts);
@@ -360,21 +371,20 @@ async function writePortableRootLockForSubmodule(opts: InitConsumerOptions): Pro
     { cwd: opts.workspaceRoot, env: nixEnv, maxBuffer: 1024 * 1024 * 16 },
   );
   try {
-    const portableLock = JSON.parse(await fsp.readFile(hiddenLock, "utf8")) as {
-      nodes?: Record<string, { original?: Record<string, unknown> }>;
-    };
-    const node = portableLock.nodes?.viberoots;
+    const candidateLock = JSON.parse(await fsp.readFile(hiddenLock, "utf8")) as FlakeLock;
+    const portableLock = existingRootLock
+      ? mergeViberootsLockNode(existingRootLock, candidateLock)
+      : candidateLock;
+    const node = portableLock.nodes?.viberoots as
+      | { original?: Record<string, unknown> }
+      | undefined;
     if (!node) return false;
     node.original = {
       rev,
       type: "git",
       url: gitLockUrl(remoteUrl),
     };
-    await fsp.writeFile(
-      path.join(opts.workspaceRoot, "flake.lock"),
-      `${JSON.stringify(portableLock, null, 2)}\n`,
-      "utf8",
-    );
+    await fsp.writeFile(rootLockPath, `${JSON.stringify(portableLock, null, 2)}\n`, "utf8");
   } finally {
     await fsp.writeFile(
       hiddenLock,

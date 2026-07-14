@@ -31,7 +31,7 @@ export type WorkspaceLockRepairResult =
   | { status: "would-repair"; reason: string }
   | { status: "repaired"; changedInput: "viberoots" };
 
-type FlakeLock = {
+export type FlakeLock = {
   nodes?: Record<string, unknown>;
   root?: string;
   version?: number;
@@ -84,6 +84,15 @@ function cloneWithoutViberoots(lock: FlakeLock): FlakeLock {
 
 function viberootsNode(lock: FlakeLock): unknown {
   return lock.nodes?.viberoots;
+}
+
+export function mergeViberootsLockNode(base: FlakeLock, candidate: FlakeLock): FlakeLock {
+  const candidateNode = viberootsNode(candidate);
+  if (!candidateNode) throw new Error("candidate flake lock is missing nodes.viberoots");
+  const merged = JSON.parse(JSON.stringify(base)) as FlakeLock;
+  merged.nodes ||= {};
+  merged.nodes.viberoots = JSON.parse(JSON.stringify(candidateNode)) as unknown;
+  return merged;
 }
 
 function usesNormalizedFilteredInput(lock: FlakeLock): boolean {
