@@ -62,13 +62,10 @@ async function resolvePreludePath(
     cachedPreludePath = (async () => {
       const flakePath = await workspaceFlakePath(tmp);
       const flakeRoot = path.dirname(flakePath);
+      const ambientInputRoot = String(process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "").trim();
       const viberootsInputRoot = String(
         opts?.viberootsInputRoot ||
-          opts?.viberootsSourceRoot ||
-          process.env.VIBEROOTS_SOURCE_ROOT ||
-          process.env.VIBEROOTS_ROOT ||
-          process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
-          "",
+          (ambientInputRoot.startsWith("/nix/store/") ? ambientInputRoot : ""),
       ).trim();
       const hasViberootsInputRoot =
         viberootsInputRoot &&

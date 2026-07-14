@@ -67,4 +67,7 @@ test("toolchain path realization progress is verbose-only", async () => {
   assert.ok(source.includes("isVbrVerbose()"));
   assert.equal(source.includes("console.error(`[toolchain-paths] checking"), false);
   assert.equal(source.includes("console.error(`[toolchain-paths] realizing"), false);
+  assert.equal(source.includes("--override-input"), false);
+  assert.equal(source.includes('path.join(root, ".viberoots", "workspace", "flake.nix")'), true);
+  assert.equal(source.includes("run viberoots bootstrap or post-clone first"), true);
 });

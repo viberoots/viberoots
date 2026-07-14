@@ -21,48 +21,30 @@ function toolchainJsonPath(root: string): string {
 
 async function workspaceFlakeRef(root: string): Promise<{
   flakeRef: string;
-  viberootsOverrideArgs: string[];
 }> {
   const parentRoot = path.dirname(root);
   if (path.basename(root) === "viberoots") {
     const parentHidden = path.join(parentRoot, ".viberoots", "workspace", "flake.nix");
-    const localViberoots = path.join(parentRoot, "viberoots");
     const hasParentWorkspace = await fsp
       .access(parentHidden)
       .then(() => true)
       .catch(() => false);
-    const hasLocalViberoots = await fsp
-      .access(path.join(localViberoots, "flake.nix"))
-      .then(() => true)
-      .catch(() => false);
-    if (hasParentWorkspace && hasLocalViberoots) {
-      return {
-        flakeRef: `path:${path.dirname(parentHidden)}`,
-        viberootsOverrideArgs: ["--override-input", "viberoots", `path:${localViberoots}`],
-      };
-    }
+    if (hasParentWorkspace) return { flakeRef: `path:${path.dirname(parentHidden)}` };
   }
-  try {
-    await fsp.access(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"));
-    await fsp.access(path.join(root, "flake.nix"));
-    return { flakeRef: `path:${root}`, viberootsOverrideArgs: [] };
-  } catch {}
   const hidden = path.join(root, ".viberoots", "workspace", "flake.nix");
-  try {
-    await fsp.access(hidden);
-    const localViberoots = path.join(root, "viberoots");
-    const hasLocalViberoots = await fsp
-      .access(path.join(localViberoots, "flake.nix"))
-      .then(() => true)
-      .catch(() => false);
-    return {
-      flakeRef: `path:${path.dirname(hidden)}`,
-      viberootsOverrideArgs: hasLocalViberoots
-        ? ["--override-input", "viberoots", `path:${localViberoots}`]
-        : [],
-    };
-  } catch {}
-  return { flakeRef: ".", viberootsOverrideArgs: [] };
+  const hasWorkspace = await fsp
+    .access(hidden)
+    .then(() => true)
+    .catch(() => false);
+  if (hasWorkspace) return { flakeRef: `path:${path.dirname(hidden)}` };
+  throw new Error(
+    `toolchain paths require generated ${path.join(
+      root,
+      ".viberoots",
+      "workspace",
+      "flake.nix",
+    )}; run viberoots bootstrap or post-clone first`,
+  );
 }
 
 function isNixStorePath(p: string): boolean {
@@ -74,12 +56,12 @@ function logToolchainProgress(message: string): void {
 }
 
 async function nixPathInfo(root: string, attr: string): Promise<string> {
-  const { flakeRef, viberootsOverrideArgs } = await workspaceFlakeRef(root);
+  const { flakeRef } = await workspaceFlakeRef(root);
   logToolchainProgress(`[toolchain-paths] checking ${attr} in Nix store`);
   const res = await $({
     cwd: root,
     stdio: "pipe",
-  })`nix path-info --impure ${`${flakeRef}#${attr}`} ${viberootsOverrideArgs} --json --accept-flake-config`
+  })`nix path-info --impure ${`${flakeRef}#${attr}`} --json --accept-flake-config`
     .quiet()
     .nothrow();
   if (res.exitCode !== 0) return "";
@@ -103,12 +85,12 @@ async function nixPathInfo(root: string, attr: string): Promise<string> {
 }
 
 async function nixBuildOutPath(root: string, attr: string): Promise<string> {
-  const { flakeRef, viberootsOverrideArgs } = await workspaceFlakeRef(root);
+  const { flakeRef } = await workspaceFlakeRef(root);
   logToolchainProgress(`[toolchain-paths] realizing ${attr} with nix build`);
   const res = await $({
     cwd: root,
     stdio: "pipe",
-  })`nix build --impure ${`${flakeRef}#${attr}`} ${viberootsOverrideArgs} --no-link --print-out-paths --accept-flake-config`.quiet();
+  })`nix build --impure ${`${flakeRef}#${attr}`} --no-link --print-out-paths --accept-flake-config`.quiet();
   const out =
     String(res.stdout || "")
       .trim()

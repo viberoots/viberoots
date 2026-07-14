@@ -2,23 +2,33 @@
 import assert from "node:assert/strict";
 import fsp from "node:fs/promises";
 import { test } from "node:test";
+import { makeFilteredFlakeRef } from "../../dev/filtered-flake";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("flake exposes viberoots version metadata and mkWorkspace", async () => {
-  const flakeRef = `path:${viberootsSourcePath(".")}`;
-  const version = await $({
-    stdio: "pipe",
-  })`nix eval --raw --accept-flake-config --impure ${`${flakeRef}#lib.version`}`;
-  const releaseTag = await $({
-    stdio: "pipe",
-  })`nix eval --raw --accept-flake-config --impure ${`${flakeRef}#lib.releaseTag`}`;
-  assert.equal(String(version.stdout || "").trim(), "0.0.0-dev");
-  assert.equal(String(releaseTag.stdout || "").trim(), "v0.0.0-dev");
+  const filtered = await makeFilteredFlakeRef({
+    workspaceRoot: viberootsSourcePath("."),
+    attr: "lib.version",
+    logPrefix: "[flake-version-metadata]",
+  });
+  const flakeRef = filtered.flakeRef.slice(0, filtered.flakeRef.lastIndexOf("#"));
+  try {
+    const version = await $({
+      stdio: "pipe",
+    })`nix eval --raw --accept-flake-config --impure ${`${flakeRef}#lib.version`}`;
+    const releaseTag = await $({
+      stdio: "pipe",
+    })`nix eval --raw --accept-flake-config --impure ${`${flakeRef}#lib.releaseTag`}`;
+    assert.equal(String(version.stdout || "").trim(), "0.0.0-dev");
+    assert.equal(String(releaseTag.stdout || "").trim(), "v0.0.0-dev");
 
-  const mkWorkspace = await $({
-    stdio: "pipe",
-  })`nix eval --no-write-lock-file --accept-flake-config --impure ${`${flakeRef}#lib.mkWorkspace`}`;
-  assert.match(String(mkWorkspace.stdout || ""), /lambda mkWorkspace/);
+    const mkWorkspace = await $({
+      stdio: "pipe",
+    })`nix eval --no-write-lock-file --accept-flake-config --impure ${`${flakeRef}#lib.mkWorkspace`}`;
+    assert.match(String(mkWorkspace.stdout || ""), /lambda mkWorkspace/);
+  } finally {
+    await filtered.cleanup();
+  }
 });
 
 test("flake app wrappers use the viberoots source root for helper scripts", async () => {

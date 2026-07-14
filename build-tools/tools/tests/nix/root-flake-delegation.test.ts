@@ -75,7 +75,7 @@ printf '%s\\n' "$status_json" | jq -e '.sourceMode == "local" and .currentPoints
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`nix develop --impure --accept-flake-config --override-input viberoots ${`path:${path.resolve("viberoots")}`} ${`path:${path.resolve(".viberoots", "workspace")}#default`} -c bash --noprofile --norc -c ${script}`;
+    })`nix develop --impure --accept-flake-config ${`path:${path.resolve(".viberoots", "workspace")}#default`} -c bash --noprofile --norc -c ${script}`;
 
     assert.equal(
       result.exitCode,
