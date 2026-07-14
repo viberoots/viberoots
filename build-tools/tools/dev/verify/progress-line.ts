@@ -53,14 +53,6 @@ function formatDuration(ms: number): string {
   return `${seconds}s`;
 }
 
-function progressBar(ratio: number | undefined): string {
-  const width = 24;
-  if (ratio === undefined || !Number.isFinite(ratio)) return `[${"░".repeat(width)}]`;
-  const clamped = Math.max(0, Math.min(1, ratio));
-  const filled = Math.round(clamped * width);
-  return `[${"█".repeat(filled)}${"░".repeat(width - filled)}]`;
-}
-
 function projectedDurationMs(state: VerifyProgressPassState): number | undefined {
   if (state.total <= 0 || state.completed <= 0) return undefined;
   return Math.max(state.elapsedMs, (state.elapsedMs * state.total) / state.completed);
@@ -97,7 +89,7 @@ export function formatVerifyProgressLine(
       : projectedMs === undefined
         ? elapsed
         : `${elapsed} / ~${formatDuration(projectedMs)}`;
-  const detail = `${name} ${progressBar(ratio)} ${completed}/${displayTotal}${failed} ${state.status} ${time}`;
+  const detail = `${name} ${formatProgressBar(ratio, 24)} ${completed}/${displayTotal}${failed} ${state.status} ${time}`;
   return `  ${mark.padEnd(colors ? 12 : 6)} ${color(valueColor, detail, colors)}`;
 }
 
@@ -265,3 +257,4 @@ export function verifyProgressEnabled(env: NodeJS.ProcessEnv = process.env): boo
       .toLowerCase(),
   );
 }
+import { formatProgressBar } from "../../lib/progress-bar";

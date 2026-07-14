@@ -10,23 +10,34 @@ PNPM_DIR="${ROOT_DIR}"
 if [ ! -f "${PNPM_DIR}/package.json" ] && [ -f "${ROOT_DIR}/viberoots/package.json" ]; then
   PNPM_DIR="${ROOT_DIR}/viberoots"
 fi
-TOOL_PNPM_DIR="${PNPM_DIR}"
-for candidate_tool_dir in "${VIBEROOTS_SOURCE_ROOT:-}" "${VIBEROOTS_FLAKE_INPUT_ROOT:-}"; do
-  if [ -n "${candidate_tool_dir}" ] && [ -x "${candidate_tool_dir}/node_modules/.bin/eslint" ]; then
-    TOOL_PNPM_DIR="${candidate_tool_dir}"
-    break
+TOOL_PNPM_DIR=""
+select_tool_dir() {
+  local candidate_tool_dir="$1"
+  local physical_node_modules
+  if [ -z "${candidate_tool_dir}" ] || [ ! -x "${candidate_tool_dir}/node_modules/.bin/eslint" ]; then
+    return 1
   fi
-done
-if [ ! -x "${TOOL_PNPM_DIR}/node_modules/.bin/eslint" ] && [ -n "${NODE_PATH:-}" ]; then
+  physical_node_modules="$(cd "${candidate_tool_dir}/node_modules" && pwd -P)"
+  TOOL_PNPM_DIR="${physical_node_modules%/node_modules}"
+}
+select_tool_dir "${VIBEROOTS_FLAKE_INPUT_ROOT:-}" || true
+if [ -z "${TOOL_PNPM_DIR}" ] && [ -n "${NODE_PATH:-}" ]; then
   OLD_IFS="${IFS}"
   IFS=:
   for node_path_dir in ${NODE_PATH}; do
     if [ -n "${node_path_dir}" ] && [ -x "${node_path_dir}/.bin/eslint" ]; then
-      TOOL_PNPM_DIR="$(cd "${node_path_dir}/.." && pwd)"
+      physical_node_modules="$(cd "${node_path_dir}" && pwd -P)"
+      TOOL_PNPM_DIR="${physical_node_modules%/node_modules}"
       break
     fi
   done
   IFS="${OLD_IFS}"
+fi
+if [ -z "${TOOL_PNPM_DIR}" ]; then
+  select_tool_dir "${VIBEROOTS_SOURCE_ROOT:-}" || select_tool_dir "${PNPM_DIR}" || {
+    echo "error: eslint is unavailable; run i before committing." >&2
+    exit 127
+  }
 fi
 LINT_STAGED_CONFIG="$(mktemp "${TMPDIR:-/tmp}/lint-staged.XXXXXX.json")"
 trap 'rm -f "${LINT_STAGED_CONFIG}"' EXIT
@@ -70,18 +81,16 @@ if ! command -v nix >/dev/null 2>&1; then
   echo "error: Nix is required for pre-commit. Install Nix and try again." 1>&2
   exit 127
 fi
-LINT_STAGED_BIN="${PNPM_DIR}/node_modules/.bin/lint-staged"
-if [ ! -x "${LINT_STAGED_BIN}" ] && [ -x "${TOOL_PNPM_DIR}/node_modules/.bin/lint-staged" ]; then
-  LINT_STAGED_BIN="${TOOL_PNPM_DIR}/node_modules/.bin/lint-staged"
-fi
+LINT_STAGED_BIN="${TOOL_PNPM_DIR}/node_modules/.bin/lint-staged"
 if [ ! -x "${LINT_STAGED_BIN}" ]; then
-  LINT_STAGED_BIN="lint-staged"
+  echo "error: lint-staged is unavailable; run i before committing." >&2
+  exit 127
 fi
 NODE_PATH_PARTS=()
 for node_modules_dir in \
-  "${PNPM_DIR}/node_modules" \
-  "${VIBEROOTS_SOURCE_ROOT:-}/node_modules" \
-  "${VIBEROOTS_FLAKE_INPUT_ROOT:-}/node_modules"; do
+  "${TOOL_PNPM_DIR}/node_modules" \
+  "${VIBEROOTS_FLAKE_INPUT_ROOT:-}/node_modules" \
+  "${VIBEROOTS_SOURCE_ROOT:-}/node_modules"; do
   if [ -n "${node_modules_dir}" ] && [ -d "${node_modules_dir}" ]; then
     NODE_PATH_PARTS+=("${node_modules_dir}")
   fi

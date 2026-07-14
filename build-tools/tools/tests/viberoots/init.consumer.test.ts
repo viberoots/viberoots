@@ -7,7 +7,9 @@ import path from "node:path";
 import { test } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
-import { initConsumer } from "../../lib/consumer-bootstrap";
+import { buckconfig, initConsumer, type ConsumerSourceMode } from "../../lib/consumer-bootstrap";
+import { envrc } from "../../lib/consumer-direnv";
+import { consumerGitignoreEntries } from "../../lib/consumer-tracked-inputs";
 import { envWithoutSelectedNix } from "../lib/test-helpers";
 
 const execFileAsync = promisify(execFile);
@@ -104,6 +106,26 @@ async function withConsumerWorkspace(
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
+}
+
+async function preparePostCloneTrackedInputs(
+  workspace: string,
+  sourceMode: ConsumerSourceMode,
+): Promise<void> {
+  await execFileAsync("git", ["init", "-q"], { cwd: workspace });
+  await Promise.all([
+    fsp.writeFile(path.join(workspace, ".buckroot"), ".\n", "utf8"),
+    fsp.writeFile(path.join(workspace, ".buckconfig"), buckconfig(sourceMode), "utf8"),
+    fsp.writeFile(path.join(workspace, ".envrc"), envrc(), "utf8"),
+    fsp.writeFile(
+      path.join(workspace, ".gitignore"),
+      `# viberoots local workspace state\n${consumerGitignoreEntries.join("\n")}\n`,
+      "utf8",
+    ),
+  ]);
+  await execFileAsync("git", ["add", ".buckroot", ".buckconfig", ".envrc", ".gitignore"], {
+    cwd: workspace,
+  });
 }
 
 async function writeFakeMacosDeveloperTools(fakeBin: string, log?: string): Promise<void> {
@@ -262,7 +284,7 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     await assertDirenvBootstrap(workspace);
     const rootFlake = await fsp.readFile(path.join(workspace, "flake.nix"), "utf8");
     assertConsumerFlakeAllowsPnpmProvisioningEnv(rootFlake);
-    assert.match(rootFlake, /if root != "" then builtins\.toPath root else \.\/\.;/);
+    assert.match(rootFlake, /if root != "" then root else \.\/\.;/);
     assert.match(rootFlake, new RegExp(`workspaceName = "${path.basename(workspace)}";`));
     await assert.rejects(fsp.lstat(path.join(workspace, "buck-out")));
     const workspaceFlake = await fsp.readFile(
@@ -867,6 +889,7 @@ test("viberoots init-consumer post-clone preserves checked-in flake files", asyn
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".nix.log");
     const hiddenLock = path.join(workspace, ".viberoots", "workspace", "flake.lock");
+    await preparePostCloneTrackedInputs(workspace, "flake");
     await fsp.mkdir(fakeBin, { recursive: true });
     await fsp.writeFile(path.join(workspace, "flake.nix"), "checked-in root flake\n", "utf8");
     await fsp.writeFile(path.join(workspace, "flake.lock"), "checked-in root lock\n", "utf8");
@@ -931,6 +954,7 @@ test("viberoots init-consumer repairs submodule current before locking", async (
     const fakeBin = path.join(workspace, ".fake-bin");
     const log = path.join(workspace, ".nix.log");
     const hiddenLock = path.join(workspace, ".viberoots", "workspace", "flake.lock");
+    await preparePostCloneTrackedInputs(workspace, "submodule");
     await fsp.mkdir(fakeBin, { recursive: true });
     await fsp.writeFile(path.join(workspace, "flake.nix"), "checked-in root flake\n", "utf8");
     await fsp.writeFile(path.join(workspace, "flake.lock"), "checked-in root lock\n", "utf8");
@@ -1969,7 +1993,7 @@ test("curlable bootstrap can drive the submodule mode through the same entrypoin
   }
 });
 
-test("curlable bootstrap skips setup when already bootstrapped", async () => {
+test("curlable bootstrap refuses to reinitialize an existing workspace", async () => {
   const workspace = await fsp.realpath(
     await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-bootstrap-idempotent-")),
   );
@@ -2014,20 +2038,24 @@ ln -s ../viberoots .viberoots/current
         env: envWithFakeNix(fakeBin),
       },
     );
-    const second = await execFileAsync(
-      path.join(viberootsRoot, "bootstrap"),
-      ["--mode", "submodule", "--workspace-root", workspace, "--workspace-name", "demo"],
-      {
-        cwd: workspace,
-        env: envWithFakeNix(fakeBin),
+    await assert.rejects(
+      execFileAsync(
+        path.join(viberootsRoot, "bootstrap"),
+        ["--mode", "submodule", "--workspace-root", workspace, "--workspace-name", "demo"],
+        {
+          cwd: workspace,
+          env: envWithFakeNix(fakeBin),
+        },
+      ),
+      (error: any) => {
+        assert.match(String(error.stderr || ""), /error: this workspace is already initialized/);
+        assert.match(String(error.stderr || ""), /viberoots update/);
+        return true;
       },
     );
 
     const text = await fsp.readFile(log, "utf8");
     assert.equal((text.match(/^init /gm) ?? []).length, 1);
-    assert.match(second.stdout, /ok\s+status already up to date/);
-    assert.match(second.stdout, /no setup changes needed/);
-    assert.match(second.stdout, /set\s+source https:\/\/github\.com\/viberoots\/viberoots\.git/);
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }

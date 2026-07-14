@@ -9,6 +9,7 @@ import {
   waitForNoActiveNixGc,
 } from "../../lib/nix-gc-lock";
 import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
+import { isCanonicalSha256SRI } from "../../lib/nix-sri";
 import { localOnlyNixBuilderArgs } from "../../lib/nix-builder-policy";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 
@@ -81,6 +82,35 @@ function flakeDirFromRef(flakeRef: string): string {
   return path.resolve(withoutAttr.slice("path:".length));
 }
 
+export function immutableViberootsInputFromFlakeFiles(flakeText: string, lockText: string): string {
+  const match = flakeText.match(/\bviberoots\.url\s*=\s*"path:([^"]+)"/);
+  const inputPath = String(match?.[1] || "");
+  if (!path.isAbsolute(inputPath)) return "";
+  if (!/^\/nix\/store\/[a-z0-9]{32}-source$/.test(inputPath)) {
+    throw new Error(`invalid absolute viberoots flake input: ${inputPath}`);
+  }
+  let lock: any;
+  try {
+    lock = JSON.parse(lockText);
+  } catch {
+    throw new Error("invalid flake.lock for immutable viberoots input");
+  }
+  const inputName = lock?.nodes?.root?.inputs?.viberoots || "viberoots";
+  const node = lock?.nodes?.[inputName];
+  const locked = node?.locked;
+  const original = node?.original;
+  if (
+    locked?.type !== "path" ||
+    locked?.path !== inputPath ||
+    !isCanonicalSha256SRI(locked?.narHash) ||
+    original?.type !== "path" ||
+    original?.path !== inputPath
+  ) {
+    throw new Error(`flake.lock does not match immutable viberoots input: ${inputPath}`);
+  }
+  return inputPath;
+}
+
 function flakeLocalViberootsSource(flakeRef: string): string {
   const flakeDir = flakeDirFromRef(flakeRef);
   if (!flakeDir) return "";
@@ -91,9 +121,23 @@ function flakeLocalViberootsSource(flakeRef: string): string {
   } catch {
     return "";
   }
-  const match = text.match(/\bviberoots\.url\s*=\s*"path:(\.[^"]*)"/);
-  if (!match?.[1]) return "";
-  return validViberootsSource(path.resolve(flakeDir, match[1]));
+  const lockText = (() => {
+    try {
+      return fs.readFileSync(path.join(flakeDir, "flake.lock"), "utf8");
+    } catch {
+      return "";
+    }
+  })();
+  const immutableInput = immutableViberootsInputFromFlakeFiles(text, lockText);
+  if (immutableInput) {
+    return fs.existsSync(path.join(immutableInput, "flake.nix")) ? immutableInput : "";
+  }
+  const match = text.match(/\bviberoots\.url\s*=\s*"path:([^"]+)"/);
+  const inputPath = String(match?.[1] || "");
+  if (!inputPath) return "";
+  const resolved = path.resolve(flakeDir, inputPath);
+  if (!inputPath.startsWith(".")) return "";
+  return validViberootsSource(resolved);
 }
 
 function activeViberootsOverride(flakeRef: string): string[] {

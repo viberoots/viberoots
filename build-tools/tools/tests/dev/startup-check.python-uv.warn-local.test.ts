@@ -5,8 +5,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 const startupCheckScript = fileURLToPath(new URL("../../dev/startup-check.ts", import.meta.url));
 
-// Locally (CI not set), language toolchains are optional (sparse/partial clones).
-// Missing python3/uv should NOT fail and should NOT warn by default.
+// Python-enabled checkouts require the Nix-provided toolchain locally as well as in CI.
 await runInTemp("startup-check-python-uv-warn-local", async (tmp, $) => {
   // Ensure zx init is loaded for TypeScript execution
   const here = new URL(import.meta.url).pathname;
@@ -37,12 +36,12 @@ await runInTemp("startup-check-python-uv-warn-local", async (tmp, $) => {
     out = String(e?.stdout || "") + String(e?.stderr || "");
   }
 
-  if (code !== 0) {
-    console.error("expected startup-check to succeed locally when python3/uv are missing\n", out);
+  if (code === 0) {
+    console.error("expected startup-check to fail locally when python3/uv are missing\n", out);
     process.exit(2);
   }
-  if (out.includes("missing tools") || out.includes("python3") || out.includes("uv")) {
-    console.error("expected no python3/uv missing-tools warning in local output\n", out);
+  if (!out.includes("Python toolchain must come from the Nix dev shell")) {
+    console.error("expected the local failure to identify the Nix Python requirement\n", out);
     process.exit(2);
   }
 });

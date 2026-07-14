@@ -74,14 +74,17 @@ curl -fsSL https://viberoots.dev/bootstrap | \
 
 Run the same command in an existing checkout; it initializes an existing `viberoots` submodule if needed and refreshes the workspace files.
 
-After bootstrap, the installed CLI can rerun the same latest-main bootstrap path:
+After bootstrap, the installed CLI owns setup repair and viberoots source updates:
 
 ```bash
 viberoots bootstrap
 viberoots update
 ```
 
-Both commands fetch the current bootstrap entrypoint from GitHub `main`, then pass through the same `VBR_*` options listed below. Use `bootstrap` for setup/repair language and `update` when the intent is to move the workspace to the current default ref, a `VBR_REF`, or a `VBR_REV`.
+Both commands fetch the current bootstrap entrypoint from GitHub `main`. Use `bootstrap` for initial
+setup or setup repair. Use `update` to move only the workspace's viberoots submodule or flake pin,
+then run the deterministic reconciliation required by that viberoots revision. It never upgrades
+project dependency versions; use `u --upgrade` for that separate operation.
 
 `vbr` is a short alias for `viberoots`. Both commands resolve the workspace from any nested directory inside the consumer repo.
 
@@ -115,7 +118,11 @@ i && b && v
 
 Post-clone is intentionally for existing checked-in workspaces. If `flake.lock` is missing, use normal bootstrap for a new workspace. If a flake-mode workspace is missing `nodes.viberoots.locked.rev`, use normal bootstrap or an explicit `VBR_REV=<full-commit-sha>` with the normal bootstrap flow. In flake-mode post-clone, an explicit `VBR_REV` must match the checked-in lock revision; in submodule-mode post-clone, explicit `VBR_REV` is rejected because the checked-in gitlink is the source of truth.
 
-Post-clone may change ignored local state. If you need proof that tracked files did not change, run `git diff --exit-code` afterward.
+Post-clone and its default `i` are read-only for tracked metadata. They may change ignored local
+state, but current committed metadata must leave both `git diff --exit-code` and
+`git status --short` clean after a fresh recursive clone. Stale dependency metadata fails with
+`repair: run u`; intentional project dependency upgrades use `u --upgrade`; stale source pins or
+generated source configuration use `viberoots update`.
 
 **Options**
 
@@ -221,6 +228,11 @@ v        # run impacted tests and verification checks
 ```
 
 Shell entry also prepares ignored viberoots workspace state. In a consumer workspace, the hidden `.viberoots/workspace/flake.nix` uses `path:../../viberoots` as the local input while `.envrc` overrides that input to `path:$PWD/viberoots` for local development. The generated root `flake.nix` mirrors the workspace flake so `nix develop` works from the workspace root and nested project directories. Activation points `.viberoots/current` at the active viberoots source, so Buck cells and Nix-backed commands see local build-tool edits immediately. Generated provider and Buck graph state stays under `.viberoots/workspace/`.
+
+The development shell and packaged `viberoots` command do not retain the exact pnpm
+`node-modules` output in their Nix closures. Shell entry only probes and relinks an already realized
+exact store; `u` owns repair, while `i` fails closed before dependency materialization when committed
+metadata is stale.
 
 Check the active source mode and split-readiness diagnostics with:
 

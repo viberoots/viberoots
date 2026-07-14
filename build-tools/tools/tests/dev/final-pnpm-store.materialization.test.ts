@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   reconcileFixedPnpmStore,
+  shouldInspectFixedStoreForRebuild,
   shouldRebuildFixedStore,
 } from "../../dev/update-pnpm-hash/fixed-store-reconcile";
 import {
@@ -13,6 +14,7 @@ import {
   updateNodeModulesHashesJson,
 } from "../../dev/update-pnpm-hash/hashes-json";
 import { extractHash } from "../../dev/update-pnpm-hash/nix";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const hashA = `sha256-${Buffer.alloc(32, 1).toString("base64")}`;
 const hashB = `sha256-${Buffer.alloc(32, 2).toString("base64")}`;
@@ -86,6 +88,33 @@ test("force reconciliation builds missing stores normally and rebuilds realized 
       throw new Error("authoritative eval failed");
     }),
     /authoritative eval failed/,
+  );
+});
+
+test("explicit reconcile inspects only an existing committed fixed store", () => {
+  assert.equal(
+    shouldInspectFixedStoreForRebuild({ currentHash: "", force: false, markerMatches: false }),
+    false,
+  );
+  assert.equal(
+    shouldInspectFixedStoreForRebuild({
+      currentHash: "not-a-hash",
+      force: true,
+      markerMatches: false,
+    }),
+    false,
+  );
+  assert.equal(
+    shouldInspectFixedStoreForRebuild({
+      currentHash: hashA,
+      force: false,
+      markerMatches: false,
+    }),
+    true,
+  );
+  assert.equal(
+    shouldInspectFixedStoreForRebuild({ currentHash: hashA, force: false, markerMatches: true }),
+    false,
   );
 });
 
@@ -340,9 +369,18 @@ test("metadata snapshot restores non-owner deletions byte-for-byte", async () =>
 });
 
 test("Nix-native fixed store retains hash authority and ordinary builds cannot fetch", async () => {
-  const store = await fsp.readFile("build-tools/tools/nix/node-modules/store.nix", "utf8");
-  const updater = await fsp.readFile("build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
-  const nix = await fsp.readFile("build-tools/tools/dev/update-pnpm-hash/nix.ts", "utf8");
+  const store = await fsp.readFile(
+    viberootsSourcePath("build-tools/tools/nix/node-modules/store.nix"),
+    "utf8",
+  );
+  const updater = await fsp.readFile(
+    viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash.ts"),
+    "utf8",
+  );
+  const nix = await fsp.readFile(
+    viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash/nix.ts"),
+    "utf8",
+  );
 
   assert.match(
     store,
@@ -355,6 +393,8 @@ test("Nix-native fixed store retains hash authority and ordinary builds cannot f
   assert.match(store, /final fixed pnpm store is missing/);
   assert.doesNotMatch(store, /mkPnpmStoreUnfixed|pnpm-store-unfixed|add-fixed/);
   assert.match(updater, /withPnpmStoreBuildFlakeRef\([\s\S]*NIX_PNPM_RECONCILE: "1"/);
+  assert.match(updater, /if \(readOnly\) \{[\s\S]*await probe\(\);[\s\S]*return;/);
+  assert.match(updater, /shouldInspectFixedStoreForRebuild\(/);
   assert.match(updater, /shouldRebuildFixedStore\(inspectForRebuild\)/);
   assert.match(updater, /rebuild: rebuildExisting/);
   assert.match(nix, /"keep-failed",\s*"false"/);

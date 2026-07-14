@@ -130,6 +130,7 @@ test("export-wasm-from-nix does not force C++ planner mode for Python wasm targe
     const script = path.join(tmp, "build-tools", "tools", "wasm", "export-wasm-from-nix.ts");
     await fsp.mkdir(path.dirname(script), { recursive: true });
     await fsp.copyFile(scriptSource, script);
+    await fsp.rm(path.join(tmp, "viberoots"), { recursive: true, force: true });
     await fsp.rm(path.join(tmp, ".viberoots"), { recursive: true, force: true });
 
     const fakeOut = path.join(tmp, "fake-nix-out");

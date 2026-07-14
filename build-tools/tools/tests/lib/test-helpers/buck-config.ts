@@ -76,14 +76,27 @@ async function resolvePreludePath(
           .access(path.join(viberootsInputRoot, "flake.nix"))
           .then(() => true)
           .catch(() => false));
-      const viberootsOverrideArgs = hasViberootsInputRoot
-        ? ["--override-input", "viberoots", `path:${viberootsInputRoot}`]
-        : [];
+      if (hasViberootsInputRoot) {
+        const pre = await $({
+          cwd: tmp,
+          stdio: "pipe",
+        })`nix build --impure ${`path:${viberootsInputRoot}#buck2-prelude`} --no-link --no-write-lock-file --accept-flake-config --print-out-paths`;
+        const out = String(pre.stdout || "")
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .pop();
+        const preludePath = out ? path.join(out, "prelude").replaceAll("\\", "/") : "";
+        if (await hasPreludeEntrypoint(preludePath)) return preludePath;
+        throw new Error(
+          `selected viberoots input did not produce a valid Buck prelude: ${viberootsInputRoot}`,
+        );
+      }
       try {
         const pre = await $({
           cwd: tmp,
           stdio: "pipe",
-        })`nix build --impure ${`path:${flakeRoot}#buck2-prelude`} ${viberootsOverrideArgs} --no-link --no-write-lock-file --accept-flake-config --print-out-paths`;
+        })`nix build --impure ${`path:${flakeRoot}#buck2-prelude`} --no-link --no-write-lock-file --accept-flake-config --print-out-paths`;
         const out = String(pre.stdout || "")
           .trim()
           .split("\n")
@@ -92,26 +105,11 @@ async function resolvePreludePath(
         const preludePath = out ? path.join(out, "prelude").replaceAll("\\", "/") : "";
         if (await hasPreludeEntrypoint(preludePath)) return preludePath;
       } catch {}
-      if (hasViberootsInputRoot) {
-        try {
-          const pre = await $({
-            cwd: tmp,
-            stdio: "pipe",
-          })`nix build --impure ${`path:${viberootsInputRoot}#buck2-prelude`} --no-link --no-write-lock-file --accept-flake-config --print-out-paths`;
-          const out = String(pre.stdout || "")
-            .trim()
-            .split("\n")
-            .filter(Boolean)
-            .pop();
-          const preludePath = out ? path.join(out, "prelude").replaceAll("\\", "/") : "";
-          if (await hasPreludeEntrypoint(preludePath)) return preludePath;
-        } catch {}
-      }
       try {
         const ev = await $({
           cwd: tmp,
           stdio: "pipe",
-        })`nix eval --impure --raw ${`path:${flakeRoot}#inputs.buck2.outPath`} ${viberootsOverrideArgs} --no-write-lock-file`;
+        })`nix eval --impure --raw ${`path:${flakeRoot}#inputs.buck2.outPath`} --no-write-lock-file`;
         const p = String(ev.stdout || "").trim();
         const preludePath = p ? path.join(p, "prelude").replaceAll("\\", "/") : "";
         if (await hasPreludeEntrypoint(preludePath)) return preludePath;

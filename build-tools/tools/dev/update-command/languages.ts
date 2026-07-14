@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runGomod2nixGenerateIn, runGomod2nixScanAll } from "../install/gomod2nix";
 import { projectModuleDirs } from "./surfaces";
+import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 
 type CommandResult = { exitCode: number; stdout: string; stderr: string };
 
@@ -47,10 +48,11 @@ export async function repairGoDependencies(root: string, verbose: boolean): Prom
 }
 
 export async function repairPythonDependencies(root: string, verbose: boolean): Promise<void> {
+  const uvBin = ensureNixStoreToolPathSync("uv");
   for (const dir of await projectModuleDirs(root, "pyproject.toml")) {
     const manifest = path.join(dir, "pyproject.toml");
     if (verbose) console.log(`[update] Python: reconciling ${path.relative(root, manifest)}`);
-    const result = await run(process.env.UPDATE_UV_BIN || "uv", ["lock"], dir);
+    const result = await run(uvBin, ["lock"], dir);
     if (result.exitCode !== 0) {
       throw new Error(`uv lock failed in ${path.relative(root, dir) || "."}\n${result.stderr}`);
     }

@@ -8,6 +8,7 @@ import { findUvLockfiles } from "../../lib/lockfiles";
 import { repoRoot } from "../../lib/repo";
 import { absenceCacheFresh, writeAbsenceCache } from "./absence-cache";
 import { staleMetadataError } from "./metadata-mode";
+import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 
 const execFileAsync = promisify(execFile);
 
@@ -51,7 +52,7 @@ export async function runUvRefreshAll(dryRun: boolean, verbose: boolean, readOnl
       const manifestPath = path.join(path.dirname(lockPath), "pyproject.toml");
       try {
         await fsp.access(manifestPath);
-        await execFileAsync(process.env.INSTALL_DEPS_UV_BIN || "uv", ["lock", "--check"], {
+        await execFileAsync(ensureNixStoreToolPathSync("uv"), ["lock", "--check"], {
           cwd: path.dirname(lockPath),
         });
       } catch (error) {

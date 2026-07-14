@@ -8,6 +8,15 @@ export async function shouldRebuildFixedStore(
   return (await inspect()) === "realized";
 }
 
+export function shouldInspectFixedStoreForRebuild(opts: {
+  currentHash: string;
+  force: boolean;
+  markerMatches: boolean;
+}): boolean {
+  const hasCommittedHash = /^sha256-[A-Za-z0-9+/]{43}=$/.test(opts.currentHash);
+  return hasCommittedHash && (opts.force || !opts.markerMatches);
+}
+
 async function restoreMetadataOrThrow(
   restoreMetadata: () => Promise<void>,
   primary: unknown,

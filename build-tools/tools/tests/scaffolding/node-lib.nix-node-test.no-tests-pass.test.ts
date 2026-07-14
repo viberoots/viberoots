@@ -4,7 +4,6 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
-import { resolveFinalPnpmStore } from "../../dev/update-pnpm-hash/realized-store";
 import { viberootsDevTool } from "./lib/viberoots-tools";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
@@ -58,38 +57,20 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
       env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
     })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${importer}/pnpm-lock.yaml`;
     const flakeRef = await workspaceFlakeRef(tmp);
-    const fixedStore = await resolveFinalPnpmStore({
-      repoRoot: tmp,
-      importer,
-      flakeRef: `path:${flakeRef}`,
-      attrPath: "pnpm-store.projects-libs-demo",
-    });
-    const fixedStoreEnv = { ...process.env };
-
-    // Confirm Nix sees the importer lockfile path
-    await $({
-      stdio: "inherit",
-    })`nix eval --impure --raw --expr 'builtins.toString (builtins.pathExists ./projects/libs/demo/pnpm-lock.yaml)'`;
-
-    // Avoid pre-warming pnpm-store/node-modules here; nix_node_test will build what it needs.
-
-    // Glue and provider mapping (export graph → providers → auto_map)
-    await $`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
-    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
-    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
-
-    // Target should exist and test should pass (no tests matched → success)
-    try {
-      await $({
-        stdio: "inherit",
-        env: fixedStoreEnv,
-      })`buck2 targets --target-platforms prelude//platforms:default //projects/libs/demo:unit`;
-      await $({
-        stdio: "inherit",
-        env: fixedStoreEnv,
-      })`buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit`;
-    } finally {
-      await fixedStore.cleanup();
-    }
+    const timeoutSecs = String(
+      Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200"),
+    );
+    const out = await $({ stdio: "pipe" })`bash --noprofile --norc -c ${
+      `timeout ${timeoutSecs}s nix build "path:${flakeRef}#node-test.projects-libs-demo" ` +
+      '--impure --no-link --accept-flake-config --builders "" --print-out-paths'
+    }`;
+    const outPath =
+      String(out.stdout || "")
+        .trim()
+        .split(/\r?\n/)
+        .filter(Boolean)
+        .pop() || "";
+    if (!outPath) throw new Error("nix build returned no out path for node-test");
+    await fsp.access(path.join(outPath, "report"));
   });
 });

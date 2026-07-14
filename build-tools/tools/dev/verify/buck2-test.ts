@@ -109,6 +109,17 @@ export function spawnVerifyBuck2Tests(opts: {
     spawnImpl: opts.spawnImpl,
   });
   const pgid = proc.pid || process.pid;
+  let exitCodeRaw: number | null = null;
+  let exitSignalRaw: NodeJS.Signals | null = null;
+  const closePromise = new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
+    (resolve) => {
+      proc.on("exit", (code, signal) => {
+        exitCodeRaw = typeof code === "number" ? code : null;
+        exitSignalRaw = signal;
+      });
+      proc.on("close", (code, signal) => resolve({ code, signal }));
+    },
+  );
 
   let passCount = 0;
   let failCount = 0;
@@ -117,8 +128,6 @@ export function spawnVerifyBuck2Tests(opts: {
   let stderrCarry = "";
   let stdoutTail = "";
   let stderrTail = "";
-  let exitCodeRaw: number | null = null;
-  let exitSignalRaw: NodeJS.Signals | null = null;
   const streamBuckOutput = isVbrVerbose() || opts.console !== "auto";
   const ui = createCommandUi({ verbose: streamBuckOutput });
   const externalProgress = Boolean(opts.onProgressUpdate);
@@ -195,15 +204,7 @@ export function spawnVerifyBuck2Tests(opts: {
   });
 
   const wait = async (): Promise<number> => {
-    const close = await new Promise<{ code: number | null; signal: NodeJS.Signals | null }>(
-      (resolve) => {
-        proc.on("exit", (code, signal) => {
-          exitCodeRaw = typeof code === "number" ? code : null;
-          exitSignalRaw = signal;
-        });
-        proc.on("close", (code, signal) => resolve({ code, signal }));
-      },
-    );
+    const close = await closePromise;
     for (const timer of pacingTimers) clearTimeout(timer);
     const exitCode = typeof close.code === "number" ? close.code : 1;
     opts.onProgressStop?.(passName, exitCode);

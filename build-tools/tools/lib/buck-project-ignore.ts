@@ -15,6 +15,12 @@ export const BUCK_PROJECT_IGNORES = [
 
 export const BUCK_PROJECT_IGNORE_LINE = `ignore = ${BUCK_PROJECT_IGNORES.join(", ")}`;
 
+export const BUCK_SOURCE_PROJECT_IGNORE_LINE = `ignore = ${[
+  ...BUCK_PROJECT_IGNORES.slice(0, 2),
+  ".viberoots",
+  ...BUCK_PROJECT_IGNORES.slice(2),
+].join(", ")}`;
+
 export function withBuckProjectIgnorePolicy(config: string): string {
   const lines = config.split("\n");
   const projectIndex = lines.findIndex((line) => line.trim() === "[project]");

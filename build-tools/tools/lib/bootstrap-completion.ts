@@ -2,7 +2,6 @@
 import * as fsp from "node:fs/promises";
 import fs from "node:fs";
 import path from "node:path";
-import { initConsumer } from "./consumer-bootstrap";
 
 type BootstrapTransaction = {
   schema?: number;
@@ -125,6 +124,7 @@ export async function checkBootstrapCompletion(opts: {
   console.error("[bootstrap-check] migrations:");
   console.error("[bootstrap-check]   - no known migration steps necessary");
 
+  const { initConsumer } = await import("./consumer-bootstrap");
   await initConsumer({
     workspaceRoot,
     workspaceName,

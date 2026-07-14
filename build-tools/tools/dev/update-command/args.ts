@@ -12,6 +12,7 @@ Make project dependency and generated metadata consistent after source edits.
 
 Go, Python, and C++ upgrades are unsupported and fail closed when those project surfaces exist.
 Neither mode updates the viberoots pin, submodule, or flake input.
+Use viberoots update when the viberoots pin itself should move.
 
 options:
   --upgrade    intentionally upgrade pnpm dependency versions

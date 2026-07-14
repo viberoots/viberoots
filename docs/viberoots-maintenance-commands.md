@@ -1,6 +1,7 @@
 # viberoots Bootstrap and Maintenance Commands
 
-This document proposes the CLI design for `viberoots bootstrap`, `viberoots update`, and `viberoots gc`.
+This document defines the command contract for `viberoots bootstrap`, `viberoots update`, and
+`viberoots gc`.
 
 The goals are:
 
@@ -21,7 +22,9 @@ viberoots gc --optimize
 viberoots gc --nix-delete-older-than 7d
 ```
 
-`viberoots bootstrap` and `viberoots update` are aliases for the same latest-main bootstrap path.
+`viberoots bootstrap` owns initial setup and setup repair. `viberoots update` is the only public
+command that moves viberoots submodule or flake pins; it performs only the deterministic
+reconciliation required by the new tooling revision and never upgrades project dependencies.
 
 `viberoots gc` is a local maintenance command. It must never remove source files, committed files, user-authored project files, local secrets, or dirty work.
 
@@ -29,14 +32,17 @@ viberoots gc --nix-delete-older-than 7d
 
 ### User Contract
 
-Both commands invoke the official bootstrap script from `https://viberoots.dev/bootstrap`, regardless of the currently installed or checked-out viberoots version.
+Both commands launch the official live bootstrap implementation regardless of the currently
+installed or checked-out viberoots version. Bootstrap uses `https://viberoots.dev/bootstrap`;
+update selects update mode so source-pin movement remains explicit.
 
 ```bash
 viberoots bootstrap
 viberoots update
 ```
 
-This ensures upgrade migrations are always sourced from the newest bootstrap entrypoint.
+This ensures setup and update migrations are sourced from the current live implementation while
+preserving separate command authority.
 
 The current local CLI should act only as a downloader/launcher. It should not try to duplicate bootstrap logic.
 
@@ -96,7 +102,9 @@ viberoots bootstrap --no-direnv-allow
 viberoots bootstrap --dry-run
 ```
 
-`viberoots update` should accept the same flags.
+`viberoots update` accepts the source-selection and launcher flags, but its mutation authority stays
+limited to viberoots pins plus required deterministic reconciliation. Project dependency versions
+move only through `u --upgrade`.
 
 The launcher should translate flags to `VBR_*` variables before invoking the downloaded script. Explicit environment variables should remain supported. A CLI flag wins over an existing environment variable for the launched process because it represents the user’s direct command invocation.
 
@@ -173,6 +181,9 @@ Command-specific completion:
 bootstrap/update: --mode --ref --rev --workspace-root --run-install --no-run-install --run-validate --no-direnv-allow --dry-run --bootstrap-url --trust-bootstrap-url --help
 gc: --dry-run --aggressive --optimize --nix --no-nix --nix-delete-older-than --keep-current-profile --verbose --help
 ```
+
+Help must describe the authority split: `u` repairs dependency metadata, `u --upgrade` upgrades
+project dependencies, and `viberoots update` updates viberoots only.
 
 ## `viberoots gc`
 
@@ -504,10 +515,11 @@ viberoots help gc
 
 ## Test Coverage
 
-### Bootstrap and Update Alias Tests
+### Bootstrap and Update Launcher Tests
 
 - `viberoots bootstrap --dry-run` downloads or resolves the live script path and invokes it with `VBR_DRY_RUN=1`.
-- `viberoots update --dry-run` produces the same launcher behavior as `bootstrap`.
+- `viberoots update --dry-run` selects update mode without mutating source pins or project
+  dependencies.
 - CLI flags override environment variables for the launched process.
 - Default URL is `https://viberoots.dev/bootstrap`.
 - Custom URL without `--trust-bootstrap-url` is refused.
@@ -553,7 +565,7 @@ viberoots help gc
 
 Implement in two PR-sized slices:
 
-1. `viberoots bootstrap` and `viberoots update` launcher aliases, help, completion, docs, and tests.
+1. `viberoots bootstrap` and isolated `viberoots update` launchers, help, completion, docs, and tests.
 2. `viberoots gc` conservative planner/executor, help, completion, docs, and tests.
 
 Keep `--aggressive` and `--optimize` in the first `gc` implementation only if the plan/execution

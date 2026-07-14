@@ -2,6 +2,14 @@ import type { BootstrapArgs } from "./infisical-iac-bootstrap-types";
 import * as path from "node:path";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 import { normalizeBootstrapScope } from "./infisical-iac-bootstrap-scope";
+import {
+  defaultBootstrapKeychainServiceName,
+  defaultRepoKeychainServiceName,
+} from "./bootstrap-starter-defaults";
+export {
+  defaultBootstrapKeychainServiceName,
+  defaultRepoKeychainServiceName,
+} from "./bootstrap-starter-defaults";
 
 export type DeploymentBootstrapScope = {
   target: string;
@@ -129,20 +137,6 @@ function defaultBootstrapScope(workspaceRoot: string) {
 
 export function defaultRepoInfisicalProjectName(workspaceRoot: string) {
   return validateRepoInfisicalProjectName(path.basename(path.resolve(workspaceRoot)));
-}
-
-export function defaultBootstrapKeychainServiceName(workspaceRoot: string) {
-  return validateKeychainServiceName(
-    `${path.basename(path.resolve(workspaceRoot))}-bootstrap`,
-    "bootstrap Keychain service name",
-  );
-}
-
-export function defaultRepoKeychainServiceName(workspaceRoot: string) {
-  return validateKeychainServiceName(
-    path.basename(path.resolve(workspaceRoot)),
-    "repo Keychain service name",
-  );
 }
 
 async function configuredBootstrapScope(workspaceRoot: string) {

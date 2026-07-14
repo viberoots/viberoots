@@ -19,7 +19,8 @@ export async function makeRemoteSource(root: string, $: typeof globalThis.$): Pr
   const source = path.join(root, "remote-viberoots-src");
   await $({
     stdio: "pipe",
-  })`rsync -a --exclude=.git --exclude=.direnv --exclude=.viberoots --exclude=buck-out --exclude=build-tools/tmp ${REPO_ROOT}/ ${source}/`;
+  })`rsync -a --chmod=Du+rwx,Dgo+rx,Fu+rw,Fgo+r --exclude=.git --exclude=.direnv --exclude=.viberoots --exclude=buck-out --exclude=build-tools/tmp ${REPO_ROOT}/ ${source}/`;
+  await fsp.chmod(source, 0o755);
   await $({ cwd: source })`git init -q`;
   await $({ cwd: source })`git add .`;
   await $({ cwd: source })`git commit -qm remote-source`;

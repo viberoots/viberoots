@@ -21,15 +21,32 @@ test("resolveToolPathSync prefers nix store binaries before host PATH entries", 
     const hostTool = path.join(hostDir, "demo-tool");
     const nixTool = path.join(nixDir, "demo-tool");
     await fsp.writeFile(hostTool, "#!/bin/sh\nexit 0\n", "utf8");
-    await fsp.writeFile(nixTool, "#!/bin/sh\nexit 0\n", "utf8");
+    await fsp.symlink(process.execPath, nixTool);
     await fsp.chmod(hostTool, 0o755);
-    await fsp.chmod(nixTool, 0o755);
 
     const resolved = resolveToolPathSync("demo-tool", {
       ...process.env,
       PATH: [hostDir, nixDir].join(path.delimiter),
     });
     assert.equal(resolved, nixTool);
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("ensureNixStoreToolPathSync rejects a nested fake Nix store", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "tool-paths-"));
+  try {
+    const fakeStoreBin = path.join(tmp, "nix", "store", "hostile", "bin");
+    await fsp.mkdir(fakeStoreBin, { recursive: true });
+    const hostile = path.join(fakeStoreBin, "python3");
+    await fsp.writeFile(hostile, "#!/bin/sh\nexit 0\n", "utf8");
+    await fsp.chmod(hostile, 0o755);
+
+    assert.throws(
+      () => ensureNixStoreToolPathSync("python3", { PATH: fakeStoreBin }),
+      /required tool must resolve to \/nix\/store/,
+    );
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
@@ -157,10 +174,9 @@ test("resolveToolPathSync ignores viberoots source trees and only searches PATH"
 
 test("install-time nix helpers use resolved Nix tool path", async () => {
   const files = [
-    "viberoots/build-tools/tools/dev/filtered-flake.ts",
+    "viberoots/build-tools/tools/dev/filtered-flake-viberoots-input.ts",
     "viberoots/build-tools/tools/dev/nix-build-filtered-flake.ts",
     "viberoots/build-tools/tools/dev/install/link-node.ts",
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/filtered-flake.ts",
     "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store.ts",
     "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-command.ts",
     "viberoots/build-tools/tools/dev/update-pnpm-hash/nix.ts",

@@ -80,7 +80,9 @@ async function defaultRunCommand(
 }
 
 export async function runLiveBootstrap(opts: LiveBootstrapOptions): Promise<void> {
-  const url = opts.bootstrapUrl || officialBootstrapUrl;
+  const url =
+    opts.bootstrapUrl ||
+    (opts.command === "post-clone" ? officialPostCloneUrl : officialBootstrapUrl);
   if (!isOfficialUrl(url) && !opts.trustBootstrapUrl) {
     throw new Error(
       "error: refusing custom bootstrap URL without --trust-bootstrap-url; custom bootstrap URLs can run non-viberoots code during setup",

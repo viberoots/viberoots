@@ -207,19 +207,16 @@ repair: run `u`
 ```
 
 ```text
-project dependencies need an intentional upgrade
-no tracked files were modified
-repair: run `u --upgrade`
-```
-
-```text
 viberoots pins are inconsistent
 no tracked files were modified
 repair: run `viberoots update`
 ```
 
 Messages should name the stale files and the expected deterministic change when possible, but the
-headline should be the exact repair command.
+headline should be the exact repair command. A consistency guard cannot infer that a developer
+intends to move dependency versions, so it must not emit `u --upgrade` as repair guidance. That mode
+is selected explicitly by the developer; when the selected project surfaces do not support an
+upgrade, `u --upgrade` fails closed and names those surfaces without modifying files.
 
 ## Implementation Requirements
 

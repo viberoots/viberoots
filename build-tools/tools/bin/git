@@ -78,6 +78,41 @@ resolve_real_git() {
   return 127
 }
 
+is_nix_store_python() {
+  local candidate="$1"
+  local resolved
+  resolved="$(resolve_symlink_path "$candidate")"
+  [[ "$candidate" == /nix/store/*/bin/python3 || "$resolved" == /nix/store/*/bin/python3 ]]
+}
+
+resolve_python3() {
+  if [[ -n "${VBR_PYTHON_BIN:-}" ]]; then
+    if [[ ! -x "${VBR_PYTHON_BIN}" ]] || ! is_nix_store_python "${VBR_PYTHON_BIN}"; then
+      echo "git wrapper: VBR_PYTHON_BIN must be an executable /nix/store python3: ${VBR_PYTHON_BIN}" >&2
+      return 127
+    fi
+    printf '%s\n' "${VBR_PYTHON_BIN}"
+    return 0
+  fi
+
+  local old_ifs="$IFS"
+  local dir
+  IFS=':'
+  for dir in ${PATH:-}; do
+    [[ -n "$dir" ]] || continue
+    local candidate="${dir}/python3"
+    if [[ -x "$candidate" ]] && is_nix_store_python "$candidate"; then
+      printf '%s\n' "$candidate"
+      IFS="$old_ifs"
+      return 0
+    fi
+  done
+  IFS="$old_ifs"
+
+  echo "git wrapper: could not find Nix-store python3 on PATH; run inside the Nix dev shell" >&2
+  return 127
+}
+
 is_worktree_add() {
   [[ "${1:-}" == "worktree" && "${2:-}" == "add" ]]
 }
@@ -131,9 +166,11 @@ cow_copy_tree() {
     return $?
   fi
 
+  local python3_bin
+  python3_bin="$(resolve_python3)"
   local ostype="${VBR_GIT_COW_OSTYPE:-${OSTYPE:-}}"
   if [[ "$ostype" == darwin* ]]; then
-    python3 - "$src" "$dst" "$manifest" <<'PY'
+    "$python3_bin" - "$src" "$dst" "$manifest" <<'PY'
 import ctypes
 import os
 import shutil
@@ -195,7 +232,7 @@ with open(manifest, "rb") as f:
             clone_entry(raw.decode("utf-8", "surrogateescape"))
 PY
   else
-    python3 - "$src" "$dst" "$manifest" <<'PY'
+    "$python3_bin" - "$src" "$dst" "$manifest" <<'PY'
 import fcntl
 import os
 import shutil

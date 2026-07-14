@@ -3,6 +3,12 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
+import {
+  defaultFilteredFlakeSnapshotRelPaths,
+  defaultFilteredFlakeSnapshotRsyncSources,
+  filteredFlakeRsyncExcludeArgs,
+} from "../../dev/nix-build-filtered-flake-lib";
 import { workspaceFlakeRef } from "../lib/test-helpers";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
@@ -20,6 +26,25 @@ async function runInNixTemp(name: string, fn: (tmp: string) => Promise<void>): P
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
+}
+
+async function materializeRealFilteredViberoots(tmp: string): Promise<string> {
+  const liveRoot = await fsp.realpath(viberootsSourcePath("."));
+  const filteredRoot = path.join(tmp, "filtered-viberoots");
+  await fsp.mkdir(filteredRoot, { recursive: true });
+  const relPaths: string[] = [];
+  for (const relPath of defaultFilteredFlakeSnapshotRelPaths()) {
+    if (relPath === ".viberoots") continue;
+    try {
+      await fsp.access(path.join(liveRoot, relPath));
+      relPaths.push(relPath);
+    } catch {}
+  }
+  await $({
+    cwd: liveRoot,
+    stdio: "pipe",
+  })`rsync -a --delete --relative ${filteredFlakeRsyncExcludeArgs()} ${defaultFilteredFlakeSnapshotRsyncSources(relPaths)} ${filteredRoot}/`;
+  return (await materializeFilteredViberootsSource(filteredRoot)).storePath;
 }
 
 test("viberoots Nix fixture receives workspaceSrc outside viberoots source", async () => {
@@ -55,11 +80,6 @@ test("viberoots Nix fixture receives workspaceSrc outside viberoots source", asy
 }
 `,
     );
-    await $({ cwd: tmp })`git init -q`;
-    await $({
-      cwd: tmp,
-    })`git add flake.nix workspace-marker viberoots/flake.nix viberoots/own-source-marker`;
-
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -75,12 +95,12 @@ test("viberoots Nix fixture receives workspaceSrc outside viberoots source", asy
 
 test("real viberoots mkWorkspace exposes metadata for external workspace source", async () => {
   await runInNixTemp("viberoots-real-mkworkspace", async (tmp) => {
-    const viberootsRoot = await fsp.realpath(viberootsSourcePath("."));
+    const viberootsStorePath = await materializeRealFilteredViberoots(tmp);
     await writeFile(path.join(tmp, "workspace-marker"), "workspace\n");
     await writeFile(
       path.join(tmp, "flake.nix"),
       `{
-  inputs.viberoots.url = "path:${viberootsRoot}";
+  inputs.viberoots.url = "path:${viberootsStorePath}";
   outputs = { self, viberoots }: {
     probe = (viberoots.lib.mkWorkspace {
       workspaceSrc = ./.;
@@ -103,7 +123,12 @@ test("real viberoots mkWorkspace exposes metadata for external workspace source"
     assert.equal(probe.releaseTag, "v0.0.0-dev");
     assert.match(probe.viberootsSourcePath, /^\/nix\/store\/[^/]+-source$/);
     assert.notEqual(probe.viberootsSourcePath, tmp);
-    assert.notEqual(probe.viberootsSourcePath, viberootsRoot);
+    assert.equal(probe.viberootsSourcePath, viberootsStorePath);
     await fsp.access(path.join(probe.viberootsSourcePath, "flake.nix"));
+    for (const rel of [".viberoots", "buck-out", "node_modules"]) {
+      await assert.rejects(fsp.access(path.join(probe.viberootsSourcePath, rel)), {
+        code: "ENOENT",
+      });
+    }
   });
 });

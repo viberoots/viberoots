@@ -162,10 +162,14 @@ It should list:
 
 ```text
 viberoots status
+viberoots develop
+viberoots init-workspace
 viberoots bootstrap-check
 viberoots bootstrap
 viberoots update
+viberoots post-clone
 viberoots gc
+viberoots resource-graph
 viberoots init-consumer
 viberoots use-submodule
 viberoots use-flake
@@ -184,10 +188,13 @@ Add bash completion for `viberoots` and its short `vbr` wrapper.
 Completion should cover commands:
 
 ```text
-status bootstrap-check bootstrap update gc init-consumer use-submodule use-flake remove-submodule completion help
+status develop init-workspace bootstrap-check bootstrap update post-clone gc resource-graph init-consumer use-submodule use-flake remove-submodule completion help
 ```
 
 Maintenance command details live in [`viberoots-maintenance-commands.md`](viberoots-maintenance-commands.md).
+That command contract also defines the authority boundary: source-mode and pin movement belongs to
+`viberoots update`, dependency metadata repair belongs to `u`, and intentional dependency upgrades
+belong to `u --upgrade`.
 
 Completion should cover `use-submodule` options:
 

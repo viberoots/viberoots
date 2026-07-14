@@ -23,7 +23,7 @@ test("install deps nix calls disable per-invocation auto-GC lock waits", async (
   if (!hashNix.includes("gcWaitConfig()")) {
     throw new Error("update-pnpm-hash/nix.ts must use bounded nix gc wait configuration");
   }
-  if (!hashNix.includes("return await buildStore(attrPath, flakeRef, activity, extraEnv)")) {
+  if (!hashNix.includes("return await buildStore(attrPath, flakeRef, activity, extraEnv, opts)")) {
     throw new Error("update-pnpm-hash/nix.ts must retry once after active nix store gc clears");
   }
 

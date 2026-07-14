@@ -12,32 +12,12 @@ function seedFlakeRef(root: string): string {
   return `path:${flakeRoot}#test-seed`;
 }
 
-function viberootsOverrideArgs(root: string, env: NodeJS.ProcessEnv): string[] {
-  const candidates = [
-    env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
-    env.VIBEROOTS_SOURCE_ROOT || "",
-    env.VIBEROOTS_ROOT || "",
-    path.join(root, "viberoots"),
-  ];
-  for (const candidate of candidates) {
-    const trimmed = String(candidate || "").trim();
-    if (!trimmed) continue;
-    const abs = path.resolve(trimmed);
-    if (fs.existsSync(path.join(abs, "flake.nix"))) {
-      return ["--override-input", "viberoots", `path:${abs}`];
-    }
-  }
-  return [];
-}
-
 export function verifySeedBuildArgs(opts: {
   root: string;
   mode: VerifySeedBuildMode;
   gcRootPath?: string;
-  env?: NodeJS.ProcessEnv;
 }): string[] {
   const flakeRef = seedFlakeRef(opts.root);
-  const overrideArgs = viberootsOverrideArgs(opts.root, opts.env || process.env);
   const base = [
     "build",
     "--option",
@@ -45,7 +25,6 @@ export function verifySeedBuildArgs(opts: {
     "false",
     "--impure",
     flakeRef,
-    ...overrideArgs,
     "--accept-flake-config",
   ];
   if (opts.mode === "remote-ready") return [...base, "--no-link", "--print-out-paths"];

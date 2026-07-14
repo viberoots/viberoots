@@ -1,5 +1,6 @@
 import path from "node:path";
 import process from "node:process";
+import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import { hashOwnerForLockfile, readNodeModulesHashForLockfile } from "./hashes-json";
 import { runExactStoreCommand } from "./exact-store-command";
@@ -32,24 +33,24 @@ async function expectedFinalPnpmStorePath(opts: {
   expectedHash: string;
   timeoutMs: number;
 }): Promise<string> {
-  const env = envWithResolvedNixBin(process.env);
+  const nixEnv = withSanitizedInheritedNixConfig(envWithResolvedNixBin(process.env));
   const converted = await runExactStoreCommand({
-    command: resolveToolPathSync("nix", env),
+    command: resolveToolPathSync("nix", nixEnv),
     echoStdout: false,
     label: `importer=${opts.importer} step=final-store-hash-convert`,
     cwd: opts.repoRoot,
     timeoutMs: opts.timeoutMs,
-    env,
+    env: nixEnv,
     args: ["hash", "convert", "--hash-algo", "sha256", "--to", "nix32", opts.expectedHash],
   });
   const nix32Hash = lastOutputWord(converted.stdout);
   const printed = await runExactStoreCommand({
-    command: resolveNixStoreBin(env),
+    command: resolveNixStoreBin(nixEnv),
     echoStdout: false,
     label: `importer=${opts.importer} step=final-store-expected-path`,
     cwd: opts.repoRoot,
     timeoutMs: opts.timeoutMs,
-    env,
+    env: nixEnv,
     args: ["--print-fixed-path", "--recursive", "sha256", nix32Hash, finalStoreName(opts.lockHash)],
   });
   const expectedPath = lastOutputWord(printed.stdout);

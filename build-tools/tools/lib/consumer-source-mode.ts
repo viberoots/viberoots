@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { initConsumer } from "./consumer-bootstrap";
+export { inferBootstrapConsumerModeSync } from "./consumer-source-mode-detect";
 
 const execFileAsync = promisify(execFile);
 
@@ -213,28 +214,6 @@ export async function currentPointsAtSubmodule(workspaceRoot: string): Promise<b
   return (
     (await readlinkIfPresent(path.join(workspaceRoot, ".viberoots", "current"))) === "../viberoots"
   );
-}
-
-export function inferBootstrapConsumerModeSync(workspaceRoot: string): "flake" | "submodule" {
-  try {
-    const flake = fs.readFileSync(path.join(workspaceRoot, "flake.nix"), "utf8");
-    if (
-      /\bviberoots\.url\s*=\s*"path:\.\/\.viberoots\/workspace\/viberoots-flake-input"/.test(flake)
-    ) {
-      return "submodule";
-    }
-    if (/\bviberoots\.url\s*=\s*"(?:git\+|github:|https?:)/.test(flake)) {
-      return "flake";
-    }
-  } catch {}
-
-  try {
-    if (fs.readlinkSync(path.join(workspaceRoot, ".viberoots", "current")) === "../viberoots") {
-      return "submodule";
-    }
-  } catch {}
-
-  return "flake";
 }
 
 function currentModeFromTarget(target: string): string {

@@ -96,6 +96,17 @@ Use `--json` when a script needs stable fields. The JSON line includes `pass_ind
 - Specific: `buck2 test //<target>`
 - Single-test external timeout (preferred): `timeout -k 10s 300s buck2 test //<target>`
 
+Command ownership is part of the test contract:
+
+- `i` and post-clone must not modify tracked metadata. They fail closed with `repair: run u` when
+  committed dependency metadata is stale.
+- `u` repairs dependency locks and derived metadata without intentionally moving versions;
+  `u --upgrade` is the explicit project dependency upgrade path.
+- `viberoots update` moves only viberoots submodule or flake pins plus required deterministic
+  reconciliation. It must not upgrade project dependencies.
+- A fresh recursive clone followed by post-clone must leave `git diff --exit-code` and
+  `git status --short` clean when committed metadata is current.
+
 Documentation-only changes are scoped separately from code changes. Markdown and reStructuredText
 files do not count as build-system changes by themselves, including files below `build-tools/**`.
 Active deployment/operator docs are still guarded: changes to those reviewed docs run the
@@ -118,6 +129,19 @@ Before Buck starts, `v` checks for active `nix store gc` / `nix-store --gc` proc
 active, verify writes a `nix gc preflight warning`, waits briefly, and fails before the test phase if
 GC remains active. A status view with `GC detected: yes` means that run saw GC contention and should
 not be used as clean timing evidence without a rerun.
+
+## Development-shell closure guardrail
+
+Development-shell and packaged `viberoots` closures must not retain the exact pnpm `node-modules`
+output or export it through `NODE_PATH`. Keep the exact output available only through explicit
+dependency attributes. Shell entry may probe and relink an already realized output, but it must not
+build or reconcile one.
+
+When this boundary changes, compare cold and immediate warm runs. Record elapsed time, filesystem
+growth, new store paths, and the count of named large outputs before and after. The regression that
+established this guardrail retained 5,278,293,400 bytes through an eager shell/command closure edge;
+after removal, a cold exact development-shell build took 2 seconds, added 7,660 KiB, and kept the
+named-output count at 12, while the warm repeat took 0 seconds and added no store paths.
 
 ## External runner helper (C++)
 
@@ -156,7 +180,7 @@ Do not copy/paste shell fragments between languages. If you need to change the b
 ## Go dependencies (gomod2nix)
 
 - After editing `go.mod` or `go.sum`, run:
-  - `i` (regenerates `gomod2nix.toml` deterministically)
+  - `u` (regenerates `gomod2nix.toml` deterministically), then `i`
 - Preview without changes:
   - `node viberoots/build-tools/tools/dev/install-deps.ts --dry-run`
 
@@ -178,7 +202,8 @@ Do not copy/paste shell fragments between languages. If you need to change the b
 
 ## On-demand vs prebuild (what to do locally vs CI)
 
-- **Local**: `i` refreshes dependencies and generated glue, `b` runs the recursive Buck build, and
-  `v` runs verify preflights plus the selected Buck test passes. Direct `buck2 test`/`buck2 build`
-  still build on demand and can be useful for focused debugging.
+- **Local**: `u` refreshes dependency locks and derived metadata after edits; `i` validates committed
+  metadata and materializes dependencies without changing tracked files. `b` runs the recursive Buck
+  build, and `v` runs verify preflights plus the selected Buck test passes. Direct `buck2 test` and
+  `buck2 build` still build on demand and can be useful for focused debugging.
 - **CI**: We keep a separate Nix build stage to warm caches and isolate template/patch errors. Later Buck stages mostly hit cache and provide clean graph-level diagnostics.

@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
@@ -12,12 +13,18 @@ async function readTool(rel: string): Promise<string> {
 }
 
 test("filtered flake snapshot excludes large generated artifacts", async () => {
-  const updaterHelper = await readTool("tools/dev/update-pnpm-hash/filtered-flake.ts");
+  const updaterHelper = [
+    await readTool("tools/dev/update-pnpm-hash/filtered-flake.ts"),
+    await readTool("tools/dev/filtered-flake-viberoots-input.ts"),
+  ].join("\n");
   const selectedHelper = [
     await readTool("tools/dev/filtered-flake.ts"),
     await readTool("tools/dev/filtered-flake-viberoots-input.ts"),
   ].join("\n");
-  const helper = await readTool("tools/dev/nix-build-filtered-flake.ts");
+  const buildHelper = await readTool("tools/dev/nix-build-filtered-flake.ts");
+  const helper = [buildHelper, await readTool("tools/dev/filtered-flake-viberoots-input.ts")].join(
+    "\n",
+  );
   const required = [
     "coverage",
     ".viberoots/buck",
@@ -29,6 +36,8 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     ".viberoots/workspace/backups",
     ".viberoots/workspace/cache",
     ".viberoots/workspace/codex-test-logs",
+    ".viberoots/workspace/exact-env-smoke.out",
+    ".viberoots/workspace/host-path",
     ".viberoots/workspace/install-cache",
     ".viberoots/workspace/nix-xdg-cache",
     ".viberoots/workspace/node",
@@ -87,9 +96,8 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     }
     if (
       !source.includes("repairSnapshotViberootsInput") ||
-      (!source.includes("rewriteViberootsInput") &&
-        !source.includes("rewriteSnapshotViberootsInput")) ||
-      !source.includes("lockPathInput")
+      !source.includes("rewriteViberootsInput") ||
+      !source.includes("materializeFilteredViberootsSource")
     ) {
       throw new Error(`${name} must repair filtered snapshot viberoots inputs with locked paths`);
     }
@@ -107,25 +115,23 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
   ] as const) {
     const usesPrefetch =
       source.includes("flake prefetch --json") || source.includes('"flake", "prefetch", "--json"');
-    const usesHashPath =
-      source.includes("hash path --sri") || source.includes('"hash", "path", "--sri"');
     if (
-      !source.includes("lockPathInput") ||
+      !source.includes("materializeFilteredViberootsSource") ||
       !source.includes("narHash") ||
-      !usesPrefetch ||
-      !usesHashPath
+      !source.includes("storePath") ||
+      !usesPrefetch
     ) {
       throw new Error(
-        `${name} must prefetch and write hash-bearing path locks for local-file verification`,
+        `${name} must prefetch and write a stable immutable store path for local-file verification`,
       );
     }
     if (
-      !source.includes("const originalPath = path.isAbsolute") ||
-      !source.includes("node.locked = { ...lockedInput, path: originalPath }") ||
-      !source.includes('node.original = { type: "path", path: originalPath }')
+      source.includes('"hash", "path", "--sri"') ||
+      !source.includes("node.locked = { ...locked, path: storePath }") ||
+      !source.includes('node.original = { type: "path", path: storePath }')
     ) {
       throw new Error(
-        `${name} must keep relative path inputs relative in flake.lock original metadata`,
+        `${name} must fail closed instead of falling back from immutable store identity`,
       );
     }
   }
@@ -146,13 +152,26 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     }
   }
   if (
-    !helper.includes("repairSnapshotViberootsInput") ||
-    !helper.includes("WORKSPACE_ROOT: snapDir")
+    !buildHelper.includes("repairSnapshotViberootsInput") ||
+    !buildHelper.includes("WORKSPACE_ROOT: snapDir")
   ) {
     throw new Error(
       "nix-build-filtered-flake must evaluate self-contained filtered snapshots from the snapshot workspace root",
     );
   }
+  assert.ok(
+    buildHelper.indexOf("repairSnapshotViberootsInput({ snapDir, flakeDir })") <
+      buildHelper.indexOf("prewarmFinalStoreForTarget(root, attr, flakeRef, nixEnv)"),
+    "selected snapshots must repair their filtered viberoots input before pnpm-store evaluation",
+  );
+  assert.ok(
+    buildHelper.indexOf("const nixEnv = envWithResolvedNixBin") <
+      buildHelper.indexOf("prewarmFinalStoreForTarget(root, attr, flakeRef, nixEnv)"),
+    "selected snapshots must establish their evaluation environment before pnpm-store prewarming",
+  );
+  assert.match(buildHelper, /VBR_PNPM_FILTERED_SNAPSHOT_ROOT: snapDir/);
+  assert.match(buildHelper, /attrPath: pnpmStoreAttrFromImporter\(importer\),\s+env,/);
+  assert.doesNotMatch(buildHelper, /tempRepoLiveViberootsRoot|activeViberootsRoot/);
   if (
     !helper.includes("copyWorkspaceGraphIntoSnapshot") ||
     !helper.includes('path.join(snapDir, ".viberoots", "buck")') ||
@@ -178,13 +197,25 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
       "nix-build-filtered-flake must build from the resolved snapshot flake directory",
     );
   }
-  if (!helper.includes("VIBEROOTS_SOURCE_ROOT: activeViberootsRoot")) {
+  if (
+    !buildHelper.includes("VIBEROOTS_FLAKE_INPUT_ROOT: snapshotViberootsRoot") ||
+    !buildHelper.includes("VIBEROOTS_ROOT: snapshotViberootsRoot") ||
+    !buildHelper.includes("VIBEROOTS_SOURCE_ROOT: snapshotViberootsRoot")
+  ) {
     throw new Error(
-      "nix-build-filtered-flake must pass the active viberoots source root into Nix evaluation",
+      "nix-build-filtered-flake must bind Nix evaluation to the filtered snapshot input",
     );
   }
-  if (!helper.includes('path.join(abs, "flake.nix")')) {
-    throw new Error("nix-build-filtered-flake must require active viberoots roots to be flakes");
+  if (!helper.includes('path.join(snapshotRoot, "flake.nix")')) {
+    throw new Error("nix-build-filtered-flake must require the filtered input to be a flake");
+  }
+  if (
+    !helper.includes("/^\\/nix\\/store\\/[a-z0-9]{32}-source$/") ||
+    helper.includes('path.join(opts.flakeDir, "viberoots-flake-input")')
+  ) {
+    throw new Error(
+      "filtered snapshots must reference one immutable store source without embedding a nested input",
+    );
   }
   for (const [name, source] of [
     ["update-pnpm-hash filtered snapshot", updaterHelper],

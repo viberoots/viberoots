@@ -26,6 +26,7 @@ import { sanitizeName } from "../lib/sanitize";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../lib/macos-metadata";
 import { findWorkspacePackageRepoDirs } from "./update-pnpm-hash/importer-workspace-packages";
 import { pnpmStoreAttrFromImporter } from "./update-pnpm-hash/paths";
+import { repairSnapshotViberootsInput } from "./filtered-flake-viberoots-input";
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -42,137 +43,6 @@ async function existingRelPaths(root: string, relPaths: readonly string[]): Prom
     if (await pathExists(path.join(root, relPath))) present.push(relPath);
   }
   return present;
-}
-
-async function resolveActiveViberootsRoot(root: string): Promise<string> {
-  const candidates = [
-    path.join(root, "viberoots"),
-    path.join(root, ".viberoots", "current"),
-    process.env.VIBEROOTS_SOURCE_ROOT || "",
-    process.env.VIBEROOTS_ROOT || "",
-    root,
-  ]
-    .map((candidate) => candidate.trim())
-    .filter(Boolean);
-  for (const candidate of candidates) {
-    const abs = path.resolve(candidate);
-    if (
-      (await pathExists(path.join(abs, "flake.nix"))) &&
-      (await pathExists(path.join(abs, "build-tools", "tools", "dev", "zx-init.mjs")))
-    ) {
-      return abs;
-    }
-  }
-  return "";
-}
-
-async function repairSnapshotViberootsInput(snapDir: string): Promise<string> {
-  const flakePath = await resolveSnapshotFlakePath(snapDir);
-  const snapshotViberootsRoot = path.join(snapDir, "viberoots");
-  if (!(await pathExists(path.join(snapshotViberootsRoot, "flake.nix")))) return "";
-  const flakeDir = path.dirname(flakePath);
-  const flakeLocalViberootsRoot = path.join(flakeDir, "viberoots");
-  const liveViberootsRoot = await tempRepoLiveViberootsRoot();
-  if (liveViberootsRoot) {
-    await fsp.rm(flakeLocalViberootsRoot, { recursive: true, force: true }).catch(() => {});
-    await rewriteSnapshotViberootsInput(flakePath, liveViberootsRoot);
-    return liveViberootsRoot;
-  }
-  await fsp.rm(flakeLocalViberootsRoot, { recursive: true, force: true }).catch(() => {});
-  await $({
-    stdio: "pipe",
-  })`rsync -a --delete --exclude .git --exclude node_modules ${snapshotViberootsRoot}/ ${flakeLocalViberootsRoot}/`;
-  const nixRelViberootsRoot = "./viberoots";
-  await rewriteSnapshotViberootsInput(flakePath, nixRelViberootsRoot);
-  return nixRelViberootsRoot;
-}
-
-async function tempRepoLiveViberootsRoot(): Promise<string> {
-  const raw = String(
-    process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
-      process.env.VIBEROOTS_SOURCE_ROOT ||
-      process.env.VIBEROOTS_ROOT ||
-      "",
-  ).trim();
-  if (!raw) return "";
-  const root = path.resolve(raw);
-  if (
-    !(await pathExists(path.join(root, "flake.nix"))) ||
-    !(await pathExists(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs")))
-  ) {
-    return "";
-  }
-  return await fsp.realpath(root).catch(() => root);
-}
-
-async function rewriteSnapshotViberootsInput(
-  flakePath: string,
-  viberootsInputPath: string,
-): Promise<void> {
-  const flakeDir = path.dirname(flakePath);
-  const resolvedInputPath = path.isAbsolute(viberootsInputPath)
-    ? viberootsInputPath
-    : path.resolve(flakeDir, viberootsInputPath);
-  const lockedInput = await lockPathInput(resolvedInputPath);
-  const originalPath = path.isAbsolute(viberootsInputPath) ? resolvedInputPath : viberootsInputPath;
-  const text = await fsp.readFile(flakePath, "utf8").catch(() => "");
-  const next = text.replace(
-    /(\bviberoots\.url\s*=\s*)"[^"]*"/,
-    (_match, prefix: string) => `${prefix}"path:${viberootsInputPath}"`,
-  );
-  if (next !== text) {
-    await fsp.writeFile(flakePath, next, "utf8");
-  }
-  const lockPath = path.join(path.dirname(flakePath), "flake.lock");
-  try {
-    const lock = JSON.parse(await fsp.readFile(lockPath, "utf8")) as {
-      nodes?: Record<string, Record<string, unknown>>;
-    };
-    const node = lock.nodes?.viberoots;
-    if (node) {
-      node.locked = { ...lockedInput, path: originalPath };
-      node.original = { type: "path", path: originalPath };
-      await fsp.writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8");
-    }
-  } catch {}
-}
-
-async function lockPathInput(inputPath: string): Promise<Record<string, unknown>> {
-  const nixEnv = envWithResolvedNixBin(process.env);
-  const nixBin = resolveToolPathSync("nix", nixEnv);
-  const canonicalInputPath = await fsp.realpath(inputPath).catch(() => inputPath);
-  const prefetched = await $({
-    stdio: "pipe",
-    env: nixEnv,
-  })`${nixBin} flake prefetch --json ${`path:${canonicalInputPath}`}`.nothrow();
-  if (prefetched.exitCode === 0) {
-    try {
-      const parsed = JSON.parse(String(prefetched.stdout || "{}"));
-      const locked = parsed?.locked || {};
-      const narHash = typeof locked.narHash === "string" ? locked.narHash : "";
-      if (/^sha256-[A-Za-z0-9+/=_-]+$/.test(narHash)) {
-        return {
-          ...(typeof locked.lastModified === "number" ? { lastModified: locked.lastModified } : {}),
-          narHash,
-          path: canonicalInputPath,
-          type: "path",
-        };
-      }
-    } catch {}
-  }
-  const hashed = await $({
-    stdio: "pipe",
-    env: nixEnv,
-  })`${nixBin} hash path --sri ${canonicalInputPath}`;
-  const narHash = String(hashed.stdout || "").trim();
-  if (!/^sha256-[A-Za-z0-9+/=_-]+$/.test(narHash)) {
-    throw new Error(`[nix-build-filtered-flake] failed to lock path input ${canonicalInputPath}`);
-  }
-  return {
-    narHash,
-    path: canonicalInputPath,
-    type: "path",
-  };
 }
 
 async function resolveSnapshotFlakePath(snapDir: string): Promise<string> {
@@ -313,6 +183,7 @@ async function prewarmFinalStoreForTarget(
   root: string,
   attr: string,
   flakeRef: string,
+  env: NodeJS.ProcessEnv,
 ): Promise<{ env: Record<string, string>; cleanup: () => Promise<void> }> {
   const targetImporter = targetPackageFromLabel(String(process.env.BUCK_TARGET || ""));
   const attrImporters = await pnpmImportersFromAttrs(root, attr);
@@ -325,6 +196,7 @@ async function prewarmFinalStoreForTarget(
     importer,
     flakeRef,
     attrPath: pnpmStoreAttrFromImporter(importer),
+    env,
   });
   return {
     env: {},
@@ -463,6 +335,17 @@ async function main(): Promise<void> {
     console.error(
       `[nix-build-filtered-flake] snapshot ready in ${formatDuration(Date.now() - snapshotStart)} files=${snapshotStats.fileCount} dirs=${snapshotStats.dirCount} kb=${snapshotStats.kb}`,
     );
+    const flakeDir = await resolveSnapshotFlakeDir(snapDir);
+    const snapshotViberootsInput = await repairSnapshotViberootsInput({ snapDir, flakeDir });
+    const snapshotViberootsRoot = snapshotViberootsInput
+      ? path.resolve(flakeDir, snapshotViberootsInput)
+      : "";
+    if (snapshotViberootsInput) {
+      console.error(
+        "[nix-build-filtered-flake] repaired snapshot viberoots input:",
+        snapshotViberootsInput,
+      );
+    }
     if (snapshotOnly) {
       console.error(
         `[nix-build-filtered-flake] snapshot-only mode; keeping snapshot at ${snapDir}`,
@@ -470,23 +353,19 @@ async function main(): Promise<void> {
       process.stdout.write(`${snapDir}\n`);
       return;
     }
-    const flakeDir = await resolveSnapshotFlakeDir(snapDir);
     const flakeRef = `path:${flakeDir}#${attr}`;
     console.error("[nix-build-filtered-flake] building attr:", attr);
-    const fixedStore = await prewarmFinalStoreForTarget(root, attr, flakeRef);
-    exactStoreCleanup = fixedStore.cleanup;
-    const activeViberootsRoot = await resolveActiveViberootsRoot(root);
-    const snapshotViberootsInput = await repairSnapshotViberootsInput(snapDir);
-    if (snapshotViberootsInput) {
-      console.error(
-        "[nix-build-filtered-flake] repaired snapshot viberoots input:",
-        snapshotViberootsInput,
-      );
-    }
     const nixEnv = envWithResolvedNixBin({
       ...process.env,
       WORKSPACE_ROOT: snapDir,
-      ...(activeViberootsRoot ? { VIBEROOTS_SOURCE_ROOT: activeViberootsRoot } : {}),
+      VBR_PNPM_FILTERED_SNAPSHOT_ROOT: snapDir,
+      ...(snapshotViberootsRoot
+        ? {
+            VIBEROOTS_FLAKE_INPUT_ROOT: snapshotViberootsRoot,
+            VIBEROOTS_ROOT: snapshotViberootsRoot,
+            VIBEROOTS_SOURCE_ROOT: snapshotViberootsRoot,
+          }
+        : {}),
       VBR_FILTERED_FLAKE_SNAPSHOT: "1",
       ...(selectedCppSources != null
         ? {
@@ -495,6 +374,8 @@ async function main(): Promise<void> {
           }
         : {}),
     });
+    const fixedStore = await prewarmFinalStoreForTarget(root, attr, flakeRef, nixEnv);
+    exactStoreCleanup = fixedStore.cleanup;
     const nixBin = resolveToolPathSync("nix", nixEnv);
     const buildStart = Date.now();
     const nixArgs = [

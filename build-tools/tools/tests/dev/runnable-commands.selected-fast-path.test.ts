@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { envWithStubbedNix, runInTemp } from "../lib/test-helpers";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 
 async function readRepoFile(rel: string): Promise<string> {
   return await fsp.readFile(viberootsSourcePath(rel), "utf8");
@@ -237,6 +238,7 @@ test("p auto source uses filtered flake when root viberoots input is generated w
     const stubBin = path.join(fakeRoot, "stub-bin");
     const fakeOut = path.join(fakeRoot, "fake-selected-out");
     const nixLog = path.join(fakeRoot, "nix-args.log");
+    const realNixBin = resolveToolPathSync("nix", envWithResolvedNixBin(process.env));
     await fsp.mkdir(stubBin, { recursive: true });
     await fsp.writeFile(
       path.join(stubBin, "nix"),
@@ -246,11 +248,10 @@ test("p auto source uses filtered flake when root viberoots input is generated w
         `echo "$*" >> ${JSON.stringify(nixLog)}`,
         'args="$*"',
         'if [[ "$args" == flake\\ prefetch\\ --json\\ path:* ]]; then',
-        '  printf \'{"locked":{"narHash":"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="}}\\n\'',
-        "  exit 0",
+        `  exec ${JSON.stringify(realNixBin)} "$@"`,
         "fi",
         `out=${JSON.stringify(fakeOut)}`,
-        'if [[ "$args" == *"path:"*"#graph-generator-selected"* ]]; then',
+        'if [[ "$args" == *"#graph-generator-selected"* ]]; then',
         '  mkdir -p "$out/bin"',
         "  cat > \"$out/bin/demo\" <<'EOF'",
         "#!/usr/bin/env bash",

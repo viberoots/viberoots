@@ -107,20 +107,28 @@ test("dogfood buckconfig routes source cells through current and generated cells
 });
 
 test("dogfood workflows use local current source and workspace providers", async () => {
-  const viberootsRoot = path.join(process.cwd(), "viberoots");
+  const liveViberootsRoot = path.join(process.cwd(), "viberoots");
+  const currentLink = await fsp.readlink(".viberoots/current");
+  const viberootsRoot = await fsp.realpath(".viberoots/current");
+  const currentIsLive = currentLink === "../viberoots";
   const buckIsolation = stableBuckIsolation(process.cwd(), "dogfood-current-layout");
-  assert.equal(await fsp.readlink(".viberoots/current"), "../viberoots");
-  assert.equal(await fsp.realpath(".viberoots/current"), viberootsRoot);
+  if (currentIsLive) {
+    assert.equal(viberootsRoot, liveViberootsRoot);
+  } else {
+    assert.match(viberootsRoot, /^\/nix\/store\/[a-z0-9]{32}-source(?:\/|$)/);
+  }
   await fsp.mkdir(path.join(process.cwd(), "buck-out", "v2"), { recursive: true });
 
-  const marker = path.join("build-tools", "tmp", `dogfood-live-edit-${process.pid}.txt`);
-  const markerAbs = path.join(viberootsRoot, marker);
-  await fsp.mkdir(path.dirname(markerAbs), { recursive: true });
-  try {
-    await fsp.writeFile(markerAbs, "live\n", "utf8");
-    assert.equal(await fsp.readFile(path.join(".viberoots/current", marker), "utf8"), "live\n");
-  } finally {
-    await fsp.rm(markerAbs, { force: true });
+  if (currentIsLive) {
+    const marker = path.join("build-tools", "tmp", `dogfood-live-edit-${process.pid}.txt`);
+    const markerAbs = path.join(viberootsRoot, marker);
+    await fsp.mkdir(path.dirname(markerAbs), { recursive: true });
+    try {
+      await fsp.writeFile(markerAbs, "live\n", "utf8");
+      assert.equal(await fsp.readFile(path.join(".viberoots/current", marker), "utf8"), "live\n");
+    } finally {
+      await fsp.rm(markerAbs, { force: true });
+    }
   }
 
   assert.equal(
@@ -135,9 +143,9 @@ test("dogfood workflows use local current source and workspace providers", async
     "viberoots version",
   );
   const status = JSON.parse(version.slice(version.indexOf("{")));
-  assert.equal(status.sourceMode, "local");
+  assert.equal(status.sourceMode, currentIsLive ? "local" : "remote");
   assert.equal(status.viberootsRoot, viberootsRoot);
-  assert.equal(status.currentPointsToLiveCheckout, true);
+  assert.equal(status.currentPointsToLiveCheckout, currentIsLive);
 
   try {
     await assertSuccess(

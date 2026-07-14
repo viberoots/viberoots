@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { BUCK_PROJECT_IGNORE_LINE } from "../../lib/buck-project-ignore";
+import {
+  BUCK_PROJECT_IGNORE_LINE,
+  BUCK_SOURCE_PROJECT_IGNORE_LINE,
+} from "../../lib/buck-project-ignore";
 import { runInScratchTemp } from "../lib/test-helpers";
 
 async function writeFile(file: string, text: string): Promise<void> {
@@ -71,13 +74,33 @@ viberoots_probe = rule(impl = _viberoots_probe_impl, attrs = {})
     );
     await writeFile(
       path.join(tmp, ".viberoots/current/.buckconfig"),
-      "[buildfile]\nname = TARGETS\n",
+      `[buildfile]
+name = TARGETS
+
+[project]
+${BUCK_SOURCE_PROJECT_IGNORE_LINE}
+`,
     );
     await writeFile(
       path.join(tmp, ".viberoots/current/macros/TARGETS"),
       `load(":defs.bzl", "viberoots_probe")
 
 viberoots_probe(name = "defs_bzl")
+`,
+    );
+    await writeFile(
+      path.join(tmp, ".viberoots/current/.viberoots/workspace/TARGETS"),
+      'filegroup(name = "invalid_generated_state", srcs = ["missing.lock"])\n',
+    );
+    await writeFile(
+      path.join(tmp, ".viberoots/workspace/nixpkgs-source-registry-extension.nix"),
+      "{ inputs }: { profiles = {}; }\n",
+    );
+    await writeFile(
+      path.join(tmp, ".viberoots/workspace/TARGETS"),
+      `load("@workspace_providers//:auto_map.bzl", "provider_probe")
+
+provider_probe(name = "nixpkgs-source-registry-extension")
 `,
     );
     await writeFile(
@@ -101,13 +124,23 @@ viberoots_probe(name = "defs_bzl")
       cwd: tmp,
       stdio: "pipe",
     })`buck2 cquery viberoots//macros:defs_bzl`;
+    const allViberootsTargets = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`buck2 cquery viberoots//...`;
+    const rootWorkspaceTarget = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`buck2 cquery //.viberoots/workspace:nixpkgs-source-registry-extension`;
     const providersTarget = await $({
       cwd: tmp,
       stdio: "pipe",
     })`buck2 cquery workspace_providers//:auto_map`;
-    const labels = `${viberootsTarget.stdout || ""}\n${providersTarget.stdout || ""}`;
+    const labels = `${viberootsTarget.stdout || ""}\n${allViberootsTargets.stdout || ""}\n${rootWorkspaceTarget.stdout || ""}\n${providersTarget.stdout || ""}`;
     assert.match(labels, /viberoots\/\/macros:defs_bzl/);
     assert.match(labels, /workspace_providers\/\/:auto_map/);
+    assert.match(labels, /root\/\/\.viberoots\/workspace:nixpkgs-source-registry-extension/);
+    assert.doesNotMatch(labels, /invalid_generated_state/);
     assert.doesNotMatch(labels, /@(?:viberoots|workspace_providers)\/\//);
   });
 });

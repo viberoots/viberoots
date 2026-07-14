@@ -75,6 +75,9 @@ test("install-time node module builders propagate selected nix to child processe
     "build-tools/tools/dev/update-pnpm-hash/filtered-flake.ts",
   );
   const selectedFilteredFlake = await readSource("build-tools/tools/dev/filtered-flake.ts");
+  const filteredFlakeInput = await readSource(
+    "build-tools/tools/dev/filtered-flake-viberoots-input.ts",
+  );
   const nixBuildFilteredFlake = await readSource(
     "build-tools/tools/dev/nix-build-filtered-flake.ts",
   );
@@ -98,8 +101,7 @@ test("install-time node module builders propagate selected nix to child processe
     ["run-runnable-nix", runRunnable],
     ["update-pnpm-hash/nix", updateNix],
     ["update-pnpm-hash/exact-store", exactStore],
-    ["update-pnpm-hash/filtered-flake", filteredFlake],
-    ["filtered-flake", selectedFilteredFlake],
+    ["filtered-flake-viberoots-input", filteredFlakeInput],
     ["nix-build-filtered-flake", nixBuildFilteredFlake],
     ["update-pnpm-hash/importer-lockfile", importerLockfile],
     ["update-pnpm-hash/realized-store", realizedStore],

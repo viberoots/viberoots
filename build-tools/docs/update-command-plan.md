@@ -347,8 +347,10 @@ reconciliation has a shared implementation boundary ready for `u`.
 - Move any tracked metadata writes out of ordinary install paths and behind explicit mutation modes.
 - Centralize stale-state classification:
   - dependency/materialization metadata stale: `repair: run u`
-  - intentional dependency upgrade required: `repair: run u --upgrade`
   - viberoots pin or source-mode drift: `repair: run viberoots update`
+- Do not infer intentional upgrade authority from stale metadata. `u --upgrade` is selected
+  explicitly when the user intends to move versions and must report its own fail-closed unsupported
+  surface diagnostics.
 - Ensure stale-state errors name the stale file and state that no tracked files were modified.
 - Consolidate pnpm hash metadata refresh, exact-store preparation, and verification behind a shared
   reconciliation module or existing helper surface that can support read-only, conservative repair,
@@ -611,10 +613,9 @@ that prevent pin/hash drift from landing, and lock the final command model into 
   - submodule pointer and `flake.lock` disagree in submodule mode;
   - tracked dependency metadata is stale;
   - post-clone would dirty tracked files.
-- Make guardrail output name the exact repair command:
-  - `u`
-  - `u --upgrade`
-  - `viberoots update`
+- Make guardrail output name the exact repair command: `u` for deterministic dependency metadata
+  repair or `viberoots update` for pin and source-mode drift. The guard cannot infer user upgrade
+  intent and must not emit `u --upgrade` as repair guidance.
 - Update command help, completion, and docs for the final model.
 - Remove or revise docs that imply `i` repairs tracked metadata.
 - Add command-surface contract tests that keep docs/help snippets aligned with behavior.

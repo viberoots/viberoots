@@ -8,11 +8,13 @@ import { withPnpmStoreBuildFlakeRef } from "./update-pnpm-hash/build-flake";
 import { resolveUpdatePnpmHashCommandRoot } from "./update-pnpm-hash/command-root";
 import {
   reconcileFixedPnpmStore,
+  shouldInspectFixedStoreForRebuild,
   shouldRebuildFixedStore,
 } from "./update-pnpm-hash/fixed-store-reconcile";
 import * as hashesJson from "./update-pnpm-hash/hashes-json";
 import { withHeartbeat } from "./update-pnpm-hash/heartbeat";
 import {
+  assertImporterLockfileFresh,
   ensureImporterLockfileFresh,
   ensureImporterLockfileFreshIfAllowed,
 } from "./update-pnpm-hash/importer-lockfile";
@@ -47,7 +49,9 @@ async function inner() {
   const lockAbs = path.join(repoRoot, relLock);
   const markerPath = verifiedMarker.verifiedMarkerPath(repoRoot, importer);
 
-  if (importer === ".") {
+  if (readOnly) {
+    await assertImporterLockfileFresh({ repoRoot, importer });
+  } else if (importer === ".") {
     if (!readOnly) await ensureImporterLockfileFreshIfAllowed({ repoRoot, importer });
   } else if (!readOnly) {
     await ensureImporterLockfileFresh({ repoRoot, importer });
@@ -142,7 +146,13 @@ async function inner() {
   }
 
   let rebuildExisting = false;
-  if (force || !markerMatches) {
+  if (
+    shouldInspectFixedStoreForRebuild({
+      currentHash,
+      force,
+      markerMatches,
+    })
+  ) {
     rebuildExisting = await shouldRebuildFixedStore(inspectForRebuild);
   }
 

@@ -2,7 +2,10 @@
 
 This walkthrough shows how to add a new language using the lang‑kit template, ensuring partial‑clone grace, capability gating, and adherence to the planner/exporter/provider wiring.
 
-Prereqs: Buck2, Nix, PNPM, Node, Go (per build-system-design), zx wrapper available.
+Prereqs: enter the Nix dev shell and confirm PNPM, Node, Go, and the language toolchain resolve from
+`/nix/store` (Nix may use `/nix/var/nix/profiles/default/bin/nix`). Buck2 must be Nix-store-backed;
+the repo's `buck-out/zx_shims` launcher is valid when it delegates to that store binary. The zx
+wrapper must be available.
 
 Steps
 
@@ -48,11 +51,19 @@ Steps
 
 - **Tests**
   - Copy the Go contract tests as a model and adjust for your language’s providers and labels. Keep tests one-per-file and wire via `TARGETS`.
-  - Include a small test that proves your adapter’s `validate(nodes)` rejects a misconfigured sample with a clear message.
+  - Include a small test that proves your adapter's `validate(nodes)` rejects a misconfigured sample with a clear message.
+  - Add command-boundary coverage: `u` repairs deterministic tracked metadata; `i` and post-clone
+    detect drift without rewriting it.
+  - Add hostile-`PATH` coverage for startup/orchestration, a rooted Nix-store Buck toolchain check,
+    and runnable-manifest execution or rejection tests where the language produces commands.
+  - Exercise a minimal temp consumer so undeclared source-checkout dependencies fail visibly.
 
-- **Run glue**
-  - Local: `node viberoots/build-tools/tools/buck/glue-pipeline.ts` (or simply `node viberoots/build-tools/tools/buck/prebuild-guard.ts`, which can auto-fix in local mode).
-  - CI: stages run these in order; Node sync runs only if `pnpm-lock.yaml` is present.
+- **Repair and validate**
+  - Run `u` to repair the language's lockfile/provider/glue metadata. Use the lower-level glue
+    pipeline only for focused development of that pipeline.
+  - Confirm `i` is clean and read-only, then run focused build and manifest tests before `b && v`.
+  - Record focused elapsed time and named disk usage per
+    `docs/handbook/getting-started-on-a-pr.md`; defer `ALL_TESTS=1 v` to the planned full checkpoint.
 
 Tips
 

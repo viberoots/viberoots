@@ -63,7 +63,7 @@ test("dev-build glue config enables stable exporter daemon reuse", async () => {
   if (!runner.includes("if (reuse) return await fn();")) {
     throw new Error("cquery runner must skip daemon cleanup when reuse is enabled");
   }
-  if (!runner.includes("const quietFlags =") || !runner.includes("buck2 ${quietFlags}")) {
+  if (!runner.includes("const quietFlags =") || !runner.includes("...quietFlags")) {
     throw new Error("cquery runner must suppress Buck daemon status output by default");
   }
 

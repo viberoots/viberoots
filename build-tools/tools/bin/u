@@ -18,6 +18,7 @@ After ordinary dependency edits, run:
   i && b && v
 
 Use u --upgrade only when dependency versions should move.
+Use viberoots update when the viberoots pin itself should move.
 EOF
 		exit 0
 		;;

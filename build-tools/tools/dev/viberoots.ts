@@ -8,20 +8,11 @@ import { findExtractionBlockers } from "../lib/extraction-blockers";
 import { resolveWorkspaceRootsSync } from "../lib/repo";
 import { activateWorkspace } from "../lib/workspace-activation";
 import { remoteSourceStatus } from "../lib/workspace-remote-source";
-import { initConsumer } from "../lib/consumer-bootstrap";
-import { checkBootstrapCompletion } from "../lib/bootstrap-completion";
-import {
-  inferBootstrapConsumerModeSync,
-  removeSubmodule,
-  useFlake,
-  useSubmodule,
-} from "../lib/consumer-source-mode";
+import { inferBootstrapConsumerModeSync } from "../lib/consumer-source-mode-detect";
 import { runLiveBootstrap } from "../lib/live-bootstrap";
-import { runViberootsGc } from "../lib/maintenance-gc";
 import { withSanitizedInheritedNixConfig } from "../lib/nix-config-env";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
 import { repairGeneratedWorkspaceLock } from "../lib/workspace-lock-repair";
-import { exportDeploymentResourceGraph } from "../deployments/resource-graph-export";
 
 type VersionStatus = ReturnType<typeof buildVersionStatus>;
 type CommandMeta = {
@@ -80,7 +71,8 @@ const commandMetadata: CommandMeta[] = [
   {
     name: "update",
     usage: "viberoots update [--mode flake|submodule] [--ref <ref>] [--rev <sha>] [--dry-run]",
-    description: "Alias for viberoots bootstrap; runs the latest live bootstrap script.",
+    description:
+      "Update viberoots pins without upgrading project dependencies; use u to repair project metadata or u --upgrade to intentionally move dependency versions.",
     options: [
       "--mode",
       "--ref",
@@ -584,7 +576,7 @@ function usage(): never {
   process.exit(2);
 }
 
-function liveBootstrapEnvOverrides(): Record<string, string> {
+function liveBootstrapEnvOverrides(command: "bootstrap" | "update"): Record<string, string> {
   const overrides: Record<string, string> = {};
   const mode = getFlagStr("mode");
   const ref = getFlagStr("ref");
@@ -594,6 +586,7 @@ function liveBootstrapEnvOverrides(): Record<string, string> {
   if (ref) overrides.VBR_REF = ref;
   if (rev) overrides.VBR_REV = rev;
   overrides.VBR_WORKSPACE_ROOT = workspaceRoot;
+  if (command === "update") overrides.VBR_UPDATE = "1";
   if (getFlagBool("run-install")) overrides.VBR_RUN_INSTALL = "1";
   if (getFlagBool("no-run-install")) overrides.VBR_RUN_INSTALL = "0";
   if (getFlagBool("run-validate")) overrides.VBR_RUN_VALIDATE = "1";
@@ -654,6 +647,7 @@ async function main() {
     return;
   }
   if (command === "init-consumer") {
+    const { initConsumer } = await import("../lib/consumer-bootstrap");
     const mode = getFlagStr("mode", "flake");
     if (mode !== "flake" && mode !== "submodule") {
       console.error("error: init-consumer --mode must be flake or submodule");
@@ -693,6 +687,7 @@ async function main() {
     return;
   }
   if (command === "bootstrap-check") {
+    const { checkBootstrapCompletion } = await import("../lib/bootstrap-completion");
     const result = await checkBootstrapCompletion({
       workspaceRoot: selectedWorkspaceRootForCommand(),
       repair: getFlagBool("repair-if-needed"),
@@ -706,7 +701,7 @@ async function main() {
       command,
       bootstrapUrl: getFlagStr("bootstrap-url", ""),
       trustBootstrapUrl: getFlagBool("trust-bootstrap-url"),
-      envOverrides: liveBootstrapEnvOverrides(),
+      envOverrides: liveBootstrapEnvOverrides(command),
     });
     return;
   }
@@ -720,6 +715,7 @@ async function main() {
     return;
   }
   if (command === "gc") {
+    const { runViberootsGc } = await import("../lib/maintenance-gc");
     await runViberootsGc({
       workspaceRoot: selectedWorkspaceRootForCommand(),
       dryRun: getFlagBool("dry-run"),
@@ -748,6 +744,7 @@ async function main() {
       console.error("run: viberoots help resource-graph");
       process.exit(2);
     }
+    const { exportDeploymentResourceGraph } = await import("../deployments/resource-graph-export");
     const result = await exportDeploymentResourceGraph({
       workspaceRoot: selectedWorkspaceRootForCommand(),
     });
@@ -757,6 +754,7 @@ async function main() {
     return;
   }
   if (command === "use-submodule") {
+    const { useSubmodule } = await import("../lib/consumer-source-mode");
     await useSubmodule({
       workspaceRoot: selectedWorkspaceRootForCommand(),
       workspaceName: getFlagStr("workspace-name", ""),
@@ -768,6 +766,7 @@ async function main() {
     return;
   }
   if (command === "use-flake") {
+    const { useFlake } = await import("../lib/consumer-source-mode");
     await useFlake({
       workspaceRoot: selectedWorkspaceRootForCommand(),
       workspaceName: getFlagStr("workspace-name", ""),
@@ -779,6 +778,7 @@ async function main() {
     return;
   }
   if (command === "remove-submodule") {
+    const { removeSubmodule } = await import("../lib/consumer-source-mode");
     await removeSubmodule({
       workspaceRoot: selectedWorkspaceRootForCommand(),
       dryRun: getFlagBool("dry-run"),

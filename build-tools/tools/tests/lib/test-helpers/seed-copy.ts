@@ -2,6 +2,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../../../lib/macos-metadata";
 import { GENERATED_REPO_STATE_PATHS } from "../../../dev/verify/generated-state-excludes";
+import { ensureNixStoreToolPathSync } from "../../../lib/tool-paths";
 
 const requiredFiles = [".buckconfig"];
 const requiredFlakeFiles = ["flake.nix", path.join(".viberoots", "workspace", "flake.nix")];
@@ -191,7 +192,8 @@ async function copyFileCow(
 }> {
   await fsp.rm(dst, { recursive: true, force: true }).catch(() => {});
   if (process.platform === "darwin") {
-    return await $(fastCopyOpts)`python3 -c ${darwinCloneFileScript} ${src} ${dst}`;
+    const python3 = ensureNixStoreToolPathSync("python3");
+    return await $(fastCopyOpts)`${python3} -c ${darwinCloneFileScript} ${src} ${dst}`;
   }
   return await $(fastCopyOpts)`cp --reflink=always -p ${src} ${dst}`;
 }
@@ -229,7 +231,7 @@ async function copyTreeCow(srcRoot: string, dstRoot: string): Promise<void> {
     process.platform === "darwin"
       ? await $(
           fastCopyOpts,
-        )`python3 -c ${darwinCloneTreeScript} ${srcRoot} ${dstRoot} ${repairPermissions ? "1" : "0"}`
+        )`${ensureNixStoreToolPathSync("python3")} -c ${darwinCloneTreeScript} ${srcRoot} ${dstRoot} ${repairPermissions ? "1" : "0"}`
       : await $(fastCopyOpts)`cp -a --reflink=always ${`${srcRoot}/.`} ${dstRoot}`;
   if (result.exitCode !== 0) {
     throw new Error(

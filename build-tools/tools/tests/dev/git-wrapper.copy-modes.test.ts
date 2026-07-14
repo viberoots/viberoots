@@ -3,7 +3,13 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { realGit, repoRoot, scratchRoot, wrapper } from "./git-wrapper-test-helpers.ts";
+import {
+  realGit,
+  repoRoot,
+  scratchRoot,
+  wrapper,
+  writeExecutable,
+} from "./git-wrapper-test-helpers.ts";
 
 async function initRepo(root: string, gitPath: string): Promise<void> {
   await $({ cwd: root, stdio: "pipe" })`${gitPath} init -q`;
@@ -88,7 +94,14 @@ test("git wrapper Darwin path creates an actual APFS CoW clone", async () => {
     const target = path.join(source, ".claude", "worktrees", "target");
     const plainCopy = path.join(tmp, "plain-copy.bin");
     const marker = path.join(source, "large-untracked.bin");
+    const hostBin = path.join(tmp, "host-bin");
+    const hostPythonMarker = path.join(tmp, "host-python-ran");
     const cloneChecker = await buildApfsCloneChecker(tmp);
+    await fsp.mkdir(hostBin);
+    await writeExecutable(
+      path.join(hostBin, "python3"),
+      `#!/bin/sh\n: > '${hostPythonMarker}'\nexit 91\n`,
+    );
     await fsp.mkdir(source);
     await initRepo(source, gitPath);
     await fsp.mkdir(path.join(source, ".codex", "worktrees", "old-agent"), {
@@ -110,10 +123,12 @@ test("git wrapper Darwin path creates an actual APFS CoW clone", async () => {
         ...process.env,
         VBR_REAL_GIT: gitPath,
         VBR_GIT_COW_OSTYPE: "darwin-test",
+        PATH: `${hostBin}${path.delimiter}${process.env.PATH || ""}`,
       },
     })`${wrapper} worktree add ${target} HEAD`;
 
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
+    await assert.rejects(fsp.access(hostPythonMarker));
     await $({ stdio: "pipe" })`/bin/cp ${marker} ${plainCopy}`;
 
     await $({ stdio: "pipe" })`cmp -s ${path.join(target, "large-untracked.bin")} ${marker}`;

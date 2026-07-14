@@ -26,8 +26,15 @@ function candidateToolPaths(tool: string, env: NodeJS.ProcessEnv): string[] {
   return Array.from(new Set(candidates));
 }
 
-function isNixStorePath(candidate: string): boolean {
-  return candidate.includes(`${path.sep}nix${path.sep}store${path.sep}`);
+export function isNixStorePath(candidate: string): boolean {
+  const isRootedStorePath = (value: string) =>
+    path.resolve(value).startsWith(`${path.sep}nix${path.sep}store${path.sep}`);
+  if (isRootedStorePath(candidate)) return true;
+  try {
+    return isRootedStorePath(fs.realpathSync.native(candidate));
+  } catch {
+    return false;
+  }
 }
 
 function isExecutable(candidate: string): boolean {

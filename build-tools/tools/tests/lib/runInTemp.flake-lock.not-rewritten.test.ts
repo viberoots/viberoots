@@ -25,22 +25,23 @@ test("runInTemp rewrites only the local viberoots lock path to its active temp s
   ).find(Boolean);
   assert.ok(lockPath, "expected a source workspace flake.lock");
   const original = JSON.parse(await fsp.readFile(lockPath, "utf8"));
-
   await runInTemp("flake-lock-no-rewrite", async (tmp) => {
-    const expectedInputRoot = process.env.VBR_TEST_SEED_STORE_PATH
-      ? await fsp
-          .realpath(path.join(process.env.VBR_TEST_SEED_STORE_PATH, "viberoots"))
-          .catch(() => path.join(process.env.VBR_TEST_SEED_STORE_PATH!, "viberoots"))
-      : path.join(tmp, "viberoots");
+    assert.ok(
+      process.env.VIBEROOTS_FLAKE_INPUT_ROOT,
+      "expected runInTemp to provide VIBEROOTS_FLAKE_INPUT_ROOT",
+    );
+    const expectedInputRoot = await fsp.realpath(process.env.VIBEROOTS_FLAKE_INPUT_ROOT);
+    assert.match(expectedInputRoot, /^\/nix\/store\/[a-z0-9]{32}-source$/);
     const tmpLockPath = path.join(tmp, ".viberoots", "workspace", "flake.lock");
     const tmpLock = JSON.parse(await fsp.readFile(tmpLockPath, "utf8"));
     const inputName = tmpLock.nodes.root.inputs.viberoots;
     assert.equal(inputName, original.nodes.root.inputs.viberoots);
     assert.equal(tmpLock.nodes[inputName].locked.type, "path");
-    assert.equal(tmpLock.nodes[inputName].locked.path, expectedInputRoot);
+    const immutableInputRoot = tmpLock.nodes[inputName].locked.path;
+    assert.equal(immutableInputRoot, expectedInputRoot);
     assert.match(String(tmpLock.nodes[inputName].locked.narHash || ""), /^sha256-/);
     assert.equal(tmpLock.nodes[inputName].original.type, "path");
-    assert.equal(tmpLock.nodes[inputName].original.path, expectedInputRoot);
+    assert.equal(tmpLock.nodes[inputName].original.path, immutableInputRoot);
     assert.ok(
       !JSON.stringify(tmpLock.nodes[inputName]).includes("viberoots-flake-input"),
       "expected filtered input lock paths to be rewritten to the active temp source",

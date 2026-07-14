@@ -35,6 +35,21 @@ repository enforcement contract, not only planner/macros/providers.
    - New language rollout is not complete until the enforcement checks are part of required repo
      validation flow.
 
+6. Define command ownership and tool authority:
+   - `u` is the intended owner for deterministic tracked language metadata repair. Do not extend the
+     legacy `b` → `install-deps --glue-only` path, which can still refresh some Go/glue metadata while
+     that boundary is migrated to read-only behavior.
+   - `i` and post-clone validate tracked metadata without rewriting it; stale state names `u` as the
+     repair command.
+   - Toolchain, update/install, startup, and runnable executables resolve from `/nix/store` through
+     the shared tool-path authority or an explicit Nix-emitted path. Do not add host fallbacks.
+
+7. Cover execution boundaries and resource guardrails:
+   - Add hostile-`PATH`, Buck toolchain, runnable-manifest, and temp-consumer tests where applicable.
+   - Measure focused elapsed time and named disk paths according to
+     `docs/handbook/getting-started-on-a-pr.md`; do not broaden snapshots or shared-cache copies to
+     satisfy fixtures.
+
 ## Completion condition for language rollout docs
 
 A language rollout doc in this directory is only complete when it includes:
@@ -43,6 +58,8 @@ A language rollout doc in this directory is only complete when it includes:
 - Exception policy expectations.
 - Checker and test updates needed to prevent drift.
 - Validation commands that contributors can run before merge.
+- Explicit `u`/`i`/post-clone ownership, Nix-store tool authority, and runnable/toolchain wiring.
+- Focused temp-repo, manifest, execution-time, and disk-growth evidence appropriate to the language.
 
 ## Canonical helper baseline
 

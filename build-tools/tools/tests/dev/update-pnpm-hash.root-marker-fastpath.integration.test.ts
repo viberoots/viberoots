@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("matching markers only skip after the committed final path is probed", async () => {
-  const main = await fsp.readFile("build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
+  const main = await fsp.readFile(
+    viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash.ts"),
+    "utf8",
+  );
   const marker = await fsp.readFile(
-    "build-tools/tools/dev/update-pnpm-hash/verified-marker.ts",
+    viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash/verified-marker.ts"),
     "utf8",
   );
   assert.match(

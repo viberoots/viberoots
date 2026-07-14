@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool";
 import { runInTemp } from "../lib/test-helpers";
 import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
+import { copyTree } from "../../lib/copy-tree";
 const DEBUG = String(process.env.GO_SIMPLE_PATCHED_UUID_DEBUG || "") === "1";
 function dbg(...args: any[]) {
   if (!DEBUG) return;
@@ -364,7 +365,13 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
 
     // Local flake using buildGoModule + vendorHash (Option E). Compute vendorHash
     // deterministically from the vendored tree, then build and run.
-    const flakePath = path.join(_tmp, "flake.nix");
+    const flakeRoot = path.join(_tmp, ".viberoots", "go-runtime-flake");
+    await copyTree(
+      path.join(_tmp, "projects", "apps", "demo-cli"),
+      path.join(flakeRoot, "demo-cli"),
+      { force: true },
+    );
+    const flakePath = path.join(flakeRoot, "flake.nix");
     const pinnedUrl = await readPinnedNixpkgsUrl(_tmp);
     dbg("pinned nixpkgs:", pinnedUrl);
     const flakeTemplate = () => `{
@@ -380,7 +387,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
           app = pkgs.buildGoModule {
             pname = "demo-cli";
             version = "0.1.0";
-            src = ./projects/apps/demo-cli;
+            src = ./demo-cli;
             subPackages = [ "cmd/demo-cli" ];
             # Vendor directory present; instruct buildGoModule to use it
             vendorHash = null;
@@ -412,7 +419,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
       } catch {}
     }
     await $({
-      cwd: _tmp,
+      cwd: flakeRoot,
       stdio: "inherit",
       env: { ...process.env, GOPROXY: "off", GOSUMDB: "off" },
     })`bash --noprofile --norc -c 'rm -f ./result'`.nothrow();
@@ -420,7 +427,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
       cwd: _tmp,
       stdio: "pipe",
       env: { ...process.env, GOPROXY: "off", GOSUMDB: "off" },
-    })`nix build ${`path:${_tmp}#app`} --accept-flake-config --no-link --print-out-paths --show-trace`;
+    })`nix build ${`path:${flakeRoot}#app`} --accept-flake-config --no-link --print-out-paths --show-trace`;
     const outPath =
       String(outStdout || "")
         .trim()

@@ -52,9 +52,14 @@ test("verify-log-status: aggregates completed pass counts with current pass prog
   const out = formatVerifyStatusText(st, { isTty: false });
   assert.match(out, /Tests:\s+\[█████████████████████░░░░░░░░░░░\] 2\/3/);
   assert.doesNotMatch(out, /Pass group:/);
-  assert.match(
-    out,
-    /Pass groups:\n\s+isolated  1\/1  done\s+\? avg\n\s+shared    1\/2  active\s+\? avg/,
+  assert.ok(
+    out.includes(
+      [
+        "Pass groups:",
+        "  isolated [████████████████████████] 1/1 done    ? avg",
+        "  shared   [████████████░░░░░░░░░░░░] 1/2 running ? avg",
+      ].join("\n"),
+    ),
   );
   assert.match(out, /\n  Pass:\s+2\n/);
 });
@@ -81,9 +86,14 @@ test("verify-log-status: pass group rows show completed outcomes over target cou
   });
 
   const out = formatVerifyStatusText(st, { isTty: false });
-  assert.match(
-    out,
-    /Pass groups:\n\s+isolated  1\/1  done\s+\? avg\n\s+shared    3\/3  failed\s+\? avg/,
+  assert.ok(
+    out.includes(
+      [
+        "Pass groups:",
+        "  isolated [████████████████████████] 1/1 done    ? avg",
+        "  shared   [████████████████████████] 3/3 failed  ? avg",
+      ].join("\n"),
+    ),
   );
   assert.match(out, /\nTests finished:\n  Pass:\s+2\n  Fail:\s+1\n/);
 });
@@ -110,9 +120,14 @@ test("verify-log-status: timeout pass group rows preserve partial completion cou
   });
 
   const out = formatVerifyStatusText(st, { isTty: false });
-  assert.match(
-    out,
-    /Pass groups:\n\s+isolated          1\/1  done\s+\? avg\n\s+resource-limited  2\/3  failed\s+\? avg/,
+  assert.ok(
+    out.includes(
+      [
+        "Pass groups:",
+        "  isolated         [████████████████████████] 1/1 done    ? avg",
+        "  resource-limited [████████████████░░░░░░░░] 2/3 failed  ? avg",
+      ].join("\n"),
+    ),
   );
   assert.match(out, /\nTests stopped:\n  Pass:\s+2\n  Fail:\s+1\n/);
   assert.match(out, /\n  Build failure:\s+1\n/);

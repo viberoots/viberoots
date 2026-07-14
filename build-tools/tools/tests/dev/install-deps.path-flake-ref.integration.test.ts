@@ -1,8 +1,11 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { buildToolsRoot } from "../../dev/dev-build/paths";
+import { immutableViberootsInputFromFlakeFiles } from "../../dev/update-pnpm-hash/nix";
+import { isCanonicalSha256SRI } from "../../lib/nix-sri";
 
 const toolsRoot = buildToolsRoot(process.cwd());
 
@@ -11,6 +14,51 @@ async function read(rel: string): Promise<string> {
 }
 
 test("install path selects flake refs by importer scope", async () => {
+  const immutableInput = `/nix/store/${"a".repeat(32)}-source`;
+  const immutableFlake = `viberoots.url = "path:${immutableInput}";\n`;
+  const validNarHash = `sha256-${"A".repeat(43)}=`;
+  const immutableLock = JSON.stringify({
+    nodes: {
+      root: { inputs: { viberoots: "viberoots" } },
+      viberoots: {
+        locked: { type: "path", path: immutableInput, narHash: validNarHash },
+        original: { type: "path", path: immutableInput },
+      },
+    },
+  });
+  assert.equal(
+    immutableViberootsInputFromFlakeFiles(immutableFlake, immutableLock),
+    immutableInput,
+  );
+  assert.equal(isCanonicalSha256SRI(validNarHash), true);
+  assert.equal(isCanonicalSha256SRI("sha256-abc="), false);
+  assert.equal(isCanonicalSha256SRI(`sha512-${"A".repeat(43)}=`), false);
+  assert.equal(isCanonicalSha256SRI(`sha256-${"A".repeat(42)}-=`), false);
+  const malformedHashLock = JSON.stringify({
+    nodes: {
+      root: { inputs: { viberoots: "viberoots" } },
+      viberoots: {
+        locked: { type: "path", path: immutableInput, narHash: "sha256-abc=" },
+        original: { type: "path", path: immutableInput },
+      },
+    },
+  });
+  assert.throws(
+    () => immutableViberootsInputFromFlakeFiles(immutableFlake, malformedHashLock),
+    /flake\.lock does not match immutable viberoots input/,
+  );
+  assert.throws(
+    () =>
+      immutableViberootsInputFromFlakeFiles(
+        'viberoots.url = "path:/tmp/live-viberoots";\n',
+        immutableLock,
+      ),
+    /invalid absolute viberoots flake input/,
+  );
+  assert.throws(
+    () => immutableViberootsInputFromFlakeFiles(immutableFlake, '{"nodes":{}}'),
+    /flake\.lock does not match immutable viberoots input/,
+  );
   const common = await read("tools/dev/install/common.ts");
   if (!common.includes("export function flakeRefForImporter(")) {
     throw new Error("common.ts must expose flakeRefForImporter");
@@ -71,19 +119,29 @@ test("install path selects flake refs by importer scope", async () => {
   }
 
   const importerLockfile = await read("tools/dev/update-pnpm-hash/importer-lockfile.ts");
-  if (!importerLockfile.includes('"--override-input", "viberoots", opts.viberootsOverride')) {
-    throw new Error("importer lockfile generation must override stale viberoots lock inputs");
-  }
   if (
-    !importerLockfile.includes('viberoots.url = "path:./viberoots-flake-input"') ||
-    !importerLockfile.includes('return "";')
+    !importerLockfile.includes("makeFilteredFlakeRef({") ||
+    !importerLockfile.includes('attr: "pnpm"') ||
+    !importerLockfile.includes("flakeRef: filtered.flakeRef")
   ) {
     throw new Error(
-      "importer lockfile generation must not override the active generated filtered viberoots input",
+      "importer lockfile generation must use one importer-scoped filtered snapshot for both Nix commands",
     );
   }
-  if (!importerLockfile.includes('path.join(repoRoot, "viberoots")')) {
-    throw new Error("importer lockfile generation must prefer the local viberoots checkout");
+  if (
+    !importerLockfile.includes("WORKSPACE_ROOT: filtered.workspaceRoot") ||
+    !importerLockfile.includes("VBR_PNPM_FILTERED_SNAPSHOT_ROOT: filtered.workspaceRoot") ||
+    importerLockfile.includes("BUCK_TEST_SRC: filtered.workspaceRoot")
+  ) {
+    throw new Error("filtered lock generation must keep command/test authority on the live repo");
+  }
+  if (
+    !importerLockfile.includes('viberootsOverride: ""') ||
+    !importerLockfile.includes("await filtered.cleanup()")
+  ) {
+    throw new Error(
+      "filtered lock generation must use the repaired input and clean up its owned snapshot",
+    );
   }
   if (
     !importerLockfile.includes('resolveRepoNodeBin(opts.repoRoot, "prettier")') ||
@@ -134,6 +192,9 @@ test("install path selects flake refs by importer scope", async () => {
     throw new Error(
       "update-pnpm-hash nix builds must not override a valid flake-local viberoots input",
     );
+  }
+  if (!hashNix.includes("/^\\/nix\\/store\\/[a-z0-9]{32}-source$/")) {
+    throw new Error("update-pnpm-hash must preserve a repaired immutable filtered viberoots input");
   }
 
   const nodeModulesBuild = await read("tools/dev/node-modules-build.ts");

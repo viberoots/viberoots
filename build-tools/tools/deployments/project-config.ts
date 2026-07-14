@@ -4,9 +4,16 @@ import * as syncFs from "node:fs";
 import * as path from "node:path";
 import { stripJsonComments } from "./json-comments";
 
-export const PROJECT_CONFIG_DIR = "projects/config";
-export const PROJECT_SHARED_CONFIG_PATH = `${PROJECT_CONFIG_DIR}/shared.json`;
-export const PROJECT_LOCAL_CONFIG_PATH = `${PROJECT_CONFIG_DIR}/local.json`;
+export {
+  PROJECT_CONFIG_DIR,
+  PROJECT_LOCAL_CONFIG_PATH,
+  PROJECT_SHARED_CONFIG_PATH,
+} from "./project-config-paths";
+import {
+  PROJECT_CONFIG_DIR,
+  PROJECT_LOCAL_CONFIG_PATH,
+  PROJECT_SHARED_CONFIG_PATH,
+} from "./project-config-paths";
 
 export type ProjectConfig = Record<string, unknown> & {
   sprinkleref?: Record<string, unknown>;

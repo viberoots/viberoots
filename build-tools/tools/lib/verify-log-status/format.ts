@@ -1,4 +1,5 @@
 import type { VerifyStatus } from "./types";
+import { formatProgressBar as formatSharedProgressBar } from "../progress-bar";
 
 export function formatVerifyStatusJsonLine(st: VerifyStatus): string {
   // Stable JSON keys for scripting.
@@ -84,9 +85,13 @@ function formatPassGroupProgress(
       : group.done
         ? "done"
         : group.active
-          ? "active"
+          ? "running"
           : "pending";
-  return `${group.name.padEnd(widths.name)}  ${progress.padStart(widths.progress)}  ${state.padEnd(widths.state)}  ${formatRate(group.completionRateAvgPerMinute)} avg`;
+  const ratio =
+    group.completed === undefined || group.targetCount === undefined || group.targetCount <= 0
+      ? undefined
+      : group.completed / group.targetCount;
+  return `${group.name.padEnd(widths.name)} ${formatSharedProgressBar(ratio, 24)} ${progress.padStart(widths.progress)} ${state.padEnd(widths.state)} ${formatRate(group.completionRateAvgPerMinute)} avg`;
 }
 
 export function formatVerifyStatusText(
@@ -169,14 +174,14 @@ export function formatVerifyStatusText(
         }),
       ),
       state: Math.max(
-        ..."pending active failed done".split(" ").map((state) => state.length),
+        ..."pending running failed done".split(" ").map((state) => state.length),
         ...st.passGroups.map((group) =>
           group.done && (group.fail > 0 || group.fatal > 0 || group.buildFailure > 0)
             ? "failed".length
             : group.done
               ? "done".length
               : group.active
-                ? "active".length
+                ? "running".length
                 : "pending".length,
         ),
       ),

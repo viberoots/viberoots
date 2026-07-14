@@ -9,6 +9,7 @@ import { runGomod2nixGenerateIn } from "../../dev/install/gomod2nix";
 import { runUvRefreshAll } from "../../dev/install/uv";
 import { assertCppTrackedMetadataReady } from "../../dev/install/metadata-mode";
 import { glueFreshnessOutputs, writeGlueFingerprint } from "../../dev/install/glue-freshness";
+import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 import { runInScratchTemp } from "../lib/test-helpers/run-in-temp";
 
 const execFileAsync = promisify(execFile);
@@ -45,8 +46,9 @@ test("read-only install rejects stale uv.lock without rewriting it", async () =>
         "[project]\nname = 'valid-baseline'\nversion = '0.0.0'\nrequires-python = '>=3.11'\n",
         "utf8",
       );
-      await execFileAsync(process.env.INSTALL_DEPS_UV_BIN || "uv", ["lock"], { cwd: root });
-      await execFileAsync(process.env.INSTALL_DEPS_UV_BIN || "uv", ["lock", "--check"], {
+      const uv = ensureNixStoreToolPathSync("uv");
+      await execFileAsync(uv, ["lock"], { cwd: root });
+      await execFileAsync(uv, ["lock", "--check"], {
         cwd: root,
       });
       const originalLock = await fsp.readFile(lock, "utf8");

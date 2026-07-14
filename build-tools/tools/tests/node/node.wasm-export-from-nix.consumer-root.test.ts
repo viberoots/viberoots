@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runNodeWithZx } from "../../lib/node-run";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 async function writeExecutable(file: string, data: string) {
@@ -70,16 +71,13 @@ test("export-wasm-from-nix resolves consumer root when launched under viberoots"
     );
 
     const fakeBin = path.join(tmp, "fake-bin");
+    const realNixBin = resolveToolPathSync("nix", envWithResolvedNixBin(process.env));
     await writeExecutable(
       path.join(fakeBin, "nix"),
       `#!/usr/bin/env bash
 set -euo pipefail
 if [[ "$*" == *"flake prefetch"* ]]; then
-  exit 1
-fi
-if [[ "$*" == hash\\ path\\ --sri* ]]; then
-  echo "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-  exit 0
+  exec "${realNixBin}" "$@"
 fi
 if [ "\${BUCK_TEST_SRC:-}" != "${tmp}" ]; then
   echo "expected consumer root, got BUCK_TEST_SRC=\${BUCK_TEST_SRC:-}" >&2

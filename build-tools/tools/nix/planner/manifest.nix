@@ -159,9 +159,9 @@ let
           elif [ -d "$dist" ]; then
             if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
             if [ -n "$importer" ]; then
-              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp\", \"run\": { \"prod\": { \"argv\": [ \"python3\", \"-m\", \"http.server\", \"--directory\", \"$dist\" ] }, \"dev\": { \"argv\": [ \"pnpm\", \"--dir\", \"$importer\", \"dev\" ] } }, \"artifacts\": { \"dist\": \"$dist\"$serverWasmArtifactField } } }" >> $out/manifest.json
+              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp\", \"run\": { \"prod\": { \"argv\": [ \"${pkgs.python3}/bin/python3\", \"-m\", \"http.server\", \"--directory\", \"$dist\" ] }, \"dev\": { \"argv\": [ \"pnpm\", \"--dir\", \"$importer\", \"dev\" ] } }, \"artifacts\": { \"dist\": \"$dist\"$serverWasmArtifactField } } }" >> $out/manifest.json
             else
-              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp\", \"run\": { \"prod\": { \"argv\": [ \"python3\", \"-m\", \"http.server\", \"--directory\", \"$dist\" ] } }, \"artifacts\": { \"dist\": \"$dist\"$serverWasmArtifactField } } }" >> $out/manifest.json
+              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [], \"aux\": [], \"runnable\": { \"kind\": \"webapp\", \"run\": { \"prod\": { \"argv\": [ \"${pkgs.python3}/bin/python3\", \"-m\", \"http.server\", \"--directory\", \"$dist\" ] } }, \"artifacts\": { \"dist\": \"$dist\"$serverWasmArtifactField } } }" >> $out/manifest.json
             fi
             first=0
           fi
@@ -172,5 +172,4 @@ let
 in {
   inherit all;
 }
-
 

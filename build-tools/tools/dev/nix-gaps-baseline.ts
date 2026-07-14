@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { getFlagBool, getFlagStr } from "../lib/cli";
 import { writeIfChanged } from "../lib/fs-helpers";
+import { ensureNixStoreToolPathSync } from "../lib/tool-paths";
 
 type CommandResult = {
   label: string;
@@ -135,8 +136,8 @@ async function main() {
         runCommand("go", ["version"]),
         runCommand("node", ["--version"]),
         runCommand("pnpm", ["--version"]),
-        runCommand("python3", ["--version"]),
-        runCommand("uv", ["--version"]),
+        runCommand(ensureNixStoreToolPathSync("python3"), ["--version"]),
+        runCommand(ensureNixStoreToolPathSync("uv"), ["--version"]),
       ];
 
   const buildSteps = isFixture

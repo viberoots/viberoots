@@ -8,6 +8,7 @@ test("install-deps gomod2nix dry-run logs command and does not write file", asyn
   await runInTemp("install-deps-dry-run", async (tmp, $) => {
     const goMod = ["module example.com/demo", "\ngo 1.22"].join("\n");
     await fsp.writeFile(path.join(tmp, "go.mod"), goMod, "utf8");
+    await fsp.writeFile(path.join(tmp, "go.sum"), "", "utf8");
     const { stdout } = await $({
       cwd: tmp,
       stdio: "pipe",

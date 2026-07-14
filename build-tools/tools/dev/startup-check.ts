@@ -7,15 +7,14 @@ import { validateStartupWorkspaceState } from "./startup-check/workspace-state";
 import { isVbrVerbose } from "../lib/command-ui";
 import { DEV_OVERRIDE_LANGS, devOverrideEnvNameForLang } from "../lib/dev-override-envs";
 import { withSanitizedInheritedNixConfig } from "../lib/nix-config-env";
-import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
+import {
+  ensureNixStoreToolPathSync,
+  envWithResolvedNixBin,
+  resolveToolPathSync,
+} from "../lib/tool-paths";
 
 async function which(cmd: string) {
-  try {
-    await $`which ${cmd}`;
-    return true;
-  } catch {
-    return false;
-  }
+  return Boolean(await resolvePreferredCmdPath(cmd));
 }
 
 async function pathExists(p: string): Promise<boolean> {
@@ -161,7 +160,6 @@ async function main() {
   // Python enablement prerequisites: python3 and uv.
   // These should only be required when Python is actually present in the checkout.
   // Do NOT require developers to edit configs (e.g. langs.json) for sparse/partial clones.
-  const isCI = (process.env.CI || "").toLowerCase() === "true";
   const pythonPresent =
     (await pathExists(sourcePath(source, "build-tools/python/defs.bzl"))) ||
     (await pathExists(sourcePath(source, "build-tools/tools/nix/templates/python.nix"))) ||
@@ -172,18 +170,23 @@ async function main() {
     .split(/[,\s]+/)
     .map((s) => s.trim())
     .filter(Boolean);
-  // Policy: tools are optional in local dev, but must be present in CI when the
-  // language is present in the checkout (to prevent "it works locally" drift).
-  if (isCI && pythonPresent) {
-    const hasPython3 = fakeMissing.includes("python3") ? false : await which("python3");
-    const hasUv = fakeMissing.includes("uv") ? false : await which("uv");
-    if (!hasPython3 || !hasUv) {
-      const missing = [!hasPython3 ? "python3" : "", !hasUv ? "uv" : ""].filter(Boolean);
-      const msg =
-        "[startup-check] missing tools: " +
-        missing.join(", ") +
-        ". Install via dev shell (direnv/nix).";
-      console.error(msg);
+  if (pythonPresent) {
+    const failures: string[] = [];
+    for (const tool of ["python3", "uv"]) {
+      if (fakeMissing.includes(tool)) {
+        failures.push(`${tool}=missing`);
+        continue;
+      }
+      try {
+        ensureNixStoreToolPathSync(tool);
+      } catch (error) {
+        failures.push(String((error as Error).message || error));
+      }
+    }
+    if (failures.length) {
+      console.error(
+        `[startup-check] Python toolchain must come from the Nix dev shell: ${failures.join("; ")}`,
+      );
       process.exit(1);
     }
   }
@@ -196,10 +199,7 @@ async function main() {
     // `buck2` may be a repo-local shim script under buck-out/ that delegates to the
     // real nix-supplied buck2 binary.
     // Required tools should be nix-provided in all environments.
-    // Optional language toolchains are only enforced in CI when that language is present.
-    const mustBeStore = ["nix", "node", "pnpm", "go"].concat(
-      isCI && pythonPresent ? ["python3", "uv"] : [],
-    );
+    const mustBeStore = ["nix", "node", "pnpm", "go"];
     const bad: Array<{ cmd: string; path: string }> = [];
     for (const cmd of mustBeStore) {
       const p = await resolvePreferredCmdPath(cmd);
@@ -212,22 +212,6 @@ async function main() {
         bad.map((b) => `${b.cmd}=${b.path}`).join(" ");
       console.error(msg);
       process.exit(1);
-    }
-
-    // Local-only advisory: when Python is present in the checkout but CI enforcement is off,
-    // do not fail if the system toolchain is on PATH first.
-    if (!isCI && pythonPresent) {
-      const p3 = await resolvePreferredCmdPath("python3");
-      const uv = await resolvePreferredCmdPath("uv");
-      const warns: Array<{ cmd: string; path: string }> = [];
-      if (p3 && !isNixStorePath(p3)) warns.push({ cmd: "python3", path: p3 });
-      if (uv && !isNixStorePath(uv)) warns.push({ cmd: "uv", path: uv });
-      if (warns.length) {
-        console.warn(
-          "[startup-check] warning: non-Nix python toolchain on PATH. Local dev is OK; CI will enforce it. " +
-            warns.map((w) => `${w.cmd}=${w.path}`).join(" "),
-        );
-      }
     }
   }
 
@@ -293,8 +277,15 @@ async function main() {
     }
     // Implementation-required feature floor: nix-command + flakes.
     // Do not require dynamic-derivations/recursive-nix/ca-derivations here; those are policy-level choices.
-  } catch {
-    console.error("[startup-check] cannot read nix config via `nix config show`");
+  } catch (error) {
+    const detail = String(
+      (error as { stderr?: unknown; message?: unknown }).stderr ||
+        (error as { message?: unknown }).message ||
+        error,
+    ).trim();
+    console.error(
+      `[startup-check] cannot read nix config via \`nix config show\`${detail ? `: ${detail}` : ""}`,
+    );
     process.exit(1);
   }
 

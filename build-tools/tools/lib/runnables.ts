@@ -4,6 +4,7 @@ import path from "node:path";
 import { normalizeTargetLabel } from "./labels";
 import { resolveServerWasmContractArtifact } from "./runnable-wasm-artifacts";
 import { SSR_FRAMEWORKS } from "./runnable-contracts";
+import { ensureNixStoreToolPathSync } from "./tool-paths";
 
 export type RunnableExec = {
   argv: string[];
@@ -217,7 +218,7 @@ export async function inferRunnableFromOutPath(opts: {
     kind: "webapp",
     run: {
       prod: {
-        argv: ["python3", "-m", "http.server", "--directory", dist],
+        argv: [ensureNixStoreToolPathSync("python3"), "-m", "http.server", "--directory", dist],
       },
       ...(opts.importer
         ? {

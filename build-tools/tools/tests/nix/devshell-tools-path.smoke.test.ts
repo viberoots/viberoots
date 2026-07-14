@@ -76,6 +76,12 @@ for bin in nix buck2 node pnpm go python3 uv jq rsync copier yq gomod2nix vibero
     *) echo "$bin resolved outside Nix/devshell paths: $path" >&2; exit 1 ;;
   esac
 done
+for bin in python3 uv; do
+  case "$(command -v "$bin")" in
+    /nix/store/*/bin/"$bin") ;;
+    *) echo "$bin must resolve directly from /nix/store: $(command -v "$bin")" >&2; exit 1 ;;
+  esac
+done
 cd projects
 for bin in s v i b; do
   case "$(command -v "$bin")" in

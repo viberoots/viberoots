@@ -3,6 +3,7 @@ import type { ChildProcess } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { ensureNixStoreToolPathSync, isNixStorePath } from "../lib/tool-paths";
 import { normalizeTargetLabel, parseLockfileLabel } from "../lib/labels";
 import {
   findRunnableEntryForTarget,
@@ -116,8 +117,16 @@ function signalChildGroup(child: ChildProcess, signal: NodeJS.Signals): void {
 }
 
 export async function runCommand(argv: string[], extra: string[], cwd?: string): Promise<number> {
-  const cmd = String(argv[0] || "").trim();
+  let cmd = String(argv[0] || "").trim();
   if (!cmd) return 2;
+  const tool = path.basename(cmd);
+  if (["python", "python3", "uv"].includes(tool)) {
+    if (cmd === tool) {
+      cmd = ensureNixStoreToolPathSync(tool);
+    } else if (!isNixStorePath(cmd)) {
+      throw new Error(`runnable tool must resolve to /nix/store: ${tool} -> ${cmd}`);
+    }
+  }
   const args = [...argv.slice(1), ...extra];
   const child = spawn(cmd, args, {
     cwd: cwd || process.cwd(),

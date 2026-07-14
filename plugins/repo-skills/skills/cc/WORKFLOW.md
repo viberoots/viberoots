@@ -59,7 +59,7 @@ repositories before committing the parent repository.
 
 Before staging a commit in a viberoots consumer repository, make sure checked-in viberoots pins and
 tracked generated metadata are coherent. This prevents committing only one side of the source pin
-or leaving stale pnpm hash metadata for the user's next `viberoots update` or post-clone run.
+or leaving stale dependency metadata for the user's next post-clone run.
 
 Treat a repository as a viberoots consumer when it has a `viberoots` submodule or a `.viberoots`
 workspace directory. In that case:
@@ -78,27 +78,22 @@ workspace directory. In that case:
   ```sh
   gitlink_rev="$(git ls-files -s viberoots | awk '$1 == "160000" { print $2; exit }')"
   submodule_rev="$(git -C viberoots rev-parse HEAD 2>/dev/null || true)"
+  prospective_gitlink_rev="${submodule_rev:-${gitlink_rev}}"
   lock_rev="$(jq -r '.nodes.viberoots.locked.rev // empty' flake.lock 2>/dev/null || true)"
   ```
 
-- If both `gitlink_rev` and `lock_rev` are present and differ, stop and tell the user to run:
+- In submodule mode, treat `submodule_rev` as the prospective gitlink because this guard runs after
+  the submodule commit and before the parent stages its updated gitlink. Fall back to the indexed
+  `gitlink_rev` only when the checkout is unavailable. If `prospective_gitlink_rev` and `lock_rev`
+  are present and differ, stop and tell the user to run exactly:
 
   ```sh
-  viberoots update
-  git status
-  ```
-
-- If `gitlink_rev` and `submodule_rev` are present and differ, stop and tell the user to run:
-
-  ```sh
-  git submodule update --init --recursive viberoots
   viberoots update
   ```
 
 - If `.viberoots/current`, `.envrc`, or checked-in flake metadata indicate submodule mode but the
   `viberoots` gitlink is absent, or indicate flake mode while an active `viberoots` gitlink is being
-  committed, stop and tell the user to run either `viberoots use-submodule --run-install` or
-  `viberoots use-flake --run-install`, whichever mode they intend.
+  committed, stop and tell the user to run exactly `viberoots update`.
 - Verify committed pnpm hash metadata by running the read-only materialization path for each
   importer with a `pnpm-lock.yaml`, for example:
 
@@ -107,11 +102,15 @@ workspace directory. In that case:
   zx-wrapper viberoots/build-tools/tools/dev/update-pnpm-hash.ts --lockfile <lockfile> --read-only
   ```
 
-  If this reports stale metadata, stop and tell the user to run `viberoots update`.
+  If this reports stale dependency metadata, stop and tell the user to run exactly `u`. Pin,
+  source-mode, and generated bootstrap drift must point to exactly `viberoots update`. The guard
+  cannot infer that the user intends to move dependency versions, so it must never invent
+  `u --upgrade` as repair guidance; that command is chosen explicitly by the user and reports its
+  own unsupported-language diagnostics.
 
 - If any consistency check dirties tracked files, stop. Do not include that dirt in the commit as an
-  incidental fix. Tell the user to run `viberoots update`, inspect the resulting diff, and rerun the
-  guard before committing.
+  incidental fix. Use the exact repair command printed by the guard (`u` or `viberoots update`),
+  inspect the resulting diff, and rerun the guard before committing.
 - If the repository has only flake-mode viberoots metadata and no `viberoots/` submodule, do not
   invent a submodule check; commit the existing flake changes as part of the normal change set.
 - If the repository has a viberoots submodule but no root `flake.lock`, no flake metadata sync is

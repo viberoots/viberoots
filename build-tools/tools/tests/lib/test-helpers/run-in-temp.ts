@@ -34,18 +34,23 @@ import { externalPnpmStateDirs } from "../../../lib/pnpm-state-paths";
 import { stableBuckIsolation } from "../../../lib/buck-command-env";
 import { resolveToolPathSync } from "../../../lib/tool-paths";
 import { pathExists } from "../../../lib/repo";
-import { mkdirWithMacosMetadataExclusion } from "../../../lib/macos-metadata";
+import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../../../lib/macos-metadata";
 import { ensureWorkspaceProvidersPackage } from "../../../lib/workspace-providers-package";
 import { resolveFinalPnpmStore } from "../../../dev/update-pnpm-hash/realized-store";
+import {
+  defaultFilteredFlakeSnapshotRelPaths,
+  defaultFilteredFlakeSnapshotRsyncSources,
+  filteredFlakeRsyncExcludeArgs,
+} from "../../../dev/nix-build-filtered-flake-lib";
+import {
+  materializeFilteredViberootsSource,
+  type MaterializedPathInput,
+} from "../../../dev/filtered-flake-viberoots-input";
 
 const LOCAL_FIXTURE_SERVICE_ENV = "VBR_DEPLOY_LOCAL_FIXTURE_SERVICE";
 const PREPARED_SEED_MARKER = ".seed-store-prepared-v7";
 
 let cachedDevEnvExport: Promise<string> | null = null;
-type PathFlakeMetadata = {
-  lastModified?: number;
-  narHash?: string;
-};
 let cachedPinnedNixpkgsPath: Promise<string> | null = null;
 let cachedPinnedCacertPath: Promise<string> | null = null;
 let cachedUnifiedPnpmStorePath: Promise<string> | null = null;
@@ -100,52 +105,56 @@ async function withTempProcessEnv<T>(
   }
 }
 
-async function exportDevEnvOncePerWorker($: any): Promise<string> {
+type TempViberootsRoles = {
+  commandSourceRoot: string;
+  consumerSnapshotRoot: string;
+  flakeInput: MaterializedPathInput;
+};
+
+async function exportDevEnvOncePerWorker($: any, roles: TempViberootsRoles): Promise<string> {
   if (cachedDevEnvExport) return await cachedDevEnvExport;
-  cachedDevEnvExport = exportDevEnvWithRetry($).catch((err) => {
+  cachedDevEnvExport = exportDevEnvWithRetry($, roles).catch((err) => {
     cachedDevEnvExport = null;
     throw err;
   });
   return await cachedDevEnvExport;
 }
 
-async function exportDevEnvWithRetry($: any): Promise<string> {
-  const devEnvRoot = await activeViberootsRootFromWorkspace();
-  const fixedStore = await resolveFinalPnpmStore({
-    repoRoot: devEnvRoot,
-    importer: ".",
-    flakeRef: `path:${devEnvRoot}`,
-    attrPath: "pnpm-store",
-  });
+async function exportDevEnvWithRetry($: any, roles: TempViberootsRoles): Promise<string> {
+  const consumerFlakeRoot = await workspaceFlakeRef(roles.consumerSnapshotRoot);
+  const filteredSnapshotEnv = {
+    ...process.env,
+    WORKSPACE_ROOT: roles.consumerSnapshotRoot,
+    BUCK_TEST_SRC: roles.consumerSnapshotRoot,
+    VBR_FILTERED_FLAKE_SNAPSHOT: "1",
+    VBR_PNPM_FILTERED_SNAPSHOT_ROOT: roles.consumerSnapshotRoot,
+  };
+  const hasRootImporter = await pathExists(path.join(roles.consumerSnapshotRoot, "pnpm-lock.yaml"));
+  const fixedStore = hasRootImporter
+    ? await resolveFinalPnpmStore({
+        repoRoot: roles.commandSourceRoot,
+        importer: ".",
+        flakeRef: `path:${consumerFlakeRoot}`,
+        attrPath: "pnpm-store",
+        env: filteredSnapshotEnv,
+      })
+    : { cleanup: async () => {} };
   const runOnce = async () => {
     // Avoid direnv here: it can be slow and re-run per temp repo, while nix develop is deterministic.
     const nixOut = await $({
-      cwd: devEnvRoot,
+      cwd: roles.consumerSnapshotRoot,
       stdio: "pipe",
       reject: false,
       nothrow: true,
       env: withSanitizedInheritedNixConfig({
-        ...process.env,
+        ...filteredSnapshotEnv,
         IN_NIX_SHELL: "1",
-        VIBEROOTS_ROOT: devEnvRoot,
-        VIBEROOTS_SOURCE_ROOT: devEnvRoot,
-        VIBEROOTS_FLAKE_INPUT_ROOT: devEnvRoot,
+        VIBEROOTS_ROOT: roles.commandSourceRoot,
+        VIBEROOTS_SOURCE_ROOT: roles.commandSourceRoot,
+        VIBEROOTS_FLAKE_INPUT_ROOT: roles.flakeInput.storePath,
       }),
-    })`nix develop --no-write-lock-file --accept-flake-config -c env -0`;
-    if (Number(nixOut.exitCode || 0) !== 127) return nixOut;
-    return await $({
-      cwd: devEnvRoot,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-      env: withSanitizedInheritedNixConfig({
-        ...process.env,
-        IN_NIX_SHELL: "1",
-        VIBEROOTS_ROOT: devEnvRoot,
-        VIBEROOTS_SOURCE_ROOT: devEnvRoot,
-        VIBEROOTS_FLAKE_INPUT_ROOT: devEnvRoot,
-      }),
-    })`bash --noprofile --norc -c 'if command -v direnv >/dev/null 2>&1; then eval "$(direnv export bash)"; env -0; else printf ""; fi'`;
+    })`nix develop ${`path:${consumerFlakeRoot}`} --no-write-lock-file --accept-flake-config -c env -0`;
+    return nixOut;
   };
   try {
     let out = await runOnce();
@@ -425,6 +434,79 @@ async function activeViberootsRootFromWorkspace(): Promise<string> {
   return repoRoot;
 }
 
+async function prepareFilteredViberootsInput(sourceRoot: string): Promise<MaterializedPathInput> {
+  const workDirRaw = await mkdtempNoindex("vbr-run-in-temp-input-", {
+    baseName: "vbr-run-in-temp-input",
+    tmpBase: process.env.TMPDIR || "/tmp",
+  });
+  const workDir = await fsp.realpath(workDirRaw).catch(() => workDirRaw);
+  const inputRoot = path.join(workDir, "source");
+  try {
+    const relPaths: string[] = [];
+    for (const rel of defaultFilteredFlakeSnapshotRelPaths()) {
+      if (rel === ".viberoots" || rel.startsWith(".viberoots/")) continue;
+      if (await pathExists(path.join(sourceRoot, rel))) relPaths.push(rel);
+    }
+    const sources = defaultFilteredFlakeSnapshotRsyncSources(relPaths);
+    if (!sources.includes("./flake.nix")) {
+      throw new Error(`runInTemp: active viberoots source is missing flake.nix: ${sourceRoot}`);
+    }
+    await mkdirWithMacosMetadataExclusion(inputRoot);
+    await $({
+      cwd: sourceRoot,
+    })`rsync -a --delete --relative ${filteredFlakeRsyncExcludeArgs()} ${sources} ${inputRoot}/`;
+    for (const excluded of [".viberoots", "buck-out", "node_modules"]) {
+      if (await pathExists(path.join(inputRoot, excluded))) {
+        throw new Error(`runInTemp: filtered viberoots input retained ${excluded}`);
+      }
+    }
+    return await materializeFilteredViberootsSource(inputRoot);
+  } finally {
+    await removeTreeWithWritableFallback(workDir, $);
+  }
+}
+
+async function prepareFilteredConsumerSnapshot(
+  consumerRoot: string,
+): Promise<{ root: string; cleanup: () => Promise<void> }> {
+  const workDirRaw = await mkdtempNoindex("vbr-run-in-temp-consumer-", {
+    baseName: "vbr-run-in-temp-consumer",
+    tmpBase: process.env.TMPDIR || "/tmp",
+  });
+  const workDir = await fsp.realpath(workDirRaw).catch(() => workDirRaw);
+  const snapshotRoot = path.join(workDir, "source");
+  try {
+    const relPaths: string[] = [];
+    for (const rel of defaultFilteredFlakeSnapshotRelPaths()) {
+      if (await pathExists(path.join(consumerRoot, rel))) relPaths.push(rel);
+    }
+    const sources = defaultFilteredFlakeSnapshotRsyncSources(relPaths);
+    if (!sources.includes("./flake.nix")) {
+      throw new Error(`runInTemp: consumer workspace is missing flake.nix: ${consumerRoot}`);
+    }
+    await mkdirWithMacosMetadataExclusion(snapshotRoot);
+    await $({
+      cwd: consumerRoot,
+    })`rsync -a --delete --relative ${filteredFlakeRsyncExcludeArgs()} ${sources} ${snapshotRoot}/`;
+    for (const excluded of [
+      ".viberoots/current",
+      ".viberoots/workspace/prelude",
+      "viberoots/prelude",
+    ]) {
+      if (await pathExists(path.join(snapshotRoot, excluded))) {
+        throw new Error(`runInTemp: filtered consumer snapshot retained ${excluded}`);
+      }
+    }
+    return {
+      root: snapshotRoot,
+      cleanup: async () => await fsp.rm(workDir, { recursive: true, force: true }),
+    };
+  } catch (error) {
+    await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
+    throw error;
+  }
+}
+
 function isGeneratedFilteredViberootsInputPath(value: string): boolean {
   const normalized = String(value || "")
     .split(path.sep)
@@ -488,8 +570,9 @@ async function gitStageRelPaths($tmp: typeof $, tmp: string, relPaths: string[])
 
 async function rewriteTempViberootsInput(
   tmp: string,
-  activeViberootsRoot: string,
+  input: MaterializedPathInput,
 ): Promise<string[]> {
+  const activeViberootsRoot = input.storePath;
   const touched: string[] = [];
   for (const flakePath of await candidateTempFlakePaths(tmp)) {
     const text = await fsp.readFile(flakePath, "utf8").catch(() => "");
@@ -511,48 +594,14 @@ async function rewriteTempViberootsInput(
       touched.push(relFromTempRoot(tmp, flakePath));
     }
   }
-  touched.push(...(await rewriteTempViberootsLockInput(tmp, activeViberootsRoot)));
+  touched.push(...(await rewriteTempViberootsLockInput(tmp, input)));
   return uniqueRelPaths(touched);
-}
-
-async function readPathFlakeMetadata(inputPath: string): Promise<PathFlakeMetadata> {
-  const canonicalInputPath = await fsp.realpath(inputPath).catch(() => inputPath);
-  const prefetched = await $({
-    stdio: "pipe",
-  })`nix flake prefetch --json ${`path:${canonicalInputPath}`}`.nothrow();
-  if (prefetched.exitCode === 0) {
-    const parsed = JSON.parse(String(prefetched.stdout || "{}"));
-    const locked = parsed?.locked || {};
-    return {
-      lastModified: typeof locked.lastModified === "number" ? locked.lastModified : undefined,
-      narHash: typeof locked.narHash === "string" ? locked.narHash : undefined,
-    };
-  }
-  const out = await $({
-    stdio: "pipe",
-  })`nix flake metadata --json ${`path:${canonicalInputPath}`} --no-write-lock-file`;
-  const parsed = JSON.parse(String(out.stdout || "{}"));
-  const locked = parsed?.locked || {};
-  const narHash =
-    typeof locked.narHash === "string"
-      ? locked.narHash
-      : String(
-          (
-            await $({
-              stdio: "pipe",
-            })`nix hash path --sri ${canonicalInputPath}`
-          ).stdout || "",
-        ).trim();
-  return {
-    lastModified: typeof locked.lastModified === "number" ? locked.lastModified : undefined,
-    narHash: narHash || undefined,
-  };
 }
 
 function rewriteViberootsLockEntry(
   entry: unknown,
   activeViberootsRoot: string,
-  metadata?: PathFlakeMetadata,
+  metadata?: Record<string, unknown>,
 ): boolean {
   if (!entry || typeof entry !== "object") return false;
   const node = entry as { type?: unknown; path?: unknown; url?: unknown };
@@ -581,8 +630,10 @@ function rewriteViberootsLockEntry(
   };
   mutableNode.type = "path";
   mutableNode.path = activeViberootsRoot;
-  if (metadata?.lastModified) mutableNode.lastModified = metadata.lastModified;
-  if (metadata?.narHash) mutableNode.narHash = metadata.narHash;
+  if (typeof metadata?.lastModified === "number") {
+    mutableNode.lastModified = metadata.lastModified;
+  }
+  if (typeof metadata?.narHash === "string") mutableNode.narHash = metadata.narHash;
   delete mutableNode.lastModifiedDate;
   delete mutableNode.ref;
   delete mutableNode.rev;
@@ -593,9 +644,9 @@ function rewriteViberootsLockEntry(
 
 async function rewriteTempViberootsLockInput(
   tmp: string,
-  activeViberootsRoot: string,
+  input: MaterializedPathInput,
 ): Promise<string[]> {
-  const metadata = await readPathFlakeMetadata(activeViberootsRoot);
+  const activeViberootsRoot = input.storePath;
   const touched: string[] = [];
   for (const lockPath of await candidateTempFlakeLockPaths(tmp)) {
     const text = await fsp.readFile(lockPath, "utf8").catch(() => "");
@@ -609,7 +660,7 @@ async function rewriteTempViberootsLockInput(
     const inputName = lock?.nodes?.root?.inputs?.viberoots || "viberoots";
     const node = lock?.nodes?.[inputName] || lock?.nodes?.viberoots || lock?.nodes?.viberootsInput;
     if (!node || typeof node !== "object") continue;
-    const lockedChanged = rewriteViberootsLockEntry(node.locked, activeViberootsRoot, metadata);
+    const lockedChanged = rewriteViberootsLockEntry(node.locked, activeViberootsRoot, input.locked);
     const originalChanged = rewriteViberootsLockEntry(node.original, activeViberootsRoot);
     const changed = lockedChanged || originalChanged;
     if (!changed) continue;
@@ -951,7 +1002,11 @@ async function prependTempRepoBin(env: Record<string, string>, tmp: string): Pro
 export async function runInTemp<T>(
   name: string,
   fn: (tmp: string, $: any) => Promise<T>,
-  opts?: { git?: boolean; workspace?: "seeded" | "scratch" },
+  opts?: {
+    git?: boolean;
+    reconcileDependencyInputs?: boolean;
+    workspace?: "seeded" | "scratch";
+  },
 ): Promise<T> {
   const realHome = String(process.env.HOME || os.homedir() || "").trim();
   const tmp = await mktemp(name + "-");
@@ -975,6 +1030,10 @@ export async function runInTemp<T>(
       "runInTemp activeViberootsRoot",
       async () => await activeViberootsRootFromWorkspace(),
     );
+    const viberootsInput = await timeAsync(
+      "runInTemp prepareFilteredViberootsInput",
+      async () => await prepareFilteredViberootsInput(activeViberootsRoot),
+    );
     let exportEnv: Record<string, string> = {};
     for (const [k, v] of Object.entries(process.env)) {
       if (typeof v === "string") exportEnv[k] = v;
@@ -987,6 +1046,7 @@ export async function runInTemp<T>(
     exportEnv.SCAF_ALLOW_LIVE_REPO = "1";
     exportEnv.VIBEROOTS_ROOT = activeViberootsRoot;
     exportEnv.VIBEROOTS_SOURCE_ROOT = activeViberootsRoot;
+    exportEnv.VIBEROOTS_FLAKE_INPUT_ROOT = viberootsInput.storePath;
     exportEnv.TEST_NO_BROWSER = exportEnv.TEST_NO_BROWSER || "1";
     exportEnv[LOCAL_FIXTURE_SERVICE_ENV] = exportEnv[LOCAL_FIXTURE_SERVICE_ENV] || "1";
     exportEnv.HOME = home;
@@ -1004,7 +1064,7 @@ export async function runInTemp<T>(
       "dev",
       "zx-init.mjs",
     );
-    await rewriteTempViberootsInput(tmp, activeViberootsRoot);
+    await rewriteTempViberootsInput(tmp, viberootsInput);
     await prependTempRepoBin(exportEnv, tmp);
     applyTempNodePath(exportEnv, [
       path.join(process.cwd(), "node_modules"),
@@ -1106,10 +1166,15 @@ export async function runInTemp<T>(
     async () => await seedStoreViberootsRootIfPresent(),
   );
   const viberootsSourceRoot = tempViberootsRoot || activeViberootsRoot;
-  const viberootsInputPath = seedStoreViberootsRoot || tempViberootsRoot || activeViberootsRoot;
+  const viberootsInputSourceRoot =
+    seedStoreViberootsRoot || tempViberootsRoot || activeViberootsRoot;
+  const viberootsInput = await timeAsync(
+    "runInTemp prepareFilteredViberootsInput",
+    async () => await prepareFilteredViberootsInput(viberootsInputSourceRoot),
+  );
   tempSetupEnv.VIBEROOTS_ROOT = viberootsSourceRoot;
   tempSetupEnv.VIBEROOTS_SOURCE_ROOT = viberootsSourceRoot;
-  tempSetupEnv.VIBEROOTS_FLAKE_INPUT_ROOT = viberootsInputPath;
+  tempSetupEnv.VIBEROOTS_FLAKE_INPUT_ROOT = viberootsInput.storePath;
   tempSetupEnv.ZX_INIT = path.join(
     viberootsSourceRoot,
     "build-tools",
@@ -1118,7 +1183,7 @@ export async function runInTemp<T>(
     "zx-init.mjs",
   );
   await timeAsync("runInTemp rewriteTempViberootsInput", async () => {
-    seedTouchedRelPaths.push(...(await rewriteTempViberootsInput(tmp, viberootsInputPath)));
+    seedTouchedRelPaths.push(...(await rewriteTempViberootsInput(tmp, viberootsInput)));
   });
   await timeAsync("runInTemp removeInheritedBuildToolsSymlink", async () => {
     seedTouchedRelPaths.push(...(await removeInheritedBuildToolsSymlink(tmp)));
@@ -1201,7 +1266,7 @@ export async function runInTemp<T>(
   const $setup = $({ cwd: tmp, env: tempSetupEnv, stdio: "pipe" });
   await timeAsync("runInTemp ensureBuckConfigForTempRepo", async () => {
     await ensureBuckConfigForTempRepo(tmp, $setup, {
-      viberootsInputRoot: viberootsInputPath,
+      viberootsInputRoot: viberootsInput.storePath,
       viberootsSourceRoot,
     });
   });
@@ -1209,13 +1274,13 @@ export async function runInTemp<T>(
     await ensureWorkspaceProvidersPackage(tmp);
   });
   await timeAsync("runInTemp ensureWorkspaceRootEnvFile", async () => {
-    await ensureWorkspaceRootEnvFile(tmp, viberootsSourceRoot, viberootsInputPath);
+    await ensureWorkspaceRootEnvFile(tmp, viberootsSourceRoot, viberootsInput.storePath);
   });
   await timeAsync("runInTemp ensureToolchainPathsForTempRepo", async () => {
     await ensureToolchainPathsForTempRepo(tmp, $setup);
   });
   await timeAsync("runInTemp rewriteTempViberootsInput after setup", async () => {
-    const touched = await rewriteTempViberootsInput(tmp, viberootsInputPath);
+    const touched = await rewriteTempViberootsInput(tmp, viberootsInput);
     if (!wantGit || touched.length === 0) return;
     const $tmp = $({ cwd: tmp, stdio: "pipe", env: tempSetupEnv });
     await gitStageRelPaths($tmp, tmp, touched);
@@ -1229,34 +1294,58 @@ export async function runInTemp<T>(
     }
   });
 
-  if ((process.env.TEST_NEED_DEV_ENV || "") === "1") {
-    const flakeRef = await workspaceFlakeRef(tmp);
-    const viberootsOverrideArgs = ["--override-input", "viberoots", `path:${viberootsInputPath}`];
-    const chk = await retryTransientNixStoreFailure(
-      "checking temp repo buck2-prelude",
-      async () =>
-        await $setup`nix build ${`path:${flakeRef}#buck2-prelude`} ${viberootsOverrideArgs} --no-link --no-write-lock-file --accept-flake-config --print-build-logs`.nothrow(),
-      (out) => `${(out as any).stdout || ""}\n${(out as any).stderr || ""}`,
-      (out) => Number((out as any).exitCode || 0) !== 0,
-    );
-    if (chk.exitCode !== 0) {
-      const detail = `${String(chk.stdout || "")}\n${String(chk.stderr || "")}`.trim();
-      throw new Error(
-        [
-          "dev-shell check failed: nix build path:<tmp>#buck2-prelude did not succeed in temp repo; ensure direnv/dev shell is active",
-          detail,
-        ]
-          .filter(Boolean)
-          .join("\n"),
-      );
-    }
+  if (opts?.reconcileDependencyInputs) {
+    await timeAsync("runInTemp reconcileTempDependencyInputs", async () => {
+      await reconcileTempDependencyInputs(tmp, $setup, viberootsSourceRoot);
+    });
   }
 
   let envOut: any = { stdout: "" };
   if ((process.env.TEST_NEED_DEV_ENV || "") === "1") {
-    envOut = await timeAsync(`devEnvExport(${path.basename(tmp)})`, async () => {
-      return { stdout: await exportDevEnvOncePerWorker($) };
-    });
+    const consumerSnapshot = await timeAsync(
+      "runInTemp prepareFilteredConsumerSnapshot",
+      async () => prepareFilteredConsumerSnapshot(tmp),
+    );
+    try {
+      const flakeRef = await workspaceFlakeRef(consumerSnapshot.root);
+      const snapshotEnv = {
+        ...tempSetupEnv,
+        WORKSPACE_ROOT: consumerSnapshot.root,
+        BUCK_TEST_SRC: consumerSnapshot.root,
+        VBR_FILTERED_FLAKE_SNAPSHOT: "1",
+        VBR_PNPM_FILTERED_SNAPSHOT_ROOT: consumerSnapshot.root,
+      };
+      const $snapshot = $({ cwd: consumerSnapshot.root, env: snapshotEnv, stdio: "pipe" });
+      const chk = await retryTransientNixStoreFailure(
+        "checking temp repo buck2-prelude",
+        async () =>
+          await $snapshot`nix build ${`path:${flakeRef}#buck2-prelude`} --no-link --no-write-lock-file --accept-flake-config --print-build-logs`.nothrow(),
+        (out) => `${(out as any).stdout || ""}\n${(out as any).stderr || ""}`,
+        (out) => Number((out as any).exitCode || 0) !== 0,
+      );
+      if (chk.exitCode !== 0) {
+        const detail = `${String(chk.stdout || "")}\n${String(chk.stderr || "")}`.trim();
+        throw new Error(
+          [
+            "dev-shell check failed: nix build path:<filtered-temp>#buck2-prelude did not succeed; ensure direnv/dev shell is active",
+            detail,
+          ]
+            .filter(Boolean)
+            .join("\n"),
+        );
+      }
+      envOut = await timeAsync(`devEnvExport(${path.basename(tmp)})`, async () => {
+        return {
+          stdout: await exportDevEnvOncePerWorker($, {
+            commandSourceRoot: viberootsSourceRoot,
+            consumerSnapshotRoot: consumerSnapshot.root,
+            flakeInput: viberootsInput,
+          }),
+        };
+      });
+    } finally {
+      await consumerSnapshot.cleanup();
+    }
   }
 
   let exportEnv: Record<string, string> = {};
@@ -1291,7 +1380,7 @@ export async function runInTemp<T>(
     const wsNodeModules = path.join(process.cwd(), "node_modules");
     const activeViberootsNodeModules = path.join(activeViberootsRoot, "node_modules");
     const viberootsSourceNodeModules = path.join(viberootsSourceRoot, "node_modules");
-    const viberootsInputNodeModules = path.join(viberootsInputPath, "node_modules");
+    const viberootsInputNodeModules = path.join(viberootsInput.storePath, "node_modules");
     applyTempNodePath(exportEnv, [
       wsNodeModules,
       activeViberootsNodeModules,
@@ -1303,7 +1392,7 @@ export async function runInTemp<T>(
   exportEnv.BUCK_TEST_SRC = tmp;
   exportEnv.VIBEROOTS_ROOT = viberootsSourceRoot;
   exportEnv.VIBEROOTS_SOURCE_ROOT = viberootsSourceRoot;
-  exportEnv.VIBEROOTS_FLAKE_INPUT_ROOT = viberootsInputPath;
+  exportEnv.VIBEROOTS_FLAKE_INPUT_ROOT = viberootsInput.storePath;
   exportEnv.VBR_RUN_IN_TEMP_REPO = "1";
   exportEnv.SCAF_ALLOW_LIVE_REPO = "1";
   exportEnv.BUCK_ISOLATION_DIR = tempNestedIso;
@@ -1506,4 +1595,19 @@ export async function runInScratchTemp<T>(
   fn: (tmp: string, $: any) => Promise<T>,
 ): Promise<T> {
   return await runInTemp(name, fn, { workspace: "scratch", git: false });
+}
+
+export async function reconcileTempDependencyInputs(
+  tmp: string,
+  $tmp: any,
+  sourceRoot = String(process.env.VIBEROOTS_SOURCE_ROOT || process.env.VIBEROOTS_ROOT || ""),
+): Promise<void> {
+  const canonicalSourceRoot = sourceRoot
+    ? await fsp.realpath(sourceRoot).catch(() => path.resolve(sourceRoot))
+    : await activeViberootsRootFromWorkspace();
+  const updateTool = path.join(canonicalSourceRoot, "build-tools", "tools", "dev", "update.ts");
+  if (!(await pathExists(updateTool))) {
+    throw new Error(`runInTemp: production u entry is missing: ${updateTool}`);
+  }
+  await $tmp({ cwd: tmp, stdio: "inherit" })`zx-wrapper ${updateTool}`;
 }

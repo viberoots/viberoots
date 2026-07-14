@@ -81,6 +81,7 @@ in
   isHiddenViberootsGeneratedRoot "buck" ||
   isHiddenViberootsGeneratedRoot "cache" ||
   isHiddenViberootsGeneratedRoot "codex-logs" ||
+  isHiddenViberootsGeneratedRoot "codex-test-logs" ||
   isWorkspaceGeneratedRoot ".viberoots" ||
   isWorkspaceGeneratedRoot "backups" ||
   isWorkspaceGeneratedRoot "buck" ||

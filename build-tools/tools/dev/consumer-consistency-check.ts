@@ -2,9 +2,17 @@
 import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import { findRepoRoot } from "../lib/repo";
 import { inferBootstrapConsumerModeSync } from "../lib/consumer-source-mode";
+import { buckconfig } from "../lib/consumer-bootstrap";
+import { envrc } from "../lib/consumer-direnv";
+import {
+  guardedConsumerTrackedPaths,
+  staleConsumerTrackedInput,
+  type GuardedConsumerTrackedPath,
+} from "../lib/consumer-tracked-inputs";
 import { discoverImportersWithLock } from "./install/importers";
 import { buildToolPath, zxInitPath } from "./dev-build/paths";
 import { envWithResolvedNixBin } from "../lib/tool-paths";
@@ -57,11 +65,7 @@ async function submoduleHead(repoRoot: string): Promise<string> {
 }
 
 function fail(message: string, repair: string): never {
-  console.error(`error: ${message}`);
-  console.error("");
-  console.error("repair:");
-  console.error(`  ${repair}`);
-  process.exit(1);
+  throw new Error(`error: ${message}\n\nrepair: run ${repair}`);
 }
 
 async function runReadOnlyPnpmChecks(repoRoot: string): Promise<void> {
@@ -87,35 +91,54 @@ async function runReadOnlyPnpmChecks(repoRoot: string): Promise<void> {
       const detail = [e.stderr, e.stdout].map((part) => String(part || "").trim()).filter(Boolean);
       fail(
         `tracked pnpm hash metadata is stale for ${lockfile}${detail.length ? `\n\n${detail.join("\n")}` : ""}`,
-        "viberoots update",
+        "u",
       );
     }
   }
 }
 
-async function main(): Promise<void> {
-  const repoRoot = await findRepoRoot(process.cwd());
+async function assertPostCloneGeneratedFilesReady(
+  repoRoot: string,
+  mode: "flake" | "submodule",
+): Promise<void> {
+  const trackedContent: Partial<Record<GuardedConsumerTrackedPath, string>> = {};
+  for (const rel of guardedConsumerTrackedPaths) {
+    const tracked = await gitOutput(repoRoot, ["ls-files", "--error-unmatch", "--", rel])
+      .then(() => true)
+      .catch(() => false);
+    if (!tracked) continue;
+    trackedContent[rel] = await fsp.readFile(path.join(repoRoot, rel), "utf8").catch(() => "");
+  }
+  const stale = staleConsumerTrackedInput({
+    tracked: trackedContent,
+    expectedBuckconfig: buckconfig(mode),
+    expectedEnvrc: envrc(),
+  });
+  if (stale) {
+    fail(`post-clone would refresh stale generated file ${stale}`, "viberoots update");
+  }
+}
+
+export async function checkConsumerConsistency(
+  repoRoot: string,
+  opts: { checkPnpm?: (repoRoot: string) => Promise<void> } = {},
+): Promise<void> {
   const before = await trackedChanges(repoRoot);
   const mode = inferBootstrapConsumerModeSync(repoRoot);
   const gitlink = await gitlinkRev(repoRoot);
-  const submodule = gitlink ? await submoduleHead(repoRoot) : "";
+  const submodule = mode === "submodule" || gitlink ? await submoduleHead(repoRoot) : "";
+  const prospectiveGitlink = mode === "submodule" && submodule ? submodule : gitlink;
   const lockRev = await readRootLockRev(repoRoot);
 
-  if (mode === "submodule" && !gitlink) {
+  if (mode === "submodule" && !prospectiveGitlink) {
     fail(
-      "source mode is submodule but viberoots is not a checked-in gitlink",
-      "viberoots use-submodule --run-install",
+      "source mode is submodule but viberoots has no checkout to stage as a gitlink",
+      "viberoots update",
     );
   }
-  if (gitlink && submodule && gitlink !== submodule) {
+  if (mode === "submodule" && prospectiveGitlink && lockRev && prospectiveGitlink !== lockRev) {
     fail(
-      `viberoots submodule checkout ${submodule} does not match checked-in gitlink ${gitlink}`,
-      "git submodule update --init --recursive viberoots && viberoots update",
-    );
-  }
-  if (gitlink && lockRev && gitlink !== lockRev) {
-    fail(
-      `viberoots submodule gitlink ${gitlink} does not match flake.lock ${lockRev}`,
+      `prospective viberoots gitlink ${prospectiveGitlink} does not match flake.lock ${lockRev}`,
       "viberoots update",
     );
   }
@@ -126,12 +149,13 @@ async function main(): Promise<void> {
     if (currentTarget === "../viberoots") {
       fail(
         "source mode is flake but .viberoots/current points at the submodule",
-        "viberoots use-submodule --run-install",
+        "viberoots update",
       );
     }
   }
 
-  await runReadOnlyPnpmChecks(repoRoot);
+  await assertPostCloneGeneratedFilesReady(repoRoot, mode);
+  await (opts.checkPnpm || runReadOnlyPnpmChecks)(repoRoot);
 
   const after = await trackedChanges(repoRoot);
   if (!sameList(before, after)) {
@@ -143,7 +167,13 @@ async function main(): Promise<void> {
   console.log("viberoots consumer consistency check passed");
 }
 
-void main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});
+async function main(): Promise<void> {
+  await checkConsumerConsistency(await findRepoRoot(process.cwd()));
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
+  void main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+  });
+}

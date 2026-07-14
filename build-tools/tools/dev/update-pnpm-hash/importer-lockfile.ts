@@ -12,7 +12,9 @@ import { externalPnpmStateDirs, removeLegacyImporterPnpmState } from "../../lib/
 import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard";
 import { resolveRepoNodeBin } from "../../lib/repo-node-bin";
 import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
+import { staleMetadataError } from "../install/metadata-mode";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
+import { makeFilteredFlakeRef } from "./filtered-flake";
 import {
   syncLocalPrefetchIntoPnpmStore,
   syncSourcePnpmStoreIntoLocalPrefetch,
@@ -20,7 +22,6 @@ import {
 import {
   cleanupLocalWorkspaceMarker,
   ensureLocalWorkspaceMarker,
-  pnpmFlakeRef,
   preferredPnpmStoreDir,
 } from "./lockfile-shared";
 import { findWorkspacePackageDirs } from "./importer-workspace-packages";
@@ -34,6 +35,7 @@ async function runLockfileCommandsWithGcRetry(opts: {
   fetchTimeout: string;
   homeDir: string;
   storeDir: string;
+  filteredEnv: Record<string, string>;
 }): Promise<void> {
   const viberootsOverrideArgs = opts.viberootsOverride
     ? ["--override-input", "viberoots", opts.viberootsOverride]
@@ -48,6 +50,7 @@ async function runLockfileCommandsWithGcRetry(opts: {
   const nixEnv = withSanitizedInheritedNixConfig(
     envWithResolvedNixBin({
       ...process.env,
+      ...opts.filteredEnv,
       NIX_PNPM_ALLOW_GENERATE: "1",
       NIX_PNPM_FETCH_TIMEOUT: opts.fetchTimeout,
       NODE_OPTIONS: "--no-warnings",
@@ -142,43 +145,6 @@ async function runLockfileCommandsWithGcRetry(opts: {
   }
 }
 
-async function activeViberootsOverride(repoRoot: string): Promise<string> {
-  const workspaceFlake = path.join(repoRoot, ".viberoots", "workspace", "flake.nix");
-  const filteredInput = path.join(repoRoot, ".viberoots", "workspace", "viberoots-flake-input");
-  try {
-    const text = await fsp.readFile(workspaceFlake, "utf8");
-    if (
-      text.includes('viberoots.url = "path:./viberoots-flake-input"') &&
-      fs.existsSync(path.join(filteredInput, "flake.nix"))
-    ) {
-      return "";
-    }
-  } catch {}
-  const candidates = [
-    path.join(repoRoot, "viberoots"),
-    path.join(repoRoot, ".viberoots", "current"),
-    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
-    process.env.VIBEROOTS_SOURCE_ROOT || "",
-    process.env.VIBEROOTS_ROOT || "",
-  ]
-    .map((candidate) => String(candidate || "").trim())
-    .filter(Boolean);
-  for (const candidate of candidates) {
-    const abs = path.resolve(candidate);
-    try {
-      const real = await fsp.realpath(abs).catch(() => abs);
-      if (real.startsWith("/nix/store/")) continue;
-      if (
-        fs.existsSync(path.join(abs, "flake.nix")) &&
-        fs.existsSync(path.join(abs, "build-tools", "tools", "dev", "zx-init.mjs"))
-      ) {
-        return `path:${real}`;
-      }
-    } catch {}
-  }
-  return "";
-}
-
 async function seedImporterLockfileFromRootIfNeeded(opts: {
   repoRoot: string;
   importerAbs: string;
@@ -220,20 +186,31 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
   const { homeDir, storeDir: externalStoreDir } = await externalPnpmStateDirs(importerAbs);
   const { storeDir, usesSharedPrefetch } = preferredPnpmStoreDir(externalStoreDir);
   if (!usesSharedPrefetch) await syncLocalPrefetchIntoPnpmStore(storeDir);
-  const flakeRef = pnpmFlakeRef(opts.repoRoot);
-  const viberootsOverride = await activeViberootsOverride(opts.repoRoot);
   console.log(`[lockfile] generating importer lockfile: ${opts.importer}`);
-  await withHiddenNodeModules(importerAbs, async () => {
-    await runLockfileCommandsWithGcRetry({
-      importerAbs,
-      flakeRef,
-      viberootsOverride,
-      timeoutMs,
-      fetchTimeout,
-      homeDir,
-      storeDir,
-    });
+  const filtered = await makeFilteredFlakeRef({
+    repoRoot: opts.repoRoot,
+    attr: "pnpm",
+    importer: opts.importer,
   });
+  try {
+    await withHiddenNodeModules(importerAbs, async () => {
+      await runLockfileCommandsWithGcRetry({
+        importerAbs,
+        flakeRef: filtered.flakeRef,
+        viberootsOverride: "",
+        timeoutMs,
+        fetchTimeout,
+        homeDir,
+        storeDir,
+        filteredEnv: {
+          WORKSPACE_ROOT: filtered.workspaceRoot,
+          VBR_PNPM_FILTERED_SNAPSHOT_ROOT: filtered.workspaceRoot,
+        },
+      });
+    });
+  } finally {
+    await filtered.cleanup();
+  }
   if (!usesSharedPrefetch) await syncSourcePnpmStoreIntoLocalPrefetch(storeDir);
   await seedImporterLockfileFromRootIfNeeded({ repoRoot: opts.repoRoot, importerAbs });
   await formatImporterLockfile({ repoRoot: opts.repoRoot, importerAbs });
@@ -252,6 +229,19 @@ async function needsFreshImporterLockfile(opts: { repoRoot: string; importer: st
       }).catch(() => true)
     : true;
   return missing || stale;
+}
+
+export async function assertImporterLockfileFresh(opts: {
+  repoRoot: string;
+  importer: string;
+}): Promise<void> {
+  if (await needsFreshImporterLockfile(opts)) {
+    const lockfile = opts.importer === "." ? "pnpm-lock.yaml" : `${opts.importer}/pnpm-lock.yaml`;
+    throw staleMetadataError(
+      lockfile,
+      "package.json and the committed pnpm lock importer require reconciliation",
+    );
+  }
 }
 
 export async function ensureImporterLockfileFreshIfAllowed(opts: {

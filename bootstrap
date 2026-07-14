@@ -27,6 +27,7 @@ if [[ -n "${VBR_REV:-}" || -n "${VIBEROOTS_REV:-}" ]]; then
   rev_explicit=1
 fi
 post_clone="$(env_or_default 0 VBR_POST_CLONE VIBEROOTS_POST_CLONE)"
+update="$(env_or_default 0 VBR_UPDATE VIBEROOTS_UPDATE)"
 ref_explicit=0
 if [[ -n "${VBR_REF:-}" || -n "${VIBEROOTS_REF:-}" ]]; then
   ref_explicit=1
@@ -724,6 +725,10 @@ if [[ "${post_clone}" != "0" && "${post_clone}" != "1" ]]; then
   echo "error: VBR_POST_CLONE must be 0 or 1" >&2
   exit 2
 fi
+if [[ "${update}" != "0" && "${update}" != "1" ]]; then
+  echo "error: VBR_UPDATE must be 0 or 1" >&2
+  exit 2
+fi
 if [[ -n "${rev}" && ! "${rev}" =~ ^[0-9a-fA-F]{40}$ ]]; then
   echo "error: --rev must be a full 40-character commit SHA" >&2
   exit 2
@@ -895,8 +900,10 @@ VBR_REV: ${rev}
 locked:  ${locked_rev}
 
 post-clone is for repairing local ignored state without advancing the checked-in
-viberoots input. Use normal bootstrap or update when you intend to change the
-pin.
+viberoots input.
+no tracked files were modified
+
+repair: run viberoots update
 EOF
     exit 2
   fi
@@ -911,7 +918,10 @@ error: VBR_REV conflicts with submodule-mode post-clone
 VBR_REV: ${rev}
 
 post-clone in submodule mode uses the checked-in submodule gitlink as the
-source of truth. Use normal bootstrap or update when you intend to change pins.
+source of truth.
+no tracked files were modified
+
+repair: run viberoots update
 EOF
     exit 2
   else
@@ -1106,6 +1116,11 @@ run_migrations() {
   fi
 }
 
+run_writable_migrations() {
+  [[ "${post_clone}" != "1" ]] || return 0
+  run_migrations
+}
+
 run_nix_init_consumer_command() {
   local init_tool_url="$1"
   nix_cmd run --refresh --accept-flake-config "${init_tool_url}#viberoots" -- \
@@ -1206,19 +1221,36 @@ bootstrap_ready() {
 
 assert_post_clone_tracked_clean() {
   [[ "${post_clone}" == "1" ]] || return 0
-  git rev-parse --is-inside-work-tree >/dev/null 2>&1 || return 0
-  local changed
-  changed="$(
-    {
-      git diff --name-only -- 2>/dev/null || true
-      git diff --cached --name-only -- 2>/dev/null || true
-    } | awk 'NF && !seen[$0]++'
-  )"
+  local repo_root changed
+  if ! repo_root="$(git rev-parse --show-toplevel 2>/dev/null)"; then
+    cat >&2 <<'EOF'
+error: post-clone could not verify workspace cleanliness
+
+environment failure: Git could not prove the workspace root.
+no tracked files were modified
+
+repair: restore Git worktree access and rerun viberoots post-clone
+EOF
+    exit 1
+  fi
+  if ! changed="$(
+    git -C "${repo_root}" status --short --untracked-files=normal --ignored=no 2>/dev/null
+  )"; then
+    cat >&2 <<'EOF'
+error: post-clone could not verify workspace cleanliness
+
+environment failure: Git could not read workspace status.
+no tracked files were modified
+
+repair: restore Git worktree access and rerun viberoots post-clone
+EOF
+    exit 1
+  fi
   if [[ -z "${changed}" ]]; then
     return 0
   fi
   cat >&2 <<EOF
-error: post-clone mutated tracked workspace metadata
+error: post-clone mutated workspace metadata
 
 ${changed}
 
@@ -1230,6 +1262,33 @@ release the refreshed metadata:
   git add -A && git commit
 EOF
   exit 1
+}
+
+assert_post_clone_required_tracked_inputs() {
+  [[ "${post_clone}" == "1" ]] || return 0
+  if ! git -C "${workspace_root}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    cat >&2 <<'EOF'
+error: post-clone could not prove required tracked workspace inputs
+no tracked files were modified
+
+repair: run viberoots update
+EOF
+    exit 1
+  fi
+  local required_inputs=(".buckroot" ".buckconfig" ".envrc" ".gitignore")
+  local rel
+  for rel in "${required_inputs[@]}"; do
+    if ! git -C "${workspace_root}" ls-files --error-unmatch -- "${rel}" >/dev/null 2>&1 ||
+      [[ ! -f "${workspace_root}/${rel}" ]]; then
+      cat >&2 <<EOF
+error: post-clone found stale tracked generated file ${rel}
+no tracked files were modified
+
+repair: run viberoots update
+EOF
+      exit 1
+    fi
+  done
 }
 
 print_summary() {
@@ -1356,6 +1415,7 @@ if [[ "${dry_run}" == "1" ]]; then
   exit 0
 fi
 
+assert_post_clone_required_tracked_inputs
 ensure_macos_developer_tools
 
 if ! select_nix_bin >/dev/null 2>&1; then
@@ -1420,58 +1480,72 @@ append_trusted_nix_user() {
   local user="$1"
   local custom_conf="/etc/nix/nix.custom.conf"
   local conf="/etc/nix/nix.conf"
-  local script
-  script="$(cat <<'PY'
-import pathlib
-import sys
+  sudo sh -s -- "${conf}" "${custom_conf}" "${user}" <<'SH'
+set -eu
+conf="$1"
+custom_conf="$2"
+user="$3"
+mkdir -p "$(dirname "$conf")" "$(dirname "$custom_conf")"
 
-conf = pathlib.Path(sys.argv[1])
-custom_conf = pathlib.Path(sys.argv[2])
-user = sys.argv[3]
+rewrite_if_changed() {
+  target="$1"
+  candidate="$2"
+  if [ ! -f "$target" ] || ! cmp -s "$target" "$candidate"; then
+    cat "$candidate" > "$target"
+  fi
+  rm -f "$candidate"
+}
 
-def read_text(path):
-    return path.read_text() if path.exists() else ""
+if [ ! -f "$conf" ] || ! awk '
+  $1 == "!include" && $2 == "nix.custom.conf" { found = 1 }
+  END { exit(found ? 0 : 1) }
+' "$conf"; then
+  conf_tmp="$(mktemp "${conf}.tmp.XXXXXX")"
+  awk '
+    { lines[NR] = $0; last = $0 }
+    END {
+      for (i = 1; i <= NR; i++) print lines[i]
+      if (NR > 0 && last !~ /^[[:space:]]*$/) print ""
+      print "!include nix.custom.conf"
+    }
+  ' "$conf" 2>/dev/null > "$conf_tmp" || printf '%s\n' '!include nix.custom.conf' > "$conf_tmp"
+  rewrite_if_changed "$conf" "$conf_tmp"
+fi
 
-def write_if_changed(path, text):
-    path.parent.mkdir(parents=True, exist_ok=True)
-    old_text = read_text(path)
-    if text != old_text:
-        path.write_text(text)
-
-def split_lines(text):
-    return text.splitlines()
-
-conf_text = read_text(conf)
-conf_lines = split_lines(conf_text)
-has_custom_include = any(
-    line.strip().split()[:2] == ["!include", "nix.custom.conf"] for line in conf_lines
-)
-if not has_custom_include:
-    if conf_lines and conf_lines[-1].strip():
-        conf_lines.append("")
-    conf_lines.append("!include nix.custom.conf")
-    write_if_changed(conf, "\n".join(conf_lines) + "\n")
-
-custom_text = read_text(custom_conf)
-lines = split_lines(custom_text)
-for i, line in enumerate(lines):
-    stripped = line.strip()
-    if stripped.startswith("extra-trusted-users") and "=" in stripped:
-        prefix, value = line.split("=", 1)
-        users = value.split()
-        if user not in users:
-            users.append(user)
-        lines[i] = f"{prefix.rstrip()} = {' '.join(users)}"
-        break
-else:
-    if lines and lines[-1].strip():
-        lines.append("")
-    lines.append(f"extra-trusted-users = {user}")
-new_text = "\n".join(lines) + "\n"
-write_if_changed(custom_conf, new_text)
-PY
-)"
-  printf '%s\n' "${script}" | sudo python3 - "${conf}" "${custom_conf}" "${user}"
+custom_tmp="$(mktemp "${custom_conf}.tmp.XXXXXX")"
+awk -v user="$user" '
+  BEGIN { updated = 0 }
+  {
+    line = $0
+    if (!updated && line ~ /^[[:space:]]*extra-trusted-users[[:space:]]*=/) {
+      eq = index(line, "=")
+      prefix = substr(line, 1, eq - 1)
+      sub(/[[:space:]]+$/, "", prefix)
+      value = substr(line, eq + 1)
+      count = split(value, users, /[[:space:]]+/)
+      found = 0
+      rendered = ""
+      for (i = 1; i <= count; i++) {
+        if (users[i] == "") continue
+        if (users[i] == user) found = 1
+        rendered = rendered (rendered == "" ? "" : " ") users[i]
+      }
+      if (!found) rendered = rendered (rendered == "" ? "" : " ") user
+      line = prefix " = " rendered
+      updated = 1
+    }
+    print line
+    last = line
+  }
+  END {
+    if (!updated) {
+      if (NR > 0 && last !~ /^[[:space:]]*$/) print ""
+      print "extra-trusted-users = " user
+    }
+  }
+' "$custom_conf" 2>/dev/null > "$custom_tmp" || printf 'extra-trusted-users = %s\n' "$user" > "$custom_tmp"
+rewrite_if_changed "$custom_conf" "$custom_tmp"
+SH
 }
 
 restart_nix_daemon() {
@@ -1548,12 +1622,42 @@ fi
 assert_viberoots_source_access "${effective_source}"
 
 if bootstrap_ready; then
-  run_migrations
+  run_writable_migrations
+  if [[ "${post_clone}" == "1" || "${update}" == "1" ]]; then
+    record_action "refreshed generated workspace state"
+    if [[ "${mode}" == "flake" ]]; then
+      run_nix_init_consumer
+    elif [[ "${post_clone}" == "1" ]]; then
+      VBR_POST_CLONE=1 ./viberoots/init \
+        --mode submodule \
+        --workspace-name "${workspace_name}" \
+        ${run_install_flag:+"${run_install_flag}"} \
+        ${direnv_allow_flag:+"${direnv_allow_flag}"}
+    else
+      VBR_BOOTSTRAP_PNPM_GENERATE=1 ./viberoots/init \
+        --mode submodule \
+        --workspace-name "${workspace_name}" \
+        ${run_install_flag:+"${run_install_flag}"} \
+        ${direnv_allow_flag:+"${direnv_allow_flag}"}
+    fi
+    if [[ "${run_install}" == "1" ]]; then
+      install_handled_by_setup=1
+    fi
+  elif [[ "${post_clone}" != "1" ]]; then
+    cat >&2 <<'EOF'
+error: this workspace is already initialized
+
+Bootstrap creates a new viberoots workspace. To intentionally advance the
+checked-in viberoots pin and reconcile required metadata, run:
+  viberoots update
+EOF
+    exit 1
+  fi
   assert_post_clone_tracked_clean
   print_summary "already up to date" "${effective_source}"
 elif [[ "${mode}" == "flake" ]]; then
   begin_transaction
-  run_migrations
+  run_writable_migrations
   record_action "ran viberoots init-consumer"
   run_nix_init_consumer
   if [[ "${run_install}" == "1" ]]; then
@@ -1578,7 +1682,7 @@ else
     exit 1
   fi
   begin_transaction
-  run_migrations
+  run_writable_migrations
   if [[ ! -e viberoots ]]; then
     if gitmodules_has_viberoots_submodule; then
       git submodule update --init --recursive viberoots
@@ -1616,7 +1720,10 @@ flake.lock: ${locked_rev}
 gitlink:    ${gitlink_rev}
 
 This repo is in submodule mode, so post-clone will not move the checked-in
-gitlink. Use normal bootstrap or update when you intend to change pins.
+gitlink.
+no tracked files were modified
+
+repair: run viberoots update
 EOF
       exit 1
     fi

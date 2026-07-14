@@ -89,7 +89,7 @@ test(
             : "";
 
           const buildAttr = async (name: string) => {
-            const cmd = `set -euo pipefail; timeout ${timeoutSecs}s nix build "path:${flakeRef}#${name}.${attr}"${viberootsOverrideArgs} --no-link --no-write-lock-file --accept-flake-config --builders "" --print-out-paths`;
+            const cmd = `set -euo pipefail; timeout ${timeoutSecs}s nix build "path:${flakeRef}#${name}.${attr}"${viberootsOverrideArgs} --impure --no-link --no-write-lock-file --accept-flake-config --builders "" --print-out-paths`;
             const result = await $({
               stdio: "pipe",
               env: {

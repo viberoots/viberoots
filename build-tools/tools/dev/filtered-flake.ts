@@ -44,74 +44,85 @@ export async function makeFilteredFlakeRef(opts: {
     tmpBase,
   });
   const workDir = await fsp.realpath(workDirRaw).catch(() => workDirRaw);
-  const snapDir = path.join(workDir, "src");
-  await mkdirWithMacosMetadataExclusion(snapDir);
-  const snapDirReal = await fsp.realpath(snapDir).catch(() => snapDir);
-  const src = path.resolve(opts.workspaceRoot);
-  console.warn(
-    `${opts.logPrefix} creating filtered source snapshot (excludes node_modules, buck-out, etc.)`,
-  );
-  if (filteredFlakeDiagnosticsEnabled()) {
-    const dirty = await readDirtyGitStats(src);
-    if (dirty) {
-      const sample =
-        dirty.sample.length > 0 ? ` sample=${dirty.sample.join(" | ").slice(0, 400)}` : "";
-      console.warn(`${opts.logPrefix} dirty-tree entries=${dirty.entryCount}${sample}`);
-    }
-  }
-  const snapshotStart = Date.now();
-  const rsyncExcludes = filteredFlakeRsyncExcludeArgs();
-  const snapshotSources = defaultFilteredFlakeSnapshotRsyncSources(
-    await existingRelPaths(src, await filteredSnapshotRelPaths(src, opts.target || "")),
-  );
-  await runCommand({
-    command: "rsync",
-    args: ["-a", "--delete", "--relative", ...rsyncExcludes, ...snapshotSources, `${snapDirReal}/`],
-    cwd: src,
-  });
-  await copyWorkspaceGraphIntoSnapshot(src, snapDirReal, opts.graphPath);
-  if (filteredFlakeDiagnosticsEnabled()) {
-    const stats = await readSnapshotStats(snapDirReal);
-    const elapsedMs = Date.now() - snapshotStart;
-    emitTimingDetail("filteredFlake snapshotRsync", elapsedMs);
+  try {
+    const snapDir = path.join(workDir, "src");
+    await mkdirWithMacosMetadataExclusion(snapDir);
+    const snapDirReal = await fsp.realpath(snapDir).catch(() => snapDir);
+    const src = path.resolve(opts.workspaceRoot);
     console.warn(
-      `${opts.logPrefix} snapshot ready in ${formatTimingDuration(elapsedMs)} files=${stats.fileCount} dirs=${stats.dirCount} kb=${stats.kb}`,
+      `${opts.logPrefix} creating filtered source snapshot (excludes node_modules, buck-out, etc.)`,
     );
-  }
-  const hiddenFlake = path.join(snapDirReal, ".viberoots", "workspace", "flake.nix");
-  const rootFlake = path.join(snapDirReal, "flake.nix");
-  const flakeDir = (await fsp
-    .access(hiddenFlake)
-    .then(() => true)
-    .catch(() => false))
-    ? path.dirname(hiddenFlake)
-    : (await fsp
-          .access(rootFlake)
-          .then(() => true)
-          .catch(() => false))
-      ? snapDirReal
-      : "";
-  if (!flakeDir) {
+    if (filteredFlakeDiagnosticsEnabled()) {
+      const dirty = await readDirtyGitStats(src);
+      if (dirty) {
+        const sample =
+          dirty.sample.length > 0 ? ` sample=${dirty.sample.join(" | ").slice(0, 400)}` : "";
+        console.warn(`${opts.logPrefix} dirty-tree entries=${dirty.entryCount}${sample}`);
+      }
+    }
+    const snapshotStart = Date.now();
+    const rsyncExcludes = filteredFlakeRsyncExcludeArgs();
+    const snapshotSources = defaultFilteredFlakeSnapshotRsyncSources(
+      await existingRelPaths(src, await filteredSnapshotRelPaths(src, opts.target || "")),
+    );
+    await runCommand({
+      command: "rsync",
+      args: [
+        "-a",
+        "--delete",
+        "--relative",
+        ...rsyncExcludes,
+        ...snapshotSources,
+        `${snapDirReal}/`,
+      ],
+      cwd: src,
+    });
+    await copyWorkspaceGraphIntoSnapshot(src, snapDirReal, opts.graphPath);
+    if (filteredFlakeDiagnosticsEnabled()) {
+      const stats = await readSnapshotStats(snapDirReal);
+      const elapsedMs = Date.now() - snapshotStart;
+      emitTimingDetail("filteredFlake snapshotRsync", elapsedMs);
+      console.warn(
+        `${opts.logPrefix} snapshot ready in ${formatTimingDuration(elapsedMs)} files=${stats.fileCount} dirs=${stats.dirCount} kb=${stats.kb}`,
+      );
+    }
+    const hiddenFlake = path.join(snapDirReal, ".viberoots", "workspace", "flake.nix");
+    const rootFlake = path.join(snapDirReal, "flake.nix");
+    const flakeDir = (await fsp
+      .access(hiddenFlake)
+      .then(() => true)
+      .catch(() => false))
+      ? path.dirname(hiddenFlake)
+      : (await fsp
+            .access(rootFlake)
+            .then(() => true)
+            .catch(() => false))
+        ? snapDirReal
+        : "";
+    if (!flakeDir) {
+      throw new Error(
+        `${opts.logPrefix} filtered source snapshot is missing .viberoots/workspace/flake.nix and flake.nix`,
+      );
+    }
+    await repairSnapshotViberootsInput({ snapDir: snapDirReal, flakeDir });
+    return {
+      flakeRef: `path:${flakeDir}#${opts.attr}`,
+      workspaceRoot: snapDirReal,
+      cleanup: async () => {
+        await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
+      },
+    };
+  } catch (error) {
     await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
-    throw new Error(
-      `${opts.logPrefix} filtered source snapshot is missing .viberoots/workspace/flake.nix and flake.nix`,
-    );
+    throw error;
   }
-  await repairSnapshotViberootsInput({ snapDir: snapDirReal, flakeDir });
-  return {
-    flakeRef: `path:${flakeDir}#${opts.attr}`,
-    workspaceRoot: snapDirReal,
-    cleanup: async () => {
-      await fsp.rm(workDir, { recursive: true, force: true }).catch(() => {});
-    },
-  };
 }
 
 async function filteredSnapshotRelPaths(root: string, target: string): Promise<string[]> {
   const relPaths = new Set(defaultFilteredFlakeSnapshotRelPaths());
   const importer = targetPackageFromLabel(target);
   if (!importer || importer === ".") return [...relPaths];
-  for (const lockfile of ["pnpm-lock.yaml", "uv.lock"]) {
+  for (const lockfile of ["pnpm-lock.yaml", "uv.lock", "go.mod"]) {
     try {
       await fsp.access(path.join(root, importer, lockfile));
       relPaths.add(importer);

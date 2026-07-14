@@ -102,6 +102,8 @@ test("temp repo buck config uses selected flake input for nix prelude resolution
       nixArgs,
       new RegExp(`path:${selectedInputRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
     );
+    assert.doesNotMatch(nixArgs, /--override-input/);
+    assert.doesNotMatch(nixArgs, new RegExp(`path:${tmp.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}#`));
     assert.doesNotMatch(nixArgs, /path:\/nix\/viberoots/);
   } finally {
     if (oldSourceRoot === undefined) delete process.env.VIBEROOTS_SOURCE_ROOT;

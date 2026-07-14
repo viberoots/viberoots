@@ -105,3 +105,44 @@ test("selected filtered-flake snapshots preserve node hash maps for pnpm targets
     await fsp.rm(root, { recursive: true, force: true });
   }
 });
+
+test("selected filtered-flake snapshots include only the target Go importer", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "selected-filtered-go-root-"));
+  let snapshotRoot = "";
+  try {
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
+    await fsp.writeFile(path.join(root, ".viberoots", "workspace", "flake.nix"), "{}\n", "utf8");
+    for (const importer of ["demo-lib", "unrelated"]) {
+      const importerDir = path.join(root, "projects", "libs", importer);
+      await fsp.mkdir(importerDir, { recursive: true });
+      await fsp.writeFile(path.join(importerDir, "go.mod"), `module example.com/${importer}\n`);
+      await fsp.writeFile(
+        path.join(importerDir, "lib.go"),
+        `package ${importer.replace("-", "")}\n`,
+      );
+    }
+
+    const filtered = await makeFilteredFlakeRef({
+      workspaceRoot: root,
+      attr: "graph-generator-selected",
+      logPrefix: "[test]",
+      target: "//projects/libs/demo-lib:demo-lib",
+    });
+    snapshotRoot = filtered.workspaceRoot;
+    try {
+      assert.equal(
+        await fsp.readFile(
+          path.join(snapshotRoot, "projects", "libs", "demo-lib", "go.mod"),
+          "utf8",
+        ),
+        "module example.com/demo-lib\n",
+      );
+      await assert.rejects(fsp.access(path.join(snapshotRoot, "projects", "libs", "unrelated")));
+    } finally {
+      await filtered.cleanup();
+    }
+  } finally {
+    if (snapshotRoot) await fsp.rm(path.dirname(snapshotRoot), { recursive: true, force: true });
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});

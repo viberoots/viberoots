@@ -40,6 +40,39 @@ async function writeExecutable(file: string, content: string): Promise<void> {
   await fsp.writeFile(file, content, { mode: 0o755 });
 }
 
+async function macosDeveloperToolsEnv(
+  root: string,
+  env: NodeJS.ProcessEnv,
+): Promise<NodeJS.ProcessEnv> {
+  const bin = path.join(root, ".fake-developer-tools");
+  await writeExecutable(
+    path.join(bin, "xcode-select"),
+    '#!/usr/bin/env bash\n[[ "${1:-}" == "-p" ]] && printf "/Applications/Xcode.app/Contents/Developer\\n"\n',
+  );
+  await writeExecutable(
+    path.join(bin, "xcrun"),
+    '#!/usr/bin/env bash\n[[ "${1:-}" == "--find" ]] && printf "/usr/bin/clang\\n" || printf "/Applications/Xcode.app/SDKs/MacOSX.sdk\\n"\n',
+  );
+  return { ...env, PATH: `${bin}:${env.PATH || ""}` };
+}
+
+async function git(root: string, args: string[], env: NodeJS.ProcessEnv = process.env) {
+  const { stdout } = await execFileAsync("git", ["-C", root, ...args], {
+    encoding: "utf8",
+    env,
+  });
+  return String(stdout || "").trim();
+}
+
+async function commitAll(root: string, message: string, env: NodeJS.ProcessEnv) {
+  await git(root, ["add", "."], env);
+  await git(
+    root,
+    ["-c", "user.name=test", "-c", "user.email=test@example.invalid", "commit", "-qm", message],
+    env,
+  );
+}
+
 async function makeOld(file: string): Promise<void> {
   const old = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
   const stat = await fsp.lstat(file);
@@ -68,6 +101,7 @@ test("viberoots bootstrap and update invoke trusted bootstrap URL with VBR overr
   printf 'VBR_RUN_VALIDATE=%s\\n' "\${VBR_RUN_VALIDATE:-}"
   printf 'VBR_DIRENV_ALLOW=%s\\n' "\${VBR_DIRENV_ALLOW:-}"
   printf 'VBR_DRY_RUN=%s\\n' "\${VBR_DRY_RUN:-}"
+  printf 'VBR_UPDATE=%s\\n' "\${VBR_UPDATE:-}"
 } > "\${VBR_CAPTURE_ENV}"
 `,
     );
@@ -116,6 +150,7 @@ test("viberoots bootstrap and update invoke trusted bootstrap URL with VBR overr
       assert.match(envText, /VBR_RUN_VALIDATE=1/);
       assert.match(envText, /VBR_DIRENV_ALLOW=0/);
       assert.match(envText, /VBR_DRY_RUN=1/);
+      assert.match(envText, command === "update" ? /VBR_UPDATE=1/ : /VBR_UPDATE=\n/);
     }
   });
 });
@@ -194,8 +229,15 @@ test("bootstrap keeps post-clone read-only and update as the pnpm metadata mutat
   assert.match(
     bootstrap,
     /assert_post_clone_tracked_clean/,
-    "post-clone must assert tracked files stayed clean before succeeding",
+    "post-clone must assert workspace metadata stayed clean before succeeding",
   );
+  assert.match(bootstrap, /status --short --untracked-files=normal --ignored=no/);
+  assert.match(bootstrap, /git rev-parse --show-toplevel/);
+  assert.match(bootstrap, /post-clone could not verify workspace cleanliness/);
+  assert.match(bootstrap, /update="\$\(env_or_default 0 VBR_UPDATE VIBEROOTS_UPDATE\)"/);
+  assert.match(bootstrap, /VBR_BOOTSTRAP_PNPM_GENERATE=1 \.\/viberoots\/init/);
+  assert.match(bootstrap, /error: this workspace is already initialized[\s\S]*viberoots update/);
+  assert.doesNotMatch(bootstrap, /pnpm update|u --upgrade/);
 });
 
 test("viberoots update defaults to the enclosing workspace root from subdirectories", async () => {
@@ -241,6 +283,207 @@ printf 'VBR_WORKSPACE_ROOT=%s\\n' "\${VBR_WORKSPACE_ROOT:-}" > "\${VBR_CAPTURE_E
       envText,
       new RegExp(`VBR_WORKSPACE_ROOT=${workspace.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
     );
+  });
+});
+
+test("viberoots update advances a submodule pin and reconciles its parent lock", async () => {
+  await withTempWorkspace("viberoots-update-submodule", async (tmp) => {
+    const viberootsRoot = await findViberootsRoot();
+    const remote = path.join(tmp, "remote");
+    const workspace = path.join(tmp, "workspace");
+    const initLog = path.join(tmp, "init.log");
+    const localGitEnv = {
+      ...process.env,
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "protocol.file.allow",
+      GIT_CONFIG_VALUE_0: "always",
+    };
+    await Promise.all([
+      fsp.mkdir(remote, { recursive: true }),
+      fsp.mkdir(workspace, { recursive: true }),
+    ]);
+    await writeExecutable(
+      path.join(remote, "init"),
+      `#!/usr/bin/env bash
+set -euo pipefail
+workspace="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")/.." && pwd)"
+rev="$(git -C "$workspace/viberoots" rev-parse HEAD)"
+printf 'generate=%s args=%s\n' "\${VBR_BOOTSTRAP_PNPM_GENERATE:-}" "$*" >> "\${VBR_TEST_INIT_LOG}"
+printf '{"nodes":{"viberoots":{"locked":{"rev":"%s"}}},"root":"root","version":7}\n' "$rev" > "$workspace/flake.lock"
+`,
+    );
+    await fsp.writeFile(path.join(remote, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
+    await git(remote, ["init", "-q", "--initial-branch=main"], localGitEnv);
+    await commitAll(remote, "fixture: old source", localGitEnv);
+    const oldRev = await git(remote, ["rev-parse", "HEAD"], localGitEnv);
+
+    await git(workspace, ["init", "-q", "--initial-branch=main"], localGitEnv);
+    await git(workspace, ["submodule", "add", "-q", remote, "viberoots"], localGitEnv);
+    await Promise.all([
+      fsp.mkdir(path.join(workspace, "projects"), { recursive: true }),
+      fsp.mkdir(path.join(workspace, ".viberoots", "workspace"), { recursive: true }),
+    ]);
+    await Promise.all([
+      fsp.writeFile(path.join(workspace, ".gitignore"), ".viberoots/\n", "utf8"),
+      fsp.writeFile(path.join(workspace, ".buckroot"), ".\n", "utf8"),
+      fsp.writeFile(path.join(workspace, ".buckconfig"), "[cells]\n", "utf8"),
+      fsp.writeFile(
+        path.join(workspace, ".envrc"),
+        'use flake "path:${PWD}/.viberoots/workspace#default" --override-input viberoots "path:${PWD}/viberoots"\n',
+        "utf8",
+      ),
+      fsp.writeFile(path.join(workspace, "flake.nix"), "{ outputs = _: {}; }\n", "utf8"),
+      fsp.writeFile(
+        path.join(workspace, "flake.lock"),
+        `${JSON.stringify({ nodes: { viberoots: { locked: { rev: oldRev } } } })}\n`,
+        "utf8",
+      ),
+      fsp.writeFile(
+        path.join(workspace, ".viberoots", "workspace", "flake.nix"),
+        'inputs.viberoots.url = "path:./viberoots-flake-input";\n',
+        "utf8",
+      ),
+    ]);
+    await fsp.symlink("../viberoots", path.join(workspace, ".viberoots", "current"));
+    await commitAll(workspace, "fixture: old consumer pin", localGitEnv);
+
+    await fsp.writeFile(path.join(remote, "VERSION"), "new\n", "utf8");
+    await commitAll(remote, "fixture: new source", localGitEnv);
+    const newRev = await git(remote, ["rev-parse", "HEAD"], localGitEnv);
+
+    const bootstrapEnv = await macosDeveloperToolsEnv(tmp, {
+      ...localGitEnv,
+      VBR_UPDATE: "1",
+      VBR_CONSUMER: "submodule",
+      VBR_SUBMODULE_URL: remote,
+      VBR_TRUST_SUBMODULE_URL: "1",
+      VBR_INSTALL_NIX: "0",
+      VBR_TRUST_NIX_USER: "0",
+      VBR_RUN_INSTALL: "0",
+      VBR_DIRENV_ALLOW: "0",
+      VBR_TEST_INIT_LOG: initLog,
+    });
+    const { stdout } = await execFileAsync(
+      "bash",
+      [path.join(viberootsRoot, "bootstrap"), "--workspace-root", workspace],
+      {
+        cwd: workspace,
+        env: bootstrapEnv,
+      },
+    );
+
+    assert.match(stdout, /checked out origin\/main/);
+    assert.equal(await git(path.join(workspace, "viberoots"), ["rev-parse", "HEAD"]), newRev);
+    assert.equal(
+      JSON.parse(await fsp.readFile(path.join(workspace, "flake.lock"), "utf8")).nodes.viberoots
+        .locked.rev,
+      newRev,
+    );
+    assert.deepEqual((await git(workspace, ["diff", "--name-only"])).split("\n"), [
+      "flake.lock",
+      "viberoots",
+    ]);
+    const initText = await fsp.readFile(initLog, "utf8");
+    assert.match(initText, /generate=1 args=.*--mode submodule/);
+    assert.doesNotMatch(initText, /pnpm|u --upgrade/);
+  });
+});
+
+test("viberoots update advances a flake pin without touching an inactive submodule", async () => {
+  await withTempWorkspace("viberoots-update-flake", async (workspace) => {
+    const viberootsRoot = await findViberootsRoot();
+    const fakeBin = path.join(workspace, ".fake-bin");
+    const nixLog = path.join(workspace, ".nix.log");
+    const currentSource = path.join(workspace, ".remote-source");
+    const oldRev = "1111111111111111111111111111111111111111";
+    const newRev = "2222222222222222222222222222222222222222";
+    const viberootsUrl = "git+https://github.com/viberoots/viberoots.git?ref=main";
+    await Promise.all([
+      fsp.mkdir(fakeBin, { recursive: true }),
+      fsp.mkdir(currentSource, { recursive: true }),
+      fsp.mkdir(path.join(workspace, "projects"), { recursive: true }),
+      fsp.mkdir(path.join(workspace, "viberoots"), { recursive: true }),
+      fsp.mkdir(path.join(workspace, ".viberoots", "workspace"), { recursive: true }),
+    ]);
+    await Promise.all([
+      fsp.writeFile(path.join(workspace, ".buckroot"), ".\n", "utf8"),
+      fsp.writeFile(path.join(workspace, ".buckconfig"), "[cells]\n", "utf8"),
+      fsp.writeFile(path.join(workspace, ".envrc"), "use flake ./.viberoots/workspace\n", "utf8"),
+      fsp.writeFile(path.join(workspace, "flake.nix"), "{ outputs = _: {}; }\n", "utf8"),
+      fsp.writeFile(path.join(workspace, "viberoots", "sentinel"), "inactive\n", "utf8"),
+      fsp.writeFile(
+        path.join(workspace, "flake.lock"),
+        `${JSON.stringify({ nodes: { viberoots: { locked: { rev: oldRev } } } })}\n`,
+        "utf8",
+      ),
+      fsp.writeFile(
+        path.join(workspace, ".viberoots", "workspace", "flake.nix"),
+        `inputs.viberoots.url = "${viberootsUrl}";\n`,
+        "utf8",
+      ),
+      fsp.writeFile(
+        path.join(workspace, ".viberoots", "workspace", "flake.lock"),
+        `${JSON.stringify({ nodes: { viberoots: { locked: { rev: oldRev } } } })}\n`,
+        "utf8",
+      ),
+    ]);
+    await fsp.symlink(currentSource, path.join(workspace, ".viberoots", "current"));
+    await writeExecutable(
+      path.join(fakeBin, "nix"),
+      `#!/usr/bin/env bash
+set -euo pipefail
+printf 'nix %s\n' "$*" >> "\${VBR_TEST_NIX_LOG}"
+if [[ "\${1:-}" == "flake" && "\${2:-}" == "metadata" ]]; then
+  printf '{"rev":"${newRev}"}\n'
+elif [[ "\${1:-}" == "run" ]]; then
+  lock='{"nodes":{"viberoots":{"locked":{"rev":"${newRev}"}}},"root":"root","version":7}'
+  printf '%s\n' "$lock" > "\${VBR_TEST_WORKSPACE}/flake.lock"
+  printf '%s\n' "$lock" > "\${VBR_TEST_WORKSPACE}/.viberoots/workspace/flake.lock"
+fi
+`,
+    );
+    const bootstrapEnv = await macosDeveloperToolsEnv(workspace, {
+      ...process.env,
+      PATH: `${fakeBin}:${process.env.PATH || ""}`,
+      VBR_NIX_BIN: path.join(fakeBin, "nix"),
+      NIX_BIN: path.join(fakeBin, "nix"),
+      VBR_UPDATE: "1",
+      VBR_CONSUMER: "flake",
+      VBR_INSTALL_NIX: "0",
+      VBR_TRUST_NIX_USER: "0",
+      VBR_RUN_INSTALL: "0",
+      VBR_DIRENV_ALLOW: "0",
+      VBR_TEST_NIX_LOG: nixLog,
+      VBR_TEST_WORKSPACE: workspace,
+    });
+    const inactiveBefore = await fsp.readFile(path.join(workspace, "viberoots", "sentinel"));
+
+    const { stdout } = await execFileAsync(
+      "bash",
+      [path.join(viberootsRoot, "bootstrap"), "--workspace-root", workspace],
+      {
+        cwd: workspace,
+        env: bootstrapEnv,
+      },
+    );
+
+    assert.match(stdout, /status already up to date/);
+    assert.equal(
+      JSON.parse(await fsp.readFile(path.join(workspace, "flake.lock"), "utf8")).nodes.viberoots
+        .locked.rev,
+      newRev,
+    );
+    assert.deepEqual(
+      await fsp.readFile(path.join(workspace, "viberoots", "sentinel")),
+      inactiveBefore,
+    );
+    const nixText = await fsp.readFile(nixLog, "utf8");
+    assert.match(
+      nixText,
+      /nix flake metadata .*git\+https:\/\/github\.com\/viberoots\/viberoots\.git/,
+    );
+    assert.match(nixText, /nix run .*#viberoots -- init-consumer --mode flake/);
+    assert.doesNotMatch(nixText, /pnpm|u --upgrade|submodule/);
   });
 });
 
@@ -470,6 +713,71 @@ test("standalone post-clone fails clearly for missing and invalid lock state", a
       /full 40-character commit SHA/,
     );
   });
+  await withTempWorkspace("viberoots-post-clone-conflicting-flake-rev", async (workspace) => {
+    const lockedRev = "0123456789abcdef0123456789abcdef01234567";
+    await fsp.writeFile(
+      path.join(workspace, "flake.lock"),
+      JSON.stringify({ nodes: { viberoots: { locked: { rev: lockedRev } } } }, null, 2),
+      "utf8",
+    );
+    await assert.rejects(
+      execFileAsync("bash", [path.join(viberootsRoot, "bootstrap")], {
+        cwd: workspace,
+        env: {
+          ...process.env,
+          VBR_POST_CLONE: "1",
+          VBR_DRY_RUN: "1",
+          VBR_CONSUMER: "flake",
+          VBR_REV: "89abcdef0123456789abcdef0123456789abcdef",
+        },
+      }),
+      /VBR_REV conflicts with checked-in flake\.lock[\s\S]*no tracked files were modified[\s\S]*repair: run viberoots update/,
+    );
+  });
+  await withTempWorkspace("viberoots-post-clone-conflicting-submodule-rev", async (workspace) => {
+    await fsp.writeFile(
+      path.join(workspace, "flake.lock"),
+      JSON.stringify({ nodes: { viberoots: { locked: {} } } }, null, 2),
+      "utf8",
+    );
+    await assert.rejects(
+      execFileAsync("bash", [path.join(viberootsRoot, "bootstrap")], {
+        cwd: workspace,
+        env: {
+          ...process.env,
+          VBR_POST_CLONE: "1",
+          VBR_DRY_RUN: "1",
+          VBR_CONSUMER: "submodule",
+          VBR_REV: "89abcdef0123456789abcdef0123456789abcdef",
+        },
+      }),
+      /VBR_REV conflicts with submodule-mode post-clone[\s\S]*no tracked files were modified[\s\S]*repair: run viberoots update/,
+    );
+  });
+  await withTempWorkspace("viberoots-post-clone-unproven-worktree", async (workspace) => {
+    const lockedRev = "0123456789abcdef0123456789abcdef01234567";
+    await fsp.writeFile(
+      path.join(workspace, "flake.lock"),
+      JSON.stringify({ nodes: { viberoots: { locked: { rev: lockedRev } } } }, null, 2),
+      "utf8",
+    );
+    for (const rel of [".buckroot", ".buckconfig", ".envrc", ".gitignore"]) {
+      await fsp.writeFile(path.join(workspace, rel), "present but unproven\n", "utf8");
+    }
+    await assert.rejects(
+      execFileAsync("bash", [path.join(viberootsRoot, "bootstrap")], {
+        cwd: workspace,
+        env: {
+          ...process.env,
+          VBR_POST_CLONE: "1",
+          VBR_INSTALL_NIX: "0",
+          VBR_TRUST_NIX_USER: "0",
+        },
+      }),
+      /post-clone could not prove required tracked workspace inputs[\s\S]*no tracked files were modified[\s\S]*repair: run viberoots update/,
+    );
+    await assert.rejects(fsp.access(path.join(workspace, ".viberoots")), { code: "ENOENT" });
+  });
 });
 
 test("live bootstrap refuses untrusted custom URL and invalid downloaded content", async () => {
@@ -490,6 +798,21 @@ test("live bootstrap refuses untrusted custom URL and invalid downloaded content
     }),
     /did not look like a shell bootstrap script/,
   );
+});
+
+test("post-clone fetches its dedicated endpoint by default", async () => {
+  let fetched = "";
+  await runLiveBootstrap({
+    command: "post-clone",
+    deps: {
+      fetchText: async (url) => {
+        fetched = url;
+        return "#!/usr/bin/env bash\nexit 0\n";
+      },
+      runCommand: async () => {},
+    },
+  });
+  assert.equal(fetched, "https://viberoots.dev/post-clone");
 });
 
 test("gc plan uses normal nix gc by default and optimization only when requested", async () => {

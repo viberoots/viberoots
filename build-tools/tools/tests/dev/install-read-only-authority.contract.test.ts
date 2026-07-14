@@ -29,5 +29,8 @@ test("post-clone owns a tracked-clean assertion and never authorizes reconciliat
     "utf8",
   );
   assert.match(bootstrap, /assert_post_clone_tracked_clean/);
+  assert.match(bootstrap, /status --short --untracked-files=normal --ignored=no/);
+  assert.match(bootstrap, /git rev-parse --show-toplevel/);
+  assert.match(bootstrap, /post-clone could not verify workspace cleanliness/);
   assert.doesNotMatch(bootstrap, /VBR_POST_CLONE=1\s+VBR_BOOTSTRAP_PNPM_GENERATE=1/);
 });

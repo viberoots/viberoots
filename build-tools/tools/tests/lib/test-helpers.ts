@@ -9,7 +9,12 @@ export { getTimingCountForLabel } from "./test-helpers/timing";
 export { rsyncRepoTo } from "./test-helpers/rsync";
 export { mktemp } from "./test-helpers/tmp";
 export { exists } from "./test-helpers/fs";
-export { runInScratchTemp, runInTemp, workspaceFlakeRef } from "./test-helpers/run-in-temp";
+export {
+  reconcileTempDependencyInputs,
+  runInScratchTemp,
+  runInTemp,
+  workspaceFlakeRef,
+} from "./test-helpers/run-in-temp";
 export {
   buildSelectedOutPath,
   exportGraphInTemp,

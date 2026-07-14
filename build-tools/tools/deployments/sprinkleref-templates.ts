@@ -4,12 +4,12 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { starterInfisicalProfile } from "./infisical-iac-bootstrap-profile-kind";
 import type { SprinkleRefConfigFile } from "./sprinkleref-types";
-import { LOCAL_VALUES_PATH } from "./aws-account-inputs";
+import { PROJECT_LOCAL_CONFIG_PATH as LOCAL_VALUES_PATH } from "./project-config-paths";
 import { findRepoRoot } from "../lib/repo";
 import {
   defaultBootstrapKeychainServiceName,
   defaultRepoKeychainServiceName,
-} from "./infisical-iac-bootstrap-config";
+} from "./bootstrap-starter-defaults";
 
 export const VAULT_DEFAULT = {
   backend: "vault" as const,

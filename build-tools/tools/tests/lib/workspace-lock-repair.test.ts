@@ -6,6 +6,8 @@ import path from "node:path";
 import { test } from "node:test";
 import { repairGeneratedWorkspaceLock } from "../../lib/workspace-lock-repair";
 
+const VALID_NAR_HASH = `sha256-${"A".repeat(43)}=`;
+
 async function withWorkspace(
   prefix: string,
   fn: (workspace: string, lockFile: string) => Promise<void>,
@@ -106,6 +108,144 @@ test("workspace lock repair normalizes generated flake local viberoots url", asy
       await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
       new RegExp(`viberoots\\.url = "path:${source.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}";`),
     );
+  });
+});
+
+test("workspace lock repair preserves an explicit flake input over a visible checkout", async () => {
+  await withWorkspace("vbr-explicit-flake-input", async (workspace, lockFile) => {
+    const explicitInput = path.join(workspace, "immutable-input");
+    await fsp.mkdir(path.join(explicitInput, "build-tools", "tools", "dev"), { recursive: true });
+    await fsp.writeFile(path.join(explicitInput, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
+    await fsp.writeFile(
+      path.join(explicitInput, "build-tools", "tools", "dev", "zx-init.mjs"),
+      "\n",
+    );
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT = explicitInput;
+    const current = lock(workspace, "sha256-old");
+    const candidate = lock(workspace, VALID_NAR_HASH);
+    candidate.nodes.viberoots.locked.path = explicitInput;
+    candidate.nodes.viberoots.original.path = explicitInput;
+    await writeLock(lockFile, current);
+
+    const result = await repairGeneratedWorkspaceLock({
+      workspaceRoot: workspace,
+      deps: { execFile: execReturning(candidate) },
+    });
+
+    assert.deepEqual(result, { status: "repaired", changedInput: "viberoots" });
+    assert.match(
+      await fsp.readFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"), "utf8"),
+      new RegExp(
+        `viberoots\\.url = "path:${explicitInput.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}";`,
+      ),
+    );
+    const repaired = JSON.parse(await fsp.readFile(lockFile, "utf8"));
+    assert.equal(repaired.nodes.viberoots.locked.path, explicitInput);
+    assert.equal(repaired.nodes.viberoots.original.path, explicitInput);
+  });
+});
+
+test("workspace lock repair skips metadata for a matching immutable input", async () => {
+  await withWorkspace("vbr-immutable-input-fresh", async (workspace, lockFile) => {
+    const generated = path.join(workspace, ".viberoots", "workspace");
+    const immutableInput = `/nix/store/${"0".repeat(32)}-source`;
+    await fsp.writeFile(
+      path.join(generated, "flake.nix"),
+      `{ inputs.viberoots.url = "path:${immutableInput}"; outputs = _: {}; }\n`,
+    );
+    const current = lock(workspace, VALID_NAR_HASH);
+    current.nodes.viberoots.locked.path = immutableInput;
+    current.nodes.viberoots.original.path = immutableInput;
+    await writeLock(lockFile, current);
+
+    const result = await repairGeneratedWorkspaceLock({
+      workspaceRoot: workspace,
+      deps: {
+        viberootsSource: immutableInput,
+        immutableSourceAccessible: () => true,
+        execFile: async () => {
+          throw new Error("metadata should not run for a matching immutable input");
+        },
+      },
+    });
+
+    assert.deepEqual(result, { status: "fresh" });
+    assert.deepEqual(JSON.parse(await fsp.readFile(lockFile, "utf8")), current);
+  });
+});
+
+test("workspace lock repair uses metadata when an immutable input is missing its hash", async () => {
+  await withWorkspace("vbr-immutable-input-stale", async (workspace, lockFile) => {
+    const generated = path.join(workspace, ".viberoots", "workspace");
+    const immutableInput = `/nix/store/${"1".repeat(32)}-source`;
+    await fsp.writeFile(
+      path.join(generated, "flake.nix"),
+      `{ inputs.viberoots.url = "path:${immutableInput}"; outputs = _: {}; }\n`,
+      "utf8",
+    );
+    const current = lock(workspace, "sha256-unused");
+    current.nodes.viberoots.locked = { type: "path", path: immutableInput };
+    current.nodes.viberoots.original = { type: "path", path: immutableInput };
+    const repairedHash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+    const candidate = lock(workspace, repairedHash);
+    candidate.nodes.viberoots.locked.path = immutableInput;
+    candidate.nodes.viberoots.original.path = immutableInput;
+    await writeLock(lockFile, current);
+    let metadataCalls = 0;
+
+    const result = await repairGeneratedWorkspaceLock({
+      workspaceRoot: workspace,
+      deps: {
+        viberootsSource: immutableInput,
+        immutableSourceAccessible: () => true,
+        execFile: async () => {
+          metadataCalls += 1;
+          return execReturning(candidate)();
+        },
+      },
+    });
+
+    assert.equal(metadataCalls, 1);
+    assert.deepEqual(result, { status: "repaired", changedInput: "viberoots" });
+    assert.equal(
+      JSON.parse(await fsp.readFile(lockFile, "utf8")).nodes.viberoots.locked.narHash,
+      repairedHash,
+    );
+  });
+});
+
+test("workspace lock repair uses metadata when an immutable input hash is malformed", async () => {
+  await withWorkspace("vbr-immutable-input-malformed", async (workspace, lockFile) => {
+    const generated = path.join(workspace, ".viberoots", "workspace");
+    const immutableInput = `/nix/store/${"2".repeat(32)}-source`;
+    await fsp.writeFile(
+      path.join(generated, "flake.nix"),
+      `{ inputs.viberoots.url = "path:${immutableInput}"; outputs = _: {}; }\n`,
+      "utf8",
+    );
+    const current = lock(workspace, "sha256-abc=");
+    current.nodes.viberoots.locked.path = immutableInput;
+    current.nodes.viberoots.original.path = immutableInput;
+    const candidate = lock(workspace, VALID_NAR_HASH);
+    candidate.nodes.viberoots.locked.path = immutableInput;
+    candidate.nodes.viberoots.original.path = immutableInput;
+    await writeLock(lockFile, current);
+    let metadataCalls = 0;
+
+    const result = await repairGeneratedWorkspaceLock({
+      workspaceRoot: workspace,
+      deps: {
+        viberootsSource: immutableInput,
+        immutableSourceAccessible: () => true,
+        execFile: async () => {
+          metadataCalls += 1;
+          return execReturning(candidate)();
+        },
+      },
+    });
+
+    assert.equal(metadataCalls, 1);
+    assert.deepEqual(result, { status: "repaired", changedInput: "viberoots" });
   });
 });
 

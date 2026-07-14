@@ -16,7 +16,6 @@ test("runInTemp seed repo does not leak mutations across temp repos", async () =
   const targetRel = path.join(".viberoots", "workspace", "flake.nix");
   const realPath = path.join(realRepoRoot, targetRel);
   const original = await fsp.readFile(realPath, "utf8");
-
   await runInTemp("seed-isolation-1", async (tmp) => {
     const p = path.join(tmp, targetRel);
     await fsp.access(p, fs.constants.W_OK);
@@ -24,6 +23,12 @@ test("runInTemp seed repo does not leak mutations across temp repos", async () =
   });
 
   await runInTemp("seed-isolation-2", async (tmp, _$) => {
+    assert.ok(
+      process.env.VIBEROOTS_FLAKE_INPUT_ROOT,
+      "expected runInTemp to provide VIBEROOTS_FLAKE_INPUT_ROOT",
+    );
+    const expectedInputRoot = await fsp.realpath(process.env.VIBEROOTS_FLAKE_INPUT_ROOT);
+    assert.match(expectedInputRoot, /^\/nix\/store\/[a-z0-9]{32}-source$/);
     const p = path.join(tmp, targetRel);
     const now = await fsp.readFile(p, "utf8");
     const activeSourceRoot =
@@ -49,14 +54,13 @@ test("runInTemp seed repo does not leak mutations across temp repos", async () =
       cwd: tmp,
       stdio: "pipe",
     })`git show ${`HEAD:${tempModulesRel}`}`;
-    const expectedInputRoot = process.env.VBR_TEST_SEED_STORE_PATH
-      ? await fsp
-          .realpath(path.join(process.env.VBR_TEST_SEED_STORE_PATH, "viberoots"))
-          .catch(() => path.join(process.env.VBR_TEST_SEED_STORE_PATH!, "viberoots"))
-      : path.join(tmp, "viberoots");
-    assert.ok(
-      now.includes(`viberoots.url = "path:${expectedInputRoot}"`),
-      "expected temp repo workspace flake to point at the stable viberoots flake input source",
+    const inputMatch = now.match(/viberoots\.url = "path:([^"]+)"/);
+    assert.ok(inputMatch, "expected temp repo workspace flake to declare viberoots input");
+    const immutableInputRoot = inputMatch[1];
+    assert.equal(
+      immutableInputRoot,
+      expectedInputRoot,
+      "expected temp repo workspace flake to point at the canonical immutable viberoots source",
     );
     assert.ok(
       !now.includes(`viberoots.url = "path:${path.join(realRepoRoot, "viberoots")}"`),

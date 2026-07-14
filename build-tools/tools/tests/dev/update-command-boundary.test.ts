@@ -12,15 +12,16 @@ test("language repair creates conservative Go and Python lock metadata", async (
   const goDir = path.join(root, "projects/apps/go-app");
   const pythonDir = path.join(root, "projects/apps/python-app");
   const fakeGo = path.join(root, "fake-go.sh");
-  const fakeUv = path.join(root, "fake-uv.sh");
   const priorRoot = process.env.WORKSPACE_ROOT;
   const priorGo = process.env.UPDATE_GO_BIN;
-  const priorUv = process.env.UPDATE_UV_BIN;
   try {
     await fsp.mkdir(goDir, { recursive: true });
     await fsp.mkdir(pythonDir, { recursive: true });
     await fsp.writeFile(path.join(goDir, "go.mod"), "module example.test/go-app\n");
-    await fsp.writeFile(path.join(pythonDir, "pyproject.toml"), "[project]\nname='python-app'\n");
+    await fsp.writeFile(
+      path.join(pythonDir, "pyproject.toml"),
+      "[project]\nname='python-app'\nversion='0.1.0'\n",
+    );
     await fsp.writeFile(
       fakeGo,
       `#!/usr/bin/env bash
@@ -28,19 +29,9 @@ set -euo pipefail
 if [[ "$*" != "mod tidy -diff" ]]; then : > go.sum; fi
 `,
     );
-    await fsp.writeFile(
-      fakeUv,
-      `#!/usr/bin/env bash
-set -euo pipefail
-[[ "$*" == "lock" ]]
-printf 'version = 1\n' > uv.lock
-`,
-    );
     await fsp.chmod(fakeGo, 0o755);
-    await fsp.chmod(fakeUv, 0o755);
     process.env.WORKSPACE_ROOT = root;
     process.env.UPDATE_GO_BIN = fakeGo;
-    process.env.UPDATE_UV_BIN = fakeUv;
 
     await repairGoDependencies(root, false);
     await repairPythonDependencies(root, false);
@@ -50,14 +41,12 @@ printf 'version = 1\n' > uv.lock
       await fsp.readFile(path.join(goDir, "gomod2nix.toml"), "utf8"),
       "schema = 3\n\n[mod]\n",
     );
-    assert.equal(await fsp.readFile(path.join(pythonDir, "uv.lock"), "utf8"), "version = 1\n");
+    assert.match(await fsp.readFile(path.join(pythonDir, "uv.lock"), "utf8"), /^version = 1$/m);
   } finally {
     if (priorRoot === undefined) delete process.env.WORKSPACE_ROOT;
     else process.env.WORKSPACE_ROOT = priorRoot;
     if (priorGo === undefined) delete process.env.UPDATE_GO_BIN;
     else process.env.UPDATE_GO_BIN = priorGo;
-    if (priorUv === undefined) delete process.env.UPDATE_UV_BIN;
-    else process.env.UPDATE_UV_BIN = priorUv;
     await fsp.rm(root, { recursive: true, force: true });
   }
 });

@@ -5,6 +5,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
 import { runInTemp } from "../lib/test-helpers/run-in-temp";
+import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 
 const execFileAsync = promisify(execFile);
 const gitIdentity = ["-c", "user.name=Test", "-c", "user.email=test@example.com"];
@@ -80,7 +81,7 @@ test("real i and post-clone preserve tracked state on current and stale metadata
       manifest,
       "[project]\nname='stale-python'\nversion='0.0.0'\nrequires-python='>=3.11'\n",
     );
-    await execFileAsync(process.env.INSTALL_DEPS_UV_BIN || "uv", ["lock"], { cwd: project });
+    await execFileAsync(ensureNixStoreToolPathSync("uv"), ["lock"], { cwd: project });
     await commitFixture(root, [manifest, path.join(project, "uv.lock")], "test: valid uv metadata");
     await fsp.appendFile(manifest, "dependencies=['idna==3.10']\n");
     await commitFixture(root, manifest, "test: stale uv metadata");

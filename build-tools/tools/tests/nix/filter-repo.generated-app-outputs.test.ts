@@ -32,7 +32,7 @@ test("filter-repo excludes generated app output directories from flake snapshots
       `expected filter-repo to exclude root ${dir}`,
     );
   }
-  for (const dir of ["buck", "cache", "codex-logs"]) {
+  for (const dir of ["buck", "cache", "codex-logs", "codex-test-logs"]) {
     assert.match(
       file,
       new RegExp(`isHiddenViberootsGeneratedRoot "${dir}"`),

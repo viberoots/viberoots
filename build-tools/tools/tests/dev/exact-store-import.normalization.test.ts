@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("Nix-native pnpm store normalization is deterministic and excludes project links", async () => {
-  const store = await fsp.readFile("build-tools/tools/nix/node-modules/store.nix", "utf8");
+  const store = await fsp.readFile(
+    viberootsSourcePath("build-tools/tools/nix/node-modules/store.nix"),
+    "utf8",
+  );
   assert.match(store, /normalize_pnpm_store_for_fod/);
   assert.match(store, /SELECT hex\(CAST\(key AS BLOB\)\)[\s\S]*ORDER BY key/);
   assert.match(

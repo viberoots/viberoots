@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { promisify } from "node:util";
 import { withSanitizedInheritedNixConfig } from "./nix-config-env";
+import { isCanonicalSha256SRI } from "./nix-sri";
 import { envWithResolvedNixBin, resolveToolPathSync } from "./tool-paths";
 import { alignGeneratedWorkspaceFlakeInput } from "./workspace-flake-repair";
 
@@ -17,7 +18,12 @@ export type WorkspaceLockRepairOptions = {
   deps?: WorkspaceLockRepairDeps;
 };
 
-export type WorkspaceLockRepairDeps = { execFile?: typeof execFileAsync; now?: () => Date };
+export type WorkspaceLockRepairDeps = {
+  execFile?: typeof execFileAsync;
+  now?: () => Date;
+  viberootsSource?: string;
+  immutableSourceAccessible?: (source: string) => boolean;
+};
 
 export type WorkspaceLockRepairResult =
   | { status: "fresh" }
@@ -100,6 +106,43 @@ function usesNormalizedFilteredInput(lock: FlakeLock): boolean {
   );
 }
 
+function usesMatchingImmutableInput(
+  lock: FlakeLock,
+  workspaceFlakeDir: string,
+  viberootsSource: string,
+  sourceAccessible: (source: string) => boolean = (source) =>
+    fs.existsSync(path.join(source, "flake.nix")) &&
+    fs.existsSync(path.join(source, "build-tools", "tools", "dev", "zx-init.mjs")),
+): boolean {
+  if (
+    !/^\/nix\/store\/[a-z0-9]{32}-source$/.test(viberootsSource) ||
+    !sourceAccessible(viberootsSource)
+  ) {
+    return false;
+  }
+  const node = viberootsNode(lock) as
+    | {
+        locked?: { type?: string; path?: string; narHash?: string };
+        original?: { type?: string; path?: string };
+      }
+    | undefined;
+  if (
+    node?.locked?.type !== "path" ||
+    node.locked.path !== viberootsSource ||
+    !isCanonicalSha256SRI(node.locked.narHash) ||
+    node.original?.type !== "path" ||
+    node.original.path !== viberootsSource
+  ) {
+    return false;
+  }
+  try {
+    const flakeText = fs.readFileSync(path.join(workspaceFlakeDir, "flake.nix"), "utf8");
+    return flakeText.includes(`viberoots.url = "path:${viberootsSource}"`);
+  } catch {
+    return false;
+  }
+}
+
 function locksDifferOnlyInViberoots(before: FlakeLock, after: FlakeLock): boolean {
   if (
     stableStringify(cloneWithoutViberoots(before)) !== stableStringify(cloneWithoutViberoots(after))
@@ -150,6 +193,16 @@ function validLocalViberootsSource(workspaceRoot: string): string {
   const workspaceFlakeDir = path.join(workspaceRoot, ".viberoots", "workspace");
   const workspaceFlake = path.join(workspaceFlakeDir, "flake.nix");
   const filteredInput = path.join(workspaceFlakeDir, "viberoots-flake-input");
+  const explicitInput = String(process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "").trim();
+  if (explicitInput) {
+    const canonicalInput = canonicalPath(explicitInput);
+    if (
+      fs.existsSync(path.join(canonicalInput, "flake.nix")) &&
+      fs.existsSync(path.join(canonicalInput, "build-tools", "tools", "dev", "zx-init.mjs"))
+    ) {
+      return canonicalInput;
+    }
+  }
   try {
     const text = fs.readFileSync(workspaceFlake, "utf8");
     if (
@@ -164,7 +217,6 @@ function validLocalViberootsSource(workspaceRoot: string): string {
     path.join(workspaceRoot, "viberoots"),
     process.env.VIBEROOTS_SOURCE_ROOT || "",
     process.env.VIBEROOTS_ROOT || "",
-    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
   ]
     .map((candidate) => String(candidate || "").trim())
     .filter(Boolean);
@@ -251,7 +303,7 @@ export async function repairGeneratedWorkspaceLock(
   if (!(await exists(lockFile))) {
     return { status: "skipped", reason: "missing-generated-workspace-lock" };
   }
-  const viberootsSource = validLocalViberootsSource(workspaceRoot);
+  const viberootsSource = opts.deps?.viberootsSource || validLocalViberootsSource(workspaceRoot);
   if (!viberootsSource) return { status: "skipped", reason: "no-local-viberoots-source" };
 
   const beforeText = await fsp.readFile(lockFile, "utf8");
@@ -280,6 +332,18 @@ export async function repairGeneratedWorkspaceLock(
       return { status: "repaired", changedInput: "viberoots" };
     }
     return { status: "fresh" };
+  }
+  if (
+    usesMatchingImmutableInput(
+      before,
+      workspaceFlakeDir,
+      viberootsSource,
+      opts.deps?.immutableSourceAccessible,
+    )
+  ) {
+    return flakeRepair === "repaired"
+      ? { status: "repaired", changedInput: "viberoots" }
+      : { status: "fresh" };
   }
   const candidateRaw = await metadataLocks({
     workspaceFlakeDir,

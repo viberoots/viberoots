@@ -9,43 +9,9 @@ import { makeFilteredFlakeRef } from "../../dev/filtered-flake";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 // prettier-ignore
-const generatedSnapshotRoots = [".viberoots/buck", ".viberoots/cache", ".viberoots/workspace/buck/unified-pnpm-store", ".viberoots/workspace/buck/codex-test-logs", ".viberoots/workspace/buck/test-logs", ".viberoots/workspace/buck/verify-logs", ".viberoots/workspace/buck/home", ".viberoots/workspace/buck/tmp", ".viberoots/workspace/codex-test-logs", ".viberoots/workspace/install-cache", "buck-out", "node_modules", "dist", "build", "coverage"];
+const generatedSnapshotRoots = [".viberoots/buck", ".viberoots/cache", ".viberoots/codex-test-logs", ".viberoots/workspace/buck/unified-pnpm-store", ".viberoots/workspace/buck/codex-test-logs", ".viberoots/workspace/buck/test-logs", ".viberoots/workspace/buck/verify-logs", ".viberoots/workspace/buck/home", ".viberoots/workspace/buck/tmp", ".viberoots/workspace/codex-test-logs", ".viberoots/workspace/install-cache", "buck-out", "node_modules", "dist", "build", "coverage"];
 
-async function writeMinimalSource(root: string): Promise<void> {
-  await fsp.mkdir(path.join(root, "build-tools", "tools", "dev"), { recursive: true });
-  await fsp.writeFile(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"), "");
-}
-
-test("devshell wrapper prefers workspace current over stale source env", async () => {
-  const workspace = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-shell-")));
-  const currentSource = path.join(workspace, "current-source");
-  const staleSource = path.join(workspace, "stale-source");
-  try {
-    await fsp.mkdir(path.join(workspace, ".viberoots"), { recursive: true });
-    await writeMinimalSource(currentSource);
-    await writeMinimalSource(staleSource);
-    await fsp.symlink(currentSource, path.join(workspace, ".viberoots", "current"));
-
-    const script = `
-set -euo pipefail
-cd "${workspace}"
-export WORKSPACE_ROOT="${workspace}"
-export VIBEROOTS_SOURCE_ROOT="${staleSource}"
-. "${viberootsSourcePath("viberoots/build-tools/tools/bin/devshell.sh")}"
-printf '%s\\n' "$VIBEROOTS_ROOT"
-`;
-    const selected = execFileSync("bash", ["--noprofile", "--norc", "-c", script], {
-      encoding: "utf8",
-    }).trim();
-
-    assert.equal(selected, path.join(workspace, ".viberoots", "current"));
-    assert.notEqual(selected, staleSource);
-  } finally {
-    await fsp.rm(workspace, { recursive: true, force: true });
-  }
-});
-
-test("devshell wires viberoots as a Nix-provided PATH command", async () => {
+test("devshell wires viberoots as a Nix-provided PATH command", async (t) => {
   const devshell = await fsp.readFile(
     viberootsSourcePath("viberoots/build-tools/tools/nix/devshell.nix"),
     "utf8",
@@ -69,16 +35,8 @@ test("devshell wires viberoots as a Nix-provided PATH command", async () => {
   );
   assert.doesNotMatch(packagedCommand, /export NIX_BIN="\$\{pkgs\.nix\}\/bin\/nix"/);
   assert.doesNotMatch(packagedCommand, /export VBR_NIX_BIN="''\$\{VBR_NIX_BIN:-\$NIX_BIN\}"/);
-  assert.match(packagedCommand, /viberootsNodeModules \? null/);
-  assert.match(
-    packagedCommand,
-    /export VIBEROOTS_NODE_PATH="\$\{viberootsNodeModules\}\/node_modules"/,
-  );
-  assert.match(packagedCommand, /export NODE_PATH="\$VIBEROOTS_NODE_PATH/);
-  assert.match(devshell, /viberootsNodeModules \? null/);
-  assert.match(devshell, /viberootsNodePath =/);
-  assert.match(devshell, /export VIBEROOTS_NODE_PATH="\$\{viberootsNodePath\}"/);
-  assert.match(devshell, /export NODE_PATH="\$VIBEROOTS_NODE_PATH/);
+  assert.doesNotMatch(packagedCommand, /viberootsNodeModules|VIBEROOTS_NODE_PATH|NODE_PATH/);
+  assert.doesNotMatch(devshell, /viberootsNodeModules|viberootsNodePath|VIBEROOTS_NODE_PATH/);
   assert.match(devshell, /entry_cwd="\$PWD"/);
   assert.match(devshell, /dev_root="''\$\{WORKSPACE_ROOT:-\$PWD\}"/);
   assert.match(devshell, /dev_root="\$\(cd "\$WORKSPACE_ROOT" && pwd\)"/);
@@ -182,7 +140,43 @@ test("devshell wires viberoots as a Nix-provided PATH command", async () => {
         .split(/\r?\n/)
         .at(-1) || "";
     assert.match(outPath, /^\/nix\/store\/.+-viberoots$/);
-
+    const closure = execFileSync("nix-store", ["--query", "--requisites", outPath], {
+      encoding: "utf8",
+    });
+    assert.doesNotMatch(
+      closure,
+      /node-modules-lock-/,
+      "packaged viberoots command must not retain an eager node_modules closure",
+    );
+    const realizedCommand = await fsp.readFile(path.join(outPath, "bin", "viberoots"), "utf8");
+    const sourceRoot = realizedCommand.match(/helper="([^"]+)\/build-tools\//)?.[1] || "";
+    const fixture = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-minimal-")));
+    t.after(async () => await fsp.rm(fixture, { recursive: true, force: true }));
+    await fsp.writeFile(path.join(fixture, ".buckroot"), ".\n");
+    await fsp.writeFile(path.join(fixture, "flake.nix"), "{ outputs = _: {}; }\n");
+    assert.equal(await fsp.stat(path.join(sourceRoot, "node_modules")).catch(() => null), null);
+    const minimalEnv = {
+      HOME: process.env.HOME,
+      PATH: `${path.join(outPath, "bin")}:/usr/bin:/bin`,
+      WORKSPACE_ROOT: fixture,
+    };
+    const initialized = execFileSync(
+      path.join(outPath, "bin", "viberoots"),
+      ["init-workspace", "--workspace-root", fixture, "--source", sourceRoot, "--json"],
+      { cwd: fixture, encoding: "utf8", env: minimalEnv },
+    );
+    assert.equal(JSON.parse(initialized).workspaceRoot, fixture);
+    const minimalStatus = execFileSync(
+      path.join(outPath, "bin", "viberoots"),
+      ["status", "--json"],
+      {
+        cwd: fixture,
+        encoding: "utf8",
+        env: minimalEnv,
+      },
+    );
+    assert.equal(JSON.parse(minimalStatus).workspaceRoot, fixture);
+    assert.equal(await fsp.stat(path.join(fixture, "node_modules")).catch(() => null), null);
     const script = `
 set -euo pipefail
 cmd="$(command -v viberoots)"
@@ -240,7 +234,7 @@ viberoots resource-graph --help
     assert.equal(
       yamlRun.exitCode,
       0,
-      `expected Nix-provided viberoots to expose packaged node modules for help paths\nstdout:\n${yamlRun.stdout}\nstderr:\n${yamlRun.stderr}`,
+      `expected minimal Nix-provided viberoots help paths to run\nstdout:\n${yamlRun.stdout}\nstderr:\n${yamlRun.stderr}`,
     );
     assert.match(String(yamlRun.stdout || ""), /viberoots commands:/);
     assert.match(String(yamlRun.stdout || ""), /viberoots resource-graph export/);

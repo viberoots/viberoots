@@ -187,3 +187,39 @@ test("spawnVerifyBuck2Tests rejects undeclared remote inputs before remote Buck 
     /BUCK_GRAPH_JSON must be passed through a declared remote input/,
   );
 });
+
+test("spawnVerifyBuck2Tests captures a child close before wait begins", async () => {
+  const proc = new EventEmitter() as EventEmitter & {
+    pid: number;
+    stdout: EventEmitter;
+    stderr: EventEmitter;
+  };
+  proc.pid = 12345;
+  proc.stdout = new EventEmitter();
+  proc.stderr = new EventEmitter();
+  const spawned = spawnVerifyBuck2Tests({
+    root: fs.mkdtempSync(path.join(os.tmpdir(), "vbr-fast-buck-close-")),
+    iso: "v-fast-close",
+    logFile: null,
+    console: "simple",
+    targets: ["//:target"],
+    zxNodeModulesOut: null,
+    threadsOverride: 1,
+    passName: "shared",
+    executionPolicy: parseVerifyExecutionPolicy({ env: {} }),
+    spawnImpl: (() => {
+      queueMicrotask(() => {
+        proc.emit("exit", 0, null);
+        proc.emit("close", 0, null);
+      });
+      return proc;
+    }) as typeof import("node:child_process").spawn,
+  });
+
+  await new Promise<void>((resolve) => setImmediate(resolve));
+  const timeout = new Promise<number>((_, reject) => {
+    const timer = setTimeout(() => reject(new Error("wait missed the child close event")), 1_000);
+    timer.unref();
+  });
+  assert.equal(await Promise.race([spawned.wait(), timeout]), 0);
+});

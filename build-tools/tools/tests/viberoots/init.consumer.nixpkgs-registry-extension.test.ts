@@ -6,8 +6,27 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
+import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
+import { makeFilteredFlakeRef } from "../../dev/filtered-flake";
 
 const execFileAsync = promisify(execFile);
+let immutableInputPromise: Promise<string> | undefined;
+
+async function immutableViberootsInput(viberootsRoot: string): Promise<string> {
+  immutableInputPromise ??= (async () => {
+    const filtered = await makeFilteredFlakeRef({
+      workspaceRoot: viberootsRoot,
+      attr: "viberoots",
+      logPrefix: "[registry-extension]",
+    });
+    try {
+      return (await materializeFilteredViberootsSource(filtered.workspaceRoot)).storePath;
+    } finally {
+      await filtered.cleanup();
+    }
+  })();
+  return immutableInputPromise;
+}
 
 async function findViberootsRoot(): Promise<string> {
   for (const candidate of [path.join(process.cwd(), "viberoots"), process.cwd()]) {
@@ -30,6 +49,7 @@ test("init-consumer generated flakes expose nixpkgs registry extension data", as
   );
   try {
     const viberootsRoot = await findViberootsRoot();
+    const flakeInput = await immutableViberootsInput(viberootsRoot);
     const { stdout, stderr } = await execFileAsync(
       path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots"),
       [
@@ -39,7 +59,7 @@ test("init-consumer generated flakes expose nixpkgs registry extension data", as
         "--workspace-name",
         "registry-extension",
         "--viberoots-url",
-        `path:${viberootsRoot}`,
+        `path:${flakeInput}`,
         "--source",
         viberootsRoot,
         "--no-lock",
@@ -54,6 +74,8 @@ test("init-consumer generated flakes expose nixpkgs registry extension data", as
       path.join(workspace, ".viberoots", "workspace", "flake.nix"),
       "utf8",
     );
+    assert.doesNotMatch(hiddenFlake, /builtins\.toPath root/);
+    assert.match(hiddenFlake, /if root != "" then root else \.\.\/\.\./);
     assert.match(hiddenFlake, /nixpkgs_23_11\.url = "github:NixOS\/nixpkgs\/nixos-23\.11"/);
     assert.match(hiddenFlake, /registryExtensionPath = \.\/nixpkgs-source-registry-extension\.nix/);
     assert.match(hiddenFlake, /import registryExtensionPath \{ inherit inputs; \}/);
@@ -90,6 +112,7 @@ test("consumer registry extension adds a locked input used by a selected target"
   );
   try {
     const viberootsRoot = await findViberootsRoot();
+    const flakeInput = await immutableViberootsInput(viberootsRoot);
     await execFileAsync(
       path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots"),
       [
@@ -99,7 +122,7 @@ test("consumer registry extension adds a locked input used by a selected target"
         "--workspace-name",
         "registry-selected",
         "--viberoots-url",
-        `path:${viberootsRoot}`,
+        `path:${flakeInput}`,
         "--source",
         viberootsRoot,
         "--no-lock",
@@ -206,6 +229,38 @@ test("consumer registry extension adds a locked input used by a selected target"
       buildLog,
       /nixpkgsSourcePlan=pkgs\.zlib -> nixpkgs-23_11 \(nixpkg_pin; rationale=Use consumer extension profile in selected fixture\.\)/,
     );
+  } finally {
+    await fsp.rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("init-consumer rejects mutable external path inputs before writing", async () => {
+  const workspace = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-external-path-")),
+  );
+  try {
+    const viberootsRoot = await findViberootsRoot();
+    await assert.rejects(
+      execFileAsync(
+        path.join(viberootsRoot, "build-tools", "tools", "bin", "viberoots"),
+        [
+          "init-consumer",
+          "--workspace-root",
+          workspace,
+          "--workspace-name",
+          "external-path",
+          "--viberoots-url",
+          `path:${viberootsRoot}`,
+          "--source",
+          viberootsRoot,
+          "--no-lock",
+          "--no-direnv",
+        ],
+        { cwd: workspace, env: { ...process.env, NO_DEV_SHELL: "1" } },
+      ),
+      /refuses mutable external path input[\s\S]*repair: place the checkout/,
+    );
+    await assert.rejects(fsp.access(path.join(workspace, ".viberoots")), { code: "ENOENT" });
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }
