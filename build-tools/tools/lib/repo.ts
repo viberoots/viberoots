@@ -23,6 +23,12 @@ export type WorkspaceRoots = {
   currentPointsToLiveCheckout: boolean;
 };
 
+export type ProjectScanContext = {
+  workspaceRoot: string;
+  projectsRoot: string;
+  buckTestTarget: string;
+};
+
 export async function pathExists(p: string): Promise<boolean> {
   try {
     await fsp.access(p);
@@ -177,6 +183,26 @@ export function resolveWorkspaceRootsSync(opts?: {
     currentStatus: currentExists ? "present" : "missing",
     currentPointsToLiveCheckout,
   };
+}
+
+export function resolveProjectScanContext(opts?: {
+  start?: string;
+  env?: NodeJS.ProcessEnv;
+}): ProjectScanContext {
+  const env = opts?.env || process.env;
+  const roots = resolveWorkspaceRootsSync({ start: opts?.start, env });
+  const workspaceRoot = canonicalPath(roots.workspaceRoot);
+  const projectsRoot = canonicalPath(path.join(workspaceRoot, "projects"));
+  if (!fs.existsSync(projectsRoot) || !projectsRoot.startsWith(`${workspaceRoot}${path.sep}`)) {
+    throw new Error(`project scan root is unavailable or outside the workspace: ${projectsRoot}`);
+  }
+  const buckTestTarget = String(env.BUCK_TEST_TARGET || "").trim();
+  if (!buckTestTarget.includes("workspace_buck//:project_enforcement_")) {
+    throw new Error(
+      `project scan requires generated workspace_buck execution evidence, got ${buckTestTarget || "<missing>"}`,
+    );
+  }
+  return { workspaceRoot, projectsRoot, buckTestTarget };
 }
 
 // Lightweight, synchronous repo root resolver used by zx scripts and helpers.

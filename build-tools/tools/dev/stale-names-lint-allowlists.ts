@@ -6,6 +6,7 @@ const WORKSPACE_STALE_NAMES_CONFIG = "projects/config/stale-names-lint.json";
 export const ALLOWED_PATHS = new Set([
   "build-tools/tools/dev/stale-names-lint.ts",
   "build-tools/tools/dev/stale-names-lint-allowlists.ts",
+  "build-tools/tools/dev/stale-names-scanner.ts",
   "build-tools/tools/tests/linting/no-stale-viberoots-names.enforcement.test.ts",
   "build-tools/tools/tests/deployments/nixos-shared-host.control-plane-service-env.test.ts",
   "docs/history/migrations/repo-rename.md",

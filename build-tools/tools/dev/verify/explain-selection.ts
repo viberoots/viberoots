@@ -25,7 +25,7 @@ export async function runExplainSelection(opts: {
     });
   }
   try {
-    const plan = (opts.resolvePlan || resolveVerifyTargetPlan)({
+    const plan = await (opts.resolvePlan || resolveVerifyTargetPlan)({
       root: opts.root,
       iso,
       targets: opts.selection.targets,

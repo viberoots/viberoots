@@ -2,10 +2,11 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("build consumers do not repair pnpm provisioning state", async () => {
   const nodeModulesBuild = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/node-modules-build.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/node-modules-build.ts"),
     "utf8",
   );
 
@@ -39,12 +40,12 @@ test("ordinary pnpm consumers cannot reconcile committed stores", async () => {
     "build-tools/tools/dev/install/link-node.ts",
   ];
   for (const file of ordinaryFiles) {
-    const source = await fsp.readFile(`viberoots/${file}`, "utf8");
+    const source = await fsp.readFile(viberootsSourcePath(`viberoots/${file}`), "utf8");
     assert.doesNotMatch(source, /prepareFinalPnpmStore|fetchExactPnpmStore|add-fixed/, file);
   }
 
   const probe = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/realized-store.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/realized-store.ts"),
     "utf8",
   );
   assert.match(probe, /"eval"/);
@@ -52,7 +53,10 @@ test("ordinary pnpm consumers cannot reconcile committed stores", async () => {
   assert.match(probe, /probeRealizedFinalPnpmStore\(/);
   assert.doesNotMatch(probe, /prepareFinalPnpmStore|fetchExactPnpmStore|add-fixed/);
 
-  const updater = await fsp.readFile("viberoots/build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
+  const updater = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash.ts"),
+    "utf8",
+  );
   const readOnlyBranch =
     updater.match(/if \(readOnly\) \{\n    if \(!currentHash[\s\S]*?\n    return;\n  \}/)?.[0] ||
     "";
@@ -65,7 +69,7 @@ test("ordinary pnpm consumers cannot reconcile committed stores", async () => {
 
 test("locked Nix pnpm build paths are offline-only", async () => {
   const storeNix = await fsp.readFile(
-    "viberoots/build-tools/tools/nix/node-modules/store.nix",
+    viberootsSourcePath("viberoots/build-tools/tools/nix/node-modules/store.nix"),
     "utf8",
   );
 
@@ -88,15 +92,15 @@ test("locked Nix pnpm build paths are offline-only", async () => {
 
 test("pnpm retry remains scoped to explicit provisioning code", async () => {
   const retrySource = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/pnpm-command-retry.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/pnpm-command-retry.ts"),
     "utf8",
   );
   const importerLockfile = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/importer-lockfile.ts"),
     "utf8",
   );
   const nodeModulesBuild = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/node-modules-build.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/dev/node-modules-build.ts"),
     "utf8",
   );
 

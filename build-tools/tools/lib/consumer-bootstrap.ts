@@ -20,8 +20,10 @@ import {
 import { writeIfChanged } from "./fs-helpers";
 import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 import { withSanitizedInheritedNixConfig } from "./nix-config-env";
+import { writePostCloneWorkspaceLock } from "./post-clone-workspace-lock";
 import { envWithResolvedNixBin, resolveToolPathSync } from "./tool-paths";
 import { activateWorkspace } from "./workspace-activation";
+import { workspaceFlakeInputs } from "./workspace-flake-inputs";
 import {
   mergeViberootsLockNode,
   repairGeneratedWorkspaceLock,
@@ -538,7 +540,26 @@ function assertSupportedLocalPathSource(opts: InitConsumerOptions): void {
 
 function workspaceViberootsUrl(opts: InitConsumerOptions): string {
   if (usesLocalSubmoduleSource(opts)) return "path:./viberoots-flake-input";
+  const immutableInput = postCloneImmutableViberootsInput(opts);
+  if (immutableInput) return `path:${immutableInput}`;
   return opts.viberootsUrl;
+}
+
+function postCloneImmutableViberootsInput(opts: InitConsumerOptions): string {
+  if (!isPostCloneBootstrap(opts)) return "";
+  for (const candidate of [
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT,
+    process.env.VIBEROOTS_SOURCE_ROOT,
+  ]) {
+    const source = String(candidate || "").trim();
+    if (
+      /^\/nix\/store\/[a-z0-9]{32}-source$/.test(source) &&
+      fs.existsSync(path.join(source, "flake.nix"))
+    ) {
+      return source;
+    }
+  }
+  return "";
 }
 
 function rootViberootsUrl(opts: InitConsumerOptions): string {
@@ -578,17 +599,7 @@ function flakeNix(opts: InitConsumerOptions, viberootsUrl = opts.viberootsUrl): 
     "TEST_EXCLUDE_CPP_REQS"
   ];
 
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    nixpkgs_23_11.url = "github:NixOS/nixpkgs/nixos-23.11";
-    buck2.url = "github:facebook/buck2/201beb86106fecdc84e30260b0f1abb5bf576988";
-    gomod2nix.url = "github:nix-community/gomod2nix";
-    gomod2nix.inputs.nixpkgs.follows = "nixpkgs";
-    viberoots.url = "${viberootsUrl}";
-    viberoots.inputs.nixpkgs.follows = "nixpkgs";
-    viberoots.inputs.buck2.follows = "buck2";
-    viberoots.inputs.gomod2nix.follows = "gomod2nix";
-  };
+${workspaceFlakeInputs(viberootsUrl)}
 
   outputs = inputs:
     let
@@ -880,6 +891,19 @@ function selectedNixCommand(): { nixBin: string; nixEnv: NodeJS.ProcessEnv } {
 
 async function runNixFlakeLock(opts: InitConsumerOptions): Promise<void> {
   const filteredViberootsInput = await prepareFilteredViberootsInput(opts.workspaceRoot, opts);
+  if (isPostCloneBootstrap(opts)) {
+    const localInputPath = filteredViberootsInput
+      ? "./viberoots-flake-input"
+      : postCloneImmutableViberootsInput(opts);
+    if (!localInputPath) {
+      throw new Error("post-clone could not establish a canonical local viberoots input");
+    }
+    await writePostCloneWorkspaceLock({
+      workspaceRoot: opts.workspaceRoot,
+      localInputPath,
+    });
+    return;
+  }
   const workspaceFlake = `path:${path.join(opts.workspaceRoot, ".viberoots", "workspace")}`;
   const { nixBin, nixEnv } = selectedNixCommand();
   if (filteredViberootsInput) {
@@ -994,7 +1018,9 @@ Project and application source belongs here.
   await repairCurrentSymlinkForBootstrap(opts.workspaceRoot, opts.sourcePath);
   if (opts.lock !== false) {
     await runNixFlakeLock(opts);
-    await repairGeneratedWorkspaceLock({ workspaceRoot: opts.workspaceRoot });
+    if (!isPostCloneBootstrap(opts)) {
+      await repairGeneratedWorkspaceLock({ workspaceRoot: opts.workspaceRoot });
+    }
   }
   await markBootstrapScaffoldVisibleToGit(opts.workspaceRoot);
   const activation = await activateWorkspace({

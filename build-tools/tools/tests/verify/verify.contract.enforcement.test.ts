@@ -216,6 +216,10 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
     viberootsSourcePath("viberoots/build-tools/tools/dev/verify/verify-passes.ts"),
     "utf8",
   );
+  const verifyPassRunner = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/verify/verify-pass-runner.ts"),
+    "utf8",
+  );
   assert.ok(
     runVerify.includes("activeNestedIsos") &&
       runVerify.includes("onNestedIso:") &&
@@ -223,8 +227,8 @@ test("verify contract: TMPDIR policy + coverage gating + disk gate strings prese
     "expected verify signal cleanup to track active nested Buck isolations",
   );
   assert.ok(
-    verifyPasses.includes("spawned.nestedIso") &&
-      verifyPasses.includes("killBuckIsolation(opts.root, spawned.nestedIso)"),
+    verifyPassRunner.includes("spawned.nestedIso") &&
+      verifyPassRunner.includes("killBuckIsolation(opts.root, spawned.nestedIso)"),
     "expected verify passes to kill child Buck nested isolations after each pass",
   );
   assert.ok(

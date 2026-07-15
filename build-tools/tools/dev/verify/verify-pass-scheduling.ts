@@ -5,7 +5,7 @@ export function isSerialVerifyPass(name: string): boolean {
 }
 
 function isSerialSidecarVerifyPass(name: string): boolean {
-  return name === "enforcement";
+  return name === "enforcement" || name === "project-enforcement";
 }
 
 const BROAD_SHARED_DELAY_TARGET_MIN = 500;

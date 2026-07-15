@@ -1,10 +1,18 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { promisify } from "node:util";
 import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
+import {
+  defaultFilteredFlakeSnapshotRelPaths,
+  defaultFilteredFlakeSnapshotRsyncSources,
+  filteredFlakeRsyncExcludeArgs,
+} from "../../dev/nix-build-filtered-flake-lib";
 import { extractHash } from "../../dev/update-pnpm-hash/nix";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 import {
   buildArgs,
   nixEnv,
@@ -15,6 +23,58 @@ import {
 import { directorySizeKib, runGuardedCommand } from "./pnpm-fixed-store-native-run";
 
 const MAX_KIB = 500 * 1024;
+const FILTERED_SOURCE_MAX_KIB = 64 * 1024;
+const COLD_REBUILD_MAX_KIB = 640 * 1024;
+const execFileAsync = promisify(execFile);
+
+async function immutableProductionSource(liveRoot: string): Promise<string> {
+  const fixture = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-native-pnpm-source-"));
+  const filtered = path.join(fixture, "source");
+  try {
+    const relPaths: string[] = [];
+    for (const rel of defaultFilteredFlakeSnapshotRelPaths()) {
+      if (
+        await fsp.access(path.join(liveRoot, rel)).then(
+          () => true,
+          () => false,
+        )
+      ) {
+        relPaths.push(rel);
+      }
+    }
+    await fsp.mkdir(filtered);
+    assert.notEqual(
+      path.resolve(filtered),
+      path.resolve(liveRoot),
+      "native reconciliation must never hand the raw live repo root to Nix",
+    );
+    await execFileAsync(
+      resolveToolPathSync("rsync"),
+      [
+        "-a",
+        "--delete",
+        "--relative",
+        ...filteredFlakeRsyncExcludeArgs(),
+        ...defaultFilteredFlakeSnapshotRsyncSources(relPaths),
+        `${filtered}/`,
+      ],
+      { cwd: liveRoot, timeout: 30_000 },
+    );
+    assert.ok(
+      (await directorySizeKib(filtered)) <= FILTERED_SOURCE_MAX_KIB,
+      "native reconciliation filtered source must stay below 64 MiB",
+    );
+    const inputRoot = (await materializeFilteredViberootsSource(filtered)).storePath;
+    assert.match(inputRoot, /^\/nix\/store\/[a-z0-9]{32}-source$/);
+    assert.ok(
+      (await directorySizeKib(inputRoot)) <= FILTERED_SOURCE_MAX_KIB,
+      "native reconciliation immutable source must stay below 64 MiB",
+    );
+    return inputRoot;
+  } finally {
+    await fsp.rm(fixture, { recursive: true, force: true });
+  }
+}
 
 function strictGot(stderr: string): string {
   const candidate = mismatchCandidate(stderr);
@@ -56,7 +116,7 @@ test(
       assert.equal(archive.status, 0, archive.stderr);
       const nixpkgsPath = JSON.parse(archive.stdout).path;
       assert.match(nixpkgsPath, /^\/nix\/store\/[a-z0-9]+-source$/);
-      const viberootsPath = (await materializeFilteredViberootsSource(repoRoot())).storePath;
+      const viberootsPath = await immutableProductionSource(repoRoot());
 
       const fixtures = [path.join(root, "candidate-a"), path.join(root, "candidate-b")];
       await Promise.all(
@@ -172,6 +232,9 @@ test(
           },
           fixtureRoot: root,
           diskRoot: "/nix",
+          // A measured cold run peaked at 512.4 MiB while registering 250 MiB
+          // total; allow bounded Nix build/registration overlap only here.
+          maxKib: COLD_REBUILD_MAX_KIB,
         },
       );
       assert.equal(updater.status, 0, updater.stderr);

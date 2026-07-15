@@ -1,17 +1,22 @@
-import { spawnSync } from "node:child_process";
 import process from "node:process";
-import { withGitAutoMaintenanceDisabledEnv } from "../../lib/git-auto-maintenance-env";
-import { dropConfigSuffix, normalizeTargetLabel } from "../../lib/labels";
-import { resolveToolPathSync } from "../../lib/tool-paths";
-import { buildBuckProcessEnvForPolicy } from "./buck2-test-remote-env";
-import { buckCqueryArgsForExecutionPolicy, targetPlatformArgsForPolicy } from "./remote-policy";
+import { normalizeTargetLabel } from "../../lib/labels";
+import { ensureProjectEnforcementRegistration } from "../../lib/project-enforcement-registration";
 import { assertVerifyRemoteTargetsAllowed } from "./remote-target-policy";
 import type { VerifyExecutionPolicy } from "./remote-policy";
+import { isVerifyTargetScan, loadVerifyTargetLabels } from "./target-label-query";
+export {
+  buildCqueryQuery,
+  isBroadVerifyTargetScan,
+  isVerifyTargetScan,
+  loadVerifyTargetLabels,
+  normalizeVerifyTargetLabel,
+} from "./target-label-query";
 
 export const VERIFY_ISOLATED_LABEL = "verify:isolated";
 export const VERIFY_BOUNDED_ISOLATED_LABEL = "verify:isolated-bounded";
 export const VERIFY_BOUNDED_ISOLATED_THREADS = 2;
 export const VERIFY_ENFORCEMENT_LABEL = "verify:enforcement";
+export const VERIFY_PROJECT_ENFORCEMENT_LABEL = "verify:project-enforcement";
 export const VERIFY_MANUAL_LABEL = "verify:manual";
 export const VERIFY_RESOURCE_LIMITED_LABEL = "verify:resource-limited";
 export const VERIFY_RESOURCE_LIMITED_THREADS = 4;
@@ -45,46 +50,6 @@ export type VerifyTargetPlan = {
 };
 export { summarizeVerifyTargetPlan } from "./target-plan-summary";
 
-type CqueryTargetInfo = {
-  labels?: string[];
-};
-
-function cqueryLiteral(target: string): string {
-  return JSON.stringify(String(target || ""));
-}
-
-export function normalizeVerifyTargetLabel(label: string): string {
-  const withoutConfig = dropConfigSuffix(label);
-  if (withoutConfig.startsWith("root//")) return `//${withoutConfig.slice("root//".length)}`;
-  if (withoutConfig.startsWith("@")) return withoutConfig.slice(1);
-  return withoutConfig;
-}
-
-export function buildCqueryQuery(targets: readonly string[]): string {
-  if (targets.length === 1) return cqueryLiteral(targets[0]!);
-  return `set(${targets.map(cqueryLiteral).join(" ")})`;
-}
-
-function isPatternVerifyTarget(target: string): boolean {
-  const trimmed = String(target || "").trim();
-  if (trimmed === "//...") return true;
-  if (trimmed.startsWith("//") && trimmed.endsWith("/...")) return true;
-  if (/^@?[^/]+\/\/\.\.\.$/.test(trimmed)) return true;
-  return /^@?[^/]+\/\/.*\/\.\.\.$/.test(trimmed);
-}
-
-export function isBroadVerifyTargetScan(target: string): boolean {
-  return String(target || "").trim() === "//...";
-}
-
-export function isVerifyTargetScan(target: string): boolean {
-  return isPatternVerifyTarget(target);
-}
-
-function isManualVerifyTarget(labels: readonly string[]): boolean {
-  return labels.includes(VERIFY_MANUAL_LABEL);
-}
-
 type IsolatedPassMode = "batch" | "per-target";
 
 function isolatedPassMode(env: NodeJS.ProcessEnv = process.env): IsolatedPassMode {
@@ -101,9 +66,26 @@ export function planVerifyTargetPasses(
   const isolatedTargets: string[] = [];
   const boundedIsolatedTargets: string[] = [];
   const enforcementTargets: string[] = [];
+  const projectEnforcementTargets: string[] = [];
   const resourceLimitedTargets: string[] = [];
 
   for (const entry of targets) {
+    if (entry.labels.includes(VERIFY_PROJECT_ENFORCEMENT_LABEL)) {
+      const conflicts = [
+        VERIFY_ENFORCEMENT_LABEL,
+        VERIFY_ISOLATED_LABEL,
+        VERIFY_BOUNDED_ISOLATED_LABEL,
+        VERIFY_RESOURCE_LIMITED_LABEL,
+        VERIFY_MANUAL_LABEL,
+      ].filter((label) => entry.labels.includes(label));
+      if (conflicts.length > 0) {
+        throw new Error(
+          `${entry.target} combines ${VERIFY_PROJECT_ENFORCEMENT_LABEL} with conflicting labels: ${conflicts.join(", ")}`,
+        );
+      }
+      projectEnforcementTargets.push(entry.target);
+      continue;
+    }
     if (entry.labels.includes(VERIFY_ISOLATED_LABEL)) {
       isolatedTargets.push(entry.target);
       continue;
@@ -163,117 +145,34 @@ export function planVerifyTargetPasses(
       targets: enforcementTargets,
     });
   }
+  if (projectEnforcementTargets.length > 0) {
+    passes.push({
+      name: "project-enforcement",
+      targets: projectEnforcementTargets,
+      threadsOverride: 1,
+    });
+  }
   if (sharedTargets.length > 0) {
     passes.push({ name: "shared", targets: sharedTargets });
   }
   return passes;
 }
 
-function parseVerifyTargetLabelsJson(stdout: string): Map<string, readonly string[]> {
-  const parsed = JSON.parse(stdout) as Record<string, CqueryTargetInfo>;
-  const out = new Map<string, readonly string[]>();
-  for (const [label, attrs] of Object.entries(parsed || {})) {
-    out.set(normalizeVerifyTargetLabel(label), Array.isArray(attrs?.labels) ? attrs.labels : []);
-  }
-  return out;
-}
-
-function queryVerifyTargetLabels(opts: {
-  root: string;
-  iso: string;
-  query: string;
-  executionPolicy: VerifyExecutionPolicy;
-}): Map<string, readonly string[]> {
-  const buck2Path = resolveToolPathSync("buck2");
-  const result = spawnSync(
-    buck2Path,
-    [
-      "--isolation-dir",
-      opts.iso,
-      "cquery",
-      ...buckCqueryArgsForExecutionPolicy(opts.executionPolicy),
-      ...targetPlatformArgsForPolicy(opts.executionPolicy),
-      "--json",
-      "--output-attribute",
-      "labels",
-      opts.query,
-    ],
-    {
-      cwd: opts.root,
-      env: {
-        ...withGitAutoMaintenanceDisabledEnv(buildBuckProcessEnvForPolicy(opts.executionPolicy)),
-        RUST_LOG:
-          (process.env.RUST_LOG || "warn") +
-          ",buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off",
-        BUCK_LOG:
-          (process.env.BUCK_LOG || "warn") +
-          ",buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off",
-      },
-      encoding: "utf8",
-    },
-  );
-  if (result.status !== 0) {
-    const stderr = String(result.stderr || "").trim();
-    throw new Error(`verify target label cquery failed (${result.status}): ${stderr}`);
-  }
-  return parseVerifyTargetLabelsJson(String(result.stdout || "{}"));
-}
-
-export function loadVerifyTargetLabels(opts: {
+export async function resolveVerifyTargetPlan(opts: {
   root: string;
   iso: string;
   targets: string[];
   executionPolicy: VerifyExecutionPolicy;
-}): VerifyTargetLabels[] {
-  if (opts.targets.length === 0) return [];
-  const explicitTargets = opts.targets.filter((target) => !isPatternVerifyTarget(target));
-  const patternTargets = opts.targets.filter(isPatternVerifyTarget);
-  const resolved = new Map<string, readonly string[]>();
-
-  if (explicitTargets.length > 0) {
-    const labelsByTarget = queryVerifyTargetLabels({
-      root: opts.root,
-      iso: opts.iso,
-      query: buildCqueryQuery(explicitTargets),
-      executionPolicy: opts.executionPolicy,
-    });
-    for (const target of explicitTargets) {
-      const normalizedTarget = normalizeVerifyTargetLabel(target);
-      resolved.set(normalizedTarget, labelsByTarget.get(normalizedTarget) ?? []);
-    }
-  }
-
-  if (patternTargets.length > 0) {
-    const labelsByTarget = queryVerifyTargetLabels({
-      root: opts.root,
-      iso: opts.iso,
-      query: `kind(test, ${buildCqueryQuery(patternTargets)})`,
-      executionPolicy: opts.executionPolicy,
-    });
-    const expandedTargets = [...labelsByTarget.keys()].sort((left, right) =>
-      left.localeCompare(right),
-    );
-    for (const target of expandedTargets) {
-      const labels = labelsByTarget.get(target) ?? [];
-      if (isManualVerifyTarget(labels)) continue;
-      if (!resolved.has(target)) {
-        resolved.set(target, labels);
-      }
-    }
-  }
-
-  return [...resolved.entries()].map(([target, labels]) => ({ target, labels }));
-}
-
-export function resolveVerifyTargetPlan(opts: {
-  root: string;
-  iso: string;
-  targets: string[];
-  executionPolicy: VerifyExecutionPolicy;
-}): VerifyTargetPlan {
+}): Promise<VerifyTargetPlan> {
+  await ensureProjectEnforcementRegistration({ workspaceRoot: opts.root });
   const targetLabels = loadVerifyTargetLabels(opts);
   if (opts.executionPolicy.mode !== "local") {
-    assertVerifyRemoteTargetsAllowed({ ...opts, targets: targetLabels });
+    assertVerifyRemoteTargetsAllowed({
+      ...opts,
+      targets: targetLabels.filter(
+        (entry) => !entry.labels.includes(VERIFY_PROJECT_ENFORCEMENT_LABEL),
+      ),
+    });
   }
   return {
     targetLabels,

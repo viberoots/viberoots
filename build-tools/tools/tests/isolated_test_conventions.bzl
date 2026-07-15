@@ -9,6 +9,7 @@ ISOLATED_TESTS = {
     "build-tools/tools/tests/lib/buck-daemon-cleanup.interrupted.test.ts": True,
     "build-tools/tools/tests/lib/buck-daemon-cleanup.non-disruptive.test.ts": True,
     "build-tools/tools/tests/lib/buck-daemon-cleanup.uninterrupted.test.ts": True,
+    "build-tools/tools/tests/verify/project-enforcement-freshness.integration.test.ts": True,
     "build-tools/tools/tests/viberoots/fresh-clone-post-clone-fail-closed.test.ts": True,
     "build-tools/tools/tests/viberoots/fresh-clone-post-clone-pnpm-stale.test.ts": True,
     "build-tools/tools/tests/viberoots/fresh-clone-post-clone.test.ts": True,

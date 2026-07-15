@@ -4,6 +4,7 @@ import path from "node:path";
 import { writeIfChanged } from "./fs-helpers";
 import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 import { DEFAULT_GRAPH_PATH, WORKSPACE_BUCK_STATE_DIR } from "./workspace-state-paths";
+import { ensureProjectEnforcementRegistration } from "./project-enforcement-registration";
 
 async function writeIfMissing(file: string, text: string): Promise<void> {
   try {
@@ -23,14 +24,5 @@ export async function ensureWorkspaceBuckStatePackage(
   await writeIfMissing(path.join(dir, ".buckconfig"), "[buildfile]\nname = TARGETS\n");
   await writeIfMissing(path.join(workspaceRoot, DEFAULT_GRAPH_PATH), "[]\n");
   await writeIfChanged(path.join(dir, "workspace-root.env"), `WORKSPACE_ROOT=${workspaceRoot}\n`);
-  await writeIfMissing(
-    path.join(dir, "TARGETS"),
-    [
-      'load("@prelude//:rules.bzl", "export_file")',
-      "",
-      'export_file(name = "graph.json", src = "graph.json", visibility = ["PUBLIC"])',
-      'export_file(name = "workspace-root.env", src = "workspace-root.env", visibility = ["PUBLIC"])',
-      "",
-    ].join("\n"),
-  );
+  await ensureProjectEnforcementRegistration({ workspaceRoot });
 }

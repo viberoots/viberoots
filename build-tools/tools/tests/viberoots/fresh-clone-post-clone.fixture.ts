@@ -196,6 +196,7 @@ export async function createFreshCloneFixture(t: TestContext) {
           VBR_INSTALL_NIX: "0",
           VBR_TRUST_NIX_USER: "0",
           VIBEROOTS_TRUST_SUBMODULE_URL: "1",
+          VBR_FAIL_NETWORK_LOCK_RESOLUTION: "1",
           ...(options.lockfile ? { VBR_STALE_PNPM_LOCK: options.lockfile } : {}),
           ...(options.failureMode ? { VBR_FAKE_GIT_FAILURE: options.failureMode } : {}),
         },

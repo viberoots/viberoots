@@ -9,6 +9,7 @@ import {
   resolveRequestedVerifyScope,
 } from "../../dev/verify/requested-scope";
 import type { VerifyArgs } from "../../dev/verify/args";
+import { PROJECT_ENFORCEMENT_TARGETS } from "../../dev/verify/project-enforcement-selection";
 
 const defaultArgs: VerifyArgs = {
   coverage: false,
@@ -35,10 +36,11 @@ test("ALL_TESTS forces the default verify selector to all Buck tests", async () 
 
   assert.equal(resolved.selection.selectorMode, "all-tests");
   assert.equal(resolved.selection.reason, "all-tests-env");
-  assert.deepEqual(
-    resolved.selection.targets,
-    allTestsTargetsForWorkspace({ root: process.cwd(), env }),
-  );
+  assert.deepEqual(resolved.selection.targets, [
+    ...allTestsTargetsForWorkspace({ root: process.cwd(), env }),
+    PROJECT_ENFORCEMENT_TARGETS,
+  ]);
+  assert.equal(resolved.selection.projectEnforcementReason, "full-suite");
 });
 
 test("ALL_TESTS=true is accepted as the all-tests override", async () => {
@@ -57,10 +59,10 @@ test("ALL_TESTS=true is accepted as the all-tests override", async () => {
 
   assert.equal(resolved.selection.selectorMode, "all-tests");
   assert.equal(resolved.selection.requestedDeploymentMode, "never");
-  assert.deepEqual(
-    resolved.selection.targets,
-    allTestsTargetsForWorkspace({ root: process.cwd(), env }),
-  );
+  assert.deepEqual(resolved.selection.targets, [
+    ...allTestsTargetsForWorkspace({ root: process.cwd(), env }),
+    PROJECT_ENFORCEMENT_TARGETS,
+  ]);
 });
 
 test("ALL_TESTS includes local non-infrastructure cells for non-flake installs", async () => {

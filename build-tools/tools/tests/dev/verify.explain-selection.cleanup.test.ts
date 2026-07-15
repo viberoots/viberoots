@@ -28,7 +28,8 @@ test("runExplainSelection kills the explain-selection isolation after printing",
     root: "/repo",
     selection: selectionFixture(),
     executionPolicy,
-    resolvePlan: (opts) => {
+    resolvePlan: async (opts) => {
+      await Promise.resolve();
       calls.push(`policy:${opts.executionPolicy === executionPolicy}`);
       return {
         targetLabels: [{ target: "@viberoots//build-tools/tools/tests/dev:sample", labels: [] }],

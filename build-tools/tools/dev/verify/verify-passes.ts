@@ -1,17 +1,10 @@
-import * as fsp from "node:fs/promises";
-import path from "node:path";
-import { prepareVerifyBuckIsolationMetadata } from "./buck-isolation-metadata";
-import { spawnVerifyBuck2Tests } from "./buck2-test";
-import { previewVerifyNestedBuckIsolation } from "./buck2-test-env";
 import {
   groupVerifyPassesForExecution,
   isSerialVerifyPass,
   splitVerifyPassGroupForStagedStart,
   verifyPassIsolationDir,
 } from "./verify-pass-scheduling";
-import { killBuckIsolation } from "./process-control";
 import { createVerifyProgressReporter, verifyProgressEnabled } from "./progress-line";
-import { startVerifySafetyRails, summarizeVerifySafetyRailsTelemetry } from "./safety-rails";
 import {
   assertVerifyTargetPlanNotEmpty,
   resolveVerifyTargetPlan,
@@ -19,11 +12,7 @@ import {
 } from "./target-passes";
 import type { VerifyExecutionPolicy } from "./remote-policy";
 import { isVbrVerbose } from "../../lib/command-ui";
-
-async function appendVerifyPassLog(file: string | null, line: string): Promise<void> {
-  if (!file) return;
-  await fsp.appendFile(file, `${line}\n`, "utf8").catch(() => {});
-}
+import { appendVerifyPassLog, startVerifyPass } from "./verify-pass-runner";
 
 function terminatePassProcessGroup(pgid: number): void {
   try {
@@ -54,7 +43,7 @@ export async function runVerifyBuckPasses(opts: {
   suppressFailureOutputTail?: () => boolean;
   shouldAbort?: () => boolean;
 }): Promise<number> {
-  const plan = resolveVerifyTargetPlan({
+  const plan = await resolveVerifyTargetPlan({
     root: opts.root,
     iso: opts.iso,
     targets: opts.targets,
@@ -100,92 +89,31 @@ export async function runVerifyBuckPasses(opts: {
 
   const passIndexes = new Map(passes.map((pass, index) => [pass, index]));
   const startPass = async (pass: (typeof passes)[number], passIso = opts.iso) => {
-    if (shouldAbort()) return null;
     const index = passIndexes.get(pass) ?? 0;
-    const passAnalysisDir = path.join(opts.analysisDir, `pass-${index + 1}`);
-    const startMs = Date.now();
-    const startS = Math.floor(startMs / 1000);
-    await appendVerifyPassLog(
-      opts.logFile,
-      `[verify] target pass begin name=${pass.name} index=${index + 1}/${passes.length} iso=${passIso} start_s=${startS} target_count=${pass.targets.length} targets=${pass.targets.join(" ")}`,
-    );
-    await prepareVerifyBuckIsolationMetadata({
+    return await startVerifyPass({
       root: opts.root,
+      baseIso: opts.iso,
       passIso,
-      nestedIso: previewVerifyNestedBuckIsolation(passIso, pass.name),
-    });
-    if (shouldAbort()) return null;
-    const spawned = spawnVerifyBuck2Tests({
-      root: opts.root,
-      iso: passIso,
       logFile: opts.logFile,
       console: opts.console,
-      targets: pass.targets,
+      pass,
+      passIndex: index,
+      passCount: passes.length,
       zxNodeModulesOut: opts.zxNodeModulesOut,
-      threadsOverride: pass.threadsOverride,
-      passName: pass.name,
-      analysisDir: passAnalysisDir,
+      analysisDir: opts.analysisDir,
       executionPolicy: opts.executionPolicy,
       exactOverallTimeoutSecs: opts.exactOverallTimeoutSecs,
       suppressFailureOutputTail: opts.suppressFailureOutputTail,
+      shouldAbort,
+      onPgid: opts.onPgid,
+      onPgidDone: opts.onPgidDone,
+      onNestedIso: opts.onNestedIso,
+      onNestedIsoDone: opts.onNestedIsoDone,
       onProgressStart: (name) => progress.update(name, { status: "running" }),
       onProgressUpdate: (name, state) => progress.update(name, state),
       onProgressStop: (name, status) =>
         progress.update(name, { status: status === 0 ? "done" : "failed" }),
     });
-    opts.onPgid(spawned.pgid);
-    opts.onNestedIso?.(spawned.nestedIso);
-    const rails = await startVerifySafetyRails({
-      root: opts.root,
-      analysisDir: passAnalysisDir,
-      processGroupIdToKill: spawned.pgid,
-      onTrigger: async (reason) =>
-        appendVerifyPassLog(
-          opts.logFile,
-          reason.startsWith("[notice] ")
-            ? `[verify] safety-rails notice: ${reason.slice(9)}`
-            : `[verify] safety-rails stop: ${reason}`,
-        ),
-    });
-    return {
-      pgid: spawned.pgid,
-      wait: async () => {
-        let status = 1;
-        try {
-          status = await spawned.wait();
-        } finally {
-          rails.stop();
-          opts.onPgidDone?.(spawned.pgid);
-          await killBuckIsolation(opts.root, spawned.nestedIso).catch(() => {});
-          opts.onNestedIsoDone?.(spawned.nestedIso);
-          if (passIso !== opts.iso) await killBuckIsolation(opts.root, passIso).catch(() => {});
-        }
-        if (rails.telemetryPath) {
-          const summary = await summarizeVerifySafetyRailsTelemetry(rails.telemetryPath).catch(
-            () => null,
-          );
-          if (summary && summary.samples > 0) {
-            const fmt = (value: number | null) =>
-              value == null ? "?" : Number.isInteger(value) ? String(value) : value.toFixed(2);
-            await appendVerifyPassLog(
-              opts.logFile,
-              `[verify] resource summary pass=${pass.name} samples=${summary.samples} max_load1=${fmt(summary.maxLoad1)} max_load5=${fmt(summary.maxLoad5)} max_processes=${fmt(summary.maxProcessCount)} max_node=${fmt(summary.maxNodeCount)} max_buck=${fmt(summary.maxBuckCount)} max_nix=${fmt(summary.maxNixCount)} max_verify_env=${fmt(summary.maxVerifyEnvCount)} high_load_top_process_samples=${summary.highLoadTopProcessSamples}`,
-            );
-            for (const line of summary.highLoadTopProcessLines) {
-              await appendVerifyPassLog(
-                opts.logFile,
-                `[verify] high-load top-process summary pass=${pass.name} ${line}`,
-              );
-            }
-          }
-        }
-        await appendVerifyPassLog(
-          opts.logFile,
-          `[verify] target pass end name=${pass.name} index=${index + 1}/${passes.length} status=${status} duration_s=${Math.round((Date.now() - startMs) / 1000)}`,
-        );
-        return status;
-      },
-    };
   };
 
   let aggregateStatus = 0;

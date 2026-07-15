@@ -699,6 +699,24 @@ Behavior:
 - The seed key includes workspace root, `HEAD`, `git status --porcelain=v1 -z`, and filter toggles (`TEST_RSYNC_ROOTS`, `TEST_PARTIAL_CLONE_GO_ONLY`, `TEST_EXCLUDE_CPP_REQS`).
 - The seed contents are a filtered working-tree snapshot built from an allowlist that mirrors the temp repo shape.
 
+## Consumer project-enforcement pass
+
+I register source-owned `*.project-enforcement.test.ts` runners as generated tests in the
+`workspace_buck` cell. Registration is refreshed before verify target discovery using only bounded
+filesystem work. Generated `TARGETS` files remain outputs, and registration does not invoke Nix.
+
+The shared changed-path authority injects the complete generated target family for project changes,
+explicit `//projects/...` selectors, unavailable change authority, and full suites. The planner
+deduplicates the result and partitions label `verify:project-enforcement` into a serial sidecar in
+the earliest execution group. This pass runs locally with remote cache reads and writes disabled;
+all other passes retain their selected execution policy.
+
+Generated runners resolve the consumer `projects/` root through workspace-root authority and fail
+closed without generated-target execution evidence. They may scan the live project tree, but
+ordinary build-system tests may not. Admitted runners must be deterministic, read-only, complete in
+30 seconds individually and 60 seconds as a warm pass, and avoid Nix, builds, services, temp
+consumers, dependency caches, and nested Buck daemons.
+
 ## Template-only selector contract (PR-2)
 
 I keep template test selection as a deterministic tool contract before verify/CI wiring.

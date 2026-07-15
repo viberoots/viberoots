@@ -10,6 +10,7 @@ import { promisify } from "node:util";
 import { buckconfig, initConsumer, type ConsumerSourceMode } from "../../lib/consumer-bootstrap";
 import { envrc } from "../../lib/consumer-direnv";
 import { consumerGitignoreEntries } from "../../lib/consumer-tracked-inputs";
+import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
 import { envWithoutSelectedNix } from "../lib/test-helpers";
 
 const execFileAsync = promisify(execFile);
@@ -127,6 +128,61 @@ async function preparePostCloneTrackedInputs(
   await execFileAsync("git", ["add", ".buckroot", ".buckconfig", ".envrc", ".gitignore"], {
     cwd: workspace,
   });
+}
+
+function committedPostCloneLock(rev = "0123456789abcdef0123456789abcdef01234567") {
+  const locked = {
+    narHash: "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+    type: "github",
+  };
+  return {
+    nodes: {
+      buck2: { locked },
+      gomod2nix: { inputs: { nixpkgs: ["nixpkgs"] }, locked },
+      nixpkgs: { locked },
+      nixpkgs_23_11: { locked },
+      root: {
+        inputs: {
+          buck2: "buck2",
+          gomod2nix: "gomod2nix",
+          nixpkgs: "nixpkgs",
+          nixpkgs_23_11: "nixpkgs_23_11",
+          viberoots: "viberoots",
+        },
+      },
+      viberoots: {
+        inputs: { buck2: ["buck2"], gomod2nix: ["gomod2nix"], nixpkgs: ["nixpkgs"] },
+        locked: {
+          narHash: "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+          rev,
+          type: "git",
+          url: "https://github.com/viberoots/viberoots.git",
+        },
+        original: { rev, type: "git", url: "https://github.com/viberoots/viberoots.git" },
+      },
+    },
+    root: "root",
+    version: 7,
+  };
+}
+
+function assertPreservedPostCloneAuthorities(lock: { nodes: Record<string, unknown> }): void {
+  const expected = committedPostCloneLock().nodes as Record<string, unknown>;
+  for (const name of ["root", "buck2", "gomod2nix", "nixpkgs", "nixpkgs_23_11"]) {
+    assert.deepEqual(lock.nodes[name], expected[name]);
+  }
+}
+
+async function materializeMinimalViberootsSource(): Promise<string> {
+  const fixture = await fsp.realpath(
+    await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-immutable-input-")),
+  );
+  try {
+    await fsp.writeFile(path.join(fixture, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
+    return (await materializeFilteredViberootsSource(fixture)).storePath;
+  } finally {
+    await fsp.rm(fixture, { recursive: true, force: true });
+  }
 }
 
 async function writeFakeMacosDeveloperTools(fakeBin: string, log?: string): Promise<void> {
@@ -916,7 +972,9 @@ test("viberoots init-consumer post-clone preserves checked-in flake files", asyn
     await preparePostCloneTrackedInputs(workspace, "flake");
     await fsp.mkdir(fakeBin, { recursive: true });
     await fsp.writeFile(path.join(workspace, "flake.nix"), "checked-in root flake\n", "utf8");
-    await fsp.writeFile(path.join(workspace, "flake.lock"), "checked-in root lock\n", "utf8");
+    const rootLockText = `${JSON.stringify(committedPostCloneLock(), null, 2)}\n`;
+    await fsp.writeFile(path.join(workspace, "flake.lock"), rootLockText, "utf8");
+    await fsp.writeFile(log, "", "utf8");
     await fsp.writeFile(
       path.join(fakeBin, "nix"),
       `#!/usr/bin/env bash
@@ -936,11 +994,14 @@ exit 0
     const oldNoDevShell = process.env.NO_DEV_SHELL;
     const oldVbrNixBin = process.env.VBR_NIX_BIN;
     const oldNixBin = process.env.NIX_BIN;
+    const oldFlakeInputRoot = process.env.VIBEROOTS_FLAKE_INPUT_ROOT;
+    const immutableInput = await materializeMinimalViberootsSource();
     try {
       process.env.PATH = `${fakeBin}${path.delimiter}${process.env.PATH ?? ""}`;
       process.env.NO_DEV_SHELL = "1";
       process.env.VBR_NIX_BIN = path.join(fakeBin, "nix");
       process.env.NIX_BIN = path.join(fakeBin, "nix");
+      process.env.VIBEROOTS_FLAKE_INPUT_ROOT = immutableInput;
       await initConsumer({
         workspaceRoot: workspace,
         workspaceName: "post-clone-preserve-flake",
@@ -957,19 +1018,24 @@ exit 0
       else process.env.VBR_NIX_BIN = oldVbrNixBin;
       if (oldNixBin === undefined) delete process.env.NIX_BIN;
       else process.env.NIX_BIN = oldNixBin;
+      if (oldFlakeInputRoot === undefined) delete process.env.VIBEROOTS_FLAKE_INPUT_ROOT;
+      else process.env.VIBEROOTS_FLAKE_INPUT_ROOT = oldFlakeInputRoot;
     }
 
     const text = await fsp.readFile(log, "utf8");
-    assert.match(text, /nix flake update viberoots/);
+    assert.match(
+      text,
+      /^VBR_POST_CLONE= nix eval --raw --accept-flake-config path:.*\/\.viberoots\/workspace#lib\.viberootsSourcePath\n$/,
+    );
+    assert.doesNotMatch(text, /\bnix flake (?:lock|update|metadata)\b/);
     assert.equal(
       await fsp.readFile(path.join(workspace, "flake.nix"), "utf8"),
       "checked-in root flake\n",
     );
-    assert.equal(
-      await fsp.readFile(path.join(workspace, "flake.lock"), "utf8"),
-      "checked-in root lock\n",
-    );
-    assert.match(await fsp.readFile(hiddenLock, "utf8"), /new-remote-rev/);
+    assert.equal(await fsp.readFile(path.join(workspace, "flake.lock"), "utf8"), rootLockText);
+    const workspaceLock = JSON.parse(await fsp.readFile(hiddenLock, "utf8"));
+    assertPreservedPostCloneAuthorities(workspaceLock);
+    assert.match(workspaceLock.nodes.viberoots.locked.path, /^\/nix\/store\/[a-z0-9]{32}-source$/);
   });
 });
 
@@ -981,7 +1047,12 @@ test("viberoots init-consumer repairs submodule current before locking", async (
     await preparePostCloneTrackedInputs(workspace, "submodule");
     await fsp.mkdir(fakeBin, { recursive: true });
     await fsp.writeFile(path.join(workspace, "flake.nix"), "checked-in root flake\n", "utf8");
-    await fsp.writeFile(path.join(workspace, "flake.lock"), "checked-in root lock\n", "utf8");
+    await fsp.writeFile(
+      path.join(workspace, "flake.lock"),
+      `${JSON.stringify(committedPostCloneLock(), null, 2)}\n`,
+      "utf8",
+    );
+    await fsp.writeFile(log, "", "utf8");
     await fsp.writeFile(
       path.join(fakeBin, "nix"),
       `#!/usr/bin/env bash
@@ -1028,9 +1099,11 @@ exit 0
       else process.env.NIX_BIN = oldNixBin;
     }
 
-    assert.match(await fsp.readFile(log, "utf8"), /nix flake lock/);
+    assert.equal(await fsp.readFile(log, "utf8"), "");
     assert.equal(await fsp.readlink(path.join(workspace, ".viberoots", "current")), "../viberoots");
-    assert.match(await fsp.readFile(hiddenLock, "utf8"), /local-submodule-rev/);
+    const workspaceLock = JSON.parse(await fsp.readFile(hiddenLock, "utf8"));
+    assertPreservedPostCloneAuthorities(workspaceLock);
+    assert.equal(workspaceLock.nodes.viberoots.locked.path, "./viberoots-flake-input");
   });
 });
 

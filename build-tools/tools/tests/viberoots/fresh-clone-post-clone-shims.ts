@@ -21,11 +21,13 @@ if [[ "\${1:-}" == "flake" && "\${2:-}" == "prefetch" ]]; then
   exit 0
 fi
 if [[ "\${1:-}" == "flake" && "\${2:-}" == "metadata" ]]; then
+  if [[ "\${VBR_FAIL_NETWORK_LOCK_RESOLUTION:-}" == "1" ]]; then exit 97; fi
   input_path="$PWD/.viberoots/workspace/viberoots-flake-input"
   printf '{"locks":{"nodes":{"root":{"inputs":{"viberoots":"viberoots"}},"viberoots":{"locked":{"path":"%s","type":"path"},"original":{"path":"%s","type":"path"}}},"root":"root","version":7}}\n' "$input_path" "$input_path"
   exit 0
 fi
 if [[ "\${1:-}" == "flake" && ("\${2:-}" == "lock" || "\${2:-}" == "update") ]]; then
+  if [[ "\${VBR_FAIL_NETWORK_LOCK_RESOLUTION:-}" == "1" ]]; then exit 97; fi
   mkdir -p .viberoots/workspace
   override=""
   prev=""
@@ -35,7 +37,8 @@ if [[ "\${1:-}" == "flake" && ("\${2:-}" == "lock" || "\${2:-}" == "update") ]];
   done
   rev="\${override##*rev=}"
   if [[ ! "$rev" =~ ^[0-9a-fA-F]{40}$ ]]; then rev="$VBR_EXPECTED_REV"; fi
-  printf '{"nodes":{"root":{"inputs":{"viberoots":"viberoots"}},"viberoots":{"locked":{"rev":"%s","type":"git","url":"https://github.com/viberoots/viberoots.git"},"original":{"rev":"%s","type":"git","url":"https://github.com/viberoots/viberoots.git"}}},"root":"root","version":7}\n' "$rev" "$rev" > .viberoots/workspace/flake.lock
+  hash='sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
+  printf '{"nodes":{"buck2":{"locked":{"narHash":"%s","type":"github"}},"gomod2nix":{"inputs":{"nixpkgs":["nixpkgs"]},"locked":{"narHash":"%s","type":"github"}},"nixpkgs":{"locked":{"narHash":"%s","type":"github"}},"nixpkgs_23_11":{"locked":{"narHash":"%s","type":"github"}},"root":{"inputs":{"buck2":"buck2","gomod2nix":"gomod2nix","nixpkgs":"nixpkgs","nixpkgs_23_11":"nixpkgs_23_11","viberoots":"viberoots"}},"viberoots":{"inputs":{"buck2":["buck2"],"gomod2nix":["gomod2nix"],"nixpkgs":["nixpkgs"]},"locked":{"narHash":"%s","rev":"%s","type":"git","url":"https://github.com/viberoots/viberoots.git"},"original":{"rev":"%s","type":"git","url":"https://github.com/viberoots/viberoots.git"}}},"root":"root","version":7}\n' "$hash" "$hash" "$hash" "$hash" "$hash" "$rev" "$rev" > .viberoots/workspace/flake.lock
   exit 0
 fi
 printf 'unexpected nix invocation: %s\n' "$*" >&2

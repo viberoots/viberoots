@@ -173,6 +173,7 @@ export function buckTestArgsForExecutionPolicy(
   policy: VerifyExecutionPolicy,
   passName: string,
 ): string[] {
+  if (passName === "project-enforcement") return ["--local-only", "--no-remote-cache"];
   if (!isRemoteVerifyPolicy(policy)) return [];
   const modeArgs =
     policy.mode === "remote-only-conformance"
@@ -187,6 +188,22 @@ export function buckTestArgsForExecutionPolicy(
     ...modeArgs,
     "--unstable-allow-compatible-tests-on-re",
   ];
+}
+
+export function executionPolicyForVerifyPass(
+  policy: VerifyExecutionPolicy,
+  passName: string,
+): VerifyExecutionPolicy {
+  if (passName !== "project-enforcement") return policy;
+  return {
+    mode: "local",
+    buckConfig: null,
+    system: null,
+    artifactDir: null,
+    activationDir: null,
+    profilePrefix: null,
+    passProfiles: {},
+  };
 }
 
 export function targetPlatformArgsForPolicy(_policy: VerifyExecutionPolicy): string[] {

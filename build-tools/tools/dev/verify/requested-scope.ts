@@ -26,9 +26,9 @@ import {
   type ResolveDeploymentVerifyScopeDeps,
 } from "./deployment-scope";
 import { resolveWorkspaceRootsSync } from "../../lib/repo";
-
+import type { ProjectEnforcementSelectionReason } from "./project-enforcement-selection";
+import { withProjectEnforcement } from "./requested-scope-project-enforcement";
 export type VerifyDeploymentScopeMode = "auto" | "always" | "never";
-
 export type DeploymentVerifySelectionDiagnostics = DeploymentImpactDiagnostics & {
   requestedMode: VerifyDeploymentScopeMode;
   deploymentDomainTargets: string[];
@@ -37,11 +37,11 @@ export type DeploymentVerifySelectionDiagnostics = DeploymentImpactDiagnostics &
   projectImpactDiagnostics: ProjectImpactSelectorDiagnostics | null;
   selectedTargets: string[];
 };
-
 export type VerifyScopeDecision = Omit<
   VerifyTemplateScopeDecision,
   "selectorMode" | "diagnostics"
 > & {
+  projectEnforcementReason: ProjectEnforcementSelectionReason;
   requestedDeploymentMode: VerifyDeploymentScopeMode;
   selectorMode:
     | VerifyTemplateScopeDecision["selectorMode"]
@@ -55,7 +55,6 @@ export type VerifyScopeDecision = Omit<
     | DocumentationImpactDiagnostics
     | null;
 };
-
 type ResolveRequestedVerifyScopeDeps = {
   resolveTemplateScope: typeof resolveVerifyTemplateTestScope;
   collectChangedPaths: typeof collectChangedPaths;
@@ -64,7 +63,6 @@ type ResolveRequestedVerifyScopeDeps = {
   resolveProjectImpactSelection: typeof resolveProjectImpactSelection;
 } & ResolveDocumentationVerifyScopeDeps &
   ResolveDeploymentVerifyScopeDeps;
-
 function isDefaultVerifyTargetSet(targets: string[]): boolean {
   return targets.length === 1 && targets[0] === "//...";
 }
@@ -76,6 +74,7 @@ function withDeploymentMode(
   return {
     ...decision,
     requestedDeploymentMode,
+    projectEnforcementReason: "not-required",
   };
 }
 
@@ -178,15 +177,21 @@ export async function resolveRequestedVerifyScope(opts: {
   ) {
     return {
       args,
-      selection: {
-        requestedMode: "auto",
-        requestedDeploymentMode,
-        selectorMode: "all-tests",
-        targets: allTestsTargetsForWorkspace({ root: opts.root, env }),
-        diagnostics: null,
-        lintFilters: null,
-        reason: "all-tests-env",
-      },
+      selection: await withProjectEnforcement({
+        root: opts.root,
+        args,
+        env,
+        decision: {
+          requestedMode: "auto",
+          requestedDeploymentMode,
+          selectorMode: "all-tests",
+          targets: allTestsTargetsForWorkspace({ root: opts.root, env }),
+          diagnostics: null,
+          lintFilters: null,
+          reason: "all-tests-env",
+          projectEnforcementReason: "not-required",
+        },
+      }),
     };
   }
   const resolveTemplateScope = opts.deps?.resolveTemplateScope || resolveVerifyTemplateTestScope;
@@ -202,7 +207,12 @@ export async function resolveRequestedVerifyScope(opts: {
   if (args.selector !== "default" || !isDefaultVerifyTargetSet(args.targets)) {
     return {
       args,
-      selection: withDeploymentMode(baseDecision, requestedDeploymentMode),
+      selection: await withProjectEnforcement({
+        root: opts.root,
+        args,
+        env,
+        decision: withDeploymentMode(baseDecision, requestedDeploymentMode),
+      }),
     };
   }
   const documentationDecision = await resolveDocumentationOverride({
@@ -215,7 +225,12 @@ export async function resolveRequestedVerifyScope(opts: {
   if (documentationDecision) {
     return {
       args,
-      selection: documentationDecision,
+      selection: await withProjectEnforcement({
+        root: opts.root,
+        args,
+        env,
+        decision: { ...documentationDecision, projectEnforcementReason: "not-required" },
+      }),
     };
   }
   const deploymentDecision = await resolveDeploymentOverride({
@@ -225,8 +240,11 @@ export async function resolveRequestedVerifyScope(opts: {
     requestedDeploymentMode,
     deps: opts.deps,
   });
+  const decision = deploymentDecision
+    ? { ...deploymentDecision, projectEnforcementReason: "not-required" as const }
+    : withDeploymentMode(baseDecision, requestedDeploymentMode);
   return {
     args,
-    selection: deploymentDecision || withDeploymentMode(baseDecision, requestedDeploymentMode),
+    selection: await withProjectEnforcement({ root: opts.root, args, env, decision }),
   };
 }

@@ -76,6 +76,19 @@ active pass group count and total test count in the `Tests:` row, plus `Pass gro
 Use `--json` when a script needs stable fields. The JSON line includes `pass_index`, `pass_total`,
 `group_completed`, and `group_total` when pass-group data is available.
 
+### Project enforcement
+
+`v` and CI add the generated `project-enforcement` pass when the effective change set touches
+`projects/`, an explicit selector addresses `//projects/...`, change authority is unavailable, or a
+full suite is requested. Its source-owned `*.project-enforcement.test.ts` runners are registered in
+the generated `workspace_buck` cell and run in the earliest pass group. They are local-only with
+remote cache reads and writes disabled because they inspect the live consumer tree.
+
+Project-enforcement runners are limited to deterministic, read-only policy scans. They must not
+invoke Nix, build targets, start services, create temp consumers, or populate dependency caches.
+Ordinary tests under `build-tools/tools/tests/` continue to use fixtures or temp consumers instead
+of inspecting live `projects/` contents.
+
 ### Verify helper
 
 - Default scoped verify:

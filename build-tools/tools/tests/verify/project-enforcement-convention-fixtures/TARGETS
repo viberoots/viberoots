@@ -1,0 +1,16 @@
+load(
+    "@viberoots//build-tools/tools/tests:project_enforcement_conventions.bzl",
+    "project_enforcement_convention_probe",
+)
+
+project_enforcement_convention_probe(
+    name = "suffix_without_label",
+    script_path = "alpha.project-enforcement.test.ts",
+    test_labels = [],
+)
+
+project_enforcement_convention_probe(
+    name = "label_without_suffix",
+    script_path = "alpha.test.ts",
+    test_labels = ["verify:project-enforcement"],
+)

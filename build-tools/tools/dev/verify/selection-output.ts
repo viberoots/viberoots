@@ -18,7 +18,7 @@ export function printVerifySelection(
 }
 
 export function summarizeVerifyScopeDecision(d: VerifyScopeDecision): string {
-  const base = `templateRequested=${d.requestedMode} deploymentRequested=${d.requestedDeploymentMode} selector=${d.selectorMode} reason=${d.reason}`;
+  const base = `templateRequested=${d.requestedMode} deploymentRequested=${d.requestedDeploymentMode} selector=${d.selectorMode} reason=${d.reason} projectEnforcement=${d.projectEnforcementReason}`;
   if (!d.diagnostics) return `${base} targetSelectors=${d.targets.length}`;
   if ("deploymentDomainTargets" in d.diagnostics) {
     return `${base} deploymentTargets=${d.diagnostics.deploymentDomainTargets.length} projectTargets=${d.diagnostics.projectTargets.length} targetSelectors=${d.targets.length}`;

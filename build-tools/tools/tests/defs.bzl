@@ -15,6 +15,11 @@ load(
     "isolated_test_convention_for_script",
 )
 load(
+    "@viberoots//build-tools/tools/tests:project_enforcement_conventions.bzl",
+    "project_enforcement_convention_for_script",
+    "validate_project_enforcement_convention",
+)
+load(
     "@viberoots//build-tools/tools/tests:resource_limited_conventions.bzl",
     "resource_limited_convention_for_script",
     "validate_resource_limited_convention",
@@ -64,12 +69,16 @@ def auto_zx_tests(root = "build-tools/tools/tests", patterns = ["**/*.test.ts"])
         isolated_test_convention = isolated_test_convention_for_script(f)
         if isolated_test_convention != None:
             labels = dedupe_preserve(labels + isolated_test_convention.get("labels", []))
+        project_enforcement_convention = project_enforcement_convention_for_script(f)
+        if project_enforcement_convention != None:
+            labels = dedupe_preserve(labels + project_enforcement_convention.get("labels", []))
         resource_limited_convention = resource_limited_convention_for_script(f)
         if resource_limited_convention != None:
             labels = dedupe_preserve(labels + resource_limited_convention.get("labels", []))
         validate_template_convention(f, labels, template_inputs)
         validate_deployment_convention(f, labels)
         validate_enforcement_convention(f, labels)
+        validate_project_enforcement_convention(f, labels)
         validate_resource_limited_convention(f, labels)
         zx_test(
             name = name,
