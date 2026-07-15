@@ -87,6 +87,7 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
 function assertConsumerFlakeAllowsPnpmProvisioningEnv(flake: string): void {
   for (const name of [
     "NIX_PNPM_ALLOW_GENERATE",
+    "NIX_PNPM_MATERIALIZE",
     "NIX_PNPM_FETCH_TIMEOUT",
     "NIX_PNPM_INSTALL_TIMEOUT",
   ]) {

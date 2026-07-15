@@ -62,9 +62,9 @@ NODE
       printf '%s\n' "$supported_architectures" >> pnpm-workspace.yaml
     }
   '';
-  reconcilePnpmStoreScript = label: ''
-    reconcile_pnpm_store() {
-      echo "[nix] ${label}: explicitly reconciling fixed pnpm store from lockfile" >&2
+  populatePnpmStoreScript = label: ''
+    populate_pnpm_store() {
+      echo "[nix] ${label}: populating fixed pnpm store from committed lock and hash metadata" >&2
       mkdir -p "$out/store"
       local modules_dir="$out/.pnpm-fetch-modules"
       local pnpm_log="$TMPDIR/${label}-reconcile.log"
@@ -211,6 +211,7 @@ in {
       # - When lockfile is missing and generation is not allowed, keep a placeholder FOD digest to preserve previous behavior.
       genAllowed = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
       reconcileAllowed = (builtins.getEnv "NIX_PNPM_RECONCILE") == "1";
+      materializeAllowed = (builtins.getEnv "NIX_PNPM_MATERIALIZE") == "1";
       fixHashAttrs =
         if (hasLockFs || hasLockStore) then {
           outputHashMode = "recursive";
@@ -293,11 +294,11 @@ in {
           PNPM_TRUST_LOCKFILE_ARG="--trust-lockfile"
         fi
         "$PNPM_BIN" config set store-dir "$out/store"
-        if [ "${if reconcileAllowed then "1" else "0"}" = "1" ]; then
-          ${reconcilePnpmStoreScript "mkPnpmStore"}
+        if [ "${if reconcileAllowed || materializeAllowed then "1" else "0"}" = "1" ]; then
+          ${populatePnpmStoreScript "mkPnpmStore"}
           for supported_architectures in ${lib.escapeShellArgs pnpmSupportedArchitectureMarkers}; do
             write_pnpm_workspace_marker "$supported_architectures"
-            reconcile_pnpm_store
+            populate_pnpm_store
           done
         else
           echo "[nix] mkPnpmStore: final fixed pnpm store is missing." >&2

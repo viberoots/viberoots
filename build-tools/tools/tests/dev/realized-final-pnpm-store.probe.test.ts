@@ -57,7 +57,7 @@ async function withFakeNix<T>(
     [
       "#!/usr/bin/env bash",
       "set -euo pipefail",
-      `printf 'args=%s exact=%s index=%s lock=%s generate=%s\\n' "$*" "\${NIX_PNPM_EXACT_STORE:-}" "\${NIX_PNPM_EXACT_STORE_INDEX:-}" "\${NIX_PNPM_EXACT_STORE_LOCK_HASH:-}" "\${NIX_PNPM_ALLOW_GENERATE:-}" >> ${JSON.stringify(log)}`,
+      `printf 'args=%s exact=%s index=%s lock=%s generate=%s materialize=%s\\n' "$*" "\${NIX_PNPM_EXACT_STORE:-}" "\${NIX_PNPM_EXACT_STORE_INDEX:-}" "\${NIX_PNPM_EXACT_STORE_LOCK_HASH:-}" "\${NIX_PNPM_ALLOW_GENERATE:-}" "\${NIX_PNPM_MATERIALIZE:-}" >> ${JSON.stringify(log)}`,
       `if [[ "$1" == "eval" ]]; then`,
       mode === "eval-failure"
         ? '  echo "authoritative eval failure" >&2; exit 41'
@@ -92,6 +92,7 @@ async function withFakeNix<T>(
     index: process.env.NIX_PNPM_EXACT_STORE_INDEX,
     lock: process.env.NIX_PNPM_EXACT_STORE_LOCK_HASH,
     generate: process.env.NIX_PNPM_ALLOW_GENERATE,
+    materialize: process.env.NIX_PNPM_MATERIALIZE,
     authority: process.env.VIBEROOTS_FLAKE_INPUT_ROOT,
   };
   try {
@@ -101,6 +102,7 @@ async function withFakeNix<T>(
     process.env.NIX_PNPM_EXACT_STORE_INDEX = "forbidden-index";
     process.env.NIX_PNPM_EXACT_STORE_LOCK_HASH = "forbidden-lock";
     process.env.NIX_PNPM_ALLOW_GENERATE = "1";
+    process.env.NIX_PNPM_MATERIALIZE = "1";
     process.env.VIBEROOTS_FLAKE_INPUT_ROOT = authority;
     return await fn(log);
   } finally {
@@ -111,6 +113,7 @@ async function withFakeNix<T>(
       NIX_PNPM_EXACT_STORE_INDEX: previous.index,
       NIX_PNPM_EXACT_STORE_LOCK_HASH: previous.lock,
       NIX_PNPM_ALLOW_GENERATE: previous.generate,
+      NIX_PNPM_MATERIALIZE: previous.materialize,
       VIBEROOTS_FLAKE_INPUT_ROOT: previous.authority,
     })) {
       if (value === undefined) delete process.env[key];
@@ -254,7 +257,7 @@ test("probe validates the literal evaluated path with a sanitized environment", 
       commands,
       new RegExp(`args=path-info ${present.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
     );
-    assert.doesNotMatch(commands, /forbidden-(?:exact|index|lock)|generate=1/);
+    assert.doesNotMatch(commands, /forbidden-(?:exact|index|lock)|generate=1|materialize=1/);
   });
 });
 

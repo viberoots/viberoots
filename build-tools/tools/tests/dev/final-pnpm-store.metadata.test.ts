@@ -119,13 +119,22 @@ test("Nix-native fixed store retains hash authority and ordinary builds cannot f
     /if \(hasLockFs \|\| hasLockStore\) then \{[\s\S]*outputHashMode = "recursive";[\s\S]*outputHash = outHash;/,
   );
   assert.match(store, /reconcileAllowed = \(builtins\.getEnv "NIX_PNPM_RECONCILE"\) == "1"/);
+  assert.match(store, /materializeAllowed = \(builtins\.getEnv "NIX_PNPM_MATERIALIZE"\) == "1"/);
   assert.match(store, /"\$PNPM_BIN" fetch/);
   assert.match(store, /--modules-dir "\$modules_dir"/);
   assert.match(store, /rm -rf "\$modules_dir" node_modules/);
   assert.match(store, /final fixed pnpm store is missing/);
   assert.doesNotMatch(store, /mkPnpmStoreUnfixed|pnpm-store-unfixed|add-fixed/);
   assert.match(updater, /withPnpmStoreBuildFlakeRef\([\s\S]*NIX_PNPM_RECONCILE: "1"/);
-  assert.match(updater, /if \(readOnly\) \{[\s\S]*await probe\(\);[\s\S]*return;/);
+  assert.match(
+    updater,
+    /if \(readOnly\) \{[\s\S]*NIX_PNPM_MATERIALIZE: "1"[\s\S]*writeVerifiedMarker[\s\S]*return;/,
+  );
+  assert.doesNotMatch(
+    updater.match(/if \(readOnly\) \{\n    if \(!currentHash[\s\S]*?\n    return;\n  \}/)?.[0] ||
+      "",
+    /NIX_PNPM_RECONCILE|updateNodeModulesHashesJson|reconcileFixedPnpmStore/,
+  );
   assert.match(updater, /shouldInspectFixedStoreForRebuild\(/);
   assert.match(updater, /shouldRebuildFixedStore\(inspectForRebuild\)/);
   assert.match(updater, /rebuild: rebuildExisting/);

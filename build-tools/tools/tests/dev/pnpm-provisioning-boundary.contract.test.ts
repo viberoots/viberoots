@@ -28,7 +28,7 @@ test("build consumers do not repair pnpm provisioning state", async () => {
   assert.doesNotMatch(nodeModulesBuild, /NIX_PNPM_EXACT_STORE/);
 });
 
-test("ordinary pnpm consumers only probe realized committed stores", async () => {
+test("ordinary pnpm consumers cannot reconcile committed stores", async () => {
   const ordinaryFiles = [
     "build-tools/tools/dev/node-modules-build.ts",
     "build-tools/tools/dev/require-unified-pnpm-store.ts",
@@ -51,6 +51,16 @@ test("ordinary pnpm consumers only probe realized committed stores", async () =>
   assert.match(probe, /"path-info"/);
   assert.match(probe, /probeRealizedFinalPnpmStore\(/);
   assert.doesNotMatch(probe, /prepareFinalPnpmStore|fetchExactPnpmStore|add-fixed/);
+
+  const updater = await fsp.readFile("viberoots/build-tools/tools/dev/update-pnpm-hash.ts", "utf8");
+  const readOnlyBranch =
+    updater.match(/if \(readOnly\) \{\n    if \(!currentHash[\s\S]*?\n    return;\n  \}/)?.[0] ||
+    "";
+  assert.match(readOnlyBranch, /NIX_PNPM_MATERIALIZE: "1"/);
+  assert.doesNotMatch(
+    readOnlyBranch,
+    /NIX_PNPM_RECONCILE|updateNodeModulesHashesJson|reconcileFixedPnpmStore/,
+  );
 });
 
 test("locked Nix pnpm build paths are offline-only", async () => {

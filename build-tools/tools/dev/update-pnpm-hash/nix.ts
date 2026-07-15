@@ -202,7 +202,8 @@ export function nixBuildArgs(opts: {
   ];
   if (
     String(opts.extraEnv?.NIX_PNPM_ALLOW_GENERATE || "").trim() === "1" ||
-    String(opts.extraEnv?.NIX_PNPM_RECONCILE || "").trim() === "1"
+    String(opts.extraEnv?.NIX_PNPM_RECONCILE || "").trim() === "1" ||
+    String(opts.extraEnv?.NIX_PNPM_MATERIALIZE || "").trim() === "1"
   ) {
     args.splice(2, 0, "--impure");
   }

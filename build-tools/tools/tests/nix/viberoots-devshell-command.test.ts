@@ -112,6 +112,7 @@ test("devshell wires viberoots as a Nix-provided PATH command", async (t) => {
     const nixEnv = { ...process.env };
     for (const key of [
       "NIX_PNPM_ALLOW_GENERATE",
+      "NIX_PNPM_MATERIALIZE",
       "NIX_PNPM_RECONCILE",
       "NIX_PNPM_EXACT_STORE",
       "NIX_PNPM_EXACT_STORE_MAP",
@@ -121,6 +122,7 @@ test("devshell wires viberoots as a Nix-provided PATH command", async (t) => {
       delete nixEnv[key];
     }
     assert.equal(nixEnv.NIX_PNPM_RECONCILE, undefined);
+    assert.equal(nixEnv.NIX_PNPM_MATERIALIZE, undefined);
     const built = await $({
       stdio: "pipe",
       reject: false,

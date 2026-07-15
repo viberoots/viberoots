@@ -126,10 +126,45 @@ async function inner() {
     );
 
   if (readOnly) {
-    const realized = await probe();
-    if (!markerMetadataMatches || marker?.derivationIdentity !== realized.derivationIdentity) {
-      throw new Error(`pnpm-store verification is stale for ${importer}; repair: run u`);
+    if (!currentHash || currentHash === PLACEHOLDER_PNPM_STORE_HASH) {
+      throw new Error(`pnpm hash metadata is stale for ${importer}; repair: run u`);
     }
+    const initialStatus = await inspectForRebuild();
+    if (initialStatus === "invalid") {
+      throw new Error(`committed pnpm store is invalid for ${importer}; repair: run u`);
+    }
+    if (initialStatus === "absent") {
+      const activity = newManagedCommandActivity();
+      const materialized = await withPnpmStoreBuildFlakeRef(
+        { repoRoot, importer, baseFlakeRef: flakeRef },
+        async (buildFlakeRef, filteredEnv) =>
+          await withHeartbeat(
+            `importer=${importer} step=fixed-materialize attr=${storeAttr}`,
+            buildStore(
+              storeAttr,
+              buildFlakeRef,
+              activity,
+              { ...filteredEnv, NIX_PNPM_MATERIALIZE: "1" },
+              { ownedDerivationName: `pnpm-store-lock-${lockHash}` },
+            ),
+            { activity },
+          ),
+      );
+      if (!materialized.ok) {
+        throw new Error(
+          `failed to materialize committed pnpm store for ${importer}; no tracked files were modified\n${materialized.output}\nrepair: run u`,
+        );
+      }
+    }
+    const realized = await probe();
+    await verifiedMarker.writeVerifiedMarker(markerPath, {
+      importer,
+      lockfile: key,
+      lockHash,
+      hashValue: currentHash,
+      builderFingerprint,
+      derivationIdentity: realized.derivationIdentity,
+    });
     console.log(`pnpm-store: ${storeAttr} is realized from committed metadata`);
     return;
   }

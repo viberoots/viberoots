@@ -20,6 +20,7 @@ function finalStoreProbeEnv(baseEnv: NodeJS.ProcessEnv = process.env): NodeJS.Pr
   for (const key of [
     "NIX_PNPM_ALLOW_GENERATE",
     "NIX_PNPM_RECONCILE",
+    "NIX_PNPM_MATERIALIZE",
     "NIX_PNPM_EXACT_STORE",
     "NIX_PNPM_EXACT_STORE_INDEX",
     "NIX_PNPM_EXACT_STORE_LOCK_HASH",

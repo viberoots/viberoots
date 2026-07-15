@@ -107,12 +107,15 @@ async function writeFixture(root: string, nixpkgsPath: string): Promise<void> {
   );
 }
 
-function nixEnv(home: string): NodeJS.ProcessEnv {
+function nixEnv(
+  home: string,
+  authority: "reconcile" | "materialize" = "reconcile",
+): NodeJS.ProcessEnv {
   return {
     HOME: home,
     XDG_CACHE_HOME: path.join(home, "xdg-cache"),
     NIX_CONFIG: "experimental-features = nix-command flakes",
-    NIX_PNPM_RECONCILE: "1",
+    ...(authority === "reconcile" ? { NIX_PNPM_RECONCILE: "1" } : { NIX_PNPM_MATERIALIZE: "1" }),
     NIX_PNPM_FETCH_TIMEOUT: "120",
     NIX_PNPM_INSTALL_TIMEOUT: "120",
   };
@@ -232,6 +235,24 @@ test(
       const offlineOutput = offline.stdout.replace(ansiCsi, "");
       assert.match(offlineOutput, /downloaded\s+0/);
       assert.match(offlineOutput, /node_modules.*never.*index\.js/);
+
+      const deleted = await runGuardedCommand(nix, ["store", "delete", outPath], {
+        cwd: root,
+        env: nixEnv(path.join(root, "delete-home")),
+        fixtureRoot: root,
+      });
+      assert.equal(deleted.status, 0, deleted.stderr);
+      await fsp.writeFile(
+        path.join(fixtures[1], "hashes.json"),
+        JSON.stringify({ "pnpm-lock.yaml": candidates[0] }) + "\n",
+      );
+      const rematerialized = await runGuardedCommand(nix, buildArgs(true), {
+        cwd: fixtures[1],
+        env: nixEnv(path.join(root, "materialize-home"), "materialize"),
+        fixtureRoot: root,
+      });
+      assert.equal(rematerialized.status, 0, rematerialized.stderr);
+      assert.equal(rematerialized.stdout.trim().split(/\s+/).at(-1), outPath);
       assert.ok((await directorySizeKib(root)) < MAX_KIB);
     } finally {
       await fsp.rm(root, { recursive: true, force: true });

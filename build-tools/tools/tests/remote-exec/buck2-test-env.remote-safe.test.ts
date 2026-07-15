@@ -153,6 +153,7 @@ test("Nix impure env allowlists classify every value for remote verify policy", 
   ]);
   for (const name of all) assert.doesNotThrow(() => assertClassifiedNixImpureEnv(name));
   assert.equal(REMOTE_SAFE_NIX_IMPURE_ENV_VARS.has("NIX_PNPM_FETCH_TIMEOUT"), true);
+  assert.equal(LOCAL_ONLY_NIX_IMPURE_ENV_VARS.has("NIX_PNPM_MATERIALIZE"), true);
   assert.equal(LOCAL_ONLY_NIX_IMPURE_ENV_VARS.has("NIX_PNPM_EXACT_STORE"), false);
   assert.equal(LOCAL_ONLY_NIX_IMPURE_ENV_VARS.has("NIX_PNPM_EXACT_STORE_MAP"), false);
   assert.equal(LOCAL_ONLY_NIX_IMPURE_ENV_VARS.has("NIX_GO_DEV_OVERRIDE_JSON"), true);
