@@ -55,6 +55,7 @@ test("failed Go upgrade restores go.mod, go.sum, and gomod2nix.toml byte-for-byt
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-update-go-rollback-"));
   const goDir = path.join(root, "projects/apps/go-app");
   const fakeGo = path.join(root, "fake-go.sh");
+  const trace = path.join(root, "go-argv.txt");
   try {
     await fsp.mkdir(goDir, { recursive: true });
     const originals = new Map<string, Buffer>([
@@ -67,18 +68,58 @@ test("failed Go upgrade restores go.mod, go.sum, and gomod2nix.toml byte-for-byt
       fakeGo,
       `#!/usr/bin/env bash
 set -euo pipefail
+printf '%s\n' "$*" >> ${JSON.stringify(trace)}
 printf 'mutated\n' > go.mod
-rm -f go.sum
-printf 'mutated\n' > gomod2nix.toml
-exit 7
+if [[ "$*" == "get -u ./..." ]]; then
+  exit 0
+fi
+if [[ "$*" == "mod tidy" ]]; then
+  rm -f go.sum
+  printf 'mutated\n' > gomod2nix.toml
+  exit 7
+fi
+exit 9
 `,
     );
     await fsp.chmod(fakeGo, 0o755);
 
     await assert.rejects(repairGoDependencies(root, false, true, fakeGo), /exited 7/);
+    assert.equal(await fsp.readFile(trace, "utf8"), "get -u ./...\nmod tidy\n");
     for (const [file, bytes] of originals) {
       assert.deepEqual(await fsp.readFile(path.join(goDir, file)), bytes);
     }
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("failed Python upgrade restores existing uv.lock bytes and uses upgrade argv", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-update-python-bytes-"));
+  const pythonDir = path.join(root, "projects/apps/python-app");
+  const fakeUv = path.join(root, "fake-uv.sh");
+  const trace = path.join(root, "uv-argv.txt");
+  const original = Buffer.from([0, 1, 2, 255]);
+  try {
+    await fsp.mkdir(pythonDir, { recursive: true });
+    await fsp.writeFile(
+      path.join(pythonDir, "pyproject.toml"),
+      "[project]\nname='python-app'\nversion='0.1.0'\n",
+    );
+    await fsp.writeFile(path.join(pythonDir, "uv.lock"), original);
+    await fsp.writeFile(
+      fakeUv,
+      `#!/usr/bin/env bash
+set -euo pipefail
+printf '%s\n' "$*" > ${JSON.stringify(trace)}
+printf 'mutated\n' > uv.lock
+exit 9
+`,
+    );
+    await fsp.chmod(fakeUv, 0o755);
+
+    await assert.rejects(repairPythonDependencies(root, false, true, fakeUv), /exited 9/);
+    assert.equal(await fsp.readFile(trace, "utf8"), "lock --upgrade\n");
+    assert.deepEqual(await fsp.readFile(path.join(pythonDir, "uv.lock")), original);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }

@@ -93,8 +93,8 @@ export async function repairPythonDependencies(
   root: string,
   verbose: boolean,
   upgrade = false,
+  uvBin = ensureNixStoreToolPathSync("uv"),
 ): Promise<number> {
-  const uvBin = ensureNixStoreToolPathSync("uv");
   let count = 0;
   for (const dir of await projectModuleDirs(root, "pyproject.toml")) {
     const manifest = path.join(dir, "pyproject.toml");
