@@ -9,9 +9,18 @@ test("ordinary install keeps every tracked reconciliation surface behind mutatio
     path.join(buildToolsRoot(process.cwd()), "tools/dev/install/deps-main.ts"),
     "utf8",
   );
+  const glueOnly = source.slice(source.indexOf("if (glueOnly)"), source.indexOf("const importers"));
+  assert.match(source, /const readOnlyGoMetadata = true/);
   for (const contract of [
-    "runGoModTidyForMissingSum(repoRoot, dryRun, verbose, readOnlyMetadata)",
-    "runGomod2nixGenerate(dryRun, verbose, readOnlyMetadata)",
+    "runGoModTidyForMissingSum(repoRoot, dryRun, verbose, readOnlyGoMetadata)",
+    "runGomod2nixGenerate(dryRun, verbose, readOnlyGoMetadata)",
+    "runGomod2nixScanAll(dryRun, verbose, readOnlyGoMetadata)",
+  ]) {
+    assert.match(glueOnly, new RegExp(contract.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+  for (const contract of [
+    "runGoModTidyForMissingSum(repoRoot, dryRun, verbose, readOnlyGoMetadata)",
+    "runGomod2nixGenerate(dryRun, verbose, readOnlyGoMetadata)",
     "runUvRefreshAll(dryRun, verbose, readOnlyMetadata)",
     "assertCppTrackedMetadataReady(repoRoot)",
     "if (!readOnlyMetadata) {\n  await syncModuleContractsForWebapps",

@@ -67,44 +67,28 @@ workspace directory. In that case:
 - Run this guard after all nested `viberoots` submodule commits are complete and before staging the
   parent repository. Do not rely on a guard result captured before committing the submodule, because
   the submodule `HEAD` and parent gitlink changed after that check.
-- Run the repo consistency check when available:
+- Resolve the active viberoots source through the workspace authority and run its canonical repo
+  consistency check:
 
   ```sh
-  zx-wrapper viberoots/build-tools/tools/dev/consumer-consistency-check.ts
+  active_viberoots="$(cd .viberoots/current 2>/dev/null && pwd -P)" || {
+    echo "error: active viberoots source is unavailable; repair: run viberoots update" >&2
+    exit 1
+  }
+  consistency_check="$active_viberoots/build-tools/tools/dev/consumer-consistency-check.ts"
+  test -f "$consistency_check" || {
+    echo "error: active viberoots source lacks the consistency checker; repair: run viberoots update" >&2
+    exit 1
+  }
+  zx-wrapper "$consistency_check"
   ```
 
-- If the consistency check is not available, perform these checks manually:
-
-  ```sh
-  gitlink_rev="$(git ls-files -s viberoots | awk '$1 == "160000" { print $2; exit }')"
-  submodule_rev="$(git -C viberoots rev-parse HEAD 2>/dev/null || true)"
-  prospective_gitlink_rev="${submodule_rev:-${gitlink_rev}}"
-  lock_rev="$(jq -r '.nodes.viberoots.locked.rev // empty' flake.lock 2>/dev/null || true)"
-  if test -n "$prospective_gitlink_rev" && test -z "$lock_rev"; then
-    echo "error: a viberoots submodule requires a committed root flake.lock" >&2
-    echo "repair: run viberoots update" >&2
-    exit 1
-  fi
-  test "$(cat .buckroot 2>/dev/null)" = "."
-  for path in .buckroot .buckconfig .envrc .gitignore; do
-    git ls-files --error-unmatch -- "$path" >/dev/null
-  done
-  for entry in .viberoots/ buck-out/ .direnv/ .nix-zsh/ .nix-gcroots/ node_modules node_modules/ projects/config/local.json .local/; do
-    grep -Fxq -- "$entry" .gitignore
-  done
-  if git ls-files --error-unmatch -- projects/config/local.json >/dev/null 2>&1; then
-    echo "error: projects/config/local.json must remain untracked" >&2
-    exit 1
-  fi
-  ```
-
-  If any required tracked input is missing or stale, or `projects/config/local.json` is tracked, stop
-  and tell the user to run exactly `viberoots update`.
-
-- In submodule mode, treat `submodule_rev` as the prospective gitlink because this guard runs after
-  the submodule commit and before the parent stages its updated gitlink. Fall back to the indexed
-  `gitlink_rev` only when the checkout is unavailable. If `prospective_gitlink_rev` and `lock_rev`
-  are present and differ, stop and tell the user to run exactly:
+- Do not replace a missing checker with partial manual checks. The canonical checker owns source-pin,
+  generated-input, pnpm, and supported-language consistency. Stop and tell the user to run exactly
+  `viberoots update` when the active source or checker cannot be resolved.
+- In submodule mode, the checker treats the checkout `HEAD` as the prospective gitlink because this
+  guard runs after the submodule commit and before the parent stages its updated gitlink. If the
+  prospective gitlink and root lock differ, stop and tell the user to run exactly:
 
   ```sh
   viberoots update
@@ -114,11 +98,14 @@ workspace directory. In that case:
   `viberoots` gitlink is absent, or indicate flake mode while an active `viberoots` gitlink is being
   committed, stop and tell the user to run exactly `viberoots update`.
 - Verify committed pnpm hash metadata by running the read-only materialization path for each
-  importer with a `pnpm-lock.yaml`, for example:
+  consumer importer with a `pnpm-lock.yaml`. The canonical consistency checker above performs this
+  check. For focused diagnosis, use the already resolved active source rather than assuming a
+  `viberoots/` submodule:
 
   ```sh
-  find projects viberoots -name pnpm-lock.yaml -print
-  zx-wrapper viberoots/build-tools/tools/dev/update-pnpm-hash.ts --lockfile <lockfile> --read-only
+  find projects -name pnpm-lock.yaml -print
+  zx-wrapper "$active_viberoots/build-tools/tools/dev/update-pnpm-hash.ts" \
+    --lockfile <consumer-lockfile> --read-only
   ```
 
   If this reports stale dependency metadata, stop and tell the user to run exactly `u`. Pin,

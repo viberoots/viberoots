@@ -1,10 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import assert from "node:assert/strict";
 import { test } from "node:test";
+import { withGoModuleInputFingerprint } from "../../dev/install/go-consistency";
 import { runInTemp } from "../lib/test-helpers";
 
-test("install-deps gomod2nix integration writes deterministic gomod2nix.toml", async () => {
+test("install-deps glue-only keeps tracked Go metadata and absence cache read-only", async () => {
   await runInTemp("install-deps-integration", async (tmp, $) => {
     await $`bash --noprofile --norc -c ${`set -euo pipefail
       printf '.\n' > .buckroot
@@ -40,39 +42,48 @@ EOF
     `}`;
     const goMod = ["module example.com/demo", "\ngo 1.22"].join("\n");
     await fsp.writeFile(path.join(tmp, "go.mod"), goMod, "utf8");
-    // Ensure gomod2nix has a real package to inspect; empty modules produce no output.
-    await fsp.writeFile(path.join(tmp, "main.go"), "package main\n\nfunc main() {}\n", "utf8");
-    // Run install-deps which invokes gomod2nix regeneration
+    await fsp.writeFile(path.join(tmp, "go.sum"), "", "utf8");
+    await fsp.writeFile(
+      path.join(tmp, "gomod2nix.toml"),
+      await withGoModuleInputFingerprint(tmp, "schema = 3\n\n[mod]\n"),
+      "utf8",
+    );
+    const tracked = ["go.mod", "go.sum", "gomod2nix.toml"];
+    const before = await Promise.all(tracked.map((file) => fsp.readFile(path.join(tmp, file))));
+    await fsp.rm(path.join(tmp, ".viberoots/workspace/install-cache"), {
+      recursive: true,
+      force: true,
+    });
     const env = {
       ...process.env,
       WORKSPACE_ROOT: tmp,
-      INSTALL_DEPS_SKIP_GO_TIDY: "0",
-      // Prefer the repo-pinned gomod2nix entrypoint for deterministic, offline-friendly runs.
-      INSTALL_DEPS_GOMOD2NIX_BIN: path.join(
-        tmp,
-        "viberoots",
-        "build-tools",
-        "tools",
-        "bin",
-        "gomod2nix",
-      ),
     } as any;
     await $({
       cwd: tmp,
       stdio: "inherit",
       env,
-    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs ./viberoots/build-tools/tools/dev/install-deps.ts --glue-only --skip-glue --verbose`;
-    const first = await fsp.readFile(path.join(tmp, "gomod2nix.toml"), "utf8");
-    // Run again; output should be stable
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-      env,
-    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs ./viberoots/build-tools/tools/dev/install-deps.ts --glue-only --skip-glue --verbose`;
-    const second = await fsp.readFile(path.join(tmp, "gomod2nix.toml"), "utf8");
-    if (first !== second) {
-      console.error("gomod2nix.toml not stable across runs");
-      process.exit(2);
+    })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs ./viberoots/build-tools/tools/dev/install-deps.ts --glue-only --skip-glue --skip-go-tidy --verbose`;
+    const after = await Promise.all(tracked.map((file) => fsp.readFile(path.join(tmp, file))));
+    assert.deepEqual(after, before);
+    await assert.rejects(
+      fsp.access(path.join(tmp, ".viberoots/workspace/install-cache/gomod2nix-root-absent.json")),
+    );
+    await assert.rejects(
+      fsp.access(path.join(tmp, ".viberoots/workspace/install-cache/gomod2nix-absent.json")),
+    );
+    await fsp.appendFile(path.join(tmp, "go.sum"), "changed\n");
+    const stale = await fsp.readFile(path.join(tmp, "go.sum"));
+    await assert.rejects(
+      $({
+        cwd: tmp,
+        stdio: "pipe",
+        env,
+      })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs ./viberoots/build-tools/tools/dev/install-deps.ts --glue-only --skip-glue --skip-go-tidy`,
+      /tracked metadata is stale/,
+    );
+    assert.deepEqual(await fsp.readFile(path.join(tmp, "go.sum")), stale);
+    for (const cache of ["gomod2nix-root-absent.json", "gomod2nix-absent.json"]) {
+      await assert.rejects(fsp.access(path.join(tmp, ".viberoots/workspace/install-cache", cache)));
     }
   });
 });

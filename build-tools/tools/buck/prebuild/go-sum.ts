@@ -26,7 +26,7 @@ export async function handleGoMissingSum(mode: Mode): Promise<void> {
   if (mode === "ci") {
     for (const imp of goMissingSum) {
       console.error(
-        `ERROR: ${imp} has go.mod but no go.sum. Run 'build-tools/tools/dev/install-deps.ts' to auto-tidy or add --skip-go-tidy to bypass`,
+        `ERROR: ${imp} has go.mod but no go.sum. Run 'u' to reconcile tracked Go metadata`,
       );
     }
     process.exit(1);
@@ -34,7 +34,7 @@ export async function handleGoMissingSum(mode: Mode): Promise<void> {
 
   for (const imp of goMissingSum) {
     console.warn(
-      `WARN: ${imp} has go.mod but no go.sum (local only). You can run 'build-tools/tools/dev/install-deps.ts' to tidy when online.`,
+      `WARN: ${imp} has go.mod but no go.sum (local only). Run 'u' to reconcile tracked Go metadata.`,
     );
   }
 }

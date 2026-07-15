@@ -5,14 +5,13 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { parseUpdateCommandArgs, UPDATE_COMMAND_HELP } from "../../dev/update-command/args";
+import { languageUpdateTimeoutMs } from "../../dev/update-command/languages";
 import { runUpdateCommand, type UpdateOperations } from "../../dev/update-command/run";
 import { pnpmLockArgs, updatePnpmLock } from "../../dev/update-command/pnpm";
-import { unsupportedUpgradeSurfaces } from "../../dev/update-command/surfaces";
 
-function operations(events: string[], unsupported: string[] = []): UpdateOperations {
+function operations(events: string[]): UpdateOperations {
   return {
     importers: async () => [".", "projects/apps/web"],
-    unsupportedUpgrades: async () => unsupported,
     repairPnpmLock: async (_root, importer) => {
       events.push(`repair:${importer}`);
     },
@@ -22,16 +21,22 @@ function operations(events: string[], unsupported: string[] = []): UpdateOperati
     reconcilePnpm: async (_root, importer) => {
       events.push(`reconcile:${importer}`);
     },
-    repairGo: async () => {
-      events.push("go");
-    },
-    repairPython: async () => {
-      events.push("python");
+    enabledLanguages: async () => ["go", "python", "cpp"],
+    languageUpdates: {
+      go: async (_root, _verbose, upgrade) => {
+        events.push(`go:${upgrade ? "upgrade" : "repair"}`);
+        return 1;
+      },
+      python: async (_root, _verbose, upgrade) => {
+        events.push(`python:${upgrade ? "upgrade" : "repair"}`);
+        return 1;
+      },
+      cpp: async () => 0,
     },
     repairWorkspaceLock: async () => {
       events.push("workspace-lock");
     },
-    repairCpp: async () => {
+    repairGeneratedMetadata: async () => {
       events.push("cpp");
     },
   };
@@ -50,8 +55,8 @@ test("plain u conservatively repairs each importer before shared metadata", asyn
     "reconcile:.",
     "repair:projects/apps/web",
     "reconcile:projects/apps/web",
-    "go",
-    "python",
+    "go:repair",
+    "python:repair",
     "workspace-lock",
     "cpp",
   ]);
@@ -75,7 +80,7 @@ test("plain u reconciles the nested tool importer without rewriting its lockfile
   assert.ok(!events.includes("repair:viberoots"));
 });
 
-test("u --upgrade upgrades pnpm and fails closed before mixed-language mutation", async () => {
+test("u --upgrade upgrades supported languages and reconciles C++ metadata", async () => {
   const upgraded: string[] = [];
   await runUpdateCommand({
     root: "/repo",
@@ -83,24 +88,16 @@ test("u --upgrade upgrades pnpm and fails closed before mixed-language mutation"
     verbose: false,
     operations: operations(upgraded),
   });
-  assert.deepEqual(upgraded.slice(0, 4), [
+  assert.deepEqual(upgraded, [
     "upgrade:.",
     "reconcile:.",
     "upgrade:projects/apps/web",
     "reconcile:projects/apps/web",
+    "go:upgrade",
+    "python:upgrade",
+    "workspace-lock",
+    "cpp",
   ]);
-
-  const blocked: string[] = [];
-  await assert.rejects(
-    runUpdateCommand({
-      root: "/repo",
-      upgrade: true,
-      verbose: false,
-      operations: operations(blocked, ["Go", "C++"]),
-    }),
-    /unsupported.*Go, C\+\+.*no files were modified/s,
-  );
-  assert.deepEqual(blocked, []);
 });
 
 test("u --upgrade reconciles but never upgrades the nested tool importer", async () => {
@@ -191,26 +188,29 @@ printf '%s\\n' "$@" > ${JSON.stringify(capture)}
   }
 });
 
-test("upgrade surface discovery is limited to actual project inputs", async () => {
-  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-update-surfaces-"));
-  try {
-    await fsp.mkdir(path.join(root, "projects/apps/mixed"), { recursive: true });
-    await fsp.writeFile(
-      path.join(root, "projects/apps/mixed/go.mod"),
-      "module example.test/mixed\n",
-    );
-    await fsp.writeFile(
-      path.join(root, "projects/apps/mixed/pyproject.toml"),
-      "[project]\nname='mixed'\n",
-    );
-    await fsp.writeFile(
-      path.join(root, "projects/apps/mixed/main.cpp"),
-      "int main() { return 0; }\n",
-    );
-    await $({ cwd: root })`git init -q`;
-    await $({ cwd: root })`git add projects`;
-    assert.deepEqual(await unsupportedUpgradeSurfaces(root), ["Go", "Python/uv", "C++"]);
-  } finally {
-    await fsp.rm(root, { recursive: true, force: true });
-  }
+test("language timeout is bounded and defaults to ten minutes", () => {
+  assert.equal(languageUpdateTimeoutMs({}), 600_000);
+  assert.equal(languageUpdateTimeoutMs({ VBR_UPDATE_LANGUAGE_TIMEOUT_SECONDS: "30" }), 30_000);
+  assert.throws(
+    () => languageUpdateTimeoutMs({ VBR_UPDATE_LANGUAGE_TIMEOUT_SECONDS: "0" }),
+    /integer from 1 to 3600/,
+  );
+  assert.throws(
+    () => languageUpdateTimeoutMs({ VBR_UPDATE_LANGUAGE_TIMEOUT_SECONDS: "3601" }),
+    /integer from 1 to 3600/,
+  );
+});
+
+test("ordinary Go and uv resolution cannot fall through to host PATH", async () => {
+  const source = await fsp.readFile(
+    path.join(
+      path.resolve(process.env.VIBEROOTS_ROOT || process.cwd()),
+      "build-tools/tools/dev/update-command/languages.ts",
+    ),
+    "utf8",
+  );
+  assert.match(source, /goBin = ensureNixStoreToolPathSync\("go"\)/);
+  assert.match(source, /ensureNixStoreToolPathSync\("uv"\)/);
+  assert.doesNotMatch(source, /UPDATE_GO_BIN/);
+  assert.doesNotMatch(source, /UPDATE_UV_BIN/);
 });

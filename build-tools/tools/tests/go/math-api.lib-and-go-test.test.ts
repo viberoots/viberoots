@@ -1,5 +1,8 @@
 #!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
+import { withGoModuleInputFingerprint } from "../../dev/install/go-consistency";
 import { runInTemp } from "../lib/test-helpers";
 
 test("go math-api lib builds and go test passes (scaffolded with temp math-core)", async () => {
@@ -18,6 +21,7 @@ test("go math-api lib builds and go test passes (scaffolded with temp math-core)
     await $`bash --noprofile --norc -c 'mkdir -p projects/libs/math-go-core/core'`;
     await $`bash --noprofile --norc -c 'cat > projects/libs/math-go-core/core/bridge.go <<"EOF"\npackage core\n\n/*\n#cgo CFLAGS: -I../../math-core/include\n#cgo LDFLAGS: -lstdc++\n#include \"addon.h\"\n*/\nimport \"C\"\n\n// Add calls into the C wrapper which calls the C++ core\nfunc Add(a, b int) int {\n\treturn int(C.add(C.int(a), C.int(b)))\n}\nEOF'`;
     await $`bash --noprofile --norc -c 'cat > projects/libs/math-go-core/go.mod <<"EOF"\nmodule example.com/math-go-core\n\ngo 1.22\nEOF'`;
+    await fsp.writeFile(path.join(tmp, "projects/libs/math-go-core/go.sum"), "", "utf8");
     await $`bash --noprofile --norc -c 'cat > projects/libs/math-go-core/TARGETS <<"EOF"\nload(\"@viberoots//build-tools/go:defs.bzl\", \"nix_go_library\")\n\nnix_go_library(\n    name = \"lib\",\n    srcs = [\n        \"core/bridge.go\",\n    ],\n    # Link to the local C++ core via repo_cgo_deps\n    repo_cgo_deps = [\"//projects/libs/math-core:lib\"],\n    labels = [\"lang:go\", \"kind:lib\"],\n    visibility = [\"PUBLIC\"],\n)\nEOF'`;
 
     // Public Go API facade (math-api) that depends on go-core
@@ -25,6 +29,7 @@ test("go math-api lib builds and go test passes (scaffolded with temp math-core)
     await $`bash --noprofile --norc -c 'cat > projects/libs/math-api/pkg/api/api.go <<"EOF"\npackage api\n\nfunc Add(a, b int) int { return a + b }\nEOF'`;
     await $`bash --noprofile --norc -c 'cat > projects/libs/math-api/pkg/api/api_test.go <<"EOF"\npackage api\n\nimport \"testing\"\n\nfunc TestAdd(t *testing.T) {\n\tif Add(2, 3) != 5 { t.Fatalf(\"expected 5\") }\n\tif Add(-4, 4) != 0 { t.Fatalf(\"expected 0\") }\n}\nEOF'`;
     await $`bash --noprofile --norc -c 'cat > projects/libs/math-api/go.mod <<"EOF"\nmodule example.com/math-api\n\ngo 1.22\nEOF'`;
+    await fsp.writeFile(path.join(tmp, "projects/libs/math-api/go.sum"), "", "utf8");
     await $`bash --noprofile --norc -c 'cat > projects/libs/math-api/TARGETS <<"EOF"\nload(\"@viberoots//build-tools/go:defs.bzl\", \"nix_go_library\")\n\nnix_go_library(\n    name = \"lib\",\n    srcs = [\n        \"pkg/api/api.go\",\n    ],\n    labels = [\"lang:go\", \"kind:lib\"],\n    visibility = [\"PUBLIC\"],\n)\nEOF'`;
 
     // Seed gomod2nix deterministically via local stub (no network)
@@ -52,11 +57,23 @@ EOF2
 EOF
 chmod +x ${stubPath}
 `}`;
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-    })`gomod2nix --dir projects/libs/math-api`;
+    for (const moduleDir of ["projects/libs/math-api", "projects/libs/math-go-core"]) {
+      await $({
+        cwd: tmp,
+        stdio: "inherit",
+        env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
+      })`gomod2nix --dir ${moduleDir}`;
+      const absoluteModuleDir = path.join(tmp, moduleDir);
+      const metadataPath = path.join(absoluteModuleDir, "gomod2nix.toml");
+      await fsp.writeFile(
+        metadataPath,
+        await withGoModuleInputFingerprint(
+          absoluteModuleDir,
+          await fsp.readFile(metadataPath, "utf8"),
+        ),
+        "utf8",
+      );
+    }
     await $`cp ${path.join(tmp, "projects/libs/math-api/gomod2nix.toml")} ${path.join(
       tmp,
       "gomod2nix.toml",

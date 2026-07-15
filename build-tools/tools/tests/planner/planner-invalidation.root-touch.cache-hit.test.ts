@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { withGoModuleInputFingerprint } from "../../dev/install/go-consistency";
 import { exportGraphInTemp, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 
 // base-contract invalidation test: touching a non-app/lib file at repo root should NOT
@@ -11,6 +12,8 @@ test("planner: touching root-only file does not change app bin store path", asyn
   await runInTemp("planner-invalidation-root-touch", async (tmp, $) => {
     // Scaffold a small CLI app under apps/
     await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
+    const moduleDir = path.join(tmp, "projects/apps/demo-cli");
+    await fsp.writeFile(path.join(moduleDir, "go.sum"), "", "utf8");
     // Seed gomod2nix deterministically via local stub (no network)
     const stubDir = path.join(tmp, "bin");
     await fsp.mkdir(stubDir, { recursive: true });
@@ -44,6 +47,12 @@ test("planner: touching root-only file does not change app bin store path", asyn
       stdio: "inherit",
       env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
     })`gomod2nix --dir projects/apps/demo-cli`;
+    const metadataPath = path.join(moduleDir, "gomod2nix.toml");
+    await fsp.writeFile(
+      metadataPath,
+      await withGoModuleInputFingerprint(moduleDir, await fsp.readFile(metadataPath, "utf8")),
+      "utf8",
+    );
     // Use app-local gomod2nix.toml (nearest ancestor resolution) to avoid broad root invalidations
 
     // Generate glue, export the current Buck graph, then build graph-generator bundle.

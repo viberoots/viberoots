@@ -18,6 +18,7 @@ type RunOptions = {
   cwd: string;
   env?: NodeJS.ProcessEnv;
   fixtureRoot: string;
+  diskRoot?: string;
   maxKib?: number;
   sampleIntervalMs?: number;
   timeoutMs?: number;
@@ -29,7 +30,8 @@ export async function runGuardedCommand(
   opts: RunOptions,
 ): Promise<CommandResult> {
   const maxKib = opts.maxKib ?? DEFAULT_MAX_KIB;
-  const beforeDisk = await diskUsedKib(opts.fixtureRoot);
+  const diskRoot = opts.diskRoot || opts.fixtureRoot;
+  const beforeDisk = await diskUsedKib(diskRoot);
   const startedAt = Date.now();
   let peakFixtureKib = 0;
   let peakDiskDeltaKib = 0;
@@ -60,6 +62,20 @@ export async function runGuardedCommand(
       signalChild("SIGTERM");
       forceTimer = setTimeout(() => signalChild("SIGKILL"), TERMINATION_GRACE_MS);
     };
+    const measure = async () => {
+      const [fixtureKib, diskKib] = await Promise.all([
+        directorySizeKib(opts.fixtureRoot),
+        diskUsedKib(diskRoot),
+      ]);
+      const diskDeltaKib = diskKib - beforeDisk;
+      peakFixtureKib = Math.max(peakFixtureKib, fixtureKib);
+      peakDiskDeltaKib = Math.max(peakDiskDeltaKib, diskDeltaKib);
+      if (fixtureKib > maxKib || diskDeltaKib > maxKib) {
+        throw new Error(
+          `native reconcile exceeded ${maxKib}KiB guard: fixture=${fixtureKib}KiB diskDelta=${diskDeltaKib}KiB`,
+        );
+      }
+    };
     const timeout = setTimeout(
       () =>
         stop(new Error(`command exceeded ${opts.timeoutMs ?? COMMAND_TIMEOUT_MS}ms: ${command}`)),
@@ -68,29 +84,24 @@ export async function runGuardedCommand(
     const sampler = setInterval(async () => {
       if (settled || stopReason) return;
       try {
-        const [fixtureKib, diskKib] = await Promise.all([
-          directorySizeKib(opts.fixtureRoot),
-          diskUsedKib(opts.fixtureRoot),
-        ]);
-        peakFixtureKib = Math.max(peakFixtureKib, fixtureKib);
-        peakDiskDeltaKib = Math.max(peakDiskDeltaKib, diskKib - beforeDisk);
-        if (fixtureKib > maxKib || diskKib - beforeDisk > maxKib) {
-          stop(
-            new Error(
-              `native reconcile exceeded ${maxKib}KiB guard: fixture=${fixtureKib}KiB diskDelta=${diskKib - beforeDisk}KiB`,
-            ),
-          );
-        }
+        await measure();
       } catch (error) {
         stop(error instanceof Error ? error : new Error(String(error)));
       }
     }, opts.sampleIntervalMs ?? DEFAULT_SAMPLE_INTERVAL_MS);
     child.on("error", stop);
-    child.on("close", (status) => {
+    child.on("close", async (status) => {
       settled = true;
       clearTimeout(timeout);
       clearTimeout(forceTimer);
       clearInterval(sampler);
+      if (!stopReason) {
+        try {
+          await measure();
+        } catch (error) {
+          stopReason = error instanceof Error ? error : new Error(String(error));
+        }
+      }
       if (stopReason) {
         Object.assign(stopReason, {
           stdout,

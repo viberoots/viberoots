@@ -3,9 +3,9 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { mkdtempNoindex } from "../../lib/macos-metadata";
 import { repoRoot } from "../../lib/repo";
-import { resolveToolPathSync } from "../../lib/tool-paths";
+import { ensureNixStoreToolPathSync, resolveToolPathSync } from "../../lib/tool-paths";
 import { absenceCacheFresh, writeAbsenceCache } from "./absence-cache";
-import { staleMetadataError } from "./metadata-mode";
+import { assertGoModuleMetadataReady, withGoModuleInputFingerprint } from "./go-consistency";
 
 async function exists(p: string): Promise<boolean> {
   try {
@@ -37,7 +37,7 @@ async function fileMtimeMs(p: string): Promise<number> {
   }
 }
 
-async function needsGomod2nixRefresh(dir: string): Promise<boolean> {
+async function needsGomod2nixRefreshByMtime(dir: string): Promise<boolean> {
   const mod = path.join(dir, "go.mod");
   const sum = path.join(dir, "go.sum");
   const out = path.join(dir, "gomod2nix.toml");
@@ -69,10 +69,17 @@ export async function runGomod2nixGenerateIn(
   dryRun: boolean,
   verbose: boolean,
   readOnly = false,
+  throwOnFailure = false,
+  gomod2nixBin?: string,
 ) {
   const root = installWorkspaceRoot();
   const hasGoMod = await exists(path.join(dir, "go.mod"));
   const hasGoSum = await exists(path.join(dir, "go.sum"));
+  if (readOnly) {
+    if (!hasGoMod && !hasGoSum) return;
+    await assertGoModuleMetadataReady(root, dir);
+    return;
+  }
   if (!hasGoMod && !hasGoSum) {
     if (!dryRun) {
       const absence = absenceNameForDir(root, dir);
@@ -90,10 +97,8 @@ export async function runGomod2nixGenerateIn(
   }
 
   // Respect dry-run before enforcing go.sum presence
-  const binOverride =
-    process.env.INSTALL_DEPS_GOMOD2NIX_BIN ||
-    path.join(process.cwd(), "build-tools", "tools", "bin", "gomod2nix");
-  const cmd = `${binOverride} --dir .`;
+  const bin = gomod2nixBin || ensureNixStoreToolPathSync("gomod2nix");
+  const cmd = `${bin} --dir .`;
   const timeoutSec = Math.max(
     1,
     Number.parseInt(String(process.env.INSTALL_DEPS_GOMOD_TIMEOUT || "600"), 10) || 600,
@@ -104,17 +109,12 @@ export async function runGomod2nixGenerateIn(
     return;
   }
 
-  if (readOnly && (await needsGomod2nixRefresh(dir))) {
-    const rel = path.relative(root, path.join(dir, "gomod2nix.toml")) || "gomod2nix.toml";
-    throw staleMetadataError(rel, "Go module metadata requires gomod2nix reconciliation");
-  }
-
   // If go.mod exists but go.sum is missing, avoid attempting generation which may hang
   // on network resolution; prefer pre-existing gomod2nix.toml or skip.
   if (hasGoMod && !hasGoSum) {
-    console.error(
-      `[gomod2nix] error: go.sum missing in ${path.relative(root, dir) || "."}; run 'build-tools/tools/dev/install-deps.ts' (or pass --skip-go-tidy to skip)`,
-    );
+    const message = `[gomod2nix] error: go.sum missing in ${path.relative(root, dir) || "."}; run 'build-tools/tools/dev/install-deps.ts' (or pass --skip-go-tidy to skip)`;
+    if (throwOnFailure) throw new Error(message);
+    console.error(message);
     process.exit(2);
   }
 
@@ -129,7 +129,7 @@ export async function runGomod2nixGenerateIn(
   const hasDeps = /^\s*(require|replace)\s*(\(|\S)/m.test(strippedGoMod);
   if (!hasDeps) {
     const dst = path.join(dir, "gomod2nix.toml");
-    const minimal = "schema = 3\n\n[mod]\n";
+    const minimal = await withGoModuleInputFingerprint(dir, "schema = 3\n\n[mod]\n");
     const cur = (await exists(dst)) ? await fsp.readFile(dst, "utf8") : "";
     if (cur !== minimal) {
       await fsp.writeFile(dst, minimal, "utf8");
@@ -143,9 +143,7 @@ export async function runGomod2nixGenerateIn(
   const beforeHash = await sha256File(path.join(dir, "gomod2nix.toml"));
   const tmp = await mkdtempNoindex("gomod2nix-", { baseName: "gomod2nix" });
   try {
-    if (hasGoMod) await fsp.copyFile(path.join(dir, "go.mod"), path.join(tmp, "go.mod"));
-    if (hasGoSum) await fsp.copyFile(path.join(dir, "go.sum"), path.join(tmp, "go.sum"));
-    console.log(`[gomod2nix] running in ${tmp} for ${path.relative(root, dir) || "."}`);
+    console.log(`[gomod2nix] staging output in ${tmp} for ${path.relative(root, dir) || "."}`);
     // Log effective env relevant to network behavior
     try {
       const gp = process.env.GOPROXY || "";
@@ -162,30 +160,27 @@ export async function runGomod2nixGenerateIn(
     try {
       const timeoutPath = resolveToolPathSync("timeout");
       await $({
-        cwd: tmp,
+        cwd: dir,
         stdio: "pipe",
       })`bash --noprofile --norc -lc ${`TIMEOUT_PATH="$1"; if command -v curl >/dev/null 2>&1; then "$TIMEOUT_PATH" 3 curl -sSfI https://proxy.golang.org/ >/dev/null && echo "[gomod2nix] preflight: proxy.golang.org OK" || echo "[gomod2nix] preflight: proxy.golang.org unreachable"; else echo "[gomod2nix] preflight: curl not found"; fi`} -- ${timeoutPath}`;
     } catch {}
-    let ran = false;
-    let tmpOut = path.join(tmp, "gomod2nix.toml");
+    const tmpOut = path.join(tmp, "gomod2nix.toml");
     try {
       const timeoutPath = resolveToolPathSync("timeout");
       await $({
-        cwd: tmp,
+        cwd: dir,
         stdio: "inherit",
-      })`bash --noprofile --norc -lc ${`TIMEOUT_PATH="$1"; "$TIMEOUT_PATH" ${timeoutSec} ${cmd}`} -- ${timeoutPath}`;
-      ran = true;
-    } catch {
-      ran = false;
-    }
-    tmpOut = path.join(tmp, "gomod2nix.toml");
+      })`${timeoutPath} ${timeoutSec} ${bin} --dir . --outdir ${tmp}`;
+    } catch {}
     const tmpExists = await exists(tmpOut);
     const dst = path.join(dir, "gomod2nix.toml");
     if (!tmpExists) {
-      console.error("[gomod2nix] error: primary path did not produce gomod2nix.toml");
+      const message = "[gomod2nix] error: primary path did not produce gomod2nix.toml";
+      if (throwOnFailure) throw new Error(message);
+      console.error(message);
       process.exit(3);
     }
-    const next = await fsp.readFile(tmpOut, "utf8");
+    const next = await withGoModuleInputFingerprint(dir, await fsp.readFile(tmpOut, "utf8"));
     const cur = (await exists(dst)) ? await fsp.readFile(dst, "utf8") : "";
     if (cur !== next) {
       await fsp.writeFile(dst, next, "utf8");
@@ -207,7 +202,7 @@ export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean, rea
   // Scan for go.mod+go.sum under projects/apps/* and projects/libs/* and generate per-module gomod2nix.toml
   const root = installWorkspaceRoot();
   const scanRoots = ["projects/apps", "projects/libs"];
-  if (!dryRun && (await absenceCacheFresh(root, "gomod2nix-absent", scanRoots))) {
+  if (!readOnly && !dryRun && (await absenceCacheFresh(root, "gomod2nix-absent", scanRoots))) {
     if (verbose) console.log("[gomod2nix] project scan skipped: no Go modules present");
     return;
   }
@@ -221,17 +216,17 @@ export async function runGomod2nixScanAll(dryRun: boolean, verbose: boolean, rea
           const d = path.join(r, e.name);
           const hasMod = await exists(path.join(d, "go.mod"));
           const hasSum = await exists(path.join(d, "go.sum"));
-          if (hasMod && hasSum) dirs.push(d);
+          if (hasMod && (readOnly || hasSum)) dirs.push(d);
         }
       }
     } catch {}
   }
-  if (!dirs.length && !dryRun) {
+  if (!dirs.length && !dryRun && !readOnly) {
     await writeAbsenceCache(root, "gomod2nix-absent", scanRoots);
     return;
   }
   for (const d of dirs) {
-    const refresh = await needsGomod2nixRefresh(d);
+    const refresh = readOnly || (await needsGomod2nixRefreshByMtime(d));
     if (!refresh) {
       if (verbose) console.log(`[gomod2nix] up-to-date: ${path.relative(root, d) || "."}`);
       continue;

@@ -290,48 +290,14 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     })`go mod tidy`;
     await writeGoSumFromDownload($, path.join(_tmp, "projects", "apps", "demo-cli"), goEnv);
 
-    // Generate gomod2nix.toml via local stub (avoid network)
-    const stubDir = path.join(_tmp, "bin");
-    await fsp.mkdir(stubDir, { recursive: true });
-    const stubPath = path.join(stubDir, "gomod2nix");
-    await fsp.writeFile(
-      stubPath,
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        "DIR=.",
-        "while [[ $# -gt 0 ]]; do",
-        '  case "$1" in',
-        "    --dir)",
-        '      DIR="$2"; shift 2;;',
-        "    *) shift;;",
-        "  esac",
-        "done",
-        'mkdir -p "$DIR"',
-        "cat > \"$DIR/gomod2nix.toml\" <<'EOF'",
-        "schema = 3",
-        "mod = {}",
-        "replace = {}",
-        "prune = { go-tests = true, unused-packages = true }",
-        "EOF",
-      ].join("\n"),
-      "utf8",
-    );
-    await $`chmod +x ${stubPath}`;
     await $({
       cwd: _tmp,
       stdio: "inherit",
-      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-    })`gomod2nix --dir projects/apps/demo-cli`;
-    await fsp.copyFile(
-      path.join(_tmp, "projects", "apps", "demo-cli", "gomod2nix.toml"),
-      path.join(_tmp, "gomod2nix.toml"),
-    );
+      env: { ...process.env, ...goEnv },
+    })`viberoots/build-tools/tools/bin/u`;
 
-    // Export glue (override gomod2nix to our local stub to avoid timeouts)
-    await $({
-      env: { ...process.env, INSTALL_DEPS_GOMOD2NIX_BIN: stubPath },
-    })`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
+    // Export read-only glue from the reconciled language metadata.
+    await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
 
     // Start a patch session and patch uuid to zero
     const { origin, ws } = await startPatchPkgSession($, _tmp, goEnv);

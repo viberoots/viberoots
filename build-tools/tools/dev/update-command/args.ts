@@ -8,14 +8,16 @@ export const UPDATE_COMMAND_HELP = `usage: u [--upgrade] [--verbose]
 Make project dependency and generated metadata consistent after source edits.
 
   u            conservatively repair locks and deterministic metadata
-  u --upgrade  intentionally upgrade pnpm dependencies, then reconcile metadata
+  u --upgrade  intentionally upgrade pnpm, Go, and Python dependencies
 
-Go, Python, and C++ upgrades are unsupported and fail closed when those project surfaces exist.
+C++ has no upgradeable dependency authority and is reconciled without moving Nix pins.
+Language operations time out after 600 seconds by default. Set
+VBR_UPDATE_LANGUAGE_TIMEOUT_SECONDS to a positive value up to 3600 to override it.
 Neither mode updates the viberoots pin, submodule, or flake input.
 Use viberoots update when the viberoots pin itself should move.
 
 options:
-  --upgrade    intentionally upgrade pnpm dependency versions
+  --upgrade    intentionally upgrade pnpm, Go, and Python dependency versions
   --verbose    show each reconciliation step
   -h, --help   show help
 

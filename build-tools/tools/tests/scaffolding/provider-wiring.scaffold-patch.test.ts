@@ -14,48 +14,19 @@ test("provider wiring present only on affected target after patch", async () => 
     ) {
       return;
     }
-    // Initialize module before editing (no tidy; avoid network)
-    await $`/usr/bin/env bash --noprofile --norc -lc 'cd projects/libs/demo-lib && test -f go.mod || go mod init example.com/demo-lib && go mod edit -require golang.org/x/text@v0.14.0'`;
-    // Generate gomod2nix lock at repo root from the lib module via local stub
-    const stubDir = path.join(_tmp, "bin");
-    await fsp.mkdir(stubDir, { recursive: true });
-    const stubPath = path.join(stubDir, "gomod2nix");
+    const moduleDir = path.join(_tmp, "projects", "libs", "demo-lib");
+    await $({ cwd: moduleDir })`go mod edit -require golang.org/x/text@v0.14.0`;
+    await fsp.mkdir(path.join(moduleDir, "pkg", "dependency"), { recursive: true });
     await fsp.writeFile(
-      stubPath,
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        "DIR=.",
-        "while [[ $# -gt 0 ]]; do",
-        '  case "$1" in',
-        "    --dir)",
-        '      DIR="$2"; shift 2;;',
-        "    *) shift;;",
-        "  esac",
-        "done",
-        'mkdir -p "$DIR"',
-        "cat > \"$DIR/gomod2nix.toml\" <<'EOF'",
-        "schema = 3",
-        "mod = {}",
-        "replace = {}",
-        "prune = { go-tests = true, unused-packages = true }",
-        "EOF",
-      ].join("\n"),
+      path.join(moduleDir, "pkg", "dependency", "keep.go"),
+      'package dependency\n\nimport _ "golang.org/x/text/language"\n',
       "utf8",
-    );
-    await $`chmod +x ${stubPath}`;
-    await $({
-      cwd: _tmp,
-      stdio: "inherit",
-      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-    })`gomod2nix --dir projects/libs/demo-lib`;
-    await fsp.copyFile(
-      path.join(_tmp, "projects", "libs", "demo-lib", "gomod2nix.toml"),
-      path.join(_tmp, "gomod2nix.toml"),
     );
     // Create a dummy patch for that module version
     await $`/usr/bin/env bash --noprofile --norc -lc 'mkdir -p patches/go && touch patches/go/golang.org__x__text@v0.14.0.patch'`;
-    // Run glue and build via Nix graph-generator
+    await $`viberoots/build-tools/tools/bin/u`;
+
+    // Run read-only glue and build via Nix graph-generator.
     await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
     const { stdout } = await $({
       cwd: _tmp,

@@ -161,11 +161,13 @@ u
 
 Ordinary `i` materialization invokes this helper in read-only mode. It may realize and link ignored
 local state, but it does not regenerate a lockfile or rewrite pnpm hash metadata. If the committed
-lock or hash metadata is stale, or its fixed store output is absent, installation fails closed,
-names the stale input, and reports `repair: run u`. Intentional reconciliation owns the committed
-fixed-store hash and realized output authority. It accepts one targeted Nix hash mismatch, refreshes
-the filtered input after the hash write, and verifies the result before success. Scaffold flows must
-run that reconciliation before their first locked/offline materialization.
+lock or hash metadata is stale or invalid, installation fails closed, names the stale input, and
+reports `repair: run u`. If that metadata is valid but its fixed output is absent locally, read-only
+install materializes exactly that committed fixed output without discovering or writing a hash.
+Intentional reconciliation owns the committed fixed-store hash authority. It accepts one targeted
+Nix hash mismatch, refreshes the filtered input after the hash write, and verifies the result before
+success. Scaffold flows must run that reconciliation before their first locked/offline
+materialization.
 
 Plain `u` conservatively refreshes importer lockfiles from current manifests before reconciliation.
 Use `u --upgrade` when pnpm dependency versions should intentionally move. Both paths share the

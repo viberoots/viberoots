@@ -184,6 +184,9 @@ const repoRoot = await resolveWorkspaceRoot();
 const metadataMode = installMetadataMode();
 const refreshPnpmHashes = metadataMode === "reconcile";
 const readOnlyMetadata = metadataMode === "read-only";
+// install-deps never owns tracked Go reconciliation. The explicit u dispatcher
+// calls repairGoDependencies directly before build or prebuild work begins.
+const readOnlyGoMetadata = true;
 await checkBootstrapCompletion({
   workspaceRoot: repoRoot,
   repair: !dryRun,
@@ -208,14 +211,14 @@ if (glueOnly) {
   } catch {}
   // Minimal Go preparation so Nix graph builds are deterministic and fast
   if (!effSkipGoTidy) {
-    await runGoModTidyForMissingSum(repoRoot, dryRun, verbose);
+    await runGoModTidyForMissingSum(repoRoot, dryRun, verbose, readOnlyGoMetadata);
   } else if (verbose) {
     console.log("[skip] go mod tidy for missing go.sum");
   }
   // Fail fast for lock regeneration in glue-only to avoid long stalls
   process.env.INSTALL_DEPS_GOMOD_TIMEOUT = process.env.INSTALL_DEPS_GOMOD_TIMEOUT || "60";
-  await runGomod2nixGenerate(dryRun, verbose);
-  await runGomod2nixScanAll(dryRun, verbose);
+  await runGomod2nixGenerate(dryRun, verbose, readOnlyGoMetadata);
+  await runGomod2nixScanAll(dryRun, verbose, readOnlyGoMetadata);
   if (!skipGlue) {
     await runGlue(dryRun, verbose);
   } else if (verbose) {
@@ -388,17 +391,17 @@ try {
 } catch {}
 // Generate gomod2nix.toml at repo root (if present) and per project (projects/apps/*, projects/libs/*)
 if (!skipGoTidy) {
-  await runGoModTidyForMissingSum(repoRoot, dryRun, verbose, readOnlyMetadata);
+  await runGoModTidyForMissingSum(repoRoot, dryRun, verbose, readOnlyGoMetadata);
 } else if (verbose) {
   console.log("[skip] go mod tidy for missing go.sum");
 }
 // Invoke root gomod2nix regardless; the generator prints a clear skip or dry-run line
 try {
-  await runGomod2nixGenerate(dryRun, verbose, readOnlyMetadata);
+  await runGomod2nixGenerate(dryRun, verbose, readOnlyGoMetadata);
 } catch (error) {
-  if (readOnlyMetadata) throw error;
+  throw error;
 }
-await runGomod2nixScanAll(dryRun, verbose, readOnlyMetadata);
+await runGomod2nixScanAll(dryRun, verbose, readOnlyGoMetadata);
 // Best-effort Python lock refresh (uv). No-ops if no uv.lock present.
 await runUvRefreshAll(dryRun, verbose, readOnlyMetadata);
 if (!skipGlue && readOnlyMetadata) {

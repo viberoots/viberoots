@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "../../dev/install/gomod2nix";
+import { writeAbsenceCache } from "../../dev/install/absence-cache";
 import { runUvRefreshAll } from "../../dev/install/uv";
 
 function captureLogs(): { logs: string[]; restore: () => void } {
@@ -141,5 +142,32 @@ test("absence cache writes under workspace root when install runs from subdirect
       );
       await assert.rejects(fsp.stat(path.join(projects, ".viberoots")));
     });
+  });
+});
+
+test("read-only gomod2nix ignores fresh absence stamps without rewriting them", async () => {
+  await withTempCwd("gomod2nix-read-only-absence-", async (tmp) => {
+    const app = path.join(tmp, "projects/apps/goapp");
+    await fsp.mkdir(app, { recursive: true });
+    for (const dir of [tmp, app]) {
+      await fsp.writeFile(path.join(dir, "go.mod"), "module example.com/read-only\n");
+      await fsp.writeFile(path.join(dir, "go.sum"), "");
+    }
+    await writeAbsenceCache(tmp, "gomod2nix-root-absent", ["."]);
+    await writeAbsenceCache(tmp, "gomod2nix-absent", ["projects/apps", "projects/libs"]);
+    const cacheDir = path.join(tmp, ".viberoots/workspace/install-cache");
+    const rootStamp = await fsp.readFile(path.join(cacheDir, "gomod2nix-root-absent.json"));
+    const projectStamp = await fsp.readFile(path.join(cacheDir, "gomod2nix-absent.json"));
+
+    await assert.rejects(runGomod2nixGenerate(false, false, true), /tracked metadata is stale/);
+    await assert.rejects(runGomod2nixScanAll(false, false, true), /tracked metadata is stale/);
+    assert.deepEqual(
+      await fsp.readFile(path.join(cacheDir, "gomod2nix-root-absent.json")),
+      rootStamp,
+    );
+    assert.deepEqual(
+      await fsp.readFile(path.join(cacheDir, "gomod2nix-absent.json")),
+      projectStamp,
+    );
   });
 });

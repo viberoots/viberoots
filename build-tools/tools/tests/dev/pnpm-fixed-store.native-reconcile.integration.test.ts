@@ -3,17 +3,18 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
+import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
 import { extractHash } from "../../dev/update-pnpm-hash/nix";
+import {
+  buildArgs,
+  nixEnv,
+  PLACEHOLDER,
+  repoRoot,
+  writeFixture,
+} from "./pnpm-fixed-store-native-fixture";
 import { directorySizeKib, runGuardedCommand } from "./pnpm-fixed-store-native-run";
 
-const PLACEHOLDER = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 const MAX_KIB = 500 * 1024;
-const COMMAND_TIMEOUT_MS = 150_000;
-
-function repoRoot(): string {
-  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
-}
 
 function strictGot(stderr: string): string {
   const candidate = mismatchCandidate(stderr);
@@ -34,117 +35,9 @@ function mismatchCandidate(stderr: string): string {
   return unique[0];
 }
 
-async function writeFixture(root: string, nixpkgsPath: string): Promise<void> {
-  await fsp.mkdir(root, { recursive: true });
-  await fsp.writeFile(
-    path.join(root, "package.json"),
-    JSON.stringify({
-      name: "tiny-native-reconcile",
-      private: true,
-      version: "0.0.0",
-      dependencies: { never: "1.1.0" },
-    }) + "\n",
-  );
-  await fsp.writeFile(
-    path.join(root, "pnpm-lock.yaml"),
-    [
-      "lockfileVersion: '9.0'",
-      "",
-      "settings:",
-      "  autoInstallPeers: true",
-      "  excludeLinksFromLockfile: false",
-      "",
-      "importers:",
-      "  .:",
-      "    dependencies:",
-      "      never:",
-      "        specifier: 1.1.0",
-      "        version: 1.1.0",
-      "",
-      "packages:",
-      "  never@1.1.0:",
-      "    resolution: {integrity: sha512-K0xfZVKUX7hrmbZKmyD1KB+PT8I9b9Ffxvmht8FhRjMIoe7/XyTfgyQko7G6RKvfnT9oxCrq0CARm1De5uXEbQ==}",
-      "    engines: {node: '>=10.18.0 <11 || >=12.14.0 <13 || >=13.5.0'}",
-      "",
-      "snapshots:",
-      "  never@1.1.0: {}",
-      "",
-    ].join("\n"),
-  );
-  await fsp.writeFile(
-    path.join(root, "hashes.json"),
-    JSON.stringify({ "pnpm-lock.yaml": PLACEHOLDER }) + "\n",
-  );
-  const sourceRoot = repoRoot();
-  const system = `${process.arch === "arm64" ? "aarch64" : "x86_64"}-${process.platform === "darwin" ? "darwin" : "linux"}`;
-  await fsp.writeFile(
-    path.join(root, "flake.nix"),
-    `{
-  inputs.nixpkgs.url = ${JSON.stringify(`path:${nixpkgsPath}`)};
-  outputs = { self, nixpkgs }:
-    let
-      system = ${JSON.stringify(system)};
-      pkgs = import nixpkgs { inherit system; };
-      store = import ${JSON.stringify(path.join(sourceRoot, "build-tools/tools/nix/node-modules/store.nix"))} {
-        inherit pkgs;
-        repoRoot = ./.;
-        repoFsRoot = ./.;
-        hashesPath = ./hashes.json;
-        allowLiveHashMap = false;
-      };
-    in {
-      packages.\${system} = {
-        candidate = store.mkPnpmStore {
-          lockfilePath = "pnpm-lock.yaml";
-          importerDir = ".";
-          packageJsonPath = "package.json";
-        };
-        pinnedPnpm = import ${JSON.stringify(path.join(sourceRoot, "build-tools/tools/nix/pnpm-11.nix"))} { inherit pkgs; };
-      };
-    };
-}
-`,
-  );
-}
-
-function nixEnv(
-  home: string,
-  authority: "reconcile" | "materialize" = "reconcile",
-): NodeJS.ProcessEnv {
-  return {
-    HOME: home,
-    XDG_CACHE_HOME: path.join(home, "xdg-cache"),
-    NIX_CONFIG: "experimental-features = nix-command flakes",
-    ...(authority === "reconcile" ? { NIX_PNPM_RECONCILE: "1" } : { NIX_PNPM_MATERIALIZE: "1" }),
-    NIX_PNPM_FETCH_TIMEOUT: "120",
-    NIX_PNPM_INSTALL_TIMEOUT: "120",
-  };
-}
-
-function buildArgs(printOutPaths = false): string[] {
-  return [
-    "build",
-    "--impure",
-    "--no-link",
-    "--no-write-lock-file",
-    "--print-build-logs",
-    ...(printOutPaths ? ["--print-out-paths"] : []),
-    "--option",
-    "keep-failed",
-    "false",
-    "--option",
-    "min-free",
-    "0",
-    "--option",
-    "max-free",
-    "0",
-    ".#candidate",
-  ];
-}
-
 test(
   "native fixed pnpm reconciliation is deterministic and offline-consumable",
-  { timeout: 180_000 },
+  { timeout: 480_000 },
   async () => {
     const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-native-pnpm-reconcile-"));
     const nix = "/nix/var/nix/profiles/default/bin/nix";
@@ -163,9 +56,20 @@ test(
       assert.equal(archive.status, 0, archive.stderr);
       const nixpkgsPath = JSON.parse(archive.stdout).path;
       assert.match(nixpkgsPath, /^\/nix\/store\/[a-z0-9]+-source$/);
+      const viberootsPath = (await materializeFilteredViberootsSource(repoRoot())).storePath;
 
       const fixtures = [path.join(root, "candidate-a"), path.join(root, "candidate-b")];
-      await Promise.all(fixtures.map((fixture) => writeFixture(fixture, nixpkgsPath)));
+      await Promise.all(
+        fixtures.map((fixture) => writeFixture(fixture, nixpkgsPath, viberootsPath)),
+      );
+      for (const fixture of fixtures) {
+        const locked = await runGuardedCommand(nix, ["flake", "lock"], {
+          cwd: fixture,
+          env: nixEnv(path.join(root, "lock-home")),
+          fixtureRoot: root,
+        });
+        assert.equal(locked.status, 0, locked.stderr);
+      }
       const candidates: string[] = [];
       for (const [index, fixture] of fixtures.entries()) {
         const home = path.join(root, `home-${index}`);
@@ -182,7 +86,7 @@ test(
       assert.equal(candidates[0], candidates[1]);
 
       await fsp.writeFile(
-        path.join(fixtures[0], "hashes.json"),
+        path.join(fixtures[0], "build-tools", "tools", "nix", "node-modules.hashes.json"),
         JSON.stringify({ "pnpm-lock.yaml": candidates[0] }) + "\n",
       );
       const final = await runGuardedCommand(nix, buildArgs(true), {
@@ -243,16 +147,62 @@ test(
       });
       assert.equal(deleted.status, 0, deleted.stderr);
       await fsp.writeFile(
-        path.join(fixtures[1], "hashes.json"),
+        path.join(fixtures[1], "build-tools", "tools", "nix", "node-modules.hashes.json"),
         JSON.stringify({ "pnpm-lock.yaml": candidates[0] }) + "\n",
       );
+      const hashMetadata = await fsp.readFile(
+        path.join(fixtures[1], "build-tools", "tools", "nix", "node-modules.hashes.json"),
+      );
+      const updater = await runGuardedCommand(
+        process.execPath,
+        [
+          "--experimental-strip-types",
+          "--import",
+          path.join(repoRoot(), "build-tools", "tools", "dev", "zx-init.mjs"),
+          path.join(repoRoot(), "build-tools", "tools", "dev", "update-pnpm-hash.ts"),
+          "--lockfile",
+          "pnpm-lock.yaml",
+          "--read-only",
+        ],
+        {
+          cwd: fixtures[1],
+          env: {
+            ...nixEnv(path.join(root, "materialize-home"), "materialize"),
+            VIBEROOTS_FLAKE_INPUT_ROOT: viberootsPath,
+          },
+          fixtureRoot: root,
+          diskRoot: "/nix",
+        },
+      );
+      assert.equal(updater.status, 0, updater.stderr);
+      assert.match(updater.stdout, /is realized from committed metadata/);
       const rematerialized = await runGuardedCommand(nix, buildArgs(true), {
         cwd: fixtures[1],
-        env: nixEnv(path.join(root, "materialize-home"), "materialize"),
+        env: nixEnv(path.join(root, "verify-home")),
         fixtureRoot: root,
       });
       assert.equal(rematerialized.status, 0, rematerialized.stderr);
       assert.equal(rematerialized.stdout.trim().split(/\s+/).at(-1), outPath);
+      assert.deepEqual(
+        await fsp.readFile(
+          path.join(fixtures[1], "build-tools", "tools", "nix", "node-modules.hashes.json"),
+        ),
+        hashMetadata,
+      );
+      const marker = JSON.parse(
+        await fsp.readFile(
+          path.join(
+            fixtures[1],
+            ".viberoots",
+            "workspace",
+            "buck",
+            "tmp",
+            "pnpm-store-verified.root.json",
+          ),
+          "utf8",
+        ),
+      );
+      assert.equal(marker.hashValue, candidates[0]);
       assert.ok((await directorySizeKib(root)) < MAX_KIB);
     } finally {
       await fsp.rm(root, { recursive: true, force: true });

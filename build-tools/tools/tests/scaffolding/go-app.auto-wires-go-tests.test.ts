@@ -14,44 +14,6 @@ test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
     // Scaffold a Go CLI app
     await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
 
-    // Seed gomod2nix deterministically via local stub (no network)
-    const stubDir = path.join(tmp, "bin");
-    await fsp.mkdir(stubDir, { recursive: true });
-    const stubPath = path.join(stubDir, "gomod2nix");
-    await fsp.writeFile(
-      stubPath,
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        "DIR=.",
-        "while [[ $# -gt 0 ]]; do",
-        '  case "$1" in',
-        "    --dir)",
-        '      DIR="$2"; shift 2;;',
-        "    *) shift;;",
-        "  esac",
-        "done",
-        'mkdir -p "$DIR"',
-        "cat > \"$DIR/gomod2nix.toml\" <<'EOF'",
-        "schema = 3",
-        "mod = {}",
-        "replace = {}",
-        "prune = { go-tests = true, unused-packages = true }",
-        "EOF",
-      ].join("\n"),
-      "utf8",
-    );
-    await $`chmod +x ${stubPath}`;
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-    })`gomod2nix --dir projects/apps/demo-cli`;
-    await fsp.copyFile(
-      path.join(tmp, "projects", "apps", "demo-cli", "gomod2nix.toml"),
-      path.join(tmp, "gomod2nix.toml"),
-    );
-
     // Add a simple *_test.go under cmd/<name>/
     const pkgDir = path.join(tmp, "projects/apps/demo-cli/cmd/demo-cli");
     await fsp.mkdir(pkgDir, { recursive: true });
@@ -61,7 +23,9 @@ test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
       "utf8",
     );
 
-    // Glue and then run the auto-wired test target
+    await $`viberoots/build-tools/tools/bin/u`;
+
+    // Glue remains read-only, then run the auto-wired test target.
     await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
     // Add a short, actionable external timeout message if the test stalls on stdlib
     try {

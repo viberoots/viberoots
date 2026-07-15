@@ -167,9 +167,9 @@ explicitly out of scope for this design.
 - `u` handles ordinary Go dependency edits. It may run the conservative repair path equivalent to
   `go mod tidy` when needed and then regenerate deterministic `gomod2nix.toml` and provider/glue
   metadata.
-- `u --upgrade` may upgrade Go dependencies only if the implementation provides an explicit,
-  bounded upgrade policy. Without that policy, it must fail closed for Go rather than quietly doing
-  conservative repair or broad upgrades.
+- `u --upgrade` runs the explicit bounded Go policy: canonical Nix-store `go get -u ./...`, then
+  `go mod tidy` and transactional `gomod2nix.toml` reconciliation. The operation has a bounded
+  timeout and restores `go.mod`, `go.sum`, and `gomod2nix.toml` byte-for-byte on failure.
 - `viberoots update` must not upgrade Go dependencies.
 
 ### Python
@@ -179,9 +179,8 @@ explicitly out of scope for this design.
 - `u` handles ordinary Python dependency edits. It may run the conservative uv lock repair path
   where supported, preserving existing locked choices when possible, then refresh deterministic
   provider/glue metadata.
-- `u --upgrade` may upgrade Python dependencies only if the implementation provides an explicit,
-  bounded uv upgrade policy. Without that policy, it must fail closed for Python rather than doing an
-  implicit upgrade.
+- `u --upgrade` runs canonical Nix-store `uv lock --upgrade` with a bounded timeout and restores
+  `uv.lock`, including its prior presence or absence, on failure.
 - `viberoots update` must not upgrade Python dependencies.
 
 ### C++
@@ -192,8 +191,8 @@ explicitly out of scope for this design.
 - `u` handles deterministic C++ metadata repair required by current checked-in C++ inputs, such as
   provider/source-selection or generated glue refreshes. C++ does not get a package-manager
   lockfile repair path unless a future design adds one.
-- `u --upgrade` must fail closed for C++ unless a reviewed source-selection or package-version
-  upgrade policy exists. It must not opportunistically move nixpkgs packages or provider selections.
+- `u --upgrade` reports C++ as reconciliation-only because C++ has no upgradeable dependency
+  authority. It must not opportunistically move nixpkgs packages or provider selections.
 - `viberoots update` must not upgrade C++ dependencies or source selections.
 
 ## Error Message Contract
@@ -215,8 +214,8 @@ repair: run `viberoots update`
 Messages should name the stale files and the expected deterministic change when possible, but the
 headline should be the exact repair command. A consistency guard cannot infer that a developer
 intends to move dependency versions, so it must not emit `u --upgrade` as repair guidance. That mode
-is selected explicitly by the developer; when the selected project surfaces do not support an
-upgrade, `u --upgrade` fails closed and names those surfaces without modifying files.
+is selected explicitly by the developer. A language without upgradeable dependency authority is
+reported as reconciliation-only and must not move source-selection or package-version authority.
 
 ## Implementation Requirements
 

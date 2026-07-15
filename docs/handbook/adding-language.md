@@ -54,23 +54,30 @@ A language is not integrated until its metadata lifecycle follows the repository
 
 - `u` owns intentional repair. Add the language's conservative lockfile, provider, glue, and other
   deterministic tracked-metadata repair to the update orchestration. An upgrade policy belongs only
-  behind `u --upgrade`; if no bounded upgrade policy exists, fail closed.
+  behind `u --upgrade`; if the language has no upgradeable dependency authority, report it as
+  reconciliation-only without moving adjacent source or package authorities.
 - `i` and post-clone are read-only for tracked files. They may materialize ignored local state, but
   stale lockfiles or generated metadata must fail with `repair: run u` and leave the checkout
   unchanged.
-- Register enablement and read-only validation with the shared project-language registry used by
-  `runReadOnlyLanguageConsistencyChecks`. Reuse the same registry to define or explicitly reject
-  `u --upgrade`; do not add a language-specific commit-check path.
-- New language work must keep `b` as a consumer of checked-in inputs and materialized state, not add
-  another tracked-metadata repair path. Current `b` still has a legacy glue-refresh path through
-  `install-deps --glue-only` that can update some Go/glue metadata; treat that as migration debt, not
-  a model to extend. Run `u` before `b` when language metadata is stale.
+- Register enablement, read-only validation, and the bounded or reconciliation-only upgrade policy
+  with the shared project-language registry used by `runReadOnlyLanguageConsistencyChecks`. Do not
+  add a language-specific commit-check or update-dispatch path.
+- Add the language's handler to the exhaustive `ProjectLanguageId` update map. A new registry entry
+  must fail type checking until both conservative `u` repair and `u --upgrade` behavior are defined.
+- Run conservative repair and upgrade commands through the shared managed-command boundary with a
+  documented timeout, awaited process-group shutdown, and byte-exact rollback for every tracked file
+  the ecosystem tool can create, remove, or rewrite. A partial multi-project failure must not leave
+  the failing project half-reconciled.
+- New language work must keep `b` and `install-deps --glue-only` as consumers of checked-in inputs
+  and materialized state, not add another tracked-metadata repair path. Run `u` before `b` when
+  language metadata is stale.
 - `v` owns validation. Add focused positive and negative tests to its target graph, including
   read-only/repair boundaries and deterministic regeneration.
 - Invoke the production `u` launcher in a bounded local/offline consumer fixture. Prove both the
   language repair result and that the viberoots gitlink, flake pins, and source-mode metadata remain
-  byte-for-byte unchanged. Add the equivalent fail-closed `u --upgrade` assertion when upgrades are
-  unsupported.
+  byte-for-byte unchanged. Exercise both plain `u` and `u --upgrade`; prove the exact ecosystem
+  upgrade argv and rollback on failure for upgradeable languages, or prove the reconciliation-only
+  result when no upgradeable dependency authority exists.
 - Every executable toolchain used by startup checks, update/install orchestration, Buck toolchains,
   or runnable manifests must resolve from `/nix/store`. Route process execution through
   `build-tools/tools/lib/tool-paths.ts` or emit an explicit Nix-store path from Nix. Do not fall back
@@ -79,7 +86,8 @@ A language is not integrated until its metadata lifecycle follows the repository
 
 For a future Rust rollout, this means deciding up front whether Cargo metadata is importer-scoped or
 package-local, making `u` the only tracked repair owner, keeping `i` read-only, and store-qualifying
-`cargo`, `rustc`, and any runnable command before project templates are considered complete.
+`cargo`, `rustc`, and any runnable command. Its registry handler must define bounded Cargo upgrade
+semantics and transactional `Cargo.lock` rollback before project templates are considered complete.
 
 ### Language contracts and manifest
 

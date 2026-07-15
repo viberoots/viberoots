@@ -1,60 +1,111 @@
-import { spawn } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { runGomod2nixGenerateIn, runGomod2nixScanAll } from "../install/gomod2nix";
+import { runGomod2nixGenerateIn } from "../install/gomod2nix";
 import { projectModuleDirs } from "./surfaces";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
+import { runManagedCommand } from "../../lib/managed-command";
+import { withFileRollback } from "./file-transaction";
 
-type CommandResult = { exitCode: number; stdout: string; stderr: string };
+const DEFAULT_LANGUAGE_TIMEOUT_SECONDS = 600;
+const MAX_LANGUAGE_TIMEOUT_SECONDS = 3600;
 
-async function run(command: string, args: string[], cwd: string): Promise<CommandResult> {
-  return await new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd, env: process.env, stdio: "pipe" });
-    let stdout = "";
-    let stderr = "";
-    child.stdout?.on("data", (chunk) => (stdout += String(chunk)));
-    child.stderr?.on("data", (chunk) => (stderr += String(chunk)));
-    child.on("error", reject);
-    child.on("exit", (code) => resolve({ exitCode: code ?? 1, stdout, stderr }));
-  });
-}
-
-export async function repairGoDependencies(root: string, verbose: boolean): Promise<void> {
-  for (const dir of await projectModuleDirs(root, "go.mod")) {
-    const goSum = path.join(dir, "go.sum");
-    const missingSum = !(await fsp.access(goSum).then(
-      () => true,
-      () => false,
-    ));
-    const check = await run(process.env.UPDATE_GO_BIN || "go", ["mod", "tidy", "-diff"], dir);
-    if (check.exitCode !== 0 && !check.stdout.trim()) {
-      throw new Error(
-        `go mod tidy check failed in ${path.relative(root, dir) || "."}\n${check.stderr}`,
-      );
-    }
-    if (check.stdout.trim() || missingSum) {
-      if (verbose) console.log(`[update] Go: repairing ${path.relative(root, dir) || "."}`);
-      const repair = await run(process.env.UPDATE_GO_BIN || "go", ["mod", "tidy"], dir);
-      if (repair.exitCode !== 0) {
-        throw new Error(
-          `go mod tidy failed in ${path.relative(root, dir) || "."}\n${repair.stderr}`,
-        );
-      }
-      await fsp.access(goSum).catch(async () => await fsp.writeFile(goSum, "", "utf8"));
-    }
-    await runGomod2nixGenerateIn(dir, false, verbose);
+export function languageUpdateTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = String(env.VBR_UPDATE_LANGUAGE_TIMEOUT_SECONDS || DEFAULT_LANGUAGE_TIMEOUT_SECONDS);
+  const seconds = Number(raw);
+  if (!Number.isInteger(seconds) || seconds < 1 || seconds > MAX_LANGUAGE_TIMEOUT_SECONDS) {
+    throw new Error(
+      `VBR_UPDATE_LANGUAGE_TIMEOUT_SECONDS must be an integer from 1 to ${MAX_LANGUAGE_TIMEOUT_SECONDS}`,
+    );
   }
-  await runGomod2nixScanAll(false, verbose);
+  return seconds * 1000;
 }
 
-export async function repairPythonDependencies(root: string, verbose: boolean): Promise<void> {
+async function runLanguageCommand(
+  command: string,
+  args: string[],
+  cwd: string,
+  allowNonzeroWithStdout = false,
+): Promise<string> {
+  const result = await runManagedCommand({
+    command,
+    args,
+    cwd,
+    env: { ...process.env, GOTOOLCHAIN: "local" },
+    timeoutMs: languageUpdateTimeoutMs(),
+  });
+  const acceptedDiff =
+    allowNonzeroWithStdout &&
+    result.code === 1 &&
+    !result.timedOut &&
+    !result.interrupted &&
+    Boolean(result.stdout.trim());
+  if ((!result.ok || result.interrupted) && !acceptedDiff) {
+    const reason = result.timedOut
+      ? `timed out after ${languageUpdateTimeoutMs() / 1000}s`
+      : result.interrupted
+        ? "was interrupted"
+        : `exited ${String(result.code)}`;
+    throw new Error(
+      `${path.basename(command)} ${args.join(" ")} ${reason} in ${cwd}\n${result.stderr}`.trim(),
+    );
+  }
+  return result.stdout;
+}
+
+export async function repairGoDependencies(
+  root: string,
+  verbose: boolean,
+  upgrade = false,
+  goBin = ensureNixStoreToolPathSync("go"),
+): Promise<number> {
+  let count = 0;
+  for (const dir of await projectModuleDirs(root, "go.mod")) {
+    const relative = path.relative(root, dir) || ".";
+    await withFileRollback(
+      ["go.mod", "go.sum", "gomod2nix.toml"].map((file) => path.join(dir, file)),
+      async () => {
+        const goSum = path.join(dir, "go.sum");
+        if (upgrade) {
+          if (verbose) console.log(`[update] Go: upgrading ${relative}`);
+          await runLanguageCommand(goBin, ["get", "-u", "./..."], dir);
+          await runLanguageCommand(goBin, ["mod", "tidy"], dir);
+        } else {
+          const missingSum = !(await fsp.access(goSum).then(
+            () => true,
+            () => false,
+          ));
+          const diff = await runLanguageCommand(goBin, ["mod", "tidy", "-diff"], dir, true);
+          if (diff.trim() || missingSum) {
+            if (verbose) console.log(`[update] Go: repairing ${relative}`);
+            await runLanguageCommand(goBin, ["mod", "tidy"], dir);
+          }
+        }
+        await fsp.access(goSum).catch(async () => await fsp.writeFile(goSum, "", "utf8"));
+        await runGomod2nixGenerateIn(dir, false, verbose, false, true);
+      },
+    );
+    count += 1;
+  }
+  return count;
+}
+
+export async function repairPythonDependencies(
+  root: string,
+  verbose: boolean,
+  upgrade = false,
+): Promise<number> {
   const uvBin = ensureNixStoreToolPathSync("uv");
+  let count = 0;
   for (const dir of await projectModuleDirs(root, "pyproject.toml")) {
     const manifest = path.join(dir, "pyproject.toml");
-    if (verbose) console.log(`[update] Python: reconciling ${path.relative(root, manifest)}`);
-    const result = await run(uvBin, ["lock"], dir);
-    if (result.exitCode !== 0) {
-      throw new Error(`uv lock failed in ${path.relative(root, dir) || "."}\n${result.stderr}`);
-    }
+    if (verbose)
+      console.log(
+        `[update] Python: ${upgrade ? "upgrading" : "reconciling"} ${path.relative(root, manifest)}`,
+      );
+    await withFileRollback([path.join(dir, "uv.lock")], async () => {
+      await runLanguageCommand(uvBin, upgrade ? ["lock", "--upgrade"] : ["lock"], dir);
+    });
+    count += 1;
   }
+  return count;
 }

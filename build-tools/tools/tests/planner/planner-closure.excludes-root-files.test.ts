@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { withGoModuleInputFingerprint } from "../../dev/install/go-consistency";
 import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
 // Ensure dev shell tools (gomod2nix, zx deps) are exported into temp repos
 process.env.TEST_NEED_DEV_ENV = "1";
@@ -18,6 +19,8 @@ test("planner: root-only files are excluded from materialized outputs", async ()
 
     // Scaffold a small CLI app under apps/
     await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
+    const moduleDir = path.join(tmp, "projects/apps/demo-cli");
+    await fsp.writeFile(path.join(moduleDir, "go.sum"), "", "utf8");
     // Provide a local stub gomod2nix to avoid network and nix lookups for this no-deps app
     const stubDir = path.join(tmp, "bin");
     await fsp.mkdir(stubDir, { recursive: true });
@@ -51,7 +54,12 @@ test("planner: root-only files are excluded from materialized outputs", async ()
       stdio: "inherit",
       env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
     })`gomod2nix --dir projects/apps/demo-cli`;
-    // No explicit go.sum creation here; allow glue-only to handle tidy deterministically.
+    const metadataPath = path.join(moduleDir, "gomod2nix.toml");
+    await fsp.writeFile(
+      metadataPath,
+      await withGoModuleInputFingerprint(moduleDir, await fsp.readFile(metadataPath, "utf8")),
+      "utf8",
+    );
 
     // Full path: glue-only (fail-fast gomod2nix), then export graph
     await $({

@@ -42,47 +42,10 @@ test(
       await $`git init`;
       // Scaffold a Go CLI app
       await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
-      // Seed gomod2nix deterministically via local stub (no network)
-      const stubDir = path.join(tmp, "bin");
-      await fsp.mkdir(stubDir, { recursive: true });
-      const stubPath = path.join(stubDir, "gomod2nix");
-      await fsp.writeFile(
-        stubPath,
-        [
-          "#!/usr/bin/env bash",
-          "set -euo pipefail",
-          "DIR=.",
-          "while [[ $# -gt 0 ]]; do",
-          '  case "$1" in',
-          "    --dir)",
-          '      DIR="$2"; shift 2;;',
-          "    *) shift;;",
-          "  esac",
-          "done",
-          'mkdir -p "$DIR"',
-          "cat > \"$DIR/gomod2nix.toml\" <<'EOF'",
-          "schema = 3",
-          "mod = {}",
-          "replace = {}",
-          "prune = { go-tests = true, unused-packages = true }",
-          "EOF",
-        ].join("\n"),
-        "utf8",
-      );
-      await $`chmod +x ${stubPath}`;
-      await $({
-        cwd: tmp,
-        stdio: "inherit",
-        env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-      })`gomod2nix --dir projects/apps/demo-cli`;
-      await fsp.copyFile(
-        path.join(tmp, "projects", "apps", "demo-cli", "gomod2nix.toml"),
-        path.join(tmp, "gomod2nix.toml"),
-      );
-
       // Use scaf to create a new test under cmd/<app>/**
       const testPath = path.join(tmp, "projects/apps/demo-cli/cmd/demo-cli/extra_case_test.go");
       await $`scaf new go test extra_case --path=${testPath}`;
+      await $`viberoots/build-tools/tools/bin/u`;
 
       // Skip glue refresh when provider maps are already present in the seeded repo.
       const autoMap = path.join(tmp, ".viberoots/workspace/providers/auto_map.bzl");

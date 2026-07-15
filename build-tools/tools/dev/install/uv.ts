@@ -9,6 +9,7 @@ import { repoRoot } from "../../lib/repo";
 import { absenceCacheFresh, writeAbsenceCache } from "./absence-cache";
 import { staleMetadataError } from "./metadata-mode";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
+import { projectModuleDirs } from "../update-command/surfaces";
 
 const execFileAsync = promisify(execFile);
 
@@ -22,14 +23,27 @@ async function sha256File(file: string): Promise<string> {
 }
 
 /**
- * Best-effort refresh for Python lock inputs (uv). We don't execute uv here.
- * For now, we surface deterministic diagnostics and a stable place to hook
- * a future uv2nix conversion without changing callers.
+ * Inspect Python lock inputs. Read-only mode verifies them with the canonical
+ * Nix-store uv; reconciliation remains owned by the update command.
  */
 export async function runUvRefreshAll(dryRun: boolean, verbose: boolean, readOnly = false) {
   const envRoot = String(process.env.WORKSPACE_ROOT || "").trim();
   const root = envRoot ? path.resolve(envRoot) : repoRoot();
   const scanRoots = ["."];
+  if (readOnly) {
+    for (const dir of await projectModuleDirs(root, "pyproject.toml")) {
+      const lock = path.join(dir, "uv.lock");
+      if (
+        !(await fsp.access(lock).then(
+          () => true,
+          () => false,
+        ))
+      ) {
+        const rel = path.relative(root, lock).replace(/\\/g, "/") || "uv.lock";
+        throw staleMetadataError(rel, "pyproject.toml exists but uv.lock is missing");
+      }
+    }
+  }
   if (!dryRun && (await absenceCacheFresh(root, "uv-locks-absent", scanRoots))) {
     if (verbose) console.log("[uv2nix] scan skipped: no uv.lock present");
     return;

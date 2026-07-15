@@ -188,45 +188,7 @@ EOF
   if (!(await fsp.stat(path.join(t, "projects", "apps", name, "go.mod")).catch(() => null))) {
     return false;
   }
-  // Seed gomod2nix deterministically via local stub (no network)
-  const stubDir = path.join(t, "bin");
-  await fsp.mkdir(stubDir, { recursive: true });
-  const stubPath = path.join(stubDir, "gomod2nix");
-  await fsp.writeFile(
-    stubPath,
-    [
-      "#!/usr/bin/env bash",
-      "set -euo pipefail",
-      "DIR=.",
-      "while [[ $# -gt 0 ]]; do",
-      '  case "$1" in',
-      "    --dir)",
-      '      DIR="$2"; shift 2;;',
-      "    *) shift;;",
-      "  esac",
-      "done",
-      'mkdir -p "$DIR"',
-      "cat > \"$DIR/gomod2nix.toml\" <<'EOF'",
-      "schema = 3",
-      "mod = {}",
-      "replace = {}",
-      "prune = { go-tests = true, unused-packages = true }",
-      "EOF",
-    ].join("\n"),
-    "utf8",
-  );
-  await $`chmod +x ${stubPath}`;
-  await $({
-    cwd: t,
-    stdio: "inherit",
-    env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-  })`gomod2nix --dir projects/apps/${name}`;
-  await fsp.copyFile(
-    path.join(t, "projects", "apps", name, "gomod2nix.toml"),
-    path.join(t, "gomod2nix.toml"),
-  );
-  await $({
-    env: { ...process.env, INSTALL_DEPS_SKIP_GO_TIDY: "1" },
-  })`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
+  await $`viberoots/build-tools/tools/bin/u`;
+  await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
   return true;
 }

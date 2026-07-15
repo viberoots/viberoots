@@ -124,8 +124,19 @@ async function fixture(name: string): Promise<string> {
 
 async function addOfflineSurfaces(root: string): Promise<void> {
   const importer = path.join(root, "projects/apps/mixed");
-  await addOfflinePnpm(root, importer);
-  await fsp.writeFile(path.join(importer, "go.mod"), "module example.test/mixed\n");
+  const local = path.join(root, "projects/apps/local");
+  await fsp.mkdir(importer, { recursive: true });
+  await fsp.mkdir(local, { recursive: true });
+  await fsp.writeFile(
+    path.join(importer, "go.mod"),
+    "module example.test/mixed\n\ngo 1.24\n\nrequire example.test/local v0.0.0\nreplace example.test/local => ../local\n",
+  );
+  await fsp.writeFile(
+    path.join(importer, "main.go"),
+    'package main\n\nimport _ "example.test/local"\n\nfunc main() {}\n',
+  );
+  await fsp.writeFile(path.join(local, "go.mod"), "module example.test/local\n\ngo 1.24\n");
+  await fsp.writeFile(path.join(local, "local.go"), "package local\n");
   await fsp.writeFile(
     path.join(importer, "pyproject.toml"),
     "[project]\nname='mixed'\nversion='0.0.0'\nrequires-python='>=3.11'\n",
@@ -161,6 +172,10 @@ test("real u repairs bounded offline language inputs without moving viberoots", 
     assert.deepEqual(await snapshot(root), before);
     await fsp.access(path.join(root, "projects/apps/mixed/go.sum"));
     await fsp.access(path.join(root, "projects/apps/mixed/gomod2nix.toml"));
+    assert.match(
+      await fsp.readFile(path.join(root, "projects/apps/mixed/gomod2nix.toml"), "utf8"),
+      /^# viberoots-go-input-sha256: [a-f0-9]{64}$/m,
+    );
     await fsp.access(path.join(root, "projects/apps/mixed/uv.lock"));
     const glueFingerprint = JSON.parse(
       await fsp.readFile(
@@ -172,30 +187,26 @@ test("real u repairs bounded offline language inputs without moving viberoots", 
       glueFingerprint.outputs?.includes(".viberoots/current/build-tools/lang/nix_attr_aliases.bzl"),
       "real u must record repaired C++ source-selection metadata in the glue fingerprint",
     );
-    assert.match(
-      await fsp.readFile(path.join(root, "projects/apps/mixed/pnpm-lock.yaml"), "utf8"),
-      /local-package/,
-    );
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }
 });
 
-test("real u --upgrade rejects unsupported languages before mutation", async () => {
-  const root = await fixture("unsupported-upgrade");
+test("real u --upgrade upgrades bounded offline languages and reconciles C++", async () => {
+  const root = await fixture("language-upgrade");
   try {
     await addOfflineSurfaces(root);
     const before = await snapshot(root);
-    const statusBefore = await execFileAsync("git", ["status", "--short"], { cwd: root });
-    await assert.rejects(
-      run(root, ["--upgrade"]),
-      /unsupported.*Go, Python\/uv, C\+\+[\s\S]*no files were modified/,
-    );
+    const result = await run(root, ["--upgrade"]);
     assert.deepEqual(await snapshot(root), before);
-    assert.equal(
-      (await execFileAsync("git", ["status", "--short"], { cwd: root })).stdout,
-      statusBefore.stdout,
-    );
+    assert.match(result.stdout, /Go: upgraded 2 module/);
+    assert.match(result.stdout, /Python\/uv: upgraded 1 project/);
+    assert.match(result.stdout, /C\+\+: reconciliation-only/);
+    await fsp.access(path.join(root, "projects/apps/mixed/go.sum"));
+    await fsp.access(path.join(root, "projects/apps/mixed/gomod2nix.toml"));
+    await fsp.access(path.join(root, "projects/apps/mixed/uv.lock"));
+    await fsp.access(path.join(root, "projects/apps/local/go.sum"));
+    await fsp.access(path.join(root, "projects/apps/local/gomod2nix.toml"));
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }

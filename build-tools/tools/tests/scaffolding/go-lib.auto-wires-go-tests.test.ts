@@ -12,44 +12,6 @@ test("go lib: adding *_test.go auto-wires nix_go_test and runs", async () => {
 
     // Scaffold a Go library
     await $`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
-    // Seed gomod2nix deterministically via local stub (no network)
-    const stubDir = path.join(tmp, "bin");
-    await fsp.mkdir(stubDir, { recursive: true });
-    const stubPath = path.join(stubDir, "gomod2nix");
-    await fsp.writeFile(
-      stubPath,
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        "DIR=.",
-        "while [[ $# -gt 0 ]]; do",
-        '  case "$1" in',
-        "    --dir)",
-        '      DIR="$2"; shift 2;;',
-        "    *) shift;;",
-        "  esac",
-        "done",
-        'mkdir -p "$DIR"',
-        "cat > \"$DIR/gomod2nix.toml\" <<'EOF'",
-        "schema = 3",
-        "mod = {}",
-        "replace = {}",
-        "prune = { go-tests = true, unused-packages = true }",
-        "EOF",
-      ].join("\n"),
-      "utf8",
-    );
-    await $`chmod +x ${stubPath}`;
-    await $({
-      cwd: tmp,
-      stdio: "inherit",
-      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-    })`gomod2nix --dir projects/libs/demo-lib`;
-    await fsp.copyFile(
-      path.join(tmp, "projects", "libs", "demo-lib", "gomod2nix.toml"),
-      path.join(tmp, "gomod2nix.toml"),
-    );
-
     // Add a simple *_test.go inside pkg/** so nix_go_library's auto-test picks it up
     const pkgDir = path.join(tmp, "projects/libs/demo-lib/pkg/demo-lib");
     await fsp.mkdir(pkgDir, { recursive: true });
@@ -59,7 +21,9 @@ test("go lib: adding *_test.go auto-wires nix_go_test and runs", async () => {
       "utf8",
     );
 
-    // Glue and build prerequisites
+    await $`viberoots/build-tools/tools/bin/u`;
+
+    // Glue and build prerequisites remain read-only after reconciliation.
     await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
 
     // Run the test via Buck; platform is set by runInTemp's .buckconfig

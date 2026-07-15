@@ -24,7 +24,7 @@
 8. [Developer Workflow (Mermaid + Commands)](#developer-workflow)
 9. [CI with Jenkins (Matrix across 3 Architectures)](#ci-with-jenkins)
 10. [Scaffolding Requirements](#scaffolding-requirements)
-11. [gomod2nix Integration (called from `build-tools/tools/install-deps.ts`)](#gomod2nix-integration-called-from-toolsinstall-depsts)
+11. [gomod2nix Integration (reconciled by `u`)](#gomod2nix-integration-reconciled-by-u)
 12. [Future-Proofing for Other Languages](#future-proofing-for-other-languages)
 13. [Appendix: Reference Snippets](#appendix-reference-snippets)
 
@@ -870,7 +870,8 @@ I add an explicit compliance selector without changing default verify behavior.
 - [ ] Add a simple **lint** script that warns if any subdirectory is found under `patches/go/`.
 - Verification:
   - [ ] Run the lint; it emits **no warnings** on a clean repo.
-- Acceptance: Lint is wired into `build-tools/tools/install-deps.ts` (or a pre-commit hook).
+- Acceptance: `u` runs the lint while reconciling dependency state, and `i` validates the committed
+  result without mutating it.
 
 ### Phase 2 — Buck Macro Shell (Go)
 
@@ -1041,7 +1042,7 @@ nix_go_binary(
 
 > **Shared glue pipeline:** Orchestration is centralized in `build-tools/tools/buck/glue-pipeline.ts` and is invoked by both local flows (e.g., `patch-pkg`/install) and CI stages to avoid drift. Behavior and outputs remain identical; only the callsite is unified.
 
-> **Why separate stages (not a single `install-deps` in CI)?**
+> **Why separate stages (not a single dependency-reconciliation step in CI)?**
 >
 > - **Cacheability:** cache artifacts per stage (graph export, provider sync, auto-map) with distinct keys.
 > - **Fail-fast diagnostics:** pinpoint exactly which step broke.
@@ -1130,11 +1131,13 @@ When adding **new** Go targets (libs or apps):
 
 ---
 
-## gomod2nix Integration (Called from `build-tools/tools/install-deps.ts`)
+## gomod2nix Integration (Reconciled by `u`)
 
 - After **dependency changes** (e.g., `go.mod` / `go.sum` updates), you **must** regenerate `gomod2nix.toml`.
-- **Do not** add a new command; this must be **invoked by the existing** `build-tools/tools/install-deps.ts` script **without breaking** its current behavior.
-- Example (conceptual): `nix run nixpkgs#gomod2nix -- --dir .` then stage the updated `gomod2nix.toml`.
+- Run `u` to reconcile `gomod2nix.toml` through the canonical Nix toolchain, then review and stage the
+  updated file.
+- `i` is read-only. It validates that committed Go dependency metadata is current and fails with
+  `repair: run u` instead of regenerating or staging it.
 
 ---
 
@@ -1241,7 +1244,8 @@ console.log("providers sync complete for", LANG);
 **When does it run?**
 
 - **Locally**: triggered by Node `patch-pkg apply` (after committing the pnpm patch).
-- **Dev env setup**: may run from `build-tools/tools/install-deps.ts` after `export-graph.ts`, before `gen-auto-map.ts`.
+- **Local reconciliation**: `u` may run it after `export-graph.ts`, before `gen-auto-map.ts`; `i`
+  validates the resulting committed inputs without rewriting them.
 - **CI**: as a dedicated stage, before `Generate auto_map`.
 
 ### Shared importer utilities (Node + Python)

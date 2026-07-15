@@ -10,7 +10,7 @@ hardening work already present in this checkout. That means PR-1 should consolid
 validate the existing read-only install, pnpm exact-store, source-mode, and scaffold fixes rather
 than rediscovering them from the previous upstream commit.
 
-The plan uses three larger PRs instead of six smaller ones so the work can share validation
+The plan uses four larger PRs instead of six smaller ones so the work can share validation
 checkpoints. The PR labels in this document are planning labels only.
 
 ## Reviewed Context
@@ -189,12 +189,12 @@ separate design update rather than being inferred into this command split.
 
 Command responsibility by language:
 
-| Language surface | `i`                                                                                                                                                        | `u`                                                                                                                                           | `u --upgrade`                                                                                | `viberoots update`                                                                      |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
-| Node/TypeScript  | Read `package.json`, `pnpm-lock.yaml`, pnpm hash metadata, exact-store metadata, and generated provider metadata; materialize ignored local state only.    | Conservatively refresh pnpm locks from manifests and refresh pnpm hash, exact-store, provider, and glue metadata.                             | Run intentional pnpm upgrade behavior and then reconcile metadata.                           | Update viberoots only; refresh Node metadata only if required by the new viberoots pin. |
-| Go               | Read `go.mod`, `go.sum`, `gomod2nix.toml`, and Go provider/glue metadata; fail if tracked state is stale.                                                  | Run conservative Go repair such as `go mod tidy` only when needed, then regenerate deterministic `gomod2nix.toml` and provider/glue metadata. | Upgrade only if an explicit bounded Go upgrade policy is implemented; otherwise fail closed. | Update viberoots only; do not upgrade Go dependencies.                                  |
-| Python/uv        | Read Python manifests, `uv.lock`, and Python provider/glue metadata; fail if tracked state is stale.                                                       | Run conservative uv lock repair where supported and refresh deterministic provider/glue metadata.                                             | Upgrade only if an explicit bounded uv upgrade policy is implemented; otherwise fail closed. | Update viberoots only; do not upgrade Python dependencies.                              |
-| C++              | Read BUILD inputs, Nix provider/source-selection metadata, C++ patch metadata, and generated provider/glue metadata; materialize ignored local state only. | Repair deterministic provider/source-selection/glue metadata required by current checked-in inputs.                                           | Fail closed unless a reviewed C++ source-selection or package-version upgrade policy exists. | Update viberoots only; do not upgrade C++ dependencies or source selections.            |
+| Language surface | `i`                                                                                                                                                        | `u`                                                                                                                                           | `u --upgrade`                                                                             | `viberoots update`                                                                      |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Node/TypeScript  | Read `package.json`, `pnpm-lock.yaml`, pnpm hash metadata, exact-store metadata, and generated provider metadata; materialize ignored local state only.    | Conservatively refresh pnpm locks from manifests and refresh pnpm hash, exact-store, provider, and glue metadata.                             | Run intentional pnpm upgrade behavior and then reconcile metadata.                        | Update viberoots only; refresh Node metadata only if required by the new viberoots pin. |
+| Go               | Read `go.mod`, `go.sum`, `gomod2nix.toml`, and Go provider/glue metadata; fail if tracked state is stale.                                                  | Run conservative Go repair such as `go mod tidy` only when needed, then regenerate deterministic `gomod2nix.toml` and provider/glue metadata. | Run bounded Nix-store `go get -u ./...`, tidy, and transactional metadata reconciliation. | Update viberoots only; do not upgrade Go dependencies.                                  |
+| Python/uv        | Read Python manifests, `uv.lock`, and Python provider/glue metadata; fail if tracked state is stale.                                                       | Run conservative uv lock repair where supported and refresh deterministic provider/glue metadata.                                             | Run bounded Nix-store `uv lock --upgrade` and transactional lock reconciliation.          | Update viberoots only; do not upgrade Python dependencies.                              |
+| C++              | Read BUILD inputs, Nix provider/source-selection metadata, C++ patch metadata, and generated provider/glue metadata; materialize ignored local state only. | Repair deterministic provider/source-selection/glue metadata required by current checked-in inputs.                                           | Report reconciliation-only; do not move Nix or flake dependency authority.                | Update viberoots only; do not upgrade C++ dependencies or source selections.            |
 
 ## Implementation Guardrails
 
@@ -364,8 +364,8 @@ reconciliation has a shared implementation boundary ready for `u`.
   - dependency/materialization metadata stale: `repair: run u`
   - viberoots pin or source-mode drift: `repair: run viberoots update`
 - Do not infer intentional upgrade authority from stale metadata. `u --upgrade` is selected
-  explicitly when the user intends to move versions and must report its own fail-closed unsupported
-  surface diagnostics.
+  explicitly when the user intends to move versions; it uses bounded ecosystem policies and reports
+  surfaces without upgradeable dependency authority as reconciliation-only.
 - Ensure stale-state errors name the stale file and state that no tracked files were modified.
 - Consolidate pnpm hash metadata refresh, exact-store preparation, and verification behind a shared
   reconciliation module or existing helper surface that can support read-only, conservative repair,
@@ -512,12 +512,10 @@ state: plain `u` for ordinary edits and `u --upgrade` for intentional project de
 - Implement `u --upgrade` as the intentional dependency-version upgrade mode.
 - For pnpm, route `u --upgrade` to package-manager upgrade behavior appropriate for the importer and
   then run shared reconciliation.
-- For Go and Python/uv, implement upgrade behavior only where the ecosystem command is explicit and
-  bounded enough to document. If the upgrade policy is not ready, fail closed for that language with
-  a diagnostic that says upgrades are unsupported rather than silently doing conservative repair.
-- For C++, `u --upgrade` should not change nixpkgs packages or provider selections unless a
-  reviewed source-selection upgrade policy exists. Without that policy, C++ upgrade requests should
-  fail closed with an unsupported-upgrade diagnostic.
+- For Go, use bounded canonical Nix-store `go get -u ./...`, then `go mod tidy` and transactional
+  gomod2nix reconciliation. For Python/uv, use bounded canonical Nix-store `uv lock --upgrade`.
+- For C++, `u --upgrade` must report reconciliation-only and must not change nixpkgs packages,
+  flake pins, or provider selections.
 - Ensure neither `u` nor `u --upgrade` calls `viberoots update`, moves submodules, updates flake
   pins, or mutates viberoots source-mode metadata except through deterministic reconciliation.
 - Update command help and completion for `u` and `u --upgrade`.
@@ -539,11 +537,10 @@ state: plain `u` for ordinary edits and `u --upgrade` for intentional project de
 - `u` repairs a Go manifest/sum state and refreshes `gomod2nix.toml` without needing `i` to mutate
   tracked files.
 - `u` repairs a Python/uv manifest/lock state without needing `i` to mutate tracked files.
-- `u --upgrade` behavior for Go and Python/uv is either implemented with focused coverage or fails
-  closed with documented unsupported-upgrade diagnostics.
+- `u --upgrade` runs the bounded Go and Python/uv upgrade policies with focused rollback coverage.
 - `u` repairs deterministic C++ provider/source-selection metadata when such metadata is tracked,
   or the C++ path is documented and tested as ignored local materialization only.
-- `u --upgrade` for C++ fails closed unless a reviewed source-selection upgrade policy exists.
+- `u --upgrade` reports C++ as reconciliation-only and does not move Nix or flake authority.
 - `u` and `u --upgrade` leave viberoots submodule pointers and flake pins unchanged.
 - `u --help` documents the normal edit workflow and does not advertise `u deps` as the preferred
   path.
@@ -562,9 +559,9 @@ state: plain `u` for ordinary edits and `u --upgrade` for intentional project de
 
 - Local command wrappers.
 - pnpm importer discovery, conservative lock repair, and upgrade paths.
-- Go conservative repair and optional upgrade diagnostics.
-- Python/uv conservative repair and optional upgrade diagnostics.
-- C++ provider/source-selection repair and unsupported-upgrade diagnostics.
+- Go conservative repair, bounded upgrades, and transactional rollback.
+- Python/uv conservative repair, bounded upgrades, and transactional rollback.
+- C++ provider/source-selection repair and reconciliation-only reporting.
 - Generated glue freshness after dependency edits.
 - Source-mode guardrails that ensure `u` and `u --upgrade` do not update viberoots.
 - CLI help and completion.
@@ -738,8 +735,8 @@ behavior-owned modules.
   Python/uv, and C++ instead of adding per-language command-path checks or duplicating stale-state
   classification.
 - Ensure each enabled language participates in the same read-only detection contract:
-  stale tracked metadata fails without mutation and identifies `u` as the repair authority; an
-  unsupported upgrade remains an explicit fail-closed `u --upgrade` result.
+  stale tracked metadata fails without mutation and identifies `u` as the repair authority;
+  upgradeable languages use explicit bounded policies and C++ reports reconciliation-only.
 - Add production-path integration coverage that invokes the actual `u` and `u --upgrade` launchers,
   not only internal command functions or mocked orchestration.
 - Give those integration fixtures bounded local or offline dependency sources so they do not depend
@@ -772,8 +769,8 @@ behavior-owned modules.
   stale tracked metadata without mutation, and do not bypass the shared language registry.
 - Real launcher tests run plain `u` against bounded local/offline pnpm, Go, Python/uv, and
   deterministic C++ repair fixtures where those surfaces have repairable metadata.
-- Real launcher tests run `u --upgrade` for the supported pnpm path and prove Go, Python/uv, and C++
-  fail closed with their documented unsupported-upgrade diagnostics.
+- Real launcher tests run `u --upgrade` for pnpm, Go, and Python/uv and prove C++ remains
+  reconciliation-only without moving Nix or flake authority.
 - Every real `u` and `u --upgrade` integration assertion proves all viberoots pins and source-mode
   metadata are byte-for-byte unchanged.
 - The split fresh-clone and `cc` guard target sets pass together and preserve all assertions from the

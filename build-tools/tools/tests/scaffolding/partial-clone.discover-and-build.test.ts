@@ -103,42 +103,9 @@ EOF
     // Scaffold a new Go lib into the sparse repo
     await $`scaf new go lib demo-lib --yes --path=projects/libs/demo-lib`;
 
-    // Seed gomod2nix deterministically via local stub (no network)
-    const stubDir = path.join(_tmp, "bin");
-    await $`mkdir -p ${stubDir}`;
-    const stubPath = path.join(stubDir, "gomod2nix");
-    await $`bash --noprofile --norc -c ${`cat > ${stubPath} <<'EOF'
-#!/usr/bin/env bash
-set -euo pipefail
-DIR=.
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --dir)
-      DIR="$2"; shift 2;;
-    *) shift;;
-  esac
-done
-mkdir -p "$DIR"
-cat > "$DIR/gomod2nix.toml" <<'EOF2'
-schema = 3
-mod = {}
-replace = {}
-prune = { go-tests = true, unused-packages = true }
-EOF2
-EOF
-chmod +x ${stubPath}
-`}`;
-    await $({
-      cwd: _tmp,
-      stdio: "inherit",
-      env: { ...process.env, PATH: `${stubDir}:${process.env.PATH || ""}` },
-    })`gomod2nix --dir projects/libs/demo-lib`;
-    await $`cp ${path.join(_tmp, "projects/libs/demo-lib/gomod2nix.toml")} ${path.join(
-      _tmp,
-      "gomod2nix.toml",
-    )}`;
+    await $`viberoots/build-tools/tools/bin/u`;
 
-    // Run glue explicitly to ensure discovery works in sparse context
+    // Run read-only glue explicitly to ensure discovery works in sparse context.
     await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
     // Keep the explicit export and mapping to mirror user flow closely
     await $`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;

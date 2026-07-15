@@ -13,7 +13,6 @@ test("language repair creates conservative Go and Python lock metadata", async (
   const pythonDir = path.join(root, "projects/apps/python-app");
   const fakeGo = path.join(root, "fake-go.sh");
   const priorRoot = process.env.WORKSPACE_ROOT;
-  const priorGo = process.env.UPDATE_GO_BIN;
   try {
     await fsp.mkdir(goDir, { recursive: true });
     await fsp.mkdir(pythonDir, { recursive: true });
@@ -26,27 +25,74 @@ test("language repair creates conservative Go and Python lock metadata", async (
       fakeGo,
       `#!/usr/bin/env bash
 set -euo pipefail
-if [[ "$*" != "mod tidy -diff" ]]; then : > go.sum; fi
+if [[ "$*" == "mod tidy -diff" ]]; then
+  printf '%s\n' 'diff --git a/go.sum b/go.sum'
+  exit 1
+fi
+: > go.sum
 `,
     );
     await fsp.chmod(fakeGo, 0o755);
     process.env.WORKSPACE_ROOT = root;
-    process.env.UPDATE_GO_BIN = fakeGo;
 
-    await repairGoDependencies(root, false);
+    await repairGoDependencies(root, false, false, fakeGo);
     await repairPythonDependencies(root, false);
 
     assert.equal(await fsp.readFile(path.join(goDir, "go.sum"), "utf8"), "");
-    assert.equal(
+    assert.match(
       await fsp.readFile(path.join(goDir, "gomod2nix.toml"), "utf8"),
-      "schema = 3\n\n[mod]\n",
+      /^# viberoots-go-input-sha256: [a-f0-9]{64}\nschema = 3\n\n\[mod\]\n$/,
     );
     assert.match(await fsp.readFile(path.join(pythonDir, "uv.lock"), "utf8"), /^version = 1$/m);
   } finally {
     if (priorRoot === undefined) delete process.env.WORKSPACE_ROOT;
     else process.env.WORKSPACE_ROOT = priorRoot;
-    if (priorGo === undefined) delete process.env.UPDATE_GO_BIN;
-    else process.env.UPDATE_GO_BIN = priorGo;
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("failed Go upgrade restores go.mod, go.sum, and gomod2nix.toml byte-for-byte", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-update-go-rollback-"));
+  const goDir = path.join(root, "projects/apps/go-app");
+  const fakeGo = path.join(root, "fake-go.sh");
+  try {
+    await fsp.mkdir(goDir, { recursive: true });
+    const originals = new Map<string, Buffer>([
+      ["go.mod", Buffer.from("module example.test/original\n")],
+      ["go.sum", Buffer.from([0, 1, 2, 255])],
+      ["gomod2nix.toml", Buffer.from("schema = 3\n\n[mod]\n")],
+    ]);
+    for (const [file, bytes] of originals) await fsp.writeFile(path.join(goDir, file), bytes);
+    await fsp.writeFile(
+      fakeGo,
+      `#!/usr/bin/env bash
+set -euo pipefail
+printf 'mutated\n' > go.mod
+rm -f go.sum
+printf 'mutated\n' > gomod2nix.toml
+exit 7
+`,
+    );
+    await fsp.chmod(fakeGo, 0o755);
+
+    await assert.rejects(repairGoDependencies(root, false, true, fakeGo), /exited 7/);
+    for (const [file, bytes] of originals) {
+      assert.deepEqual(await fsp.readFile(path.join(goDir, file)), bytes);
+    }
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("failed Python upgrade preserves uv.lock absence", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-update-python-rollback-"));
+  const pythonDir = path.join(root, "projects/apps/python-app");
+  try {
+    await fsp.mkdir(pythonDir, { recursive: true });
+    await fsp.writeFile(path.join(pythonDir, "pyproject.toml"), "this is not toml = [\n");
+    await assert.rejects(repairPythonDependencies(root, false, true), /uv lock --upgrade exited/);
+    await assert.rejects(fsp.access(path.join(pythonDir, "uv.lock")), { code: "ENOENT" });
+  } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }
 });
@@ -92,7 +138,6 @@ test("u modes preserve source authority while plain u repairs C++ metadata", asy
     const before = await protectedSnapshot();
     const makeOperations = (): UpdateOperations => ({
       importers: async () => ["projects/apps/web"],
-      unsupportedUpgrades: async () => [],
       repairPnpmLock: async () => {
         await fsp.writeFile(path.join(root, "projects/apps/web/pnpm-lock.yaml"), "repaired\n");
       },
@@ -103,10 +148,14 @@ test("u modes preserve source authority while plain u repairs C++ metadata", asy
         );
       },
       reconcilePnpm: async () => {},
-      repairGo: async () => {},
-      repairPython: async () => {},
+      enabledLanguages: async () => ["go", "python", "cpp"],
+      languageUpdates: {
+        go: async () => 0,
+        python: async () => 0,
+        cpp: async () => 0,
+      },
       repairWorkspaceLock: async () => {},
-      repairCpp: async () => {
+      repairGeneratedMetadata: async () => {
         await fsp.writeFile(path.join(root, "cpp-provider-metadata.json"), '{"fresh":true}\n');
       },
     });

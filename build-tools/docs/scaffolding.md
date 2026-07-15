@@ -20,8 +20,8 @@ This document describes the scaffolding system used in this repository: how temp
 
 When a generated scaffold creates or changes dependency inputs (`package.json`, `go.mod`, or
 `pyproject.toml`), run `u` from the workspace root to refresh its lock and deterministic provider
-metadata, then run `i && b && v`. Use `u --upgrade` only when pnpm dependency versions should move;
-Go, Python/uv, and C++ upgrades remain unsupported and fail closed.
+metadata, then run `i && b && v`. Use `u --upgrade` when pnpm, Go, or Python/uv dependency versions
+should move; C++ remains reconciliation-only and does not move Nix or flake pins.
 
 ### CLI UX (intended)
 

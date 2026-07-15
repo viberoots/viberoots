@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { buildToolPath } from "../dev-build/paths";
 import { glueFingerprintFresh } from "./glue-freshness";
 
 export type InstallMetadataMode = "read-only" | "reconcile";
@@ -27,27 +28,25 @@ export async function assertCppTrackedMetadataReady(
   enabledOverride?: boolean,
 ): Promise<void> {
   const config = JSON.parse(
-    await fsp
-      .readFile(path.join(root, "build-tools/tools/nix/langs.json"), "utf8")
-      .catch(() => "{}"),
+    await fsp.readFile(buildToolPath(root, "tools/nix/langs.json"), "utf8").catch(() => "{}"),
   ) as { enabled?: string[] };
   if (!(enabledOverride ?? config.enabled?.includes("cpp"))) return;
-  const tracked = [
-    "build-tools/lang/auto_map.bzl",
-    "build-tools/lang/nix_attr_aliases.bzl",
-    "build-tools/tools/nix/langs.nix",
-  ];
-  for (const file of tracked) {
+  const tracked = ["lang/auto_map.bzl", "lang/nix_attr_aliases.bzl", "tools/nix/langs.nix"];
+  for (const rel of tracked) {
+    const file = buildToolPath(root, rel);
     try {
-      await fsp.access(path.join(root, file));
+      await fsp.access(file);
     } catch {
-      throw staleMetadataError(file, "C++ provider/source-selection metadata is missing");
+      throw staleMetadataError(
+        path.relative(root, file).replace(/\\/g, "/"),
+        "C++ provider/source-selection metadata is missing",
+      );
     }
   }
   const freshness = await glueFingerprintFresh(root);
   if (!freshness.fresh && freshness.reason !== "missing-output") {
     throw staleMetadataError(
-      "build-tools/tools/nix/langs.json",
+      path.relative(root, buildToolPath(root, "tools/nix/langs.json")).replace(/\\/g, "/"),
       `C++ provider/source-selection inputs changed (${freshness.reason})`,
     );
   }

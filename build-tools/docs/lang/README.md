@@ -36,21 +36,27 @@ repository enforcement contract, not only planner/macros/providers.
      validation flow.
 
 6. Define command ownership and tool authority:
-   - `u` is the intended owner for deterministic tracked language metadata repair. Do not extend the
-     legacy `b` → `install-deps --glue-only` path, which can still refresh some Go/glue metadata while
-     that boundary is migrated to read-only behavior.
+   - `u` is the intended owner for deterministic tracked language metadata repair. `b` and
+     `install-deps --glue-only` are read-only for tracked language metadata; do not add mutation to
+     either path.
    - `i` and post-clone validate tracked metadata without rewriting it; stale state names `u` as the
      repair command.
    - Register the language with the canonical project-language consistency registry. Reuse that
      entry for read-only checks and `u --upgrade` support detection rather than adding parallel
      language-specific orchestration.
+   - Add its exhaustive typed update handler. Conservative repair and bounded upgrade implementations
+     use canonical Nix-store tools, the shared managed-command timeout and process-group shutdown,
+     and byte-exact rollback for every tracked metadata file the ecosystem command can alter.
    - Toolchain, update/install, startup, and runnable executables resolve from `/nix/store` through
      the shared tool-path authority or an explicit Nix-emitted path. Do not add host fallbacks.
 
 7. Cover execution boundaries and resource guardrails:
    - Add hostile-`PATH`, Buck toolchain, runnable-manifest, and temp-consumer tests where applicable.
-   - Add a bounded production-launcher fixture that proves `u` repair or fail-closed `u --upgrade`
-     behavior without changing viberoots gitlinks, flake pins, or source-mode metadata.
+   - Add a bounded production-launcher fixture that proves `u` repair and either bounded upgrade or
+     reconciliation-only `u --upgrade` behavior without changing viberoots gitlinks, flake pins, or
+     source-mode metadata.
+   - For an upgradeable language, assert the exact ecosystem upgrade argv and a failure case that
+     restores prior file bytes and prior file presence or absence.
    - Measure focused elapsed time and named disk paths according to
      `docs/handbook/getting-started-on-a-pr.md`; do not broaden snapshots or shared-cache copies to
      satisfy fixtures.

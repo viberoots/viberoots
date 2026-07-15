@@ -9,6 +9,14 @@ test("runInTemp locks a filtered viberoots input instead of the live source root
     viberootsSourcePath("build-tools/tools/tests/lib/test-helpers/run-in-temp.ts"),
     "utf8",
   );
+  const materializer = await fsp.readFile(
+    viberootsSourcePath("build-tools/tools/dev/filtered-flake-viberoots-input.ts"),
+    "utf8",
+  );
+  assert.match(
+    materializer,
+    /args: \["flake", "prefetch", "--json", "--no-use-registries", `path:\$\{canonical\}`\]/,
+  );
   assert.match(source, /materializeFilteredViberootsSource\(inputRoot\)/);
   assert.match(source, /prepareFilteredViberootsInput\(activeViberootsRoot\)/);
   assert.match(source, /filteredFlakeRsyncExcludeArgs\(\)/);
