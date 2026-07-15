@@ -16,5 +16,6 @@ test("Nix-native pnpm store normalization is deterministic and excludes project 
   );
   assert.match(store, /rm -rf "\$out\/store"\/v\*\/projects/);
   assert.match(store, /find "\$out\/store" -exec touch -h -t 197001010000/);
+  assert.match(store, /fs\.writeSync\(fd, Buffer\.alloc\(4\), 0, 4, 96\)/);
   assert.doesNotMatch(store, /exact-store-import|add-fixed/);
 });

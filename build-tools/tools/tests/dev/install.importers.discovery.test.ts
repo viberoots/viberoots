@@ -51,7 +51,7 @@ test("install importer discovery includes untracked workspace importers from rep
 
   const importers = await discoverImportersWithLock(repo, { cwd: repo });
 
-  assert.deepEqual(importers, ["projects/apps/kept", "projects/apps/stray"]);
+  assert.deepEqual(importers, [".", "projects/apps/kept", "projects/apps/stray"]);
 });
 
 test("install importer discovery keeps the current untracked importer when run inside it", async () => {
@@ -67,5 +67,5 @@ test("install importer discovery keeps the current untracked importer when run i
 
   const importers = await discoverImportersWithLock(repo, { cwd: strayImporter });
 
-  assert.deepEqual(importers, ["projects/apps/kept", "projects/apps/stray"]);
+  assert.deepEqual(importers, [".", "projects/apps/kept", "projects/apps/stray"]);
 });

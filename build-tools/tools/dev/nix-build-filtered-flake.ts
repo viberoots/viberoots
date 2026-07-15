@@ -27,6 +27,7 @@ import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../lib/macos-me
 import { findWorkspacePackageRepoDirs } from "./update-pnpm-hash/importer-workspace-packages";
 import { pnpmStoreAttrFromImporter } from "./update-pnpm-hash/paths";
 import { repairSnapshotViberootsInput } from "./filtered-flake-viberoots-input";
+import { runCommand } from "./filtered-flake-command";
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -221,13 +222,22 @@ async function readSnapshotStats(
   dir: string,
 ): Promise<{ fileCount: number; dirCount: number; kb: number }> {
   const [{ stdout: files }, { stdout: dirs }, { stdout: kb }] = await Promise.all([
-    $({ stdio: "pipe" })`find ${dir} -type f | wc -l`,
-    $({ stdio: "pipe" })`find ${dir} -type d | wc -l`,
-    $({ stdio: "pipe" })`du -sk ${dir}`,
+    runCommand({
+      command: resolveToolPathSync("find"),
+      args: [dir, "-type", "f"],
+    }),
+    runCommand({
+      command: resolveToolPathSync("find"),
+      args: [dir, "-type", "d"],
+    }),
+    runCommand({
+      command: resolveToolPathSync("du"),
+      args: ["-sk", dir],
+    }),
   ]);
   return {
-    fileCount: readInt(files),
-    dirCount: readInt(dirs),
+    fileCount: String(files).trim().split(/\n/).filter(Boolean).length,
+    dirCount: String(dirs).trim().split(/\n/).filter(Boolean).length,
     kb: readInt(String(kb || "").split(/\s+/)[0]),
   };
 }
@@ -271,6 +281,13 @@ async function main(): Promise<void> {
         ? await readSelectedPythonSnapshotSources(root)
         : null;
     const snapshotStart = Date.now();
+    const rsyncBin = resolveToolPathSync("rsync");
+    const runSnapshotRsync = async (sources: string[]) =>
+      await runCommand({
+        command: rsyncBin,
+        args: ["-a", "--delete", "--relative", ...rsyncExcludes, ...sources, `${snapDir}/`],
+        cwd: root,
+      });
     if (selectedCppSources != null) {
       console.error(
         "[nix-build-filtered-flake] creating selected cpp snapshot:",
@@ -280,13 +297,7 @@ async function main(): Promise<void> {
         "rsyncSources=",
         String(selectedCppSources.rsyncSources.length),
       );
-      await withHeartbeat(
-        "snapshot-rsync",
-        $({
-          stdio: "inherit",
-          cwd: root,
-        })`rsync -a --delete --relative ${rsyncExcludes} ${selectedCppSources.rsyncSources} ${snapDir}/`,
-      );
+      await withHeartbeat("snapshot-rsync", runSnapshotRsync(selectedCppSources.rsyncSources));
     } else if (selectedNodeSources != null) {
       console.error(
         "[nix-build-filtered-flake] creating selected node snapshot:",
@@ -296,13 +307,7 @@ async function main(): Promise<void> {
         "rsyncSources=",
         String(selectedNodeSources.rsyncSources.length),
       );
-      await withHeartbeat(
-        "snapshot-rsync",
-        $({
-          stdio: "inherit",
-          cwd: root,
-        })`rsync -a --delete --relative ${rsyncExcludes} ${selectedNodeSources.rsyncSources} ${snapDir}/`,
-      );
+      await withHeartbeat("snapshot-rsync", runSnapshotRsync(selectedNodeSources.rsyncSources));
     } else if (selectedPythonSources != null) {
       console.error(
         "[nix-build-filtered-flake] creating selected python snapshot:",
@@ -312,23 +317,11 @@ async function main(): Promise<void> {
         "rsyncSources=",
         String(selectedPythonSources.rsyncSources.length),
       );
-      await withHeartbeat(
-        "snapshot-rsync",
-        $({
-          stdio: "inherit",
-          cwd: root,
-        })`rsync -a --delete --relative ${rsyncExcludes} ${selectedPythonSources.rsyncSources} ${snapDir}/`,
-      );
+      await withHeartbeat("snapshot-rsync", runSnapshotRsync(selectedPythonSources.rsyncSources));
     } else {
       console.error("[nix-build-filtered-flake] creating filtered snapshot:", snapDir);
       const defaultSources = await readDefaultSnapshotSources(root);
-      await withHeartbeat(
-        "snapshot-rsync",
-        $({
-          stdio: "inherit",
-          cwd: root,
-        })`rsync -a --delete --relative ${rsyncExcludes} ${defaultSources} ${snapDir}/`,
-      );
+      await withHeartbeat("snapshot-rsync", runSnapshotRsync(defaultSources));
     }
     await copyWorkspaceGraphIntoSnapshot(root, snapDir);
     const snapshotStats = await readSnapshotStats(snapDir);
@@ -395,12 +388,12 @@ async function main(): Promise<void> {
     const runOnce = () =>
       withHeartbeat(
         "nix-build",
-        $({
-          stdio: "pipe",
+        runCommand({
+          command: nixBin,
+          args: nixArgs,
           env: nixEnv,
-          reject: false,
-          nothrow: true,
-        })`${nixBin} ${nixArgs}`,
+          allowFailure: true,
+        }),
       );
     const res = await runNixBuildWithTransientRetry({ runOnce });
     if (Number(res.exitCode || 0) !== 0) {

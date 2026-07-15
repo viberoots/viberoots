@@ -324,9 +324,24 @@ the mandatory full-validation checkpoint.
 Use this ledger for deliberate follow-up discovered during implementation. Do not use it to hide
 failing tests, weakened assertions, missing docs, or behavior regressions.
 
-| Area                   | Introduced by | Owner PR | Status    | Notes                                                                                 |
-| ---------------------- | ------------- | -------- | --------- | ------------------------------------------------------------------------------------- |
-| Full integration suite | PR-1          | PR-1     | Scheduled | Broad live-worktree source filtering triggers `i && b && ALL_TESTS=1 v` after review. |
+| Area                   | Introduced by | Owner PR | Status | Notes                                                                                 |
+| ---------------------- | ------------- | -------- | ------ | ------------------------------------------------------------------------------------- |
+| Full integration suite | PR-1          | PR-4     | Closed | Functional checkpoint passed; storage defect was fixed and bounded by focused reruns. |
+
+Verified evidence:
+
+- The PR-3 checkpoint driver `.viberoots/buck/codex-test-logs/pr3-final-full-fixed-20260713.log`
+  ran `i && b && ALL_TESTS=1 v` in `6844.89s`. Install and build passed; the five verify groups
+  passed 1,834 tests (`45 + 9 + 15 + 239 + 1526`) with zero failures. The verify log is
+  `.viberoots/workspace/buck/verify-logs/verify-2026-07-14T05-51-43-723Z-60140-9829e0e36ef88.log`.
+- That run's storage audit did not pass: net filesystem growth was 485,140 KiB, but it registered
+  `/nix/store/y5qnpv...-source` at 5,263,861,872 bytes by capturing generated live-worktree state.
+  The functional pass therefore was not treated as storage-clean.
+- After removing the live-source authority defect, the 10-target focused regression passed 10/10.
+  From Nix DB baseline 2,745,399 it registered 36 paths totaling 334,572,480 bytes; the largest was
+  a 38,188,792-byte test seed, no path was at least 100 MB, and net Nix growth was 487,652 KiB.
+- The canonical-lock four-target follow-up passed in 55 seconds. It registered four paths totaling
+  89,667,960 bytes, with a 38,192,008-byte maximum and 97,968 KiB net Nix growth.
 
 ## PR-1: Consolidate Read-Only Materialization And Reconciliation Foundation
 
@@ -701,6 +716,134 @@ This is the largest PR in the plan and requires the mandatory full-suite checkpo
 the source-mode split, fresh-clone smoke, commit guardrails, and final docs avoids multiple separate
 full validation iterations over the same bootstrap/update surface.
 
+## PR-4: Close Update And Commit Consistency Gaps
+
+### 1. Intent
+
+Close the remaining end-of-range assessment gaps without reopening the command model: make commit
+guards fail closed when required root lock metadata is absent, apply the canonical dependency
+consistency authority uniformly across Go, Python/uv, and C++, prove the real `u` command paths with
+bounded integration fixtures, and leave the new guard and fresh-clone coverage in maintainable
+behavior-owned modules.
+
+### 2. Scope of changes
+
+- Make the `cc` consumer consistency guard reject a submodule consumer whose required root
+  `flake.lock` is missing. Diagnose the missing committed input and name `viberoots update` as the
+  repair command; do not treat absence as a mode where metadata synchronization can be skipped.
+- Keep the bootstrap boundary unchanged: Nix itself may still resolve through
+  `/nix/var/nix/profiles/default/bin/nix`, while Python and uv remain Nix-store-only when Python is
+  enabled.
+- Reuse the existing canonical dependency consistency guard and language registry for Go,
+  Python/uv, and C++ instead of adding per-language command-path checks or duplicating stale-state
+  classification.
+- Ensure each enabled language participates in the same read-only detection contract:
+  stale tracked metadata fails without mutation and identifies `u` as the repair authority; an
+  unsupported upgrade remains an explicit fail-closed `u --upgrade` result.
+- Add production-path integration coverage that invokes the actual `u` and `u --upgrade` launchers,
+  not only internal command functions or mocked orchestration.
+- Give those integration fixtures bounded local or offline dependency sources so they do not depend
+  on mutable registries or network availability and cannot cause unbounded store growth.
+- Assert before and after each real command run that viberoots submodule pointers, workspace/root
+  flake pins, and source-mode metadata remain unchanged.
+- Split `build-tools/tools/tests/viberoots/fresh-clone-post-clone.test.ts` by successful bootstrap
+  behavior and fail-closed behavior, with shared setup remaining in the fixture module.
+- Split `build-tools/tools/tests/dev/repo-skills-cc.viberoots-guard.contract.test.ts` by accepted
+  state, missing-input rejection, and dirty/stale-state rejection while keeping consumer fixture
+  construction in one private helper.
+- Remove any file-size exception made unnecessary by those splits. Do not redesign shared test
+  snapshots or broaden source selection as part of the decomposition.
+- Close the integration debt ledger by recording the already validated PR-3 full-run command,
+  result, elapsed time, disk-growth evidence, and bounded largest-store-path evidence. Do not replace
+  that evidence with an unverified summary or rerun the full suite solely to populate the ledger.
+
+### 3. External prerequisites
+
+- PR-1 through PR-3 are complete.
+- The passing PR-3 `i && b && ALL_TESTS=1 v` checkpoint evidence, including timing and disk-growth
+  measurements, is available for the ledger.
+
+### 4. Tests to be added
+
+- A submodule consumer with no required root `flake.lock` is rejected by the `cc` guard without
+  mutation and receives exact `viberoots update` guidance.
+- Coherent submodule and flake consumers remain accepted after the missing-lock guard is tightened.
+- Table-driven consistency tests prove Go, Python/uv, and C++ all reach the canonical guard, reject
+  stale tracked metadata without mutation, and do not bypass the shared language registry.
+- Real launcher tests run plain `u` against bounded local/offline pnpm, Go, Python/uv, and
+  deterministic C++ repair fixtures where those surfaces have repairable metadata.
+- Real launcher tests run `u --upgrade` for the supported pnpm path and prove Go, Python/uv, and C++
+  fail closed with their documented unsupported-upgrade diagnostics.
+- Every real `u` and `u --upgrade` integration assertion proves all viberoots pins and source-mode
+  metadata are byte-for-byte unchanged.
+- The split fresh-clone and `cc` guard target sets pass together and preserve all assertions from the
+  original modules.
+- Run focused formatting, linting, file-size enforcement, command-help, dependency-consistency,
+  update-command, fresh-clone, post-clone, and repo-skill guard targets with bounded elapsed-time and
+  disk-growth evidence.
+- Broaden validation only to selectors reachable from a changed shared production helper. Run
+  another full suite only if the implementation changes behavior outside the already validated
+  command/guard surface.
+
+### 5. Docs to be added or updated
+
+- Update the `cc` workflow documentation to state that required root lock metadata is mandatory in
+  submodule consumer mode and that missing metadata is repaired with `viberoots update`.
+- Update `docs/handbook/adding-language.md`, `docs/handbook/new-language-walkthrough.md`, and the
+  language design checklist so a new ecosystem must register with the canonical read-only
+  consistency guard, define its `u` repair behavior, define or reject `u --upgrade`, and prove its
+  viberoots-pin boundary with production-path tests.
+- Update the file-size exception manifests after the two behavior-owned test splits.
+- Update this plan's integration debt ledger with the validated PR-3 full-run evidence and mark the
+  entry closed only when the recorded command, result, timing, and disk measurements are verified.
+
+### 5.5. Expected regression scope
+
+- Consumer consistency checks and the repo-skills `cc` guard.
+- Shared Go, Python/uv, and C++ stale-dependency detection registration.
+- The production `u` and `u --upgrade` launchers and their bounded integration fixtures.
+- Fresh-clone/post-clone and command-boundary test organization.
+- Language-adding guidance and the integration debt ledger.
+
+### 6. Acceptance criteria
+
+- `cc` cannot commit a submodule consumer whose required root `flake.lock` is absent.
+- Go, Python/uv, and C++ use one canonical consistency authority and have parity coverage that fails
+  if a language bypasses it.
+- Real production-path `u` and `u --upgrade` tests pass against bounded local/offline sources and
+  prove viberoots pins never move.
+- The two assessed oversized tests are split by behavior and fixture ownership and comply with the
+  active file-size methodology without new exceptions.
+- The integration debt ledger contains verified full-run timing and disk-growth evidence and has no
+  open unapproved entries.
+
+### 7. Risks
+
+- Tightening the missing-root-lock contract may expose consumer fixtures that accidentally relied on
+  absent metadata being accepted.
+- A language-specific consistency path may contain behavior not yet represented by the shared guard.
+- Production-path dependency tests can become slow or nondeterministic if their sources are not
+  fully local and bounded.
+
+### 8. Mitigations
+
+- Repair fixtures to model coherent committed metadata rather than weakening the guard.
+- Add table-driven parity cases before removing any language-specific duplication.
+- Use small immutable local/offline dependency sources and record elapsed-time and disk deltas for
+  the combined focused run.
+- Preserve the existing command authorities and fail closed where a language cannot satisfy them.
+
+### 9. Consequences of not implementing this PR
+
+The commit guard can accept an incomplete consumer, language consistency checks can drift as new
+ecosystems are added, and internal-only tests can miss failures in the actual `u` launch path.
+
+### 10. Downsides for implementing this PR
+
+The final follow-up adds focused integration runtime and modest test-fixture restructuring after the
+mandatory PR-3 checkpoint, but it closes the assessment findings without another broad command or
+snapshot redesign.
+
 ## Rollout And Sequencing
 
 Implement PRs in order:
@@ -710,11 +853,13 @@ Implement PRs in order:
 2. PR-2 adds the project dependency command surface: `u` and `u --upgrade`.
 3. PR-3 isolates `viberoots update`, adds fresh-clone and commit guardrails, locks docs/help, and
    runs the mandatory full validation.
+4. PR-4 closes the assessed commit-guard, cross-language consistency, production-path integration,
+   test-size, and validation-ledger gaps without changing the command authority model.
 
 Do not land PR-2 before PR-1 proves ordinary install is read-only. Do not enable strict `cc` skill
 guardrails before PR-3 fixtures prove accepted and rejected states. Do not add a second full-suite
-checkpoint unless the implementation crosses broader build-system boundaries than the current
-in-flight hardening already touches.
+checkpoint for PR-4 unless its implementation crosses broader build-system boundaries than the
+focused command and consistency-guard surfaces described above.
 
 ## Verification And Backout Strategy
 
@@ -736,3 +881,8 @@ i && b && ALL_TESTS=1 v
 ```
 
 plus a fresh-clone/post-clone smoke run that proves tracked files remain clean.
+
+PR-4 must additionally run its combined focused consistency-guard, production `u`, fresh-clone,
+post-clone, repo-skill guard, lint, formatting, and file-size targets with bounded timing and disk
+evidence. The validated PR-3 full run closes the deferred PR-1 integration entry; rerun the full
+suite after PR-4 only when its shared-helper blast radius requires it.

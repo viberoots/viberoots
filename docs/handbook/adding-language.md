@@ -58,12 +58,19 @@ A language is not integrated until its metadata lifecycle follows the repository
 - `i` and post-clone are read-only for tracked files. They may materialize ignored local state, but
   stale lockfiles or generated metadata must fail with `repair: run u` and leave the checkout
   unchanged.
+- Register enablement and read-only validation with the shared project-language registry used by
+  `runReadOnlyLanguageConsistencyChecks`. Reuse the same registry to define or explicitly reject
+  `u --upgrade`; do not add a language-specific commit-check path.
 - New language work must keep `b` as a consumer of checked-in inputs and materialized state, not add
   another tracked-metadata repair path. Current `b` still has a legacy glue-refresh path through
   `install-deps --glue-only` that can update some Go/glue metadata; treat that as migration debt, not
   a model to extend. Run `u` before `b` when language metadata is stale.
 - `v` owns validation. Add focused positive and negative tests to its target graph, including
   read-only/repair boundaries and deterministic regeneration.
+- Invoke the production `u` launcher in a bounded local/offline consumer fixture. Prove both the
+  language repair result and that the viberoots gitlink, flake pins, and source-mode metadata remain
+  byte-for-byte unchanged. Add the equivalent fail-closed `u --upgrade` assertion when upgrades are
+  unsupported.
 - Every executable toolchain used by startup checks, update/install orchestration, Buck toolchains,
   or runnable manifests must resolve from `/nix/store`. Route process execution through
   `build-tools/tools/lib/tool-paths.ts` or emit an explicit Nix-store path from Nix. Do not fall back

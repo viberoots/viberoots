@@ -4,27 +4,17 @@ let
   lib = common.lib;
   node = pkgs.nodejs_22;
   pnpm = import ../pnpm-11.nix { inherit pkgs; };
+  nix = pkgs.nix;
   certs = pkgs.cacert;
   dirnameOf = common.dirnameOf;
   importerOnlySrc = common.importerOnlySrc;
   hashMap = common.hashMap;
   placeholderDigest = common.placeholderDigest;
-  pnpmSupportedArchitectures = ''
-    supportedArchitectures:
-      os:
-        - darwin
-        - linux
-        - win32
-      cpu:
-        - x64
-        - arm64
-        - arm
-      libc:
-        - glibc
-        - musl
-  '';
+  supportedPlatforms = import ./supported-platforms.nix { };
+  pnpmSupportedArchitectureMarkers = supportedPlatforms.universalMarkers;
   pnpmWorkspaceMarkerScript = ''
     write_pnpm_workspace_marker() {
+      local supported_architectures="$1"
       local existing="$TMPDIR/pnpm-workspace.source.yaml"
       local workspace_config=""
       local search_dir="$PWD"
@@ -69,7 +59,7 @@ for (let i = 0; i < lines.length;) {
 }
 process.stdout.write(out.join("\n") + "\n");
 NODE
-      printf '%s\n' ${lib.escapeShellArg pnpmSupportedArchitectures} >> pnpm-workspace.yaml
+      printf '%s\n' "$supported_architectures" >> pnpm-workspace.yaml
     }
   '';
   reconcilePnpmStoreScript = label: ''
@@ -80,7 +70,6 @@ NODE
       local pnpm_log="$TMPDIR/${label}-reconcile.log"
       set +e
       timeout "$IT"s env CI="1" NODE_OPTIONS="--no-warnings" PNPM_HOME="$PNPM_HOME" "$PNPM_BIN" fetch \
-        --force \
         --frozen-lockfile \
         --ignore-scripts \
         --ignore-pnpmfile \
@@ -113,8 +102,8 @@ NODE
         fi
       done
       if [ -z "$populated" ]; then
-        if yq -e '(.packages // {}) | length == 0' pnpm-lock.yaml >/dev/null; then
-          echo "[nix] ${label}: lockfile has no external packages; empty fixed store is valid" >&2
+        if yq -e '((.packages // {}) | keys | map(select(test("(^|@)(file|link|workspace):") | not)) | length) == 0' pnpm-lock.yaml >/dev/null; then
+          echo "[nix] ${label}: lockfile has no registry packages; empty fixed store is valid" >&2
         else
           echo "[nix] ${label}: pnpm fetch produced no content-addressed files for a lockfile with external packages" >&2
           exit 6
@@ -179,6 +168,17 @@ NODE
         sqlite3 "$normalized_db" < "$normalized_sql"
         sqlite3 "$normalized_db" 'ANALYZE; VACUUM;'
         cp "$normalized_db" "$index_db"
+        node - "$index_db" <<'NODE'
+const fs = require("fs");
+const indexDb = process.argv[2];
+const fd = fs.openSync(indexDb, "r+");
+try {
+  // SQLite header bytes 96..99 identify the library that last wrote the DB.
+  fs.writeSync(fd, Buffer.alloc(4), 0, 4, 96);
+} finally {
+  fs.closeSync(fd);
+}
+NODE
         rm -f "$normalized_db" "$normalized_rows" "$normalized_sql"
         touch -h -t 197001010000 "$index_db" >/dev/null 2>&1 || true
       done
@@ -225,7 +225,7 @@ in {
       pname = "pnpm-store";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
       inherit src;
-      nativeBuildInputs = [ node pnpm pkgs.coreutils pkgs.sqlite pkgs.yq-go ];
+      nativeBuildInputs = [ node pnpm nix pkgs.coreutils pkgs.sqlite pkgs.yq-go ];
       # These outputs are package-cache snapshots, not runtime executables, so generic
       # fixup spends time scanning vendored payloads without improving correctness.
       dontFixup = true;
@@ -283,10 +283,9 @@ in {
           echo "[nix] mkPnpmStore: no lockfile present; seed a lockfile first using build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${relLock} (set NIX_PNPM_ALLOW_GENERATE=1 for generation)" >&2
           exit 4
         fi
-        # Force workspace root to current directory and pin platform selection so
-        # pnpm materializes a platform-invariant set of optional binary packages in hermetic builds.
+        # Force workspace root to current directory. The universal fixed store is
+        # the deterministic union of the exact Nix platforms supported below.
         ${pnpmWorkspaceMarkerScript}
-        write_pnpm_workspace_marker
         IT="${installTimeoutVal}"
         PNPM_BIN="${pnpm}/bin/pnpm"
         PNPM_TRUST_LOCKFILE_ARG=""
@@ -296,7 +295,10 @@ in {
         "$PNPM_BIN" config set store-dir "$out/store"
         if [ "${if reconcileAllowed then "1" else "0"}" = "1" ]; then
           ${reconcilePnpmStoreScript "mkPnpmStore"}
-          reconcile_pnpm_store
+          for supported_architectures in ${lib.escapeShellArgs pnpmSupportedArchitectureMarkers}; do
+            write_pnpm_workspace_marker "$supported_architectures"
+            reconcile_pnpm_store
+          done
         else
           echo "[nix] mkPnpmStore: final fixed pnpm store is missing." >&2
           echo "repair: run u" >&2
@@ -347,6 +349,20 @@ in {
           cp pnpm-lock.yaml "$out/lockfile/pnpm-lock.yaml"
         fi
         runHook postBuild
+        if [ "${if reconcileAllowed then "1" else "0"}" = "1" ]; then
+          expected_hash=${lib.escapeShellArg outHash}
+          actual_hash="$(${nix}/bin/nix hash path --sri "$out")"
+          if [ "$actual_hash" != "$expected_hash" ]; then
+            chmod -R u+w "$out"
+            rm -rf "$out"
+            if [ -e "$out" ]; then
+              echo "error: failed to remove mismatched fixed-output candidate: $out" >&2
+              exit 7
+            fi
+            echo "viberoots-pnpm-fod-hash-mismatch-v1 output=$out specified=$expected_hash got=$actual_hash" >&2
+            exit 1
+          fi
+        fi
       '' else ''
         runHook preBuild
         # quiet: reduce verbose diagnostics

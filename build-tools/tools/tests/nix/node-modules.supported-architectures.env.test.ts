@@ -1,42 +1,75 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
+import { promisify } from "node:util";
+import { resolveToolPathSync } from "../../lib/tool-paths";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
-async function expectSupportedArchitectureEnv(file: string): Promise<void> {
-  const txt = await fsp.readFile(file, "utf8");
-  if (!txt.includes("supportedArchitectures:")) {
-    throw new Error(`${file} must write pnpm supported architectures for optional platform deps`);
-  }
-  if (!txt.includes("os:")) {
-    throw new Error(`${file} must declare pnpm supported os for platform-specific optional deps`);
-  }
-  if (!txt.includes("cpu:")) {
-    throw new Error(`${file} must declare pnpm supported cpu for platform-specific optional deps`);
-  }
-  if (!txt.includes("libc:")) {
-    throw new Error(`${file} must declare pnpm supported libc for linux optional deps`);
-  }
-  if (!txt.includes("- darwin") || !txt.includes("- linux")) {
-    throw new Error(
-      `${file} must include multiple os targets so pnpm-store hashes stay cross-platform`,
-    );
-  }
-  if (!txt.includes("- x64") || !txt.includes("- arm64")) {
-    throw new Error(
-      `${file} must include multiple cpu targets so pnpm-store hashes stay cross-platform`,
-    );
-  }
-  if (!txt.includes("- glibc") || !txt.includes("- musl")) {
-    throw new Error(
-      `${file} must include linux libc variants so pnpm-store hashes stay cross-platform`,
-    );
-  }
-}
+const execFileAsync = promisify(execFile);
 
-test("pnpm store derivation writes supported architecture config", async () => {
-  await expectSupportedArchitectureEnv("viberoots/build-tools/tools/nix/node-modules/store.nix");
+test("pnpm store and node_modules share the exact supported Nix platform authority", async () => {
+  const root = viberootsSourcePath("viberoots/build-tools/tools/nix/node-modules");
+  const [platforms, store, modules] = await Promise.all(
+    ["supported-platforms.nix", "store.nix", "modules.nix"].map(
+      async (file) => await fsp.readFile(`${root}/${file}`, "utf8"),
+    ),
+  );
+  for (const tuple of [
+    'system = "aarch64-darwin"; os = "darwin"; cpu = "arm64";',
+    'system = "aarch64-linux"; os = "linux"; cpu = "arm64"; libc = "glibc";',
+    'system = "x86_64-linux"; os = "linux"; cpu = "x64"; libc = "glibc";',
+  ]) {
+    assert.match(platforms, new RegExp(tuple.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+  const platformTuples = platforms.slice(
+    platforms.indexOf("platforms = ["),
+    platforms.indexOf("];", platforms.indexOf("platforms = [")) + 2,
+  );
+  assert.doesNotMatch(platformTuples, /win32|musl|cpu = "arm"|x86_64-darwin/);
+  assert.match(platforms, /if platform\.os == "linux" then \[ "glibc" "musl" \]/);
+  assert.match(platforms, /throw "unsupported Nix system/);
+  assert.match(store, /supportedPlatforms\.universalMarkers/);
+  assert.match(store, /for supported_architectures in/);
+  assert.match(
+    modules,
+    /supportedPlatforms\.markerForSystem pkgs\.stdenvNoCC\.hostPlatform\.system/,
+  );
 });
 
-test("node-modules derivation writes supported architecture config", async () => {
-  await expectSupportedArchitectureEnv("viberoots/build-tools/tools/nix/node-modules/modules.nix");
+test("evaluated universal markers retain both Linux libcs while exact Nix markers stay glibc", async () => {
+  const platformsPath = viberootsSourcePath(
+    "viberoots/build-tools/tools/nix/node-modules/supported-platforms.nix",
+  );
+  const expression = `
+    let supported = import (builtins.toPath ${JSON.stringify(platformsPath)}) { };
+    in {
+      universal = supported.universalMarkers;
+      exactArm64 = supported.markerForSystem "aarch64-linux";
+      exactX64 = supported.markerForSystem "x86_64-linux";
+      exactDarwin = supported.markerForSystem "aarch64-darwin";
+    }
+  `;
+  const { stdout } = await execFileAsync(
+    resolveToolPathSync("nix"),
+    ["eval", "--impure", "--json", "--expr", expression],
+    { timeout: 30_000 },
+  );
+  const evaluated = JSON.parse(stdout) as {
+    universal: string[];
+    exactArm64: string;
+    exactX64: string;
+    exactDarwin: string;
+  };
+  const linuxUniversal = evaluated.universal.filter((marker) => marker.includes("- linux"));
+  assert.equal(linuxUniversal.length, 2);
+  for (const marker of linuxUniversal) {
+    assert.match(marker, /libc:\n    - glibc\n    - musl\n/);
+  }
+  for (const marker of [evaluated.exactArm64, evaluated.exactX64]) {
+    assert.match(marker, /libc:\n    - glibc\n/);
+    assert.doesNotMatch(marker, /musl/);
+  }
+  assert.doesNotMatch(evaluated.exactDarwin, /libc:/);
 });

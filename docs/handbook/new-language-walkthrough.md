@@ -45,6 +45,9 @@ Steps
 
 - **Capability gating**
   - Add an entry to `build-tools/tools/nix/langs.json` with `requiredPaths`, `optionalPaths`, and `capabilities` for your language. Missing required paths in a sparse checkout disables the language; glue and scaf will still work for others.
+  - Add the project surface to the canonical update/consistency language registry. Its read-only
+    check must fail with `repair: run u`, and the same registry must either define a bounded upgrade
+    policy or make `u --upgrade` fail closed.
 
 - **Scaffolding templates**
   - Add a `build-tools/tools/scaffolding/templates/<lang>/` directory, with `meta.json` and `copier.yaml`. Keep variables minimal and defaults sensible. Use `scaf help new <lang> <template>` to preview variables.
@@ -54,6 +57,9 @@ Steps
   - Include a small test that proves your adapter's `validate(nodes)` rejects a misconfigured sample with a clear message.
   - Add command-boundary coverage: `u` repairs deterministic tracked metadata; `i` and post-clone
     detect drift without rewriting it.
+  - Run the real `u` launcher in a bounded local/offline consumer and compare the viberoots gitlink,
+    flake pins, and source-mode metadata byte-for-byte before and after. Cover the supported upgrade
+    path or the exact fail-closed `u --upgrade` diagnostic.
   - Add hostile-`PATH` coverage for startup/orchestration, a rooted Nix-store Buck toolchain check,
     and runnable-manifest execution or rejection tests where the language produces commands.
   - Exercise a minimal temp consumer so undeclared source-checkout dependencies fail visibly.

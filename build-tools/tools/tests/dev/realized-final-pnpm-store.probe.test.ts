@@ -3,9 +3,11 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
 import {
   inspectFinalPnpmStore,
   probeRealizedFinalPnpmStore,
+  realizedFinalStoreProbeTimeoutMs,
 } from "../../dev/update-pnpm-hash/realized-store";
 
 type FakeMode =
@@ -16,6 +18,23 @@ type FakeMode =
   | "validity-malformed"
   | "validation-failure"
   | "success";
+
+let immutableAuthorityPromise: Promise<string> | undefined;
+
+async function immutableAuthority(): Promise<string> {
+  immutableAuthorityPromise ||= (async () => {
+    const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-final-probe-authority-"));
+    try {
+      await fsp.mkdir(path.join(tmp, "build-tools/tools/dev"), { recursive: true });
+      await fsp.writeFile(path.join(tmp, "flake.nix"), "{ outputs = _: {}; }\n");
+      await fsp.writeFile(path.join(tmp, "build-tools/tools/dev/zx-init.mjs"), "\n");
+      return (await materializeFilteredViberootsSource(tmp)).storePath;
+    } finally {
+      await fsp.rm(tmp, { recursive: true, force: true });
+    }
+  })();
+  return await immutableAuthorityPromise;
+}
 
 function existingStorePath(): string {
   const match = path.resolve(process.execPath).match(/^(\/nix\/store\/[^/]+)/);
@@ -32,6 +51,7 @@ async function withFakeNix<T>(
   const log = path.join(tmp, "nix.log");
   const nix = path.join(tmp, "nix");
   const nixStore = path.join(tmp, "nix-store");
+  const authority = await immutableAuthority();
   await fsp.writeFile(
     nix,
     [
@@ -72,6 +92,7 @@ async function withFakeNix<T>(
     index: process.env.NIX_PNPM_EXACT_STORE_INDEX,
     lock: process.env.NIX_PNPM_EXACT_STORE_LOCK_HASH,
     generate: process.env.NIX_PNPM_ALLOW_GENERATE,
+    authority: process.env.VIBEROOTS_FLAKE_INPUT_ROOT,
   };
   try {
     process.env.VBR_NIX_BIN = nix;
@@ -80,6 +101,7 @@ async function withFakeNix<T>(
     process.env.NIX_PNPM_EXACT_STORE_INDEX = "forbidden-index";
     process.env.NIX_PNPM_EXACT_STORE_LOCK_HASH = "forbidden-lock";
     process.env.NIX_PNPM_ALLOW_GENERATE = "1";
+    process.env.VIBEROOTS_FLAKE_INPUT_ROOT = authority;
     return await fn(log);
   } finally {
     for (const [key, value] of Object.entries({
@@ -89,6 +111,7 @@ async function withFakeNix<T>(
       NIX_PNPM_EXACT_STORE_INDEX: previous.index,
       NIX_PNPM_EXACT_STORE_LOCK_HASH: previous.lock,
       NIX_PNPM_ALLOW_GENERATE: previous.generate,
+      VIBEROOTS_FLAKE_INPUT_ROOT: previous.authority,
     })) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
@@ -106,6 +129,12 @@ function probe(expectedPath: string) {
     expectedPath,
   });
 }
+
+test("final store probes inherit the bounded pnpm Nix timeout", () => {
+  assert.equal(realizedFinalStoreProbeTimeoutMs({ NIX_PNPM_FETCH_TIMEOUT: "1800" }), 1_800_000);
+  assert.equal(realizedFinalStoreProbeTimeoutMs({ NIX_PNPM_FETCH_TIMEOUT: "5" }), 30_000);
+  assert.equal(realizedFinalStoreProbeTimeoutMs({}), 600_000);
+});
 
 test("probe propagates authoritative Nix evaluation failure", async () => {
   await withFakeNix("eval-failure", "/nix/store/unused", async () => {
@@ -213,7 +242,7 @@ test("probe validates the literal evaluated path with a sanitized environment", 
     const commands = await fsp.readFile(log, "utf8");
     assert.match(
       commands,
-      /args=eval --raw --no-write-lock-file --accept-flake-config path:\/tmp\/filtered#pnpm-store\.projects-apps-demo\.outPath/,
+      /args=eval --override-input viberoots path:[^ ]+ --raw --no-write-lock-file --accept-flake-config path:\/tmp\/filtered#pnpm-store\.projects-apps-demo\.outPath/,
     );
     assert.match(
       commands,
@@ -242,7 +271,7 @@ test("filtered consumer probe uses only its marked bounded snapshot root", async
       assert.equal(await probe(present), present);
       assert.match(
         await fsp.readFile(log, "utf8"),
-        /args=eval --impure --raw .*path:\/tmp\/filtered#pnpm-store/,
+        /args=eval --impure --override-input viberoots path:[^ ]+ --raw .*path:\/tmp\/filtered#pnpm-store/,
       );
     } finally {
       if (previous.workspace === undefined) delete process.env.WORKSPACE_ROOT;

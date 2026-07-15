@@ -21,6 +21,10 @@ function mismatch(specified: string, got: string, name = derivationName): string
   ].join("\n");
 }
 
+function builderMismatch(specified: string, got: string, name = derivationName): string {
+  return `pnpm-store-lock> viberoots-pnpm-fod-hash-mismatch-v1 output=/nix/store/${"c".repeat(32)}-${name} specified=${specified} got=${got}\n`;
+}
+
 test("fixed-output mismatch parsing requires one targeted pnpm-store block", () => {
   assert.equal(extractHash(mismatch(hashA, hashB), derivationName, hashA), hashB);
   assert.equal(extractHash(`got: ${hashB}\n`, derivationName, hashA), null);
@@ -37,6 +41,38 @@ test("fixed-output mismatch parsing requires one targeted pnpm-store block", () 
     null,
   );
   assert.equal(extractHash(mismatch(hashB, hashA), derivationName, hashA), null);
+  assert.equal(extractHash(builderMismatch(hashA, hashB), derivationName, hashA), hashB);
+  assert.equal(
+    extractHash(
+      builderMismatch(hashA, hashB).replace("pnpm-store-lock>", `${derivationName}>`),
+      derivationName,
+      hashA,
+    ),
+    hashB,
+  );
+  assert.equal(extractHash(builderMismatch(hashA, hashB).repeat(2), derivationName, hashA), hashB);
+  assert.equal(
+    extractHash(
+      builderMismatch(hashA, hashB) + builderMismatch(hashA, hashA),
+      derivationName,
+      hashA,
+    ),
+    null,
+  );
+  assert.equal(extractHash(builderMismatch(hashB, hashA), derivationName, hashA), null);
+  assert.equal(
+    extractHash(
+      builderMismatch(hashA, hashB).replace("pnpm-store-lock>", "other-derivation>"),
+      derivationName,
+      hashA,
+    ),
+    null,
+  );
+  assert.equal(
+    extractHash(`embedded ${builderMismatch(hashA, hashB)}`, derivationName, hashA),
+    null,
+  );
+  assert.equal(extractHash(`> ${builderMismatch(hashA, hashB)}`, derivationName, hashA), null);
 });
 
 test("wrong specified hash cannot trigger metadata mutation", async () => {

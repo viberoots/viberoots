@@ -41,11 +41,16 @@ repository enforcement contract, not only planner/macros/providers.
      that boundary is migrated to read-only behavior.
    - `i` and post-clone validate tracked metadata without rewriting it; stale state names `u` as the
      repair command.
+   - Register the language with the canonical project-language consistency registry. Reuse that
+     entry for read-only checks and `u --upgrade` support detection rather than adding parallel
+     language-specific orchestration.
    - Toolchain, update/install, startup, and runnable executables resolve from `/nix/store` through
      the shared tool-path authority or an explicit Nix-emitted path. Do not add host fallbacks.
 
 7. Cover execution boundaries and resource guardrails:
    - Add hostile-`PATH`, Buck toolchain, runnable-manifest, and temp-consumer tests where applicable.
+   - Add a bounded production-launcher fixture that proves `u` repair or fail-closed `u --upgrade`
+     behavior without changing viberoots gitlinks, flake pins, or source-mode metadata.
    - Measure focused elapsed time and named disk paths according to
      `docs/handbook/getting-started-on-a-pr.md`; do not broaden snapshots or shared-cache copies to
      satisfy fixtures.

@@ -8,11 +8,13 @@ function isWorkspaceImporter(importer: string, workspaceRoots: readonly string[]
   return workspaceRoots.some((base) => importer.startsWith(`${base}/`));
 }
 
+function importerLockfile(root: string, importer: string): string {
+  return path.join(root, importer === "." ? "" : importer, "pnpm-lock.yaml");
+}
+
 async function hasLock(root: string, importer: string): Promise<boolean> {
   try {
-    await fsp.access(
-      path.join(root, importer === "." ? "pnpm-lock.yaml" : importer, "pnpm-lock.yaml"),
-    );
+    await fsp.access(importerLockfile(root, importer));
     return true;
   } catch {
     return false;
@@ -133,9 +135,7 @@ export async function discoverImportersWithLock(
       (importer === "." ? allowDotImporter : isWorkspaceImporter(importer, workspaceRoots))
     ) {
       try {
-        await fsp.access(
-          path.join(root, importer === "." ? "pnpm-lock.yaml" : importer, "pnpm-lock.yaml"),
-        );
+        await fsp.access(importerLockfile(root, importer));
       } catch {
         return [...out].sort((left, right) => left.localeCompare(right));
       }

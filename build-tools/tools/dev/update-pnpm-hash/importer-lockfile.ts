@@ -27,27 +27,17 @@ import {
 } from "./lockfile-shared";
 import { findWorkspacePackageDirs } from "./importer-workspace-packages";
 import { runPnpmCommandWithRetry } from "./pnpm-command-retry";
+import { activeViberootsOverride } from "./nix";
 
 async function runLockfileCommandsWithGcRetry(opts: {
   importerAbs: string;
   flakeRef: string;
-  viberootsOverride: string;
   timeoutMs: number;
   fetchTimeout: string;
   homeDir: string;
   storeDir: string;
   filteredEnv: Record<string, string>;
 }): Promise<void> {
-  const viberootsOverrideArgs = opts.viberootsOverride
-    ? ["--override-input", "viberoots", opts.viberootsOverride]
-    : [];
-  const nixRunPrefix = [
-    "--quiet",
-    "run",
-    "--accept-flake-config",
-    "--no-write-lock-file",
-    ...viberootsOverrideArgs,
-  ];
   const nixEnv = withSanitizedInheritedNixConfig(
     envWithResolvedNixBin({
       ...process.env,
@@ -62,7 +52,7 @@ async function runLockfileCommandsWithGcRetry(opts: {
   const runPnpm = async (...args: string[]) => {
     await runCommand({
       command: nixBin,
-      args: [...nixRunPrefix, opts.flakeRef, "--", ...args],
+      args: pnpmNixRunArgs(opts.flakeRef, args, nixEnv),
       cwd: opts.importerAbs,
       env: nixEnv,
       timeoutMs: opts.timeoutMs,
@@ -148,6 +138,23 @@ async function runLockfileCommandsWithGcRetry(opts: {
   }
 }
 
+export function pnpmNixRunArgs(
+  flakeRef: string,
+  pnpmArgs: string[],
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
+  return [
+    "--quiet",
+    "run",
+    "--accept-flake-config",
+    "--no-write-lock-file",
+    ...activeViberootsOverride(flakeRef, env),
+    flakeRef,
+    "--",
+    ...pnpmArgs,
+  ];
+}
+
 async function seedImporterLockfileFromRootIfNeeded(opts: {
   repoRoot: string;
   importerAbs: string;
@@ -201,7 +208,6 @@ export async function generateImporterLockfile(opts: { repoRoot: string; importe
       await runLockfileCommandsWithGcRetry({
         importerAbs,
         flakeRef: filtered.flakeRef,
-        viberootsOverride: "",
         timeoutMs,
         fetchTimeout,
         homeDir,
@@ -230,7 +236,7 @@ async function needsFreshImporterLockfile(opts: { repoRoot: string; importer: st
     ? await importerLockfileNeedsRegen({
         repoRootAbs: opts.repoRoot,
         importerRel: opts.importer,
-      }).catch(() => true)
+      })
     : true;
   return missing || stale;
 }

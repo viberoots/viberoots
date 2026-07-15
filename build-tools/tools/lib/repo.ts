@@ -33,9 +33,23 @@ export async function pathExists(p: string): Promise<boolean> {
 }
 
 export async function findRepoRoot(start: string): Promise<string> {
+  const explicitWorkspaceRoot = (process.env.WORKSPACE_ROOT || "").trim();
+  if (explicitWorkspaceRoot) {
+    const explicitRoot = path.resolve(explicitWorkspaceRoot);
+    const startAbs = path.resolve(start);
+    const startsInsideExplicitRoot =
+      startAbs === explicitRoot || startAbs.startsWith(`${explicitRoot}${path.sep}`);
+    if (
+      startsInsideExplicitRoot &&
+      ((await pathExists(path.join(explicitRoot, "flake.nix"))) ||
+        (await pathExists(path.join(explicitRoot, VIBEROOTS_WORKSPACE_REL, "flake.nix"))))
+    ) {
+      return explicitRoot;
+    }
+  }
   const candidates = [
     start,
-    (process.env.WORKSPACE_ROOT || "").trim(),
+    explicitWorkspaceRoot,
     (process.env._VIBEROOTS_DEVSHELL_ROOT || "").trim(),
     (process.env.LIVE_ROOT || "").trim(),
   ].filter(Boolean);

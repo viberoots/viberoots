@@ -6,10 +6,14 @@ import { promisify } from "node:util";
 import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import { committedFinalStore } from "./exact-store";
+import { activeViberootsOverride } from "./nix";
 import { sha256File } from "./verified-marker";
 
 const execFileAsync = promisify(execFile);
-const REALIZED_FINAL_STORE_PROBE_TIMEOUT_MS = 30_000;
+export function realizedFinalStoreProbeTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
+  const seconds = Number.parseInt(String(env.NIX_PNPM_FETCH_TIMEOUT || "600").trim(), 10);
+  return Math.max(30, Number.isFinite(seconds) ? seconds : 600) * 1000;
+}
 
 function finalStoreProbeEnv(baseEnv: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const env = withSanitizedInheritedNixConfig(envWithResolvedNixBin({ ...baseEnv }));
@@ -49,6 +53,66 @@ function filteredSnapshotEvalArgs(env: NodeJS.ProcessEnv, flakeRef: string): str
   return flakeDir === root || flakeDir.startsWith(`${root}${path.sep}`) ? ["--impure"] : [];
 }
 
+export function finalPnpmStoreEvalArgs(
+  env: NodeJS.ProcessEnv,
+  flakeRef: string,
+  attrPath: string,
+): string[] {
+  return [
+    "eval",
+    ...filteredSnapshotEvalArgs(env, flakeRef),
+    ...activeViberootsOverride(flakeRef, env),
+    "--raw",
+    "--no-write-lock-file",
+    "--accept-flake-config",
+    `${flakeRef}#${attrPath}.outPath`,
+  ];
+}
+
+export function finalPnpmStoreDerivationEvalArgs(
+  env: NodeJS.ProcessEnv,
+  flakeRef: string,
+  attrPath: string,
+): string[] {
+  return [
+    "eval",
+    ...filteredSnapshotEvalArgs(env, flakeRef),
+    ...activeViberootsOverride(flakeRef, env),
+    "--raw",
+    "--no-write-lock-file",
+    "--accept-flake-config",
+    `${flakeRef}#${attrPath}.drvPath`,
+  ];
+}
+
+export async function evaluatePnpmStoreDerivationIdentity(opts: {
+  repoRoot: string;
+  flakeRef: string;
+  attrPath: string;
+  env?: NodeJS.ProcessEnv;
+}): Promise<string> {
+  const env = finalStoreProbeEnv(opts.env);
+  const timeout = realizedFinalStoreProbeTimeoutMs(opts.env);
+  const nixBin = resolveToolPathSync("nix", env);
+  const flakeRef = opts.flakeRef.split("#", 1)[0] || opts.flakeRef;
+  const evaluated = commandOutput(
+    (
+      await execFileAsync(nixBin, finalPnpmStoreDerivationEvalArgs(env, flakeRef, opts.attrPath), {
+        cwd: opts.repoRoot,
+        env,
+        timeout,
+        maxBuffer: 4 * 1024 * 1024,
+      })
+    ).stdout,
+  );
+  if (!/^\/nix\/store\/[a-z0-9]{32}-[^/]+\.drv$/.test(evaluated)) {
+    throw new Error(
+      `nix eval returned an invalid pnpm store derivation identity: ${evaluated || "(empty)"}`,
+    );
+  }
+  return evaluated;
+}
+
 export type FinalPnpmStoreInspection =
   | { status: "realized"; path: string }
   | { status: "absent"; path: string }
@@ -60,13 +124,14 @@ export async function checkLiteralStorePathValidity(opts: {
   env?: NodeJS.ProcessEnv;
 }): Promise<"valid" | "invalid"> {
   const env = opts.env || finalStoreProbeEnv();
+  const timeout = realizedFinalStoreProbeTimeoutMs(opts.env);
   const nixStoreBin = resolveNixStoreBin(env);
   const invalid = String(
     (
       await execFileAsync(nixStoreBin, ["--check-validity", "--print-invalid", opts.storePath], {
         cwd: opts.repoRoot,
         env,
-        timeout: REALIZED_FINAL_STORE_PROBE_TIMEOUT_MS,
+        timeout,
         maxBuffer: 4 * 1024 * 1024,
       })
     ).stdout || "",
@@ -87,27 +152,17 @@ export async function inspectFinalPnpmStore(opts: {
   env?: NodeJS.ProcessEnv;
 }): Promise<FinalPnpmStoreInspection> {
   const env = finalStoreProbeEnv(opts.env);
+  const timeout = realizedFinalStoreProbeTimeoutMs(opts.env);
   const nixBin = resolveToolPathSync("nix", env);
   const flakeRef = opts.flakeRef.split("#", 1)[0] || opts.flakeRef;
   const evaluated = commandOutput(
     (
-      await execFileAsync(
-        nixBin,
-        [
-          "eval",
-          ...filteredSnapshotEvalArgs(env, flakeRef),
-          "--raw",
-          "--no-write-lock-file",
-          "--accept-flake-config",
-          `${flakeRef}#${opts.attrPath}.outPath`,
-        ],
-        {
-          cwd: opts.repoRoot,
-          env,
-          timeout: REALIZED_FINAL_STORE_PROBE_TIMEOUT_MS,
-          maxBuffer: 4 * 1024 * 1024,
-        },
-      )
+      await execFileAsync(nixBin, finalPnpmStoreEvalArgs(env, flakeRef, opts.attrPath), {
+        cwd: opts.repoRoot,
+        env,
+        timeout,
+        maxBuffer: 4 * 1024 * 1024,
+      })
     ).stdout,
   );
   if (!/^\/nix\/store\/[A-Za-z0-9._+?=-]+$/.test(evaluated)) {
@@ -137,7 +192,7 @@ export async function inspectFinalPnpmStore(opts: {
       await execFileAsync(nixBin, ["path-info", evaluated], {
         cwd: opts.repoRoot,
         env,
-        timeout: REALIZED_FINAL_STORE_PROBE_TIMEOUT_MS,
+        timeout,
         maxBuffer: 4 * 1024 * 1024,
       })
     ).stdout,
@@ -177,7 +232,7 @@ export async function inspectCommittedFinalPnpmStore(opts: {
     repoRoot: opts.repoRoot,
     importer: opts.importer,
     lockHash: await sha256File(path.resolve(opts.repoRoot, opts.importer, "pnpm-lock.yaml")),
-    timeoutMs: REALIZED_FINAL_STORE_PROBE_TIMEOUT_MS,
+    timeoutMs: realizedFinalStoreProbeTimeoutMs(opts.env),
   });
   return await inspectFinalPnpmStore({ ...opts, expectedPath: committed.expectedPath });
 }

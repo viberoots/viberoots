@@ -9,6 +9,11 @@ import { importerInstallFreshness } from "../../dev/install/importer-freshness";
 import { sanitizeName } from "../../dev/install/common";
 import { currentVerifiedMarkerFingerprint } from "../../dev/update-pnpm-hash/verified-marker";
 
+const DERIVATION_IDENTITY = `/nix/store/${"a".repeat(32)}-pnpm-store-fixture.drv`;
+const FRESHNESS_DEPS = {
+  currentDerivationIdentity: async () => DERIVATION_IDENTITY,
+};
+
 async function writeFile(filePath: string, content: string): Promise<void> {
   await fsp.mkdir(path.dirname(filePath), { recursive: true });
   await fsp.writeFile(filePath, content, "utf8");
@@ -68,6 +73,7 @@ async function seedStoreMarker(
         lockHash,
         hashValue: "sha256-fixture",
         builderFingerprint: await currentVerifiedMarkerFingerprint(repoRoot, importer),
+        derivationIdentity: DERIVATION_IDENTITY,
       },
       null,
       2,
@@ -111,10 +117,13 @@ test("importer freshness accepts verified linked install state", async () => {
     await seedLinkMarker(repo.repoRoot, repo.importer, repo.lockHash);
 
     assert.deepEqual(
-      await importerInstallFreshness({
-        repoRoot: repo.repoRoot,
-        importer: repo.importer,
-      }),
+      await importerInstallFreshness(
+        {
+          repoRoot: repo.repoRoot,
+          importer: repo.importer,
+        },
+        FRESHNESS_DEPS,
+      ),
       { fresh: true },
     );
   } finally {
@@ -129,10 +138,13 @@ test("importer freshness supports the viberoots importer hash key", async () => 
     await seedLinkMarker(repo.repoRoot, repo.importer, repo.lockHash);
 
     assert.deepEqual(
-      await importerInstallFreshness({
-        repoRoot: repo.repoRoot,
-        importer: repo.importer,
-      }),
+      await importerInstallFreshness(
+        {
+          repoRoot: repo.repoRoot,
+          importer: repo.importer,
+        },
+        FRESHNESS_DEPS,
+      ),
       { fresh: true },
     );
   } finally {
@@ -147,19 +159,39 @@ test("importer freshness rejects stale or incomplete install state", async () =>
     await seedLinkMarker(repo.repoRoot, repo.importer, repo.lockHash);
 
     assert.deepEqual(
-      await importerInstallFreshness({
-        repoRoot: repo.repoRoot,
-        importer: repo.importer,
-      }),
+      await importerInstallFreshness(
+        {
+          repoRoot: repo.repoRoot,
+          importer: repo.importer,
+        },
+        FRESHNESS_DEPS,
+      ),
       { fresh: true },
+    );
+
+    assert.deepEqual(
+      await importerInstallFreshness(
+        {
+          repoRoot: repo.repoRoot,
+          importer: repo.importer,
+        },
+        {
+          currentDerivationIdentity: async () =>
+            `/nix/store/${"b".repeat(32)}-pnpm-store-changed.drv`,
+        },
+      ),
+      { fresh: false, reason: "stale-store-marker" },
     );
 
     await fsp.rm(path.join(repo.repoRoot, repo.importer, "node_modules"));
     assert.deepEqual(
-      await importerInstallFreshness({
-        repoRoot: repo.repoRoot,
-        importer: repo.importer,
-      }),
+      await importerInstallFreshness(
+        {
+          repoRoot: repo.repoRoot,
+          importer: repo.importer,
+        },
+        FRESHNESS_DEPS,
+      ),
       { fresh: false, reason: "stale-link-marker" },
     );
 
@@ -168,10 +200,13 @@ test("importer freshness rejects stale or incomplete install state", async () =>
       "lockfileVersion: '9.0'\n# changed\n",
     );
     assert.deepEqual(
-      await importerInstallFreshness({
-        repoRoot: repo.repoRoot,
-        importer: repo.importer,
-      }),
+      await importerInstallFreshness(
+        {
+          repoRoot: repo.repoRoot,
+          importer: repo.importer,
+        },
+        FRESHNESS_DEPS,
+      ),
       { fresh: false, reason: "stale-store-marker" },
     );
   } finally {

@@ -22,13 +22,16 @@ export function staleMetadataError(file: string, detail: string): Error {
   );
 }
 
-export async function assertCppTrackedMetadataReady(root: string): Promise<void> {
+export async function assertCppTrackedMetadataReady(
+  root: string,
+  enabledOverride?: boolean,
+): Promise<void> {
   const config = JSON.parse(
     await fsp
       .readFile(path.join(root, "build-tools/tools/nix/langs.json"), "utf8")
       .catch(() => "{}"),
   ) as { enabled?: string[] };
-  if (!config.enabled?.includes("cpp")) return;
+  if (!(enabledOverride ?? config.enabled?.includes("cpp"))) return;
   const tracked = [
     "build-tools/lang/auto_map.bzl",
     "build-tools/lang/nix_attr_aliases.bzl",

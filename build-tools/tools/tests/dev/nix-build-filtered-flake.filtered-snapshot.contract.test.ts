@@ -32,4 +32,6 @@ test("filtered flake builds mark the snapshot so graph-generator can reuse flake
     planner.includes("if filteredFlakeSnapshot\n    then src"),
     "expected graph-generator to reuse the filtered flake src instead of re-filtering BUCK_TEST_SRC",
   );
+  assert.match(helper, /import \{ runCommand \} from "\.\/filtered-flake-command"/);
+  assert.doesNotMatch(helper, /\$\s*\(/, "filtered builder must not depend on ambient zx globals");
 });

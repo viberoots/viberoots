@@ -14,10 +14,15 @@ test("matching markers only skip after the committed final path is probed", asyn
   );
   assert.match(
     main,
-    /if \(markerMatches && !force\) \{[\s\S]*await probe\(\)[\s\S]*await persist\(currentHash\)/,
+    /if \(markerMetadataMatches && !force\) \{[\s\S]*const realized = await probe\(\)[\s\S]*marker\?\.derivationIdentity === realized\.derivationIdentity[\s\S]*await persist\(currentHash, realized\.derivationIdentity\)/,
   );
   assert.match(main, /marker\.hashValue === currentHash/);
   assert.match(main, /acceptedBuilderFingerprints\.includes\(marker\.builderFingerprint\)/);
+  assert.match(main, /marker\?\.derivationIdentity === realized\.derivationIdentity/);
+  assert.match(main, /pnpm-store verification is stale.*repair: run u/);
+  assert.match(marker, /derivationIdentity: string/);
+  assert.match(marker, /test\(derivationIdentity\)/);
+  assert.match(marker, /\\\.drv\$/);
   assert.match(marker, /importer === "\." \? "root"/);
   assert.doesNotMatch(main, /prepareFinalPnpmStore|skip-root-marker-verify/);
 });

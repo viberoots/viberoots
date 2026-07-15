@@ -80,6 +80,11 @@ workspace directory. In that case:
   submodule_rev="$(git -C viberoots rev-parse HEAD 2>/dev/null || true)"
   prospective_gitlink_rev="${submodule_rev:-${gitlink_rev}}"
   lock_rev="$(jq -r '.nodes.viberoots.locked.rev // empty' flake.lock 2>/dev/null || true)"
+  if test -n "$prospective_gitlink_rev" && test -z "$lock_rev"; then
+    echo "error: a viberoots submodule requires a committed root flake.lock" >&2
+    echo "repair: run viberoots update" >&2
+    exit 1
+  fi
   test "$(cat .buckroot 2>/dev/null)" = "."
   for path in .buckroot .buckconfig .envrc .gitignore; do
     git ls-files --error-unmatch -- "$path" >/dev/null
@@ -127,8 +132,9 @@ workspace directory. In that case:
   inspect the resulting diff, and rerun the guard before committing.
 - If the repository has only flake-mode viberoots metadata and no `viberoots/` submodule, do not
   invent a submodule check; commit the existing flake changes as part of the normal change set.
-- If the repository has a viberoots submodule but no root `flake.lock`, no flake metadata sync is
-  needed.
+- If the repository has a viberoots submodule but no root `flake.lock`, stop and tell the user to
+  run exactly `viberoots update`. The lock is required committed source metadata, not an optional
+  synchronization surface.
 
 ## Write The Commit Message
 

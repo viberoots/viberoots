@@ -1,9 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { buildToolsRoot } from "../../dev/dev-build/paths";
+import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
+import { pnpmNixRunArgs } from "../../dev/update-pnpm-hash/importer-lockfile";
 import { immutableViberootsInputFromFlakeFiles } from "../../dev/update-pnpm-hash/nix";
 import { isCanonicalSha256SRI } from "../../lib/nix-sri";
 
@@ -13,7 +16,7 @@ async function read(rel: string): Promise<string> {
   return await fsp.readFile(path.join(toolsRoot, rel), "utf8");
 }
 
-test("install path selects flake refs by importer scope", async () => {
+test("install path selects flake refs by importer scope", async (t) => {
   const immutableInput = `/nix/store/${"a".repeat(32)}-source`;
   const immutableFlake = `viberoots.url = "path:${immutableInput}";\n`;
   const validNarHash = `sha256-${"A".repeat(43)}=`;
@@ -136,13 +139,32 @@ test("install path selects flake refs by importer scope", async () => {
     throw new Error("filtered lock generation must keep command/test authority on the live repo");
   }
   if (
-    !importerLockfile.includes('viberootsOverride: ""') ||
+    !importerLockfile.includes("pnpmNixRunArgs(opts.flakeRef, args, nixEnv)") ||
     !importerLockfile.includes("await filtered.cleanup()")
   ) {
     throw new Error(
-      "filtered lock generation must use the repaired input and clean up its owned snapshot",
+      "filtered lock generation must use canonical env-aware Nix args and clean up its owned snapshot",
     );
   }
+  const authorityFixture = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-lock-authority-"));
+  t.after(async () => await fsp.rm(authorityFixture, { recursive: true, force: true }));
+  await fsp.mkdir(path.join(authorityFixture, "build-tools/tools/dev"), { recursive: true });
+  await fsp.writeFile(path.join(authorityFixture, "flake.nix"), "{ outputs = _: {}; }\n");
+  await fsp.writeFile(path.join(authorityFixture, "build-tools/tools/dev/zx-init.mjs"), "\n");
+  const authority = (await materializeFilteredViberootsSource(authorityFixture)).storePath;
+  const flakeRef = "path:/tmp/filtered-lock-input";
+  assert.deepEqual(pnpmNixRunArgs(flakeRef, ["fetch"], { VIBEROOTS_FLAKE_INPUT_ROOT: authority }), [
+    "--quiet",
+    "run",
+    "--accept-flake-config",
+    "--no-write-lock-file",
+    "--override-input",
+    "viberoots",
+    `path:${authority}`,
+    flakeRef,
+    "--",
+    "fetch",
+  ]);
   if (
     !importerLockfile.includes('resolveRepoNodeBin(opts.repoRoot, "prettier")') ||
     !importerLockfile.includes("formatImporterLockfile({ repoRoot: opts.repoRoot, importerAbs })")
@@ -182,8 +204,13 @@ test("install path selects flake refs by importer scope", async () => {
   if (!hashNix.includes('return ["--override-input", "viberoots", `path:${real}`];')) {
     throw new Error("update-pnpm-hash nix builds must override stale viberoots lock inputs");
   }
-  if (!hashNix.includes("...activeViberootsOverride(opts.flakeRef)")) {
-    throw new Error("update-pnpm-hash nix build args must include the local viberoots override");
+  if (
+    !hashNix.includes("extraEnv: commandEnv") ||
+    !hashNix.includes("...activeViberootsOverride(opts.flakeRef, opts.extraEnv)")
+  ) {
+    throw new Error(
+      "update-pnpm-hash nix build args must use the merged command environment for the viberoots override",
+    );
   }
   if (
     !hashNix.includes("function flakeLocalViberootsSource(") ||

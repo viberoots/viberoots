@@ -9,10 +9,13 @@ import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
 import { buildToolPath } from "./dev-build/paths";
 import {
   findNearestImporterLock,
+  flakeRefForImporter,
   nodeModulesAttr,
   normalizeImporter,
+  pnpmStoreAttr,
   sanitizeName,
 } from "./install/common";
+import { currentPnpmStoreDerivationIdentity } from "./update-pnpm-hash/build-flake";
 import {
   currentVerifiedMarkerFingerprintCandidates,
   currentVerifiedMarkerFingerprint,
@@ -218,14 +221,21 @@ async function hasFreshVerifiedMarker(lockfileRel: string, hashKey: string): Pro
     repoRoot,
     importer,
   );
-  return (
+  const metadataMatches =
     marker.importer === importer &&
     marker.lockfile === hashKey &&
     marker.lockHash === lockHash &&
     marker.hashValue === (await readHashForLock(hashKey)) &&
     (marker.builderFingerprint === builderFingerprint ||
-      acceptedBuilderFingerprints.includes(marker.builderFingerprint))
-  );
+      acceptedBuilderFingerprints.includes(marker.builderFingerprint));
+  if (!metadataMatches) return false;
+  const derivationIdentity = await currentPnpmStoreDerivationIdentity({
+    repoRoot,
+    importer,
+    baseFlakeRef: flakeRefForImporter(repoRoot, importer),
+    attrPath: pnpmStoreAttr(importer),
+  });
+  return marker.derivationIdentity === derivationIdentity;
 }
 
 async function recoverOutPathFromLinkMarker(

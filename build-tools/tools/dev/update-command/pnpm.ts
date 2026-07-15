@@ -15,7 +15,7 @@ export function pnpmLockArgs(upgrade: boolean, storeDir: string): string[] {
   return [
     ...operation,
     "--lockfile-only",
-    "--prod=false",
+    ...(upgrade ? [] : ["--prod=false"]),
     "--ignore-scripts",
     "--ignore-pnpmfile",
     "--lockfile-dir",
@@ -26,8 +26,7 @@ export function pnpmLockArgs(upgrade: boolean, storeDir: string): string[] {
     storeDir,
     "--network-concurrency",
     "1",
-    "--child-concurrency",
-    "1",
+    ...(upgrade ? [] : ["--child-concurrency", "1"]),
     "--reporter",
     "append-only",
   ];

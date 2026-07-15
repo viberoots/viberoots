@@ -70,3 +70,83 @@ test("importerLockfileNeedsRegen treats importer-local lockfile '.' as canonical
     assert.equal(needsRegen, false);
   });
 });
+
+test("importerLockfileNeedsRegen preserves malformed lockfile failures", async () => {
+  await withTempDir("pnpm-importer-lockfile-malformed", async (tmp) => {
+    const importerRel = "app";
+    const importerAbs = path.join(tmp, importerRel);
+    await fsp.mkdir(importerAbs);
+    await fsp.writeFile(path.join(importerAbs, "package.json"), "{}\n");
+    await fsp.writeFile(path.join(importerAbs, "pnpm-lock.yaml"), "importers:\n  .: [\n");
+
+    await assert.rejects(
+      importerLockfileNeedsRegen({ repoRootAbs: tmp, importerRel }),
+      /failed to parse pnpm lockfile with Nix yq: .*pnpm-lock\.yaml/,
+    );
+  });
+});
+
+test("importerLockfileNeedsRegen preserves missing lockfile failures", async () => {
+  await withTempDir("pnpm-importer-lockfile-missing", async (tmp) => {
+    const importerRel = "app";
+    const importerAbs = path.join(tmp, importerRel);
+    await fsp.mkdir(importerAbs);
+    await fsp.writeFile(path.join(importerAbs, "package.json"), "{}\n");
+
+    await assert.rejects(importerLockfileNeedsRegen({ repoRootAbs: tmp, importerRel }), {
+      code: "ENOENT",
+    });
+  });
+});
+
+test("importerLockfileNeedsRegen preserves unreadable lockfile failures", async () => {
+  await withTempDir("pnpm-importer-lockfile-unreadable", async (tmp) => {
+    const importerRel = "app";
+    const importerAbs = path.join(tmp, importerRel);
+    const lock = path.join(importerAbs, "pnpm-lock.yaml");
+    await fsp.mkdir(importerAbs);
+    await fsp.writeFile(path.join(importerAbs, "package.json"), "{}\n");
+    await fsp.writeFile(lock, "importers:\n  .: {}\npackages: {}\n");
+    await fsp.chmod(lock, 0o000);
+    try {
+      await assert.rejects(
+        importerLockfileNeedsRegen({ repoRootAbs: tmp, importerRel }),
+        /failed to parse pnpm lockfile with Nix yq: .*pnpm-lock\.yaml/,
+      );
+    } finally {
+      await fsp.chmod(lock, 0o600);
+    }
+  });
+});
+
+test("importerLockfileNeedsRegen bypasses a host yq earlier on PATH", async () => {
+  await withTempDir("pnpm-importer-lockfile-host-yq", async (tmp) => {
+    const importerRel = "app";
+    const importerAbs = path.join(tmp, importerRel);
+    const fakeBin = path.join(tmp, "host-bin");
+    const marker = path.join(tmp, "host-yq-ran");
+    await fsp.mkdir(importerAbs);
+    await fsp.mkdir(fakeBin);
+    await fsp.writeFile(path.join(importerAbs, "package.json"), "{}\n");
+    await fsp.writeFile(
+      path.join(importerAbs, "pnpm-lock.yaml"),
+      "importers:\n  .: {}\npackages: {}\n",
+    );
+    await fsp.writeFile(
+      path.join(fakeBin, "yq"),
+      `#!/bin/sh\ntouch ${JSON.stringify(marker)}\nexit 91\n`,
+      {
+        mode: 0o755,
+      },
+    );
+    const previousPath = process.env.PATH;
+    process.env.PATH = `${fakeBin}${path.delimiter}${previousPath || ""}`;
+    try {
+      assert.equal(await importerLockfileNeedsRegen({ repoRootAbs: tmp, importerRel }), false);
+      await assert.rejects(fsp.access(marker), { code: "ENOENT" });
+    } finally {
+      if (previousPath === undefined) delete process.env.PATH;
+      else process.env.PATH = previousPath;
+    }
+  });
+});

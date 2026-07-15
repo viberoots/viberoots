@@ -13,5 +13,6 @@ export async function reconcilePnpmStore(opts: {
     cwd: opts.repoRoot,
     env: { ...process.env, WORKSPACE_ROOT: opts.repoRoot },
     zxInitPath: path.resolve(import.meta.dirname, "zx-init.mjs"),
+    awaitChildOnSignal: true,
   });
 }

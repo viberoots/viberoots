@@ -9,20 +9,8 @@ let
   dirnameOf = common.dirnameOf;
   importerOnlySrc = common.importerOnlySrc;
   mkPnpmStore = store.mkPnpmStore;
-  pnpmSupportedArchitectures = ''
-    supportedArchitectures:
-      os:
-        - darwin
-        - linux
-        - win32
-      cpu:
-        - x64
-        - arm64
-        - arm
-      libc:
-        - glibc
-        - musl
-  '';
+  supportedPlatforms = import ./supported-platforms.nix { };
+  pnpmSupportedArchitectures = supportedPlatforms.markerForSystem pkgs.stdenvNoCC.hostPlatform.system;
   pnpmWorkspaceMarkerScript = ''
     write_pnpm_workspace_marker() {
       local existing="$TMPDIR/pnpm-workspace.source.yaml"
@@ -222,7 +210,7 @@ in {
         # Hardlinked files from read-only store paths can fail during bin chmod.
         "$PNPM_BIN" config set package-import-method copy
         ${pnpmWorkspaceMarkerScript}
-        write_pnpm_workspace_marker
+        write_pnpm_workspace_marker ${lib.escapeShellArg pnpmSupportedArchitectures}
         FT="${ftVal}"
         IT="${installTimeoutVal}"
         debug_mknm "[VBR-MKNM-DEBUG] NIX_PNPM_FETCH_TIMEOUT=$FT"

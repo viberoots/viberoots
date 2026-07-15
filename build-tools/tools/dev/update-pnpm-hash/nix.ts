@@ -10,6 +10,10 @@ import {
 } from "../../lib/nix-gc-lock";
 import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { runCommand } from "../filtered-flake-command";
+import {
+  cleanupChangedOwnedInvalidPnpmStores,
+  snapshotOwnedInvalidPnpmStores,
+} from "./invalid-store-cleanup";
 import { isCanonicalSha256SRI } from "../../lib/nix-sri";
 import { localOnlyNixBuilderArgs } from "../../lib/nix-builder-policy";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
@@ -45,6 +49,19 @@ export function extractHash(
       matches.push(got[0][1]);
     }
   }
+  const escapedName = expectedDerivationName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const markerEvidence = new Map<string, string>();
+  for (const marker of text.matchAll(
+    new RegExp(
+      `^(?:(?:pnpm-store-lock|${escapedName})> )?viberoots-pnpm-fod-hash-mismatch-v1 output=(/nix/store/[a-z0-9]{32}-${escapedName}) specified=(sha256-[A-Za-z0-9+/]{43}=) got=(sha256-[A-Za-z0-9+/]{43}=)\\s*$`,
+      "gm",
+    ),
+  )) {
+    if (marker[2] !== expectedSpecifiedHash) continue;
+    markerEvidence.set(`${marker[1]}\0${marker[2]}\0${marker[3]}`, marker[3]);
+  }
+  if (markerEvidence.size > 1) return null;
+  if (markerEvidence.size === 1) matches.push(markerEvidence.values().next().value as string);
   return matches.length === 1 ? matches[0] : null;
 }
 
@@ -67,7 +84,6 @@ function envWithFetchTimeout(timeoutSec: number, extraEnv?: NodeJS.ProcessEnv): 
 function validViberootsSource(candidate: string): string {
   const abs = path.resolve(candidate);
   const real = fs.existsSync(abs) ? fs.realpathSync.native(abs) : abs;
-  if (real.startsWith("/nix/store/")) return "";
   if (
     fs.existsSync(path.join(abs, "flake.nix")) &&
     fs.existsSync(path.join(abs, "build-tools", "tools", "dev", "zx-init.mjs"))
@@ -141,29 +157,22 @@ function flakeLocalViberootsSource(flakeRef: string): string {
   return validViberootsSource(resolved);
 }
 
-function activeViberootsOverride(flakeRef: string): string[] {
+export function activeViberootsOverride(
+  flakeRef: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
   if (flakeLocalViberootsSource(flakeRef)) return [];
-  const workspaceRoot = String(process.env.WORKSPACE_ROOT || process.cwd()).trim();
-  const candidates = [
-    workspaceRoot
-      ? path.join(workspaceRoot, ".viberoots", "workspace", "viberoots-flake-input")
-      : "",
-    workspaceRoot ? path.join(workspaceRoot, "viberoots") : "",
-    workspaceRoot ? path.join(workspaceRoot, ".viberoots", "current") : "",
-    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
-    process.env.VIBEROOTS_SOURCE_ROOT || "",
-    process.env.VIBEROOTS_ROOT || "",
-  ]
-    .map((candidate) => String(candidate || "").trim())
-    .filter(Boolean);
-  for (const candidate of candidates) {
-    const real = validViberootsSource(candidate);
-    if (real) return ["--override-input", "viberoots", `path:${real}`];
+  const candidate = String(env.VIBEROOTS_FLAKE_INPUT_ROOT || "").trim();
+  const real = candidate ? validViberootsSource(candidate) : "";
+  if (!real || !/^\/nix\/store\/[a-z0-9]{32}-source$/.test(real)) {
+    throw new Error(
+      "update-pnpm-hash requires an immutable Nix-store viberoots flake-input authority",
+    );
   }
-  return [];
+  return ["--override-input", "viberoots", `path:${real}`];
 }
 
-function nixBuildArgs(opts: {
+export function nixBuildArgs(opts: {
   flakeRef: string;
   attrPath: string;
   printOutPaths: boolean;
@@ -178,7 +187,7 @@ function nixBuildArgs(opts: {
     "--no-link",
     "--no-write-lock-file",
     "--accept-flake-config",
-    ...activeViberootsOverride(opts.flakeRef),
+    ...activeViberootsOverride(opts.flakeRef, opts.extraEnv),
     ...localOnlyNixBuilderArgs(),
     "--print-build-logs",
     "--option",
@@ -209,13 +218,19 @@ export async function buildStore(
   flakeRef: string,
   activity?: ManagedCommandActivity,
   extraEnv?: NodeJS.ProcessEnv,
-  opts: { rebuild?: boolean } = {},
-): Promise<{ ok: boolean; output: string; outPath?: string }> {
+  opts: { rebuild?: boolean; ownedDerivationName?: string } = {},
+): Promise<{ ok: boolean; output: string; outPath?: string; interrupted?: boolean }> {
   const maxJobs = String(process.env.NIX_MAX_JOBS || "").trim() || "0";
   const cores = String(process.env.NIX_CORES || "").trim() || "0";
   const timeoutSec = resolvedFetchTimeoutSec();
   const streamBuildLogs = String(process.env.VBR_STREAM_NIX_BUILD_LOGS || "").trim() === "1";
   const commandEnv = envWithFetchTimeout(timeoutSec, extraEnv);
+  const invalidBefore = opts.ownedDerivationName
+    ? await snapshotOwnedInvalidPnpmStores({
+        derivationName: opts.ownedDerivationName,
+        env: commandEnv,
+      })
+    : null;
   const nixBin = resolveToolPathSync("nix", commandEnv);
   console.error(
     `[update-pnpm-hash] nix build ${attrPath} (timeout=${timeoutSec}s, logs=${streamBuildLogs ? "stream" : "compact"})`,
@@ -228,7 +243,7 @@ export async function buildStore(
       printOutPaths: true,
       maxJobs,
       cores,
-      extraEnv,
+      extraEnv: commandEnv,
       rebuild: opts.rebuild,
     }),
     cwd: process.cwd(),
@@ -238,7 +253,21 @@ export async function buildStore(
     onStderr: streamBuildLogs ? (chunk) => process.stderr.write(chunk) : undefined,
   });
   const output = String(res.stdout || "") + String(res.stderr || "");
-  if (!res.ok) {
+  let cleanupOutput = "";
+  if ((res.interrupted || res.timedOut) && invalidBefore && opts.ownedDerivationName) {
+    try {
+      const deleted = await cleanupChangedOwnedInvalidPnpmStores({
+        derivationName: opts.ownedDerivationName,
+        before: invalidBefore,
+        env: commandEnv,
+      });
+      if (deleted.length > 0)
+        cleanupOutput = `\nremoved interrupted invalid output: ${deleted.join(", ")}`;
+    } catch (error) {
+      cleanupOutput = `\ninterrupted invalid-output cleanup failed: ${String(error)}`;
+    }
+  }
+  if (!res.ok && !res.interrupted && !res.timedOut) {
     const gcPids = await activeNixGcPids();
     if (gcPids.length > 0) {
       const gcCfg = gcWaitConfig();
@@ -249,7 +278,12 @@ export async function buildStore(
       if (remaining.length > 0) {
         return {
           ok: false,
-          output: output + "\n" + nixGcLockMessage("update-pnpm-hash buildStore", remaining),
+          output:
+            output +
+            cleanupOutput +
+            "\n" +
+            nixGcLockMessage("update-pnpm-hash buildStore", remaining),
+          interrupted: res.interrupted || res.timedOut,
         };
       }
       return await buildStore(attrPath, flakeRef, activity, extraEnv, opts);
@@ -260,7 +294,9 @@ export async function buildStore(
       ok: false,
       output:
         output +
+        cleanupOutput +
         `\nupdate-pnpm-hash: timed out building ${attrPath} after ${timeoutSec}s (descendants terminated)`,
+      interrupted: true,
     };
   }
   const outPath =
@@ -269,7 +305,7 @@ export async function buildStore(
       .split(/\r?\n/)
       .filter(Boolean)
       .pop() || undefined;
-  return { ok: res.ok, output, outPath };
+  return { ok: res.ok, output: output + cleanupOutput, outPath, interrupted: res.interrupted };
 }
 
 async function currentSystem(): Promise<string> {
@@ -304,6 +340,7 @@ export async function flakeAttrExists(
       args: [
         "eval",
         "--impure",
+        ...activeViberootsOverride(flakeRef, nixEnv),
         `${flakeRef}#packages.${sys}.${attrset}`,
         "--apply",
         `builtins.hasAttr "${key}"`,

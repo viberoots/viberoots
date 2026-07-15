@@ -19,6 +19,8 @@ test("devshell.sh supports safe direnv bypass fast-path", async () => {
     !txt.includes("devshell_inputs_stale") ||
     !txt.includes("devshell_stale_reload_allowed") ||
     !txt.includes(".source-fingerprint") ||
+    !txt.includes("build-tools/tools/bin/devshell.sh") ||
+    !txt.includes("build-tools/tools/dev/refresh-direnv-stage0.ts") ||
     !txt.includes("re-running this command through direnv exec") ||
     !txt.includes("VBR_DEVSHELL_STALE_RELOAD_ATTEMPTED=1") ||
     !txt.includes('exec direnv exec "$live_root" "$@"')

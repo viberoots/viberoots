@@ -14,7 +14,7 @@ test("importer lockfile generation uses the explicit bounded command runner", as
 
   assert.match(source, /import \{ runCommand \} from "\.\.\/filtered-flake-command"/);
   assert.match(source, /command: nixBin/);
-  assert.match(source, /args: \[\.\.\.nixRunPrefix, opts\.flakeRef, "--", \.\.\.args\]/);
+  assert.match(source, /args: pnpmNixRunArgs\(opts\.flakeRef, args, nixEnv\)/);
   assert.match(source, /timeoutMs: opts\.timeoutMs/);
   assert.doesNotMatch(source, /\$\(/);
 

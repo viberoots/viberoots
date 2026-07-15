@@ -44,6 +44,7 @@ pkgs.writeShellScriptBin "zx-wrapper" ''
         ;;
     esac
   fi
+  export PATH=${pkgs.yq}/bin:"$PATH"
   exec ${pkgs.nodejs_22}/bin/node \
     --experimental-strip-types \
     --experimental-top-level-await \

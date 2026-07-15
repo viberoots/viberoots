@@ -29,7 +29,7 @@ function startParentWatchdog(opts: {
     '    if [ -n "$D" ]; then rm -rf -- "$D" 2>/dev/null || true; fi',
     "    exit 0",
     "  fi",
-    "  sleep 1",
+    "  if IFS= read -r -t 1 _ <&3; then exit 0; fi",
     "done",
   ].join("\n");
   const watchdog = spawn(
@@ -48,18 +48,17 @@ function startParentWatchdog(opts: {
     {
       cwd: opts.cwd,
       env: watchdogEnvFor(opts.env),
-      stdio: "ignore",
+      stdio: ["ignore", "ignore", "ignore", "pipe"],
       detached: true,
     },
   );
-  const watchdogPid = watchdog.pid || 0;
+  const control = watchdog.stdio[3] as (NodeJS.WritableStream & { unref?: () => void }) | null;
+  control?.on("error", () => {});
+  control?.unref?.();
   watchdog.on("error", () => {});
   watchdog.unref();
   return () => {
-    if (watchdogPid <= 0) return;
-    try {
-      process.kill(watchdogPid, "SIGTERM");
-    } catch {}
+    control?.end("stop\n");
   };
 }
 

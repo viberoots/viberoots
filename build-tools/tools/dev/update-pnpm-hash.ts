@@ -26,10 +26,17 @@ import {
   repoRelativeLockfilePath,
 } from "./update-pnpm-hash/paths";
 import {
+  evaluatePnpmStoreDerivationIdentity,
   inspectCommittedFinalPnpmStore,
   resolveFinalPnpmStore,
 } from "./update-pnpm-hash/realized-store";
 import * as verifiedMarker from "./update-pnpm-hash/verified-marker";
+import {
+  closeManagedCancellationChannel,
+  initializeManagedCancellationChannel,
+} from "../lib/managed-cancellation";
+
+initializeManagedCancellationChannel();
 
 const PLACEHOLDER_PNPM_STORE_HASH = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
@@ -71,7 +78,7 @@ async function inner() {
   const acceptedBuilderFingerprints =
     await verifiedMarker.currentVerifiedMarkerFingerprintCandidates(repoRoot, importer);
   const marker = await verifiedMarker.readVerifiedMarker(markerPath);
-  const markerMatches = Boolean(
+  const markerMetadataMatches = Boolean(
     currentHash &&
       marker &&
       marker.importer === importer &&
@@ -81,19 +88,26 @@ async function inner() {
       acceptedBuilderFingerprints.includes(marker.builderFingerprint),
   );
 
-  const probe = async (): Promise<string> =>
+  const probe = async (): Promise<{ fixedStorePath: string; derivationIdentity: string }> =>
     await withPnpmStoreBuildFlakeRef(
       { repoRoot, importer, baseFlakeRef: flakeRef },
-      async (buildFlakeRef, filteredEnv) =>
-        (
-          await resolveFinalPnpmStore({
-            repoRoot,
-            importer,
-            flakeRef: buildFlakeRef,
-            attrPath: storeAttr,
-            env: { ...process.env, ...filteredEnv },
-          })
-        ).fixedStorePath,
+      async (buildFlakeRef, filteredEnv) => {
+        const env = { ...process.env, ...filteredEnv };
+        const resolved = await resolveFinalPnpmStore({
+          repoRoot,
+          importer,
+          flakeRef: buildFlakeRef,
+          attrPath: storeAttr,
+          env,
+        });
+        const derivationIdentity = await evaluatePnpmStoreDerivationIdentity({
+          repoRoot,
+          flakeRef: buildFlakeRef,
+          attrPath: storeAttr,
+          env,
+        });
+        return { fixedStorePath: resolved.fixedStorePath, derivationIdentity };
+      },
     );
 
   const inspectForRebuild = async (): Promise<"realized" | "absent" | "invalid"> =>
@@ -112,12 +126,15 @@ async function inner() {
     );
 
   if (readOnly) {
-    await probe();
+    const realized = await probe();
+    if (!markerMetadataMatches || marker?.derivationIdentity !== realized.derivationIdentity) {
+      throw new Error(`pnpm-store verification is stale for ${importer}; repair: run u`);
+    }
     console.log(`pnpm-store: ${storeAttr} is realized from committed metadata`);
     return;
   }
 
-  const persist = async (hashValue: string) => {
+  const persist = async (hashValue: string, derivationIdentity: string) => {
     await verifiedMarker.persistVerifiedHash({
       repoRoot,
       markerPath,
@@ -127,19 +144,24 @@ async function inner() {
         lockHash,
         hashValue,
         builderFingerprint,
+        derivationIdentity,
       },
       sharedCacheBuilderFingerprint,
     });
   };
 
-  if (markerMatches && !force) {
+  let markerMatches = false;
+  if (markerMetadataMatches && !force) {
     try {
-      await probe();
-      await persist(currentHash);
-      console.log(
-        `[update-pnpm-hash] importer=${importer} step=skip-marker attr=${storeAttr} lockfile=${key}`,
-      );
-      return;
+      const realized = await probe();
+      if (marker?.derivationIdentity === realized.derivationIdentity) {
+        markerMatches = true;
+        await persist(currentHash, realized.derivationIdentity);
+        console.log(
+          `[update-pnpm-hash] importer=${importer} step=skip-marker attr=${storeAttr} lockfile=${key}`,
+        );
+        return;
+      }
     } catch (error) {
       if (!String(error).includes("final pnpm store is not realized")) throw error;
     }
@@ -164,7 +186,6 @@ async function inner() {
         const restored = await verifiedMarker.restoreHashFromSharedCache({
           repoRoot,
           key,
-          markerPath,
           importer,
           storeAttr,
           builderFingerprint,
@@ -181,7 +202,9 @@ async function inner() {
             root: repoRoot,
           });
           try {
-            await probe();
+            const realized = await probe();
+            if (!effectiveHash) throw new Error(`shared hash cache returned no hash for ${key}`);
+            await persist(effectiveHash, realized.derivationIdentity);
             return;
           } catch (error) {
             if (!String(error).includes("final pnpm store is not realized")) throw error;
@@ -206,7 +229,10 @@ async function inner() {
                 buildFlakeRef,
                 activity,
                 { ...filteredEnv, NIX_PNPM_RECONCILE: "1" },
-                { rebuild },
+                {
+                  rebuild,
+                  ownedDerivationName: `pnpm-store-lock-${lockHash}`,
+                },
               ),
               { activity },
             );
@@ -232,7 +258,8 @@ async function inner() {
         }));
       if (!finalHash)
         throw new Error(`fixed pnpm store reconciliation returned no hash for ${key}`);
-      await persist(finalHash);
+      const realized = await probe();
+      await persist(finalHash, realized.derivationIdentity);
       console.log(`pnpm-store: ${storeAttr} hash updated and build succeeded`);
     },
   );
@@ -254,7 +281,9 @@ async function main() {
   });
 }
 
-void main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
-  process.exit(1);
-});
+void main()
+  .catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  })
+  .finally(closeManagedCancellationChannel);

@@ -17,7 +17,10 @@ import {
 import { emitTimingDetail } from "../../lib/timing-detail";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../../lib/macos-metadata";
 import { findWorkspacePackageRepoDirs } from "./importer-workspace-packages";
-import { repairSnapshotViberootsInput } from "../filtered-flake-viberoots-input";
+import {
+  materializeFilteredViberootsSource,
+  repairSnapshotViberootsInput,
+} from "../filtered-flake-viberoots-input";
 import { runCommand } from "../filtered-flake-command";
 import { removeOwnedTempTree, rethrowAfterOwnedTempCleanup } from "../../lib/owned-temp-cleanup";
 
@@ -36,7 +39,12 @@ export async function makeFilteredFlakeRef(opts: {
   repoRoot: string;
   attr: string;
   importer?: string;
-}): Promise<{ flakeRef: string; workspaceRoot: string; cleanup: () => Promise<void> }> {
+}): Promise<{
+  flakeRef: string;
+  workspaceRoot: string;
+  viberootsInputRoot: string;
+  cleanup: () => Promise<void>;
+}> {
   const tmpBase = process.env.TMPDIR || "/tmp";
   const workDirRaw = await mkdtempNoindex("scaf-flake-", {
     baseName: "scaf-flake",
@@ -110,10 +118,23 @@ export async function makeFilteredFlakeRef(opts: {
         "[update-pnpm-hash] filtered flake snapshot is missing .viberoots/workspace/flake.nix and flake.nix",
       );
     }
-    await repairSnapshotViberootsInput({ snapDir: snapDirReal, flakeDir });
+    let viberootsInputRoot = await repairSnapshotViberootsInput({
+      snapDir: snapDirReal,
+      flakeDir,
+    });
+    if (
+      !viberootsInputRoot &&
+      (await fsp
+        .access(path.join(src, "build-tools", "tools", "dev", "zx-init.mjs"))
+        .then(() => true)
+        .catch(() => false))
+    ) {
+      viberootsInputRoot = (await materializeFilteredViberootsSource(snapDirReal)).storePath;
+    }
     return {
       flakeRef: `path:${flakeDir}#${opts.attr}`,
       workspaceRoot: snapDirReal,
+      viberootsInputRoot,
       cleanup: async () => await removeOwnedTempTree(workDir),
     };
   } catch (error) {

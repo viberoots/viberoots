@@ -12,6 +12,7 @@ export type PnpmStoreVerifiedMarker = {
   lockHash: string;
   hashValue: string;
   builderFingerprint: string;
+  derivationIdentity: string;
 };
 
 export type SharedPnpmStoreHashCacheEntry = {
@@ -30,6 +31,7 @@ const pnpmStoreBuilderFingerprintFiles = [
   "viberoots/build-tools/tools/nix/node-modules/common.nix",
   "viberoots/build-tools/tools/nix/node-modules/store.nix",
   "viberoots/build-tools/tools/nix/node-modules/modules.nix",
+  "viberoots/build-tools/tools/nix/node-modules/supported-platforms.nix",
 ] as const;
 
 const exactStoreProvisioningFingerprintFiles = [
@@ -116,8 +118,18 @@ export async function readVerifiedMarker(
     const lockHash = String(m.lockHash || "").trim();
     const hashValue = String(m.hashValue || "").trim();
     const builderFingerprint = String(m.builderFingerprint || "").trim();
-    if (!importer || !lockfile || !lockHash || !hashValue || !builderFingerprint) return null;
-    return { importer, lockfile, lockHash, hashValue, builderFingerprint };
+    const derivationIdentity = String(m.derivationIdentity || "").trim();
+    if (
+      !importer ||
+      !lockfile ||
+      !lockHash ||
+      !hashValue ||
+      !builderFingerprint ||
+      !/^\/nix\/store\/[a-z0-9]{32}-[^/]+\.drv$/.test(derivationIdentity)
+    ) {
+      return null;
+    }
+    return { importer, lockfile, lockHash, hashValue, builderFingerprint, derivationIdentity };
   } catch {
     return null;
   }
@@ -291,7 +303,6 @@ export async function withSharedHashCacheLock<T>(
 export async function restoreHashFromSharedCache(opts: {
   repoRoot: string;
   key: string;
-  markerPath: string;
   importer: string;
   storeAttr: string;
   builderFingerprint: string;
@@ -314,18 +325,6 @@ export async function restoreHashFromSharedCache(opts: {
       root: opts.hashRoot || opts.repoRoot,
     });
   }
-  await persistVerifiedHash({
-    repoRoot: opts.repoRoot,
-    markerPath: opts.markerPath,
-    marker: {
-      importer: opts.importer,
-      lockfile: opts.key,
-      lockHash: opts.existingLockHash,
-      hashValue: sharedHash,
-      builderFingerprint: opts.builderFingerprint,
-    },
-    sharedCacheBuilderFingerprint: opts.sharedCacheBuilderFingerprint,
-  });
   console.log(
     `[update-pnpm-hash] importer=${opts.importer} step=shared-hash-cache attr=${opts.storeAttr} lockfile=${opts.key}`,
   );

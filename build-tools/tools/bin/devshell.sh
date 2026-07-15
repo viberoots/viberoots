@@ -375,6 +375,8 @@ devshell_inputs_stale() {
 		"${live_root}/.viberoots/workspace/flake.lock" \
 		"${live_root}/viberoots/flake.nix" \
 		"${live_root}/viberoots/flake.lock" \
+		"${live_root}/viberoots/build-tools/tools/bin/devshell.sh" \
+		"${live_root}/viberoots/build-tools/tools/dev/refresh-direnv-stage0.ts" \
 		"${live_root}/viberoots/build-tools/tools/nix/devshell.nix" \
 		"${live_root}/viberoots/build-tools/tools/lib/consumer-direnv.ts"; do
 		[[ -f "${file}" && "${file}" -nt "${marker}" ]] && return 0
@@ -390,6 +392,32 @@ devshell_stale_reload_allowed() {
 	[[ -z "${VBR_TEST_SEED_STORE_PATH:-}" ]] || return 1
 	[[ -z "${VBR_RUN_IN_TEMP_REPO:-}" ]] || return 1
 	return 0
+}
+
+nix_store_zx_wrapper() {
+	local candidate
+	candidate="$(command -v zx-wrapper 2>/dev/null || true)"
+	case "${candidate}" in
+		/nix/store/*/bin/zx-wrapper)
+			[[ -x "${candidate}" ]] && printf '%s\n' "${candidate}" && return 0
+			;;
+	esac
+	return 1
+}
+
+refresh_stale_direnv_stage0() {
+	local live_root="$1"
+	local source_root="${live_root}/viberoots"
+	local refresh_script="${source_root}/build-tools/tools/dev/refresh-direnv-stage0.ts"
+	local zx_init="${source_root}/build-tools/tools/dev/zx-init.mjs"
+	local wrapper
+	wrapper="$(nix_store_zx_wrapper || true)"
+	if [[ -z "${wrapper}" || ! -f "${refresh_script}" || ! -f "${zx_init}" ]]; then
+		echo "error: stale dev shell inputs require the current Nix-store zx-wrapper" 1>&2
+		echo "repair: run viberoots post-clone, then retry the command" 1>&2
+		return 1
+	fi
+	"${wrapper}" --import "${zx_init}" "${refresh_script}" --workspace-root "${live_root}"
 }
 
 devshell_help_only() {
@@ -434,6 +462,7 @@ exec_in_dev_shell() {
 	if [[ -z "${NO_DEV_SHELL:-}" && "${VBR_DEVSHELL_STALE_RELOAD_ATTEMPTED:-}" != "1" ]] && devshell_stale_reload_allowed && devshell_inputs_stale "${live_root}"; then
 		if command -v direnv >/dev/null 2>&1; then
 			echo "warn dev shell inputs changed; re-running this command through direnv exec" 1>&2
+			refresh_stale_direnv_stage0 "${live_root}"
 			BUCK_CONFIG_LOCK=1 VBR_DEVSHELL_STALE_RELOAD_ATTEMPTED=1 exec direnv exec "$live_root" "$@"
 		elif [[ -z "${IN_NIX_SHELL:-}" ]]; then
 			echo "error: direnv not found on PATH; run inside the dev shell" 1>&2

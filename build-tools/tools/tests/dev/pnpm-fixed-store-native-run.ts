@@ -5,7 +5,14 @@ const DEFAULT_SAMPLE_INTERVAL_MS = 1_000;
 const COMMAND_TIMEOUT_MS = 150_000;
 const TERMINATION_GRACE_MS = 5_000;
 
-export type CommandResult = { status: number | null; stdout: string; stderr: string };
+export type CommandResult = {
+  status: number | null;
+  stdout: string;
+  stderr: string;
+  elapsedMs: number;
+  peakFixtureKib: number;
+  peakDiskDeltaKib: number;
+};
 
 type RunOptions = {
   cwd: string;
@@ -13,6 +20,7 @@ type RunOptions = {
   fixtureRoot: string;
   maxKib?: number;
   sampleIntervalMs?: number;
+  timeoutMs?: number;
 };
 
 export async function runGuardedCommand(
@@ -22,6 +30,9 @@ export async function runGuardedCommand(
 ): Promise<CommandResult> {
   const maxKib = opts.maxKib ?? DEFAULT_MAX_KIB;
   const beforeDisk = await diskUsedKib(opts.fixtureRoot);
+  const startedAt = Date.now();
+  let peakFixtureKib = 0;
+  let peakDiskDeltaKib = 0;
   return await new Promise((resolve, reject) => {
     const child = spawn(command, args, {
       cwd: opts.cwd,
@@ -50,8 +61,9 @@ export async function runGuardedCommand(
       forceTimer = setTimeout(() => signalChild("SIGKILL"), TERMINATION_GRACE_MS);
     };
     const timeout = setTimeout(
-      () => stop(new Error(`command exceeded ${COMMAND_TIMEOUT_MS}ms: ${command}`)),
-      COMMAND_TIMEOUT_MS,
+      () =>
+        stop(new Error(`command exceeded ${opts.timeoutMs ?? COMMAND_TIMEOUT_MS}ms: ${command}`)),
+      opts.timeoutMs ?? COMMAND_TIMEOUT_MS,
     );
     const sampler = setInterval(async () => {
       if (settled || stopReason) return;
@@ -60,6 +72,8 @@ export async function runGuardedCommand(
           directorySizeKib(opts.fixtureRoot),
           diskUsedKib(opts.fixtureRoot),
         ]);
+        peakFixtureKib = Math.max(peakFixtureKib, fixtureKib);
+        peakDiskDeltaKib = Math.max(peakDiskDeltaKib, diskKib - beforeDisk);
         if (fixtureKib > maxKib || diskKib - beforeDisk > maxKib) {
           stop(
             new Error(
@@ -77,8 +91,24 @@ export async function runGuardedCommand(
       clearTimeout(timeout);
       clearTimeout(forceTimer);
       clearInterval(sampler);
-      if (stopReason) reject(stopReason);
-      else resolve({ status, stdout, stderr });
+      if (stopReason) {
+        Object.assign(stopReason, {
+          stdout,
+          stderr,
+          elapsedMs: Date.now() - startedAt,
+          peakFixtureKib,
+          peakDiskDeltaKib,
+        });
+        reject(stopReason);
+      } else
+        resolve({
+          status,
+          stdout,
+          stderr,
+          elapsedMs: Date.now() - startedAt,
+          peakFixtureKib,
+          peakDiskDeltaKib,
+        });
     });
   });
 }

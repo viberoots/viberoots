@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { envWithStubbedNix } from "../lib/test-helpers";
+import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 
@@ -44,9 +45,24 @@ test("p auto source uses filtered flake when root viberoots input is generated w
       JSON.stringify({ nodes: { viberoots: {} }, root: "root", version: 7 }, null, 2) + "\n",
       "utf8",
     );
+    await ensureBuckConfigForTempRepo(fakeRoot, $);
+    await $({ cwd: fakeRoot, stdio: "pipe" })`git init`;
     await fsp.writeFile(
       path.join(fakeRoot, "projects", "apps", "demo", "src", "index.ts"),
       "console.log('ok');\n",
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(fakeRoot, "projects", "apps", "demo", "TARGETS"),
+      [
+        'load("@prelude//:rules.bzl", "genrule")',
+        "genrule(",
+        '    name = "demo",',
+        '    out = "demo",',
+        '    cmd = "touch $OUT",',
+        ")",
+        "",
+      ].join("\n"),
       "utf8",
     );
     await fsp.writeFile(
@@ -105,7 +121,11 @@ test("p auto source uses filtered flake when root viberoots input is generated w
     const run = await $({
       cwd: fakeRoot,
       stdio: "pipe",
-      env: envWithStubbedNix(stubBin),
+      env: {
+        ...envWithStubbedNix(stubBin),
+        WORKSPACE_ROOT: fakeRoot,
+        BUCK_TEST_SRC: fakeRoot,
+      },
     })`${tool} ${target}`;
     assert.match(String(run.stdout || ""), /selected-prod-ok/);
     assert.match(

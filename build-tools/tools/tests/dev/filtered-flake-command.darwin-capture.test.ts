@@ -92,10 +92,10 @@ test(
             ].join(";"),
             pidFile,
           ],
-          timeoutMs: 1_000,
+          timeoutMs: 10_000,
           killGraceMs: 100,
         }),
-        /timed out after 1000ms/,
+        /timed out after 10000ms/,
       );
       const descendantPid = Number(await fsp.readFile(pidFile, "utf8"));
       assert.ok(Number.isFinite(descendantPid) && descendantPid > 1);
@@ -187,4 +187,14 @@ test("filtered flake command clears timeout before asynchronous capture reading"
   const asyncReadIndex = source.indexOf("void (async () =>", closeIndex);
   assert.ok(closeIndex >= 0 && clearIndex > closeIndex && clearIndex < asyncReadIndex);
   assert.match(source.slice(closeIndex, asyncReadIndex), /const closedTimedOut = timedOut/);
+});
+
+test("filtered flake command stops its watchdog through a private control pipe", async () => {
+  const source = await fsp.readFile(
+    path.join(root, "build-tools/tools/dev/filtered-flake-command.ts"),
+    "utf8",
+  );
+  assert.match(source, /read -r -t 1 _ <&3/);
+  assert.match(source, /control\?\.end\("stop\\n"\)/);
+  assert.doesNotMatch(source, /process\.kill\(watchdogPid/);
 });

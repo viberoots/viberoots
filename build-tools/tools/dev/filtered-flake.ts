@@ -120,17 +120,29 @@ async function filteredSnapshotRelPaths(root: string, target: string): Promise<s
   const relPaths = new Set(defaultFilteredFlakeSnapshotRelPaths());
   const importer = targetPackageFromLabel(target);
   if (!importer || importer === ".") return [...relPaths];
+  const normalizedImporter = path.posix.normalize(importer);
+  const importerAbs = path.resolve(root, importer);
+  const importerFromRoot = path.relative(root, importerAbs);
+  if (
+    importer.includes("\\") ||
+    normalizedImporter !== importer ||
+    importerFromRoot === ".." ||
+    importerFromRoot.startsWith(`..${path.sep}`) ||
+    path.isAbsolute(importerFromRoot)
+  ) {
+    throw new Error(`selected target package escapes the workspace: ${importer}`);
+  }
+  relPaths.add(importer);
   for (const lockfile of ["pnpm-lock.yaml", "uv.lock", "go.mod"]) {
     try {
       await fsp.access(path.join(root, importer, lockfile));
-      relPaths.add(importer);
       if (lockfile === "pnpm-lock.yaml") relPaths.add("projects/node-modules.hashes.json");
       break;
     } catch {}
   }
   const workspacePackageDirs = await findWorkspacePackageRepoDirs({
     repoRoot: root,
-    importerAbs: path.join(root, importer),
+    importerAbs,
   });
   for (const workspacePackageDir of workspacePackageDirs) {
     relPaths.add(workspacePackageDir);

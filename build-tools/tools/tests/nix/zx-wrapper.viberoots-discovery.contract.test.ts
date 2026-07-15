@@ -5,7 +5,8 @@ import path from "node:path";
 import { test } from "node:test";
 
 async function resolveRepoFile(rel: string): Promise<string> {
-  for (const candidate of [rel, path.join("viberoots", rel)]) {
+  const normalized = rel.replace(/^viberoots\//, "");
+  for (const candidate of [normalized, path.join("viberoots", normalized)]) {
     try {
       await fsp.access(candidate);
       return candidate;
@@ -22,6 +23,7 @@ test("nix zx-wrapper discovers zx-init in standalone and consumer viberoots layo
   assert.match(source, /\$_search\/viberoots\/build-tools\/tools\/dev\/zx-init\.mjs/);
   assert.match(source, /\$_search\/\.viberoots\/current\/build-tools\/tools\/dev\/zx-init\.mjs/);
   assert.match(source, /break 2/);
+  assert.match(source, /export PATH=\$\{pkgs\.yq\}\/bin:/);
 
   assert.ok(
     source.indexOf("$_search/viberoots/build-tools/tools/dev/zx-init.mjs") <

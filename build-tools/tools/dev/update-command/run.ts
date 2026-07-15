@@ -19,10 +19,7 @@ export type UpdateOperations = {
 };
 
 export const defaultUpdateOperations: UpdateOperations = {
-  importers: async (root) =>
-    (await discoverImportersWithLock(root, { cwd: process.cwd() })).filter(
-      (importer) => importer !== "viberoots",
-    ),
+  importers: async (root) => await discoverImportersWithLock(root, { cwd: process.cwd() }),
   unsupportedUpgrades: unsupportedUpgradeSurfaces,
   repairPnpmLock: async (root, importer) =>
     await updatePnpmLock({ root, importer, upgrade: false }),
@@ -55,8 +52,12 @@ export async function runUpdateCommand(opts: {
   const importers = await operations.importers(opts.root);
   for (const importer of importers) {
     if (opts.verbose) console.log(`[update] pnpm: ${importer}`);
-    if (opts.upgrade) await operations.upgradePnpm(opts.root, importer);
-    else await operations.repairPnpmLock(opts.root, importer);
+    // The nested tool importer owns its committed lockfile. Workspace u only
+    // reconciles that lock into the workspace-local exact-store authority.
+    if (importer !== "viberoots") {
+      if (opts.upgrade) await operations.upgradePnpm(opts.root, importer);
+      else await operations.repairPnpmLock(opts.root, importer);
+    }
     await operations.reconcilePnpm(opts.root, importer);
   }
   await operations.repairGo(opts.root, opts.verbose);

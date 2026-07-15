@@ -57,6 +57,24 @@ test("plain u conservatively repairs each importer before shared metadata", asyn
   ]);
 });
 
+test("plain u reconciles the nested tool importer without rewriting its lockfile", async () => {
+  const events: string[] = [];
+  const nested = operations(events);
+  nested.importers = async () => ["projects/apps/web", "viberoots"];
+  await runUpdateCommand({
+    root: "/repo",
+    upgrade: false,
+    verbose: false,
+    operations: nested,
+  });
+  assert.deepEqual(events.slice(0, 3), [
+    "repair:projects/apps/web",
+    "reconcile:projects/apps/web",
+    "reconcile:viberoots",
+  ]);
+  assert.ok(!events.includes("repair:viberoots"));
+});
+
 test("u --upgrade upgrades pnpm and fails closed before mixed-language mutation", async () => {
   const upgraded: string[] = [];
   await runUpdateCommand({
@@ -83,6 +101,20 @@ test("u --upgrade upgrades pnpm and fails closed before mixed-language mutation"
     /unsupported.*Go, C\+\+.*no files were modified/s,
   );
   assert.deepEqual(blocked, []);
+});
+
+test("u --upgrade reconciles but never upgrades the nested tool importer", async () => {
+  const events: string[] = [];
+  const nested = operations(events);
+  nested.importers = async () => ["viberoots"];
+  await runUpdateCommand({
+    root: "/repo",
+    upgrade: true,
+    verbose: false,
+    operations: nested,
+  });
+  assert.equal(events[0], "reconcile:viberoots");
+  assert.ok(!events.includes("upgrade:viberoots"));
 });
 
 test("help documents the edit workflow and does not advertise u deps", () => {
@@ -120,6 +152,10 @@ test("pnpm lock modes are explicit and use a bounded ephemeral store", () => {
     ["--store-dir", "/tmp/ephemeral-store"],
   );
   assert.ok(!conservative.includes("fetch"));
+  assert.ok(conservative.includes("--child-concurrency"));
+  assert.ok(!upgrade.includes("--child-concurrency"));
+  assert.ok(conservative.includes("--prod=false"));
+  assert.ok(!upgrade.includes("--prod=false"));
 });
 
 test("pnpm lock repair removes its ephemeral store and restores local state", async () => {

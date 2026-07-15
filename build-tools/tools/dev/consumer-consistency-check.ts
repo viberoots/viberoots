@@ -16,6 +16,7 @@ import {
 import { discoverImportersWithLock } from "./install/importers";
 import { buildToolPath, zxInitPath } from "./dev-build/paths";
 import { envWithResolvedNixBin } from "../lib/tool-paths";
+import { runReadOnlyLanguageConsistencyChecks } from "./dependency-consistency";
 
 const execFileAsync = promisify(execFile);
 
@@ -121,7 +122,10 @@ async function assertPostCloneGeneratedFilesReady(
 
 export async function checkConsumerConsistency(
   repoRoot: string,
-  opts: { checkPnpm?: (repoRoot: string) => Promise<void> } = {},
+  opts: {
+    checkPnpm?: (repoRoot: string) => Promise<void>;
+    checkLanguages?: (repoRoot: string) => Promise<void>;
+  } = {},
 ): Promise<void> {
   const before = await trackedChanges(repoRoot);
   const mode = inferBootstrapConsumerModeSync(repoRoot);
@@ -135,6 +139,9 @@ export async function checkConsumerConsistency(
       "source mode is submodule but viberoots has no checkout to stage as a gitlink",
       "viberoots update",
     );
+  }
+  if (mode === "submodule" && !lockRev) {
+    fail("required root flake.lock is missing its committed viberoots input", "viberoots update");
   }
   if (mode === "submodule" && prospectiveGitlink && lockRev && prospectiveGitlink !== lockRev) {
     fail(
@@ -156,6 +163,7 @@ export async function checkConsumerConsistency(
 
   await assertPostCloneGeneratedFilesReady(repoRoot, mode);
   await (opts.checkPnpm || runReadOnlyPnpmChecks)(repoRoot);
+  await (opts.checkLanguages || runReadOnlyLanguageConsistencyChecks)(repoRoot);
 
   const after = await trackedChanges(repoRoot);
   if (!sameList(before, after)) {

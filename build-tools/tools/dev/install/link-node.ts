@@ -119,15 +119,16 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
     }
   }
   const flakeRef = flakeRefForImporter(flakeRoot, importer);
-  let tempFlake: { flakeRef: string; workspaceRoot: string; cleanup: () => Promise<void> } | null =
-    null;
+  let tempFlake: {
+    flakeRef: string;
+    workspaceRoot: string;
+    viberootsInputRoot: string;
+    cleanup: () => Promise<void>;
+  } | null = null;
   let buildFlakeRefBase = flakeRef;
   if (!outPath && attr) {
     try {
-      if (importer === "viberoots") {
-        const viberootsRoot = path.join(root, "viberoots");
-        buildFlakeRefBase = `path:${viberootsRoot}`;
-      } else if (!isDefaultImporter) {
+      if (!isDefaultImporter) {
         console.error("[link-node] preparing filtered flake snapshot for importer", importer);
         tempFlake = await withHeartbeat(
           `importer=${importer} step=prepare-filtered-flake`,
@@ -160,6 +161,16 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
         stderrBytes: 0,
       };
       const fakeNix = usesTempRepoFakeNix(root);
+      const filteredEnv = tempFlake
+        ? {
+            ...process.env,
+            WORKSPACE_ROOT: tempFlake.workspaceRoot,
+            VBR_PNPM_FILTERED_SNAPSHOT_ROOT: tempFlake.workspaceRoot,
+            ...(tempFlake.viberootsInputRoot
+              ? { VIBEROOTS_FLAKE_INPUT_ROOT: tempFlake.viberootsInputRoot }
+              : {}),
+          }
+        : process.env;
       const buildWithEnv = async (exactStoreEnv: NodeJS.ProcessEnv) => {
         const buildEnv = fakeNix ? exactStoreEnv : envWithResolvedNixBin(exactStoreEnv);
         const nixBin = fakeNix
@@ -185,7 +196,7 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
               "--print-out-paths",
             ],
             cwd: root,
-            env: tempFlake ? { ...buildEnv, WORKSPACE_ROOT: tempFlake.workspaceRoot } : buildEnv,
+            env: buildEnv,
             timeoutMs: nixBuildTimeoutMs,
             activity,
           }),
@@ -193,13 +204,14 @@ export async function relinkNodeModules(force: boolean, importerOverride = "") {
         );
       };
       const built = fakeNix
-        ? await buildWithEnv(process.env)
+        ? await buildWithEnv(filteredEnv)
         : await withResolvedFinalPnpmStore(
             {
               repoRoot: root,
               importer,
               flakeRef: buildFlakeRefBase,
               attrPath: `pnpm-store.${attr}`,
+              env: filteredEnv,
             },
             buildWithEnv,
           );

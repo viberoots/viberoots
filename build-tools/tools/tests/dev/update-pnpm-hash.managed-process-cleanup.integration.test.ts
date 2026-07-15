@@ -17,4 +17,7 @@ test("update-pnpm-hash nix helpers use managed command execution with bounded ti
   if (!txt.includes("descendants terminated")) {
     throw new Error("update-pnpm-hash/nix.ts must report descendant teardown on timeout");
   }
+  if (!txt.includes("!res.interrupted && !res.timedOut")) {
+    throw new Error("interrupted reconciliation must not retry after owned child shutdown");
+  }
 });

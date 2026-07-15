@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import path from "node:path";
+import { MANAGED_CANCEL_READY, MANAGED_CANCEL_REQUEST } from "./managed-cancellation";
 
 export type RunNodeWithZxOptions = {
   script: string;
@@ -10,6 +11,8 @@ export type RunNodeWithZxOptions = {
   zxInitPath: string;
   stdio?: "inherit" | "pipe";
   timeoutMs?: number;
+  awaitChildOnSignal?: boolean;
+  signalCleanupGraceMs?: number;
 };
 
 export function nodeFlagsWithZx(zxInitPath: string): string[] {
@@ -85,11 +88,20 @@ export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
     const proc = spawn(nodeBin, argv, {
       cwd,
       env,
-      stdio: stdio === "inherit" ? "inherit" : "pipe",
+      stdio: opts.awaitChildOnSignal
+        ? stdio === "inherit"
+          ? ["inherit", "inherit", "inherit", "ipc"]
+          : ["pipe", "pipe", "pipe", "ipc"]
+        : stdio,
+      detached: opts.awaitChildOnSignal === true,
     });
     let timedOut = false;
+    let forwardedSignal: NodeJS.Signals | null = null;
     let killTimer: NodeJS.Timeout | null = null;
     let hardKillTimer: NodeJS.Timeout | null = null;
+    let signalKillTimer: NodeJS.Timeout | null = null;
+    let cancellationReady = false;
+    let cancellationSent = false;
     if (timeoutMs > 0) {
       killTimer = setTimeout(() => {
         timedOut = true;
@@ -104,6 +116,41 @@ export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
       }, timeoutMs);
     }
 
+    const forwardSignal = (signal: NodeJS.Signals): void => {
+      if (forwardedSignal) return;
+      forwardedSignal = signal;
+      sendCancellation();
+      signalKillTimer = setTimeout(
+        () => {
+          if (!proc.pid) return;
+          try {
+            process.kill(-proc.pid, "SIGKILL");
+          } catch {}
+        },
+        Math.max(1, opts.signalCleanupGraceMs ?? 180_000),
+      );
+    };
+    if (opts.awaitChildOnSignal) {
+      proc.on("message", (message: unknown) => {
+        if (
+          message &&
+          typeof message === "object" &&
+          (message as { type?: unknown }).type === MANAGED_CANCEL_READY
+        ) {
+          cancellationReady = true;
+          sendCancellation();
+        }
+      });
+      process.once("SIGINT", forwardSignal);
+      process.once("SIGTERM", forwardSignal);
+    }
+
+    function sendCancellation(): void {
+      if (cancellationSent || !cancellationReady || !forwardedSignal || !proc.connected) return;
+      cancellationSent = true;
+      proc.send({ type: MANAGED_CANCEL_REQUEST, signal: forwardedSignal });
+    }
+
     let stdout = "";
     let stderr = "";
     if (stdio !== "inherit") {
@@ -111,14 +158,21 @@ export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
       proc.stderr?.on("data", (b) => (stderr += String(b)));
     }
 
-    proc.on("error", reject);
-    proc.on("exit", (code, signal) => {
+    const clearLifecycle = (): void => {
+      if (opts.awaitChildOnSignal) {
+        process.off("SIGINT", forwardSignal);
+        process.off("SIGTERM", forwardSignal);
+      }
       if (killTimer) clearTimeout(killTimer);
       if (hardKillTimer) clearTimeout(hardKillTimer);
-      if (code === 0) {
-        resolve({ stdout, stderr });
-        return;
-      }
+      if (signalKillTimer) clearTimeout(signalKillTimer);
+    };
+    proc.on("error", (error) => {
+      clearLifecycle();
+      reject(error);
+    });
+    proc.on("close", (code, signal) => {
+      clearLifecycle();
       if (timedOut) {
         reject(
           Object.assign(new Error(`${path.basename(opts.script)} timed out after ${timeoutMs}ms`), {
@@ -127,6 +181,22 @@ export async function runNodeWithZx(opts: RunNodeWithZxOptions): Promise<{
             stderr,
           }),
         );
+        return;
+      }
+      if (forwardedSignal) {
+        process.kill(process.pid, forwardedSignal);
+        reject(
+          Object.assign(
+            new Error(
+              `${path.basename(opts.script)} interrupted by ${forwardedSignal} after child close`,
+            ),
+            { exitCode: 128 + (forwardedSignal === "SIGINT" ? 2 : 15), signal: forwardedSignal },
+          ),
+        );
+        return;
+      }
+      if (code === 0) {
+        resolve({ stdout, stderr });
         return;
       }
       const suffix = signal ? ` (signal ${signal})` : "";

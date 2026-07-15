@@ -120,6 +120,24 @@ test("findRepoRoot prefers cwd workspace over stale WORKSPACE_ROOT", async () =>
   }
 });
 
+test("findRepoRoot honors an explicit nested viberoots workspace without changing implicit consumer resolution", async () => {
+  const consumer = await extractedWorkspace("repo-find-root-explicit-nested-viberoots");
+  const nested = path.join(consumer, "viberoots");
+  const previous = process.env.WORKSPACE_ROOT;
+  try {
+    process.env.WORKSPACE_ROOT = nested;
+    assert.equal(await findRepoRoot(nested), nested);
+    assert.equal(await findRepoRoot(consumer), consumer);
+
+    delete process.env.WORKSPACE_ROOT;
+    assert.equal(await findRepoRoot(nested), consumer);
+  } finally {
+    if (typeof previous === "string") process.env.WORKSPACE_ROOT = previous;
+    else delete process.env.WORKSPACE_ROOT;
+    await fsp.rm(consumer, { recursive: true, force: true });
+  }
+});
+
 test("workspace root detection prefers extracted parent workspace over nested viberoots flake", async () => {
   const tmp = await extractedWorkspace("vbr-roots-extracted");
   const previousWorkspaceRoot = process.env.WORKSPACE_ROOT;

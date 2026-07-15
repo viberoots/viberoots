@@ -1,5 +1,10 @@
 #!/usr/bin/env zx-wrapper
+import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
+import { promisify } from "node:util";
+import { ensureNixStoreToolPathSync } from "./tool-paths";
+
+const execFileAsync = promisify(execFile);
 
 export type PNPMDoc = {
   importers: Record<string, any>;
@@ -7,10 +12,24 @@ export type PNPMDoc = {
 };
 
 export async function parsePnpmLock(file: string): Promise<PNPMDoc> {
-  const mod = await import("yaml");
-  const YAML: any = (mod as any).default || mod;
-  const txt = await fsp.readFile(file, "utf8");
-  return YAML.parse(txt) as PNPMDoc;
+  await fsp.access(file);
+  const yq = ensureNixStoreToolPathSync("yq");
+  try {
+    const { stdout } = await execFileAsync(yq, [".", file], {
+      env: process.env,
+      maxBuffer: 32 * 1024 * 1024,
+    });
+    return JSON.parse(stdout) as PNPMDoc;
+  } catch (error) {
+    const stderr =
+      error && typeof error === "object" && "stderr" in error
+        ? String(error.stderr || "").trim()
+        : "";
+    const detail = stderr || (error instanceof Error ? error.message : String(error));
+    throw new Error(`failed to parse pnpm lockfile with Nix yq: ${file}: ${detail}`, {
+      cause: error,
+    });
+  }
 }
 
 export function buildPnpmGraph(doc: PNPMDoc) {

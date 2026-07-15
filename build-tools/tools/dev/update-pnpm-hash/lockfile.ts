@@ -12,6 +12,7 @@ export async function makeFilteredFlakeRef(
 ): Promise<{
   flakeRef: string;
   workspaceRoot: string;
+  viberootsInputRoot: string;
   cleanup: () => Promise<void>;
 }> {
   return await makeScopedFilteredFlakeRef({

@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { extractHash } from "../../dev/update-pnpm-hash/nix";
 import { directorySizeKib, runGuardedCommand } from "./pnpm-fixed-store-native-run";
 
 const PLACEHOLDER = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
@@ -15,11 +16,22 @@ function repoRoot(): string {
 }
 
 function strictGot(stderr: string): string {
-  const matches = Array.from(stderr.matchAll(/^\s*got:\s*(sha256-[A-Za-z0-9+/]{43}=)\s*$/gm)).map(
-    (match) => match[1],
-  );
-  assert.equal(matches.length, 1, `expected exactly one authoritative got line:\n${stderr}`);
-  return matches[0];
+  const candidate = mismatchCandidate(stderr);
+  const derivationName = path.basename(candidate).replace(/^[a-z0-9]{32}-/, "");
+  const got = extractHash(stderr, derivationName, PLACEHOLDER);
+  assert.match(String(got || ""), /^sha256-[A-Za-z0-9+/]{43}=$/);
+  return got as string;
+}
+
+function mismatchCandidate(stderr: string): string {
+  const matches = Array.from(
+    stderr.matchAll(
+      /viberoots-pnpm-fod-hash-mismatch-v1 output=(\/nix\/store\/[a-z0-9]{32}-pnpm-store-lock-[a-f0-9]{64}) specified=sha256-[A-Za-z0-9+/]{43}= got=sha256-[A-Za-z0-9+/]{43}=/g,
+    ),
+  ).map((match) => match[1]);
+  const unique = [...new Set(matches)];
+  assert.equal(unique.length, 1, `expected one unique authoritative mismatch path:\n${stderr}`);
+  return unique[0];
 }
 
 async function writeFixture(root: string, nixpkgsPath: string): Promise<void> {
@@ -161,6 +173,7 @@ test(
           fixtureRoot: root,
         });
         assert.notEqual(result.status, 0, "placeholder FOD build must report a mismatch");
+        await assert.rejects(fsp.access(mismatchCandidate(result.stderr)), { code: "ENOENT" });
         candidates.push(strictGot(result.stderr));
       }
       assert.equal(candidates[0], candidates[1]);

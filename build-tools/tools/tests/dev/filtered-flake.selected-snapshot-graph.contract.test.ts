@@ -106,6 +106,66 @@ test("selected filtered-flake snapshots preserve node hash maps for pnpm targets
   }
 });
 
+test("selected filtered-flake snapshots preserve a lockless target package", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "selected-filtered-lockless-root-"));
+  let snapshotRoot = "";
+  try {
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
+    await fsp.writeFile(path.join(root, ".viberoots", "workspace", "flake.nix"), "{}\n");
+    const importer = path.join(root, "projects", "apps", "demo");
+    await fsp.mkdir(path.join(importer, "src"), { recursive: true });
+    await fsp.writeFile(path.join(importer, "TARGETS"), "# package marker\n");
+    await fsp.writeFile(path.join(importer, "src", "index.ts"), "export {};\n");
+
+    const filtered = await makeFilteredFlakeRef({
+      workspaceRoot: root,
+      attr: "graph-generator-selected",
+      logPrefix: "[test]",
+      target: "//projects/apps/demo:app",
+    });
+    snapshotRoot = filtered.workspaceRoot;
+    try {
+      assert.equal(
+        await fsp.readFile(path.join(snapshotRoot, "projects", "apps", "demo", "TARGETS"), "utf8"),
+        "# package marker\n",
+      );
+      assert.equal(
+        await fsp.readFile(
+          path.join(snapshotRoot, "projects", "apps", "demo", "src", "index.ts"),
+          "utf8",
+        ),
+        "export {};\n",
+      );
+    } finally {
+      await filtered.cleanup();
+    }
+  } finally {
+    if (snapshotRoot) await fsp.rm(path.dirname(snapshotRoot), { recursive: true, force: true });
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("selected filtered-flake snapshots reject target packages outside the workspace", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "selected-filtered-escape-root-"));
+  try {
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
+    await fsp.writeFile(path.join(root, ".viberoots", "workspace", "flake.nix"), "{}\n");
+    for (const target of ["//..:app", "//../outside:app"]) {
+      await assert.rejects(
+        makeFilteredFlakeRef({
+          workspaceRoot: root,
+          attr: "graph-generator-selected",
+          logPrefix: "[test]",
+          target,
+        }),
+        /selected target package escapes the workspace/,
+      );
+    }
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
 test("selected filtered-flake snapshots include only the target Go importer", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "selected-filtered-go-root-"));
   let snapshotRoot = "";

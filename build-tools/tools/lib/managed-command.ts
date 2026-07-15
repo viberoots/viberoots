@@ -1,6 +1,7 @@
 import { spawn } from "node:child_process";
 import process from "node:process";
 
+import { onManagedCancellation } from "./managed-cancellation";
 import { resolveWatchdogShell, watchdogEnvFor } from "./managed-command-watchdog";
 
 export type ManagedCommandResult = {
@@ -10,6 +11,7 @@ export type ManagedCommandResult = {
   stdout: string;
   stderr: string;
   timedOut: boolean;
+  interrupted: boolean;
 };
 
 export type ManagedCommandActivity = {
@@ -45,10 +47,11 @@ export async function runManagedCommand(opts: {
   let stdout = "";
   let stderr = "";
   let timedOut = false;
+  let interrupted = false;
   let ended = false;
   let killTimer: NodeJS.Timeout | null = null;
   let timeoutTimer: NodeJS.Timeout | null = null;
-  let watchdogPid = 0;
+  let watchdogControl: (NodeJS.WritableStream & { unref?: () => void }) | null = null;
   const pid = child.pid || 0;
   const activity: ManagedCommandActivity = opts.activity || {
     startedAtMs: Date.now(),
@@ -80,11 +83,9 @@ export async function runManagedCommand(opts: {
   };
 
   const stopWatchdog = (): void => {
-    if (!watchdogPid) return;
-    try {
-      process.kill(watchdogPid, "SIGTERM");
-    } catch {}
-    watchdogPid = 0;
+    const control = watchdogControl;
+    watchdogControl = null;
+    control?.end("stop\n");
   };
 
   const startParentWatchdog = (): void => {
@@ -109,7 +110,7 @@ export async function runManagedCommand(opts: {
       '    kill -KILL -"$G" 2>/dev/null || true',
       "    exit 0",
       "  fi",
-      "  sleep 2",
+      "  if IFS= read -r -t 2 _ <&3; then exit 0; fi",
       "done",
     ].join("\n");
     try {
@@ -126,10 +127,15 @@ export async function runManagedCommand(opts: {
       const wd = spawn(shell, watchdogArgs, {
         cwd: opts.cwd,
         env: watchdogEnv,
-        stdio: debugWatchdog ? ["ignore", "pipe", "pipe"] : "ignore",
+        stdio: debugWatchdog
+          ? ["ignore", "pipe", "pipe", "pipe"]
+          : ["ignore", "ignore", "ignore", "pipe"],
         detached: true,
       });
-      watchdogPid = wd.pid || 0;
+      const watchdogPid = wd.pid || 0;
+      watchdogControl = wd.stdio[3] as (NodeJS.WritableStream & { unref?: () => void }) | null;
+      watchdogControl?.on("error", () => {});
+      watchdogControl?.unref?.();
       wd.once("error", (err) => {
         if (!debugWatchdog) return;
         try {
@@ -175,10 +181,14 @@ export async function runManagedCommand(opts: {
     }, killGraceMs);
   };
 
-  const onInterrupt = (): void => requestStop();
+  const onInterrupt = (): void => {
+    interrupted = true;
+    requestStop();
+  };
 
   process.once("SIGINT", onInterrupt);
   process.once("SIGTERM", onInterrupt);
+  const removeManagedCancellation = onManagedCancellation(onInterrupt);
 
   if (timeoutMs > 0) {
     timeoutTimer = setTimeout(() => {
@@ -228,6 +238,7 @@ export async function runManagedCommand(opts: {
         stdout,
         stderr,
         timedOut,
+        interrupted,
       });
     });
     const finishProcess = (code: number | null, signal: NodeJS.Signals | null): void => {
@@ -239,9 +250,9 @@ export async function runManagedCommand(opts: {
         stdout,
         stderr,
         timedOut,
+        interrupted,
       });
     };
-    child.once("exit", finishProcess);
     child.once("close", finishProcess);
   });
 
@@ -250,5 +261,6 @@ export async function runManagedCommand(opts: {
   stopWatchdog();
   process.off("SIGINT", onInterrupt);
   process.off("SIGTERM", onInterrupt);
+  removeManagedCancellation();
   return result;
 }

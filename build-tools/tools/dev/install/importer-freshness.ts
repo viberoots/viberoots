@@ -6,7 +6,8 @@ import {
   readVerifiedMarker,
   currentVerifiedMarkerFingerprintCandidates,
 } from "../update-pnpm-hash/verified-marker";
-import { sanitizeName } from "./common";
+import { currentPnpmStoreDerivationIdentity } from "../update-pnpm-hash/build-flake";
+import { flakeRefForImporter, pnpmStoreAttr, sanitizeName } from "./common";
 
 export type ImporterInstallFreshness =
   | { fresh: true }
@@ -19,6 +20,14 @@ export type ImporterInstallFreshness =
         | "stale-store-marker"
         | "stale-link-marker";
     };
+
+type ImporterFreshnessDeps = {
+  currentDerivationIdentity: typeof currentPnpmStoreDerivationIdentity;
+};
+
+const defaultDeps: ImporterFreshnessDeps = {
+  currentDerivationIdentity: currentPnpmStoreDerivationIdentity,
+};
 
 const PLACEHOLDER_HASH = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
@@ -86,12 +95,15 @@ async function readHashForLockfile(repoRoot: string, lockfileRel: string): Promi
   return hash;
 }
 
-async function hasFreshStoreMarker(opts: {
-  repoRoot: string;
-  importer: string;
-  lockHash: string;
-  hashValue: string;
-}): Promise<boolean> {
+async function hasFreshStoreMarker(
+  opts: {
+    repoRoot: string;
+    importer: string;
+    lockHash: string;
+    hashValue: string;
+  },
+  deps: ImporterFreshnessDeps,
+): Promise<boolean> {
   const markerPath = path.join(
     opts.repoRoot,
     ".viberoots",
@@ -106,13 +118,20 @@ async function hasFreshStoreMarker(opts: {
     opts.repoRoot,
     opts.importer,
   );
-  return (
+  const metadataMatches =
     marker.importer === opts.importer &&
     marker.lockfile === hashKeyForImporter(opts.importer) &&
     marker.lockHash === opts.lockHash &&
     marker.hashValue === opts.hashValue &&
-    acceptedFingerprints.includes(marker.builderFingerprint)
-  );
+    acceptedFingerprints.includes(marker.builderFingerprint);
+  if (!metadataMatches) return false;
+  const derivationIdentity = await deps.currentDerivationIdentity({
+    repoRoot: opts.repoRoot,
+    importer: opts.importer,
+    baseFlakeRef: flakeRefForImporter(opts.repoRoot, opts.importer),
+    attrPath: pnpmStoreAttr(opts.importer),
+  });
+  return marker.derivationIdentity === derivationIdentity;
 }
 
 async function hasFreshLinkMarker(opts: {
@@ -151,11 +170,14 @@ async function hasFreshLinkMarker(opts: {
   }
 }
 
-export async function importerInstallFreshness(opts: {
-  repoRoot: string;
-  importer: string;
-  force?: boolean;
-}): Promise<ImporterInstallFreshness> {
+export async function importerInstallFreshness(
+  opts: {
+    repoRoot: string;
+    importer: string;
+    force?: boolean;
+  },
+  deps: ImporterFreshnessDeps = defaultDeps,
+): Promise<ImporterInstallFreshness> {
   if (opts.force) return { fresh: false, reason: "force" };
   const importer = normalizeImporter(opts.importer);
   const lockRel = importerLockRel(importer);
@@ -171,12 +193,15 @@ export async function importerInstallFreshness(opts: {
     return { fresh: false, reason: "missing-hash" };
   }
   if (
-    !(await hasFreshStoreMarker({
-      repoRoot: opts.repoRoot,
-      importer,
-      lockHash,
-      hashValue,
-    }))
+    !(await hasFreshStoreMarker(
+      {
+        repoRoot: opts.repoRoot,
+        importer,
+        lockHash,
+        hashValue,
+      },
+      deps,
+    ))
   ) {
     return { fresh: false, reason: "stale-store-marker" };
   }

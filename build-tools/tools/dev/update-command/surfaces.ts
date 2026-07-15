@@ -32,10 +32,32 @@ export async function hasTrackedCppProjectSurface(root: string): Promise<boolean
     .some((file) => /\.(?:c|cc|cpp|cxx|h|hh|hpp|hxx)$/i.test(file));
 }
 
+export const projectLanguageSurfaces = [
+  {
+    id: "go",
+    displayName: "Go",
+    enabled: async (root: string) => (await projectModuleDirs(root, "go.mod")).length > 0,
+  },
+  {
+    id: "python",
+    displayName: "Python/uv",
+    enabled: async (root: string) => (await projectModuleDirs(root, "pyproject.toml")).length > 0,
+  },
+  {
+    id: "cpp",
+    displayName: "C++",
+    enabled: hasTrackedCppProjectSurface,
+  },
+] as const;
+
+export type ProjectLanguageId = (typeof projectLanguageSurfaces)[number]["id"];
+
 export async function unsupportedUpgradeSurfaces(root: string): Promise<string[]> {
-  const surfaces: string[] = [];
-  if ((await projectModuleDirs(root, "go.mod")).length > 0) surfaces.push("Go");
-  if ((await projectModuleDirs(root, "pyproject.toml")).length > 0) surfaces.push("Python/uv");
-  if (await hasTrackedCppProjectSurface(root)) surfaces.push("C++");
-  return surfaces;
+  const enabled = await Promise.all(
+    projectLanguageSurfaces.map(async (surface) => ({
+      surface,
+      enabled: await surface.enabled(root),
+    })),
+  );
+  return enabled.filter(({ enabled }) => enabled).map(({ surface }) => surface.displayName);
 }

@@ -26,10 +26,15 @@ test("link-node builds non-default importers from stable workspace flake ref", a
   if (!txt.includes("buildFlakeRefBase")) {
     throw new Error("link-node.ts must select build flake base for non-default importer builds");
   }
-  if (!txt.includes('importer === "viberoots"') || !txt.includes('path.join(root, "viberoots")')) {
-    throw new Error(
-      "link-node.ts must build viberoots tooling node_modules from the live viberoots flake",
-    );
+  if (
+    !txt.includes("VBR_PNPM_FILTERED_SNAPSHOT_ROOT: tempFlake.workspaceRoot") ||
+    !txt.includes("VIBEROOTS_FLAKE_INPUT_ROOT: tempFlake.viberootsInputRoot") ||
+    !txt.includes("env: filteredEnv")
+  ) {
+    throw new Error("link-node.ts must pass the filtered source authority through probe and build");
+  }
+  if (txt.includes("buildFlakeRefBase = `path:${viberootsRoot}`")) {
+    throw new Error("link-node.ts must never pass the raw live viberoots worktree to Nix");
   }
   if (!txt.includes("await tempFlake.cleanup()")) {
     throw new Error("link-node.ts must clean up temporary filtered flake snapshot");

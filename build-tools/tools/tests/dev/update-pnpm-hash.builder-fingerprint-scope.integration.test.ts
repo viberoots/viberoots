@@ -23,6 +23,7 @@ test("update-pnpm-hash separates verified marker and shared-cache fingerprints",
     "viberoots/build-tools/tools/nix/flake/packages/node-mods.nix",
     "viberoots/build-tools/tools/nix/node-modules/store.nix",
     "viberoots/build-tools/tools/nix/node-modules/modules.nix",
+    "viberoots/build-tools/tools/nix/node-modules/supported-platforms.nix",
   ]) {
     if (!primaryList.includes(rel)) {
       throw new Error(`verified-marker.ts builder fingerprint must include ${rel}`);

@@ -140,10 +140,19 @@ export async function ensureImporterLockfileFresh(opts: {
   nixPnpmFetchTimeoutSecs: string;
 }): Promise<void> {
   const lockAbs = path.join(opts.tmp, opts.importerRel, "pnpm-lock.yaml");
-  const needsRegen = await importerLockfileNeedsRegen({
-    repoRootAbs: opts.tmp,
-    importerRel: opts.importerRel,
-  }).catch(() => true);
+  const lockMissing = await fsp
+    .access(lockAbs)
+    .then(() => false)
+    .catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return true;
+      throw error;
+    });
+  const needsRegen =
+    lockMissing ||
+    (await importerLockfileNeedsRegen({
+      repoRootAbs: opts.tmp,
+      importerRel: opts.importerRel,
+    }));
   if (!needsRegen) return;
   const importerAbs = path.join(opts.tmp, opts.importerRel);
   await removeLegacyImporterPnpmState(importerAbs);

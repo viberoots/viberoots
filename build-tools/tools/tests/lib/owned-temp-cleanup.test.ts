@@ -1,5 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 import {
   removeOwnedTempTree,
@@ -61,4 +64,21 @@ test("owned temp operation cleanup does not mask its primary error", async () =>
     ),
     (error) => error === primary && primary.cause === cleanup,
   );
+});
+
+test("owned temp cleanup removes read-only trees produced by Nix", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "owned-read-only-"));
+  const nested = path.join(root, "src");
+  await fsp.mkdir(nested);
+  for (let index = 0; index < 64; index += 1) {
+    const dir = path.join(nested, `dir-${index}`);
+    await fsp.mkdir(dir);
+    await fsp.writeFile(path.join(dir, ".buckroot"), "\n");
+    await fsp.chmod(path.join(dir, ".buckroot"), 0o444);
+    await fsp.chmod(dir, 0o555);
+  }
+  await fsp.chmod(nested, 0o555);
+
+  await removeOwnedTempTree(root);
+  await assert.rejects(fsp.access(root));
 });
