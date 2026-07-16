@@ -20,9 +20,14 @@ test("update-pnpm-hash emits heartbeat logs for long-running build phases", asyn
   if (!heartbeatTxt.includes("no_output_window_exceeded=true")) {
     throw new Error("update-pnpm-hash heartbeat must surface no-output stall windows");
   }
-  const mainFile = viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash.ts");
-  const mainTxt = await fsp.readFile(mainFile, "utf8");
-  if (!mainTxt.includes("withHeartbeat(")) {
-    throw new Error("update-pnpm-hash.ts must wrap long-running build calls with heartbeat");
+  for (const relativePath of [
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/build-flake.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/exact-store-command.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/fixed-store-reconcile.ts",
+  ]) {
+    const source = await fsp.readFile(viberootsSourcePath(relativePath), "utf8");
+    if (!source.includes("withHeartbeat(")) {
+      throw new Error(`${relativePath} must wrap its long-running command with heartbeat`);
+    }
   }
 });

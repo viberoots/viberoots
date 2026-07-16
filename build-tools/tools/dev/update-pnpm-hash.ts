@@ -2,23 +2,17 @@
 import path from "node:path";
 import { flakeRefForImporter } from "./install/common";
 import { withExclusiveInstallLock } from "./install/lock";
-import { newManagedCommandActivity } from "./update-pnpm-hash/activity";
 import { parseUpdatePnpmHashArgs } from "./update-pnpm-hash/args";
 import { withPnpmStoreBuildFlakeRef } from "./update-pnpm-hash/build-flake";
 import { resolveUpdatePnpmHashCommandRoot } from "./update-pnpm-hash/command-root";
-import {
-  reconcileFixedPnpmStore,
-  shouldInspectFixedStoreForRebuild,
-  shouldRebuildFixedStore,
-} from "./update-pnpm-hash/fixed-store-reconcile";
+import { ensureExactStoreGcRoot } from "./update-pnpm-hash/exact-store-gc-root";
+import { runPnpmStoreReconciliation } from "./update-pnpm-hash/fixed-store-reconcile";
 import * as hashesJson from "./update-pnpm-hash/hashes-json";
-import { withHeartbeat } from "./update-pnpm-hash/heartbeat";
 import {
   assertImporterLockfileFresh,
   ensureImporterLockfileFresh,
   ensureImporterLockfileFreshIfAllowed,
 } from "./update-pnpm-hash/importer-lockfile";
-import { buildStore } from "./update-pnpm-hash/nix";
 import {
   installLockKeyForImporter,
   normalizeImporter,
@@ -106,6 +100,13 @@ async function inner() {
           attrPath: storeAttr,
           env,
         });
+        await ensureExactStoreGcRoot({
+          repoRoot,
+          importer,
+          storePath: resolved.fixedStorePath,
+          mode: readOnly ? "read-only" : "reconcile",
+          env,
+        });
         return { fixedStorePath: resolved.fixedStorePath, derivationIdentity };
       },
     );
@@ -133,29 +134,10 @@ async function inner() {
     if (initialStatus === "invalid") {
       throw new Error(`committed pnpm store is invalid for ${importer}; repair: run u`);
     }
-    if (initialStatus === "absent") {
-      const activity = newManagedCommandActivity();
-      const materialized = await withPnpmStoreBuildFlakeRef(
-        { repoRoot, importer, baseFlakeRef: flakeRef },
-        async (buildFlakeRef, filteredEnv) =>
-          await withHeartbeat(
-            `importer=${importer} step=fixed-materialize attr=${storeAttr}`,
-            buildStore(
-              storeAttr,
-              buildFlakeRef,
-              activity,
-              { ...filteredEnv, NIX_PNPM_MATERIALIZE: "1" },
-              { ownedDerivationName: `pnpm-store-lock-${lockHash}` },
-            ),
-            { activity },
-          ),
+    if (initialStatus === "absent")
+      throw new Error(
+        `final pnpm store is not realized for ${importer}; no tracked files were modified\nrepair: run u`,
       );
-      if (!materialized.ok) {
-        throw new Error(
-          `failed to materialize committed pnpm store for ${importer}; no tracked files were modified\n${materialized.output}\nrepair: run u`,
-        );
-      }
-    }
     const realized = await probe();
     await verifiedMarker.writeVerifiedMarker(markerPath, {
       importer,
@@ -169,135 +151,24 @@ async function inner() {
     return;
   }
 
-  const persist = async (hashValue: string, derivationIdentity: string) => {
-    await verifiedMarker.persistVerifiedHash({
-      repoRoot,
-      markerPath,
-      marker: {
-        importer,
-        lockfile: key,
-        lockHash,
-        hashValue,
-        builderFingerprint,
-        derivationIdentity,
-      },
-      sharedCacheBuilderFingerprint,
-    });
-  };
-
-  let markerMatches = false;
-  if (markerMetadataMatches && !force) {
-    try {
-      const realized = await probe();
-      if (marker?.derivationIdentity === realized.derivationIdentity) {
-        markerMatches = true;
-        await persist(currentHash, realized.derivationIdentity);
-        console.log(
-          `[update-pnpm-hash] importer=${importer} step=skip-marker attr=${storeAttr} lockfile=${key}`,
-        );
-        return;
-      }
-    } catch (error) {
-      if (!String(error).includes("final pnpm store is not realized")) throw error;
-    }
-  }
-
-  let rebuildExisting = false;
-  if (
-    shouldInspectFixedStoreForRebuild({
-      currentHash,
-      force,
-      markerMatches,
-    })
-  ) {
-    rebuildExisting = await shouldRebuildFixedStore(inspectForRebuild);
-  }
-
-  await verifiedMarker.withSharedHashCacheLock(
-    { repoRoot, builderFingerprint: sharedCacheBuilderFingerprint, lockHash },
-    async () => {
-      let effectiveHash = currentHash;
-      if (!force) {
-        const restored = await verifiedMarker.restoreHashFromSharedCache({
-          repoRoot,
-          key,
-          importer,
-          storeAttr,
-          builderFingerprint,
-          sharedCacheBuilderFingerprint,
-          existingLockHash: lockHash,
-          existingHash: currentHash,
-          hasValidExistingHash: Boolean(currentHash),
-          hashOwner,
-          hashRoot: repoRoot,
-        });
-        if (restored) {
-          effectiveHash = await hashesJson.readNodeModulesHashForLockfile(key, {
-            owner: hashOwner,
-            root: repoRoot,
-          });
-          try {
-            const realized = await probe();
-            if (!effectiveHash) throw new Error(`shared hash cache returned no hash for ${key}`);
-            await persist(effectiveHash, realized.derivationIdentity);
-            return;
-          } catch (error) {
-            if (!String(error).includes("final pnpm store is not realized")) throw error;
-            rebuildExisting = false;
-          }
-        }
-      }
-
-      const metadata = await hashesJson.snapshotNodeModulesHashesJson(key, {
-        owner: hashOwner,
-        root: repoRoot,
-      });
-      const runBuild = async (rebuild: boolean) =>
-        await withPnpmStoreBuildFlakeRef(
-          { repoRoot, importer, baseFlakeRef: flakeRef },
-          async (buildFlakeRef, filteredEnv) => {
-            const activity = newManagedCommandActivity();
-            return await withHeartbeat(
-              `importer=${importer} step=fixed-reconcile attr=${storeAttr}`,
-              buildStore(
-                storeAttr,
-                buildFlakeRef,
-                activity,
-                { ...filteredEnv, NIX_PNPM_RECONCILE: "1" },
-                {
-                  rebuild,
-                  ownedDerivationName: `pnpm-store-lock-${lockHash}`,
-                },
-              ),
-              { activity },
-            );
-          },
-        );
-      const reconciled = await reconcileFixedPnpmStore({
-        currentHash: effectiveHash || PLACEHOLDER_PNPM_STORE_HASH,
-        expectedDerivationName: `pnpm-store-lock-${lockHash}`,
-        rebuild: rebuildExisting,
-        runBuild,
-        updateHash: async (hash) =>
-          await hashesJson.updateNodeModulesHashesJson(key, hash, {
-            owner: hashOwner,
-            root: repoRoot,
-          }),
-        restoreMetadata: metadata.restore,
-      });
-      const finalHash =
-        reconciled.hash ||
-        (await hashesJson.readNodeModulesHashForLockfile(key, {
-          owner: hashOwner,
-          root: repoRoot,
-        }));
-      if (!finalHash)
-        throw new Error(`fixed pnpm store reconciliation returned no hash for ${key}`);
-      const realized = await probe();
-      await persist(finalHash, realized.derivationIdentity);
-      console.log(`pnpm-store: ${storeAttr} hash updated and build succeeded`);
-    },
-  );
+  await runPnpmStoreReconciliation({
+    repoRoot,
+    importer,
+    flakeRef,
+    storeAttr,
+    lockHash,
+    key,
+    hashOwner,
+    markerPath,
+    currentHash,
+    force,
+    markerMetadataMatches,
+    marker,
+    builderFingerprint,
+    sharedCacheBuilderFingerprint,
+    probe,
+    inspectForRebuild,
+  });
 }
 
 async function main() {

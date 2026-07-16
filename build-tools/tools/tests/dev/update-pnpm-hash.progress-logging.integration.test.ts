@@ -4,8 +4,13 @@ import { test } from "node:test";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("update-pnpm-hash logs native fixed reconciliation progress", async () => {
-  const file = viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash.ts");
-  const txt = await fsp.readFile(file, "utf8");
+  const files = [
+    "viberoots/build-tools/tools/dev/update-pnpm-hash.ts",
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/fixed-store-reconcile.ts",
+  ];
+  const txt = (
+    await Promise.all(files.map((file) => fsp.readFile(viberootsSourcePath(file), "utf8")))
+  ).join("\n");
   if (!txt.includes("step=fixed-reconcile")) {
     throw new Error("update-pnpm-hash.ts must log fixed reconciliation phase");
   }

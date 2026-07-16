@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import type { ChildProcess } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { externalNodeToolEnv } from "../lib/external-node-env";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { ensureNixStoreToolPathSync, isNixStorePath } from "../lib/tool-paths";
 import { normalizeTargetLabel, parseLockfileLabel } from "../lib/labels";
@@ -131,7 +132,7 @@ export async function runCommand(argv: string[], extra: string[], cwd?: string):
   const child = spawn(cmd, args, {
     cwd: cwd || process.cwd(),
     stdio: "inherit",
-    env: process.env,
+    env: externalNodeToolEnv(),
     detached: true,
   });
   let stopping = false;

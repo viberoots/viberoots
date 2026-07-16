@@ -41,10 +41,6 @@
       "justification": "Pre-existing oversized startup workspace-state helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
     },
     {
-      "path": "dev/update-pnpm-hash.ts",
-      "justification": "Pre-existing oversized pnpm hash update entrypoint pending focused decomposition outside the remote-consumer final checkpoint."
-    },
-    {
       "path": "dev/update-pnpm-hash/exact-store.ts",
       "justification": "Pre-existing oversized exact-store helper pending focused decomposition outside the remote-consumer final checkpoint."
     },
@@ -107,10 +103,6 @@
     {
       "path": "dev/verify/safety-rails.ts",
       "justification": "Pre-existing oversized verify safety-rails helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
-    },
-    {
-      "path": "dev/verify/seed-staging.ts",
-      "justification": "Pre-existing oversized verify seed staging helper pending focused decomposition outside the remote-consumer final checkpoint."
     },
     {
       "path": "dev/verify/seed.ts",
@@ -193,10 +185,6 @@
       "justification": "Pre-existing oversized seed-copy test helper pending focused decomposition outside the remote-consumer final checkpoint."
     },
     {
-      "path": "tests/lib/test-helpers/seed-store.ts",
-      "justification": "Pre-existing oversized seed-store test helper pending focused decomposition outside the remote-consumer final checkpoint."
-    },
-    {
       "path": "tests/lib/workspace-activation.test.ts",
       "justification": "Pre-existing oversized workspace activation test pending focused decomposition outside the remote-consumer final checkpoint."
     },
@@ -211,10 +199,6 @@
     {
       "path": "tests/scaffolding/webapp.install-guardrails.contract.test.ts",
       "justification": "Pre-existing oversized scaffolding guardrail test pending focused decomposition outside the remote-consumer final checkpoint."
-    },
-    {
-      "path": "tests/verify/seed.staging-policy.test.ts",
-      "justification": "Pre-existing oversized verify seed staging policy test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
     },
     {
       "path": "tests/verify/template-test-scope.policy.test.ts",

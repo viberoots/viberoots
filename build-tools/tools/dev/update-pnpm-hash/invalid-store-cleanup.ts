@@ -1,11 +1,12 @@
-import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
+import { runManagedCommand } from "../../lib/managed-command";
 import { openFileOwnerPids } from "../../lib/open-file-inspection";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 
-const execFileAsync = promisify(execFile);
+export const INVALID_STORE_QUERY_TIMEOUT_MS = 30_000;
+export const INVALID_STORE_CLEANUP_TIMEOUT_MS = 120_000;
+export const INVALID_STORE_SHUTDOWN_MARGIN_MS = 5_000;
 
 export type InvalidStorePathEvidence = { sizeKib: number; mtimeMs: number };
 export type InvalidStoreSnapshot = Map<string, InvalidStorePathEvidence>;
@@ -20,28 +21,21 @@ export type InvalidStoreCleanupDeps = {
   deletePath: (storePath: string) => Promise<void>;
 };
 
-async function commandLines(
+export async function runInvalidStoreCleanupCommand(
   command: string,
   args: string[],
-): Promise<{ ok: boolean; lines: string[]; errorLines: string[] }> {
-  try {
-    const { stdout } = await execFileAsync(command, args, { maxBuffer: 1024 * 1024 * 4 });
-    return {
-      ok: true,
-      lines: String(stdout || "")
-        .split(/\r?\n/)
-        .filter(Boolean),
-      errorLines: [],
-    };
-  } catch (error) {
-    const stdout = String((error as { stdout?: unknown }).stdout || "");
-    const stderr = String((error as { stderr?: unknown }).stderr || "");
-    return {
-      ok: false,
-      lines: stdout.split(/\r?\n/).filter(Boolean),
-      errorLines: stderr.split(/\r?\n/).filter(Boolean),
-    };
-  }
+  timeoutMs = INVALID_STORE_QUERY_TIMEOUT_MS,
+): Promise<{ ok: boolean; lines: string[]; errorLines: string[]; timedOut: boolean }> {
+  const result = await runManagedCommand({ command, args, timeoutMs, killGraceMs: 1_000 });
+  return {
+    ok: result.ok,
+    lines: result.stdout.split(/\r?\n/).filter(Boolean),
+    errorLines: [
+      ...(result.timedOut ? [`command timed out after ${timeoutMs}ms`] : []),
+      ...result.stderr.split(/\r?\n/).filter(Boolean),
+    ],
+    timedOut: result.timedOut,
+  };
 }
 
 export function storePathValidityFromCommand(
@@ -56,29 +50,76 @@ export function storePathValidityFromCommand(
 }
 
 async function requiredCommandLines(
+  run: (
+    command: string,
+    args: string[],
+  ) => Promise<{
+    ok: boolean;
+    lines: string[];
+  }>,
   command: string,
   args: string[],
   label: string,
 ): Promise<string[]> {
-  const result = await commandLines(command, args);
+  const result = await run(command, args);
   if (!result.ok) throw new Error(`could not query Nix store ${label}`);
   return result.lines;
 }
 
-function defaultDeps(env: NodeJS.ProcessEnv): InvalidStoreCleanupDeps {
+function remainingMs(deadlineMs: number): number {
+  const remaining = deadlineMs - Date.now();
+  if (remaining <= 0) throw new Error("invalid pnpm store cleanup exceeded its aggregate deadline");
+  return remaining;
+}
+
+export function invalidStoreChildTimeoutMs(
+  deadlineMs: number,
+  capMs: number,
+  minimumMs = 1,
+  nowMs = Date.now(),
+): number {
+  const available = deadlineMs - nowMs - INVALID_STORE_SHUTDOWN_MARGIN_MS;
+  if (available < minimumMs) {
+    throw new Error("invalid pnpm store cleanup exceeded its aggregate deadline");
+  }
+  return Math.min(capMs, available);
+}
+
+async function beforeDeadline<T>(deadlineMs: number, operation: () => Promise<T>): Promise<T> {
+  const timeoutMs = remainingMs(deadlineMs);
+  let timer: NodeJS.Timeout | undefined;
+  try {
+    return await Promise.race([
+      operation(),
+      new Promise<T>((_resolve, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("invalid pnpm store cleanup exceeded its aggregate deadline")),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function defaultDeps(env: NodeJS.ProcessEnv, deadlineMs: number): InvalidStoreCleanupDeps {
   const nixStore = resolveToolPathSync("nix-store", env);
   const du = resolveToolPathSync("du", env);
+  const run = async (command: string, args: string[]) =>
+    await runInvalidStoreCleanupCommand(
+      command,
+      args,
+      invalidStoreChildTimeoutMs(deadlineMs, INVALID_STORE_QUERY_TIMEOUT_MS),
+    );
   return {
     listStoreEntries: async () => await fsp.readdir("/nix/store"),
     isValid: async (storePath) =>
-      storePathValidityFromCommand(
-        storePath,
-        await commandLines(nixStore, ["--check-validity", storePath]),
-      ),
+      storePathValidityFromCommand(storePath, await run(nixStore, ["--check-validity", storePath])),
     evidence: async (storePath) => {
       const [stat, measured] = await Promise.all([
         fsp.stat(storePath),
-        commandLines(du, ["-sk", storePath]),
+        run(du, ["-sk", storePath]),
       ]);
       const size = measured.lines[0]?.trim().split(/\s+/)[0] || "";
       if (!measured.ok || !/^\d+$/.test(size)) throw new Error(`could not measure ${storePath}`);
@@ -86,19 +127,25 @@ function defaultDeps(env: NodeJS.ProcessEnv): InvalidStoreCleanupDeps {
     },
     referrers: async (storePath) =>
       await requiredCommandLines(
+        run,
         nixStore,
         ["--query", "--referrers", storePath],
         `referrers for ${storePath}`,
       ),
     roots: async (storePath) =>
       await requiredCommandLines(
+        run,
         nixStore,
         ["--query", "--roots", storePath],
         `roots for ${storePath}`,
       ),
-    openOwners: async (storePath) => await openFileOwnerPids(storePath, { env }),
+    openOwners: async (storePath) =>
+      await openFileOwnerPids(storePath, {
+        env,
+        timeoutMs: invalidStoreChildTimeoutMs(deadlineMs, 5_000, 250),
+      }),
     deletePath: async (storePath) => {
-      const deleted = await commandLines(nixStore, ["--delete", storePath]);
+      const deleted = await run(nixStore, ["--delete", storePath]);
       if (!deleted.ok) throw new Error(`nix-store refused to delete ${storePath}`);
     },
   };
@@ -118,13 +165,15 @@ export async function snapshotOwnedInvalidPnpmStores(opts: {
   derivationName: string;
   env?: NodeJS.ProcessEnv;
   deps?: InvalidStoreCleanupDeps;
+  timeoutMs?: number;
 }): Promise<InvalidStoreSnapshot> {
-  const deps = opts.deps || defaultDeps(opts.env || process.env);
+  const deadlineMs = Date.now() + (opts.timeoutMs ?? INVALID_STORE_CLEANUP_TIMEOUT_MS);
+  const deps = opts.deps || defaultDeps(opts.env || process.env, deadlineMs);
   const snapshot: InvalidStoreSnapshot = new Map();
-  for (const entry of await deps.listStoreEntries()) {
+  for (const entry of await beforeDeadline(deadlineMs, deps.listStoreEntries)) {
     const storePath = ownedStorePath(entry, opts.derivationName);
-    if (!storePath || (await deps.isValid(storePath))) continue;
-    snapshot.set(storePath, await deps.evidence(storePath));
+    if (!storePath || (await beforeDeadline(deadlineMs, () => deps.isValid(storePath)))) continue;
+    snapshot.set(storePath, await beforeDeadline(deadlineMs, () => deps.evidence(storePath)));
   }
   return snapshot;
 }
@@ -134,12 +183,16 @@ export async function cleanupChangedOwnedInvalidPnpmStores(opts: {
   before: InvalidStoreSnapshot;
   env?: NodeJS.ProcessEnv;
   deps?: InvalidStoreCleanupDeps;
+  log?: (message: string) => void;
+  timeoutMs?: number;
 }): Promise<string[]> {
-  const deps = opts.deps || defaultDeps(opts.env || process.env);
+  const deadlineMs = Date.now() + (opts.timeoutMs ?? INVALID_STORE_CLEANUP_TIMEOUT_MS);
+  const deps = opts.deps || defaultDeps(opts.env || process.env, deadlineMs);
   const after = await snapshotOwnedInvalidPnpmStores({
     derivationName: opts.derivationName,
     env: opts.env,
     deps,
+    timeoutMs: remainingMs(deadlineMs),
   });
   const deleted: string[] = [];
   for (const [storePath, evidence] of after) {
@@ -147,11 +200,17 @@ export async function cleanupChangedOwnedInvalidPnpmStores(opts: {
     if (prior && evidence.sizeKib <= prior.sizeKib && evidence.mtimeMs <= prior.mtimeMs) continue;
     const entry = path.basename(storePath);
     if (ownedStorePath(entry, opts.derivationName) !== storePath) continue;
-    if (await deps.isValid(storePath)) continue;
-    if ((await deps.referrers(storePath)).length > 0) continue;
-    if ((await deps.roots(storePath)).length > 0) continue;
-    if ((await deps.openOwners(storePath)).length > 0) continue;
-    await deps.deletePath(storePath);
+    if (await beforeDeadline(deadlineMs, () => deps.isValid(storePath))) continue;
+    const referrers = await beforeDeadline(deadlineMs, () => deps.referrers(storePath));
+    if (referrers.length > 0) continue;
+    const roots = await beforeDeadline(deadlineMs, () => deps.roots(storePath));
+    if (roots.length > 0) continue;
+    const openOwners = await beforeDeadline(deadlineMs, () => deps.openOwners(storePath));
+    if (openOwners.length > 0) continue;
+    (opts.log || console.error)(
+      `[update-pnpm-hash] interrupted invalid-output cleanup path=${storePath} size_kib=${evidence.sizeKib} mtime_ms=${evidence.mtimeMs} referrers=${referrers.length} roots=${roots.length} open_owners=${openOwners.length}`,
+    );
+    await beforeDeadline(deadlineMs, () => deps.deletePath(storePath));
     deleted.push(storePath);
   }
   return deleted;

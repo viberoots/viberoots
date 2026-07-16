@@ -159,7 +159,9 @@ test("pnpm lock repair removes its ephemeral store and restores local state", as
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-update-pnpm-test-"));
   const fakePnpm = path.join(root, "fake-pnpm.sh");
   const capture = path.join(root, "capture.txt");
+  const envCapture = path.join(root, "capture.env.txt");
   const priorBin = process.env.UPDATE_PNPM_BIN;
+  const priorNodeOptions = process.env.NODE_OPTIONS;
   try {
     await fsp.writeFile(path.join(root, "package.json"), '{"name":"fixture"}\n');
     await fsp.writeFile(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
@@ -168,12 +170,18 @@ test("pnpm lock repair removes its ephemeral store and restores local state", as
     await fsp.writeFile(
       fakePnpm,
       `#!/usr/bin/env bash
-set -euo pipefail
-printf '%s\\n' "$@" > ${JSON.stringify(capture)}
-`,
+	set -euo pipefail
+	printf '%s\\n' "$@" > ${JSON.stringify(capture)}
+	printf '%s' "\${NODE_OPTIONS-}" > ${JSON.stringify(envCapture)}
+	`,
     );
     await fsp.chmod(fakePnpm, 0o755);
     process.env.UPDATE_PNPM_BIN = fakePnpm;
+    process.env.NODE_OPTIONS = [
+      "--max-old-space-size=256",
+      "--import /tmp/viberoots/build-tools/tools/dev/zx-init.mjs",
+      "--trace-warnings",
+    ].join(" ");
     await updatePnpmLock({ root, importer: ".", upgrade: false });
 
     const args = (await fsp.readFile(capture, "utf8")).trim().split("\n");
@@ -181,9 +189,15 @@ printf '%s\\n' "$@" > ${JSON.stringify(capture)}
     await assert.rejects(fsp.access(store), { code: "ENOENT" });
     assert.equal(await fsp.readFile(path.join(root, "node_modules/sentinel"), "utf8"), "present\n");
     await assert.rejects(fsp.access(path.join(root, "pnpm-workspace.yaml")), { code: "ENOENT" });
+    assert.equal(
+      await fsp.readFile(envCapture, "utf8"),
+      "--max-old-space-size=256 --trace-warnings",
+    );
   } finally {
     if (priorBin === undefined) delete process.env.UPDATE_PNPM_BIN;
     else process.env.UPDATE_PNPM_BIN = priorBin;
+    if (priorNodeOptions === undefined) delete process.env.NODE_OPTIONS;
+    else process.env.NODE_OPTIONS = priorNodeOptions;
     await fsp.rm(root, { recursive: true, force: true });
   }
 });

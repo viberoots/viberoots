@@ -1,4 +1,5 @@
 #!/usr/bin/env zx-wrapper
+import { createHash } from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runManagedCommand } from "../lib/managed-command";
@@ -9,7 +10,7 @@ import {
   validateTsManifestProbes,
 } from "./wasm-watch-manifest";
 
-export type Fingerprint = { mtimeMs: number; size: number };
+export type Fingerprint = { mtimeMs: number; size: number; membership: string };
 
 async function fileFingerprint(absPath: string): Promise<Fingerprint> {
   try {
@@ -18,6 +19,7 @@ async function fileFingerprint(absPath: string): Promise<Fingerprint> {
       const stack = [absPath];
       let newest = st.mtimeMs;
       let totalSize = 0;
+      const members: string[] = [];
       while (stack.length > 0) {
         const cur = stack.pop()!;
         const entries = await fsp.readdir(cur, { withFileTypes: true }).catch(() => []);
@@ -25,21 +27,24 @@ async function fileFingerprint(absPath: string): Promise<Fingerprint> {
           const child = path.join(cur, entry.name);
           if (entry.isDirectory()) {
             if (entry.name === ".git" || entry.name === "node_modules") continue;
+            members.push(`d:${path.relative(absPath, child)}`);
             stack.push(child);
             continue;
           }
           if (!entry.isFile()) continue;
+          members.push(`f:${path.relative(absPath, child)}`);
           const cst = await fsp.stat(child).catch(() => null);
           if (!cst) continue;
           newest = Math.max(newest, cst.mtimeMs);
           totalSize += cst.size;
         }
       }
-      return { mtimeMs: newest, size: totalSize };
+      const membership = createHash("sha256").update(members.sort().join("\0")).digest("hex");
+      return { mtimeMs: newest, size: totalSize, membership };
     }
-    return { mtimeMs: st.mtimeMs, size: st.size };
+    return { mtimeMs: st.mtimeMs, size: st.size, membership: "file" };
   } catch {
-    return { mtimeMs: 0, size: -1 };
+    return { mtimeMs: 0, size: -1, membership: "missing" };
   }
 }
 
@@ -54,7 +59,19 @@ export function mapsEqual(a: Map<string, Fingerprint>, b: Map<string, Fingerprin
   for (const [k, av] of a.entries()) {
     const bv = b.get(k);
     if (!bv) return false;
-    if (av.mtimeMs !== bv.mtimeMs || av.size !== bv.size) return false;
+    if (av.mtimeMs !== bv.mtimeMs || av.size !== bv.size || av.membership !== bv.membership)
+      return false;
+  }
+  return true;
+}
+
+export function membershipMapsEqual(
+  a: Map<string, Fingerprint>,
+  b: Map<string, Fingerprint>,
+): boolean {
+  if (a.size !== b.size) return false;
+  for (const [key, value] of a.entries()) {
+    if (value.membership !== b.get(key)?.membership) return false;
   }
   return true;
 }

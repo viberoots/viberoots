@@ -54,11 +54,14 @@ A language is not integrated until its metadata lifecycle follows the repository
 
 - `u` owns intentional repair. Add the language's conservative lockfile, provider, glue, and other
   deterministic tracked-metadata repair to the update orchestration. An upgrade policy belongs only
-  behind `u --upgrade`; if the language has no upgradeable dependency authority, report it as
-  reconciliation-only without moving adjacent source or package authorities.
-- `i` and post-clone are read-only for tracked files. They may materialize ignored local state, but
-  stale lockfiles or generated metadata must fail with `repair: run u` and leave the checkout
-  unchanged.
+  behind `u --upgrade`. When the ecosystem can upgrade dependencies, the language integration must
+  implement that upgrade path; do not classify it as reconciliation-only merely because upgrade
+  support has not been wired yet. Reconciliation-only is valid only when the language has no
+  upgradeable dependency authority, and must not move adjacent source or package authorities.
+- `i`, `b`, post-clone, and devshell entry are read-only for tracked files. They may materialize
+  ignored local state, but stale lockfiles or generated metadata must fail with `repair: run u` and
+  leave the checkout unchanged. They must never invoke the language's reconciliation or dependency
+  upgrade command.
 - Register enablement, read-only validation, and the bounded or reconciliation-only upgrade policy
   with the shared project-language registry used by `runReadOnlyLanguageConsistencyChecks`. Do not
   add a language-specific commit-check or update-dispatch path.
@@ -76,8 +79,9 @@ A language is not integrated until its metadata lifecycle follows the repository
 - Invoke the production `u` launcher in a bounded local/offline consumer fixture. Prove both the
   language repair result and that the viberoots gitlink, flake pins, and source-mode metadata remain
   byte-for-byte unchanged. Exercise both plain `u` and `u --upgrade`; prove the exact ecosystem
-  upgrade argv and rollback on failure for upgradeable languages, or prove the reconciliation-only
-  result when no upgradeable dependency authority exists.
+  upgrade argv, observable dependency-authority movement, and rollback on failure for upgradeable
+  languages. For a reconciliation-only language, prove both the reported result and that the
+  ecosystem genuinely exposes no upgradeable dependency authority.
 - Every executable toolchain used by startup checks, update/install orchestration, Buck toolchains,
   or runnable manifests must resolve from `/nix/store`. Route process execution through
   `build-tools/tools/lib/tool-paths.ts` or emit an explicit Nix-store path from Nix. Do not fall back

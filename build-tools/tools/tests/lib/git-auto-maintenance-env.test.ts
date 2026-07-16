@@ -35,8 +35,29 @@ test("git auto-maintenance env args are Buck test --env pairs", () => {
     GIT_CONFIG_KEY_2: "gc.autoDetach",
     GIT_CONFIG_VALUE_2: "false",
   });
-  assert.deepEqual(gitAutoMaintenanceDisabledTestEnvArgs({ GIT_CONFIG_COUNT: "1" }).slice(0, 2), [
+  const inherited = {
+    GIT_CONFIG_COUNT: "1",
+    GIT_CONFIG_KEY_0: "protocol.file.allow",
+    GIT_CONFIG_VALUE_0: "always",
+  };
+  assert.deepEqual(gitAutoMaintenanceDisabledTestEnvArgs(inherited), [
     "--env",
     "GIT_CONFIG_COUNT=4",
+    "--env",
+    "GIT_CONFIG_KEY_0=protocol.file.allow",
+    "--env",
+    "GIT_CONFIG_VALUE_0=always",
+    "--env",
+    "GIT_CONFIG_KEY_1=maintenance.auto",
+    "--env",
+    "GIT_CONFIG_VALUE_1=false",
+    "--env",
+    "GIT_CONFIG_KEY_2=gc.auto",
+    "--env",
+    "GIT_CONFIG_VALUE_2=0",
+    "--env",
+    "GIT_CONFIG_KEY_3=gc.autoDetach",
+    "--env",
+    "GIT_CONFIG_VALUE_3=false",
   ]);
 });

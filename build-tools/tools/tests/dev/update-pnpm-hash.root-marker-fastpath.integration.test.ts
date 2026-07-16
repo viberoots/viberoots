@@ -8,17 +8,21 @@ test("committed stores refresh ignored markers only after the final path is veri
     viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash.ts"),
     "utf8",
   );
+  const reconcile = await fsp.readFile(
+    viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash/fixed-store-reconcile.ts"),
+    "utf8",
+  );
   const marker = await fsp.readFile(
     viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash/verified-marker.ts"),
     "utf8",
   );
   assert.match(
-    main,
-    /if \(markerMetadataMatches && !force\) \{[\s\S]*const realized = await probe\(\)[\s\S]*marker\?\.derivationIdentity === realized\.derivationIdentity[\s\S]*await persist\(currentHash, realized\.derivationIdentity\)/,
+    reconcile,
+    /if \(opts\.markerMetadataMatches && !opts\.force\) \{[\s\S]*const realized = await opts\.probe\(\)[\s\S]*opts\.marker\?\.derivationIdentity === realized\.derivationIdentity[\s\S]*await persist\(opts\.currentHash, realized\.derivationIdentity\)/,
   );
   assert.match(main, /marker\.hashValue === currentHash/);
   assert.match(main, /acceptedBuilderFingerprints\.includes\(marker\.builderFingerprint\)/);
-  assert.match(main, /marker\?\.derivationIdentity === realized\.derivationIdentity/);
+  assert.match(reconcile, /opts\.marker\?\.derivationIdentity === realized\.derivationIdentity/);
   assert.match(
     main,
     /if \(readOnly\) \{\n    if \(!currentHash[\s\S]*await probe\(\)[\s\S]*writeVerifiedMarker/,

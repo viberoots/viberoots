@@ -8,6 +8,8 @@ import {
   ensureProjectEnforcementRegistration,
   PROJECT_ENFORCEMENT_LABEL,
 } from "../../lib/project-enforcement-registration";
+import { ensureWorkspaceBuckStatePackage } from "../../lib/workspace-buck-state";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("project enforcement registration discovers suffix runners without Nix", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "project-enforcement-registration-"));
@@ -31,4 +33,26 @@ test("project enforcement registration discovers suffix runners without Nix", as
   assert.match(targets, /template_inputs = \["@viberoots/);
   assert.doesNotMatch(targets, /ignored\.test\.ts/);
   assert.doesNotMatch(targets, /\bnix\b/);
+});
+
+test("verify target planning creates the complete workspace Buck package before cquery", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "verify-workspace-buck-state-"));
+  try {
+    await ensureWorkspaceBuckStatePackage(root);
+    assert.equal(
+      await fsp.readFile(path.join(root, ".viberoots/workspace/buck/graph.json"), "utf8"),
+      "[]\n",
+    );
+
+    const source = await fsp.readFile(
+      viberootsSourcePath("build-tools/tools/dev/verify/target-passes.ts"),
+      "utf8",
+    );
+    assert.ok(
+      source.indexOf("await ensureWorkspaceBuckStatePackage(opts.root)") <
+        source.indexOf("const targetLabels = loadVerifyTargetLabels(opts)"),
+    );
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
 });

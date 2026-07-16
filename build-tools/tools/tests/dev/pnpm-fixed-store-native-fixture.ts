@@ -1,5 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { externalNodeToolEnv } from "../../lib/external-node-env";
+import { NATIVE_PNPM_COMMAND_TIMEOUT_MS } from "./pnpm-fixed-store-native-run";
 import { fileURLToPath } from "node:url";
 
 export const PLACEHOLDER = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
@@ -94,12 +96,13 @@ export function nixEnv(
   authority: "reconcile" | "materialize" = "reconcile",
 ): NodeJS.ProcessEnv {
   return {
+    ...externalNodeToolEnv(),
     HOME: home,
     XDG_CACHE_HOME: path.join(home, "xdg-cache"),
     NIX_CONFIG: "experimental-features = nix-command flakes",
     ...(authority === "reconcile" ? { NIX_PNPM_RECONCILE: "1" } : { NIX_PNPM_MATERIALIZE: "1" }),
-    NIX_PNPM_FETCH_TIMEOUT: "120",
-    NIX_PNPM_INSTALL_TIMEOUT: "120",
+    NIX_PNPM_FETCH_TIMEOUT: String(NATIVE_PNPM_COMMAND_TIMEOUT_MS / 1000),
+    NIX_PNPM_INSTALL_TIMEOUT: String(NATIVE_PNPM_COMMAND_TIMEOUT_MS / 1000),
   };
 }
 

@@ -27,15 +27,16 @@ test("update-pnpm-hash probes the committed final pnpm store before fixed builds
   }
   if (storeTxt.includes("NIX_PNPM_EXACT_STORE"))
     throw new Error("store.nix retained exact env input");
-  if (!mainTxt.includes('NIX_PNPM_MATERIALIZE: "1"')) {
-    throw new Error("read-only update must materialize a missing committed final store");
-  }
+  if (!mainTxt.includes("final pnpm store is not realized"))
+    throw new Error("read-only update must fail closed when the committed store is absent");
   const readOnlyBranch =
     mainTxt.match(/if \(readOnly\) \{\n    if \(!currentHash[\s\S]*?\n    return;\n  \}/)?.[0] ||
     "";
   if (
     /NIX_PNPM_RECONCILE|updateNodeModulesHashesJson|reconcileFixedPnpmStore/.test(readOnlyBranch)
   ) {
-    throw new Error("read-only materialization must not gain reconciliation authority");
+    throw new Error("read-only probing must not gain reconciliation authority");
   }
+  if (!mainTxt.includes("ensureExactStoreGcRoot"))
+    throw new Error("realized committed stores must establish their durable gc root");
 });

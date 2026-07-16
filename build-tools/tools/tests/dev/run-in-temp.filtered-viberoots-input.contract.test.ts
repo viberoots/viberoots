@@ -5,10 +5,26 @@ import { test } from "node:test";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("runInTemp locks a filtered viberoots input instead of the live source root", async () => {
-  const source = await fsp.readFile(
-    viberootsSourcePath("build-tools/tools/tests/lib/test-helpers/run-in-temp.ts"),
-    "utf8",
-  );
+  const source = (
+    await Promise.all(
+      [
+        "filtered-inputs.ts",
+        "flake-rewrite.ts",
+        "nix-support.ts",
+        "scratch-runner.ts",
+        "seeded-setup.ts",
+        "seeded-runner.ts",
+        "dev-env.ts",
+        "runtime-env.ts",
+        "cleanup.ts",
+      ].map((name) =>
+        fsp.readFile(
+          viberootsSourcePath(`build-tools/tools/tests/lib/test-helpers/run-in-temp/${name}`),
+          "utf8",
+        ),
+      ),
+    )
+  ).join("\n");
   const materializer = await fsp.readFile(
     viberootsSourcePath("build-tools/tools/dev/filtered-flake-viberoots-input.ts"),
     "utf8",
@@ -26,7 +42,7 @@ test("runInTemp locks a filtered viberoots input instead of the live source root
   assert.match(source, /rewriteTempViberootsInput\(tmp, viberootsInput\)/);
   assert.match(source, /type TempViberootsRoles = \{/);
   assert.match(source, /commandSourceRoot: viberootsSourceRoot/);
-  assert.match(source, /consumerSnapshotRoot: snapshot\.root/);
+  assert.match(source, /consumerSnapshotRoot: consumerSnapshot\.root/);
   assert.match(source, /flakeInput: viberootsInput/);
   assert.match(source, /prepareFilteredConsumerSnapshot\(tmp\)/);
   assert.match(source, /VBR_FILTERED_FLAKE_SNAPSHOT: "1"/);

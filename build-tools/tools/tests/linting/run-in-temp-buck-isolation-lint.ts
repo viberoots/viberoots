@@ -143,7 +143,7 @@ function isApprovedRegisteredHelper(relPath: string, context: string): boolean {
     return true;
   }
   return (
-    relPath === "build-tools/tools/tests/lib/test-helpers/run-in-temp.ts" &&
+    relPath === "build-tools/tools/tests/lib/test-helpers/run-in-temp/command-shims.ts" &&
     /createTempBuck2Shim|real_buck2/.test(context)
   );
 }

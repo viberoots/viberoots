@@ -47,3 +47,31 @@ test("fresh recursive clone runs real post-clone initialization without tracked 
   const nixInvocations = await fsp.readFile(fixture.nixLog, "utf8");
   assert.doesNotMatch(nixInvocations, /nix flake (?:lock|update|metadata)\b/);
 });
+
+test("fresh flake-mode clone runs cold post-clone from immutable source without lock repair", async (t) => {
+  const fixture = await createFreshCloneFixture(t, { sourceMode: "flake" });
+  const clone = await fixture.clone("flake-clone");
+  await fsp.writeFile(fixture.nixLog, "");
+
+  const { stdout } = await fixture.postClone(clone, { runInstall: true });
+  assert.match(stdout, /status bootstrapped/);
+  assert.match(stdout, /workspace initialized/);
+  const currentSource = await fsp.realpath(path.join(clone, ".viberoots", "current"));
+  assert.match(currentSource, /^\/nix\/store\//);
+  const { stdout: statusText } = await fixture.runCommand(["status", "--json"], clone, {
+    ...fixture.commandEnv,
+    WORKSPACE_ROOT: clone,
+    VIBEROOTS_ROOT: currentSource,
+    VIBEROOTS_SOURCE_ROOT: currentSource,
+  });
+  assert.equal(JSON.parse(statusText).sourceMode, "remote");
+  assert.equal(await git(clone, ["diff", "--name-only"]), "");
+  assert.equal(await git(clone, ["status", "--short"]), "");
+  const nixInvocations = await fsp.readFile(fixture.nixLog, "utf8");
+  assert.match(nixInvocations, new RegExp(`nix flake metadata .*rev=${fixture.submoduleRev}`));
+  assert.doesNotMatch(nixInvocations, /nix flake (?:lock|update)\b/);
+  assert.doesNotMatch(
+    nixInvocations,
+    new RegExp(`nix flake metadata .*path:${clone.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
+  );
+});

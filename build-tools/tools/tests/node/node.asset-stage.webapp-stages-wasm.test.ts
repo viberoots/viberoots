@@ -8,6 +8,7 @@ import {
   stageTempRepoPaths,
 } from "../lib/test-helpers/git-stage";
 import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
+import { withGoModuleInputFingerprint } from "../../dev/install/go-consistency";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -47,6 +48,11 @@ test(
 
 go 1.22.0
 `,
+        );
+        await fs.outputFile(path.join(wasmDir, "go.sum"), "");
+        await fs.outputFile(
+          path.join(wasmDir, "gomod2nix.toml"),
+          await withGoModuleInputFingerprint(wasmDir, "schema = 3\n\n[mod]\n"),
         );
         await fs.outputFile(
           path.join(wasmDir, "main.go"),

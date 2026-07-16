@@ -48,7 +48,7 @@ async function waitForValueOrWatcherFailure<T>(opts: {
 }
 
 test(
-  "wasm in-session refresh enrolls and retires module keys without restart",
+  "wasm in-session refresh handles membership transitions without restart",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
     await runInTemp("vbr-wasm-dynamic-refresh", async (tmp, _$) => {
@@ -73,7 +73,7 @@ test(
           "--poll-ms",
           "120",
           "--refresh-throttle-ms",
-          "400",
+          "2000",
         ],
         { cwd: appAbs, stdio: "pipe", env: process.env },
       );
@@ -115,8 +115,27 @@ test(
           label: "extra contract refresh",
         });
 
+        await writeAndBumpMtime(topPayloadPath, "top-1");
         await fsp.rm(extraPayloadPath, { force: true });
+        await waitForValue(
+          async () => logs.join(""),
+          (text) =>
+            text.includes(
+              "[wasm-watch] source-membership-change module_type=wasm module_key=extra-contract status=settling",
+            ),
+          20000,
+          100,
+        );
         await writeAndBumpMtime(targetPath, await fsp.readFile(targetPath, "utf8"));
+        await waitForValueOrWatcherFailure({
+          getter: async () => await fsp.readFile(topContractPath, "utf8"),
+          check: (body) => body.includes("top-1"),
+          watcher,
+          logs,
+          timeoutMs: STEP_TIMEOUT_MS,
+          pollMs: 150,
+          label: "retained top contract refresh",
+        });
         const merged = await waitForValue(
           async () => logs.join(""),
           (text) => text.includes("[wasm-watch] coordinator:refresh modules=1"),
@@ -126,6 +145,7 @@ test(
         assert.equal(watcher.exitCode, null, "watcher exited during in-session refresh");
         assert.equal(watcher.pid, initialPid, "watcher process restarted unexpectedly");
         assert.match(merged, /\[wasm-watch\] coordinator:registered /);
+        assert.doesNotMatch(merged, /rebuild:fail.*module_key=extra-contract/);
         assertSingleQueueInvariant(merged);
       } finally {
         await stopServer(watcher);

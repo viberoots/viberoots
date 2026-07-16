@@ -3,8 +3,25 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { externalNodeToolEnv } from "../../lib/external-node-env";
+import { nodeOptionsWithoutZxInit, runNodeWithZx } from "../../lib/node-run";
 import { runInTemp } from "./test-helpers";
-import { runNodeWithZx } from "../../lib/node-run";
+
+test("external Node tools drop zx-init imports and preserve unrelated options", () => {
+  const zxInit = "/tmp/workspace/viberoots/build-tools/tools/dev/zx-init.mjs";
+  const inherited = [
+    "--max-old-space-size=256",
+    `--import ${zxInit}`,
+    `--import=${zxInit}`,
+    "--trace-warnings",
+  ].join(" ");
+  assert.equal(nodeOptionsWithoutZxInit(inherited), "--max-old-space-size=256 --trace-warnings");
+  assert.equal(
+    externalNodeToolEnv({ NODE_OPTIONS: inherited }).NODE_OPTIONS,
+    "--max-old-space-size=256 --trace-warnings",
+  );
+  assert.equal(externalNodeToolEnv({ NODE_OPTIONS: `--import=${zxInit}` }).NODE_OPTIONS, undefined);
+});
 
 test("node-run loads zx-init, forwards args, and propagates exit codes", async () => {
   await runInTemp("node-run-helper", async (tmp) => {

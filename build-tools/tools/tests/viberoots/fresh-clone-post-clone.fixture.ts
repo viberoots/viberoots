@@ -1,15 +1,13 @@
-import { execFile } from "node:child_process";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { TestContext } from "node:test";
-import { promisify } from "node:util";
 import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
 import { VIBEROOTS_SOURCE_ROOT } from "../lib/test-helpers/source-paths";
+import { execManaged } from "../lib/test-helpers/managed-exec";
 import { withGitAutoMaintenanceDisabledEnv } from "../../lib/git-auto-maintenance-env";
 import { writeFreshCloneShims } from "./fresh-clone-post-clone-shims";
 
-export const execFileAsync = promisify(execFile);
 export const requiredTrackedInputs = [".buckroot", ".buckconfig", ".envrc", ".gitignore"] as const;
 
 export async function git(
@@ -17,8 +15,7 @@ export async function git(
   args: string[],
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<string> {
-  const { stdout } = await execFileAsync(env.VBR_REAL_GIT || "git", ["-C", root, ...args], {
-    encoding: "utf8",
+  const { stdout } = await execManaged(env.VBR_REAL_GIT || "git", ["-C", root, ...args], {
     env,
   });
   return String(stdout || "").trim();
@@ -51,7 +48,11 @@ async function underlyingGitPath(): Promise<string> {
   throw new Error("could not find an underlying Git binary for the fixture");
 }
 
-export async function createFreshCloneFixture(t: TestContext) {
+export async function createFreshCloneFixture(
+  t: TestContext,
+  options: { sourceMode?: "flake" | "submodule" } = {},
+) {
+  const sourceMode = options.sourceMode || "submodule";
   const sourceRoot = VIBEROOTS_SOURCE_ROOT;
   const tmp = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-fresh-clone-")));
   const submoduleSource = path.join(tmp, "submodule-source");
@@ -70,17 +71,21 @@ export async function createFreshCloneFixture(t: TestContext) {
   await Promise.all(
     [submoduleSource, consumerSource, fakeBin].map((dir) => fsp.mkdir(dir, { recursive: true })),
   );
-  await execFileAsync("rsync", [
-    "-a",
-    "--chmod=Du+rwx,Dgo+rx,Fu+rw,Fgo+r",
-    "--exclude=.git",
-    "--exclude=.direnv",
-    "--exclude=.viberoots",
-    "--exclude=buck-out",
-    "--exclude=node_modules",
-    `${sourceRoot}/`,
-    `${submoduleSource}/`,
-  ]);
+  await execManaged(
+    "rsync",
+    [
+      "-a",
+      "--chmod=Du+rwx,Dgo+rx,Fu+rw,Fgo+r",
+      "--exclude=.git",
+      "--exclude=.direnv",
+      "--exclude=.viberoots",
+      "--exclude=buck-out",
+      "--exclude=node_modules",
+      `${sourceRoot}/`,
+      `${submoduleSource}/`,
+    ],
+    { env: localGitEnv },
+  );
   await fsp.chmod(submoduleSource, 0o755);
   await git(submoduleSource, ["init", "-q", "--initial-branch=main"], localGitEnv);
   await commitAll(submoduleSource, "fixture: staged viberoots source", localGitEnv);
@@ -93,18 +98,16 @@ export async function createFreshCloneFixture(t: TestContext) {
     localGitEnv,
   );
   const consumerImporter = path.join("projects", "apps", "viberoots-site");
-  const checkedInImporter = path.join(path.dirname(sourceRoot), consumerImporter);
   await fsp.mkdir(path.join(consumerSource, consumerImporter), { recursive: true });
-  for (const file of ["package.json", "pnpm-lock.yaml"]) {
-    await fsp.copyFile(
-      path.join(checkedInImporter, file),
-      path.join(consumerSource, consumerImporter, file),
-    );
-  }
-  await fsp.copyFile(
-    path.join(path.dirname(sourceRoot), "projects", "node-modules.hashes.json"),
-    path.join(consumerSource, "projects", "node-modules.hashes.json"),
+  await fsp.writeFile(
+    path.join(consumerSource, consumerImporter, "package.json"),
+    `${JSON.stringify({ name: "fresh-clone-importer", private: true }, null, 2)}\n`,
   );
+  await fsp.writeFile(
+    path.join(consumerSource, consumerImporter, "pnpm-lock.yaml"),
+    "lockfileVersion: '9.0'\n\nimporters:\n  .: {}\n",
+  );
+  await fsp.writeFile(path.join(consumerSource, "projects", "node-modules.hashes.json"), "{}\n");
   await writeFreshCloneShims(fakeBin);
   const devToolsRoot = path.join(sourceRoot, "build-tools", "tools", "dev");
   const commandEnv = {
@@ -126,7 +129,7 @@ export async function createFreshCloneFixture(t: TestContext) {
     VBR_STALE_PNPM_LOCK: "projects/apps/viberoots-site/pnpm-lock.yaml",
   };
   const runCommand = (args: string[], cwd: string, env: NodeJS.ProcessEnv = commandEnv) =>
-    execFileAsync(
+    execManaged(
       process.execPath,
       [
         "--experimental-strip-types",
@@ -135,21 +138,27 @@ export async function createFreshCloneFixture(t: TestContext) {
         commandEnv.VBR_REAL_COMMAND!,
         ...args,
       ],
-      { cwd, env, maxBuffer: 1024 * 1024 * 16 },
+      { cwd, env },
     );
+  const sourceArgs =
+    sourceMode === "submodule"
+      ? [
+          "--viberoots-url",
+          `path:${path.join(consumerSource, "viberoots")}`,
+          "--source",
+          path.join(consumerSource, "viberoots"),
+        ]
+      : ["--viberoots-url", `git+https://github.com/viberoots/viberoots.git?rev=${submoduleRev}`];
   await runCommand(
     [
       "init-consumer",
       "--mode",
-      "submodule",
+      sourceMode,
       "--workspace-root",
       consumerSource,
       "--workspace-name",
       "fresh-clone-fixture",
-      "--viberoots-url",
-      `path:${path.join(consumerSource, "viberoots")}`,
-      "--source",
-      path.join(consumerSource, "viberoots"),
+      ...sourceArgs,
       "--no-direnv",
       "--setup-direnv",
       "never",
@@ -162,11 +171,12 @@ export async function createFreshCloneFixture(t: TestContext) {
     consumerSource,
     localGitEnv,
     nixLog,
+    sourceMode,
     submoduleRev,
     runCommand,
     async clone(name: string) {
       const root = path.join(tmp, name);
-      await execFileAsync(realGitPath, ["clone", "-q", "--recursive", consumerSource, root], {
+      await execManaged(realGitPath, ["clone", "-q", "--recursive", consumerSource, root], {
         env: localGitEnv,
       });
       return root;
@@ -185,7 +195,7 @@ export async function createFreshCloneFixture(t: TestContext) {
       root: string,
       options: { failureMode?: string; runInstall?: boolean; lockfile?: string } = {},
     ) {
-      return execFileAsync("bash", [path.join(sourceRoot, "bootstrap"), "--workspace-root", root], {
+      return execManaged("bash", [path.join(sourceRoot, "bootstrap"), "--workspace-root", root], {
         cwd: root,
         env: {
           ...commandEnv,
@@ -200,7 +210,6 @@ export async function createFreshCloneFixture(t: TestContext) {
           ...(options.lockfile ? { VBR_STALE_PNPM_LOCK: options.lockfile } : {}),
           ...(options.failureMode ? { VBR_FAKE_GIT_FAILURE: options.failureMode } : {}),
         },
-        maxBuffer: 1024 * 1024 * 16,
       });
     },
   };

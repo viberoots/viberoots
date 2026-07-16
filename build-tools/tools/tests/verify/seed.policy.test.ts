@@ -117,13 +117,17 @@ test("verify seed key includes active viberoots submodule state", async () => {
 test("verify seed snapshot excludes generated workspace buck state", async () => {
   const source = await readRepoFile("build-tools/tools/nix/flake/packages/filter-seed-repo.nix");
   const seedSource = await readRepoFile("build-tools/tools/nix/flake/packages/test-seed.nix");
-  const seedStagingSource = await readRepoFile("build-tools/tools/dev/verify/seed-staging.ts");
+  const seedStagingSource = [
+    await readRepoFile("build-tools/tools/dev/verify/seed-stage-tree.ts"),
+    await readRepoFile("build-tools/tools/dev/verify/seed-stage-source-overlay.ts"),
+  ].join("\n");
   const seedCopySource = await readRepoFile(
     "build-tools/tools/tests/lib/test-helpers/seed-copy.ts",
   );
-  const seedStoreSource = await readRepoFile(
-    "build-tools/tools/tests/lib/test-helpers/seed-store.ts",
-  );
+  const seedStoreSource = [
+    await readRepoFile("build-tools/tools/tests/lib/test-helpers/seed-store.ts"),
+    await readRepoFile("build-tools/tools/tests/lib/test-helpers/seed-worktree-overlay.ts"),
+  ].join("\n");
   const rsyncSource = await readRepoFile("build-tools/tools/tests/lib/test-helpers/rsync.ts");
   assert.match(source, /rel == "\.viberoots\/workspace\/buck"/);
   assert.match(source, /lib\.hasPrefix "\.viberoots\/workspace\/buck\/" rel/);

@@ -1,4 +1,10 @@
 import { extractHash } from "./nix";
+import { withPnpmStoreBuildFlakeRef } from "./build-flake";
+import * as hashesJson from "./hashes-json";
+import { withHeartbeat } from "./heartbeat";
+import { buildStore } from "./nix";
+import * as verifiedMarker from "./verified-marker";
+import { newManagedCommandActivity } from "./activity";
 
 export type FixedStoreBuildResult = { ok: boolean; output: string; outPath?: string };
 
@@ -76,5 +82,155 @@ export async function reconcileFixedPnpmStore(opts: {
   throw new Error(
     `fixed pnpm store still failed after hash update; restored prior metadata\n\n${second.output}`,
     { cause: primary },
+  );
+}
+
+type ProbeResult = { fixedStorePath: string; derivationIdentity: string };
+
+export async function runPnpmStoreReconciliation(opts: {
+  repoRoot: string;
+  importer: string;
+  flakeRef: string;
+  storeAttr: string;
+  lockHash: string;
+  key: string;
+  hashOwner: hashesJson.HashesJsonOwner;
+  markerPath: string;
+  currentHash: string;
+  force: boolean;
+  markerMetadataMatches: boolean;
+  marker: Awaited<ReturnType<typeof verifiedMarker.readVerifiedMarker>>;
+  builderFingerprint: string;
+  sharedCacheBuilderFingerprint: string;
+  probe: () => Promise<ProbeResult>;
+  inspectForRebuild: () => Promise<"realized" | "absent" | "invalid">;
+}): Promise<void> {
+  const persist = async (hashValue: string, derivationIdentity: string) =>
+    await verifiedMarker.persistVerifiedHash({
+      repoRoot: opts.repoRoot,
+      markerPath: opts.markerPath,
+      marker: {
+        importer: opts.importer,
+        lockfile: opts.key,
+        lockHash: opts.lockHash,
+        hashValue,
+        builderFingerprint: opts.builderFingerprint,
+        derivationIdentity,
+      },
+      sharedCacheBuilderFingerprint: opts.sharedCacheBuilderFingerprint,
+    });
+
+  if (opts.markerMetadataMatches && !opts.force) {
+    try {
+      const realized = await opts.probe();
+      if (opts.marker?.derivationIdentity === realized.derivationIdentity) {
+        await persist(opts.currentHash, realized.derivationIdentity);
+        console.log(
+          `[update-pnpm-hash] importer=${opts.importer} step=skip-marker attr=${opts.storeAttr} lockfile=${opts.key}`,
+        );
+        return;
+      }
+    } catch (error) {
+      if (!String(error).includes("final pnpm store is not realized")) throw error;
+    }
+  }
+
+  let rebuildExisting = false;
+  if (
+    shouldInspectFixedStoreForRebuild({
+      currentHash: opts.currentHash,
+      force: opts.force,
+      markerMatches: false,
+    })
+  ) {
+    rebuildExisting = await shouldRebuildFixedStore(opts.inspectForRebuild);
+  }
+
+  await verifiedMarker.withSharedHashCacheLock(
+    {
+      repoRoot: opts.repoRoot,
+      builderFingerprint: opts.sharedCacheBuilderFingerprint,
+      lockHash: opts.lockHash,
+    },
+    async () => {
+      let effectiveHash = opts.currentHash;
+      if (!opts.force) {
+        const restored = await verifiedMarker.restoreHashFromSharedCache({
+          repoRoot: opts.repoRoot,
+          key: opts.key,
+          importer: opts.importer,
+          storeAttr: opts.storeAttr,
+          builderFingerprint: opts.builderFingerprint,
+          sharedCacheBuilderFingerprint: opts.sharedCacheBuilderFingerprint,
+          existingLockHash: opts.lockHash,
+          existingHash: opts.currentHash,
+          hasValidExistingHash: Boolean(opts.currentHash),
+          hashOwner: opts.hashOwner,
+          hashRoot: opts.repoRoot,
+        });
+        if (restored) {
+          effectiveHash = await hashesJson.readNodeModulesHashForLockfile(opts.key, {
+            owner: opts.hashOwner,
+            root: opts.repoRoot,
+          });
+          try {
+            const realized = await opts.probe();
+            if (!effectiveHash)
+              throw new Error(`shared hash cache returned no hash for ${opts.key}`);
+            await persist(effectiveHash, realized.derivationIdentity);
+            return;
+          } catch (error) {
+            if (!String(error).includes("final pnpm store is not realized")) throw error;
+            rebuildExisting = false;
+          }
+        }
+      }
+
+      const metadata = await hashesJson.snapshotNodeModulesHashesJson(opts.key, {
+        owner: opts.hashOwner,
+        root: opts.repoRoot,
+      });
+      const runBuild = async (rebuild: boolean) =>
+        await withPnpmStoreBuildFlakeRef(
+          { repoRoot: opts.repoRoot, importer: opts.importer, baseFlakeRef: opts.flakeRef },
+          async (buildFlakeRef, filteredEnv) => {
+            const activity = newManagedCommandActivity();
+            return await withHeartbeat(
+              `importer=${opts.importer} step=fixed-reconcile attr=${opts.storeAttr}`,
+              buildStore(
+                opts.storeAttr,
+                buildFlakeRef,
+                activity,
+                { ...filteredEnv, NIX_PNPM_RECONCILE: "1" },
+                { rebuild, ownedDerivationName: `pnpm-store-lock-${opts.lockHash}` },
+              ),
+              { activity },
+            );
+          },
+        );
+      const reconciled = await reconcileFixedPnpmStore({
+        currentHash: effectiveHash || "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
+        expectedDerivationName: `pnpm-store-lock-${opts.lockHash}`,
+        rebuild: rebuildExisting,
+        runBuild,
+        updateHash: async (hash) =>
+          await hashesJson.updateNodeModulesHashesJson(opts.key, hash, {
+            owner: opts.hashOwner,
+            root: opts.repoRoot,
+          }),
+        restoreMetadata: metadata.restore,
+      });
+      const finalHash =
+        reconciled.hash ||
+        (await hashesJson.readNodeModulesHashForLockfile(opts.key, {
+          owner: opts.hashOwner,
+          root: opts.repoRoot,
+        }));
+      if (!finalHash)
+        throw new Error(`fixed pnpm store reconciliation returned no hash for ${opts.key}`);
+      const realized = await opts.probe();
+      await persist(finalHash, realized.derivationIdentity);
+      console.log(`pnpm-store: ${opts.storeAttr} hash updated and build succeeded`);
+    },
   );
 }

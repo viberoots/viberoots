@@ -60,7 +60,8 @@ test("ordinary pnpm consumers cannot reconcile committed stores", async () => {
   const readOnlyBranch =
     updater.match(/if \(readOnly\) \{\n    if \(!currentHash[\s\S]*?\n    return;\n  \}/)?.[0] ||
     "";
-  assert.match(readOnlyBranch, /NIX_PNPM_MATERIALIZE: "1"/);
+  assert.match(readOnlyBranch, /final pnpm store is not realized/);
+  assert.doesNotMatch(readOnlyBranch, /NIX_PNPM_MATERIALIZE/);
   assert.doesNotMatch(
     readOnlyBranch,
     /NIX_PNPM_RECONCILE|updateNodeModulesHashesJson|reconcileFixedPnpmStore/,

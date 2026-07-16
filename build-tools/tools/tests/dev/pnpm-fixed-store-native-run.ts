@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 
 const DEFAULT_MAX_KIB = 500 * 1024;
 const DEFAULT_SAMPLE_INTERVAL_MS = 1_000;
-const COMMAND_TIMEOUT_MS = 150_000;
+export const NATIVE_PNPM_COMMAND_TIMEOUT_MS = 600_000;
 const TERMINATION_GRACE_MS = 5_000;
 
 export type CommandResult = {
@@ -20,6 +20,7 @@ type RunOptions = {
   fixtureRoot: string;
   diskRoot?: string;
   maxKib?: number;
+  measureUsage?: () => Promise<{ diskDeltaKib: number; fixtureKib: number }>;
   sampleIntervalMs?: number;
   timeoutMs?: number;
 };
@@ -31,7 +32,7 @@ export async function runGuardedCommand(
 ): Promise<CommandResult> {
   const maxKib = opts.maxKib ?? DEFAULT_MAX_KIB;
   const diskRoot = opts.diskRoot || opts.fixtureRoot;
-  const beforeDisk = await diskUsedKib(diskRoot);
+  const beforeDisk = opts.measureUsage ? 0 : await diskUsedKib(diskRoot);
   const startedAt = Date.now();
   let peakFixtureKib = 0;
   let peakDiskDeltaKib = 0;
@@ -47,6 +48,7 @@ export async function runGuardedCommand(
     let stopReason: Error | null = null;
     let settled = false;
     let forceTimer: NodeJS.Timeout | undefined;
+    let sampleInFlight: Promise<void> | null = null;
     child.stdout.on("data", (chunk) => (stdout += String(chunk)));
     child.stderr.on("data", (chunk) => (stderr += String(chunk)));
 
@@ -63,11 +65,15 @@ export async function runGuardedCommand(
       forceTimer = setTimeout(() => signalChild("SIGKILL"), TERMINATION_GRACE_MS);
     };
     const measure = async () => {
-      const [fixtureKib, diskKib] = await Promise.all([
-        directorySizeKib(opts.fixtureRoot),
-        diskUsedKib(diskRoot),
-      ]);
-      const diskDeltaKib = diskKib - beforeDisk;
+      const { fixtureKib, diskDeltaKib } = opts.measureUsage
+        ? await opts.measureUsage()
+        : await (async () => {
+            const [measuredFixtureKib, diskKib] = await Promise.all([
+              directorySizeKib(opts.fixtureRoot),
+              diskUsedKib(diskRoot),
+            ]);
+            return { fixtureKib: measuredFixtureKib, diskDeltaKib: diskKib - beforeDisk };
+          })();
       peakFixtureKib = Math.max(peakFixtureKib, fixtureKib);
       peakDiskDeltaKib = Math.max(peakDiskDeltaKib, diskDeltaKib);
       if (fixtureKib > maxKib || diskDeltaKib > maxKib) {
@@ -76,18 +82,25 @@ export async function runGuardedCommand(
         );
       }
     };
-    const timeout = setTimeout(
-      () =>
-        stop(new Error(`command exceeded ${opts.timeoutMs ?? COMMAND_TIMEOUT_MS}ms: ${command}`)),
-      opts.timeoutMs ?? COMMAND_TIMEOUT_MS,
-    );
-    const sampler = setInterval(async () => {
-      if (settled || stopReason) return;
-      try {
-        await measure();
-      } catch (error) {
-        stop(error instanceof Error ? error : new Error(String(error)));
-      }
+    const invocation = [command, ...args].map((value) => JSON.stringify(value)).join(" ");
+    const timeoutMs = opts.timeoutMs ?? NATIVE_PNPM_COMMAND_TIMEOUT_MS;
+    const timeout = setTimeout(() => {
+      stop(new Error(`command exceeded ${timeoutMs}ms: ${invocation}`));
+    }, timeoutMs);
+    const sampler = setInterval(() => {
+      if (settled || stopReason || sampleInFlight) return;
+      sampleInFlight = measure()
+        .catch((error) => {
+          const reason = error instanceof Error ? error : new Error(String(error));
+          if (settled) {
+            stopReason ||= reason;
+          } else {
+            stop(reason);
+          }
+        })
+        .finally(() => {
+          sampleInFlight = null;
+        });
     }, opts.sampleIntervalMs ?? DEFAULT_SAMPLE_INTERVAL_MS);
     child.on("error", stop);
     child.on("close", async (status) => {
@@ -95,6 +108,7 @@ export async function runGuardedCommand(
       clearTimeout(timeout);
       clearTimeout(forceTimer);
       clearInterval(sampler);
+      await sampleInFlight;
       if (!stopReason) {
         try {
           await measure();
@@ -129,10 +143,22 @@ export async function directorySizeKib(target: string): Promise<number> {
   return parseNonnegativeKib(output.split(/\s+/)[0], "du");
 }
 
-async function diskUsedKib(target: string): Promise<number> {
-  const output = await shellOutput("df", ["-k", target]);
+export function diskUsageCommand(
+  target: string,
+  platform: NodeJS.Platform = process.platform,
+): { command: string; args: string[] } {
+  // Coreutils df reports APFS container-wide usage. Apple's df reports the requested volume.
+  return { command: platform === "darwin" ? "/bin/df" : "df", args: ["-k", target] };
+}
+
+export function parseDfUsedKib(output: string): number {
   const fields = output.trim().split("\n").at(-1)?.trim().split(/\s+/) || [];
   return parseNonnegativeKib(fields[2], "df");
+}
+
+async function diskUsedKib(target: string): Promise<number> {
+  const invocation = diskUsageCommand(target);
+  return parseDfUsedKib(await shellOutput(invocation.command, invocation.args));
 }
 
 export function parseNonnegativeKib(value: string | undefined, command: string): number {

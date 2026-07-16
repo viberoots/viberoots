@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { externalNodeToolEnv } from "./external-node-env";
 
 import {
   syncLocalPrefetchIntoPnpmStore,
@@ -167,7 +168,7 @@ export async function ensureImporterLockfileFresh(opts: {
     await opts.$({
       stdio: "inherit",
       env: {
-        ...opts.env,
+        ...externalNodeToolEnv(opts.env),
         VBR_PNPM_LOCKFILE_VIBEROOTS_OVERRIDE: viberootsOverride,
       },
     })`bash --noprofile --norc -c 'set -euo pipefail; vbr_override="\${VBR_PNPM_LOCKFILE_VIBEROOTS_OVERRIDE:-}"; vbr_override_args=(); if [[ -n "$vbr_override" ]]; then vbr_override_args=(--override-input viberoots "$vbr_override"); fi; mkdir -p "${homeDir}" "${storeDir}"; export PNPM_HOME="${homeDir}"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config --no-write-lock-file "\${vbr_override_args[@]}" "path:${opts.tmp}#pnpm" -- config set store-dir "${storeDir}"; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config --no-write-lock-file "\${vbr_override_args[@]}" "path:${opts.tmp}#pnpm" -- install --force --filter "./${opts.importerRel}" --lockfile-only --prefer-offline --prod=false --ignore-scripts --lockfile-dir "./${opts.importerRel}" --dir "./${opts.importerRel}" --color never; env NIX_PNPM_ALLOW_GENERATE=1 NIX_PNPM_FETCH_TIMEOUT="${opts.nixPnpmFetchTimeoutSecs}" nix run --accept-flake-config --no-write-lock-file "\${vbr_override_args[@]}" "path:${opts.tmp}#pnpm" -- fetch --force --filter "./${opts.importerRel}" --prefer-offline --prod=false --lockfile-dir "./${opts.importerRel}" --dir "./${opts.importerRel}" --color never'`;

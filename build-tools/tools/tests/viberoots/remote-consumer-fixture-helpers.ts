@@ -65,6 +65,9 @@ export async function makeConsumerWithFlakeUrl(
     cwd: path.join(consumer, ".viberoots", "workspace"),
     stdio: "pipe",
   })`nix flake lock --accept-flake-config`.quiet();
+  await $({ cwd: consumer, stdio: "pipe" })`git init -q`;
+  await $({ cwd: consumer, stdio: "pipe" })`git add -A`;
+  await $({ cwd: consumer, stdio: "pipe" })`git commit -qm consumer-fixture`;
   return consumer;
 }
 

@@ -18,7 +18,7 @@ test("fixed pnpm store reconciliation keeps outputHash and verifies updated meta
   );
   assert.match(store, /outputHashMode = "recursive"/);
   assert.match(store, /outputHash = outHash/);
-  assert.match(updater, /snapshotNodeModulesHashesJson/);
+  assert.match(state, /snapshotNodeModulesHashesJson/);
   assert.match(state, /await opts\.updateHash\(suggested\)[\s\S]*await opts\.runBuild\(false\)/);
   assert.match(state, /restoreMetadataOrThrow/);
   assert.match(state, /new AggregateError/);

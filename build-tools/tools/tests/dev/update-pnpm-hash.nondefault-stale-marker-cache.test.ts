@@ -4,13 +4,13 @@ import { test } from "node:test";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("stale builders force a native fixed-output rebuild under the shared cache lock", async () => {
-  const main = await fsp.readFile(
-    viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash.ts"),
+  const reconciliation = await fsp.readFile(
+    viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash/fixed-store-reconcile.ts"),
     "utf8",
   );
-  assert.match(main, /withSharedHashCacheLock/);
-  assert.match(main, /shouldRebuildFixedStore\(inspectForRebuild\)/);
-  assert.match(main, /rebuild: rebuildExisting/);
-  assert.match(main, /NIX_PNPM_RECONCILE: "1"/);
-  assert.doesNotMatch(main, /stale-builder-recompute|pnpm-store-unfixed/);
+  assert.match(reconciliation, /withSharedHashCacheLock/);
+  assert.match(reconciliation, /shouldRebuildFixedStore\(opts\.inspectForRebuild\)/);
+  assert.match(reconciliation, /rebuild: rebuildExisting/);
+  assert.match(reconciliation, /NIX_PNPM_RECONCILE: "1"/);
+  assert.doesNotMatch(reconciliation, /stale-builder-recompute|pnpm-store-unfixed/);
 });

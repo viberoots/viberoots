@@ -95,7 +95,7 @@ test("p auto source uses filtered flake when root viberoots input is generated w
         "set -euo pipefail",
         `echo "$*" >> ${JSON.stringify(nixLog)}`,
         'args="$*"',
-        'if [[ "$args" == flake\\ prefetch\\ --json\\ path:* ]]; then',
+        'if [[ "$args" == flake\\ prefetch\\ --json\\ --no-use-registries\\ path:* ]]; then',
         `  exec ${JSON.stringify(realNixBin)} "$@"`,
         "fi",
         `out=${JSON.stringify(fakeOut)}`,
@@ -135,8 +135,18 @@ test("p auto source uses filtered flake when root viberoots input is generated w
     );
 
     const logTxt = await fsp.readFile(nixLog, "utf8");
-    assert.match(logTxt, /path:.*#graph-generator-selected/);
-    assert.doesNotMatch(logTxt, new RegExp(`${fakeRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}#`));
+    const escapedRoot = fakeRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    assert.match(
+      logTxt,
+      /flake prefetch --json --no-use-registries path:.*\/viberoots/,
+      "generated workspace inputs must be materialized to immutable source identity",
+    );
+    assert.match(
+      logTxt,
+      /build .*path:.*#graph-generator-selected/,
+      "the clean fixture must build through the immutable filtered flake",
+    );
+    assert.doesNotMatch(logTxt, new RegExp(`path:${escapedRoot}#`));
   } finally {
     await fsp.rm(fakeRoot, { recursive: true, force: true }).catch(() => {});
   }

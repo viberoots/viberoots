@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
+import { externalNodeToolEnv } from "../lib/external-node-env";
 import "zx/globals";
 import { getFlagBool, getFlagStr } from "../lib/cli";
 import { resolveWorkspaceRootSync } from "../lib/repo";
@@ -73,7 +74,7 @@ async function main(): Promise<void> {
   if (runSetup) {
     // Best-effort: create lockfile-only and refresh glue
     try {
-      await $({ cwd: dest })`pnpm -w install --lockfile-only`;
+      await $({ cwd: dest, env: externalNodeToolEnv() })`pnpm -w install --lockfile-only`;
     } catch {
       console.warn("warning: pnpm lockfile-only step failed (dev shell not loaded?)");
     }

@@ -34,8 +34,15 @@ export function withGitAutoMaintenanceDisabledEnv<T extends EnvLike>(env: T): T 
 }
 
 export function gitAutoMaintenanceDisabledTestEnvArgs(env: EnvLike = process.env): string[] {
-  return Object.entries(gitAutoMaintenanceDisabledEnvEntries(env)).flatMap(([key, value]) => [
-    "--env",
-    `${key}=${value}`,
-  ]);
+  const complete = withGitAutoMaintenanceDisabledEnv(env);
+  const count = parseGitConfigCount(complete.GIT_CONFIG_COUNT);
+  const entries: [string, string][] = [["GIT_CONFIG_COUNT", String(count)]];
+  for (let slot = 0; slot < count; slot++) {
+    for (const kind of ["KEY", "VALUE"] as const) {
+      const key = `GIT_CONFIG_${kind}_${slot}`;
+      const value = complete[key];
+      if (typeof value === "string") entries.push([key, value]);
+    }
+  }
+  return entries.flatMap(([key, value]) => ["--env", `${key}=${value}`]);
 }

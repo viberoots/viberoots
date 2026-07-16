@@ -7,6 +7,7 @@ import {
   withBuckProjectIgnorePolicy,
 } from "../../lib/buck-project-ignore";
 import { writeIfChanged } from "../../lib/fs-helpers";
+import { ensureBuckCompatibilityCells } from "../../lib/buck-compatibility-cells";
 async function pathExists(p: string): Promise<boolean> {
   try {
     await fsp.access(p);
@@ -19,6 +20,7 @@ async function pathExists(p: string): Promise<boolean> {
 export async function ensureBuckPreludeConfig(root: string): Promise<boolean> {
   try {
     await applyNixCacheHealthPolicy(root);
+    await ensureBuckCompatibilityCells(root);
     try {
       const rootCfgPath = path.join(root, ".buckconfig");
       const preludeFileExists = await pathExists(
@@ -69,8 +71,8 @@ viberoots = ./.viberoots/current
 prelude = ./.viberoots/workspace/prelude
 toolchains = ./.viberoots/current/toolchains
 repo_toolchains = ./.viberoots/workspace/toolchains
-fbsource = ./.viberoots/current/config/fbsource_stub
-fbcode = ./.viberoots/current/config/fbcode_stub
+fbsource = ./.viberoots/workspace/buck-cell-stubs/fbsource
+fbcode = ./.viberoots/workspace/buck-cell-stubs/fbcode
 config = ./.viberoots/current/config
 workspace_providers = ./.viberoots/workspace/providers
 workspace_buck = ./.viberoots/workspace/buck
@@ -81,8 +83,8 @@ viberoots = ./.viberoots/current
 prelude = ./.viberoots/workspace/prelude
 toolchains = ./.viberoots/current/toolchains
 repo_toolchains = ./.viberoots/workspace/toolchains
-fbsource = ./.viberoots/current/config/fbsource_stub
-fbcode = ./.viberoots/current/config/fbcode_stub
+fbsource = ./.viberoots/workspace/buck-cell-stubs/fbsource
+fbcode = ./.viberoots/workspace/buck-cell-stubs/fbcode
 config = ./.viberoots/current/config
 workspace_providers = ./.viberoots/workspace/providers
 workspace_buck = ./.viberoots/workspace/buck

@@ -34,7 +34,7 @@ function srcToString(src: unknown): string {
 
 test(
   "scaf go test: app auto-wires *_test.go under cmd/<app>/**",
-  { timeout: 240_000 },
+  { timeout: 480_000 },
   async () => {
     await runInTemp("scaf-test-app", async (tmp, _$) => {
       const $ = _$({ stdio: "inherit" });

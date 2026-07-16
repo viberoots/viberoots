@@ -113,6 +113,10 @@ test("Nix-native fixed store retains hash authority and ordinary builds cannot f
     viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash/nix.ts"),
     "utf8",
   );
+  const reconcile = await fsp.readFile(
+    viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash/fixed-store-reconcile.ts"),
+    "utf8",
+  );
 
   assert.match(
     store,
@@ -125,19 +129,19 @@ test("Nix-native fixed store retains hash authority and ordinary builds cannot f
   assert.match(store, /rm -rf "\$modules_dir" node_modules/);
   assert.match(store, /final fixed pnpm store is missing/);
   assert.doesNotMatch(store, /mkPnpmStoreUnfixed|pnpm-store-unfixed|add-fixed/);
-  assert.match(updater, /withPnpmStoreBuildFlakeRef\([\s\S]*NIX_PNPM_RECONCILE: "1"/);
+  assert.match(reconcile, /withPnpmStoreBuildFlakeRef\([\s\S]*NIX_PNPM_RECONCILE: "1"/);
   assert.match(
     updater,
-    /if \(readOnly\) \{[\s\S]*NIX_PNPM_MATERIALIZE: "1"[\s\S]*writeVerifiedMarker[\s\S]*return;/,
+    /if \(readOnly\) \{[\s\S]*final pnpm store is not realized[\s\S]*writeVerifiedMarker[\s\S]*return;/,
   );
   assert.doesNotMatch(
     updater.match(/if \(readOnly\) \{\n    if \(!currentHash[\s\S]*?\n    return;\n  \}/)?.[0] ||
       "",
     /NIX_PNPM_RECONCILE|updateNodeModulesHashesJson|reconcileFixedPnpmStore/,
   );
-  assert.match(updater, /shouldInspectFixedStoreForRebuild\(/);
-  assert.match(updater, /shouldRebuildFixedStore\(inspectForRebuild\)/);
-  assert.match(updater, /rebuild: rebuildExisting/);
+  assert.match(reconcile, /shouldInspectFixedStoreForRebuild\(/);
+  assert.match(reconcile, /shouldRebuildFixedStore\(opts\.inspectForRebuild\)/);
+  assert.match(reconcile, /rebuild: rebuildExisting/);
   assert.match(nix, /"keep-failed",\s*"false"/);
   assert.match(nix, /if \(opts\.rebuild\) args\.push\("--rebuild"\)/);
 });

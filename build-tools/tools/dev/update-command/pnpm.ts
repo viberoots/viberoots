@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { externalNodeToolEnv } from "../../lib/external-node-env";
 import { mkdtempNoindex } from "../../lib/macos-metadata";
 import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard";
 import { resolveRepoNodeBin } from "../../lib/repo-node-bin";
@@ -47,7 +48,7 @@ export async function updatePnpmLock(opts: {
         command: process.env.UPDATE_PNPM_BIN || "pnpm",
         args: pnpmLockArgs(opts.upgrade, path.join(temp, "store")),
         cwd: importerAbs,
-        env: { ...process.env, PNPM_HOME: path.join(temp, "home") },
+        env: { ...externalNodeToolEnv(), PNPM_HOME: path.join(temp, "home") },
       });
     });
     const prettier = await resolveRepoNodeBin(opts.root, "prettier");
@@ -55,6 +56,7 @@ export async function updatePnpmLock(opts: {
       command: prettier,
       args: ["--write", path.join(importerAbs, "pnpm-lock.yaml")],
       cwd: opts.root,
+      env: externalNodeToolEnv(),
     });
   } finally {
     await cleanupLocalWorkspaceMarker({

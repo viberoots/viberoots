@@ -5,6 +5,7 @@ import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { externalNodeToolEnv } from "../../lib/external-node-env";
 import { test } from "node:test";
 import { promisify } from "node:util";
 import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
@@ -155,7 +156,7 @@ test(
   async () => {
     const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-pnpm-platform-filter-"));
     const { pnpm, universalMarkers } = await productionConfig();
-    const env = { ...process.env, CI: "1", FORCE_COLOR: "0", NO_COLOR: "1" };
+    const env = { ...externalNodeToolEnv(), CI: "1", FORCE_COLOR: "0", NO_COLOR: "1" };
     try {
       await fsp.writeFile(
         path.join(root, "package.json"),

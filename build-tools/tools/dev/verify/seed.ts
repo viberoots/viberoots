@@ -3,13 +3,18 @@ import path from "node:path";
 import process from "node:process";
 import "zx/globals";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
-import { writeIfChanged } from "../../lib/fs-helpers";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { runManagedCommand } from "../../lib/managed-command";
 import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import { verifySeedBuildArgs, type VerifySeedBuildMode } from "./seed-build";
-import { createSharedSeedStagePin, shouldStageSeed, stageSeedStore } from "./seed-staging";
+import { createSharedSeedStagePin, shouldStageSeed } from "./seed-staging";
+import {
+  createVerifySeedPin,
+  readCurrentSeed,
+  stageSeedWithInheritedProtection,
+  writeCurrentSeed,
+} from "./seed-pins";
 import { writeVerifySeedRemoteManifest } from "./seed-manifest";
 import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope";
 import { pidAlive } from "./seed-utils";
@@ -175,47 +180,6 @@ async function buildSeedStorePath(
   return out;
 }
 
-async function writeCurrentSeed(root: string, seedPath: string, seedKey: string): Promise<void> {
-  const dir = seedRootDir(root);
-  await mkdirWithMacosMetadataExclusion(dir).catch(() => {});
-  await writeIfChanged(path.join(dir, "current"), seedPath + "\n");
-  await writeIfChanged(path.join(dir, "current.key"), seedKey + "\n");
-}
-
-async function readCurrentSeed(root: string, seedKey: string): Promise<string | null> {
-  const dir = seedRootDir(root);
-  const existingKey = (
-    await fsp.readFile(path.join(dir, "current.key"), "utf8").catch(() => "")
-  ).trim();
-  if (existingKey !== seedKey) return null;
-  const seedPath = (await fsp.readFile(path.join(dir, "current"), "utf8").catch(() => "")).trim();
-  if (!seedPath) return null;
-  const exists = await fsp
-    .access(seedPath)
-    .then(() => true)
-    .catch(() => false);
-  return exists ? seedPath : null;
-}
-
-async function createPin(
-  root: string,
-  iso: string,
-  seedPath: string,
-  seedKey: string,
-): Promise<string> {
-  const pinDir = path.join(pinRootDir(root), iso);
-  await mkdirWithMacosMetadataExclusion(pinDir).catch(() => {});
-  await fsp.writeFile(
-    path.join(pinDir, "owner.json"),
-    JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString(), seedKey }) + "\n",
-    "utf8",
-  );
-  const link = path.join(pinDir, "seed");
-  await fsp.rm(link, { recursive: true, force: true }).catch(() => {});
-  await fsp.symlink(seedPath, link).catch(() => {});
-  return pinDir;
-}
-
 export async function prepareVerifySeed(opts: {
   root: string;
   iso: string;
@@ -240,14 +204,19 @@ export async function prepareVerifySeed(opts: {
       cleanup: async () => {},
     };
   }
+  const inheritedPinDir = String(process.env.VBR_TEST_SEED_PIN_DIR || "").trim();
   const seedPathForRun = (await shouldStageSeed(seedPath))
-    ? await stageSeedStore(seedPath, seedKey, seedTtlMs, {
+    ? await stageSeedWithInheritedProtection({
+        seedPath,
+        seedKey,
+        seedTtlMs,
         workspaceRoot: opts.root,
-        sharedPinIso: opts.iso,
+        iso: opts.iso,
+        inheritedPinDir,
       })
     : seedPath;
   await writeCurrentSeed(opts.root, seedPathForRun, seedKey);
-  const pinDir = await createPin(opts.root, opts.iso, seedPathForRun, seedKey);
+  const pinDir = await createVerifySeedPin(opts.root, opts.iso, seedPathForRun, seedKey);
   const sharedPinDir = await createSharedSeedStagePin(seedPathForRun, opts.iso);
   const cleanup = async () => {
     if (sharedPinDir) await fsp.rm(sharedPinDir, { recursive: true, force: true }).catch(() => {});

@@ -11,6 +11,10 @@ test("update-pnpm-hash separates verified marker and shared-cache fingerprints",
     "viberoots/build-tools/tools/dev/update-pnpm-hash.ts",
     "utf8",
   );
+  const reconciliationTxt = await fsp.readFile(
+    "viberoots/build-tools/tools/dev/update-pnpm-hash/fixed-store-reconcile.ts",
+    "utf8",
+  );
   const primaryList = txt.match(
     /const pnpmStoreBuilderFingerprintFiles = \[([\s\S]*?)\] as const;/,
   )?.[1];
@@ -100,8 +104,13 @@ test("update-pnpm-hash separates verified marker and shared-cache fingerprints",
   if (!candidatesBody.includes("Array.from(new Set([current, exactStoreProvisioning]))")) {
     throw new Error("verified marker candidates must include current and exact-store fingerprints");
   }
-  const persistCount = (updaterTxt.match(/persistVerifiedHash\(\{/g) || []).length;
-  const sharedPersistCount = (updaterTxt.match(/sharedCacheBuilderFingerprint,/g) || []).length;
+  const updateFlowTxt = `${updaterTxt}\n${reconciliationTxt}`;
+  const persistCount = (updateFlowTxt.match(/persistVerifiedHash\(\{/g) || []).length;
+  const sharedPersistCount = (
+    updateFlowTxt.match(
+      /sharedCacheBuilderFingerprint(?:,|: opts\.sharedCacheBuilderFingerprint)/g,
+    ) || []
+  ).length;
   if (persistCount === 0 || sharedPersistCount < persistCount + 1) {
     throw new Error(
       "all update-pnpm-hash persist/restore paths must use the shared-cache builder fingerprint",

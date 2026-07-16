@@ -37,19 +37,6 @@ export async function discoverPrebuildInputs(root = process.cwd()): Promise<stri
   ]);
   const seen = new Set<string>();
 
-  const shouldInclude = (rel: string): boolean => {
-    if (!rel) return false;
-    if (rel === "TARGETS" || rel.endsWith("/TARGETS")) return true;
-    if (rel.endsWith(".bzl")) return true;
-    if (rel === "flake.nix" || rel === "flake.lock") return true;
-    if (rel.endsWith("/go.mod") || rel.endsWith("/go.sum")) return true;
-    if (rel.endsWith("pnpm-lock.yaml") || rel.endsWith("uv.lock")) return true;
-    if (rel.startsWith("patches/") && rel.endsWith(".patch")) return true;
-    if (rel.startsWith("build-tools/tools/nix/overlays/")) return true;
-    if (isToolSourceInput(rel)) return true;
-    return false;
-  };
-
   const shouldIncludeToolSource = (rel: string): boolean => {
     if (TOOL_SOURCE_FILES.has(rel)) return true;
     if (!/\.(ts|mjs|json|nix|bzl)$/.test(rel)) return false;
@@ -78,7 +65,7 @@ export async function discoverPrebuildInputs(root = process.cwd()): Promise<stri
         continue;
       }
       const rel = path.relative(root, path.join(dirAbs, e.name)).replace(/\\/g, "/");
-      if (!shouldInclude(rel)) continue;
+      if (!isPrebuildInputRelPath(rel)) continue;
       addInput(path.join(dirAbs, e.name));
     }
   }
@@ -122,6 +109,18 @@ export async function discoverPrebuildInputs(root = process.cwd()): Promise<stri
   await addActiveToolSourceInputs();
   result.sort();
   return result;
+}
+
+export function isPrebuildInputRelPath(rel: string): boolean {
+  if (!rel) return false;
+  if (rel === "TARGETS" || rel.endsWith("/TARGETS")) return true;
+  if (rel.endsWith(".bzl")) return true;
+  if (rel === "flake.nix" || rel === "flake.lock") return true;
+  if (rel.endsWith("/go.mod") || rel.endsWith("/go.sum")) return true;
+  if (rel.endsWith("pnpm-lock.yaml") || rel.endsWith("uv.lock")) return true;
+  if (rel.startsWith("patches/") && rel.endsWith(".patch")) return true;
+  if (rel.startsWith("build-tools/tools/nix/overlays/")) return true;
+  return isToolSourceInput(rel);
 }
 
 function isToolSourceInput(rel: string): boolean {

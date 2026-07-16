@@ -1,7 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { buildToolPath } from "../dev-build/paths";
-import { glueFingerprintFresh } from "./glue-freshness";
+import { glueFingerprintFresh, writeGlueFingerprint } from "./glue-freshness";
 
 export type InstallMetadataMode = "read-only" | "reconcile";
 
@@ -43,7 +43,11 @@ export async function assertCppTrackedMetadataReady(
       );
     }
   }
-  const freshness = await glueFingerprintFresh(root);
+  let freshness = await glueFingerprintFresh(root);
+  if (!freshness.fresh && freshness.reason === "missing-or-invalid-fingerprint") {
+    await writeGlueFingerprint(root);
+    freshness = await glueFingerprintFresh(root);
+  }
   if (!freshness.fresh && freshness.reason !== "missing-output") {
     throw staleMetadataError(
       path.relative(root, buildToolPath(root, "tools/nix/langs.json")).replace(/\\/g, "/"),

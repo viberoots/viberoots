@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { withGoModuleInputFingerprint } from "../../dev/install/go-consistency";
 import { buildSelectedOutPath, runInTemp } from "../lib/test-helpers";
 
 test("Node N-API addon builds and returns add(2,3)=5 (temp repo)", async () => {
@@ -55,13 +57,15 @@ module example.com/math/api
 
 go 1.22.0
 EOF'`;
+    await sh`bash --noprofile --norc -c ': > projects/libs/math-api/go.sum'`;
     // Minimal gomod2nix (no deps) so the planner can resolve modulesTomlFor for this Go target.
-    await sh`bash --noprofile --norc -c 'cat > projects/libs/math-api/gomod2nix.toml <<"EOF"
-schema = 3
-mod = {}
-replace = {}
-prune = { go-tests = true, unused-packages = true }
-EOF'`;
+    await fsp.writeFile(
+      path.join(tmp, "projects/libs/math-api/gomod2nix.toml"),
+      await withGoModuleInputFingerprint(
+        path.join(tmp, "projects/libs/math-api"),
+        "schema = 3\nmod = {}\nreplace = {}\nprune = { go-tests = true, unused-packages = true }\n",
+      ),
+    );
     // TARGETS declaring a Go c-archive
     await sh`bash --noprofile --norc -c 'cat > projects/libs/math-api/TARGETS <<"EOF"
 load("@viberoots//build-tools/go:defs.bzl", "nix_go_carchive")

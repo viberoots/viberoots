@@ -47,7 +47,9 @@ Steps
   - Add an entry to `build-tools/tools/nix/langs.json` with `requiredPaths`, `optionalPaths`, and `capabilities` for your language. Missing required paths in a sparse checkout disables the language; glue and scaf will still work for others.
   - Add the project surface to the canonical update/consistency language registry. Its read-only
     check must fail with `repair: run u`, and the same registry must define either a bounded upgrade
-    policy or an explicit reconciliation-only policy for dependency authorities that cannot move.
+    policy or an explicit reconciliation-only policy for an ecosystem with no upgradeable dependency
+    authority. If the ecosystem can upgrade dependencies, a real `u --upgrade` implementation is
+    required; an unwired upgrade path is not reconciliation-only.
   - Add an exhaustive typed update handler for conservative repair and upgrade. Route executable
     work through canonical Nix-store tool resolution and managed timeout/process-group shutdown;
     restore every tracked file the tool may create, remove, or rewrite if the operation fails.
@@ -58,12 +60,13 @@ Steps
 - **Tests**
   - Copy the Go contract tests as a model and adjust for your language’s providers and labels. Keep tests one-per-file and wire via `TARGETS`.
   - Include a small test that proves your adapter's `validate(nodes)` rejects a misconfigured sample with a clear message.
-  - Add command-boundary coverage: `u` repairs deterministic tracked metadata; `i` and post-clone
-    detect drift without rewriting it.
+  - Add command-boundary coverage: `u` repairs deterministic tracked metadata; `i`, `b`, post-clone,
+    and devshell entry detect drift without rewriting it and never invoke reconciliation or upgrade.
   - Run the real `u` launcher in a bounded local/offline consumer and compare the viberoots gitlink,
     flake pins, and source-mode metadata byte-for-byte before and after. Cover both plain repair and
-    the supported upgrade path, including exact upgrade argv and failure rollback, or the exact
-    reconciliation-only `u --upgrade` result.
+    the supported upgrade path, including exact upgrade argv, observable dependency movement, and
+    failure rollback. Use reconciliation-only only when the ecosystem has no upgradeable dependency
+    authority, and test that fact alongside the exact `u --upgrade` result.
   - Add hostile-`PATH` coverage for startup/orchestration, a rooted Nix-store Buck toolchain check,
     and runnable-manifest execution or rejection tests where the language produces commands.
   - Exercise a minimal temp consumer so undeclared source-checkout dependencies fail visibly.

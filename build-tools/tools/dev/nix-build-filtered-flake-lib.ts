@@ -1,4 +1,6 @@
 import { normalizeTargetLabel, packagePathFromLabel } from "../lib/labels";
+export { DEFAULT_FILTERED_FLAKE_CONFIG_PATHS } from "./filtered-flake-config-paths";
+import { DEFAULT_FILTERED_FLAKE_CONFIG_PATHS } from "./filtered-flake-config-paths";
 
 type GraphNodeRecord = Record<string, unknown>;
 
@@ -110,7 +112,11 @@ export function filteredFlakeRsyncExcludeArgs(): string[] {
 }
 
 export function defaultFilteredFlakeSnapshotRelPaths(): string[] {
-  return [...DEFAULT_FILTERED_FLAKE_ROOT_FILES, ...DEFAULT_FILTERED_FLAKE_ROOTS];
+  return [
+    ...DEFAULT_FILTERED_FLAKE_ROOT_FILES,
+    ...DEFAULT_FILTERED_FLAKE_CONFIG_PATHS,
+    ...DEFAULT_FILTERED_FLAKE_ROOTS,
+  ];
 }
 
 export function defaultFilteredFlakeSnapshotRsyncSources(relPaths: readonly string[]): string[] {

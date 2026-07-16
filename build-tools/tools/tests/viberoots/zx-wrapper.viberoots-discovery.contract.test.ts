@@ -34,7 +34,8 @@ test("runInTemp installs a zx-wrapper shim for temp-repo build-tools command pat
     "tests",
     "lib",
     "test-helpers",
-    "run-in-temp.ts",
+    "run-in-temp",
+    "command-shims.ts",
   );
   const source = await fsp.readFile(helperPath, "utf8");
 

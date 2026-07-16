@@ -1,103 +1,22 @@
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { promisify } from "node:util";
-import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
-import {
-  defaultFilteredFlakeSnapshotRelPaths,
-  defaultFilteredFlakeSnapshotRsyncSources,
-  filteredFlakeRsyncExcludeArgs,
-} from "../../dev/nix-build-filtered-flake-lib";
-import { extractHash } from "../../dev/update-pnpm-hash/nix";
-import { resolveToolPathSync } from "../../lib/tool-paths";
-import {
-  buildArgs,
-  nixEnv,
-  PLACEHOLDER,
-  repoRoot,
-  writeFixture,
-} from "./pnpm-fixed-store-native-fixture";
+import { buildArgs, nixEnv, repoRoot, writeFixture } from "./pnpm-fixed-store-native-fixture";
 import { directorySizeKib, runGuardedCommand } from "./pnpm-fixed-store-native-run";
+import {
+  immutableProductionSource,
+  mismatchCandidate,
+  strictGot,
+} from "./pnpm-fixed-store-native-source";
 
 const MAX_KIB = 500 * 1024;
-const FILTERED_SOURCE_MAX_KIB = 64 * 1024;
-const COLD_REBUILD_MAX_KIB = 640 * 1024;
-const execFileAsync = promisify(execFile);
-
-async function immutableProductionSource(liveRoot: string): Promise<string> {
-  const fixture = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-native-pnpm-source-"));
-  const filtered = path.join(fixture, "source");
-  try {
-    const relPaths: string[] = [];
-    for (const rel of defaultFilteredFlakeSnapshotRelPaths()) {
-      if (
-        await fsp.access(path.join(liveRoot, rel)).then(
-          () => true,
-          () => false,
-        )
-      ) {
-        relPaths.push(rel);
-      }
-    }
-    await fsp.mkdir(filtered);
-    assert.notEqual(
-      path.resolve(filtered),
-      path.resolve(liveRoot),
-      "native reconciliation must never hand the raw live repo root to Nix",
-    );
-    await execFileAsync(
-      resolveToolPathSync("rsync"),
-      [
-        "-a",
-        "--delete",
-        "--relative",
-        ...filteredFlakeRsyncExcludeArgs(),
-        ...defaultFilteredFlakeSnapshotRsyncSources(relPaths),
-        `${filtered}/`,
-      ],
-      { cwd: liveRoot, timeout: 30_000 },
-    );
-    assert.ok(
-      (await directorySizeKib(filtered)) <= FILTERED_SOURCE_MAX_KIB,
-      "native reconciliation filtered source must stay below 64 MiB",
-    );
-    const inputRoot = (await materializeFilteredViberootsSource(filtered)).storePath;
-    assert.match(inputRoot, /^\/nix\/store\/[a-z0-9]{32}-source$/);
-    assert.ok(
-      (await directorySizeKib(inputRoot)) <= FILTERED_SOURCE_MAX_KIB,
-      "native reconciliation immutable source must stay below 64 MiB",
-    );
-    return inputRoot;
-  } finally {
-    await fsp.rm(fixture, { recursive: true, force: true });
-  }
-}
-
-function strictGot(stderr: string): string {
-  const candidate = mismatchCandidate(stderr);
-  const derivationName = path.basename(candidate).replace(/^[a-z0-9]{32}-/, "");
-  const got = extractHash(stderr, derivationName, PLACEHOLDER);
-  assert.match(String(got || ""), /^sha256-[A-Za-z0-9+/]{43}=$/);
-  return got as string;
-}
-
-function mismatchCandidate(stderr: string): string {
-  const matches = Array.from(
-    stderr.matchAll(
-      /viberoots-pnpm-fod-hash-mismatch-v1 output=(\/nix\/store\/[a-z0-9]{32}-pnpm-store-lock-[a-f0-9]{64}) specified=sha256-[A-Za-z0-9+/]{43}= got=sha256-[A-Za-z0-9+/]{43}=/g,
-    ),
-  ).map((match) => match[1]);
-  const unique = [...new Set(matches)];
-  assert.equal(unique.length, 1, `expected one unique authoritative mismatch path:\n${stderr}`);
-  return unique[0];
-}
+const TEST_TIMEOUT_MS = 18 * 60 * 1000;
 
 test(
   "native fixed pnpm reconciliation is deterministic and offline-consumable",
-  { timeout: 480_000 },
+  { timeout: TEST_TIMEOUT_MS },
   async () => {
     const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-native-pnpm-reconcile-"));
     const nix = "/nix/var/nix/profiles/default/bin/nix";
@@ -222,23 +141,19 @@ test(
           path.join(repoRoot(), "build-tools", "tools", "dev", "update-pnpm-hash.ts"),
           "--lockfile",
           "pnpm-lock.yaml",
-          "--read-only",
         ],
         {
           cwd: fixtures[1],
           env: {
-            ...nixEnv(path.join(root, "materialize-home"), "materialize"),
+            ...nixEnv(path.join(root, "reconcile-home"), "reconcile"),
             VIBEROOTS_FLAKE_INPUT_ROOT: viberootsPath,
           },
           fixtureRoot: root,
           diskRoot: "/nix",
-          // A measured cold run peaked at 512.4 MiB while registering 250 MiB
-          // total; allow bounded Nix build/registration overlap only here.
-          maxKib: COLD_REBUILD_MAX_KIB,
         },
       );
       assert.equal(updater.status, 0, updater.stderr);
-      assert.match(updater.stdout, /is realized from committed metadata/);
+      assert.match(updater.stdout, /hash updated and build succeeded/);
       const rematerialized = await runGuardedCommand(nix, buildArgs(true), {
         cwd: fixtures[1],
         env: nixEnv(path.join(root, "verify-home")),

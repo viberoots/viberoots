@@ -3,31 +3,16 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { resolveRequestedVerifyScope } from "../../dev/verify/requested-scope";
 import { summarizeVerifyScopeDecision } from "../../dev/verify/selection-output";
-
-const defaultArgs = {
-  coverage: false,
-  console: "auto" as const,
-  targets: ["//..."],
-  selector: "default" as const,
-  requestedProjects: [],
-  explainSelection: false,
-};
-
-function baseDecision(overrides: Record<string, unknown> = {}) {
-  return {
-    requestedMode: "auto" as const,
-    selectorMode: "no-template-impact" as const,
-    targets: ["//..."],
-    diagnostics: null,
-    lintFilters: null,
-    reason: "fallback-build-system-scope",
-    ...overrides,
-  };
-}
+import {
+  assertEmptySafetyFloorRejected,
+  baseDecision,
+  defaultArgs,
+  rootWithoutChangeAuthority,
+} from "./requested-scope.deployment.fixture";
 
 test("deployment-only changes select deployment suite plus safety floor", async () => {
   const result = await resolveRequestedVerifyScope({
-    root: process.cwd(),
+    root: rootWithoutChangeAuthority,
     invocationCwd: process.cwd(),
     args: defaultArgs,
     env: {},
@@ -52,12 +37,13 @@ test("deployment-only changes select deployment suite plus safety floor", async 
     "//:deployment_domain_labels_cquery",
     "//:deployment_verify_scope_boundary",
     "//:nixos_shared_host_contract",
+    "workspace_buck//...",
   ]);
 });
 
 test("viberoots-prefixed deployment-only changes override full build-system base scope", async () => {
   const result = await resolveRequestedVerifyScope({
-    root: process.cwd(),
+    root: rootWithoutChangeAuthority,
     invocationCwd: process.cwd(),
     args: defaultArgs,
     env: {},
@@ -89,12 +75,13 @@ test("viberoots-prefixed deployment-only changes override full build-system base
     "viberoots//:deployment_domain_labels_cquery",
     "viberoots//:deployment_verify_scope_boundary",
     "viberoots//:nixos_shared_host_contract",
+    "workspace_buck//...",
   ]);
 });
 
 test("deployment project changes select project-impact targets without framework suite", async () => {
   const result = await resolveRequestedVerifyScope({
-    root: process.cwd(),
+    root: rootWithoutChangeAuthority,
     invocationCwd: process.cwd(),
     args: defaultArgs,
     env: {},
@@ -137,6 +124,7 @@ test("deployment project changes select project-impact targets without framework
   assert.deepEqual(result.selection.targets, [
     "//projects/apps/sample-app/...",
     "//projects/deployments/sample/dev/...",
+    "workspace_buck//...",
   ]);
   assert.ok(result.selection.diagnostics);
   assert.equal("deploymentDomainTargets" in result.selection.diagnostics, true);
@@ -148,7 +136,7 @@ test("deployment project changes select project-impact targets without framework
 
 test("mixed build-system deployment impact keeps the existing selection", async () => {
   const result = await resolveRequestedVerifyScope({
-    root: process.cwd(),
+    root: rootWithoutChangeAuthority,
     invocationCwd: process.cwd(),
     args: defaultArgs,
     env: {},
@@ -164,12 +152,12 @@ test("mixed build-system deployment impact keeps the existing selection", async 
 
   assert.equal(result.selection.selectorMode, "no-template-impact");
   assert.equal(result.selection.reason, "fallback-build-system-scope");
-  assert.deepEqual(result.selection.targets, ["//..."]);
+  assert.deepEqual(result.selection.targets, ["//...", "workspace_buck//..."]);
 });
 
 test("reviewed deployment documentation changes select only documentation contract targets", async () => {
   const result = await resolveRequestedVerifyScope({
-    root: process.cwd(),
+    root: rootWithoutChangeAuthority,
     invocationCwd: process.cwd(),
     args: defaultArgs,
     env: {},
@@ -192,13 +180,16 @@ test("reviewed deployment documentation changes select only documentation contra
 
   assert.equal(result.selection.selectorMode, "documentation-contract");
   assert.equal(result.selection.reason, "documentation-contract-targeted");
-  assert.deepEqual(result.selection.targets, ["//:deployment_docs_front_door_parity"]);
+  assert.deepEqual(result.selection.targets, [
+    "//:deployment_docs_front_door_parity",
+    "workspace_buck//...",
+  ]);
   assert.match(summarizeVerifyScopeDecision(result.selection), /documentationPaths=2/);
 });
 
 test("never mode bypasses deployment selection", async () => {
   const result = await resolveRequestedVerifyScope({
-    root: process.cwd(),
+    root: rootWithoutChangeAuthority,
     invocationCwd: process.cwd(),
     args: defaultArgs,
     env: { VBR_DEPLOYMENT_TEST_SCOPE: "never" },
@@ -218,7 +209,7 @@ test("always mode fails unless the change is safely deployment-only", async () =
   await assert.rejects(
     async () =>
       resolveRequestedVerifyScope({
-        root: process.cwd(),
+        root: rootWithoutChangeAuthority,
         invocationCwd: process.cwd(),
         args: defaultArgs,
         env: { VBR_DEPLOYMENT_TEST_SCOPE: "always" },
@@ -236,7 +227,7 @@ test("deployment selection fails fast when the deployment query resolves zero ta
   await assert.rejects(
     async () =>
       resolveRequestedVerifyScope({
-        root: process.cwd(),
+        root: rootWithoutChangeAuthority,
         invocationCwd: process.cwd(),
         args: defaultArgs,
         env: {},
@@ -252,21 +243,5 @@ test("deployment selection fails fast when the deployment query resolves zero ta
 });
 
 test("deployment selection fails fast when the safety floor is empty", async () => {
-  await assert.rejects(
-    async () =>
-      resolveRequestedVerifyScope({
-        root: process.cwd(),
-        invocationCwd: process.cwd(),
-        args: defaultArgs,
-        env: {},
-        deps: {
-          resolveTemplateScope: async () => baseDecision(),
-          collectChangedPaths: async () => ["build-tools/deployments/defs.bzl"],
-          listDeploymentTargets: async () => ["//projects/deployments/sample/dev:deploy"],
-          queryDeploymentDomainTargets: async () => ["//:deployment_domain_labels_cquery"],
-          deploymentSafetyFloorTargets: [],
-        },
-      }),
-    /zero deployment safety-floor targets/,
-  );
+  await assertEmptySafetyFloorRejected();
 });

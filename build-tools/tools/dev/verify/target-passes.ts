@@ -1,6 +1,6 @@
 import process from "node:process";
 import { normalizeTargetLabel } from "../../lib/labels";
-import { ensureProjectEnforcementRegistration } from "../../lib/project-enforcement-registration";
+import { ensureWorkspaceBuckStatePackage } from "../../lib/workspace-buck-state";
 import { assertVerifyRemoteTargetsAllowed } from "./remote-target-policy";
 import type { VerifyExecutionPolicy } from "./remote-policy";
 import { isVerifyTargetScan, loadVerifyTargetLabels } from "./target-label-query";
@@ -164,7 +164,7 @@ export async function resolveVerifyTargetPlan(opts: {
   targets: string[];
   executionPolicy: VerifyExecutionPolicy;
 }): Promise<VerifyTargetPlan> {
-  await ensureProjectEnforcementRegistration({ workspaceRoot: opts.root });
+  await ensureWorkspaceBuckStatePackage(opts.root);
   const targetLabels = loadVerifyTargetLabels(opts);
   if (opts.executionPolicy.mode !== "local") {
     assertVerifyRemoteTargetsAllowed({

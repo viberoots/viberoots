@@ -27,9 +27,10 @@ test("patch-node start creates session and workspace (idempotent)", async () => 
     const mockBin = path.join(tmp, "_mockbin");
     await fs.mkdirp(mockBin);
     const mockPnpm = path.join(mockBin, "pnpm");
+    const capturedNodeOptions = path.join(tmp, "pnpm-node-options.txt");
     await fs.outputFile(
       mockPnpm,
-      `#!/usr/bin/env bash\nif [ "$1" = "patch" ]; then echo "${fakeWs}"; else echo "ok"; fi\n`,
+      `#!/usr/bin/env bash\nprintf '%s' "${"$"}{NODE_OPTIONS-}" > "${capturedNodeOptions}"\nif [ "$1" = "patch" ]; then echo "${fakeWs}"; else echo "ok"; fi\n`,
       { encoding: "utf8" },
     );
     await $`chmod +x ${mockPnpm}`;
@@ -38,6 +39,14 @@ test("patch-node start creates session and workspace (idempotent)", async () => 
       ...process.env,
       PATH: `${mockBin}:${process.env.PATH || ""}`,
       PNPM_BIN: mockPnpm,
+      NODE_OPTIONS: `--trace-warnings --import ${path.join(
+        tmp,
+        "viberoots",
+        "build-tools",
+        "tools",
+        "dev",
+        "zx-init.mjs",
+      )} --max-old-space-size=256`,
     } as any;
 
     const r1 = await $({ cwd: importer, env })`${cli} start node lodash --importer ${importer}`;
@@ -47,6 +56,11 @@ test("patch-node start creates session and workspace (idempotent)", async () => 
       .pop() as string;
     if (ws1 !== fakeWs) {
       console.error("unexpected workspace path", ws1);
+      process.exit(2);
+    }
+    const childNodeOptions = await fs.readFile(capturedNodeOptions, "utf8");
+    if (childNodeOptions !== "--trace-warnings --max-old-space-size=256") {
+      console.error("pnpm inherited orchestration NODE_OPTIONS", childNodeOptions);
       process.exit(2);
     }
 

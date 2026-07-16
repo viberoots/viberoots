@@ -5,12 +5,14 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { ensureBuckPreludeConfig } from "../../dev/dev-build/prelude";
+import { VIBEROOTS_SOURCE_ROOT } from "../lib/test-helpers/source-paths";
 
 test("ensureBuckPreludeConfig repairs legacy current prelude cell paths", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-prelude-config-"));
   try {
     await fsp.writeFile(path.join(root, ".buckroot"), ".\n", "utf8");
-    await fsp.mkdir(path.join(root, ".viberoots", "current"), { recursive: true });
+    await fsp.mkdir(path.join(root, ".viberoots"), { recursive: true });
+    await fsp.symlink(VIBEROOTS_SOURCE_ROOT, path.join(root, ".viberoots", "current"));
     await fsp.writeFile(
       path.join(root, ".buckconfig"),
       [
@@ -32,7 +34,23 @@ test("ensureBuckPreludeConfig repairs legacy current prelude cell paths", async 
 
     const buckconfig = await fsp.readFile(path.join(root, ".buckconfig"), "utf8");
     assert.match(buckconfig, /prelude = \.\/\.viberoots\/workspace\/prelude/);
+    assert.match(buckconfig, /config = \.\/\.viberoots\/current\/config/);
     assert.doesNotMatch(buckconfig, /prelude = \.\/\.viberoots\/current\/prelude/);
+    for (const target of [
+      "config/os/TARGETS",
+      "config/cpu/TARGETS",
+      "config/go/constraints/TARGETS",
+    ]) {
+      await fsp.access(path.join(root, ".viberoots", "current", target));
+    }
+    for (const cell of ["fbsource", "fbcode"]) {
+      const cellRoot = path.join(root, ".viberoots", "workspace", "buck-cell-stubs", cell);
+      assert.equal(
+        await fsp.readFile(path.join(cellRoot, ".buckconfig"), "utf8"),
+        "[buildfile]\nname = TARGETS\n",
+      );
+      await fsp.access(path.join(cellRoot, "TARGETS"));
+    }
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }

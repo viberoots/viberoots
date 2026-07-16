@@ -7,12 +7,23 @@ async function readRepoFile(relativePath: string): Promise<string> {
 }
 
 test("runInTemp removes temp-repo-specific pnpm state on normal cleanup", async () => {
-  const helper = await readRepoFile("build-tools/tools/tests/lib/test-helpers/run-in-temp.ts");
+  const runtime = await readRepoFile(
+    "build-tools/tools/tests/lib/test-helpers/run-in-temp/runtime-env.ts",
+  );
+  const pnpm = await readRepoFile(
+    "build-tools/tools/tests/lib/test-helpers/run-in-temp/seeded-overlays.ts",
+  );
+  const helper = await readRepoFile(
+    "build-tools/tools/tests/lib/test-helpers/run-in-temp/cleanup.ts",
+  );
+  const tracking = await readRepoFile(
+    "build-tools/tools/tests/lib/test-helpers/run-in-temp/seeded-runner.ts",
+  );
 
-  if (!helper.includes("let tempPnpmStateRoot: string | null = null")) {
+  if (!tracking.includes("let tempPnpmStateRoot: string | null = null")) {
     throw new Error("runInTemp must track the temp-repo pnpm state root for cleanup");
   }
-  if (!helper.includes("tempPnpmStateRoot = pnpmState.rootDir")) {
+  if (!pnpm.includes("return state.rootDir")) {
     throw new Error("runInTemp must remember externalPnpmStateDirs(tmp).rootDir");
   }
   if (!helper.includes("await removeTreeWithWritableFallback(tempPnpmStateRoot, $)")) {
@@ -21,7 +32,7 @@ test("runInTemp removes temp-repo-specific pnpm state on normal cleanup", async 
 
   const keepTmpStart = helper.indexOf(
     'if (process.env.TEST_KEEP_TMP === "1")',
-    helper.indexOf("tempPnpmStateRoot = pnpmState.rootDir"),
+    helper.indexOf("tempPnpmStateRoot"),
   );
   const cleanupBranchStart = helper.indexOf("} else {", keepTmpStart);
   const keepTmpBranch = helper.slice(keepTmpStart, cleanupBranchStart);
@@ -64,7 +75,10 @@ test("external pnpm state records exact ownership for orphan cleanup", async () 
 });
 
 test("runInTemp preserves managed viberoots node_modules for temp child commands", async () => {
-  const helper = await readRepoFile("build-tools/tools/tests/lib/test-helpers/run-in-temp.ts");
+  const helper = [
+    await readRepoFile("build-tools/tools/tests/lib/test-helpers/run-in-temp/command-shims.ts"),
+    await readRepoFile("build-tools/tools/tests/lib/test-helpers/run-in-temp/runtime-env.ts"),
+  ].join("\n");
 
   if (!helper.includes("function applyTempNodePath(")) {
     throw new Error("runInTemp must centralize temp child NODE_PATH construction");

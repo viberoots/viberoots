@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
+import { writeGlueFingerprint } from "../../dev/install/glue-freshness";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const execFileAsync = promisify(execFile);
@@ -65,6 +66,25 @@ test("stale install fails before Nix materialization and u remains available", a
   );
   assert.match(String(updateHelp), /usage: u \[--upgrade\]/);
   assert.equal(await fsp.stat(path.join(root, "node_modules")).catch(() => null), null);
+
+  await writeGlueFingerprint(root);
+  await fsp.writeFile(
+    path.join(root, "build-tools", "tools", "nix", "langs.json"),
+    '{"enabled":["cpp"],"fixture":"stale-input"}\n',
+  );
+  await git(root, ["add", "build-tools/tools/nix/langs.json"]);
+  await execFileAsync("git", [
+    "-C",
+    root,
+    "-c",
+    "user.name=test",
+    "-c",
+    "user.email=test@example.invalid",
+    "commit",
+    "-qm",
+    "change prebuild input",
+  ]);
+  assert.equal(await git(root, ["status", "--short"]), "");
 
   const env = {
     ...process.env,

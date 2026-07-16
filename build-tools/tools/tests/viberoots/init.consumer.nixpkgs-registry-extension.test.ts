@@ -6,42 +6,14 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
-import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
-import { makeFilteredFlakeRef } from "../../dev/filtered-flake";
+import {
+  findViberootsRoot,
+  immutableViberootsInput,
+  seedWorkspaceLockFromCommittedAuthority,
+  writeFixtureFile as write,
+} from "./registry-extension-fixture";
 
 const execFileAsync = promisify(execFile);
-let immutableInputPromise: Promise<string> | undefined;
-
-async function immutableViberootsInput(viberootsRoot: string): Promise<string> {
-  immutableInputPromise ??= (async () => {
-    const filtered = await makeFilteredFlakeRef({
-      workspaceRoot: viberootsRoot,
-      attr: "viberoots",
-      logPrefix: "[registry-extension]",
-    });
-    try {
-      return (await materializeFilteredViberootsSource(filtered.workspaceRoot)).storePath;
-    } finally {
-      await filtered.cleanup();
-    }
-  })();
-  return immutableInputPromise;
-}
-
-async function findViberootsRoot(): Promise<string> {
-  for (const candidate of [path.join(process.cwd(), "viberoots"), process.cwd()]) {
-    try {
-      await fsp.access(path.join(candidate, "build-tools", "tools", "bin", "viberoots"));
-      return candidate;
-    } catch {}
-  }
-  throw new Error("could not find viberoots root");
-}
-
-async function write(file: string, content: string): Promise<void> {
-  await fsp.mkdir(path.dirname(file), { recursive: true });
-  await fsp.writeFile(file, content, "utf8");
-}
 
 test("init-consumer generated flakes expose nixpkgs registry extension data", async () => {
   const workspace = await fsp.realpath(
@@ -181,9 +153,20 @@ test("consumer registry extension adds a locked input used by a selected target"
       ) + "\n",
     );
 
+    await seedWorkspaceLockFromCommittedAuthority(workspace);
+
     await execFileAsync(
       "nix",
-      ["flake", "lock", "--accept-flake-config", "path:.viberoots/workspace"],
+      [
+        "flake",
+        "lock",
+        "--offline",
+        "--accept-flake-config",
+        "--override-input",
+        "viberoots",
+        `path:${flakeInput}`,
+        "path:.viberoots/workspace",
+      ],
       {
         cwd: workspace,
         maxBuffer: 1024 * 1024 * 16,

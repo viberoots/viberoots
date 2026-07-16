@@ -12,13 +12,20 @@ test("pnpm reconciliation is Nix-native and unavailable to ordinary consumers", 
     viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash.ts"),
     "utf8",
   );
+  const reconciliation = await fsp.readFile(
+    viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash/fixed-store-reconcile.ts"),
+    "utf8",
+  );
   const stage0 = await fsp.readFile(
     viberootsSourcePath("build-tools/tools/lib/consumer-direnv.ts"),
     "utf8",
   );
   assert.match(store, /NIX_PNPM_RECONCILE/);
   assert.match(store, /"\$PNPM_BIN" fetch/);
-  assert.match(updater, /NIX_PNPM_RECONCILE: "1"/);
+  assert.match(reconciliation, /NIX_PNPM_RECONCILE: "1"/);
   assert.doesNotMatch(stage0, /NIX_PNPM_RECONCILE|add-fixed/);
-  assert.doesNotMatch(store + updater, /add-fixed|mkPnpmStoreUnfixed|pnpm-store-unfixed/);
+  assert.doesNotMatch(
+    store + updater + reconciliation,
+    /add-fixed|mkPnpmStoreUnfixed|pnpm-store-unfixed/,
+  );
 });

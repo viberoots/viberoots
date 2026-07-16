@@ -2,6 +2,11 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   cleanupChangedOwnedInvalidPnpmStores,
+  INVALID_STORE_CLEANUP_TIMEOUT_MS,
+  INVALID_STORE_QUERY_TIMEOUT_MS,
+  INVALID_STORE_SHUTDOWN_MARGIN_MS,
+  invalidStoreChildTimeoutMs,
+  runInvalidStoreCleanupCommand,
   snapshotOwnedInvalidPnpmStores,
   storePathValidityFromCommand,
   type InvalidStoreCleanupDeps,
@@ -26,13 +31,62 @@ function deps(overrides: Partial<InvalidStoreCleanupDeps> = {}): InvalidStoreCle
 
 test("interrupted reconciliation deletes a preexisting owned invalid path only when it grew", async () => {
   const deleted: string[] = [];
+  const logs: string[] = [];
   const run = deps({ deletePath: async (storePath) => void deleted.push(storePath) });
   const before = new Map([[owned, { sizeKib: 100, mtimeMs: 1 }]]);
   assert.deepEqual(
-    await cleanupChangedOwnedInvalidPnpmStores({ derivationName: name, before, deps: run }),
+    await cleanupChangedOwnedInvalidPnpmStores({
+      derivationName: name,
+      before,
+      deps: run,
+      log: (message) => logs.push(message),
+    }),
     [owned],
   );
   assert.deepEqual(deleted, [owned]);
+  assert.match(logs[0] || "", /size_kib=200 .*referrers=0 roots=0 open_owners=0/);
+});
+
+test("invalid-store commands stop their owned process group at the bounded timeout", async () => {
+  assert.equal(INVALID_STORE_CLEANUP_TIMEOUT_MS, 120_000);
+  assert.equal(INVALID_STORE_QUERY_TIMEOUT_MS, 30_000);
+  assert.equal(INVALID_STORE_SHUTDOWN_MARGIN_MS, 5_000);
+  const result = await runInvalidStoreCleanupCommand(
+    "bash",
+    ["--noprofile", "--norc", "-c", "sleep 30"],
+    20,
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.timedOut, true);
+  assert.match(result.errorLines.join("\n"), /timed out after 20ms/);
+});
+
+test("cleanup refuses to start a child without aggregate shutdown margin", () => {
+  assert.equal(invalidStoreChildTimeoutMs(20_000, 30_000, 1, 1_000), 14_000);
+  assert.throws(() => invalidStoreChildTimeoutMs(6_000, 30_000, 1, 1_000), /aggregate deadline/);
+});
+
+test("cleanup aggregate deadline fails closed before checking every candidate", async () => {
+  const second = `/nix/store/${"c".repeat(32)}-${name}`;
+  let deleted = false;
+  await assert.rejects(
+    cleanupChangedOwnedInvalidPnpmStores({
+      derivationName: name,
+      before: new Map(),
+      timeoutMs: 20,
+      deps: deps({
+        listStoreEntries: async () =>
+          [owned, second].map((storePath) => storePath.slice("/nix/store/".length)),
+        referrers: async () => {
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          return [];
+        },
+        deletePath: async () => void (deleted = true),
+      }),
+    }),
+    /aggregate deadline/,
+  );
+  assert.equal(deleted, false);
 });
 
 test("cleanup refuses unchanged, valid, referenced, rooted, open, and unowned paths", async () => {

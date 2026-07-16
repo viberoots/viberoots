@@ -12,7 +12,7 @@ if [[ "\${1:-}" == "--version" ]]; then exit 0; fi
 if [[ "\${1:-}" == "run" ]]; then
   while [[ "\${1:-}" != "--" ]]; do shift; done
   shift
-  cold_root="$PWD/.viberoots/current"
+  cold_root="$VBR_FAKE_PREFETCH_STORE"
   [[ ! -e "$cold_root/node_modules" ]]
   VIBEROOTS_SOURCE_ROOT="$cold_root" exec "$VBR_REAL_NODE" --experimental-strip-types --import "$cold_root/build-tools/tools/dev/zx-init.mjs" "$cold_root/build-tools/tools/dev/viberoots.ts" "$@"
 fi
@@ -24,6 +24,10 @@ if [[ "\${1:-}" == "flake" && "\${2:-}" == "metadata" ]]; then
   if [[ "\${VBR_FAIL_NETWORK_LOCK_RESOLUTION:-}" == "1" ]]; then exit 97; fi
   input_path="$PWD/.viberoots/workspace/viberoots-flake-input"
   printf '{"locks":{"nodes":{"root":{"inputs":{"viberoots":"viberoots"}},"viberoots":{"locked":{"path":"%s","type":"path"},"original":{"path":"%s","type":"path"}}},"root":"root","version":7}}\n' "$input_path" "$input_path"
+  exit 0
+fi
+if [[ "\${1:-}" == "eval" && "$*" == *"#lib.viberootsSourcePath"* ]]; then
+  printf '%s' "$VBR_FAKE_PREFETCH_STORE"
   exit 0
 fi
 if [[ "\${1:-}" == "flake" && ("\${2:-}" == "lock" || "\${2:-}" == "update") ]]; then

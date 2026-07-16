@@ -4,7 +4,11 @@ import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { processStartSignature } from "../../lib/process-inspection";
 import { resolveToolPathSync } from "../../lib/tool-paths";
+import { nixGcLockMessage, waitForNoActiveNixGc } from "../../lib/nix-gc-lock";
 import { buildToolPath, nodeBin, zxNodeBase } from "./paths";
+import { gcClientResultAccepted, HOUSEKEEPING_HARD_MIN_FREE_BYTES } from "./housekeeping-gc-result";
+
+class HousekeepingGcError extends Error {}
 
 async function getDiskStats(root: string): Promise<{ freePct: number; freeBytes: number }> {
   try {
@@ -93,6 +97,8 @@ function cleanTempOutsCooldownMinutes(): number {
 export async function runHousekeeping(opts: {
   cleanTempOuts?: () => Promise<boolean>;
   diskStats?: () => Promise<{ freePct: number; freeBytes: number }>;
+  runNixGc?: (cap: string) => Promise<number>;
+  waitForNixGcQuiescence?: () => Promise<number[]>;
   isCI: boolean;
   root: string;
 }): Promise<void> {
@@ -140,7 +146,7 @@ export async function runHousekeeping(opts: {
 
     const diskStats = opts.diskStats || (() => getDiskStats(opts.root));
     const { freePct: beforePct, freeBytes: beforeBytes } = await diskStats();
-    const underPressure = beforePct < 12 || beforeBytes < 8 * 1024 * 1024 * 1024;
+    const underPressure = beforePct < 12 || beforeBytes < HOUSEKEEPING_HARD_MIN_FREE_BYTES;
     const liveVerifyLock = await verifyLockIsLive(opts.root);
     if (verbose || underPressure) {
       const detail = `free=${beforePct.toFixed(0)}% (${fmtBytes(beforeBytes)})`;
@@ -182,14 +188,30 @@ export async function runHousekeeping(opts: {
       const cap = level === 1 ? "1G" : level === 2 ? "2G" : "4G";
       if (verbose) console.log(`[housekeeping] GC: running --max-freed ${cap} (<=45s)...`);
       else ui.step("housekeeping", `running nix GC ${cap}`);
-      await $({
-        stdio: "ignore",
-        cwd: opts.root,
-      })`bash --noprofile --norc -c 'set -euo pipefail; TOUT=45; TIMEOUT_PATH="$1"; CAP="$2"; set +e; "$TIMEOUT_PATH" -k 5s "$TOUT"s nix-store --gc --max-freed "$CAP" >/dev/null 2>&1; exit 0' -- ${timeoutPath} ${cap}`.nothrow();
+      const runNixGc =
+        opts.runNixGc ||
+        (async (maxFreed: string) => {
+          const nixStorePath = resolveToolPathSync("nix-store");
+          const result = await $({
+            stdio: "ignore",
+            cwd: opts.root,
+          })`${timeoutPath} -k 5s 45s ${nixStorePath} --gc --max-freed ${maxFreed}`.nothrow();
+          return result.exitCode;
+        });
+      const exitCode = await runNixGc(cap);
+      const remaining = await (opts.waitForNixGcQuiescence || waitForNoActiveNixGc)();
+      if (remaining.length > 0) {
+        throw new HousekeepingGcError(nixGcLockMessage("build housekeeping", remaining));
+      }
+      const { freePct: afterPct, freeBytes: afterBytes } = await diskStats();
+      if (!gcClientResultAccepted({ afterBytes, exitCode })) {
+        throw new HousekeepingGcError(
+          `build housekeeping: nix GC client exited ${exitCode} after the store became quiescent with ${fmtBytes(afterBytes)} free`,
+        );
+      }
       await touch(gcStamp);
 
-      const { freePct: afterPct, freeBytes: afterBytes } = await diskStats();
-      const stillLow = afterPct < 12 || afterBytes < 8 * 1024 * 1024 * 1024;
+      const stillLow = afterPct < 12 || afterBytes < HOUSEKEEPING_HARD_MIN_FREE_BYTES;
       const nextLevel = stillLow ? Math.min(3, level + 1) : 1;
       try {
         await fsp.writeFile(gcLevelFile, String(nextLevel), "utf8");
@@ -210,5 +232,7 @@ export async function runHousekeeping(opts: {
     }
 
     if (verbose) console.log("[housekeeping] finished.");
-  } catch {}
+  } catch (error) {
+    if (error instanceof HousekeepingGcError) throw error;
+  }
 }

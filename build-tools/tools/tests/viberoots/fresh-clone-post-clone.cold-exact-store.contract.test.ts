@@ -8,7 +8,7 @@ async function source(rel: string): Promise<string> {
   return await fsp.readFile(viberootsSourcePath(rel), "utf8");
 }
 
-test("cold post-clone materializes only the committed exact pnpm store", async () => {
+test("post-clone roots an existing store but fails closed when the store is cold", async () => {
   const [bootstrap, install, updater, store, devshell] = await Promise.all([
     source("build-tools/tools/lib/consumer-bootstrap.ts"),
     source("build-tools/tools/dev/install/deps-main.ts"),
@@ -23,17 +23,19 @@ test("cold post-clone materializes only the committed exact pnpm store", async (
     updater.match(/if \(readOnly\) \{\n    if \(!currentHash[\s\S]*?\n    return;\n  \}/)?.[0] ||
     "";
   assert.match(readOnlyBranch, /inspectForRebuild\(\)/);
-  assert.match(readOnlyBranch, /NIX_PNPM_MATERIALIZE: "1"/);
+  assert.match(readOnlyBranch, /final pnpm store is not realized/);
   assert.match(readOnlyBranch, /writeVerifiedMarker/);
+  assert.match(updater, /ensureExactStoreGcRoot/);
   assert.doesNotMatch(
     readOnlyBranch,
     /NIX_PNPM_RECONCILE|updateNodeModulesHashesJson|reconcileFixedPnpmStore/,
   );
-  assert.match(store, /reconcileAllowed \|\| materializeAllowed[\s\S]*populate_pnpm_store/);
+  assert.doesNotMatch(readOnlyBranch, /NIX_PNPM_MATERIALIZE/);
+  assert.match(bootstrap, /VBR_POST_CLONE[\s\S]*return false/);
   assert.doesNotMatch(devshell, /NIX_PNPM_MATERIALIZE/);
 });
 
-test("cold flake-mode post-clone reaches the same read-only materialization path", async () => {
+test("cold flake-mode post-clone reaches the same read-only fail-closed path", async () => {
   const [bootstrapScript, consumerBootstrap, updater, devshell] = await Promise.all([
     source("bootstrap"),
     source("build-tools/tools/lib/consumer-bootstrap.ts"),
@@ -57,7 +59,8 @@ test("cold flake-mode post-clone reaches the same read-only materialization path
   const readOnlyBranch =
     updater.match(/if \(readOnly\) \{\n    if \(!currentHash[\s\S]*?\n    return;\n  \}/)?.[0] ||
     "";
-  assert.match(readOnlyBranch, /NIX_PNPM_MATERIALIZE: "1"/);
+  assert.match(readOnlyBranch, /final pnpm store is not realized/);
+  assert.doesNotMatch(readOnlyBranch, /NIX_PNPM_MATERIALIZE/);
   assert.doesNotMatch(readOnlyBranch, /NIX_PNPM_RECONCILE|updateNodeModulesHashesJson/);
   assert.doesNotMatch(devshell, /NIX_PNPM_MATERIALIZE/);
 });

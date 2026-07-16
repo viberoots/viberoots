@@ -17,6 +17,7 @@ import {
   computeFingerprintMap,
   copyAtomically,
   mapsEqual,
+  membershipMapsEqual,
   refreshTriggerPaths,
   runBuildStep,
   type Fingerprint,
@@ -197,6 +198,7 @@ async function main() {
   let refreshState = await computeFingerprintMap(refreshTriggerPaths(baseRefreshPaths, specs));
   let lastRefreshAt = 0;
   const prevByModule = new Map<string, Map<string, Fingerprint>>();
+  const membershipChangeByModule = new Map<string, { since: number; refreshAttempted: boolean }>();
   for (const spec of specs) {
     prevByModule.set(spec.moduleKey, await computeFingerprintMap(spec.watchPaths));
   }
@@ -213,6 +215,7 @@ async function main() {
     const removed = Array.from(prevKeys).filter((key) => !nextKeys.has(key));
     for (const key of removed) {
       prevByModule.delete(key);
+      membershipChangeByModule.delete(key);
     }
     const nextProbe = await validateTsManifestProbes(cwd, resolved.tsManifestPath);
     for (const line of nextProbe) console.error(line);
@@ -239,7 +242,7 @@ async function main() {
   console.error(
     `[wasm-watch] coordinator:registered app_target=${resolved.appTargetLabel} app_id=${resolved.appId} modules=${specs.length}`,
   );
-  for (;;) {
+  watchLoop: for (;;) {
     await new Promise((resolve) => setTimeout(resolve, pollMs));
     if (Date.now() - lastRefreshAt >= refreshThrottleMs) {
       const nextRefresh = await computeFingerprintMap(refreshTriggerPaths(baseRefreshPaths, specs));
@@ -253,17 +256,29 @@ async function main() {
     for (const spec of specs) {
       const prev = prevByModule.get(spec.moduleKey) || new Map<string, Fingerprint>();
       const next = await computeFingerprintMap(spec.watchPaths);
+      const membershipChanged = !membershipMapsEqual(prev, next);
+      if (!membershipChanged) membershipChangeByModule.delete(spec.moduleKey);
       if (!mapsEqual(prev, next)) {
-        if (Array.from(next.values()).some((fingerprint) => fingerprint.size < 0)) {
-          const nextRefresh = await computeFingerprintMap(
-            refreshTriggerPaths(baseRefreshPaths, specs),
-          );
-          if (!mapsEqual(refreshState, nextRefresh)) {
-            const { removed } = await refreshCoordinatorState();
+        if (membershipChanged) {
+          let change = membershipChangeByModule.get(spec.moduleKey);
+          if (!change) {
+            change = { since: Date.now(), refreshAttempted: false };
+            membershipChangeByModule.set(spec.moduleKey, change);
+            console.error(
+              `[wasm-watch] source-membership-change module_type=${spec.moduleType} module_key=${spec.moduleKey} status=settling`,
+            );
+            continue;
+          }
+          if (Date.now() - change.since < refreshThrottleMs) continue;
+
+          if (!change.refreshAttempted) {
+            change.refreshAttempted = true;
+            await refreshCoordinatorState();
             lastRefreshAt = Date.now();
-            if (removed.includes(spec.moduleKey)) continue;
+            continue watchLoop;
           }
         }
+        membershipChangeByModule.delete(spec.moduleKey);
         prevByModule.set(spec.moduleKey, next);
         buildSeq += 1;
         console.error(

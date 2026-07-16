@@ -1,17 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { promisify } from "node:util";
 import { writePostCloneWorkspaceLock } from "../../lib/post-clone-workspace-lock";
 import { findRepoRoot } from "../../lib/repo";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import { workspaceFlakeInputs } from "../../lib/workspace-flake-inputs";
-
-const execFileAsync = promisify(execFile);
+import { execManaged } from "./test-helpers/managed-exec";
 
 function generatedWorkspaceFlake(viberoots: string): string {
   return `{
@@ -42,19 +39,15 @@ test("cold post-clone lock evaluates offline solely from preserved immutable nod
     all_proxy: "http://127.0.0.1:9",
     no_proxy: "",
   };
-  const fetchExpression = `(builtins.fetchTree (builtins.fromJSON ${JSON.stringify(
-    JSON.stringify(viberootsNode.locked),
-  )})).outPath`;
-  assert.doesNotMatch(fetchExpression, new RegExp(repoRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  const { stdout: viberootsSource } = await execFileAsync(
-    nix,
-    ["eval", "--offline", "--no-use-registries", "--raw", "--expr", fetchExpression],
-    { cwd: root, env: blockedNetworkEnv },
-  );
   await fsp.writeFile(path.join(root, "flake.lock"), authoritativeText, "utf8");
   const workspace = path.join(root, ".viberoots", "workspace");
-  await fsp.mkdir(workspace, { recursive: true });
-  const workspaceFlake = generatedWorkspaceFlake(viberootsSource.trim());
+  const filteredInput = path.join(workspace, "viberoots-flake-input");
+  await fsp.mkdir(filteredInput, { recursive: true });
+  await fsp.copyFile(
+    path.join(repoRoot, "viberoots", "flake.nix"),
+    path.join(filteredInput, "flake.nix"),
+  );
+  const workspaceFlake = generatedWorkspaceFlake("./viberoots-flake-input");
   assert.match(workspaceFlake, /gomod2nix\.url = "github:nix-community\/gomod2nix";/);
   assert.doesNotMatch(
     workspaceFlake,
@@ -64,7 +57,7 @@ test("cold post-clone lock evaluates offline solely from preserved immutable nod
 
   await writePostCloneWorkspaceLock({
     workspaceRoot: root,
-    localInputPath: viberootsSource.trim(),
+    localInputPath: "./viberoots-flake-input",
   });
   const lockFile = path.join(workspace, "flake.lock");
   const derivedText = await fsp.readFile(lockFile, "utf8");
@@ -72,7 +65,7 @@ test("cold post-clone lock evaluates offline solely from preserved immutable nod
   for (const [name, node] of Object.entries(authoritative.nodes)) {
     if (node !== viberootsNode) assert.deepEqual(derived.nodes[name], node);
   }
-  const { stdout } = await execFileAsync(
+  const { stdout } = await execManaged(
     nix,
     [
       "eval",

@@ -17,7 +17,7 @@ test("hidden workspace flake delegates workspace construction through the select
   const flake = await fsp.readFile(path.join(".viberoots", "workspace", "flake.nix"), "utf8");
   assert.match(flake, /viberoots\.url\s*=\s*"path:.*\/viberoots(?:-flake-input)?"/);
   assert.match(flake, /inputs\.viberoots\.lib\.mkWorkspace/);
-  assert.match(flake, /if root != "" then builtins\.toPath root else \.\.\/\.\./);
+  assert.match(flake, /if root != "" then root else \.\.\/\.\./);
   assert.match(flake, /viberootsInput\s*=\s*inputs\.viberoots/);
   assert.doesNotMatch(flake, /import\s+\.\/build-tools\/tools\/nix\/flake\/outputs\.nix/);
 });

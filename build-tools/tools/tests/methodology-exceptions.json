@@ -33,10 +33,6 @@
       "justification": "Pre-existing oversized Buck process inspection helper pending focused decomposition; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
     },
     {
-      "path": "lib/test-helpers/run-in-temp.ts",
-      "justification": "Shared temp-repo harness pending extraction into smaller focused helpers."
-    },
-    {
       "path": "lib/verify-log-status.pass-aggregation.test.ts",
       "justification": "Pre-existing oversized verify-log pass aggregation test pending focused scenario split; kept as a reviewed owner-local exception so strict source validation can proceed without unrelated refactoring."
     },

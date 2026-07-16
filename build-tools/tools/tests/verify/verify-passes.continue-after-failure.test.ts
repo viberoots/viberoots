@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const sourcePath = path.resolve(here, "../../dev/verify/verify-passes.ts");
+const runnerPath = path.resolve(here, "../../dev/verify/verify-pass-runner.ts");
 const runVerifyPath = path.resolve(here, "../../dev/verify/run-verify.ts");
 
 test("failed verify pass groups do not skip later pass groups", () => {
@@ -24,11 +25,14 @@ test("failed verify pass groups do not skip later pass groups", () => {
 
 test("requested verify shutdown stops scheduling later pass groups", () => {
   const source = fs.readFileSync(sourcePath, "utf8");
+  const runner = fs.readFileSync(runnerPath, "utf8");
   const runVerify = fs.readFileSync(runVerifyPath, "utf8");
 
   assert.match(source, /shouldAbort\?: \(\) => boolean;/);
   assert.match(source, /const shouldAbort = \(\) => opts\.shouldAbort\?\.\(\) === true;/);
-  assert.match(source, /if \(shouldAbort\(\)\) return null;/);
+  assert.match(source, /shouldAbort,/);
+  assert.match(runner, /shouldAbort: \(\) => boolean;/);
+  assert.match(runner, /if \(opts\.shouldAbort\(\)\) return null;/);
   assert.match(source, /if \(run\) trackRun\(run\);/);
   assert.match(
     source,

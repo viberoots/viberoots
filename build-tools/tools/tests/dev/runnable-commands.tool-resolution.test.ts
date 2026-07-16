@@ -48,3 +48,33 @@ test("runnable Python rejects an absolute command in a nested fake Nix store", a
     /runnable tool must resolve to \/nix\/store/,
   );
 });
+
+test("runnable pnpm strips orchestration preloads and preserves other Node options", async () => {
+  const root = await fsp.mkdtemp(
+    path.join(process.cwd(), ".viberoots/workspace/buck/tmp/runnable-pnpm-env-"),
+  );
+  const fakePnpm = path.join(root, "pnpm");
+  const capture = path.join(root, "node-options.txt");
+  const originalNodeOptions = process.env.NODE_OPTIONS;
+  try {
+    await fsp.writeFile(
+      fakePnpm,
+      `#!/bin/sh\nprintf '%s' "${"$"}{NODE_OPTIONS-}" > "${capture}"\n`,
+      "utf8",
+    );
+    await fsp.chmod(fakePnpm, 0o755);
+    process.env.NODE_OPTIONS = [
+      "--trace-warnings",
+      "--import",
+      path.join(process.cwd(), "build-tools/tools/dev/zx-init.mjs"),
+      "--max-old-space-size=256",
+    ].join(" ");
+
+    assert.equal(await runCommand([fakePnpm], []), 0);
+    assert.equal(await fsp.readFile(capture, "utf8"), "--trace-warnings --max-old-space-size=256");
+  } finally {
+    if (originalNodeOptions === undefined) delete process.env.NODE_OPTIONS;
+    else process.env.NODE_OPTIONS = originalNodeOptions;
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});

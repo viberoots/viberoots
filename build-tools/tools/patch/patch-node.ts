@@ -10,6 +10,7 @@ import { requirePositional } from "./lib/args";
 import { resolveImporterLocalPatchDir } from "./lib/importer-local-patch-dir";
 import { runSession } from "./lib/session";
 import { runNodeSyncRequired } from "./node-sync-required";
+import { commitNodePatch, removeNodePatch, startNodePatch } from "./patch-node-pnpm";
 import {
   deleteSession,
   deleteSessionAtPath,
@@ -20,10 +21,6 @@ import {
   setSession,
 } from "./state";
 import type { LanguageHandler, SessionRecord } from "./types";
-
-function pnpmBin(): string {
-  return (process.env.PNPM_BIN || "").trim() || "pnpm";
-}
 
 function sessionKey(importerDir: string, pkgName: string): string {
   const canonical = (p: string): string => {
@@ -83,8 +80,7 @@ async function doStart(args: string[]) {
   });
   const importerRel = await resolveImporterDir(process.cwd(), readImporterArg("") || undefined);
   const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
-  // pnpm prints the temp directory on stdout; capture it
-  const res = await $({ cwd: importerDir, stdio: "pipe" })`${pnpmBin()} patch ${pkg}`;
+  const res = await startNodePatch(importerDir, pkg);
   const ws =
     String(res.stdout || "")
       .trim()
@@ -161,7 +157,7 @@ async function doApply(args: string[]) {
   });
   await fsp.mkdir(patchDir, { recursive: true });
   // Ensure patches-dir is respected; prefer configuration via .npmrc
-  await $({ cwd: importerDir })`${pnpmBin()} patch-commit ${sess.workspacePath}`;
+  await commitNodePatch(importerDir, sess.workspacePath);
   if (sessionStorePath) {
     await deleteSessionAtPath("node", sessionKeyUsed, sessionStorePath);
   } else {
@@ -203,7 +199,7 @@ async function doRemove(args: string[]) {
   const importerDir = importerRel === "." ? repoRoot() : path.resolve(repoRoot(), importerRel);
   // Try native pnpm removal first; fall back to editing package.json
   try {
-    await $({ cwd: importerDir })`${pnpmBin()} patch-remove ${pkg}`;
+    await removeNodePatch(importerDir, pkg);
   } catch {
     const pkgJsonPath = path.join(importerDir, "package.json");
     try {

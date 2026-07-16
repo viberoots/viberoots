@@ -13,7 +13,7 @@ test("nondefault reconciliation recreates filtered input after a hash update", a
     "utf8",
   );
   assert.match(
-    main,
+    state,
     /const runBuild = async \(rebuild: boolean\) =>\s*await withPnpmStoreBuildFlakeRef/,
   );
   assert.match(
