@@ -31,7 +31,7 @@ test("runInTemp locks a filtered viberoots input instead of the live source root
   );
   assert.match(
     materializer,
-    /args: \["flake", "prefetch", "--json", "--no-use-registries", `path:\$\{canonical\}`\]/,
+    /"flake",[\s\S]*"prefetch",[\s\S]*"--json",[\s\S]*"--no-use-registries",[\s\S]*"--option",[\s\S]*"flake-registry",[\s\S]*"",[\s\S]*`path:\$\{canonical\}`/,
   );
   assert.match(source, /materializeFilteredViberootsSource\(inputRoot\)/);
   assert.match(source, /prepareFilteredViberootsInput\(activeViberootsRoot\)/);

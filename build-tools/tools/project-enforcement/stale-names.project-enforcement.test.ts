@@ -1,25 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 import { readMigrationLabelSkipPaths } from "../dev/stale-names-lint-allowlists";
 import { scanStaleNameEntry, type StaleNameHit } from "../dev/stale-names-scanner";
-import { resolveProjectScanContext } from "../lib/repo";
-
-const execFileAsync = promisify(execFile);
-
-async function listProjectFiles(workspaceRoot: string): Promise<string[]> {
-  const { stdout } = await execFileAsync(
-    "git",
-    ["ls-files", "-z", "--cached", "--others", "--exclude-standard", "--", "projects"],
-    { cwd: workspaceRoot, encoding: "utf8" },
-  );
-  return String(stdout || "")
-    .split("\0")
-    .filter(Boolean)
-    .sort();
-}
+import { resolveProjectScanContext } from "../lib/workspace-roots";
+import { listProjectFiles } from "./project-file-tree";
 
 async function scan(workspaceRoot: string, rel: string, skips: ReadonlySet<string>) {
   let text = "";
@@ -31,7 +16,9 @@ async function scan(workspaceRoot: string, rel: string, skips: ReadonlySet<strin
 
 async function main(): Promise<void> {
   const context = resolveProjectScanContext();
-  const files = await listProjectFiles(context.workspaceRoot);
+  const files = (await listProjectFiles(context.projectsRoot, () => true)).map((file) =>
+    path.relative(context.workspaceRoot, file).replaceAll(path.sep, "/"),
+  );
   const skips = await readMigrationLabelSkipPaths(context.workspaceRoot);
   const hits: StaleNameHit[] = (
     await Promise.all(files.map((rel) => scan(context.workspaceRoot, rel, skips)))

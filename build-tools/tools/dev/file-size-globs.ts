@@ -1,6 +1,6 @@
 import path from "node:path";
 import * as fsp from "node:fs/promises";
-import { normalizeRepoPath } from "../lib/project-graph";
+import { normalizeRepoPath } from "../lib/repo-path";
 
 function escapeRegex(value: string): string {
   return value.replace(/[|\\{}()[\]^$+?.]/g, "\\$&");

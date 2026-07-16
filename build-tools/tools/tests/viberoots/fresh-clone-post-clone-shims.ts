@@ -58,7 +58,12 @@ if [[ "\${1:-}" == "--version" ]]; then exit 0; fi
 if [[ "\${1:-}" == "exec" && "\${3:-}" == "i" ]]; then
   cold_root="$PWD/.viberoots/current"
   [[ ! -e "$cold_root/node_modules" ]]
+  printf 'post-clone read-only install\n' >> "$VBR_FAKE_NIX_LOG"
   VIBEROOTS_SOURCE_ROOT="$cold_root" exec "$VBR_REAL_NODE" --experimental-strip-types --import "$cold_root/build-tools/tools/dev/zx-init.mjs" "$cold_root/build-tools/tools/tests/viberoots/fresh-clone-post-clone-lock-check.ts" "$VBR_STALE_PNPM_LOCK"
+fi
+if [[ "\${1:-}" == "exec" && "\${3:-}" == "zx-wrapper" && "\${4:-}" == *"post-clone-pnpm-materialize.ts" ]]; then
+  printf 'post-clone materialize committed pnpm stores\n' >> "$VBR_FAKE_NIX_LOG"
+  exit 0
 fi
 printf 'unexpected direnv invocation: %s\n' "$*" >&2
 exit 93

@@ -8,7 +8,7 @@ const { isolationDir, ownsIsolation } = resolveNestedBuckIsolation({
 });
 const fixture = "viberoots//build-tools/tools/tests/verify/project-enforcement-convention-fixtures";
 
-test("project-enforcement suffix and label convention rejects both mismatch directions", async () => {
+test("project-enforcement convention rejects membership and pass conflicts at analysis", async () => {
   try {
     for (const [target, message] of [
       ["suffix_without_label", "project-enforcement test must include verify:project-enforcement"],
@@ -25,6 +25,25 @@ test("project-enforcement suffix and label convention rejects both mismatch dire
       assert.notEqual(result.exitCode, 0, `expected ${target} analysis to fail`);
       assert.match(String(result.stderr), new RegExp(message));
     }
+    for (const target of [
+      "conflict_enforcement",
+      "conflict_isolated",
+      "conflict_isolated_bounded",
+      "conflict_resource_limited",
+      "conflict_manual",
+    ]) {
+      const result = await $({
+        env: buckCommandEnv(),
+        nothrow: true,
+        quiet: true,
+      })`buck2 --isolation-dir ${isolationDir} build --target-platforms prelude//platforms:default ${`${fixture}:${target}`}`;
+      assert.notEqual(result.exitCode, 0, `expected ${target} analysis to fail`);
+      assert.match(String(result.stderr), /project-enforcement test has conflicting labels/);
+    }
+    await $({
+      env: buckCommandEnv(),
+      quiet: true,
+    })`buck2 --isolation-dir ${isolationDir} build --target-platforms prelude//platforms:default ${`${fixture}:valid_project_enforcement`}`;
   } finally {
     if (ownsIsolation) {
       await $({

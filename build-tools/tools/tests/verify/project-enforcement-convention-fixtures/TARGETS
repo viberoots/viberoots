@@ -14,3 +14,24 @@ project_enforcement_convention_probe(
     script_path = "alpha.test.ts",
     test_labels = ["verify:project-enforcement"],
 )
+
+project_enforcement_convention_probe(
+    name = "valid_project_enforcement",
+    script_path = "alpha.project-enforcement.test.ts",
+    test_labels = ["verify:project-enforcement"],
+)
+
+[
+    project_enforcement_convention_probe(
+        name = "conflict_" + label.replace("verify:", "").replace("-", "_"),
+        script_path = "alpha.project-enforcement.test.ts",
+        test_labels = ["verify:project-enforcement", label],
+    )
+    for label in [
+        "verify:enforcement",
+        "verify:isolated",
+        "verify:isolated-bounded",
+        "verify:resource-limited",
+        "verify:manual",
+    ]
+]

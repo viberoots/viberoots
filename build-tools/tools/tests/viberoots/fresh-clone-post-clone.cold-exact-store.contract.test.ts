@@ -8,9 +8,11 @@ async function source(rel: string): Promise<string> {
   return await fsp.readFile(viberootsSourcePath(rel), "utf8");
 }
 
-test("post-clone roots an existing store but fails closed when the store is cold", async () => {
-  const [bootstrap, install, updater, store, devshell] = await Promise.all([
+test("post-clone explicitly materializes committed stores before read-only install", async () => {
+  const [bootstrap, dispatcher, committed, install, updater, store, devshell] = await Promise.all([
     source("build-tools/tools/lib/consumer-bootstrap.ts"),
+    source("build-tools/tools/dev/post-clone-pnpm-materialize.ts"),
+    source("build-tools/tools/dev/update-pnpm-hash/materialize-committed.ts"),
     source("build-tools/tools/dev/install/deps-main.ts"),
     source("build-tools/tools/dev/update-pnpm-hash.ts"),
     source("build-tools/tools/nix/node-modules/store.nix"),
@@ -18,6 +20,10 @@ test("post-clone roots an existing store but fails closed when the store is cold
   ]);
 
   assert.match(bootstrap, /\["exec", workspaceRoot, "i"\]/);
+  assert.match(bootstrap, /runPostClonePnpmMaterialization/);
+  assert.match(bootstrap, /opts\.runInstall && isPostCloneBootstrap\(opts\)/);
+  assert.match(dispatcher, /"--materialize-committed"/);
+  assert.match(dispatcher, /importer === "\." \? "pnpm-lock\.yaml" : path\.join\(importer/);
   assert.match(install, /refreshPnpmHashes \? \[\] : \["--read-only"\]/);
   const readOnlyBranch =
     updater.match(/if \(readOnly\) \{\n    if \(!currentHash[\s\S]*?\n    return;\n  \}/)?.[0] ||
@@ -31,11 +37,21 @@ test("post-clone roots an existing store but fails closed when the store is cold
     /NIX_PNPM_RECONCILE|updateNodeModulesHashesJson|reconcileFixedPnpmStore/,
   );
   assert.doesNotMatch(readOnlyBranch, /NIX_PNPM_MATERIALIZE/);
+  const materializeBranch =
+    updater.match(/if \(materializeCommitted\) \{[\s\S]*?\n    return;\n  \}/)?.[0] || "";
+  assert.match(materializeBranch, /materializeCommittedPnpmStore/);
+  assert.match(committed, /NIX_PNPM_MATERIALIZE: "1"/);
+  assert.match(committed, /buildStore/);
+  assert.match(committed, /ensureExactStoreGcRoot/);
+  assert.doesNotMatch(
+    `${materializeBranch}\n${committed}`,
+    /updateNodeModulesHashesJson|runPnpmStoreReconciliation|restoreHashFromSharedCache/,
+  );
   assert.match(bootstrap, /VBR_POST_CLONE[\s\S]*return false/);
   assert.doesNotMatch(devshell, /NIX_PNPM_MATERIALIZE/);
 });
 
-test("cold flake-mode post-clone reaches the same read-only fail-closed path", async () => {
+test("cold flake-mode post-clone uses the explicit committed materialization path", async () => {
   const [bootstrapScript, consumerBootstrap, updater, devshell] = await Promise.all([
     source("bootstrap"),
     source("build-tools/tools/lib/consumer-bootstrap.ts"),
@@ -54,6 +70,7 @@ test("cold flake-mode post-clone reaches the same read-only fail-closed path", a
     /opts\.sourceMode \|\| \(opts\.sourcePath \? "submodule" : "flake"\)/,
   );
   assert.match(consumerBootstrap, /if \(opts\.runInstall\) await runInstall\(opts\.workspaceRoot/);
+  assert.match(consumerBootstrap, /runPostClonePnpmMaterialization/);
   assert.match(consumerBootstrap, /\["exec", workspaceRoot, "i"\]/);
 
   const readOnlyBranch =

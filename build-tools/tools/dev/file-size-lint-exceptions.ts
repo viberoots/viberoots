@@ -1,6 +1,6 @@
 import path from "node:path";
 import * as fsp from "node:fs/promises";
-import { normalizeRepoPath } from "../lib/project-graph";
+import { normalizeRepoPath } from "../lib/repo-path";
 import { listFilesMatching } from "./file-size-globs";
 
 export const METHODOLOGY_EXCEPTIONS_FILENAME = "methodology-exceptions.json";

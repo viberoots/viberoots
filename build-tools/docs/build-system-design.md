@@ -703,7 +703,8 @@ Behavior:
 
 I register source-owned `*.project-enforcement.test.ts` runners as generated tests in the
 `workspace_buck` cell. Registration is refreshed before verify target discovery using only bounded
-filesystem work. Generated `TARGETS` files remain outputs, and registration does not invoke Nix.
+filesystem work. The suffix glob is the sole membership authority for source exports and generated
+targets. Generated `TARGETS` files remain outputs, and registration does not invoke Nix.
 
 The shared changed-path authority injects the complete generated target family for project changes,
 explicit `//projects/...` selectors, unavailable change authority, and full suites. The planner
@@ -716,6 +717,14 @@ closed without generated-target execution evidence. They may scan the live proje
 ordinary build-system tests may not. Admitted runners must be deterministic, read-only, complete in
 30 seconds individually and 60 seconds as a warm pass, and avoid Nix, builds, services, temp
 consumers, dependency caches, and nested Buck daemons.
+
+Starlark analysis rejects project-enforcement targets carrying another verify pass label. Runtime
+pass planning repeats that check as defense in depth. Registration follows each runner's local
+import graph and rejects prohibited heavy subsystems and operations before generating targets.
+Bounded runtime coverage checks all discovered runners with lint skipping enabled, compares Nix
+store entries, canonical-source identity, and pre-existing consumer-cache fingerprints, and waits
+for each owned runner process to close. Generated Buck fixtures cover local/submodule and canonical
+remote Nix-store source authority against temp consumers.
 
 The admitted policy set is stale names, process-inspection commands, stale deployment environment
 branches, project source-file size, and deployment-metadata secrets. Each generated runner shares

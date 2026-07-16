@@ -229,9 +229,9 @@ test("resolveWorkspaceRootsSync keeps workspace usable when current symlink is m
 test("resolveWorkspaceRootsSync reports remote-shaped current source", async () => {
   const tmp = await workspace("vbr-roots-remote");
   try {
-    const source = path.join(tmp, "nix", "store", "abc-viberoots-source");
+    const source = path.dirname(path.dirname(process.execPath));
+    assert.match(source, /^\/nix\/store\//);
     await fsp.mkdir(path.join(tmp, ".viberoots"), { recursive: true });
-    await fsp.mkdir(source, { recursive: true });
     await fsp.symlink(source, path.join(tmp, ".viberoots", "current"));
 
     const roots = resolveWorkspaceRootsSync({ start: tmp, env: { WORKSPACE_ROOT: tmp } });
@@ -399,10 +399,10 @@ test("viberoots version reports missing current symlink", async () => {
 test("viberoots version reports remote-shaped source and locked revision", async () => {
   const tmp = await workspace("vbr-version-remote");
   try {
-    const source = path.join(tmp, "nix", "store", "abc-viberoots-source");
+    const source = path.dirname(path.dirname(process.execPath));
+    assert.match(source, /^\/nix\/store\//);
     const lockedRev = "0123456789abcdef0123456789abcdef01234567";
     await fsp.mkdir(path.join(tmp, ".viberoots"), { recursive: true });
-    await fsp.mkdir(source, { recursive: true });
     await fsp.symlink(source, path.join(tmp, ".viberoots", "current"));
     await fsp.writeFile(
       path.join(tmp, "flake.lock"),

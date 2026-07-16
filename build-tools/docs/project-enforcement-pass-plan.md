@@ -216,6 +216,98 @@ scheduled.
 
 Cheap policies may run both as fail-fast preflights and pass targets, adding bounded repeated work.
 
+## PR-3: Close Pass Authority And Admission-Proof Gaps
+
+### 1. Intent
+
+Make project-enforcement membership, pass isolation, consumer-root behavior, and lightweight-runner
+admission mechanically enforceable so future changes cannot silently weaken the completed pass.
+
+### 2. Scope of changes
+
+- Add an analysis-time Starlark convention that rejects any target combining
+  `verify:project-enforcement` with `enforcement`, `isolated`, `isolated-bounded`,
+  `resource-limited`, or `manual`; retain the runtime planner conflict check as defense in depth.
+- Make `*.project-enforcement.test.ts` suffix discovery the sole reviewed runner-membership
+  authority. If Buck still requires explicit generated exports, derive them from that discovery and
+  fail closed on any parity mismatch instead of maintaining an independent list.
+- Prove the canonical consumer-root authority separately for submodule source mode, flake/remote
+  source mode with a Nix-store `VIBEROOTS_ROOT`, and temp consumers; generated runners must execute
+  against the consumer project root in the remote-source layout.
+- Prove `VERIFY_SKIP_LINT=1` cannot suppress project-enforcement discovery, selection, or execution.
+- Add mechanically enforced admission checks that reject runners capable of Nix realization, temp
+  consumer or dependency-cache population, service startup, nested Buck daemons, or handbook timing
+  and disk-budget violations. Reuse canonical process, path, timing, and disk evidence rather than
+  adding parallel authorities.
+- Add project-root negative generated-runner coverage for process inspection, deployment branches,
+  project file size, and deployment metadata secrets without duplicating broad integration suites.
+
+### 3. External prerequisites
+
+PR-2 must be complete with Checkpoint B evidence. No new external tools or services are required.
+
+### 4. Tests to be added
+
+- Starlark fixture cases for every forbidden mixed label and one valid project-enforcement-only
+  target, plus the retained runtime planner conflict cases.
+- Discovery/export parity tests that add and remove a suffix-owned runner and fail on stale or extra
+  generated membership.
+- Distinct submodule, Nix-store remote-source, and temp-consumer root tests, including generated
+  runner execution from a remote-source layout and fail-closed root-authority cases.
+- Selection and execution tests with `VERIFY_SKIP_LINT=1` proving all required generated runners
+  remain present.
+- Structural admission tests for prohibited Nix, temp-consumer, cache, service, and nested-Buck
+  operations, plus bounded runtime tests that capture process, timing, disk-growth, and Nix-path
+  evidence under the handbook procedure.
+- Focused project-root negative fixtures for each of the four PR-2 scanners, retaining their
+  existing pure-scanner fixture coverage and avoiding redundant full-consumer scenarios.
+
+### 5. Docs to be added or updated
+
+Update the testing handbook and build-system design with the single membership authority,
+analysis-time label convention, consumer-root matrix, skip-lint boundary, and mechanically enforced
+runner-admission procedure. Record measured time and disk evidence where the handbook requires it.
+
+### 5.5. Expected regression scope
+
+Generated runner discovery and exports, Buck target analysis, pass planning, skip-lint selection,
+consumer-root and source-mode authority, temp-consumer fixtures, and project-enforcement admission
+guardrails.
+
+### 6. Acceptance criteria
+
+- Buck analysis rejects every forbidden mixed label before execution, while the runtime planner
+  continues to reject malformed discovered targets.
+- Suffix discovery is the sole runner-membership authority or strict generated-export parity fails
+  closed; adding a conforming runner requires no second manually maintained registration edit.
+- Submodule, remote Nix-store source, and temp-consumer tests each prove the runner scans the intended
+  consumer root, and `VERIFY_SKIP_LINT=1` cannot disable the pass.
+- Every admitted runner has structural and measured evidence excluding prohibited heavy work and
+  satisfying the handbook's execution-time and disk-growth budgets.
+- All four migrated scanners reject representative invalid files through their generated runner at
+  the project root; focused tests, full validation, and independent scope review pass.
+
+### 7. Risks
+
+Static admission checks may miss indirect heavy operations or reject legitimate shared helpers, and
+remote-source fixtures may accidentally exercise a local source path.
+
+### 8. Mitigations
+
+Combine structural checks with bounded runtime evidence, reuse canonical authorities, assert the
+actual Nix-store source and consumer roots in fixtures, and keep runtime planner checks as defense in
+depth.
+
+### 9. Consequences of not implementing this PR
+
+Membership drift, conflicting pass labels, skip-lint omissions, source-mode root mistakes, or newly
+heavy runners could bypass review while the existing happy-path suite remains green.
+
+### 10. Downsides for implementing this PR
+
+The pass gains analysis fixtures and focused source-mode/admission tests that add bounded validation
+cost and require updates when the runner contract intentionally changes.
+
 ## Rollout And Sequencing
 
 Land PR-1 first and stop at Checkpoint A if registration, freshness, source-mode, timing, or disk

@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import { spawn, type ChildProcess } from "node:child_process";
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { getFlagStr } from "../lib/cli";
@@ -17,6 +16,7 @@ function spawnShell(
   command: string,
   cwd: string,
   envOverrides: Record<string, string>,
+  onOutput?: (text: string) => void,
 ): ChildProcess {
   const env = { ...process.env, ...envOverrides };
   const shell = String(env.BASH || "bash").trim() || "bash";
@@ -26,8 +26,16 @@ function spawnShell(
     stdio: "pipe",
     detached: true,
   });
-  child.stdout?.on("data", (chunk) => process.stdout.write(`[${name}] ${String(chunk || "")}`));
-  child.stderr?.on("data", (chunk) => process.stderr.write(`[${name}] ${String(chunk || "")}`));
+  child.stdout?.on("data", (chunk) => {
+    const text = String(chunk || "");
+    onOutput?.(text);
+    process.stdout.write(`[${name}] ${text}`);
+  });
+  child.stderr?.on("data", (chunk) => {
+    const text = String(chunk || "");
+    onOutput?.(text);
+    process.stderr.write(`[${name}] ${text}`);
+  });
   return child;
 }
 
@@ -38,56 +46,23 @@ function killGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   } catch {}
 }
 
-type WasmModuleManifest = {
-  modules?: Array<{
-    runtimeDestinations?: {
-      client?: string;
-      server?: string;
-    };
-  }>;
-};
-
-async function waitForInitialWasmSync(cwd: string, contractsDir: string, watch: ChildProcess) {
-  const manifestPath = path.join(contractsDir, "wasm-modules.manifest.json");
-  let manifest: WasmModuleManifest;
-  try {
-    manifest = JSON.parse(await fsp.readFile(manifestPath, "utf8")) as WasmModuleManifest;
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`failed to read wasm manifest before dev startup: ${message}`);
-  }
-  const outputs = Array.from(
-    new Set(
-      (manifest.modules || [])
-        .flatMap((module) => [
-          String(module.runtimeDestinations?.client || "").trim(),
-          String(module.runtimeDestinations?.server || "").trim(),
-        ])
-        .filter(Boolean)
-        .map((rel) => path.resolve(cwd, rel)),
-    ),
-  );
-  if (outputs.length === 0) return;
+async function waitForInitialWasmSync(watch: ChildProcess, ready: Promise<void>) {
   const timeoutMs = Math.max(30_000, Number(getFlagStr("startup-wasm-timeout-ms", "120000")));
   const startedAt = Date.now();
-  while (Date.now() - startedAt < timeoutMs) {
-    if (watch.exitCode != null) {
-      throw new Error(
-        `wasm watcher exited before initial sync completed (code=${String(watch.exitCode)})`,
-      );
-    }
-    const states = await Promise.all(outputs.map((abs) => fsp.stat(abs).catch(() => null)));
-    if (states.every((st) => st && st.isFile() && st.size > 0)) {
-      console.error(
-        `[dev-wasm] startup:ready outputs=${outputs.length} elapsed_ms=${Date.now() - startedAt}`,
-      );
-      return;
-    }
-    await sleep(250);
-  }
-  throw new Error(
-    `timed out waiting for initial wasm sync after ${timeoutMs}ms: ${outputs.join(", ")}`,
-  );
+  await Promise.race([
+    ready,
+    new Promise<never>((_, reject) =>
+      watch.once("exit", (code) =>
+        reject(
+          new Error(`wasm watcher exited before initial sync completed (code=${String(code)})`),
+        ),
+      ),
+    ),
+    sleep(timeoutMs).then(() => {
+      throw new Error(`timed out waiting for initial wasm sync after ${timeoutMs}ms`);
+    }),
+  ]);
+  console.error(`[dev-wasm] startup:ready elapsed_ms=${Date.now() - startedAt}`);
 }
 
 async function main() {
@@ -106,7 +81,15 @@ async function main() {
     `[dev-wasm] contracts:ready app_target=${synced.appTargetLabel} app_id=${synced.appId} dir=${synced.contractsDir}`,
   );
 
-  const watch = spawnShell("wasm-watch", watchCmd, cwd, childEnv);
+  let readyOutput = "";
+  let markReady!: () => void;
+  const ready = new Promise<void>((resolve) => {
+    markReady = resolve;
+  });
+  const watch = spawnShell("wasm-watch", watchCmd, cwd, childEnv, (text) => {
+    readyOutput = `${readyOutput}${text}`.slice(-4096);
+    if (readyOutput.includes("[wasm-watch] coordinator:ready ")) markReady();
+  });
   let vite: ChildProcess | null = null;
   let stopping = false;
   let sawFailure = false;
@@ -132,7 +115,7 @@ async function main() {
   });
 
   try {
-    await waitForInitialWasmSync(cwd, synced.contractsDir, watch);
+    await waitForInitialWasmSync(watch, ready);
     vite = spawnShell("vite", viteCmd, cwd, childEnv);
   } catch (error) {
     stopAll("SIGTERM");

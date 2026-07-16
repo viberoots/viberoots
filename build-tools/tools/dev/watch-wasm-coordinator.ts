@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { spawn } from "node:child_process";
+import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,21 +9,15 @@ import { resolveModuleContractsPaths } from "./module-contract-paths";
 import { syncModuleContractsForApp } from "./sync-module-contracts-core";
 import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { findRepoRoot } from "../lib/repo";
-import {
-  specsFromWasmManifest,
-  validateTsManifestProbes,
-  type WasmModuleSpec,
-} from "./wasm-watch-manifest";
+import { specsFromWasmManifest, validateTsManifestProbes } from "./wasm-watch-manifest";
 import {
   computeFingerprintMap,
-  copyAtomically,
   mapsEqual,
   membershipMapsEqual,
-  refreshTriggerPaths,
-  runBuildStep,
   type Fingerprint,
 } from "./watch-wasm-producer-ops";
 import { computeTaskKey, type CoordinatorLease } from "./wasm-watch-coordinator-types";
+import { readCoordinatorResult } from "./wasm-watch-coordinator-results";
 
 function uniqueSorted(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
@@ -39,6 +34,7 @@ async function ensureDaemon(root: string, pollMs: number): Promise<void> {
     daemonScript,
     path.join(toolDir, "watch-wasm-producer-ops.ts"),
     path.join(toolDir, "wasm-watch-coordinator-types.ts"),
+    path.join(toolDir, "wasm-watch-coordinator-results.ts"),
   ];
   let daemonCodeMtime = 0;
   for (const dep of daemonDeps) {
@@ -96,6 +92,7 @@ function leaseFromSpecs(args: {
         buildCommand: spec.buildCommand,
         watchPaths: spec.watchPaths,
       }),
+      requestId: crypto.randomUUID(),
       moduleKey: spec.moduleKey,
       moduleType: "wasm",
       buildCommand: spec.buildCommand,
@@ -107,46 +104,47 @@ function leaseFromSpecs(args: {
   };
 }
 
-async function runCoordinatorBuild(args: {
-  cwd: string;
-  spec: WasmModuleSpec;
-  seq: number;
-  reason: string;
+async function waitForLeaseResults(args: {
+  lease: CoordinatorLease;
+  resultsDir: string;
+  timeoutMs: number;
+  lastGeneration: Map<string, number>;
 }): Promise<void> {
-  const startedAt = Date.now();
-  console.error(
-    `[wasm-watch] rebuild:start seq=${args.seq} module_type=${args.spec.moduleType} module_key=${args.spec.moduleKey} reason=${args.reason}`,
-  );
-  try {
-    await runBuildStep(args.spec.buildCommand, args.cwd);
-    const syncOuts = [args.spec.syncOut, ...(args.spec.extraSyncOuts || [])];
-    let copiedSize = 0;
-    for (const outPath of syncOuts) {
-      copiedSize = await copyAtomically(args.spec.buildOut, outPath);
+  const started = Date.now();
+  for (;;) {
+    let pending = false;
+    for (const sub of args.lease.subscriptions) {
+      const result = await readCoordinatorResult(args.resultsDir, sub.taskKey);
+      if (!result?.requestIds.includes(sub.requestId)) {
+        pending = true;
+        continue;
+      }
+      if ((args.lastGeneration.get(sub.taskKey) || 0) < result.generation) {
+        console.error(
+          `[wasm-watch] rebuild:start seq=${result.generation} module_type=wasm module_key=${sub.moduleKey} reason=${result.reason}`,
+        );
+        if (result.status === "failure") {
+          console.error(
+            `[wasm-watch] rebuild:fail seq=${result.generation} module_type=wasm module_key=${sub.moduleKey} elapsed_ms=${result.elapsedMs}`,
+          );
+          console.error(result.error || "wasm coordinator build failed");
+          console.error(`[wasm-watch] recovery: run this command manually:\n${sub.buildCommand}`);
+          throw new Error(result.error || `wasm coordinator task failed: ${sub.taskKey}`);
+        }
+        console.error(
+          `[wasm-watch] sync:ok seq=${result.generation} module_type=wasm module_key=${sub.moduleKey} bytes=${result.outputs.reduce((sum, output) => sum + output.size, 0)} elapsed_ms=${result.elapsedMs} out=${result.outputs.map((output) => output.path).join(",")}`,
+        );
+        args.lastGeneration.set(sub.taskKey, result.generation);
+      }
     }
-    console.error(
-      `[wasm-watch] sync:ok seq=${args.seq} module_type=${args.spec.moduleType} module_key=${args.spec.moduleKey} bytes=${copiedSize} elapsed_ms=${Date.now() - startedAt} out=${syncOuts.join(",")}`,
-    );
-  } catch (err) {
-    console.error(
-      `[wasm-watch] rebuild:fail seq=${args.seq} module_type=${args.spec.moduleType} module_key=${args.spec.moduleKey} elapsed_ms=${Date.now() - startedAt}`,
-    );
-    console.error(err instanceof Error ? err.message : String(err));
-    console.error(`[wasm-watch] recovery: run this command manually:\n${args.spec.buildCommand}`);
-    throw err;
+    if (!pending) return;
+    if (Date.now() - started >= args.timeoutMs) {
+      throw new Error(
+        `timed out waiting for wasm coordinator acknowledgement after ${args.timeoutMs}ms`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
-}
-
-async function runInitialBuilds(
-  cwd: string,
-  specs: Awaited<ReturnType<typeof specsFromWasmManifest>>,
-): Promise<number> {
-  let seq = 0;
-  for (const spec of specs) {
-    seq += 1;
-    await runCoordinatorBuild({ cwd, spec, seq, reason: "startup" });
-  }
-  return seq;
 }
 
 async function main() {
@@ -167,12 +165,21 @@ async function main() {
   });
   const baseDir = path.join(resolved.repoRoot, "buck-out", "tmp", "wasm-watch-coordinator");
   const leasesDir = path.join(baseDir, "leases");
+  const resultsDir = path.join(baseDir, "results");
   await mkdirWithMacosMetadataExclusion(leasesDir);
   const leaseId = `${resolved.appId}-${process.pid}`;
   const leasePath = path.join(leasesDir, `${leaseId}.json`);
-  const writeLease = async (specs: Awaited<ReturnType<typeof specsFromWasmManifest>>) => {
+  const persistLease = async (lease: CoordinatorLease): Promise<void> => {
+    const temp = `${leasePath}.${process.pid}.tmp`;
+    await fsp.writeFile(temp, JSON.stringify(lease, null, 2) + "\n", "utf8");
+    await fsp.rename(temp, leasePath);
+  };
+  const writeLease = async (
+    specs: Awaited<ReturnType<typeof specsFromWasmManifest>>,
+  ): Promise<CoordinatorLease> => {
     const lease = leaseFromSpecs({ appId: resolved.appId, leaseId, cwd, specs });
-    await fsp.writeFile(leasePath, JSON.stringify(lease, null, 2) + "\n", "utf8");
+    await persistLease(lease);
+    return lease;
   };
   const removeLease = async () => {
     await fsp.rm(leasePath, { force: true }).catch(() => {});
@@ -195,14 +202,15 @@ async function main() {
     path.join(cwd, "package.json"),
     path.join(resolved.repoRoot, "build-tools", "tools", "buck", "graph.json"),
   ]);
-  let refreshState = await computeFingerprintMap(refreshTriggerPaths(baseRefreshPaths, specs));
+  let refreshState = await computeFingerprintMap(baseRefreshPaths);
   let lastRefreshAt = 0;
   const prevByModule = new Map<string, Map<string, Fingerprint>>();
   const membershipChangeByModule = new Map<string, { since: number; refreshAttempted: boolean }>();
+  const lastResultGeneration = new Map<string, number>();
   for (const spec of specs) {
     prevByModule.set(spec.moduleKey, await computeFingerprintMap(spec.watchPaths));
   }
-  let buildSeq = await runInitialBuilds(cwd, specs);
+  let activeLease: CoordinatorLease;
   const refreshCoordinatorState = async () => {
     await syncModuleContractsForApp({
       appCwd: cwd,
@@ -226,30 +234,42 @@ async function main() {
       path.join(cwd, "package.json"),
       path.join(resolved.repoRoot, "build-tools", "tools", "buck", "graph.json"),
     ]);
-    refreshState = await computeFingerprintMap(refreshTriggerPaths(baseRefreshPaths, specs));
+    refreshState = await computeFingerprintMap(baseRefreshPaths);
     for (const spec of specs) {
       if (prevByModule.has(spec.moduleKey)) continue;
       prevByModule.set(spec.moduleKey, await computeFingerprintMap(spec.watchPaths));
-      buildSeq += 1;
-      await runCoordinatorBuild({ cwd, spec, seq: buildSeq, reason: "refresh:add" });
     }
-    await writeLease(specs);
+    activeLease = await writeLease(specs);
+    await waitForLeaseResults({
+      lease: activeLease,
+      resultsDir,
+      timeoutMs: 600_000,
+      lastGeneration: lastResultGeneration,
+    });
     console.error(`[wasm-watch] coordinator:refresh modules=${specs.length}`);
     return { removed };
   };
   await ensureDaemon(resolved.repoRoot, pollMs);
-  await writeLease(specs);
+  activeLease = await writeLease(specs);
+  await waitForLeaseResults({
+    lease: activeLease,
+    resultsDir,
+    timeoutMs: 600_000,
+    lastGeneration: lastResultGeneration,
+  });
   console.error(
     `[wasm-watch] coordinator:registered app_target=${resolved.appTargetLabel} app_id=${resolved.appId} modules=${specs.length}`,
   );
+  console.error(`[wasm-watch] coordinator:ready lease_id=${leaseId}`);
   watchLoop: for (;;) {
     await new Promise((resolve) => setTimeout(resolve, pollMs));
     if (Date.now() - lastRefreshAt >= refreshThrottleMs) {
-      const nextRefresh = await computeFingerprintMap(refreshTriggerPaths(baseRefreshPaths, specs));
+      const nextRefresh = await computeFingerprintMap(baseRefreshPaths);
       if (!mapsEqual(refreshState, nextRefresh)) {
         await refreshCoordinatorState();
       } else {
-        await fsp.utimes(leasePath, new Date(), new Date()).catch(() => {});
+        activeLease.updatedAtMs = Date.now();
+        await persistLease(activeLease);
       }
       lastRefreshAt = Date.now();
     }
@@ -280,18 +300,20 @@ async function main() {
         }
         membershipChangeByModule.delete(spec.moduleKey);
         prevByModule.set(spec.moduleKey, next);
-        buildSeq += 1;
-        console.error(
-          `[wasm-watch] source-change module_type=${spec.moduleType} module_key=${spec.moduleKey}`,
-        );
-        await runCoordinatorBuild({ cwd, spec, seq: buildSeq, reason: "source-change" });
       }
     }
     await ensureDaemon(resolved.repoRoot, pollMs);
+    await waitForLeaseResults({
+      lease: activeLease,
+      resultsDir,
+      timeoutMs: 600_000,
+      lastGeneration: lastResultGeneration,
+    });
     const prev = await fsp.readFile(leasePath, "utf8").catch(() => "");
     const parsed = prev ? (JSON.parse(prev) as CoordinatorLease) : null;
     if (!parsed || parsed.updatedAtMs + refreshThrottleMs < Date.now()) {
-      await writeLease(specs);
+      activeLease.updatedAtMs = Date.now();
+      await persistLease(activeLease);
     }
   }
 }

@@ -11,11 +11,16 @@ import {
 } from "./file-size-lint-scopes";
 import { resolveSourceFileSizeExceptionPaths } from "./file-size-lint-exceptions";
 import {
+  scanFileSizeOffenders,
+  scopeUsesFileSizeExceptions,
+  type FileOffender,
+} from "./file-size-scanner";
+import {
   parseFileSizeLintArgs,
   type FileSizeLintOptions as Options,
 } from "./file-size-lint-options";
-import { listFilesMatching } from "./file-size-globs";
 export { PROJECT_SOURCE_FILES_SCOPE, SOURCE_FILES_SCOPE, type FileSizeScope };
+export type { FileOffender } from "./file-size-scanner";
 
 const execFileAsync = promisify(execFile);
 
@@ -89,62 +94,18 @@ async function listChangedFilesFromRoot(root: string): Promise<string[]> {
   return listSourceFilesFromRoot(root);
 }
 
-async function countLines(file: string): Promise<number> {
-  try {
-    const data = await fsp.readFile(file, "utf8");
-    if (data.length === 0) return 0;
-    const newlineCount = data.match(/\n/g)?.length ?? 0;
-    const endsWithNewline = data.endsWith("\n");
-    return endsWithNewline ? newlineCount : newlineCount + 1;
-  } catch {
-    return 0;
-  }
-}
-
-export type FileOffender = { file: string; lines: number };
-
-async function listScopeMatches(root: string, scope: FileSizeScope): Promise<Set<string>> {
-  const matches = await listFilesMatching({
-    root,
-    include: scope.include,
-    exclude: scope.exclude,
-  });
-  return new Set(matches.map(normalizeRelPath));
-}
-
-function sameList(left: readonly string[], right: readonly string[]): boolean {
-  return left.length === right.length && left.every((value, index) => value === right[index]);
-}
-
-function usesSourceFileSizeExceptions(scope: FileSizeScope): boolean {
-  const isDefault =
-    sameList(scope.include, SOURCE_FILES_SCOPE.include) &&
-    sameList(scope.exclude, SOURCE_FILES_SCOPE.exclude);
-  const isProject =
-    sameList(scope.include, PROJECT_SOURCE_FILES_SCOPE.include) &&
-    sameList(scope.exclude, PROJECT_SOURCE_FILES_SCOPE.exclude);
-  return isDefault || isProject;
-}
-
 export async function findFileSizeOffenders(opts: Options): Promise<FileOffender[]> {
   const root = opts.root;
   const base = opts.changedOnly
     ? await listChangedFilesFromRoot(root)
     : await listSourceFilesFromRoot(root);
-  const inScope = await listScopeMatches(root, opts.scope);
-  const ownerLocalExceptions = new Set(
-    usesSourceFileSizeExceptions(opts.scope) ? await resolveSourceFileSizeExceptionPaths(root) : [],
-  );
-
-  const offenders: FileOffender[] = [];
-  for (const rel of base) {
-    if (!inScope.has(rel)) continue;
-    if (!opts.allowKnown && ownerLocalExceptions.has(rel)) continue;
-    const abs = path.join(root, rel);
-    const lines = await countLines(abs);
-    if (lines > opts.threshold) offenders.push({ file: rel, lines });
-  }
-  return offenders.sort((a, b) => b.lines - a.lines);
+  return await scanFileSizeOffenders({
+    root,
+    candidates: base,
+    threshold: opts.threshold,
+    allowKnown: opts.allowKnown,
+    scope: opts.scope,
+  });
 }
 
 function splitKnownOffenders(
@@ -165,7 +126,7 @@ async function runCli() {
   const opts = parseFileSizeLintArgs();
   const offenders = await findFileSizeOffenders(opts);
   if (offenders.length === 0) return;
-  const knownPaths = usesSourceFileSizeExceptions(opts.scope)
+  const knownPaths = scopeUsesFileSizeExceptions(opts.scope)
     ? await resolveSourceFileSizeExceptionPaths(opts.root)
     : [];
   const { unknown, known } = opts.allowKnown

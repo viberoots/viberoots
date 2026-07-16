@@ -853,6 +853,25 @@ async function runInstall(workspaceRoot: string, allowPnpmGenerate: boolean): Pr
   );
 }
 
+async function runPostClonePnpmMaterialization(
+  workspaceRoot: string,
+  sourcePath: string,
+): Promise<void> {
+  const script = path.join(
+    sourcePath,
+    "build-tools",
+    "tools",
+    "dev",
+    "post-clone-pnpm-materialize.ts",
+  );
+  await runInherited(
+    "direnv",
+    ["exec", workspaceRoot, "zx-wrapper", script],
+    workspaceRoot,
+    process.env,
+  );
+}
+
 async function runInherited(
   command: string,
   args: string[],
@@ -1036,6 +1055,9 @@ Project and application source belongs here.
   }
   if (opts.allowDirenv !== false) {
     await runOptionalDirenvAllow(opts.workspaceRoot, allowPnpmGenerate);
+  }
+  if (opts.runInstall && isPostCloneBootstrap(opts)) {
+    await runPostClonePnpmMaterialization(opts.workspaceRoot, activation.sourcePath);
   }
   if (opts.runInstall) await runInstall(opts.workspaceRoot, allowPnpmGenerate);
   ui.ok("workspace initialized", opts.workspaceRoot);

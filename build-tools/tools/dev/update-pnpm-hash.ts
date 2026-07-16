@@ -8,6 +8,7 @@ import { resolveUpdatePnpmHashCommandRoot } from "./update-pnpm-hash/command-roo
 import { ensureExactStoreGcRoot } from "./update-pnpm-hash/exact-store-gc-root";
 import { runPnpmStoreReconciliation } from "./update-pnpm-hash/fixed-store-reconcile";
 import * as hashesJson from "./update-pnpm-hash/hashes-json";
+import { materializeCommittedPnpmStore } from "./update-pnpm-hash/materialize-committed";
 import {
   assertImporterLockfileFresh,
   ensureImporterLockfileFresh,
@@ -35,9 +36,16 @@ initializeManagedCancellationChannel();
 const PLACEHOLDER_PNPM_STORE_HASH = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
 async function inner() {
-  const { lockfile, force = false, readOnly = false } = parseUpdatePnpmHashArgs();
-  if (force && readOnly) {
-    throw new Error("update-pnpm-hash --read-only cannot be combined with --force");
+  const {
+    lockfile,
+    force = false,
+    readOnly = false,
+    materializeCommitted = false,
+  } = parseUpdatePnpmHashArgs();
+  if (Number(readOnly) + Number(materializeCommitted) + Number(force) > 1) {
+    throw new Error(
+      "update-pnpm-hash --read-only, --materialize-committed, and --force are mutually exclusive",
+    );
   }
 
   const repoRoot = await resolveUpdatePnpmHashCommandRoot(process.cwd());
@@ -50,7 +58,7 @@ async function inner() {
   const lockAbs = path.join(repoRoot, relLock);
   const markerPath = verifiedMarker.verifiedMarkerPath(repoRoot, importer);
 
-  if (readOnly) {
+  if (readOnly || materializeCommitted) {
     await assertImporterLockfileFresh({ repoRoot, importer });
   } else if (importer === ".") {
     if (!readOnly) await ensureImporterLockfileFreshIfAllowed({ repoRoot, importer });
@@ -125,6 +133,31 @@ async function inner() {
           })
         ).status,
     );
+
+  if (materializeCommitted) {
+    if (!currentHash || currentHash === PLACEHOLDER_PNPM_STORE_HASH) {
+      throw new Error(`pnpm hash metadata is stale for ${importer}; repair: run u`);
+    }
+    const materialized = await materializeCommittedPnpmStore({
+      repoRoot,
+      importer,
+      flakeRef,
+      storeAttr,
+      lockHash,
+    });
+    await verifiedMarker.writeVerifiedMarker(markerPath, {
+      importer,
+      lockfile: key,
+      lockHash,
+      hashValue: currentHash,
+      builderFingerprint,
+      derivationIdentity: materialized.derivationIdentity,
+    });
+    console.log(
+      `pnpm-store: ${storeAttr} materialized from committed metadata at ${materialized.fixedStorePath}`,
+    );
+    return;
+  }
 
   if (readOnly) {
     if (!currentHash || currentHash === PLACEHOLDER_PNPM_STORE_HASH) {

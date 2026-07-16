@@ -9,6 +9,9 @@ load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_c
 load("@viberoots//build-tools/lang:source_snapshot.bzl", "SourceSnapshotInfo")
 def _zx_test_impl(ctx):
     script = ctx.attrs.script
+    viberoots_script_path = ctx.attrs.viberoots_script_path
+    if viberoots_script_path and viberoots_script_path != "build-tools/tools/project-enforcement/project-enforcement-runner.ts":
+        fail("viberoots_script_path is reserved for the canonical project-enforcement runner")
     timeout_ms = ctx.attrs.test_rule_timeout_ms if ctx.attrs.test_rule_timeout_ms != None else 20 * 60 * 1000
     timeout_sec = timeout_ms // 1000 if timeout_ms > 0 else 1200
     run_and_report = (
@@ -138,9 +141,10 @@ def _zx_test_impl(ctx):
             + "cd \"$WORKSPACE_ROOT\"; "
             + "PKG=\"%s\"; "
             + "if [ -z \"$PKG\" ]; then PKG=$(printf %%s \"$BUCK_TEST_TARGET\" | sed -E 's/ \\([^)]*\\)$//; s#^.*//([^:]+):.*$#\\1#'); fi; "
-            + "CAND1=\"$WORKSPACE_ROOT/%s\"; CAND2=\"$WORKSPACE_ROOT/$PKG/%s\"; CAND3=\"$VBR_ROOT/%s\"; "
+            + "CAND1=\"$WORKSPACE_ROOT/%s\"; CAND2=\"$WORKSPACE_ROOT/$PKG/%s\"; CAND3=\"$VBR_ROOT/%s\"; CAND4=\"$VBR_ROOT/%s\"; "
             + "SCRIPT_PATH=\"$CAND1\"; if [ ! -f \"$SCRIPT_PATH\" ]; then SCRIPT_PATH=\"$CAND2\"; fi; "
             + "if [ ! -f \"$SCRIPT_PATH\" ]; then SCRIPT_PATH=\"$CAND3\"; fi; "
+            + "if [ -n \"%s\" ] && [ ! -f \"$SCRIPT_PATH\" ]; then SCRIPT_PATH=\"$CAND4\"; fi; "
             + "HEARTBEAT_RUNNER=\"$VBR_HEARTBEAT_RUNNER\"; "
             + "WD=; "
             + "OUT_LOG=\"$LOGDIR/test.stdout.log\"; ERR_LOG=\"$LOGDIR/test.stderr.log\"; RAW_ERR_LOG=\"$LOGDIR/test.stderr.raw.log\"; "
@@ -157,7 +161,7 @@ def _zx_test_impl(ctx):
             + "if [ -n \"$WD\" ]; then kill \"$WD\" >/dev/null 2>&1 || true; fi; "
             + "exit \"$STATUS\""
         )
-        % (ctx.label, ctx.label.package, script.short_path, script.short_path, script.short_path)
+        % (ctx.label, ctx.label.package, script.short_path, script.short_path, script.short_path, viberoots_script_path, viberoots_script_path)
     )
     local_command = [
         "bash",
@@ -265,6 +269,7 @@ zx_test = clone_rule(
         "tool_closure": attrs.option(attrs.source(), default = None),
         "remote_builder_smoke": attrs.option(attrs.source(), default = None),
         "template_inputs": attrs.list(attrs.source(), default = []),
+        "viberoots_script_path": attrs.string(default = ""),
         "remote_execution": attrs.one_of(
             attrs.string(),
             re_test_common.opts_for_tests_arg(),

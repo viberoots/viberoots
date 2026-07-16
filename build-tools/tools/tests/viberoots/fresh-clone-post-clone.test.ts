@@ -45,6 +45,10 @@ test("fresh recursive clone runs real post-clone initialization without tracked 
   }
   assert.equal(workspaceLock.nodes.viberoots.locked.path, "./viberoots-flake-input");
   const nixInvocations = await fsp.readFile(fixture.nixLog, "utf8");
+  assert.match(
+    nixInvocations,
+    /post-clone materialize committed pnpm stores[\s\S]*post-clone read-only install/,
+  );
   assert.doesNotMatch(nixInvocations, /nix flake (?:lock|update|metadata)\b/);
 });
 
@@ -68,6 +72,10 @@ test("fresh flake-mode clone runs cold post-clone from immutable source without 
   assert.equal(await git(clone, ["diff", "--name-only"]), "");
   assert.equal(await git(clone, ["status", "--short"]), "");
   const nixInvocations = await fsp.readFile(fixture.nixLog, "utf8");
+  assert.match(
+    nixInvocations,
+    /post-clone materialize committed pnpm stores[\s\S]*post-clone read-only install/,
+  );
   assert.match(nixInvocations, new RegExp(`nix flake metadata .*rev=${fixture.submoduleRev}`));
   assert.doesNotMatch(nixInvocations, /nix flake (?:lock|update)\b/);
   assert.doesNotMatch(

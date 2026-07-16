@@ -5,7 +5,7 @@ import {
   DEPLOYMENT_METADATA_FILE_PATTERN,
   scanDeploymentMetadataSecrets,
 } from "../deployments/deployment-metadata-secret-scanner";
-import { resolveProjectScanContext } from "../lib/repo";
+import { resolveProjectScanContext } from "../lib/workspace-roots";
 import { listProjectFiles } from "./project-file-tree";
 
 const context = resolveProjectScanContext();

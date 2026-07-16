@@ -28,9 +28,3 @@ export_file(
     src = "flake.lock",
     visibility = ["PUBLIC"],
 )
-
-export_file(
-    name = "project-enforcement-runner.ts",
-    src = "project-enforcement-runner.ts",
-    visibility = ["PUBLIC"],
-)

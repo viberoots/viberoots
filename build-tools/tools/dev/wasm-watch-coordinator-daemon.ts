@@ -16,6 +16,11 @@ import {
   type CoordinatorLease,
   type CoordinatorTask,
 } from "./wasm-watch-coordinator-types";
+import {
+  outputIdentities,
+  readCoordinatorResult,
+  writeCoordinatorResult,
+} from "./wasm-watch-coordinator-results";
 
 function sorted(values: string[]): string[] {
   return Array.from(new Set(values.filter(Boolean))).sort((a, b) => a.localeCompare(b));
@@ -59,6 +64,7 @@ function tasksFromLeases(leases: CoordinatorLease[]): CoordinatorTask[] {
           watchPaths: [...sub.watchPaths],
           syncOuts: [...sub.syncOuts],
           subscribers: [`${lease.appId}:${lease.leaseId}`],
+          requestIds: [sub.requestId],
         });
         continue;
       }
@@ -66,16 +72,21 @@ function tasksFromLeases(leases: CoordinatorLease[]): CoordinatorTask[] {
       cur.syncOuts = sorted([...cur.syncOuts, ...sub.syncOuts]);
       cur.watchPaths = sorted([...cur.watchPaths, ...sub.watchPaths]);
       cur.subscribers = sorted([...cur.subscribers, `${lease.appId}:${lease.leaseId}`]);
+      cur.requestIds = sorted([...cur.requestIds, sub.requestId]);
     }
   }
   return Array.from(byKey.values()).sort((a, b) => a.taskKey.localeCompare(b.taskKey));
 }
 
-async function ensureDirs(baseDir: string): Promise<{ leasesDir: string; daemonPid: string }> {
+async function ensureDirs(
+  baseDir: string,
+): Promise<{ leasesDir: string; resultsDir: string; daemonPid: string }> {
   const leasesDir = path.join(baseDir, "leases");
+  const resultsDir = path.join(baseDir, "results");
   await mkdirWithMacosMetadataExclusion(leasesDir);
+  await mkdirWithMacosMetadataExclusion(resultsDir);
   const daemonPid = path.join(baseDir, "daemon.pid");
-  return { leasesDir, daemonPid };
+  return { leasesDir, resultsDir, daemonPid };
 }
 
 async function writePidFile(pidPath: string): Promise<void> {
@@ -102,7 +113,7 @@ async function main() {
     // Another daemon process already owns the singleton lock for this repo.
     return;
   }
-  const { leasesDir, daemonPid } = await ensureDirs(baseDir);
+  const { leasesDir, resultsDir, daemonPid } = await ensureDirs(baseDir);
   await writePidFile(daemonPid);
   let stopping = false;
   process.once("SIGINT", () => {
@@ -133,7 +144,8 @@ async function main() {
         const reason = pending.get(taskKey) || "unknown";
         pending.delete(taskKey);
         if (!task) continue;
-        buildSeq += 1;
+        const previousResult = await readCoordinatorResult(resultsDir, taskKey);
+        buildSeq = Math.max(buildSeq + 1, (previousResult?.generation || 0) + 1);
         const seq = buildSeq;
         const started = Date.now();
         console.error(
@@ -144,6 +156,16 @@ async function main() {
           let copiedSize = 0;
           for (const syncOut of task.syncOuts)
             copiedSize = await copyAtomically(task.buildOut, syncOut);
+          await writeCoordinatorResult(resultsDir, {
+            schemaVersion: 1,
+            generation: seq,
+            taskKey,
+            requestIds: task.requestIds,
+            status: "success",
+            reason,
+            elapsedMs: Date.now() - started,
+            outputs: await outputIdentities(task.syncOuts),
+          });
           console.error(
             `[wasm-watchd] sync:ok seq=${seq} task=${task.taskKey} bytes=${copiedSize} elapsed_ms=${Date.now() - started}`,
           );
@@ -153,6 +175,17 @@ async function main() {
             `[wasm-watchd] rebuild:fail seq=${seq} task=${task.taskKey} elapsed_ms=${Date.now() - started}`,
           );
           console.error(msg);
+          await writeCoordinatorResult(resultsDir, {
+            schemaVersion: 1,
+            generation: seq,
+            taskKey,
+            requestIds: task.requestIds,
+            status: "failure",
+            reason,
+            elapsedMs: Date.now() - started,
+            outputs: [],
+            error: msg,
+          });
         }
       }
     } finally {
@@ -186,6 +219,12 @@ async function main() {
       }
       tasks = nextTasks;
       byTask = nextByTask;
+      for (const task of tasks) {
+        const result = await readCoordinatorResult(resultsDir, task.taskKey);
+        if (task.requestIds.some((requestId) => !result?.requestIds.includes(requestId))) {
+          queue(task.taskKey, "subscription");
+        }
+      }
       for (const task of tasks) {
         const prev = prevByTask.get(task.taskKey) || new Map<string, Fingerprint>();
         const next = await computeFingerprintMap(task.watchPaths);

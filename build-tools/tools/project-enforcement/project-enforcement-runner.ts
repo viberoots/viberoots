@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { pathToFileURL } from "node:url";
-import { discoverProjectEnforcementRunners } from "./build-tools/tools/lib/project-enforcement-registration";
+import { discoverProjectEnforcementRunners } from "../lib/project-enforcement-registration";
 
 const target = String(process.env.BUCK_TEST_TARGET || "")
   .replace(/ \([^)]*\)$/, "")

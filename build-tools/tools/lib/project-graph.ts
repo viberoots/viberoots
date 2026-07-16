@@ -1,4 +1,7 @@
 import { packagePathFromLabel } from "./labels";
+import { normalizeRepoPath } from "./repo-path";
+
+export { normalizeRepoPath } from "./repo-path";
 
 type GraphNodeLike = {
   name?: string;
@@ -22,12 +25,6 @@ function normalizedProjectPrefixes(projectPrefixes?: readonly string[]): string[
       .filter(Boolean)
       .map((prefix) => `${prefix}/`),
   );
-}
-
-export function normalizeRepoPath(relPath: string): string {
-  return String(relPath || "")
-    .replace(/\\/g, "/")
-    .trim();
 }
 
 export function toSortedUnique(values: Iterable<string>): string[] {

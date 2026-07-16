@@ -2,8 +2,9 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { writeIfChanged } from "./fs-helpers";
 import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
-import { resolveWorkspaceRootsSync } from "./repo";
 import { WORKSPACE_BUCK_STATE_DIR } from "./workspace-state-paths";
+import { resolveWorkspaceRootsSync } from "./workspace-roots";
+import { assertProjectEnforcementRunnerAdmission } from "./project-enforcement-admission";
 
 export const PROJECT_ENFORCEMENT_SUFFIX = ".project-enforcement.test.ts";
 export const PROJECT_ENFORCEMENT_LABEL = "verify:project-enforcement";
@@ -48,10 +49,11 @@ export function renderWorkspaceBuckTargets(runners: readonly ProjectEnforcementR
       "",
       "zx_test(",
       `    name = ${JSON.stringify(runner.name)},`,
-      '    script = "@viberoots//:project-enforcement-runner.ts",',
+      '    script = "@viberoots//build-tools/tools/project-enforcement:project-enforcement-runner.ts",',
       `    out = ${JSON.stringify(`${runner.name}.stamp`)},`,
       `    labels = [${JSON.stringify(PROJECT_ENFORCEMENT_LABEL)}],`,
       `    template_inputs = [${JSON.stringify(runner.sourceLabel)}],`,
+      '    viberoots_script_path = "build-tools/tools/project-enforcement/project-enforcement-runner.ts",',
       "    test_rule_timeout_ms = 30 * 1000,",
       ")",
     );
@@ -75,6 +77,7 @@ export async function ensureProjectEnforcementRegistration(opts?: {
       `project enforcement registration found no ${PROJECT_ENFORCEMENT_SUFFIX} runners`,
     );
   }
+  await assertProjectEnforcementRunnerAdmission(runners, viberootsRoot);
   const dir = path.join(workspaceRoot, WORKSPACE_BUCK_STATE_DIR);
   await mkdirWithMacosMetadataExclusion(dir);
   await writeIfChanged(path.join(dir, "TARGETS"), renderWorkspaceBuckTargets(runners));

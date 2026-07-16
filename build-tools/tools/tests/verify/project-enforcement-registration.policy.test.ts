@@ -30,24 +30,58 @@ test("project enforcement registration discovers suffix runners without Nix", as
     ["project_enforcement_alpha"],
   );
   assert.match(targets, new RegExp(PROJECT_ENFORCEMENT_LABEL));
-  assert.match(targets, /@viberoots\/\/:project-enforcement-runner\.ts/);
+  assert.match(
+    targets,
+    /@viberoots\/\/build-tools\/tools\/project-enforcement:project-enforcement-runner\.ts/,
+  );
   assert.match(targets, /template_inputs = \["@viberoots/);
+  assert.match(
+    targets,
+    /viberoots_script_path = "build-tools\/tools\/project-enforcement\/project-enforcement-runner\.ts"/,
+  );
   assert.doesNotMatch(targets, /ignored\.test\.ts/);
   assert.doesNotMatch(targets, /\bnix\b/);
 });
 
-test("project enforcement source owns the complete admitted policy runner set", async () => {
-  const runners = await discoverProjectEnforcementRunners(viberootsSourcePath(""));
+test("project enforcement registration follows suffix additions and removals", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "project-enforcement-membership-"));
+  const source = path.join(root, "source");
+  const runnerDir = path.join(source, "build-tools/tools/project-enforcement");
+  await fsp.mkdir(runnerDir, { recursive: true });
+  const alpha = path.join(runnerDir, "alpha.project-enforcement.test.ts");
+  const beta = path.join(runnerDir, "beta.project-enforcement.test.ts");
+  await fsp.writeFile(alpha, "export {};\n");
+  await ensureProjectEnforcementRegistration({ workspaceRoot: root, viberootsRoot: source });
+  await fsp.writeFile(beta, "export {};\n");
+  await ensureProjectEnforcementRegistration({ workspaceRoot: root, viberootsRoot: source });
+  await fsp.rm(alpha);
+  const runners = await ensureProjectEnforcementRegistration({
+    workspaceRoot: root,
+    viberootsRoot: source,
+  });
+  const targets = await fsp.readFile(path.join(root, ".viberoots/workspace/buck/TARGETS"), "utf8");
   assert.deepEqual(
     runners.map((runner) => runner.name),
-    [
-      "project_enforcement_deployment_branches",
-      "project_enforcement_deployment_metadata_secrets",
-      "project_enforcement_file_size",
-      "project_enforcement_process_inspection",
-      "project_enforcement_stale_names",
-    ],
+    ["project_enforcement_beta"],
   );
+  assert.match(targets, /project_enforcement_beta/);
+  assert.doesNotMatch(targets, /project_enforcement_alpha/);
+});
+
+test("project enforcement exports and registration share suffix discovery", async () => {
+  const root = viberootsSourcePath("");
+  const runnerDir = path.join(root, "build-tools/tools/project-enforcement");
+  const suffixFiles = (await fsp.readdir(runnerDir))
+    .filter((file) => file.endsWith(".project-enforcement.test.ts"))
+    .sort();
+  const runners = await discoverProjectEnforcementRunners(root);
+  assert.deepEqual(
+    runners.map((runner) => path.basename(runner.sourcePath)),
+    suffixFiles,
+  );
+  const targets = await fsp.readFile(path.join(runnerDir, "TARGETS"), "utf8");
+  assert.match(targets, /glob\(\["\*\.project-enforcement\.test\.ts"\]\)/);
+  for (const file of suffixFiles) assert.doesNotMatch(targets, new RegExp(`"${file}"`));
 });
 
 test("verify target planning creates the complete workspace Buck package before cquery", async () => {

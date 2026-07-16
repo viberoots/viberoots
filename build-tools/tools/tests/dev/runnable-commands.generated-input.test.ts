@@ -95,7 +95,7 @@ test("p auto source uses filtered flake when root viberoots input is generated w
         "set -euo pipefail",
         `echo "$*" >> ${JSON.stringify(nixLog)}`,
         'args="$*"',
-        'if [[ "$args" == flake\\ prefetch\\ --json\\ --no-use-registries\\ path:* ]]; then',
+        'if [[ "$args" == flake\\ prefetch\\ --json\\ --no-use-registries\\ --option\\ flake-registry\\ \\ path:* ]]; then',
         `  exec ${JSON.stringify(realNixBin)} "$@"`,
         "fi",
         `out=${JSON.stringify(fakeOut)}`,
@@ -138,7 +138,7 @@ test("p auto source uses filtered flake when root viberoots input is generated w
     const escapedRoot = fakeRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     assert.match(
       logTxt,
-      /flake prefetch --json --no-use-registries path:.*\/viberoots/,
+      /flake prefetch --json --no-use-registries --option flake-registry  path:.*\/viberoots/,
       "generated workspace inputs must be materialized to immutable source identity",
     );
     assert.match(

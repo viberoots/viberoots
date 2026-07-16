@@ -42,7 +42,16 @@ export async function materializeFilteredViberootsSource(
   const canonical = await fsp.realpath(inputPath).catch(() => inputPath);
   const prefetched = await runCommand({
     command: nixBin,
-    args: ["flake", "prefetch", "--json", "--no-use-registries", `path:${canonical}`],
+    args: [
+      "flake",
+      "prefetch",
+      "--json",
+      "--no-use-registries",
+      "--option",
+      "flake-registry",
+      "",
+      `path:${canonical}`,
+    ],
     env: nixEnv,
     allowFailure: true,
   });

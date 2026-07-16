@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 
 export type CoordinatorLeaseSubscription = {
+  requestId: string;
   taskKey: string;
   moduleKey: string;
   moduleType: "wasm";
@@ -28,6 +29,19 @@ export type CoordinatorTask = {
   watchPaths: string[];
   syncOuts: string[];
   subscribers: string[];
+  requestIds: string[];
+};
+
+export type CoordinatorResult = {
+  schemaVersion: 1;
+  generation: number;
+  taskKey: string;
+  requestIds: string[];
+  status: "success" | "failure";
+  reason: string;
+  elapsedMs: number;
+  outputs: Array<{ path: string; size: number }>;
+  error?: string;
 };
 
 function normalized(values: string[]): string[] {
@@ -53,6 +67,7 @@ export function normalizeSubscription(
 ): CoordinatorLeaseSubscription {
   return {
     ...sub,
+    requestId: String(sub.requestId || "").trim(),
     taskKey: String(sub.taskKey || "").trim(),
     moduleKey: String(sub.moduleKey || "").trim(),
     moduleType: "wasm",

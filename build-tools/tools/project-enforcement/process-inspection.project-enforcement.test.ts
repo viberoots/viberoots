@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { scanProcessInspectionTree } from "../lib/process-inspection-scanner";
-import { resolveProjectScanContext } from "../lib/repo";
+import { resolveProjectScanContext } from "../lib/workspace-roots";
 
 const context = resolveProjectScanContext();
 const hits = await scanProcessInspectionTree({

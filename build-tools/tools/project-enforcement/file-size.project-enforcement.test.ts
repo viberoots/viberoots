@@ -1,13 +1,19 @@
 #!/usr/bin/env zx-wrapper
-import { findFileSizeOffenders, PROJECT_SOURCE_FILES_SCOPE } from "../dev/file-size-lint";
-import { resolveProjectScanContext } from "../lib/repo";
+import { PROJECT_SOURCE_FILES_SCOPE } from "../dev/file-size-lint-scopes";
+import { scanFileSizeOffenders } from "../dev/file-size-scanner";
+import { listFilesMatching } from "../dev/file-size-globs";
+import { resolveProjectScanContext } from "../lib/workspace-roots";
 
 const context = resolveProjectScanContext();
-const offenders = await findFileSizeOffenders({
+const candidates = await listFilesMatching({
   root: context.workspaceRoot,
-  changedOnly: false,
+  include: PROJECT_SOURCE_FILES_SCOPE.include,
+  exclude: PROJECT_SOURCE_FILES_SCOPE.exclude,
+});
+const offenders = await scanFileSizeOffenders({
+  root: context.workspaceRoot,
+  candidates,
   threshold: 250,
-  failOnOffenders: true,
   allowKnown: false,
   scope: PROJECT_SOURCE_FILES_SCOPE,
 });

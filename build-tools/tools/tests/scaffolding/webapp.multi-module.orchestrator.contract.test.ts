@@ -84,6 +84,13 @@ test("multi-module watcher emits module-scoped deterministic markers", async () 
   assert.match(daemonSource, /\[wasm-watchd\] rebuild:fail seq=/);
   assert.match(source, /\[wasm-watch\] coordinator:registered app_target=/);
   assert.match(source, /\[wasm-watch\] coordinator:refresh modules=/);
+  assert.match(source, /\[wasm-watch\] coordinator:ready lease_id=/);
+  assert.match(source, /requestId: crypto\.randomUUID\(\)/);
+  assert.match(source, /waitForLeaseResults/);
+  assert.doesNotMatch(source, /runBuildStep|copyAtomically|runCoordinatorBuild/);
+  assert.match(daemonSource, /writeCoordinatorResult/);
+  assert.match(daemonSource, /outputs: await outputIdentities\(task\.syncOuts\)/);
+  assert.doesNotMatch(source, /validateCoordinatorOutputs/);
   assert.match(opsSource, /\[wasm-watch\] refresh:ok module_count=/);
   assert.match(source, /specsFromWasmManifest/);
   assert.match(source, /validateTsManifestProbes/);

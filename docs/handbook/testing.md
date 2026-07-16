@@ -84,6 +84,11 @@ full suite is requested. Its source-owned `*.project-enforcement.test.ts` runner
 the generated `workspace_buck` cell and run in the earliest pass group. They are local-only with
 remote cache reads and writes disabled because they inspect the live consumer tree.
 
+The filename suffix is the only runner-membership authority. Source exports use the same suffix
+glob, and generated registration fails closed if imports cannot be resolved. Buck analysis rejects
+any runner that also carries `enforcement`, `isolated`, `isolated-bounded`, `resource-limited`, or
+`manual`; the runtime planner retains the same conflict check.
+
 Project-enforcement runners are limited to deterministic, read-only policy scans. They must not
 invoke Nix, build targets, start services, create temp consumers, or populate dependency caches.
 Ordinary tests under `build-tools/tools/tests/` continue to use fixtures or temp consumers instead
@@ -96,6 +101,16 @@ mixed viberoots/project checks keep their viberoots-owned assertions in the ordi
 Adding a runner requires positive, negative, and allowlist fixture coverage plus evidence that it
 finishes within 30 seconds without Nix realization, dependency-cache population, temp consumers,
 services, or nested Buck daemons. The complete warm pass must remain under 60 seconds.
+
+Registration mechanically scans each runner's local import graph before admission. It rejects
+imports from heavy install, service, and temp-consumer subsystems and rejects direct heavy tool,
+temp, service, dependency-cache, child-process, or dynamic-import operations. Runtime admission
+coverage executes the generated Buck targets against temp consumers, including with
+`VERIFY_SKIP_LINT=1`, and compares owned-process completion, pre-existing consumer-cache
+fingerprints, the canonical immutable source, and Nix-store entries. Root coverage separately proves
+local/submodule and Nix-store remote-source authority against a temp consumer. A focused measured
+run completed the three-case integration in 45.48 seconds; the complete warm pass took less than 60
+seconds, changed none of the guarded paths, and registered no new Nix paths during runner execution.
 
 CI and local `v` use the same target discovery and selection decision. Selection summaries report
 one stable cause: `project-change`, `explicit-project-selector`, `full-suite`, or

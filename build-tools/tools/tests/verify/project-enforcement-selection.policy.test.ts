@@ -44,3 +44,19 @@ test("project enforcement selection covers every authority reason and deduplicat
     PROJECT_ENFORCEMENT_TARGETS,
   ]);
 });
+
+test("VERIFY_SKIP_LINT cannot suppress project-enforcement selection", async () => {
+  const selected = await resolveProjectEnforcementSelection({
+    root: "/fixture",
+    requestedTargets: ["//projects/apps/demo/..."],
+    fullSuite: false,
+    env: { VERIFY_SKIP_LINT: "1" },
+    collectChangedPaths: async () => [],
+  });
+  assert.equal(selected.required, true);
+  assert.equal(selected.reason, "explicit-project-selector");
+  assert.deepEqual(injectProjectEnforcementTarget(["//projects/apps/demo/..."], selected), [
+    "//projects/apps/demo/...",
+    PROJECT_ENFORCEMENT_TARGETS,
+  ]);
+});

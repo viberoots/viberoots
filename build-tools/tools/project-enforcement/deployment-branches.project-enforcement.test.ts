@@ -5,7 +5,7 @@ import {
   DEPLOYMENT_SOURCE_FILE_EXTENSIONS,
   scanDeploymentEnvironmentBranchText,
 } from "../deployments/deployment-environment-branch-scanner";
-import { resolveProjectScanContext } from "../lib/repo";
+import { resolveProjectScanContext } from "../lib/workspace-roots";
 import { listProjectFiles } from "./project-file-tree";
 
 const context = resolveProjectScanContext();

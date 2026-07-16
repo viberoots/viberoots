@@ -1,6 +1,17 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 
+const EXCLUDED_DIRECTORIES = new Set([
+  ".direnv",
+  ".git",
+  ".terraform",
+  "buck-out",
+  "build",
+  "coverage",
+  "dist",
+  "node_modules",
+]);
+
 export async function listProjectFiles(
   root: string,
   predicate: (filePath: string) => boolean,
@@ -13,7 +24,7 @@ export async function listProjectFiles(
     for (const entry of entries) {
       if (entry.isSymbolicLink()) continue;
       const abs = path.join(current, entry.name);
-      if (entry.isDirectory() && entry.name !== ".terraform") stack.push(abs);
+      if (entry.isDirectory() && !EXCLUDED_DIRECTORIES.has(entry.name)) stack.push(abs);
       else if (entry.isFile() && predicate(abs)) files.push(abs);
     }
   }
