@@ -717,6 +717,13 @@ ordinary build-system tests may not. Admitted runners must be deterministic, rea
 30 seconds individually and 60 seconds as a warm pass, and avoid Nix, builds, services, temp
 consumers, dependency caches, and nested Buck daemons.
 
+The admitted policy set is stale names, process-inspection commands, stale deployment environment
+branches, project source-file size, and deployment-metadata secrets. Each generated runner shares
+a pure scanner with its lint preflight or fixture-based ordinary test; mixed assertions retain only
+their viberoots-owned scope in the ordinary lane. CI calls the same requested-scope resolver used by
+local `v`, consumes generated discovery, and emits the same stable selection reason instead of
+owning a second target registry.
+
 ## Template-only selector contract (PR-2)
 
 I keep template test selection as a deterministic tool contract before verify/CI wiring.

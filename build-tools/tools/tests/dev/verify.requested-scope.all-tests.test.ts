@@ -10,6 +10,7 @@ import {
 } from "../../dev/verify/requested-scope";
 import type { VerifyArgs } from "../../dev/verify/args";
 import { PROJECT_ENFORCEMENT_TARGETS } from "../../dev/verify/project-enforcement-selection";
+import { summarizeVerifyScopeDecision } from "../../dev/verify/selection-output";
 
 const defaultArgs: VerifyArgs = {
   coverage: false,
@@ -41,6 +42,7 @@ test("ALL_TESTS forces the default verify selector to all Buck tests", async () 
     PROJECT_ENFORCEMENT_TARGETS,
   ]);
   assert.equal(resolved.selection.projectEnforcementReason, "full-suite");
+  assert.match(summarizeVerifyScopeDecision(resolved.selection), /projectEnforcement=full-suite/);
 });
 
 test("ALL_TESTS=true is accepted as the all-tests override", async () => {
@@ -112,6 +114,19 @@ test("ALL_TESTS remains root-only for flake-installed remote viberoots", async (
       }),
       ["//..."],
     );
+
+    const env = {
+      ALL_TESTS: "1",
+      VIBEROOTS_ROOT: "/nix/store/example-viberoots-source",
+    };
+    const resolved = await resolveRequestedVerifyScope({
+      root: tmp,
+      invocationCwd: tmp,
+      args: defaultArgs,
+      env,
+    });
+    assert.deepEqual(resolved.selection.targets, ["//...", PROJECT_ENFORCEMENT_TARGETS]);
+    assert.equal(resolved.selection.projectEnforcementReason, "full-suite");
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }

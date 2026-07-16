@@ -42,6 +42,11 @@ test("ci buck-test stage uses the shared verify selection resolver", async () =>
     txt.includes("[ci] buck-test selection:"),
     "expected CI buck-test stage to log the resolved selection",
   );
+  assert.doesNotMatch(
+    txt,
+    /PROJECT_ENFORCEMENT_TARGETS|workspace_buck/,
+    "expected CI to consume shared discovery instead of owning a project-enforcement registry",
+  );
 });
 
 test("ci buck-test stage delegates Buck execution through verify passes", async () => {

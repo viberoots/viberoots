@@ -3,6 +3,11 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  DEPLOYMENT_SOURCE_FILE_EXTENSIONS,
+  scanDeploymentEnvironmentBranchText,
+  STALE_BRANCH_REQUIREMENT,
+} from "../../deployments/deployment-environment-branch-scanner";
 import { viberootsRepoPath } from "./deployment-command";
 
 const repoRoot = process.cwd();
@@ -23,15 +28,7 @@ const sourceRoots = [
   "build-tools/deployments",
   "build-tools/tools/deployments",
   "viberoots/build-tools/tools/scaffolding/templates/deployment",
-  "projects/deployments",
 ];
-const sourceFileExts = new Set([".bzl", ".ts", ".tsx", ".js", ".json", ".jsonc", ".jinja"]);
-const negation =
-  /\b(?:not|never|without|instead|reject|rejected|no longer|do not|must not|is not|are not|rather than)\b/i;
-const staleBranchRequirement =
-  /\b(?:allowed_refs|source_ref_policy|promotion|promote|admission|source authority|source ref)[^\n]*(?:^|[^A-Za-z0-9_./-])(?:refs\/heads\/)?env\/(?:<family>|[A-Za-z0-9_.-]+)\/(?:<stage>|[A-Za-z0-9_.-]+)(?=$|[^A-Za-z0-9_./-])/i;
-const releasePointerAuthority =
-  /\brelease[- ]pointer[^\n]*(?:authoritative|source of truth|runtime deployment input)\b/i;
 
 function ownedPath(relPath: string): string {
   if (relPath.startsWith("projects/")) return path.join(repoRoot, relPath);
@@ -45,27 +42,14 @@ async function walkFiles(root: string): Promise<string[]> {
   for (const entry of entries) {
     const rel = path.posix.join(root, entry.name);
     if (entry.isDirectory()) files.push(...(await walkFiles(rel)));
-    else if (sourceFileExts.has(path.extname(entry.name))) files.push(rel);
+    else if (DEPLOYMENT_SOURCE_FILE_EXTENSIONS.has(path.extname(entry.name))) files.push(rel);
   }
   return files;
 }
 
 async function scanFile(relPath: string): Promise<string[]> {
   const text = await fsp.readFile(ownedPath(relPath), "utf8");
-  const errors: string[] = [];
-  if (/\bstage_branches(?:_required)?\b/.test(text)) {
-    errors.push(`${relPath}: must not expose stage_branches in active deployment files`);
-  }
-  for (const [index, line] of text.split(/\r?\n/g).entries()) {
-    if (negation.test(line)) continue;
-    if (staleBranchRequirement.test(line)) {
-      errors.push(`${relPath}:${index + 1}: environment branch must not be normal authority`);
-    }
-    if (releasePointerAuthority.test(line)) {
-      errors.push(`${relPath}:${index + 1}: release-pointer files must not be authoritative`);
-    }
-  }
-  return errors;
+  return scanDeploymentEnvironmentBranchText(relPath, text);
 }
 
 test("active deployment sources and normative docs reject environment-branch authority", async () => {
@@ -76,13 +60,29 @@ test("active deployment sources and normative docs reject environment-branch aut
 });
 
 test("stale branch enforcement catches full Git ref authority examples", () => {
-  assert.match('allowed_refs = ["env/app/prod"]', staleBranchRequirement);
-  assert.match('allowed_refs = ["refs/heads/env/app/prod"]', staleBranchRequirement);
-  assert.match('source_ref_policy = {"prod": "refs/heads/env/app/prod"}', staleBranchRequirement);
-  assert.doesNotMatch('allowed_refs = ["refs/tags/env/app/prod"]', staleBranchRequirement);
+  assert.match('allowed_refs = ["env/app/prod"]', STALE_BRANCH_REQUIREMENT);
+  assert.match('allowed_refs = ["refs/heads/env/app/prod"]', STALE_BRANCH_REQUIREMENT);
+  assert.match('source_ref_policy = {"prod": "refs/heads/env/app/prod"}', STALE_BRANCH_REQUIREMENT);
+  assert.doesNotMatch('allowed_refs = ["refs/tags/env/app/prod"]', STALE_BRANCH_REQUIREMENT);
   assert.doesNotMatch(
     'source_ref_policy = {"prod": "refs/tags/env/app/prod"}',
-    staleBranchRequirement,
+    STALE_BRANCH_REQUIREMENT,
+  );
+});
+
+test("stale branch scanner preserves negative and negated examples", () => {
+  assert.deepEqual(
+    scanDeploymentEnvironmentBranchText("projects/deployments/demo/TARGETS", "stage_branches = []"),
+    [
+      "projects/deployments/demo/TARGETS: must not expose stage_branches in active deployment files",
+    ],
+  );
+  assert.deepEqual(
+    scanDeploymentEnvironmentBranchText(
+      "projects/deployments/demo/README.md",
+      "environment branches must not be normal authority",
+    ),
+    [],
   );
 });
 

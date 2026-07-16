@@ -27,3 +27,8 @@ export const SOURCE_FILES_SCOPE: FileSizeScope = {
     "coverage/**",
   ],
 };
+
+export const PROJECT_SOURCE_FILES_SCOPE: FileSizeScope = {
+  include: SOURCE_FILES_SCOPE.include.map((pattern) => `projects/${pattern}`),
+  exclude: SOURCE_FILES_SCOPE.exclude,
+};

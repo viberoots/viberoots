@@ -3,6 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import {
+  DEPLOYMENT_METADATA_FILE_PATTERN,
+  scanDeploymentMetadataSecrets,
+} from "../../deployments/deployment-metadata-secret-scanner";
 import { viberootsRepoPath } from "./deployment-command";
 
 const repoRoot = process.cwd();
@@ -29,7 +33,7 @@ const allowedInfisicalImports = new Set([
   "deployment-secret-runtime-worker.ts",
   "deployment-secret-worker-runtime-metadata.ts",
 ]);
-const checkedInMetadataRoots = ["projects/deployments", "build-tools/deployments"];
+const checkedInMetadataRoots = ["build-tools/deployments"];
 const docsWithInfisicalExamples = [
   "docs/deployment-secrets-api.md",
   "docs/deployments-usage.md",
@@ -99,28 +103,34 @@ test("checked-in deployment metadata keeps Infisical secret material out of repo
       checkedInMetadataRoots.map((root) =>
         walkFiles(
           root.startsWith("build-tools/") ? viberootsRepoPath(root) : path.join(repoRoot, root),
-          (filePath) => /\.(bzl|json|md|nix|tf)$/.test(filePath),
+          (filePath) => DEPLOYMENT_METADATA_FILE_PATTERN.test(filePath),
         ),
       ),
     )
   ).flat();
-  const forbidden = [
-    /\bINFISICAL_ACCESS_TOKEN\s*=/,
-    /\bINFISICAL_TOKEN\s*=/,
-    /\bINFISICAL_PERSONAL_TOKEN\s*=/,
-    /\binfisical_access_token\b/i,
-    /\binfisical_personal_token\b/i,
-    /\bclient_secret\s*[:=]\s*["'][^"']+["']/i,
-    /\bsecret_value\s*[:=]\s*["'][^"']+["']/i,
-  ];
   const violations: string[] = [];
   for (const filePath of files) {
     const text = await fsp.readFile(filePath, "utf8");
-    forbidden.forEach((pattern) => {
-      if (pattern.test(text)) violations.push(`${relative(filePath)} matches ${pattern}`);
-    });
+    violations.push(...scanDeploymentMetadataSecrets(relative(filePath), text));
   }
   assert.deepEqual(violations, []);
+});
+
+test("deployment metadata secret scanner preserves positive and safe-reference behavior", () => {
+  assert.equal(
+    scanDeploymentMetadataSecrets(
+      "projects/deployments/demo/TARGETS",
+      'client_secret = "raw-value"',
+    ).length,
+    1,
+  );
+  assert.deepEqual(
+    scanDeploymentMetadataSecrets(
+      "projects/deployments/demo/TARGETS",
+      'client_secret_ref = "secret://deployments/demo/client-secret"',
+    ),
+    [],
+  );
 });
 
 test("Infisical docs keep examples non-secret and admin commands read-only", async () => {

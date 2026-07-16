@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import {
+  discoverProjectEnforcementRunners,
   ensureProjectEnforcementRegistration,
   PROJECT_ENFORCEMENT_LABEL,
 } from "../../lib/project-enforcement-registration";
@@ -33,6 +34,20 @@ test("project enforcement registration discovers suffix runners without Nix", as
   assert.match(targets, /template_inputs = \["@viberoots/);
   assert.doesNotMatch(targets, /ignored\.test\.ts/);
   assert.doesNotMatch(targets, /\bnix\b/);
+});
+
+test("project enforcement source owns the complete admitted policy runner set", async () => {
+  const runners = await discoverProjectEnforcementRunners(viberootsSourcePath(""));
+  assert.deepEqual(
+    runners.map((runner) => runner.name),
+    [
+      "project_enforcement_deployment_branches",
+      "project_enforcement_deployment_metadata_secrets",
+      "project_enforcement_file_size",
+      "project_enforcement_process_inspection",
+      "project_enforcement_stale_names",
+    ],
+  );
 });
 
 test("verify target planning creates the complete workspace Buck package before cquery", async () => {

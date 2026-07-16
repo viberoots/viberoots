@@ -89,6 +89,18 @@ invoke Nix, build targets, start services, create temp consumers, or populate de
 Ordinary tests under `build-tools/tools/tests/` continue to use fixtures or temp consumers instead
 of inspecting live `projects/` contents.
 
+The admitted runner set enforces stale names, direct process-inspection commands, stale deployment
+environment branches, the 250-line project source limit, and deployment-metadata secret material.
+Each runner delegates to the same pure scanner used by ordinary fixture tests or lint preflights;
+mixed viberoots/project checks keep their viberoots-owned assertions in the ordinary test lane.
+Adding a runner requires positive, negative, and allowlist fixture coverage plus evidence that it
+finishes within 30 seconds without Nix realization, dependency-cache population, temp consumers,
+services, or nested Buck daemons. The complete warm pass must remain under 60 seconds.
+
+CI and local `v` use the same target discovery and selection decision. Selection summaries report
+one stable cause: `project-change`, `explicit-project-selector`, `full-suite`, or
+`unavailable-change-authority`. CI must not maintain a separate runner list.
+
 ### Verify helper
 
 - Default scoped verify:

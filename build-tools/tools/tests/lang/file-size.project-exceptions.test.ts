@@ -6,7 +6,11 @@ import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 import { test } from "node:test";
-import { SOURCE_FILES_SCOPE, findFileSizeOffenders } from "../../dev/file-size-lint";
+import {
+  PROJECT_SOURCE_FILES_SCOPE,
+  SOURCE_FILES_SCOPE,
+  findFileSizeOffenders,
+} from "../../dev/file-size-lint";
 import {
   METHODOLOGY_EXCEPTIONS_FILENAME,
   resolveSourceFileSizeExceptionPaths,
@@ -160,5 +164,40 @@ test("repo-root file-size exceptions are rejected", async () => {
     );
 
     await assert.rejects(resolveSourceFileSizeExceptionPaths(tmp), /must not live at repo root/);
+  });
+});
+
+test("project source scope rejects an unlisted offender and preserves owner-local exceptions", async () => {
+  await withTempRoot("file-size-project-scope", async (tmp) => {
+    const project = path.join(tmp, "projects/apps/demo");
+    await fsp.mkdir(path.join(project, "src"), { recursive: true });
+    await fsp.writeFile(
+      path.join(project, METHODOLOGY_EXCEPTIONS_FILENAME),
+      JSON.stringify({
+        sourceFileSizeExceptions: [
+          { path: "src/allowed.ts", justification: "Generated project source fixture." },
+        ],
+      }),
+    );
+    await fsp.writeFile(path.join(project, "src/allowed.ts"), oversizedModule(260));
+    await fsp.writeFile(path.join(project, "src/rejected.ts"), oversizedModule(270));
+    await fsp.writeFile(path.join(project, "src/untracked.ts"), oversizedModule(275));
+    await fsp.mkdir(path.join(tmp, "build-tools"), { recursive: true });
+    await fsp.writeFile(path.join(tmp, "build-tools/ignored.ts"), oversizedModule(280));
+    await initTrackedFixture(tmp);
+    await execFileAsync("git", ["reset", "projects/apps/demo/src/untracked.ts"], { cwd: tmp });
+
+    const offenders = await findFileSizeOffenders({
+      root: tmp,
+      changedOnly: false,
+      threshold: 250,
+      failOnOffenders: true,
+      allowKnown: false,
+      scope: PROJECT_SOURCE_FILES_SCOPE,
+    });
+    assert.deepEqual(offenders, [
+      { file: "projects/apps/demo/src/untracked.ts", lines: 275 },
+      { file: "projects/apps/demo/src/rejected.ts", lines: 270 },
+    ]);
   });
 });

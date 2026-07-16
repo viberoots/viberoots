@@ -5,3 +5,17 @@ export_file(
     src = "stale-names.project-enforcement.test.ts",
     visibility = ["PUBLIC"],
 )
+
+[
+    export_file(
+        name = runner,
+        src = runner,
+        visibility = ["PUBLIC"],
+    )
+    for runner in [
+        "deployment-branches.project-enforcement.test.ts",
+        "deployment-metadata-secrets.project-enforcement.test.ts",
+        "file-size.project-enforcement.test.ts",
+        "process-inspection.project-enforcement.test.ts",
+    ]
+]

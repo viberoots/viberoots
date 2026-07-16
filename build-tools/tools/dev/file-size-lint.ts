@@ -4,14 +4,18 @@ import { fileURLToPath } from "node:url";
 import * as fsp from "node:fs/promises";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { SOURCE_FILES_SCOPE, type FileSizeScope } from "./file-size-lint-scopes";
+import {
+  PROJECT_SOURCE_FILES_SCOPE,
+  SOURCE_FILES_SCOPE,
+  type FileSizeScope,
+} from "./file-size-lint-scopes";
 import { resolveSourceFileSizeExceptionPaths } from "./file-size-lint-exceptions";
 import {
   parseFileSizeLintArgs,
   type FileSizeLintOptions as Options,
 } from "./file-size-lint-options";
 import { listFilesMatching } from "./file-size-globs";
-export { SOURCE_FILES_SCOPE, type FileSizeScope };
+export { PROJECT_SOURCE_FILES_SCOPE, SOURCE_FILES_SCOPE, type FileSizeScope };
 
 const execFileAsync = promisify(execFile);
 
@@ -19,12 +23,16 @@ function normalizeRelPath(p: string): string {
   return p.replaceAll("\\", "/").replace(/^\.\/+/, "");
 }
 
-async function listTrackedFilesFromRoot(root: string): Promise<string[]> {
+async function listSourceFilesFromRoot(root: string): Promise<string[]> {
   try {
-    const { stdout } = await execFileAsync("git", ["ls-files", "-z"], {
-      cwd: root,
-      encoding: "utf8",
-    });
+    const { stdout } = await execFileAsync(
+      "git",
+      ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+      {
+        cwd: root,
+        encoding: "utf8",
+      },
+    );
     return String(stdout || "")
       .split("\0")
       .filter(Boolean)
@@ -78,7 +86,7 @@ async function listChangedFilesFromRoot(root: string): Promise<string[]> {
       .filter(Boolean);
     if (changed.length > 0) return changed;
   } catch {}
-  return listTrackedFilesFromRoot(root);
+  return listSourceFilesFromRoot(root);
 }
 
 async function countLines(file: string): Promise<number> {
@@ -108,21 +116,24 @@ function sameList(left: readonly string[], right: readonly string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
 
-function isDefaultFileSizeScope(scope: FileSizeScope): boolean {
-  return (
+function usesSourceFileSizeExceptions(scope: FileSizeScope): boolean {
+  const isDefault =
     sameList(scope.include, SOURCE_FILES_SCOPE.include) &&
-    sameList(scope.exclude, SOURCE_FILES_SCOPE.exclude)
-  );
+    sameList(scope.exclude, SOURCE_FILES_SCOPE.exclude);
+  const isProject =
+    sameList(scope.include, PROJECT_SOURCE_FILES_SCOPE.include) &&
+    sameList(scope.exclude, PROJECT_SOURCE_FILES_SCOPE.exclude);
+  return isDefault || isProject;
 }
 
 export async function findFileSizeOffenders(opts: Options): Promise<FileOffender[]> {
   const root = opts.root;
   const base = opts.changedOnly
     ? await listChangedFilesFromRoot(root)
-    : await listTrackedFilesFromRoot(root);
+    : await listSourceFilesFromRoot(root);
   const inScope = await listScopeMatches(root, opts.scope);
   const ownerLocalExceptions = new Set(
-    isDefaultFileSizeScope(opts.scope) ? await resolveSourceFileSizeExceptionPaths(root) : [],
+    usesSourceFileSizeExceptions(opts.scope) ? await resolveSourceFileSizeExceptionPaths(root) : [],
   );
 
   const offenders: FileOffender[] = [];
@@ -154,7 +165,7 @@ async function runCli() {
   const opts = parseFileSizeLintArgs();
   const offenders = await findFileSizeOffenders(opts);
   if (offenders.length === 0) return;
-  const knownPaths = isDefaultFileSizeScope(opts.scope)
+  const knownPaths = usesSourceFileSizeExceptions(opts.scope)
     ? await resolveSourceFileSizeExceptionPaths(opts.root)
     : [];
   const { unknown, known } = opts.allowKnown

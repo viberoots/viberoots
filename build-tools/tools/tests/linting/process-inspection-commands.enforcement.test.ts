@@ -1,132 +1,15 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
-import path from "node:path";
+import assert from "node:assert/strict";
 import { test } from "node:test";
-
-const EXCLUDED_DIRS = new Set([
-  ".claude",
-  ".codex",
-  ".git",
-  ".viberoots",
-  "backups",
-  "codex-test-logs",
-  ".direnv",
-  ".nix-zsh",
-  "buck-out",
-  "coverage",
-  "dist",
-  "docs",
-  "node_modules",
-  "result",
-  "pr-logs",
-  "test-logs",
-]);
-
-const ALLOWED_PATHS = new Set([
-  "build-tools/tools/bin/kill-all",
-  "build-tools/tools/dev/tail-log/resolve.ts",
-  "build-tools/tools/dev/verify/lock.ts",
-  "build-tools/tools/dev/verify/owned-process-state.ts",
-  "build-tools/tools/dev/verify/process-control.ts",
-  "build-tools/tools/dev/verify/temp-repo-process-cleanup.ts",
-  "build-tools/tools/lib/process-inspection.ts",
-  "build-tools/tools/lib/open-file-inspection.ts",
-  "build-tools/tools/lib/shared-buck-isolation-lock.ts",
-  "build-tools/tools/tests/dev/verify.orphan-owned-process-cleanup.helpers.ts",
-  "build-tools/tools/tests/dev/verify.temp-repo-buck-cleanup.scoped.test.ts",
-  "build-tools/tools/tests/lib/buck-daemon-cleanup.interrupted.test.ts",
-  "build-tools/tools/tests/lib/buck-daemon-cleanup.non-disruptive.test.ts",
-  "build-tools/tools/tests/lib/buck-daemon-reaper.exits-after-parent-exit.test.ts",
-  "build-tools/tools/tests/lib/buck-daemon-reaper.ts",
-  "build-tools/tools/tests/lib/buck-daemon-reaper.verify-owned-processes.test.ts",
-  "build-tools/tools/tests/lib/buck-procs.ps-fallback.test.ts",
-  "build-tools/tools/tests/lib/process-inspection.safehouse.test.ts",
-  "build-tools/tools/tests/lib/open-file-inspection.test.ts",
-  "build-tools/tools/tests/lib/process-tree.ts",
-  "build-tools/tools/tests/lib/test-helpers/buck-procs.ts",
-  "build-tools/tools/tests/lib/test-helpers/buck-reaper.ts",
-  "build-tools/tools/tests/linting/process-inspection-commands.enforcement.test.ts",
-  "TESTING.md",
-  "ps.txt",
-]);
-
-const ALLOWED_PATH_PATTERNS = [/^projects\/apps\/[^/]+\/e2e\/process-control\.ts$/];
-
-const PROCESS_INSPECTION_PATTERNS: Array<{ re: RegExp; label: string }> = [
-  { re: /resolveToolPath(?:Sync)?\(["']ps["']\)/g, label: "ps tool resolution" },
-  { re: /(?:^|[^A-Za-z0-9_-])\/bin\/ps(?:$|[^A-Za-z0-9_-])/g, label: "/bin/ps" },
-  { re: /(?:^|[^A-Za-z0-9_-])ps\s+-[A-Za-z]/g, label: "ps command" },
-  { re: /(?:^|[^A-Za-z0-9_-])pgrep(?:$|[^A-Za-z0-9_-])/g, label: "pgrep command" },
-  { re: /(?:^|[^A-Za-z0-9_-])pkill(?:$|[^A-Za-z0-9_-])/g, label: "pkill command" },
-  { re: /(?:^|[^A-Za-z0-9_-])killall(?:$|[^A-Za-z0-9_-])/g, label: "killall command" },
-  { re: /(?:^|[^A-Za-z0-9_-])lsof(?:$|[^A-Za-z0-9_-])/g, label: "lsof command" },
-];
-
-function normalizeRel(p: string): string {
-  return p.replaceAll("\\", "/").replace(/^\.\/+/, "");
-}
-
-function reviewedRel(p: string): string {
-  const rel = normalizeRel(p);
-  return rel.startsWith("viberoots/") ? rel.slice("viberoots/".length) : rel;
-}
-
-function isExcludedDir(relDir: string): boolean {
-  return normalizeRel(relDir)
-    .split("/")
-    .filter(Boolean)
-    .some((part) => EXCLUDED_DIRS.has(part));
-}
-
-function lineNumberForOffset(text: string, offset: number): number {
-  return text.slice(0, offset).split("\n").length;
-}
-
-async function listRepoFiles(repoRoot: string): Promise<string[]> {
-  const files: string[] = [];
-  const stack = [repoRoot];
-
-  while (stack.length > 0) {
-    const cur = stack.pop()!;
-    const relDir = normalizeRel(path.relative(repoRoot, cur));
-    if (isExcludedDir(relDir)) continue;
-
-    for (const entry of await fsp.readdir(cur, { withFileTypes: true })) {
-      const abs = path.join(cur, entry.name);
-      if (entry.isDirectory()) {
-        stack.push(abs);
-        continue;
-      }
-      if (entry.isFile()) files.push(abs);
-    }
-  }
-
-  return files.sort((a, b) => a.localeCompare(b));
-}
+import {
+  isProcessInspectionPathAllowed,
+  scanProcessInspectionText,
+  scanProcessInspectionTree,
+} from "../../lib/process-inspection-scanner";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("process inspection commands stay in reviewed helper modules", async () => {
-  const repoRoot = process.cwd();
-  const hits: string[] = [];
-
-  for (const abs of await listRepoFiles(repoRoot)) {
-    const rel = normalizeRel(path.relative(repoRoot, abs));
-    const reviewed = reviewedRel(rel);
-    if (ALLOWED_PATHS.has(reviewed)) continue;
-    if (ALLOWED_PATH_PATTERNS.some((pattern) => pattern.test(reviewed))) continue;
-
-    let text = "";
-    try {
-      text = await fsp.readFile(abs, "utf8");
-    } catch {
-      continue;
-    }
-
-    for (const pattern of PROCESS_INSPECTION_PATTERNS) {
-      for (const match of text.matchAll(pattern.re)) {
-        hits.push(`${rel}:${lineNumberForOffset(text, match.index ?? 0)} direct ${pattern.label}`);
-      }
-    }
-  }
+  const hits = await scanProcessInspectionTree({ root: viberootsSourcePath("") });
 
   if (hits.length > 0) {
     throw new Error(
@@ -137,4 +20,16 @@ test("process inspection commands stay in reviewed helper modules", async () => 
       ].join("\n"),
     );
   }
+});
+
+test("process inspection scanner preserves positive, negative, and project allowlist behavior", () => {
+  assert.deepEqual(scanProcessInspectionText("projects/apps/demo/src/run.ts", "ps -axo pid"), [
+    "projects/apps/demo/src/run.ts:1 direct ps command",
+  ]);
+  assert.deepEqual(scanProcessInspectionText("projects/apps/demo/src/run.ts", "elapsed = 1"), []);
+  assert.equal(isProcessInspectionPathAllowed("projects/apps/demo/e2e/process-control.ts"), true);
+  assert.deepEqual(
+    scanProcessInspectionText("projects/apps/demo/e2e/process-control.ts", "pkill worker"),
+    [],
+  );
 });
