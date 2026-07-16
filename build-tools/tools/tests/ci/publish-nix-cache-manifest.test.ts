@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import fs from "node:fs";
 import { test } from "node:test";
 import {
   buildCacheManifest,
@@ -194,4 +195,32 @@ test("cache publishing can restrict PATH to the remote-ci-tools closure", () => 
     PATH: "/nix/store/remote-ci-tools/bin",
   });
   assert.throws(() => remoteCiToolsPathEnv("/tmp/tools", {}), /expected Nix store path/);
+});
+
+test("all cache publication entrypoints perform fixed protected admission before work", () => {
+  const ciRoot = "viberoots/build-tools/tools/ci";
+  const publicationEntrypoints = fs
+    .readdirSync(ciRoot, { recursive: true })
+    .map((entry) => String(entry))
+    .filter((entry) => entry.endsWith(".ts") && entry !== "cache-manifest.ts")
+    .filter((entry) =>
+      fs.readFileSync(`${ciRoot}/${entry}`, "utf8").includes("renderPublisherCommand"),
+    );
+  assert.deepEqual(publicationEntrypoints, [
+    "publish-nix-cache-manifest.ts",
+    "wheelhouse-preload.ts",
+  ]);
+  for (const entrypoint of publicationEntrypoints) {
+    const source = fs.readFileSync(`${ciRoot}/${entrypoint}`, "utf8");
+    const admission = source.indexOf("await admitCachePublication");
+    assert.match(source, /cache-publication-policy/);
+    assert.ok(admission > 0 && admission < source.indexOf("writeManifest("));
+    const firstBuild = Math.max(source.indexOf("await packageNamesForCurrentSystem"), 0);
+    const firstWheelhouseEval = Math.max(source.indexOf("await currentSystem"), 0);
+    assert.ok(admission < Math.max(firstBuild, firstWheelhouseEval));
+  }
+  const authority = fs.readFileSync(`${ciRoot}/cache-publication-policy.ts`, "utf8");
+  assert.match(authority, /purpose: "cache-publication"/);
+  assert.match(authority, /inspectWorkspaceArtifactSource/);
+  assert.match(authority, /admitArtifactContext/);
 });

@@ -11,6 +11,11 @@ import { runNodeWithZx } from "../lib/node-run";
 import { buildToolPath, buildToolsRoot } from "../dev/dev-build/paths";
 import { runCiBuckTestStage } from "./buck-test-stage";
 import { runWheelhousePreload } from "./wheelhouse-preload";
+import { classifyArtifactBuild } from "../lib/artifact-build-policy";
+import {
+  admitArtifactContext,
+  inspectWorkspaceArtifactSource,
+} from "../dev/artifact-policy-inspection";
 
 type Stage =
   | "codegen"
@@ -149,14 +154,29 @@ async function main() {
       await runTool(target, ["--scope=source", "--fail=true"]);
       break;
     }
-    case "nix-build-graph-generator":
+    case "nix-build-graph-generator": {
       // Optional: if the flake doesn't expose graph-generator, skip gracefully in local runs
+      const source = await inspectWorkspaceArtifactSource({
+        workspaceRoot,
+        targetPackages: [],
+      });
+      await admitArtifactContext({
+        classification: classifyArtifactBuild({
+          diagnosticImpure: false,
+          localDevelopment: source.localDevelopment,
+        }),
+        purpose: "ci",
+        impureEvaluation: false,
+        workspaceRoot,
+        toolNames: ["git"],
+      });
       try {
         await $`nix build .#graph-generator --no-link`;
       } catch (e) {
         console.warn("graph-generator attribute missing; skipping nix build stage");
       }
       break;
+    }
     case "buck-test":
       await runCiBuckTestStage();
       break;

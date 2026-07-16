@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { buildSelectedOutPath } from "../dev/run-runnable-graph";
 import { resolveSelectedTargetLabel } from "../dev/target-label-resolver";
 import { getFlagStr, getPositionalsWithValueFlags } from "../lib/cli";
 import type { DeploymentTarget } from "./contract";
@@ -8,6 +7,7 @@ import { resolveDeploymentFromTarget } from "./deployment-query";
 import {
   artifactDirFromBuiltOutPath,
   buildArtifactDirsByComponentId,
+  buildDeploymentSelectedOutPath,
   parseComponentArtifactDirs,
 } from "./deployment-component-artifact-dirs";
 
@@ -114,7 +114,7 @@ export async function resolveArtifactDirForCli(
 ): Promise<string> {
   const artifactDir = getFlagStr("artifact-dir", "").trim();
   if (artifactDir) return path.resolve(artifactDir);
-  const outPath = await buildSelectedOutPath(workspaceRoot, deployment.component.target);
+  const outPath = await buildDeploymentSelectedOutPath(workspaceRoot, deployment.component.target);
   return artifactDirFromBuiltOutPath(deployment.component.kind, outPath);
 }
 

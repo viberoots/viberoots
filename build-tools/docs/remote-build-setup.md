@@ -55,6 +55,17 @@ The current implementation uses conventional flake outputs, graph-generator pack
 
 Remote builders are not automatically used for every `nix build` invocation in this repository:
 
+Artifact policy diagnostics summarize effective builder, substituter, and sandbox state as stable
+categories. They intentionally omit builder hosts, cache URLs, keys, credentials, and other machine
+identity. CI, release, cache-publication, provenance, and deployment jobs reject explicit
+local-development or diagnostic-impure artifact classifications; an unavailable or malformed
+effective Nix configuration, unknown sandbox/builders/substituters, or unavailable source inventory
+also fails those protected jobs closed. Cache manifest publication performs this admission before
+building or uploading any output. Deployment artifact builders and CI graph materialization use
+fixed protected purposes, so ambient `VBR_ARTIFACT_JOB` cannot downgrade those operations. This is
+provisional admission evidence, not yet the
+independent-builder proof required for the hermetic-build claim.
+
 - `.envrc` injects `NIX_CONFIG` with empty `builders =`, empty `build-hook =`, and `max-jobs = auto` unless `NIX_CONFIG` already contains `builders =`.
 - Known local-only Nix paths include `build-tools/tools/dev/node-modules-build.ts`, `build-tools/tools/buck/node-cli-bundle.ts`, update-pnpm-hash/store-refresh helpers, and some tests/scaffolding helpers that pass `--builders ""`.
 - Most selected-target Nix builds can use configured builders if the environment allows them, but repo-local wrappers may intentionally prefer local builds for latency, reproducibility, or store-cache behavior.

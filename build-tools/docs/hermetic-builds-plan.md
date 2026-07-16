@@ -97,6 +97,22 @@ assumption or known integration risk. Review and close every entry at PR-3 and P
 - Until PR-4, broad environment inheritance and unqualified Buck action tools remain gaps.
 - Until PR-5, hermeticity is enforced locally but lacks the independent-builder release proof.
 
+### PR-1 Deferred Full-Suite Record
+
+- Commit: the PR-1 commit containing this record.
+- Turbo Mode base: `0b93ea6b564cf84e45669de3df99d59cfdcab484`.
+- Focused validation: `i && b && v` with the complete 18-selector affected union and the canonical
+  five-target enforcement floor. The command, elapsed time, selector list, and bounded disk and Nix
+  deltas are recorded in
+  `.viberoots/workspace/buck/codex-test-logs/i-b-v-hermetic-pr1-final.evidence.log`; complete command
+  output is in the sibling `i-b-v-hermetic-pr1-final.log`.
+- Broader validation deferred: `ALL_TESTS=1` remains mandatory at the PR-3 checkpoint under the
+  Turbo Mode policy.
+- Open integration assumptions: graph selection and ordinary materialization may still require
+  impure evaluation until PR-2; relevant untracked inputs retain the provisional local-development
+  contract until PR-3; environment and tool qualification remain PR-4 scope; independent-builder
+  agreement remains PR-5 scope.
+
 ## PR-1: Establish Hermetic Policy Authority And Evidence
 
 ### 1. Intent

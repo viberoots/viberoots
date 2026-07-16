@@ -1,6 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { getFlagStr } from "../lib/cli";
+import { getFlagBool, getFlagStr } from "../lib/cli";
 import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import {
   buildCacheManifest,
@@ -8,8 +8,10 @@ import {
   renderPublisherCommand,
   writeManifest,
 } from "./cache-manifest";
+import { admitCachePublication } from "./cache-publication-policy";
 
 export async function runWheelhousePreload(): Promise<void> {
+  await admitCachePublication({ env: process.env, diagnosticImpure: getFlagBool("impure") });
   const to = getFlagStr("to", process.env.NIX_CACHE_TO || "");
   const manifestOut = getFlagStr("manifest-out", "buck-out/tmp/wheelhouse-cache-manifest.json");
   const system = await currentSystem();

@@ -7,6 +7,13 @@ export function artifactDirFromBuiltOutPath(componentKind: string, outPath: stri
   return componentKind === "static-webapp" ? path.join(outPath, "dist") : outPath;
 }
 
+export async function buildDeploymentSelectedOutPath(
+  workspaceRoot: string,
+  target: string,
+): Promise<string> {
+  return await buildSelectedOutPath(workspaceRoot, target, "auto", { purpose: "deployment" });
+}
+
 export async function buildArtifactDirsByComponentId(
   workspaceRoot: string,
   deployment: DeploymentTarget,
@@ -14,7 +21,7 @@ export async function buildArtifactDirsByComponentId(
   return Object.fromEntries(
     await Promise.all(
       deployment.components.map(async (component) => {
-        const outPath = await buildSelectedOutPath(workspaceRoot, component.target);
+        const outPath = await buildDeploymentSelectedOutPath(workspaceRoot, component.target);
         return [component.id, artifactDirFromBuiltOutPath(component.kind, outPath)] as const;
       }),
     ),

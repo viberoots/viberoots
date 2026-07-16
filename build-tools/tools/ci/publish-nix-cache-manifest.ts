@@ -16,6 +16,7 @@ import {
   sourcePlanEvidenceFromGraphFile,
   type SourcePlanEvidence,
 } from "../lib/source-plan-evidence";
+import { admitCachePublication } from "./cache-publication-policy";
 
 type ExtraOutputs = { graph?: string[]; targets?: string[] };
 
@@ -27,6 +28,11 @@ async function main() {
   const backend = getFlagStr("backend", "none") as CacheBackendKind;
   const destination = getFlagStr("to", process.env.NIX_CACHE_TO || "");
   const dryRun = getFlagBool("dry-run") || backend === "none";
+  await admitCachePublication({
+    env: process.env,
+    diagnosticImpure: getFlagBool("impure"),
+    toolNames: backend === "attic" || backend === "cachix" ? [backend] : [],
+  });
   const packageNames = await packageNamesForCurrentSystem();
   const selectedGraphAttrs = getRepeatedFlag("selected-graph-attr");
   const selectedTargetAttrs = getRepeatedFlag("selected-target-attr");

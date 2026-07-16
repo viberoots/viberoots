@@ -3,11 +3,12 @@ import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { ensureGraph } from "../buck/glue-run";
 import { runNixBuildWithProgress } from "./run-runnable-nix";
-import { untrackedRequiresImpureForTargets } from "./dev-build/untracked";
-import { makeFilteredFlakeRef } from "./filtered-flake";
 import { resolveFinalPnpmStore } from "./update-pnpm-hash/realized-store";
 import { pnpmStoreAttrFromImporter } from "./update-pnpm-hash/paths";
 import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
+import type { ArtifactJobPurpose } from "../lib/artifact-build-policy";
+import { targetPackageFromLabel } from "../lib/artifact-source-inventory";
+import { chooseRunnableFlakeRef } from "./run-runnable-source";
 
 async function withScopedGraphEnv<T>(
   workspaceRoot: string,
@@ -46,110 +47,21 @@ function lastOutPath(stdout: string, err: string): string {
   return outPath;
 }
 
-function targetPackageFromLabel(target: string): string {
-  const t = String(target || "").trim();
-  const noCell = t.startsWith("root//") ? t.slice("root//".length - 2) : t;
-  if (!noCell.startsWith("//")) return "";
-  const body = noCell.slice(2);
-  const idx = body.indexOf(":");
-  return idx >= 0 ? body.slice(0, idx) : body;
-}
-
-function isLikelyTempWorkspace(workspaceRoot: string): boolean {
-  const workspaceAbs = path.resolve(workspaceRoot);
-  return (
-    workspaceAbs.startsWith("/tmp/") ||
-    workspaceAbs.startsWith("/private/tmp/") ||
-    workspaceAbs.startsWith("/private/var/folders/") ||
-    workspaceAbs.includes(`${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`)
-  );
-}
-
-async function hasGeneratedWorkspaceViberootsInput(workspaceRoot: string): Promise<boolean> {
-  const flakePath = path.join(workspaceRoot, "flake.nix");
-  const text = await fsp.readFile(flakePath, "utf8").catch(() => "");
-  return /\bviberoots\.url\s*=\s*"path:\.\/\.viberoots\/workspace\/viberoots-flake-input"/.test(
-    text,
-  );
-}
-
-async function chooseFlakeRef(opts: {
-  workspaceRoot: string;
-  target?: string;
-  sourceMode: "auto" | "git" | "path";
-  attr: "graph-generator" | "graph-generator-selected";
-}): Promise<{ flakeRef: string; workspaceRoot?: string; cleanup?: () => Promise<void> }> {
-  if (opts.sourceMode === "path") return { flakeRef: `path:${opts.workspaceRoot}#${opts.attr}` };
-  if (opts.sourceMode === "git") return { flakeRef: `${opts.workspaceRoot}#${opts.attr}` };
-  if (isLikelyTempWorkspace(opts.workspaceRoot))
-    return { flakeRef: `path:${path.resolve(opts.workspaceRoot)}#${opts.attr}` };
-
-  try {
-    if (await hasGeneratedWorkspaceViberootsInput(opts.workspaceRoot)) {
-      console.warn(
-        "[run-runnable] Falling back to filtered flake source because root flake uses generated viberoots workspace input",
-      );
-      const filtered = await makeFilteredFlakeRef({
-        workspaceRoot: opts.workspaceRoot,
-        attr: opts.attr,
-        logPrefix: "[run-runnable]",
-        target: opts.target,
-      });
-      return {
-        flakeRef: filtered.flakeRef,
-        workspaceRoot: filtered.workspaceRoot,
-        cleanup: filtered.cleanup,
-      };
-    }
-
-    const { stdout } = await $({
-      stdio: "pipe",
-      cwd: opts.workspaceRoot,
-    })`git ls-files --others --exclude-standard`;
-    const untracked = String(stdout || "")
-      .trim()
-      .split("\n")
-      .map((x) => x.trim())
-      .filter(Boolean);
-    if (untracked.length === 0) return { flakeRef: `${opts.workspaceRoot}#${opts.attr}` };
-
-    const targetPackages = opts.target ? [targetPackageFromLabel(opts.target)].filter(Boolean) : [];
-    const decision = untrackedRequiresImpureForTargets({ untracked, targetPackages });
-    if (!decision.requiresImpure) return { flakeRef: `${opts.workspaceRoot}#${opts.attr}` };
-
-    console.warn(
-      "[run-runnable] Falling back to path flake source due to relevant untracked files:",
-    );
-    for (const f of decision.relevant.slice(0, 50)) console.warn(` - ${f}`);
-    if (decision.relevant.length > 50) {
-      console.warn(` ... and ${decision.relevant.length - 50} more`);
-    }
-    const filtered = await makeFilteredFlakeRef({
-      workspaceRoot: opts.workspaceRoot,
-      attr: opts.attr,
-      logPrefix: "[run-runnable]",
-      target: opts.target,
-    });
-    return {
-      flakeRef: filtered.flakeRef,
-      workspaceRoot: filtered.workspaceRoot,
-      cleanup: filtered.cleanup,
-    };
-  } catch {
-    return { flakeRef: `${opts.workspaceRoot}#${opts.attr}` };
-  }
-}
-
 export async function buildRunnableManifest(
   workspaceRoot: string,
-  opts?: { sourceMode?: "auto" | "git" | "path"; target?: string },
+  opts?: {
+    sourceMode?: "auto" | "git" | "path";
+    target?: string;
+    purpose?: ArtifactJobPurpose;
+  },
 ): Promise<string> {
   const sourceMode = opts?.sourceMode || "auto";
-  const source = await chooseFlakeRef({
+  const source = await chooseRunnableFlakeRef({
     workspaceRoot,
     sourceMode,
     target: opts?.target,
     attr: "graph-generator",
+    purpose: opts?.purpose || "local",
   });
   const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
   const baseEnv: Record<string, string> = {
@@ -200,13 +112,21 @@ export async function buildSelectedOutPath(
   workspaceRoot: string,
   target: string,
   sourceMode: "auto" | "git" | "path" = "auto",
-  label: string = `build selected target ${target}`,
+  labelOrOptions:
+    | string
+    | { label?: string; purpose?: ArtifactJobPurpose } = `build selected target ${target}`,
 ): Promise<string> {
-  const source = await chooseFlakeRef({
+  const label =
+    typeof labelOrOptions === "string"
+      ? labelOrOptions
+      : labelOrOptions.label || `build selected target ${target}`;
+  const purpose = typeof labelOrOptions === "string" ? "local" : labelOrOptions.purpose || "local";
+  const source = await chooseRunnableFlakeRef({
     workspaceRoot,
     sourceMode,
     target,
     attr: "graph-generator-selected",
+    purpose,
   });
   const targetImporter = targetPackageFromLabel(target);
   const fixedStore =

@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { buildSelectedOutPath } from "../dev/run-runnable-graph";
+import { buildDeploymentSelectedOutPath } from "./deployment-component-artifact-dirs";
 import { getFlagStr } from "../lib/cli";
 import type { OpenTofuDeployment } from "./contract";
 import { printDeployJson } from "./deploy-front-door";
@@ -13,7 +13,7 @@ async function resolveMigrationBundlePath(opts: {
   artifactDirFlag: string;
 }): Promise<string> {
   if (opts.artifactDirFlag) return path.resolve(opts.artifactDirFlag);
-  return await buildSelectedOutPath(
+  return await buildDeploymentSelectedOutPath(
     opts.workspaceRoot,
     opts.deployment.migrationBundleRef || opts.deployment.component.target,
   );

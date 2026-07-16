@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { buildSelectedOutPath } from "../dev/run-runnable-graph";
 import {
   isAppStoreConnectDeployment,
   isGooglePlayDeployment,
@@ -16,6 +15,7 @@ import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidenc
 import {
   artifactDirFromBuiltOutPath,
   buildArtifactDirsByComponentId,
+  buildDeploymentSelectedOutPath,
 } from "./deployment-component-artifact-dirs";
 import { isMultiComponentNixosSharedHostDeployment } from "./nixos-shared-host-components";
 import { submitCloudflarePagesControlPlaneDeploy } from "./cloudflare-pages-control-plane";
@@ -83,7 +83,7 @@ async function resolveArtifactDir(
   workspaceRoot: string,
   deployment: Pick<DeploymentTarget, "component">,
 ): Promise<string> {
-  const outPath = await buildSelectedOutPath(workspaceRoot, deployment.component.target);
+  const outPath = await buildDeploymentSelectedOutPath(workspaceRoot, deployment.component.target);
   return artifactDirFromBuiltOutPath(deployment.component.kind, outPath);
 }
 

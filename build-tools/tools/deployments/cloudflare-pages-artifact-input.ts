@@ -1,8 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { buildSelectedOutPath } from "../dev/run-runnable-graph";
-import { artifactDirFromBuiltOutPath } from "./deployment-component-artifact-dirs";
+import {
+  artifactDirFromBuiltOutPath,
+  buildDeploymentSelectedOutPath,
+} from "./deployment-component-artifact-dirs";
 import type { CloudflarePagesDeployment } from "./contract";
 import {
   createStaticWebappArtifactBundleBytes,
@@ -125,7 +127,7 @@ async function admitServerBuild(opts: {
   submissionId: string;
 }): Promise<AdmittedStaticWebappArtifact> {
   await verifySourceRevision(opts.workspaceRoot, opts.deployment, opts.input.sourceRevision);
-  const outPath = await buildSelectedOutPath(opts.workspaceRoot, opts.input.buildTarget);
+  const outPath = await buildDeploymentSelectedOutPath(opts.workspaceRoot, opts.input.buildTarget);
   const artifactDir = artifactDirFromBuiltOutPath(opts.deployment.component.kind, outPath);
   return await admitStaticWebappArtifact({
     recordsRoot: opts.recordsRoot,

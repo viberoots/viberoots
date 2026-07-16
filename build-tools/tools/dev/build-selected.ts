@@ -9,10 +9,10 @@ import { getImporterRootsContract } from "../lib/importer-roots";
 import { sanitizeAttrNameFromLabel } from "../lib/labels";
 import { runNodeWithZx } from "../lib/node-run";
 import { findRepoRoot, pathExists } from "../lib/repo";
-import { getArgvTokens } from "../lib/cli";
+import { getArgvTokens, getFlagBool } from "../lib/cli";
 import { runMain } from "../lib/cli-wrap";
 import { withScopedEnv } from "../lib/scoped-env";
-import { untrackedRequiresImpureForTargets } from "./dev-build/untracked";
+import { inspectArtifactSource } from "../lib/artifact-source-inventory";
 import { targetPackageFromLabel } from "./build-selected-helpers";
 import { parseSelectedBuildOutPath, selectedNixBuildArgs } from "./build-selected-nix-command";
 import { makeFilteredFlakeRef } from "./filtered-flake";
@@ -22,6 +22,12 @@ import { withSanitizedInheritedNixConfig } from "../lib/nix-config-env";
 import { resolveSelectedTargetLabel } from "./target-label-resolver";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 import { buildToolPath, zxInitPath } from "./dev-build/paths";
+import { classifyArtifactBuild } from "../lib/artifact-build-policy";
+import { resolveToolPathSync } from "../lib/tool-paths";
+import {
+  emitArtifactPolicyEvidence,
+  inspectArtifactBuildPolicy,
+} from "./artifact-policy-inspection";
 
 async function runCommand(opts: {
   command: string;
@@ -112,7 +118,12 @@ async function chooseFlakeRef(opts: {
   target: string;
   sourceMode: "auto" | "git" | "path";
   graphPath: string;
-}): Promise<{ flakeRef: string; workspaceRoot?: string; cleanup?: () => Promise<void> }> {
+}): Promise<{
+  flakeRef: string;
+  workspaceRoot?: string;
+  cleanup?: () => Promise<void>;
+  localDevelopment?: boolean;
+}> {
   const repoRootEnv = String(process.env.REPO_ROOT || "").trim();
   const workspaceAbs = path.resolve(opts.workspaceRoot);
   const isLikelyTempWorkspace =
@@ -121,7 +132,28 @@ async function chooseFlakeRef(opts: {
     workspaceAbs.startsWith("/private/var/folders/") ||
     workspaceAbs.includes(`${path.sep}viberoots-verify-`) ||
     workspaceAbs.includes(`${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`);
-  if (opts.sourceMode === "auto" && isLikelyTempWorkspace) {
+  if (opts.sourceMode === "path")
+    return {
+      flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected"),
+      localDevelopment: true,
+    };
+  const targetPackages = [targetPackageFromLabel(opts.target)].filter(Boolean);
+  const inventory = await inspectArtifactSource({
+    targetPackages,
+    runGit: async () =>
+      await runCommand({
+        command: resolveToolPathSync("git"),
+        args: ["ls-files", "-z", "--others", "--exclude-standard"],
+        cwd: opts.workspaceRoot,
+        allowFailure: true,
+      }),
+  });
+  if (opts.sourceMode === "git")
+    return {
+      flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected"),
+      localDevelopment: inventory.localDevelopment,
+    };
+  if (isLikelyTempWorkspace) {
     const filtered = await makeFilteredFlakeRef({
       workspaceRoot: opts.workspaceRoot,
       attr: "graph-generator-selected",
@@ -129,62 +161,41 @@ async function chooseFlakeRef(opts: {
       graphPath: opts.graphPath,
       target: opts.target,
     });
-    return filtered;
+    return { ...filtered, localDevelopment: inventory.localDevelopment };
   }
-  if (opts.sourceMode === "auto" && repoRootEnv) {
+  if (repoRootEnv) {
     const repoRootAbs = path.resolve(repoRootEnv);
     if (repoRootAbs !== workspaceAbs) {
-      return { flakeRef: await workspaceFlakeRef(workspaceAbs, "graph-generator-selected") };
+      return {
+        flakeRef: await workspaceFlakeRef(workspaceAbs, "graph-generator-selected"),
+        localDevelopment: inventory.localDevelopment,
+      };
     }
   }
-  if (opts.sourceMode === "path")
-    return { flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected") };
-  if (opts.sourceMode === "git")
-    return { flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected") };
-  try {
-    const { stdout } = await runCommand({
-      command: "git",
-      args: ["ls-files", "--others", "--exclude-standard"],
-      cwd: opts.workspaceRoot,
-      allowFailure: true,
-    });
-    const untracked = String(stdout || "")
-      .trim()
-      .split("\n")
-      .map((x) => x.trim())
-      .filter(Boolean);
-    if (untracked.length === 0)
-      return {
-        flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected"),
-      };
-    const targetPackages = [targetPackageFromLabel(opts.target)].filter(Boolean);
-    const decision = untrackedRequiresImpureForTargets({ untracked, targetPackages });
-    if (!decision.requiresImpure)
-      return {
-        flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected"),
-      };
-    console.error(
-      "[build-selected] Falling back to path flake source due to relevant untracked files:",
-    );
-    for (const f of decision.relevant.slice(0, 50)) console.error(` - ${f}`);
-    if (decision.relevant.length > 50) {
-      console.error(` ... and ${decision.relevant.length - 50} more`);
-    }
-    const filtered = await makeFilteredFlakeRef({
-      workspaceRoot: opts.workspaceRoot,
-      attr: "graph-generator-selected",
-      logPrefix: "[build-selected]",
-      graphPath: opts.graphPath,
-      target: opts.target,
-    });
+  if (!inventory.localDevelopment)
     return {
-      flakeRef: filtered.flakeRef,
-      workspaceRoot: filtered.workspaceRoot,
-      cleanup: filtered.cleanup,
+      flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected"),
     };
-  } catch {
-    return { flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected") };
+  console.error(
+    "[build-selected] Falling back to path flake source due to relevant untracked files:",
+  );
+  for (const f of inventory.relevant.slice(0, 50)) console.error(` - ${f}`);
+  if (inventory.relevant.length > 50) {
+    console.error(` ... and ${inventory.relevant.length - 50} more`);
   }
+  const filtered = await makeFilteredFlakeRef({
+    workspaceRoot: opts.workspaceRoot,
+    attr: "graph-generator-selected",
+    logPrefix: "[build-selected]",
+    graphPath: opts.graphPath,
+    target: opts.target,
+  });
+  return {
+    flakeRef: filtered.flakeRef,
+    workspaceRoot: filtered.workspaceRoot,
+    cleanup: filtered.cleanup,
+    localDevelopment: true,
+  };
 }
 async function main() {
   const parsedSource = parseSourceMode(getArgvTokens());
@@ -295,6 +306,19 @@ async function main() {
         VBR_PNPM_FILTERED_SNAPSHOT_ROOT: flakeSource.workspaceRoot,
       }
     : sanitizedEnv;
+  const policyEvidence = await inspectArtifactBuildPolicy({
+    classification: classifyArtifactBuild({
+      diagnosticImpure: getFlagBool("impure"),
+      localDevelopment: Boolean(flakeSource.localDevelopment),
+    }),
+    impureEvaluation: true,
+    env: flakeEnv,
+    toolPaths: { node: process.execPath },
+    toolNames: ["git"],
+    runCommand: async (command, args) =>
+      await runCommand({ command, args, env: flakeEnv, allowFailure: true }),
+  });
+  emitArtifactPolicyEvidence(policyEvidence);
   const targetImporter = targetPackageFromLabel(target);
   let fixedStore: Awaited<ReturnType<typeof resolveFinalPnpmStore>> | null = null;
   let attempt: any;

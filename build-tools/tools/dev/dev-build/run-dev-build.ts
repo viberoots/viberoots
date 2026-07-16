@@ -24,6 +24,7 @@ import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 import { findRepoRoot } from "../../lib/repo";
 import { resolveToolPathSync } from "../../lib/tool-paths";
+import { admitArtifactContext } from "../artifact-policy-inspection";
 
 export async function missingOptionalPatchDirsForFreshIsolation(opts: {
   root: string;
@@ -167,6 +168,12 @@ export async function runDevBuild(): Promise<void> {
       }
     }
     await runStartupCheck(root);
+    await admitArtifactContext({
+      classification: auto.classification,
+      impureEvaluation: true,
+      workspaceRoot: root,
+      toolNames: ["git", "buck2"],
+    });
     await ensureDevBuildStoreSpace({
       subcmd: parsed.subcmd,
       restArgs: parsed.restArgs,

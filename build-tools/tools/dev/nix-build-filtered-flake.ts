@@ -28,6 +28,12 @@ import { findWorkspacePackageRepoDirs } from "./update-pnpm-hash/importer-worksp
 import { pnpmStoreAttrFromImporter } from "./update-pnpm-hash/paths";
 import { repairSnapshotViberootsInput } from "./filtered-flake-viberoots-input";
 import { runCommand } from "./filtered-flake-command";
+import { classifyArtifactBuild } from "../lib/artifact-build-policy";
+import { inspectArtifactSource } from "../lib/artifact-source-inventory";
+import {
+  emitArtifactPolicyEvidence,
+  inspectArtifactBuildPolicy,
+} from "./artifact-policy-inspection";
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -250,6 +256,31 @@ async function main(): Promise<void> {
   }
   const snapshotOnly = getFlagBool("snapshot-only");
   const root = path.resolve(String(process.env.WORKSPACE_ROOT || process.cwd()).trim());
+  const targetPackage = targetPackageFromLabel(String(process.env.BUCK_TARGET || ""));
+  const sourceInventory = await inspectArtifactSource({
+    targetPackages: targetPackage ? [targetPackage] : [],
+    runGit: async () =>
+      await runCommand({
+        command: resolveToolPathSync("git"),
+        args: ["ls-files", "-z", "--others", "--exclude-standard"],
+        cwd: root,
+        allowFailure: true,
+      }),
+  });
+  const policyEnv = envWithResolvedNixBin({ ...process.env, WORKSPACE_ROOT: root });
+  const policyEvidence = await inspectArtifactBuildPolicy({
+    classification: classifyArtifactBuild({
+      diagnosticImpure: getFlagBool("impure"),
+      localDevelopment: sourceInventory.localDevelopment,
+    }),
+    impureEvaluation: true,
+    env: policyEnv,
+    toolPaths: { node: process.execPath },
+    toolNames: ["git", "rsync"],
+    runCommand: async (command, args) =>
+      await runCommand({ command, args, env: policyEnv, allowFailure: true }),
+  });
+  emitArtifactPolicyEvidence(policyEvidence);
   const tmpBase = process.env.TMPDIR || "/tmp";
   const workDir = await mkdtempNoindex("vbr-flake-", {
     baseName: "vbr-flake",
@@ -367,9 +398,9 @@ async function main(): Promise<void> {
           }
         : {}),
     });
+    const nixBin = resolveToolPathSync("nix", nixEnv);
     const fixedStore = await prewarmFinalStoreForTarget(root, attr, flakeRef, nixEnv);
     exactStoreCleanup = fixedStore.cleanup;
-    const nixBin = resolveToolPathSync("nix", nixEnv);
     const buildStart = Date.now();
     const nixArgs = [
       "build",

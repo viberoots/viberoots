@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { buildSelectedOutPath } from "../dev/run-runnable-graph";
+import { buildDeploymentSelectedOutPath } from "./deployment-component-artifact-dirs";
 import { getFlagBool, getFlagStr, hasFlag } from "../lib/cli";
 import type { NixosSharedHostDeployment } from "./contract";
 import type { DeploymentAdmissionEvidence } from "./deployment-admission-evidence";
@@ -114,7 +114,7 @@ async function resolveLocalArtifactDir(
 ): Promise<string> {
   const artifactDir = getFlagStr("artifact-dir", "").trim();
   if (artifactDir) return path.resolve(artifactDir);
-  const outPath = await buildSelectedOutPath(workspaceRoot, deployment.component.target);
+  const outPath = await buildDeploymentSelectedOutPath(workspaceRoot, deployment.component.target);
   return path.join(outPath, "dist");
 }
 

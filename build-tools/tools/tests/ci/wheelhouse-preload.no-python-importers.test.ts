@@ -44,6 +44,10 @@ test("wheelhouse-preload: no python importers → no-op and success", async () =
     // Ensure no Python importers exist
     await fsp.rm(path.join(tmp, "apps"), { recursive: true, force: true }).catch(() => {});
     await fsp.rm(path.join(tmp, "libs"), { recursive: true, force: true }).catch(() => {});
+    await $({ cwd: tmp })`git init -q`;
+    await fsp.appendFile(path.join(tmp, ".git", "info", "exclude"), "/.viberoots/\n");
+    await $({ cwd: tmp })`git add -A`;
+    await $({ cwd: tmp })`git -c user.name=test -c user.email=test@example.invalid commit -qm seed`;
     // Run stage; should no-op successfully
     const rc = await $({
       cwd: tmp,
