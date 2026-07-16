@@ -1,11 +1,12 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { resolveRequestedVerifyScope } from "../../dev/verify/requested-scope";
 import { summarizeVerifyScopeDecision } from "../../dev/verify/selection-output";
+import { resolveRequestedVerifyScope } from "../../dev/verify/requested-scope";
 import {
   assertEmptySafetyFloorRejected,
   baseDecision,
+  changedPaths,
   defaultArgs,
   rootWithoutChangeAuthority,
 } from "./requested-scope.deployment.fixture";
@@ -18,7 +19,7 @@ test("deployment-only changes select deployment suite plus safety floor", async 
     env: {},
     deps: {
       resolveTemplateScope: async () => baseDecision(),
-      collectChangedPaths: async () => ["build-tools/deployments/defs.bzl"],
+      collectChangedPaths: async () => changedPaths("build-tools/deployments/defs.bzl"),
       listDeploymentTargets: async () => ["//projects/deployments/sample/dev:deploy"],
       queryDeploymentDomainTargets: async () => [
         "//:deployment_domain_labels_cquery",
@@ -37,7 +38,6 @@ test("deployment-only changes select deployment suite plus safety floor", async 
     "//:deployment_domain_labels_cquery",
     "//:deployment_verify_scope_boundary",
     "//:nixos_shared_host_contract",
-    "workspace_buck//...",
   ]);
 });
 
@@ -53,10 +53,11 @@ test("viberoots-prefixed deployment-only changes override full build-system base
           targets: ["//...", "viberoots//..."],
           reason: "fallback-build-system-scope",
         }),
-      collectChangedPaths: async () => [
-        "viberoots/build-tools/deployments/defs.bzl",
-        "viberoots/build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts",
-      ],
+      collectChangedPaths: async () =>
+        changedPaths(
+          "viberoots/build-tools/deployments/defs.bzl",
+          "viberoots/build-tools/tools/tests/deployments/deployment-domain.labels.cquery.test.ts",
+        ),
       listDeploymentTargets: async () => ["//projects/deployments/sample/dev:deploy"],
       queryDeploymentDomainTargets: async () => [
         "viberoots//:deployment_domain_labels_cquery",
@@ -75,7 +76,6 @@ test("viberoots-prefixed deployment-only changes override full build-system base
     "viberoots//:deployment_domain_labels_cquery",
     "viberoots//:deployment_verify_scope_boundary",
     "viberoots//:nixos_shared_host_contract",
-    "workspace_buck//...",
   ]);
 });
 
@@ -92,10 +92,11 @@ test("deployment project changes select project-impact targets without framework
           targets: ["//projects/apps/sample-app/..."],
           reason: "project-impact-targeted",
         }),
-      collectChangedPaths: async () => [
-        "projects/apps/sample-app/src/index.ts",
-        "projects/deployments/sample/dev/TARGETS",
-      ],
+      collectChangedPaths: async () =>
+        changedPaths(
+          "projects/apps/sample-app/src/index.ts",
+          "projects/deployments/sample/dev/TARGETS",
+        ),
       listDeploymentTargets: async () => ["//projects/deployments/sample/dev:deploy"],
       queryDeploymentDomainTargets: async () => {
         throw new Error("deployment framework suite should not run for project deployment edits");
@@ -142,7 +143,8 @@ test("mixed build-system deployment impact keeps the existing selection", async 
     env: {},
     deps: {
       resolveTemplateScope: async () => baseDecision(),
-      collectChangedPaths: async () => ["viberoots/build-tools/tools/dev/verify/run-verify.ts"],
+      collectChangedPaths: async () =>
+        changedPaths("viberoots/build-tools/tools/dev/verify/run-verify.ts"),
       listDeploymentTargets: async () => ["//projects/deployments/sample/dev:deploy"],
       queryDeploymentDomainTargets: async () => {
         throw new Error("deployment query should not run in mixed-build-system mode");
@@ -152,7 +154,7 @@ test("mixed build-system deployment impact keeps the existing selection", async 
 
   assert.equal(result.selection.selectorMode, "no-template-impact");
   assert.equal(result.selection.reason, "fallback-build-system-scope");
-  assert.deepEqual(result.selection.targets, ["//...", "workspace_buck//..."]);
+  assert.deepEqual(result.selection.targets, ["//..."]);
 });
 
 test("reviewed deployment documentation changes select only documentation contract targets", async () => {
@@ -167,10 +169,11 @@ test("reviewed deployment documentation changes select only documentation contra
           targets: ["//docs/..."],
           reason: "non-build-system-scope",
         }),
-      collectChangedPaths: async () => [
-        "docs/nixos-shared-host-setup.md",
-        "build-tools/tools/deployments/control-plane-host-profile/saas-oci-profile.md",
-      ],
+      collectChangedPaths: async () =>
+        changedPaths(
+          "docs/nixos-shared-host-setup.md",
+          "build-tools/tools/deployments/control-plane-host-profile/saas-oci-profile.md",
+        ),
       listDeploymentTargets: async () => {
         throw new Error("deployment domain query should not run for docs-only changes");
       },
@@ -180,10 +183,7 @@ test("reviewed deployment documentation changes select only documentation contra
 
   assert.equal(result.selection.selectorMode, "documentation-contract");
   assert.equal(result.selection.reason, "documentation-contract-targeted");
-  assert.deepEqual(result.selection.targets, [
-    "//:deployment_docs_front_door_parity",
-    "workspace_buck//...",
-  ]);
+  assert.deepEqual(result.selection.targets, ["//:deployment_docs_front_door_parity"]);
   assert.match(summarizeVerifyScopeDecision(result.selection), /documentationPaths=2/);
 });
 
@@ -195,9 +195,7 @@ test("never mode bypasses deployment selection", async () => {
     env: { VBR_DEPLOYMENT_TEST_SCOPE: "never" },
     deps: {
       resolveTemplateScope: async () => baseDecision(),
-      collectChangedPaths: async () => {
-        throw new Error("deployment classifier should not run when selector is disabled");
-      },
+      collectChangedPaths: async () => changedPaths(),
     },
   });
 
@@ -215,7 +213,7 @@ test("always mode fails unless the change is safely deployment-only", async () =
         env: { VBR_DEPLOYMENT_TEST_SCOPE: "always" },
         deps: {
           resolveTemplateScope: async () => baseDecision(),
-          collectChangedPaths: async () => ["projects/deployments/sample/dev/TARGETS"],
+          collectChangedPaths: async () => changedPaths("projects/deployments/sample/dev/TARGETS"),
           listDeploymentTargets: async () => ["//projects/deployments/sample/dev:deploy"],
         },
       }),
@@ -233,7 +231,7 @@ test("deployment selection fails fast when the deployment query resolves zero ta
         env: {},
         deps: {
           resolveTemplateScope: async () => baseDecision(),
-          collectChangedPaths: async () => ["build-tools/deployments/defs.bzl"],
+          collectChangedPaths: async () => changedPaths("build-tools/deployments/defs.bzl"),
           listDeploymentTargets: async () => ["//projects/deployments/sample/dev:deploy"],
           queryDeploymentDomainTargets: async () => [],
         },

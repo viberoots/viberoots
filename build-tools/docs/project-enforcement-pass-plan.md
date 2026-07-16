@@ -395,6 +395,99 @@ unreadable inputs, or fail to run when committed renames move policy-relevant fi
 Admission and scanner fixtures become stricter, and the bounded integration test records additional
 filesystem evidence on every focused guardrail run.
 
+## PR-5: Fail Closed On Change Authority And Complete Static Admission
+
+### 1. Intent
+
+Close the remaining authority gaps so project-enforcement selection distinguishes a legitimately
+empty change set from failed Git discovery, and read-only static admission recognizes valid compact
+module declarations while following mutation capabilities through helper call graphs.
+
+### 2. Scope of changes
+
+- Make the canonical changed-path discovery authority return an explicit success or failure result
+  for every Git diff, status, and baseline query instead of collapsing command failures into an
+  empty path set.
+- On failed changed-path authority, fail closed into conservative project-enforcement selection with
+  an actionable reason. Preserve the existing no-change decision only when every required query
+  succeeds and returns no relevant paths, and reuse the same result across all shared selector
+  consumers rather than adding a project-enforcement-specific Git path.
+- Extend the self-contained static module analyzer to recognize legal same-line static `import` and
+  `export` declarations without requiring formatting changes or an external parser/runtime
+  dependency.
+- Traverse direct and transitive calls into locally defined or imported helpers so filesystem
+  mutation capability cannot be hidden behind an admitted helper. Retain the existing reviewed
+  read-only capability boundary and fail closed on unresolved mutation-relevant analysis.
+- Keep the change limited to canonical selection and static admission authorities; do not broaden
+  snapshots, add host or live-tree fallbacks, introduce eager closures, or change unrelated verify
+  scheduling and scanner behavior.
+
+### 3. External prerequisites
+
+PR-4 must be complete. No new external tools, parser packages, caches, services, source snapshots,
+or network access are required.
+
+### 4. Tests to be added
+
+- Canonical changed-path fixtures covering failed committed diff, working-tree diff, status, and
+  baseline discovery, each proving an actionable conservative selection result rather than a
+  no-change result.
+- A successful empty-change fixture proving the existing no-change behavior remains distinct from
+  discovery failure.
+- Focused shared-consumer tests proving each selector that consumes canonical changed paths receives
+  the same failure state and conservative project-enforcement decision without duplicating Git
+  parsing or command execution.
+- Static admission fixtures for valid same-line default, named, namespace, side-effect, re-export,
+  and mixed import/export declarations, including positive read-only cases.
+- Negative fixtures proving direct and transitive local/imported helper calls that reach filesystem
+  mutation are rejected, with positive helper-graph fixtures that remain entirely read-only.
+
+### 5. Docs to be added or updated
+
+Update the testing handbook and build-system design with the explicit changed-path success/failure
+contract, conservative selection behavior, compact static module syntax support, and transitive
+helper-graph admission boundary.
+
+### 5.5. Expected regression scope
+
+Canonical Git changed-path discovery, shared verify selectors and selection reasons,
+project-enforcement pass scheduling, static module discovery, helper-call traversal, and read-only
+runner admission fixtures.
+
+### 6. Acceptance criteria
+
+- A failed Git diff, status, or baseline query cannot be reported as an empty change set and always
+  schedules project-enforcement conservatively with an actionable reason.
+- A successful empty change set retains the existing no-change behavior, and all shared selector
+  consumers use the canonical result consistently.
+- Legal same-line static import and export declarations are analyzed correctly without external
+  parser or runtime dependencies.
+- Direct and transitive helper calls cannot conceal filesystem mutation, while read-only helper
+  graphs remain admitted.
+- Focused selection-consumer and admission regressions pass with bounded handbook time and disk
+  evidence, followed by the validation and independent scope review required by this plan.
+
+### 7. Risks
+
+Conservative selection may run the pass more often when repository metadata is unavailable, and
+expanded helper traversal may expose previously unexamined ambiguous module or call patterns.
+
+### 8. Mitigations
+
+Preserve the successful-empty result as a distinct state, reuse one canonical failure reason across
+selectors, keep the analyzer self-contained and deterministic, and cover compact declarations plus
+direct and transitive helper graphs with positive and negative fixtures.
+
+### 9. Consequences of not implementing this PR
+
+Git authority failures could silently suppress project enforcement, and formatting or helper
+indirection could allow filesystem mutation to bypass static admission.
+
+### 10. Downsides for implementing this PR
+
+Changed-path callers must handle an explicit failure state, and the static admission analyzer gains
+additional syntax and call-graph fixtures that must remain aligned with its narrow capability model.
+
 ## Rollout And Sequencing
 
 Land PR-1 first and stop at Checkpoint A if registration, freshness, source-mode, timing, or disk

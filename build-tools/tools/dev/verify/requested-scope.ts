@@ -1,12 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { collectChangedPaths } from "../../lib/build-system-test-scope";
-import type { DocumentationImpactDiagnostics } from "../../lib/documentation-impact-selector";
-import {
-  type ProjectImpactSelectorDiagnostics,
-  resolveProjectImpactSelection,
-} from "../../lib/project-impact-selector";
-import type { DeploymentImpactDiagnostics } from "../../lib/deployment-impact-selector";
+import { resolveProjectImpactSelection } from "../../lib/project-impact-selector";
 import { listDeploymentTargets } from "../../deployments/deployment-query";
 import { queryDeploymentDomainTargets } from "../../lib/deployment-test-targets";
 import type { VerifyArgs } from "./args";
@@ -14,7 +9,6 @@ import { normalizeVerifyTargets } from "./args";
 import {
   resolveVerifyTemplateTestScope,
   type VerifyTemplateScopeDecision,
-  type VerifySelectionDiagnostics as VerifyTemplateSelectionDiagnostics,
 } from "./template-test-scope";
 import { allTestsRequested, parseDeploymentTestScopeMode } from "./scope-env";
 import {
@@ -26,35 +20,14 @@ import {
   type ResolveDeploymentVerifyScopeDeps,
 } from "./deployment-scope";
 import { resolveWorkspaceRootsSync } from "../../lib/repo";
-import type { ProjectEnforcementSelectionReason } from "./project-enforcement-selection";
 import { withProjectEnforcement } from "./requested-scope-project-enforcement";
-export type VerifyDeploymentScopeMode = "auto" | "always" | "never";
-export type DeploymentVerifySelectionDiagnostics = DeploymentImpactDiagnostics & {
-  requestedMode: VerifyDeploymentScopeMode;
-  deploymentDomainTargets: string[];
-  deploymentSafetyFloorTargets: string[];
-  projectTargets: string[];
-  projectImpactDiagnostics: ProjectImpactSelectorDiagnostics | null;
-  selectedTargets: string[];
-};
-export type VerifyScopeDecision = Omit<
-  VerifyTemplateScopeDecision,
-  "selectorMode" | "diagnostics"
-> & {
-  projectEnforcementReason: ProjectEnforcementSelectionReason;
-  requestedDeploymentMode: VerifyDeploymentScopeMode;
-  selectorMode:
-    | VerifyTemplateScopeDecision["selectorMode"]
-    | "all-tests"
-    | "documentation-contract"
-    | "deployment-only"
-    | "deployment-and-project-impact";
-  diagnostics:
-    | VerifyTemplateSelectionDiagnostics
-    | DeploymentVerifySelectionDiagnostics
-    | DocumentationImpactDiagnostics
-    | null;
-};
+import type { VerifyDeploymentScopeMode, VerifyScopeDecision } from "./requested-scope-types";
+
+export type {
+  DeploymentVerifySelectionDiagnostics,
+  VerifyDeploymentScopeMode,
+  VerifyScopeDecision,
+} from "./requested-scope-types";
 type ResolveRequestedVerifyScopeDeps = {
   resolveTemplateScope: typeof resolveVerifyTemplateTestScope;
   collectChangedPaths: typeof collectChangedPaths;
@@ -194,6 +167,10 @@ export async function resolveRequestedVerifyScope(opts: {
       }),
     };
   }
+  const changedPathsResult =
+    args.selector === "default" && isDefaultVerifyTargetSet(args.targets)
+      ? await (opts.deps?.collectChangedPaths || collectChangedPaths)(opts.root, env)
+      : undefined;
   const resolveTemplateScope = opts.deps?.resolveTemplateScope || resolveVerifyTemplateTestScope;
   const baseDecision = await resolveTemplateScope({
     root: opts.root,
@@ -203,6 +180,7 @@ export async function resolveRequestedVerifyScope(opts: {
         ? { mode: "project-closure", projects: args.requestedProjects }
         : null,
     env,
+    changedPathsResult,
   });
   if (args.selector !== "default" || !isDefaultVerifyTargetSet(args.targets)) {
     return {
@@ -212,6 +190,7 @@ export async function resolveRequestedVerifyScope(opts: {
         args,
         env,
         decision: withDeploymentMode(baseDecision, requestedDeploymentMode),
+        changedPathsResult,
       }),
     };
   }
@@ -221,6 +200,7 @@ export async function resolveRequestedVerifyScope(opts: {
     baseDecision,
     requestedDeploymentMode,
     deps: opts.deps,
+    changedPathsResult,
   });
   if (documentationDecision) {
     return {
@@ -230,6 +210,7 @@ export async function resolveRequestedVerifyScope(opts: {
         args,
         env,
         decision: { ...documentationDecision, projectEnforcementReason: "not-required" },
+        changedPathsResult,
       }),
     };
   }
@@ -239,12 +220,19 @@ export async function resolveRequestedVerifyScope(opts: {
     baseDecision,
     requestedDeploymentMode,
     deps: opts.deps,
+    changedPathsResult,
   });
   const decision = deploymentDecision
     ? { ...deploymentDecision, projectEnforcementReason: "not-required" as const }
     : withDeploymentMode(baseDecision, requestedDeploymentMode);
   return {
     args,
-    selection: await withProjectEnforcement({ root: opts.root, args, env, decision }),
+    selection: await withProjectEnforcement({
+      root: opts.root,
+      args,
+      env,
+      decision,
+      changedPathsResult,
+    }),
   };
 }

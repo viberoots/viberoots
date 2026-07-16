@@ -9,10 +9,12 @@ import {
   isBuildSystemPath,
   isIgnoredBuildSystemScopePath,
   parseBuildSystemTestMode,
+  requireChangedPaths,
   resolveBuildSystemBuckTestScope,
 } from "../../lib/build-system-test-scope";
 import { resolveNonBuildSystemBuckTargets } from "../../lib/non-build-system-scope";
 import { mktemp, runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("build-system test scope mode parsing supports auto/always/never", () => {
   assert.equal(parseBuildSystemTestMode(undefined), "auto");
@@ -97,7 +99,7 @@ test("dirty nested viberoots repo expands to build-system changed paths", async 
 
     await fsp.writeFile(toolPath, "export const marker = 2;\n");
 
-    const changedPaths = await collectChangedPaths(root, {});
+    const changedPaths = requireChangedPaths(await collectChangedPaths(root, {}));
     assert.equal(changedPaths.includes("viberoots"), true);
     assert.equal(changedPaths.includes("viberoots/build-tools/tools/dev/verify.ts"), true);
     assert.equal(hasRelevantBuildSystemChanges(changedPaths), true);
@@ -132,7 +134,7 @@ test("flake-mode viberoots symlink does not expand nested source changes", async
     await fsp.mkdir(path.join(root, ".viberoots"), { recursive: true });
     await fsp.symlink(storeLike, path.join(root, ".viberoots", "current"));
     await fsp.symlink(storeLike, path.join(root, "viberoots"));
-    const changedPaths = await collectChangedPaths(root, {});
+    const changedPaths = requireChangedPaths(await collectChangedPaths(root, {}));
 
     assert.equal(changedPaths.includes("viberoots"), true);
     assert.equal(
@@ -148,7 +150,7 @@ test("flake-mode viberoots symlink does not expand nested source changes", async
 
 test("git helper probes use non-throwing zx calls", async () => {
   const txt = await fsp.readFile(
-    "viberoots/build-tools/tools/lib/build-system-test-scope.ts",
+    viberootsSourcePath("viberoots/build-tools/tools/lib/changed-paths.ts"),
     "utf8",
   );
   assert.match(txt, /git rev-parse --verify --quiet \$\{ref\}`\s*\.nothrow\(\)\s*\.quiet\(\)/);

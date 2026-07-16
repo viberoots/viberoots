@@ -13,7 +13,7 @@ test("project enforcement selection covers every authority reason and deduplicat
       root: "/fixture",
       requestedTargets: targets,
       fullSuite,
-      collectChangedPaths: async () => paths,
+      collectChangedPaths: async () => ({ ok: true, paths }),
     });
   for (const changed of [
     "projects/app/committed.ts",
@@ -35,9 +35,11 @@ test("project enforcement selection covers every authority reason and deduplicat
     root: "/fixture",
     requestedTargets: ["//:focused"],
     fullSuite: false,
-    collectChangedPaths: async () => {
-      throw new Error("git unavailable");
-    },
+    collectChangedPaths: async () => ({
+      ok: false,
+      paths: [],
+      reason: "git status failed: git unavailable",
+    }),
   });
   assert.equal(unavailable.reason, "unavailable-change-authority");
   assert.deepEqual(injectProjectEnforcementTarget([PROJECT_ENFORCEMENT_TARGETS], unavailable), [
@@ -51,7 +53,7 @@ test("VERIFY_SKIP_LINT cannot suppress project-enforcement selection", async () 
     requestedTargets: ["//projects/apps/demo/..."],
     fullSuite: false,
     env: { VERIFY_SKIP_LINT: "1" },
-    collectChangedPaths: async () => [],
+    collectChangedPaths: async () => ({ ok: true, paths: [] }),
   });
   assert.equal(selected.required, true);
   assert.equal(selected.reason, "explicit-project-selector");

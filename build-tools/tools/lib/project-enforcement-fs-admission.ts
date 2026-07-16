@@ -94,7 +94,7 @@ function importedBindings(source: string): {
   const declarationRanges: Array<[number, number]> = [];
   let unsafe = false;
   const imports = new RegExp(
-    String.raw`(?:^|\n)\s*import\s+([^;]+?)\s+from\s+["']${FS_MODULE}["']\s*;?`,
+    String.raw`\bimport\s+([^;]+?)\s+from\s+["']${FS_MODULE}["']\s*;?`,
     "g",
   );
   for (const match of source.matchAll(imports)) {

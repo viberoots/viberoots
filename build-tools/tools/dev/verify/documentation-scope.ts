@@ -1,4 +1,4 @@
-import { collectChangedPaths } from "../../lib/build-system-test-scope";
+import { collectChangedPaths, type ChangedPathsResult } from "../../lib/build-system-test-scope";
 import {
   DEPLOYMENT_DOC_CONTRACT_TARGETS,
   resolveDocumentationImpactSelection,
@@ -17,10 +17,13 @@ export async function resolveDocumentationOverride(opts: {
   baseDecision: VerifyTemplateScopeDecision;
   requestedDeploymentMode: VerifyDeploymentScopeMode;
   deps?: Partial<ResolveDocumentationVerifyScopeDeps>;
+  changedPathsResult?: ChangedPathsResult;
 }): Promise<VerifyScopeDecision | null> {
   if (opts.requestedDeploymentMode === "never") return null;
   const collectPaths = opts.deps?.collectChangedPaths || collectChangedPaths;
-  const changedPaths = await collectPaths(opts.root, opts.env);
+  const changedPathsResult = opts.changedPathsResult || (await collectPaths(opts.root, opts.env));
+  if (!changedPathsResult.ok) return null;
+  const changedPaths = changedPathsResult.paths;
   const selected = resolveDocumentationImpactSelection(changedPaths, {
     deploymentDocContractTargets:
       opts.deps?.deploymentDocContractTargets || DEPLOYMENT_DOC_CONTRACT_TARGETS,

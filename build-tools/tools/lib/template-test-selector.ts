@@ -1,4 +1,8 @@
-import { collectChangedPaths, isBuildSystemPath } from "./build-system-test-scope";
+import {
+  collectChangedPaths,
+  isBuildSystemPath,
+  type ChangedPathsResult,
+} from "./build-system-test-scope";
 import { TEMPLATE_TAXONOMY } from "../scaffolding/scaf/templates/generated/template-taxonomy.generated";
 import { queryTargetsForTemplateLabel } from "./template-test-selector-query";
 import { readTemplateOwnedTestIndex, targetLabelFromScript } from "./template-owned-tests";
@@ -140,11 +144,17 @@ type SelectorDeps = {
 export async function resolveTemplateTestSelection(opts: {
   root: string;
   changedPaths?: string[];
+  changedPathsResult?: ChangedPathsResult;
   env?: NodeJS.ProcessEnv;
   deps?: Partial<SelectorDeps>;
 }): Promise<TemplateTestSelectorResult> {
   const env = opts.env || process.env;
-  const changedPaths = opts.changedPaths || (await collectChangedPaths(opts.root, env));
+  const changedPathsResult =
+    opts.changedPathsResult ||
+    (opts.changedPaths
+      ? { ok: true as const, paths: opts.changedPaths }
+      : await collectChangedPaths(opts.root, env));
+  const changedPaths = changedPathsResult.ok ? changedPathsResult.paths : [];
   const normalizedPaths = toSortedUnique(changedPaths.map((p) => normalizePath(p)));
   const {
     mode,
@@ -152,7 +162,15 @@ export async function resolveTemplateTestSelection(opts: {
     ownedChangedTestPaths,
     ownedChangedTestTargets,
     nonTemplateBuildSystemPaths,
-  } = await classifyTemplateSelectorMode(opts.root, normalizedPaths);
+  } = changedPathsResult.ok
+    ? await classifyTemplateSelectorMode(opts.root, normalizedPaths)
+    : {
+        mode: "mixed" as const,
+        changedTemplateIds: [],
+        ownedChangedTestPaths: [],
+        ownedChangedTestTargets: [],
+        nonTemplateBuildSystemPaths: [],
+      };
   const templateTargetsById: Record<string, string[]> = {};
   const queryByLabel = opts.deps?.queryTargetsForTemplateLabel || queryTargetsForTemplateLabel;
 

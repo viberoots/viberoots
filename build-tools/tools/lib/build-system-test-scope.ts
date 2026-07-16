@@ -1,8 +1,11 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
-import "../dev/zx-init.mjs";
+import { collectChangedPaths, type ChangedPathsResult } from "./changed-paths";
 import { resolveNonBuildSystemBuckTargets } from "./non-build-system-scope";
+
+export { collectChangedPaths, requireChangedPaths } from "./changed-paths";
+export type { ChangedPathsResult } from "./changed-paths";
 
 export type BuildSystemTestMode = "auto" | "always" | "never";
 
@@ -10,6 +13,7 @@ type ScopeDecision = {
   targets: string[];
   mode: BuildSystemTestMode;
   hasBuildSystemChanges: boolean;
+  changeAuthorityFailure?: string;
 };
 
 const ROOT_AUTO_TARGETS = ["//..."];
@@ -136,153 +140,6 @@ function shouldAutoScopeTargets(targets: string[]): boolean {
   return targets.length === 1 && targets[0] === "//...";
 }
 
-function parseStatusPaths(statusText: string): string[] {
-  const out: string[] = [];
-  for (const raw of statusText.split(/\r?\n/)) {
-    const line = String(raw || "").trimEnd();
-    if (!line) {
-      continue;
-    }
-    const body = line.length > 3 ? line.slice(3).trim() : "";
-    if (!body) {
-      continue;
-    }
-    if (body.includes(" -> ")) {
-      for (const side of body.split(" -> ")) {
-        const p = normalizePath(side);
-        if (p) {
-          out.push(p);
-        }
-      }
-      continue;
-    }
-    out.push(normalizePath(body));
-  }
-  return out.filter(Boolean);
-}
-
-async function gitLines(root: string, args: string[]): Promise<string[]> {
-  const out = await $({ cwd: root, stdio: "pipe" })`git ${args}`.nothrow().quiet();
-  if ((out as any).exitCode !== 0) {
-    return [];
-  }
-  return String((out as any).stdout || "")
-    .split(/\r?\n/)
-    .map((x) => normalizePath(x))
-    .filter(Boolean);
-}
-
-async function gitRefExists(root: string, ref: string): Promise<boolean> {
-  const out = await $({
-    cwd: root,
-    stdio: "pipe",
-  })`git rev-parse --verify --quiet ${ref}`
-    .nothrow()
-    .quiet();
-  return (out as any).exitCode === 0;
-}
-
-async function mergeBaseChangedPaths(root: string, env: NodeJS.ProcessEnv): Promise<string[]> {
-  const baseRefs: string[] = [];
-  const baseBranch = String(env.GITHUB_BASE_REF || "").trim();
-  if (baseBranch) {
-    baseRefs.push(`origin/${baseBranch}`, `github/${baseBranch}`, baseBranch);
-  }
-  baseRefs.push("github/main", "origin/main", "main");
-
-  let mergeBase = "";
-  for (const ref of baseRefs) {
-    if (!(await gitRefExists(root, ref))) {
-      continue;
-    }
-    const mb = await $({ cwd: root, stdio: "pipe" })`git merge-base ${ref} HEAD`.nothrow().quiet();
-    if ((mb as any).exitCode === 0) {
-      mergeBase = String((mb as any).stdout || "").trim();
-      if (mergeBase) {
-        break;
-      }
-    }
-  }
-
-  if (!mergeBase) {
-    if (await gitRefExists(root, "HEAD~1")) {
-      return await gitLines(root, ["diff", "--name-only", "--no-renames", "HEAD~1...HEAD"]);
-    }
-    return [];
-  }
-  return await gitLines(root, ["diff", "--name-only", "--no-renames", `${mergeBase}...HEAD`]);
-}
-
-export async function collectChangedPaths(
-  root: string,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<string[]> {
-  const rootChangedPaths = await collectGitChangedPaths(root, env);
-  const nestedViberootsChangedPaths = await collectNestedViberootsChangedPaths(
-    root,
-    env,
-    rootChangedPaths,
-  );
-  return Array.from(
-    new Set<string>(
-      [...rootChangedPaths, ...nestedViberootsChangedPaths].map((p) => normalizePath(p)),
-    ),
-  ).sort();
-}
-
-async function collectGitChangedPaths(
-  root: string,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<string[]> {
-  const committed = await mergeBaseChangedPaths(root, env);
-  const statusRaw = await $({
-    cwd: root,
-    stdio: "pipe",
-  })`git status --porcelain=v1`
-    .nothrow()
-    .quiet();
-  const statusPaths =
-    (statusRaw as any).exitCode === 0
-      ? parseStatusPaths(String((statusRaw as any).stdout || ""))
-      : [];
-  return Array.from(
-    new Set<string>([...committed, ...statusPaths].map((p) => normalizePath(p))),
-  ).sort();
-}
-
-async function collectNestedViberootsChangedPaths(
-  root: string,
-  env: NodeJS.ProcessEnv,
-  rootChangedPaths: string[],
-): Promise<string[]> {
-  if (!rootChangedPaths.some((p) => p === "viberoots" || p.startsWith("viberoots/"))) {
-    return [];
-  }
-  const currentTarget = await fsp
-    .readlink(path.join(root, ".viberoots", "current"))
-    .catch(() => "");
-  if (currentTarget !== "../viberoots") {
-    return [];
-  }
-  const viberootsRoot = path.join(root, "viberoots");
-  let viberootsStat: Awaited<ReturnType<typeof fsp.lstat>> | null = null;
-  try {
-    viberootsStat = await fsp.lstat(viberootsRoot);
-  } catch {}
-  if (!viberootsStat || viberootsStat.isSymbolicLink()) {
-    return [];
-  }
-  const hasNestedGit = await fsp
-    .access(path.join(viberootsRoot, ".git"))
-    .then(() => true)
-    .catch(() => false);
-  if (!hasNestedGit) {
-    return [];
-  }
-  const nestedPaths = await collectGitChangedPaths(viberootsRoot, env);
-  return nestedPaths.map((p) => normalizePath(path.posix.join("viberoots", p))).filter(Boolean);
-}
-
 function hasNestedViberootsBuildSystemChanges(paths: string[]): boolean {
   return paths.some(
     (p) =>
@@ -317,6 +174,7 @@ export async function resolveBuildSystemBuckTestScope(opts: {
   root: string;
   requestedTargets: string[];
   env?: NodeJS.ProcessEnv;
+  changedPathsResult?: ChangedPathsResult;
 }): Promise<ScopeDecision> {
   const env = opts.env || process.env;
   const mode = parseBuildSystemTestMode(env.VBR_BUILD_SYSTEM_TESTS);
@@ -341,11 +199,21 @@ export async function resolveBuildSystemBuckTestScope(opts: {
     };
   }
 
-  const changedPaths = await collectChangedPaths(opts.root, env);
-  const changed = hasRelevantBuildSystemChanges(changedPaths);
+  const changedPathsResult = opts.changedPathsResult || (await collectChangedPaths(opts.root, env));
+  if (!changedPathsResult.ok) {
+    return {
+      targets: (await hasLocalViberootsCell(opts.root))
+        ? [...ROOT_AUTO_TARGETS, VIBEROOTS_AUTO_TARGET]
+        : ROOT_AUTO_TARGETS,
+      mode,
+      hasBuildSystemChanges: true,
+      changeAuthorityFailure: changedPathsResult.reason,
+    };
+  }
+  const changed = hasRelevantBuildSystemChanges(changedPathsResult.paths);
   return {
     targets: changed
-      ? await autoTargetsForChangedPaths(opts.root, changedPaths)
+      ? await autoTargetsForChangedPaths(opts.root, changedPathsResult.paths)
       : await resolveNonBuildSystemBuckTargets(opts.root),
     mode,
     hasBuildSystemChanges: changed,

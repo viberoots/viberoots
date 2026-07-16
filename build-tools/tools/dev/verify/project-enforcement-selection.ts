@@ -1,5 +1,4 @@
-import { spawnSync } from "node:child_process";
-import { collectChangedPaths } from "../../lib/build-system-test-scope";
+import { collectChangedPaths, type ChangedPathsResult } from "../../lib/build-system-test-scope";
 
 export const PROJECT_ENFORCEMENT_TARGETS = "workspace_buck//...";
 
@@ -14,6 +13,7 @@ export type ProjectEnforcementSelection = {
   required: boolean;
   reason: ProjectEnforcementSelectionReason;
   changedPaths: string[];
+  changeAuthorityFailure?: string;
 };
 
 function normalizePath(value: string): string {
@@ -37,39 +37,32 @@ export function isExplicitProjectSelector(value: string): boolean {
   );
 }
 
-function assertChangeAuthority(root: string): void {
-  for (const args of [
-    ["rev-parse", "--is-inside-work-tree"],
-    ["status", "--porcelain=v1", "--untracked-files=no"],
-  ]) {
-    const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
-    if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed`);
-  }
-}
-
 export async function resolveProjectEnforcementSelection(opts: {
   root: string;
   requestedTargets: readonly string[];
   fullSuite: boolean;
   env?: NodeJS.ProcessEnv;
   collectChangedPaths?: typeof collectChangedPaths;
+  changedPathsResult?: ChangedPathsResult;
 }): Promise<ProjectEnforcementSelection> {
   if (opts.fullSuite) return { required: true, reason: "full-suite", changedPaths: [] };
   if (opts.requestedTargets.some(isExplicitProjectSelector)) {
     return { required: true, reason: "explicit-project-selector", changedPaths: [] };
   }
-  try {
-    if (!opts.collectChangedPaths) assertChangeAuthority(opts.root);
-    const changedPaths = await (opts.collectChangedPaths || collectChangedPaths)(
-      opts.root,
-      opts.env || process.env,
-    );
-    return changedPaths.some(isProjectPath)
-      ? { required: true, reason: "project-change", changedPaths }
-      : { required: false, reason: "not-required", changedPaths };
-  } catch {
-    return { required: true, reason: "unavailable-change-authority", changedPaths: [] };
+  const result =
+    opts.changedPathsResult ||
+    (await (opts.collectChangedPaths || collectChangedPaths)(opts.root, opts.env || process.env));
+  if (!result.ok) {
+    return {
+      required: true,
+      reason: "unavailable-change-authority",
+      changedPaths: [],
+      changeAuthorityFailure: result.reason,
+    };
   }
+  return result.paths.some(isProjectPath)
+    ? { required: true, reason: "project-change", changedPaths: result.paths }
+    : { required: false, reason: "not-required", changedPaths: result.paths };
 }
 
 export function injectProjectEnforcementTarget(

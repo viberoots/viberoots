@@ -207,13 +207,17 @@ ordinary Buck test:
 - The Buck pass fixes the individual executor timeout at 30 seconds and the aggregate command at 60
   seconds. `VERIFY_TIMEOUT_SECS`, `TEST_NIX_TIMEOUT_SECS`, and ordinary lane timeout floors must not
   raise either budget.
-- The admission scan follows every static local import. It permits read-only `node:fs` and
-  `node:fs/promises` capabilities but rejects file, directory, permission, stream, copy, link,
-  timestamp, and rename mutation capabilities. Filesystem namespace bindings cannot escape through
-  arguments, reflection, destructuring, computed dynamic access, aliases, casts, or namespace
-  re-exports; each runtime reference must be a reviewed read-only member.
-- The canonical changed-path authority preserves both paths for committed and dirty renames.
-  Renames into, within, or out of `projects/` must schedule the complete pass.
+- The admission scan follows every static local import, including same-line import/export syntax
+  and direct or transitive helper modules. It permits read-only `node:fs` and `node:fs/promises`
+  capabilities but rejects file, directory, permission, stream, copy, link, timestamp, and rename
+  mutation capabilities. Filesystem namespace bindings cannot escape through arguments,
+  reflection, destructuring, computed dynamic access, aliases, casts, or namespace re-exports;
+  each runtime reference must be a reviewed read-only member.
+- The canonical changed-path authority returns explicit success or failure and preserves both paths
+  for committed and dirty renames. Verify shares one result across its selectors. A failed baseline,
+  diff, or status query schedules broad build-system coverage plus the complete project-enforcement
+  pass; only a successful empty result means no changes. Renames into, within, or out of `projects/`
+  must schedule the complete pass.
 - A scanner reports the unreadable directory or file and fails closed. Only a root explicitly
   declared optional by the caller may translate root `ENOENT` into an empty result. This exception
   is limited to the two deployment runners' optional `projects/deployments/` root; descendant access

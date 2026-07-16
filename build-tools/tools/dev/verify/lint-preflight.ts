@@ -279,9 +279,11 @@ export async function runVerifyLintPreflight(
           (p) => p === "." || !shouldIgnoreLintPath(p),
         )
       : [];
-  const fullRepoLintRequested = explicitLintPaths.includes(".");
-  const rawChangedPaths =
-    lintFilters.length > 0 ? [] : await collectChangedPaths(root, process.env);
+  const changedPathsResult =
+    lintFilters.length > 0 ? null : await collectChangedPaths(root, process.env);
+  const changeAuthorityUnavailable = changedPathsResult?.ok === false;
+  const fullRepoLintRequested = explicitLintPaths.includes(".") || changeAuthorityUnavailable;
+  const rawChangedPaths = changedPathsResult?.ok ? changedPathsResult.paths : [];
   const normalizedChangedPaths = Array.from(
     new Set(rawChangedPaths.map((p) => normalizeRepoPath(p)).filter(Boolean)),
   ).sort();
@@ -294,19 +296,20 @@ export async function runVerifyLintPreflight(
   const onlyIgnoredScaffoldChanges =
     lintFilters.length === 0 && existingChangedPaths.length > 0 && changedLintPaths.length === 0;
   const eslintTargets =
-    lintFilters.length > 0
+    lintFilters.length > 0 || changeAuthorityUnavailable
       ? fullRepoLintRequested
         ? ["."]
         : explicitLintPaths.filter(isEslintPath)
       : changedLintPaths.filter(isEslintPath);
   const prettierTargets =
-    lintFilters.length > 0
+    lintFilters.length > 0 || changeAuthorityUnavailable
       ? fullRepoLintRequested
         ? ["."]
         : explicitLintPaths.filter(isPrettierPath)
       : changedLintPaths.filter(isPrettierPath);
   const scoped =
-    (lintFilters.length > 0 && (eslintTargets.length > 0 || prettierTargets.length > 0)) ||
+    ((lintFilters.length > 0 || changeAuthorityUnavailable) &&
+      (eslintTargets.length > 0 || prettierTargets.length > 0)) ||
     changedLintPaths.length > 0;
   if (onlyIgnoredScaffoldChanges) {
     if (verbose()) {

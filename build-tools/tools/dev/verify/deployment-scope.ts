@@ -1,4 +1,4 @@
-import { collectChangedPaths } from "../../lib/build-system-test-scope";
+import { collectChangedPaths, type ChangedPathsResult } from "../../lib/build-system-test-scope";
 import {
   type DeploymentImpactDiagnostics,
   deploymentProjectPrefixesFromLabels,
@@ -65,11 +65,14 @@ export async function resolveDeploymentOverride(opts: {
   baseDecision: VerifyTemplateScopeDecision;
   requestedDeploymentMode: VerifyDeploymentScopeMode;
   deps?: Partial<ResolveDeploymentVerifyScopeDeps>;
+  changedPathsResult?: ChangedPathsResult;
 }): Promise<VerifyScopeDecision | null> {
   if (opts.requestedDeploymentMode === "never") return null;
 
   const collectPaths = opts.deps?.collectChangedPaths || collectChangedPaths;
-  const changedPaths = await collectPaths(opts.root, opts.env);
+  const changedPathsResult = opts.changedPathsResult || (await collectPaths(opts.root, opts.env));
+  if (!changedPathsResult.ok) return null;
+  const changedPaths = changedPathsResult.paths;
   const resolveDeploymentLabels = opts.deps?.listDeploymentTargets || listDeploymentTargets;
   const deploymentTargetLabels = await resolveDeploymentLabels(opts.root);
   const impact = resolveDeploymentImpactSelection(changedPaths, {

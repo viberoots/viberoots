@@ -12,6 +12,7 @@ import {
   resolveProjectImpactSelection,
 } from "../../lib/project-impact-selector";
 import {
+  type ChangedPathsResult,
   isIgnoredBuildSystemScopePath,
   resolveBuildSystemBuckTestScope,
 } from "../../lib/build-system-test-scope";
@@ -114,6 +115,7 @@ export async function resolveVerifyTemplateTestScope(opts: {
   requestedTargets: string[];
   requestedSelector?: { mode: "project-closure"; projects: string[] } | null;
   env?: NodeJS.ProcessEnv;
+  changedPathsResult?: ChangedPathsResult;
   deps?: Partial<VerifyTemplateScopeDeps>;
 }): Promise<VerifyTemplateScopeDecision> {
   const env = opts.env || process.env;
@@ -123,6 +125,7 @@ export async function resolveVerifyTemplateTestScope(opts: {
     root: opts.root,
     requestedTargets: opts.requestedTargets,
     env,
+    changedPathsResult: opts.changedPathsResult,
   });
   const resolveProjectClosure =
     opts.deps?.resolveProjectClosureSelection || resolveProjectClosureSelection;
@@ -161,7 +164,11 @@ export async function resolveVerifyTemplateTestScope(opts: {
     opts.deps?.resolveTemplateSelection || resolveTemplateTestSelection;
   const resolveProjectImpact =
     opts.deps?.resolveProjectImpactSelection || resolveProjectImpactSelection;
-  const selected = await resolveTemplateSelection({ root: opts.root, env });
+  const selected = await resolveTemplateSelection({
+    root: opts.root,
+    env,
+    changedPathsResult: opts.changedPathsResult,
+  });
   const diagnostics = selected.diagnostics;
 
   if (requestedMode === "always" && selected.mode !== "template-only") {

@@ -1,6 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import { collectChangedPaths } from "../lib/build-system-test-scope";
+import { collectChangedPaths, requireChangedPaths } from "../lib/build-system-test-scope";
 import { getFlagBool, getFlagList, getFlagStr, hasFlag } from "../lib/cli";
 import {
   runExplicitRemovalDeployment,
@@ -84,7 +84,7 @@ export async function runFromChangesCli(workspaceRoot: string) {
   const deployments = await resolveAllDeployments(workspaceRoot);
   const plan = await resolveDeploymentsFromChanges({
     workspaceRoot,
-    changedPaths: changedPaths || (await collectChangedPaths(workspaceRoot)),
+    changedPaths: changedPaths || requireChangedPaths(await collectChangedPaths(workspaceRoot)),
     deployments,
   });
   const smokeConnectOverride = collectSmokeConnectOverride();

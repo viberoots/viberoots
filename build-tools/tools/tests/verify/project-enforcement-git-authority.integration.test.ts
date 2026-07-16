@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { collectChangedPaths } from "../../lib/build-system-test-scope";
 import { resolveProjectEnforcementSelection } from "../../dev/verify/project-enforcement-selection";
 
 async function git(root: string, ...args: string[]): Promise<void> {
@@ -129,5 +130,99 @@ test("committed rename authority preserves both sides across the projects bounda
     assert.equal(result.reason, "project-change", `${from} -> ${to}`);
     assert.ok(result.changedPaths.includes(from), `missing rename source ${from}`);
     assert.ok(result.changedPaths.includes(to), `missing rename destination ${to}`);
+  }
+});
+
+test("git discovery failures remain distinct from a successful empty change set", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "project-enforcement-git-failures-"));
+  await fsp.writeFile(path.join(root, "base.ts"), "export const base = 1;\n");
+  await git(root, "init", "-b", "main");
+  await git(root, "add", ".");
+  await git(
+    root,
+    "-c",
+    "user.name=test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "base",
+  );
+  await git(root, "switch", "-c", "feature");
+  await fsp.writeFile(path.join(root, "feature.ts"), "export const feature = 1;\n");
+  await git(root, "add", ".");
+  await git(
+    root,
+    "-c",
+    "user.name=test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "feature",
+  );
+
+  const bin = await fsp.mkdtemp(path.join(os.tmpdir(), "project-enforcement-fake-git-"));
+  const realGit = String((await $`command -v git`).stdout).trim();
+  await fsp.writeFile(
+    path.join(bin, "git"),
+    [
+      "#!/usr/bin/env bash",
+      'if [[ -n "$FAIL_MATCH" && " $* " == *"$FAIL_MATCH"* ]]; then',
+      '  printf "forced git failure: %s\\n" "$FAIL_MATCH" >&2',
+      "  exit 2",
+      "fi",
+      'exec "$REAL_GIT" "$@"',
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+
+  const original = {
+    path: process.env.PATH,
+    realGit: process.env.REAL_GIT,
+    failMatch: process.env.FAIL_MATCH,
+  };
+  try {
+    process.env.PATH = `${bin}${path.delimiter}${original.path || ""}`;
+    process.env.REAL_GIT = realGit;
+    for (const command of [
+      "rev-parse --verify --quiet main",
+      "merge-base main HEAD",
+      "diff --name-only --no-renames",
+      "status --porcelain=v1",
+    ]) {
+      process.env.FAIL_MATCH = command;
+      const result = await collectChangedPaths(root, {});
+      assert.equal(result.ok, false, command);
+      if (result.ok) continue;
+      assert.match(result.reason, new RegExp(command.split(" ")[0]!));
+      const conservative = await resolveProjectEnforcementSelection({
+        root,
+        requestedTargets: ["//:focused"],
+        fullSuite: false,
+        changedPathsResult: result,
+      });
+      assert.equal(conservative.reason, "unavailable-change-authority");
+      assert.match(conservative.changeAuthorityFailure || "", /forced git failure/);
+    }
+    delete process.env.FAIL_MATCH;
+    await git(root, "reset", "--hard", "main");
+    const empty = await collectChangedPaths(root, {});
+    assert.deepEqual(empty, { ok: true, paths: [] });
+    const noChange = await resolveProjectEnforcementSelection({
+      root,
+      requestedTargets: ["//:focused"],
+      fullSuite: false,
+      changedPathsResult: empty,
+    });
+    assert.equal(noChange.reason, "not-required");
+  } finally {
+    process.env.PATH = original.path;
+    if (original.realGit === undefined) delete process.env.REAL_GIT;
+    else process.env.REAL_GIT = original.realGit;
+    if (original.failMatch === undefined) delete process.env.FAIL_MATCH;
+    else process.env.FAIL_MATCH = original.failMatch;
+    await fsp.rm(bin, { recursive: true, force: true });
   }
 });

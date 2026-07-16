@@ -34,8 +34,8 @@ const PROHIBITED_SOURCE = [
 function staticModuleSpecifiers(source: string): string[] {
   const specifiers: string[] = [];
   for (const pattern of [
-    /(?:^|\n)\s*import\s*["']([^"']+)["']/gm,
-    /(?:^|\n)\s*(?:import|export)\s+[\s\S]*?\sfrom\s*["']([^"']+)["']/gm,
+    /\bimport\s*["']([^"']+)["']/g,
+    /\b(?:import|export)\s+[^;]*?\bfrom\s*["']([^"']+)["']/g,
   ]) {
     for (const match of source.matchAll(pattern)) specifiers.push(match[1]!);
   }

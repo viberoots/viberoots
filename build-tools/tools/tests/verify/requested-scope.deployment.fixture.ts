@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { resolveRequestedVerifyScope } from "../../dev/verify/requested-scope";
 
+export const changedPaths = (...paths: string[]) => ({ ok: true as const, paths });
+
 export const defaultArgs = {
   coverage: false,
   console: "auto" as const,
@@ -38,7 +40,7 @@ export async function assertEmptySafetyFloorRejected(): Promise<void> {
         env: {},
         deps: {
           resolveTemplateScope: async () => baseDecision(),
-          collectChangedPaths: async () => ["build-tools/deployments/defs.bzl"],
+          collectChangedPaths: async () => changedPaths("build-tools/deployments/defs.bzl"),
           listDeploymentTargets: async () => ["//projects/deployments/sample/dev:deploy"],
           queryDeploymentDomainTargets: async () => ["//:deployment_domain_labels_cquery"],
           deploymentSafetyFloorTargets: [],

@@ -706,11 +706,14 @@ I register source-owned `*.project-enforcement.test.ts` runners as generated tes
 filesystem work. The suffix glob is the sole membership authority for source exports and generated
 targets. Generated `TARGETS` files remain outputs, and registration does not invoke Nix.
 
-The shared changed-path authority injects the complete generated target family for project changes,
-explicit `//projects/...` selectors, unavailable change authority, and full suites. The planner
-deduplicates the result and partitions label `verify:project-enforcement` into a serial sidecar in
-the earliest execution group. This pass runs locally with remote cache reads and writes disabled;
-all other passes retain their selected execution policy.
+The shared changed-path authority returns either a successful path set, including a legitimately
+empty set, or an actionable Git discovery failure. Verify computes that result once for its shared
+selectors. A failed baseline, diff, or status query selects the broad build-system scope and injects
+the complete generated project-enforcement family instead of masquerading as no changes. Explicit
+`//projects/...` selectors and full suites also inject the family. The planner deduplicates the
+result and partitions label `verify:project-enforcement` into a serial sidecar in the earliest
+execution group. This pass runs locally with remote cache reads and writes disabled; all other
+passes retain their selected execution policy.
 
 Generated runners resolve the consumer `projects/` root through workspace-root authority and fail
 closed without generated-target execution evidence. They may scan the live project tree, but
@@ -720,8 +723,10 @@ consumers, dependency caches, and nested Buck daemons.
 
 The 30-second runner and 60-second aggregate timeouts are pass-owned Buck execution policy. Broader
 `VERIFY_TIMEOUT_SECS`, `TEST_NIX_TIMEOUT_SECS`, and ordinary test-lane floors cannot raise them;
-other pass budgets retain their existing behavior. Admission follows the complete static local import graph and rejects
-filesystem mutation capabilities from `node:fs` and `node:fs/promises`, including file, directory,
+other pass budgets retain their existing behavior. Admission follows the complete static local
+import graph, including compact same-line import/export declarations and direct or transitive
+helper modules, and rejects filesystem mutation capabilities from `node:fs` and
+`node:fs/promises`, including file, directory,
 permission, stream, copy, link, timestamp, and rename APIs. Read-only directory enumeration,
 metadata inspection, and file reads remain admitted. The source-owned lexical authority requires
 every runtime namespace reference to be a reviewed read-only member; namespace arguments,
