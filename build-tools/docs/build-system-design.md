@@ -66,6 +66,30 @@ arguments and artifact identity unchanged, so the record separately exposes the 
 `evaluation.impure` gap. Later hermetic-build PRs remove that gap before the public hermeticity
 claim is enabled.
 
+### Immutable evaluation bundles
+
+Normal selected and full graph evaluators do not receive a live workspace as their flake source.
+The existing source-role and filtered-snapshot authority first stages reviewed source, including
+tracked modifications, while excluding workspace state, outputs, caches, logs, credentials, and
+unrelated project roots. It rewrites the viberoots input to the canonical immutable store source and
+removes the redundant staged viberoots tree before bundle registration.
+
+The materializer creates `viberoots.evaluation-bundle.v1`. Its `source/` directory is the sole
+evaluator root. Stable JSON records carry the requested attribute, target and platform,
+classification, dependency identities, file manifest, and a SHA-256 diagnostic digest. The complete
+bundle is added to the Nix store with NAR addressing. An unchanged warm build therefore reuses the
+same bundle path. CoW is only a staging optimization: CoW and full-copy construction validate and
+register the same bytes.
+
+Construction rejects external symlinks and unsupported file types. The materializer owns one
+temporary root, bounds Nix registration, forwards interruption to the owned registration process,
+and removes its root after success, failure, timeout, interruption, or hard owner death. A detached
+PID-and-nonce watchdog stops and awaits the recorded registration process group before deleting only
+a marker-matching root. Cleanup failure remains attached to the primary error. No evaluator falls
+back to the live tree when filtering, registration, ownership, or cleanup is ambiguous. This
+establishes immutable evaluation input; the remaining selector-environment and `--impure` removal
+belongs to the next hermetic-build stage.
+
 - Buck2 remains the **source of truth** for the dependency graph and test impact analysis.
 - Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.
 - Planner-visible probes/stubs are allowed only when explicitly documented as non-build exceptions.

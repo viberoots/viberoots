@@ -83,8 +83,13 @@ let
         if builtins.pathExists pyPlanner && !(builtins.elem "python" withCpp)
         then (withCpp ++ [ "python" ])
         else withCpp;
+      nodePlanner = manifestBase + "/planner/node.nix";
+      withNode =
+        if builtins.pathExists nodePlanner && !(builtins.elem "node" withPy)
+        then (withPy ++ [ "node" ])
+        else withPy;
     in
-      withPy;
+      withNode;
 
   LANGS =
     builtins.listToAttrs (map (id: { name = id; value = ensureAdapter id; }) langIds);
@@ -107,5 +112,4 @@ let
 in {
   inherit LANGS pick;
 }
-
 

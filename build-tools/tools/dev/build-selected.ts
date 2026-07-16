@@ -79,16 +79,6 @@ async function workspaceFlakeDir(workspaceRoot: string): Promise<string> {
   return "";
 }
 
-async function workspaceFlakeRef(workspaceRoot: string, attr: string): Promise<string> {
-  const flakeDir = await workspaceFlakeDir(workspaceRoot);
-  if (!flakeDir) {
-    throw new Error(
-      `workspace flake not found at ${workspaceRoot}/.viberoots/workspace/flake.nix or ${workspaceRoot}/flake.nix`,
-    );
-  }
-  return `path:${flakeDir}#${attr}`;
-}
-
 function parseSourceMode(argv: string[]): {
   sourceMode: "auto" | "git" | "path";
   sourceError?: string;
@@ -124,7 +114,6 @@ async function chooseFlakeRef(opts: {
   cleanup?: () => Promise<void>;
   localDevelopment?: boolean;
 }> {
-  const repoRootEnv = String(process.env.REPO_ROOT || "").trim();
   const workspaceAbs = path.resolve(opts.workspaceRoot);
   const isLikelyTempWorkspace =
     workspaceAbs.startsWith("/tmp/") ||
@@ -132,11 +121,6 @@ async function chooseFlakeRef(opts: {
     workspaceAbs.startsWith("/private/var/folders/") ||
     workspaceAbs.includes(`${path.sep}viberoots-verify-`) ||
     workspaceAbs.includes(`${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`);
-  if (opts.sourceMode === "path")
-    return {
-      flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected"),
-      localDevelopment: true,
-    };
   const targetPackages = [targetPackageFromLabel(opts.target)].filter(Boolean);
   const inventory = await inspectArtifactSource({
     targetPackages,
@@ -148,40 +132,13 @@ async function chooseFlakeRef(opts: {
         allowFailure: true,
       }),
   });
-  if (opts.sourceMode === "git")
-    return {
-      flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected"),
-      localDevelopment: inventory.localDevelopment,
-    };
-  if (isLikelyTempWorkspace) {
-    const filtered = await makeFilteredFlakeRef({
-      workspaceRoot: opts.workspaceRoot,
-      attr: "graph-generator-selected",
-      logPrefix: "[build-selected]",
-      graphPath: opts.graphPath,
-      target: opts.target,
-    });
-    return { ...filtered, localDevelopment: inventory.localDevelopment };
-  }
-  if (repoRootEnv) {
-    const repoRootAbs = path.resolve(repoRootEnv);
-    if (repoRootAbs !== workspaceAbs) {
-      return {
-        flakeRef: await workspaceFlakeRef(workspaceAbs, "graph-generator-selected"),
-        localDevelopment: inventory.localDevelopment,
-      };
-    }
-  }
-  if (!inventory.localDevelopment)
-    return {
-      flakeRef: await workspaceFlakeRef(opts.workspaceRoot, "graph-generator-selected"),
-    };
-  console.error(
-    "[build-selected] Falling back to path flake source due to relevant untracked files:",
-  );
-  for (const f of inventory.relevant.slice(0, 50)) console.error(` - ${f}`);
-  if (inventory.relevant.length > 50) {
-    console.error(` ... and ${inventory.relevant.length - 50} more`);
+  const localDevelopment =
+    opts.sourceMode === "path" || isLikelyTempWorkspace || inventory.localDevelopment;
+  if (inventory.localDevelopment && opts.sourceMode === "auto") {
+    console.error(
+      "[build-selected] bundling relevant untracked files as local development source:",
+    );
+    for (const file of inventory.relevant.slice(0, 50)) console.error(` - ${file}`);
   }
   const filtered = await makeFilteredFlakeRef({
     workspaceRoot: opts.workspaceRoot,
@@ -189,12 +146,13 @@ async function chooseFlakeRef(opts: {
     logPrefix: "[build-selected]",
     graphPath: opts.graphPath,
     target: opts.target,
+    classification: localDevelopment ? "local-development" : "hermetic",
   });
   return {
     flakeRef: filtered.flakeRef,
     workspaceRoot: filtered.workspaceRoot,
     cleanup: filtered.cleanup,
-    localDevelopment: true,
+    localDevelopment,
   };
 }
 async function main() {
@@ -302,8 +260,10 @@ async function main() {
     ? {
         ...sanitizedEnv,
         WORKSPACE_ROOT: flakeSource.workspaceRoot,
+        BUCK_TEST_SRC: flakeSource.workspaceRoot,
         BUCK_GRAPH_JSON: path.join(flakeSource.workspaceRoot, DEFAULT_GRAPH_PATH),
         VBR_PNPM_FILTERED_SNAPSHOT_ROOT: flakeSource.workspaceRoot,
+        VBR_FILTERED_FLAKE_SNAPSHOT: "1",
       }
     : sanitizedEnv;
   const policyEvidence = await inspectArtifactBuildPolicy({

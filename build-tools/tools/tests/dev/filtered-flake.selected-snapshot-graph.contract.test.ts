@@ -13,6 +13,8 @@ test("selected filtered-flake snapshots preserve the active workspace graph", as
   try {
     await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
     await fsp.writeFile(path.join(root, ".viberoots", "workspace", "flake.nix"), "{}\n", "utf8");
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace", "buck"), { recursive: true });
+    await fsp.writeFile(path.join(root, DEFAULT_GRAPH_PATH), "[]\n");
 
     const graphPath = path.join(
       root,
@@ -62,7 +64,6 @@ test("selected filtered-flake snapshots preserve the active workspace graph", as
       await filtered.cleanup();
     }
   } finally {
-    if (snapshotRoot) await fsp.rm(path.dirname(snapshotRoot), { recursive: true, force: true });
     await fsp.rm(root, { recursive: true, force: true });
   }
 });
@@ -73,6 +74,8 @@ test("selected filtered-flake snapshots preserve node hash maps for pnpm targets
   try {
     await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
     await fsp.writeFile(path.join(root, ".viberoots", "workspace", "flake.nix"), "{}\n", "utf8");
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace", "buck"), { recursive: true });
+    await fsp.writeFile(path.join(root, DEFAULT_GRAPH_PATH), "[]\n");
     await fsp.mkdir(path.join(root, "projects", "apps", "demo"), { recursive: true });
     await fsp.writeFile(
       path.join(root, "projects", "apps", "demo", "pnpm-lock.yaml"),
@@ -101,7 +104,6 @@ test("selected filtered-flake snapshots preserve node hash maps for pnpm targets
       await filtered.cleanup();
     }
   } finally {
-    if (snapshotRoot) await fsp.rm(path.dirname(snapshotRoot), { recursive: true, force: true });
     await fsp.rm(root, { recursive: true, force: true });
   }
 });
@@ -112,6 +114,8 @@ test("selected filtered-flake snapshots preserve a lockless target package", asy
   try {
     await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
     await fsp.writeFile(path.join(root, ".viberoots", "workspace", "flake.nix"), "{}\n");
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace", "buck"), { recursive: true });
+    await fsp.writeFile(path.join(root, DEFAULT_GRAPH_PATH), "[]\n");
     const importer = path.join(root, "projects", "apps", "demo");
     await fsp.mkdir(path.join(importer, "src"), { recursive: true });
     await fsp.writeFile(path.join(importer, "TARGETS"), "# package marker\n");
@@ -140,7 +144,6 @@ test("selected filtered-flake snapshots preserve a lockless target package", asy
       await filtered.cleanup();
     }
   } finally {
-    if (snapshotRoot) await fsp.rm(path.dirname(snapshotRoot), { recursive: true, force: true });
     await fsp.rm(root, { recursive: true, force: true });
   }
 });
@@ -172,6 +175,8 @@ test("selected filtered-flake snapshots include only the target Go importer", as
   try {
     await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
     await fsp.writeFile(path.join(root, ".viberoots", "workspace", "flake.nix"), "{}\n", "utf8");
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace", "buck"), { recursive: true });
+    await fsp.writeFile(path.join(root, DEFAULT_GRAPH_PATH), "[]\n");
     for (const importer of ["demo-lib", "unrelated"]) {
       const importerDir = path.join(root, "projects", "libs", importer);
       await fsp.mkdir(importerDir, { recursive: true });
@@ -202,7 +207,6 @@ test("selected filtered-flake snapshots include only the target Go importer", as
       await filtered.cleanup();
     }
   } finally {
-    if (snapshotRoot) await fsp.rm(path.dirname(snapshotRoot), { recursive: true, force: true });
     await fsp.rm(root, { recursive: true, force: true });
   }
 });

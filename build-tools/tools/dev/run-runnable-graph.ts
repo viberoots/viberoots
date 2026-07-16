@@ -56,6 +56,10 @@ export async function buildRunnableManifest(
   },
 ): Promise<string> {
   const sourceMode = opts?.sourceMode || "auto";
+  const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
+  await withScopedGraphEnv(workspaceRoot, { BUCK_GRAPH_JSON: graphPath }, async () => {
+    await ensureGraph();
+  });
   const source = await chooseRunnableFlakeRef({
     workspaceRoot,
     sourceMode,
@@ -63,16 +67,13 @@ export async function buildRunnableManifest(
     attr: "graph-generator",
     purpose: opts?.purpose || "local",
   });
-  const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
   const baseEnv: Record<string, string> = {
     ...process.env,
     WORKSPACE_ROOT: source.workspaceRoot || workspaceRoot,
-    BUCK_TEST_SRC: workspaceRoot,
-    BUCK_GRAPH_JSON: graphPath,
+    BUCK_TEST_SRC: source.workspaceRoot || workspaceRoot,
+    BUCK_GRAPH_JSON: path.join(source.workspaceRoot || workspaceRoot, DEFAULT_GRAPH_PATH),
+    VBR_FILTERED_FLAKE_SNAPSHOT: "1",
   };
-  await withScopedGraphEnv(workspaceRoot, { BUCK_GRAPH_JSON: graphPath }, async () => {
-    await ensureGraph();
-  });
   const stdout = await (async () => {
     try {
       return await runNixBuildWithProgress({
@@ -121,6 +122,14 @@ export async function buildSelectedOutPath(
       ? labelOrOptions
       : labelOrOptions.label || `build selected target ${target}`;
   const purpose = typeof labelOrOptions === "string" ? "local" : labelOrOptions.purpose || "local";
+  const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
+  await withScopedGraphEnv(
+    workspaceRoot,
+    { BUCK_GRAPH_JSON: graphPath, BUCK_TARGET: target },
+    async () => {
+      await ensureGraph();
+    },
+  );
   const source = await chooseRunnableFlakeRef({
     workspaceRoot,
     sourceMode,
@@ -142,23 +151,16 @@ export async function buildSelectedOutPath(
           attrPath: pnpmStoreAttrFromImporter(targetImporter),
         })
       : null;
-  const graphPath = path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
   const selectedEnv: Record<string, string> = {
     ...process.env,
     WORKSPACE_ROOT: source.workspaceRoot || workspaceRoot,
-    BUCK_TEST_SRC: workspaceRoot,
-    BUCK_GRAPH_JSON: graphPath,
+    BUCK_TEST_SRC: source.workspaceRoot || workspaceRoot,
+    BUCK_GRAPH_JSON: path.join(source.workspaceRoot || workspaceRoot, DEFAULT_GRAPH_PATH),
     BUCK_TARGET: target,
+    VBR_FILTERED_FLAKE_SNAPSHOT: "1",
   };
   let stdout = "";
   try {
-    await withScopedGraphEnv(
-      workspaceRoot,
-      { BUCK_GRAPH_JSON: graphPath, BUCK_TARGET: target },
-      async () => {
-        await ensureGraph();
-      },
-    );
     stdout = await runNixBuildWithProgress({
       workspaceRoot,
       env: selectedEnv,

@@ -1,4 +1,3 @@
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { ArtifactBuildClassification, ArtifactJobPurpose } from "../lib/artifact-build-policy";
 import { targetPackageFromLabel } from "../lib/artifact-source-inventory";
@@ -12,13 +11,6 @@ function isLikelyTempWorkspace(workspaceRoot: string): boolean {
     workspaceAbs.startsWith("/private/tmp/") ||
     workspaceAbs.startsWith("/private/var/folders/") ||
     workspaceAbs.includes(`${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`)
-  );
-}
-
-async function hasGeneratedWorkspaceViberootsInput(workspaceRoot: string): Promise<boolean> {
-  const text = await fsp.readFile(path.join(workspaceRoot, "flake.nix"), "utf8").catch(() => "");
-  return /\bviberoots\.url\s*=\s*"path:\.\/\.viberoots\/workspace\/viberoots-flake-input"/.test(
-    text,
   );
 }
 
@@ -36,7 +28,6 @@ export async function chooseRunnableFlakeRef(opts: {
 }> {
   const targetPackages = opts.target ? [targetPackageFromLabel(opts.target)].filter(Boolean) : [];
   let classification: ArtifactBuildClassification;
-  let filteredRequired = false;
   const pathSource = opts.sourceMode === "path" || isLikelyTempWorkspace(opts.workspaceRoot);
 
   if (pathSource) {
@@ -48,12 +39,8 @@ export async function chooseRunnableFlakeRef(opts: {
     });
     classification =
       opts.sourceMode === "git" || !inventory.localDevelopment ? "hermetic" : "local-development";
-    filteredRequired =
-      opts.sourceMode === "auto" &&
-      ((await hasGeneratedWorkspaceViberootsInput(opts.workspaceRoot)) ||
-        inventory.localDevelopment);
     if (inventory.localDevelopment && opts.sourceMode === "auto") {
-      console.warn("[run-runnable] using filtered flake source due to relevant untracked files:");
+      console.warn("[run-runnable] bundling relevant untracked files as local development source:");
       for (const file of inventory.relevant.slice(0, 50)) console.warn(` - ${file}`);
     }
   }
@@ -66,20 +53,12 @@ export async function chooseRunnableFlakeRef(opts: {
     toolNames: ["git"],
   });
 
-  if (pathSource) {
-    return {
-      flakeRef: `path:${path.resolve(opts.workspaceRoot)}#${opts.attr}`,
-      classification,
-    };
-  }
-  if (!filteredRequired) {
-    return { flakeRef: `${opts.workspaceRoot}#${opts.attr}`, classification };
-  }
   const filtered = await makeFilteredFlakeRef({
     workspaceRoot: opts.workspaceRoot,
     attr: opts.attr,
     logPrefix: "[run-runnable]",
     target: opts.target,
+    classification,
   });
   return {
     flakeRef: filtered.flakeRef,

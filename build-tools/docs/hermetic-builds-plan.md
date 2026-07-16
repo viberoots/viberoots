@@ -113,6 +113,37 @@ assumption or known integration risk. Review and close every entry at PR-3 and P
   contract until PR-3; environment and tool qualification remain PR-4 scope; independent-builder
   agreement remains PR-5 scope.
 
+### PR-2 Deferred Full-Suite Record
+
+- Commit identity: the viberoots commit with subject `build: materialize immutable evaluation
+bundles` whose first parent is `fc0d992daf592feeafe18b4b9016bada1012b704`. Parent plus subject
+  identifies the commit without the impossible requirement that a commit contain its own final
+  hash.
+- Turbo Mode base: `fc0d992daf592feeafe18b4b9016bada1012b704` in viberoots and
+  `77d6891079fb26579df0ccd829007306a4366ab9` in the parent repository.
+- Focused validation: the fresh post-review `i && b && v` passed the complete 19-selector affected
+  union plus the canonical five-target project-enforcement floor, including
+  bundle lifecycle and identity, filtered-source exclusion and cleanup, selected and full
+  materialization, runnable selection, planner/Node neighbors, hard owner death, and Darwin capture
+  cleanup. Project enforcement completed 5/5 in 9 seconds with one thread, the shared pass completed
+  19/19 in 21 seconds, and the full focused command took 66 seconds. Output is recorded in
+  `.viberoots/workspace/buck/codex-test-logs/i-b-v-hermetic-pr2-final-post-review-concrete-20260716-105915.log`;
+  bounded disk, Nix-path, process, and cleanup evidence is in the sibling
+  `hermetic-pr2-final-post-review-concrete-evidence-20260716-105915` directory. The preceding focused
+  cleanup regression passed 2/2 and is recorded in the sibling
+  `hermetic-pr2-cleanup-regression-evidence-20260716-105113` directory. Changed-file ESLint and
+  Prettier passed before verify; verify used a documented lint-preflight waiver for an unchanged
+  parent `flake.lock` hash that the stale-name scanner misclassified as a migration label.
+- Disk and lifecycle evidence: the final focused run added 45,545,048 direct NAR bytes, including
+  one 65,496-byte identity fixture bundle. Workspace growth was 316 KiB and `buck-out` growth was 128
+  KiB. Measured temp roots were empty and no bundle root, registration descendant, capture path,
+  owned process, or owned orphan remained; the shared noindex parent contained only its zero-size
+  metadata marker.
+- Broader validation deferred: `ALL_TESTS=1` remains mandatory at the PR-3 checkpoint under the
+  Turbo Mode policy.
+- Open integration assumptions: selector environment and normal `--impure` removal remain PR-3;
+  environment and tool qualification remain PR-4; independent-builder agreement remains PR-5.
+
 ## PR-1: Establish Hermetic Policy Authority And Evidence
 
 ### 1. Intent

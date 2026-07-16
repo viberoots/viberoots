@@ -152,25 +152,22 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
       throw new Error(`${name} must not broad-rsync the workspace root into filtered snapshots`);
     }
   }
-  if (
-    !buildHelper.includes("repairSnapshotViberootsInput") ||
-    !buildHelper.includes("WORKSPACE_ROOT: snapDir")
-  ) {
-    throw new Error(
-      "nix-build-filtered-flake must evaluate self-contained filtered snapshots from the snapshot workspace root",
-    );
-  }
+  assert.match(buildHelper, /repairSnapshotViberootsInput/);
+  assert.match(buildHelper, /materializeEvaluationBundle/);
+  assert.match(buildHelper, /WORKSPACE_ROOT: bundleRoot/);
   assert.ok(
     buildHelper.indexOf("repairSnapshotViberootsInput({ snapDir, flakeDir })") <
-      buildHelper.indexOf("prewarmFinalStoreForTarget(root, attr, flakeRef, nixEnv)"),
-    "selected snapshots must repair their filtered viberoots input before pnpm-store evaluation",
+      buildHelper.indexOf("const bundle = await materializeEvaluationBundle") &&
+      buildHelper.indexOf("const bundle = await materializeEvaluationBundle") <
+        buildHelper.indexOf("prewarmFinalStoreForTarget(root, attr, flakeRef, nixEnv)"),
+    "selected snapshots must repair inputs and register the bundle before pnpm-store evaluation",
   );
   assert.ok(
     buildHelper.indexOf("const nixEnv = envWithResolvedNixBin") <
       buildHelper.indexOf("prewarmFinalStoreForTarget(root, attr, flakeRef, nixEnv)"),
     "selected snapshots must establish their evaluation environment before pnpm-store prewarming",
   );
-  assert.match(buildHelper, /VBR_PNPM_FILTERED_SNAPSHOT_ROOT: snapDir/);
+  assert.match(buildHelper, /VBR_PNPM_FILTERED_SNAPSHOT_ROOT: bundleRoot/);
   assert.match(buildHelper, /attrPath: pnpmStoreAttrFromImporter\(importer\),\s+env,/);
   assert.doesNotMatch(buildHelper, /tempRepoLiveViberootsRoot|activeViberootsRoot/);
   if (
@@ -192,10 +189,10 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
   if (
     !helper.includes("resolveSnapshotFlakeDir") ||
     !helper.includes('".viberoots", "workspace", "flake.nix"') ||
-    !helper.includes("const flakeRef = `path:${flakeDir}#${attr}`")
+    !helper.includes("const flakeRef = bundle.flakeRef")
   ) {
     throw new Error(
-      "nix-build-filtered-flake must build from the resolved snapshot flake directory",
+      "nix-build-filtered-flake must build from the registered bundle flake reference",
     );
   }
   if (

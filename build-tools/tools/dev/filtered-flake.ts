@@ -12,6 +12,9 @@ import {
   defaultFilteredFlakeSnapshotRelPaths,
   defaultFilteredFlakeSnapshotRsyncSources,
   filteredFlakeRsyncExcludeArgs,
+  computeSelectedCppPackageClosure,
+  graphNodesFromJson,
+  graphPackagePaths,
 } from "./nix-build-filtered-flake-lib";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 import { emitTimingDetail } from "../lib/timing-detail";
@@ -20,6 +23,8 @@ import { targetPackageFromLabel } from "./build-selected-helpers";
 import { findWorkspacePackageRepoDirs } from "./update-pnpm-hash/importer-workspace-packages";
 import { repairSnapshotViberootsInput } from "./filtered-flake-viberoots-input";
 import { removeOwnedTempTree, rethrowAfterOwnedTempCleanup } from "../lib/owned-temp-cleanup";
+import type { ArtifactBuildClassification } from "../lib/artifact-build-policy";
+import { materializeEvaluationBundle } from "./evaluation-bundle";
 
 async function existingRelPaths(root: string, relPaths: readonly string[]): Promise<string[]> {
   const present: string[] = [];
@@ -38,7 +43,14 @@ export async function makeFilteredFlakeRef(opts: {
   logPrefix: string;
   graphPath?: string;
   target?: string;
-}): Promise<{ flakeRef: string; workspaceRoot: string; cleanup: () => Promise<void> }> {
+  classification?: ArtifactBuildClassification;
+}): Promise<{
+  flakeRef: string;
+  workspaceRoot: string;
+  bundlePath: string;
+  bundleDigest: string;
+  cleanup: () => Promise<void>;
+}> {
   const tmpBase = process.env.TMPDIR || "/tmp";
   const workDirRaw = await mkdtempNoindex("vbr-flake-", {
     baseName: "vbr-flake",
@@ -64,7 +76,10 @@ export async function makeFilteredFlakeRef(opts: {
     const snapshotStart = Date.now();
     const rsyncExcludes = filteredFlakeRsyncExcludeArgs();
     const snapshotSources = defaultFilteredFlakeSnapshotRsyncSources(
-      await existingRelPaths(src, await filteredSnapshotRelPaths(src, opts.target || "")),
+      await existingRelPaths(
+        src,
+        await filteredSnapshotRelPaths(src, opts.target || "", opts.graphPath),
+      ),
     );
     await runCommand({
       command: "rsync",
@@ -105,19 +120,55 @@ export async function makeFilteredFlakeRef(opts: {
         `${opts.logPrefix} filtered source snapshot is missing .viberoots/workspace/flake.nix and flake.nix`,
       );
     }
-    await repairSnapshotViberootsInput({ snapDir: snapDirReal, flakeDir });
+    const immutableViberoots = await repairSnapshotViberootsInput({
+      snapDir: snapDirReal,
+      flakeDir,
+    });
+    if (immutableViberoots) await fsp.rm(path.join(snapDirReal, "viberoots"), { recursive: true });
+    const bundle = await materializeEvaluationBundle({
+      stagedSource: snapDirReal,
+      attr: opts.attr,
+      target: opts.target,
+      classification: opts.classification || "hermetic",
+      platform: String(process.env.BUCK_TARGET_PLATFORM || "").trim(),
+      requireGraph: opts.attr.startsWith("graph-generator"),
+    });
+    await removeOwnedTempTree(workDir);
     return {
-      flakeRef: `path:${flakeDir}#${opts.attr}`,
-      workspaceRoot: snapDirReal,
-      cleanup: async () => await removeOwnedTempTree(workDir),
+      ...bundle,
+      bundleDigest: bundle.digest,
     };
   } catch (error) {
     await rethrowAfterOwnedTempCleanup(error, [async () => await removeOwnedTempTree(workDir)]);
   }
 }
 
-async function filteredSnapshotRelPaths(root: string, target: string): Promise<string[]> {
+async function graphSourcePaths(graphPath: string, target: string): Promise<string[]> {
+  const raw = JSON.parse(await fsp.readFile(graphPath, "utf8"));
+  const nodes = graphNodesFromJson(raw);
+  return target ? computeSelectedCppPackageClosure(nodes, target) : graphPackagePaths(nodes);
+}
+
+async function filteredSnapshotRelPaths(
+  root: string,
+  target: string,
+  explicitGraphPath?: string,
+): Promise<string[]> {
   const relPaths = new Set(defaultFilteredFlakeSnapshotRelPaths());
+  const graphPath = path.resolve(
+    String(explicitGraphPath || process.env.BUCK_GRAPH_JSON || path.join(root, DEFAULT_GRAPH_PATH)),
+  );
+  try {
+    for (const sourcePath of await graphSourcePaths(graphPath, target)) relPaths.add(sourcePath);
+  } catch (error) {
+    if (
+      await fsp
+        .access(graphPath)
+        .then(() => true)
+        .catch(() => false)
+    )
+      throw error;
+  }
   const importer = targetPackageFromLabel(target);
   if (!importer || importer === ".") return [...relPaths];
   const normalizedImporter = path.posix.normalize(importer);

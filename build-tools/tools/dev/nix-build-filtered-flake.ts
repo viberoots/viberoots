@@ -34,6 +34,7 @@ import {
   emitArtifactPolicyEvidence,
   inspectArtifactBuildPolicy,
 } from "./artifact-policy-inspection";
+import { materializeEvaluationBundle } from "./evaluation-bundle";
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -268,11 +269,12 @@ async function main(): Promise<void> {
       }),
   });
   const policyEnv = envWithResolvedNixBin({ ...process.env, WORKSPACE_ROOT: root });
+  const classification = classifyArtifactBuild({
+    diagnosticImpure: getFlagBool("impure"),
+    localDevelopment: sourceInventory.localDevelopment,
+  });
   const policyEvidence = await inspectArtifactBuildPolicy({
-    classification: classifyArtifactBuild({
-      diagnosticImpure: getFlagBool("impure"),
-      localDevelopment: sourceInventory.localDevelopment,
-    }),
+    classification,
     impureEvaluation: true,
     env: policyEnv,
     toolPaths: { node: process.execPath },
@@ -377,12 +379,25 @@ async function main(): Promise<void> {
       process.stdout.write(`${snapDir}\n`);
       return;
     }
-    const flakeRef = `path:${flakeDir}#${attr}`;
+    if (snapshotViberootsInput) {
+      await fsp.rm(path.join(snapDir, "viberoots"), { recursive: true });
+    }
+    const bundle = await materializeEvaluationBundle({
+      stagedSource: snapDir,
+      attr,
+      target: String(process.env.BUCK_TARGET || "").trim(),
+      classification,
+      platform: String(process.env.BUCK_TARGET_PLATFORM || "").trim(),
+      requireGraph: attr.startsWith("graph-generator"),
+    });
+    const flakeRef = bundle.flakeRef;
+    const bundleRoot = bundle.workspaceRoot;
     console.error("[nix-build-filtered-flake] building attr:", attr);
     const nixEnv = envWithResolvedNixBin({
       ...process.env,
-      WORKSPACE_ROOT: snapDir,
-      VBR_PNPM_FILTERED_SNAPSHOT_ROOT: snapDir,
+      WORKSPACE_ROOT: bundleRoot,
+      BUCK_TEST_SRC: bundleRoot,
+      VBR_PNPM_FILTERED_SNAPSHOT_ROOT: bundleRoot,
       ...(snapshotViberootsRoot
         ? {
             VIBEROOTS_FLAKE_INPUT_ROOT: snapshotViberootsRoot,
@@ -393,8 +408,7 @@ async function main(): Promise<void> {
       VBR_FILTERED_FLAKE_SNAPSHOT: "1",
       ...(selectedCppSources != null
         ? {
-            BUCK_GRAPH_JSON: path.join(snapDir, DEFAULT_GRAPH_PATH),
-            BUCK_TEST_SRC: snapDir,
+            BUCK_GRAPH_JSON: path.join(bundleRoot, DEFAULT_GRAPH_PATH),
           }
         : {}),
     });
@@ -405,6 +419,7 @@ async function main(): Promise<void> {
     const nixArgs = [
       "build",
       "--impure",
+      "--no-write-lock-file",
       "--accept-flake-config",
       flakeRef,
       "--option",

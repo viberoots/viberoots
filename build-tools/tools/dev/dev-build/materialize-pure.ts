@@ -2,13 +2,15 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
-import { pathExists } from "../../lib/repo";
 import { resolveToolPath } from "../../lib/tool-paths";
 import {
   formatRunnableLine,
   inferRunnableFromOutPath,
   parseRunnableManifest,
 } from "../../lib/runnables";
+import { targetPackageFromLabel } from "../../lib/artifact-source-inventory";
+import { inspectWorkspaceArtifactSource } from "../artifact-policy-inspection";
+import { makeFilteredFlakeRef } from "../filtered-flake";
 
 function materializeTimeoutSec(defaultSec: number): number {
   const raw = String(process.env.VBR_MATERIALIZE_TIMEOUT_SEC || "").trim();
@@ -17,24 +19,19 @@ function materializeTimeoutSec(defaultSec: number): number {
   return Math.floor(parsed);
 }
 
-async function workspaceFlakeRef(root: string, attr: string): Promise<string> {
-  const hidden = path.join(root, ".viberoots", "workspace");
-  if (await pathExists(path.join(hidden, "flake.nix"))) return `path:${hidden}#${attr}`;
-  return `.#${attr}`;
-}
-
-async function viberootsOverrideArgs(root: string): Promise<string> {
-  const inputRoot = String(
-    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || process.env.VIBEROOTS_SOURCE_ROOT || "",
-  ).trim();
-  if (inputRoot && (await pathExists(path.join(inputRoot, "flake.nix")))) {
-    return ` --override-input viberoots path:${inputRoot}`;
-  }
-  const local = path.join(root, "viberoots");
-  if (await pathExists(path.join(local, "flake.nix"))) {
-    return ` --override-input viberoots path:${local}`;
-  }
-  return "";
+async function evaluationBundle(root: string, attr: string, target = "") {
+  const inventory = await inspectWorkspaceArtifactSource({
+    workspaceRoot: root,
+    targetPackages: target ? [targetPackageFromLabel(target)].filter(Boolean) : [],
+  });
+  return await makeFilteredFlakeRef({
+    workspaceRoot: root,
+    attr,
+    target,
+    graphPath: path.join(root, DEFAULT_GRAPH_PATH),
+    logPrefix: "[dev-build]",
+    classification: inventory.localDevelopment ? "local-development" : "hermetic",
+  });
 }
 
 async function nixBuildPrintOutPaths(opts: {
@@ -138,29 +135,24 @@ export async function materializePureGraphIfEnabled(opts: {
   await mkdirWithMacosMetadataExclusion(linkDir);
   const linkName = path.join(linkDir, `buck-go-${Date.now()}`);
 
-  const envPure = {
-    ...process.env,
-    WORKSPACE_ROOT: opts.root,
-    BUCK_GRAPH_JSON: path.join(opts.root, DEFAULT_GRAPH_PATH),
-  } as any;
-
   const specific = extractSpecificTargets(opts.restArgs || []);
   if (specific.length > 0) {
-    const selectedFlake = await workspaceFlakeRef(opts.root, "graph-generator-pure-selected");
-    const localViberoots = await viberootsOverrideArgs(opts.root);
     console.log("Materializing selected targets (pure):");
     for (const sel of specific) {
+      const bundle = await evaluationBundle(opts.root, "graph-generator-pure-selected", sel);
       try {
         const envSel = {
           ...process.env,
-          WORKSPACE_ROOT: opts.root,
+          WORKSPACE_ROOT: bundle.workspaceRoot,
+          BUCK_TEST_SRC: bundle.workspaceRoot,
           BUCK_TARGET: sel,
-          BUCK_GRAPH_JSON: path.join(opts.root, DEFAULT_GRAPH_PATH),
+          BUCK_GRAPH_JSON: path.join(bundle.workspaceRoot, DEFAULT_GRAPH_PATH),
+          VBR_FILTERED_FLAKE_SNAPSHOT: "1",
         } as any;
         const selOut = await nixBuildPrintOutPaths({
           root: opts.root,
           env: envSel as Record<string, string>,
-          args: `--no-write-lock-file ${selectedFlake}${localViberoots} --accept-flake-config --no-link --print-out-paths`,
+          args: `--no-write-lock-file ${bundle.flakeRef} --accept-flake-config --no-link --print-out-paths`,
           label: `materialize selected target ${sel}`,
           timeoutSec: 120,
         });
@@ -185,25 +177,28 @@ export async function materializePureGraphIfEnabled(opts: {
       } catch (e) {
         console.log(` - ${sel}: (failed to materialize)`);
         throw e;
+      } finally {
+        await bundle.cleanup();
       }
     }
     return;
   }
 
+  const bundle = await evaluationBundle(opts.root, "graph-generator-pure");
   const envFull = {
     ...process.env,
-    WORKSPACE_ROOT: opts.root,
-    BUCK_GRAPH_JSON: path.join(opts.root, DEFAULT_GRAPH_PATH),
+    WORKSPACE_ROOT: bundle.workspaceRoot,
+    BUCK_TEST_SRC: bundle.workspaceRoot,
+    BUCK_GRAPH_JSON: path.join(bundle.workspaceRoot, DEFAULT_GRAPH_PATH),
+    VBR_FILTERED_FLAKE_SNAPSHOT: "1",
   } as any;
-  const fullFlake = await workspaceFlakeRef(opts.root, "graph-generator-pure");
-  const localViberoots = await viberootsOverrideArgs(opts.root);
   const pureOut = await nixBuildPrintOutPaths({
     root: opts.root,
     env: envFull as Record<string, string>,
-    args: `--impure --no-write-lock-file ${fullFlake}${localViberoots} --accept-flake-config --no-link --print-out-paths`,
+    args: `--impure --no-write-lock-file ${bundle.flakeRef} --accept-flake-config --no-link --print-out-paths`,
     label: "materialize full pure graph",
     timeoutSec: 420,
-  });
+  }).finally(bundle.cleanup);
   const purePath =
     String(pureOut || "")
       .trim()

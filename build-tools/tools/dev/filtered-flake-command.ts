@@ -70,6 +70,7 @@ export async function runCommand(opts: {
   allowFailure?: boolean;
   timeoutMs?: number;
   killGraceMs?: number;
+  onSpawn?: (processGroupId: number) => void;
 }): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   const capture = await commandCapture();
   let stopWatchdog = () => {};
@@ -88,6 +89,7 @@ export async function runCommand(opts: {
           let stderr = "";
           let settled = false;
           let timedOut = false;
+          let spawnHookError: unknown = null;
           let timer: NodeJS.Timeout | null = null;
           let timeoutEscalation: Promise<void> | null = null;
           const pid = proc.pid || 0;
@@ -116,6 +118,7 @@ export async function runCommand(opts: {
             if (timer) clearTimeout(timer);
             fn();
           };
+          proc.on("error", (error) => finish(() => reject(error)));
           const requestStop = () => {
             if (timeoutEscalation) return;
             signalOwnedProcess("SIGTERM");
@@ -151,7 +154,6 @@ export async function runCommand(opts: {
             : null;
           proc.stdout?.on("data", (chunk) => (stdout += String(chunk)));
           proc.stderr?.on("data", (chunk) => (stderr += String(chunk)));
-          proc.on("error", (error) => finish(() => reject(error)));
           proc.on("close", (code, signal) => {
             if (timer) {
               clearTimeout(timer);
@@ -162,7 +164,17 @@ export async function runCommand(opts: {
             void (async () => {
               if (closeEscalation) await closeEscalation;
               if (process.platform === "darwin") {
-                ({ stdout, stderr } = await capture.read());
+                try {
+                  ({ stdout, stderr } = await capture.read());
+                } catch (error) {
+                  if (!spawnHookError) throw error;
+                  if (spawnHookError instanceof Error && spawnHookError.cause === undefined) {
+                    spawnHookError.cause = error;
+                  }
+                }
+              }
+              if (spawnHookError) {
+                return finish(() => reject(spawnHookError));
               }
               if (closedTimedOut) {
                 return finish(() =>
@@ -191,6 +203,12 @@ export async function runCommand(opts: {
               );
             })().catch((error) => finish(() => reject(error)));
           });
+          try {
+            if (pid > 0) opts.onSpawn?.(pid);
+          } catch (error) {
+            spawnHookError = error;
+            requestStop();
+          }
         });
       } finally {
         removeSignalHandlers();

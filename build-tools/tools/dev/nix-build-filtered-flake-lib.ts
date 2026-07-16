@@ -1,6 +1,5 @@
 import { normalizeTargetLabel, packagePathFromLabel } from "../lib/labels";
-export { DEFAULT_FILTERED_FLAKE_CONFIG_PATHS } from "./filtered-flake-config-paths";
-import { DEFAULT_FILTERED_FLAKE_CONFIG_PATHS } from "./filtered-flake-config-paths";
+export * from "./nix-build-filtered-flake-filters";
 
 type GraphNodeRecord = Record<string, unknown>;
 
@@ -16,112 +15,6 @@ const SHARED_NODE_SNAPSHOT_ROOT_FILES = [
   "pnpm-workspace.yaml",
   "projects/node-modules.hashes.json",
 ];
-
-// prettier-ignore
-export const DEFAULT_FILTERED_FLAKE_ROOT_FILES = [".buckconfig", ".buckroot", ".npmrc", "TARGETS", "eslint.config.js", "flake.lock", "flake.nix", "gomod2nix.toml", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json"];
-
-// prettier-ignore
-export const DEFAULT_FILTERED_FLAKE_ROOTS = [".viberoots", "build-tools", "cpp", "go", "lang", "node", "patches", "prelude", "python", "tools", "third_party", "toolchains", "types", "viberoots"];
-
-export const FILTERED_FLAKE_RSYNC_EXCLUDES = [
-  ".git",
-  "node_modules",
-  "buck-out",
-  ".codex-logs",
-  ".codex-*.log",
-  ".full-test-output.log",
-  ".patch-sessions.json",
-  "test-logs",
-  "/backups",
-  "/cache",
-  "/codex-test-logs",
-  "/install-cache",
-  "/nix-xdg-cache",
-  "/pr-logs",
-  "/viberoots-flake-input",
-  "/xdg-cache",
-  ".viberoots/buck",
-  ".viberoots/buck/tmp",
-  ".viberoots/cache",
-  ".viberoots/codex-logs",
-  ".viberoots/codex-test-logs",
-  ".viberoots/current",
-  ".viberoots/workspace/.viberoots",
-  ".viberoots/workspace/backups",
-  ".viberoots/workspace/buck",
-  ".viberoots/workspace/cache",
-  ".viberoots/workspace/codex-test-logs",
-  ".viberoots/workspace/exact-env-smoke.out",
-  ".viberoots/workspace/host-path",
-  ".viberoots/workspace/install-cache",
-  ".viberoots/workspace/nix-xdg-cache",
-  ".viberoots/workspace/node",
-  ".viberoots/workspace/prelude",
-  ".viberoots/workspace/pr-logs",
-  ".viberoots/workspace/viberoots-flake-input",
-  ".viberoots/workspace/xdg-cache",
-  "viberoots/.viberoots",
-  "viberoots/backups",
-  "viberoots/cache",
-  "viberoots/codex-test-logs",
-  "viberoots/install-cache",
-  "viberoots/nix-xdg-cache",
-  "viberoots/pr-logs",
-  "viberoots/xdg-cache",
-  "viberoots/.cache",
-  "viberoots/.clinic",
-  "viberoots/.codex-logs",
-  "viberoots/.codex-*.log",
-  "viberoots/.direnv",
-  "viberoots/.full-test-output.log",
-  "viberoots/.nix-gcroots",
-  "viberoots/.patch-sessions.json",
-  "viberoots/.pnpm-store",
-  "viberoots/buck-out",
-  "viberoots/build-tools/tmp",
-  "viberoots/coverage",
-  "viberoots/node_modules",
-  "viberoots/prelude",
-  "viberoots/result",
-  "viberoots/result-*",
-  "viberoots/test-logs",
-  ".direnv",
-  ".pnpm-store",
-  ".pnpm-home",
-  "coverage",
-  ".clinic",
-  ".turbo",
-  ".cache",
-  "dist",
-  "build",
-  ".vite",
-  ".next",
-  ".wasm-producer",
-  ".node_modules.lockfile-guard.*",
-  ".*.tmp",
-  ".*.ts.??????",
-  ".*.tsx.??????",
-  ".*.js.??????",
-  ".*.mjs.??????",
-  "result",
-  "result-*",
-];
-
-export function filteredFlakeRsyncExcludeArgs(): string[] {
-  return FILTERED_FLAKE_RSYNC_EXCLUDES.map((entry) => ["--exclude", entry]).flat();
-}
-
-export function defaultFilteredFlakeSnapshotRelPaths(): string[] {
-  return [
-    ...DEFAULT_FILTERED_FLAKE_ROOT_FILES,
-    ...DEFAULT_FILTERED_FLAKE_CONFIG_PATHS,
-    ...DEFAULT_FILTERED_FLAKE_ROOTS,
-  ];
-}
-
-export function defaultFilteredFlakeSnapshotRsyncSources(relPaths: readonly string[]): string[] {
-  return relPaths.map((relPath) => `./${relPath}`);
-}
 
 function isRecord(value: unknown): value is GraphNodeRecord {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -160,6 +53,15 @@ export function graphNodesFromJson(raw: unknown): GraphNodeRecord[] {
     }
     return { name };
   });
+}
+
+export function graphPackagePaths(nodes: readonly GraphNodeRecord[]): string[] {
+  const packages = new Set<string>();
+  for (const node of nodes) {
+    const packagePath = packagePathFromLabel(graphNodeNameOf(node));
+    if (packagePath) packages.add(packagePath);
+  }
+  return [...packages].sort();
 }
 
 export function computeSelectedCppPackageClosure(
