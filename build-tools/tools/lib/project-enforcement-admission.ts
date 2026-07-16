@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import type { ProjectEnforcementRunner } from "./project-enforcement-registration";
+import { hasUnsafeFilesystemCapability } from "./project-enforcement-fs-admission";
 
 const PROHIBITED_PATH_PARTS = [
   "/dev/install/",
@@ -77,6 +78,9 @@ export async function projectEnforcementAdmissionViolations(
     const source = await fsp.readFile(file, "utf8");
     for (const rule of PROHIBITED_SOURCE) {
       if (rule.pattern.test(source)) violations.push(`${rel}: ${rule.operation}`);
+    }
+    if (hasUnsafeFilesystemCapability(source)) {
+      violations.push(`${rel}: filesystem mutation capability`);
     }
     for (const specifier of staticModuleSpecifiers(source)) {
       if (!specifier.startsWith(".")) {

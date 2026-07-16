@@ -718,6 +718,16 @@ ordinary build-system tests may not. Admitted runners must be deterministic, rea
 30 seconds individually and 60 seconds as a warm pass, and avoid Nix, builds, services, temp
 consumers, dependency caches, and nested Buck daemons.
 
+The 30-second runner and 60-second aggregate timeouts are pass-owned Buck execution policy. Broader
+`VERIFY_TIMEOUT_SECS`, `TEST_NIX_TIMEOUT_SECS`, and ordinary test-lane floors cannot raise them;
+other pass budgets retain their existing behavior. Admission follows the complete static local import graph and rejects
+filesystem mutation capabilities from `node:fs` and `node:fs/promises`, including file, directory,
+permission, stream, copy, link, timestamp, and rename APIs. Read-only directory enumeration,
+metadata inspection, and file reads remain admitted. The source-owned lexical authority requires
+every runtime namespace reference to be a reviewed read-only member; namespace arguments,
+reflection, destructuring, dynamic computed access, aliases, casts, namespace/promises re-exports,
+and unreviewed named imports fail closed without relying on consumer-installed parser packages.
+
 Starlark analysis rejects project-enforcement targets carrying another verify pass label. Runtime
 pass planning repeats that check as defense in depth. Registration follows each runner's local
 import graph and rejects prohibited heavy subsystems and operations before generating targets.
@@ -725,6 +735,22 @@ Bounded runtime coverage checks all discovered runners with lint skipping enable
 store entries, canonical-source identity, and pre-existing consumer-cache fingerprints, and waits
 for each owned runner process to close. Generated Buck fixtures cover local/submodule and canonical
 remote Nix-store source authority against temp consumers.
+
+Committed change discovery disables rename collapsing in the canonical Git diff so both old and new
+paths reach scope selection for renames into, within, and out of `projects/`. Dirty status parsing
+continues to use the same changed-path authority. Project tree, stale-name, process-inspection, and
+file-size scans report the failed operation and path on unexpected access errors; only an API call
+that explicitly marks its root optional may treat root `ENOENT` as empty. The two deployment
+runners use that contract because `projects/deployments/` is optional; all other project roots and
+every discovered descendant remain required.
+
+Warm-pass guardrail evidence fingerprints the consumer project tree before and after execution and
+measures `.viberoots/workspace`, `buck-out`, `.viberoots/workspace/tmp`, and `buck-out/tmp` without
+pre-measurement cleanup. It enforces the 60-second aggregate budget, zero new Nix paths, unchanged
+consumer/cache/source fingerprints, and bounded per-root growth.
+
+The 2026-07-16 focused run recorded a 1.413-second warm pass, zero new Nix paths, unchanged cache and
+source fingerprints, zero workspace or temp-root growth, and 11,113 bytes of `buck-out` growth.
 
 The admitted policy set is stale names, process-inspection commands, stale deployment environment
 branches, project source-file size, and deployment-metadata secrets. Each generated runner shares

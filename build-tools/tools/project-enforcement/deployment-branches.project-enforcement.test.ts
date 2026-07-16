@@ -10,8 +10,10 @@ import { listProjectFiles } from "./project-file-tree";
 
 const context = resolveProjectScanContext();
 const root = path.join(context.projectsRoot, "deployments");
-const files = await listProjectFiles(root, (file) =>
-  DEPLOYMENT_SOURCE_FILE_EXTENSIONS.has(path.extname(file)),
+const files = await listProjectFiles(
+  root,
+  (file) => DEPLOYMENT_SOURCE_FILE_EXTENSIONS.has(path.extname(file)),
+  { optionalRoot: true },
 );
 const errors = (
   await Promise.all(

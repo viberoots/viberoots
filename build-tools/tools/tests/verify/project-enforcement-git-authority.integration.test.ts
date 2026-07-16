@@ -10,15 +10,17 @@ async function git(root: string, ...args: string[]): Promise<void> {
   await $({ cwd: root })`git ${args}`;
 }
 
+async function selection(root: string) {
+  return await resolveProjectEnforcementSelection({
+    root,
+    requestedTargets: ["//:focused"],
+    fullSuite: false,
+    env: {},
+  });
+}
+
 async function selected(root: string): Promise<boolean> {
-  return (
-    await resolveProjectEnforcementSelection({
-      root,
-      requestedTargets: ["//:focused"],
-      fullSuite: false,
-      env: {},
-    })
-  ).required;
+  return (await selection(root)).required;
 }
 
 test("project change authority covers committed and every dirty worktree state", async () => {
@@ -26,6 +28,7 @@ test("project change authority covers committed and every dirty worktree state",
   const project = path.join(root, "projects/app");
   await fsp.mkdir(project, { recursive: true });
   await fsp.writeFile(path.join(project, "base.ts"), "export const base = 1;\n");
+  await fsp.writeFile(path.join(root, "outside.ts"), "export const outside = 1;\n");
   await git(root, "init", "-b", "main");
   await git(root, "add", ".");
   await git(
@@ -83,4 +86,48 @@ test("project change authority covers committed and every dirty worktree state",
     fullSuite: false,
   });
   assert.equal(unavailable.reason, "unavailable-change-authority");
+});
+
+test("committed rename authority preserves both sides across the projects boundary", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "project-enforcement-renames-"));
+  await fsp.mkdir(path.join(root, "projects/app"), { recursive: true });
+  await fsp.writeFile(path.join(root, "projects/app/base.ts"), "export const base = 1;\n");
+  await fsp.writeFile(path.join(root, "outside.ts"), "export const outside = 1;\n");
+  await git(root, "init", "-b", "main");
+  await git(root, "add", ".");
+  await git(
+    root,
+    "-c",
+    "user.name=test",
+    "-c",
+    "user.email=test@example.com",
+    "commit",
+    "-m",
+    "base",
+  );
+  await git(root, "switch", "-c", "feature");
+
+  const cases = [
+    ["outside.ts", "projects/app/incoming.ts"],
+    ["projects/app/base.ts", "moved-out.ts"],
+    ["projects/app/base.ts", "projects/app/within.ts"],
+  ] as const;
+  for (const [from, to] of cases) {
+    await git(root, "reset", "--hard", "main");
+    await git(root, "mv", from, to);
+    await git(
+      root,
+      "-c",
+      "user.name=test",
+      "-c",
+      "user.email=test@example.com",
+      "commit",
+      "-m",
+      `rename ${from}`,
+    );
+    const result = await selection(root);
+    assert.equal(result.reason, "project-change", `${from} -> ${to}`);
+    assert.ok(result.changedPaths.includes(from), `missing rename source ${from}`);
+    assert.ok(result.changedPaths.includes(to), `missing rename destination ${to}`);
+  }
 });

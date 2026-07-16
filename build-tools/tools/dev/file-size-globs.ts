@@ -32,16 +32,24 @@ export async function listFilesMatching(opts: {
   root: string;
   include: readonly string[];
   exclude: readonly string[];
+  optionalRoot?: boolean;
 }): Promise<string[]> {
   const result: string[] = [];
   const ignoredDirs = new Set([".git", ".direnv", "buck-out", "node_modules", "coverage"]);
 
   async function walk(dir: string): Promise<void> {
-    let entries: Array<{ name: string; isDirectory(): boolean; isSymbolicLink(): boolean }> = [];
+    let entries: Array<{ name: string; isDirectory(): boolean; isSymbolicLink(): boolean }>;
     try {
       entries = await fsp.readdir(dir, { withFileTypes: true });
-    } catch {
-      return;
+    } catch (error) {
+      if (
+        opts.optionalRoot &&
+        dir === opts.root &&
+        (error as NodeJS.ErrnoException).code === "ENOENT"
+      ) {
+        return;
+      }
+      throw new Error(`file-size scanner cannot read directory ${dir}`, { cause: error });
     }
     for (const entry of entries) {
       if (entry.name.startsWith(".")) continue;

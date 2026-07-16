@@ -1,16 +1,12 @@
 #!/usr/bin/env zx-wrapper
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { readMigrationLabelSkipPaths } from "../dev/stale-names-lint-allowlists";
 import { scanStaleNameEntry, type StaleNameHit } from "../dev/stale-names-scanner";
 import { resolveProjectScanContext } from "../lib/workspace-roots";
-import { listProjectFiles } from "./project-file-tree";
+import { listProjectFiles, readProjectFile } from "./project-file-tree";
 
 async function scan(workspaceRoot: string, rel: string, skips: ReadonlySet<string>) {
-  let text = "";
-  try {
-    text = await fsp.readFile(path.join(workspaceRoot, rel), "utf8");
-  } catch {}
+  const text = await readProjectFile(path.join(workspaceRoot, rel), "stale-name scanner");
   return scanStaleNameEntry({ rel, text, migrationLabelSkipPaths: skips });
 }
 

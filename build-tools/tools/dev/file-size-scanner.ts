@@ -20,8 +20,8 @@ async function countLines(file: string): Promise<number> {
     if (data.length === 0) return 0;
     const newlineCount = data.match(/\n/g)?.length ?? 0;
     return data.endsWith("\n") ? newlineCount : newlineCount + 1;
-  } catch {
-    return 0;
+  } catch (error) {
+    throw new Error(`file-size scanner cannot read file ${file}`, { cause: error });
   }
 }
 

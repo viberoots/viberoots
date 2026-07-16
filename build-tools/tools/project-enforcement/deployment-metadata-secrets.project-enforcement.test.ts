@@ -10,7 +10,9 @@ import { listProjectFiles } from "./project-file-tree";
 
 const context = resolveProjectScanContext();
 const root = path.join(context.projectsRoot, "deployments");
-const files = await listProjectFiles(root, (file) => DEPLOYMENT_METADATA_FILE_PATTERN.test(file));
+const files = await listProjectFiles(root, (file) => DEPLOYMENT_METADATA_FILE_PATTERN.test(file), {
+  optionalRoot: true,
+});
 const violations = (
   await Promise.all(
     files.map(async (file) =>

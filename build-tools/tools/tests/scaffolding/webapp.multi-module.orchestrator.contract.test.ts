@@ -90,6 +90,7 @@ test("multi-module watcher emits module-scoped deterministic markers", async () 
   assert.doesNotMatch(source, /runBuildStep|copyAtomically|runCoordinatorBuild/);
   assert.match(daemonSource, /writeCoordinatorResult/);
   assert.match(daemonSource, /outputs: await outputIdentities\(task\.syncOuts\)/);
+  assert.match(daemonSource, /if \(membershipMapsEqual\(prev, next\)\) queue\(/);
   assert.doesNotMatch(source, /validateCoordinatorOutputs/);
   assert.match(opsSource, /\[wasm-watch\] refresh:ok module_count=/);
   assert.match(source, /specsFromWasmManifest/);

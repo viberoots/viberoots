@@ -12,15 +12,36 @@ const EXCLUDED_DIRECTORIES = new Set([
   "node_modules",
 ]);
 
+export async function readProjectFile(file: string, scanner: string): Promise<string> {
+  try {
+    return await fsp.readFile(file, "utf8");
+  } catch (error) {
+    throw new Error(`${scanner} cannot read file ${file}`, { cause: error });
+  }
+}
+
 export async function listProjectFiles(
   root: string,
   predicate: (filePath: string) => boolean,
+  opts: { optionalRoot?: boolean } = {},
 ): Promise<string[]> {
   const files: string[] = [];
   const stack = [root];
   while (stack.length > 0) {
     const current = stack.pop()!;
-    const entries = await fsp.readdir(current, { withFileTypes: true }).catch(() => []);
+    let entries;
+    try {
+      entries = await fsp.readdir(current, { withFileTypes: true });
+    } catch (error) {
+      if (
+        opts.optionalRoot &&
+        current === root &&
+        (error as NodeJS.ErrnoException).code === "ENOENT"
+      ) {
+        return [];
+      }
+      throw new Error(`project file tree cannot read directory ${current}`, { cause: error });
+    }
     for (const entry of entries) {
       if (entry.isSymbolicLink()) continue;
       const abs = path.join(current, entry.name);

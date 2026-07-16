@@ -8,6 +8,7 @@ import {
   computeFingerprintMap,
   copyAtomically,
   mapsEqual,
+  membershipMapsEqual,
   runBuildStep,
   type Fingerprint,
 } from "./watch-wasm-producer-ops";
@@ -230,7 +231,7 @@ async function main() {
         const next = await computeFingerprintMap(task.watchPaths);
         if (!mapsEqual(prev, next)) {
           prevByTask.set(task.taskKey, next);
-          queue(task.taskKey, "source-change");
+          if (membershipMapsEqual(prev, next)) queue(task.taskKey, "source-change");
         }
       }
       await runQueued();

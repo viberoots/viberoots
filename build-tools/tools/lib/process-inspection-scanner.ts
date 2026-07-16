@@ -105,7 +105,15 @@ export async function scanProcessInspectionTree(opts: {
   while (stack.length > 0) {
     const current = stack.pop()!;
     if (isExcludedDir(path.relative(opts.root, current))) continue;
-    for (const entry of await fsp.readdir(current, { withFileTypes: true })) {
+    let entries;
+    try {
+      entries = await fsp.readdir(current, { withFileTypes: true });
+    } catch (error) {
+      throw new Error(`process inspection scanner cannot read directory ${current}`, {
+        cause: error,
+      });
+    }
+    for (const entry of entries) {
       const abs = path.join(current, entry.name);
       if (entry.isDirectory()) stack.push(abs);
       else if (entry.isFile()) files.push(abs);
@@ -117,13 +125,11 @@ export async function scanProcessInspectionTree(opts: {
     const rel = opts.pathPrefix
       ? `${normalizeProcessInspectionPath(opts.pathPrefix)}/${local}`
       : local;
-    let text = "";
     try {
-      text = await fsp.readFile(abs, "utf8");
-    } catch {
-      continue;
+      hits.push(...scanProcessInspectionText(rel, await fsp.readFile(abs, "utf8")));
+    } catch (error) {
+      throw new Error(`process inspection scanner cannot read file ${abs}`, { cause: error });
     }
-    hits.push(...scanProcessInspectionText(rel, text));
   }
   return hits;
 }

@@ -114,7 +114,8 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     ["nix-build-filtered-flake snapshot", helper],
   ] as const) {
     const usesPrefetch =
-      source.includes("flake prefetch --json") || source.includes('"flake", "prefetch", "--json"');
+      /flake\s+prefetch\s+--json/.test(source) ||
+      /["']flake["']\s*,\s*["']prefetch["']\s*,\s*["']--json["']/.test(source);
     if (
       !source.includes("materializeFilteredViberootsSource") ||
       !source.includes("narHash") ||

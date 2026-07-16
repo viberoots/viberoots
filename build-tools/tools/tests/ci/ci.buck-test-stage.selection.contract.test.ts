@@ -76,7 +76,10 @@ test("ci buck-test stage preserves legacy timeout as exact verify timeout", asyn
   assert.ok(stage.includes("Number(process.env.TIMEOUT_SEC || 1200)"));
   assert.ok(stage.includes("exactOverallTimeoutSecs: ciBuckTestTimeoutSecs()"));
   assert.ok(verifyPasses.includes("exactOverallTimeoutSecs?: number"));
-  assert.ok(buck2Test.includes("opts.exactOverallTimeoutSecs ?? Math.max"));
+  assert.match(
+    buck2Test,
+    /fixedPassTimeouts\?\.overall\s*\?\?\s*opts\.exactOverallTimeoutSecs\s*\?\?\s*Math\.max\(/,
+  );
   assert.ok(!stage.includes("VERIFY_TIMEOUT_SECS"));
 });
 

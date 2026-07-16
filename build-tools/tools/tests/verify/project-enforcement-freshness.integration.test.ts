@@ -26,7 +26,7 @@ async function runBuck($: TempShell, target: string, envOverrides: NodeJS.Proces
 async function treeFingerprint(root: string): Promise<string> {
   const rows: string[] = [];
   const visit = async (dir: string): Promise<void> => {
-    for (const entry of await fsp.readdir(dir, { withFileTypes: true }).catch(() => [])) {
+    for (const entry of await fsp.readdir(dir, { withFileTypes: true })) {
       const file = path.join(dir, entry.name);
       const rel = path.relative(root, file).replaceAll(path.sep, "/");
       const stat = await fsp.lstat(file);
@@ -38,6 +38,27 @@ async function treeFingerprint(root: string): Promise<string> {
   };
   await visit(root);
   return crypto.createHash("sha256").update(rows.sort().join("\n")).digest("hex");
+}
+
+async function treeBytes(root: string, optional = false): Promise<number> {
+  const stat = await fsp.lstat(root).catch((error: NodeJS.ErrnoException) => {
+    if (optional && error.code === "ENOENT") return null;
+    throw error;
+  });
+  if (!stat) return 0;
+  if (!stat.isDirectory()) return stat.size;
+  let bytes = stat.size;
+  for (const entry of await fsp.readdir(root)) bytes += await treeBytes(path.join(root, entry));
+  return bytes;
+}
+
+async function boundedRoots(root: string): Promise<Record<string, number>> {
+  return {
+    workspace: await treeBytes(path.join(root, ".viberoots/workspace")),
+    buck: await treeBytes(path.join(root, "buck-out")),
+    workspaceTmp: await treeBytes(path.join(root, ".viberoots/workspace/tmp"), true),
+    buckTmp: await treeBytes(path.join(root, "buck-out/tmp"), true),
+  };
 }
 
 async function prepareCacheSentinels(root: string): Promise<void> {
@@ -186,11 +207,25 @@ test("complete generated pass rejects scanner fixtures and stays bounded when wa
     const immutableBefore = await treeFingerprint(immutable);
     const cold = await runBuck($, allTargets);
     assert.equal(cold.exitCode, 0, String(cold.stderr || cold.stdout));
+    const projectsBefore = await treeFingerprint(path.join(root, "projects"));
+    const rootsBefore = await boundedRoots(root);
     const started = performance.now();
     const warm = await runBuck($, allTargets);
     const elapsedMs = performance.now() - started;
     assert.equal(warm.exitCode, 0, String(warm.stderr || warm.stdout));
     assert.ok(elapsedMs <= 60_000, `warm project-enforcement pass took ${elapsedMs.toFixed(0)}ms`);
+    const rootsAfter = await boundedRoots(root);
+    const growth = Object.fromEntries(
+      Object.keys(rootsBefore).map((key) => [key, rootsAfter[key]! - rootsBefore[key]!]),
+    );
+    assert.equal(await treeFingerprint(path.join(root, "projects")), projectsBefore);
+    assert.ok(growth.workspace! <= 32 * 1024 * 1024, `workspace grew ${growth.workspace} bytes`);
+    assert.ok(growth.buck! <= 64 * 1024 * 1024, `buck-out grew ${growth.buck} bytes`);
+    assert.ok(
+      growth.workspaceTmp! <= 8 * 1024 * 1024,
+      `workspace tmp grew ${growth.workspaceTmp} bytes`,
+    );
+    assert.ok(growth.buckTmp! <= 16 * 1024 * 1024, `buck tmp grew ${growth.buckTmp} bytes`);
     assert.deepEqual(await cacheFingerprints(root), cachesBefore);
     assert.equal(await treeFingerprint(immutable), immutableBefore);
     assert.deepEqual(
@@ -198,7 +233,7 @@ test("complete generated pass rejects scanner fixtures and stays bounded when wa
       [],
     );
     console.log(
-      `project-enforcement evidence: warm=${elapsedMs.toFixed(0)}ms new_nix_paths=0 cache_changes=0`,
+      `project-enforcement evidence: warm=${elapsedMs.toFixed(0)}ms new_nix_paths=0 cache_changes=0 growth=${JSON.stringify(growth)}`,
     );
     await killAndAssertNoOwnedProcesses($, root);
   });

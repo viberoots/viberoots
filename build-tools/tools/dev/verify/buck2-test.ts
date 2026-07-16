@@ -22,6 +22,7 @@ import {
   remoteBuckPolicySummary,
   writeRemoteBuckMaterializationMetadata,
 } from "./remote-buck-artifacts";
+import { exactTimeoutsForVerifyPass } from "./project-enforcement-execution-policy";
 export { verifyBuck2Threads, type VerifyBuck2ThreadsOptions } from "./buck2-threads";
 export function spawnVerifyBuck2Tests(opts: {
   root: string;
@@ -42,6 +43,8 @@ export function spawnVerifyBuck2Tests(opts: {
   spawnImpl?: typeof spawn;
 }): { pgid: number; nestedIso: string; wait: () => Promise<number> } {
   const minPerTestTimeoutSecs = 20 * 60;
+  const passName = String(opts.passName || "shared");
+  const fixedPassTimeouts = exactTimeoutsForVerifyPass(passName);
   const tsecRaw = Number((process.env.VERIFY_TIMEOUT_SECS || "14400").trim());
   const tsec = Number.isFinite(tsecRaw) && tsecRaw > 0 ? Math.floor(tsecRaw) : 14400;
   const tms = tsec * 1000;
@@ -50,10 +53,15 @@ export function spawnVerifyBuck2Tests(opts: {
     Number.isFinite(testNixTimeoutRaw) && testNixTimeoutRaw > 0
       ? Math.floor(testNixTimeoutRaw)
       : 1800;
-  const testNixTimeoutSecs = Math.max(minPerTestTimeoutSecs, requestedTestNixTimeoutSecs);
+  const testNixTimeoutSecs =
+    fixedPassTimeouts?.perTest ?? Math.max(minPerTestTimeoutSecs, requestedTestNixTimeoutSecs);
   const overallTimeoutSecs =
-    opts.exactOverallTimeoutSecs ?? Math.max(tsec, testNixTimeoutSecs + 5 * 60);
-  const nodeTestTimeoutMs = Math.max(minPerTestTimeoutSecs * 1000, tms, testNixTimeoutSecs * 1000);
+    fixedPassTimeouts?.overall ??
+    opts.exactOverallTimeoutSecs ??
+    Math.max(tsec, testNixTimeoutSecs + 5 * 60);
+  const nodeTestTimeoutMs = fixedPassTimeouts?.perTest
+    ? fixedPassTimeouts.perTest * 1000
+    : Math.max(minPerTestTimeoutSecs * 1000, tms, testNixTimeoutSecs * 1000);
   const consoleFlag =
     opts.console === "auto"
       ? []
@@ -62,7 +70,6 @@ export function spawnVerifyBuck2Tests(opts: {
         : ["--console", "simple"];
 
   const threads = opts.threadsOverride ?? verifyBuck2Threads({ targetCount: opts.targets.length });
-  const passName = String(opts.passName || "shared");
   const nestedIso = previewVerifyNestedBuckIsolation(opts.iso, passName);
   registerVerifyBuckTestIsolations({ parentIso: opts.iso, nestedIso, repoRoot: opts.root });
   const testEnvArgs = buildVerifyTestEnvArgs({

@@ -308,6 +308,93 @@ heavy runners could bypass review while the existing happy-path suite remains gr
 The pass gains analysis fixtures and focused source-mode/admission tests that add bounded validation
 cost and require updates when the runner contract intentionally changes.
 
+## PR-4: Enforce Read-Only Bounded Execution And Complete Change Authority
+
+### 1. Intent
+
+Close the remaining mechanical-enforcement gaps so every project-enforcement runner is read-only,
+retains its fixed execution budget under normal verify orchestration, fails closed on unreadable
+inputs, and is selected for both sides of committed project renames.
+
+### 2. Scope of changes
+
+- Keep the canonical 30-second project-enforcement runner cap independent of broader verify and Nix
+  timeout environment variables. Preserve the existing timeout behavior for all other test lanes.
+- Extend admission across the complete admitted import graph to reject filesystem mutation
+  capabilities, including file, directory, permission, stream, copy, link, and rename operations.
+  Reuse one reviewed read-only capability authority rather than maintaining runner-specific lists.
+- Make the canonical committed changed-path authority rename-aware and preserve both the old and new
+  paths for renames into, within, and out of `projects/`, without adding a second Git parser.
+- Make the shared project tree, stale-name, process-inspection, and file-size scanners fail closed on
+  unexpected directory or file access errors with actionable paths. Ignore `ENOENT` only where an
+  explicitly optional root contract requires it.
+- Extend the bounded runtime evidence to fingerprint the consumer source tree and record/enforce
+  before/after size deltas for `.viberoots/workspace`, `buck-out`, and relevant repository-local temp
+  roots under the handbook guardrails.
+
+### 3. External prerequisites
+
+PR-3 must be complete. No new external tools, caches, services, or source snapshots are required.
+
+### 4. Tests to be added
+
+- An argv/runtime contract that sets the normal broad verify timeout environment and proves a
+  generated project-enforcement runner still terminates at its fixed 30-second cap.
+- Structural admission fixtures covering every prohibited filesystem mutation class through direct
+  and imported helpers, plus positive fixtures for the read-only filesystem operations scanners need.
+- Committed Git fixtures for renames into and out of `projects/` that assert both paths reach the
+  canonical selection decision and schedule the pass.
+- Scanner fixtures that make directories and files unreadable or otherwise fail access and assert
+  actionable fail-closed diagnostics, while preserving explicitly optional missing-root behavior.
+- A warm bounded integration run that proves consumer-tree immutability and records/enforces disk
+  deltas for workspace state, Buck output, and repository-local temp roots without cleanup masking.
+
+### 5. Docs to be added or updated
+
+Update the testing handbook and build-system design with the fixed timeout boundary, read-only
+filesystem capability policy, rename-aware committed change authority, fail-closed scanner error
+contract, and measured execution-time and disk-growth evidence.
+
+### 5.5. Expected regression scope
+
+Project-enforcement target execution, Buck test timeout propagation, admission traversal, Git change
+scope, shared project scanners and their preflight callers, verify selection, and bounded runtime
+evidence collection.
+
+### 6. Acceptance criteria
+
+- Normal `v` cannot raise a project-enforcement runner above its canonical 30-second cap, while
+  non-project test timeout behavior remains unchanged.
+- Admission rejects filesystem mutation through the full admitted import graph, and generated
+  runners retain only the read capabilities required by their scanners.
+- Committed renames crossing the `projects/` boundary preserve both paths and cannot omit the pass.
+- Unexpected filesystem access failures produce actionable errors instead of empty or partial policy
+  results.
+- Focused tests record bounded execution and disk evidence for all required roots, then full
+  validation and independent scope review pass.
+
+### 7. Risks
+
+Timeout isolation may affect Buck wrapper contracts, mutation detection may reject legitimate shared
+helpers, rename parsing may change unrelated scope decisions, and stricter scanner errors may expose
+previously hidden permission or race defects.
+
+### 8. Mitigations
+
+Apply timeout policy only to the generated pass label, centralize read-only capability admission,
+reuse the existing Git authority with rename-aware records, distinguish only explicitly optional
+missing roots, and test unchanged behavior for other lanes and callers.
+
+### 9. Consequences of not implementing this PR
+
+Generated runners could mutate consumer state, run far beyond their reviewed budget, silently skip
+unreadable inputs, or fail to run when committed renames move policy-relevant files out of a project.
+
+### 10. Downsides for implementing this PR
+
+Admission and scanner fixtures become stricter, and the bounded integration test records additional
+filesystem evidence on every focused guardrail run.
+
 ## Rollout And Sequencing
 
 Land PR-1 first and stop at Checkpoint A if registration, freshness, source-mode, timing, or disk

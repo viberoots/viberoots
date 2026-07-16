@@ -199,6 +199,38 @@ viberoots source gains `.viberoots/`, `buck-out/`, `config/workspace_*`, `projec
 consumer-owned generated state, and it should make that assertion before fixture cleanup can remove
 the misplaced files.
 
+### 3.3 Project-enforcement execution guardrails
+
+Project-enforcement runners are live consumer scans, so their reviewed boundary is narrower than an
+ordinary Buck test:
+
+- The Buck pass fixes the individual executor timeout at 30 seconds and the aggregate command at 60
+  seconds. `VERIFY_TIMEOUT_SECS`, `TEST_NIX_TIMEOUT_SECS`, and ordinary lane timeout floors must not
+  raise either budget.
+- The admission scan follows every static local import. It permits read-only `node:fs` and
+  `node:fs/promises` capabilities but rejects file, directory, permission, stream, copy, link,
+  timestamp, and rename mutation capabilities. Filesystem namespace bindings cannot escape through
+  arguments, reflection, destructuring, computed dynamic access, aliases, casts, or namespace
+  re-exports; each runtime reference must be a reviewed read-only member.
+- The canonical changed-path authority preserves both paths for committed and dirty renames.
+  Renames into, within, or out of `projects/` must schedule the complete pass.
+- A scanner reports the unreadable directory or file and fails closed. Only a root explicitly
+  declared optional by the caller may translate root `ENOENT` into an empty result. This exception
+  is limited to the two deployment runners' optional `projects/deployments/` root; descendant access
+  errors still fail closed.
+- Warm validation fingerprints `projects/` and the immutable runner source, checks that existing
+  consumer caches do not change, records new Nix paths, and measures `.viberoots/workspace`,
+  `buck-out`, `.viberoots/workspace/tmp`, and `buck-out/tmp` before cleanup. Growth limits are 32 MiB,
+  64 MiB, 8 MiB, and 16 MiB respectively; unexpected growth blocks admission rather than being
+  hidden by cleanup.
+
+The 2026-07-16 focused policy run measured the warm generated pass at 1.413 seconds with zero new
+Nix paths, zero cache changes, zero workspace or temp-root growth, and 11,113 bytes of `buck-out`
+growth. Across the complete three-target `i && b && v` rerun, `.viberoots/workspace` grew 316 KiB,
+`buck-out` shrank 24 KiB, and the verify temp root shrank 360 KiB. The shared APFS volume used about
+340.2 MiB during build and fixture execution; treat that volume-wide delta as contextual evidence,
+not project-enforcement retained growth.
+
 ### 4. When `v` is slow (performance regression workflow)
 
 `v` is expected to complete in a predictable window locally. If a run regresses substantially (for example jumping from ~20 minutes to ~30+ minutes), treat it like a failing test: identify the root cause and fix it.

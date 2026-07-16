@@ -77,7 +77,14 @@ function scrubInheritedGitConfigEnv(): void {
   }
 }
 
-function spawnSnapshot(mode: "local" | RemoteMode, extraEnv: NodeJS.ProcessEnv = {}): Snapshot {
+function spawnSnapshot(
+  mode: "local" | RemoteMode,
+  extraEnv: NodeJS.ProcessEnv = {},
+  spawnOpts: {
+    exactOverallTimeoutSecs?: number;
+    passName?: string;
+  } = {},
+): Snapshot {
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "vbr-spawn-snapshot-"));
   const artifactDir = path.join(tmp, "artifacts");
   const activationDir = path.join(tmp, "activation");
@@ -136,9 +143,10 @@ function spawnSnapshot(mode: "local" | RemoteMode, extraEnv: NodeJS.ProcessEnv =
       targets: ["//:target"],
       zxNodeModulesOut: null,
       threadsOverride: 3,
-      passName: "shared",
+      passName: spawnOpts.passName || "shared",
       executionPolicy: policy,
       spawnImpl: captureSpawn(calls),
+      ...spawnOpts,
     });
   } finally {
     for (const key of Object.keys(process.env)) if (!(key in prev)) delete process.env[key];
@@ -158,6 +166,19 @@ test("spawnVerifyBuck2Tests local argv/env snapshot is unchanged", () => {
       "info,buck2_event_log::writer=off,buck2_client_ctx=debug,buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off",
     VBR_VERIFY_REGISTER_PROCESS: undefined,
   });
+});
+
+test("project enforcement keeps its exact timeout under broad verify budgets", () => {
+  const { call } = spawnSnapshot(
+    "local",
+    { TEST_NIX_TIMEOUT_SECS: "7200", VERIFY_TIMEOUT_SECS: "28800" },
+    { passName: "project-enforcement" },
+  );
+  assert.ok(call.args.includes("60s"), "Buck overall timeout must remain 60 seconds");
+  const executorArgs = call.args.slice(call.args.lastIndexOf("--") + 1);
+  assert.deepEqual(executorArgs.slice(0, 2), ["--timeout", "30"]);
+  assert.ok(executorArgs.includes("TEST_NODE_OPTIONS=--test-timeout=30000"));
+  assert.ok(executorArgs.includes("TEST_NIX_TIMEOUT_SECS=30"));
 });
 
 test("spawnVerifyBuck2Tests remote argv/env snapshots cover every mode", () => {

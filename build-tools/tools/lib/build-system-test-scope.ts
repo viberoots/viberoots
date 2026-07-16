@@ -206,11 +206,11 @@ async function mergeBaseChangedPaths(root: string, env: NodeJS.ProcessEnv): Prom
 
   if (!mergeBase) {
     if (await gitRefExists(root, "HEAD~1")) {
-      return await gitLines(root, ["diff", "--name-only", "HEAD~1...HEAD"]);
+      return await gitLines(root, ["diff", "--name-only", "--no-renames", "HEAD~1...HEAD"]);
     }
     return [];
   }
-  return await gitLines(root, ["diff", "--name-only", `${mergeBase}...HEAD`]);
+  return await gitLines(root, ["diff", "--name-only", "--no-renames", `${mergeBase}...HEAD`]);
 }
 
 export async function collectChangedPaths(
