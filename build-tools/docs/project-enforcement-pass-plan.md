@@ -488,6 +488,86 @@ indirection could allow filesystem mutation to bypass static admission.
 Changed-path callers must handle an explicit failure state, and the static admission analyzer gains
 additional syntax and call-graph fixtures that must remain aligned with its narrow capability model.
 
+## PR-6: Parse Changed Paths As Structural Git Records
+
+### 1. Intent
+
+Make canonical changed-path discovery safe for every valid Git path so quoting, whitespace, special
+characters, deletion, or either side of a rename cannot evade project-enforcement selection.
+
+### 2. Scope of changes
+
+- Replace line-oriented changed-path parsing with NUL-delimited structural Git records for committed,
+  staged, unstaged, untracked, deleted, and renamed paths.
+- Preserve both source and destination paths from rename records before canonical selection, including
+  renames into, within, and out of `projects/`, without relying on Git's quoted display format.
+- Reuse the canonical changed-path authority and its explicit success/failure result across every
+  shared selector consumer; do not add a project-enforcement-specific Git query or parser.
+- Fail closed with an actionable conservative selection reason when Git commands fail or structural
+  records are malformed, truncated, or internally inconsistent. Preserve no-change behavior only for
+  a successfully parsed empty record set.
+- Keep the change limited to changed-path collection and its existing consumers; do not broaden
+  snapshots, add live-tree or host fallbacks, or change unrelated verify scheduling.
+
+### 3. External prerequisites
+
+PR-5 must be complete. No new external tools, caches, services, source snapshots, or network access
+are required.
+
+### 4. Tests to be added
+
+- Canonical committed, staged, unstaged, untracked, deleted, and rename fixtures whose paths contain
+  spaces, tabs, newlines, quotes, backslashes, and other Git-valid special characters.
+- Rename fixtures covering moves into, within, and out of `projects/`, proving both old and new paths
+  reach canonical selection without quoted-path decoding or information loss.
+- Malformed, truncated, and failed-record fixtures proving changed-path discovery fails closed with an
+  actionable reason instead of returning an empty or partial path set.
+- Focused shared-consumer fixtures proving every selector receives the same canonical structural result
+  for unusual paths, deletions, renames, successful emptiness, and discovery failure.
+
+### 5. Docs to be added or updated
+
+Update the testing handbook and build-system design with the NUL-delimited structural Git record
+contract, both-sides rename authority, supported path-byte behavior, and fail-closed malformed-record
+boundary.
+
+### 5.5. Expected regression scope
+
+Canonical Git changed-path commands and parsing, committed and working-tree path collection, shared
+verify selectors, selection reasons, project-enforcement pass scheduling, and changed-path fixtures.
+
+### 6. Acceptance criteria
+
+- Every Git-valid committed, staged, unstaged, untracked, or deleted path is preserved exactly enough
+  for canonical project selection without dependence on display quoting or line boundaries.
+- Both sides of every rename reach selection, including renames crossing the `projects/` boundary.
+- Failed or malformed structural records cannot produce an empty or partial success result and instead
+  schedule project enforcement conservatively with an actionable reason.
+- All shared selector consumers use the same canonical result, and focused validation passes with
+  bounded handbook execution-time and disk-growth evidence before the plan-required broader validation
+  and independent scope review.
+
+### 7. Risks
+
+Structural record parsing may expose assumptions in shared selectors, and byte-exact unusual paths may
+exercise platform-specific filesystem limitations in fixtures.
+
+### 8. Mitigations
+
+Keep Git record decoding centralized, test commands and parsing separately from filesystem-dependent
+fixtures where necessary, preserve both rename fields before selection, and validate every shared
+consumer against the same canonical result.
+
+### 9. Consequences of not implementing this PR
+
+Valid paths containing quoting-sensitive characters or record delimiters could be split, rewritten,
+or omitted, and a rename side could escape project-enforcement selection.
+
+### 10. Downsides for implementing this PR
+
+Changed-path fixtures become more complex, and callers must consume structural results instead of
+human-readable line output.
+
 ## Rollout And Sequencing
 
 Land PR-1 first and stop at Checkpoint A if registration, freshness, source-mode, timing, or disk

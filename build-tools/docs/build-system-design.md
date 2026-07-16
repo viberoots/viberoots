@@ -715,6 +715,15 @@ result and partitions label `verify:project-enforcement` into a serial sidecar i
 execution group. This pass runs locally with remote cache reads and writes disabled; all other
 passes retain their selected execution policy.
 
+Changed-path Git queries use structural NUL-delimited output: committed changes use
+`git diff --name-status -z --find-renames`, while staged, unstaged, untracked, deleted, and dirty
+rename state uses `git status --porcelain=v1 -z --untracked-files=all`. The shared parser preserves
+spaces, tabs, newlines, quotes, backslashes, leading or trailing whitespace, and both rename paths
+without interpreting Git's display quoting. Paths must be valid UTF-8 because selector and
+diagnostic APIs carry JavaScript strings; undecodable bytes, truncated records, invalid statuses,
+or missing rename fields fail closed as unavailable change authority instead of yielding partial
+paths. A successful zero-byte command result is the only structural empty result.
+
 Generated runners resolve the consumer `projects/` root through workspace-root authority and fail
 closed without generated-target execution evidence. They may scan the live project tree, but
 ordinary build-system tests may not. Admitted runners must be deterministic, read-only, complete in

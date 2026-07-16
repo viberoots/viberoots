@@ -6,6 +6,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { collectChangedPaths } from "../../lib/build-system-test-scope";
 import { resolveProjectEnforcementSelection } from "../../dev/verify/project-enforcement-selection";
+import { realGit } from "../dev/git-wrapper-test-helpers";
 
 async function git(root: string, ...args: string[]): Promise<void> {
   await $({ cwd: root })`git ${args}`;
@@ -163,7 +164,7 @@ test("git discovery failures remain distinct from a successful empty change set"
   );
 
   const bin = await fsp.mkdtemp(path.join(os.tmpdir(), "project-enforcement-fake-git-"));
-  const realGit = String((await $`command -v git`).stdout).trim();
+  const realGitPath = await realGit();
   await fsp.writeFile(
     path.join(bin, "git"),
     [
@@ -185,12 +186,12 @@ test("git discovery failures remain distinct from a successful empty change set"
   };
   try {
     process.env.PATH = `${bin}${path.delimiter}${original.path || ""}`;
-    process.env.REAL_GIT = realGit;
+    process.env.REAL_GIT = realGitPath;
     for (const command of [
       "rev-parse --verify --quiet main",
       "merge-base main HEAD",
-      "diff --name-only --no-renames",
-      "status --porcelain=v1",
+      "diff --name-status -z --find-renames",
+      "status --porcelain=v1 -z --untracked-files=all",
     ]) {
       process.env.FAIL_MATCH = command;
       const result = await collectChangedPaths(root, {});
@@ -223,6 +224,7 @@ test("git discovery failures remain distinct from a successful empty change set"
     else process.env.REAL_GIT = original.realGit;
     if (original.failMatch === undefined) delete process.env.FAIL_MATCH;
     else process.env.FAIL_MATCH = original.failMatch;
-    await fsp.rm(bin, { recursive: true, force: true });
+    await fsp.unlink(path.join(bin, "git")).catch(() => undefined);
+    await fsp.rmdir(bin).catch(() => undefined);
   }
 });

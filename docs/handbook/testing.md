@@ -152,9 +152,13 @@ files do not count as build-system changes by themselves, including files below 
 Active deployment/operator docs are still guarded: changes to those reviewed docs run the
 deployment documentation contract bucket, not the full deployment domain.
 
-Default scope selection reads committed changes from a merge-base diff and then unions in the dirty
-worktree from `git status --porcelain=v1`. Merge-base candidates are `GITHUB_BASE_REF` when present,
-then `github/main`, `origin/main`, and `main`; if none exist, verify falls back to `HEAD~1...HEAD`.
+Default scope selection reads committed changes from a NUL-delimited merge-base
+`git diff --name-status -z --find-renames` and then unions in the dirty worktree from
+`git status --porcelain=v1 -z --untracked-files=all`. Both rename fields and UTF-8 special path
+characters are preserved structurally. Malformed or failed discovery selects conservatively;
+only successful empty output means no changes. Merge-base candidates are `GITHUB_BASE_REF` when
+present, then `github/main`, `origin/main`, and `main`; if none exist, verify falls back to
+`HEAD~1...HEAD`.
 
 ## Optional Nix caches
 

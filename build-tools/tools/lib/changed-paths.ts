@@ -1,16 +1,15 @@
 import * as fsp from "node:fs/promises";
+import { spawn } from "node:child_process";
 import path from "node:path";
 import process from "node:process";
-import "../dev/zx-init.mjs";
+import { parseDiffNameStatusZ, parsePorcelainStatusZ } from "./git-changed-path-records";
 
 export type ChangedPathsResult =
   | { ok: true; paths: string[] }
   | { ok: false; paths: []; reason: string };
 
 function normalizePath(value: string): string {
-  return String(value || "")
-    .replace(/\\/g, "/")
-    .trim();
+  return String(value || "");
 }
 
 export function requireChangedPaths(result: ChangedPathsResult): string[] {
@@ -18,35 +17,57 @@ export function requireChangedPaths(result: ChangedPathsResult): string[] {
   return result.paths;
 }
 
-function parseStatusPaths(statusText: string): string[] {
-  const out: string[] = [];
-  for (const raw of statusText.split(/\r?\n/)) {
-    const body = raw.trimEnd().slice(3).trim();
-    if (!body) continue;
-    if (body.includes(" -> ")) out.push(...body.split(" -> ").map(normalizePath));
-    else out.push(normalizePath(body));
-  }
-  return out.filter(Boolean);
-}
-
 type FailedChangedPaths = Extract<ChangedPathsResult, { ok: false }>;
 
-function gitFailure(args: string[], out: unknown): FailedChangedPaths {
-  const result = out as { stderr?: unknown; stdout?: unknown };
-  const detail = String(result.stderr || result.stdout || "unknown git error").trim();
+type GitResult = { exitCode: number; stdout: Buffer; stderr: Buffer };
+
+async function runGit(root: string, args: string[]): Promise<GitResult> {
+  return await new Promise((resolve) => {
+    const child = spawn("git", args, { cwd: root, stdio: ["ignore", "pipe", "pipe"] });
+    const stdout: Buffer[] = [];
+    const stderr: Buffer[] = [];
+    let settled = false;
+    child.stdout.on("data", (chunk) => stdout.push(Buffer.from(chunk)));
+    child.stderr.on("data", (chunk) => stderr.push(Buffer.from(chunk)));
+    child.once("error", (error) => {
+      if (settled) return;
+      settled = true;
+      resolve({ exitCode: -1, stdout: Buffer.concat(stdout), stderr: Buffer.from(String(error)) });
+    });
+    child.once("close", (code) => {
+      if (settled) return;
+      settled = true;
+      resolve({
+        exitCode: code ?? -1,
+        stdout: Buffer.concat(stdout),
+        stderr: Buffer.concat(stderr),
+      });
+    });
+  });
+}
+
+function gitFailure(args: string[], result: GitResult): FailedChangedPaths {
+  const detail =
+    String(result.stderr.length ? result.stderr : result.stdout).trim() || "unknown git error";
   return { ok: false, paths: [], reason: `git ${args.join(" ")} failed: ${detail}` };
 }
 
-async function gitLines(root: string, args: string[]): Promise<ChangedPathsResult> {
-  const out = await $({ cwd: root, stdio: "pipe" })`git ${args}`.nothrow().quiet();
-  if ((out as any).exitCode !== 0) return gitFailure(args, out);
-  return {
-    ok: true,
-    paths: String((out as any).stdout || "")
-      .split(/\r?\n/)
-      .map(normalizePath)
-      .filter(Boolean),
-  };
+async function gitPathRecords(
+  root: string,
+  args: string[],
+  parse: (stdout: Uint8Array) => string[],
+): Promise<ChangedPathsResult> {
+  const result = await runGit(root, args);
+  if (result.exitCode !== 0) return gitFailure(args, result);
+  try {
+    return { ok: true, paths: parse(result.stdout) };
+  } catch (error) {
+    return {
+      ok: false,
+      paths: [],
+      reason: `git ${args.join(" ")} returned malformed records: ${String(error)}`,
+    };
+  }
 }
 
 async function gitRefExists(
@@ -54,10 +75,8 @@ async function gitRefExists(
   ref: string,
 ): Promise<{ ok: true; exists: boolean } | { ok: false; reason: string }> {
   const args = ["rev-parse", "--verify", "--quiet", ref];
-  const out = await $({ cwd: root, stdio: "pipe" })`git rev-parse --verify --quiet ${ref}`
-    .nothrow()
-    .quiet();
-  const exitCode = Number((out as any).exitCode);
+  const out = await runGit(root, args);
+  const exitCode = out.exitCode;
   if (exitCode === 0) return { ok: true, exists: true };
   if (exitCode === 1) return { ok: true, exists: false };
   return { ok: false, reason: gitFailure(args, out).reason };
@@ -77,18 +96,27 @@ async function mergeBaseChangedPaths(
     const refResult = await gitRefExists(root, ref);
     if (!refResult.ok) return { ok: false, paths: [], reason: refResult.reason };
     if (!refResult.exists) continue;
-    const out = await $({ cwd: root, stdio: "pipe" })`git merge-base ${ref} HEAD`.nothrow().quiet();
-    if ((out as any).exitCode !== 0) return gitFailure(["merge-base", ref, "HEAD"], out);
-    mergeBase = String((out as any).stdout || "").trim();
+    const args = ["merge-base", ref, "HEAD"];
+    const out = await runGit(root, args);
+    if (out.exitCode !== 0) return gitFailure(args, out);
+    mergeBase = String(out.stdout).trim();
     if (mergeBase) break;
   }
   if (!mergeBase) {
     const previous = await gitRefExists(root, "HEAD~1");
     if (!previous.ok) return { ok: false, paths: [], reason: previous.reason };
     if (!previous.exists) return { ok: true, paths: [] };
-    return await gitLines(root, ["diff", "--name-only", "--no-renames", "HEAD~1...HEAD"]);
+    return await gitPathRecords(
+      root,
+      ["diff", "--name-status", "-z", "--find-renames", "HEAD~1...HEAD"],
+      parseDiffNameStatusZ,
+    );
   }
-  return await gitLines(root, ["diff", "--name-only", "--no-renames", `${mergeBase}...HEAD`]);
+  return await gitPathRecords(
+    root,
+    ["diff", "--name-status", "-z", "--find-renames", `${mergeBase}...HEAD`],
+    parseDiffNameStatusZ,
+  );
 }
 
 async function collectGitChangedPaths(
@@ -97,14 +125,15 @@ async function collectGitChangedPaths(
 ): Promise<ChangedPathsResult> {
   const committed = await mergeBaseChangedPaths(root, env);
   if (!committed.ok) return committed;
-  const statusArgs = ["status", "--porcelain=v1"];
-  const status = await $({ cwd: root, stdio: "pipe" })`git status --porcelain=v1`.nothrow().quiet();
-  if ((status as any).exitCode !== 0) return gitFailure(statusArgs, status);
+  const status = await gitPathRecords(
+    root,
+    ["status", "--porcelain=v1", "-z", "--untracked-files=all"],
+    parsePorcelainStatusZ,
+  );
+  if (!status.ok) return status;
   return {
     ok: true,
-    paths: Array.from(
-      new Set([...committed.paths, ...parseStatusPaths(String((status as any).stdout || ""))]),
-    ).sort(),
+    paths: Array.from(new Set([...committed.paths, ...status.paths])).sort(),
   };
 }
 

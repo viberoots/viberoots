@@ -27,10 +27,14 @@ build-system changes just because they live under `build-tools/**`. Reviewed dep
 docs select a compact deployment documentation contract bucket instead of the full deployment
 matrix.
 
-Verify chooses its default scope from the merge-base diff plus the dirty worktree. Base refs are
-resolved from `GITHUB_BASE_REF` when present, then `github/main`, `origin/main`, and `main`; dirty,
-untracked, renamed, and deleted paths from `git status --porcelain=v1` are unioned with committed
-changes. If you need to see broad coverage regardless of that selection, set `ALL_TESTS=1`.
+Verify chooses its default scope from NUL-delimited structural merge-base diff and dirty-worktree
+records. Base refs are resolved from `GITHUB_BASE_REF` when present, then `github/main`,
+`origin/main`, and `main`; dirty, untracked, renamed, and deleted paths from
+`git status --porcelain=v1 -z --untracked-files=all` are unioned with committed
+`git diff --name-status -z --find-renames` paths. Both rename sides and UTF-8 special path
+characters are preserved. Malformed or failed discovery selects conservatively; only successful
+empty output means no changes. If you need broad coverage regardless of that selection, set
+`ALL_TESTS=1`.
 
 - Default scoped verify:
 

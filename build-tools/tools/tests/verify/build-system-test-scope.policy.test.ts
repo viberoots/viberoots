@@ -153,9 +153,9 @@ test("git helper probes use non-throwing zx calls", async () => {
     viberootsSourcePath("viberoots/build-tools/tools/lib/changed-paths.ts"),
     "utf8",
   );
-  assert.match(txt, /git rev-parse --verify --quiet \$\{ref\}`\s*\.nothrow\(\)\s*\.quiet\(\)/);
-  assert.match(txt, /git merge-base \$\{ref\} HEAD`\s*\.nothrow\(\)\s*\.quiet\(\)/);
-  assert.match(txt, /git status --porcelain=v1`\s*\.nothrow\(\)\s*\.quiet\(\)/);
+  assert.match(txt, /spawn\("git", args/);
+  assert.match(txt, /\["diff", "--name-status", "-z", "--find-renames"/);
+  assert.match(txt, /\["status", "--porcelain=v1", "-z", "--untracked-files=all"\]/);
 });
 
 test("non-build-system target scope derives selectors from top-level workspace roots", async () => {

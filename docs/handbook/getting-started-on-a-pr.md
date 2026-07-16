@@ -218,6 +218,11 @@ ordinary Buck test:
   diff, or status query schedules broad build-system coverage plus the complete project-enforcement
   pass; only a successful empty result means no changes. Renames into, within, or out of `projects/`
   must schedule the complete pass.
+- Changed-path queries and fixtures must use NUL-delimited `--name-status -z` and
+  `--porcelain=v1 -z` records, not display lines or quoted-path decoding. Preserve UTF-8 path bytes
+  represented by JavaScript strings, including whitespace, newlines, quotes, and backslashes, and
+  retain both fields of rename records. Truncated, malformed, internally inconsistent, or
+  undecodable records fail closed; do not return a partial set or reinterpret failure as no change.
 - A scanner reports the unreadable directory or file and fails closed. Only a root explicitly
   declared optional by the caller may translate root `ENOENT` into an empty result. This exception
   is limited to the two deployment runners' optional `projects/deployments/` root; descendant access

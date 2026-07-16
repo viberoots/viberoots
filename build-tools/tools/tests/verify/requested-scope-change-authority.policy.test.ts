@@ -61,3 +61,24 @@ test("a successful shared empty result retains no-change project enforcement", a
   assert.equal(result.selection.projectEnforcementReason, "not-required");
   assert.equal(result.selection.targets.includes(PROJECT_ENFORCEMENT_TARGETS), false);
 });
+
+test("shared selectors receive unusual structural paths without rewriting", async () => {
+  const paths = ['projects/app/ space\tline\nquote"backslash\\.ts ', "outside/rename-source\n.ts"];
+  const changed = { ok: true as const, paths };
+  const result = await resolveRequestedVerifyScope({
+    root: process.cwd(),
+    invocationCwd: process.cwd(),
+    args: defaultArgs,
+    env: { VBR_DEPLOYMENT_TEST_SCOPE: "never" },
+    deps: {
+      collectChangedPaths: async () => changed,
+      resolveTemplateScope: async (opts) => {
+        assert.equal(opts.changedPathsResult, changed);
+        assert.deepEqual(opts.changedPathsResult.paths, paths);
+        return baseDecision({ targets: ["//..."] });
+      },
+    },
+  });
+  assert.equal(result.selection.projectEnforcementReason, "project-change");
+  assert.ok(result.selection.targets.includes(PROJECT_ENFORCEMENT_TARGETS));
+});
