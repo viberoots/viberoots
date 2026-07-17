@@ -51,6 +51,7 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     "/install-cache",
     "/nix-xdg-cache",
     "/pr-logs",
+    "/prelude",
     "/viberoots-flake-input",
     "/xdg-cache",
     ".viberoots/workspace/viberoots-flake-input",
@@ -103,10 +104,8 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     }
   }
 
-  if (!helper.includes('"build"') || !helper.includes('"--impure"')) {
-    throw new Error(
-      "nix-build-filtered-flake must use --impure so selected planner env reaches filtered flake builds",
-    );
+  if (!helper.includes('"build"') || helper.includes('"--impure"')) {
+    throw new Error("nix-build-filtered-flake must evaluate registered bundles without --impure");
   }
   for (const [name, source] of [
     ["update-pnpm-hash filtered snapshot", updaterHelper],
@@ -154,7 +153,8 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
   }
   assert.match(buildHelper, /repairSnapshotViberootsInput/);
   assert.match(buildHelper, /materializeEvaluationBundle/);
-  assert.match(buildHelper, /WORKSPACE_ROOT: bundleRoot/);
+  assert.match(buildHelper, /withoutEvaluationSelectors\(process\.env\)/);
+  assert.doesNotMatch(buildHelper, /WORKSPACE_ROOT: bundleRoot/);
   assert.ok(
     buildHelper.indexOf("repairSnapshotViberootsInput({ snapDir, flakeDir })") <
       buildHelper.indexOf("const bundle = await materializeEvaluationBundle") &&

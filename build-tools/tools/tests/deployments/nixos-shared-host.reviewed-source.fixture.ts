@@ -43,7 +43,12 @@ export async function ensureNixosSharedHostReviewedSourceRef(
     await $({ cwd, stdio: "pipe" })`git branch -f ${localBranch} HEAD`;
   }
   await $({ cwd, stdio: "pipe" })`git update-ref ${remoteRef} HEAD`;
-  const remoteRoot = path.join(path.dirname(cwd), `${path.basename(cwd)}-reviewed-origin.git`);
+  const gitDirRaw = String(
+    (await $({ cwd, stdio: "pipe" })`git rev-parse --git-common-dir`).stdout || "",
+  ).trim();
+  if (!gitDirRaw) throw new Error("reviewed-source fixture could not resolve its Git directory");
+  const gitDir = path.isAbsolute(gitDirRaw) ? gitDirRaw : path.resolve(cwd, gitDirRaw);
+  const remoteRoot = path.join(gitDir, "viberoots-reviewed-origin.git");
   const remotes = String((await $({ cwd, stdio: "pipe" })`git remote`).stdout || "")
     .split(/\r?\n/)
     .map((entry) => entry.trim())

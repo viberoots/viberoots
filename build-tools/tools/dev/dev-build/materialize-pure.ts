@@ -9,8 +9,10 @@ import {
   parseRunnableManifest,
 } from "../../lib/runnables";
 import { targetPackageFromLabel } from "../../lib/artifact-source-inventory";
+import { evaluationBundleHasLanguageOverrides } from "../evaluation-bundle-selectors";
 import { inspectWorkspaceArtifactSource } from "../artifact-policy-inspection";
 import { makeFilteredFlakeRef } from "../filtered-flake";
+import { withoutEvaluationSelectors } from "../evaluation-bundle-env";
 
 function materializeTimeoutSec(defaultSec: number): number {
   const raw = String(process.env.VBR_MATERIALIZE_TIMEOUT_SEC || "").trim();
@@ -30,7 +32,10 @@ async function evaluationBundle(root: string, attr: string, target = "") {
     target,
     graphPath: path.join(root, DEFAULT_GRAPH_PATH),
     logPrefix: "[dev-build]",
-    classification: inventory.localDevelopment ? "local-development" : "hermetic",
+    classification:
+      inventory.localDevelopment || evaluationBundleHasLanguageOverrides(process.env)
+        ? "local-development"
+        : "hermetic",
   });
 }
 
@@ -141,14 +146,10 @@ export async function materializePureGraphIfEnabled(opts: {
     for (const sel of specific) {
       const bundle = await evaluationBundle(opts.root, "graph-generator-pure-selected", sel);
       try {
-        const envSel = {
+        const envSel = withoutEvaluationSelectors({
           ...process.env,
-          WORKSPACE_ROOT: bundle.workspaceRoot,
-          BUCK_TEST_SRC: bundle.workspaceRoot,
-          BUCK_TARGET: sel,
-          BUCK_GRAPH_JSON: path.join(bundle.workspaceRoot, DEFAULT_GRAPH_PATH),
           VBR_FILTERED_FLAKE_SNAPSHOT: "1",
-        } as any;
+        });
         const selOut = await nixBuildPrintOutPaths({
           root: opts.root,
           env: envSel as Record<string, string>,
@@ -185,17 +186,14 @@ export async function materializePureGraphIfEnabled(opts: {
   }
 
   const bundle = await evaluationBundle(opts.root, "graph-generator-pure");
-  const envFull = {
+  const envFull = withoutEvaluationSelectors({
     ...process.env,
-    WORKSPACE_ROOT: bundle.workspaceRoot,
-    BUCK_TEST_SRC: bundle.workspaceRoot,
-    BUCK_GRAPH_JSON: path.join(bundle.workspaceRoot, DEFAULT_GRAPH_PATH),
     VBR_FILTERED_FLAKE_SNAPSHOT: "1",
-  } as any;
+  });
   const pureOut = await nixBuildPrintOutPaths({
     root: opts.root,
     env: envFull as Record<string, string>,
-    args: `--impure --no-write-lock-file ${bundle.flakeRef} --accept-flake-config --no-link --print-out-paths`,
+    args: `--no-write-lock-file ${bundle.flakeRef} --accept-flake-config --no-link --print-out-paths`,
     label: "materialize full pure graph",
     timeoutSec: 420,
   }).finally(bundle.cleanup);

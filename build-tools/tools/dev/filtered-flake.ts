@@ -155,9 +155,7 @@ async function filteredSnapshotRelPaths(
   explicitGraphPath?: string,
 ): Promise<string[]> {
   const relPaths = new Set(defaultFilteredFlakeSnapshotRelPaths());
-  const graphPath = path.resolve(
-    String(explicitGraphPath || process.env.BUCK_GRAPH_JSON || path.join(root, DEFAULT_GRAPH_PATH)),
-  );
+  const graphPath = path.resolve(String(explicitGraphPath || path.join(root, DEFAULT_GRAPH_PATH)));
   try {
     for (const sourcePath of await graphSourcePaths(graphPath, target)) relPaths.add(sourcePath);
   } catch (error) {
@@ -206,9 +204,7 @@ async function copyWorkspaceGraphIntoSnapshot(
   snapDir: string,
   explicitGraphPath?: string,
 ): Promise<void> {
-  const graphPath = path.resolve(
-    String(explicitGraphPath || process.env.BUCK_GRAPH_JSON || path.join(root, DEFAULT_GRAPH_PATH)),
-  );
+  const graphPath = path.resolve(String(explicitGraphPath || path.join(root, DEFAULT_GRAPH_PATH)));
   try {
     await fsp.access(graphPath);
   } catch {

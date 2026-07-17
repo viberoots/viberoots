@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { describe, test } from "node:test";
+import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 process.env.TEST_NEED_DEV_ENV = "1";
@@ -33,24 +34,35 @@ async function retryTransientNixStoreError<T>(fn: () => Promise<T>): Promise<T> 
 describe("pre-commit hook (lint-staged with Prettier + ESLint)", () => {
   test("blocks commit on lint/format errors and allows commit when fixed", async () => {
     await runInTemp("linting", async (tmp, $) => {
-      await $`git init`;
-      await $`git config user.email tester@example.com`;
-      await $`git config user.name Tester`;
+      const eslintBin = ensureNixStoreToolPathSync("eslint", process.env);
+      const toolNodeModules = await fsp.realpath(path.dirname(path.dirname(eslintBin)));
+      const fixture$ = $({
+        cwd: tmp,
+        env: {
+          ...process.env,
+          NODE_PATH: [toolNodeModules, process.env.NODE_PATH || ""]
+            .filter(Boolean)
+            .join(path.delimiter),
+        },
+      });
+      await fixture$`git init`;
+      await fixture$`git config user.email tester@example.com`;
+      await fixture$`git config user.name Tester`;
       // Speed: avoid running pre-commit across the entire temp repo during the
       // initial commit. Configure hooks after the first commit so the test only
       // exercises the hook on the targeted commit(s) below.
-      await $`git add .buckroot .buckconfig .viberoots viberoots config toolchains`;
-      await $`git commit --allow-empty -m "chore: init"`;
-      await $`git config core.hooksPath viberoots/.husky`;
+      await fixture$`git add .buckroot .buckconfig .viberoots viberoots config toolchains`;
+      await fixture$`git commit --allow-empty -m "chore: init"`;
+      await fixture$`git config core.hooksPath viberoots/.husky`;
 
       const badFile = path.join(tmp, "viberoots", "build-tools", "tools", "dev", "bad.ts");
       await fsp.mkdir(path.dirname(badFile), { recursive: true });
       await fsp.writeFile(badFile, `const x = ;\n`, "utf8");
-      await $`git add ${path.relative(tmp, badFile)}`;
+      await fixture$`git add ${path.relative(tmp, badFile)}`;
 
       let blocked = false;
       try {
-        await $({ stdio: "pipe" })`git commit -m "feat: add bad file"`;
+        await fixture$({ stdio: "pipe" })`git commit -m "feat: add bad file"`;
       } catch {
         blocked = true;
       }
@@ -60,9 +72,9 @@ describe("pre-commit hook (lint-staged with Prettier + ESLint)", () => {
       }
 
       await fsp.writeFile(badFile, `if (true) { console.log('ok'); }\n`, "utf8");
-      await $`git add ${path.relative(tmp, badFile)}`;
+      await fixture$`git add ${path.relative(tmp, badFile)}`;
       await retryTransientNixStoreError(
-        async () => await $`git commit -m "style: fix lint issues"`,
+        async () => await fixture$`git commit -m "style: fix lint issues"`,
       );
 
       const fixed = await fsp.readFile(badFile, "utf8");

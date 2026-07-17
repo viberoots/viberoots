@@ -25,6 +25,7 @@ import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 import { findRepoRoot } from "../../lib/repo";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { admitArtifactContext } from "../artifact-policy-inspection";
+import { evaluationBundleHasLanguageOverrides } from "../evaluation-bundle-selectors";
 
 export async function missingOptionalPatchDirsForFreshIsolation(opts: {
   root: string;
@@ -146,6 +147,10 @@ export async function runDevBuild(): Promise<void> {
       restArgs: parsed.restArgs,
     });
     const impure = auto.impure || parsed.impure;
+    const classification =
+      auto.classification === "hermetic" && evaluationBundleHasLanguageOverrides(process.env)
+        ? "local-development"
+        : auto.classification;
     const materializeDecision = await shouldMaterializeByDefault({
       root,
       requestedMaterialize: parsed.materialize,
@@ -169,8 +174,8 @@ export async function runDevBuild(): Promise<void> {
     }
     await runStartupCheck(root);
     await admitArtifactContext({
-      classification: auto.classification,
-      impureEvaluation: true,
+      classification,
+      impureEvaluation: impure,
       workspaceRoot: root,
       toolNames: ["git", "buck2"],
     });

@@ -59,7 +59,7 @@
             export uv2nix_kind="${kind}"
             export uv2nix_groups='${builtins.toJSON groups}'
             export INFO="$INFO"
-            ${ (nixpkgs.legacyPackages.${builtins.currentSystem}).python3 or (nixpkgs.legacyPackages.${builtins.currentSystem}).python311 }/bin/python - <<'PY'
+            ${pkgs.python3 or pkgs.python311}/bin/python - <<'PY'
 import io, json, os, re, shutil, subprocess, sys, hashlib, tempfile
 from pathlib import Path
 

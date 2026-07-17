@@ -248,6 +248,8 @@ Do not copy/paste shell fragments between languages. If you need to change the b
 
 - **Local**: `u` refreshes dependency locks and derived metadata after edits; `i` validates committed
   metadata and materializes dependencies without changing tracked files. `b` runs the recursive Buck
-  build, and `v` runs verify preflights plus the selected Buck test passes. Direct `buck2 test` and
-  `buck2 build` still build on demand and can be useful for focused debugging.
+  build from an immutable evaluation bundle. Relevant untracked source creates a non-release local
+  development bundle without impure evaluation. `b --impure` is diagnostic only. `d` retains the
+  live worktree for watchers and hot reload. `v` runs verify preflights plus the selected Buck test
+  passes. Direct `buck2 test` and `buck2 build` still build on demand for focused debugging.
 - **CI**: We keep a separate Nix build stage to warm caches and isolate template/patch errors. Later Buck stages mostly hit cache and provide clean graph-level diagnostics.

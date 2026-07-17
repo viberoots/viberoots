@@ -25,15 +25,10 @@ let
   isStorePath = p: lib.hasPrefix "/nix/store/" p;
   toStore = p: builtins.toString (builtins.path { path = builtins.toPath p; name = "uv-dev"; });
 
-  flakeRoot = builtins.toString ./.;
-  buckTestSrc = builtins.getEnv "BUCK_TEST_SRC";
-  workspaceEnv = builtins.getEnv "WORKSPACE_ROOT";
-  wsRootOk = wsRoot != null && wsRoot != "" && !(isStorePath wsRoot);
+  wsRootOk = wsRoot != null && wsRoot != "";
   originRoot =
     if wsRootOk then wsRoot
-    else if buckTestSrc != "" then buckTestSrc
-    else if workspaceEnv != "" then workspaceEnv
-    else flakeRoot;
+    else builtins.throw "uv2nix adapter: explicit wsRoot is required";
 
   devOverridesCoerced =
     let keys = builtins.attrNames devOverrides;

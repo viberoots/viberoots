@@ -40,7 +40,7 @@ test("target-aware untracked policy marks global build inputs relevant", () => {
   assert.equal(r.relevant.length, 2);
 });
 
-test("auto impure logging is compact in quiet mode", async () => {
+test("local development bundle logging is compact in quiet mode", async () => {
   await runInTemp("dev-build-untracked-quiet-log", async (tmp) => {
     await $({ cwd: tmp, stdio: "ignore" })`git init`;
     await fsp.mkdir(`${tmp}/projects/apps/myapp/src`, { recursive: true });
@@ -62,8 +62,9 @@ test("auto impure logging is compact in quiet mode", async () => {
         subcmd: "build",
         restArgs: ["//projects/apps/myapp:app"],
       });
-      assert.equal(result.impure, true);
-      assert.match(stderr, /warn\s+impure build due to \d+ relevant untracked file\(s\)/);
+      assert.equal(result.impure, false);
+      assert.equal(result.classification, "local-development");
+      assert.match(stderr, /warn\s+development bundle includes \d+ relevant untracked file\(s\)/);
       assert.match(stderr, /    - .+/);
       assert.match(stderr, /    - \.\.\. \d+ more/);
       assert.doesNotMatch(stderr, /Falling back to --impure/);
@@ -75,7 +76,7 @@ test("auto impure logging is compact in quiet mode", async () => {
   });
 });
 
-test("auto impure logging summarizes bootstrap scaffold files in quiet mode", async () => {
+test("development bundle logging summarizes bootstrap scaffold files", async () => {
   await runInScratchTemp("dev-build-untracked-scaffold-quiet-log", async (tmp) => {
     await $({ cwd: tmp, stdio: "ignore" })`git init`;
     await fsp.mkdir(`${tmp}/projects/config`, { recursive: true });
@@ -103,8 +104,8 @@ test("auto impure logging summarizes bootstrap scaffold files in quiet mode", as
         subcmd: "build",
         restArgs: ["//..."],
       });
-      assert.equal(result.impure, true);
-      assert.match(stderr, /warn\s+impure build due to \d+ uncommitted scaffold file\(s\)/);
+      assert.equal(result.impure, false);
+      assert.match(stderr, /warn\s+development bundle includes \d+ uncommitted scaffold file\(s\)/);
       assert.doesNotMatch(stderr, /    - \.buckconfig/);
       assert.doesNotMatch(stderr, /generated workspace untracked file/);
     } finally {
@@ -115,7 +116,7 @@ test("auto impure logging summarizes bootstrap scaffold files in quiet mode", as
   });
 });
 
-test("auto impure logging summarizes generated workspace files in quiet mode", async () => {
+test("development bundle logging summarizes generated workspace files", async () => {
   await runInScratchTemp("dev-build-untracked-generated-quiet-log", async (tmp) => {
     await $({ cwd: tmp, stdio: "ignore" })`git init`;
     await fsp.writeFile(`${tmp}/.gitignore`, ".metadata_never_index\n", "utf8");
@@ -143,10 +144,10 @@ test("auto impure logging summarizes generated workspace files in quiet mode", a
         subcmd: "build",
         restArgs: ["//..."],
       });
-      assert.equal(result.impure, true);
+      assert.equal(result.impure, false);
       assert.match(
         stderr,
-        /warn\s+impure build due to \d+ generated workspace untracked file\(s\)/,
+        /warn\s+development bundle includes \d+ generated workspace untracked file\(s\)/,
       );
       assert.doesNotMatch(stderr, /    - \.direnv/);
     } finally {
@@ -154,5 +155,19 @@ test("auto impure logging summarizes generated workspace files in quiet mode", a
       if (typeof prevVerbose === "string") process.env.VBR_VERBOSE = prevVerbose;
       else delete process.env.VBR_VERBOSE;
     }
+  });
+});
+
+test("explicit impure mode remains diagnostic instead of automatic", async () => {
+  await runInTemp("dev-build-explicit-impure", async (tmp) => {
+    await $({ cwd: tmp, stdio: "ignore" })`git init`;
+    const result = await maybeAutoImpureFromUntrackedFiles({
+      isCI: false,
+      root: tmp,
+      impure: true,
+      subcmd: "build",
+      restArgs: ["//..."],
+    });
+    assert.deepEqual(result, { impure: true, classification: "diagnostic-impure" });
   });
 });

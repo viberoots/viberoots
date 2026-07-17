@@ -12,6 +12,7 @@ import {
 import { registerEvaluationBundle } from "./evaluation-bundle-register";
 import { claimBundleTempRoot } from "./evaluation-bundle-owner";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
+import { captureEvaluationBundleSelectors } from "./evaluation-bundle-selectors";
 
 export type EvaluationBundle = {
   bundlePath: string;
@@ -65,6 +66,7 @@ export async function materializeEvaluationBundle(
     classification: ArtifactBuildClassification;
     platform?: string;
     requireGraph?: boolean;
+    selectorEnv?: NodeJS.ProcessEnv;
   },
   deps: { register?: RegisterBundle; copyMode?: CopyFileCloneMode } = {},
 ): Promise<EvaluationBundle> {
@@ -94,10 +96,27 @@ export async function materializeEvaluationBundle(
     });
     assertRunning();
     const files = await inventoryBundleSource(sourceRoot);
+    const selectors = await captureEvaluationBundleSelectors({
+      bundleRoot,
+      env: opts.selectorEnv || process.env,
+      copyMode: deps.copyMode || cloneMode(),
+    });
+    assertRunning();
+    if (
+      opts.classification === "hermetic" &&
+      Object.values(selectors.languageOverrides).some(
+        (overrides) => Object.keys(overrides).length > 0,
+      )
+    ) {
+      throw new Error("evaluation bundle with language overrides must be local-development");
+    }
     const selection = {
       attr: opts.attr,
+      languageOverrides: selectors.languageOverrides,
+      onlyCpp: selectors.onlyCpp,
       platform: opts.platform || "",
       target: opts.target || "",
+      wasmBackend: selectors.wasmBackend,
     };
     const classification = { classification: opts.classification };
     const graphPath = path.join(sourceRoot, DEFAULT_GRAPH_PATH);
@@ -109,8 +128,14 @@ export async function materializeEvaluationBundle(
       }
       return Buffer.from("[]\n");
     });
-    const dependencies = { inputs: dependencyInputs(files) };
-    const manifest = { schema: "viberoots.evaluation-bundle-manifest.v1", files };
+    const rootModulesTomlPath = files.some((file) => file.path === "gomod2nix.toml")
+      ? "gomod2nix.toml"
+      : "";
+    const dependencies = { inputs: dependencyInputs(files), rootModulesTomlPath };
+    const manifest = {
+      schema: "viberoots.evaluation-bundle-manifest.v1",
+      files: [...files, ...selectors.overrideFiles],
+    };
     const digest = manifestDigest({
       selection,
       classification,
@@ -138,7 +163,7 @@ export async function materializeEvaluationBundle(
     return {
       bundlePath: storePath,
       digest: `sha256:${digest}`,
-      flakeRef: `path:${path.join(storeSource, subdir)}#${opts.attr}`,
+      flakeRef: `path:${storePath}?dir=${path.posix.join("source", subdir)}#${opts.attr}`,
       workspaceRoot: storeSource,
       cleanup: async () => {},
     };

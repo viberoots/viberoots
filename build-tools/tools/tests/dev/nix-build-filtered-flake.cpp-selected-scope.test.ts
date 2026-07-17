@@ -60,10 +60,13 @@ test("selected cpp filtered-flake snapshots follow the target package closure", 
   ]);
   assert.ok(
     snapshotRelPaths.includes("build-tools") &&
-      snapshotRelPaths.includes("prelude") &&
       snapshotRelPaths.includes("toolchains") &&
       snapshotRelPaths.includes("viberoots"),
     "expected selected cpp snapshot to retain registry, planner, and shared flake roots",
+  );
+  assert.ok(
+    !snapshotRelPaths.includes("prelude"),
+    "generated root prelude must not enter filtered Nix source snapshots",
   );
   assert.ok(
     snapshotRelPaths.includes("projects/apps/demo") &&
@@ -168,10 +171,13 @@ test("selected node filtered-flake snapshots keep only the importer and native s
   ]);
   assert.ok(
     snapshotRelPaths.includes("build-tools") &&
-      snapshotRelPaths.includes("prelude") &&
       snapshotRelPaths.includes("toolchains") &&
       snapshotRelPaths.includes("viberoots"),
     "expected selected node snapshot to retain shared flake and local viberoots roots",
+  );
+  assert.ok(
+    !snapshotRelPaths.includes("prelude"),
+    "generated root prelude must not enter filtered Nix source snapshots",
   );
   assert.ok(
     snapshotRelPaths.includes("projects/apps/sample-app") &&

@@ -3,12 +3,7 @@ let
   lib = pkgs.lib;
   srcForUv2nixEnv =
     let
-      wsEnv = builtins.getEnv "WORKSPACE_ROOT";
-      buckEnv = builtins.getEnv "BUCK_TEST_SRC";
-      originRoot =
-        if wsEnv != "" then wsEnv
-        else if buckEnv != "" then buckEnv
-        else inputs.originRoot;
+      originRoot = inputs.originRoot;
       srcStr = builtins.toString inputs.src;
       srcIsStore = lib.hasPrefix "/nix/store/" srcStr;
       subdirStr = if inputs.subdir == "." || inputs.subdir == "" then "" else inputs.subdir;

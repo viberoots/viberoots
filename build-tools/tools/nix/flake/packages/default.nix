@@ -7,6 +7,7 @@
 , viberootsNodeMods ? null
 , prelude
 , uv2nixLib
+, evaluationBundle ? null
 , nixpkgsRegistry ? null
 , version
 , releaseTag
@@ -23,7 +24,7 @@ let
 
   importers = import ./importers.nix { inherit lib filterRepo repoSnapshot repoRoot; };
   graph = import ./graph.nix {
-    inherit pkgs repoSnapshot uv2nixLib repoRoot viberootsRoot nixpkgsRegistry;
+    inherit pkgs repoSnapshot uv2nixLib repoRoot viberootsRoot nixpkgsRegistry evaluationBundle;
     nodeMods = resolvedNodeMods;
   };
 

@@ -102,17 +102,22 @@ buck2 test $(buck2 targets //:scaffolding_* | tr '\n' ' ')
 buck2 test //:scaffolding_help -- --env COVERAGE=1
 ```
 
-## Dev Build Modes (Pure vs Impure)
+## Artifact And Diagnostic Build Modes
 
-- Pure (CI-equivalent, default):
-  - Uses a store-pinned Buck graph built via Nix (`nix build .#buck-graph`).
+- Hermetic (default when relevant untracked source is absent):
+  - Evaluates the immutable source, graph, selection, dependency, and classification bundle.
   - Example: `build-tools/tools/dev/dev-build.ts build //...`
 
-- Impure (fast local loop):
-  - Regenerates `build-tools/tools/buck/graph.json` from the live workspace and evaluates with `--impure`.
+- Local development (automatic when relevant untracked source exists):
+  - Captures relevant source in a filtered, content-addressed bundle and still evaluates purely.
+  - The result is labeled non-release and protected publication jobs reject it.
+
+- Diagnostic impurity (explicit only):
+  - Regenerates the graph from the live workspace and evaluates with `--impure` for investigation.
   - Example: `build-tools/tools/dev/dev-build.ts --impure build //...`
 
-CI should always use the pure path. Local development can opt into `--impure` for fast iteration.
+Track relevant source before CI or publication. Use `d`, not diagnostic impurity, for normal live
+watcher and hot-reload work.
 
 ## Runnable target commands
 

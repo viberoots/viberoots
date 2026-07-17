@@ -47,8 +47,56 @@ test("bundle manifests are identical for CoW and full-copy construction", async 
     );
     assert.equal(cow.digest, none.digest);
     assert.equal(captures[1], captures[0]);
+    assert.match(none.flakeRef, /\?dir=source#graph-generator$/);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("bundle captures planner selectors and rewrites override sources", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "evaluation-bundle-selectors-"));
+  const root = path.join(tmp, "source");
+  const override = path.join(tmp, "override");
+  const registered = path.join(tmp, "registered");
+  await fixture(root);
+  await fsp.mkdir(override);
+  await fsp.writeFile(path.join(override, "module.txt"), "captured\n");
+  try {
+    await materializeEvaluationBundle(
+      {
+        stagedSource: root,
+        attr: "graph-generator",
+        classification: "local-development",
+        selectorEnv: {
+          NIX_GO_DEV_OVERRIDE_JSON: JSON.stringify({ "example.test/mod@v1": override }),
+          PLANNER_ONLY_CPP: "1",
+          WEB_WASM_BACKEND: "wasi_single",
+        },
+      },
+      {
+        register: async (bundleRoot) => {
+          await fsp.cp(bundleRoot, registered, { recursive: true });
+          return registered;
+        },
+      },
+    );
+    const selection = JSON.parse(
+      await fsp.readFile(path.join(registered, "selection.json"), "utf8"),
+    );
+    const captured = selection.languageOverrides.NIX_GO_DEV_OVERRIDE_JSON["example.test/mod@v1"];
+    assert.equal(selection.onlyCpp, true);
+    assert.equal(selection.wasmBackend, "wasi_single");
+    assert.match(captured, /^overrides\/NIX_GO_DEV_OVERRIDE_JSON\/0000$/);
+    assert.equal(
+      await fsp.readFile(path.join(registered, captured, "module.txt"), "utf8"),
+      "captured\n",
+    );
+    const manifest = JSON.parse(await fsp.readFile(path.join(registered, "manifest.json"), "utf8"));
+    assert.ok(
+      manifest.files.some((file: { path: string }) => file.path === `${captured}/module.txt`),
+    );
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
   }
 });
 

@@ -39,6 +39,23 @@ function submissionPaths(tmp: string) {
   };
 }
 
+test("reviewed-source fixture remote is owned by runInTemp cleanup", async () => {
+  let remoteRoot = "";
+  await runInTemp("nixos-reviewed-source-owned-remote", async (tmp, $) => {
+    const deployment = nixosSharedHostDeploymentFixture();
+    await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
+    remoteRoot = String(
+      (await $({ cwd: tmp, stdio: "pipe" })`git remote get-url origin`).stdout || "",
+    ).trim();
+    assert.ok(
+      remoteRoot.startsWith(path.join(tmp, ".git") + path.sep),
+      `reviewed-source fixture remote escaped the owned Git directory: ${remoteRoot}`,
+    );
+    assert.equal((await fsp.stat(remoteRoot)).isDirectory(), true);
+  });
+  await assert.rejects(fsp.access(remoteRoot));
+});
+
 test("backend snapshots the reviewed ref from the remote instead of ambient local branch state", async () => {
   await runInTemp("nixos-reviewed-source-snapshot", async (tmp, $) => {
     const deployment = nixosSharedHostDeploymentFixture();

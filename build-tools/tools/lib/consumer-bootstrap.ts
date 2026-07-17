@@ -610,11 +610,7 @@ ${workspaceFlakeInputs(viberootsUrl)}
         else { profiles = { }; };
     in
     inputs.viberoots.lib.mkWorkspace {
-      workspaceSrc =
-        let
-          root = builtins.getEnv "WORKSPACE_ROOT";
-        in
-        if root != "" then root else ../..;
+      workspaceSrc = ../..;
       viberootsInput = inputs.viberoots;
       workspaceName = "${opts.workspaceName}";
       inherit nixpkgsRegistryExtension;
@@ -625,7 +621,7 @@ ${workspaceFlakeInputs(viberootsUrl)}
 
 function rootFlakeNix(opts: InitConsumerOptions): string {
   return flakeNix(opts, rootViberootsUrl(opts))
-    .replace('if root != "" then root else ../..;', 'if root != "" then root else ./.;')
+    .replace("workspaceSrc = ../..;", "workspaceSrc = ./.;")
     .replace(
       "registryExtensionPath = ./nixpkgs-source-registry-extension.nix;",
       "registryExtensionPath = ./.viberoots/workspace/nixpkgs-source-registry-extension.nix;",

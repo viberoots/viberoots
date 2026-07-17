@@ -1,4 +1,4 @@
-{ pkgs, repoSnapshot, uv2nixLib, repoRoot, viberootsRoot, nodeMods ? null, mkNodeMods ? null, nixpkgsRegistry ? null }:
+{ pkgs, repoSnapshot, uv2nixLib, repoRoot, viberootsRoot, nodeMods ? null, mkNodeMods ? null, nixpkgsRegistry ? null, evaluationBundle ? null }:
 let
   resolvedNodeMods =
     if nodeMods != null then nodeMods
@@ -6,8 +6,11 @@ let
     else builtins.throw "packages/graph.nix requires nodeMods or mkNodeMods";
   graphGen =
     let
-      envGraph = builtins.getEnv "BUCK_GRAPH_JSON";
-      selectedTargetName = builtins.getEnv "BUCK_TARGET";
+      envGraph = if evaluationBundle == null then builtins.getEnv "BUCK_GRAPH_JSON" else "";
+      selectedTargetName =
+        if evaluationBundle == null
+        then builtins.getEnv "BUCK_TARGET"
+        else evaluationBundle.selection.target;
       workspaceGraph = repoRoot + "/.viberoots/workspace/buck/graph.json";
       testOverrideGraph = repoRoot + "/build-tools/tools/buck/graph.json";
       workspaceGraphExists = builtins.pathExists workspaceGraph;
@@ -17,7 +20,8 @@ let
         && builtins.pathExists p
         && pkgs.lib.hasInfix selectedTargetName (builtins.readFile p);
       graphPath =
-        if envGraph != "" then envGraph
+        if evaluationBundle != null then evaluationBundle.graphPath
+        else if envGraph != "" then envGraph
         else if selectedTargetName != "" && testOverrideGraphExists && (!workspaceGraphExists || (!(graphHasSelectedTarget workspaceGraph) && graphHasSelectedTarget testOverrideGraph)) then testOverrideGraph
         else workspaceGraph;
       graphArg =
@@ -29,8 +33,9 @@ let
       nodeMods = resolvedNodeMods;
       inherit viberootsRoot;
       inherit nixpkgsRegistry;
+      inherit evaluationBundle;
       graphJsonPath = graphArg;
-      rootModulesTomlPath =
+      rootModulesTomlPath = if evaluationBundle != null then evaluationBundle.rootModulesTomlPath else
         let
           envRootToml = builtins.getEnv "ROOT_GOMOD2NIX_TOML";
         in
@@ -43,9 +48,10 @@ let
     inherit pkgs;
     graphJsonPath =
       let
-        envGraph = builtins.getEnv "BUCK_GRAPH_JSON";
+        envGraph = if evaluationBundle == null then builtins.getEnv "BUCK_GRAPH_JSON" else "";
       in
-      if envGraph != ""
+      if evaluationBundle != null then evaluationBundle.graphPath
+      else if envGraph != ""
       then (builtins.path { path = (builtins.toPath envGraph); name = "graph.json"; })
       else throw "BUCK_GRAPH_JSON not set; export the graph and pass it explicitly";
   };
@@ -56,12 +62,14 @@ let
     nodeMods = resolvedNodeMods;
     inherit viberootsRoot;
     inherit nixpkgsRegistry;
+    inherit evaluationBundle;
     graphJsonPath =
       let
-        envGraph = builtins.getEnv "BUCK_GRAPH_JSON";
+        envGraph = if evaluationBundle == null then builtins.getEnv "BUCK_GRAPH_JSON" else "";
       in
-      if envGraph != "" then envGraph else (buckGraph + "/graph.json");
-    rootModulesTomlPath =
+      if evaluationBundle != null then evaluationBundle.graphPath
+      else if envGraph != "" then envGraph else (buckGraph + "/graph.json");
+    rootModulesTomlPath = if evaluationBundle != null then evaluationBundle.rootModulesTomlPath else
       let
         envRootToml = builtins.getEnv "ROOT_GOMOD2NIX_TOML";
       in

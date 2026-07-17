@@ -16,6 +16,7 @@ let
     if builtins.isAttrs viberootsInput then viberootsInput.outPath else viberootsInput;
   repoRoot = workspaceRootPath;
   viberootsRoot = viberootsRootPath;
+  evaluationBundle = import ./evaluation-bundle.nix { inherit repoRoot; };
   pkgs = import nixpkgs {
     inherit system;
     overlays =
@@ -25,7 +26,11 @@ let
         cppOverlays =
           if (haveCppOverlayFile && useCppOverlay) then [ (import ../overlays/cpp-patches.nix) ] else [ ];
       in
-      [ gomod2nix.overlays.default ] ++ cppOverlays;
+      [ gomod2nix.overlays.default ]
+      ++ cppOverlays
+      ++ (if evaluationBundle == null then [ ] else [
+        (_final: _prev: { viberootsEvaluationBundle = evaluationBundle; })
+      ]);
   };
   nixpkgsRegistry = import ../nixpkgs-source-registry.nix {
     inputs = { inherit nixpkgs; };
@@ -42,7 +47,7 @@ let
     buck2Input = buck2;
   };
 
-  liveFsRoot =
+  liveFsRoot = if evaluationBundle != null then repoRoot else
     let
       w = builtins.getEnv "WORKSPACE_ROOT";
       t = builtins.getEnv "BUCK_TEST_SRC";
@@ -54,7 +59,11 @@ let
     import ../node-modules.nix {
       inherit pkgs repoFsRoot;
       repoRoot = repoRoot;
-      hashesPath = ../node-modules.hashes.json;
+      hashesPath =
+        if evaluationBundle != null
+        then repoRoot + "/projects/node-modules.hashes.json"
+        else ../node-modules.hashes.json;
+      allowLiveHashMap = evaluationBundle == null;
       prefetchedStorePathGlobal =
         let
           s = builtins.getEnv "LOCAL_PNPM_STORE";
@@ -96,7 +105,7 @@ let
     };
 in
 {
-  inherit pkgs system zx-wrapper devshell prelude uv2nixLib liveFsRoot mkNodeMods repoRoot viberootsRoot viberootsNodeMods version releaseTag;
+  inherit pkgs system zx-wrapper devshell prelude uv2nixLib evaluationBundle liveFsRoot mkNodeMods repoRoot viberootsRoot viberootsNodeMods version releaseTag;
   nixpkgsRegistry = resolvedNixpkgsRegistry;
   buck2Input = buck2;
 } // (if includeNodeMods then { nodeMods = mkNodeMods { }; } else { })

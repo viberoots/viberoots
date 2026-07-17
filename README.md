@@ -227,6 +227,10 @@ b        # build the full default repo scope
 v        # run impacted tests and verification checks
 ```
 
+`b` evaluates a filtered, content-addressed bundle. Relevant untracked source is included in a
+non-release local development bundle and is rejected by protected publication jobs. `b --impure`
+is reserved for diagnostics. Use `d` for live worktree watchers and hot reload.
+
 Shell entry also prepares ignored viberoots workspace state. In a consumer workspace, the hidden `.viberoots/workspace/flake.nix` uses `path:../../viberoots` as the local input while `.envrc` overrides that input to `path:$PWD/viberoots` for local development. The generated root `flake.nix` mirrors the workspace flake so `nix develop` works from the workspace root and nested project directories. Activation points `.viberoots/current` at the active viberoots source, so Buck cells and Nix-backed commands see local build-tool edits immediately. Generated provider and Buck graph state stays under `.viberoots/workspace/`.
 
 The development shell and packaged `viberoots` command do not retain the exact pnpm

@@ -4,12 +4,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runNixBuildWithTransientRetry } from "./build-selected-nix-retry";
 import { ensureGraph } from "../buck/glue-run";
-import { allDevOverrideEnvNames } from "../lib/dev-override-envs";
 import { getImporterRootsContract } from "../lib/importer-roots";
 import { sanitizeAttrNameFromLabel } from "../lib/labels";
 import { runNodeWithZx } from "../lib/node-run";
 import { findRepoRoot, pathExists } from "../lib/repo";
-import { getArgvTokens, getFlagBool } from "../lib/cli";
+import { getArgvTokens } from "../lib/cli";
 import { runMain } from "../lib/cli-wrap";
 import { withScopedEnv } from "../lib/scoped-env";
 import { inspectArtifactSource } from "../lib/artifact-source-inventory";
@@ -20,10 +19,11 @@ import { resolveFinalPnpmStore } from "./update-pnpm-hash/realized-store";
 import { pnpmStoreAttrFromImporter } from "./update-pnpm-hash/paths";
 import { withSanitizedInheritedNixConfig } from "../lib/nix-config-env";
 import { resolveSelectedTargetLabel } from "./target-label-resolver";
-import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
 import { buildToolPath, zxInitPath } from "./dev-build/paths";
 import { classifyArtifactBuild } from "../lib/artifact-build-policy";
 import { resolveToolPathSync } from "../lib/tool-paths";
+import { withoutEvaluationSelectors } from "./evaluation-bundle-env";
+import { evaluationBundleHasLanguageOverrides } from "./evaluation-bundle-selectors";
 import {
   emitArtifactPolicyEvidence,
   inspectArtifactBuildPolicy,
@@ -133,7 +133,10 @@ async function chooseFlakeRef(opts: {
       }),
   });
   const localDevelopment =
-    opts.sourceMode === "path" || isLikelyTempWorkspace || inventory.localDevelopment;
+    opts.sourceMode === "path" ||
+    isLikelyTempWorkspace ||
+    inventory.localDevelopment ||
+    evaluationBundleHasLanguageOverrides(process.env);
   if (inventory.localDevelopment && opts.sourceMode === "auto") {
     console.error(
       "[build-selected] bundling relevant untracked files as local development source:",
@@ -237,19 +240,14 @@ async function main() {
   const providedTargetAttr = (process.env.BUCK_TARGET_ATTR || "").trim();
   const cppTargetAttrSuffix = providedTargetAttr || sanitizeAttrNameFromLabel(target);
   console.error(`[build-selected] cppTargetAttrSuffix=${cppTargetAttrSuffix}`);
-  const sanitizedEnv: Record<string, string> = withSanitizedInheritedNixConfig({
-    ...process.env,
-    BUCK_TARGET: target,
-    WORKSPACE_ROOT: workspaceRoot,
-    BUCK_TEST_SRC: workspaceRoot,
-    BUCK_GRAPH_JSON: graphPath,
-    BUCK_QUERY_ROOTS: queryRoots,
-    EXPORTER_VALIDATION: validation,
-    EXPORTER_DEBUG: exporterDebug,
-  });
-  for (const envName of allDevOverrideEnvNames()) {
-    sanitizedEnv[envName] = "";
-  }
+  const sanitizedEnv = withoutEvaluationSelectors(
+    withSanitizedInheritedNixConfig({
+      ...process.env,
+      BUCK_QUERY_ROOTS: queryRoots,
+      EXPORTER_VALIDATION: validation,
+      EXPORTER_DEBUG: exporterDebug,
+    }),
+  );
   const flakeSource = await chooseFlakeRef({
     workspaceRoot,
     target,
@@ -259,19 +257,16 @@ async function main() {
   const flakeEnv = flakeSource.workspaceRoot
     ? {
         ...sanitizedEnv,
-        WORKSPACE_ROOT: flakeSource.workspaceRoot,
-        BUCK_TEST_SRC: flakeSource.workspaceRoot,
-        BUCK_GRAPH_JSON: path.join(flakeSource.workspaceRoot, DEFAULT_GRAPH_PATH),
         VBR_PNPM_FILTERED_SNAPSHOT_ROOT: flakeSource.workspaceRoot,
         VBR_FILTERED_FLAKE_SNAPSHOT: "1",
       }
     : sanitizedEnv;
   const policyEvidence = await inspectArtifactBuildPolicy({
     classification: classifyArtifactBuild({
-      diagnosticImpure: getFlagBool("impure"),
+      diagnosticImpure: false,
       localDevelopment: Boolean(flakeSource.localDevelopment),
     }),
-    impureEvaluation: true,
+    impureEvaluation: false,
     env: flakeEnv,
     toolPaths: { node: process.execPath },
     toolNames: ["git"],

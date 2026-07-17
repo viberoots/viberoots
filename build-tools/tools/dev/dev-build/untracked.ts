@@ -54,7 +54,7 @@ function isBootstrapScaffoldUntrackedPath(p: string): boolean {
   return false;
 }
 
-function writeUntrackedImpureWarning(opts: {
+function writeDevelopmentBundleWarning(opts: {
   ui: ReturnType<typeof createCommandUi>;
   untracked: string[];
   relevantLabel?: string;
@@ -66,7 +66,7 @@ function writeUntrackedImpureWarning(opts: {
   const scaffold = opts.untracked.filter(isBootstrapScaffoldUntrackedPath).length;
   const relevant = opts.relevantLabel ? ` ${opts.relevantLabel}` : "";
   if (visible.length === 0 && scaffold > 0) {
-    opts.ui.warn(`impure build due to ${scaffold} uncommitted scaffold file(s)`);
+    opts.ui.warn(`development bundle includes ${scaffold} uncommitted scaffold file(s)`);
     if (hiddenGenerated > 0) {
       opts.ui.list([`... ${hiddenGenerated} generated workspace file(s) hidden`], {
         stream: "stderr",
@@ -76,10 +76,12 @@ function writeUntrackedImpureWarning(opts: {
     return;
   }
   if (visible.length === 0 && hiddenGenerated > 0) {
-    opts.ui.warn(`impure build due to ${hiddenGenerated} generated workspace untracked file(s)`);
+    opts.ui.warn(
+      `development bundle includes ${hiddenGenerated} generated workspace untracked file(s)`,
+    );
     return;
   }
-  opts.ui.warn(`impure build due to ${opts.untracked.length}${relevant} untracked file(s)`);
+  opts.ui.warn(`development bundle includes ${opts.untracked.length}${relevant} untracked file(s)`);
   opts.ui.list(visible, { stream: "stderr" });
   if (hiddenGenerated > 0) {
     opts.ui.list([`... ${hiddenGenerated} generated workspace file(s) hidden`], {
@@ -124,17 +126,17 @@ export async function maybeAutoImpureFromUntrackedFiles(opts: {
   }
 
   if (verbose) {
-    console.warn("[dev-build] Falling back to --impure due to relevant untracked files:");
+    console.warn("[dev-build] creating non-release development bundle for untracked files:");
     for (const f of inventory.relevant.slice(0, 50)) console.warn(` - ${f}`);
     if (inventory.relevant.length > 50) {
       console.warn(` ... and ${inventory.relevant.length - 50} more`);
     }
   } else {
-    writeUntrackedImpureWarning({
+    writeDevelopmentBundleWarning({
       ui,
       untracked: inventory.relevant,
       relevantLabel: targetPkgs.length > 0 ? "relevant" : undefined,
     });
   }
-  return { impure: true, classification: "local-development" };
+  return { impure: false, classification: "local-development" };
 }

@@ -4,7 +4,6 @@ export function selectedNixBuildArgs(opts: { flakeRef: string; showTrace?: boole
   return [
     "nix",
     "build",
-    "--impure",
     "--no-write-lock-file",
     "--option",
     "eval-cache",

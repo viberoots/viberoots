@@ -33,7 +33,9 @@ test("runnable graph admission precedes snapshots and builds without a live-sour
   assert.doesNotMatch(source, /catch\s*\{\s*return \{ flakeRef:/);
   assert.doesNotMatch(source, /git ls-files --others/);
   assert.match(graph, /chooseRunnableFlakeRef/);
-  assert.match(graph, /"--impure"[\s\S]*"--no-write-lock-file"/);
+  assert.match(source, /impureEvaluation: false/);
+  assert.match(graph, /withoutEvaluationSelectors/);
+  assert.doesNotMatch(graph, /["']--impure["']/);
 });
 
 test("every deployment runnable caller propagates a fixed protected purpose", () => {

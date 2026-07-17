@@ -9,6 +9,7 @@ import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import type { ArtifactJobPurpose } from "../lib/artifact-build-policy";
 import { targetPackageFromLabel } from "../lib/artifact-source-inventory";
 import { chooseRunnableFlakeRef } from "./run-runnable-source";
+import { withoutEvaluationSelectors } from "./evaluation-bundle-env";
 
 async function withScopedGraphEnv<T>(
   workspaceRoot: string,
@@ -68,11 +69,9 @@ export async function buildRunnableManifest(
     purpose: opts?.purpose || "local",
   });
   const baseEnv: Record<string, string> = {
-    ...process.env,
-    WORKSPACE_ROOT: source.workspaceRoot || workspaceRoot,
-    BUCK_TEST_SRC: source.workspaceRoot || workspaceRoot,
-    BUCK_GRAPH_JSON: path.join(source.workspaceRoot || workspaceRoot, DEFAULT_GRAPH_PATH),
+    ...withoutEvaluationSelectors(process.env),
     VBR_FILTERED_FLAKE_SNAPSHOT: "1",
+    VBR_PNPM_FILTERED_SNAPSHOT_ROOT: source.workspaceRoot || workspaceRoot,
   };
   const stdout = await (async () => {
     try {
@@ -81,7 +80,6 @@ export async function buildRunnableManifest(
         env: baseEnv,
         label: "build runnable manifest",
         args: [
-          "--impure",
           "--no-write-lock-file",
           "--option",
           "eval-cache",
@@ -149,15 +147,17 @@ export async function buildSelectedOutPath(
           importer: targetImporter,
           flakeRef: source.flakeRef,
           attrPath: pnpmStoreAttrFromImporter(targetImporter),
+          env: {
+            ...withoutEvaluationSelectors(process.env),
+            VBR_FILTERED_FLAKE_SNAPSHOT: "1",
+            VBR_PNPM_FILTERED_SNAPSHOT_ROOT: source.workspaceRoot || workspaceRoot,
+          },
         })
       : null;
   const selectedEnv: Record<string, string> = {
-    ...process.env,
-    WORKSPACE_ROOT: source.workspaceRoot || workspaceRoot,
-    BUCK_TEST_SRC: source.workspaceRoot || workspaceRoot,
-    BUCK_GRAPH_JSON: path.join(source.workspaceRoot || workspaceRoot, DEFAULT_GRAPH_PATH),
-    BUCK_TARGET: target,
+    ...withoutEvaluationSelectors(process.env),
     VBR_FILTERED_FLAKE_SNAPSHOT: "1",
+    VBR_PNPM_FILTERED_SNAPSHOT_ROOT: source.workspaceRoot || workspaceRoot,
   };
   let stdout = "";
   try {
@@ -166,7 +166,6 @@ export async function buildSelectedOutPath(
       env: selectedEnv,
       label,
       args: [
-        "--impure",
         "--no-write-lock-file",
         "--option",
         "eval-cache",

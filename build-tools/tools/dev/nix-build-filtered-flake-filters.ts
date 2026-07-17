@@ -6,7 +6,7 @@ export { DEFAULT_FILTERED_FLAKE_CONFIG_PATHS } from "./filtered-flake-config-pat
 export const DEFAULT_FILTERED_FLAKE_ROOT_FILES = [".buckconfig", ".buckroot", ".npmrc", "TARGETS", "eslint.config.js", "flake.lock", "flake.nix", "gomod2nix.toml", "package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "tsconfig.json"];
 
 // prettier-ignore
-export const DEFAULT_FILTERED_FLAKE_ROOTS = ["build-tools", "cpp", "go", "lang", "node", "patches", "prelude", "python", "tools", "third_party", "toolchains", "types", "viberoots"];
+export const DEFAULT_FILTERED_FLAKE_ROOTS = ["build-tools", "cpp", "go", "lang", "node", "patches", "python", "tools", "third_party", "toolchains", "types", "viberoots"];
 
 export const DEFAULT_FILTERED_FLAKE_WORKSPACE_PATHS = [
   ".viberoots/workspace/flake.nix",
@@ -38,6 +38,7 @@ export const FILTERED_FLAKE_RSYNC_EXCLUDES = [
   "/install-cache",
   "/nix-xdg-cache",
   "/pr-logs",
+  "/prelude",
   "/viberoots-flake-input",
   "/xdg-cache",
   ".viberoots/buck",

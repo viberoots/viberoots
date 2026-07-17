@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import { envWithStubbedNix, runInTemp } from "../lib/test-helpers";
 
 test("d selected webapp dev bypasses pnpm-backed generated dev scripts", async () => {
@@ -49,6 +50,7 @@ test("d selected webapp dev bypasses pnpm-backed generated dev scripts", async (
 
     const stubBin = path.join(tmp, "stub-bin");
     const fakeOut = path.join(tmp, "fake-selected-out");
+    const realNixBin = resolveToolPathSync("nix", envWithResolvedNixBin(process.env));
     const realZxWrapper = String((await $({ stdio: "pipe" })`command -v zx-wrapper`).stdout || "")
       .trim()
       .split("\n")
@@ -61,6 +63,9 @@ test("d selected webapp dev bypasses pnpm-backed generated dev scripts", async (
         "#!/usr/bin/env bash",
         "set -euo pipefail",
         'args="$*"',
+        'if [[ "$args" == flake\\ prefetch\\ --json\\ --no-use-registries\\ --option\\ flake-registry\\ \\ path:* ]] || [[ "$args" == store\\ add-path\\ --name\\ viberoots-evaluation-bundle\\ * ]]; then',
+        `  exec ${JSON.stringify(realNixBin)} "$@"`,
+        "fi",
         `out=${JSON.stringify(fakeOut)}`,
         'if [[ "$args" == *"graph-generator-selected"* ]]; then',
         '  mkdir -p "$out/dist/server" "$out/dist/client"',

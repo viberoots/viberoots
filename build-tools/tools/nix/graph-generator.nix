@@ -7,20 +7,25 @@
 , nixpkgsRegistry ? null
 , nixpkgsRegistryPath ? ./nixpkgs-source-registry.nix
 , viberootsRoot ? null
+, evaluationBundle ? null
 }:
 let
   lib = pkgs.lib;
   H = import ./lib/lang-helpers.nix { inherit pkgs; };
-  filteredFlakeSnapshot = (builtins.getEnv "VBR_FILTERED_FLAKE_SNAPSHOT") != "";
-  buckTestSrcEnv = builtins.getEnv "BUCK_TEST_SRC";
+  filteredFlakeSnapshot = evaluationBundle != null || (builtins.getEnv "VBR_FILTERED_FLAKE_SNAPSHOT") != "";
+  buckTestSrcEnv = if evaluationBundle == null then builtins.getEnv "BUCK_TEST_SRC" else "";
   repoRootStr =
     if filteredFlakeSnapshot then builtins.toString src
     else if buckTestSrcEnv != "" then buckTestSrcEnv
     else builtins.toString src;
   repoRootBase = if filteredFlakeSnapshot then src else builtins.toPath repoRootStr;
   traceEnabled = (builtins.getEnv "PLANNER_TRACE") != "";
-  onlyCpp = (builtins.getEnv "PLANNER_ONLY_CPP") != "";
-  selectedTargetName = builtins.getEnv "BUCK_TARGET";
+  onlyCpp = if evaluationBundle == null
+    then (builtins.getEnv "PLANNER_ONLY_CPP") != ""
+    else evaluationBundle.selection.onlyCpp or false;
+  selectedTargetName = if evaluationBundle == null
+    then builtins.getEnv "BUCK_TARGET"
+    else evaluationBundle.selection.target;
   # build-tools/tools/{dev,buck} needed for node-webapp sync-module-contracts during Nix build.
   # Use suffix/infix matching (like projects/*) to stay robust to /var vs /private/var path aliases.
   keepAppsLibsPath = path: type:
@@ -200,19 +205,28 @@ let
   Overrides = import (manifestBase + "/planner/overrides.nix");
   devOverrideJSON =
     if builtins.hasAttr "go" Overrides
-    then builtins.getEnv (builtins.getAttr "go" Overrides)
+    then if evaluationBundle == null
+      then builtins.getEnv (builtins.getAttr "go" Overrides)
+      else builtins.toJSON (evaluationBundle.languageOverrides.${builtins.getAttr "go" Overrides} or { })
     else "";
   devOverrideCppJSON =
     if builtins.hasAttr "cpp" Overrides
-    then builtins.getEnv (builtins.getAttr "cpp" Overrides)
+    then if evaluationBundle == null
+      then builtins.getEnv (builtins.getAttr "cpp" Overrides)
+      else builtins.toJSON (evaluationBundle.languageOverrides.${builtins.getAttr "cpp" Overrides} or { })
     else "";
   devOverridePyJSON =
     if builtins.hasAttr "python" Overrides
-    then builtins.getEnv (builtins.getAttr "python" Overrides)
+    then if evaluationBundle == null
+      then builtins.getEnv (builtins.getAttr "python" Overrides)
+      else builtins.toJSON (evaluationBundle.languageOverrides.${builtins.getAttr "python" Overrides} or { })
     else "";
   overridePresentList =
     let langs = builtins.attrNames Overrides;
-    in builtins.filter (lang: (builtins.getEnv (builtins.getAttr lang Overrides)) != "") langs;
+    in if evaluationBundle != null then builtins.filter
+         (lang: (evaluationBundle.languageOverrides.${builtins.getAttr lang Overrides} or { }) != { })
+         langs
+       else builtins.filter (lang: (builtins.getEnv (builtins.getAttr lang Overrides)) != "") langs;
   # CI detection and optional suppression flag for planner dev-override logs
   isCI = (builtins.getEnv "CI") == "true";
   suppressDevOverrideLog = (builtins.getEnv "PLANNER_NO_DEV_OVERRIDE_LOG") != "";
@@ -249,7 +263,7 @@ let
 
   # Build planner context and import language plugins if present
   ctx = {
-    inherit lib T repoRoot repoRootStr localModuleOverrides pkgPathOf pkgs;
+    inherit lib T repoRoot repoRootStr localModuleOverrides onlyCpp pkgPathOf pkgs;
     inherit (SourceSelection) nixpkgsRegistry pkgsForProfile sourcePlanFor resolveNixpkgAttr resolveNixpkgAttrs;
     repoSnapshot = src;
     repoStoreRoot = repoStoreRoot;
@@ -260,6 +274,9 @@ let
     nodes = nodesList;
     get = get;
     modulesTomlFor = modulesTomlFor;
+    wasmBackend = if evaluationBundle == null
+      then builtins.getEnv "WEB_WASM_BACKEND"
+      else evaluationBundle.selection.wasmBackend or "";
   };
   # Language adapters and dispatch (extracted module)
   Langs = import (manifestBase + "/planner/langs.nix") {
@@ -620,8 +637,10 @@ let
   # Minimal TinyGo wasm selected builder: builds a wasm for BUCK_TARGET without requiring
   # the node to be present in the exported graph. Intended for tests and simple consumers.
   selectedWasm =
-    let tgt = builtins.getEnv "BUCK_TARGET";
-        backend = builtins.getEnv "WEB_WASM_BACKEND";
+    let tgt = selectedTargetName;
+        backend = if evaluationBundle == null
+          then builtins.getEnv "WEB_WASM_BACKEND"
+          else evaluationBundle.selection.wasmBackend or "";
         goTarget =
           if backend == "wasi_single" then "wasi"
           else "wasm";

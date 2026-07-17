@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
+import { makeFilteredFlakeRef } from "../../dev/filtered-flake";
 import {
   findViberootsRoot,
   immutableViberootsInput,
@@ -47,7 +48,8 @@ test("init-consumer generated flakes expose nixpkgs registry extension data", as
       "utf8",
     );
     assert.doesNotMatch(hiddenFlake, /builtins\.toPath root/);
-    assert.match(hiddenFlake, /if root != "" then root else \.\.\/\.\./);
+    assert.match(hiddenFlake, /workspaceSrc = \.\.\/\.\.;/);
+    assert.doesNotMatch(hiddenFlake, /builtins\.getEnv "WORKSPACE_ROOT"/);
     assert.match(hiddenFlake, /nixpkgs_23_11\.url = "github:NixOS\/nixpkgs\/nixos-23\.11"/);
     assert.match(hiddenFlake, /registryExtensionPath = \.\/nixpkgs-source-registry-extension\.nix/);
     assert.match(hiddenFlake, /import registryExtensionPath \{ inherit inputs; \}/);
@@ -178,24 +180,19 @@ test("consumer registry extension adds a locked input used by a selected target"
     );
     assert.match(lockText, /nixpkgs_23_11/);
 
+    const bundle = await makeFilteredFlakeRef({
+      workspaceRoot: workspace,
+      attr: "graph-generator-selected",
+      logPrefix: "[registry-extension]",
+      graphPath,
+      target,
+      classification: "local-development",
+    });
     const { stdout } = await execFileAsync(
       "nix",
-      [
-        "build",
-        "--impure",
-        "--accept-flake-config",
-        "path:.viberoots/workspace#graph-generator-selected",
-        "--no-link",
-        "--print-out-paths",
-      ],
+      ["build", "--accept-flake-config", bundle.flakeRef, "--no-link", "--print-out-paths"],
       {
         cwd: workspace,
-        env: {
-          ...process.env,
-          BUCK_TARGET: target,
-          BUCK_GRAPH_JSON: graphPath,
-          WORKSPACE_ROOT: workspace,
-        },
         maxBuffer: 1024 * 1024 * 32,
       },
     );

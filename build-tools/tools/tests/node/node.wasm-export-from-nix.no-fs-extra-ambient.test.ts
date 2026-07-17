@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runNodeWithZx } from "../../lib/node-run";
+import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import { runInTemp } from "../lib/test-helpers";
 
 async function writeExecutable(file: string, data: string) {
@@ -82,10 +83,14 @@ test("export-wasm-from-nix works without ambient fs-extra", async () => {
     );
 
     const fakeBin = path.join(tmp, "fake-bin");
+    const realNixBin = resolveToolPathSync("nix", envWithResolvedNixBin(process.env));
     await writeExecutable(
       path.join(fakeBin, "nix"),
       `#!/usr/bin/env bash
 set -euo pipefail
+if [[ "$*" == store\\ add-path\\ --name\\ viberoots-evaluation-bundle\\ * ]]; then
+  exec "${realNixBin}" "$@"
+fi
 if [[ "$*" == *"flake metadata"* ]]; then
   printf '{"url":"path:%s?lastModified=1&narHash=sha256-test"}\\n' "\${VIBEROOTS_ROOT:-$PWD}"
   exit 0
@@ -158,10 +163,14 @@ test("export-wasm-from-nix does not force C++ planner mode for Python wasm targe
     );
 
     const fakeBin = path.join(tmp, "fake-bin");
+    const realNixBin = resolveToolPathSync("nix", envWithResolvedNixBin(process.env));
     await writeExecutable(
       path.join(fakeBin, "nix"),
       `#!/usr/bin/env bash
 set -euo pipefail
+if [[ "$*" == store\\ add-path\\ --name\\ viberoots-evaluation-bundle\\ * ]]; then
+  exec "${realNixBin}" "$@"
+fi
 if [[ "$*" == *"flake metadata"* ]]; then
   printf '{"url":"path:%s?lastModified=1&narHash=sha256-test"}\\n' "\${VIBEROOTS_ROOT:-$PWD}"
   exit 0

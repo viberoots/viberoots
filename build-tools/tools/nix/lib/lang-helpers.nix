@@ -158,7 +158,10 @@ let
 
   readDevOverrides = envName:
     let
-      v = builtins.getEnv envName;
+      bundle = pkgs.viberootsEvaluationBundle or null;
+      v = if bundle == null
+          then builtins.getEnv envName
+          else builtins.toJSON (bundle.languageOverrides.${envName} or { });
       _t = if (builtins.getEnv "PLANNER_TRACE") != "" then builtins.trace ("[planner][trace] " + envName + " len=" + (toString (builtins.stringLength v))) null else null;
       parsed =
         if v == "" then {}
@@ -177,7 +180,10 @@ let
        else parsed;
 
   guardNoDevOverridesInCI = envName:
-    let v = builtins.getEnv envName; in
+    let
+      bundle = pkgs.viberootsEvaluationBundle or null;
+      v = if bundle == null then builtins.getEnv envName else "";
+    in
       if (builtins.getEnv "CI") == "true" && v != "" then
         builtins.throw "Dev overrides are forbidden in CI"
       else null;

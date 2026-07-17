@@ -3,6 +3,7 @@ import type { ArtifactBuildClassification, ArtifactJobPurpose } from "../lib/art
 import { targetPackageFromLabel } from "../lib/artifact-source-inventory";
 import { admitArtifactContext, inspectWorkspaceArtifactSource } from "./artifact-policy-inspection";
 import { makeFilteredFlakeRef } from "./filtered-flake";
+import { evaluationBundleHasLanguageOverrides } from "./evaluation-bundle-selectors";
 
 function isLikelyTempWorkspace(workspaceRoot: string): boolean {
   const workspaceAbs = path.resolve(workspaceRoot);
@@ -29,6 +30,7 @@ export async function chooseRunnableFlakeRef(opts: {
   const targetPackages = opts.target ? [targetPackageFromLabel(opts.target)].filter(Boolean) : [];
   let classification: ArtifactBuildClassification;
   const pathSource = opts.sourceMode === "path" || isLikelyTempWorkspace(opts.workspaceRoot);
+  const languageOverrides = evaluationBundleHasLanguageOverrides(process.env);
 
   if (pathSource) {
     classification = "local-development";
@@ -38,7 +40,9 @@ export async function chooseRunnableFlakeRef(opts: {
       targetPackages,
     });
     classification =
-      opts.sourceMode === "git" || !inventory.localDevelopment ? "hermetic" : "local-development";
+      languageOverrides || (opts.sourceMode !== "git" && inventory.localDevelopment)
+        ? "local-development"
+        : "hermetic";
     if (inventory.localDevelopment && opts.sourceMode === "auto") {
       console.warn("[run-runnable] bundling relevant untracked files as local development source:");
       for (const file of inventory.relevant.slice(0, 50)) console.warn(` - ${file}`);
@@ -48,7 +52,7 @@ export async function chooseRunnableFlakeRef(opts: {
   await admitArtifactContext({
     classification,
     purpose: opts.purpose,
-    impureEvaluation: true,
+    impureEvaluation: false,
     workspaceRoot: opts.workspaceRoot,
     toolNames: ["git"],
   });

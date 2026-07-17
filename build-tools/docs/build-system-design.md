@@ -86,9 +86,14 @@ temporary root, bounds Nix registration, forwards interruption to the owned regi
 and removes its root after success, failure, timeout, interruption, or hard owner death. A detached
 PID-and-nonce watchdog stops and awaits the recorded registration process group before deleting only
 a marker-matching root. Cleanup failure remains attached to the primary error. No evaluator falls
-back to the live tree when filtering, registration, ownership, or cleanup is ambiguous. This
-establishes immutable evaluation input; the remaining selector-environment and `--impure` removal
-belongs to the next hermetic-build stage.
+back to the live tree when filtering, registration, ownership, or cleanup is ambiguous.
+
+Normal selected and full materialization evaluate the registered bundle without `--impure`. The
+bundle's graph, selection, dependency, and classification records are the only authority for the
+former graph, target, workspace, root-lock, and language-override selectors. Relevant untracked
+source selects a visibly non-release `local-development` bundle locally and is rejected by
+protected jobs. `b --impure` remains an explicit diagnostic path only. Live `d` commands continue
+to watch the importer worktree rather than an evaluation bundle.
 
 - Buck2 remains the **source of truth** for the dependency graph and test impact analysis.
 - Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.

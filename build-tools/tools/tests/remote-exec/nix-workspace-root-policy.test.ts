@@ -13,11 +13,6 @@ const allowedWorkspaceRootUsers = new Set([
   "viberoots/build-tools/tools/nix/flake/packages/python.nix",
   "viberoots/build-tools/tools/nix/flake/per-system-context.nix",
   "viberoots/build-tools/tools/nix/node-modules/common.nix",
-  "viberoots/build-tools/tools/nix/templates/python.nix",
-  "viberoots/build-tools/tools/nix/templates/python/wasm-site.nix",
-  "viberoots/build-tools/tools/nix/templates/python/wasm.nix",
-  "viberoots/build-tools/tools/nix/uv2nix-env.nix",
-  "viberoots/build-tools/tools/nix/uv2nix-inputs.nix",
 ]);
 
 async function nixFiles(dir: string): Promise<string[]> {

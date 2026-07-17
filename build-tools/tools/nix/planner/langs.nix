@@ -69,7 +69,7 @@ let
   # Build the list of language ids, always including "go"; include "cpp" when its planner exists
   langIds =
     let
-      onlyCpp = (builtins.getEnv "PLANNER_ONLY_CPP") != "";
+      onlyCpp = ctx.onlyCpp or false;
       ids0 = readLangIds;
       withGo =
         if onlyCpp then ids0 else (if builtins.elem "go" ids0 then ids0 else (ids0 ++ [ "go" ]));
@@ -112,4 +112,3 @@ let
 in {
   inherit LANGS pick;
 }
-

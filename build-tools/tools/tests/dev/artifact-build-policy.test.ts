@@ -21,6 +21,7 @@ import {
   untrackedRequiresImpureForTargets,
 } from "../../lib/artifact-source-inventory";
 import { chooseRunnableFlakeRef } from "../../dev/run-runnable-source";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 const effectiveConfig = {
   sandbox: { value: true },
@@ -204,28 +205,34 @@ test("deployment runnable admission rejects a local path before source construct
   }
 });
 
-test("both artifact executors use policy authority without changing Nix build identity", async () => {
+test("both artifact executors use policy authority with pure bundle evaluation", async () => {
   for (const file of ["build-selected.ts", "nix-build-filtered-flake.ts"]) {
-    const source = await fsp.readFile(`viberoots/build-tools/tools/dev/${file}`, "utf8");
+    const source = await fsp.readFile(viberootsSourcePath(`build-tools/tools/dev/${file}`), "utf8");
     assert.match(source, /inspectArtifactBuildPolicy/);
     assert.match(source, /emitArtifactPolicyEvidence/);
-    assert.match(source, /impureEvaluation: true/);
+    assert.match(source, /impureEvaluation: false/);
   }
   const command = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/build-selected-nix-command.ts",
+    viberootsSourcePath("build-tools/tools/dev/build-selected-nix-command.ts"),
     "utf8",
   );
-  assert.match(command, /"--impure"/);
+  assert.doesNotMatch(command, /"--impure"/);
   assert.match(command, /"--no-write-lock-file"/);
-  const selected = await fsp.readFile("viberoots/build-tools/tools/dev/build-selected.ts", "utf8");
+  const selected = await fsp.readFile(
+    viberootsSourcePath("build-tools/tools/dev/build-selected.ts"),
+    "utf8",
+  );
   assert.match(selected, /inspectArtifactSource/);
   assert.match(selected, /"ls-files", "-z"/);
   assert.doesNotMatch(selected, /catch \{\s*return \{ flakeRef:/);
   const filtered = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/nix-build-filtered-flake.ts",
+    viberootsSourcePath("build-tools/tools/dev/nix-build-filtered-flake.ts"),
     "utf8",
   );
-  assert.match(filtered, /localDevelopment: sourceInventory\.localDevelopment/);
+  assert.match(
+    filtered,
+    /sourceInventory\.localDevelopment \|\| evaluationBundleHasLanguageOverrides\(process\.env\)/,
+  );
   assert.doesNotMatch(filtered, /localDevelopment: false/);
   assert.ok(
     filtered.indexOf("await inspectArtifactBuildPolicy") <

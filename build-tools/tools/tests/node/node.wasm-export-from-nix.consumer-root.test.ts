@@ -71,17 +71,15 @@ test("export-wasm-from-nix resolves consumer root when launched under viberoots"
     );
 
     const fakeBin = path.join(tmp, "fake-bin");
+    const nixLog = path.join(tmp, "nix-args.log");
     const realNixBin = resolveToolPathSync("nix", envWithResolvedNixBin(process.env));
     await writeExecutable(
       path.join(fakeBin, "nix"),
       `#!/usr/bin/env bash
 set -euo pipefail
-if [[ "$*" == *"flake prefetch"* ]]; then
+echo "$*" >> ${JSON.stringify(nixLog)}
+if [[ "$*" == flake\\ prefetch\\ --json\\ --no-use-registries\\ --option\\ flake-registry\\ \\ path:* ]] || [[ "$*" == store\\ add-path\\ --name\\ viberoots-evaluation-bundle\\ * ]]; then
   exec "${realNixBin}" "$@"
-fi
-if [ "\${BUCK_TEST_SRC:-}" != "${tmp}" ]; then
-  echo "expected consumer root, got BUCK_TEST_SRC=\${BUCK_TEST_SRC:-}" >&2
-  exit 43
 fi
 echo "${fakeOut}"
 `,
@@ -107,6 +105,12 @@ echo "${fakeOut}"
       },
     });
     assert.match(result.stderr, /creating selected python snapshot/);
+    const nixArgs = await fsp.readFile(nixLog, "utf8");
+    const bundle = nixArgs.match(
+      /path:(\/nix\/store\/[a-z0-9]{32}-viberoots-evaluation-bundle)\?dir=source/,
+    )?.[1];
+    assert.ok(bundle, `expected immutable evaluation bundle in Nix log: ${nixArgs}`);
+    await fsp.access(path.join(bundle, "source", "projects", "libs", "demo-py-wasm", "uv.lock"));
 
     const actual = await fsp.readFile(outPath);
     assert.deepEqual(actual, expected);

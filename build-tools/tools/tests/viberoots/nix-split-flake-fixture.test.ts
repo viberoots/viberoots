@@ -125,7 +125,26 @@ test("real viberoots mkWorkspace exposes metadata for external workspace source"
     assert.notEqual(probe.viberootsSourcePath, tmp);
     assert.equal(probe.viberootsSourcePath, viberootsStorePath);
     await fsp.access(path.join(probe.viberootsSourcePath, "flake.nix"));
-    for (const rel of [".viberoots", "buck-out", "node_modules"]) {
+    const localStateRoot = path.join(probe.viberootsSourcePath, ".viberoots");
+    const localStateEntries = await fsp.readdir(localStateRoot).catch(() => []);
+    assert.deepEqual(localStateEntries, localStateEntries.length === 0 ? [] : ["workspace"]);
+    if (localStateEntries.length > 0) {
+      const reviewedWorkspaceEntries = await fsp.readdir(path.join(localStateRoot, "workspace"));
+      const allowed = new Set([
+        "flake.lock",
+        "flake.nix",
+        "nixpkgs-source-registry-extension.nix",
+        "providers",
+      ]);
+      assert.ok(reviewedWorkspaceEntries.every((entry) => allowed.has(entry)));
+    }
+    for (const rel of [
+      ".viberoots/current",
+      ".viberoots/workspace/buck",
+      ".viberoots/workspace/cache",
+      "buck-out",
+      "node_modules",
+    ]) {
       await assert.rejects(fsp.access(path.join(probe.viberootsSourcePath, rel)), {
         code: "ENOENT",
       });

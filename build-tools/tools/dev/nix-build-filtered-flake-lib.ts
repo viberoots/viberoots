@@ -4,7 +4,7 @@ export * from "./nix-build-filtered-flake-filters";
 type GraphNodeRecord = Record<string, unknown>;
 
 // prettier-ignore
-const SHARED_CPP_SNAPSHOT_ROOTS = [".viberoots", "build-tools", "prelude", "third_party", "toolchains", "types", "viberoots"];
+const SHARED_CPP_SNAPSHOT_ROOTS = [".viberoots", "build-tools", "third_party", "toolchains", "types", "viberoots"];
 
 // prettier-ignore
 const SHARED_CPP_SNAPSHOT_ROOT_FILES = [".npmrc", "flake.lock", "flake.nix", "gomod2nix.toml", "package.json", "pnpm-lock.yaml"];

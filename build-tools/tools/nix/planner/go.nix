@@ -154,6 +154,7 @@ let
   wasm = GoWasm {
     inherit T get repoRoot pkgPathOf byName L LC normalizeLabelList normalizeOverrides;
     inherit dedupePreserveOrder labelsOfName nodeOfName;
+    wasmBackend = ctx.wasmBackend or "";
   };
   patchDirsAbsFor = name:
     let

@@ -22,27 +22,17 @@ let
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
-      wsRootEnv = builtins.getEnv "WORKSPACE_ROOT";
-      wsRoot =
-        if wsRootEnv != "" then wsRootEnv
-        else builtins.toString srcRoot;
+      wsRoot = builtins.toString srcRoot;
       patchDir = builtins.toPath ("${wsRoot}/${subdir}/patches/python");
       patchesMap = H.pythonPatchesMapFromDirs { dirs = [ patchDir ]; };
       devOverrides = H.readDevOverrides devOverrideEnv;
       # Also pass through the live workspace root for test-only origin lookups
-      # Use a stable snapshot of the app/lib subtree, preferring the live WORKSPACE_ROOT
-      # so temp repos created during tests are visible even if srcRoot was store-snapshotted earlier.
+      # Snapshot the app/lib subtree from the explicit immutable source authority.
       srcAbs =
-        let
-          baseWS = wsRoot;
-          baseSrcRoot = builtins.toString srcRoot;
-          baseFlake = builtins.toString ../../..;
-          candidate =
-            if wsRootEnv != "" && builtins.pathExists (builtins.toPath ("${baseWS}/" + subdir)) then baseWS
-            else if builtins.pathExists (builtins.toPath ("${baseSrcRoot}/" + subdir)) then baseSrcRoot
-            else if builtins.pathExists (builtins.toPath ("${baseFlake}/" + subdir)) then baseFlake
-            else baseSrcRoot;
-        in builtins.path { path = builtins.toPath ("${candidate}/" + subdir); name = "py-src"; };
+        builtins.path {
+          path = builtins.toPath ("${builtins.toString srcRoot}/${subdir}");
+          name = "py-src";
+        };
       lockRel = lockfile;
       pname =
         if kind == "app"
@@ -173,10 +163,7 @@ in {
     patchDirs ? [ ../../patches/python ],
   }:
     let
-      wsRootEnv = builtins.getEnv "WORKSPACE_ROOT";
-      wsRoot =
-        if wsRootEnv != "" then wsRootEnv
-        else builtins.toString srcRoot;
+      wsRoot = builtins.toString srcRoot;
       patchDir = builtins.toPath ("${wsRoot}/${subdir}/patches/python");
       patchesMap = H.pythonPatchesMapFromDirs { dirs = [ patchDir ]; };
 
@@ -203,4 +190,3 @@ in {
       groups = [];
     };
 }
-

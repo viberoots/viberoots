@@ -98,6 +98,9 @@ test("p auto source uses filtered flake when root viberoots input is generated w
         'if [[ "$args" == flake\\ prefetch\\ --json\\ --no-use-registries\\ --option\\ flake-registry\\ \\ path:* ]]; then',
         `  exec ${JSON.stringify(realNixBin)} "$@"`,
         "fi",
+        'if [[ "$args" == store\\ add-path\\ --name\\ viberoots-evaluation-bundle\\ * ]]; then',
+        `  exec ${JSON.stringify(realNixBin)} "$@"`,
+        "fi",
         `out=${JSON.stringify(fakeOut)}`,
         'if [[ "$args" == *"#graph-generator-selected"* ]]; then',
         '  mkdir -p "$out/bin"',
@@ -130,8 +133,8 @@ test("p auto source uses filtered flake when root viberoots input is generated w
     assert.match(String(run.stdout || ""), /selected-prod-ok/);
     assert.match(
       String(run.stderr || ""),
-      /generated viberoots workspace input/,
-      "clean consumer workspaces with generated local viberoots inputs must not use git flake snapshots",
+      /bundling relevant untracked files as local development source/,
+      "the uncommitted fixture must be captured as an explicit local-development source",
     );
 
     const logTxt = await fsp.readFile(nixLog, "utf8");

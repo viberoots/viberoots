@@ -35,6 +35,8 @@ import {
   inspectArtifactBuildPolicy,
 } from "./artifact-policy-inspection";
 import { materializeEvaluationBundle } from "./evaluation-bundle";
+import { withoutEvaluationSelectors } from "./evaluation-bundle-env";
+import { evaluationBundleHasLanguageOverrides } from "./evaluation-bundle-selectors";
 
 async function pathExists(filePath: string): Promise<boolean> {
   try {
@@ -257,7 +259,9 @@ async function main(): Promise<void> {
   }
   const snapshotOnly = getFlagBool("snapshot-only");
   const root = path.resolve(String(process.env.WORKSPACE_ROOT || process.cwd()).trim());
-  const targetPackage = targetPackageFromLabel(String(process.env.BUCK_TARGET || ""));
+  const target = String(process.env.BUCK_TARGET || "").trim();
+  const platform = String(process.env.BUCK_TARGET_PLATFORM || "").trim();
+  const targetPackage = targetPackageFromLabel(target);
   const sourceInventory = await inspectArtifactSource({
     targetPackages: targetPackage ? [targetPackage] : [],
     runGit: async () =>
@@ -271,11 +275,12 @@ async function main(): Promise<void> {
   const policyEnv = envWithResolvedNixBin({ ...process.env, WORKSPACE_ROOT: root });
   const classification = classifyArtifactBuild({
     diagnosticImpure: getFlagBool("impure"),
-    localDevelopment: sourceInventory.localDevelopment,
+    localDevelopment:
+      sourceInventory.localDevelopment || evaluationBundleHasLanguageOverrides(process.env),
   });
   const policyEvidence = await inspectArtifactBuildPolicy({
     classification,
-    impureEvaluation: true,
+    impureEvaluation: false,
     env: policyEnv,
     toolPaths: { node: process.execPath },
     toolNames: ["git", "rsync"],
@@ -385,18 +390,16 @@ async function main(): Promise<void> {
     const bundle = await materializeEvaluationBundle({
       stagedSource: snapDir,
       attr,
-      target: String(process.env.BUCK_TARGET || "").trim(),
+      target,
       classification,
-      platform: String(process.env.BUCK_TARGET_PLATFORM || "").trim(),
+      platform,
       requireGraph: attr.startsWith("graph-generator"),
     });
     const flakeRef = bundle.flakeRef;
     const bundleRoot = bundle.workspaceRoot;
     console.error("[nix-build-filtered-flake] building attr:", attr);
     const nixEnv = envWithResolvedNixBin({
-      ...process.env,
-      WORKSPACE_ROOT: bundleRoot,
-      BUCK_TEST_SRC: bundleRoot,
+      ...withoutEvaluationSelectors(process.env),
       VBR_PNPM_FILTERED_SNAPSHOT_ROOT: bundleRoot,
       ...(snapshotViberootsRoot
         ? {
@@ -406,11 +409,6 @@ async function main(): Promise<void> {
           }
         : {}),
       VBR_FILTERED_FLAKE_SNAPSHOT: "1",
-      ...(selectedCppSources != null
-        ? {
-            BUCK_GRAPH_JSON: path.join(bundleRoot, DEFAULT_GRAPH_PATH),
-          }
-        : {}),
     });
     const nixBin = resolveToolPathSync("nix", nixEnv);
     const fixedStore = await prewarmFinalStoreForTarget(root, attr, flakeRef, nixEnv);
@@ -418,7 +416,6 @@ async function main(): Promise<void> {
     const buildStart = Date.now();
     const nixArgs = [
       "build",
-      "--impure",
       "--no-write-lock-file",
       "--accept-flake-config",
       flakeRef,

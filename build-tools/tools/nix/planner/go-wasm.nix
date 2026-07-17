@@ -11,7 +11,8 @@
   normalizeOverrides,
   dedupePreserveOrder,
   labelsOfName,
-  nodeOfName
+  nodeOfName,
+  wasmBackend
 }:
 let
   patchInputsFor = name:
@@ -98,7 +99,7 @@ in {
           ordered = builtins.filter (dep: builtins.hasAttr dep overrides) linkDeps;
           entries = builtins.map (dep: "${dep}=${overrides.${dep}}") ordered;
         in lib.concatStringsSep "," entries;
-      backend = builtins.getEnv "WEB_WASM_BACKEND";
+      backend = wasmBackend;
       tinyTarget = if backend == "wasi_single" then "wasi" else "wasm";
       wasmTarget = if tinyTarget == "wasi" then "wasm32-wasi" else "wasm32-unknown-unknown";
 

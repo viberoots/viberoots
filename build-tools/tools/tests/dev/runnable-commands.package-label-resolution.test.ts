@@ -3,61 +3,19 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { envWithStubbedNix, runInTemp } from "../lib/test-helpers";
+import {
+  selectedTargets,
+  writeDemoGraph,
+  writePnpmCwdStub,
+  writeSelectedNixStub,
+} from "./runnable-commands.package-label-resolution.fixture";
 
 test("p resolves package label to runnable target label", async () => {
   await runInTemp("runnable-package-label-resolution", async (tmp, $) => {
-    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
-    const graphDir = path.dirname(graphPath);
-    await fsp.mkdir(graphDir, { recursive: true });
-    await fsp.writeFile(
-      graphPath,
-      JSON.stringify(
-        [
-          {
-            name: "//projects/apps/demo:app",
-            rule_type: "node_asset_stage",
-            labels: [
-              "lang:node",
-              "kind:app",
-              "webapp:ssr",
-              "framework:vite",
-              "lockfile:projects/apps/demo/pnpm-lock.yaml#projects/apps/demo",
-            ],
-            srcs: ["projects/apps/demo/src/entry-server.ts"],
-            deps: [],
-          },
-        ],
-        null,
-        2,
-      ) + "\n",
-      "utf8",
-    );
-
-    const stubBin = path.join(tmp, "stub-bin");
-    const fakeOut = path.join(tmp, "fake-selected-out");
+    await writeDemoGraph(tmp);
     const targetLog = path.join(tmp, "buck-target.log");
-    await fsp.mkdir(stubBin, { recursive: true });
-    await fsp.writeFile(
-      path.join(stubBin, "nix"),
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        `echo \"${"$"}{BUCK_TARGET}\" >> ${JSON.stringify(targetLog)}`,
-        `out=${JSON.stringify(fakeOut)}`,
-        'mkdir -p "$out/bin"',
-        "cat > \"$out/bin/demo\" <<'EOF'",
-        "#!/usr/bin/env bash",
-        "echo package-resolution-ok",
-        "EOF",
-        'chmod +x "$out/bin/demo"',
-        'echo "$out"',
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    await $`chmod +x ${path.join(stubBin, "nix")}`;
+    const stubBin = await writeSelectedNixStub(tmp, targetLog, "package-resolution-ok");
 
     const run = await $({
       cwd: tmp,
@@ -65,66 +23,17 @@ test("p resolves package label to runnable target label", async () => {
       env: envWithStubbedNix(stubBin),
     })`viberoots/build-tools/tools/bin/p //projects/apps/demo`;
     assert.match(String(run.stdout || ""), /package-resolution-ok/);
-
-    const loggedTarget = String(await fsp.readFile(targetLog, "utf8")).trim();
-    assert.equal(loggedTarget, "//projects/apps/demo:app");
+    assert.deepEqual(await selectedTargets(targetLog), ["//projects/apps/demo:app"]);
   });
 });
 
 test("p resolves relative and absolute directory paths to runnable target label", async () => {
   await runInTemp("runnable-path-label-resolution", async (tmp, $) => {
-    const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
-    const graphDir = path.dirname(graphPath);
-    await fsp.mkdir(graphDir, { recursive: true });
-    await fsp.writeFile(
-      graphPath,
-      JSON.stringify(
-        [
-          {
-            name: "//projects/apps/demo:app",
-            rule_type: "node_asset_stage",
-            labels: [
-              "lang:node",
-              "kind:app",
-              "webapp:ssr",
-              "framework:vite",
-              "lockfile:projects/apps/demo/pnpm-lock.yaml#projects/apps/demo",
-            ],
-            srcs: ["projects/apps/demo/src/entry-server.ts"],
-            deps: [],
-          },
-        ],
-        null,
-        2,
-      ) + "\n",
-      "utf8",
-    );
-
-    const stubBin = path.join(tmp, "stub-bin");
-    const fakeOut = path.join(tmp, "fake-selected-out");
+    await writeDemoGraph(tmp);
     const targetLog = path.join(tmp, "buck-target.log");
-    await fsp.mkdir(stubBin, { recursive: true });
-    await fsp.writeFile(
-      path.join(stubBin, "nix"),
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        `echo \"${"$"}{BUCK_TARGET}\" >> ${JSON.stringify(targetLog)}`,
-        `out=${JSON.stringify(fakeOut)}`,
-        'mkdir -p "$out/bin"',
-        "cat > \"$out/bin/demo\" <<'EOF'",
-        "#!/usr/bin/env bash",
-        "echo path-resolution-ok",
-        "EOF",
-        'chmod +x "$out/bin/demo"',
-        'echo "$out"',
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    await $`chmod +x ${path.join(stubBin, "nix")}`;
-
+    const stubBin = await writeSelectedNixStub(tmp, targetLog, "path-resolution-ok");
     const commonEnv = envWithStubbedNix(stubBin);
+
     const relativeRun = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -138,181 +47,56 @@ test("p resolves relative and absolute directory paths to runnable target label"
       env: commonEnv,
     })`viberoots/build-tools/tools/bin/p ${path.join(tmp, "projects", "apps", "demo")}`;
     assert.match(String(absoluteRun.stdout || ""), /path-resolution-ok/);
-
-    const loggedTargets = String(await fsp.readFile(targetLog, "utf8"))
-      .split(/\n+/)
-      .map((x) => x.trim())
-      .filter(Boolean);
-    assert.deepEqual(loggedTargets, ["//projects/apps/demo:app", "//projects/apps/demo:app"]);
+    assert.deepEqual(await selectedTargets(targetLog), [
+      "//projects/apps/demo:app",
+      "//projects/apps/demo:app",
+    ]);
   });
 });
 
-test("d resolves current directory path (.) from package cwd", async () => {
-  await runInTemp("runnable-dot-cwd-resolution", async (tmp, $) => {
-    const graphDir = path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH));
-    await fsp.mkdir(graphDir, { recursive: true });
-    await fsp.writeFile(
-      path.join(tmp, DEFAULT_GRAPH_PATH),
-      JSON.stringify(
-        [
-          {
-            name: "//projects/apps/demo:app",
-            rule_type: "node_asset_stage",
-            labels: [
-              "lang:node",
-              "kind:app",
-              "webapp:ssr",
-              "framework:vite",
-              "lockfile:projects/apps/demo/pnpm-lock.yaml#projects/apps/demo",
-            ],
-            srcs: ["projects/apps/demo/src/entry-server.ts"],
-            deps: [],
-          },
-        ],
-        null,
-        2,
-      ) + "\n",
-      "utf8",
-    );
-
-    const appDir = path.join(tmp, "projects", "apps", "demo");
-    await fsp.mkdir(appDir, { recursive: true });
-    const tmpReal = await fsp.realpath(tmp).catch(() => tmp);
-    const stubBin = path.join(tmp, "stub-bin");
-    const fakeOut = path.join(tmp, "fake-selected-out");
-    const targetLog = path.join(tmp, "buck-target-dot.log");
-    await fsp.mkdir(stubBin, { recursive: true });
-    await fsp.writeFile(
-      path.join(stubBin, "nix"),
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        `echo \"${"$"}{BUCK_TARGET}\" >> ${JSON.stringify(targetLog)}`,
-        `out=${JSON.stringify(fakeOut)}`,
-        'mkdir -p "$out/bin"',
-        "cat > \"$out/bin/demo\" <<'EOF'",
-        "#!/usr/bin/env bash",
-        "echo dot-resolution-ok",
-        "EOF",
-        'chmod +x "$out/bin/demo"',
-        'echo "$out"',
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(stubBin, "pnpm"),
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        `if [[ "$PWD" != ${JSON.stringify(tmp)} && "$PWD" != ${JSON.stringify(tmpReal)} ]]; then`,
-        '  echo "unexpected-cwd:$PWD" >&2',
-        "  exit 98",
-        "fi",
-        "echo dev-dot-ok",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    await $`chmod +x ${path.join(stubBin, "nix")} ${path.join(stubBin, "pnpm")}`;
-
-    const run = await $({
-      cwd: appDir,
-      stdio: "pipe",
-      env: envWithStubbedNix(stubBin),
-    })`${path.join(tmp, "viberoots", "build-tools", "tools", "bin", "d")} .`;
-    assert.match(String(run.stdout || ""), /dev-dot-ok/);
-    const loggedTarget = String(await fsp.readFile(targetLog, "utf8")).trim();
-    assert.equal(loggedTarget, "//projects/apps/demo:app");
+for (const scenario of [
+  {
+    name: "d resolves current directory path (.) from package cwd",
+    tempName: "runnable-dot-cwd-resolution",
+    targetLog: "buck-target-dot.log",
+    buildOutput: "dot-resolution-ok",
+    devOutput: "dev-dot-ok",
+    argument: ".",
+  },
+  {
+    name: "d defaults to current directory when target is omitted",
+    tempName: "runnable-default-cwd-resolution",
+    targetLog: "buck-target-default.log",
+    buildOutput: "default-resolution-build-ok",
+    devOutput: "dev-default-ok",
+    argument: undefined,
+  },
+] as const) {
+  test(scenario.name, async () => {
+    await runInTemp(scenario.tempName, async (tmp, $) => {
+      await writeDemoGraph(tmp);
+      const appDir = path.join(tmp, "projects", "apps", "demo");
+      await fsp.mkdir(appDir, { recursive: true });
+      const targetLog = path.join(tmp, scenario.targetLog);
+      const stubBin = await writeSelectedNixStub(tmp, targetLog, scenario.buildOutput);
+      await writePnpmCwdStub(tmp, stubBin, scenario.devOutput);
+      const command = path.join(tmp, "viberoots", "build-tools", "tools", "bin", "d");
+      const run = scenario.argument
+        ? await $({
+            cwd: appDir,
+            stdio: "pipe",
+            env: envWithStubbedNix(stubBin),
+          })`${command} ${scenario.argument}`
+        : await $({ cwd: appDir, stdio: "pipe", env: envWithStubbedNix(stubBin) })`${command}`;
+      assert.match(String(run.stdout || ""), new RegExp(scenario.devOutput));
+      assert.deepEqual(await selectedTargets(targetLog), ["//projects/apps/demo:app"]);
+    });
   });
-});
-
-test("d defaults to current directory when target is omitted", async () => {
-  await runInTemp("runnable-default-cwd-resolution", async (tmp, $) => {
-    const graphDir = path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH));
-    await fsp.mkdir(graphDir, { recursive: true });
-    await fsp.writeFile(
-      path.join(tmp, DEFAULT_GRAPH_PATH),
-      JSON.stringify(
-        [
-          {
-            name: "//projects/apps/demo:app",
-            rule_type: "node_asset_stage",
-            labels: [
-              "lang:node",
-              "kind:app",
-              "webapp:ssr",
-              "framework:vite",
-              "lockfile:projects/apps/demo/pnpm-lock.yaml#projects/apps/demo",
-            ],
-            srcs: ["projects/apps/demo/src/entry-server.ts"],
-            deps: [],
-          },
-        ],
-        null,
-        2,
-      ) + "\n",
-      "utf8",
-    );
-
-    const appDir = path.join(tmp, "projects", "apps", "demo");
-    await fsp.mkdir(appDir, { recursive: true });
-    const tmpReal = await fsp.realpath(tmp).catch(() => tmp);
-    const stubBin = path.join(tmp, "stub-bin");
-    const fakeOut = path.join(tmp, "fake-selected-out");
-    const targetLog = path.join(tmp, "buck-target-default.log");
-    await fsp.mkdir(stubBin, { recursive: true });
-    await fsp.writeFile(
-      path.join(stubBin, "nix"),
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        `echo \"${"$"}{BUCK_TARGET}\" >> ${JSON.stringify(targetLog)}`,
-        `out=${JSON.stringify(fakeOut)}`,
-        'mkdir -p "$out/bin"',
-        "cat > \"$out/bin/demo\" <<'EOF'",
-        "#!/usr/bin/env bash",
-        "echo default-resolution-build-ok",
-        "EOF",
-        'chmod +x "$out/bin/demo"',
-        'echo "$out"',
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    await fsp.writeFile(
-      path.join(stubBin, "pnpm"),
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        `if [[ "$PWD" != ${JSON.stringify(tmp)} && "$PWD" != ${JSON.stringify(tmpReal)} ]]; then`,
-        '  echo "unexpected-cwd:$PWD" >&2',
-        "  exit 98",
-        "fi",
-        "echo dev-default-ok",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    await $`chmod +x ${path.join(stubBin, "nix")} ${path.join(stubBin, "pnpm")}`;
-
-    const run = await $({
-      cwd: appDir,
-      stdio: "pipe",
-      env: envWithStubbedNix(stubBin),
-    })`${path.join(tmp, "viberoots", "build-tools", "tools", "bin", "d")}`;
-    assert.match(String(run.stdout || ""), /dev-default-ok/);
-    const loggedTarget = String(await fsp.readFile(targetLog, "utf8")).trim();
-    assert.equal(loggedTarget, "//projects/apps/demo:app");
-  });
-});
+}
 
 test("p falls back from a directory path to :app when graph data is stale", async () => {
   await runInTemp("runnable-stale-graph-app-fallback", async (tmp, $) => {
-    const graphDir = path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH));
-    await fsp.mkdir(graphDir, { recursive: true });
-    await fsp.writeFile(path.join(tmp, DEFAULT_GRAPH_PATH), "[]\n", "utf8");
-
+    await writeDemoGraph(tmp, []);
     const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(appDir, { recursive: true });
     await fsp.writeFile(path.join(appDir, "smoke.sh"), "#!/usr/bin/env bash\necho smoke\n", "utf8");
@@ -329,29 +113,8 @@ test("p falls back from a directory path to :app when graph data is stale", asyn
       ].join("\n"),
       "utf8",
     );
-    const stubBin = path.join(tmp, "stub-bin");
-    const fakeOut = path.join(tmp, "fake-selected-out");
     const targetLog = path.join(tmp, "buck-target-stale.log");
-    await fsp.mkdir(stubBin, { recursive: true });
-    await fsp.writeFile(
-      path.join(stubBin, "nix"),
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        `echo \"${"$"}{BUCK_TARGET}\" >> ${JSON.stringify(targetLog)}`,
-        `out=${JSON.stringify(fakeOut)}`,
-        'mkdir -p "$out/bin"',
-        "cat > \"$out/bin/demo\" <<'EOF'",
-        "#!/usr/bin/env bash",
-        "echo stale-graph-fallback-ok",
-        "EOF",
-        'chmod +x "$out/bin/demo"',
-        'echo "$out"',
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    await $`chmod +x ${path.join(stubBin, "nix")}`;
+    const stubBin = await writeSelectedNixStub(tmp, targetLog, "stale-graph-fallback-ok");
 
     const run = await $({
       cwd: appDir,
@@ -359,7 +122,6 @@ test("p falls back from a directory path to :app when graph data is stale", asyn
       env: envWithStubbedNix(stubBin),
     })`${path.join(tmp, "viberoots", "build-tools", "tools", "bin", "p")} .`;
     assert.match(String(run.stdout || ""), /stale-graph-fallback-ok/);
-    const loggedTarget = String(await fsp.readFile(targetLog, "utf8")).trim();
-    assert.equal(loggedTarget, "//projects/apps/demo:app");
+    assert.deepEqual(await selectedTargets(targetLog), ["//projects/apps/demo:app"]);
   });
 });

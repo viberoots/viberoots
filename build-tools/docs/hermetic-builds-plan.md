@@ -144,6 +144,39 @@ bundles` whose first parent is `fc0d992daf592feeafe18b4b9016bada1012b704`. Paren
 - Open integration assumptions: selector environment and normal `--impure` removal remain PR-3;
   environment and tool qualification remain PR-4; independent-builder agreement remains PR-5.
 
+### PR-3 Full-Suite Checkpoint Record
+
+- Commit identity: the viberoots commit with subject `feat(build): classify local development
+bundles` whose first parent is `0ea3873d428cc2d79598be91b10a57b16d08a5da`. Parent plus subject
+  identifies the checkpoint commit without requiring the commit to contain its own final hash.
+- Focused validation: the exact checkpoint failures, new structural contracts, root-cause groups,
+  and conservative affected union passed before the full suite. The affected union passed 341/341
+  twice; the second run is recorded in
+  `.viberoots/workspace/buck/codex-test-logs/hermetic-pr3-conservative-union341-warm-20260716-153550.log`.
+  A real unchanged `b //projects/apps/viberoots-site:app` selector then passed twice, with the second
+  invocation adding zero Nix paths, source identities, or evaluation-bundle identities; evidence is
+  in the sibling `hermetic-pr3-production-identity-20260716-160345.log`.
+- Full checkpoint: exact `i && b && ALL_TESTS=1 v` passed all 1,889 targets in 7,189 seconds with no
+  failure, timeout, infrastructure failure, source edit, or concurrent GC. Project enforcement
+  passed 5/5, enforcement 45/45, isolated 14/14, isolated-bounded 15/15, resource-limited 246/246,
+  and shared 1,564/1,564. The supervising log is
+  `.viberoots/workspace/buck/codex-test-logs/i-b-all-tests-v-hermetic-pr3-restart-20260716T232737Z.log`,
+  the copied complete verify log has the sibling `.verify-full.log` suffix, and bounded timing,
+  disk, Nix-role, process, load, and cleanup evidence is in the sibling
+  `hermetic-pr3-restart-20260716T232737Z` evidence directory.
+- Disk and lifecycle evidence: APFS used 8,855,968 KiB while surviving added Nix paths accounted for
+  6,969,160 KiB and retained verify temp accounted for 325,732 KiB. Added Nix paths comprised 545
+  source paths, 78 evaluation bundles, one 4 KiB capture identity, and 1,369 other closure paths.
+  Source fingerprints were unchanged; no run-owned process, deleted-open file, reviewed-origin
+  repository, or nonempty capture-construction root remained. The two retained capture base
+  directories were zero-size metadata-marker roots. The remaining APFS delta was preserved as
+  evidence and not hidden with cleanup or GC.
+- Ledger reconciliation: PR-1/PR-2 debt for ordinary selector impurity, immutable bundle consumption,
+  and the relevant-untracked local-development contract is closed by this checkpoint. Broad
+  environment inheritance and action-tool qualification remain explicit PR-4 scope, and
+  independent-builder agreement remains explicit PR-5 scope; neither is concealed as deferred PR-3
+  validation debt.
+
 ## PR-1: Establish Hermetic Policy Authority And Evidence
 
 ### 1. Intent

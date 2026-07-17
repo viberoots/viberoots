@@ -29,8 +29,11 @@ test("build-selected runs node patch requirement preflight", async () => {
   if (!txt.includes("--source=auto|git|path")) {
     throw new Error(`${file} usage should document --source mode choices`);
   }
-  if (!txt.includes("untrackedRequiresImpureForTargets")) {
-    throw new Error(`${file} should reuse untracked impurity policy helper`);
+  if (!txt.includes("inspectArtifactSource") || !txt.includes("makeFilteredFlakeRef")) {
+    throw new Error(`${file} should inventory artifact source before constructing its bundle`);
+  }
+  if (!txt.includes("withoutEvaluationSelectors")) {
+    throw new Error(`${file} must strip former selectors before Nix evaluation`);
   }
   if (!txt.includes("runMain(main)")) {
     throw new Error(`${file} must use the shared runMain entrypoint`);
@@ -57,10 +60,10 @@ test("build-selected runs node patch requirement preflight", async () => {
   if (
     !txt.includes("const flakeEnv = flakeSource.workspaceRoot") ||
     !txt.includes("VBR_PNPM_FILTERED_SNAPSHOT_ROOT: flakeSource.workspaceRoot") ||
-    (txt.match(/env: flakeEnv/g) || []).length !== 2
+    (txt.match(/env: flakeEnv/g) || []).length < 2
   ) {
     throw new Error(
-      `${file} must use one marked filtered-snapshot environment for the final-store probe and build`,
+      `${file} must use one sanitized bundle environment for the final-store probe and build`,
     );
   }
   const flakeSourceIndex = txt.indexOf("const flakeSource = await chooseFlakeRef");
@@ -86,7 +89,6 @@ test("build-selected constructs selected nix build argv with no-link for normal 
   assert.deepEqual(selectedNixBuildArgs({ flakeRef: "path:/repo#graph-generator-selected" }), [
     "nix",
     "build",
-    "--impure",
     "--no-write-lock-file",
     "--option",
     "eval-cache",
@@ -101,7 +103,6 @@ test("build-selected constructs selected nix build argv with no-link for normal 
     [
       "nix",
       "build",
-      "--impure",
       "--no-write-lock-file",
       "--option",
       "eval-cache",

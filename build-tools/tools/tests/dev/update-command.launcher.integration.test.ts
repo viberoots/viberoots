@@ -12,6 +12,7 @@ import {
   defaultFilteredFlakeSnapshotRsyncSources,
   filteredFlakeRsyncExcludeArgs,
 } from "../../dev/nix-build-filtered-flake-lib";
+import { derivePostCloneWorkspaceLock } from "../../lib/post-clone-workspace-lock";
 import { VIBEROOTS_SOURCE_ROOT } from "../lib/test-helpers/source-paths";
 
 const execFileAsync = promisify(execFile);
@@ -99,9 +100,16 @@ async function fixture(name: string): Promise<string> {
   const consumerRoot = path.dirname(VIBEROOTS_SOURCE_ROOT);
   await fsp.copyFile(path.join(consumerRoot, "flake.nix"), path.join(root, "flake.nix"));
   await fsp.copyFile(path.join(consumerRoot, "flake.lock"), path.join(root, "flake.lock"));
-  await fsp.copyFile(
-    path.join(consumerRoot, ".viberoots/workspace/flake.lock"),
+  const rootLockText = await fsp.readFile(path.join(root, "flake.lock"), "utf8");
+  const workspaceLock = derivePostCloneWorkspaceLock({
+    rootLockText,
+    workspaceFlakeDir: path.join(root, ".viberoots/workspace"),
+    localInputPath: await immutableViberootsSource(),
+  });
+  await fsp.writeFile(
     path.join(root, ".viberoots/workspace/flake.lock"),
+    `${JSON.stringify(workspaceLock, null, 2)}\n`,
+    "utf8",
   );
   await fsp.writeFile(
     path.join(root, ".viberoots/bootstrap/transactions/source-mode.json"),

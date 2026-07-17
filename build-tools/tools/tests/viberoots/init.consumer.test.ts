@@ -341,7 +341,8 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     await assertDirenvBootstrap(workspace);
     const rootFlake = await fsp.readFile(path.join(workspace, "flake.nix"), "utf8");
     assertConsumerFlakeAllowsPnpmProvisioningEnv(rootFlake);
-    assert.match(rootFlake, /if root != "" then root else \.\/\.;/);
+    assert.match(rootFlake, /workspaceSrc = \.\/\.;/);
+    assert.doesNotMatch(rootFlake, /builtins\.getEnv "WORKSPACE_ROOT"/);
     assert.match(rootFlake, new RegExp(`workspaceName = "${path.basename(workspace)}";`));
     await assert.rejects(fsp.lstat(path.join(workspace, "buck-out")));
     const workspaceFlake = await fsp.readFile(
@@ -350,7 +351,8 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     );
     assertConsumerFlakeAllowsPnpmProvisioningEnv(workspaceFlake);
     assert.match(workspaceFlake, /path:\.\/viberoots-flake-input/);
-    assert.match(workspaceFlake, /builtins\.getEnv "WORKSPACE_ROOT"/);
+    assert.match(workspaceFlake, /workspaceSrc = \.\.\/\.\.;/);
+    assert.doesNotMatch(workspaceFlake, /builtins\.getEnv "WORKSPACE_ROOT"/);
     const readme = await fsp.readFile(path.join(workspace, "README.md"), "utf8");
     assert.match(readme, /viberoots\/README\.md/);
     assert.match(readme, /Existing Checkout \/ New Workstation/);

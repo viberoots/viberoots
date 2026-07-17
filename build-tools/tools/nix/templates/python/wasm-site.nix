@@ -10,12 +10,7 @@
   }:
     let
       _guard = H.guardNoDevOverridesInCI devOverrideEnv;
-      buckTestSrc = builtins.getEnv "BUCK_TEST_SRC";
-      workspaceEnv = builtins.getEnv "WORKSPACE_ROOT";
-      wsRoot =
-        if buckTestSrc != "" then buckTestSrc
-        else if workspaceEnv != "" then workspaceEnv
-        else builtins.toString srcRoot;
+      wsRoot = builtins.toString srcRoot;
       patchDir = builtins.toPath ("${wsRoot}/${subdir}/patches/python");
       uv = UvBackend {
         pname = "pylib-${H.sanitizeName name}";
