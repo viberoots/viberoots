@@ -109,7 +109,7 @@ async function buildSsrWebappOutPath(
   await stageTempRepoPaths({
     tmp,
     _$,
-    explicitPaths: ["projects/node-modules.hashes.json"],
+    explicitPaths: ["projects/config/node-modules.hashes.json"],
   });
   const attr = sanitizeImporterForNixAttr(importer);
   const flakeRef = await workspaceFlakeRef(tmp);

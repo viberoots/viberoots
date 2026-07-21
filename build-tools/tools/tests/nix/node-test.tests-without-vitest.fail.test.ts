@@ -2,7 +2,8 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
+import { runFilteredFlakeAttr } from "../lib/test-helpers/selected-build";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -13,9 +14,6 @@ test(
   async () => {
     await runInTemp("node-test-missing-vitest", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "inherit" });
-      const TIMEOUT_SECS = String(
-        Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200"),
-      );
       const importer = "projects/apps/demo-node";
       const impDir = path.join(tmp, importer);
       await fsp.mkdir(path.join(impDir, "src"), { recursive: true });
@@ -62,13 +60,15 @@ test(
         env,
       })`zx-wrapper viberoots/build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
       await $({ cwd: tmp, stdio: "pipe" })`git add -A ${importer}`;
-      const flakeRef = await workspaceFlakeRef(tmp);
       // Expect build to fail because tests are present but vitest is not installed
-      const res = await $({
-        cwd: tmp,
-        stdio: "pipe",
+      const res = await runFilteredFlakeAttr({
+        tmp,
+        $,
+        target: `//${importer}:demo-node-tests`,
+        attr: `node-test.${sanitized}`,
         env,
-      })`bash --noprofile --norc -c 'timeout ${TIMEOUT_SECS}s nix build "path:${flakeRef}#node-test.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-build-logs'`.nothrow();
+        nothrow: true,
+      });
       if (res.exitCode === 0) {
         throw new Error(
           "expected node-test derivation to fail when vitest is missing and tests exist",

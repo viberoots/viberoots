@@ -152,6 +152,31 @@ function usesMatchingImmutableInput(
   }
 }
 
+export type GeneratedWorkspaceViberootsAuthority =
+  | { kind: "immutable"; source: string }
+  | { kind: "remote" }
+  | { kind: "invalid" };
+
+export async function generatedWorkspaceViberootsAuthority(
+  workspaceRoot: string,
+  sourceAccessible?: (source: string) => boolean,
+): Promise<GeneratedWorkspaceViberootsAuthority> {
+  const workspaceFlakeDir = path.join(canonicalPath(workspaceRoot), ".viberoots", "workspace");
+  const lock = await readJson<FlakeLock>(path.join(workspaceFlakeDir, "flake.lock"));
+  const node = lock?.nodes?.viberoots as
+    | {
+        locked?: { type?: string; path?: string };
+        original?: { type?: string; path?: string };
+      }
+    | undefined;
+  if (!lock || !node?.locked?.type || !node.original?.type) return { kind: "invalid" };
+  if (node.locked.type !== "path" && node.original.type !== "path") return { kind: "remote" };
+  const source = String(node?.locked?.path || "");
+  return usesMatchingImmutableInput(lock, workspaceFlakeDir, source, sourceAccessible)
+    ? { kind: "immutable", source }
+    : { kind: "invalid" };
+}
+
 function locksDifferOnlyInViberoots(before: FlakeLock, after: FlakeLock): boolean {
   if (
     stableStringify(cloneWithoutViberoots(before)) !== stableStringify(cloneWithoutViberoots(after))
@@ -335,7 +360,11 @@ export async function repairGeneratedWorkspaceLock(
   if (flakeRepair === "repaired" && opts.verbose) {
     console.error("[install-deps] refreshing generated workspace viberoots flake input");
   }
-  if (usesNormalizedFilteredInput(before)) {
+  const filteredInput = path.join(workspaceFlakeDir, "viberoots-flake-input");
+  if (
+    usesNormalizedFilteredInput(before) &&
+    canonicalPath(viberootsSource) === canonicalPath(filteredInput)
+  ) {
     if (flakeRepair === "repaired") {
       await touchFilteredInputMarker(workspaceFlakeDir);
       return { status: "repaired", changedInput: "viberoots" };

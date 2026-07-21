@@ -9,6 +9,7 @@ import {
   renderRolloutPolicyLines,
   writePublisherConfig,
 } from "./mobile-release.e2e.helpers";
+import { reconcileSyntheticDeploymentGraph } from "./deployment-graph.fixture";
 
 export async function writeGooglePlayConfig(
   workspaceRoot: string,
@@ -77,6 +78,7 @@ export async function installGooglePlayTargets(
       );
     }),
   );
+  await reconcileSyntheticDeploymentGraph(workspaceRoot);
 }
 
 export function googlePlayFakeEnv(tmp: string): NodeJS.ProcessEnv {

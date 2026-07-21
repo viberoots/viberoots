@@ -7,7 +7,11 @@ import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { runManagedCommand } from "../../lib/managed-command";
 import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
-import { verifySeedBuildArgs, type VerifySeedBuildMode } from "./seed-build";
+import {
+  assertVerifySeedComplete,
+  verifySeedBuildArgs,
+  type VerifySeedBuildMode,
+} from "./seed-build";
 import { createSharedSeedStagePin, shouldStageSeed } from "./seed-staging";
 import {
   createVerifySeedPin,
@@ -19,7 +23,12 @@ import { writeVerifySeedRemoteManifest } from "./seed-manifest";
 import { isNonBuildSystemOnlyVerifyTargets } from "./target-scope";
 import { pidAlive } from "./seed-utils";
 import { computeGitState } from "./seed-git-state";
-import fs from "node:fs";
+import { makeFilteredFlakeRef } from "../filtered-flake";
+import { withoutEvaluationSelectors } from "../evaluation-bundle-env";
+import {
+  buildArtifactEnvironment,
+  withoutArtifactEnvironmentInfluence,
+} from "../../lib/artifact-environment";
 
 export type SeedInfo = {
   seedKey: string;
@@ -120,9 +129,27 @@ function seedBuildTimeoutSec(): number {
 
 async function buildSeedStorePath(
   root: string,
+  artifactToolsRoot: string,
   mode: VerifySeedBuildMode = "local",
 ): Promise<string> {
   const timeoutSec = seedBuildTimeoutSec();
+  const artifactEnv = buildArtifactEnvironment({
+    baseEnv: withoutArtifactEnvironmentInfluence(process.env),
+    mode: String(process.env.CI || "").trim() ? "ci" : "local",
+    stateRoot: path.join(root, "buck-out", "tmp", "artifact-environment"),
+    workspaceRoot: root,
+    artifactToolsRoot,
+  });
+  const source = await makeFilteredFlakeRef({
+    workspaceRoot: root,
+    attr: "test-seed",
+    logPrefix: "[verify-seed]",
+    classification: "hermetic",
+    env: artifactEnv,
+    selectorEnv: withoutEvaluationSelectors(process.env),
+    coverage: process.env.COVERAGE === "1",
+    immutableViberootsInputRoot: await activatedImmutableViberootsInput(root),
+  });
   // Pin the built derivation as a Nix GC root so nix-collect-garbage does not evict
   // the current seed between verify runs. Each build overwrites the symlink, so only
   // the most-recent seed derivation is pinned; older ones remain GC-eligible.
@@ -130,12 +157,9 @@ async function buildSeedStorePath(
   await mkdirWithMacosMetadataExclusion(seedRootDir(root)).catch(() => {});
   const verbose = isVbrVerbose();
   const ui = createCommandUi({ verbose });
-  const flakeRoot = fs.existsSync(path.join(root, ".viberoots", "workspace", "flake.nix"))
-    ? path.join(root, ".viberoots", "workspace")
-    : root;
   if (verbose) {
     process.stderr.write(
-      `[verify] seed build: nix build path:${flakeRoot}#test-seed (timeout=${timeoutSec}s)\n`,
+      `[verify] seed build: nix build ${source.flakeRef} (timeout=${timeoutSec}s)\n`,
     );
   } else {
     ui.step("seed", "checking test fixture store");
@@ -151,21 +175,25 @@ async function buildSeedStorePath(
   const nixBin = resolveToolPathSync("nix", seedEnv);
   const cmd = await runManagedCommand({
     command: nixBin,
-    args: verifySeedBuildArgs({ root, mode, gcRootPath }),
+    args: verifySeedBuildArgs({
+      flakeRef: source.flakeRef,
+      mode,
+      gcRootPath,
+    }),
     cwd: root,
     env: seedEnv,
     timeoutMs: timeoutSec * 1000,
     killGraceMs: 5000,
-  });
+  }).finally(source.cleanup);
   if (!cmd.ok) {
     const detail = String(cmd.stderr || cmd.stdout || "").trim();
     if (cmd.timedOut) {
       throw new Error(
-        `verify seed: nix build path:${flakeRoot}#test-seed timed out after ${timeoutSec}s${detail ? `\n${detail}` : ""}`,
+        `verify seed: nix build ${source.flakeRef} timed out after ${timeoutSec}s${detail ? `\n${detail}` : ""}`,
       );
     }
     throw new Error(
-      `verify seed: nix build path:${flakeRoot}#test-seed failed (exit ${String(cmd.code)})${detail ? `\n${detail}` : ""}`,
+      `verify seed: nix build ${source.flakeRef} failed (exit ${String(cmd.code)})${detail ? `\n${detail}` : ""}`,
     );
   }
   const out = String(cmd.stdout || "")
@@ -173,23 +201,33 @@ async function buildSeedStorePath(
     .split("\n")
     .filter(Boolean)
     .pop();
-  if (!out)
-    throw new Error(`verify seed: nix build path:${flakeRoot}#test-seed returned no store path`);
+  if (!out) throw new Error(`verify seed: nix build ${source.flakeRef} returned no store path`);
+  await assertVerifySeedComplete(out);
   if (verbose) process.stderr.write("[verify] seed build: complete\n");
   else ui.ok("seed", "ready");
   return out;
 }
 
+async function activatedImmutableViberootsInput(root: string): Promise<string> {
+  const current = path.join(root, ".viberoots", "current");
+  const canonical = await fsp.realpath(current).catch(() => "");
+  if (!/^\/nix\/store\/[a-z0-9]{32}-source$/.test(canonical)) return "";
+  const flake = await fsp.stat(path.join(canonical, "flake.nix")).catch(() => null);
+  return flake?.isFile() ? canonical : "";
+}
+
 export async function prepareVerifySeed(opts: {
   root: string;
   iso: string;
+  artifactToolsRoot: string;
   mode?: VerifySeedBuildMode;
 }): Promise<SeedInfo> {
   await sweepStalePins(opts.root);
   const mode = opts.mode || "local";
   const seedKey = await computeSeedKey(opts.root);
   const currentSeedPath = mode === "local" ? await readCurrentSeed(opts.root, seedKey) : null;
-  const seedPath = currentSeedPath || (await buildSeedStorePath(opts.root, mode));
+  const seedPath =
+    currentSeedPath || (await buildSeedStorePath(opts.root, opts.artifactToolsRoot, mode));
   if (mode === "remote-ready") {
     const remoteManifestPath = await writeVerifySeedRemoteManifest({
       root: opts.root,

@@ -13,7 +13,7 @@ import { exists, runInTemp } from "../lib/test-helpers";
 
 test("sync-providers --lang node regenerates downstream glue via the centralized pipeline", async () => {
   await runInTemp("sync-providers-node-glue", async (tmp, $) => {
-    const importerDir = path.join(tmp, "apps", "web");
+    const importerDir = path.join(tmp, "projects", "apps", "web");
     await fsp.mkdir(importerDir, { recursive: true });
     await fsp.writeFile(
       path.join(importerDir, "package.json"),
@@ -24,6 +24,22 @@ test("sync-providers --lang node regenerates downstream glue via the centralized
     await fsp.writeFile(
       path.join(importerDir, "pnpm-lock.yaml"),
       "lockfileVersion: 9.0\nimporters: {}\n",
+      "utf8",
+    );
+    await fsp.writeFile(path.join(importerDir, "input.txt"), "provider-sync\n", "utf8");
+    await fsp.writeFile(
+      path.join(importerDir, "TARGETS"),
+      [
+        'load("@viberoots//build-tools/node:defs.bzl", "nix_node_gen")',
+        "",
+        "nix_node_gen(",
+        '    name = "app",',
+        '    srcs = ["input.txt"],',
+        '    out = "generated.txt",',
+        '    cmd = "cat input.txt > $OUT",',
+        ")",
+        "",
+      ].join("\n"),
       "utf8",
     );
 

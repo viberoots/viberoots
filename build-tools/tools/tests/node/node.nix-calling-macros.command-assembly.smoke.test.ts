@@ -10,7 +10,8 @@ function assertCmdInvariants(cmd: string, label: string, requiresOutPathCapture 
     assert.ok(
       cmd.includes("--no-link --print-out-paths") ||
         cmd.includes("OUT_PATHS_FILE=") ||
-        cmd.includes("vbr-nix-outpaths.txt"),
+        cmd.includes("vbr-nix-outpaths.txt") ||
+        (cmd.includes("build-selected.ts") && cmd.includes("OUT_RAW=")),
       `${label}: expected nix build out-path capture`,
     );
   }

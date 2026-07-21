@@ -107,6 +107,7 @@ export function rewriteViberootsLockEntry(
   const isRecognized =
     rawPath === "" ||
     path.basename(rawPath) === "viberoots" ||
+    /^\/nix\/store\/[a-z0-9]{32}-source$/.test(rawPath) ||
     isGeneratedFilteredViberootsInputPath(rawPath) ||
     String(node.url || "").includes("viberoots/viberoots");
   if (!isRecognized) return false;

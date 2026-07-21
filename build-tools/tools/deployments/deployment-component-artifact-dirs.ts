@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
 import { buildSelectedOutPath } from "../dev/run-runnable-graph";
+import { canonicalArtifactToolsRoot } from "../lib/artifact-environment";
 import type { DeploymentTarget } from "./contract";
 
 export function artifactDirFromBuiltOutPath(componentKind: string, outPath: string): string {
@@ -11,7 +12,10 @@ export async function buildDeploymentSelectedOutPath(
   workspaceRoot: string,
   target: string,
 ): Promise<string> {
-  return await buildSelectedOutPath(workspaceRoot, target, "auto", { purpose: "deployment" });
+  return await buildSelectedOutPath(workspaceRoot, target, "auto", {
+    purpose: "deployment",
+    artifactToolsRoot: canonicalArtifactToolsRoot(workspaceRoot),
+  });
 }
 
 export async function buildArtifactDirsByComponentId(

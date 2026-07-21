@@ -20,6 +20,40 @@ export type CreateIsolationOptions = {
   reuseDaemon?: boolean;
 };
 
+export function sharedDevBuildIsolationName(workspaceRoot: string): string {
+  const repoHash = crypto
+    .createHash("sha256")
+    .update(path.resolve(workspaceRoot))
+    .digest("hex")
+    .slice(0, 10);
+  return `devbuild-shared-${repoHash}`;
+}
+
+export function sharedExporterIsolationName(workspaceRoot: string): string {
+  const repoHash = crypto
+    .createHash("sha256")
+    .update(path.resolve(workspaceRoot))
+    .digest("hex")
+    .slice(0, 10);
+  return `exporter-shared-${repoHash}`;
+}
+
+export function changedGraphConsumerIsolationNames(
+  workspaceRoot: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string[] {
+  return [
+    ...new Set(
+      [
+        sharedDevBuildIsolationName(workspaceRoot),
+        sharedExporterIsolationName(workspaceRoot),
+        String(env.BUCK_ISOLATION_DIR || "").trim(),
+        String(env.BUCK_NESTED_ISO || "").trim(),
+      ].filter(Boolean),
+    ),
+  ];
+}
+
 async function reapChildBuckDaemonsByPrefix(prefixes: string[]): Promise<void> {
   try {
     const lines = await buckProcessTableLines(2000);
@@ -57,12 +91,9 @@ export function createIsolation(opts: CreateIsolationOptions = {}): Isolation {
     ? String(process.env.BUCK_DEVBUILD_KILL_ON_EXIT || "").trim() === "1"
     : defaultKillOnExit;
   const inheritedIso = (process.env.BUCK_ISOLATION_DIR || "").trim();
-  const repoHash = crypto
-    .createHash("sha256")
-    .update(path.resolve(process.cwd()))
-    .digest("hex")
-    .slice(0, 10);
-  const defaultIso = reuseDaemon ? `devbuild-shared-${repoHash}` : `devbuild-${process.pid}`;
+  const defaultIso = reuseDaemon
+    ? sharedDevBuildIsolationName(process.cwd())
+    : `devbuild-${process.pid}`;
   const buckIsolation = inheritedIso ? inheritedIso : defaultIso;
   const createdOwnIsolation = !inheritedIso && process.env.BUCK_NO_ISOLATION !== "1";
   const registerForCleanup = createdOwnIsolation && killOnExit;

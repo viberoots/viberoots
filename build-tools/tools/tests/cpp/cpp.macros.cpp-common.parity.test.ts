@@ -69,12 +69,16 @@ function sanitizeValueFromProbeOut(out: string): string {
 test("cpp macros: lib/bin/addon delegate through shared core and keep emitted attrs consistent", async () => {
   await runInTemp("cpp-macros-cpp-common", async (tmp, $) => {
     // Provider target and mapping used by realize_provider_edges(...)
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
-genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
-genrule(name="prov_extra", out="prov_extra.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
-EOF'`;
+    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "third_party", "providers", "TARGETS"),
+      [
+        'genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])',
+        'genrule(name="prov_extra", out="prov_extra.stamp", cmd=": > $OUT", visibility=["PUBLIC"])',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<'\''EOF'\''

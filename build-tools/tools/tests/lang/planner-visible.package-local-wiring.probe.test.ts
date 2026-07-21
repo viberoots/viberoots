@@ -8,11 +8,12 @@ import { runInTemp } from "../lib/test-helpers";
 test("wire_package_local_planner_visible_stub: stamps patch_scope, includes patch inputs, and honors provider wiring options", async () => {
   await runInTemp("planner-visible-package-local-wiring-probe", async (tmp, $) => {
     // Minimal provider and auto_map mapping
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
-genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
-EOF'`;
+    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "third_party", "providers", "TARGETS"),
+      'genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])\n',
+      "utf8",
+    );
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<'\''EOF'\''

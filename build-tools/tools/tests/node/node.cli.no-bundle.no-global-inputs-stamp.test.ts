@@ -46,5 +46,9 @@ test("nix_node_cli_bin(bundle=False) stamps global Nix inputs", async () => {
       out.includes(":flake.lock"),
       "expected //.viberoots/workspace:flake.lock to be present when bundle=False is Nix-calling",
     );
+    assert.ok(
+      out.includes("planner_target://projects/apps/cli:tool_copy__nix_impl__planner"),
+      "expected public CLI wrapper to declare its canonical planner target",
+    );
   });
 });

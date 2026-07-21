@@ -129,6 +129,7 @@ Guardrails for all current and future languages:
 - Enforce migration status via `build-tools/tools/dev/nix-gaps-inventory-check.ts`:
   - Probe-only exceptions are sourced from `docs/handbook/nix-gaps-exceptions.json` (`exceptions`).
   - Temporary non-Nix artifact routes are sourced from `docs/handbook/nix-gaps-exceptions.json` (`artifactRouteAllowlist`).
+  - Production command-site roles and the deterministic inventory digest are sourced from `docs/handbook/nix-command-site-policy.json`; this mandatory policy is not an exception.
   - The check fails on missing or stale allowlist entries so temporary gaps do not become permanent.
   - The check runs as a required gate in both local verify preflight (`v`) and CI stage execution.
 
@@ -1226,7 +1227,7 @@ pipeline {
             steps { sh 'node build-tools/tools/buck/prebuild-guard.ts' }
           }
           stage('Nix-gaps policy gate') {
-            steps { sh 'node build-tools/tools/dev/nix-gaps-inventory-check.ts --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions docs/handbook/nix-gaps-exceptions.json' }
+            steps { sh 'node build-tools/tools/dev/nix-gaps-inventory-check.ts --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions docs/handbook/nix-gaps-exceptions.json --command-site-policy docs/handbook/nix-command-site-policy.json' }
           }
           stage('Build All (graph-generator)') {
             steps { sh 'nix build .#graph-generator' }

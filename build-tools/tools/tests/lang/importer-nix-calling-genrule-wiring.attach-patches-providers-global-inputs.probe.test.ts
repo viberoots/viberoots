@@ -11,7 +11,9 @@ import {
 import { runInTemp } from "../lib/test-helpers";
 
 const GLOBAL_INPUT_LABELS = [
+  "//.viberoots/workspace:flake.nix",
   "//.viberoots/workspace:flake.lock",
+  "workspace_buck//:graph.json",
   "@viberoots//build-tools/tools/nix:nixpkgs_source_registry",
   "//.viberoots/workspace:nixpkgs-source-registry-extension",
 ];

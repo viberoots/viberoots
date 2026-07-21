@@ -23,7 +23,7 @@ The active build system is Buck2 as the orchestrator and Nix as the hermetic too
 - `.#graph-generator-selected-wasm`
 - `.#graph-generator-pure`
 - `.#graph-generator-pure-selected`
-- `.#buck-graph` when `BUCK_GRAPH_JSON` is supplied with impure evaluation
+- `.#buck-graph` for internal graph materialization
 - `.#test-seed`
 - `.#node-test.<importer>`
 - `.#py-wheelhouse-*`
@@ -31,11 +31,18 @@ The active build system is Buck2 as the orchestrator and Nix as the hermetic too
 - `.#remote-worker-tools`
 - `.#remote-ci-tools`
 
-Language-specific Buck rules generally call Nix through the selected-target path. The common shape is:
+Language-specific Buck rules call Nix through the selected-target path. The common shape is:
 
-1. Buck exports or consumes the target graph.
-2. A rule or test runner sets `BUCK_TARGET`, `BUCK_GRAPH_JSON`, `WORKSPACE_ROOT`, and related env.
-3. `build-tools/tools/dev/build-selected.ts` invokes `nix build --impure ... .#graph-generator-selected` or a target-specific selected output.
+1. Explicit `u` reconciles the generated target graph and tracked dependency metadata.
+2. A public build, runnable, or CI wrapper admits the canonical tool closure and transports the
+   selected target through argv or declared Buck action inputs.
+3. The filtered source and immutable evaluation bundle carry the graph, target selection, source
+   closure, and tool inputs into a pure Nix evaluation.
+
+Ambient `BUCK_TARGET`, `BUCK_GRAPH_JSON`, and `WORKSPACE_ROOT` values are not public artifact
+authority. Ordinary `b`, `i`, post-clone, and devshell entry do not reconcile stale metadata or
+missing exact stores; they fail closed and direct the user to `u`. `b --impure` remains a diagnostic
+mode, not a normal selected-build path.
 
 The implementation-required Nix feature floor is only:
 
@@ -47,11 +54,19 @@ experimental-features = nix-command flakes
 
 ### Nix Build Shape
 
-The current implementation uses conventional flake outputs, graph-generator package attributes, selected-target env, and pure graph outputs such as `.#graph-generator-pure-selected`.
+The current implementation uses conventional flake outputs, graph-generator package attributes,
+immutable evaluation-bundle selection, and pure graph outputs such as
+`.#graph-generator-pure-selected`.
 
-`.#buck-graph` is a graph-materialization output, not a standalone pure `nix build .#buck-graph`. It requires an exported graph path through `BUCK_GRAPH_JSON` and impure evaluation.
+`.#buck-graph` is an internal graph-materialization output, not the public artifact ingress. Public
+artifact commands consume the graph through the canonical immutable bundle rather than asking Nix
+to read a live path from ambient environment.
 
-`build-tools/tools/dev/build-selected.ts` uses `--no-link --print-out-paths` for selected-target `nix build` calls and consumes the printed store path directly. Local verify seed preparation still uses `--out-link` under `buck-out/tmp/verify-seed` to pin `.#test-seed`; remote-ready seed mode uses `--no-link --print-out-paths` and must publish explicit artifact/cache manifest evidence before it can be selected.
+The selected-target executor uses `--no-link --print-out-paths` for Nix builds and consumes the
+printed store path directly. Local verify seed preparation still uses `--out-link` under
+`buck-out/tmp/verify-seed` to pin `.#test-seed`; remote-ready seed mode uses
+`--no-link --print-out-paths` and must publish explicit artifact/cache manifest evidence before it
+can be selected.
 
 Remote builders are not automatically used for every `nix build` invocation in this repository:
 
@@ -135,19 +150,19 @@ Jenkins runs a matrix over:
 - `aarch64-linux`
 - `x86_64-linux`
 
-Each axis currently runs `node build-tools/tools/ci/run-stage.ts --stage <name>` through `codegen`, `export-graph`, `sync-providers`, `gen-auto-map`, `prebuild-guard`, `nix-gaps-policy`, `cpp-addon-smoke`, `file-size-lint`, `patches-lint`, `nix-build-graph-generator`, `wheelhouse-preload`, `buck-test`, and a coverage pass that reruns `buck-test` with `COVERAGE=1` before `pnpm coverage:build`.
+Each axis currently runs `build-tools/tools/ci/run-stage.sh --stage <name>` through `codegen`, `export-graph`, `sync-providers`, `gen-auto-map`, `prebuild-guard`, `nix-gaps-policy`, `cpp-addon-smoke`, `file-size-lint`, `patches-lint`, `nix-build-graph-generator`, `wheelhouse-preload`, `buck-test`, and a coverage pass that reruns `buck-test --coverage` before `pnpm coverage:build`.
 
 The `wheelhouse-preload` stage already has one implemented cache-push path:
 
 ```bash
-NIX_CACHE_TO='s3://...' node build-tools/tools/ci/run-stage.ts --stage wheelhouse-preload
+build-tools/tools/ci/run-stage.sh --stage wheelhouse-preload --to 's3://...'
 # or
-node build-tools/tools/ci/run-stage.ts --stage wheelhouse-preload --to 's3://...'
+build-tools/tools/ci/run-stage.sh --stage wheelhouse-preload --to 's3://...'
 ```
 
 It discovers `py-wheelhouse-*` attrs, builds them, and runs `nix copy --to` when a destination is configured. Jenkins currently invokes the stage but does not configure the cache destination in the `Jenkinsfile`.
 
-`build-tools/tools/ci/publish-nix-cache-manifest.ts` is the generic dormant cache manifest path for
+`build-tools/tools/ci/publish-nix-cache-manifest.sh` is the generic dormant cache manifest path for
 remote-readiness lanes. In dry-run mode it builds the initial prewarm attrs with
 `--no-link --print-out-paths`, archives flake inputs with `nix flake archive --json`, and writes a
 manifest containing system, source revision, flake lock hash, attrs, exact output paths, selected
@@ -157,7 +172,7 @@ selected target's `nixpkgs_profile` and normalized `nixpkg_pins` attr/profile li
 stay out of the cache manifest; the lockfile and registry evidence identify the package source.
 
 ```bash
-node build-tools/tools/ci/publish-nix-cache-manifest.ts \
+build-tools/tools/ci/publish-nix-cache-manifest.sh \
   --dry-run \
   --out buck-out/tmp/nix-cache-manifest.json
 ```
@@ -166,10 +181,15 @@ The initial attr set is `.#graph-generator`, `.#buck2-prelude`, `.#test-seed`,
 `.#remote-worker-tools`, `.#toolchains.go`, `.#toolchains.cxx`, `.#toolchains.python`, discovered
 `.#py-wheelhouse-*`, and discovered `.#node-modules.*`. Backend credentials stay outside the
 manifest; only redacted endpoint identity is recorded. CI can pass
-`--remote-ci-tools /nix/store/...-remote-ci-tools` or set `VBR_REMOTE_CI_TOOLS` to run child commands
-with `PATH` restricted to the declared CI closure. Writable-store publishing renders `nix copy --to`; future backend
-closures can use `--backend attic` or `--backend cachix` only after those CLIs are declared in the
-remote CI tools closure.
+`--remote-ci-tools /nix/store/...-remote-ci-tools` to run child commands
+with `PATH` restricted to the declared CI closure. Writable-store publishing renders `nix copy --to`.
+Attic and Cachix publication also requires `--publisher-env-file` naming an absolute, regular,
+non-symlink JSON file with mode `0600`. The file may contain only `ATTIC_TOKEN` for Attic or
+`CACHIX_AUTH_TOKEN` and optional `CACHIX_SIGNING_KEY` for Cachix. The helper reads that file only
+after canonical ingress and exposes the values only to the declared publisher subprocess; it does
+not put credentials in argv, manifests, bundles, or logs. These backends can be selected with
+`--backend attic` or `--backend cachix` only after their CLI is declared in the remote CI tools
+closure.
 
 ### Verify Today
 
@@ -384,13 +404,16 @@ cachix push <cache> "$out"
 
 Managed Cachix should use `cachix push`; Attic should use `attic push`. Harmonia and nix-serve serve an existing Nix store, so populate them by building on the cache host or copying closures to the host/store, then signing with host-owned cache keys. For generic writable Nix stores such as S3 or local file binary caches, CI publishers may need signing material through `secret-key-files`, `--extra-secret-key-files`, or the destination store's `secret-key`/`secret-keys` setting. Cache services and store-serving hosts should keep signing material with the cache service or host unless explicitly configured for local self-signing; CI should receive only the backend-specific write capability required for that model, not broad signing keys. For managed Cachix, publishers need Cachix write auth such as `CACHIX_AUTH_TOKEN`; Cachix signs server-side by default. Only self-signed Cachix caches need publisher-side signing material such as `CACHIX_SIGNING_KEY`. Readers should receive only trusted public keys and read credentials, never signing keys.
 
-Wheelhouse preload currently supports `nix copy`-compatible destinations through `NIX_CACHE_TO` or `--to`, such as S3, file, or SSH store URIs:
+Wheelhouse preload currently supports `nix copy`-compatible destinations through `--to`, such as S3, file, or SSH store URIs:
 
 ```bash
-NIX_CONFIG=$'secret-key-files = /run/secrets/nix-cache-key\n' \
-NIX_CACHE_TO="s3://bucket?region=us-east-2" \
-  node build-tools/tools/ci/run-stage.ts --stage wheelhouse-preload
+build-tools/tools/ci/run-stage.sh --stage wheelhouse-preload \
+  --to "s3://bucket?region=us-east-2"
 ```
+
+The wheelhouse path does not admit ambient `NIX_CONFIG` credentials. An authenticated generic
+`nix copy` publisher needs its own reviewed, publisher-only secret-file boundary before that mode
+is enabled in CI.
 
 For S3 binary caches, the signing key can also be supplied as a store setting in the destination URI if the installed Nix version supports it. Managed Cachix publishing remains design-compatible, but it needs a separate `cachix push` CI step or a dedicated publisher hook.
 
@@ -447,23 +470,27 @@ node build-tools/tools/dev/startup-check.ts
 nix build .#graph-generator --no-link --accept-flake-config --rebuild
 ```
 
-For a local smoke test that attempts to force an eligible derivation onto remote builders:
+For a reviewed remote-builder smoke, use the immutable tool, registry, policy, and probe authorities
+selected for the active execution system:
 
 ```bash
-export NIX_CONFIG=$'experimental-features = nix-command flakes\nbuilders = @/etc/nix/machines\nmax-jobs = 0\nbuilders-use-substitutes = true\n'
-node build-tools/tools/remote-exec/nix-remote-builder-smoke.ts \
+node --import build-tools/tools/dev/zx-init.mjs --experimental-strip-types \
+  build-tools/tools/remote-exec/nix-remote-builder-smoke.ts \
+  --remote-ci-tools /nix/store/<hash>-remote-ci-tools \
   --builder-uri 'ssh-ng://nix-builder@builder-x86-linux.example.com?ssh-key=/etc/nix/builder_ed25519' \
-  --probe-build \
+  --builder-policy force_builders_file \
+  --system x86_64-linux \
+  --builder-identity 'reviewed:linux-builder-primary' \
+  --reviewed-builders /nix/store/<hash>-reviewed-builders/registry.json \
+  --probe-flake /nix/store/<hash>-remote-builder-probes \
   --report buck-out/tmp/nix-remote-builder-smoke.json
 ```
 
-This does not override derivations that prefer local builds, missing system/feature matches, or daemon SSH/trust failures.
-The smoke report is machine-readable and distinguishes inherited builders, forced generated builder
-files, and intentionally disabled builders. It also reports the effective Nix config for builders,
-substituters, trusted public keys, and `max-jobs`, and flags the common `.envrc` case where empty
-`builders =` masks daemon-level remote builders. The tool does not mutate global Nix config or set
-builders by default; `nix store info --store ...` and the `.#graph-generator --no-link --rebuild`
-probe run only when explicitly requested.
+The registry must bind the selected builder identity to its exact builder URI, immutable policy
+assertion, and probe flake. The assertion's system must match `--system`. The smoke runs bounded
+store, fixed-output, host-read, network, and wrong-hash probes and writes a machine-readable report
+only after all probes produce their required pass or denial evidence. A saved report is audit
+evidence; remote admission requires a smoke produced by the same active invocation.
 
 ## Distributed Test Execution Design
 
@@ -728,7 +755,7 @@ The worker must not need broad deployment credentials. It needs RE worker creden
 
 `build-tools/tools/remote-exec/render-buckconfig.ts` is the dormant renderer for CI/developer Buck RE config files. It writes `.buckconfig.remote.generated` under an explicit artifact directory such as `buck-out/tmp/remote-exec/<run-id>/`; repo root output is rejected. The renderer does not enable remote execution by itself, and local verify/Jenkins defaults do not read the generated file. A later opt-in lane must explicitly set `VBR_REMOTE_BUCK_CONFIG`.
 
-The verify wrapper accepts remote policy only when explicitly requested with `VBR_REMOTE_EXEC_MODE=hybrid|remote|remote-only-conformance`. Remote verify requires absolute `VBR_REMOTE_BUCK_CONFIG`, `VBR_REMOTE_ARTIFACT_DIR`, and `VBR_REMOTE_TEST_ACTIVATION_DIR` paths plus `VBR_REMOTE_EXEC_SYSTEM=x86_64-linux|aarch64-linux|aarch64-darwin`. Invalid policy fails before local-only verify setup starts. `VBR_REMOTE_TEST_PROFILE_<PASS_NAME>` can override the default `<system-prefix>-default` test profile for a pass; system prefixes are `linux-x86_64`, `linux-aarch64`, and `darwin-aarch64`.
+The verify wrapper accepts remote policy only when explicitly requested with `VBR_REMOTE_EXEC_MODE=hybrid|remote|remote-only-conformance`. Remote verify requires absolute `VBR_REMOTE_BUCK_CONFIG`, `VBR_REMOTE_ARTIFACT_DIR`, and `VBR_REMOTE_TEST_ACTIVATION_DIR` paths plus `VBR_REMOTE_EXEC_SYSTEM=x86_64-linux|aarch64-linux|aarch64-darwin`. It also requires `VBR_REMOTE_CI_TOOLS`, `VBR_REMOTE_PROBE_FLAKE`, and `VBR_REMOTE_REVIEWED_BUILDERS` to name immutable Nix-store authorities and requires `VBR_REMOTE_BUILDER_URI` and `VBR_REMOTE_BUILDER_IDENTITY` to select the reviewed builder. Before target admission, that same verify invocation runs the canonical remote-builder smoke; a saved report is audit-only and cannot authorize a later run. Invalid policy fails before local-only verify setup starts. `VBR_REMOTE_TEST_PROFILE_<PASS_NAME>` can override the default `<system-prefix>-default` test profile for a pass; system prefixes are `linux-x86_64`, `linux-aarch64`, and `darwin-aarch64`.
 
 Remote verify passes `--config-file <generated-config>`, `--config-file <activation-dir>/<pass>.buckconfig`, `--prefer-remote` for hybrid/remote lanes, `--remote-only` for conformance lanes, and `--unstable-allow-compatible-tests-on-re`. The generated remote Buck config only enables RE client/platform plumbing; profile maps are inert until the pass-specific activation config reaches Buck analysis. Verify rewrites the pass-specific activation config from the selected profile before spawning Buck, so stale files cannot silently diverge from `VBR_REMOTE_TEST_PROFILE_<PASS_NAME>`. Activation configs contain the selected profile name and the repo-owned execution-platform registration label only, not RE endpoints or credentials. If a remote pass maps to a profile but the activation directory is not selected, verify fails before spawning Buck. Keep the committed `toolchains//:remote_test_execution` default profile unset; do not set a default profile in local toolchain config.
 
@@ -1076,7 +1103,7 @@ The expected fix is not to disable remote execution broadly. The expected fix is
 
 1. Pick the binary cache backend and signing model.
 2. Configure CI agents with substituters and trusted keys.
-3. Set `NIX_CACHE_TO` for `wheelhouse-preload`.
+3. Pass `--to` to `wheelhouse-preload`.
 4. Add targeted cache push steps for `.#graph-generator`, graph-materialization outputs produced with `BUCK_GRAPH_JSON`, `.#test-seed`, and high-value toolchain attrs.
 5. Archive the exact flake source and locked inputs with `nix flake archive`, populate the selected cache backend using its supported writable-store or push flow, and publish a cache hydration manifest per CI axis containing the exact wheelhouse/toolchain/test-seed output paths, flake archive metadata, cache endpoint, system, source revision, and flake lock fingerprint.
 6. Define `packages.<system>.remote-worker-tools` as the authoritative repo-controlled worker tool closure and, if useful, `apps.<system>.remote-worker-bootstrap` as the activation command.

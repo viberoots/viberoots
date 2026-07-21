@@ -1,6 +1,7 @@
 load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_cmd_prefix")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_artifact_bash", "nix_cmd_prefix", "nix_declared_action_inputs_manifest_cmd", "nix_declared_action_transport_args")
 load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_export_graph_cmd", "nix_action_workspace_setup_from_args")
+load("@viberoots//build-tools/lang:nix_artifact_inputs.bzl", "nix_artifact_action_inputs", "with_nix_artifact_action_attrs")
 load("@viberoots//build-tools/lang:remote_action_policy.bzl", "run_nix_action")
 
 
@@ -46,26 +47,16 @@ def _cpp_nix_build_impl(ctx):
     # 1) Ensure the Buck graph is exported for the temp workspace
     # 2) Build the planner-selected attr directly via nix build .#graph-generator-cppTargets.<sanitized>
     # 3) Copy the produced artifact to the declared output
-    build_prefix = (
-        "env "
-        + "PLANNER_ONLY_CPP=1 "
-        + ("BUCK_TARGET=\"%s\" " % raw)
-        + "BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" "
-        + "BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/.viberoots/workspace/buck/graph.json\" "
-    )
     run_and_copy = (
         nix_action_workspace_setup_from_args()
         + "export VBR_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
         + nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
-        + "SECONDS=0; "
+        + nix_declared_action_inputs_manifest_cmd()
         + "BUCK_EXEC_ROOT=\"$PWD\"; "
         + "cd \"$FLK_ROOT\"; "
-        + "graph_export_start=$SECONDS; "
         + nix_action_export_graph_cmd(
             out_graph = "$WORKSPACE_ROOT/.viberoots/workspace/buck/graph.json",
-            zx_wrapper = "path:$VIBEROOTS_ROOT#zx-wrapper",
         )
-        + "graph_export_secs=$((SECONDS - graph_export_start)); "
         # Require a pre-exported Buck graph for the temp workspace (fail fast if missing)
         + "echo \"[cpp_nix_build] WR=$WORKSPACE_ROOT FLK=$FLK_ROOT\" >&2; "
         + "ls -la \"$WORKSPACE_ROOT/.viberoots/workspace/buck\" >/dev/null 2>&1 || true; "
@@ -74,26 +65,24 @@ def _cpp_nix_build_impl(ctx):
         + "  exit 2; "
         + "fi; "
         + "export BUCK_GRAPH_JSON=\"$WORKSPACE_ROOT/.viberoots/workspace/buck/graph.json\"; "
+        + "realpath \"$BUCK_GRAPH_JSON\" >> \"$VBR_BUCK_INPUTS\"; sort -u \"$VBR_BUCK_INPUTS\" -o \"$VBR_BUCK_INPUTS\"; "
         + "export VBR_NODE_ZX_INIT=\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
         # Build via a filtered flake snapshot instead of the live repo root so broad
         # dev builds are not poisoned by dirty/untracked workspace artifacts.
-        + "export PLANNER_ONLY_CPP=1; "
-        + ("export BUCK_TARGET=\"%s\"; " % raw)
         + "export BUCK_TEST_SRC=\"$WORKSPACE_ROOT\"; "
         + "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
-        + "selected_build_start=$SECONDS; "
         + (
             "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning "
             + "--experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
             + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
-            + "\"graph-generator-selected\" > \"$OUT_PATHS_FILE\"; "
+            + ("\"graph-generator-selected\" --target \"%s\" --buck-action-inputs \"$VBR_BUCK_INPUTS\" " % raw)
+            + nix_declared_action_transport_args()
+            + " --planner-only-cpp $VBR_DEV_OVERRIDE_ARG > \"$OUT_PATHS_FILE\"; "
         )
-        + "selected_build_secs=$((SECONDS - selected_build_start)); "
-        + "action_total_secs=$SECONDS; "
-        + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
-        + "tail -n1 \"$OUT_PATHS_FILE\" > \"$OUT_LAST_FILE\"; "
-        + "outPath=\"\"; read -r outPath < \"$OUT_LAST_FILE\" 2>/dev/null || true; "
-        + "test -n \"$outPath\"; "
+        + "OUT_REST_FILE=\"$OUT_PATHS_FILE.rest\"; sed -n '2,$p' \"$OUT_PATHS_FILE\" > \"$OUT_REST_FILE\"; "
+        + "outPath=\"\"; IFS= read -r outPath < \"$OUT_PATHS_FILE\" 2>/dev/null || true; "
+        + "case \"$outPath\" in /nix/store/*) ;; *) echo 'cpp_nix_build: filtered build produced an invalid output path' >&2; cat \"$OUT_PATHS_FILE\" >&2; exit 2 ;; esac; "
+        + "if [ -s \"$OUT_REST_FILE\" ]; then echo 'cpp_nix_build: filtered build produced multiple stdout lines' >&2; cat \"$OUT_PATHS_FILE\" >&2; exit 2; fi; "
         + (
             "if [ ! -e \"$outPath/%s\" ]; then echo 'cpp_nix_build (%s): expected artifact not found for kind \"%s\": %s' >&2; (ls -la \"$outPath\"; ls -la \"$outPath/bin\" 2>/dev/null || true; ls -la \"$outPath/lib\" 2>/dev/null || true; ls -la \"$outPath/include\" 2>/dev/null || true) >&2; exit 2; fi; "
             % (expected, raw, kind, expected)
@@ -120,9 +109,6 @@ def _cpp_nix_build_impl(ctx):
             + "  \"phase_log=$outPath/diagnostics/emscripten/phase-times.tsv\" "
             + "  \"compile_log=$outPath/diagnostics/emscripten/compile-times.tsv\" "
             + "  \"source_log=$outPath/diagnostics/emscripten/source-list.txt\" "
-            + "  \"graph_export_secs=$graph_export_secs\" "
-            + "  \"selected_build_secs=$selected_build_secs\" "
-            + "  \"action_total_secs=$action_total_secs\" "
             + "  \"js=$outPath/%s\" "
             + "  \"wasm=$outPath/%s\" > \"$DEST\"; "
             + "else "
@@ -132,10 +118,10 @@ def _cpp_nix_build_impl(ctx):
     )
     out = ctx.actions.declare_output(ctx.attrs.out)
     # For bash -c, $0 is set to the first argument after the script string
-    graph_arg = (ctx.attrs.graph_json if ctx.attrs.graph_json != None else "")
-    env_arg = (ctx.attrs.workspace_env if ctx.attrs.workspace_env != None else "")
+    graph_arg = ctx.attrs._graph_json
+    env_arg = ctx.attrs._workspace_root_env
     cmd = cmd_args([
-        "bash",
+        nix_artifact_bash(),
         "-c",
         run_and_copy,
         out.as_output(),
@@ -145,19 +131,15 @@ def _cpp_nix_build_impl(ctx):
         env_arg,
         # $3: absolute path to the repository flake.nix to pin FLK_ROOT deterministically
         ctx.attrs.flake_file if ctx.attrs.flake_file != None else "",
-    ], hidden = (
-        ctx.attrs.srcs + ctx.attrs.nix_inputs
-        + ([ctx.attrs.graph_json] if ctx.attrs.graph_json != None else [])
-        + ([ctx.attrs.workspace_env] if ctx.attrs.workspace_env != None else [])
-        + ([ctx.attrs.flake_file] if ctx.attrs.flake_file != None else [])
-    ))  # include local patches and explicit Nix inputs
-    policy_info = run_nix_action(ctx, cmd, category = "cpp_nix_build")
+    ], hidden = nix_artifact_action_inputs(ctx) + ([ctx.attrs.flake_file] if ctx.attrs.flake_file != None else []))
+    declared_inputs = nix_artifact_action_inputs(ctx) + ([ctx.attrs.flake_file] if ctx.attrs.flake_file != None else [])
+    policy_info = run_nix_action(ctx, cmd, category = "cpp_nix_build", declared_inputs = declared_inputs)
     return [DefaultInfo(default_output = out)] + policy_info
 
 
 cpp_nix_build = rule(
     impl = _cpp_nix_build_impl,
-    attrs = {
+    attrs = with_nix_artifact_action_attrs({
         "self_label": attrs.string(),
         "kind": attrs.string(),  # "bin" | "lib" | "addon" | "headers" | "emscripten"
         "out": attrs.string(),
@@ -175,11 +157,7 @@ cpp_nix_build = rule(
         "labels": attrs.list(attrs.string(), default = []),
         # Optional Emscripten symbol export contract (consumed by planner/template path).
         "exported_functions": attrs.list(attrs.string(), default = []),
-        # Optional: path to a buck graph.json; if provided, used to derive WORKSPACE_ROOT
-        "graph_json": attrs.option(attrs.source(), default = None),
-        # Optional: env file to inject WORKSPACE_ROOT explicitly (used by tests)
-        "workspace_env": attrs.option(attrs.source(), default = None),
         # Optional: absolute path to flake.nix; when provided, used to pin FLK_ROOT deterministically
         "flake_file": attrs.option(attrs.source(), default = None),
-    },
+    }),
 )

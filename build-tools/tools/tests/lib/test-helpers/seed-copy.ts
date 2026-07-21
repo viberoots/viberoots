@@ -1,7 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../../../lib/macos-metadata";
-import { GENERATED_REPO_STATE_PATHS } from "../../../dev/verify/generated-state-excludes";
+import { GENERATED_REPO_STATE_PATHS } from "../../../lib/generated-repo-state";
 import { ensureNixStoreToolPathSync } from "../../../lib/tool-paths";
 
 const requiredFiles = [".buckconfig"];

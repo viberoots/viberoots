@@ -1,15 +1,21 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
+import { ensureNixStoreToolPathSync } from "../lib/tool-paths";
 import { runCommand } from "./filtered-flake-command";
 
 export async function registerEvaluationBundle(
   bundleRoot: string,
   recordProcessGroup: (processGroupId: number) => void = () => {},
+  artifactEnv?: NodeJS.ProcessEnv,
 ): Promise<string> {
-  const env = envWithResolvedNixBin(process.env);
+  if (!artifactEnv) {
+    throw new Error(
+      "registerEvaluationBundle requires an explicit artifactEnv; the caller must resolve authority at the public boundary.",
+    );
+  }
+  const env = artifactEnv;
   const result = await runCommand({
-    command: resolveToolPathSync("nix", env),
+    command: ensureNixStoreToolPathSync("nix", env),
     args: ["store", "add-path", "--name", "viberoots-evaluation-bundle", bundleRoot],
     env,
     allowFailure: true,

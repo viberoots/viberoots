@@ -1,31 +1,17 @@
 #!/usr/bin/env zx-wrapper
-import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { runNixBuildWithTransientRetry } from "./build-selected-nix-retry";
-import { getFlagBool, getFlagStr } from "../lib/cli";
-import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
-import {
-  computeSelectedCppPackageClosure,
-  filteredFlakeRsyncExcludeArgs,
-  defaultFilteredFlakeSnapshotRelPaths,
-  defaultFilteredFlakeSnapshotRsyncSources,
-  graphNodesFromJson,
-  selectedCppSnapshotRsyncSources,
-  selectedCppSnapshotRelPaths,
-  selectedNodeSnapshotRelPaths,
-  selectedNodeSnapshotRsyncSources,
-  selectedPythonSnapshotRelPaths,
-  selectedPythonSnapshotRsyncSources,
-} from "./nix-build-filtered-flake-lib";
 import { targetPackageFromLabel } from "./build-selected-helpers";
-import { resolveFinalPnpmStore } from "./update-pnpm-hash/realized-store";
-import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
-import { getImporterRootsContract } from "../lib/importer-roots";
-import { sanitizeName } from "../lib/sanitize";
+import { getArgvTokens, getFlagBool, getFlagStr } from "../lib/cli";
+import { ensureNixStoreToolPathSync, envWithResolvedNixBin } from "../lib/tool-paths";
+import {
+  defaultFilteredFlakeSnapshotRsyncSources,
+  filteredFlakeRsyncExcludeArgs,
+} from "./nix-build-filtered-flake-lib";
+import { filteredSnapshotSelection } from "./filtered-flake-snapshot-selection";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../lib/macos-metadata";
-import { findWorkspacePackageRepoDirs } from "./update-pnpm-hash/importer-workspace-packages";
-import { pnpmStoreAttrFromImporter } from "./update-pnpm-hash/paths";
 import { repairSnapshotViberootsInput } from "./filtered-flake-viberoots-input";
 import { runCommand } from "./filtered-flake-command";
 import { classifyArtifactBuild } from "../lib/artifact-build-policy";
@@ -34,249 +20,123 @@ import {
   emitArtifactPolicyEvidence,
   inspectArtifactBuildPolicy,
 } from "./artifact-policy-inspection";
+import { enterCanonicalArtifactEntrypoint } from "./canonical-artifact-entrypoint";
 import { materializeEvaluationBundle } from "./evaluation-bundle";
 import { withoutEvaluationSelectors } from "./evaluation-bundle-env";
-import { evaluationBundleHasLanguageOverrides } from "./evaluation-bundle-selectors";
+import {
+  evaluationBundleDevOverrides,
+  evaluationBundleHasLanguageOverrides,
+} from "./evaluation-bundle-selectors";
+import {
+  assertNoArtifactSelectorInjection,
+  buildArtifactEnvironment,
+  withoutArtifactEnvironmentInfluence,
+} from "../lib/artifact-environment";
+import { artifactNixPolicyArgs } from "../lib/artifact-nix-policy";
+import {
+  materializeDeclaredImporterInputs,
+  materializeDeclaredProviderEdges,
+  readDeclaredBuckActionInputs,
+} from "./nix-build-filtered-flake-declared-inputs";
+import {
+  copyWorkspaceControlIntoSnapshot,
+  copyWorkspaceGraphIntoSnapshot,
+  resolveSnapshotFlakeDir,
+} from "./nix-build-filtered-flake-preparation";
+import {
+  formatDuration,
+  prewarmFinalStoreForTarget,
+  readSnapshotStats,
+} from "./nix-build-filtered-flake-runtime";
+export {
+  assertDeclaredBuckActionInput,
+  readDeclaredBuckActionInputs,
+} from "./nix-build-filtered-flake-declared-inputs";
 
-async function pathExists(filePath: string): Promise<boolean> {
-  try {
-    await fsp.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function existingRelPaths(root: string, relPaths: readonly string[]): Promise<string[]> {
-  const present: string[] = [];
-  for (const relPath of relPaths) {
-    if (await pathExists(path.join(root, relPath))) present.push(relPath);
-  }
-  return present;
-}
-
-async function resolveSnapshotFlakePath(snapDir: string): Promise<string> {
-  const hiddenFlake = path.join(snapDir, ".viberoots", "workspace", "flake.nix");
-  if (await pathExists(hiddenFlake)) return hiddenFlake;
-  return path.join(snapDir, "flake.nix");
-}
-
-async function resolveSnapshotFlakeDir(snapDir: string): Promise<string> {
-  const flakePath = await resolveSnapshotFlakePath(snapDir);
-  if (!(await pathExists(flakePath))) {
-    throw new Error(
-      `[nix-build-filtered-flake] snapshot is missing .viberoots/workspace/flake.nix and flake.nix: ${snapDir}`,
-    );
-  }
-  return path.dirname(flakePath);
-}
-
-async function copyWorkspaceGraphIntoSnapshot(root: string, snapDir: string): Promise<void> {
-  const graphPath = path.resolve(
-    String(process.env.BUCK_GRAPH_JSON || path.join(root, DEFAULT_GRAPH_PATH)),
-  );
-  if (!(await pathExists(graphPath))) return;
-  const snapshotGraphPath = path.join(snapDir, DEFAULT_GRAPH_PATH);
-  const snapshotBuckRoot = path.join(snapDir, ".viberoots", "buck");
-  await mkdirWithMacosMetadataExclusion(snapshotBuckRoot);
-  await fsp.copyFile(graphPath, path.join(snapshotBuckRoot, "graph.json"));
-  const snapshotWorkspaceBuck = path.dirname(snapshotGraphPath);
-  const workspaceBuckStat = await fsp.lstat(snapshotWorkspaceBuck).catch(() => null);
-  if (!workspaceBuckStat?.isSymbolicLink()) {
-    await mkdirWithMacosMetadataExclusion(snapshotWorkspaceBuck);
-    await fsp.copyFile(graphPath, snapshotGraphPath);
-  }
-}
-
-async function readSelectedCppSnapshotSources(
-  root: string,
-): Promise<{ packagePaths: string[]; rsyncSources: string[] } | null> {
-  const target = String(process.env.BUCK_TARGET || "").trim();
-  const onlyCpp = String(process.env.PLANNER_ONLY_CPP || "").trim() !== "";
-  if (!onlyCpp || !target) return null;
-  const graphPath = path.resolve(
-    String(process.env.BUCK_GRAPH_JSON || path.join(root, DEFAULT_GRAPH_PATH)),
-  );
-  if (!(await pathExists(graphPath))) return null;
-  let rawGraph: unknown;
-  try {
-    rawGraph = JSON.parse(await fsp.readFile(graphPath, "utf8"));
-  } catch {
-    return null;
-  }
-  const packagePaths = computeSelectedCppPackageClosure(graphNodesFromJson(rawGraph), target);
-  if (packagePaths.length === 0) return null;
-  const relPaths = selectedCppSnapshotRelPaths(packagePaths);
-  const presentRelPaths: string[] = [];
-  for (const relPath of relPaths) {
-    const absPath = path.resolve(root, relPath);
-    if (!(await pathExists(absPath))) continue;
-    presentRelPaths.push(relPath);
-  }
-  const rsyncSources = selectedCppSnapshotRsyncSources(presentRelPaths);
-  if (rsyncSources.length === 0) return null;
-  return { packagePaths, rsyncSources };
-}
-
-async function readSelectedNodeSnapshotSources(
-  root: string,
-  attr: string,
-): Promise<{ importer: string; rsyncSources: string[] } | null> {
-  const nodeArtifactPrefixes = [
-    "node-cli.",
-    "node-service.",
-    "node-test.",
-    "node-vercel-next.",
-    "node-webapp.",
-  ];
-  if (!nodeArtifactPrefixes.some((prefix) => attr.startsWith(prefix))) return null;
-  const importers = await pnpmImportersFromAttrs(root, attr);
-  const importer = targetPackageFromLabel(String(process.env.BUCK_TARGET || "")) || importers[0];
-  if (!importer || importer === ".") return null;
-  if (!(await pathExists(path.join(root, importer, "pnpm-lock.yaml")))) return null;
-  const workspacePackageDirs = await findWorkspacePackageRepoDirs({
-    repoRoot: root,
-    importerAbs: path.join(root, importer),
-  });
-  const relPaths = selectedNodeSnapshotRelPaths(importer, workspacePackageDirs);
-  const presentRelPaths: string[] = [];
-  for (const relPath of relPaths) {
-    const absPath = path.resolve(root, relPath);
-    if (!(await pathExists(absPath))) continue;
-    presentRelPaths.push(relPath);
-  }
-  const rsyncSources = selectedNodeSnapshotRsyncSources(presentRelPaths);
-  if (rsyncSources.length === 0) return null;
-  return { importer, rsyncSources };
-}
-
-async function readSelectedPythonSnapshotSources(
-  root: string,
-): Promise<{ importer: string; rsyncSources: string[] } | null> {
-  const importer = targetPackageFromLabel(String(process.env.BUCK_TARGET || ""));
-  if (!importer || importer === ".") return null;
-  if (!(await pathExists(path.join(root, importer, "uv.lock")))) return null;
-  const presentRelPaths = await existingRelPaths(root, selectedPythonSnapshotRelPaths(importer));
-  const rsyncSources = selectedPythonSnapshotRsyncSources(presentRelPaths);
-  if (rsyncSources.length === 0) return null;
-  return { importer, rsyncSources };
-}
-
-async function readDefaultSnapshotSources(root: string): Promise<string[]> {
-  const presentRelPaths = await existingRelPaths(root, defaultFilteredFlakeSnapshotRelPaths());
-  return defaultFilteredFlakeSnapshotRsyncSources(presentRelPaths);
-}
-
-async function pnpmImportersFromAttrs(root: string, attr: string): Promise<string[]> {
-  const { workspaceRoots } = getImporterRootsContract();
-  const out: string[] = [];
-  for (const workspaceRoot of workspaceRoots) {
-    const absRoot = path.join(root, workspaceRoot);
-    let entries: fs.Dirent[] = [];
-    try {
-      entries = await fsp.readdir(absRoot, { withFileTypes: true });
-    } catch {
-      continue;
-    }
-    for (const entry of entries) {
-      if (!entry.isDirectory()) continue;
-      const importer = path.posix.join(workspaceRoot, entry.name);
-      if (sanitizeName(importer) !== attr.split(".").at(-1)) continue;
-      if (!(await pathExists(path.join(root, importer, "pnpm-lock.yaml")))) continue;
-      out.push(importer);
-    }
-  }
-  return out.sort((a, b) => a.localeCompare(b));
-}
-
-async function prewarmFinalStoreForTarget(
-  root: string,
-  attr: string,
-  flakeRef: string,
-  env: NodeJS.ProcessEnv,
-): Promise<{ env: Record<string, string>; cleanup: () => Promise<void> }> {
-  const targetImporter = targetPackageFromLabel(String(process.env.BUCK_TARGET || ""));
-  const attrImporters = await pnpmImportersFromAttrs(root, attr);
-  const importer = targetImporter || attrImporters[0] || "";
-  if (!importer || !(await pathExists(path.join(root, importer, "pnpm-lock.yaml")))) {
-    return { env: {}, cleanup: async () => {} };
-  }
-  const prepared = await resolveFinalPnpmStore({
-    repoRoot: root,
-    importer,
-    flakeRef,
-    attrPath: pnpmStoreAttrFromImporter(importer),
-    env,
-  });
-  return {
-    env: {},
-    cleanup: prepared.cleanup,
-  };
-}
-
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(ms < 10_000 ? 2 : 1)}s`;
-  const mins = Math.floor(ms / 60_000);
-  const secs = ((ms % 60_000) / 1000).toFixed(1);
-  return `${mins}m${secs}s`;
-}
-
-function readInt(value: unknown): number {
-  const n = Number.parseInt(String(value || "").trim(), 10);
-  return Number.isFinite(n) ? n : 0;
-}
-
-async function readSnapshotStats(
-  dir: string,
-): Promise<{ fileCount: number; dirCount: number; kb: number }> {
-  const [{ stdout: files }, { stdout: dirs }, { stdout: kb }] = await Promise.all([
-    runCommand({
-      command: resolveToolPathSync("find"),
-      args: [dir, "-type", "f"],
-    }),
-    runCommand({
-      command: resolveToolPathSync("find"),
-      args: [dir, "-type", "d"],
-    }),
-    runCommand({
-      command: resolveToolPathSync("du"),
-      args: ["-sk", dir],
-    }),
-  ]);
-  return {
-    fileCount: String(files).trim().split(/\n/).filter(Boolean).length,
-    dirCount: String(dirs).trim().split(/\n/).filter(Boolean).length,
-    kb: readInt(String(kb || "").split(/\s+/)[0]),
-  };
-}
-
-async function main(): Promise<void> {
+async function main(declaredArtifactToolsRoot: string): Promise<void> {
+  const devOverrides = evaluationBundleDevOverrides(getArgvTokens(), {});
   const attr = getFlagStr("attr", "");
   if (!attr) {
     console.error("[nix-build-filtered-flake] missing --attr");
     process.exit(2);
   }
   const snapshotOnly = getFlagBool("snapshot-only");
-  const root = path.resolve(String(process.env.WORKSPACE_ROOT || process.cwd()).trim());
-  const target = String(process.env.BUCK_TARGET || "").trim();
-  const platform = String(process.env.BUCK_TARGET_PLATFORM || "").trim();
+  const buckActionInputsPath = getFlagStr("buck-action-inputs", "").trim();
+  const buckAction = buckActionInputsPath !== "";
+  const declaredSourceRoot = buckAction ? String(process.env.VIBEROOTS_ROOT || "").trim() : "";
+  const root = path.resolve(getFlagStr("workspace-root", "").trim() || process.cwd());
+  const declaredActionInputs = await readDeclaredBuckActionInputs(
+    buckActionInputsPath,
+    root,
+    getFlagStr("buck-action-state-root", "").trim(),
+  );
+  const target = getFlagStr("target", "").trim();
+  assertNoArtifactSelectorInjection(process.env, {
+    allow: buckAction ? ["VBR_ARTIFACT_TOOLS_ROOT", "VIBEROOTS_ROOT"] : ["VBR_ARTIFACT_TOOLS_ROOT"],
+  });
+  // Explicit --target is the canonical public authority. Downstream helpers still
+  // read process.env.BUCK_TARGET as the internally declared selector; set it here
+  // after admission so the ambient-ingress rejection stays intact.
+  if (target) process.env.BUCK_TARGET = target;
+  const platform = "";
   const targetPackage = targetPackageFromLabel(target);
+  const policyEnv = buildArtifactEnvironment({
+    baseEnv: withoutArtifactEnvironmentInfluence(
+      envWithResolvedNixBin(withoutEvaluationSelectors(process.env)),
+    ),
+    mode: String(process.env.CI || "").trim() ? "ci" : "local",
+    stateRoot: path.join(root, "buck-out", "tmp", "artifact-environment"),
+    workspaceRoot: root,
+    artifactToolsRoot: declaredArtifactToolsRoot,
+    internal: {
+      BUCK_GRAPH_JSON: getFlagStr("buck-graph-json", "").trim(),
+      BUCK_TARGET: target,
+      WORKSPACE_ROOT: root,
+    },
+  });
+  let immutableViberootsInputRoot = "";
+  if (buckAction) {
+    const canonicalSourceRoot = path.join(
+      String(policyEnv.VBR_ARTIFACT_TOOLS_ROOT || ""),
+      "share",
+      "viberoots-source",
+    );
+    let canonicalReal: string;
+    try {
+      canonicalReal = await fsp.realpath(canonicalSourceRoot);
+    } catch (error) {
+      throw new Error("Buck action viberoots source authority is unavailable", { cause: error });
+    }
+    immutableViberootsInputRoot = canonicalReal;
+    // The canonical re-exec strips VIBEROOTS_ROOT before invoking this entrypoint. When the
+    // Buck action bootstrap did declare it, verify that it matches the canonical tool closure.
+    // When it is absent post-re-exec, canonical ingress already asserted the
+    // tool closure is authentic, so no further comparison is required.
+    if (declaredSourceRoot) {
+      const declaredReal = await fsp.realpath(declaredSourceRoot);
+      if (declaredReal !== canonicalReal) {
+        throw new Error(
+          `Buck action viberoots source authority mismatch: declared=${declaredSourceRoot} canonical=${canonicalSourceRoot}`,
+        );
+      }
+    }
+    policyEnv.VIBEROOTS_ROOT = canonicalSourceRoot;
+  }
   const sourceInventory = await inspectArtifactSource({
     targetPackages: targetPackage ? [targetPackage] : [],
     runGit: async () =>
       await runCommand({
-        command: resolveToolPathSync("git"),
+        command: ensureNixStoreToolPathSync("git", policyEnv),
         args: ["ls-files", "-z", "--others", "--exclude-standard"],
         cwd: root,
+        env: policyEnv,
         allowFailure: true,
       }),
   });
-  const policyEnv = envWithResolvedNixBin({ ...process.env, WORKSPACE_ROOT: root });
   const classification = classifyArtifactBuild({
     diagnosticImpure: getFlagBool("impure"),
     localDevelopment:
-      sourceInventory.localDevelopment || evaluationBundleHasLanguageOverrides(process.env),
+      sourceInventory.localDevelopment || evaluationBundleHasLanguageOverrides(devOverrides),
   });
   const policyEvidence = await inspectArtifactBuildPolicy({
     classification,
@@ -288,7 +148,7 @@ async function main(): Promise<void> {
       await runCommand({ command, args, env: policyEnv, allowFailure: true }),
   });
   emitArtifactPolicyEvidence(policyEvidence);
-  const tmpBase = process.env.TMPDIR || "/tmp";
+  const tmpBase = policyEnv.TMPDIR || "/tmp";
   const workDir = await mkdtempNoindex("vbr-flake-", {
     baseName: "vbr-flake",
     tmpBase,
@@ -311,63 +171,85 @@ async function main(): Promise<void> {
   try {
     await mkdirWithMacosMetadataExclusion(snapDir);
     const rsyncExcludes = filteredFlakeRsyncExcludeArgs();
-    const selectedCppSources = await readSelectedCppSnapshotSources(root);
-    const selectedNodeSources =
-      selectedCppSources == null ? await readSelectedNodeSnapshotSources(root, attr) : null;
-    const selectedPythonSources =
-      selectedCppSources == null && selectedNodeSources == null
-        ? await readSelectedPythonSnapshotSources(root)
-        : null;
+    // Single graph-derived source authority: reuse the same selection helper the
+    // canonical build-selected.ts entrypoint uses via makeFilteredFlakeRef so
+    // scaffolded importers, cpp link_deps package closures, and declared Buck
+    // sources land in one authoritative snapshot rather than two heuristic paths.
+    const declaredGraphPath = path.resolve(
+      getFlagStr("buck-graph-json", "").trim() ||
+        path.join(root, ".viberoots", "workspace", "buck", "graph.json"),
+    );
+    const snapshotSelection = await filteredSnapshotSelection(root, target, declaredGraphPath);
     const snapshotStart = Date.now();
-    const rsyncBin = resolveToolPathSync("rsync");
-    const runSnapshotRsync = async (sources: string[]) =>
-      await runCommand({
-        command: rsyncBin,
-        args: ["-a", "--delete", "--relative", ...rsyncExcludes, ...sources, `${snapDir}/`],
-        cwd: root,
-      });
-    if (selectedCppSources != null) {
-      console.error(
-        "[nix-build-filtered-flake] creating selected cpp snapshot:",
-        snapDir,
-        "packages=",
-        selectedCppSources.packagePaths.join(","),
-        "rsyncSources=",
-        String(selectedCppSources.rsyncSources.length),
-      );
-      await withHeartbeat("snapshot-rsync", runSnapshotRsync(selectedCppSources.rsyncSources));
-    } else if (selectedNodeSources != null) {
-      console.error(
-        "[nix-build-filtered-flake] creating selected node snapshot:",
-        snapDir,
-        "importer=",
-        selectedNodeSources.importer,
-        "rsyncSources=",
-        String(selectedNodeSources.rsyncSources.length),
-      );
-      await withHeartbeat("snapshot-rsync", runSnapshotRsync(selectedNodeSources.rsyncSources));
-    } else if (selectedPythonSources != null) {
-      console.error(
-        "[nix-build-filtered-flake] creating selected python snapshot:",
-        snapDir,
-        "importer=",
-        selectedPythonSources.importer,
-        "rsyncSources=",
-        String(selectedPythonSources.rsyncSources.length),
-      );
-      await withHeartbeat("snapshot-rsync", runSnapshotRsync(selectedPythonSources.rsyncSources));
-    } else {
-      console.error("[nix-build-filtered-flake] creating filtered snapshot:", snapDir);
-      const defaultSources = await readDefaultSnapshotSources(root);
-      await withHeartbeat("snapshot-rsync", runSnapshotRsync(defaultSources));
+    const rsyncBin = ensureNixStoreToolPathSync("rsync", policyEnv);
+    const presentRelPaths: string[] = [];
+    for (const rel of snapshotSelection.relPaths) {
+      try {
+        await fsp.lstat(path.join(root, rel));
+        presentRelPaths.push(rel);
+      } catch {}
     }
-    await copyWorkspaceGraphIntoSnapshot(root, snapDir);
-    const snapshotStats = await readSnapshotStats(snapDir);
+    const snapshotSources = defaultFilteredFlakeSnapshotRsyncSources(presentRelPaths);
+    console.error(
+      `[nix-build-filtered-flake] creating graph-derived snapshot: ${snapDir} target=${target || "<none>"} relPaths=${presentRelPaths.length} declaredSources=${snapshotSelection.declaredSources.length}`,
+    );
+    await withHeartbeat(
+      "snapshot-rsync",
+      runCommand({
+        command: rsyncBin,
+        args: ["-a", "--delete", "--relative", ...rsyncExcludes, ...snapshotSources, `${snapDir}/`],
+        cwd: root,
+        env: policyEnv,
+      }),
+    );
+    for (const relative of snapshotSelection.declaredSources) {
+      const copied = path.join(snapDir, relative);
+      const stat = await fsp.lstat(copied).catch(() => null);
+      if (!stat || (!stat.isFile() && !stat.isSymbolicLink())) {
+        throw new Error(`declared Buck source was excluded from filtered snapshot: ${relative}`);
+      }
+    }
+    await copyWorkspaceControlIntoSnapshot(root, snapDir);
+    const snapshotGraphPath = await copyWorkspaceGraphIntoSnapshot(
+      root,
+      snapDir,
+      declaredGraphPath,
+    );
+    // Buck action inputs that live outside the workspace tree (e.g.
+    // __provider_edges__/* staged at the action root) still need targeted copy
+    // into the snapshot; they are declared inputs but not workspace source.
+    if (buckAction && snapshotGraphPath) {
+      const importer = targetPackageFromLabel(target);
+      if (importer) {
+        await materializeDeclaredImporterInputs({
+          root,
+          snapDir,
+          graphPath: snapshotGraphPath,
+          target,
+          importer,
+          declaredActionInputs,
+        });
+        await materializeDeclaredProviderEdges({
+          root,
+          snapDir,
+          graphPath: snapshotGraphPath,
+          target,
+          importer,
+          declaredActionInputs,
+        });
+      }
+    }
+    const snapshotStats = await readSnapshotStats(snapDir, policyEnv);
     console.error(
       `[nix-build-filtered-flake] snapshot ready in ${formatDuration(Date.now() - snapshotStart)} files=${snapshotStats.fileCount} dirs=${snapshotStats.dirCount} kb=${snapshotStats.kb}`,
     );
     const flakeDir = await resolveSnapshotFlakeDir(snapDir);
-    const snapshotViberootsInput = await repairSnapshotViberootsInput({ snapDir, flakeDir });
+    const snapshotViberootsInput = await repairSnapshotViberootsInput({
+      snapDir,
+      flakeDir,
+      immutableInputRoot: immutableViberootsInputRoot,
+      env: policyEnv,
+    });
     const snapshotViberootsRoot = snapshotViberootsInput
       ? path.resolve(flakeDir, snapshotViberootsInput)
       : "";
@@ -376,6 +258,7 @@ async function main(): Promise<void> {
         "[nix-build-filtered-flake] repaired snapshot viberoots input:",
         snapshotViberootsInput,
       );
+      await fsp.rm(path.join(snapDir, "viberoots"), { recursive: true, force: true });
     }
     if (snapshotOnly) {
       console.error(
@@ -384,38 +267,50 @@ async function main(): Promise<void> {
       process.stdout.write(`${snapDir}\n`);
       return;
     }
-    if (snapshotViberootsInput) {
-      await fsp.rm(path.join(snapDir, "viberoots"), { recursive: true });
-    }
     const bundle = await materializeEvaluationBundle({
       stagedSource: snapDir,
       attr,
       target,
       classification,
       platform,
-      requireGraph: attr.startsWith("graph-generator"),
+      requireGraph: Boolean(target),
+      artifactEnv: policyEnv,
+      devOverrides,
+      wasmBackend: getFlagStr("wasm-backend", "").trim(),
+      onlyCpp: getFlagBool("planner-only-cpp"),
+      coverage: getFlagBool("coverage"),
     });
     const flakeRef = bundle.flakeRef;
     const bundleRoot = bundle.workspaceRoot;
     console.error("[nix-build-filtered-flake] building attr:", attr);
-    const nixEnv = envWithResolvedNixBin({
-      ...withoutEvaluationSelectors(process.env),
-      VBR_PNPM_FILTERED_SNAPSHOT_ROOT: bundleRoot,
-      ...(snapshotViberootsRoot
-        ? {
-            VIBEROOTS_FLAKE_INPUT_ROOT: snapshotViberootsRoot,
-            VIBEROOTS_ROOT: snapshotViberootsRoot,
-            VIBEROOTS_SOURCE_ROOT: snapshotViberootsRoot,
-          }
-        : {}),
-      VBR_FILTERED_FLAKE_SNAPSHOT: "1",
+    const inheritedNixEnv = withoutArtifactEnvironmentInfluence(
+      envWithResolvedNixBin(withoutEvaluationSelectors(process.env)),
+    );
+    const nixEnv = buildArtifactEnvironment({
+      baseEnv: inheritedNixEnv,
+      mode: String(process.env.CI || "").trim() ? "ci" : "local",
+      stateRoot: path.join(root, "buck-out", "tmp", "artifact-environment"),
+      workspaceRoot: root,
+      artifactToolsRoot: declaredArtifactToolsRoot,
+      internal: {
+        VBR_PNPM_FILTERED_SNAPSHOT_ROOT: bundleRoot,
+        ...(snapshotViberootsRoot
+          ? {
+              VIBEROOTS_FLAKE_INPUT_ROOT: snapshotViberootsRoot,
+              VIBEROOTS_ROOT: snapshotViberootsRoot,
+              VIBEROOTS_SOURCE_ROOT: snapshotViberootsRoot,
+            }
+          : {}),
+        VBR_FILTERED_FLAKE_SNAPSHOT: "1",
+      },
     });
-    const nixBin = resolveToolPathSync("nix", nixEnv);
-    const fixedStore = await prewarmFinalStoreForTarget(root, attr, flakeRef, nixEnv);
+    const nixBin = ensureNixStoreToolPathSync("nix", nixEnv);
+    const fixedStore = await prewarmFinalStoreForTarget(bundleRoot, root, attr, flakeRef, nixEnv);
     exactStoreCleanup = fixedStore.cleanup;
     const buildStart = Date.now();
     const nixArgs = [
       "build",
+      ...artifactNixPolicyArgs(),
       "--no-write-lock-file",
       "--accept-flake-config",
       flakeRef,
@@ -466,7 +361,14 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  const declaredBuckAction = getFlagStr("buck-action-inputs", "").trim() !== "";
+  const artifactToolsRoot = enterCanonicalArtifactEntrypoint(process.cwd(), {
+    declaredBuckAction,
+    allowDevOverrides: true,
+  });
+  main(artifactToolsRoot).catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}

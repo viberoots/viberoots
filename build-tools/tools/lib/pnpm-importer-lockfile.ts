@@ -6,6 +6,7 @@ import {
   syncLocalPrefetchIntoPnpmStore,
   syncSourcePnpmStoreIntoLocalPrefetch,
 } from "../dev/update-pnpm-hash/prefetched-store";
+import { preferredPnpmStoreDir } from "../dev/update-pnpm-hash/lockfile-shared";
 import { withHiddenNodeModules } from "./pnpm-node-modules-guard";
 import { parsePnpmLock } from "./pnpm-lock";
 import { externalPnpmStateDirs, removeLegacyImporterPnpmState } from "./pnpm-state-paths";
@@ -42,6 +43,69 @@ function lockfileLooksPlaceholder(doc: { packages?: Record<string, any> }): bool
   return pkgCount === 0;
 }
 
+function isWithin(root: string, candidate: string): boolean {
+  const rel = path.relative(root, candidate);
+  return rel === "" || (!rel.startsWith(`..${path.sep}`) && rel !== ".." && !path.isAbsolute(rel));
+}
+
+async function isCompleteWorkspaceLink(opts: {
+  repoRootAbs: string;
+  importerAbs: string;
+  dependencyName: string;
+  requested: unknown;
+  resolved: unknown;
+}): Promise<boolean> {
+  if (typeof opts.requested !== "string" || !opts.requested.startsWith("workspace:")) {
+    return false;
+  }
+  if (!opts.resolved || typeof opts.resolved !== "object") return false;
+  const entry = opts.resolved as { specifier?: unknown; version?: unknown };
+  if (entry.specifier !== opts.requested) return false;
+  if (typeof entry.version !== "string" || !entry.version.startsWith("link:")) return false;
+
+  const repoRoot = await fsp.realpath(opts.repoRootAbs).catch(() => path.resolve(opts.repoRootAbs));
+  const linkedPath = path.resolve(opts.importerAbs, entry.version.slice("link:".length));
+  const linkedRoot = await fsp.realpath(linkedPath).catch(() => "");
+  if (!linkedRoot || !isWithin(repoRoot, linkedRoot)) return false;
+
+  const linkedPackage = await readJson<{ name?: unknown }>(
+    path.join(linkedRoot, "package.json"),
+  ).catch(() => null);
+  return linkedPackage?.name === opts.dependencyName;
+}
+
+async function emptyPackageGraphIsCompleteForWorkspaceLinks(opts: {
+  repoRootAbs: string;
+  importerAbs: string;
+  pkg: PkgJson;
+  importer: Record<string, any>;
+}): Promise<boolean> {
+  const groups = [
+    "dependencies",
+    "devDependencies",
+    "optionalDependencies",
+    "peerDependencies",
+  ] as const;
+  for (const group of groups) {
+    const requested = opts.pkg[group] || {};
+    const resolved = opts.importer[group] || {};
+    for (const [dependencyName, specifier] of Object.entries(requested)) {
+      if (
+        !(await isCompleteWorkspaceLink({
+          repoRootAbs: opts.repoRootAbs,
+          importerAbs: opts.importerAbs,
+          dependencyName,
+          requested: specifier,
+          resolved: resolved[dependencyName],
+        }))
+      ) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 async function hasLocalWorkspaceFile(importerAbs: string): Promise<boolean> {
   return await fsp
     .access(path.join(importerAbs, "pnpm-workspace.yaml"))
@@ -56,17 +120,6 @@ function generatedWorkspaceOverridesMissing(doc: Record<string, any>): boolean {
     if (overrides[name] !== version) return true;
   }
   return false;
-}
-
-function preferredPnpmStoreDir(defaultStoreDir: string): {
-  storeDir: string;
-  usesSharedPrefetch: boolean;
-} {
-  const localPrefetch = String(process.env.LOCAL_PNPM_STORE || "").trim();
-  if (localPrefetch) {
-    return { storeDir: localPrefetch, usesSharedPrefetch: true };
-  }
-  return { storeDir: defaultStoreDir, usesSharedPrefetch: false };
 }
 
 async function activeViberootsOverride(repoRootAbs: string): Promise<string> {
@@ -123,7 +176,18 @@ export async function importerLockfileNeedsRegen(opts: {
 
   const hasAnyPkgDeps =
     pkgDeps.length + pkgDevDeps.length + pkgOptDeps.length + pkgPeerDeps.length > 0;
-  if (hasAnyPkgDeps && lockfileLooksPlaceholder(doc)) return true;
+  if (
+    hasAnyPkgDeps &&
+    lockfileLooksPlaceholder(doc) &&
+    !(await emptyPackageGraphIsCompleteForWorkspaceLinks({
+      repoRootAbs: opts.repoRootAbs,
+      importerAbs,
+      pkg,
+      importer: imp as Record<string, any>,
+    }))
+  ) {
+    return true;
+  }
 
   if (!sameKeySet(pkgDeps, lockDeps)) return true;
   if (!sameKeySet(pkgDevDeps, lockDevDeps)) return true;

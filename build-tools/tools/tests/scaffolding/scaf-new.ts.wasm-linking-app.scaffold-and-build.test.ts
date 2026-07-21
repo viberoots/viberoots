@@ -121,6 +121,13 @@ test("scaf: new ts wasm-linking-app; build tinygo wasm; callAdd2() returns 5", a
       inlineTargetsText.includes("node_wasm_inline_module"),
       "expected wasm-inline package to use node_wasm_inline_module",
     );
+    const cliTargetsText = await fs.readFile(cliTargets, "utf8");
+    for (const provider of ["package.json", "wasm_inline", "wasm_inline_cpp", "wasm_inline_py"]) {
+      assert.ok(
+        cliTargetsText.includes(`:${provider}`),
+        `expected wasm-linking CLI to declare ${provider}`,
+      );
+    }
 
     const coreTargetsText = await fs.readFile(coreTargets, "utf8");
     assert.ok(coreTargetsText.includes("header_deps"), "expected core_wasm to declare header_deps");

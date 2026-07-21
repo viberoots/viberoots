@@ -126,12 +126,15 @@ export async function scaffoldAndPrepareWorkspace(
     stdio: "inherit",
     env: tempWorkspaceEnv(tmp, { BUCK_TARGET: appLabel }),
   })`zx-wrapper ${viberootsDevTool("install/deps-main.ts", tmp)} --verbose --glue-only`;
-  await reconcileTempDependencyInputs(tmp, $);
+  await reconcileTempDependencyInputs(tmp, _$);
   await stageTempRepoPaths({
     tmp,
     _$,
     recursiveRoots: [appRel],
-    explicitPaths: ["projects/node-modules.hashes.json", ...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS],
+    explicitPaths: [
+      "projects/config/node-modules.hashes.json",
+      ...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
+    ],
   });
   await fsp.rm(graphJsonAbs, { force: true });
   await _$({
@@ -160,7 +163,10 @@ export async function buildSelectedSsr(
     tmp,
     _$,
     recursiveRoots: [importer],
-    explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS, "projects/node-modules.hashes.json"],
+    explicitPaths: [
+      ...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
+      "projects/config/node-modules.hashes.json",
+    ],
   });
   await reconcilePnpmStore({ repoRoot: tmp, importer });
   const outPath = await buildSelectedOutPath({ tmp, $: _$, target: label });

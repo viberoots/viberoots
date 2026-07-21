@@ -6,46 +6,10 @@ import { withBootstrapKeychainServiceName } from "./infisical-iac-bootstrap-conf
 import { resolverConfigPath } from "./infisical-iac-bootstrap-preflight";
 import { readSprinkleRefConfig } from "./sprinkleref-config";
 import * as bootstrapGuard from "./sprinkleref-bootstrap-guard";
-import { createSprinkleRefStore } from "./sprinkleref-store";
 import { initLocalSprinkleRefValues, initSprinkleRefConfigs } from "./sprinkleref-templates";
-import type { SprinkleRefBackendConfig } from "./sprinkleref-types";
+import { createSprinkleRefCredentialSink } from "./infisical-iac-bootstrap-sprinkleref-sink";
 
 export { LocalFileCredentialSink } from "./infisical-iac-bootstrap-local-file-sink";
-
-type SprinkleRefWritableStore = {
-  describe(): string;
-  has(ref: string): Promise<boolean>;
-  read(ref: string): Promise<string | undefined>;
-  add(ref: string, value: string): Promise<void>;
-  update(ref: string, value: string): Promise<void>;
-};
-
-class SprinkleRefCredentialSink implements CredentialSink {
-  private readonly category: string;
-  private readonly store: SprinkleRefWritableStore;
-
-  constructor(category: string, store: SprinkleRefWritableStore) {
-    this.category = category;
-    this.store = store;
-  }
-
-  describe() {
-    return `SprinkleRef ${this.category} ${this.store.describe()}`;
-  }
-
-  async has(ref: string) {
-    return await this.store.has(ref);
-  }
-
-  async read(ref: string) {
-    return await this.store.read(ref);
-  }
-
-  async write(ref: string, value: string, overwrite: boolean) {
-    if (overwrite && (await this.store.has(ref))) return await this.store.update(ref, value);
-    await this.store.add(ref, value);
-  }
-}
 
 export type CredentialSinkSelection = {
   kind: "local-file" | "macos-keychain" | "sprinkleref";
@@ -91,9 +55,14 @@ export async function createCredentialSink(
   if (args.credentialSink === "local-file")
     return new LocalFileCredentialSink(args.localCredentialFile);
   if (selection.kind === "sprinkleref") {
-    return createSprinkleRefCredentialSinkFromBackend(
+    const resolved = await resolvedSprinkleRefBackend(
+      args,
+      selection.configPath,
+      opts.workspaceRoot,
+    );
+    return createSprinkleRefCredentialSink(
       selection.category || args.sprinkleCategory || "bootstrap",
-      await resolvedSprinkleRefBackend(args, selection.configPath, opts.workspaceRoot),
+      resolved.backend,
     );
   }
   if (selection.kind === "macos-keychain")
@@ -117,25 +86,16 @@ async function resolvedSprinkleRefBackend(
   );
 }
 
-function createSprinkleRefCredentialSinkFromBackend(
-  category: string,
-  resolved: { backend: SprinkleRefBackendConfig },
-) {
-  return new SprinkleRefCredentialSink(category, createSprinkleRefStore(resolved.backend));
-}
-
 async function createMacosCredentialSink(
   args: BootstrapArgs,
   platform: NodeJS.Platform,
   workspaceRoot?: string,
 ) {
   const selection = await macosSelection(args, { platform, workspaceRoot });
-  return new SprinkleRefCredentialSink(
+  return createSprinkleRefCredentialSink(
     args.sprinkleCategory || "bootstrap",
-    createSprinkleRefStore(
-      { backend: "macos-keychain", service: selection.description },
-      { platform },
-    ),
+    { backend: "macos-keychain", service: selection.description },
+    { platform },
   );
 }
 

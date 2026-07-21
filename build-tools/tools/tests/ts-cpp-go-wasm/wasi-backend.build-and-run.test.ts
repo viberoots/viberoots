@@ -98,7 +98,6 @@ nix_go_tiny_wasm_lib(
       tmp,
       $,
       target: "//projects/libs/math-core:core_wasm",
-      env: { PLANNER_ONLY_CPP: "1" },
     });
     // Basic artifact presence check
     const libDir = path.join(outCppPath, "lib");

@@ -1,9 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
-
-const realNixBin = resolveToolPathSync("nix", envWithResolvedNixBin(process.env));
 
 const demoTarget = {
   name: "//projects/apps/demo:app",
@@ -25,68 +22,50 @@ export async function writeDemoGraph(tmp: string, targets: unknown[] = [demoTarg
   await fsp.writeFile(graphPath, JSON.stringify(targets, null, 2) + "\n", "utf8");
 }
 
-export async function writeSelectedNixStub(tmp: string, targetLog: string, successOutput: string) {
-  const stubBin = path.join(tmp, "stub-bin");
-  const fakeOut = path.join(tmp, "fake-selected-out");
-  await fsp.mkdir(stubBin, { recursive: true });
+export async function writeRunnableFixture(
+  tmp: string,
+  prodOutput: string,
+  devOutput = prodOutput,
+): Promise<string> {
+  const fixtureDir = path.join(tmp, "buck-out", "tmp", "package-label-runnable");
+  const prodBin = path.join(fixtureDir, "prod");
+  const devBin = path.join(fixtureDir, "dev");
+  const manifestPath = path.join(fixtureDir, "manifest.json");
+  await fsp.mkdir(fixtureDir, { recursive: true });
   await fsp.writeFile(
-    path.join(stubBin, "nix"),
-    [
-      "#!/usr/bin/env bash",
-      "set -euo pipefail",
-      'args="$*"',
-      'if [[ "$args" == flake\\ prefetch\\ --json\\ --no-use-registries\\ --option\\ flake-registry\\ \\ path:* ]] || [[ "$args" == store\\ add-path\\ --name\\ viberoots-evaluation-bundle\\ * ]]; then',
-      `  exec ${JSON.stringify(realNixBin)} "$@"`,
-      "fi",
-      'bundle="${args#*path:}"',
-      'bundle="${bundle%%\\?dir=*}"',
-      `echo "$bundle" >> ${JSON.stringify(targetLog)}`,
-      `out=${JSON.stringify(fakeOut)}`,
-      'mkdir -p "$out/bin"',
-      "cat > \"$out/bin/demo\" <<'EOF'",
-      "#!/usr/bin/env bash",
-      `echo ${successOutput}`,
-      "EOF",
-      'chmod +x "$out/bin/demo"',
-      'echo "$out"',
-      "",
-    ].join("\n"),
+    prodBin,
+    `#!/usr/bin/env bash\nset -euo pipefail\necho ${JSON.stringify(prodOutput)}\n`,
     "utf8",
   );
-  await fsp.chmod(path.join(stubBin, "nix"), 0o755);
-  return stubBin;
-}
-
-export async function writePnpmCwdStub(tmp: string, stubBin: string, output: string) {
-  const tmpReal = await fsp.realpath(tmp).catch(() => tmp);
   await fsp.writeFile(
-    path.join(stubBin, "pnpm"),
-    [
-      "#!/usr/bin/env bash",
-      "set -euo pipefail",
-      `if [[ "$PWD" != ${JSON.stringify(tmp)} && "$PWD" != ${JSON.stringify(tmpReal)} ]]; then`,
-      '  echo "unexpected-cwd:$PWD" >&2',
-      "  exit 98",
-      "fi",
-      `echo ${output}`,
-      "",
-    ].join("\n"),
+    devBin,
+    `#!/usr/bin/env bash\nset -euo pipefail\necho ${JSON.stringify(devOutput)}\n`,
     "utf8",
   );
-  await fsp.chmod(path.join(stubBin, "pnpm"), 0o755);
-}
-
-export async function selectedTargets(bundleLog: string): Promise<string[]> {
-  const bundlePaths = String(await fsp.readFile(bundleLog, "utf8"))
-    .split(/\n+/)
-    .map((entry) => entry.trim())
-    .filter((entry) => /^\/nix\/store\/[a-z0-9]{32}-viberoots-evaluation-bundle$/.test(entry));
-  return await Promise.all(
-    bundlePaths.map(async (bundlePath) => {
-      const selection = JSON.parse(
-        await fsp.readFile(path.join(bundlePath, "selection.json"), "utf8"),
-      ) as { target?: string };
-      return selection.target || "";
-    }),
+  await Promise.all([fsp.chmod(prodBin, 0o755), fsp.chmod(devBin, 0o755)]);
+  await fsp.writeFile(
+    manifestPath,
+    `${JSON.stringify(
+      [
+        {
+          label: "//projects/apps/demo:app",
+          kind: "bin",
+          bins: [prodBin],
+          aux: [],
+          runnable: {
+            kind: "native-bin",
+            run: {
+              prod: { argv: [prodBin] },
+              dev: { argv: [devBin] },
+            },
+            artifacts: { bins: [prodBin] },
+          },
+        },
+      ],
+      null,
+      2,
+    )}\n`,
+    "utf8",
   );
+  return manifestPath;
 }

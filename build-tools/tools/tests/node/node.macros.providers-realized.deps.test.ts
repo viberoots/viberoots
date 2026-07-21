@@ -8,11 +8,12 @@ import { runInTemp } from "../lib/test-helpers";
 test("node macros: provider edges realized into deps for nix_node_test", async () => {
   await runInTemp("node-macro-providers-deps", async (tmp, $) => {
     // Minimal provider target and auto_map mapping
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
-genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
-EOF'`;
+    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "third_party", "providers", "TARGETS"),
+      'genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])\n',
+      "utf8",
+    );
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<'\''EOF'\''

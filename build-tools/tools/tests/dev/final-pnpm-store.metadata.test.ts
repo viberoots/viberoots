@@ -37,7 +37,7 @@ test("standalone source root owns its root hash through current symlink", async 
       await fsp.readFile(path.join(root, "build-tools/tools/nix/node-modules.hashes.json"), "utf8"),
       "{}\n",
     );
-    await assert.rejects(fsp.stat(path.join(root, "projects/node-modules.hashes.json")), {
+    await assert.rejects(fsp.stat(path.join(root, "projects/config/node-modules.hashes.json")), {
       code: "ENOENT",
     });
   } finally {
@@ -48,7 +48,7 @@ test("standalone source root owns its root hash through current symlink", async 
 test("parent viberoots importer updates the nested canonical map only", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-parent-hash-owner-"));
   const nestedMap = path.join(root, "viberoots/build-tools/tools/nix/node-modules.hashes.json");
-  const parentMap = path.join(root, "projects/node-modules.hashes.json");
+  const parentMap = path.join(root, "projects/config/node-modules.hashes.json");
   try {
     await fsp.mkdir(path.join(root, "viberoots/build-tools/tools/dev"), { recursive: true });
     await fsp.mkdir(path.dirname(nestedMap), { recursive: true });
@@ -72,7 +72,7 @@ test("parent viberoots importer updates the nested canonical map only", async ()
 test("metadata snapshot restores non-owner deletions byte-for-byte", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-hash-footprint-"));
   const viberootsMap = path.join(root, "build-tools/tools/nix/node-modules.hashes.json");
-  const workspaceMap = path.join(root, "projects/node-modules.hashes.json");
+  const workspaceMap = path.join(root, "projects/config/node-modules.hashes.json");
   const beforeViberoots = `{"pnpm-lock.yaml":"${hashA}","viberoots":"keep"}\n`;
   const beforeWorkspace = `{"pnpm-lock.yaml":"${hashA}","workspace":"keep"}\n`;
   try {

@@ -50,3 +50,31 @@ test("glue/generator emits node-lock-index.json deterministically", async () => 
     assert.equal(a, b, "sidecar should be deterministic across runs");
   });
 });
+
+test("glue/generator emits an empty node-lock-index for an empty graph", async () => {
+  await runInTemp("exp-node-sidecar-empty", async (tmp, $) => {
+    const sidecar = path.join(tmp, DEFAULT_NODE_LOCK_INDEX_PATH);
+    const graph = path.join(tmp, DEFAULT_GRAPH_PATH);
+    await fs.outputFile(
+      sidecar,
+      JSON.stringify({ version: 1, index: { "//stale:target": "lockfile:stale" } }) + "\n",
+    );
+    await fs.outputFile(
+      graph,
+      JSON.stringify({ $schema: "x", version: 1, nodes: [] }, null, 2) + "\n",
+    );
+
+    await $({ cwd: tmp })`node viberoots/build-tools/tools/buck/gen-provider-index.ts`;
+
+    assert.deepEqual(JSON.parse(await fs.readFile(sidecar, "utf8")), {
+      $schema: "https://example.com/schemas/node-lock-index.schema.json",
+      version: 1,
+      index: {},
+    });
+
+    const firstStat = await fs.stat(sidecar);
+    await new Promise((resolve) => setTimeout(resolve, 15));
+    await $({ cwd: tmp })`node viberoots/build-tools/tools/buck/gen-provider-index.ts`;
+    assert.equal((await fs.stat(sidecar)).mtimeMs, firstStat.mtimeMs);
+  });
+});

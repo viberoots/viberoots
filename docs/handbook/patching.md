@@ -138,11 +138,16 @@ Node and Python only (Go/C++ don’t require glue for patch invalidation). Local
 
 Running `i` in the dev shell runs the full sequence automatically. CI runs the same as separate stages.
 
-### `BUCK_TARGET` behavior in `ensureGraph()`
+### Selected-target graph behavior
 
-Some tooling flows set `BUCK_TARGET` (for example `viberoots/build-tools/tools/dev/build-selected.ts` and the `graph-generator-selected` Nix entrypoint). When `BUCK_TARGET` is set, `ensureGraph()` treats `.viberoots/workspace/buck/graph.json` as valid only if the exported graph already contains that target after normalization (drop cell prefixes and config suffixes).
+Public artifact commands transport the selected target through canonical argv or declared Buck
+action inputs. They do not accept ambient `BUCK_TARGET` as target authority. The selected target and
+generated graph are recorded in the immutable evaluation bundle consumed by Nix.
 
-If the existing graph is missing the requested target, `ensureGraph()` regenerates the graph before continuing. This keeps target-scoped tooling reliable in temp workspaces and partial clones where the graph may have been generated with a narrower query.
+Explicit `u` owns graph and provider reconciliation. If an ordinary `b`, `i`, post-clone, or
+devshell entry sees a missing target or stale generated graph, it fails closed with repair guidance
+instead of mutating the workspace. Temp-workspace tests that scaffold new targets must run public
+`u` before building them.
 
 Provider index notes:
 
@@ -189,7 +194,7 @@ node viberoots/build-tools/tools/dev/patches-lint.ts --lang go
 In CI, strict mode runs and exits nonzero on violations:
 
 ```
-node viberoots/build-tools/tools/ci/run-stage.ts --stage patches-lint
+viberoots/build-tools/tools/ci/run-stage.sh --stage patches-lint
 ```
 
 Python (uv) importer‑local patches use the same linter. To scope checks locally:

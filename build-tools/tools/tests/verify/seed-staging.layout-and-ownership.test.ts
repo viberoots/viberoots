@@ -67,6 +67,7 @@ test("verify seed staging preserves stages pinned by live verify runs", async ()
   const workspaceRoot = await mktemp("seed-stage-workspace-");
   const seed = await mktemp("seed-stage-prune-source-");
   await writeRequiredStageFiles(seed);
+  await writeRequiredStageFiles(workspaceRoot);
   await initGitSeed(seed);
   const staleStage = path.join(stageRoot, "seed-live-pinned");
   await fsp.mkdir(staleStage, { recursive: true });

@@ -7,7 +7,7 @@ import type {
   S3StaticDeployment,
 } from "../../deployments/contract";
 import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
-import { stableBuckIsolation } from "../../lib/buck-command-env";
+import { reconcileSyntheticDeploymentGraph } from "./deployment-graph.fixture";
 
 export type ReviewedDeployment =
   | CloudflarePagesDeployment
@@ -21,7 +21,6 @@ export type TargetsFileFragment = {
 };
 
 const SYNTHETIC_TARGETS_MANIFEST = ".tmp-deployment-targets.fragments.json";
-let syntheticInstallBuckNonce = 0;
 
 export function labelDir(label: string): string {
   return label.replace(/^\/\//, "").split(":")[0] || "";
@@ -146,22 +145,19 @@ export async function writeTargetsFragments(
   await writeTargetsManifest(workspaceRoot, fragments);
 }
 
+export async function writeReconciledTargetsFragments(
+  workspaceRoot: string,
+  newFragments: Map<string, TargetsFileFragment>,
+): Promise<void> {
+  await writeTargetsFragments(workspaceRoot, newFragments);
+  await reconcileSyntheticDeploymentGraph(workspaceRoot);
+}
+
 export async function synchronizeInstalledDeployments(
   workspaceRoot: string,
   deployments: ReviewedDeployment[],
 ): Promise<void> {
-  const syncIsolation = stableBuckIsolation(
-    path.join(workspaceRoot, `.synthetic-install-sync-${++syntheticInstallBuckNonce}`),
-    "zxtest-install-sync",
-  );
-  const queryEnv: NodeJS.ProcessEnv = {
-    ...process.env,
-    // Use a fresh temp-repo buck isolation after rewriting synthetic TARGETS so cquery does not
-    // reuse a stale package view from an earlier install in the same temp workspace.
-    BUCK_ISOLATION_DIR: syncIsolation,
-    BUCK_NESTED_ISO: syncIsolation,
-    BUCK_ISOLATION_DIR_EXPORTER: syncIsolation,
-  };
+  const queryEnv = await reconcileSyntheticDeploymentGraph(workspaceRoot);
   const resolved = await Promise.all(
     deployments.map((deployment) =>
       resolveDeploymentFromTarget(workspaceRoot, deployment.label, { env: queryEnv }),

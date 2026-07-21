@@ -64,8 +64,8 @@ test("ci buck-test stage delegates Buck execution through verify passes", async 
     "expected no raw buck2 test invocation in buck-test stage",
   );
   assert.ok(
-    txt.includes('process.env.COVERAGE === "1"'),
-    "expected coverage mode to be preserved when parsing verify execution policy",
+    txt.includes("coverage: Boolean(opts.coverage)"),
+    "expected coverage mode to enter through declared stage options",
   );
 });
 

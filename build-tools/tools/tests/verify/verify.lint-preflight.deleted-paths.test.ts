@@ -31,6 +31,12 @@ test("lint preflight expands project selector directories to existing files befo
 
     const paths = await resolveLintPreflightFilterPaths(tmp, ["./projects"]);
 
-    assert.deepEqual(paths, ["projects/config/shared.json"]);
+    // Exact sorted expectation; if the seed grows a new legitimate file under
+    // projects/, add it here explicitly rather than loosening the assertion.
+    assert.deepEqual(paths, [
+      "projects/config/TARGETS",
+      "projects/config/node-modules.hashes.json",
+      "projects/config/shared.json",
+    ]);
   });
 });

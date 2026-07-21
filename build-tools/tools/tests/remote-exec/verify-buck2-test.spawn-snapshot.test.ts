@@ -13,6 +13,7 @@ import {
   remoteArgvSnapshot,
   type RemoteMode,
 } from "./verify-buck2-test.spawn-snapshot-fixtures";
+import { VERIFY_BUCK2_TEST_REMOTE_ENV as remoteEnv } from "./verify-buck2-test-remote-env";
 
 type SpawnCall = {
   command: string;
@@ -27,11 +28,7 @@ type Snapshot = {
   call: SpawnCall;
 };
 
-const remoteEnv = {
-  VBR_REMOTE_ARTIFACT_DIR: "/tmp/vbr-remote/artifacts",
-  VBR_REMOTE_BUCK_CONFIG: "/tmp/vbr-remote/buckconfig",
-  VBR_REMOTE_EXEC_SYSTEM: "x86_64-linux",
-};
+const artifactToolsRoot = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-artifact-tools";
 
 function captureSpawn(calls: SpawnCall[]) {
   return ((command: string, args: string[], options: SpawnCall["options"]) => {
@@ -145,6 +142,7 @@ function spawnSnapshot(
       threadsOverride: 3,
       passName: spawnOpts.passName || "shared",
       executionPolicy: policy,
+      artifactToolsRoot,
       spawnImpl: captureSpawn(calls),
       ...spawnOpts,
     });
@@ -228,6 +226,7 @@ test("spawnVerifyBuck2Tests captures a child close before wait begins", async ()
     threadsOverride: 1,
     passName: "shared",
     executionPolicy: parseVerifyExecutionPolicy({ env: {} }),
+    artifactToolsRoot,
     spawnImpl: (() => {
       queueMicrotask(() => {
         proc.emit("exit", 0, null);

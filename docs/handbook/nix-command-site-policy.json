@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "expectedCount": 342,
+  "expectedDigest": "832da29cc5176c38edfdf94e08e6626313447fc58d3ba894fa50d9ace537d39b",
+  "classificationRules": [
+    {
+      "pathPattern": "^build-tools/tools/dev/(?:dev-with-wasm-watch|run-runnable(?:\\.ts|-core\\.ts)|watch-wasm-(?:coordinator|coordinator-daemon))",
+      "role": "live-d",
+      "justification": "Live development launchers and watcher coordinators intentionally retain working-tree observation and cannot publish artifacts."
+    },
+    {
+      "pathPattern": "^build-tools/tools/dev/dev-build(?:\\.ts|/)",
+      "role": "canonical-artifact",
+      "justification": "The public build command and its private orchestration implement canonical artifact admission and construction, including explicitly classified non-release development bundles."
+    },
+    {
+      "pathPattern": "^build-tools/(?:tools/(?:dev/(?:buck-global-input-handoff\\.ts$|install/|update|require-unified-pnpm-store)|lib/maintenance-gc|buck/prebuild/|patch/|scaffolding/)|tools/bin/devshell\\.sh)",
+      "role": "update-install",
+      "justification": "Explicit update, install, bootstrap, scaffolding, repair, and maintenance commands own mutation or reconciliation."
+    },
+    {
+      "pathPattern": "^build-tools/(?:go|cpp|python|rust|node|wasm)/",
+      "role": "canonical-artifact",
+      "justification": "Language artifact rules must use canonical immutable inputs, tools, and artifact policy."
+    },
+    {
+      "pathPattern": "^build-tools/lang/(?:nix_|remote_action_policy|source_snapshot|global_inputs|importer_wiring_probe|language_wiring_probe|provider_edges|wasm_package_local_wiring|internal/)",
+      "role": "canonical-artifact",
+      "justification": "Shared Buck artifact actions, wiring, provider metadata, and command assembly are canonical artifact boundaries."
+    },
+    {
+      "pathPattern": "^build-tools/deployments/migration_bundle_rules\\.bzl$",
+      "role": "canonical-artifact",
+      "justification": "Migration bundles are declared Buck artifacts and must use canonical action inputs and tools."
+    },
+    {
+      "pathPattern": "^build-tools/tools/nix/",
+      "role": "canonical-artifact",
+      "justification": "Nix derivations and generated scripts are artifact construction boundaries."
+    },
+    {
+      "pathPattern": "^build-tools/tools/(?:ci/|remote-exec/|buck/node-cli-bundle\\.ts$|lib/artifact-command-runner\\.ts$|dev/(?:artifact|build-selected|evaluation-bundle|filtered-flake|nix-build-filtered-flake|node-modules-build|run-runnable-(?:graph|nix)))",
+      "role": "canonical-artifact",
+      "justification": "Local, CI, remote, and Buck artifact executors share canonical environment, source, and policy authorities."
+    },
+    {
+      "pathPattern": "^build-tools/tools/deployments/",
+      "role": "non-artifact-orchestration",
+      "justification": "Deployment control-plane commands consume reviewed build outputs and manage external state; they do not construct repository build artifacts."
+    },
+    {
+      "pathPattern": "^build-tools/tools/buck/(?:export-inline\\.ts$|exporter/|gen-auto-map\\.ts$|sync-providers\\.ts$)",
+      "role": "non-artifact-orchestration",
+      "justification": "Buck graph export and provider synchronization commands produce control-plane metadata rather than build artifacts."
+    },
+    {
+      "pathPattern": "^build-tools/tools/dev/(?:verify/|tail-log/|buck-kill-stale\\.ts$|buck-watchdog\\.ts$|bulk-move\\.ts$|clear-overrides-cpp\\.ts$|coverage-summary\\.ts$|file-size-globs\\.ts$|lint-global-stamping\\.ts$|nix-gaps-baseline\\.ts$|prewarm-toolchains\\.ts$|stamping-lint\\.ts$|startup-check\\.ts$|toolchain-paths\\.ts$|viberoots-root-coupling-inventory\\.ts$|viberoots\\.ts$)",
+      "role": "non-artifact-orchestration",
+      "justification": "Verification, status, cleanup, inventory, and developer control commands inspect or coordinate state without publishing artifacts."
+    },
+    {
+      "pathPattern": "^build-tools/tools/lib/(?:changed-paths|consumer-bootstrap|deployment-test-targets|fs-helpers|live-bootstrap|lockfiles|managed-command|node-run|open-file-inspection|pnpm-importer-lockfile|process-inspection|template-test-selector-query|tool-paths|workspace-remote-source)\\.ts$",
+      "role": "non-artifact-orchestration",
+      "justification": "These shared utilities support bootstrap, inspection, querying, deployment tests, and process control without constructing artifacts."
+    }
+  ]
+}

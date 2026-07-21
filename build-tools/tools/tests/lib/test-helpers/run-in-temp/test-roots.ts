@@ -140,6 +140,10 @@ export async function stableXdgCacheRoot(): Promise<string> {
   return root;
 }
 
+export function absoluteXdgCacheHome(inherited: string | undefined, fallback: string): string {
+  return path.isAbsolute(inherited || "") ? inherited! : fallback;
+}
+
 export async function stableTestHomeOncePerWorker(): Promise<string> {
   if (stableTestHomeOnce) return await stableTestHomeOnce;
   stableTestHomeOnce = (async () => {

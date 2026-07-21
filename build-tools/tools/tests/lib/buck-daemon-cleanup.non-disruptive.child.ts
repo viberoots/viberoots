@@ -1,8 +1,14 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { spawn } from "node:child_process";
 import { runInTemp } from "./test-helpers";
+
+async function exists(file: string): Promise<boolean> {
+  return await fsp
+    .access(file)
+    .then(() => true)
+    .catch(() => false);
+}
 
 async function findForkserverDir(tmp: string): Promise<string | null> {
   const buckOut = path.join(tmp, "buck-out");
@@ -28,7 +34,8 @@ async function findForkserverDir(tmp: string): Promise<string | null> {
   return null;
 }
 
-process.env.TEST_KEEP_TMP = "1";
+// This child exits through runInTemp cleanup; only the interruption fixture keeps its temp root.
+delete process.env.TEST_KEEP_TMP;
 // Keep early TMP disabled by default; parents should synchronize on READY/TMP emitted below.
 if (!Object.prototype.hasOwnProperty.call(process.env, "TEST_EARLY_TMP_STDOUT")) {
   process.env.TEST_EARLY_TMP_STDOUT = "0";
@@ -36,28 +43,13 @@ if (!Object.prototype.hasOwnProperty.call(process.env, "TEST_EARLY_TMP_STDOUT"))
 
 await runInTemp("buck-cleanup-nondisruptive-child", async (tmp, $) => {
   console.log(`TMP ${tmp}`);
-  const buck = spawn("buck2", ["build", "//.viberoots/workspace:flake.lock"], {
+  await $({
     cwd: tmp,
     env: {
       ...process.env,
       HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
     },
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: true,
-  });
-  let buckOut = "";
-  let buckErr = "";
-  if (buck.stdout) {
-    buck.stdout.setEncoding("utf8");
-    buck.stdout.on("data", (d) => (buckOut += d));
-  }
-  if (buck.stderr) {
-    buck.stderr.setEncoding("utf8");
-    buck.stderr.on("data", (d) => (buckErr += d));
-  }
-  buck.on("error", (err) => {
-    buckErr += `\n[spawn error] ${String(err)}\n`;
-  });
+  })`buck2 build //.viberoots/workspace:flake.lock`;
 
   const t0 = Date.now();
   let forkserverReady = false;
@@ -76,13 +68,6 @@ await runInTemp("buck-cleanup-nondisruptive-child", async (tmp, $) => {
     console.error(
       `buck cleanup child: forkserver dir did not appear within ${Math.round(waitMs / 1000)}s`,
     );
-    if (buckOut.trim() || buckErr.trim()) {
-      console.error("buck2 stdout:\n" + buckOut.trim());
-      console.error("buck2 stderr:\n" + buckErr.trim());
-    }
-    if (buck.exitCode !== null) {
-      console.error(`buck2 exit code: ${buck.exitCode}`);
-    }
     process.exit(2);
   }
   if (forkserverPath) {
@@ -90,19 +75,18 @@ await runInTemp("buck-cleanup-nondisruptive-child", async (tmp, $) => {
   }
   console.log("READY");
 
-  const signal = path.join(tmp, "go.signal");
+  const goSignal = path.join(tmp, "go.signal");
+  const stopSignal = path.join(tmp, "stop.signal");
+  let pinged = false;
   while (true) {
-    try {
-      await fsp.access(signal);
-      break;
-    } catch {
-      await new Promise((r) => setTimeout(r, 100));
+    if (await exists(stopSignal)) return;
+    if (!pinged && (await exists(goSignal))) {
+      if (await exists(stopSignal)) return;
+      // If cleanup from another repo was too broad, this build fails.
+      await $`buck2 build //.viberoots/workspace:flake.lock`;
+      console.log("PING_OK");
+      pinged = true;
     }
+    await new Promise((resolve) => setTimeout(resolve, 100));
   }
-
-  // If cleanup from other runs is too broad, this build can fail (repo broken / daemon killed mid-flight).
-  await $`buck2 build //.viberoots/workspace:flake.lock`;
-  console.log("PING_OK");
-
-  await new Promise(() => {});
 });

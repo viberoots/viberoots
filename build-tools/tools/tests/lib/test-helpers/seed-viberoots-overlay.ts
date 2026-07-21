@@ -1,7 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { mkdtempNoindex } from "../../../lib/macos-metadata";
-import { isGeneratedRepoStateRelPath } from "../../../dev/verify/generated-state-excludes";
+import { isGeneratedRepoStateRelPath } from "../../../lib/generated-repo-state";
 import { PREPARED_SEED_MARKER } from "./seed-store-config";
 
 function parseGitStatusRel(line: string): { rel: string; deleted: boolean } | null {

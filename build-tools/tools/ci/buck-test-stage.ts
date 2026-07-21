@@ -10,13 +10,16 @@ function ciBuckTestTimeoutSecs(): number {
   return Number(process.env.TIMEOUT_SEC || 1200);
 }
 
-export async function runCiBuckTestStage(): Promise<void> {
+export async function runCiBuckTestStage(opts: {
+  coverage?: boolean;
+  artifactToolsRoot: string;
+}): Promise<void> {
   const root = process.cwd();
   const { selection } = await resolveRequestedVerifyScope({
     root,
     invocationCwd: root,
     args: {
-      coverage: false,
+      coverage: Boolean(opts.coverage),
       console: "auto",
       targets: ["//..."],
       selector: "default",
@@ -41,8 +44,9 @@ export async function runCiBuckTestStage(): Promise<void> {
     zxNodeModulesOut: null,
     analysisDir,
     onPgid: () => {},
-    executionPolicy: parseVerifyExecutionPolicy({ coverage: process.env.COVERAGE === "1" }),
+    executionPolicy: parseVerifyExecutionPolicy({ coverage: Boolean(opts.coverage) }),
     exactOverallTimeoutSecs: ciBuckTestTimeoutSecs(),
+    artifactToolsRoot: opts.artifactToolsRoot,
   });
   if (status !== 0) process.exit(status);
 }

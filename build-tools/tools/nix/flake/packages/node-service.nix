@@ -35,7 +35,7 @@ let
           fi
           TSC_BIN="node_modules/.bin/tsc"
           test -x "$TSC_BIN" || { echo "node-service: tsc binary missing" >&2; exit 3; }
-          "$TSC_BIN" -p .
+          ${pkgs.bash}/bin/bash "$TSC_BIN" -p .
           VIBEROOTS_SOURCE_ROOT="${viberootsRoot}"
           node --experimental-strip-types \
             --disable-warning=ExperimentalWarning \

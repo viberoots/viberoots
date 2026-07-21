@@ -17,6 +17,7 @@ test("runInTemp locks a filtered viberoots input instead of the live source root
         "dev-env.ts",
         "runtime-env.ts",
         "cleanup.ts",
+        "dependency-reconcile.ts",
       ].map((name) =>
         fsp.readFile(
           viberootsSourcePath(`build-tools/tools/tests/lib/test-helpers/run-in-temp/${name}`),
@@ -33,7 +34,7 @@ test("runInTemp locks a filtered viberoots input instead of the live source root
     materializer,
     /"flake",[\s\S]*"prefetch",[\s\S]*"--json",[\s\S]*"--no-use-registries",[\s\S]*"--option",[\s\S]*"flake-registry",[\s\S]*"",[\s\S]*`path:\$\{canonical\}`/,
   );
-  assert.match(source, /materializeFilteredViberootsSource\(inputRoot\)/);
+  assert.match(source, /materializeFilteredViberootsSource\(inputRoot,\s*env\)/);
   assert.match(source, /prepareFilteredViberootsInput\(activeViberootsRoot\)/);
   assert.match(source, /filteredFlakeRsyncExcludeArgs\(\)/);
   assert.match(source, /defaultFilteredFlakeSnapshotRelPaths\(\)/);
@@ -98,4 +99,19 @@ test("runInTemp locks a filtered viberoots input instead of the live source root
   assert.match(source, /repoNodeBinDirectories\(process\.cwd\(\), exportEnv\)/);
   assert.match(source, /runAsyncCleanupSteps\(steps\)/);
   assert.match(source, /await consumerSnapshot\?\.cleanup\(\)/);
+  assert.match(
+    source,
+    /registerTempCommandEnvironment\(cleanupCommand, setup\.tmp, runtime\.exportEnv\)/,
+  );
+  assert.ok(
+    source.indexOf("const commandEnv = commandEnvironments.get($tmp)") <
+      source.indexOf('await $tmp({ cwd: tmp, stdio: "inherit" })`${updateTool}`'),
+    "unregistered temp command factories must fail before public reconciliation",
+  );
+  assert.match(source, /commandEnv\.VBR_ARTIFACT_TOOLS_ROOT = repairedArtifactToolsRoot/);
+  assert.ok(
+    source.indexOf("canonicalArtifactToolsRoot(tmp)") <
+      source.indexOf("commandEnv.VBR_ARTIFACT_TOOLS_ROOT = repairedArtifactToolsRoot"),
+    "temp commands may adopt tool authority only after validating the repaired workspace manifest",
+  );
 });

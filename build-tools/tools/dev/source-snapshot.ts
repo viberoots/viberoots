@@ -2,76 +2,14 @@
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-
-const EXCLUDES = [
-  ".git",
-  ".direnv",
-  "node_modules",
-  "buck-out",
-  ".pnpm-store",
-  ".pnpm-home",
-  ".codex-logs",
-  ".nix-gcroots",
-  "coverage",
-  ".cache",
-  ".turbo",
-  "dist",
-  "build",
-  ".vite",
-  ".next",
-  ".wasm-producer",
-  ".viberoots/workspace/.viberoots",
-  ".viberoots/workspace/backups",
-  ".viberoots/workspace/buck",
-  ".viberoots/workspace/cache",
-  ".viberoots/workspace/codex-test-logs",
-  ".viberoots/workspace/install-cache",
-  ".viberoots/workspace/nix-xdg-cache",
-  ".viberoots/workspace/node",
-  ".viberoots/workspace/pr-logs",
-  ".viberoots/workspace/viberoots-flake-input",
-  ".viberoots/workspace/xdg-cache",
-  ".tmp",
-  "tmp",
-  "test-logs",
-  "result",
-];
-const ROOT_FILE_EXCLUDES = new Set([".full-test-output.log", ".patch-sessions.json"]);
-const ROOT_DIR_EXCLUDES = new Set([
-  "backups",
-  "cache",
-  "codex-test-logs",
-  "install-cache",
-  "nix-xdg-cache",
-  "pr-logs",
-  "viberoots-flake-input",
-  "xdg-cache",
-]);
-const VIBEROOTS_ROOT_DIR_EXCLUDES = new Set([
-  ".cache",
-  ".clinic",
-  ".codex-logs",
-  ".direnv",
-  ".nix-gcroots",
-  ".pnpm-store",
-  ".viberoots",
-  "backups",
-  "buck-out",
-  "cache",
-  "codex-test-logs",
-  "coverage",
-  "install-cache",
-  "nix-xdg-cache",
-  "node_modules",
-  "pr-logs",
-  "result",
-  "test-logs",
-  "xdg-cache",
-]);
-const GRAPH_PATH_IN_SNAPSHOT = [".viberoots", "workspace", "buck", "graph.json"].join("/");
+import { sourcePlanEvidenceFromGraphFile } from "./source-snapshot-graph";
+import {
+  forbiddenSnapshotPath,
+  GRAPH_PATH_IN_SNAPSHOT,
+  SOURCE_SNAPSHOT_EXCLUDES,
+} from "./source-snapshot-policy";
 
 type FileArg = { rel: string; src: string };
-type GraphRecord = Record<string, unknown>;
 
 function argvTokens(): string[] {
   const raw = Array.isArray(process.argv) ? process.argv : [];
@@ -100,91 +38,6 @@ function fileArgs(tokens: string[]): FileArg[] {
   return out;
 }
 
-function forbidden(rel: string): boolean {
-  const normalized = rel.replaceAll("\\", "/").replace(/^\/+/, "").replace(/\/+$/, "");
-  if (normalized === GRAPH_PATH_IN_SNAPSHOT) return false;
-  for (const exclude of EXCLUDES) {
-    if (!exclude.includes("/")) continue;
-    if (normalized === exclude || normalized.startsWith(`${exclude}/`)) return true;
-  }
-  const parts = normalized.split("/").filter(Boolean);
-  if (parts.length === 1 && ROOT_FILE_EXCLUDES.has(parts[0])) return true;
-  if (parts.length === 1 && /^\.codex-.+\.log$/.test(parts[0])) return true;
-  if (parts.length === 1 && /^result-.+/.test(parts[0])) return true;
-  if (parts.length > 0 && ROOT_DIR_EXCLUDES.has(parts[0])) return true;
-  if (
-    parts[0] === "viberoots" &&
-    parts.length === 2 &&
-    (ROOT_FILE_EXCLUDES.has(parts[1]) || /^\.codex-.+\.log$/.test(parts[1]))
-  ) {
-    return true;
-  }
-  if (parts[0] === "viberoots" && parts.length > 1 && VIBEROOTS_ROOT_DIR_EXCLUDES.has(parts[1])) {
-    return true;
-  }
-  return parts.some(
-    (part, index) => EXCLUDES.includes(part) && (part !== "node_modules" || index === 0),
-  );
-}
-
-function isRecord(value: unknown): value is GraphRecord {
-  return !!value && typeof value === "object" && !Array.isArray(value);
-}
-
-function normalizeTargetLabel(label: string): string {
-  const noConfig = label.replace(/\s+\(.*\)$/, "");
-  const idx = noConfig.indexOf("//");
-  return idx >= 0 ? `//${noConfig.slice(idx + 2)}` : noConfig;
-}
-
-function normalizeNixAttr(attr: string): string {
-  const value = String(attr || "")
-    .trim()
-    .toLowerCase();
-  if (!value) return "";
-  const prefixed = value.startsWith("pkgs.") ? value : `pkgs.${value}`;
-  return prefixed === "pkgs.gtest" ? "pkgs.googletest" : prefixed;
-}
-
-function normalizeNixpkgsProfile(value: unknown): string {
-  return typeof value === "string" && value.trim() ? value.trim() : "default";
-}
-
-function sourcePlansFromGraph(raw: unknown) {
-  const nodes = Array.isArray(raw)
-    ? raw.filter(isRecord)
-    : isRecord(raw) && Array.isArray(raw.nodes)
-      ? raw.nodes.filter(isRecord)
-      : [];
-  return nodes.flatMap((node) => {
-    const target = normalizeTargetLabel(String(node.name || "").trim());
-    if (!target) return [];
-    const rawPins = isRecord(node.nixpkg_pins) ? node.nixpkg_pins : {};
-    const nixpkg_pins = Object.fromEntries(
-      Object.entries(rawPins).flatMap(([attr, rawPin]) => {
-        if (!isRecord(rawPin)) return [];
-        const normalizedAttr = normalizeNixAttr(attr);
-        if (!normalizedAttr) return [];
-        return [
-          [normalizedAttr, { nixpkgs_profile: normalizeNixpkgsProfile(rawPin.nixpkgs_profile) }],
-        ];
-      }),
-    );
-    return [
-      { target, nixpkgs_profile: normalizeNixpkgsProfile(node.nixpkgs_profile), nixpkg_pins },
-    ];
-  });
-}
-
-async function sourcePlanEvidenceFromGraphFile(file: string): Promise<unknown[]> {
-  if (!file) return [];
-  try {
-    return sourcePlansFromGraph(JSON.parse(await fsp.readFile(file, "utf8")));
-  } catch {
-    return [];
-  }
-}
-
 async function copyFile(src: string, dest: string): Promise<void> {
   const stat = await fsp.lstat(src);
   if (!stat.isFile() && !stat.isSymbolicLink()) return;
@@ -204,7 +57,7 @@ async function walk(dir: string, base: string, files: FileArg[]): Promise<void> 
   for (const entry of await fsp.readdir(dir, { withFileTypes: true })) {
     const abs = path.join(dir, entry.name);
     const rel = path.relative(base, abs);
-    if (forbidden(rel)) continue;
+    if (forbiddenSnapshotPath(rel)) continue;
     if (entry.isDirectory()) await walk(abs, base, files);
     else if (entry.isFile() || entry.isSymbolicLink()) files.push({ rel, src: abs });
   }
@@ -241,7 +94,7 @@ async function main(): Promise<void> {
   const copied: string[] = [];
   for (const file of files) {
     const rel = file.rel.replace(/^\/+/, "");
-    if (!rel || forbidden(rel)) continue;
+    if (!rel || forbiddenSnapshotPath(rel)) continue;
     if (!fs.existsSync(file.src)) continue;
     await copyFile(file.src, path.join(out, rel));
     copied.push(rel);
@@ -254,7 +107,7 @@ async function main(): Promise<void> {
     declaredGraphPath: declaredGraph,
     graphPathInSnapshot: GRAPH_PATH_IN_SNAPSHOT,
     sourcePlans: await sourcePlanEvidenceFromGraphFile(graph),
-    excludes: EXCLUDES,
+    excludes: SOURCE_SNAPSHOT_EXCLUDES,
     files: snapshotFiles,
     copiedFiles: [...new Set(copied)].sort(),
   };

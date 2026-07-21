@@ -1,6 +1,7 @@
-load(":auto_map.bzl", "provider_fixture")
+load("@prelude//:rules.bzl", "export_file")
 
-provider_fixture(
+export_file(
     name = "auto_map",
+    src = "auto_map.bzl",
     visibility = ["PUBLIC"],
 )

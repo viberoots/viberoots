@@ -21,6 +21,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
   const timedPhase = phaseTimer.timedPhase;
   const invocationCwd = process.cwd();
   const root = deps.repoRoot();
+  const artifactToolsRoot = deps.resolveArtifactToolsRoot(root);
   const parsedArgs = deps.parseVerifyArgs();
   const verbose = isVbrVerbose();
   const ui = createCommandUi({ verbose });
@@ -177,7 +178,8 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
   if (remoteVerify && deps.shouldPrepareVerifySeedForRequestedTargets(selection.targets)) {
     const seed = await timedPhase(
       "prepare-verify-seed-remote-ready",
-      async () => await deps.prepareVerifySeed({ root, iso, mode: "remote-ready" }),
+      async () =>
+        await deps.prepareVerifySeed({ root, iso, artifactToolsRoot, mode: "remote-ready" }),
     );
     process.env.VBR_TEST_SEED_STORE_PATH = seed.seedPath;
     process.env.VBR_TEST_SEED_KEY = seed.seedKey;
@@ -189,7 +191,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
   } else if (!remoteVerify && deps.shouldPrepareVerifySeedForRequestedTargets(selection.targets)) {
     const seed = await timedPhase(
       "prepare-verify-seed",
-      async () => await deps.prepareVerifySeed({ root, iso }),
+      async () => await deps.prepareVerifySeed({ root, iso, artifactToolsRoot }),
     );
     process.env.VBR_TEST_SEED_STORE_PATH = seed.seedPath;
     process.env.VBR_TEST_SEED_KEY = seed.seedKey;
@@ -268,6 +270,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
           onNestedIso: (nestedIso) => activeNestedIsos.add(nestedIso),
           onNestedIsoDone: (nestedIso) => activeNestedIsos.delete(nestedIso),
           executionPolicy,
+          artifactToolsRoot,
           suppressFailureOutputTail: () => requestedExitCode !== null,
           shouldAbort: () => requestedExitCode !== null,
         }),

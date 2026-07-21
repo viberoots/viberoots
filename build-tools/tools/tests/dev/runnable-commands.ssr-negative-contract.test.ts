@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { withoutArtifactEnvironmentInfluence } from "../../lib/artifact-environment";
 import { runInTemp } from "../lib/test-helpers";
+
+const fixtureRunner = "viberoots/build-tools/tools/tests/dev/run-runnable.fixture.ts";
 
 type SsrManifestOpts = {
   framework?: string;
@@ -81,8 +84,8 @@ test("SSR runnable commands fail fast on invalid contract shapes", async () => {
         cwd: tmp,
         stdio: "pipe",
         nothrow: true,
-        env: { ...process.env, RUNNABLE_TEST_MANIFEST: manifestPath },
-      })`viberoots/build-tools/tools/bin/${opts.cmd} //projects/apps/ssr:app`;
+        env: withoutArtifactEnvironmentInfluence(process.env),
+      })`zx-wrapper ${fixtureRunner} --mode ${opts.cmd === "p" ? "prod" : "dev"} //projects/apps/ssr:app --fixture-manifest=${manifestPath}`;
       assert.notEqual(result.exitCode, 0, `${opts.name}: expected non-zero exit`);
       assert.match(String(result.stderr || ""), opts.expected, `${opts.name}: expected error`);
     };

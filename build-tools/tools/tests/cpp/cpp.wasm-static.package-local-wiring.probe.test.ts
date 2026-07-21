@@ -8,11 +8,12 @@ import { runInTemp } from "../lib/test-helpers";
 test("nix_cpp_wasm_static_lib: stamps wasm + patch_scope and includes package-local patch inputs", async () => {
   await runInTemp("cpp-wasm-static-package-local-wiring", async (tmp, $) => {
     // Minimal provider target and auto_map mapping to verify provider-edge realization.
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
-genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
-EOF'`;
+    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "third_party", "providers", "TARGETS"),
+      'genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])\n',
+      "utf8",
+    );
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<'\''EOF'\''

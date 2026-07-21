@@ -8,24 +8,13 @@ import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { materializeEvaluationBundle } from "../../dev/evaluation-bundle";
 import { inventoryBundleSource } from "../../dev/evaluation-bundle-manifest";
-import { resolveToolPathSync } from "../../lib/tool-paths";
-
-async function fixture(root: string): Promise<void> {
-  await fsp.mkdir(path.join(root, "projects", "app"), { recursive: true });
-  await fsp.mkdir(path.join(root, ".viberoots", "workspace", "buck"), { recursive: true });
-  await fsp.writeFile(path.join(root, "flake.nix"), "{ outputs = _: {}; }\n");
-  await fsp.writeFile(path.join(root, "flake.lock"), "{}\n");
-  await fsp.writeFile(path.join(root, "projects", "app", "main.ts"), "export const n = 1;\n");
-  await fsp.writeFile(path.join(root, ".viberoots", "workspace", "buck", "graph.json"), "[]\n");
-}
-
-async function tempBundleDirs(tmp: string): Promise<string[]> {
-  const parent =
-    process.platform === "darwin" ? path.join(tmp, "vbr-evaluation-bundle.noindex") : tmp;
-  return (await fsp.readdir(parent).catch(() => [] as string[])).filter((name) =>
-    name.startsWith("vbr-evaluation-bundle-"),
-  );
-}
+import {
+  assertUnsupportedBundleEntryRejected,
+  artifactEnvForTmp,
+  artifactToolsRoot,
+  tempBundleDirs,
+  writeEvaluationBundleFixture as fixture,
+} from "./evaluation-bundle-test-fixture";
 
 test("bundle manifests are identical for CoW and full-copy construction", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "evaluation-bundle-parity-"));
@@ -38,11 +27,23 @@ test("bundle manifests are identical for CoW and full-copy construction", async 
   };
   try {
     const none = await materializeEvaluationBundle(
-      { stagedSource: root, attr: "graph-generator", classification: "hermetic" },
+      {
+        stagedSource: root,
+        attr: "graph-generator",
+        classification: "hermetic",
+        artifactToolsRoot,
+        selectorEnv: {},
+      },
       { register, copyMode: "none" },
     );
     const cow = await materializeEvaluationBundle(
-      { stagedSource: root, attr: "graph-generator", classification: "hermetic" },
+      {
+        stagedSource: root,
+        attr: "graph-generator",
+        classification: "hermetic",
+        artifactToolsRoot,
+        selectorEnv: {},
+      },
       { register, copyMode: "try" },
     );
     assert.equal(cow.digest, none.digest);
@@ -67,11 +68,18 @@ test("bundle captures planner selectors and rewrites override sources", async ()
         stagedSource: root,
         attr: "graph-generator",
         classification: "local-development",
+        artifactToolsRoot,
         selectorEnv: {
-          NIX_GO_DEV_OVERRIDE_JSON: JSON.stringify({ "example.test/mod@v1": override }),
-          PLANNER_ONLY_CPP: "1",
-          WEB_WASM_BACKEND: "wasi_single",
+          TEST_EXCLUDE_CPP_REQS: "1",
+          TEST_PARTIAL_CLONE_GO_ONLY: "1",
+          TEST_RSYNC_ROOTS: "viberoots, projects/app viberoots",
         },
+        devOverrides: {
+          NIX_GO_DEV_OVERRIDE_JSON: JSON.stringify({ "example.test/mod@v1": override }),
+        },
+        wasmBackend: "wasi_single",
+        onlyCpp: true,
+        coverage: true,
       },
       {
         register: async (bundleRoot) => {
@@ -85,7 +93,13 @@ test("bundle captures planner selectors and rewrites override sources", async ()
     );
     const captured = selection.languageOverrides.NIX_GO_DEV_OVERRIDE_JSON["example.test/mod@v1"];
     assert.equal(selection.onlyCpp, true);
+    assert.deepEqual(selection.verifySeed, {
+      excludeCppReqs: true,
+      partialCloneGoOnly: true,
+      rsyncRoots: ["projects/app", "viberoots"],
+    });
     assert.equal(selection.wasmBackend, "wasi_single");
+    assert.equal(selection.coverage, true);
     assert.match(captured, /^overrides\/NIX_GO_DEV_OVERRIDE_JSON\/0000$/);
     assert.equal(
       await fsp.readFile(path.join(registered, captured, "module.txt"), "utf8"),
@@ -113,6 +127,8 @@ test("bundle construction rejects external symlinks and cleans failure roots", a
         stagedSource: root,
         attr: "graph-generator",
         classification: "hermetic",
+        artifactEnv: artifactEnvForTmp(tmp),
+        selectorEnv: {},
       }),
       /external symlink: .*projects.*app.*external/,
     );
@@ -133,7 +149,13 @@ test("registration failure preserves its cause and cleans the owned root", async
   try {
     await assert.rejects(
       materializeEvaluationBundle(
-        { stagedSource: root, attr: "graph-generator", classification: "hermetic" },
+        {
+          stagedSource: root,
+          attr: "graph-generator",
+          classification: "hermetic",
+          artifactEnv: artifactEnvForTmp(tmp),
+          selectorEnv: {},
+        },
         { register: async () => Promise.reject(new Error("registration timed out")) },
       ),
       /registration timed out/,
@@ -147,19 +169,7 @@ test("registration failure preserves its cause and cleans the owned root", async
 });
 
 test("bundle construction rejects unsupported filesystem entries", async () => {
-  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "evaluation-bundle-unsupported-"));
-  await fixture(root);
-  const fifo = path.join(root, "projects", "app", "pipe");
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(resolveToolPathSync("mkfifo"), [fifo], { stdio: "ignore" });
-    child.once("error", reject);
-    child.once("close", (code) => (code === 0 ? resolve() : reject(new Error(`mkfifo ${code}`))));
-  });
-  try {
-    await assert.rejects(inventoryBundleSource(root), /unsupported entry: projects\/app\/pipe/);
-  } finally {
-    await fsp.rm(root, { recursive: true, force: true });
-  }
+  await assertUnsupportedBundleEntryRejected();
 });
 
 test("SIGTERM waits for construction and removes the owned root", async () => {
@@ -203,7 +213,13 @@ test("bundle cleanup fails closed when ownership becomes ambiguous", async () =>
     const primary = new Error("registration failed");
     await assert.rejects(
       materializeEvaluationBundle(
-        { stagedSource: root, attr: "graph-generator", classification: "hermetic" },
+        {
+          stagedSource: root,
+          attr: "graph-generator",
+          classification: "hermetic",
+          artifactEnv: artifactEnvForTmp(tmp),
+          selectorEnv: {},
+        },
         {
           register: async (bundleRoot) => {
             const marker = path.join(

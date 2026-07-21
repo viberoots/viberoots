@@ -40,6 +40,25 @@ test("target-aware untracked policy marks global build inputs relevant", () => {
   assert.equal(r.relevant.length, 2);
 });
 
+test("target-aware untracked policy ignores generated roots and test evidence", () => {
+  const generated = [
+    ".nix-gcroots/artifact-tools",
+    ".nix-zsh/.zshrc",
+    "buck-out/exporter-shared/cache/incremental_state/db.sqlite",
+    "buck-out/exporter-shared/cache/incremental_state/db.sqlite-wal",
+    "test-tmp-paths.log",
+    "viberoots/.nix-gcroots/devshell",
+    "viberoots/test-tmp-paths.log",
+  ];
+  const result = untrackedRequiresImpureForTargets({
+    untracked: generated,
+    targetPackages: ["projects/apps/myapp"],
+  });
+  assert.equal(result.requiresImpure, false);
+  assert.deepEqual(result.relevant, []);
+  assert.deepEqual(result.ignored, generated);
+});
+
 test("local development bundle logging is compact in quiet mode", async () => {
   await runInTemp("dev-build-untracked-quiet-log", async (tmp) => {
     await $({ cwd: tmp, stdio: "ignore" })`git init`;
@@ -116,7 +135,7 @@ test("development bundle logging summarizes bootstrap scaffold files", async () 
   });
 });
 
-test("development bundle logging summarizes generated workspace files", async () => {
+test("generated workspace files do not trigger a development bundle", async () => {
   await runInScratchTemp("dev-build-untracked-generated-quiet-log", async (tmp) => {
     await $({ cwd: tmp, stdio: "ignore" })`git init`;
     await fsp.writeFile(`${tmp}/.gitignore`, ".metadata_never_index\n", "utf8");
@@ -127,6 +146,14 @@ test("development bundle logging summarizes generated workspace files", async ()
     })`git -c user.name=test -c user.email=test@example.com commit -m init`;
     await fsp.mkdir(`${tmp}/.direnv/bin`, { recursive: true });
     await fsp.writeFile(`${tmp}/.direnv/bin/nix-direnv-reload`, "", "utf8");
+    await fsp.mkdir(`${tmp}/buck-out/exporter-shared/cache/materializer_state`, {
+      recursive: true,
+    });
+    await fsp.writeFile(
+      `${tmp}/buck-out/exporter-shared/cache/materializer_state/db.sqlite`,
+      "generated\n",
+      "utf8",
+    );
 
     const prevVerbose = process.env.VBR_VERBOSE;
     delete process.env.VBR_VERBOSE;
@@ -145,11 +172,8 @@ test("development bundle logging summarizes generated workspace files", async ()
         restArgs: ["//..."],
       });
       assert.equal(result.impure, false);
-      assert.match(
-        stderr,
-        /warn\s+development bundle includes \d+ generated workspace untracked file\(s\)/,
-      );
-      assert.doesNotMatch(stderr, /    - \.direnv/);
+      assert.equal(result.classification, "hermetic");
+      assert.equal(stderr, "");
     } finally {
       process.stderr.write = prevWrite;
       if (typeof prevVerbose === "string") process.env.VBR_VERBOSE = prevVerbose;

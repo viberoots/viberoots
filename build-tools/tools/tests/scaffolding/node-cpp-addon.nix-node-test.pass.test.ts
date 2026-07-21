@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { exportGraphInTemp, runFilteredFlakeAttr } from "../lib/test-helpers/selected-build";
 import { viberootsDevTool } from "./lib/viberoots-tools";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
@@ -11,24 +12,12 @@ process.env.TEST_NEED_DEV_ENV = "1";
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
-async function workspaceFlakeRef(root: string): Promise<string> {
-  const hidden = path.join(root, ".viberoots", "workspace", "flake.nix");
-  try {
-    await fsp.access(hidden);
-    return path.dirname(hidden);
-  } catch {}
-  return root;
-}
-
 test(
   "node cpp-addon: scaffold, build addon, and pass nix_node_test",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
     await runInTemp("node-cpp-addon-nix-node-test", async (tmp, _$) => {
       const $ = _$({ cwd: tmp, stdio: "pipe" });
-      const TIMEOUT_SECS = String(
-        Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200"),
-      );
       const env = {
         ...process.env,
         NIX_PNPM_ALLOW_GENERATE: "1",
@@ -40,12 +29,7 @@ test(
       await $`scaf new ts cpp-addon demo --yes --skip-lockfile-gen`;
 
       const importer = "projects/libs/demo";
-      const sanitized = importer
-        .replace(/\/\//g, "")
-        .replace(/:/g, "-")
-        .replace(/[\/\s]+/g, "-");
       const lockfile = path.join(importer, "pnpm-lock.yaml");
-      const flakeRef = await workspaceFlakeRef(tmp);
 
       // Commit scaffold so pure flake snapshots see new importers
       await $({
@@ -57,22 +41,17 @@ test(
         stdio: "inherit",
         env,
       })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${lockfile}`;
-      await $`git add projects/node-modules.hashes.json`;
+      await $`git add projects/config/node-modules.hashes.json`;
       await $`git commit -m update-hashes`.nothrow();
 
-      // Build the node-test derivation; vitest should pass calling through the native addon
-      const out = await (async () => {
-        const mj = String(process.env.NIX_MAX_JOBS || "0");
-        const cr = String(process.env.NIX_CORES || "0");
-        const flags = [
-          mj && mj !== "0" ? `--max-jobs ${mj}` : "",
-          cr && cr !== "0" ? `--option cores ${cr}` : "",
-        ]
-          .filter(Boolean)
-          .join(" ");
-        const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "path:${flakeRef}#node-test.${sanitized}" --impure --no-link --accept-flake-config --builders "" --print-out-paths ${flags}`;
-        return await $({ stdio: "pipe", env })`bash --noprofile --norc -c ${cmd}`;
-      })();
+      await exportGraphInTemp({ tmp, $, env });
+      const out = await runFilteredFlakeAttr({
+        tmp,
+        $,
+        target: "//projects/libs/demo:unit",
+        attr: "node-test.projects-libs-demo",
+        env,
+      });
       const outPath =
         String(out.stdout || "")
           .trim()

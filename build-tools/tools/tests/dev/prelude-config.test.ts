@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { ensureBuckPreludeConfig } from "../../dev/dev-build/prelude";
+import { writeGlobalNixInputTargetFixtures } from "../lib/test-helpers/buck-config";
 import { VIBEROOTS_SOURCE_ROOT } from "../lib/test-helpers/source-paths";
 
 test("ensureBuckPreludeConfig repairs legacy current prelude cell paths", async () => {
@@ -13,6 +14,26 @@ test("ensureBuckPreludeConfig repairs legacy current prelude cell paths", async 
     await fsp.writeFile(path.join(root, ".buckroot"), ".\n", "utf8");
     await fsp.mkdir(path.join(root, ".viberoots"), { recursive: true });
     await fsp.symlink(VIBEROOTS_SOURCE_ROOT, path.join(root, ".viberoots", "current"));
+    await Promise.all([
+      fsp.mkdir(path.join(root, "projects/config"), { recursive: true }),
+      fsp.mkdir(path.join(root, ".viberoots/workspace"), { recursive: true }),
+    ]);
+    await Promise.all([
+      fsp.writeFile(path.join(root, "projects/config/node-modules.hashes.json"), "{}\n"),
+      fsp.writeFile(
+        path.join(root, ".viberoots/workspace/flake.nix"),
+        `{ outputs = _: { lib.viberootsSourcePath = ${JSON.stringify(VIBEROOTS_SOURCE_ROOT)}; }; }\n`,
+      ),
+      fsp.writeFile(
+        path.join(root, ".viberoots/workspace/flake.lock"),
+        '{"nodes":{},"root":"root","version":7}\n',
+      ),
+      fsp.writeFile(
+        path.join(root, ".viberoots/workspace/nixpkgs-source-registry-extension.nix"),
+        "{ inputs }: { profiles = {}; }\n",
+      ),
+    ]);
+    await writeGlobalNixInputTargetFixtures(root);
     await fsp.writeFile(
       path.join(root, ".buckconfig"),
       [

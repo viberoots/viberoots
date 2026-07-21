@@ -15,6 +15,8 @@ export const requiredConsumerTrackedPaths = [
   ".buckconfig",
   ".envrc",
   ".gitignore",
+  "projects/config/TARGETS",
+  "projects/config/node-modules.hashes.json",
 ] as const;
 
 export const guardedConsumerTrackedPaths = [
@@ -46,6 +48,12 @@ export function staleConsumerTrackedInput(opts: {
   ]);
   for (const [rel, content] of expected) {
     if (opts.tracked[rel] !== content) return rel;
+  }
+  for (const rel of [
+    "projects/config/TARGETS",
+    "projects/config/node-modules.hashes.json",
+  ] as const) {
+    if (opts.tracked[rel] === undefined) return rel;
   }
   if (
     opts.tracked[".gitignore"] === undefined ||

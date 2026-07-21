@@ -3,13 +3,23 @@ import assert from "node:assert/strict";
 import fsp from "node:fs/promises";
 import { test } from "node:test";
 import { makeFilteredFlakeRef } from "../../dev/filtered-flake";
+import {
+  buildCanonicalArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+} from "../../lib/artifact-environment";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("flake exposes viberoots version metadata and mkWorkspace", async () => {
+  const artifactToolsRoot = canonicalArtifactToolsRoot(
+    process.cwd(),
+    String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+  );
   const filtered = await makeFilteredFlakeRef({
     workspaceRoot: viberootsSourcePath("."),
     attr: "lib.version",
     logPrefix: "[flake-version-metadata]",
+    env: buildCanonicalArtifactEnvironment(process.cwd(), { artifactToolsRoot }),
+    selectorEnv: {},
   });
   const flakeRef = filtered.flakeRef.slice(0, filtered.flakeRef.lastIndexOf("#"));
   try {

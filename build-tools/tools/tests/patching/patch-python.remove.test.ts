@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 test("patch-python remove drops patch and refreshes glue deterministically", async () => {
   await runInTemp("patch-python-remove", async (tmp, $) => {
@@ -24,12 +25,14 @@ test("patch-python remove drops patch and refreshes glue deterministically", asy
     await fs.mkdirp(patchDir);
     const patch = path.join(patchDir, "requests@2.32.3.patch");
     await fs.writeFile(patch, "--- a/readme.txt\n+++ b/readme.txt\n", "utf8");
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
 
     await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
 
     // Remove should delete the patch and invoke glue (creating providers auto outputs)
     await $({
       cwd: tmp,
+      env: graphEnv,
     })`WORKSPACE_ROOT=${tmp} NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
     })} NIX_PY_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg remove python requests --importer ${importer}`;
@@ -64,6 +67,7 @@ test("patch-python remove drops patch and refreshes glue deterministically", asy
     // Idempotency: a second remove should be a no-op and leave outputs stable
     await $({
       cwd: tmp,
+      env: graphEnv,
     })`WORKSPACE_ROOT=${tmp} NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
     })} NIX_PY_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg remove python requests --importer ${importer}`;

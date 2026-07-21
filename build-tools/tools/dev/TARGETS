@@ -36,6 +36,18 @@ export_file(
 )
 
 export_file(
+    name = "source-snapshot-graph.ts",
+    src = "source-snapshot-graph.ts",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "source-snapshot-policy.ts",
+    src = "source-snapshot-policy.ts",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
     name = "zx-init.mjs",
     src = "zx-init.mjs",
     visibility = ["PUBLIC"],

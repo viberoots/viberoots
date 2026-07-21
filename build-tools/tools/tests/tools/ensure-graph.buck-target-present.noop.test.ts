@@ -5,10 +5,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { withScopedEnv } from "../lib/test-helpers/scoped-env";
-import { ensureGraph } from "../../buck/glue-run";
+import { reconcileGeneratedGraph } from "../../buck/glue-run";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 
-test("ensureGraph is a no-op when BUCK_TARGET is already present in the graph", async () => {
+test("graph reconciliation is a no-op when BUCK_TARGET is already present", async () => {
   await runInTemp("ensure-graph-buck-target-present", async (tmp) => {
     const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
@@ -34,7 +34,7 @@ test("ensureGraph is a no-op when BUCK_TARGET is already present in the graph", 
         await new Promise((r) => setTimeout(r, 1100));
 
         let invoked = false;
-        await ensureGraph({
+        await reconcileGeneratedGraph({
           exportGraph: async () => {
             invoked = true;
             await fsp.writeFile(graphPath, "[]\n", "utf8");
@@ -43,7 +43,7 @@ test("ensureGraph is a no-op when BUCK_TARGET is already present in the graph", 
 
         const st2 = await fsp.stat(graphPath);
         if (invoked) {
-          console.error("expected ensureGraph() to be a no-op (injected exporter was called)");
+          console.error("expected graph reconciliation to skip the exporter");
           process.exit(2);
         }
         if (st1.mtimeMs !== st2.mtimeMs) {
@@ -58,7 +58,7 @@ test("ensureGraph is a no-op when BUCK_TARGET is already present in the graph", 
   });
 });
 
-test("ensureGraph hides debug lines unless VBR_VERBOSE is enabled", async () => {
+test("graph reconciliation hides debug lines unless VBR_VERBOSE is enabled", async () => {
   await runInTemp("ensure-graph-quiet-debug", async (tmp) => {
     const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
@@ -86,7 +86,7 @@ test("ensureGraph hides debug lines unless VBR_VERBOSE is enabled", async () => 
             BUCK_TARGET: "//projects/apps/example:svc",
           },
           async () => {
-            await ensureGraph();
+            await reconcileGeneratedGraph();
           },
         );
       } finally {

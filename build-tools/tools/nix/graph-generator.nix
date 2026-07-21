@@ -7,6 +7,7 @@
 , nixpkgsRegistry ? null
 , nixpkgsRegistryPath ? ./nixpkgs-source-registry.nix
 , viberootsRoot ? null
+, artifactToolsRoot ? null
 , evaluationBundle ? null
 }:
 let
@@ -269,13 +270,19 @@ let
     repoStoreRoot = repoStoreRoot;
     repoFsRoot = builtins.toPath repoRootStr;
     viberootsRoot = viberootsRoot;
+    declaredArtifactToolsRoot =
+      if evaluationBundle == null then "" else evaluationBundle.artifactToolsRoot;
+    artifactToolsRoot = artifactToolsRoot;
+    artifactToolsInput = artifactToolsRoot;
+    evaluationGraphPath = if evaluationBundle == null then null else evaluationBundle.graphPath;
+    dependencyArtifactOf = dependencyArtifactOf;
     nodeMods = nodeMods;
     # Provide full nodes list so language plugins (e.g., C++) can walk deps
     nodes = nodesList;
     get = get;
     modulesTomlFor = modulesTomlFor;
     wasmBackend = if evaluationBundle == null
-      then builtins.getEnv "WEB_WASM_BACKEND"
+      then ""
       else evaluationBundle.selection.wasmBackend or "";
   };
   # Language adapters and dispatch (extracted module)
@@ -286,6 +293,53 @@ let
   LANGS = Langs.LANGS;
   _trace_langs = if traceEnabled then builtins.trace ("[planner][trace] LANGS keys=" + (builtins.concatStringsSep "," (builtins.attrNames LANGS))) null else null;
   pick = Langs.pick;
+
+  dependencyArtifactOf = target:
+    let
+      normalized = H.normalizeTargetLabel target;
+      matches = builtins.filter (candidate:
+        H.normalizeTargetLabel (ensureFullLabel candidate) == normalized
+      ) nodesList;
+      n = if matches == [] then null else builtins.head matches;
+      labels = if n == null then [] else P.labelsOf n;
+      buildLabel = if n == null then normalized else H.normalizeTargetLabel (ensureFullLabel n);
+    in
+      if n == null then builtins.throw "planner dependency target is absent from graph: ${target}"
+      else if builtins.elem "lang:go" labels then
+        let kind = LANGS.go.kindOf n; in
+          if kind == "bin" then LANGS.go.mkApp buildLabel
+          else if kind == "lib" then LANGS.go.mkLib buildLabel
+          else if kind == "test" then LANGS.go.mkTest buildLabel
+          else if kind == "carchive" then LANGS.go.mkCArchive buildLabel
+          else if kind == "tinywasm" then LANGS.go.mkTinyWasm buildLabel
+          else builtins.throw "planner dependency target has unsupported Go kind: ${target}"
+      else if builtins.elem "lang:node" labels then
+        let kind = LANGS.node.kindOf n; in
+          if kind == "webapp" then LANGS.node.mkWebapp buildLabel
+          else if kind == "bin" then LANGS.node.mkBin buildLabel
+          else if kind == "lib" then LANGS.node.mkLib buildLabel
+          else if kind == "gen" then LANGS.node.mkGen buildLabel
+          else LANGS.node.mkApp buildLabel
+      else if builtins.elem "lang:cpp" labels then
+        let kind = LANGS.cpp.kindOf n; in
+          if kind == "bin" then LANGS.cpp.mkApp buildLabel
+          else if kind == "headers" then LANGS.cpp.mkHeaders buildLabel
+          else if kind == "lib" then LANGS.cpp.mkLib buildLabel
+          else if kind == "test" then LANGS.cpp.mkTest buildLabel
+          else if kind == "addon" then LANGS.cpp.mkAddon buildLabel
+          else LANGS.cpp.mkApp buildLabel
+      else if builtins.elem "lang:python" labels then
+        let kind = LANGS.python.kindOf n; in
+          if kind == "wasm" then
+            if builtins.elem "wasm:lib" labels
+            then LANGS.python.mkWasmLib buildLabel
+            else LANGS.python.mkWasmApp buildLabel
+          else if kind == "pyext" then LANGS.python.mkPyExt buildLabel
+          else if kind == "pyext_wasm" then LANGS.python.mkPyExtWasm buildLabel
+          else if kind == "test" then LANGS.python.mkTest buildLabel
+          else if kind == "bin" then LANGS.python.mkApp buildLabel
+          else LANGS.python.mkLib buildLabel
+      else builtins.throw "planner dependency target has no supported language role: ${target}";
 
   modulesTomlDefault = if rootModulesTomlPath != null
     then builtins.toPath rootModulesTomlPath
@@ -548,7 +602,34 @@ let
           exit 1
         '' else (
           let
-            n = builtins.head matches;
+            requestedNode = builtins.head matches;
+            requestedLabels = labelsOf requestedNode;
+            plannerRouteLabels = builtins.filter (
+              label: builtins.isString label && lib.hasPrefix "planner_target:" label
+            ) requestedLabels;
+            plannerRouteTarget =
+              if (builtins.length plannerRouteLabels) == 1
+              then lib.removePrefix "planner_target:" (builtins.head plannerRouteLabels)
+              else "";
+            plannerRouteMatches =
+              if plannerRouteTarget == "" then []
+              else builtins.filter (
+                candidate:
+                  (normalizedTargetKeyFromNode candidate) ==
+                    (normalizedTargetKeyFromString plannerRouteTarget)
+              ) nodesList;
+            plannerRouteError =
+              if (builtins.length plannerRouteLabels) > 1 then
+                "selected target ${selectedTargetName} declares multiple planner_target routes"
+              else if plannerRouteLabels != [] && !lib.hasPrefix "//" plannerRouteTarget then
+                "selected target ${selectedTargetName} declares malformed planner_target route: ${plannerRouteTarget}"
+              else if plannerRouteLabels != [] && (builtins.length plannerRouteMatches) != 1 then
+                "selected target ${selectedTargetName} planner_target route must resolve exactly once: ${plannerRouteTarget}"
+              else "";
+            n =
+              if plannerRouteLabels == [] then requestedNode
+              else if plannerRouteError == "" then builtins.head plannerRouteMatches
+              else requestedNode;
             rt = get n "rule_type";
             hasDispatch = (rt != null) && builtins.hasAttr rt D;
             hintedTemplate = templateFromLabels n;
@@ -571,7 +652,10 @@ let
               else pick n;
             buildLabel = H.normalizeTargetLabel (ensureFullLabel n);
           in
-            if k == null then pkgs.runCommand "missing-kind-${sanitize selectedTargetName}" {} ''
+            if plannerRouteError != "" then pkgs.runCommand "invalid-planner-route-${sanitize selectedTargetName}" {} ''
+              echo ${pkgs.lib.escapeShellArg plannerRouteError} >&2
+              exit 1
+            '' else if k == null then pkgs.runCommand "missing-kind-${sanitize selectedTargetName}" {} ''
               echo "missing kind for: ${selectedTargetName}" >&2
               exit 1
             '' else (
@@ -639,7 +723,7 @@ let
   selectedWasm =
     let tgt = selectedTargetName;
         backend = if evaluationBundle == null
-          then builtins.getEnv "WEB_WASM_BACKEND"
+          then ""
           else evaluationBundle.selection.wasmBackend or "";
         goTarget =
           if backend == "wasi_single" then "wasi"

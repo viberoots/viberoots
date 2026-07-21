@@ -178,6 +178,10 @@ test("u modes preserve source authority while plain u repairs C++ metadata", asy
     });
     const before = await protectedSnapshot();
     const makeOperations = (): UpdateOperations => ({
+      repairToolchainAuthority: async () => ({
+        artifactToolsRoot: "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-artifact-tools",
+        viberootsSource: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-source",
+      }),
       importers: async () => ["projects/apps/web"],
       repairPnpmLock: async () => {
         await fsp.writeFile(path.join(root, "projects/apps/web/pnpm-lock.yaml"), "repaired\n");

@@ -8,7 +8,7 @@ test("sync-providers-cpp: second run is a no-op when inputs unchanged", async ()
   await runInTemp("cpp-idem", async (tmp, $) => {
     const outFile = path.join(tmp, "third_party", "providers", "TARGETS.cpp.auto");
 
-    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang cpp`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang cpp --no-glue`;
     const exists1 = await fs.pathExists(outFile);
     if (exists1) {
       console.error("C++ sync should be a no-op; no TARGETS.cpp.auto should be created");
@@ -16,7 +16,7 @@ test("sync-providers-cpp: second run is a no-op when inputs unchanged", async ()
     }
 
     // Second run should not modify the file contents
-    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang cpp`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang cpp --no-glue`;
     const exists2 = await fs.pathExists(outFile);
     if (exists2) {
       console.error("C++ sync should be a no-op on repeated runs as well");

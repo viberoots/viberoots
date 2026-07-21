@@ -29,7 +29,7 @@ const VIBEROOTS_COMMAND = path.join(REPO_ROOT, "build-tools", "tools", "dev", "v
 
 async function activateAndAssertStatus(
   consumer: string,
-  expectedRequestedRef: RegExp = /^file:\/\/.*remote-viberoots-src/,
+  expectedRequestedRef: RegExp = /^file:\/\/\/nix\/store\/[a-z0-9]{32}-viberoots-remote-git\?ref=release\/v1\.4\.2$/,
 ): Promise<string> {
   const workspaceFlake = path.join(consumer, ".viberoots", "workspace");
   for (let i = 0; i < 2; i++) {
@@ -68,6 +68,12 @@ async function activateAndAssertStatus(
 
 async function runBareCommands(consumer: string, cwd: string, sourcePath: string): Promise<void> {
   const env = commandEnv(consumer);
+  await $({
+    cwd: consumer,
+    env: { ...env, VIBEROOTS_FLAKE_INPUT_ROOT: sourcePath },
+    stdio: "pipe",
+  })`u`;
+  await assertCleanConsumerBoundary(consumer, sourcePath, "after u");
   await $({ cwd, env, stdio: "pipe" })`i --glue-only --skip-go-tidy`;
   await assertCleanConsumerBoundary(consumer, sourcePath, "after i");
   assert.equal(
@@ -154,8 +160,8 @@ test("consumer boundary check rejects representative parent-owned source state",
     const source = path.join(tmp, "source");
     await fsp.mkdir(path.join(consumer, ".viberoots/workspace/providers"), { recursive: true });
     await fsp.mkdir(path.join(consumer, ".viberoots/workspace/buck"), { recursive: true });
-    await fsp.mkdir(path.join(consumer, "projects"), { recursive: true });
-    await fsp.writeFile(path.join(consumer, "projects/node-modules.hashes.json"), "{}\n");
+    await fsp.mkdir(path.join(consumer, "projects/config"), { recursive: true });
+    await fsp.writeFile(path.join(consumer, "projects/config/node-modules.hashes.json"), "{}\n");
     await fsp.mkdir(source, { recursive: true });
 
     for (const rel of FORBIDDEN_SOURCE_STATE) {
@@ -195,6 +201,46 @@ test("reusable deployment bootstrap runtime keeps parent-specific families out o
     assert.doesNotMatch(text, /\b[Pp]leomino\b/, rel);
     assert.doesNotMatch(text, /\bSAMPLE_WEBAPP_/, rel);
   }
+});
+
+test("remote consumer fixture source identity is independent of its temp root", async () => {
+  await runInScratchTemp("viberoots-remote-consumer-identity", async (tmp, $) => {
+    const firstSource = await makeRemoteSource(path.join(tmp, "first-root"), $);
+    const secondSource = await makeRemoteSource(path.join(tmp, "second-root"), $);
+    assert.equal(secondSource, firstSource);
+    assert.doesNotMatch(firstSource, new RegExp(escapeRegex(tmp)));
+
+    const first = await makeConsumer(
+      path.join(tmp, "first-consumer-root"),
+      "consumer",
+      firstSource,
+      $,
+    );
+    const second = await makeConsumer(
+      path.join(tmp, "second-consumer-root"),
+      "consumer",
+      secondSource,
+      $,
+    );
+    const readLockedRevision = async (consumer: string): Promise<string> => {
+      const lock = JSON.parse(
+        await fsp.readFile(path.join(consumer, ".viberoots", "workspace", "flake.lock"), "utf8"),
+      );
+      return String(lock.nodes.viberoots.locked.rev || "");
+    };
+    const firstRevision = await readLockedRevision(first);
+    const secondRevision = await readLockedRevision(second);
+    assert.match(firstRevision, /^[a-f0-9]{40}$/);
+    assert.equal(secondRevision, firstRevision);
+
+    for (const consumer of [first, second]) {
+      const lockText = await fsp.readFile(
+        path.join(consumer, ".viberoots", "workspace", "flake.lock"),
+        "utf8",
+      );
+      assert.doesNotMatch(lockText, new RegExp(escapeRegex(tmp)));
+    }
+  });
 });
 
 test("remote consumers activate locked source, run bare commands, and keep ownership boundaries", async () => {

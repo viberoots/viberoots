@@ -1,7 +1,9 @@
 #!/usr/bin/env zx-wrapper
+import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 import { viberootsDevTool } from "./lib/viberoots-tools";
 
 // Ensure dev env tooling (yaml parser, zx deps) is exported in temp repos
@@ -23,16 +25,20 @@ test("node cli: build bundled single-file and run help", async () => {
        t=t.replace('# bundle = True,', 'bundle = True,');
        t=t.replace('# importer = "{{ importer }}",', 'importer = "projects/apps/demo",');
        fs.writeFileSync(p,t,'utf8');`}`;
-      // Glue
+      await reconcileTempDependencyInputs(tmp, $);
       await $`zx-wrapper ${viberootsDevTool("install-deps.ts")} --glue-only`;
+      await assert.rejects(
+        fsp.access(path.join(tmp, ".viberoots/workspace/node-modules.hashes.json")),
+        { code: "ENOENT" },
+      );
+      assert.match(
+        await fsp.readFile(path.join(tmp, "projects/config/TARGETS"), "utf8"),
+        /name = "node-modules\.hashes\.json"/,
+      );
       await $({
         cwd: tmp,
         stdio: "inherit",
-      })`NIX_PNPM_ALLOW_GENERATE=1 node ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile projects/apps/demo/pnpm-lock.yaml`;
-      await $({
-        cwd: tmp,
-        stdio: "inherit",
-      })`git add projects/node-modules.hashes.json`;
+      })`git add projects/config/node-modules.hashes.json`;
       // Build bundled artifact via macro (nix build under the hood)
       await $`buck2 build --target-platforms prelude//platforms:default //projects/apps/demo:demo`;
       // Run the bundled artifact and assert help works

@@ -1,57 +1,45 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
-import * as fsp from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
+import fs from "node:fs";
 import { test } from "node:test";
 import {
-  artifactJobPurpose,
   assertArtifactBuildAdmitted,
   buildArtifactPolicyEvidence,
-  classifyArtifactBuild,
   serializeArtifactPolicyEvidence,
 } from "../../lib/artifact-build-policy";
 import {
+  admitArtifactContext,
+  hasRejectedNixPolicyDiagnostics,
   inspectArtifactBuildPolicy,
-  inspectWorkspaceArtifactSource,
 } from "../../dev/artifact-policy-inspection";
+import { REVIEWED_PUBLIC_KEYS, REVIEWED_SUBSTITUTERS } from "../../lib/artifact-nix-policy";
 import {
   inspectArtifactSource,
   parseUntrackedInventory,
   untrackedRequiresImpureForTargets,
 } from "../../lib/artifact-source-inventory";
-import { chooseRunnableFlakeRef } from "../../dev/run-runnable-source";
-import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
+import {
+  buildCanonicalArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+  withoutArtifactEnvironmentInfluence,
+} from "../../lib/artifact-environment";
+import {
+  EFFECTIVE_ARTIFACT_TEST_CONFIG as effectiveConfig,
+  registerArtifactBuildPolicyBasicContracts,
+  registerArtifactBuildPolicyDelegatedContracts,
+} from "./artifact-build-policy-basic-contracts";
 
-const effectiveConfig = {
-  sandbox: { value: true },
-  builders: { value: "" },
-  substituters: { value: ["https://cache.example.invalid"] },
-  "access-tokens": { value: { "github.com": "do-not-emit" } },
-};
+registerArtifactBuildPolicyBasicContracts(test);
 
-test("artifact classification has one canonical precedence", () => {
-  assert.equal(
-    classifyArtifactBuild({ diagnosticImpure: false, localDevelopment: false }),
-    "hermetic",
-  );
-  assert.equal(
-    classifyArtifactBuild({ diagnosticImpure: false, localDevelopment: true }),
-    "local-development",
-  );
-  assert.equal(
-    classifyArtifactBuild({ diagnosticImpure: true, localDevelopment: true }),
-    "diagnostic-impure",
-  );
-});
-
-test("CI cannot be downgraded and invalid job purposes fail closed", () => {
-  assert.equal(artifactJobPurpose({ CI: "1", VBR_ARTIFACT_JOB: "local" }), "ci");
-  assert.equal(artifactJobPurpose({ VBR_ARTIFACT_JOB: "release" }), "release");
-  assert.throws(
-    () => artifactJobPurpose({ VBR_ARTIFACT_JOB: "maybe-release" }),
-    /invalid VBR_ARTIFACT_JOB/,
-  );
+test("artifact policy inspection rejects ignored restricted Nix settings", () => {
+  for (const diagnostic of [
+    "warning: ignoring the user-specified setting 'sandbox', because it is a restricted setting and you are not a trusted user",
+    "warning: option 'builders' requires a trusted user",
+    "warning: not allowed to set restricted option sandbox-paths",
+  ]) {
+    assert.equal(hasRejectedNixPolicyDiagnostics(diagnostic), true, diagnostic);
+  }
+  assert.equal(hasRejectedNixPolicyDiagnostics("warning: Git tree is dirty"), false);
 });
 
 test("policy evidence is deterministic and redacts values and machine identity", () => {
@@ -65,14 +53,20 @@ test("policy evidence is deterministic and redacts values and machine identity",
     },
     toolPaths: { zzz: "/usr/bin/zzz", nix: "/nix/var/nix/profiles/default/bin/nix" },
     nixConfig: effectiveConfig,
+    nixStoreUrl: "daemon",
   });
   assert.deepEqual(evidence.evaluation.selectorEnvironment, ["BUCK_TARGET", "WORKSPACE_ROOT"]);
   assert.deepEqual(evidence.tools, { nix: "nix-bootstrap", zzz: "host" });
   assert.deepEqual(evidence.nix, {
     inspection: "available",
     sandbox: "enabled",
+    sandboxFallback: "disabled",
+    hostPaths: "none",
+    multiUser: "daemon",
     builders: "local-only",
-    substituters: "configured",
+    substituters: "reviewed",
+    publicKeys: "reviewed",
+    network: "sandboxed-fixed-output-only",
   });
   const serialized = serializeArtifactPolicyEvidence(evidence);
   assert.equal(serialized, serializeArtifactPolicyEvidence(evidence));
@@ -90,6 +84,7 @@ test("protected admission rejects explicit impurity and missing inspection", () 
       env: {},
       toolPaths: {},
       nixConfig: effectiveConfig,
+      nixStoreUrl: "daemon",
     });
     assert.throws(() => assertArtifactBuildAdmitted(evidence), /rejects/);
   }
@@ -111,12 +106,52 @@ test("protected admission rejects explicit impurity and missing inspection", () 
       toolPaths: {},
       nixConfig: {
         sandbox: { value: field === "sandbox" ? undefined : true },
+        "sandbox-fallback": { value: false },
+        "sandbox-paths": { value: {} },
         builders: { value: field === "builders" ? undefined : "" },
-        substituters: { value: field === "substituters" ? undefined : [] },
+        substituters: {
+          value: field === "substituters" ? undefined : [...REVIEWED_SUBSTITUTERS],
+        },
+        "trusted-public-keys": { value: [...REVIEWED_PUBLIC_KEYS] },
       },
+      nixStoreUrl: "daemon",
     });
     assert.throws(() => assertArtifactBuildAdmitted(unknown), new RegExp(field));
   }
+});
+
+test("artifact admission rejects exact tool paths outside the declared closure", () => {
+  const evidence = buildArtifactPolicyEvidence({
+    classification: "hermetic",
+    purpose: "local",
+    impureEvaluation: false,
+    env: {
+      VBR_ARTIFACT_TOOLS_ROOT: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-tools-a",
+    },
+    toolPaths: {
+      node: "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-tools-b/bin/node",
+      nix: "/nix/var/nix/profiles/default/bin/nix",
+    },
+    nixConfig: effectiveConfig,
+    nixStoreUrl: "daemon",
+  });
+  assert.throws(
+    () => assertArtifactBuildAdmitted(evidence),
+    /tools outside the canonical closure: node/,
+  );
+});
+
+test("artifact admission requires exact node and Nix closure evidence", () => {
+  const evidence = buildArtifactPolicyEvidence({
+    classification: "hermetic",
+    purpose: "local",
+    impureEvaluation: false,
+    env: {},
+    toolPaths: {},
+    nixConfig: effectiveConfig,
+    nixStoreUrl: "daemon",
+  });
+  assert.throws(() => assertArtifactBuildAdmitted(evidence), /exact canonical tool closure root/);
 });
 
 test("source inventory is exact, target-aware, and fails closed", async () => {
@@ -145,98 +180,56 @@ test("source inventory is exact, target-aware, and fails closed", async () => {
   );
 });
 
-test("runtime inspection treats hostile JSON as data and does not emit it", async () => {
-  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "artifact-policy-"));
-  try {
-    const nixBin = path.join(tmp, "nix");
-    await fsp.writeFile(nixBin, "#!/bin/sh\nexit 0\n");
-    await fsp.chmod(nixBin, 0o755);
-    const evidence = await inspectArtifactBuildPolicy({
+test("runtime inspection derives executing Node evidence only from the process", async () => {
+  const env = buildCanonicalArtifactEnvironment(process.cwd(), {
+    artifactToolsRoot: canonicalArtifactToolsRoot(
+      process.cwd(),
+      String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+    ),
+  });
+  const inspect = () =>
+    inspectArtifactBuildPolicy({
       classification: "hermetic",
       impureEvaluation: true,
-      env: { VBR_NIX_BIN: nixBin },
-      runCommand: async () => ({
+      env,
+      toolPaths: { node: `${env.VBR_ARTIFACT_TOOLS_ROOT}/bin/node` },
+      runCommand: async (_command, args) => ({
         exitCode: 0,
-        stdout: JSON.stringify(effectiveConfig),
+        stdout: JSON.stringify(args.includes("info") ? { url: "daemon" } : effectiveConfig),
         stderr: "hostile stderr secret",
       }),
     });
-    assert.equal(evidence.nix.inspection, "available");
-    assert.doesNotMatch(serializeArtifactPolicyEvidence(evidence), /secret|cache\.example/);
-  } finally {
-    await fsp.rm(tmp, { recursive: true, force: true });
+  const canonicalNode = fs.realpathSync(`${env.VBR_ARTIFACT_TOOLS_ROOT}/bin/node`);
+  if (fs.realpathSync(process.execPath) !== canonicalNode) {
+    await assert.rejects(inspect, /executing Node is outside the canonical tool closure/);
+    return;
   }
+  const evidence = await inspect();
+  assert.equal(evidence.tools.node, "nix-store");
+  assert.doesNotMatch(serializeArtifactPolicyEvidence(evidence), /secret|cache\.example/);
 });
 
-test("workspace source inspection propagates git inventory failure", async () => {
-  const parent = path.join(process.cwd(), ".viberoots", "workspace", "buck", "tmp");
-  await fsp.mkdir(parent, { recursive: true });
-  const tmp = await fsp.mkdtemp(path.join(parent, "artifact-inventory-failure-"));
-  try {
-    await assert.rejects(
-      inspectWorkspaceArtifactSource({
-        workspaceRoot: tmp,
-        targetPackages: [],
-        env: { ...process.env, GIT_CEILING_DIRECTORIES: parent },
-      }),
-      /artifact source inventory failed/,
-    );
-  } finally {
-    await fsp.rm(tmp, { recursive: true, force: true });
+test("artifact context admission rejects a noncanonical executor instead of admitting a child", async () => {
+  const env = buildCanonicalArtifactEnvironment(process.cwd(), {
+    artifactToolsRoot: canonicalArtifactToolsRoot(
+      process.cwd(),
+      String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+    ),
+  });
+  const admission = admitArtifactContext({
+    classification: "hermetic",
+    purpose: "local",
+    impureEvaluation: false,
+    env,
+    workspaceRoot: process.cwd(),
+  });
+  const canonicalNode = fs.realpathSync(`${env.VBR_ARTIFACT_TOOLS_ROOT}/bin/node`);
+  if (fs.realpathSync(process.execPath) !== canonicalNode) {
+    await assert.rejects(admission, /must execute under the canonical Node closure/);
+    return;
   }
+  const evidence = await admission;
+  assert.equal(evidence.tools.node, "nix-store");
 });
 
-test("deployment runnable admission rejects a local path before source construction", async () => {
-  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "artifact-deployment-source-"));
-  try {
-    await assert.rejects(
-      chooseRunnableFlakeRef({
-        workspaceRoot: tmp,
-        sourceMode: "path",
-        attr: "graph-generator-selected",
-        target: "//projects/app:bin",
-        purpose: "deployment",
-      }),
-      /deployment artifact admission rejects local-development builds/,
-    );
-    assert.deepEqual(await fsp.readdir(tmp), []);
-  } finally {
-    await fsp.rm(tmp, { recursive: true, force: true });
-  }
-});
-
-test("both artifact executors use policy authority with pure bundle evaluation", async () => {
-  for (const file of ["build-selected.ts", "nix-build-filtered-flake.ts"]) {
-    const source = await fsp.readFile(viberootsSourcePath(`build-tools/tools/dev/${file}`), "utf8");
-    assert.match(source, /inspectArtifactBuildPolicy/);
-    assert.match(source, /emitArtifactPolicyEvidence/);
-    assert.match(source, /impureEvaluation: false/);
-  }
-  const command = await fsp.readFile(
-    viberootsSourcePath("build-tools/tools/dev/build-selected-nix-command.ts"),
-    "utf8",
-  );
-  assert.doesNotMatch(command, /"--impure"/);
-  assert.match(command, /"--no-write-lock-file"/);
-  const selected = await fsp.readFile(
-    viberootsSourcePath("build-tools/tools/dev/build-selected.ts"),
-    "utf8",
-  );
-  assert.match(selected, /inspectArtifactSource/);
-  assert.match(selected, /"ls-files", "-z"/);
-  assert.doesNotMatch(selected, /catch \{\s*return \{ flakeRef:/);
-  const filtered = await fsp.readFile(
-    viberootsSourcePath("build-tools/tools/dev/nix-build-filtered-flake.ts"),
-    "utf8",
-  );
-  assert.match(
-    filtered,
-    /sourceInventory\.localDevelopment \|\| evaluationBundleHasLanguageOverrides\(process\.env\)/,
-  );
-  assert.doesNotMatch(filtered, /localDevelopment: false/);
-  assert.ok(
-    filtered.indexOf("await inspectArtifactBuildPolicy") <
-      filtered.indexOf("const workDir = await mkdtempNoindex"),
-    "filtered source admission must precede snapshot creation",
-  );
-});
+registerArtifactBuildPolicyDelegatedContracts(test);

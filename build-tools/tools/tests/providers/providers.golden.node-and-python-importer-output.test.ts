@@ -109,7 +109,7 @@ test("golden: Python importer provider TARGETS.python.auto is stable for represe
     ].join("\n");
     await fsp.writeFile(lockfilePath, uvLock, "utf8");
 
-    await $`node ${await toolScript(tmp, "tools/buck/sync-providers.ts")} --lang python`;
+    await $`node ${await toolScript(tmp, "tools/buck/sync-providers.ts")} --lang python --no-glue`;
     const out = await readText(
       path.join(tmp, ".viberoots/workspace/providers/TARGETS.python.auto"),
     );

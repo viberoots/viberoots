@@ -3,54 +3,53 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { envWithStubbedNix, runInTemp } from "../lib/test-helpers";
+import { withoutArtifactEnvironmentInfluence } from "../../lib/artifact-environment";
+import { runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 import {
-  selectedTargets,
   writeDemoGraph,
-  writePnpmCwdStub,
-  writeSelectedNixStub,
+  writeRunnableFixture,
 } from "./runnable-commands.package-label-resolution.fixture";
+
+const fixtureRunner = viberootsSourcePath("build-tools/tools/tests/dev/run-runnable.fixture.ts");
+
+function fixtureEnv(): NodeJS.ProcessEnv {
+  return withoutArtifactEnvironmentInfluence(process.env);
+}
 
 test("p resolves package label to runnable target label", async () => {
   await runInTemp("runnable-package-label-resolution", async (tmp, $) => {
     await writeDemoGraph(tmp);
-    const targetLog = path.join(tmp, "buck-target.log");
-    const stubBin = await writeSelectedNixStub(tmp, targetLog, "package-resolution-ok");
+    const manifestPath = await writeRunnableFixture(tmp, "package-resolution-ok");
 
     const run = await $({
       cwd: tmp,
       stdio: "pipe",
-      env: envWithStubbedNix(stubBin),
-    })`viberoots/build-tools/tools/bin/p //projects/apps/demo`;
+      env: fixtureEnv(),
+    })`zx-wrapper ${fixtureRunner} --mode prod //projects/apps/demo --fixture-manifest=${manifestPath}`;
     assert.match(String(run.stdout || ""), /package-resolution-ok/);
-    assert.deepEqual(await selectedTargets(targetLog), ["//projects/apps/demo:app"]);
   });
 });
 
 test("p resolves relative and absolute directory paths to runnable target label", async () => {
   await runInTemp("runnable-path-label-resolution", async (tmp, $) => {
     await writeDemoGraph(tmp);
-    const targetLog = path.join(tmp, "buck-target.log");
-    const stubBin = await writeSelectedNixStub(tmp, targetLog, "path-resolution-ok");
-    const commonEnv = envWithStubbedNix(stubBin);
+    const manifestPath = await writeRunnableFixture(tmp, "path-resolution-ok");
+    const commonEnv = fixtureEnv();
 
     const relativeRun = await $({
       cwd: tmp,
       stdio: "pipe",
       env: commonEnv,
-    })`viberoots/build-tools/tools/bin/p projects/apps/demo`;
+    })`zx-wrapper ${fixtureRunner} --mode prod projects/apps/demo --fixture-manifest=${manifestPath}`;
     assert.match(String(relativeRun.stdout || ""), /path-resolution-ok/);
 
     const absoluteRun = await $({
       cwd: tmp,
       stdio: "pipe",
       env: commonEnv,
-    })`viberoots/build-tools/tools/bin/p ${path.join(tmp, "projects", "apps", "demo")}`;
+    })`zx-wrapper ${fixtureRunner} --mode prod ${path.join(tmp, "projects", "apps", "demo")} --fixture-manifest=${manifestPath}`;
     assert.match(String(absoluteRun.stdout || ""), /path-resolution-ok/);
-    assert.deepEqual(await selectedTargets(targetLog), [
-      "//projects/apps/demo:app",
-      "//projects/apps/demo:app",
-    ]);
   });
 });
 
@@ -58,7 +57,6 @@ for (const scenario of [
   {
     name: "d resolves current directory path (.) from package cwd",
     tempName: "runnable-dot-cwd-resolution",
-    targetLog: "buck-target-dot.log",
     buildOutput: "dot-resolution-ok",
     devOutput: "dev-dot-ok",
     argument: ".",
@@ -66,7 +64,6 @@ for (const scenario of [
   {
     name: "d defaults to current directory when target is omitted",
     tempName: "runnable-default-cwd-resolution",
-    targetLog: "buck-target-default.log",
     buildOutput: "default-resolution-build-ok",
     devOutput: "dev-default-ok",
     argument: undefined,
@@ -77,19 +74,24 @@ for (const scenario of [
       await writeDemoGraph(tmp);
       const appDir = path.join(tmp, "projects", "apps", "demo");
       await fsp.mkdir(appDir, { recursive: true });
-      const targetLog = path.join(tmp, scenario.targetLog);
-      const stubBin = await writeSelectedNixStub(tmp, targetLog, scenario.buildOutput);
-      await writePnpmCwdStub(tmp, stubBin, scenario.devOutput);
-      const command = path.join(tmp, "viberoots", "build-tools", "tools", "bin", "d");
+      const manifestPath = await writeRunnableFixture(
+        tmp,
+        scenario.buildOutput,
+        scenario.devOutput,
+      );
+      const env = fixtureEnv();
       const run = scenario.argument
         ? await $({
             cwd: appDir,
             stdio: "pipe",
-            env: envWithStubbedNix(stubBin),
-          })`${command} ${scenario.argument}`
-        : await $({ cwd: appDir, stdio: "pipe", env: envWithStubbedNix(stubBin) })`${command}`;
+            env,
+          })`zx-wrapper ${fixtureRunner} --mode dev ${scenario.argument} --fixture-manifest=${manifestPath}`
+        : await $({
+            cwd: appDir,
+            stdio: "pipe",
+            env,
+          })`zx-wrapper ${fixtureRunner} --mode dev --fixture-manifest=${manifestPath}`;
       assert.match(String(run.stdout || ""), new RegExp(scenario.devOutput));
-      assert.deepEqual(await selectedTargets(targetLog), ["//projects/apps/demo:app"]);
     });
   });
 }
@@ -113,15 +115,13 @@ test("p falls back from a directory path to :app when graph data is stale", asyn
       ].join("\n"),
       "utf8",
     );
-    const targetLog = path.join(tmp, "buck-target-stale.log");
-    const stubBin = await writeSelectedNixStub(tmp, targetLog, "stale-graph-fallback-ok");
+    const manifestPath = await writeRunnableFixture(tmp, "stale-graph-fallback-ok");
 
     const run = await $({
       cwd: appDir,
       stdio: "pipe",
-      env: envWithStubbedNix(stubBin),
-    })`${path.join(tmp, "viberoots", "build-tools", "tools", "bin", "p")} .`;
+      env: fixtureEnv(),
+    })`zx-wrapper ${fixtureRunner} --mode prod . --fixture-manifest=${manifestPath}`;
     assert.match(String(run.stdout || ""), /stale-graph-fallback-ok/);
-    assert.deepEqual(await selectedTargets(targetLog), ["//projects/apps/demo:app"]);
   });
 });

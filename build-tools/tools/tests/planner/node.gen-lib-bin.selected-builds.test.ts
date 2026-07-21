@@ -41,6 +41,27 @@ test("planner builds selected node gen/lib/bin targets with expected output path
         out: "demo.sh",
         cmd: "printf '#!/usr/bin/env sh\\necho node-bin\\n' > \"$OUT\"",
       },
+      {
+        name: "//projects/apps/node-artifacts:proxy_bin",
+        rule_type: "genrule",
+        labels: [
+          "lang:node",
+          "kind:bin",
+          lockLabel,
+          "planner_target://projects/apps/node-artifacts:proxy_bin__planner",
+        ],
+        srcs: ["projects/apps/node-artifacts/src/input.txt"],
+        out: "proxy.sh",
+        cmd: "echo public proxy command must not run >&2; exit 99",
+      },
+      {
+        name: "//projects/apps/node-artifacts:proxy_bin__planner",
+        rule_type: "genrule",
+        labels: ["lang:node", "kind:bin", lockLabel],
+        srcs: ["projects/apps/node-artifacts/src/input.txt"],
+        out: "proxy.sh",
+        cmd: "printf '#!/usr/bin/env sh\\necho planner-route\\n' > \"$OUT\"",
+      },
     ];
     await fs.writeFile(path.join(graphDir, "graph.json"), JSON.stringify(nodes), "utf8");
 
@@ -60,6 +81,11 @@ test("planner builds selected node gen/lib/bin targets with expected output path
         relPath: "bin/demo.sh",
         expected: "node-bin",
       },
+      {
+        target: "//projects/apps/node-artifacts:proxy_bin",
+        relPath: "bin/proxy.sh",
+        expected: "planner-route",
+      },
     ] as const;
 
     for (const c of cases) {
@@ -78,6 +104,60 @@ test("planner builds selected node gen/lib/bin targets with expected output path
       assert.equal(await fs.pathExists(targetOut), true, `missing output for ${c.target}`);
       const txt = await fs.readFile(targetOut, "utf8");
       assert.match(txt, new RegExp(c.expected), `unexpected content for ${c.target}`);
+    }
+  });
+});
+
+test("planner target declarations fail closed when malformed, missing, or ambiguous", async () => {
+  await runInTemp("planner-node-route-rejection", async (tmp, $) => {
+    const graphDir = path.join(tmp, "build-tools/tools/buck");
+    await fs.mkdirp(graphDir);
+    const appDir = path.join(tmp, "projects/apps/node-routes");
+    await fs.mkdirp(appDir);
+    await fs.writeFile(path.join(appDir, "pnpm-lock.yaml"), "# fixture\n", "utf8");
+    const lockLabel = "lockfile:projects/apps/node-routes/pnpm-lock.yaml#projects/apps/node-routes";
+    const base = (name: string, route: string) => ({
+      name: `//projects/apps/node-routes:${name}`,
+      rule_type: "genrule",
+      labels: ["lang:node", "kind:bin", lockLabel, `planner_target:${route}`],
+      srcs: [],
+      out: name,
+      cmd: `printf '${name}\\n' > "$OUT"`,
+    });
+    const nodes = [
+      base("malformed", "not-a-canonical-label"),
+      base("missing", "//projects/apps/node-routes:absent"),
+      base("ambiguous", "//projects/apps/node-routes:duplicate"),
+      {
+        ...base("duplicate", "//projects/apps/node-routes:unused"),
+        labels: ["lang:node", "kind:bin", lockLabel],
+      },
+      {
+        ...base("duplicate", "//projects/apps/node-routes:unused"),
+        labels: ["lang:node", "kind:bin", lockLabel],
+      },
+    ];
+    await fs.writeFile(path.join(graphDir, "graph.json"), JSON.stringify(nodes), "utf8");
+    const flakeRef = `path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`;
+    const cases = [
+      ["malformed", /declares malformed planner_target route/],
+      ["missing", /planner_target route must resolve exactly once/],
+      ["ambiguous", /planner_target route must resolve exactly once/],
+    ] as const;
+    for (const [name, expected] of cases) {
+      const result = await $({
+        cwd: tmp,
+        env: {
+          ...process.env,
+          BUCK_TARGET: `//projects/apps/node-routes:${name}`,
+          BUCK_TEST_SRC: tmp,
+        },
+        reject: false,
+        nothrow: true,
+        stdio: "pipe",
+      })`nix build --impure -L ${flakeRef} --accept-flake-config --no-link`;
+      assert.notEqual(result.exitCode, 0, `${name} planner route must fail closed`);
+      assert.match(String(result.stderr || result.stdout || ""), expected);
     }
   });
 });

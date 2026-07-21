@@ -12,7 +12,11 @@ import {
 import { registerEvaluationBundle } from "./evaluation-bundle-register";
 import { claimBundleTempRoot } from "./evaluation-bundle-owner";
 import { DEFAULT_GRAPH_PATH } from "../lib/workspace-state-paths";
-import { captureEvaluationBundleSelectors } from "./evaluation-bundle-selectors";
+import {
+  captureEvaluationBundleSelectors,
+  type DevOverrideValues,
+} from "./evaluation-bundle-selectors";
+import { buildCanonicalArtifactEnvironment } from "../lib/artifact-environment";
 
 export type EvaluationBundle = {
   bundlePath: string;
@@ -25,6 +29,7 @@ export type EvaluationBundle = {
 type RegisterBundle = (
   bundleRoot: string,
   recordProcessGroup: (processGroupId: number) => void,
+  env?: NodeJS.ProcessEnv,
 ) => Promise<string>;
 
 function cloneMode(): CopyFileCloneMode {
@@ -67,14 +72,32 @@ export async function materializeEvaluationBundle(
     platform?: string;
     requireGraph?: boolean;
     selectorEnv?: NodeJS.ProcessEnv;
+    devOverrides?: DevOverrideValues;
+    wasmBackend?: string;
+    onlyCpp?: boolean;
+    coverage?: boolean;
+    artifactEnv?: NodeJS.ProcessEnv;
+    artifactToolsRoot?: string;
   },
   deps: { register?: RegisterBundle; copyMode?: CopyFileCloneMode } = {},
 ): Promise<EvaluationBundle> {
+  const artifactEnv =
+    opts.artifactEnv ||
+    (opts.artifactToolsRoot
+      ? buildCanonicalArtifactEnvironment(process.cwd(), {
+          artifactToolsRoot: opts.artifactToolsRoot,
+        })
+      : undefined);
+  if (!artifactEnv) {
+    throw new Error(
+      "materializeEvaluationBundle requires either artifactEnv or artifactToolsRoot; the caller must resolve authority at the public boundary.",
+    );
+  }
   const tempRoot = await mkdtempNoindex("vbr-evaluation-bundle-", {
     baseName: "vbr-evaluation-bundle",
-    tmpBase: process.env.TMPDIR || "/tmp",
+    tmpBase: artifactEnv.TMPDIR || "/tmp",
   });
-  const claim = await claimBundleTempRoot(tempRoot);
+  const claim = await claimBundleTempRoot(tempRoot, artifactEnv);
   const cleanupTempRoot = claim.cleanup;
   let interrupted = "";
   const onSigint = () => (interrupted = "SIGINT");
@@ -99,7 +122,11 @@ export async function materializeEvaluationBundle(
     const selectors = await captureEvaluationBundleSelectors({
       bundleRoot,
       env: opts.selectorEnv || process.env,
+      devOverrides: opts.devOverrides,
       copyMode: deps.copyMode || cloneMode(),
+      wasmBackend: opts.wasmBackend,
+      onlyCpp: opts.onlyCpp,
+      coverage: opts.coverage,
     });
     assertRunning();
     if (
@@ -114,8 +141,10 @@ export async function materializeEvaluationBundle(
       attr: opts.attr,
       languageOverrides: selectors.languageOverrides,
       onlyCpp: selectors.onlyCpp,
+      coverage: selectors.coverage,
       platform: opts.platform || "",
       target: opts.target || "",
+      verifySeed: selectors.verifySeed,
       wasmBackend: selectors.wasmBackend,
     };
     const classification = { classification: opts.classification };
@@ -131,7 +160,11 @@ export async function materializeEvaluationBundle(
     const rootModulesTomlPath = files.some((file) => file.path === "gomod2nix.toml")
       ? "gomod2nix.toml"
       : "";
-    const dependencies = { inputs: dependencyInputs(files), rootModulesTomlPath };
+    const dependencies = {
+      artifactToolsRoot: String(artifactEnv.VBR_ARTIFACT_TOOLS_ROOT || ""),
+      inputs: dependencyInputs(files),
+      rootModulesTomlPath,
+    };
     const manifest = {
       schema: "viberoots.evaluation-bundle-manifest.v1",
       files: [...files, ...selectors.overrideFiles],
@@ -156,6 +189,7 @@ export async function materializeEvaluationBundle(
     const storePath = await (deps.register || registerEvaluationBundle)(
       bundleRoot,
       claim.recordProcessGroup,
+      artifactEnv,
     );
     assertRunning();
     await cleanupTempRoot();

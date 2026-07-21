@@ -11,12 +11,11 @@ import { activateWorkspace } from "../../lib/workspace-activation";
 const execFileAsync = promisify(execFile);
 const COMMAND = new URL("../../dev/viberoots.ts", import.meta.url).pathname;
 
-type LocalInputMode = "path" | "git" | false;
+type LocalInputMode = "path" | false;
 
 async function workspace(prefix: string, localInput: LocalInputMode = "path"): Promise<string> {
   const tmp = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), `${prefix}-`)));
-  const url =
-    localInput === "path" ? "path:./viberoots" : localInput === "git" ? "git+file:./viberoots" : "";
+  const url = localInput === "path" ? "path:./viberoots" : "";
   const flake = url
     ? `{ inputs.viberoots.url = "${url}"; outputs = _: {}; }\n`
     : "{ outputs = _: {}; }\n";
@@ -84,8 +83,8 @@ test("init-workspace keeps current on workspace root before local tool extractio
   }
 });
 
-test("init-workspace points current at extracted git+file viberoots submodule", async () => {
-  const root = await workspace("vbr-activate-git-local", "git");
+test("init-workspace points current at extracted path viberoots submodule", async () => {
+  const root = await workspace("vbr-activate-path-local");
   try {
     const source = await makeSource(root);
     await addExtractedToolTree(source);
@@ -117,6 +116,37 @@ test("activateWorkspace is idempotent on an already activated workspace", async 
     assert.equal(await readlink(root), firstLink);
     assert.equal(await fsp.realpath(path.join(root, ".viberoots/current")), firstReal);
     await assert.rejects(fsp.lstat(path.join(root, ".viberoots", "workspace", ".viberoots")));
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("activateWorkspace migrates generated Buck state before linking its canonical owner", async () => {
+  const root = await workspace("vbr-activate-buck-state");
+  try {
+    await makeSource(root);
+    const legacyDir = path.join(root, ".viberoots", "workspace", "buck");
+    await fsp.mkdir(legacyDir, { recursive: true });
+    const files = new Map([
+      [".buckconfig", "[buildfile]\nname = TARGETS\n"],
+      ["TARGETS", "# generated targets\n"],
+      ["graph.json", '[{"label":"//:kept"}]\n'],
+      ["workspace-root.env", "# derived from declared input\n"],
+    ]);
+    for (const [name, contents] of files) {
+      await fsp.writeFile(path.join(legacyDir, name), contents, "utf8");
+    }
+
+    await activateWorkspace({ start: root, env: { WORKSPACE_ROOT: root } });
+    await activateWorkspace({ start: root, env: { WORKSPACE_ROOT: root } });
+
+    assert.equal(await fsp.readlink(legacyDir), "../buck");
+    for (const [name, contents] of files) {
+      assert.equal(
+        await fsp.readFile(path.join(root, ".viberoots", "buck", name), "utf8"),
+        contents,
+      );
+    }
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }

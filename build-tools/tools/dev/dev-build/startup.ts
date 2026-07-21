@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { runNodeWithZx } from "../../lib/node-run";
 
 async function pathExists(p: string): Promise<boolean> {
   try {
@@ -138,9 +139,12 @@ export async function runStartupCheck(root: string): Promise<void> {
         }
       : {}),
   } as any;
-  await $({
-    stdio: "inherit",
+  await runNodeWithZx({
+    script: startupCheck,
+    zxInitPath: zxInit,
+    nodeBin: process.execPath,
     cwd: root,
     env: envStartup,
-  })`node --experimental-strip-types --disable-warning=ExperimentalWarning --import ${zxInit} ${startupCheck}`;
+    stdio: "inherit",
+  });
 }

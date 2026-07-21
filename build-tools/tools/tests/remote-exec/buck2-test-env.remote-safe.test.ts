@@ -22,6 +22,7 @@ const remotePolicy: VerifyExecutionPolicy = {
   activationDir: "/tmp/vbr-remote/activation",
   profilePrefix: "linux-x86_64",
   passProfiles: {},
+  remoteSmoke: null,
 };
 
 function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => T): T {

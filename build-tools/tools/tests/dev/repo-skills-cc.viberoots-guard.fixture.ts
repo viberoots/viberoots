@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { buckconfig } from "../../lib/consumer-bootstrap";
 import { envrc } from "../../lib/consumer-direnv";
 import { consumerGitignoreEntries } from "../../lib/consumer-tracked-inputs";
+import { renderGlobalNixInputTargets } from "../../lib/global-nix-input-targets";
 
 export const execFileAsync = promisify(execFile);
 export const commitEnv = {
@@ -32,9 +33,30 @@ export async function ccFixture(mode: "flake" | "submodule"): Promise<string> {
     path.join(root, ".gitignore"),
     `# viberoots local workspace state\n${consumerGitignoreEntries.join("\n")}\n`,
   );
+  await fsp.mkdir(path.join(root, "projects", "config"), { recursive: true });
+  const targets = renderGlobalNixInputTargets({
+    hashesJson: Buffer.from("{}\n"),
+    flakeNix: Buffer.from(""),
+    flakeLock: Buffer.from(""),
+    registryExtension: Buffer.from(""),
+  });
+  await fsp.writeFile(
+    path.join(root, "projects", "config", "TARGETS"),
+    targets.projectsConfigTargets,
+  );
+  await fsp.writeFile(path.join(root, "projects", "config", "node-modules.hashes.json"), "{}\n");
   await execFileAsync(
     "git",
-    ["add", "flake.nix", ".buckconfig", ".buckroot", ".envrc", ".gitignore"],
+    [
+      "add",
+      "flake.nix",
+      ".buckconfig",
+      ".buckroot",
+      ".envrc",
+      ".gitignore",
+      "projects/config/TARGETS",
+      "projects/config/node-modules.hashes.json",
+    ],
     { cwd: root },
   );
   await execFileAsync("git", ["commit", "-qm", "fixture"], { cwd: root, env: commitEnv });

@@ -48,7 +48,7 @@ async function main() {
     // Buck macros load provider mappings via @workspace_providers//:auto_map.bzl.
     //
     // Delegate to the centralized glue pipeline for the shared post-sync steps
-    // (ensureGraph → optional provider_index → auto_map).
+    // (graph reconciliation → optional provider_index → auto_map).
     await runGluePipeline({
       skipProviderSync: true,
       graphPath: DEFAULT_GRAPH_PATH,

@@ -61,6 +61,7 @@ in
   isRootDir "install-cache" ||
   isRootDir "nix-xdg-cache" ||
   isRootDir "pr-logs" ||
+  isRootDir "viberoots" ||
   isRootDir "viberoots-flake-input" ||
   isRootDir "xdg-cache" ||
   isRootDir "buck-out" ||

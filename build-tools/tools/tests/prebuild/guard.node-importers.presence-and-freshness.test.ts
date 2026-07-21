@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { exists, runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 test("prebuild-guard: flags missing Node importer providers and auto-fixes locally", async () => {
   await runInTemp("prebuild-node-importers", async (tmp, $) => {
@@ -10,8 +11,7 @@ test("prebuild-guard: flags missing Node importer providers and auto-fixes local
     const buckDir = path.join(tmp, ".viberoots", "workspace", "buck");
     await fsp.mkdir(providersDir, { recursive: true });
     await fsp.mkdir(buckDir, { recursive: true });
-    // Minimal glue outputs (graph + auto_map) present
-    await fsp.writeFile(path.join(buckDir, "graph.json"), "[]\n", "utf8");
+    // Minimal non-graph glue outputs are present; the graph fixture is reconciled below.
     await fsp.writeFile(path.join(buckDir, "node-lock-index.json"), "{}\n", "utf8");
     await fsp.writeFile(
       path.join(buckDir, "invalidation-report.txt"),
@@ -45,17 +45,20 @@ test("prebuild-guard: flags missing Node importer providers and auto-fixes local
     // Initialize git so provider sync discovers lockfiles via git ls-files
     await $({ cwd: tmp })`git init`;
     await $({ cwd: tmp })`git add ${path.relative(tmp, lockPath)}`;
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
 
     // Run guard with no-fix mode to observe error-free local behavior and a skip note
-    const env = { ...process.env, PREBUILD_GUARD_NO_FIX: "1" };
+    const env = { ...graphEnv, PREBUILD_GUARD_NO_FIX: "1" };
     await $({
       cwd: tmp,
+      env: graphEnv,
       env,
     })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
 
     // Now allow auto-fix and re-run; guard should regenerate providers via autoFixGlue
     await $({
       cwd: tmp,
+      env: graphEnv,
     })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
     const txt = await fsp.readFile(targetsNode, "utf8");
     if (

@@ -33,9 +33,9 @@ let
       mkdir -p $out/bin
       : > $out/manifest.json
       : > $out/build.log
-      echo "repoRootStr=${repoRootStr}" >> $out/build.log
-      echo "appsDir=${builtins.toString (builtins.toPath (repoRootStr + "/projects/apps"))}" >> $out/build.log
-      echo "libsDir=${builtins.toString (builtins.toPath (repoRootStr + "/projects/libs"))}" >> $out/build.log
+      echo "repoRootStr=." >> $out/build.log
+      echo "appsDir=projects/apps" >> $out/build.log
+      echo "libsDir=projects/libs" >> $out/build.log
       echo "devOverrideJSON=${builtins.toJSON devOverrideJSON}" >> $out/build.log
       ${if (!isCI && !suppressDevOverrideLog && ((builtins.length overridePresentList) > 0)) then ''
         echo "[planner] dev overrides present: ${presentShort}" >> $out/build.log
@@ -172,4 +172,3 @@ let
 in {
   inherit all;
 }
-

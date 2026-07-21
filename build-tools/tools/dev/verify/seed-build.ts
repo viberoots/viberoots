@@ -1,30 +1,53 @@
-import fs from "node:fs";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
-import process from "node:process";
+import { artifactNixPolicyArgs } from "../../lib/artifact-nix-policy";
 
 export type VerifySeedBuildMode = "local" | "remote-ready";
 
-function seedFlakeRef(root: string): string {
-  const hiddenWorkspaceFlake = path.join(root, ".viberoots", "workspace", "flake.nix");
-  const flakeRoot = fs.existsSync(hiddenWorkspaceFlake)
-    ? path.join(root, ".viberoots", "workspace")
-    : root;
-  return `path:${flakeRoot}#test-seed`;
+async function pathExists(filePath: string): Promise<boolean> {
+  return await fsp
+    .access(filePath)
+    .then(() => true)
+    .catch(() => false);
 }
 
+export async function assertVerifySeedComplete(seedPath: string): Promise<void> {
+  for (const required of [".buckconfig", "viberoots/flake.nix"]) {
+    if (!(await pathExists(path.join(seedPath, required)))) {
+      throw new Error(`verify seed is incomplete: missing ${required} in ${seedPath}`);
+    }
+  }
+  const flakeCandidates = ["flake.nix", ".viberoots/workspace/flake.nix"];
+  if (
+    !(await Promise.all(flakeCandidates.map((rel) => pathExists(path.join(seedPath, rel))))).some(
+      Boolean,
+    )
+  ) {
+    throw new Error(
+      `verify seed is incomplete: missing flake.nix or .viberoots/workspace/flake.nix in ${seedPath}`,
+    );
+  }
+}
+
+const evaluationBundleSeedRef =
+  /^path:\/nix\/store\/[a-z0-9]{32}-viberoots-evaluation-bundle\?dir=source(?:\/[^#?]+)?#test-seed$/;
+
 export function verifySeedBuildArgs(opts: {
-  root: string;
+  flakeRef: string;
   mode: VerifySeedBuildMode;
   gcRootPath?: string;
 }): string[] {
-  const flakeRef = seedFlakeRef(opts.root);
+  if (!evaluationBundleSeedRef.test(opts.flakeRef)) {
+    throw new Error("verify seed build requires the canonical immutable evaluation-bundle source");
+  }
   const base = [
     "build",
+    ...artifactNixPolicyArgs(),
     "--option",
     "eval-cache",
     "false",
-    "--impure",
-    flakeRef,
+    "--no-write-lock-file",
+    opts.flakeRef,
     "--accept-flake-config",
   ];
   if (opts.mode === "remote-ready") return [...base, "--no-link", "--print-out-paths"];

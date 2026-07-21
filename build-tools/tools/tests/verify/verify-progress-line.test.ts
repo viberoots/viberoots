@@ -5,6 +5,7 @@ import {
   formatVerifyProgressLine,
   formatVerifyProgressLines,
 } from "../../dev/verify/progress-line";
+import { captureProgressStream } from "./verify-progress-line.fixture";
 
 test("verify progress line starts with test-count progress and elapsed time", () => {
   const line = formatVerifyProgressLine({
@@ -85,17 +86,12 @@ test("verify progress colors match verify status color policy", () => {
 
 test("verify progress reporter freezes completed pass elapsed time", () => {
   let now = 0;
-  const writes: string[] = [];
+  const { stream, writes } = captureProgressStream(true);
   const reporter = createVerifyProgressReporter({
     enabled: true,
     passes: [{ name: "isolated", total: 1 }],
     now: () => now,
-    stream: {
-      isTTY: true,
-      write: (chunk) => {
-        writes.push(String(chunk));
-      },
-    },
+    stream,
     env: { TERM: "xterm-256color" },
   });
 
@@ -116,16 +112,11 @@ test("verify progress reporter freezes completed pass elapsed time", () => {
 });
 
 test("verify progress reporter stays silent for empty target selections", () => {
-  const writes: string[] = [];
+  const { stream, writes } = captureProgressStream(false);
   const reporter = createVerifyProgressReporter({
     enabled: true,
     passes: [],
-    stream: {
-      isTTY: false,
-      write: (chunk) => {
-        writes.push(String(chunk));
-      },
-    },
+    stream,
   });
 
   reporter.start();
@@ -135,16 +126,11 @@ test("verify progress reporter stays silent for empty target selections", () => 
 });
 
 test("verify progress reporter redraws tty output from column zero", () => {
-  const writes: string[] = [];
+  const { stream, writes } = captureProgressStream(true);
   const reporter = createVerifyProgressReporter({
     enabled: true,
     passes: [{ name: "isolated", total: 8 }],
-    stream: {
-      isTTY: true,
-      write: (chunk) => {
-        writes.push(String(chunk));
-      },
-    },
+    stream,
     env: { TERM: "xterm-256color" },
   });
 
@@ -159,17 +145,12 @@ test("verify progress reporter redraws tty output from column zero", () => {
 
 test("verify progress reporter renders successful passes complete", () => {
   let now = 0;
-  const writes: string[] = [];
+  const { stream, writes } = captureProgressStream(true);
   const reporter = createVerifyProgressReporter({
     enabled: true,
     passes: [{ name: "shared", total: 1505 }],
     now: () => now,
-    stream: {
-      isTTY: true,
-      write: (chunk) => {
-        writes.push(String(chunk));
-      },
-    },
+    stream,
     env: { TERM: "xterm-256color" },
   });
 
@@ -188,17 +169,12 @@ test("verify progress reporter renders successful passes complete", () => {
 
 test("verify progress reporter redraws in Codex cmux TTY terminals", () => {
   let now = 0;
-  const writes: string[] = [];
+  const { stream, writes } = captureProgressStream(true);
   const reporter = createVerifyProgressReporter({
     enabled: true,
     passes: [{ name: "isolated", total: 1 }],
     now: () => now,
-    stream: {
-      isTTY: true,
-      write: (chunk) => {
-        writes.push(String(chunk));
-      },
-    },
+    stream,
     env: {
       TERM: "xterm-256color",
       CODEX_CI: "1",
@@ -219,7 +195,7 @@ test("verify progress reporter redraws in Codex cmux TTY terminals", () => {
 });
 
 test("verify progress reporter only prints changed passes for non-tty output", () => {
-  const writes: string[] = [];
+  const { stream, writes } = captureProgressStream(false);
   const reporter = createVerifyProgressReporter({
     enabled: true,
     passes: [
@@ -228,12 +204,7 @@ test("verify progress reporter only prints changed passes for non-tty output", (
       { name: "shared", total: 1494 },
     ],
     now: () => 7_000,
-    stream: {
-      isTTY: false,
-      write: (chunk) => {
-        writes.push(String(chunk));
-      },
-    },
+    stream,
     env: {
       TERM: "xterm-256color",
       CODEX_CI: "1",

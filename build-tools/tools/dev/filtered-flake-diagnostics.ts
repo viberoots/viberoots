@@ -26,11 +26,20 @@ export function formatTimingDuration(ms: number): string {
 
 export async function readSnapshotStats(
   dir: string,
+  env: NodeJS.ProcessEnv,
 ): Promise<{ fileCount: number; dirCount: number; kb: number }> {
   const [{ stdout: files }, { stdout: dirs }, { stdout: kb }] = await Promise.all([
-    runCommand({ command: "find", args: [dir, "-type", "f", "-print"] }),
-    runCommand({ command: "find", args: [dir, "-type", "d", "-print"] }),
-    runCommand({ command: "du", args: ["-sk", dir] }),
+    runCommand({
+      command: ensureNixStoreToolPathSync("find", env),
+      args: [dir, "-type", "f", "-print"],
+      env,
+    }),
+    runCommand({
+      command: ensureNixStoreToolPathSync("find", env),
+      args: [dir, "-type", "d", "-print"],
+      env,
+    }),
+    runCommand({ command: ensureNixStoreToolPathSync("du", env), args: ["-sk", dir], env }),
   ]);
   return {
     fileCount: files.trim() ? files.trimEnd().split("\n").length : 0,
@@ -39,15 +48,19 @@ export async function readSnapshotStats(
   };
 }
 
-export async function readDirtyGitStats(workspaceRoot: string): Promise<{
+export async function readDirtyGitStats(
+  workspaceRoot: string,
+  env: NodeJS.ProcessEnv,
+): Promise<{
   entryCount: number;
   sample: string[];
 } | null> {
   if (!diagnosticsEnabled()) return null;
   const status = await runCommand({
-    command: "git",
+    command: ensureNixStoreToolPathSync("git", env),
     args: ["status", "--porcelain", "--untracked-files=normal"],
     cwd: workspaceRoot,
+    env,
     allowFailure: true,
   });
   if (Number(status.exitCode || 0) !== 0) return null;
@@ -61,3 +74,4 @@ export async function readDirtyGitStats(workspaceRoot: string): Promise<{
   };
 }
 import { runCommand } from "./filtered-flake-command";
+import { ensureNixStoreToolPathSync } from "../lib/tool-paths";

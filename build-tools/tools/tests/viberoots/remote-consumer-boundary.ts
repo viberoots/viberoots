@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { withoutArtifactEnvironmentInfluence } from "../../lib/artifact-environment";
 
 export async function exists(file: string): Promise<boolean> {
   return await fsp
@@ -31,17 +32,14 @@ export function commandEnv(consumer: string, extra: NodeJS.ProcessEnv = {}): Nod
     "bin",
   );
   const env = {
-    ...process.env,
+    ...withoutArtifactEnvironmentInfluence(process.env),
     ...extra,
-    WORKSPACE_ROOT: consumer,
     VIBEROOTS_ROOT: "",
     VIBEROOTS_SOURCE_ROOT: "",
     NO_DEV_SHELL: "1",
-    VBR_RUN_IN_TEMP_REPO: "1",
     VERIFY_SKIP_LINT: "1",
     VERIFY_ALLOW_CONCURRENT: "1",
     VBR_NIX_CACHE_POLICY: "off",
-    BUCK_DEVBUILD_REUSE_DAEMON: "0",
     PATH: `${currentToolBin}:${process.env.PATH || ""}`,
   };
   delete env.BUCK_ISOLATION_DIR;
@@ -78,7 +76,7 @@ export const FORBIDDEN_SOURCE_STATE = [
   "config/workspace_buck/graph.json",
   "config/workspace_providers/auto_map.bzl",
   "config/workspace_providers/provider_index.json",
-  "projects/node-modules.hashes.json",
+  "projects/config/node-modules.hashes.json",
   "projects/config/shared.json",
   "projects/config/local.json",
   "projects/config/control-plane/stack.json",
@@ -119,5 +117,8 @@ export async function assertCleanConsumerBoundary(
   }
   assert.equal(await exists(path.join(consumer, ".viberoots", "workspace", "providers")), true);
   assert.equal(await exists(path.join(consumer, ".viberoots", "workspace", "buck")), true);
-  assert.equal(await exists(path.join(consumer, "projects", "node-modules.hashes.json")), true);
+  assert.equal(
+    await exists(path.join(consumer, "projects", "config", "node-modules.hashes.json")),
+    true,
+  );
 }

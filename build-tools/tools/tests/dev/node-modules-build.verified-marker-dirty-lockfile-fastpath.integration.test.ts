@@ -30,6 +30,17 @@ test("node-modules-build reuses verified markers even when temp lockfiles are gi
     throw new Error("node-modules-build.ts must not prewarm or import a candidate pnpm store");
   }
   if (
+    txt.includes("currentPnpmStoreDerivationIdentity") ||
+    txt.includes("withPnpmStoreBuildFlakeRef")
+  ) {
+    throw new Error(
+      "node-modules-build.ts must not re-evaluate update-only filtered flakes to trust a matching verified marker",
+    );
+  }
+  if (!txt.includes("withNodeModulesEvaluationBundle") || !txt.includes("makeFilteredFlakeRef")) {
+    throw new Error("cold node_modules realization must use the immutable evaluation bundle");
+  }
+  if (
     !txt.includes("recoverOutPathFromLinkMarker(importer, lockfileRel)") ||
     !txt.includes("node-modules-link.${markerKey}.json") ||
     !txt.includes('fsp.access(path.join(outPath, "node_modules"))')

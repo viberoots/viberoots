@@ -4,9 +4,9 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { withScopedEnv } from "../lib/test-helpers/scoped-env";
-import { ensureGraph } from "../../buck/glue-run";
+import { reconcileGeneratedGraph } from "../../buck/glue-run";
 
-test("ensureGraph regenerates when BUCK_TARGET is missing from the existing graph", async () => {
+test("graph reconciliation regenerates when BUCK_TARGET is missing", async () => {
   await runInTemp("ensure-graph-buck-target-missing", async (tmp) => {
     const graphPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
     await fsp.mkdir(path.dirname(graphPath), { recursive: true });
@@ -21,7 +21,7 @@ test("ensureGraph regenerates when BUCK_TARGET is missing from the existing grap
         );
 
         let invoked = false;
-        await ensureGraph({
+        await reconcileGeneratedGraph({
           exportGraph: async () => {
             invoked = true;
             const want = String(process.env.BUCK_TARGET || "").trim();
@@ -38,7 +38,7 @@ test("ensureGraph regenerates when BUCK_TARGET is missing from the existing grap
         });
 
         if (!invoked) {
-          console.error("expected ensureGraph() to regenerate via injected exporter");
+          console.error("expected graph reconciliation to invoke the exporter");
           process.exit(2);
         }
 

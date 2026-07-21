@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { buildToolsRoot } from "../../dev/dev-build/paths";
 import { FILTERED_FLAKE_RSYNC_EXCLUDES } from "../../dev/nix-build-filtered-flake-lib";
+import { REQUIRED_FILTERED_FLAKE_EXCLUDES } from "./filtered-flake-snapshot-required-excludes";
 
 const toolsRoot = buildToolsRoot(process.cwd());
 
@@ -21,62 +22,17 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     await readTool("tools/dev/filtered-flake.ts"),
     await readTool("tools/dev/filtered-flake-viberoots-input.ts"),
   ].join("\n");
-  const buildHelper = await readTool("tools/dev/nix-build-filtered-flake.ts");
+  const buildMain = await readTool("tools/dev/nix-build-filtered-flake.ts");
+  const buildHelper = [
+    buildMain,
+    await readTool("tools/dev/nix-build-filtered-flake-preparation.ts"),
+    await readTool("tools/dev/nix-build-filtered-flake-declared-inputs.ts"),
+    await readTool("tools/dev/nix-build-filtered-flake-runtime.ts"),
+  ].join("\n");
   const helper = [buildHelper, await readTool("tools/dev/filtered-flake-viberoots-input.ts")].join(
     "\n",
   );
-  const required = [
-    "coverage",
-    ".viberoots/buck",
-    ".viberoots/buck/tmp",
-    ".viberoots/cache",
-    ".viberoots/current",
-    ".codex-*.log",
-    ".viberoots/workspace/.viberoots",
-    ".viberoots/workspace/backups",
-    ".viberoots/workspace/cache",
-    ".viberoots/workspace/codex-test-logs",
-    ".viberoots/workspace/exact-env-smoke.out",
-    ".viberoots/workspace/host-path",
-    ".viberoots/workspace/install-cache",
-    ".viberoots/workspace/nix-xdg-cache",
-    ".viberoots/workspace/node",
-    ".viberoots/workspace/prelude",
-    ".viberoots/workspace/pr-logs",
-    ".viberoots/workspace/xdg-cache",
-    "viberoots/.viberoots",
-    "/backups",
-    "/cache",
-    "/codex-test-logs",
-    "/install-cache",
-    "/nix-xdg-cache",
-    "/pr-logs",
-    "/prelude",
-    "/viberoots-flake-input",
-    "/xdg-cache",
-    ".viberoots/workspace/viberoots-flake-input",
-    ".clinic",
-    "viberoots/.codex-*.log",
-    "viberoots/.full-test-output.log",
-    "viberoots/.patch-sessions.json",
-    "viberoots/backups",
-    "viberoots/cache",
-    "viberoots/codex-test-logs",
-    "viberoots/install-cache",
-    "viberoots/nix-xdg-cache",
-    "viberoots/pr-logs",
-    "viberoots/prelude",
-    "viberoots/test-logs",
-    "viberoots/xdg-cache",
-    ".turbo",
-    ".cache",
-    ".node_modules.lockfile-guard.*",
-    ".*.tmp",
-    ".*.ts.??????",
-    "result-*",
-  ];
-
-  for (const token of required) {
+  for (const token of REQUIRED_FILTERED_FLAKE_EXCLUDES) {
     if (!FILTERED_FLAKE_RSYNC_EXCLUDES.includes(token)) {
       throw new Error(`nix-build-filtered-flake snapshot must include ${token}`);
     }
@@ -86,6 +42,11 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
       "filtered flake snapshots must preserve pnpm-workspace.yaml because it can affect frozen lockfile validation",
     );
   }
+  assert.ok(FILTERED_FLAKE_RSYNC_EXCLUDES.includes("build/"));
+  assert.ok(
+    !FILTERED_FLAKE_RSYNC_EXCLUDES.includes("build"),
+    "build output directories must be excluded without dropping the public bin/build command",
+  );
 
   for (const [name, source] of [
     ["update-pnpm-hash filtered snapshot", updaterHelper],
@@ -140,8 +101,12 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
     ["selected-build filtered snapshot", selectedHelper],
     ["nix-build-filtered-flake snapshot", helper],
   ] as const) {
+    const usesSelectedGraphRoots =
+      name !== "update-pnpm-hash filtered snapshot" &&
+      source.includes("filteredSnapshotSelection") &&
+      source.includes("snapshotSelection.relPaths");
     if (
-      !source.includes("defaultFilteredFlakeSnapshotRelPaths") ||
+      (!source.includes("defaultFilteredFlakeSnapshotRelPaths") && !usesSelectedGraphRoots) ||
       !source.includes("defaultFilteredFlakeSnapshotRsyncSources") ||
       !source.includes("--relative")
     ) {
@@ -151,28 +116,28 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
       throw new Error(`${name} must not broad-rsync the workspace root into filtered snapshots`);
     }
   }
-  assert.match(buildHelper, /repairSnapshotViberootsInput/);
-  assert.match(buildHelper, /materializeEvaluationBundle/);
-  assert.match(buildHelper, /withoutEvaluationSelectors\(process\.env\)/);
-  assert.doesNotMatch(buildHelper, /WORKSPACE_ROOT: bundleRoot/);
+  assert.match(buildMain, /repairSnapshotViberootsInput/);
+  assert.match(buildMain, /materializeEvaluationBundle/);
+  assert.match(buildMain, /withoutEvaluationSelectors\(process\.env\)/);
+  assert.doesNotMatch(buildMain, /WORKSPACE_ROOT: bundleRoot/);
   assert.ok(
-    buildHelper.indexOf("repairSnapshotViberootsInput({ snapDir, flakeDir })") <
-      buildHelper.indexOf("const bundle = await materializeEvaluationBundle") &&
-      buildHelper.indexOf("const bundle = await materializeEvaluationBundle") <
-        buildHelper.indexOf("prewarmFinalStoreForTarget(root, attr, flakeRef, nixEnv)"),
+    buildMain.indexOf("repairSnapshotViberootsInput({") <
+      buildMain.indexOf("const bundle = await materializeEvaluationBundle") &&
+      buildMain.indexOf("const bundle = await materializeEvaluationBundle") <
+        buildMain.indexOf("prewarmFinalStoreForTarget("),
     "selected snapshots must repair inputs and register the bundle before pnpm-store evaluation",
   );
   assert.ok(
-    buildHelper.indexOf("const nixEnv = envWithResolvedNixBin") <
-      buildHelper.indexOf("prewarmFinalStoreForTarget(root, attr, flakeRef, nixEnv)"),
+    buildMain.indexOf("const nixEnv = buildArtifactEnvironment") <
+      buildMain.indexOf("prewarmFinalStoreForTarget("),
     "selected snapshots must establish their evaluation environment before pnpm-store prewarming",
   );
-  assert.match(buildHelper, /VBR_PNPM_FILTERED_SNAPSHOT_ROOT: bundleRoot/);
+  assert.match(buildMain, /VBR_PNPM_FILTERED_SNAPSHOT_ROOT: bundleRoot/);
   assert.match(buildHelper, /attrPath: pnpmStoreAttrFromImporter\(importer\),\s+env,/);
-  assert.doesNotMatch(buildHelper, /tempRepoLiveViberootsRoot|activeViberootsRoot/);
+  assert.doesNotMatch(buildMain, /tempRepoLiveViberootsRoot|activeViberootsRoot/);
   if (
     !helper.includes("copyWorkspaceGraphIntoSnapshot") ||
-    !helper.includes('path.join(snapDir, ".viberoots", "buck")') ||
+    !helper.includes('path.join(snapDir, ".viberoots", "buck", "graph.json")') ||
     !helper.includes("fsp.copyFile(graphPath, snapshotGraphPath)") ||
     !helper.includes("path.join(snapDir, DEFAULT_GRAPH_PATH)") ||
     !helper.includes("workspaceBuckStat?.isSymbolicLink()")
@@ -204,7 +169,12 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
       "nix-build-filtered-flake must bind Nix evaluation to the filtered snapshot input",
     );
   }
-  if (!helper.includes('path.join(snapshotRoot, "flake.nix")')) {
+  if (
+    !helper.includes("resolveSnapshotFlakeDir") ||
+    !helper.includes('path.join(snapDir, ".viberoots", "workspace", "flake.nix")') ||
+    !helper.includes('path.join(snapDir, "flake.nix")') ||
+    !helper.includes("snapshot is missing .viberoots/workspace/flake.nix and flake.nix")
+  ) {
     throw new Error("nix-build-filtered-flake must require the filtered input to be a flake");
   }
   if (
@@ -215,22 +185,23 @@ test("filtered flake snapshot excludes large generated artifacts", async () => {
       "filtered snapshots must reference one immutable store source without embedding a nested input",
     );
   }
-  for (const [name, source] of [
-    ["update-pnpm-hash filtered snapshot", updaterHelper],
-    ["selected-build filtered snapshot", selectedHelper],
-    ["nix-build-filtered-flake snapshot", helper],
+  for (const [name, source, environmentAuthority] of [
+    ["update-pnpm-hash filtered snapshot", updaterHelper, "buildCanonicalArtifactEnvironment"],
+    ["selected-build filtered snapshot", selectedHelper, "const artifactEnv = opts.env"],
+    ["nix-build-filtered-flake snapshot", helper, "envWithResolvedNixBin"],
   ] as const) {
     if (
       source.includes("process.env.NIX_BIN") ||
       source.includes('resolveToolPathSync("nix")') ||
-      !source.includes("envWithResolvedNixBin")
+      !source.includes(environmentAuthority) ||
+      !source.includes('ensureNixStoreToolPathSync("nix"')
     ) {
       throw new Error(`${name} must invoke nix through the selected VBR_NIX_BIN environment`);
     }
   }
-  if (!helper.includes('resolveToolPathSync("nix", nixEnv)')) {
+  if (!helper.includes('ensureNixStoreToolPathSync("nix", nixEnv)')) {
     throw new Error(
-      "nix-build-filtered-flake must resolve the nix command from the same env passed to nix",
+      "nix-build-filtered-flake must require the nix command from the same env passed to nix",
     );
   }
   if (!helper.includes("resolveFinalPnpmStore")) {

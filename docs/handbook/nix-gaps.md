@@ -41,6 +41,7 @@ Planner coverage note: Go library and binary target kinds are supported by the N
 - `nix_node_bin` → Nix build (alias of `nix_node_gen` with planner kind `bin` / `mkBin`).
 - `node_webapp` → Nix build (calls `nix build` in genrule).
 - `node_vercel_next_artifact` → Nix build (calls `nix build` in genrule and packages the `node-webapp` output).
+- `node_service_artifact` → Nix build (calls the filtered immutable Node service artifact route).
 - `nix_node_cli_bin` → Nix build (calls `nix build` in genrule for both bundle modes).
 - `node_asset_stage` → Nix build (`standalone nix-calling genrule route` with selected-build out-path capture).
 - `node_wasm_inline_module` → Nix build (`standalone nix-calling genrule route` with selected-build out-path capture).
@@ -55,6 +56,7 @@ Node macro outcome classification:
 | `nix_node_bin`              | artifact-producing        | Nix build     | Alias of `nix_node_gen` with planner kind `bin` (`mkBin`).                                        |
 | `node_webapp`               | orchestration wrapper     | Nix build     | Uses `genrule` to call `nix build`.                                                               |
 | `node_vercel_next_artifact` | artifact-producing        | Nix build     | Uses `genrule` to call the filtered flake `node-vercel-next` package.                             |
+| `node_service_artifact`     | artifact-producing        | Nix build     | Uses the filtered flake `node-service` package and a declared runtime contract.                   |
 | `nix_node_cli_bin`          | artifact-producing        | Nix build     | Both `bundle = True` and `bundle = False` use Nix-calling routes.                                 |
 | `node_asset_stage`          | artifact-producing        | Nix build     | Uses standalone nix-calling genrule route with selected-build out-path capture and shared wiring. |
 | `node_wasm_inline_module`   | artifact-producing        | Nix build     | Uses standalone nix-calling genrule route with selected-build out-path capture and shared wiring. |
@@ -104,7 +106,7 @@ Allowed non-build public macros:
 ## Enforcement gates
 
 I keep machine-checked enforcement in `build-tools/tools/dev/nix-gaps-inventory-check.ts`.
-The policy data lives in `docs/handbook/nix-gaps-exceptions.json`:
+Exception data lives in `docs/handbook/nix-gaps-exceptions.json`:
 
 - `exceptions`: allowed probe-only non-build macros.
 - `artifactRouteAllowlist`: temporary non-Nix artifact routes that are still allowed.
@@ -112,6 +114,22 @@ The policy data lives in `docs/handbook/nix-gaps-exceptions.json`:
 Current temporary allowlist entries:
 
 - None.
+
+### Production command-site inventory
+
+The same checker mechanically inventories production Nix, Buck, and process/action command sites.
+`docs/handbook/nix-command-site-policy.json` is the reviewed authority for the inventory digest and
+these roles; it is separate from the exception ledger because every production command site must be
+classified:
+
+- `canonical-artifact`: consumes immutable source and the canonical artifact environment/tool policy.
+- `live-d`: explicit local development behavior; it cannot publish or cache production artifacts.
+- `update-install`: explicit mutation, reconciliation, bootstrap, repair, or maintenance ownership.
+- `non-artifact-orchestration`: probes, queries, cleanup, scaffolding, and control-plane operations
+  that cannot publish artifacts.
+
+New, changed, or unclassified production command sites fail the checker. Updating the deterministic
+digest requires reviewing the affected site and its role; a path rule alone does not admit a change.
 
 ## Toolchains
 

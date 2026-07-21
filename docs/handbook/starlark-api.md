@@ -26,6 +26,7 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `nix_node_bin`
   - `node_webapp`
   - `node_vercel_next_artifact`
+  - `node_service_artifact`
   - `nix_node_cli_bin`
   - `node_asset_stage`
   - `node_wasm_inline_module`

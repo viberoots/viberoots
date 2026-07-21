@@ -9,6 +9,8 @@ import {
   remoteCiToolsPathEnv,
   renderPublisherCommand,
 } from "../../ci/cache-manifest";
+import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
+import { registerCachePublisherSecretContract } from "./publish-nix-cache-publisher-contract";
 
 const archive = {
   path: "/nix/store/source-flake",
@@ -124,6 +126,14 @@ test("cache publisher renders backend commands without persisting credentials", 
     () => renderPublisherCommand(manifest, "cachix://cache?token=inline"),
     /must not contain credential material/,
   );
+  assert.throws(
+    () => renderPublisherCommand(manifest, "s3://writer:abc123@example-cache"),
+    /must not contain credential material/,
+  );
+  assert.throws(
+    () => renderPublisherCommand(manifest, "s3://example-cache?X-Amz-Credential=value"),
+    /must not contain credential material/,
+  );
 });
 
 test("cache manifest rejects non-store paths and inline credential material", () => {
@@ -191,9 +201,14 @@ test("cache manifest rejects non-store paths and inline credential material", ()
 });
 
 test("cache publishing can restrict PATH to the remote-ci-tools closure", () => {
-  assert.deepEqual(remoteCiToolsPathEnv("/nix/store/remote-ci-tools", { PATH: "/usr/bin" }), {
-    PATH: "/nix/store/remote-ci-tools/bin",
+  const tools = canonicalArtifactToolsRoot(process.cwd());
+  const env = remoteCiToolsPathEnv(tools, {
+    PATH: "/usr/bin",
+    HOME: "/host/home",
   });
+  assert.equal(env.PATH, `${tools}/bin`);
+  assert.notEqual(env.HOME, "/host/home");
+  assert.throws(() => remoteCiToolsPathEnv("", { PATH: "/usr/bin" }), /required/);
   assert.throws(() => remoteCiToolsPathEnv("/tmp/tools", {}), /expected Nix store path/);
 });
 
@@ -215,12 +230,15 @@ test("all cache publication entrypoints perform fixed protected admission before
     const admission = source.indexOf("await admitCachePublication");
     assert.match(source, /cache-publication-policy/);
     assert.ok(admission > 0 && admission < source.indexOf("writeManifest("));
-    const firstBuild = Math.max(source.indexOf("await packageNamesForCurrentSystem"), 0);
-    const firstWheelhouseEval = Math.max(source.indexOf("await currentSystem"), 0);
-    assert.ok(admission < Math.max(firstBuild, firstWheelhouseEval));
+    const sourceAuthority = source.indexOf("await chooseRunnableFlakeRef");
+    const artifactCommand = source.indexOf("await runArtifact");
+    assert.ok(sourceAuthority > admission);
+    assert.ok(artifactCommand > sourceAuthority);
   }
   const authority = fs.readFileSync(`${ciRoot}/cache-publication-policy.ts`, "utf8");
   assert.match(authority, /purpose: "cache-publication"/);
   assert.match(authority, /inspectWorkspaceArtifactSource/);
   assert.match(authority, /admitArtifactContext/);
 });
+
+registerCachePublisherSecretContract(test);

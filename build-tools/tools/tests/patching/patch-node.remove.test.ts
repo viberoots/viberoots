@@ -4,6 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { DEFAULT_AUTO_MAP_PATH, providerAutoTargetsPath } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 test("patch-node remove drops patch and refreshes glue deterministically", async () => {
   await runInTemp("patch-node-remove", async (tmp, $) => {
@@ -30,9 +31,10 @@ test("patch-node remove drops patch and refreshes glue deterministically", async
       { encoding: "utf8" },
     );
     await $`chmod +x ${mockPnpm}`;
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
 
     const env = {
-      ...process.env,
+      ...graphEnv,
       PATH: `${mockBin}:${process.env.PATH || ""}`,
       PNPM_BIN: mockPnpm,
       ZX_INIT: path.join(tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),

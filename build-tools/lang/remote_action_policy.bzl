@@ -1,3 +1,5 @@
+load(":remote_builder_smoke_policy.bzl", "remote_builder_smoke_declaration", "validate_remote_builder_smoke_declaration")
+
 REMOTE_LOCAL_ONLY = "remote:local-only"
 REMOTE_READY = "remote:ready"
 REMOTE_NEEDS_SOURCE_SNAPSHOT = "remote:needs-source-snapshot"
@@ -26,7 +28,8 @@ _REMOTE_BUILDER_POLICIES_REQUIRING_SMOKE = ["inherit_config", "force_builders_fi
 
 _NIX_BUILDER_POLICIES = ["local_only", "inherit_config", "force_builders_file"]
 
-NixRemoteActionPolicyInfo = provider(fields = ["builder_policy", "labels", "metadata", "remote_builder_smoke_policy"])
+NixRemoteActionPolicyInfo = provider(fields = ["builder_policy", "labels", "metadata", "remote_builder_smoke_path", "remote_builder_smoke_policy"])
+NixArtifactActionInfo = provider(fields = ["classification", "publishable"])
 
 _GENRULE_LOCAL_SCHEDULING_LABEL = "uses_local_filesystem_abspaths"
 
@@ -99,13 +102,13 @@ def _validate_builder_evidence(evidence):
     if policy == "local_only":
         fail("remote-ready action cannot use local_only Nix builder policy")
     if policy in _REMOTE_BUILDER_POLICIES_REQUIRING_SMOKE:
-        smoke_policy = values.get("remote_builder_smoke")
-        if type(smoke_policy) == "dict":
-            smoke_policy = smoke_policy.get("builder_policy")
+        smoke = values.get("remote_builder_smoke")
+        smoke_policy = smoke.get("builder_policy") if type(smoke) == "dict" else smoke
         if type(smoke_policy) != "string":
             fail("remote-ready action requires typed remote_builder_smoke evidence")
         if smoke_policy != policy:
             fail("remote-ready action with %s builder policy requires matching remote_builder_smoke evidence" % policy)
+        validate_remote_builder_smoke_declaration(smoke, policy)
 
 def _validate_source_snapshot_evidence(evidence):
     snapshot = (evidence or {}).get("source_snapshot")
@@ -163,6 +166,7 @@ def remote_action_policy(
             builder_policy = "local_only",
             labels = _policy_labels(evidence, "local_only"),
             metadata = "remote-action-policy:local-only",
+            remote_builder_smoke_path = None,
             remote_builder_smoke_policy = None,
             stamp = "remote_action_policy_local_only",
         )
@@ -176,6 +180,7 @@ def remote_action_policy(
             builder_policy = evidence.get("builder_policy"),
             labels = _policy_labels(evidence, "inherit_config"),
             metadata = "remote-action-policy:remote-ready",
+            remote_builder_smoke_path = evidence.get("remote_builder_smoke").get("path"),
             remote_builder_smoke_policy = evidence.get("remote_builder_smoke"),
             stamp = "remote_action_policy_remote_ready",
         )
@@ -191,6 +196,7 @@ def remote_action_policy(
             builder_policy = evidence.get("builder_policy"),
             labels = _policy_labels(evidence, "inherit_config"),
             metadata = "remote-action-policy:hybrid",
+            remote_builder_smoke_path = evidence.get("remote_builder_smoke").get("path"),
             remote_builder_smoke_policy = evidence.get("remote_builder_smoke"),
             stamp = "remote_action_policy_hybrid",
         )
@@ -213,10 +219,7 @@ def remote_ready_evidence(
         "artifact_contract": {"path": str(artifact_contract)},
         "builder_policy": builder_policy,
         "materialization_manifest": {"path": str(materialization_manifest)},
-        "remote_builder_smoke": {
-            "builder_policy": builder_policy,
-            "path": str(remote_builder_smoke),
-        },
+        "remote_builder_smoke": remote_builder_smoke_declaration(remote_builder_smoke, builder_policy),
         "remote_profile_compatibility": True,
         "source_snapshot": {
             "declared_root": str(source_snapshot),
@@ -226,14 +229,18 @@ def remote_ready_evidence(
         "tool_closure": {"path": str(tool_closure)},
     }
 
-def run_nix_action(ctx, cmd, category, mode = "local-only", evidence = None, fallback_reason = None):
+def run_nix_action(ctx, cmd, category, declared_inputs = None, publication = "artifact", mode = "local-only", evidence = None, fallback_reason = None):
+    if declared_inputs == None:
+        fail("Nix artifact action requires an explicit declared_inputs list")
+    if publication not in ["artifact", "orchestration", "probe"]:
+        fail("invalid Nix action publication classification: %s" % publication)
     policy = remote_action_policy(
         mode = mode,
         evidence = evidence,
         fallback_reason = fallback_reason,
     )
     ctx.actions.run(
-        cmd,
+        cmd_args(cmd, hidden = declared_inputs),
         category = "%s_%s" % (category, policy.stamp),
         local_only = policy.local_only,
     )
@@ -241,7 +248,11 @@ def run_nix_action(ctx, cmd, category, mode = "local-only", evidence = None, fal
         builder_policy = policy.builder_policy,
         labels = policy.labels,
         metadata = policy.metadata,
+        remote_builder_smoke_path = policy.remote_builder_smoke_path,
         remote_builder_smoke_policy = policy.remote_builder_smoke_policy,
+    ), NixArtifactActionInfo(
+        classification = publication,
+        publishable = publication == "artifact",
     )]
 
 def write_nix_test_stamp(ctx, output, content, mode = "local-only", evidence = None, fallback_reason = None):
@@ -255,5 +266,6 @@ def write_nix_test_stamp(ctx, output, content, mode = "local-only", evidence = N
         builder_policy = policy.builder_policy,
         labels = policy.labels,
         metadata = policy.metadata,
+        remote_builder_smoke_path = policy.remote_builder_smoke_path,
         remote_builder_smoke_policy = policy.remote_builder_smoke_policy,
     )]

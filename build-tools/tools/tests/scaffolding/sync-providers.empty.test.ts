@@ -19,7 +19,7 @@ async function toolScript(tmp: string, rel: string): Promise<string> {
 
 test("sync-providers: empty repo still generates minimal Node providers file when requested", async () => {
   await runInTemp("sync-empty", async (tmp, $) => {
-    await $`node ${await toolScript(tmp, "tools/buck/sync-providers.ts")} --lang node`;
+    await $`node ${await toolScript(tmp, "tools/buck/sync-providers.ts")} --lang node --no-glue`;
     const txt = await fsp.readFile(
       `${tmp}/.viberoots/workspace/providers/TARGETS.node.auto`,
       "utf8",

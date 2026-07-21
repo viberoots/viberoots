@@ -1,6 +1,7 @@
-load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
-load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_cmd_prefix")
+load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd", "nix_action_workspace_setup_from_args")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_artifact_bash", "nix_cmd_prefix")
 load("@viberoots//build-tools/lang:remote_action_policy.bzl", "run_nix_action")
+load("@viberoots//build-tools/lang:nix_artifact_inputs.bzl", "nix_artifact_action_inputs", "with_nix_artifact_action_attrs")
 
 def _go_nix_build_carchive_impl(ctx):
     raw = ctx.attrs.self_label
@@ -14,7 +15,10 @@ def _go_nix_build_carchive_impl(ctx):
     )
     run_and_copy = (
         "DEST=\"$0\"; case \"$DEST\" in /*) ;; *) DEST=\"$PWD/$DEST\" ;; esac; "
+        + nix_action_workspace_setup_from_args()
         + nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
+        + "VBR_GRAPH_REAL_FILE=\"$TMP/vbr-declared-graph.real\"; realpath \"$GRAPH\" > \"$VBR_GRAPH_REAL_FILE\"; "
+        + "BUCK_GRAPH_JSON=\"\"; read -r BUCK_GRAPH_JSON < \"$VBR_GRAPH_REAL_FILE\"; export BUCK_GRAPH_JSON; "
         + safe_log_path_prefix
         + nix_action_build_selected_out_path_cmd(
             target_label = raw,
@@ -22,7 +26,6 @@ def _go_nix_build_carchive_impl(ctx):
             raw_var = "OUT_RAW",
             status_var = "NIX_STATUS",
             log_file = "$BUILD_SELECTED_LOG",
-            zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
         )
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then "
         + "  if [ -f \"$BUILD_SELECTED_LOG\" ]; then cat \"$BUILD_SELECTED_LOG\" >&2; fi; "
@@ -50,16 +53,25 @@ def _go_nix_build_carchive_impl(ctx):
         + "cp -R \"$outPath/include\" \"$DEST/\"; "
     )
     out = ctx.actions.declare_output(ctx.attrs.out)
+    declared_inputs = nix_artifact_action_inputs(ctx)
     cmd = cmd_args(
-        ["bash", "-c", run_and_copy, out.as_output()],
-        hidden = ctx.attrs.srcs + ctx.attrs.nix_inputs,
+        [
+            nix_artifact_bash(),
+            "-c",
+            run_and_copy,
+            out.as_output(),
+            ctx.attrs._graph_json,
+            ctx.attrs._workspace_root_env,
+            "",
+        ],
+        hidden = declared_inputs,
     )
-    policy_info = run_nix_action(ctx, cmd, category = "go_nix_build_carchive")
+    policy_info = run_nix_action(ctx, cmd, category = "go_nix_build_carchive", declared_inputs = declared_inputs)
     return [DefaultInfo(default_output = out)] + policy_info
 
 go_nix_build_carchive = rule(
     impl = _go_nix_build_carchive_impl,
-    attrs = {
+    attrs = with_nix_artifact_action_attrs({
         "self_label": attrs.string(),
         "out": attrs.string(),
         "deps": attrs.list(attrs.dep(), default = []),
@@ -72,5 +84,5 @@ go_nix_build_carchive = rule(
         "asan": attrs.bool(default = False),
         "race": attrs.bool(default = False),
         "cgo_enabled": attrs.option(attrs.bool(), default = None),
-    },
+    }),
 )

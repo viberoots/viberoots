@@ -2,7 +2,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import "zx/globals";
 import { mkdtempNoindex } from "../../lib/macos-metadata";
-import { isGeneratedRepoStateRelPath } from "./generated-state-excludes";
+import { isGeneratedRepoStateRelPath } from "../../lib/generated-repo-state";
 
 function parseGitStatusRel(line: string): { rel: string; deleted: boolean } | null {
   if (line.length < 4) return null;
@@ -16,12 +16,18 @@ function parseGitStatusRel(line: string): { rel: string; deleted: boolean } | nu
 }
 
 async function activeViberootsRoot(workspaceRoot: string): Promise<string> {
-  const nested = path.join(workspaceRoot, "viberoots");
-  const nestedOk = await fsp
-    .access(path.join(nested, "build-tools", "tools", "dev", "zx-init.mjs"))
-    .then(() => true)
-    .catch(() => false);
-  return nestedOk ? nested : workspaceRoot;
+  for (const candidate of [
+    path.join(workspaceRoot, "viberoots"),
+    path.join(workspaceRoot, ".viberoots", "current"),
+    workspaceRoot,
+  ]) {
+    const available = await fsp
+      .access(path.join(candidate, "build-tools", "tools", "dev", "zx-init.mjs"))
+      .then(() => true)
+      .catch(() => false);
+    if (available) return await fsp.realpath(candidate).catch(() => path.resolve(candidate));
+  }
+  throw new Error(`verify seed overlay requires declared viberoots source under ${workspaceRoot}`);
 }
 
 async function listActiveSourceOverlayFiles(source: string): Promise<{

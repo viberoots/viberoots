@@ -3,7 +3,8 @@ import fs from "fs-extra";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
+import { exportGraphInTemp, runFilteredFlakeAttr } from "../lib/test-helpers/selected-build";
 import { viberootsDevTool } from "./lib/viberoots-tools";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
@@ -56,14 +57,13 @@ test("node lib: nix_node_test target passes when no tests present", async () => 
       stdio: "inherit",
       env: { ...process.env, NIX_PNPM_ALLOW_GENERATE: "1" },
     })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${importer}/pnpm-lock.yaml`;
-    const flakeRef = await workspaceFlakeRef(tmp);
-    const timeoutSecs = String(
-      Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200"),
-    );
-    const out = await $({ stdio: "pipe" })`bash --noprofile --norc -c ${
-      `timeout ${timeoutSecs}s nix build "path:${flakeRef}#node-test.projects-libs-demo" ` +
-      '--impure --no-link --accept-flake-config --builders "" --print-out-paths'
-    }`;
+    await exportGraphInTemp({ tmp, $ });
+    const out = await runFilteredFlakeAttr({
+      tmp,
+      $,
+      target: "//projects/libs/demo:unit",
+      attr: "node-test.projects-libs-demo",
+    });
     const outPath =
       String(out.stdout || "")
         .trim()

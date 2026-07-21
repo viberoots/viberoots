@@ -5,7 +5,6 @@ import {
   assertRemoteTargetsAllowed,
   type RemoteExecTargetMetadata,
 } from "../remote-exec-policy-check";
-import type { NixBuilderPolicy } from "../../lib/nix-builder-policy";
 import {
   buckCqueryArgsForExecutionPolicy,
   targetPlatformArgsForPolicy,
@@ -14,6 +13,9 @@ import {
 import { localArtifactPathWrites, parseArtifactContractMetadata } from "./remote-target-artifacts";
 import { parseMaterializationContractMetadata } from "./remote-target-materialization";
 import type { VerifyTargetLabels } from "./target-passes";
+import { parseBuilderPolicyMetadata } from "./remote-target-builder-policy";
+import { runRemoteBuilderSmoke } from "../../remote-exec/nix-remote-builder-smoke";
+import { artifactTransportEnvironment } from "../../lib/artifact-environment";
 
 type CqueryInfo = {
   labels?: string[];
@@ -85,63 +87,6 @@ function parseProviderMetadata(
         executableText,
       ),
     ...parseMaterializationContractMetadata([], providerText, executableText),
-  };
-}
-
-function parsePolicyValue(raw: string): NixBuilderPolicy | undefined {
-  if (raw === "local_only" || raw === "inherit_config" || raw === "force_builders_file") {
-    return raw;
-  }
-  return undefined;
-}
-
-function parseEvidenceValue(raw: string): NixBuilderPolicy | string {
-  return parsePolicyValue(raw) || raw;
-}
-
-function parseMetadataValue(
-  text: string,
-  keys: readonly string[],
-): NixBuilderPolicy | string | undefined {
-  for (const key of keys) {
-    const match = text.match(
-      new RegExp(`${key}["']?\\s*[:=]\\s*(?:"([^"]+)"|'([^']+)'|([^,\\s)\\]}]+))`),
-    );
-    if (match) return parseEvidenceValue(String(match[1] || match[2] || match[3] || ""));
-  }
-  return undefined;
-}
-
-function parseLabeledPolicy(
-  labels: readonly string[],
-  prefix: string,
-): NixBuilderPolicy | string | undefined {
-  for (const label of labels) {
-    if (label.startsWith(prefix)) return parseEvidenceValue(label.slice(prefix.length));
-  }
-  return undefined;
-}
-
-function parseProviderLabel(text: string, prefix: string): NixBuilderPolicy | string | undefined {
-  const start = text.indexOf(prefix);
-  if (start < 0) return undefined;
-  const value = text.slice(start + prefix.length).match(/^[A-Za-z0-9_-]+/)?.[0];
-  return value ? parseEvidenceValue(value) : undefined;
-}
-
-function parseBuilderPolicyMetadata(
-  labels: readonly string[],
-  providerText: string,
-): Partial<RemoteExecTargetMetadata> {
-  return {
-    nixBuilderPolicy:
-      parseLabeledPolicy(labels, "nix-builder:") ||
-      parseProviderLabel(providerText, "nix-builder:") ||
-      parseMetadataValue(providerText, ["nix_builder_policy", "builder_policy"]),
-    remoteBuilderSmokePolicy:
-      parseLabeledPolicy(labels, "remote-builder-smoke:") ||
-      parseProviderLabel(providerText, "remote-builder-smoke:") ||
-      parseMetadataValue(providerText, ["remote_builder_smoke", "remote_builder_smoke_policy"]),
   };
 }
 
@@ -246,5 +191,53 @@ export function assertVerifyRemoteTargetsAllowed(opts: {
     mode: opts.executionPolicy.mode,
     targets: collectRemoteExecTargetMetadata(opts),
     allowedProfiles,
+    remoteSystem: opts.executionPolicy.system || undefined,
+  });
+}
+
+export async function admitVerifyRemoteTargets(opts: {
+  root: string;
+  iso: string;
+  targets: VerifyTargetLabels[];
+  executionPolicy: VerifyExecutionPolicy;
+  runBuck?: BuckRunner;
+  testOnlyRunRemoteBuilderSmoke?: typeof runRemoteBuilderSmoke;
+}): Promise<void> {
+  const targets = collectRemoteExecTargetMetadata(opts);
+  const policies = Array.from(
+    new Set(
+      targets
+        .map((target) => target.nixBuilderPolicy)
+        .filter((policy) => policy === "inherit_config" || policy === "force_builders_file"),
+    ),
+  );
+  if (policies.length > 1) {
+    throw new Error("one verify invocation cannot mix active remote builder policies");
+  }
+  let evidence: unknown;
+  if (policies.length === 1) {
+    const smoke = opts.executionPolicy.remoteSmoke;
+    if (!smoke) throw new Error("remote verify requires canonical active builder smoke inputs");
+    const runner = opts.testOnlyRunRemoteBuilderSmoke || runRemoteBuilderSmoke;
+    evidence = await runner({
+      ...smoke,
+      policy: policies[0]!,
+      expectedSystem: opts.executionPolicy.system!,
+      baseEnv: artifactTransportEnvironment(process.env),
+    });
+  }
+  const profilePrefix = opts.executionPolicy.profilePrefix;
+  const allowedProfiles = [
+    ...Object.values(opts.executionPolicy.passProfiles),
+    ...(profilePrefix ? [`${profilePrefix}-default`, `${profilePrefix}-large`] : []),
+  ];
+  assertRemoteTargetsAllowed({
+    mode: opts.executionPolicy.mode,
+    targets,
+    allowedProfiles,
+    remoteSystem: opts.executionPolicy.system || undefined,
+    ...(opts.testOnlyRunRemoteBuilderSmoke
+      ? { testOnlyRemoteBuilderSmokeEvidence: evidence }
+      : { activeRemoteBuilderSmokeEvidence: evidence }),
   });
 }

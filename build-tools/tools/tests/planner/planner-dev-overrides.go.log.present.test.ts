@@ -35,5 +35,13 @@ test("planner logs dev override presence for Go (non-CI)", async () => {
       console.error("expected '[planner] dev overrides present: go' in build.log, got:\n", log);
       process.exit(2);
     }
+    for (const stableRoot of ["repoRootStr=.", "appsDir=projects/apps", "libsDir=projects/libs"]) {
+      if (!log.includes(stableRoot)) {
+        throw new Error(`expected stable logical root '${stableRoot}' in build.log`);
+      }
+    }
+    if (log.includes(tmp)) {
+      throw new Error("planner build.log must not retain the temporary workspace path");
+    }
   });
 });

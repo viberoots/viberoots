@@ -48,6 +48,8 @@ viberoots pin.
   status.
 - [`go-linking.md`](go-linking.md): Go linking behavior.
 - [`pnpm/hermetic-node-modules.md`](pnpm/hermetic-node-modules.md): hermetic PNPM `node_modules`
+- [`hermetic-artifact-policy.md`](hermetic-artifact-policy.md): artifact environment, tool, sandbox,
+  builder, and network enforcement
   materialization.
 - [`python-wasm-wasi.md`](python-wasm-wasi.md): Python WASM/WASI usage.
 - [`wasm-linking.md`](wasm-linking.md) and [`wasm-node-linking.md`](wasm-node-linking.md): Wasm
@@ -70,6 +72,10 @@ viberoots pin.
 These docs describe active contracts or implementation models:
 
 - [`abstractions.md`](abstractions.md)
+- [`lang/rust-design.md`](lang/rust-design.md): current Rust placeholder baseline and first-class
+  language contract.
+- [`rust-language-plan.md`](rust-language-plan.md): implementation plan for first-class Rust
+  support.
 - [`mapping-design.md`](mapping-design.md)
 - [`node-wasm-staging-contract-design.md`](node-wasm-staging-contract-design.md)
 

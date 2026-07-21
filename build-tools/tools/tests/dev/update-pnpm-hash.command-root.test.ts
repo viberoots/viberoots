@@ -16,7 +16,7 @@ test("update-pnpm-hash targets an explicit nested viberoots checkout", async () 
   try {
     const nested = path.join(workspace, "viberoots");
     const parentSubdir = path.join(workspace, "projects", "app");
-    const parentHashes = path.join(workspace, "projects", "node-modules.hashes.json");
+    const parentHashes = path.join(workspace, "projects", "config", "node-modules.hashes.json");
     const parentSentinel = '{"projects/apps/demo/pnpm-lock.yaml":"sha256-demo"}\n';
     await writeFile(path.join(workspace, "flake.nix"));
     await writeFile(path.join(workspace, ".viberoots", "workspace", "flake.nix"));

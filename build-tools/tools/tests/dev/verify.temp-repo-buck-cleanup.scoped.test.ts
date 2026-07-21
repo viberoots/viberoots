@@ -16,7 +16,13 @@ import { pathStartsWithRootVariant } from "../../dev/verify/buck-orphan-cleanup-
 import { registeredIsolationProcessPidsFromLines } from "../../dev/verify/registered-buck-cleanup";
 import { parseVerifyOwnedState } from "../../dev/verify/owned-process-state";
 import { buckProcessTableLines, processCommandLines } from "../../lib/process-inspection";
+import {
+  observeBuckCleanupChild,
+  requestBuckCleanupChildStop,
+  waitForBuckCleanupChildReady,
+} from "../lib/buck-daemon-cleanup.fixture";
 import { terminateChildTree } from "../lib/process-tree";
+import { rethrowAfterAsyncCleanup, runAsyncCleanupSteps } from "../lib/test-helpers/async-cleanup";
 
 async function killAndWait(child: ReturnType<typeof spawn>, timeoutMs = 2000): Promise<void> {
   const done =
@@ -203,71 +209,27 @@ test(
         },
       });
 
-    const attachReady = (child: ReturnType<typeof spawnChild>) => {
-      let tmp = "";
-      let out = "";
-      let err = "";
-      let ready = false;
-      let exitCode: number | null = null;
-      child.stdout.setEncoding("utf8");
-      child.stdout.on("data", (d) => {
-        out += d;
-        const m = out.match(/TMP\s+(\S+)/);
-        if (m && m[1]) tmp = String(m[1]).trim();
-        if (out.includes("\nREADY\n") || out.trimEnd().endsWith("READY")) ready = true;
-      });
-      child.stderr.setEncoding("utf8");
-      child.stderr.on("data", (d) => {
-        err += d;
-      });
-      child.on("close", (code) => {
-        exitCode = code;
-      });
-      return {
-        getTmp: () => tmp,
-        getReady: () => ready,
-        getOut: () => out,
-        getErr: () => err,
-        getExitCode: () => exitCode,
-      };
-    };
-
     const foreign = spawnChild();
-    const foreignState = attachReady(foreign);
+    const foreignState = observeBuckCleanupChild(foreign);
     const owned = spawnChild();
-    const ownedState = attachReady(owned);
+    const ownedState = observeBuckCleanupChild(owned);
     let stateDir = "";
+    const cleanup = async () =>
+      await runAsyncCleanupSteps([
+        async () => await requestBuckCleanupChildStop(foreignState),
+        async () => await requestBuckCleanupChildStop(ownedState),
+        async () => {
+          if (stateDir) await fsp.rm(stateDir, { recursive: true, force: true });
+        },
+      ]);
 
     try {
-      const t0 = Date.now();
-      while (
-        (!foreignState.getTmp() ||
-          !foreignState.getReady() ||
-          !ownedState.getTmp() ||
-          !ownedState.getReady()) &&
-        Date.now() - t0 < 120_000
-      ) {
-        if (foreignState.getExitCode() !== null || ownedState.getExitCode() !== null) break;
-        await new Promise((r) => setTimeout(r, 50));
-      }
-      const foreignTmp = foreignState.getTmp();
-      const ownedTmp = ownedState.getTmp();
-      assert.ok(
-        foreignTmp,
-        `expected foreign tmp path; got stdout:\n${foreignState.getOut()}\nstderr:\n${foreignState.getErr()}`,
-      );
-      assert.ok(
-        ownedTmp,
-        `expected owned tmp path; got stdout:\n${ownedState.getOut()}\nstderr:\n${ownedState.getErr()}`,
-      );
-      assert.ok(
-        foreignState.getReady(),
-        `expected foreign READY; got stdout:\n${foreignState.getOut()}\nstderr:\n${foreignState.getErr()}`,
-      );
-      assert.ok(
-        ownedState.getReady(),
-        `expected owned READY; got stdout:\n${ownedState.getOut()}\nstderr:\n${ownedState.getErr()}`,
-      );
+      await Promise.all([
+        waitForBuckCleanupChildReady(foreignState),
+        waitForBuckCleanupChildReady(ownedState),
+      ]);
+      const foreignTmp = foreignState.tmp();
+      const ownedTmp = ownedState.tmp();
 
       const foreignBase = path.basename(foreignTmp);
       const ownedBase = path.basename(ownedTmp);
@@ -281,12 +243,22 @@ test(
       await cleanupRegisteredTempRepos({ stateFile, maxKills: 50 });
       await waitForNoForkserver(ownedBase, 30_000);
       await waitForForkserver(foreignBase, 10_000);
-    } finally {
-      await Promise.all([killAndWait(foreign), killAndWait(owned)]);
-      if (stateDir) {
-        await fsp.rm(stateDir, { recursive: true, force: true }).catch(() => {});
-      }
+    } catch (error) {
+      console.error(
+        `foreign buck cleanup child stdout before owned cleanup:\n${foreignState.stdout()}`,
+      );
+      console.error(
+        `foreign buck cleanup child stderr before owned cleanup:\n${foreignState.stderr()}`,
+      );
+      console.error(
+        `owned buck cleanup child stdout before owned cleanup:\n${ownedState.stdout()}`,
+      );
+      console.error(
+        `owned buck cleanup child stderr before owned cleanup:\n${ownedState.stderr()}`,
+      );
+      await rethrowAfterAsyncCleanup(error, cleanup);
     }
+    await cleanup();
   },
 );
 

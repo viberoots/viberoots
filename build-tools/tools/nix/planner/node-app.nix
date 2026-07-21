@@ -20,7 +20,7 @@ in
     pname = "node-cli-" + (sanitize name);
     version = sanitize importerDir;
     src = repoStoreRoot;
-    nativeBuildInputs = [ pkgs.nodejs_22 ];
+    nativeBuildInputs = [ pkgs.esbuild pkgs.nodejs_22 ];
     buildPhase = ''
       set -euo pipefail
       cd ${importerDir}
@@ -138,12 +138,7 @@ in
         if [ -d src ]; then ls -la src >&2; fi
         exit 2
       fi
-      ESBUILD_BIN="${nm}/node_modules/.bin/esbuild"
-      if [ ! -x "$ESBUILD_BIN" ]; then
-        echo "node planner: missing esbuild in locked node_modules for ${importerDir}" >&2
-        exit 2
-      fi
-      "$ESBUILD_BIN" ${entryRel} \
+      ${pkgs.esbuild}/bin/esbuild ${entryRel} \
         --platform=node \
         --target=node22 \
         --bundle \

@@ -15,6 +15,7 @@ const remotePolicy: VerifyExecutionPolicy = {
   activationDir: "/tmp/activation",
   profilePrefix: "linux-x86_64",
   passProfiles: {},
+  remoteSmoke: null,
 };
 
 function fakeBuck(providerText: string) {

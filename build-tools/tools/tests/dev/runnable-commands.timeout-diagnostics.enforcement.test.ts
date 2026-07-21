@@ -15,4 +15,10 @@ test("run-runnable exposes timeout diagnostics toggles", async () => {
   if (!txt.includes("timeout diagnostics:")) {
     throw new Error(`${file} must log timeout diagnostics location`);
   }
+  if (!txt.includes("runBoundedArtifactCommand({")) {
+    throw new Error(`${file} must await bounded managed-command shutdown`);
+  }
+  if (/\bspawn\s*\(\s*nixBin/.test(txt)) {
+    throw new Error(`${file} must not own a second Nix process lifecycle`);
+  }
 });

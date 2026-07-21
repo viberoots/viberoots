@@ -2,133 +2,17 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
-import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
 import {
-  defaultFilteredFlakeSnapshotRelPaths,
-  defaultFilteredFlakeSnapshotRsyncSources,
-  filteredFlakeRsyncExcludeArgs,
-} from "../../dev/nix-build-filtered-flake-lib";
-import { derivePostCloneWorkspaceLock } from "../../lib/post-clone-workspace-lock";
-import { VIBEROOTS_SOURCE_ROOT } from "../lib/test-helpers/source-paths";
+  createUpdateCommandFixture as fixture,
+  runUpdateCommand as run,
+  snapshotUpdateCommandFixture as snapshot,
+} from "./update-command-launcher.fixture";
+import { removeTreeWithWritableFallback } from "../lib/test-helpers/remove-tree";
 
 const execFileAsync = promisify(execFile);
-let immutableSourcePromise: Promise<string> | undefined;
-const protectedPaths = [
-  ".gitmodules",
-  "flake.nix",
-  "flake.lock",
-  ".viberoots/workspace/flake.lock",
-  ".viberoots/bootstrap/transactions/source-mode.json",
-] as const;
-
-async function run(root: string, args: string[] = []) {
-  const immutableSource = await immutableViberootsSource();
-  return await execFileAsync(path.join(VIBEROOTS_SOURCE_ROOT, "build-tools/tools/bin/u"), args, {
-    cwd: root,
-    env: {
-      ...process.env,
-      NO_DEV_SHELL: "1",
-      WORKSPACE_ROOT: root,
-      VIBEROOTS_SOURCE_ROOT: immutableSource,
-      VIBEROOTS_FLAKE_INPUT_ROOT: immutableSource,
-    },
-    timeout: 180_000,
-    maxBuffer: 1024 * 1024 * 32,
-  });
-}
-
-async function immutableViberootsSource(): Promise<string> {
-  immutableSourcePromise ||= (async () => {
-    const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-u-filtered-source-"));
-    const filtered = path.join(tmp, "input");
-    await fsp.mkdir(filtered);
-    try {
-      const relPaths: string[] = [];
-      for (const rel of defaultFilteredFlakeSnapshotRelPaths()) {
-        if (
-          await fsp.access(path.join(VIBEROOTS_SOURCE_ROOT, rel)).then(
-            () => true,
-            () => false,
-          )
-        ) {
-          relPaths.push(rel);
-        }
-      }
-      await execFileAsync(
-        "rsync",
-        [
-          "-a",
-          "--delete",
-          "--relative",
-          ...filteredFlakeRsyncExcludeArgs(),
-          ...defaultFilteredFlakeSnapshotRsyncSources(relPaths),
-          `${filtered}/`,
-        ],
-        { cwd: VIBEROOTS_SOURCE_ROOT },
-      );
-      return (await materializeFilteredViberootsSource(filtered)).storePath;
-    } finally {
-      await fsp.rm(tmp, { recursive: true, force: true });
-    }
-  })();
-  return await immutableSourcePromise;
-}
-
-async function snapshot(root: string) {
-  const { stdout } = await execFileAsync("git", ["ls-files", "-s", "viberoots"], { cwd: root });
-  return {
-    gitlink: stdout.trim(),
-    files: await Promise.all(
-      protectedPaths.map(async (rel) => [rel, await fsp.readFile(path.join(root, rel))] as const),
-    ),
-  };
-}
-
-async function fixture(name: string): Promise<string> {
-  const root = await fsp.mkdtemp(path.join(os.tmpdir(), `vbr-u-launcher-${name}-`));
-  await fsp.mkdir(path.join(root, ".viberoots/bootstrap/transactions"), { recursive: true });
-  await fsp.mkdir(path.join(root, ".viberoots/workspace"), { recursive: true });
-  await fsp.symlink(VIBEROOTS_SOURCE_ROOT, path.join(root, ".viberoots/current"));
-  await fsp.writeFile(
-    path.join(root, ".gitmodules"),
-    '[submodule "viberoots"]\n\tpath = viberoots\n\turl = https://example.invalid/viberoots.git\n',
-  );
-  const consumerRoot = path.dirname(VIBEROOTS_SOURCE_ROOT);
-  await fsp.copyFile(path.join(consumerRoot, "flake.nix"), path.join(root, "flake.nix"));
-  await fsp.copyFile(path.join(consumerRoot, "flake.lock"), path.join(root, "flake.lock"));
-  const rootLockText = await fsp.readFile(path.join(root, "flake.lock"), "utf8");
-  const workspaceLock = derivePostCloneWorkspaceLock({
-    rootLockText,
-    workspaceFlakeDir: path.join(root, ".viberoots/workspace"),
-    localInputPath: await immutableViberootsSource(),
-  });
-  await fsp.writeFile(
-    path.join(root, ".viberoots/workspace/flake.lock"),
-    `${JSON.stringify(workspaceLock, null, 2)}\n`,
-    "utf8",
-  );
-  await fsp.writeFile(
-    path.join(root, ".viberoots/bootstrap/transactions/source-mode.json"),
-    '{"mode":"submodule","status":"completed"}\n',
-  );
-  await execFileAsync("git", ["init", "-q"], { cwd: root });
-  await execFileAsync(
-    "git",
-    [
-      "update-index",
-      "--add",
-      "--cacheinfo",
-      "160000,0123456789012345678901234567890123456789,viberoots",
-    ],
-    { cwd: root },
-  );
-  await execFileAsync("git", ["add", ...protectedPaths], { cwd: root });
-  return root;
-}
 
 async function addOfflineSurfaces(root: string): Promise<void> {
   const importer = path.join(root, "projects/apps/mixed");
@@ -196,7 +80,7 @@ test("real u repairs bounded offline language inputs without moving viberoots", 
       "real u must record repaired C++ source-selection metadata in the glue fingerprint",
     );
   } finally {
-    await fsp.rm(root, { recursive: true, force: true });
+    await removeTreeWithWritableFallback(root, $);
   }
 });
 
@@ -216,7 +100,7 @@ test("real u --upgrade upgrades bounded offline languages and reconciles C++", a
     await fsp.access(path.join(root, "projects/apps/local/go.sum"));
     await fsp.access(path.join(root, "projects/apps/local/gomod2nix.toml"));
   } finally {
-    await fsp.rm(root, { recursive: true, force: true });
+    await removeTreeWithWritableFallback(root, $);
   }
 });
 
@@ -240,6 +124,6 @@ test("real u --upgrade upgrades a bounded offline pnpm importer without moving v
     assert.notEqual(versionTwoLock, versionOneLock);
     assert.match(versionTwoLock, /file:local-package-v2/);
   } finally {
-    await fsp.rm(root, { recursive: true, force: true });
+    await removeTreeWithWritableFallback(root, $);
   }
 });

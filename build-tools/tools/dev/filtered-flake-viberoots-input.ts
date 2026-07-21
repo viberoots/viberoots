@@ -1,6 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
+import { ensureNixStoreToolPathSync } from "../lib/tool-paths";
 import { isCanonicalSha256SRI } from "../lib/nix-sri";
 import { runCommand } from "./filtered-flake-command";
 
@@ -9,36 +9,81 @@ export interface MaterializedPathInput {
   locked: Record<string, unknown>;
 }
 
-type MaterializeInput = (inputPath: string) => Promise<MaterializedPathInput>;
+type MaterializeInput = (
+  inputPath: string,
+  env?: NodeJS.ProcessEnv,
+) => Promise<MaterializedPathInput>;
 
 export async function repairSnapshotViberootsInput(
   opts: {
     snapDir: string;
     flakeDir: string;
+    immutableInputRoot?: string;
+    env?: NodeJS.ProcessEnv;
   },
   deps: {
     materializeInput?: MaterializeInput;
   } = {},
 ): Promise<string> {
   const snapshotRoot = path.join(opts.snapDir, "viberoots");
-  try {
-    await fsp.access(path.join(snapshotRoot, "flake.nix"));
-  } catch {
-    return "";
+  const declaredRoot = String(opts.immutableInputRoot || "").trim();
+  const immutableRoot = await immutableSource(declaredRoot);
+  if (declaredRoot && !immutableRoot) {
+    throw new Error(
+      `[filtered-flake] declared viberoots input is not an immutable Nix-store source: ${declaredRoot}`,
+    );
   }
+  const inputRoot = immutableRoot || ((await hasFlake(snapshotRoot)) ? snapshotRoot : "");
+  if (!inputRoot) return "";
   const materialized = await (deps.materializeInput || materializeFilteredViberootsSource)(
-    snapshotRoot,
+    inputRoot,
+    opts.env,
   );
   assertImmutableSourcePath(materialized.storePath);
-  await rewriteViberootsInput(opts.flakeDir, materialized);
+  for (const flakeDir of await snapshotWorkspaceFlakeDirs(opts.snapDir, opts.flakeDir)) {
+    await rewriteViberootsInput(flakeDir, materialized);
+  }
   return materialized.storePath;
+}
+
+async function snapshotWorkspaceFlakeDirs(snapDir: string, primary: string): Promise<string[]> {
+  const candidates = [primary, snapDir, path.join(snapDir, ".viberoots", "workspace")];
+  const present: string[] = [];
+  for (const candidate of candidates) {
+    if (present.includes(candidate) || !(await hasFlake(candidate))) continue;
+    present.push(candidate);
+  }
+  return present;
+}
+
+async function hasFlake(root: string): Promise<boolean> {
+  if (!root) return false;
+  return await fsp
+    .access(path.join(root, "flake.nix"))
+    .then(() => true)
+    .catch(() => false);
+}
+
+async function immutableSource(root: string): Promise<string> {
+  if (!root) return "";
+  const canonical = await fsp.realpath(root).catch(() => "");
+  if (!/^\/nix\/store\/[a-z0-9]{32}-source$/.test(canonical) || !(await hasFlake(canonical))) {
+    return "";
+  }
+  return canonical;
 }
 
 export async function materializeFilteredViberootsSource(
   inputPath: string,
+  env?: NodeJS.ProcessEnv,
 ): Promise<MaterializedPathInput> {
-  const nixEnv = envWithResolvedNixBin(process.env);
-  const nixBin = resolveToolPathSync("nix", nixEnv);
+  if (!env) {
+    throw new Error(
+      "materializeFilteredViberootsSource requires an explicit env; the caller must resolve authority at the public boundary.",
+    );
+  }
+  const nixEnv = env;
+  const nixBin = ensureNixStoreToolPathSync("nix", nixEnv);
   const canonical = await fsp.realpath(inputPath).catch(() => inputPath);
   const prefetched = await runCommand({
     command: nixBin,
@@ -92,7 +137,7 @@ async function rewriteViberootsInput(
   const { storePath, locked } = materialized;
   const flakePath = path.join(flakeDir, "flake.nix");
   const text = await fsp.readFile(flakePath, "utf8");
-  const next = text.replace(
+  let next = text.replace(
     /(\bviberoots\.url\s*=\s*)"[^"]*"/,
     (_match, prefix: string) => `${prefix}"path:${storePath}"`,
   );
@@ -108,6 +153,9 @@ async function rewriteViberootsInput(
   if (!node) throw new Error(`[filtered-flake] snapshot lock does not contain viberoots input`);
   node.locked = { ...locked, path: storePath };
   node.original = { type: "path", path: storePath };
+  // `parent` is meaningful for a relative path input. Keeping it after rewriting to
+  // an absolute store path makes Nix consider the otherwise-coherent lock stale.
+  delete node.parent;
   await fsp.writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8");
 }
 

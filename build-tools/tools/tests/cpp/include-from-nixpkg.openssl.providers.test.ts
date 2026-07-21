@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("cpp openssl include via nixpkg_deps at call site", async () => {
@@ -66,6 +66,7 @@ nix_cpp_test(
 )
 `;
     await fs.outputFile(path.join(appDir, "TARGETS"), targets);
+    await reconcileTempDependencyInputs(tmp, $);
 
     await $`buck2 test --target-platforms prelude//platforms:default //projects/apps/demo:demo_openssl_gtest`;
   });

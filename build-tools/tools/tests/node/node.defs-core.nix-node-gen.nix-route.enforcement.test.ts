@@ -24,6 +24,10 @@ test("build-tools/node/defs_core.bzl routes nix_node_gen through graph-generator
     `${file} must build selected planner output for nix_node_gen wrapper`,
   );
   assert(
+    txt.includes('"planner_target:%s" % raw'),
+    `${file} must declare the public wrapper's planner target in graph metadata`,
+  );
+  assert(
     txt.includes("nix_calling_node_patch_requirements_preflight("),
     `${file} must run node patch requirements preflight in nix_node_gen wrapper`,
   );

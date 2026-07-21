@@ -4,8 +4,13 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { test } from "node:test";
-import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
-import { viberootsTool } from "../scaffolding/lib/viberoots-tools";
+import {
+  publicBuildOutPath,
+  reconcileTempDependencyInputs,
+  runInTemp,
+  runPublicBuild,
+} from "../lib/test-helpers";
+import { stageTempRepoPaths } from "../lib/test-helpers/git-stage";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -99,6 +104,9 @@ nix_go_tiny_wasm_lib(
   "version": "0.1.0",
   "exports": {
     ".": "./index.js"
+  },
+  "dependencies": {
+    "ansi-regex": "5.0.1"
   }
 }
 `,
@@ -111,9 +119,19 @@ nix_go_tiny_wasm_lib(
 
 importers:
   projects/libs/demo-wasm-inline:
-    dependencies: {}
+    dependencies:
+      ansi-regex:
+        specifier: 5.0.1
+        version: 5.0.1
 
-packages: {}
+packages:
+  ansi-regex@5.0.1:
+    resolution:
+      integrity: sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==
+    engines: { node: ">=8" }
+
+snapshots:
+  ansi-regex@5.0.1: {}
 `,
         );
         await fs.outputFile(
@@ -127,37 +145,55 @@ node_wasm_inline_module(
 )
 `,
         );
-        await $({
-          cwd: tmp,
-          stdio: "inherit",
-        })`node ${viberootsTool("viberoots/build-tools/tools/buck/export-graph.ts")} --out .viberoots/workspace/buck/graph.json`;
+        await fs.outputFile(
+          path.join(tmp, "pnpm-workspace.yaml"),
+          "packages:\n  - projects/apps/*\n  - projects/libs/*\n",
+        );
+        await stageTempRepoPaths({
+          tmp,
+          _$,
+          recursiveRoots: ["projects/libs/demo-wasm", "projects/libs/demo-wasm-inline"],
+          explicitPaths: ["pnpm-workspace.yaml"],
+        });
 
-        const build = await $({
-          cwd: tmp,
-          stdio: "pipe",
-          env: { ...process.env, WEB_WASM_BACKEND: "wasi_single" },
-        })`buck2 build --target-platforms prelude//platforms:default --show-output //projects/libs/demo-wasm-inline:wasm_inline`;
-        const outText = String(build.stdout || build.stderr || "").trim();
-        const outLine = outText.split(/\n+/).pop() || "";
-        const outPath = outLine.split(/\s+/).pop() || "";
-        if (!outPath) throw new Error("no output file from buck2 build for wasm_inline");
-        const outputFile = path.isAbsolute(outPath) ? outPath : path.join(tmp, outPath);
+        const inlineTarget = "//projects/libs/demo-wasm-inline:wasm_inline";
+        const staleInlineBuild = await runPublicBuild({
+          tmp,
+          $,
+          target: inlineTarget,
+          reject: false,
+        });
+        assert.notEqual(
+          staleInlineBuild.exitCode,
+          0,
+          "b must fail closed before inline importer reconciliation",
+        );
+        assert.match(
+          String(staleInlineBuild.stderr || staleInlineBuild.stdout || ""),
+          /repair: run u/,
+        );
+        await reconcileTempDependencyInputs(tmp, _$);
+        await stageTempRepoPaths({
+          tmp,
+          _$,
+          explicitPaths: ["projects/config/node-modules.hashes.json"],
+        });
+        const outputFile = await publicBuildOutPath({
+          tmp,
+          $,
+          target: inlineTarget,
+          wasmBackend: "wasi_single",
+        });
         await fs.copy(outputFile, path.join(inlineDir, "index.js"));
         const mod = await import(pathToFileURL(outputFile).href);
         assert.equal(typeof mod.wasmBytes, "function");
         const bytes = mod.wasmBytes();
-        const sourceBuild = await $({
-          cwd: tmp,
-          stdio: "pipe",
-          env: { ...process.env, WEB_WASM_BACKEND: "wasi_single" },
-        })`buck2 build --target-platforms prelude//platforms:default --show-output //projects/libs/demo-wasm:wasm`;
-        const sourceOutText = String(sourceBuild.stdout || sourceBuild.stderr || "").trim();
-        const sourceOutLine = sourceOutText.split(/\n+/).pop() || "";
-        const sourceOutPath = sourceOutLine.split(/\s+/).pop() || "";
-        if (!sourceOutPath) throw new Error("no output file from buck2 build for wasm source");
-        const sourceFile = path.isAbsolute(sourceOutPath)
-          ? sourceOutPath
-          : path.join(tmp, sourceOutPath);
+        const sourceFile = await publicBuildOutPath({
+          tmp,
+          $,
+          target: "//projects/libs/demo-wasm:wasm",
+          wasmBackend: "wasi_single",
+        });
         const sourceBytes = await fs.readFile(sourceFile);
         assert.deepEqual(
           Array.from(bytes),
@@ -168,10 +204,68 @@ node_wasm_inline_module(
         const exp = instance.exports as Record<string, any>;
         assert.equal(exp.add(2, 3), 5);
 
-        await fs.outputFile(
-          path.join(tmp, "pnpm-workspace.yaml"),
-          "packages:\n  - projects/apps/*\n  - projects/libs/*\n",
+        const graphPath = path.join(tmp, ".viberoots", "workspace", "buck", "graph.json");
+        const hashesPath = path.join(tmp, "projects", "config", "node-modules.hashes.json");
+        const graphBeforeHashChange = await fs.readFile(graphPath);
+        const hashesBeforeHashChange = await fs.readFile(hashesPath);
+        const inlinePackagePath = path.join(inlineDir, "package.json");
+        const inlinePackage = await fs.readFile(inlinePackagePath, "utf8");
+        await fs.writeFile(inlinePackagePath, inlinePackage.replace('"5.0.1"', '"6.2.0"'));
+        const inlineLockPath = path.join(inlineDir, "pnpm-lock.yaml");
+        const inlineLock = await fs.readFile(inlineLockPath, "utf8");
+        await fs.writeFile(
+          inlineLockPath,
+          inlineLock
+            .replaceAll("5.0.1", "6.2.0")
+            .replace(
+              "sha512-quJQXlTSUGL2LH9SUXo8VwsY4soanhgo6LNSm84E1LBcE8s3O0wpdiRzyR9z/ZZJMlMWv37qOOb9pdJlMUEKFQ==",
+              "sha512-TKY5pyBkHyADOPYlRT9Lx6F544mPl0vS5Ew7BJ45hA08Q+t3GjbueLliBWN3sMICk6+y7HdyxSzC4bWS8baBdg==",
+            )
+            .replace('node: ">=8"', 'node: ">=12"'),
         );
+        await stageTempRepoPaths({
+          tmp,
+          _$,
+          explicitPaths: [
+            "projects/libs/demo-wasm-inline/package.json",
+            "projects/libs/demo-wasm-inline/pnpm-lock.yaml",
+          ],
+        });
+        const staleHashBuild = await runPublicBuild({
+          tmp,
+          $,
+          target: inlineTarget,
+          reject: false,
+        });
+        assert.notEqual(staleHashBuild.exitCode, 0, "b must fail closed for a stale importer hash");
+        assert.match(String(staleHashBuild.stderr || staleHashBuild.stdout || ""), /repair: run u/);
+        assert.deepEqual(
+          await fs.readFile(graphPath),
+          graphBeforeHashChange,
+          "stale b must not rewrite graph bytes",
+        );
+        await reconcileTempDependencyInputs(tmp, _$);
+        await stageTempRepoPaths({
+          tmp,
+          _$,
+          explicitPaths: ["projects/config/node-modules.hashes.json"],
+        });
+        assert.notDeepEqual(
+          await fs.readFile(hashesPath),
+          hashesBeforeHashChange,
+          "u must reconcile the changed importer hash",
+        );
+        assert.notDeepEqual(
+          await fs.readFile(graphPath),
+          graphBeforeHashChange,
+          "u must refresh graph bytes for a content-addressed hash identity change",
+        );
+        await publicBuildOutPath({
+          tmp,
+          $,
+          target: inlineTarget,
+          wasmBackend: "wasi_single",
+        });
 
         const cliDir = path.join(tmp, "projects", "apps", "demo-cli");
         await fs.mkdirp(path.join(cliDir, "src"));
@@ -257,22 +351,36 @@ nix_node_cli_bin(
 )
 `,
         );
-        await reconcileTempDependencyInputs(tmp, $);
-        await $({
-          cwd: tmp,
-          stdio: "inherit",
-        })`git add projects/node-modules.hashes.json`;
-
-        const cliBuild = await $({
-          cwd: tmp,
-          stdio: "pipe",
-          env: { ...process.env, WEB_WASM_BACKEND: "wasi_single" },
-        })`buck2 build --target-platforms prelude//platforms:default --show-output //projects/apps/demo-cli:demo_cli`;
-        const cliOutText = String(cliBuild.stdout || cliBuild.stderr || "").trim();
-        const cliLine = cliOutText.split(/\n+/).pop() || "";
-        const cliOutPath = cliLine.split(/\s+/).pop() || "";
-        if (!cliOutPath) throw new Error("no output file from buck2 build for demo_cli");
-        const cliOutput = path.isAbsolute(cliOutPath) ? cliOutPath : path.join(tmp, cliOutPath);
+        await stageTempRepoPaths({
+          tmp,
+          _$,
+          recursiveRoots: [
+            "projects/apps/demo-cli",
+            "projects/libs/demo-wasm",
+            "projects/libs/demo-wasm-inline",
+          ],
+          explicitPaths: ["pnpm-workspace.yaml", "projects/config/node-modules.hashes.json"],
+        });
+        const cliTarget = "//projects/apps/demo-cli:demo_cli";
+        const staleCliBuild = await runPublicBuild({ tmp, $, target: cliTarget, reject: false });
+        assert.notEqual(
+          staleCliBuild.exitCode,
+          0,
+          "b must fail closed after adding an unreconciled importer",
+        );
+        assert.match(String(staleCliBuild.stderr || staleCliBuild.stdout || ""), /repair: run u/);
+        await reconcileTempDependencyInputs(tmp, _$);
+        await stageTempRepoPaths({
+          tmp,
+          _$,
+          explicitPaths: ["projects/config/node-modules.hashes.json"],
+        });
+        const cliOutput = await publicBuildOutPath({
+          tmp,
+          $,
+          target: cliTarget,
+          wasmBackend: "wasi_single",
+        });
         const runDir = path.join(tmp, "tmp-run");
         await fs.mkdirp(runDir);
         const runBin = path.join(runDir, "demo-cli");

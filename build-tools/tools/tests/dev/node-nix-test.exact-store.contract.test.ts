@@ -11,6 +11,15 @@ test("node_nix_test delegates final pnpm store materialization to the filtered b
   if (!rule.includes("WORKSPACE_ROOT_ENV_ARG")) {
     throw new Error("node_nix_test must source the declared workspace-root.env input");
   }
+  if (
+    !rule.includes('GRAPH_ARG=\\"${1:-}\\"') ||
+    !rule.includes('graph_json_path = "$GRAPH_ARG"')
+  ) {
+    throw new Error("node_nix_test must bind and validate its declared Buck graph input");
+  }
+  if (!rule.includes('"node_nix_test", ctx.attrs._graph_json, ctx.attrs._workspace_root_env')) {
+    throw new Error("node_nix_test must pass graph and workspace authorities as fixed argv");
+  }
   if (rule.includes("prepare-final-pnpm-store.ts") || rule.includes("_prepare_final_pnpm_store")) {
     throw new Error("node_nix_test must not carry a redundant final-store prewarm helper");
   }
@@ -22,6 +31,9 @@ test("node_nix_test delegates final pnpm store materialization to the filtered b
   }
   if (!rule.includes("nix-build-filtered-flake.ts")) {
     throw new Error("node_nix_test must build through the filtered flake helper");
+  }
+  if (!rule.includes("COVERAGE_ARG=--coverage") || !rule.includes("unset COVERAGE")) {
+    throw new Error("node_nix_test must convert coverage to explicit filtered-build argv");
   }
   if (!rule.includes("$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts")) {
     throw new Error("node_nix_test must build through the VIBEROOTS_ROOT filtered flake helper");

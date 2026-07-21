@@ -3,7 +3,13 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { buildArgs, nixEnv, repoRoot, writeFixture } from "./pnpm-fixed-store-native-fixture";
+import {
+  buildArgs,
+  nixEnv,
+  repoRoot,
+  stageFixtureLock,
+  writeFixture,
+} from "./pnpm-fixed-store-native-fixture";
 import { directorySizeKib, runGuardedCommand } from "./pnpm-fixed-store-native-run";
 import {
   immutableProductionSource,
@@ -48,6 +54,7 @@ test(
           fixtureRoot: root,
         });
         assert.equal(locked.status, 0, locked.stderr);
+        await stageFixtureLock(fixture);
       }
       const candidates: string[] = [];
       for (const [index, fixture] of fixtures.entries()) {
@@ -154,6 +161,19 @@ test(
       );
       assert.equal(updater.status, 0, updater.stderr);
       assert.match(updater.stdout, /hash updated and build succeeded/);
+      const archived = await runGuardedCommand(nix, ["flake", "archive", "--json", "."], {
+        cwd: fixtures[1],
+        env: nixEnv(path.join(root, "archive-home"), "materialize"),
+        fixtureRoot: root,
+      });
+      assert.equal(archived.status, 0, archived.stderr);
+      const archivedSource = String(JSON.parse(archived.stdout).path || "");
+      assert.match(archivedSource, /^\/nix\/store\/[a-z0-9]{32}-source$/);
+      for (const generatedRoot of [".nix-gcroots", ".viberoots", "buck-out"]) {
+        await assert.rejects(fsp.access(path.join(archivedSource, generatedRoot)), {
+          code: "ENOENT",
+        });
+      }
       const rematerialized = await runGuardedCommand(nix, buildArgs(true), {
         cwd: fixtures[1],
         env: nixEnv(path.join(root, "verify-home")),

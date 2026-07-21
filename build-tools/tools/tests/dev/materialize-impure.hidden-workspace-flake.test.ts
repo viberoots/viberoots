@@ -20,43 +20,29 @@ test("materialize impure selected targets use hidden workspace flake in extracte
     await fsp.mkdir(path.join(tmp, ".viberoots", "workspace"), { recursive: true });
     await fsp.writeFile(path.join(tmp, ".viberoots", "workspace", "flake.nix"), "{}\n", "utf8");
 
-    const stubBin = path.join(tmp, ".stub-bin");
-    const stubNix = path.join(stubBin, "nix");
-    const argsLog = path.join(tmp, "nix-args.log");
     const fakeOut = path.join(tmp, "fake-out");
-    await fsp.mkdir(stubBin, { recursive: true });
     await fsp.mkdir(fakeOut, { recursive: true });
-    await fsp.writeFile(
-      stubNix,
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        `printf '%s\\n' "$*" > ${JSON.stringify(argsLog)}`,
-        `printf '%s\\n' ${JSON.stringify(fakeOut)}`,
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    await fsp.chmod(stubNix, 0o755);
+    let invocation:
+      | {
+          env?: Record<string, string>;
+          internal?: Record<string, string>;
+          args: string[];
+        }
+      | undefined;
+    await maybePrintImpureMaterializedBins({
+      root: tmp,
+      impure: true,
+      subcmd: "build",
+      restArgs: ["//projects/apps/web:web"],
+      runNixBuild: async (opts) => {
+        invocation = opts;
+        return `${fakeOut}\n`;
+      },
+    });
 
-    const prevPath = process.env.PATH || "";
-    const prevVbrNixBin = process.env.VBR_NIX_BIN;
-    process.env.PATH = `${stubBin}:${prevPath}`;
-    process.env.VBR_NIX_BIN = stubNix;
-    try {
-      await maybePrintImpureMaterializedBins({
-        root: tmp,
-        impure: true,
-        subcmd: "build",
-        restArgs: ["//projects/apps/web:web"],
-      });
-    } finally {
-      process.env.PATH = prevPath;
-      if (typeof prevVbrNixBin === "string") process.env.VBR_NIX_BIN = prevVbrNixBin;
-      else delete process.env.VBR_NIX_BIN;
-    }
-
-    const args = await fsp.readFile(argsLog, "utf8");
+    const observed = invocation as NonNullable<typeof invocation>;
+    assert.ok(observed, "expected the selected target to invoke the Nix build boundary");
+    const args = observed.args.join(" ");
     assert.match(
       args,
       new RegExp(
@@ -64,5 +50,13 @@ test("materialize impure selected targets use hidden workspace flake in extracte
       ),
     );
     assert.doesNotMatch(args, / \.#graph-generator-selected(?: |$)/);
+    for (const name of ["BUCK_GRAPH_JSON", "BUCK_TARGET", "BUCK_TEST_SRC", "NIX_BIN"]) {
+      assert.equal(observed.env?.[name], undefined, `${name} must not use the base env channel`);
+    }
+    assert.deepEqual(observed.internal, {
+      BUCK_TEST_SRC: tmp,
+      BUCK_GRAPH_JSON: graphPath,
+      BUCK_TARGET: "//projects/apps/web:web",
+    });
   });
 });

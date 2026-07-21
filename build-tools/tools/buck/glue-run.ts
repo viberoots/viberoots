@@ -1,1 +1,1 @@
-export { ensureGraph, runGlue } from "../patch/glue";
+export { materializeSelectedGraph, reconcileGeneratedGraph, runGlue } from "../patch/glue";

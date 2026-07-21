@@ -35,6 +35,7 @@ import { maybeWriteVerifyTimingSummary, runTemplateManifestCheck } from "./templ
 import { ensureRepoLocalTmpRoot } from "./tmp-root";
 import { runVerifyBuckPasses } from "./verify-passes";
 import { computeZxTestNodeModulesOut } from "./zx-node-modules";
+import { canonicalArtifactToolsRoot } from "../../lib/artifact-tool-authority";
 
 export const defaultRunVerifyDeps = {
   appendVerifyLogLine,
@@ -61,6 +62,7 @@ export const defaultRunVerifyDeps = {
   parseVerifyExecutionPolicyForArgs,
   prepareVerifySeed,
   prewarmVerifyOnce,
+  resolveArtifactToolsRoot: canonicalArtifactToolsRoot,
   recordNixGcPreflight,
   repoRoot,
   resolveRequestedVerifyScope,

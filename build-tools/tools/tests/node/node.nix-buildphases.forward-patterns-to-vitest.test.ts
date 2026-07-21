@@ -28,8 +28,24 @@ test("node test buildPhase decodes and forwards explicit vitest patterns", async
     throw new Error("node-test buildPhase must decode PATTERNS_VALUE from the environment");
   }
 
-  if (!script.includes("mapfile -t PATTERN_ARGS < <(node -e")) {
+  if (!nixExpr.includes('export NODE_BIN="${pkgs.nodejs_22}/bin/node"')) {
+    throw new Error("node-test.nix must bind the runner to Nix-store Node");
+  }
+
+  if (!script.includes('mapfile -t PATTERN_ARGS < <("$NODE_BIN" -e')) {
     throw new Error("node-test buildPhase must materialize explicit vitest pattern arguments");
+  }
+
+  if (!script.includes('"$NODE_BIN" "$VITEST_BIN" run')) {
+    throw new Error("node-test buildPhase must invoke the Vitest module through Nix-store Node");
+  }
+
+  if (script.includes('VITEST_BIN="node_modules/.bin/vitest"')) {
+    throw new Error("node-test buildPhase must not execute pnpm shell shims");
+  }
+
+  if (!script.includes('server: { host: "127.0.0.1", hmr: false }')) {
+    throw new Error("node-test buildPhase must avoid sandbox DNS and HMR listeners");
   }
 
   if (!script.includes('"${PATTERN_ARGS[@]}"')) {

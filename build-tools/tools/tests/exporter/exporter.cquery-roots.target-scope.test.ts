@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { computeIsolationFlags, computeRootsExpr } from "../../buck/exporter/cquery/runner";
+import { artifactGraphQueryRoots } from "../../buck/artifact-graph-query-roots";
 import { withScopedEnv } from "../lib/test-helpers/scoped-env";
 
 test("exporter cquery roots use BUCK_TARGET for sparse temp workspaces", async () => {
@@ -41,6 +42,14 @@ test("exporter cquery roots do not broaden sparse workspaces to //...", async ()
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
+});
+
+test("artifact graph roots include the canonical deployment roots", () => {
+  const roots = artifactGraphQueryRoots();
+  assert.ok(roots.includes("projects/deployments"));
+  assert.ok(roots.includes("sandbox/deployments"));
+  assert.ok(roots.includes("projects/apps"));
+  assert.equal(new Set(roots).size, roots.length);
 });
 
 test("exporter cquery reuse defaults to per-workspace isolation", async () => {

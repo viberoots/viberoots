@@ -15,7 +15,7 @@ let
       candidates =
         if (!allowLiveHashMap) || wr == "" then []
         else [
-          (builtins.toPath (wr + "/projects/node-modules.hashes.json"))
+          (builtins.toPath (wr + "/projects/config/node-modules.hashes.json"))
         ];
     in
       lib.foldl' (acc: p: acc // (readHashMap p)) {} candidates;

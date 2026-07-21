@@ -113,7 +113,7 @@ in {
       : > "$commandsLog"
       : > "$sourceLog"
       phase_done() {
-        printf '%s\t%s\n' "$1" "$2" >> "$phaseLog"
+        printf '%s\t0\n' "$1" >> "$phaseLog"
       }
       count_files() {
         find "$1" -type f 2>/dev/null | wc -l | tr -d ' '
@@ -121,19 +121,14 @@ in {
       size_kb() {
         du -sk "$1" 2>/dev/null | awk '{print $1}'
       }
-      SECONDS=0
-      cache_seed_start=$SECONDS
       cp -a ${emscriptenCacheSeed}/. "$EM_CACHE"/
       chmod -R u+w "$EM_CACHE"
-      cache_seed_secs=$((SECONDS - cache_seed_start))
-      phase_done em_cache_seed_copy "$cache_seed_secs"
+      phase_done em_cache_seed_copy
       em_cache_seed_files="$(count_files "$EM_CACHE")"
       em_cache_seed_kb="$(size_kb "$EM_CACHE")"
 
-      src_discovery_start=$SECONDS
       mapfile -t SRCS < <(${srcsCmd})
-      src_discovery_secs=$((SECONDS - src_discovery_start))
-      phase_done source_discovery "$src_discovery_secs"
+      phase_done source_discovery
       printf '%s\n' "''${SRCS[@]}" > "$sourceLog"
       src_count="''${#SRCS[@]}"
       if [ "$src_count" -eq 0 ]; then
@@ -141,11 +136,9 @@ in {
         exit 2
       fi
 
-      header_copy_start=$SECONDS
       find . -type f \( -name '*.h' -o -name '*.hpp' -o -name '*.hh' -o -name '*.hxx' \) -print0 \
         | xargs -0 -I{} sh -c 'install -Dm644 "{}" "$out/include/{}"'
-      header_copy_secs=$((SECONDS - header_copy_start))
-      phase_done header_copy "$header_copy_secs"
+      phase_done header_copy
       header_count="$(count_files "$out/include")"
 
       incFlags="${incFlags}"
@@ -164,7 +157,6 @@ in {
         echo "linkFlags=${join (emFlagsCommon ++ ldExports)}"
       } >> "$commandsLog"
 
-      compile_total_secs=0
       for s in "''${SRCS[@]}"; do
         [ -n "$s" ] || continue
         rel="$s"
@@ -172,45 +164,35 @@ in {
         mkdir -p "$(dirname "$obj")"
         case "$s" in
           *.c)
-            compile_start=$SECONDS
             echo "compile.c $s -> $obj" >> "$commandsLog"
             ${emcc} -std=c11 $incFlags $defFlags $extraC -c "$s" -o "$obj"
-            compile_secs=$((SECONDS - compile_start))
             ;;
           *.cpp|*.cc|*.cxx)
-            compile_start=$SECONDS
             echo "compile.cxx $s -> $obj" >> "$commandsLog"
             ${empp} -std=$std $incFlags $defFlags $extraC -c "$s" -o "$obj"
-            compile_secs=$((SECONDS - compile_start))
             ;;
           *)
             continue
             ;;
         esac
-        compile_total_secs=$((compile_total_secs + compile_secs))
         obj_bytes="$(wc -c < "$obj" | tr -d ' ')"
         case "$s" in
           *.c) lang=c ;;
           *) lang=cxx ;;
         esac
-        printf '%s\t%s\t%s\t%s\t%s\n' "$lang" "$compile_secs" "$s" "$obj" "$obj_bytes" >> "$compileLog"
+        printf '%s\t0\t%s\t%s\t%s\n' "$lang" "$s" "$obj" "$obj_bytes" >> "$compileLog"
       done
-      phase_done compile_total "$compile_total_secs"
+      phase_done compile_total
 
-      object_list_start=$SECONDS
       mapfile -t OBJS < <(find "$TMPDIR/obj" -type f -name '*.o' | sort)
-      object_list_secs=$((SECONDS - object_list_start))
-      phase_done object_list "$object_list_secs"
+      phase_done object_list
       object_count="''${#OBJS[@]}"
       object_total_bytes="$(find "$TMPDIR/obj" -type f -name '*.o' -print0 | xargs -0 wc -c 2>/dev/null | awk 'END{print $1+0}')"
-      link_start=$SECONDS
       echo "link ${join (emFlagsCommon ++ ldExports)} -> ${jsOut}" >> "$commandsLog"
       ${emcc} ${join (emFlagsCommon ++ ldExports)} "''${OBJS[@]}" -o "${jsOut}"
-      link_secs=$((SECONDS - link_start))
-      phase_done link "$link_secs"
+      phase_done link
       test -f "${jsOut}" && test -f "${wasmOut}"
-      total_secs=$SECONDS
-      phase_done total "$total_secs"
+      phase_done total
       out_js_bytes="$(wc -c < "${jsOut}" | tr -d ' ')"
       out_wasm_bytes="$(wc -c < "${wasmOut}" | tr -d ' ')"
       em_cache_final_files="$(count_files "$EM_CACHE")"
@@ -232,11 +214,6 @@ in {
         echo "em_cache_seed_kb=$em_cache_seed_kb"
         echo "em_cache_final_files=$em_cache_final_files"
         echo "em_cache_final_kb=$em_cache_final_kb"
-        echo "source_discovery_secs=$src_discovery_secs"
-        echo "header_copy_secs=$header_copy_secs"
-        echo "compile_total_secs=$compile_total_secs"
-        echo "link_secs=$link_secs"
-        echo "total_secs=$total_secs"
         echo "phase_log=$phaseLog"
         echo "compile_log=$compileLog"
         echo "commands_log=$commandsLog"

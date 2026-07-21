@@ -36,6 +36,8 @@ def _source_snapshot_impl(ctx):
             ],
         ),
         "source_snapshot",
+        declared_inputs = [ctx.attrs._runner[DefaultInfo].default_outputs, ctx.attrs.graph] + ctx.attrs.srcs,
+        publication = "orchestration",
         mode = "local-only",
     )
     return [
@@ -61,21 +63,29 @@ def _require_nix_bin(bin_path, label):
 
 def _source_snapshot_runner_impl(ctx):
     zx_wrapper_tool = ctx.attrs.zx_wrapper_tool[DefaultInfo].default_outputs
+    module_tree = ctx.actions.symlinked_dir(
+        ctx.attrs.name + ".modules",
+        {
+            "source-snapshot-graph.ts": ctx.attrs.graph_module,
+            "source-snapshot-policy.ts": ctx.attrs.policy_module,
+            "source-snapshot.ts": ctx.attrs.generator,
+        },
+    )
     return [
         DefaultInfo(
-            default_output = ctx.attrs.generator,
+            default_output = module_tree,
             other_outputs = [ctx.attrs.zx_init] + zx_wrapper_tool,
         ),
         RunInfo(args = cmd_args(
             ctx.attrs.zx_wrapper_tool[RunInfo],
+            "--preserve-symlinks",
+            "--preserve-symlinks-main",
             "--import",
             cmd_args(ctx.attrs.zx_init, format = "./{}"),
-            cmd_args(ctx.attrs.generator, format = "./{}"),
+            cmd_args(module_tree, format = "./{}/source-snapshot.ts"),
             hidden = [
-                ctx.attrs.generator,
+                module_tree,
                 ctx.attrs.zx_init,
-                ctx.attrs.dev_runtime[DefaultInfo].default_outputs,
-                ctx.attrs.lib_runtime[DefaultInfo].default_outputs,
                 zx_wrapper_tool,
             ],
         )),
@@ -84,9 +94,9 @@ def _source_snapshot_runner_impl(ctx):
 source_snapshot_runner = rule(
     impl = _source_snapshot_runner_impl,
     attrs = {
-        "dev_runtime": attrs.dep(default = "@viberoots//build-tools/tools/dev:runtime_ts"),
         "generator": attrs.source(default = "@viberoots//build-tools/tools/dev:source-snapshot.ts"),
-        "lib_runtime": attrs.dep(default = "@viberoots//build-tools/tools/lib:runtime_ts"),
+        "graph_module": attrs.source(default = "@viberoots//build-tools/tools/dev:source-snapshot-graph.ts"),
+        "policy_module": attrs.source(default = "@viberoots//build-tools/tools/dev:source-snapshot-policy.ts"),
         "zx_init": attrs.source(default = "@viberoots//build-tools/tools/dev:zx-init.mjs"),
         "zx_wrapper_tool": attrs.dep(
             default = "@viberoots//build-tools/tools/dev:source-snapshot-zx-wrapper",

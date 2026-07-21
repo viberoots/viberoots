@@ -200,7 +200,7 @@ test("resource inventory reads deployment graph through the composite graph surf
 
 test("graph-first Infisical inventory paths use composite graph reads", async () => {
   for (const relPath of [
-    "build-tools/tools/deployments/infisical-iac-bootstrap-resolver.ts",
+    "build-tools/tools/deployments/infisical-iac-bootstrap-resolver-profiles.ts",
     "build-tools/tools/deployments/infisical-iac-bootstrap-deployments-discovery.ts",
   ]) {
     const source = await fsp.readFile(viberootsRepoPath(relPath), "utf8");

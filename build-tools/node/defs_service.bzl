@@ -6,6 +6,7 @@ load(
     "nix_calling_env_export_nix_pnpm_fetch_timeout",
     "nix_calling_genrule_bootstrap",
     "nix_calling_node_patch_requirements_preflight",
+    "nix_declared_action_transport_args",
 )
 load(
     "@viberoots//build-tools/node:defs_nix_helpers.bzl",
@@ -83,7 +84,9 @@ def node_service_artifact(
             "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning "
             + "--experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
             + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
-            + ("\"node-service.%s\" > \"$OUT_PATHS_FILE\"; " % sanitize_importer_for_nix_attr(_importer))
+            + ("\"node-service.%s\" --target \"//%s:%s\" --buck-action-inputs \"$VBR_BUCK_INPUTS\" " % (sanitize_importer_for_nix_attr(_importer), native.package_name(), name))
+            + nix_declared_action_transport_args()
+            + " $VBR_DEV_OVERRIDE_ARG > \"$OUT_PATHS_FILE\"; "
         )
         + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
         + "tail -n1 \"$OUT_PATHS_FILE\" > \"$OUT_LAST_FILE\"; "

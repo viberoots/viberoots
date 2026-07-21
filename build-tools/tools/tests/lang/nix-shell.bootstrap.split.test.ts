@@ -59,13 +59,14 @@ test("nix_shell bootstrap split: core is language-agnostic; PNPM store is opt-in
       "expected core bootstrap to include WORKSPACE_ROOT/FLK_ROOT logic",
     );
     assert.ok(
-      outCore.indexOf("$WORKSPACE_ROOT/viberoots/build-tools/tools/dev/zx-init.mjs") >= 0,
-      "expected core bootstrap to prefer a nested viberoots source root",
+      outCore.includes("share/viberoots-source") &&
+        outCore.includes("build-tools/tools/dev/zx-init.mjs"),
+      "expected core bootstrap to use the declared artifact-tool source closure",
     );
     assert.ok(
-      outCore.indexOf("$WORKSPACE_ROOT/viberoots/build-tools/tools/dev/zx-init.mjs") <
-        outCore.indexOf("$WORKSPACE_ROOT/.viberoots/current/build-tools/tools/dev/zx-init.mjs"),
-      "expected nested viberoots source root before .viberoots/current fallback",
+      !outCore.includes("$WORKSPACE_ROOT/viberoots/build-tools/tools/dev/zx-init.mjs") &&
+        !outCore.includes("$WORKSPACE_ROOT/.viberoots/current/build-tools/tools/dev/zx-init.mjs"),
+      "expected artifact bootstrap to exclude live viberoots source paths",
     );
     assert.ok(
       !outCore.includes("require-unified-pnpm-store.ts") &&

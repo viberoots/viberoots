@@ -4,6 +4,7 @@ import { externalNodeToolEnv } from "../../lib/external-node-env";
 import { mkdtempNoindex } from "../../lib/macos-metadata";
 import { withHiddenNodeModules } from "../../lib/pnpm-node-modules-guard";
 import { resolveRepoNodeBin } from "../../lib/repo-node-bin";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 import {
   cleanupLocalWorkspaceMarker,
   ensureLocalWorkspaceMarker,
@@ -44,11 +45,18 @@ export async function updatePnpmLock(opts: {
   const temp = await mkdtempNoindex("vbr-update-pnpm-", { baseName: "update-pnpm" });
   try {
     await withHiddenNodeModules(importerAbs, async () => {
+      const env = { ...externalNodeToolEnv(), PNPM_HOME: path.join(temp, "home") };
+      const override = String(process.env.UPDATE_PNPM_BIN || "").trim();
+      const command = override || resolveToolPathSync("node", env);
+      const args = [
+        ...(override ? [] : [resolveToolPathSync("pnpm", env)]),
+        ...pnpmLockArgs(opts.upgrade, path.join(temp, "store")),
+      ];
       await runCommand({
-        command: process.env.UPDATE_PNPM_BIN || "pnpm",
-        args: pnpmLockArgs(opts.upgrade, path.join(temp, "store")),
+        command,
+        args,
         cwd: importerAbs,
-        env: { ...externalNodeToolEnv(), PNPM_HOME: path.join(temp, "home") },
+        env,
       });
     });
     const prettier = await resolveRepoNodeBin(opts.root, "prettier");

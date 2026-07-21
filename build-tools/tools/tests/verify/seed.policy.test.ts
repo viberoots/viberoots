@@ -4,7 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { shouldPrepareVerifySeedForRequestedTargets } from "../../dev/verify/seed";
-import { verifySeedBuildArgs } from "../../dev/verify/seed-build";
+import { assertVerifySeedComplete, verifySeedBuildArgs } from "../../dev/verify/seed-build";
 import { writeVerifySeedRemoteManifest } from "../../dev/verify/seed-manifest";
 import { mktemp } from "../lib/test-helpers";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
@@ -44,63 +44,78 @@ test("verify seed policy honors override mode", () => {
 });
 
 test("verify seed build args split local pinning from remote-ready no-link mode", () => {
+  const flakeRef =
+    "path:/nix/store/00000000000000000000000000000000-viberoots-evaluation-bundle?dir=source#test-seed";
   assert.deepEqual(
     verifySeedBuildArgs({
-      root: "/repo",
+      flakeRef,
       mode: "local",
       gcRootPath: "/repo/.viberoots/workspace/buck/verify-seed/nix-root",
     }).slice(-3),
     ["--out-link", "/repo/.viberoots/workspace/buck/verify-seed/nix-root", "--print-out-paths"],
   );
-  const remoteArgs = verifySeedBuildArgs({ root: "/repo", mode: "remote-ready" });
+  const remoteArgs = verifySeedBuildArgs({
+    flakeRef,
+    mode: "remote-ready",
+  });
   assert.ok(remoteArgs.includes("--no-link"));
   assert.ok(remoteArgs.includes("--print-out-paths"));
   assert.ok(!remoteArgs.includes("--out-link"));
+  assert.ok(remoteArgs.includes("--no-write-lock-file"));
 });
 
-test("verify seed build args fall back to root flake when generated workspace flake is absent", async () => {
-  const root = await mktemp("verify-seed-root-flake-");
-  try {
-    await fsp.writeFile(path.join(root, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
-    const args = verifySeedBuildArgs({ root, mode: "remote-ready" });
-    assert.ok(args.includes(`path:${root}#test-seed`));
-  } finally {
-    await fsp.rm(root, { recursive: true, force: true });
-  }
+test("verify seed build args require the caller's immutable bundle authority", () => {
+  const flakeRef =
+    "path:/nix/store/00000000000000000000000000000000-viberoots-evaluation-bundle?dir=source/.viberoots/workspace#test-seed";
+  const args = verifySeedBuildArgs({ flakeRef, mode: "remote-ready" });
+  assert.ok(args.includes(flakeRef));
+  assert.equal(args.includes("--impure"), false);
+  assert.throws(
+    () =>
+      verifySeedBuildArgs({
+        flakeRef: "path:/repo/.viberoots/workspace#test-seed",
+        mode: "remote-ready",
+      }),
+    /canonical immutable evaluation-bundle source/,
+  );
 });
 
-test("verify seed build args trust the generated workspace input without a mutable override", async () => {
-  const root = await mktemp("verify-seed-remote-source-");
+test("verify seed completeness accepts root and generated workspace flake layouts", async () => {
+  const rootFlake = await mktemp("verify-seed-root-flake-");
+  const workspaceFlake = await mktemp("verify-seed-workspace-flake-");
+  const incomplete = await mktemp("verify-seed-incomplete-");
   try {
-    await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
+    for (const seed of [rootFlake, workspaceFlake, incomplete]) {
+      await fsp.writeFile(path.join(seed, ".buckconfig"), "", "utf8");
+      await fsp.mkdir(path.join(seed, "viberoots"), { recursive: true });
+      await fsp.writeFile(path.join(seed, "viberoots", "flake.nix"), "{}\n", "utf8");
+    }
+    await fsp.writeFile(path.join(rootFlake, "flake.nix"), "{}\n", "utf8");
+    await fsp.mkdir(path.join(workspaceFlake, ".viberoots", "workspace"), { recursive: true });
     await fsp.writeFile(
-      path.join(root, ".viberoots", "workspace", "flake.nix"),
-      "{ outputs = _: {}; }\n",
+      path.join(workspaceFlake, ".viberoots", "workspace", "flake.nix"),
+      "{}\n",
       "utf8",
     );
-    const args = verifySeedBuildArgs({ root, mode: "remote-ready" });
-    assert.ok(args.includes(`path:${root}/.viberoots/workspace#test-seed`));
-    assert.equal(args.includes("--override-input"), false);
-  } finally {
-    await fsp.rm(root, { recursive: true, force: true });
-  }
-});
 
-test("verify seed build args omit missing submodule override in remote consumers", async () => {
-  const root = await mktemp("verify-seed-no-submodule-");
-  try {
-    const args = verifySeedBuildArgs({ root, mode: "remote-ready" });
-    assert.equal(args.includes("--override-input"), false);
-    assert.equal(args.includes(`path:${root}/viberoots`), false);
+    await assert.doesNotReject(assertVerifySeedComplete(rootFlake));
+    await assert.doesNotReject(assertVerifySeedComplete(workspaceFlake));
+    await assert.rejects(assertVerifySeedComplete(incomplete), /missing flake\.nix or/);
   } finally {
-    await fsp.rm(root, { recursive: true, force: true });
+    await Promise.all(
+      [rootFlake, workspaceFlake, incomplete].map((seed) =>
+        fsp.rm(seed, { recursive: true, force: true }),
+      ),
+    );
   }
 });
 
 test("verify seed reuses matching current seed before building", async () => {
   const source = await readRepoFile("build-tools/tools/dev/verify/seed.ts");
   const currentLookup = source.indexOf("await readCurrentSeed(opts.root, seedKey)");
-  const buildCall = source.indexOf("await buildSeedStorePath(opts.root, mode)");
+  const buildCall = source.indexOf(
+    "await buildSeedStorePath(opts.root, opts.artifactToolsRoot, mode)",
+  );
   assert.ok(currentLookup > 0, "prepareVerifySeed must read current seed state");
   assert.ok(buildCall > currentLookup, "prepareVerifySeed must try current seed before nix build");
   assert.match(source, /\.viberoots", "workspace", "buck", "verify-seed"/);

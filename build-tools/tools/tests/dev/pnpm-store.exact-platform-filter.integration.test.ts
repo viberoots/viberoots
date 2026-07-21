@@ -10,6 +10,10 @@ import { test } from "node:test";
 import { promisify } from "node:util";
 import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
 import {
+  buildCanonicalArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+} from "../../lib/artifact-environment";
+import {
   defaultFilteredFlakeSnapshotRelPaths,
   defaultFilteredFlakeSnapshotRsyncSources,
   filteredFlakeRsyncExcludeArgs,
@@ -73,7 +77,13 @@ async function immutableProductionSource(): Promise<string> {
       ],
       { cwd: sourceRoot, timeout: 30_000 },
     );
-    const inputRoot = (await materializeFilteredViberootsSource(filtered)).storePath;
+    const env = buildCanonicalArtifactEnvironment(process.cwd(), {
+      artifactToolsRoot: canonicalArtifactToolsRoot(
+        process.cwd(),
+        String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+      ),
+    });
+    const inputRoot = (await materializeFilteredViberootsSource(filtered, env)).storePath;
     assert.match(inputRoot, /^\/nix\/store\/[a-z0-9]{32}-source$/);
     return inputRoot;
   } finally {

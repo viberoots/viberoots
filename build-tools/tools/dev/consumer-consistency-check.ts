@@ -69,7 +69,10 @@ function fail(message: string, repair: string): never {
   throw new Error(`error: ${message}\n\nrepair: run ${repair}`);
 }
 
-async function runReadOnlyPnpmChecks(repoRoot: string): Promise<void> {
+export async function runReadOnlyPnpmChecks(
+  repoRoot: string,
+  opts: { viberootsInputRoot?: string } = {},
+): Promise<void> {
   const importers = await discoverImportersWithLock(repoRoot, { cwd: repoRoot });
   const update = buildToolPath(repoRoot, "tools/dev/update-pnpm-hash.ts");
   const env = envWithResolvedNixBin({
@@ -77,6 +80,7 @@ async function runReadOnlyPnpmChecks(repoRoot: string): Promise<void> {
     VBR_PNPM_HASHES_READONLY: "1",
     WORKSPACE_ROOT: repoRoot,
     ZX_INIT: zxInitPath(repoRoot),
+    ...(opts.viberootsInputRoot ? { VIBEROOTS_FLAKE_INPUT_ROOT: opts.viberootsInputRoot } : {}),
   });
   for (const importer of importers) {
     const lockfile =

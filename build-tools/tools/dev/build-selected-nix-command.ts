@@ -1,9 +1,11 @@
 import { stripAnsi } from "./build-selected-helpers";
+import { artifactNixPolicyArgs } from "../lib/artifact-nix-policy";
 
 export function selectedNixBuildArgs(opts: { flakeRef: string; showTrace?: boolean }): string[] {
   return [
     "nix",
     "build",
+    ...artifactNixPolicyArgs(),
     "--no-write-lock-file",
     "--option",
     "eval-cache",

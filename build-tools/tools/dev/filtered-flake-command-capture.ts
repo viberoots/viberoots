@@ -8,7 +8,15 @@ import {
 } from "../lib/owned-temp-cleanup";
 
 export type CommandCapture = {
-  stdio: ["ignore", "pipe" | number, "pipe" | number];
+  stdio: ["ignore" | "inherit", "ignore" | "inherit" | "pipe", "ignore" | "inherit" | "pipe"];
+  redirect?: (
+    shell: string,
+    command: string,
+    args: readonly string[],
+  ) => {
+    command: string;
+    args: string[];
+  };
   read: () => Promise<{ stdout: string; stderr: string }>;
   cleanup: () => Promise<void>;
   cleanupPath?: string;
@@ -26,23 +34,26 @@ export async function commandCapture(): Promise<CommandCapture> {
   const dir = await mkdtempNoindex("vbr-command-", { baseName: "viberoots-command" });
   const stdoutPath = path.join(dir, "stdout");
   const stderrPath = path.join(dir, "stderr");
-  const stdoutHandle = await fsp.open(stdoutPath, "w+");
-  const stderrHandle = await fsp.open(stderrPath, "w+").catch(async (error) => {
-    await rethrowAfterOwnedTempCleanup(error, [
-      async () => await stdoutHandle.close(),
-      async () => await removeOwnedTempTree(dir),
-    ]);
-  });
-  let closed = false;
-  const close = async () => {
-    if (closed) return;
-    closed = true;
-    await Promise.all([stdoutHandle.close(), stderrHandle.close()]);
-  };
+  await Promise.all([fsp.writeFile(stdoutPath, ""), fsp.writeFile(stderrPath, "")]).catch(
+    async (error) => await rethrowAfterOwnedTempCleanup(error, [() => removeOwnedTempTree(dir)]),
+  );
   return {
-    stdio: ["ignore", stdoutHandle.fd, stderrHandle.fd],
+    stdio: ["inherit", "inherit", "inherit"],
+    redirect: (shell, command, args) => ({
+      command: shell,
+      args: [
+        "--noprofile",
+        "--norc",
+        "-c",
+        'stdout="$1"; stderr="$2"; shift 2; exec "$@" </dev/null >"$stdout" 2>"$stderr"',
+        "viberoots-command-capture",
+        stdoutPath,
+        stderrPath,
+        command,
+        ...args,
+      ],
+    }),
     read: async () => {
-      await close();
       const [stdout, stderr] = await Promise.all([
         fsp.readFile(stdoutPath, "utf8"),
         fsp.readFile(stderrPath, "utf8"),
@@ -50,10 +61,7 @@ export async function commandCapture(): Promise<CommandCapture> {
       return { stdout, stderr };
     },
     cleanup: async () => {
-      await runOwnedTempCleanup([
-        async () => await close(),
-        async () => await removeOwnedTempTree(dir),
-      ]);
+      await runOwnedTempCleanup([async () => await removeOwnedTempTree(dir)]);
     },
     cleanupPath: dir,
   };

@@ -11,12 +11,13 @@ load("@viberoots//build-tools/node/private:patch_requirements.bzl", "apply_node_
 load("@viberoots//build-tools/lang:remote_action_policy.bzl", "stamp_local_only_genrule_labels")
 load(
     "@viberoots//build-tools/lang:nix_shell.bzl",
-    "nix_build_out_path_cmd",
     "nix_calling_env_export_buck_graph_json",
     "nix_calling_genrule_bootstrap",
     "nix_calling_node_patch_requirements_preflight",
 )
 load("@viberoots//build-tools/node/private:nix_test.bzl", "node_nix_test")
+load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
+load("@viberoots//build-tools/lang:nix_artifact_inputs.bzl", "nix_artifact_tool_source_labels")
 
 # NOTE: Prebuild guard ensures this load is valid before builds/tests run.
 MODULE_PROVIDERS = {}
@@ -60,7 +61,7 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
     wiring = prepare_language_wiring(
         name = name,
         kwargs = kwargs,
-        srcs = srcs,
+        srcs = list(srcs) + nix_artifact_tool_source_labels(),
         deps = deps,
         lang = "node",
         kind = kind,
@@ -83,13 +84,16 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
         )
         + nix_calling_env_export_buck_graph_json()
         + nix_calling_node_patch_requirements_preflight(wiring.importer)
-        + nix_build_out_path_cmd(
-            "\"path:$FLK_ROOT#graph-generator-selected\"",
-            timeout_var = "TIMEOUT",
-            impure = True,
-            build_prefix = ("env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" " % raw),
-            graph_target = raw,
+        + nix_action_build_selected_out_path_cmd(
+            target_label = raw,
+            out_var = "outPath",
+            raw_var = "OUT_RAW",
+            status_var = "NIX_STATUS",
+            log_file = "$WORKSPACE_ROOT/buck-out/tmp/build-selected/node_gen.%s.log" % name,
+            attr = "graph-generator-selected",
+            escape_cmd_subst = True,
         )
+        + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then cat \"$WORKSPACE_ROOT/buck-out/tmp/build-selected/node_gen.%s.log\" >&2 2>/dev/null || true; exit \"${NIX_STATUS:-2}\"; fi; " % name
         + ("EXPECTED=\"$outPath/%s\"; " % effective_out)
         + "if [ ! -e \"$EXPECTED\" ]; then "
         + "  echo \"nix_node_gen: expected output missing: $EXPECTED\" >&2; "
@@ -100,7 +104,9 @@ def nix_node_gen(name, srcs = [], out = None, cmd = None, deps = [], labels = []
     )
     kw["out"] = effective_out
     kw["cmd"] = wrapper_cmd
-    kw["labels"] = stamp_local_only_genrule_labels(kw.get("labels", []) or [])
+    kw["labels"] = stamp_local_only_genrule_labels(
+        (kw.get("labels", []) or []) + ["planner_target:%s" % raw],
+    )
     genrule(**kw)
 
 def nix_node_test(

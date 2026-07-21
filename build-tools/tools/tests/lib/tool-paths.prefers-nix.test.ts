@@ -186,7 +186,11 @@ test("install-time nix helpers use resolved Nix tool path", async () => {
 
   for (const file of files) {
     const source = await fsp.readFile(file, "utf8");
-    assert.match(source, /resolveToolPathSync\("nix"/, `${file} must resolve nix explicitly`);
+    assert.match(
+      source,
+      /(?:resolveToolPathSync|ensureNixStoreToolPathSync)\("nix"/,
+      `${file} must resolve nix explicitly through the canonical tool authority`,
+    );
     assert.doesNotMatch(source, /command:\s*"nix"/, `${file} must not spawn ambient nix`);
     assert.doesNotMatch(source, /execFileSync\(\s*"nix"/, `${file} must not exec ambient nix`);
     assert.doesNotMatch(

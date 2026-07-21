@@ -6,6 +6,8 @@ import {
   previewVerifyNestedBuckIsolation,
 } from "../../dev/verify/buck2-test-env";
 
+const artifactToolsRoot = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-artifact-tools";
+
 function envValue(envArgs: string[], name: string): string | undefined {
   const prefix = `${name}=`;
   return envArgs.find((arg) => arg.startsWith(prefix))?.slice(prefix.length);
@@ -25,6 +27,7 @@ test("verify child env reuses a shared nested buck isolation per pass", () => {
     zxNodeModulesOut: "/tmp/zx-node-modules",
     nodeTestTimeoutMs: 120_000,
     testNixTimeoutSecs: 1800,
+    artifactToolsRoot,
   });
   assert.ok(envArgs.includes(`BUCK_NESTED_ISO=${shared}`));
   assert.ok(envArgs.includes("BUCK_EXPORTER_REUSE_DAEMON=1"));
@@ -68,6 +71,7 @@ test("verify child env preserves explicit nix binary path", () => {
       zxNodeModulesOut: "/tmp/zx-node-modules",
       nodeTestTimeoutMs: 120_000,
       testNixTimeoutSecs: 1800,
+      artifactToolsRoot,
     });
     assert.ok(envArgs.includes("NIX_BIN=/nix/store/demo-nix/bin/nix"));
     assert.ok(envArgs.includes("VBR_NIX_BIN=/nix/store/demo-nix/bin/nix"));
@@ -99,6 +103,7 @@ test("verify child env propagates dev-shell Nix certificate env", () => {
       zxNodeModulesOut: "/tmp/zx-node-modules",
       nodeTestTimeoutMs: 120_000,
       testNixTimeoutSecs: 1800,
+      artifactToolsRoot,
     });
 
     assert.ok(envArgs.includes("NIX_SSL_CERT_FILE=/nix/store/cacert/etc/ssl/certs/ca-bundle.crt"));

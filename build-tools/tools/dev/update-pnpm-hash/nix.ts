@@ -96,7 +96,13 @@ function validViberootsSource(candidate: string): string {
 function flakeDirFromRef(flakeRef: string): string {
   const withoutAttr = flakeRef.replace(/#.*$/, "");
   if (!withoutAttr.startsWith("path:")) return "";
-  return path.resolve(withoutAttr.slice("path:".length));
+  const [rawPath, query = ""] = withoutAttr.slice("path:".length).split("?", 2);
+  const root = path.resolve(decodeURIComponent(rawPath || ""));
+  const dir = new URLSearchParams(query).get("dir") || "";
+  if (!dir) return root;
+  if (path.posix.isAbsolute(dir) || dir.includes("\\") || dir.split("/").includes("..")) return "";
+  const resolved = path.resolve(root, ...dir.split("/"));
+  return resolved.startsWith(`${root}${path.sep}`) ? resolved : "";
 }
 
 export function immutableViberootsInputFromFlakeFiles(flakeText: string, lockText: string): string {
@@ -255,7 +261,7 @@ export async function buildStore(
   });
   const output = String(res.stdout || "") + String(res.stderr || "");
   let cleanupOutput = "";
-  if ((res.interrupted || res.timedOut) && invalidBefore && opts.ownedDerivationName) {
+  if (!res.ok && invalidBefore && opts.ownedDerivationName) {
     try {
       const deleted = await cleanupChangedOwnedInvalidPnpmStores({
         derivationName: opts.ownedDerivationName,
@@ -263,12 +269,13 @@ export async function buildStore(
         env: commandEnv,
       });
       if (deleted.length > 0)
-        cleanupOutput = `\nremoved interrupted invalid output: ${deleted.join(", ")}`;
+        cleanupOutput = `\nremoved failed-build invalid output: ${deleted.join(", ")}`;
     } catch (error) {
-      cleanupOutput = `\ninterrupted invalid-output cleanup failed: ${String(error)}`;
+      cleanupOutput = `\nfailed-build invalid-output cleanup failed: ${String(error)}`;
     }
   }
-  if (!res.ok && !res.interrupted && !res.timedOut) {
+  const expectedHashMismatch = output.includes("viberoots-pnpm-fod-hash-mismatch-v1");
+  if (!res.ok && !res.interrupted && !res.timedOut && !expectedHashMismatch) {
     const gcPids = await activeNixGcPids();
     if (gcPids.length > 0) {
       const gcCfg = gcWaitConfig();

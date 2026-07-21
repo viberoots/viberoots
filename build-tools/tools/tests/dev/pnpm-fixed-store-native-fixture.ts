@@ -1,10 +1,15 @@
+import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { promisify } from "node:util";
 import { externalNodeToolEnv } from "../../lib/external-node-env";
+import { resolveWorkspaceRootSync } from "../../lib/repo";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 import { NATIVE_PNPM_COMMAND_TIMEOUT_MS } from "./pnpm-fixed-store-native-run";
 import { fileURLToPath } from "node:url";
 
 export const PLACEHOLDER = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+const execFileAsync = promisify(execFile);
 
 export function repoRoot(): string {
   return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
@@ -16,8 +21,23 @@ export async function writeFixture(
   viberootsPath: string,
 ): Promise<void> {
   await fsp.mkdir(path.join(root, "build-tools", "tools", "dev"), { recursive: true });
+  await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
   await fsp.mkdir(path.join(root, "build-tools", "tools", "nix"), { recursive: true });
   await fsp.writeFile(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"), "\n");
+  // The reconcile derivation invokes viberoots JS helpers that resolve the
+  // canonical artifact tool authority. Stage the live workspace's
+  // toolchain-paths.json into the fixture so the fixture root can play the
+  // role of workspace root explicitly, rather than relying on an ambient
+  // fallback.
+  await fsp.copyFile(
+    path.join(
+      resolveWorkspaceRootSync(process.cwd()),
+      ".viberoots",
+      "workspace",
+      "toolchain-paths.json",
+    ),
+    path.join(root, ".viberoots", "workspace", "toolchain-paths.json"),
+  );
   await fsp.writeFile(
     path.join(root, "package.json"),
     JSON.stringify({
@@ -89,6 +109,24 @@ export async function writeFixture(
 }
 `,
   );
+  await fsp.writeFile(
+    path.join(root, ".gitignore"),
+    ["/.nix-gcroots/", "/.viberoots/", "/buck-out/", "/result", "/result-*", ""].join("\n"),
+  );
+  const git = resolveToolPathSync("git");
+  await execFileAsync(git, ["init", "-q"], { cwd: root, env: externalNodeToolEnv() });
+  await execFileAsync(
+    git,
+    ["add", "--", ".gitignore", "build-tools", "flake.nix", "package.json", "pnpm-lock.yaml"],
+    { cwd: root, env: externalNodeToolEnv() },
+  );
+}
+
+export async function stageFixtureLock(root: string): Promise<void> {
+  await execFileAsync(resolveToolPathSync("git"), ["add", "--", "flake.lock"], {
+    cwd: root,
+    env: externalNodeToolEnv(),
+  });
 }
 
 export function nixEnv(

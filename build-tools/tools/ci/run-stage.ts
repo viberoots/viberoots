@@ -3,8 +3,7 @@
 import assert from "node:assert";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { ensureGraph, runGlue } from "../buck/glue-run";
-import { getFlagStr } from "../lib/cli";
+import { getFlagBool, getFlagStr } from "../lib/cli";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
 import { DEFAULT_AUTO_MAP_PATH } from "../lib/workspace-state-paths";
 import { runNodeWithZx } from "../lib/node-run";
@@ -16,6 +15,14 @@ import {
   admitArtifactContext,
   inspectWorkspaceArtifactSource,
 } from "../dev/artifact-policy-inspection";
+import { chooseRunnableFlakeRef } from "../dev/run-runnable-source";
+import { runNixBuildWithProgress } from "../dev/run-runnable-nix";
+import { withoutEvaluationSelectors } from "../dev/evaluation-bundle-env";
+import { requireArtifactGlue, requireArtifactGraph } from "../dev/artifact-graph-executor";
+import { enterCanonicalArtifactEntrypoint } from "../dev/canonical-artifact-entrypoint";
+import { buildCanonicalArtifactEnvironment } from "../lib/artifact-environment";
+
+const artifactToolsRoot = enterCanonicalArtifactEntrypoint();
 
 type Stage =
   | "codegen"
@@ -34,6 +41,7 @@ type Stage =
   | "wheelhouse-preload";
 
 const stage = getFlagStr("stage", "");
+const coverage = getFlagBool("coverage");
 assert(stage, "missing --stage=<name>");
 const workspaceRoot = process.cwd();
 const viberootsBuildToolsRoot = buildToolsRoot(workspaceRoot);
@@ -49,7 +57,12 @@ function viberootsPath(rel: string): string {
 }
 
 async function runTool(script: string, args: string[] = []) {
-  await runNodeWithZx({ zxInitPath: zxInit, script, args });
+  await runNodeWithZx({
+    zxInitPath: zxInit,
+    script,
+    args,
+    env: buildCanonicalArtifactEnvironment(workspaceRoot, { artifactToolsRoot }),
+  });
 }
 
 async function main() {
@@ -94,11 +107,19 @@ async function main() {
       break;
     }
     case "export-graph": {
-      await ensureGraph();
+      await requireArtifactGraph({
+        workspaceRoot,
+        graphPath: path.join(workspaceRoot, DEFAULT_GRAPH_PATH),
+        artifactToolsRoot,
+      });
       break;
     }
     case "glue": {
-      await runGlue();
+      await requireArtifactGlue({
+        workspaceRoot,
+        graphPath: path.join(workspaceRoot, DEFAULT_GRAPH_PATH),
+        artifactToolsRoot,
+      });
       break;
     }
     case "sync-providers": {
@@ -133,6 +154,8 @@ async function main() {
         viberootsPath("docs/handbook/nix-gaps.md"),
         "--exceptions",
         viberootsPath("docs/handbook/nix-gaps-exceptions.json"),
+        "--command-site-policy",
+        viberootsPath("docs/handbook/nix-command-site-policy.json"),
       ]);
       break;
     }
@@ -166,19 +189,33 @@ async function main() {
           localDevelopment: source.localDevelopment,
         }),
         purpose: "ci",
+        artifactToolsRoot,
         impureEvaluation: false,
         workspaceRoot,
         toolNames: ["git"],
       });
+      const bundle = await chooseRunnableFlakeRef({
+        workspaceRoot,
+        sourceMode: "git",
+        attr: "graph-generator",
+        purpose: "ci",
+        artifactToolsRoot,
+      });
       try {
-        await $`nix build .#graph-generator --no-link`;
-      } catch (e) {
-        console.warn("graph-generator attribute missing; skipping nix build stage");
+        await runNixBuildWithProgress({
+          workspaceRoot,
+          env: withoutEvaluationSelectors(process.env) as Record<string, string>,
+          label: "CI graph-generator",
+          artifactToolsRoot,
+          args: ["--no-write-lock-file", bundle.flakeRef, "--accept-flake-config", "--no-link"],
+        });
+      } finally {
+        await bundle.cleanup?.();
       }
       break;
     }
     case "buck-test":
-      await runCiBuckTestStage();
+      await runCiBuckTestStage({ coverage, artifactToolsRoot });
       break;
     case "cpp-addon-smoke": {
       const target = toolPath("tools/ci/cpp-addon-smoke.ts");
@@ -186,7 +223,7 @@ async function main() {
       break;
     }
     case "wheelhouse-preload": {
-      await runWheelhousePreload();
+      await runWheelhousePreload(artifactToolsRoot);
       break;
     }
     default:

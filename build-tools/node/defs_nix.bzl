@@ -5,11 +5,12 @@ load(
     "@viberoots//build-tools/lang:nix_shell.bzl",
     "nix_calling_env_export_buck_graph_json",
     "nix_calling_env_export_nix_pnpm_fetch_timeout",
-    "nix_build_out_path_cmd",
     "nix_calling_genrule_bootstrap",
     "nix_calling_node_patch_requirements_preflight",
+    "nix_declared_action_transport_args",
 )
 load("@viberoots//build-tools/node:defs_core.bzl", "nix_node_gen")
+load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
 load(
     "@viberoots//build-tools/node:defs_nix_helpers.bzl",
     "apply_default_lockfile_label",
@@ -63,7 +64,9 @@ def node_webapp(
         + (
             "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
             + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
-            + ("\"node-webapp.%s\" > \"$OUT_PATHS_FILE\"; " % sanitize_importer_for_nix_attr(_importer))
+            + ("\"node-webapp.%s\" --target \"//%s:%s\" --buck-action-inputs \"$VBR_BUCK_INPUTS\" " % (sanitize_importer_for_nix_attr(_importer), native.package_name(), name))
+            + nix_declared_action_transport_args()
+            + " $VBR_DEV_OVERRIDE_ARG > \"$OUT_PATHS_FILE\"; "
         )
         + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
         + "tail -n1 \"$OUT_PATHS_FILE\" > \"$OUT_LAST_FILE\"; "
@@ -135,13 +138,15 @@ def nix_node_cli_bin(
             )
             + nix_calling_env_export_buck_graph_json()
             + nix_calling_node_patch_requirements_preflight(wiring.importer)
-            + nix_build_out_path_cmd(
-                "\"path:$FLK_ROOT#graph-generator-selected\"",
-                timeout_var = "TIMEOUT",
-                impure = True,
-                build_prefix = ("env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"%s\" " % impl_label),
-                graph_target = impl_label,
+            + nix_action_build_selected_out_path_cmd(
+                target_label = impl_label,
+                out_var = "outPath",
+                raw_var = "OUT_RAW",
+                status_var = "NIX_STATUS",
+                log_file = "$WORKSPACE_ROOT/buck-out/tmp/build-selected/node_cli.%s.log" % name,
+                escape_cmd_subst = True,
             )
+            + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then cat \"$WORKSPACE_ROOT/buck-out/tmp/build-selected/node_cli.%s.log\" >&2 2>/dev/null || true; exit \"${NIX_STATUS:-2}\"; fi; " % name
             + ("EXPECTED=\"$outPath/%s\"; " % out)
             + "if [ ! -f \"$EXPECTED\" ]; then "
             + "  echo \"nix_node_cli_bin(bundle=False): expected output missing: $EXPECTED\" >&2; "
@@ -153,7 +158,9 @@ def nix_node_cli_bin(
         )
         kw["out"] = out
         kw["cmd"] = cmd
-        kw["labels"] = stamp_local_only_genrule_labels(kw.get("labels", []) or [])
+        kw["labels"] = stamp_local_only_genrule_labels(
+            (kw.get("labels", []) or []) + ["planner_target:%s" % impl_label],
+        )
         genrule(**kw)
         return
     if entry == None:
@@ -201,7 +208,9 @@ def nix_node_cli_bin(
         + (
             "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
             + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
-            + ("\"node-cli.%s\" > \"$OUT_PATHS_FILE\"; " % sanitize_importer_for_nix_attr(_importer))
+            + ("\"node-cli.%s\" --target \"//%s:%s\" --buck-action-inputs \"$VBR_BUCK_INPUTS\" " % (sanitize_importer_for_nix_attr(_importer), native.package_name(), name))
+            + nix_declared_action_transport_args()
+            + " $VBR_DEV_OVERRIDE_ARG > \"$OUT_PATHS_FILE\"; "
         )
         + "OUT_LAST_FILE=\"$OUT_PATHS_FILE.last\"; "
         + "tail -n1 \"$OUT_PATHS_FILE\" > \"$OUT_LAST_FILE\"; "
@@ -218,5 +227,7 @@ def nix_node_cli_bin(
     )
     kw["out"] = out
     kw["cmd"] = cmd
-    kw["labels"] = stamp_local_only_genrule_labels(kw.get("labels", []) or [])
+    kw["labels"] = stamp_local_only_genrule_labels(
+        (kw.get("labels", []) or []) + ["node:cli-bundle"],
+    )
     genrule(**kw)

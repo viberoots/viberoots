@@ -16,6 +16,11 @@ let
   repoStoreRoot = ctx.repoStoreRoot or repoSnapshot;
   repoFsRoot = ctx.repoFsRoot or repoStoreRoot;
   viberootsRoot = ctx.viberootsRoot or null;
+  artifactToolsRoot = ctx.artifactToolsRoot or "";
+  declaredArtifactToolsRoot = ctx.declaredArtifactToolsRoot or "";
+  artifactToolsInput = ctx.artifactToolsInput or null;
+  evaluationGraphPath = ctx.evaluationGraphPath or null;
+  dependencyArtifactOf = ctx.dependencyArtifactOf or (_: null);
   sharedNodeMods = ctx.nodeMods or null;
   labelsOf = L.labelsOf;
   nameOf = L.nameOf;
@@ -56,8 +61,11 @@ let
       lib.hasInfix "node-webapp." cmd ||
       lib.hasInfix "--attr \"node-webapp." cmd ||
       lib.hasInfix "--attr node-webapp." cmd;
+  isBundledCli = name:
+    let n = nodeOfName name;
+    in n != null && builtins.elem "node:cli-bundle" (labelsOf n);
   mkGenLike = import ./node-genlike.nix {
-    inherit pkgs H repoStoreRoot lockInfoOfName nodeOfName get srcsOf targetNameOf;
+    inherit pkgs H repoStoreRoot artifactToolsRoot declaredArtifactToolsRoot artifactToolsInput evaluationGraphPath dependencyArtifactOf lockInfoOfName nodeOfName get srcsOf targetNameOf;
   };
 in {
   isTarget = n:
@@ -79,7 +87,10 @@ in {
   };
   mkGen = name: mkGenLike { inherit name; kind = "gen"; };
   mkLib = name: mkGenLike { inherit name; kind = "lib"; };
-  mkBin = name: mkGenLike { inherit name; kind = "bin"; };
+  mkBin = name:
+    if isBundledCli name then import ./node-app.nix {
+      inherit pkgs H repoStoreRoot repoFsRoot sharedNodeMods lockInfoOfName targetNameOf name;
+    } else mkGenLike { inherit name; kind = "bin"; };
   mkWebapp = name: import ./node-webapp.nix {
     inherit pkgs H repoStoreRoot repoFsRoot viberootsRoot sharedNodeMods lockInfoOfName nodeOfName labelsOf name;
     frameworkMissingError =

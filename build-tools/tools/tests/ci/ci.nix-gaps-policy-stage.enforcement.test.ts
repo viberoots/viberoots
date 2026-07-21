@@ -23,7 +23,9 @@ test("ci run-stage wires nix-gaps policy gate with canonical docs paths", async 
       txt.includes("--nix-gaps") &&
       txt.includes("docs/handbook/nix-gaps.md") &&
       txt.includes("--exceptions") &&
-      txt.includes("docs/handbook/nix-gaps-exceptions.json"),
+      txt.includes("docs/handbook/nix-gaps-exceptions.json") &&
+      txt.includes("--command-site-policy") &&
+      txt.includes("docs/handbook/nix-command-site-policy.json"),
     "expected nix-gaps-policy stage to use canonical docs path flags",
   );
 });

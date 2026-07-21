@@ -1,30 +1,31 @@
 #!/usr/bin/env zx-wrapper
 import fs from "node:fs";
-import { spawn } from "node:child_process";
 import { performance } from "node:perf_hooks";
+import path from "node:path";
 import { getFlagBool, getFlagStr } from "../lib/cli";
+import {
+  buildCanonicalArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+} from "../lib/artifact-environment";
+import { artifactNixPolicyArgs } from "../lib/artifact-nix-policy";
+import { runBoundedArtifactCommand } from "../lib/artifact-command-runner";
+import { ensureNixStoreToolPathSync } from "../lib/tool-paths";
+import {
+  readMaterializationManifest,
+  redactCommand,
+  redactEndpoint,
+  redactMaterializationManifest,
+  type NixStoreMaterializationManifest,
+  type StorePathEntry,
+} from "./nix-store-materialization-manifest";
 
-export type StorePathEntry = {
-  attr: string;
-  path: string;
-  narHash?: string;
-  expectedOutputIdentity: string;
-};
-
-export type NixStoreMaterializationManifest = {
-  schemaVersion: "viberoots.nix-store-materialization.v1";
-  sourceRevision: string;
-  sourceSnapshot: string;
-  flakeLockFingerprint: string;
-  substituter: {
-    endpointIdentity?: string;
-    trustedPublicKeys: string[];
-  };
-  tools: {
-    nix: string;
-  };
-  storePaths: StorePathEntry[];
-};
+export {
+  parseMaterializationManifest,
+  readMaterializationManifest,
+  redactMaterializationManifest,
+  type NixStoreMaterializationManifest,
+  type StorePathEntry,
+} from "./nix-store-materialization-manifest";
 
 export type MaterializationReport = {
   path: string;
@@ -38,53 +39,11 @@ export type MaterializationReport = {
 
 type Runner = (command: string[]) => Promise<{ stdout: string; stderr: string }>;
 
-const SCHEMA = "viberoots.nix-store-materialization.v1";
-
-export function parseMaterializationManifest(input: unknown): NixStoreMaterializationManifest {
-  const data = input as Partial<NixStoreMaterializationManifest>;
-  if (data?.schemaVersion !== SCHEMA) throw new Error(`manifest schemaVersion must be ${SCHEMA}`);
-  requireString(data.sourceRevision, "sourceRevision");
-  requireStoreOrRelativePath(data.sourceSnapshot, "sourceSnapshot");
-  requireString(data.flakeLockFingerprint, "flakeLockFingerprint");
-  requireStorePath(data.tools?.nix, "tools.nix");
-  if (data.substituter?.endpointIdentity) {
-    requireString(data.substituter.endpointIdentity, "substituter.endpointIdentity");
-  }
-  if (!Array.isArray(data.substituter?.trustedPublicKeys)) {
-    throw new Error("substituter.trustedPublicKeys must be an array");
-  }
-  if (!Array.isArray(data.storePaths) || data.storePaths.length === 0) {
-    throw new Error("storePaths must list at least one required path");
-  }
-  for (const [index, entry] of data.storePaths.entries()) {
-    requireString(entry?.attr, `storePaths[${index}].attr`);
-    requireStorePath(entry?.path, `storePaths[${index}].path`);
-    requireString(entry?.expectedOutputIdentity, `storePaths[${index}].expectedOutputIdentity`);
-  }
-  return data as NixStoreMaterializationManifest;
-}
-
-export function readMaterializationManifest(file: string): NixStoreMaterializationManifest {
-  return parseMaterializationManifest(JSON.parse(fs.readFileSync(file, "utf8")));
-}
-
-export function redactMaterializationManifest(
-  manifest: NixStoreMaterializationManifest,
-): NixStoreMaterializationManifest {
-  return {
-    ...manifest,
-    substituter: {
-      endpointIdentity: redactEndpoint(manifest.substituter.endpointIdentity),
-      trustedPublicKeys: manifest.substituter.trustedPublicKeys.map((key) => redactKey(key)),
-    },
-  };
-}
-
 export function renderMaterializationCommand(
   manifest: NixStoreMaterializationManifest,
   entry: StorePathEntry,
+  nix = `${manifest.tools.nix}/bin/nix`,
 ): string[] {
-  const nix = `${manifest.tools.nix}/bin/nix`;
   if (manifest.substituter.endpointIdentity) {
     return [
       nix,
@@ -94,6 +53,7 @@ export function renderMaterializationCommand(
       "--option",
       "trusted-public-keys",
       manifest.substituter.trustedPublicKeys.join(" "),
+      ...artifactNixPolicyArgs(),
       entry.path,
     ];
   }
@@ -101,6 +61,7 @@ export function renderMaterializationCommand(
     nix,
     "build",
     `${manifest.sourceSnapshot}#${entry.attr}`,
+    ...artifactNixPolicyArgs(),
     "--no-link",
     "--print-out-paths",
   ];
@@ -108,13 +69,42 @@ export function renderMaterializationCommand(
 
 export async function materializeNixStorePaths(opts: {
   manifest: NixStoreMaterializationManifest;
+  artifactToolsRoot: string;
   dryRun?: boolean;
   runner?: Runner;
 }): Promise<MaterializationReport[]> {
-  const runner = opts.runner || defaultRunner;
+  if (!opts.artifactToolsRoot) {
+    throw new Error(
+      "materializeNixStorePaths requires an explicit artifactToolsRoot; the caller must resolve authority at the public boundary.",
+    );
+  }
+  const artifactEnv = buildCanonicalArtifactEnvironment(process.cwd(), {
+    artifactToolsRoot: opts.artifactToolsRoot,
+  });
+  const closureNix = path.join(String(artifactEnv.VBR_ARTIFACT_TOOLS_ROOT), "bin", "nix");
+  const nix = ensureNixStoreToolPathSync("nix", {
+    ...artifactEnv,
+    VBR_NIX_BIN: closureNix,
+    NIX_BIN: closureNix,
+  });
+  const declaredNix = path.join(opts.manifest.tools.nix, "bin", "nix");
+  let declaredNixReal: string;
+  let canonicalNixReal: string;
+  try {
+    declaredNixReal = fs.realpathSync(declaredNix);
+    canonicalNixReal = fs.realpathSync(nix);
+  } catch (error) {
+    throw new Error("materialization manifest Nix authority is unavailable", { cause: error });
+  }
+  if (declaredNixReal !== canonicalNixReal) {
+    throw new Error(
+      "materialization manifest Nix authority does not match the canonical tool closure",
+    );
+  }
+  const runner = opts.runner || ((command) => defaultRunner(command, artifactEnv));
   const reports: MaterializationReport[] = [];
   for (const entry of opts.manifest.storePaths) {
-    const command = renderMaterializationCommand(opts.manifest, entry);
+    const command = renderMaterializationCommand(opts.manifest, entry, nix);
     const started = performance.now();
     if (opts.dryRun) {
       reports.push(report(entry, opts.manifest, command, started, "dry-run"));
@@ -130,7 +120,7 @@ export async function materializeNixStorePaths(opts: {
       throw new Error(`materialized ${entry.attr} as ${realized}, expected ${entry.path}`);
     }
     if (!realized) {
-      const verify = await runner(pathInfoCommand(opts.manifest, entry));
+      const verify = await runner(pathInfoCommand(nix, entry));
       const present = verify.stdout
         .split(/\r?\n/)
         .map((line) => line.trim())
@@ -144,29 +134,24 @@ export async function materializeNixStorePaths(opts: {
   return reports;
 }
 
-function pathInfoCommand(
-  manifest: NixStoreMaterializationManifest,
-  entry: StorePathEntry,
-): string[] {
-  return [`${manifest.tools.nix}/bin/nix`, "path-info", entry.path];
+function pathInfoCommand(nix: string, entry: StorePathEntry): string[] {
+  return [nix, ...artifactNixPolicyArgs(), "path-info", entry.path];
 }
 
-async function defaultRunner(command: string[]): Promise<{ stdout: string; stderr: string }> {
-  return await new Promise((resolve, reject) => {
-    const child = spawn(command[0]!, command.slice(1), { stdio: "pipe" });
-    const stdout: Buffer[] = [];
-    const stderr: Buffer[] = [];
-    child.stdout.on("data", (chunk) => stdout.push(Buffer.from(chunk)));
-    child.stderr.on("data", (chunk) => stderr.push(Buffer.from(chunk)));
-    child.on("error", reject);
-    child.on("close", (code) => {
-      const output = {
-        stdout: Buffer.concat(stdout).toString("utf8"),
-        stderr: Buffer.concat(stderr).toString("utf8"),
-      };
-      code === 0 ? resolve(output) : reject(new Error(output.stderr || `nix exited ${code}`));
-    });
+async function defaultRunner(
+  command: string[],
+  env: NodeJS.ProcessEnv,
+): Promise<{ stdout: string; stderr: string }> {
+  const result = await runBoundedArtifactCommand({
+    command: command[0]!,
+    args: command.slice(1),
+    env,
+    timeoutMs: 600_000,
   });
+  if (result.exitCode !== 0 || result.timedOut || result.interrupted) {
+    throw new Error(result.stderr || `nix exited ${result.exitCode}`);
+  }
+  return { stdout: result.stdout, stderr: result.stderr };
 }
 
 function report(
@@ -187,41 +172,17 @@ function report(
   };
 }
 
-function requireString(value: unknown, name: string): void {
-  if (typeof value !== "string" || value.trim() === "") throw new Error(`${name} is required`);
-}
-
-function requireStorePath(value: unknown, name: string): void {
-  requireString(value, name);
-  if (!String(value).startsWith("/nix/store/"))
-    throw new Error(`${name} must be a /nix/store path`);
-}
-
-function requireStoreOrRelativePath(value: unknown, name: string): void {
-  requireString(value, name);
-  if (String(value).startsWith("http:") || String(value).startsWith("https:")) {
-    throw new Error(`${name} must be a declared local source snapshot`);
-  }
-}
-
-function redactEndpoint(endpoint: string): string {
-  if (!endpoint) return "";
-  return endpoint.replace(/\/\/([^/@]+)@/, "//<redacted>@");
-}
-
-function redactKey(key: string): string {
-  return key.replace(/:[A-Za-z0-9+/=._-]{8,}$/, ":<redacted>");
-}
-
-function redactCommand(command: string[]): string[] {
-  return command.map((part, index) =>
-    command[index - 1] === "--option" ? part : redactEndpoint(part),
-  );
-}
-
 if (import.meta.url === `file://${process.argv[1]}`) {
   const manifest = readMaterializationManifest(getFlagStr("manifest"));
-  const reports = await materializeNixStorePaths({ manifest, dryRun: getFlagBool("dry-run") });
+  const artifactToolsRoot = canonicalArtifactToolsRoot(
+    process.cwd(),
+    String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+  );
+  const reports = await materializeNixStorePaths({
+    manifest,
+    artifactToolsRoot,
+    dryRun: getFlagBool("dry-run"),
+  });
   process.stdout.write(
     `${JSON.stringify({ manifest: redactMaterializationManifest(manifest), reports }, null, 2)}\n`,
   );

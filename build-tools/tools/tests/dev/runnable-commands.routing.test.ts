@@ -4,6 +4,9 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { withoutArtifactEnvironmentInfluence } from "../../lib/artifact-environment";
+
+const fixtureRunner = "viberoots/build-tools/tools/tests/dev/run-runnable.fixture.ts";
 
 test("p routes to run.prod", async () => {
   await runInTemp("runnable-routes-prod", async (tmp, $) => {
@@ -40,10 +43,9 @@ test("p routes to run.prod", async () => {
       cwd: tmp,
       stdio: "pipe",
       env: {
-        ...process.env,
-        RUNNABLE_TEST_MANIFEST: manifestPath,
+        ...withoutArtifactEnvironmentInfluence(process.env),
       },
-    })`viberoots/build-tools/tools/bin/p //projects/apps/demo:demo`;
+    })`zx-wrapper ${fixtureRunner} --mode prod //projects/apps/demo:demo --fixture-manifest=${manifestPath}`;
     assert.match(String(stdout || ""), /prod-ok/);
   });
 });
@@ -92,11 +94,10 @@ test("d routes to run.dev and fails clearly when unavailable", async () => {
       cwd: tmp,
       stdio: "pipe",
       env: {
-        ...process.env,
+        ...withoutArtifactEnvironmentInfluence(process.env),
         PATH: `${stubBin}:${process.env.PATH || ""}`,
-        RUNNABLE_TEST_MANIFEST: manifestPath,
       },
-    })`viberoots/build-tools/tools/bin/d //projects/apps/web:web`;
+    })`zx-wrapper ${fixtureRunner} --mode dev //projects/apps/web:web --fixture-manifest=${manifestPath}`;
     assert.match(String(dev.stdout || ""), /dev-ok/);
 
     const noDevManifestPath = path.join(tmp, "buck-out", "tmp", "runnable.no-dev.manifest.json");
@@ -126,10 +127,9 @@ test("d routes to run.dev and fails clearly when unavailable", async () => {
       stdio: "pipe",
       nothrow: true,
       env: {
-        ...process.env,
-        RUNNABLE_TEST_MANIFEST: noDevManifestPath,
+        ...withoutArtifactEnvironmentInfluence(process.env),
       },
-    })`viberoots/build-tools/tools/bin/d //projects/apps/demo:demo`;
+    })`zx-wrapper ${fixtureRunner} --mode dev //projects/apps/demo:demo --fixture-manifest=${noDevManifestPath}`;
     assert.notEqual(missing.exitCode, 0);
     assert.match(String(missing.stderr || ""), /run\.dev is not available/);
 
@@ -148,10 +148,9 @@ test("d routes to run.dev and fails clearly when unavailable", async () => {
       stdio: "pipe",
       nothrow: true,
       env: {
-        ...process.env,
-        RUNNABLE_TEST_MANIFEST: libraryManifestPath,
+        ...withoutArtifactEnvironmentInfluence(process.env),
       },
-    })`viberoots/build-tools/tools/bin/p //projects/libs/core:core`;
+    })`zx-wrapper ${fixtureRunner} --mode prod //projects/libs/core:core --fixture-manifest=${libraryManifestPath}`;
     assert.notEqual(libraryRun.exitCode, 0);
     assert.match(String(libraryRun.stderr || ""), /library-only/);
   });
@@ -166,7 +165,7 @@ test("SSR runnable routes to canonical node prod and dev:ssr commands", async ()
     const clientDir = path.join(outPath, "dist", "client");
     await fsp.mkdir(path.dirname(serverEntry), { recursive: true });
     await fsp.mkdir(clientDir, { recursive: true });
-    await fsp.writeFile(serverEntry, "console.log('server');\n", "utf8");
+    await fsp.writeFile(serverEntry, `console.log('node-ok:' + process.argv[1]);\n`, "utf8");
     await fsp.writeFile(
       manifestPath,
       JSON.stringify(
@@ -179,9 +178,16 @@ test("SSR runnable routes to canonical node prod and dev:ssr commands", async ()
             runnable: {
               kind: "webapp-ssr",
               framework: "vite",
+              // SSR runnable contract requires argv[0] to be the literal
+              // interpreter name ("node" / "pnpm"); the runtime resolves it
+              // from PATH. Tests prepend stub-bin to PATH below.
               run: {
-                prod: { argv: ["node", serverEntry] },
-                dev: { argv: ["pnpm", "--dir", "projects/apps/ssr", "dev:ssr"] },
+                prod: {
+                  argv: ["node", serverEntry],
+                },
+                dev: {
+                  argv: ["pnpm", "--dir", "projects/apps/ssr", "dev:ssr"],
+                },
               },
               artifacts: { serverEntry, clientDir },
             },
@@ -205,11 +211,10 @@ test("SSR runnable routes to canonical node prod and dev:ssr commands", async ()
       cwd: tmp,
       stdio: "pipe",
       env: {
-        ...process.env,
+        ...withoutArtifactEnvironmentInfluence(process.env),
         PATH: `${stubBin}:${process.env.PATH || ""}`,
-        RUNNABLE_TEST_MANIFEST: manifestPath,
       },
-    })`viberoots/build-tools/tools/bin/p //projects/apps/ssr:app`;
+    })`zx-wrapper ${fixtureRunner} --mode prod //projects/apps/ssr:app --fixture-manifest=${manifestPath}`;
     assert.match(
       String(prod.stdout || ""),
       new RegExp(`node-ok:${serverEntry.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`),
@@ -219,11 +224,15 @@ test("SSR runnable routes to canonical node prod and dev:ssr commands", async ()
       cwd: tmp,
       stdio: "pipe",
       env: {
-        ...process.env,
+        ...withoutArtifactEnvironmentInfluence(process.env),
         PATH: `${stubBin}:${process.env.PATH || ""}`,
-        RUNNABLE_TEST_MANIFEST: manifestPath,
       },
-    })`viberoots/build-tools/tools/bin/d //projects/apps/ssr:app`;
+    })`zx-wrapper ${fixtureRunner} --mode dev //projects/apps/ssr:app --fixture-manifest=${manifestPath}`;
     assert.match(String(dev.stdout || ""), /pnpm-ok:--dir projects\/apps\/ssr dev:ssr/);
   });
+});
+
+test("public runnable entrypoint exposes no fixture manifest override", async () => {
+  const source = await fsp.readFile(new URL("../../dev/run-runnable.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(source, /(?:test|fixture)-manifest/);
 });

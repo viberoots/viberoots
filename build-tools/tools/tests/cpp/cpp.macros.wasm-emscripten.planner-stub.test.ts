@@ -16,18 +16,22 @@ function outputMessage(kind: string, out: string): string {
 test("nix_cpp_wasm_emscripten_lib: routes through cpp_nix_build with wasm labels", async () => {
   await runInTemp("cpp-wasm-emscripten-stub", async (tmp, $) => {
     // Minimal provider target and auto_map mapping to verify provider-edge realization.
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
-genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
-EOF'`;
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<'\''EOF'\''
-MODULE_PROVIDERS = {
-  "//projects/apps/demo:core_emscripten": ["//third_party/providers:prov"],
-}
-EOF'`;
+    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "third_party", "providers", "TARGETS"),
+      'genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])\n',
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(tmp, ".viberoots", "workspace", "providers", "auto_map.bzl"),
+      [
+        "MODULE_PROVIDERS = {",
+        '  "//projects/apps/demo:core_emscripten": ["//third_party/providers:prov"],',
+        "}",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
 
     const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "src"), { recursive: true });
@@ -170,9 +174,10 @@ EOF'`;
     const stampText = await fsp.readFile(stampAbs, "utf8");
     assert.ok(stampText.includes("build_log="), "expected emscripten stamp to expose build_log");
     assert.ok(stampText.includes("phase_log="), "expected emscripten stamp to expose phase_log");
-    assert.ok(
-      stampText.includes("selected_build_secs="),
-      "expected emscripten stamp to expose selected build timing",
+    assert.doesNotMatch(
+      stampText,
+      /(?:graph_export|selected_build|action_total)_secs=/,
+      "emscripten artifact stamps must not contain nondeterministic action timing",
     );
   });
 });

@@ -27,7 +27,10 @@ import { withInstallProgress } from "./progress";
 import { writeGlueFingerprint } from "./glue-freshness";
 import { checkBootstrapCompletion } from "../../lib/bootstrap-completion";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
-import { repairGeneratedWorkspaceLock } from "../../lib/workspace-lock-repair";
+import {
+  generatedWorkspaceViberootsAuthority,
+  repairGeneratedWorkspaceLock,
+} from "../../lib/workspace-lock-repair";
 import { envWithResolvedNixBin } from "../../lib/tool-paths";
 import { glueFingerprintFresh } from "./glue-freshness";
 import {
@@ -75,6 +78,32 @@ async function runGeneratedWorkspaceLockRepair(opts: {
     console.log(`[install-deps] workspace lock repair skipped: ${lockRepair.reason}`);
   } else if (opts.verbose && lockRepair.status === "fresh") {
     console.log(`[install-deps] workspace lock repair fresh (${opts.phase})`);
+  }
+}
+
+async function assertGeneratedWorkspaceLockReady(opts: {
+  repoRoot: string;
+  verbose: boolean;
+}): Promise<void> {
+  const authority = await generatedWorkspaceViberootsAuthority(opts.repoRoot);
+  if (authority.kind === "remote") return;
+  if (authority.kind !== "immutable") {
+    throw staleMetadataError(
+      ".viberoots/workspace/flake.lock",
+      "generated workspace viberoots input is not a coherent immutable source",
+    );
+  }
+  const lockState = await repairGeneratedWorkspaceLock({
+    workspaceRoot: opts.repoRoot,
+    dryRun: true,
+    verbose: opts.verbose,
+    deps: { viberootsSource: authority.source },
+  });
+  if (lockState.status === "would-repair") {
+    throw staleMetadataError(
+      ".viberoots/workspace/flake.lock",
+      "generated workspace viberoots lock input requires reconciliation",
+    );
   }
 }
 
@@ -202,7 +231,7 @@ try {
     process.env.BUCK_TEST_SRC = repoRoot;
   }
 } catch {}
-await ensureToolchainPathsFiles(repoRoot);
+await ensureToolchainPathsFiles(repoRoot, { refresh: metadataMode === "reconcile" });
 if (glueOnly) {
   if (verbose) console.log("[install-deps] glue-only mode");
   try {
@@ -227,15 +256,19 @@ if (glueOnly) {
   const glueOnlyImporters = await discoverImportersWithLock(repoRoot, { cwd: process.cwd() });
   await syncModuleContractsForWebapps(repoRoot, glueOnlyImporters, dryRun, verbose);
   if (!dryRun && shouldRunFinalWorkspaceLockRepair()) {
-    await withExclusiveInstallLock(
-      "workspace-lock-repair",
-      async () => {
-        await runGeneratedWorkspaceLockRepair({ repoRoot, dryRun, verbose, phase: "final" });
-      },
-      {
-        verbose: verbose || String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1",
-      },
-    );
+    if (readOnlyMetadata) {
+      await assertGeneratedWorkspaceLockReady({ repoRoot, verbose });
+    } else {
+      await withExclusiveInstallLock(
+        "workspace-lock-repair",
+        async () => {
+          await runGeneratedWorkspaceLockRepair({ repoRoot, dryRun, verbose, phase: "final" });
+        },
+        {
+          verbose: verbose || String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1",
+        },
+      );
+    }
   } else if (!dryRun && verbose) {
     console.log("[install-deps] final workspace lock repair skipped");
   }
@@ -267,17 +300,7 @@ if (dryRun) {
       }
       try {
         if (readOnlyMetadata) {
-          const lockState = await repairGeneratedWorkspaceLock({
-            workspaceRoot: repoRoot,
-            dryRun: true,
-            verbose,
-          });
-          if (lockState.status === "would-repair") {
-            throw staleMetadataError(
-              ".viberoots/workspace/flake.lock",
-              "generated workspace viberoots lock input requires reconciliation",
-            );
-          }
+          await assertGeneratedWorkspaceLockReady({ repoRoot, verbose });
         } else {
           await runGeneratedWorkspaceLockRepair({ repoRoot, dryRun, verbose, phase: "initial" });
         }

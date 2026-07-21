@@ -5,19 +5,30 @@ import { promisify } from "node:util";
 import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
 import { makeFilteredFlakeRef } from "../../dev/filtered-flake";
 import { findRepoRoot } from "../../lib/repo";
+import {
+  buildCanonicalArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+} from "../../lib/artifact-environment";
 
 let immutableInputPromise: Promise<string> | undefined;
 const execFileAsync = promisify(execFile);
 
 export async function immutableViberootsInput(viberootsRoot: string): Promise<string> {
   immutableInputPromise ??= (async () => {
+    const artifactToolsRoot = canonicalArtifactToolsRoot(
+      process.cwd(),
+      String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+    );
+    const env = buildCanonicalArtifactEnvironment(process.cwd(), { artifactToolsRoot });
     const filtered = await makeFilteredFlakeRef({
       workspaceRoot: viberootsRoot,
       attr: "viberoots",
       logPrefix: "[registry-extension]",
+      env,
+      selectorEnv: {},
     });
     try {
-      return (await materializeFilteredViberootsSource(filtered.workspaceRoot)).storePath;
+      return (await materializeFilteredViberootsSource(filtered.workspaceRoot, env)).storePath;
     } finally {
       await filtered.cleanup();
     }

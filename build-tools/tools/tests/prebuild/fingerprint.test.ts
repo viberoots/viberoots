@@ -43,7 +43,7 @@ test("prebuild fingerprint satisfies write-if-changed output freshness", async (
   });
 });
 
-test("prebuild fingerprint preserves generatedAt when proof content is unchanged", async () => {
+test("prebuild fingerprint is byte-identical when proof content is unchanged", async () => {
   await runInTemp("prebuild-fingerprint-no-churn", async (tmp) => {
     const { input, output } = await seedInputAndOutput(tmp);
     await writePrebuildFingerprint({ root: tmp, inputs: [input], outputs: [output] });
@@ -54,14 +54,11 @@ test("prebuild fingerprint preserves generatedAt when proof content is unchanged
       "buck",
       "prebuild-fingerprint.json",
     );
-    const before = JSON.parse(await fsp.readFile(fingerprint, "utf8"));
+    const before = await fsp.readFile(fingerprint, "utf8");
 
     await writePrebuildFingerprint({ root: tmp, inputs: [input], outputs: [output] });
-    const after = JSON.parse(await fsp.readFile(fingerprint, "utf8"));
-
-    assert.equal(after.generatedAt, before.generatedAt);
-    assert.deepEqual(after.inputs, before.inputs);
-    assert.deepEqual(after.outputs, before.outputs);
+    const after = await fsp.readFile(fingerprint, "utf8");
+    assert.equal(after, before);
   });
 });
 

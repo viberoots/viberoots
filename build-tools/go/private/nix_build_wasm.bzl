@@ -1,6 +1,7 @@
-load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_cmd_prefix")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_artifact_bash", "nix_cmd_prefix")
 load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
 load("@viberoots//build-tools/lang:remote_action_policy.bzl", "run_nix_action")
+load("@viberoots//build-tools/lang:nix_artifact_inputs.bzl", "nix_artifact_action_inputs", "with_nix_artifact_action_attrs")
 
 def _go_nix_build_wasm_impl(ctx):
     """
@@ -11,7 +12,6 @@ def _go_nix_build_wasm_impl(ctx):
     # Default to the graph-aware selected build path (build-selected.ts), which can consume
     # exported graph semantics (e.g. link_deps / link_closure). The minimal selected-wasm
     # path intentionally bypasses the exported graph and must be explicitly opted into.
-    build_prefix = "env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" " + ("BUCK_TARGET=\"%s\" " % raw)
     # Use a per-target stable log path so tests can assert the build path deterministically
     # without racing on a single global /tmp file across concurrent builds.
     #
@@ -33,29 +33,20 @@ def _go_nix_build_wasm_impl(ctx):
         "DEST=\"$0\"; case \"$DEST\" in /*) ;; *) DEST=\"$PWD/$DEST\" ;; esac; "
         + nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
         + safe_log_path_prefix
-        + "if [ \"${USE_SELECTED_WASM:-0}\" = \"1\" ]; then "
-        + nix_build_out_path_cmd(
-            "\"path:$FLK_ROOT#graph-generator-selected-wasm\"",
-            timeout_var = "TIMEOUT",
-            impure = True,
-            build_prefix = build_prefix,
-            graph_target = raw,
-        )
-        + "else "
         + nix_action_build_selected_out_path_cmd(
             target_label = raw,
             out_var = "outPath",
             raw_var = "OUT_RAW",
             status_var = "NIX_STATUS",
             log_file = "$BUILD_SELECTED_LOG",
-            zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
+            attr = "graph-generator-selected-wasm" if ctx.attrs.use_selected_wasm else "graph-generator-selected",
+            graph_json_arg = "$1",
         )
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then "
         + "  if [ -f \"$BUILD_SELECTED_LOG\" ]; then cat \"$BUILD_SELECTED_LOG\" >&2; fi; "
         + "  if [ \"$NIX_STATUS\" -ne 0 ]; then exit \"$NIX_STATUS\"; fi; "
         + "  echo \"go_nix_build_wasm (%s): build-selected produced no output path\" >&2; " % raw
         + "  exit 2; "
-        + "fi; "
         + "fi; "
         + "test -n \"$outPath\"; "
         + (
@@ -71,18 +62,21 @@ def _go_nix_build_wasm_impl(ctx):
         + "cp -f \"$outPath/%s\" \"$DEST\"; " % expected_rel
     )
     out = ctx.actions.declare_output(ctx.attrs.out)
+    declared_inputs = nix_artifact_action_inputs(ctx)
     cmd = cmd_args([
-        "bash",
+        nix_artifact_bash(),
         "-c",
-        "USE_SELECTED_WASM=%s; %s" % ("1" if ctx.attrs.use_selected_wasm else "0", run_and_copy),
+        run_and_copy,
         out.as_output(),
-    ], hidden = ctx.attrs.srcs + ctx.attrs.nix_inputs)
-    policy_info = run_nix_action(ctx, cmd, category = "go_nix_build_wasm")
+        ctx.attrs._graph_json,
+        declared_inputs,
+    ], hidden = declared_inputs)
+    policy_info = run_nix_action(ctx, cmd, category = "go_nix_build_wasm", declared_inputs = declared_inputs)
     return [DefaultInfo(default_output = out)] + policy_info
 
 go_nix_build_wasm = rule(
     impl = _go_nix_build_wasm_impl,
-    attrs = {
+    attrs = with_nix_artifact_action_attrs({
         "self_label": attrs.string(),
         "out": attrs.string(),
         "expected_rel": attrs.string(default = "lib/top.wasm"),
@@ -96,5 +90,5 @@ go_nix_build_wasm = rule(
         "srcs": attrs.list(attrs.source(), default = []),
         "nix_inputs": attrs.list(attrs.source(), default = []),
         "labels": attrs.list(attrs.string(), default = []),
-    },
+    }),
 )

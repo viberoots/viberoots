@@ -3,6 +3,10 @@ load("@viberoots//build-tools/node:defs.bzl", "nix_node_cli_bin")
 nix_node_cli_bin(
     name = "{{ name }}_cli",
     bundle = True,
-    deps = ["//projects/libs/{{ name }}-wasm-inline:wasm_inline"],
+    deps = [
+        "//projects/libs/{{ name }}-wasm-inline:package.json",
+        "//projects/libs/{{ name }}-wasm-inline:wasm_inline",
+        "//projects/libs/{{ name }}-wasm-inline:wasm_inline_cpp",
+        "//projects/libs/{{ name }}-wasm-inline:wasm_inline_py",
+    ],
 )
-

@@ -351,6 +351,9 @@ Prevent ambient host state from affecting bundle evaluation, Buck actions, or Ni
 
 - Apply one mode-aware environment allowlist to `b`, Buck, Nix, CI, and remote execution; isolate
   home/temp/config roots and reject artifact selectors outside the bundle.
+- Remove trusted devshell session inputs before canonical TypeScript admission, and restore caller
+  compiler, language, and package selectors that differ from the trusted baseline so admission
+  rejects them; neither class may enter bundle, derivation, or runtime environments.
 - Reject unknown artifact-affecting variables in CI, strip harmless unknowns locally, fail local
   known-selector injection, and use a smaller declared transport allowlist remotely.
 - Declare/store-qualify Buck action shells and tools, including copy/materialization tools; retain
@@ -374,6 +377,30 @@ canary host-file and network reads; fixed-output hash success/failure; local/rem
 parity; direct-action and supported-platform enforcement tests. Every rejection must provide a
 tested remediation diagnostic, and policy must come from the effective daemon/builder rather than
 client environment text.
+
+### 4.5. De-risking protocol
+
+- Before editing production behavior, inventory every artifact executor, environment builder, Buck
+  action tool, CI and remote boundary, sandbox and builder policy reader, and network-capable path.
+  Add structural coverage that fails when a new entrypoint bypasses the canonical authorities.
+- Implement and validate five authority checkpoints in order: environment policy, store-qualified
+  tools, declared Buck inputs, effective sandbox/builder/substituter policy, and derivation
+  network/fixed-output policy. Freeze the source between checkpoints and do not carry an unexplained
+  failure into the next authority.
+- Run the hostile-environment matrix across every supported artifact language and mixed-language
+  build. Separately prove that live `d` workflows keep their intended working-tree behavior without
+  leaking that environment or source authority into artifact builds.
+- Build conservative affected-target unions for every shared authority change, including indirect
+  language, runnable, temp-repository, CI, publication, and remote-execution consumers. Record cold
+  and identical warm timing, disk, Nix-path, source/bundle identity, process, capture, and cleanup
+  evidence; unchanged warm inputs must add no source or bundle identity.
+- Require separate material reviews for environment/tool authority, sandbox/network policy, and
+  overall scope/guardrail compliance. Reviewers should report substantive bypasses or missing
+  evidence rather than stylistic or wording preferences.
+- Escalate to `i && b && ALL_TESTS=1 v` within PR-4 when a shared environment, tool, graph, sandbox,
+  network, or remote-execution change cannot be bounded by a meaningfully smaller affected union, or
+  when that union approaches the complete validation inventory. Do not carry unbounded uncertainty
+  into PR-5 merely because PR-5 is the scheduled final checkpoint.
 
 ### 5. Docs to be added or updated
 
@@ -414,26 +441,67 @@ bypassing it.
 ### 2. Scope of changes
 
 - Add independent-checkout/builder evidence comparison for representative Go, Node, Python, C++,
-  WebAssembly, and mixed artifacts, including forced rebuilds and stable warm identities.
+  WebAssembly, and mixed artifacts on every supported Nix system represented by release builders,
+  including forced rebuilds and stable warm identities.
+- Close and enforce the artifact-entrypoint inventory. Every artifact-producing CLI, Buck macro,
+  Nix invocation, CI stage, remote executor, cache publisher, and deployment admission path must be
+  classified under the canonical source, bundle, tool, environment, sandbox, network, and
+  publication authorities. Inventory or command-site drift fails until its classification and
+  policy digest are reviewed.
+- Add structural enforcement that rejects known escape routes: direct artifact construction outside
+  canonical macros and entrypoints, unapproved `--impure`, raw live-worktree inputs, host-tool
+  fallback, ambient selector transport, automatic network lock regeneration, and publication of
+  local-development bundles.
 - Gate release, cache, provenance, and deployment admission on hermetic classification and matching
-  evidence. Extend language scaffolding/onboarding policy checks with the bundle and tool contracts.
+  evidence. Provenance must bind revision, immutable source, evaluation bundle, declared graph,
+  dependency/lock authority, tool closure, Nix system, derivation, output, and NAR identities.
+- Extend language scaffolding/onboarding policy checks and documentation with required source roles,
+  dependency reconciliation, immutable bundle inputs, store-qualified toolchains, selector
+  transport, sandbox/network behavior, remote execution, publication admission, and reproducibility
+  tests. A new language cannot graduate with an unclassified artifact route.
 - Enable the public hermetic-build claim only after all gates pass.
 
 ### 3. External prerequisites
 
 Two independent same-system builder executions from separate checkouts under different absolute
-paths, plus reviewed release evidence storage.
+paths for each supported release-builder Nix system, plus reviewed release evidence storage.
 
 ### 4. Tests to be added
 
-Compare derivation, output, and NAR identities across paths, forced rebuilds, and hostile environments.
-Require evidence fields for revision, bundle digest, system, derivation path, output path, and NAR
-hash; test tampering, missing proof, non-release rejection, stable warm source/fixed-output identities,
-and new-language policy fixtures.
+Compare derivation, output, and NAR identities across paths, forced rebuilds, hostile environments,
+and supported release-builder systems. Require evidence fields for revision, immutable source digest,
+bundle digest, declared graph digest, dependency/lock identity, tool-closure identity, system,
+derivation path, output path, and NAR hash. Test tampering, missing proof, non-release rejection,
+stable warm source/bundle/fixed-output identities, and new-language policy fixtures.
+
+Add inventory freshness tests that fail for an unclassified artifact-producing command or direct Nix
+route. Add negative structural and runtime tests for the known escape patterns above. Rotate the
+representative forced-rebuild matrix over time while keeping at least one artifact from every
+supported language and mixed-language family in the mandatory PR-5 checkpoint.
+
+### 4.5. De-risking protocol
+
+- Freeze source between each independent-builder pair and archive the exact revision, inventory,
+  policy, builder, timing, disk, process, cleanup, and identity evidence. A comparison with source or
+  policy edits between executions is invalid.
+- Run cold and identical warm comparisons. Unchanged warm inputs must create no new immutable source
+  or evaluation-bundle identity; attribute every other new Nix path by owning role before accepting
+  it.
+- Exercise publication admission only with evidence emitted by the canonical build path. Handwritten,
+  stale, cross-system, mismatched-toolchain, or local-development evidence must fail closed.
+- Require independent reviews of entrypoint/inventory completeness, cross-builder reproducibility,
+  publication/provenance admission, language onboarding, and overall hermetic scope. Reviewers should
+  identify material bypasses or missing proof rather than stylistic preferences.
+- Do not introduce a new tracing framework, macro architecture, or CI platform merely to strengthen
+  the final claim. If the exhaustive assessment identifies a necessary guard that cannot reuse the
+  existing authorities, record an implementation finding and extend the active PR range rather than
+  weakening PR-5 acceptance.
 
 ### 5. Docs to be added or updated
 
-Update build claims, CI/release runbooks, language-adding guidance, evidence interpretation, and backout.
+Update build claims, CI/release runbooks, language-adding guidance, evidence interpretation, and
+backout. Document the closed artifact-route inventory and the required review when shared macros,
+source selection, canonical environments, Nix builders, or publication boundaries change.
 
 ### 5.5. Expected regression scope
 
@@ -441,17 +509,31 @@ All artifact languages, release/cache/provenance workflows, deployments, scaffol
 
 ### 6. Acceptance criteria
 
-Representative independent same-system builders produce matching outputs; protected publication
-requires valid evidence; new languages cannot graduate without enforcement;
-`i && b && ALL_TESTS=1 v` passes within guardrails.
+For every supported release-builder Nix system, representative independent same-system builders
+produce matching derivation, output, and NAR identities, and forced rebuilds are byte-equivalent.
+The artifact-entrypoint inventory is complete and freshness-enforced; known escape routes fail
+structurally or at admission; identical warm runs add no source or evaluation-bundle identity;
+protected publication requires valid provenance bound to the reviewed source, graph, dependency,
+tool, platform, derivation, and output authorities; new languages cannot graduate without the full
+contract; `i && b && ALL_TESTS=1 v` passes within guardrails.
+
+The end-of-range plan and design assessments must independently validate the complete hermetic-build
+claim across every supported build family and artifact entrypoint. They must trace immutable source
+and dependency inputs, ambient selector and environment rejection, store-qualified tools, effective
+sandbox/builder/substituter and network policy, independent same-system output identity, publication
+admission, live-`d` separation, tracked-state mutation boundaries, and bounded disk/process/cleanup
+evidence. A representative sample or the presence of implementation files is not sufficient; any
+unclassified or unproven build path is an implementation finding that extends the active PR range.
 
 ### 7. Risks
 
-Builder drift may create false mismatches, while narrow fixtures may miss nondeterministic artifacts.
+Builder drift may create false mismatches, narrow fixtures may miss nondeterministic artifacts, and
+an incomplete entrypoint inventory may leave an unreviewed bypass outside the evidence matrix.
 
 ### 8. Mitigations
 
-Pin builder policy, compare structured evidence, retain failing outputs, and expand by artifact class.
+Pin builder policy, compare structured evidence, retain failing outputs, rotate reproducibility
+samples, and fail closed on inventory drift or unclassified artifact routes.
 
 ### 9. Consequences of not implementing this PR
 

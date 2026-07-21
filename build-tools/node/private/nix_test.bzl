@@ -1,5 +1,5 @@
 load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_calling_env_export_source_snapshot", "nix_timeout_wrapper_var")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_artifact_bash", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_calling_env_export_buck_graph_json", "nix_calling_env_export_source_snapshot", "nix_declared_action_inputs_manifest_cmd", "nix_declared_action_transport_args", "nix_timeout_wrapper_var")
 load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "stamp_remote_readiness_labels", "write_nix_test_stamp")
 load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
@@ -43,11 +43,14 @@ def _node_nix_test_impl(ctx):
     run_cmd = (
         # Skip unified pnpm prewarm at bootstrap; we'll do it only if tests exist
         "export VBR_SKIP_REQUIRE_UNIFIED_PNPM_STORE=1; "
-        + "WORKSPACE_ROOT_ENV_ARG=\"${1:-}\"; "
+        + "GRAPH_ARG=\"${1:-}\"; WORKSPACE_ROOT_ENV_ARG=\"${2:-}\"; "
         + "if [ -n \"$WORKSPACE_ROOT_ENV_ARG\" ] && [ -f \"$WORKSPACE_ROOT_ENV_ARG\" ]; then . \"$WORKSPACE_ROOT_ENV_ARG\" 2>/dev/null || true; fi; "
-        + nix_calling_env_export_source_snapshot(snapshot_root = "${2:-}", manifest_path = "${3:-}")
+        + nix_calling_env_export_source_snapshot(snapshot_root = "${3:-}", manifest_path = "${4:-}")
         + nix_bootstrap_env_core()
+        + nix_declared_action_inputs_manifest_cmd()
+        + nix_calling_env_export_buck_graph_json(graph_json_path = "$GRAPH_ARG")
         + ("".join(env_pairs))
+        + "COVERAGE_ARG=\"\"; case \"${COVERAGE:-}\" in \"\"|0) ;; 1) COVERAGE_ARG=--coverage ;; *) echo 'node_nix_test: COVERAGE must be empty, 0, or 1' >&2; exit 2 ;; esac; unset COVERAGE; "
         + ("export TEST_NIX_TIMEOUT_SECS=\"%d\"; " % (tout if tout > 0 else 1800))
         + ("export NIX_PNPM_FETCH_TIMEOUT=\"%d\"; " % (tout if tout > 0 else 1800))
         + ("export NIX_PNPM_INSTALL_TIMEOUT=\"%d\"; " % (tout if tout > 0 else 1800))
@@ -66,7 +69,9 @@ def _node_nix_test_impl(ctx):
         + "JOBS_FLAG=\"\"; if [ -n \"$NIX_MAXJ\" ] && [ \"$NIX_MAXJ\" != \"0\" ]; then JOBS_FLAG=\"--max-jobs $NIX_MAXJ\"; fi; "
         + "CORES_FLAG=\"\"; if [ -n \"$NIX_CORES\" ] && [ \"$NIX_CORES\" != \"0\" ]; then CORES_FLAG=\"--option cores $NIX_CORES\"; fi; "
         + ("echo '[node_nix_test] phase=nix-build target=%s importer=%s attr=%s timeout='$TOUT's' >&2; " % (target_label, imp, imp_attr))
-        + ("node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$VIBEROOTS_ROOT/build-tools/tools/dev/command-heartbeat.ts\" --prefix \"[node_nix_test]\" --label \"target=%s importer=%s step=nix-build attr=%s\" --cwd \"$FLK_ROOT\" --timeout-ms $(( TOUT * 1000 )) --no-output-warn-sec 60 -- node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr \"node-test.%s\"; " % (target_label, imp, imp_attr, imp_attr))
+        + ("node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$VIBEROOTS_ROOT/build-tools/tools/dev/command-heartbeat.ts\" --prefix \"[node_nix_test]\" --label \"target=%s importer=%s step=nix-build attr=%s\" --cwd \"$FLK_ROOT\" --timeout-ms $(( TOUT * 1000 )) --no-output-warn-sec 60 -- node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr \"node-test.%s\" --target \"%s\" --buck-action-inputs \"$VBR_BUCK_INPUTS\" " % (target_label, imp, imp_attr, imp_attr, target_label))
+        + nix_declared_action_transport_args()
+        + " $COVERAGE_ARG $VBR_DEV_OVERRIDE_ARG; "
     )
 
     # Declare a tiny deterministic output so builds have an artifact
@@ -78,6 +83,7 @@ def _node_nix_test_impl(ctx):
         snapshot_inputs.append(ctx.attrs.source_snapshot)
     if ctx.attrs.source_snapshot_manifest != None:
         snapshot_inputs.append(ctx.attrs.source_snapshot_manifest)
+    snapshot_args = [ctx.attrs.source_snapshot or "", ctx.attrs.source_snapshot_manifest or ""]
     snapshot_labels = []
     if ctx.attrs.source_snapshot != None and ctx.attrs.source_snapshot_manifest != None:
         snapshot_labels = ["source-snapshot:declared-root", "source-snapshot:manifest", "source-snapshot:graph"]
@@ -94,7 +100,7 @@ def _node_nix_test_impl(ctx):
     ]
     command = external_runner_command(
         labels,
-        ["bash", "-c", run_cmd, "node_nix_test", ctx.attrs._workspace_root_env] + snapshot_inputs,
+        [nix_artifact_bash(), "-c", run_cmd, "node_nix_test", ctx.attrs._graph_json, ctx.attrs._workspace_root_env] + snapshot_args + declared_inputs,
         remote_command = remote_command,
         declared_inputs = declared_inputs,
         required_inputs = [

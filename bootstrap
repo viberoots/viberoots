@@ -1360,7 +1360,7 @@ repair: run viberoots update
 EOF
     exit 1
   fi
-  local required_inputs=(".buckroot" ".buckconfig" ".envrc" ".gitignore")
+  local required_inputs=(".buckroot" ".buckconfig" ".envrc" ".gitignore" "projects/config/TARGETS" "projects/config/node-modules.hashes.json")
   local rel
   for rel in "${required_inputs[@]}"; do
     if ! git -C "${workspace_root}" ls-files --error-unmatch -- "${rel}" >/dev/null 2>&1 ||

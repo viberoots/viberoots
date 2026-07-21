@@ -11,6 +11,12 @@ const remoteEnv = {
   VBR_REMOTE_EXEC_MODE: "hybrid",
   VBR_REMOTE_EXEC_SYSTEM: "x86_64-linux",
   VBR_REMOTE_TEST_ACTIVATION_DIR: "/tmp/vbr-remote/activation",
+  VBR_REMOTE_CI_TOOLS: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-remote-ci-tools",
+  VBR_REMOTE_BUILDER_URI: "ssh-ng://builder",
+  VBR_REMOTE_PROBE_FLAKE: "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-probe-flake",
+  VBR_REMOTE_BUILDER_IDENTITY: "builder",
+  VBR_REMOTE_REVIEWED_BUILDERS:
+    "/nix/store/cccccccccccccccccccccccccccccccc-reviewed-builders/registry.json",
 };
 
 class VerifyExit extends Error {
@@ -90,6 +96,7 @@ function fakeRunVerifyDeps(calls: string[]): Partial<RunVerifyDeps> {
     prewarmVerifyOnce: async () => calls.push("prewarm"),
     recordNixGcPreflight: async () => {},
     repoRoot: () => "/tmp/repo",
+    resolveArtifactToolsRoot: () => "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-artifact-tools",
     runStartupCheck: async () => calls.push("startup"),
     setupLocalVerifyWorkspace: async () => {
       calls.push("setup-local-workspace");

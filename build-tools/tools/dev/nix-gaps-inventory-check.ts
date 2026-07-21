@@ -12,6 +12,7 @@ import {
   parseNixGapsInventory,
   parseNodeClassificationTableMacros,
   parseNonBuildInventoryMacros,
+  parsePublicStarlarkDefs,
   publicNodeDefsBzlPath,
   parseStarlarkIndexMacros,
   parseStarlarkIndexMacrosByModule,
@@ -19,8 +20,13 @@ import {
   type NixGapsException,
 } from "./nix-gaps-inventory-check-lib";
 import { enforceNodeImplementationRouteChecks } from "./nix-gaps-inventory-node-routes";
+import {
+  enforceProductionCommandSiteInventory,
+  type CommandSiteInventoryPolicy,
+} from "./nix-gaps-command-sites";
 
 const defaultExceptionsPath = "docs/handbook/nix-gaps-exceptions.json";
+const defaultCommandSitePolicyPath = "docs/handbook/nix-command-site-policy.json";
 
 async function sourceRoot(): Promise<string> {
   const envRoot = String(
@@ -51,10 +57,17 @@ async function main() {
     source,
     getFlagStr("exceptions", defaultExceptionsPath),
   );
+  const commandSitePolicyPath = await sourceOwnedPath(
+    source,
+    getFlagStr("command-site-policy", defaultCommandSitePolicyPath),
+  );
 
   const starlarkTxt = await fs.readFile(starlarkPath, "utf8");
   const inventoryTxt = await fs.readFile(inventoryPath, "utf8");
   const exceptionsJson = await fs.readJson(exceptionsPath);
+  const commandSitePolicy = (await fs.readJson(
+    commandSitePolicyPath,
+  )) as CommandSiteInventoryPolicy;
   const exceptionListRaw = Array.isArray(exceptionsJson?.exceptions)
     ? exceptionsJson.exceptions
     : [];
@@ -63,9 +76,23 @@ async function main() {
     ? exceptionsJson.artifactRouteAllowlist
     : [];
   const artifactRouteAllowlist = artifactRouteAllowlistRaw as ArtifactRouteAllowlistEntry[];
-
   const starlarkMacros = parseStarlarkIndexMacros(starlarkTxt);
   const starlarkByModule = parseStarlarkIndexMacrosByModule(starlarkTxt);
+  for (const [moduleLabel, documented] of Object.entries(starlarkByModule)) {
+    if (!moduleLabel.includes("//build-tools/") || !moduleLabel.endsWith(":defs.bzl")) continue;
+    const rel = moduleLabel
+      .replace(/^@viberoots\/\//, "")
+      .replace(/^\/\//, "")
+      .replace(":", "/");
+    const sourceText = await fs.readFile(path.join(source, rel), "utf8");
+    const actual = parsePublicStarlarkDefs(sourceText);
+    const missingFromIndex = actual.filter((name) => !documented.includes(name));
+    if (missingFromIndex.length > 0) {
+      throw new Error(
+        `Starlark Index is missing public definitions from ${moduleLabel}: ${missingFromIndex.join(", ")}`,
+      );
+    }
+  }
   const nodePublicMacros =
     starlarkByModule[publicNodeDefsBzlPath] || starlarkByModule[nodeDefsBzlPath] || [];
   const inventoryMacros = parseNixGapsInventory(inventoryTxt);
@@ -200,6 +227,10 @@ async function main() {
     hasNodeImplementationFiles,
     nixRouteDetailsByMacro,
   });
+  const commandSiteRoleCounts = await enforceProductionCommandSiteInventory(
+    source,
+    commandSitePolicy,
+  );
 
   if (extra.length > 0) {
     console.warn("Extra macros in nix-gaps inventory (not in starlark index):");
@@ -207,7 +238,7 @@ async function main() {
   }
 
   console.log(
-    `nix-gaps inventory OK (${starlarkMacros.length} public macros, ${inventoryMacros.length} inventory entries, ${nodePublicMacros.length} Node classifications)`,
+    `nix-gaps inventory OK (${starlarkMacros.length} public macros, ${inventoryMacros.length} inventory entries, ${nodePublicMacros.length} Node classifications, command sites ${JSON.stringify(commandSiteRoleCounts)})`,
   );
 }
 

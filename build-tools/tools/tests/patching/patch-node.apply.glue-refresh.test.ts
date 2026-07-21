@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 test("patch-node apply runs glue and writes provider targets deterministically", async () => {
   await runInTemp("patch-node-apply", async (tmp, $) => {
@@ -30,9 +31,10 @@ test("patch-node apply runs glue and writes provider targets deterministically",
       { encoding: "utf8" },
     );
     await $`chmod +x ${mockPnpm}`;
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
 
     const env = {
-      ...process.env,
+      ...graphEnv,
       PATH: `${mockBin}:${process.env.PATH || ""}`,
       PNPM_BIN: mockPnpm,
       ZX_INIT: path.join(tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),

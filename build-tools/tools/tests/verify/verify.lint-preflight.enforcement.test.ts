@@ -59,7 +59,9 @@ test("verify includes a bounded lint preflight (enforcement)", async () => {
       txt.includes("--nix-gaps") &&
       txt.includes("docs/handbook/nix-gaps.md") &&
       txt.includes("--exceptions") &&
-      txt.includes("docs/handbook/nix-gaps-exceptions.json"),
+      txt.includes("docs/handbook/nix-gaps-exceptions.json") &&
+      txt.includes("--command-site-policy") &&
+      txt.includes("docs/handbook/nix-command-site-policy.json"),
     "expected verify preflight to invoke nix-gaps policy checker with canonical docs paths",
   );
 });

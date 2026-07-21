@@ -10,7 +10,7 @@ import {
   ownerPidFromEphemeralIsolation,
   tryTempRepoRootFromBuckDaemonCwd,
 } from "../../dev/verify/buck-orphan-cleanup-lib";
-import { buckIsolationProcessPidsFromLines } from "../../dev/verify/process-control";
+import { buckIsolationProcessPidsFromLines } from "../../lib/buck-isolation-processes";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 async function readRepoFile(relativePath: string): Promise<string> {

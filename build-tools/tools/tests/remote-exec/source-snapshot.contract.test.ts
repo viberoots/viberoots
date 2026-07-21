@@ -168,7 +168,7 @@ test("source_snapshot action uses declared zx-wrapper runner without flake or ha
 
   assert.match(
     command,
-    /cmd = \[[^,\]]*build-tools\/tools\/dev\/__source-snapshot-zx-wrapper__\/source-snapshot-zx-wrapper, --import, \.\/[^,\]]*build-tools\/tools\/dev\/__zx-init\.mjs__\/zx-init\.mjs, \.\/[^,\]]*build-tools\/tools\/dev\/__source-snapshot\.ts__\/source-snapshot\.ts,/,
+    /cmd = \[[^,\]]*build-tools\/tools\/dev\/__source-snapshot-zx-wrapper__\/source-snapshot-zx-wrapper, --preserve-symlinks, --preserve-symlinks-main, --import, \.\/[^,\]]*build-tools\/tools\/dev\/__zx-init\.mjs__\/zx-init\.mjs, \.\/[^,\]]*source-snapshot-runner\.modules\/source-snapshot\.ts,/,
   );
   assert.doesNotMatch(command, /nix, run|path:\.#zx-wrapper/);
   assert.doesNotMatch(command, /cmd = \[[^,\]]*source-snapshot\.ts,/);
@@ -190,6 +190,18 @@ test("source_snapshot runtime is a declared Buck tool output", async () => {
   );
 
   assert.match(actions, /identifier = source-snapshot-zx-wrapper,\s+kind = write,/);
+  assert.match(
+    actions,
+    /category = symlinked_dir,\s+identifier = source-snapshot-runner\.modules,\s+kind = symlinkeddir,/,
+  );
+  for (const moduleName of [
+    "source-snapshot.ts",
+    "source-snapshot-graph.ts",
+    "source-snapshot-policy.ts",
+  ]) {
+    assert.match(actions, new RegExp(moduleName.replaceAll(".", "\\.")));
+  }
+  assert.doesNotMatch(actions, /tools\/dev\/__runtime_ts__|tools\/lib\/__runtime_ts__/);
   assert.match(actions, /\/nix\/store\/[^,\n]+-zx-wrapper\/bin\/zx-wrapper/);
   assert.match(
     actions,

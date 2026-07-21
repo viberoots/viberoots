@@ -35,10 +35,10 @@
   - `node --import ./viberoots/build-tools/tools/dev/zx-init.mjs --experimental-strip-types viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`
   - Or: `node --import ./viberoots/build-tools/tools/dev/zx-init.mjs --experimental-strip-types viberoots/build-tools/tools/dev/install-deps.ts --glue-only`
 - In CI, run dedicated stages before build/test:
-  - `viberoots/build-tools/tools/ci/run-stage.ts --stage export-graph`
-  - `viberoots/build-tools/tools/ci/run-stage.ts --stage sync-providers`
-  - `viberoots/build-tools/tools/ci/run-stage.ts --stage gen-auto-map`
-  - `viberoots/build-tools/tools/ci/run-stage.ts --stage prebuild-guard`
+  - `viberoots/build-tools/tools/ci/run-stage.sh --stage export-graph`
+  - `viberoots/build-tools/tools/ci/run-stage.sh --stage sync-providers`
+  - `viberoots/build-tools/tools/ci/run-stage.sh --stage gen-auto-map`
+  - `viberoots/build-tools/tools/ci/run-stage.sh --stage prebuild-guard`
 
 ## Local generated-state bloat
 

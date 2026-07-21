@@ -7,6 +7,7 @@ import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
 } from "../lib/test-helpers/git-stage";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 // Verify that the nix_node_test external runner propagates test failures to Buck (non-zero).
 const TEST_TIMEOUT_MS =
@@ -71,6 +72,7 @@ test(
         "",
       ].join("\n");
       await fsp.writeFile(path.join(tmp, importer, "src", "failing.test.ts"), failingTest, "utf8");
+      const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
 
       // Nix flakes read sources from git-tracked files; ensure the injected failing test and TARGETS
       // are visible to the flake evaluation inside the external runner.
@@ -96,12 +98,22 @@ test(
       const res = await $({
         cwd: tmp,
         stdio: "pipe",
+        env: graphEnv,
       })`buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit`.nothrow();
       if (res.exitCode === 0) {
         console.error("[debug] buck2 exitCode=", res.exitCode);
         if (res.stdout) console.error("[debug] buck2 stdout:\n" + res.stdout);
         if (res.stderr) console.error("[debug] buck2 stderr:\n" + res.stderr);
         throw new Error("expected buck2 test to fail when importer tests fail");
+      }
+      const failureEvidence = `${String(res.stdout || "")}\n${String(res.stderr || "")}`;
+      if (
+        !/failing\.test\.ts/i.test(failureEvidence) ||
+        !/expected true to be false/i.test(failureEvidence)
+      ) {
+        throw new Error(
+          `nix_node_test failed before reaching the intended Vitest assertion:\n${failureEvidence}`,
+        );
       }
     });
   },

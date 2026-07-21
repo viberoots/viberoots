@@ -10,6 +10,8 @@ test("nix_node_cli_bin(bundle=True) includes global Nix inputs as genrule srcs (
     const dir = path.join(tmp, "projects", "apps", "cli");
     await fsp.mkdir(path.join(dir, "src"), { recursive: true });
     await fsp.writeFile(path.join(dir, "src", "index.ts"), "console.log('cli')\n", "utf8");
+    await fsp.writeFile(path.join(dir, "package.json"), '{"name":"cli"}\n', "utf8");
+    await fsp.writeFile(path.join(dir, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n", "utf8");
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
@@ -38,9 +40,19 @@ test("nix_node_cli_bin(bundle=True) includes global Nix inputs as genrule srcs (
       "expected //.viberoots/workspace:flake.lock to be present in srcs via global_nix_inputs()",
     );
     assert.ok(
+      raw.includes("//projects/config:node-modules.hashes.json"),
+      "expected the canonical committed pnpm hash authority in srcs via global_nix_inputs()",
+    );
+    assert.ok(
       raw.includes("__global_nix_inputs__"),
       "expected dict-shaped srcs to include synthetic keys for global inputs",
     );
+    for (const relative of ["src/index.ts", "package.json", "pnpm-lock.yaml"]) {
+      assert.ok(
+        raw.includes(`projects/apps/cli/${relative}`),
+        `expected importer-layout action input for ${relative}`,
+      );
+    }
 
     const labelsProbe = await $({
       cwd: tmp,

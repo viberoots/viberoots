@@ -5,6 +5,7 @@ import path from "node:path";
 import type { NixosSharedHostDeployment } from "../../deployments/contract";
 import { LOCAL_FIXTURE_SERVICE_ENV } from "../../deployments/deployment-service-transport-policy";
 import { resolveDeploymentFromTarget } from "../../deployments/deployment-query";
+import { reconcileSyntheticDeploymentGraph } from "./deployment-graph.fixture";
 import { writeReviewedLaneAdmissionEvidenceJson } from "./deployment-lane-governance.fixture";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 import { createNixosSharedHostInstallFixture } from "./nixos-shared-host.install.fixture";
@@ -165,6 +166,7 @@ export async function installReviewedSampleWebappTargets(tmp: string): Promise<v
     ].join("\n"),
     "utf8",
   );
+  await reconcileSyntheticDeploymentGraph(tmp);
 }
 
 export async function requireServiceAuthForSampleWebapp(tmp: string): Promise<void> {

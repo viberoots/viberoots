@@ -18,7 +18,9 @@ test("dev-build fresh-prebuild fast path is before glue refresh", async () => {
     "[dev-build] fast-path: skipping glue/materialize (${materializeDecision.reason})",
   );
   const materializeGateIndex = source.indexOf("if (!isCI && materialize) {");
-  const glueRefreshIndex = source.indexOf("await refreshGlueAndExportGraph(root);");
+  const glueRefreshIndex = source.indexOf(
+    "await refreshGlueAndExportGraph(root, artifactToolsRoot);",
+  );
 
   assert.notEqual(decisionIndex, -1, "dev-build must compute the materialize policy");
   assert.notEqual(fastPathIndex, -1, "dev-build must log the fresh-prebuild fast path");

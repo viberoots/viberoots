@@ -1,6 +1,8 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
+import path from "node:path";
 import type { SourcePlanEvidence } from "../lib/source-plan-evidence";
+import { buildArtifactEnvironment } from "../lib/artifact-environment";
 
 export type CacheBackendKind = "none" | "nix-copy" | "attic" | "cachix";
 
@@ -89,7 +91,7 @@ export function manifestStorePaths(manifest: CacheManifest): string[] {
 }
 
 export function renderPublisherCommand(manifest: CacheManifest, destination: string): string[] {
-  assertNoSecret("cache destination", destination);
+  assertCacheDestination(destination);
   const paths = manifestStorePaths(manifest);
   if (manifest.backend === "none") return [];
   if (manifest.backend === "nix-copy") return ["nix", "copy", "--to", destination, ...paths];
@@ -101,6 +103,25 @@ export function renderPublisherCommand(manifest: CacheManifest, destination: str
     return [executable, "push", destination, ...paths];
   }
   return [];
+}
+
+function assertCacheDestination(destination: string): void {
+  assertNoSecret("cache destination", destination);
+  if (!destination) return;
+  let parsed: URL;
+  try {
+    parsed = new URL(destination);
+  } catch {
+    return;
+  }
+  if (parsed.password) {
+    throw new Error("cache destination must not contain credential material");
+  }
+  for (const key of parsed.searchParams.keys()) {
+    if (/(?:auth|credential|password|secret|signature|token|access[-_]?key)/iu.test(key)) {
+      throw new Error("cache destination must not contain credential material");
+    }
+  }
 }
 
 export function discoverCacheAttrs(packageNames: string[]): string[] {
@@ -121,12 +142,17 @@ export function remoteCiToolsPathEnv(
   remoteCiTools: string,
   baseEnv: NodeJS.ProcessEnv = process.env,
 ): NodeJS.ProcessEnv {
-  if (!remoteCiTools) return baseEnv;
+  if (!remoteCiTools) {
+    throw new Error("remote-ci-tools is required for a remote artifact environment");
+  }
   assertStorePath(remoteCiTools);
-  return {
-    ...baseEnv,
-    PATH: `${remoteCiTools}/bin`,
-  };
+  return buildArtifactEnvironment({
+    baseEnv: { ...baseEnv, PATH: `${remoteCiTools}/bin` },
+    mode: "remote",
+    stateRoot: path.join(process.cwd(), "buck-out", "tmp", "remote-artifact-environment"),
+    workspaceRoot: process.cwd(),
+    artifactToolsRoot: remoteCiTools,
+  });
 }
 
 export function writeManifest(path: string, manifest: CacheManifest): void {

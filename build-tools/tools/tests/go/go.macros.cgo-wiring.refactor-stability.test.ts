@@ -1,6 +1,8 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 function firstCqueryNode<T>(json: unknown): T | null {
@@ -18,12 +20,16 @@ function firstCqueryNode<T>(json: unknown): T | null {
 
 test("go macros: CGO wiring + tuple labels + provider edges remain stable after refactor", async () => {
   await runInTemp("go-cgo-wiring-refactor-stability", async (tmp, $) => {
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
-genrule(name="nix_pkgs_zlib", out="nix_pkgs_zlib.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
-genrule(name="extra_provider", out="extra_provider.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
-EOF'`;
+    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "third_party", "providers", "TARGETS"),
+      [
+        'genrule(name="nix_pkgs_zlib", out="nix_pkgs_zlib.stamp", cmd=": > $OUT", visibility=["PUBLIC"])',
+        'genrule(name="extra_provider", out="extra_provider.stamp", cmd=": > $OUT", visibility=["PUBLIC"])',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
 
     await $({
       cwd: tmp,

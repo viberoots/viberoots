@@ -16,7 +16,6 @@ type FingerprintEntry = {
 
 type PrebuildFingerprint = {
   schema: number;
-  generatedAt: string;
   inputs: FingerprintEntry[];
   outputs: string[];
 };
@@ -76,7 +75,6 @@ function readFingerprint(fingerprintPath: string): PrebuildFingerprint | null {
     if (!Array.isArray(parsed.inputs) || !Array.isArray(parsed.outputs)) return null;
     return {
       schema: parsed.schema,
-      generatedAt: String(parsed.generatedAt || ""),
       inputs: parsed.inputs.map((entry: any) => ({
         path: String(entry?.path || ""),
         hash: String(entry?.hash || ""),
@@ -86,13 +84,6 @@ function readFingerprint(fingerprintPath: string): PrebuildFingerprint | null {
   } catch {
     return null;
   }
-}
-
-function sameEntries(a: FingerprintEntry[], b: FingerprintEntry[]): boolean {
-  return (
-    a.length === b.length &&
-    a.every((entry, index) => entry.path === b[index]?.path && entry.hash === b[index]?.hash)
-  );
 }
 
 export async function writePrebuildFingerprint(opts: {
@@ -111,15 +102,9 @@ export async function writePrebuildFingerprint(opts: {
   if (!hashedInputs) {
     throw new Error("cannot write prebuild fingerprint: unable to hash discovered inputs");
   }
-  const previous = readFingerprint(fingerprintPath);
   const outputs = normalizeList(root, opts.outputs);
-  const generatedAt =
-    previous && sameEntries(previous.inputs, hashedInputs) && sameList(previous.outputs, outputs)
-      ? previous.generatedAt
-      : new Date().toISOString();
   const record: PrebuildFingerprint = {
     schema: FINGERPRINT_SCHEMA,
-    generatedAt,
     inputs: hashedInputs,
     outputs,
   };

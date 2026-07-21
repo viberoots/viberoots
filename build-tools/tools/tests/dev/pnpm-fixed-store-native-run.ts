@@ -147,8 +147,9 @@ export function diskUsageCommand(
   target: string,
   platform: NodeJS.Platform = process.platform,
 ): { command: string; args: string[] } {
-  // Coreutils df reports APFS container-wide usage. Apple's df reports the requested volume.
-  return { command: platform === "darwin" ? "/bin/df" : "df", args: ["-k", target] };
+  return platform === "darwin"
+    ? { command: "/bin/df", args: ["-Pk", target] }
+    : { command: "df", args: ["-k", target] };
 }
 
 export function parseDfUsedKib(output: string): number {
@@ -156,9 +157,26 @@ export function parseDfUsedKib(output: string): number {
   return parseNonnegativeKib(fields[2], "df");
 }
 
+export function parseDiskutilUsedKib(output: string): number {
+  const match = output.match(/<key>CapacityInUse<\/key>\s*<integer>(\d+)<\/integer>/);
+  const bytes = parseNonnegativeKib(match?.[1], "diskutil");
+  return Math.ceil(bytes / 1024);
+}
+
+export function parseDfDevice(output: string): string {
+  const device = output.trim().split("\n").at(-1)?.trim().split(/\s+/)[0];
+  if (!device?.startsWith("/dev/")) {
+    throw new Error("df did not emit a device path");
+  }
+  return device;
+}
+
 async function diskUsedKib(target: string): Promise<number> {
   const invocation = diskUsageCommand(target);
-  return parseDfUsedKib(await shellOutput(invocation.command, invocation.args));
+  const output = await shellOutput(invocation.command, invocation.args);
+  if (process.platform !== "darwin") return parseDfUsedKib(output);
+  const device = parseDfDevice(output);
+  return parseDiskutilUsedKib(await shellOutput("/usr/sbin/diskutil", ["info", "-plist", device]));
 }
 
 export function parseNonnegativeKib(value: string | undefined, command: string): number {

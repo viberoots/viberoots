@@ -20,6 +20,7 @@ export {
   exportGraphInTemp,
   runBuildSelected,
 } from "./test-helpers/selected-build";
+export { publicBuildOutPath, runPublicBuild } from "./test-helpers/public-build";
 
 const ownedBuckIsolations = new Map<string, string>();
 let buckIsolationCleanupRegistered = false;

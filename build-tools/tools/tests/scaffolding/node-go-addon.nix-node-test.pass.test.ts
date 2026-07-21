@@ -2,7 +2,8 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { exists, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { exists, runInTemp } from "../lib/test-helpers";
+import { exportGraphInTemp, runFilteredFlakeAttr } from "../lib/test-helpers/selected-build";
 import { viberootsDevTool } from "./lib/viberoots-tools";
 
 // Ensure dev env tooling when spawning Buck/Nix inside temp repos
@@ -24,14 +25,7 @@ test(
     }
     try {
       await runInTemp("node-go-addon-nix-node-test", async (tmp, _$) => {
-        const $ = _$;
-        const rawTimeoutSecs = Number(
-          process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200",
-        );
-        // This zx_test action has a hard Buck-side timeout (currently 15 minutes). Keep the
-        // internal nix build timeout comfortably below that so we fail deterministically rather
-        // than being SIGKILL'd (which can strand nix-daemon builders).
-        const TIMEOUT_SECS = String(Math.min(rawTimeoutSecs, 14 * 60));
+        const $ = _$({ cwd: tmp, stdio: "pipe" });
         const NIX_PNPM_FETCH_TIMEOUT = String(Number(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"));
         const env = {
           ...process.env,
@@ -66,10 +60,6 @@ test(
         await $`bash --noprofile --norc -c 'git -C ${tmp} config user.email test@example.com && git -C ${tmp} config user.name test && git -C ${tmp} add -A && git -C ${tmp} commit -m scaffold'`.nothrow();
 
         const importer = "projects/libs/demo";
-        const sanitized = importer
-          .replace(/\/\//g, "")
-          .replace(/:/g, "-")
-          .replace(/[\/\s]+/g, "-");
         const lockfile = path.join(importer, "pnpm-lock.yaml");
 
         // Align fixed-output hash for the importer before building node-test.
@@ -79,22 +69,14 @@ test(
         })`zx-wrapper ${viberootsDevTool("update-pnpm-hash.ts")} --lockfile ${lockfile}`;
 
         // Build the importer's Node tests; the builder links the Go c-archive into the addon
-        const testOut = await (async () => {
-          const mj = String(process.env.NIX_MAX_JOBS || "0");
-          const cr = String(process.env.NIX_CORES || "0");
-          const flags = [
-            mj && mj !== "0" ? `--max-jobs ${mj}` : "",
-            cr && cr !== "0" ? `--option cores ${cr}` : "",
-          ]
-            .filter(Boolean)
-            .join(" ");
-          const flakeRef = await workspaceFlakeRef(tmp);
-          const cmd = `set -euo pipefail; timeout ${TIMEOUT_SECS}s nix build "path:${flakeRef}#node-test.${sanitized}" -L --impure --no-link --accept-flake-config --builders "" --print-out-paths ${flags}`;
-          return await $({
-            stdio: "pipe",
-            env,
-          })`bash --noprofile --norc -c ${cmd}`;
-        })();
+        await exportGraphInTemp({ tmp, $, env });
+        const testOut = await runFilteredFlakeAttr({
+          tmp,
+          $,
+          target: "//projects/libs/demo:unit",
+          attr: "node-test.projects-libs-demo",
+          env,
+        });
         const outPath =
           String(testOut.stdout || "")
             .trim()

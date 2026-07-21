@@ -6,75 +6,10 @@ import { runInTemp } from "../lib/test-helpers";
 // E2E: partial-clone discovery & build in a sparse workspace.
 
 test("partial clone: discover and build scaffolded lib via //...", async () => {
-  // Avoid dev env export path
   await runInTemp("partial-clone-discover", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
-    const T = Number(process.env.TEST_CMD_TIMEOUT_S || "300");
-    await $`bash --noprofile --norc -c ${`set -euo pipefail
-      printf '.\n' > .buckroot
-      test -f flake.lock || printf "{}\n" > flake.lock
-      cat > TARGETS <<'EOF'
-load("@prelude//:rules.bzl", "export_file")
-
-platform(
-    name = "no_cgo",
-    constraint_values = [
-        "config//go/constraints:cgo_enabled_false",
-        "config//go/constraints:asan_false",
-        "config//go/constraints:race_false",
-    ],
-    visibility = ["PUBLIC"],
-)
-
-export_file(
-    name = "flake.lock",
-    src = "flake.lock",
-    visibility = ["PUBLIC"],
-)
-EOF
-      cat > .buckconfig <<'EOF'
-[buildfile]
-name = TARGETS
-
-[repositories]
-root = .
-prelude = ./.viberoots/current/prelude
-viberoots = ./.viberoots/current
-workspace_buck = ./.viberoots/workspace/buck
-workspace_providers = ./.viberoots/workspace/providers
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./.viberoots/current/prelude/third-party/fbsource_stub
-fbcode = ./.viberoots/current/prelude/third-party/fbcode_stub
-config = ./.viberoots/current/prelude
-
-[cells]
-root = .
-prelude = ./.viberoots/current/prelude
-viberoots = ./.viberoots/current
-workspace_buck = ./.viberoots/workspace/buck
-workspace_providers = ./.viberoots/workspace/providers
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./.viberoots/current/prelude/third-party/fbsource_stub
-fbcode = ./.viberoots/current/prelude/third-party/fbcode_stub
-config = ./.viberoots/current/prelude
-
-[build]
-prelude = prelude
-default_platform = //:no_cgo
-user_platform = //:no_cgo
-target_platforms = //:no_cgo
-EOF
-      mkdir -p toolchains .viberoots/workspace/buck .viberoots/workspace/providers
-      ln -sfn ../viberoots .viberoots/current
-      printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
-      printf '[buildfile]\nname = TARGETS\n' > .viberoots/workspace/buck/.buckconfig
-      printf '[buildfile]\nname = TARGETS\n' > .viberoots/workspace/providers/.buckconfig
-    `}`;
-
-    // The test harness already rsyncs a minimal repo (excludes libs), writes .buckconfig and prelude.
-    // We only need to ensure shared glue scripts exist (copied from repo root if missing) and scaffold a package.
+    // The harness owns Buck cells, the immutable viberoots source, and generated workspace state.
+    // This fixture only adds the sparse files needed for discovery and scaffolding.
 
     const repoRoot = process.env.WORKSPACE_ROOT || process.cwd();
     async function ensureFile(rel: string) {

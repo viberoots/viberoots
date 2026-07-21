@@ -60,7 +60,7 @@ test("bundle fields are the normal graph selector authority", async () => {
   assert.match(goWasm, /backend = wasmBackend/);
   assert.doesNotMatch(goWasm, /getEnv "WEB_WASM_BACKEND"/);
   assert.match(context, /bundleRoot \+ "\/\$\{relative\}"/);
-  assert.match(systemContext, /repoRoot \+ "\/projects\/node-modules\.hashes\.json"/);
+  assert.match(systemContext, /repoRoot \+ "\/projects\/config\/node-modules\.hashes\.json"/);
   assert.match(systemContext, /allowLiveHashMap = evaluationBundle == null/);
 });
 

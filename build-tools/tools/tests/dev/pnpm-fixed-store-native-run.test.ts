@@ -6,7 +6,9 @@ import { test } from "node:test";
 import {
   diskUsageCommand,
   NATIVE_PNPM_COMMAND_TIMEOUT_MS,
+  parseDfDevice,
   parseDfUsedKib,
+  parseDiskutilUsedKib,
   parseNonnegativeKib,
   runGuardedCommand,
 } from "./pnpm-fixed-store-native-run";
@@ -26,12 +28,26 @@ test("disk guard measurements fail closed on malformed size output", () => {
   assert.throws(() => parseNonnegativeKib("not-a-size", "du"), /nonnegative KiB value/);
   assert.throws(() => parseNonnegativeKib(undefined, "df"), /nonnegative KiB value/);
   assert.throws(() => parseDfUsedKib("not df output"), /nonnegative KiB value/);
+  assert.equal(
+    parseDiskutilUsedKib(
+      "<plist><dict><key>CapacityInUse</key><integer>2097153</integer></dict></plist>",
+    ),
+    2049,
+  );
+  assert.throws(() => parseDiskutilUsedKib("not plist output"), /nonnegative KiB value/);
+  assert.equal(
+    parseDfDevice(
+      "Filesystem 1024-blocks Used Available Capacity Mounted on\n/dev/disk3s7 9 7 2 78% /nix",
+    ),
+    "/dev/disk3s7",
+  );
+  assert.throws(() => parseDfDevice("not df output"), /device path/);
 });
 
-test("disk guard samples the requested APFS volume with Apple's df", () => {
+test("disk guard samples the requested APFS volume with structured diskutil output", () => {
   assert.deepEqual(diskUsageCommand("/nix", "darwin"), {
     command: "/bin/df",
-    args: ["-k", "/nix"],
+    args: ["-Pk", "/nix"],
   });
   assert.deepEqual(diskUsageCommand("/nix", "linux"), {
     command: "df",

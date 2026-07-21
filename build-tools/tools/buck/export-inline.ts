@@ -3,11 +3,12 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagBool, getFlagList, getFlagStr } from "../lib/cli";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
-import { getImporterRootsContract } from "../lib/importer-roots";
+import { artifactGraphQueryRoots } from "./artifact-graph-query-roots";
 import { normalizeTargetLabel } from "../lib/labels";
 import { resolveWorkspaceRootSync } from "../lib/repo";
 import { normalizeNixpkgPins, normalizeNixpkgsProfile } from "./source-selection";
 import { DEPLOYMENT_CQUERY_ATTRS } from "../deployments/deployment-query-attrs";
+import { canonicalWorkspaceGraphOutput } from "./exporter/cquery/nodes";
 
 type InlineExportOptions = {
   workspaceRoot: string;
@@ -16,6 +17,8 @@ type InlineExportOptions = {
   roots?: string[];
   includeTargetPlatforms?: boolean;
   normalizeLabels?: boolean;
+  env?: NodeJS.ProcessEnv;
+  buck2Bin?: string;
 };
 
 function buildAttrs(): string[] {
@@ -57,11 +60,14 @@ function buildAttrs(): string[] {
   );
 }
 
-function buildIsolationArgs(): { isoArgs: string[]; useIso: boolean; iso: string } {
-  const parentIso =
-    (process.env.BUCK_ISOLATION_DIR_EXPORTER || process.env.BUCK_ISOLATION_DIR || "")?.trim() || "";
+function buildIsolationArgs(env: NodeJS.ProcessEnv = process.env): {
+  isoArgs: string[];
+  useIso: boolean;
+  iso: string;
+} {
+  const parentIso = (env.BUCK_ISOLATION_DIR_EXPORTER || env.BUCK_ISOLATION_DIR || "")?.trim() || "";
   const iso = parentIso ? `${parentIso}__exporter-${process.pid}` : `exporter-${process.pid}`;
-  const useIso = process.env.BUCK_NO_ISOLATION !== "1";
+  const useIso = env.BUCK_NO_ISOLATION !== "1";
   const isoArgs = useIso ? ["--isolation-dir", iso] : [];
   return { isoArgs, useIso, iso };
 }
@@ -80,7 +86,7 @@ function buildQuery(opts: { target?: string; roots: string[] }): string {
 export function buildInlinePlan(options: InlineExportOptions) {
   const attrs = buildAttrs();
   const flags = attrs.flatMap((a) => ["--output-attribute", a]);
-  const { isoArgs, useIso, iso } = buildIsolationArgs();
+  const { isoArgs, useIso, iso } = buildIsolationArgs(options.env);
   const platformFlags = options.includeTargetPlatforms
     ? ["--target-platforms", "prelude//platforms:default"]
     : [];
@@ -100,11 +106,14 @@ export function buildInlinePlan(options: InlineExportOptions) {
 
 export async function exportInlineGraph(opts: InlineExportOptions): Promise<void> {
   const plan = buildInlinePlan(opts);
+  const buck2Bin = opts.buck2Bin || "buck2";
+  const env = opts.env || process.env;
   await fsp.mkdir(path.dirname(opts.outPath), { recursive: true }).catch(() => {});
   const res = await $({
     cwd: opts.workspaceRoot,
     stdio: "pipe",
-  })`buck2 ${plan.isoArgs} cquery ${plan.platformFlags} ${plan.query} --json ${plan.flags}`.nothrow();
+    env,
+  })`${buck2Bin} ${plan.isoArgs} cquery ${plan.platformFlags} ${plan.query} --json ${plan.flags}`.nothrow();
   const stdout = String(res.stdout || "");
   const parsed: Record<string, any> = (() => {
     try {
@@ -138,6 +147,7 @@ export async function exportInlineGraph(opts: InlineExportOptions): Promise<void
     merged.push({
       ...a,
       name,
+      out: canonicalWorkspaceGraphOutput(nameRaw, a["out"]),
       rule_type: ruleType || a["rule_type"] || "",
       deps: deps || a["deps"] || [],
       labels: Array.from(new Set(labelsArr || [])),
@@ -153,7 +163,7 @@ export async function exportInlineGraph(opts: InlineExportOptions): Promise<void
   await fsp.rename(tmp, opts.outPath);
   if (plan.useIso) {
     // lint: allow-hardcoded-buck-isolation: inline export owns and kills its selected isolation
-    await $({ stdio: "pipe" })`buck2 --isolation-dir ${plan.iso} kill`.nothrow();
+    await $({ stdio: "pipe", env })`${buck2Bin} --isolation-dir ${plan.iso} kill`.nothrow();
   }
 }
 
@@ -163,8 +173,7 @@ export async function runFromCLI(): Promise<void> {
   const targetRaw = getFlagStr("target", "");
   const target = targetRaw ? normalizeTargetLabel(targetRaw) : "";
   const rootsList = getFlagList("roots");
-  const importerRoots = getImporterRootsContract().workspaceRoots;
-  const defaultRoots = Array.from(new Set([...importerRoots, "go", "cpp", "third_party"]));
+  const defaultRoots = artifactGraphQueryRoots();
   const envRoots = String(process.env.BUCK_QUERY_ROOTS || "").trim();
   const roots = rootsList.length
     ? rootsList

@@ -4,6 +4,7 @@ import path from "node:path";
 import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 import { VIBEROOTS_CURRENT_REL, VIBEROOTS_WORKSPACE_REL, resolveWorkspaceRootSync } from "./repo";
 import { remoteSourcePath } from "./workspace-remote-source";
+import { inferBootstrapConsumerModeSync } from "./consumer-source-mode-detect";
 
 export type ActivationResult = {
   workspaceRoot: string;
@@ -19,21 +20,6 @@ type ActivationOptions = {
   sourcePath?: string;
   shellEntry?: boolean;
 };
-
-function flakeUsesLocalViberoots(workspaceRoot: string): boolean {
-  for (const flakePath of [
-    path.join(workspaceRoot, ".viberoots", "workspace", "flake.nix"),
-    path.join(workspaceRoot, "flake.nix"),
-  ]) {
-    try {
-      const text = fs.readFileSync(flakePath, "utf8");
-      if (/viberoots\.url\s*=\s*"(?:path|git\+file):(?:\.\.\/\.\.\/|\.\/)viberoots"/.test(text)) {
-        return true;
-      }
-    } catch {}
-  }
-  return false;
-}
 
 function requireFile(filePath: string, message: string): void {
   if (!fs.existsSync(filePath)) throw new Error(message);
@@ -55,7 +41,9 @@ function isGeneratedRemoteSourceLinkTarget(target: string): boolean {
 
 function chooseSource(workspaceRoot: string, opts: ActivationOptions): string {
   if (opts.sourcePath) return path.resolve(workspaceRoot, opts.sourcePath);
-  if (flakeUsesLocalViberoots(workspaceRoot)) return path.join(workspaceRoot, "viberoots");
+  if (inferBootstrapConsumerModeSync(workspaceRoot) === "submodule") {
+    return path.join(workspaceRoot, "viberoots");
+  }
   const remotePath = remoteSourcePath(workspaceRoot);
   if (remotePath) return remotePath;
   const envRoot = (opts.env?.VIBEROOTS_ROOT || "").trim();
@@ -161,13 +149,59 @@ async function ensureWorkspaceBuckStateLink(workspaceRoot: string): Promise<void
   const linkTarget = "../buck";
   await mkdirWithMacosMetadataExclusion(realDir);
   await mkdirWithMacosMetadataExclusion(path.dirname(linkPath));
+
+  const migrateEntry = async (source: string, destination: string): Promise<void> => {
+    const sourceStat = await fsp.lstat(source);
+    const destinationStat = await fsp.lstat(destination).catch(() => null);
+    if (!destinationStat) {
+      await fsp.rename(source, destination);
+      return;
+    }
+    if (sourceStat.isDirectory() && destinationStat.isDirectory()) {
+      for (const name of await fsp.readdir(source)) {
+        await migrateEntry(path.join(source, name), path.join(destination, name));
+      }
+      await fsp.rmdir(source);
+      return;
+    }
+    if (sourceStat.isFile() && destinationStat.isFile()) {
+      const [sourceBytes, destinationBytes] = await Promise.all([
+        fsp.readFile(source),
+        fsp.readFile(destination),
+      ]);
+      if (sourceBytes.equals(destinationBytes)) {
+        await fsp.unlink(source);
+        return;
+      }
+    }
+    if (sourceStat.isSymbolicLink() && destinationStat.isSymbolicLink()) {
+      const [sourceTarget, destinationTarget] = await Promise.all([
+        fsp.readlink(source),
+        fsp.readlink(destination),
+      ]);
+      if (sourceTarget === destinationTarget) {
+        await fsp.unlink(source);
+        return;
+      }
+    }
+    throw new Error(
+      `workspace Buck state migration refuses to overwrite conflicting path: ${destination}`,
+    );
+  };
+
   try {
     const stat = await fsp.lstat(linkPath);
     if (stat.isSymbolicLink()) {
       if ((await fsp.readlink(linkPath)) === linkTarget) return;
       await fsp.unlink(linkPath);
     } else {
-      await fsp.rm(linkPath, { recursive: true, force: true });
+      if (!stat.isDirectory()) {
+        throw new Error(`workspace Buck state path is not a directory: ${linkPath}`);
+      }
+      for (const name of await fsp.readdir(linkPath)) {
+        await migrateEntry(path.join(linkPath, name), path.join(realDir, name));
+      }
+      await fsp.rmdir(linkPath);
     }
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;

@@ -1,21 +1,23 @@
 #!/usr/bin/env zx-wrapper
 import * as crypto from "node:crypto";
-import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { nixBuilderPolicyShellArgs } from "../lib/nix-builder-policy";
-import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
+import { resolveToolPathSync } from "../lib/tool-paths";
+import {
+  canonicalArtifactToolsRoot,
+  buildCanonicalArtifactEnvironment,
+} from "../lib/artifact-environment";
 import { buildToolPath } from "./dev-build/paths";
+import { inspectWorkspaceArtifactSource } from "./artifact-policy-inspection";
+import { makeFilteredFlakeRef } from "./filtered-flake";
 import {
   findNearestImporterLock,
-  flakeRefForImporter,
   nodeModulesAttr,
   normalizeImporter,
-  pnpmStoreAttr,
   sanitizeName,
 } from "./install/common";
-import { currentPnpmStoreDerivationIdentity } from "./update-pnpm-hash/build-flake";
 import {
   currentVerifiedMarkerFingerprintCandidates,
   currentVerifiedMarkerFingerprint,
@@ -149,44 +151,6 @@ try {
   );
   process.exit(2);
 }
-const workspaceFlakeRoot = path.join(flakeRoot, ".viberoots", "workspace");
-const flakeRef = await fsp
-  .access(path.join(workspaceFlakeRoot, "flake.nix"))
-  .then(() => `path:${workspaceFlakeRoot}`)
-  .catch(() => flakeRoot);
-function activeViberootsRoot(): string {
-  const candidates = [
-    process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "",
-    path.join(repoRoot, "viberoots"),
-    path.join(repoRoot, ".viberoots", "current"),
-    process.env.VIBEROOTS_SOURCE_ROOT || "",
-    process.env.VIBEROOTS_ROOT || "",
-  ]
-    .map((candidate) => String(candidate || "").trim())
-    .filter(Boolean);
-  for (const candidate of candidates) {
-    const abs = path.resolve(candidate);
-    try {
-      if (
-        fs.existsSync(path.join(abs, "flake.nix")) &&
-        fs.existsSync(path.join(abs, "build-tools", "tools", "dev", "zx-init.mjs"))
-      ) {
-        return abs;
-      }
-    } catch {}
-  }
-  return "";
-}
-const activeViberootsSourceRoot = activeViberootsRoot();
-const viberootsOverrideArgs = activeViberootsSourceRoot
-  ? ["--override-input", "viberoots", `path:${activeViberootsSourceRoot}`]
-  : [];
-const nixWorkspaceEnv = envWithResolvedNixBin({
-  ...process.env,
-  WORKSPACE_ROOT: repoRoot,
-  ...(activeViberootsSourceRoot ? { VIBEROOTS_SOURCE_ROOT: activeViberootsSourceRoot } : {}),
-});
-
 function liveMarkerRepoRoot(): string {
   const liveRoot = String(process.env.REPO_ROOT || "").trim();
   if (liveRoot && path.isAbsolute(liveRoot)) return path.resolve(liveRoot);
@@ -196,7 +160,7 @@ function liveMarkerRepoRoot(): string {
 async function readHashForLock(lockfileRel: string): Promise<string> {
   const hashFiles = [
     buildToolPath(flakeRoot, "tools/nix/node-modules.hashes.json"),
-    path.join(flakeRoot, "projects", "node-modules.hashes.json"),
+    path.join(flakeRoot, "projects", "config", "node-modules.hashes.json"),
   ];
   let found = "";
   for (const hashFile of hashFiles) {
@@ -229,13 +193,40 @@ async function hasFreshVerifiedMarker(lockfileRel: string, hashKey: string): Pro
     (marker.builderFingerprint === builderFingerprint ||
       acceptedBuilderFingerprints.includes(marker.builderFingerprint));
   if (!metadataMatches) return false;
-  const derivationIdentity = await currentPnpmStoreDerivationIdentity({
+  return true;
+}
+
+async function withNodeModulesEvaluationBundle<T>(
+  fn: (flakeRef: string, env: NodeJS.ProcessEnv) => Promise<T>,
+): Promise<T> {
+  const artifactToolsRoot = canonicalArtifactToolsRoot(
     repoRoot,
-    importer,
-    baseFlakeRef: flakeRefForImporter(repoRoot, importer),
-    attrPath: pnpmStoreAttr(importer),
+    String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+  );
+  const artifactEnv = buildCanonicalArtifactEnvironment(repoRoot, { artifactToolsRoot });
+  const targetPackages = importer === "." ? [] : [importer];
+  const inventory = await inspectWorkspaceArtifactSource({
+    workspaceRoot: repoRoot,
+    targetPackages,
+    env: artifactEnv,
   });
-  return marker.derivationIdentity === derivationIdentity;
+  const target = importer === "." ? "" : `//${importer}:__node_modules__`;
+  const graphPath = path.join(repoRoot, ".viberoots", "workspace", "buck", "graph.json");
+  const source = await makeFilteredFlakeRef({
+    workspaceRoot: repoRoot,
+    attr: fullAttr,
+    target,
+    graphPath,
+    logPrefix: "[node-modules-build]",
+    classification: inventory.localDevelopment ? "local-development" : "hermetic",
+    env: artifactEnv,
+    selectorEnv: {},
+  });
+  try {
+    return await fn(source.flakeRef, artifactEnv);
+  } finally {
+    await source.cleanup();
+  }
 }
 
 async function recoverOutPathFromLinkMarker(
@@ -310,32 +301,9 @@ async function requireFreshPnpmStoreState(lockfileRel: string, hashKey: string):
 let outPath = "";
 await requireFreshPnpmStoreState(lockfileRel, hashKey);
 outPath = await recoverOutPathFromLinkMarker(importer, lockfileRel);
-try {
-  if (!outPath) {
-    const nixBin = resolveToolPathSync("nix", nixWorkspaceEnv);
-    const pi = await $({
-      env: nixWorkspaceEnv,
-    })`${nixBin} path-info ${flakeRef}#${fullAttr} --accept-flake-config ${viberootsOverrideArgs}`;
-    const cand =
-      String(pi.stdout || "")
-        .trim()
-        .split("\n")
-        .filter(Boolean)
-        .pop() || "";
-    if (cand) {
-      try {
-        await fsp.access(cand);
-        outPath = cand;
-      } catch {}
-    }
-  }
-} catch {}
-async function tryBuild(): Promise<string> {
-  const timeoutPath = resolveToolPathSync("timeout");
-  const nixBin = resolveToolPathSync("nix", nixWorkspaceEnv);
-  const overrideShellArgs = viberootsOverrideArgs
-    .map((arg) => `'${arg.replace(/'/g, "'\\''")}'`)
-    .join(" ");
+async function tryBuild(flakeRef: string, env: NodeJS.ProcessEnv): Promise<string> {
+  const timeoutPath = resolveToolPathSync("timeout", env);
+  const nixBin = resolveToolPathSync("nix", env);
   const cmd = [
     "set -euo pipefail;",
     'TIMEOUT_PATH="$1";',
@@ -347,10 +315,10 @@ async function tryBuild(): Promise<string> {
     'TS="${NIX_PNPM_FETCH_TIMEOUT:-900}";',
     'JOBS_FLAG=""; if [ -n "$MJ" ] && [ "$MJ" != "0" ]; then JOBS_FLAG="--max-jobs $MJ"; fi;',
     'CORES_FLAG=""; if [ -n "$CR" ] && [ "$CR" != "0" ]; then CORES_FLAG="--option cores $CR"; fi;',
-    `"$TIMEOUT_PATH" -k 10s "\${TS}s" "$NIX_BIN" build "\${FLAKE_REF}#\${FULL_ATTR}" --no-link --accept-flake-config ${overrideShellArgs} ${nixBuilderPolicyShellArgs("local_only")} --print-out-paths $JOBS_FLAG $CORES_FLAG`,
+    `"$TIMEOUT_PATH" -k 10s "\${TS}s" "$NIX_BIN" build "\${FLAKE_REF}" --no-link --accept-flake-config ${nixBuilderPolicyShellArgs("local_only")} --print-out-paths $JOBS_FLAG $CORES_FLAG`,
   ].join(" ");
   const built = await $({
-    env: nixWorkspaceEnv,
+    env,
   })`bash --noprofile --norc -c ${cmd} -- ${timeoutPath} ${flakeRef} ${fullAttr} ${nixBin}`.nothrow();
   const txt = String(built.stdout || "").trim();
   if (built.exitCode === 0 && txt) {
@@ -360,7 +328,22 @@ async function tryBuild(): Promise<string> {
 }
 
 if (!outPath) {
-  outPath = await tryBuild();
+  outPath = await withNodeModulesEvaluationBundle(async (flakeRef, env) => {
+    try {
+      const nixBin = resolveToolPathSync("nix", env);
+      const pi = await $({ env })`${nixBin} path-info ${flakeRef} --accept-flake-config`;
+      const candidate =
+        String(pi.stdout || "")
+          .trim()
+          .split("\n")
+          .filter(Boolean)
+          .pop() || "";
+      if (candidate) await fsp.access(candidate);
+      return candidate;
+    } catch {
+      return await tryBuild(flakeRef, env);
+    }
+  });
 }
 if (!outPath) {
   console.error("node-modules-build: nix build produced no output path");

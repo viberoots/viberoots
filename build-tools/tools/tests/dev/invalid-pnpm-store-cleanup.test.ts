@@ -15,6 +15,7 @@ import {
 const lockHash = "a".repeat(64);
 const name = `pnpm-store-lock-${lockHash}`;
 const owned = `/nix/store/${"b".repeat(32)}-${name}`;
+const ownedTmp = `${owned}.tmp`;
 
 function deps(overrides: Partial<InvalidStoreCleanupDeps> = {}): InvalidStoreCleanupDeps {
   return {
@@ -45,6 +46,37 @@ test("interrupted reconciliation deletes a preexisting owned invalid path only w
   );
   assert.deepEqual(deleted, [owned]);
   assert.match(logs[0] || "", /size_kib=200 .*referrers=0 roots=0 open_owners=0/);
+});
+
+test("failed reconciliation recognizes only the exact owned temporary output", async () => {
+  const deleted: string[] = [];
+  const run = deps({
+    listStoreEntries: async () => [
+      ownedTmp.slice("/nix/store/".length),
+      `${ownedTmp}-unrelated`.slice("/nix/store/".length),
+    ],
+    deletePath: async (storePath) => void deleted.push(storePath),
+  });
+  assert.deepEqual(
+    await cleanupChangedOwnedInvalidPnpmStores({
+      derivationName: name,
+      before: new Map(),
+      deps: run,
+      log: () => {},
+    }),
+    [ownedTmp],
+  );
+  assert.deepEqual(deleted, [ownedTmp]);
+});
+
+test("snapshot ignores an invalid output removed by a concurrent owner before measurement", async () => {
+  assert.deepEqual(
+    await snapshotOwnedInvalidPnpmStores({
+      derivationName: name,
+      deps: deps({ evidence: async () => null }),
+    }),
+    new Map(),
+  );
 });
 
 test("invalid-store commands stop their owned process group at the bounded timeout", async () => {

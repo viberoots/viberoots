@@ -4,7 +4,12 @@ import path from "node:path";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 import { readCompositeGraph } from "../../lib/graph-view";
 import { isVbrVerbose } from "../../lib/command-ui";
-import { buildToolPath, nodeBin, zxNodeBase } from "./paths";
+import { runNodeWithZx } from "../../lib/node-run";
+import {
+  buildArtifactEnvironment,
+  withoutArtifactEnvironmentInfluence,
+} from "../../lib/artifact-environment";
+import { buildToolPath, nodeBin, zxInitPath } from "./paths";
 import { runGluePipeline } from "../../buck/glue-pipeline";
 
 export async function cleanDevBuildWorkspace(root: string): Promise<void> {
@@ -39,18 +44,18 @@ async function debugListTargets(root: string): Promise<void> {
 
 async function exportGraph(root: string, opts: { scope?: string; env: NodeJS.ProcessEnv }) {
   const node = nodeBin();
-  const nodeBase = zxNodeBase(root);
   const graphPath = path.join(root, DEFAULT_GRAPH_PATH);
   const scope = (opts.scope || "").trim();
   const verbose = isVbrVerbose() || String(process.env.DEVBUILD_DEBUG || "").trim() === "1";
-  const cmd = `${node} ${nodeBase} ${buildToolPath(root, "tools/buck/export-graph.ts")}${
-    scope ? ` --scope ${scope}` : ""
-  } --out ${graphPath}`;
-  await $({
-    stdio: verbose ? "inherit" : "pipe",
+  await runNodeWithZx({
+    script: buildToolPath(root, "tools/buck/export-graph.ts"),
+    args: [...(scope ? ["--scope", scope] : []), "--out", graphPath],
     cwd: root,
-    env: opts.env as any,
-  })`bash --noprofile --norc -c ${cmd}`;
+    env: opts.env,
+    nodeBin: node,
+    zxInitPath: zxInitPath(root),
+    stdio: verbose ? "inherit" : "pipe",
+  });
   return graphPath;
 }
 
@@ -60,21 +65,24 @@ function stableExporterIsolation(root: string): string {
   return `exporter-shared-${h}`;
 }
 
-function buckProcessEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
-  const sslCertFile = process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE || "";
+function buckProcessEnv(
+  extra: NodeJS.ProcessEnv = {},
+  baseEnv: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const sslCertFile = baseEnv.SSL_CERT_FILE || baseEnv.NIX_SSL_CERT_FILE || "";
   const quietBuck =
     !isVbrVerbose() &&
     String(process.env.DEVBUILD_DEBUG || "").trim() !== "1" &&
     !String(process.env.BUCK_VERBOSE || "").trim();
   return {
-    ...process.env,
+    ...baseEnv,
     ...(quietBuck ? { BUCK_VERBOSE: "0" } : {}),
     ...extra,
-    HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
+    HOME: baseEnv.BUCK2_REAL_HOME || baseEnv.HOME,
     ...(sslCertFile
       ? {
           SSL_CERT_FILE: sslCertFile,
-          NIX_SSL_CERT_FILE: process.env.NIX_SSL_CERT_FILE || sslCertFile,
+          NIX_SSL_CERT_FILE: baseEnv.NIX_SSL_CERT_FILE || sslCertFile,
         }
       : {}),
   };
@@ -182,25 +190,39 @@ async function ensureNonEmptyGraphOrExit(root: string, graphPath: string): Promi
   process.exit(2);
 }
 
-export async function refreshGlueAndExportGraph(root: string): Promise<string> {
+export async function refreshGlueAndExportGraph(
+  root: string,
+  artifactToolsRoot: string,
+): Promise<string> {
   const node = nodeBin();
-  const nodeBase = zxNodeBase(root);
   const verbose = isVbrVerbose() || String(process.env.DEVBUILD_DEBUG || "").trim() === "1";
-  await $({
-    stdio: verbose ? "inherit" : "pipe",
+  const artifactEnv = buildArtifactEnvironment({
+    baseEnv: withoutArtifactEnvironmentInfluence(process.env),
+    mode: String(process.env.CI || "").trim() ? "ci" : "local",
+    stateRoot: path.join(root, "buck-out", "tmp", "artifact-environment", "glue"),
+    workspaceRoot: root,
+    artifactToolsRoot,
+  });
+  await runNodeWithZx({
+    script: buildToolPath(root, "tools/dev/install-deps.ts"),
+    args: ["--glue-only"],
     cwd: root,
-  })`bash --noprofile --norc -c ${`${node} ${nodeBase} ${buildToolPath(
-    root,
-    "tools/dev/install-deps.ts",
-  )} --glue-only`}`;
+    env: artifactEnv,
+    nodeBin: node,
+    zxInitPath: zxInitPath(root),
+    stdio: verbose ? "inherit" : "pipe",
+  });
 
   await debugListTargets(root);
 
-  const runEnv = buckProcessEnv({
-    BUCK_NESTED_ISO: stableExporterIsolation(root),
-    BUCK_EXPORTER_REUSE_DAEMON: "1",
-    ...(String(process.env.DEVBUILD_DEBUG || "").trim() === "1" ? { EXPORTER_DEBUG: "1" } : {}),
-  });
+  const runEnv = buckProcessEnv(
+    {
+      BUCK_NESTED_ISO: stableExporterIsolation(root),
+      BUCK_EXPORTER_REUSE_DAEMON: "1",
+      ...(String(process.env.DEVBUILD_DEBUG || "").trim() === "1" ? { EXPORTER_DEBUG: "1" } : {}),
+    },
+    artifactEnv,
+  );
 
   const scope = (process.env.DEVBUILD_SCOPE || "").trim();
   const graphPath = await exportGraph(root, { scope, env: runEnv });

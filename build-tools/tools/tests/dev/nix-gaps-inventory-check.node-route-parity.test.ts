@@ -5,10 +5,12 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
+import { inspectProductionCommandSites } from "../../dev/nix-gaps-command-sites";
 
 const scriptPath = "viberoots/build-tools/tools/dev/nix-gaps-inventory-check.ts";
 const scriptSourcePath = viberootsSourcePath(scriptPath);
 const exceptionsPath = "docs/handbook/nix-gaps-exceptions.json";
+const commandSitePolicyPath = "docs/handbook/nix-command-site-policy.json";
 
 const starlarkApi = `# Starlark API reference
 
@@ -61,11 +63,9 @@ def node_asset_stage(name, app, assets = [], out = None, **kwargs):
         )
         + nix_calling_env_export_buck_graph_json()
         + "if [ -n \\"$VBR_NODE_ROUTE_TARGET\\" ]; then "
-        + nix_build_out_path_cmd(
-            "\\"path:$WORKSPACE_ROOT#graph-generator-selected\\"",
+        + nix_action_build_selected_out_path_cmd(
+            target_label = "$VBR_NODE_ROUTE_TARGET",
             timeout_var = "TIMEOUT",
-            impure = True,
-            build_prefix = "env BUCK_TEST_SRC=\\"$WORKSPACE_ROOT\\" BUCK_TARGET=\\"$VBR_NODE_ROUTE_TARGET\\" ",
         )
         + "fi; "
     )
@@ -88,11 +88,9 @@ def node_wasm_inline_module(name, src, out = None, **kwargs):
         )
         + nix_calling_env_export_buck_graph_json()
         + "if [ -n \\"$VBR_NODE_ROUTE_TARGET\\" ]; then "
-        + nix_build_out_path_cmd(
-            "\\"path:$WORKSPACE_ROOT#graph-generator-selected\\"",
+        + nix_action_build_selected_out_path_cmd(
+            target_label = "$VBR_NODE_ROUTE_TARGET",
             timeout_var = "TIMEOUT",
-            impure = True,
-            build_prefix = "env BUCK_TEST_SRC=\\"$WORKSPACE_ROOT\\" BUCK_TARGET=\\"$VBR_NODE_ROUTE_TARGET\\" ",
         )
         + "fi; "
     )
@@ -111,26 +109,99 @@ const defsCoreMinimal = `def nix_node_test(name, **kwargs):
     pass
 `;
 
+const defsPublicFixture = `def node_asset_stage(name, **kwargs):
+    pass
+
+def node_wasm_inline_module(name, **kwargs):
+    pass
+`;
+
 const emptyExceptions = `{
   "exceptions": [],
   "artifactRouteAllowlist": []
 }
 `;
 
+async function writeRouteExceptions(tmp: string): Promise<void> {
+  const source = path.join(tmp, "route-source");
+  const policy = {
+    schemaVersion: 1 as const,
+    expectedCount: 0,
+    expectedDigest: "",
+    classificationRules: [
+      {
+        pathPattern: "^build-tools/",
+        role: "non-artifact-orchestration" as const,
+        justification: "Private route fixture sites exercise checker behavior only.",
+      },
+    ],
+  };
+  const actual = await inspectProductionCommandSites(source, policy);
+  await fs.outputJson(
+    path.join(tmp, commandSitePolicyPath),
+    {
+      ...policy,
+      expectedCount: actual.count,
+      expectedDigest: actual.digest,
+    },
+    { spaces: 2 },
+  );
+  await fs.outputFile(path.join(tmp, exceptionsPath), emptyExceptions);
+}
+
 test("nix-gaps checker accepts standalone stage/inline route when docs and implementation match", async () => {
   await runInTemp("nix-gaps-node-route-standalone-pass", async (tmp, $) => {
     await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), inventoryStandaloneRoute);
-    await fs.outputFile(path.join(tmp, exceptionsPath), emptyExceptions);
     await fs.outputFile(
-      path.join(tmp, "viberoots/build-tools/node/defs_core.bzl"),
+      path.join(tmp, "route-source/build-tools/node/defs_core.bzl"),
       defsCoreMinimal,
     );
-    await fs.outputFile(path.join(tmp, "build-tools/node/defs_stage.bzl"), defsStageStandalone);
+    await fs.outputFile(
+      path.join(tmp, "route-source/build-tools/node/defs.bzl"),
+      defsPublicFixture,
+    );
+    await fs.outputFile(
+      path.join(tmp, "route-source/build-tools/node/defs_stage.bzl"),
+      defsStageStandalone,
+    );
+    await writeRouteExceptions(tmp);
     await $({
       cwd: tmp,
-    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath}`;
+      env: { ...process.env, VIBEROOTS_SOURCE_ROOT: path.join(tmp, "route-source") },
+    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath} --command-site-policy ${commandSitePolicyPath}`;
+  });
+});
+
+test("nix-gaps checker rejects standalone routes that bypass the canonical selected-build helper", async () => {
+  await runInTemp("nix-gaps-node-route-helper-missing", async (tmp, $) => {
+    await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
+    await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
+    await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), inventoryStandaloneRoute);
+    await fs.outputFile(
+      path.join(tmp, "route-source/build-tools/node/defs_core.bzl"),
+      defsCoreMinimal,
+    );
+    await fs.outputFile(
+      path.join(tmp, "route-source/build-tools/node/defs.bzl"),
+      defsPublicFixture,
+    );
+    await fs.outputFile(
+      path.join(tmp, "route-source/build-tools/node/defs_stage.bzl"),
+      defsStageStandalone.replaceAll(
+        "nix_action_build_selected_out_path_cmd(",
+        "noncanonical_selected_build(",
+      ),
+    );
+    await writeRouteExceptions(tmp);
+    const res = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      env: { ...process.env, VIBEROOTS_SOURCE_ROOT: path.join(tmp, "route-source") },
+    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath} --command-site-policy ${commandSitePolicyPath}`.nothrow();
+    assert.notEqual(res.exitCode, 0);
+    assert.match(String(res.stderr || ""), /canonical|selected-build|standalone nix-calling/);
   });
 });
 
@@ -139,16 +210,24 @@ test("nix-gaps checker fails when docs claim wrapper route but stage/inline impl
     await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), inventoryWrapperRoute);
-    await fs.outputFile(path.join(tmp, exceptionsPath), emptyExceptions);
     await fs.outputFile(
-      path.join(tmp, "viberoots/build-tools/node/defs_core.bzl"),
+      path.join(tmp, "route-source/build-tools/node/defs_core.bzl"),
       defsCoreMinimal,
     );
-    await fs.outputFile(path.join(tmp, "build-tools/node/defs_stage.bzl"), defsStageStandalone);
+    await fs.outputFile(
+      path.join(tmp, "route-source/build-tools/node/defs.bzl"),
+      defsPublicFixture,
+    );
+    await fs.outputFile(
+      path.join(tmp, "route-source/build-tools/node/defs_stage.bzl"),
+      defsStageStandalone,
+    );
+    await writeRouteExceptions(tmp);
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath}`.nothrow();
+      env: { ...process.env, VIBEROOTS_SOURCE_ROOT: path.join(tmp, "route-source") },
+    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath} --command-site-policy ${commandSitePolicyPath}`.nothrow();
     assert.notEqual(res.exitCode, 0);
     assert.match(String(res.stderr || ""), /docs\/implementation mismatch/);
   });

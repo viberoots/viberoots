@@ -54,3 +54,12 @@ test("remote action policy rejects boolean remote-builder smoke evidence", async
     message: /typed remote_builder_smoke evidence/,
   });
 });
+
+test("remote action policy rejects fabricated passed probe claims", async () => {
+  await assertPolicyFails({
+    name: "remote-fabricated-smoke-evidence",
+    targetBody:
+      'policy_probe(name = "t", evidence = {"source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/.viberoots/workspace/buck/graph.json"}, "materialization_manifest": {"path": "materialization-manifest.json"}, "artifact_contract": {"path": "artifact-contract.json"}, "builder_policy": "inherit_config", "remote_builder_smoke": {"builder_policy": "inherit_config", "path": "remote-builder-smoke.json", "schema": "viberoots.remote-builder-smoke-evidence.v2", "validation": "actual-report-required", "status": "passed", "probes": {"store": {"result": "passed"}}}, "tool_closure": {"path": "tool-closure.json"}, "remote_profile_compatibility": True})',
+    message: /rejects fabricated remote-builder result claims/,
+  });
+});

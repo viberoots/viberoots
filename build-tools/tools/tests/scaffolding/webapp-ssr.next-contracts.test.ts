@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { assertSsrAdapterConformance } from "../lib/ssr-adapter-conformance";
 import { runInTemp } from "../lib/test-helpers";
+import { exportGraphInTemp } from "../lib/test-helpers/selected-build";
 import {
   TEST_TIMEOUT_MS,
   buildSelectedSsr,
@@ -13,6 +14,7 @@ import {
 } from "./lib/webapp-ssr";
 
 async function buildBuckOutput(tmp: string, _$: any, label: string): Promise<string> {
+  await exportGraphInTemp({ tmp, $: _$, env: { BUCK_TARGET: label }, stdio: "pipe" });
   const built = await _$({
     cwd: tmp,
     stdio: "pipe",

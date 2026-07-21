@@ -14,7 +14,7 @@ export type InvalidStoreSnapshot = Map<string, InvalidStorePathEvidence>;
 export type InvalidStoreCleanupDeps = {
   listStoreEntries: () => Promise<string[]>;
   isValid: (storePath: string) => Promise<boolean>;
-  evidence: (storePath: string) => Promise<InvalidStorePathEvidence>;
+  evidence: (storePath: string) => Promise<InvalidStorePathEvidence | null>;
   referrers: (storePath: string) => Promise<string[]>;
   roots: (storePath: string) => Promise<string[]>;
   openOwners: (storePath: string) => Promise<string[]>;
@@ -117,12 +117,24 @@ function defaultDeps(env: NodeJS.ProcessEnv, deadlineMs: number): InvalidStoreCl
     isValid: async (storePath) =>
       storePathValidityFromCommand(storePath, await run(nixStore, ["--check-validity", storePath])),
     evidence: async (storePath) => {
-      const [stat, measured] = await Promise.all([
-        fsp.stat(storePath),
-        run(du, ["-sk", storePath]),
-      ]);
+      let stat;
+      try {
+        stat = await fsp.stat(storePath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+        throw error;
+      }
+      const measured = await run(du, ["-sk", storePath]);
       const size = measured.lines[0]?.trim().split(/\s+/)[0] || "";
-      if (!measured.ok || !/^\d+$/.test(size)) throw new Error(`could not measure ${storePath}`);
+      if (!measured.ok || !/^\d+$/.test(size)) {
+        try {
+          await fsp.stat(storePath);
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+          throw error;
+        }
+        throw new Error(`could not measure ${storePath}`);
+      }
       return { sizeKib: Number(size), mtimeMs: stat.mtimeMs };
     },
     referrers: async (storePath) =>
@@ -156,7 +168,7 @@ function ownedStorePath(entry: string, derivationName: string): string | null {
     throw new Error(`invalid owned pnpm store derivation name: ${derivationName}`);
   }
   const storePath = path.join("/nix/store", entry);
-  return new RegExp(`^/nix/store/[a-z0-9]{32}-${derivationName}$`).test(storePath)
+  return new RegExp(`^/nix/store/[a-z0-9]{32}-${derivationName}(?:\\.tmp)?$`).test(storePath)
     ? storePath
     : null;
 }
@@ -173,7 +185,8 @@ export async function snapshotOwnedInvalidPnpmStores(opts: {
   for (const entry of await beforeDeadline(deadlineMs, deps.listStoreEntries)) {
     const storePath = ownedStorePath(entry, opts.derivationName);
     if (!storePath || (await beforeDeadline(deadlineMs, () => deps.isValid(storePath)))) continue;
-    snapshot.set(storePath, await beforeDeadline(deadlineMs, () => deps.evidence(storePath)));
+    const evidence = await beforeDeadline(deadlineMs, () => deps.evidence(storePath));
+    if (evidence) snapshot.set(storePath, evidence);
   }
   return snapshot;
 }
@@ -208,7 +221,7 @@ export async function cleanupChangedOwnedInvalidPnpmStores(opts: {
     const openOwners = await beforeDeadline(deadlineMs, () => deps.openOwners(storePath));
     if (openOwners.length > 0) continue;
     (opts.log || console.error)(
-      `[update-pnpm-hash] interrupted invalid-output cleanup path=${storePath} size_kib=${evidence.sizeKib} mtime_ms=${evidence.mtimeMs} referrers=${referrers.length} roots=${roots.length} open_owners=${openOwners.length}`,
+      `[update-pnpm-hash] failed-build invalid-output cleanup path=${storePath} size_kib=${evidence.sizeKib} mtime_ms=${evidence.mtimeMs} referrers=${referrers.length} roots=${roots.length} open_owners=${openOwners.length}`,
     );
     await beforeDeadline(deadlineMs, () => deps.deletePath(storePath));
     deleted.push(storePath);

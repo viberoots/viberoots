@@ -1,11 +1,10 @@
 #!/usr/bin/env zx-wrapper
-import fs from "node:fs";
-import { getArgvTokens } from "../lib/cli";
 import type { NixBuilderPolicy } from "../lib/nix-builder-policy";
+import type { RemoteBuilderSystem } from "../remote-exec/nix-remote-builder-config";
+import { remoteBuilderSmokeAdmissionError } from "./remote-builder-smoke-admission";
 import { materializationMessages } from "./remote-exec-policy-materialization";
-
+import { prepareRemoteExecPolicyCli } from "./remote-exec-policy-cli";
 export type RemoteExecMode = "local" | "hybrid" | "remote" | "remote-only-conformance";
-
 export type RemoteExecTargetMetadata = {
   target: string;
   ruleFamily?: string;
@@ -28,13 +27,13 @@ export type RemoteExecTargetMetadata = {
   referencedNixStorePaths?: string[];
   nixBuilderPolicy?: unknown;
   remoteBuilderSmokePolicy?: unknown;
+  remoteBuilderSmokeEvidence?: unknown;
+  remoteBuilderSmokePath?: string;
 };
-
 export type RemoteExecPolicyFinding = {
   target: string;
   message: string;
 };
-
 const REMOTE_LOCAL_ONLY = "remote:local-only";
 const REMOTE_READY = "remote:ready";
 const EXTERNAL_MUTATING_LOCKED = "remote:external-mutating-locked";
@@ -50,11 +49,9 @@ const ALLOWED_REMOTE_READY_FAMILIES = new Set([
 const RESOURCE_PROFILE_LABELS = new Map([
   ["verify:resource-limited", ["linux-x86_64-large", "linux-aarch64-large"]],
 ]);
-
 function labelsOf(target: RemoteExecTargetMetadata): string[] {
   return Array.isArray(target.labels) ? target.labels : [];
 }
-
 function isRemoteMode(mode: RemoteExecMode): boolean {
   return REMOTE_MODES.has(mode);
 }
@@ -72,6 +69,9 @@ export function validateRemoteExecTargets(opts: {
   targets: RemoteExecTargetMetadata[];
   lockCapabilities?: string[];
   allowedProfiles?: string[];
+  activeRemoteBuilderSmokeEvidence?: unknown;
+  testOnlyRemoteBuilderSmokeEvidence?: unknown;
+  remoteSystem?: RemoteBuilderSystem;
 }): RemoteExecPolicyFinding[] {
   const lockCaps = new Set(opts.lockCapabilities || []);
   const allowedProfiles = new Set(opts.allowedProfiles || []);
@@ -183,6 +183,29 @@ export function validateRemoteExecTargets(opts: {
         finding(target, `${target.nixBuilderPolicy} requires matching remote-builder smoke`),
       );
     }
+    if (
+      target.nixBuilderPolicy === "inherit_config" ||
+      target.nixBuilderPolicy === "force_builders_file"
+    ) {
+      const remoteSystem =
+        opts.remoteSystem ||
+        (opts.testOnlyRemoteBuilderSmokeEvidence &&
+        typeof opts.testOnlyRemoteBuilderSmokeEvidence === "object"
+          ? (opts.testOnlyRemoteBuilderSmokeEvidence as { supportedSystem?: RemoteBuilderSystem })
+              .supportedSystem
+          : undefined);
+      if (!remoteSystem) {
+        findings.push(finding(target, "remote:ready requires an active remote execution system"));
+        continue;
+      }
+      const message = remoteBuilderSmokeAdmissionError({
+        policy: target.nixBuilderPolicy,
+        expectedSystem: remoteSystem,
+        activeEvidence: opts.activeRemoteBuilderSmokeEvidence,
+        testOnlyEvidence: opts.testOnlyRemoteBuilderSmokeEvidence,
+      });
+      if (message) findings.push(finding(target, message));
+    }
   }
   return findings;
 }
@@ -192,43 +215,33 @@ export function assertRemoteTargetsAllowed(opts: {
   targets: RemoteExecTargetMetadata[];
   lockCapabilities?: string[];
   allowedProfiles?: string[];
+  activeRemoteBuilderSmokeEvidence?: unknown;
+  testOnlyRemoteBuilderSmokeEvidence?: unknown;
+  remoteSystem?: RemoteBuilderSystem;
 }): void {
   const findings = validateRemoteExecTargets({
     mode: opts.mode,
     targets: opts.targets,
     lockCapabilities: opts.lockCapabilities,
     allowedProfiles: opts.allowedProfiles,
+    activeRemoteBuilderSmokeEvidence: opts.activeRemoteBuilderSmokeEvidence,
+    testOnlyRemoteBuilderSmokeEvidence: opts.testOnlyRemoteBuilderSmokeEvidence,
+    remoteSystem: opts.remoteSystem,
   });
   if (findings.length > 0) {
     throw new Error(findings.map((f) => `${f.target}: ${f.message}`).join("\n"));
   }
 }
 
-function parseCli() {
-  const tokens = getArgvTokens();
-  const value = (name: string) => {
-    const prefixed = tokens.find((t) => t.startsWith(`${name}=`));
-    if (prefixed) return prefixed.slice(name.length + 1);
-    const i = tokens.indexOf(name);
-    return i >= 0 ? String(tokens[i + 1] || "") : "";
-  };
-  return {
-    mode: (value("--mode") || "remote") as RemoteExecMode,
-    metadataJson: value("--metadata-json"),
-    profiles: value("--profiles").split(",").filter(Boolean),
-    locks: value("--locks").split(",").filter(Boolean),
-  };
-}
-
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const args = parseCli();
-  if (!args.metadataJson) throw new Error("--metadata-json is required");
-  const targets = JSON.parse(fs.readFileSync(args.metadataJson, "utf8"));
+  const { args, targets, activeRemoteBuilderSmokeEvidence } = await prepareRemoteExecPolicyCli();
   const findings = validateRemoteExecTargets({
     mode: args.mode,
     targets,
     lockCapabilities: args.locks,
     allowedProfiles: args.profiles,
+    activeRemoteBuilderSmokeEvidence,
+    remoteSystem: args.system,
   });
   if (findings.length > 0) {
     for (const item of findings) process.stderr.write(`${item.target}: ${item.message}\n`);

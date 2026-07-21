@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { checkConsumerConsistency } from "../../dev/consumer-consistency-check";
+import { requiredConsumerTrackedPaths } from "../../lib/consumer-tracked-inputs";
 import { ccFixture, commitEnv, execFileAsync } from "./repo-skills-cc.viberoots-guard.fixture";
 
 const noDependencyChecks = {
@@ -33,7 +34,7 @@ test("cc guard rejects a missing submodule root lock without mutation", async ()
 });
 
 test("cc guard rejects every missing generated input without mutation", async () => {
-  for (const rel of [".buckroot", ".buckconfig", ".envrc", ".gitignore"]) {
+  for (const rel of requiredConsumerTrackedPaths) {
     const root = await ccFixture("flake");
     try {
       await execFileAsync("git", ["rm", "-q", rel], { cwd: root });

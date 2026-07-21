@@ -156,7 +156,7 @@ EOF
               exit 3
             fi
             PHASE_STEP_T0="$(phase_diag_begin)"
-            "$VITE_BIN" build
+            ${pkgs.bash}/bin/bash "$VITE_BIN" build
             phase_diag_end "vite-build-static" "$PHASE_STEP_T0"
             test -d dist
             PHASE_STEP_T0="$(phase_diag_begin)"
@@ -168,13 +168,13 @@ EOF
               exit 3
             fi
             PHASE_STEP_T0="$(phase_diag_begin)"
-            "$VITE_BIN" build --outDir dist/client
+            ${pkgs.bash}/bin/bash "$VITE_BIN" build --outDir dist/client
             phase_diag_end "vite-build-client" "$PHASE_STEP_T0"
             PHASE_STEP_T0="$(phase_diag_begin)"
-            "$VITE_BIN" build --ssr src/entry-server.ts --outDir dist/server
+            ${pkgs.bash}/bin/bash "$VITE_BIN" build --ssr src/entry-server.ts --outDir dist/server
             phase_diag_end "vite-build-ssr" "$PHASE_STEP_T0"
             PHASE_STEP_T0="$(phase_diag_begin)"
-            "$TSC_BIN" -p tsconfig.server.json
+            ${pkgs.bash}/bin/bash "$TSC_BIN" -p tsconfig.server.json
             phase_diag_end "tsc-server" "$PHASE_STEP_T0"
             test -d dist/client
             test -f dist/server/index.js
@@ -193,10 +193,10 @@ EOF
               exit 3
             fi
             PHASE_STEP_T0="$(phase_diag_begin)"
-            "$NEXT_BIN" build
+            ${pkgs.bash}/bin/bash "$NEXT_BIN" build
             phase_diag_end "next-build" "$PHASE_STEP_T0"
             PHASE_STEP_T0="$(phase_diag_begin)"
-            "$TSC_BIN" -p tsconfig.server.json
+            ${pkgs.bash}/bin/bash "$TSC_BIN" -p tsconfig.server.json
             phase_diag_end "tsc-server" "$PHASE_STEP_T0"
             test -d .next
             PHASE_STEP_T0="$(phase_diag_begin)"

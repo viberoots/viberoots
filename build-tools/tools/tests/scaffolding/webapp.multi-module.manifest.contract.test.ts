@@ -223,7 +223,7 @@ test(
         });
 
         await _$({ cwd: tmp, stdio: "pipe" })`git add -A projects/apps/demo-web`;
-        await reconcileTempDependencyInputs(tmp, $);
+        await reconcileTempDependencyInputs(tmp, _$);
         await pnpmInstallForDevTest({
           tmp,
           _$,

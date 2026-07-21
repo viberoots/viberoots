@@ -12,6 +12,7 @@ export function normalizeSpawnArg(arg: string): string {
   if (arg.startsWith("NIX_BIN=")) return "NIX_BIN=<nix>";
   if (arg.startsWith("PATCH_BIN=")) return "PATCH_BIN=<patch>";
   if (arg.startsWith("GIT_BIN=")) return "GIT_BIN=<git>";
+  if (arg.startsWith("VBR_ARTIFACT_TOOLS_ROOT=")) return "VBR_ARTIFACT_TOOLS_ROOT=<tools>";
   return arg;
 }
 
@@ -29,6 +30,8 @@ function commonTestEnvArgs(): string[] {
     "NIX_PNPM_INSTALL_TIMEOUT=1800",
     "--env",
     "VBR_GC_MODE=off",
+    "--env",
+    "VBR_ARTIFACT_TOOLS_ROOT=<tools>",
     "--env",
     "GIT_CONFIG_COUNT=3",
     "--env",
@@ -150,6 +153,8 @@ function remoteTestEnvArgs(): string[] {
     "PATCH_BIN=<patch>",
     "--env",
     "GIT_BIN=<git>",
+    "--env",
+    "VBR_ARTIFACT_TOOLS_ROOT=<tools>",
   ];
 }
 

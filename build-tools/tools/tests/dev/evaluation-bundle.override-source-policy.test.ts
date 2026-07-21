@@ -5,6 +5,22 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { materializeEvaluationBundle } from "../../dev/evaluation-bundle";
+import {
+  buildCanonicalArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+} from "../../lib/artifact-environment";
+
+const artifactToolsRoot = canonicalArtifactToolsRoot(
+  process.cwd(),
+  String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+);
+
+function artifactEnvWithTmp(tmpdir: string): NodeJS.ProcessEnv {
+  return {
+    ...buildCanonicalArtifactEnvironment(process.cwd(), { artifactToolsRoot }),
+    TMPDIR: tmpdir,
+  };
+}
 
 async function sourceFixture(root: string): Promise<void> {
   await fsp.mkdir(path.join(root, ".viberoots", "workspace", "buck"), { recursive: true });
@@ -25,7 +41,9 @@ test("bundle rejects generated state inside an override source", async () => {
         stagedSource: source,
         attr: "graph-generator",
         classification: "local-development",
-        selectorEnv: { NIX_GO_DEV_OVERRIDE_JSON: JSON.stringify({ module: override }) },
+        artifactToolsRoot,
+        selectorEnv: {},
+        devOverrides: { NIX_GO_DEV_OVERRIDE_JSON: JSON.stringify({ module: override }) },
       }),
       /override source contains excluded path: node_modules/,
     );
@@ -37,16 +55,20 @@ test("bundle rejects generated state inside an override source", async () => {
 test("bundle rejects an override ancestor that would recursively capture staging", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "bundle-override-recursive-"));
   const source = path.join(tmp, "source");
+  const stagingBase = path.join(tmp, "staging");
   const priorTmp = process.env.TMPDIR;
   await sourceFixture(source);
-  process.env.TMPDIR = tmp;
+  await fsp.mkdir(stagingBase);
+  process.env.TMPDIR = stagingBase;
   try {
     await assert.rejects(
       materializeEvaluationBundle({
         stagedSource: source,
         attr: "graph-generator",
         classification: "local-development",
-        selectorEnv: { NIX_CPP_DEV_OVERRIDE_JSON: JSON.stringify({ "pkgs.demo": tmp }) },
+        artifactEnv: artifactEnvWithTmp(stagingBase),
+        selectorEnv: {},
+        devOverrides: { NIX_CPP_DEV_OVERRIDE_JSON: JSON.stringify({ "pkgs.demo": tmp }) },
       }),
       /override source contains the bundle staging root/,
     );
@@ -61,17 +83,21 @@ test("bundle resolves an override alias before checking recursive capture", asyn
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "bundle-override-alias-"));
   const source = path.join(tmp, "source");
   const alias = `${tmp}-alias`;
+  const stagingBase = path.join(tmp, "staging");
   const priorTmp = process.env.TMPDIR;
   await sourceFixture(source);
+  await fsp.mkdir(stagingBase);
   await fsp.symlink(tmp, alias);
-  process.env.TMPDIR = tmp;
+  process.env.TMPDIR = stagingBase;
   try {
     await assert.rejects(
       materializeEvaluationBundle({
         stagedSource: source,
         attr: "graph-generator",
         classification: "local-development",
-        selectorEnv: { NIX_CPP_DEV_OVERRIDE_JSON: JSON.stringify({ "pkgs.demo": alias }) },
+        artifactEnv: artifactEnvWithTmp(stagingBase),
+        selectorEnv: {},
+        devOverrides: { NIX_CPP_DEV_OVERRIDE_JSON: JSON.stringify({ "pkgs.demo": alias }) },
       }),
       /override source contains the bundle staging root/,
     );

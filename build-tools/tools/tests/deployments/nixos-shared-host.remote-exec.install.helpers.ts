@@ -2,6 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { viberootsToolScript } from "./deployment-command";
+import { reconcileSyntheticDeploymentGraph } from "./deployment-graph.fixture";
 
 export async function installClientProfile(
   $: any,
@@ -148,6 +149,7 @@ export async function installReviewedSampleWebappTargets(tmp: string): Promise<v
     ].join("\n"),
     "utf8",
   );
+  await reconcileSyntheticDeploymentGraph(tmp);
 }
 
 export async function prepareReviewedRemoteHostPaths(opts: {

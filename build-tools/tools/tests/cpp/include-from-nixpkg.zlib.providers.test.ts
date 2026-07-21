@@ -69,6 +69,7 @@ nix_cpp_test(
 )
 `;
     await fs.outputFile(path.join(appDir, "TARGETS"), targets);
+    await $`u`;
 
     // Build and run the test; explicit platform to bind toolchains
     await $`buck2 test --target-platforms prelude//platforms:default //projects/apps/demo:demo_zlib_gtest`;

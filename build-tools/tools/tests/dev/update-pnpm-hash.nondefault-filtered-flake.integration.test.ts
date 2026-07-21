@@ -6,6 +6,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { makeFilteredFlakeRef } from "../../dev/update-pnpm-hash/filtered-flake";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
+import { ensureToolchainPathsForTempRepo } from "../lib/test-helpers/toolchain-paths";
 
 test("update-pnpm-hash uses filtered flake snapshots for every importer build", async () => {
   const helper = await fsp.readFile(
@@ -42,9 +43,13 @@ test("root importer filtered snapshot excludes large generated Buck state", asyn
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "root-pnpm-filter-"));
   let cleanup: (() => Promise<void>) | undefined;
   try {
-    await fsp.writeFile(path.join(root, "flake.nix"), "{}\n");
-    await fsp.writeFile(path.join(root, "package.json"), '{"private":true}\n');
+    await fsp.mkdir(path.join(root, "build-tools", "tools", "dev"), { recursive: true });
+    await fsp.writeFile(path.join(root, "flake.nix"), "{ outputs = _: {}; }\n");
+    await fsp.writeFile(path.join(root, "package.json"), '{"name":"viberoots","private":true}\n');
     await fsp.writeFile(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
+    await fsp.writeFile(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"), "\n");
+    await fsp.writeFile(path.join(root, "build-tools", "tools", "dev", "viberoots.ts"), "\n");
+    await ensureToolchainPathsForTempRepo(root, $);
     const sentinel = path.join(root, ".viberoots", "workspace", "buck", "large-sentinel.bin");
     await fsp.mkdir(path.dirname(sentinel), { recursive: true });
     await fsp.writeFile(sentinel, Buffer.alloc(8 * 1024 * 1024, 0x61));

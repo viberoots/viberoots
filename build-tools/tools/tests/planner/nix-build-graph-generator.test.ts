@@ -14,10 +14,6 @@ test("nix builds graph-generator", async () => {
     await fs.remove(stableRoot);
     await fs.symlink(tmp, stableRoot, "dir");
     try {
-      const buckRoot = path.join(tmp, ".viberoots", "workspace", "buck");
-      const rootEnv = path.join(buckRoot, "workspace-root.env");
-      const normalizedEnv = (await fs.readFile(rootEnv, "utf8")).replaceAll(tmp, stableRoot);
-      await fs.writeFile(rootEnv, normalizedEnv, "utf8");
       const graph = path.join(stableRoot, ".viberoots", "workspace", "buck", "graph.json");
       await fs.writeFile(graph, "[]\n", "utf8");
       const { stdout } = await $({

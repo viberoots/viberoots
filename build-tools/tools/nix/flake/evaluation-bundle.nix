@@ -21,8 +21,10 @@ let
 in
 assert schema.schema == "viberoots.evaluation-bundle.v1";
 assert builtins.elem classification.classification [ "hermetic" "local-development" ];
+assert builtins.match "/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-[^/]+" dependencies.artifactToolsRoot != null;
 {
   inherit bundleRoot classification dependencies languageOverrides selection;
+  artifactToolsRoot = dependencies.artifactToolsRoot;
   graphPath = bundleRoot + "/graph.json";
   repoRoot = repoRoot;
   rootModulesTomlPath =

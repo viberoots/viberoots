@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 test("patch-pkg prints patch model one-liner for importer-local languages (node)", async () => {
   await runInTemp("patch-pkg-contract-msg-node", async (tmp, $) => {
@@ -30,9 +31,10 @@ test("patch-pkg prints patch model one-liner for importer-local languages (node)
       { encoding: "utf8" },
     );
     await $`chmod +x ${mockPnpm}`;
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
 
     const env = {
-      ...process.env,
+      ...graphEnv,
       PATH: `${mockBin}:${process.env.PATH || ""}`,
       PNPM_BIN: mockPnpm,
       ZX_INIT: path.join(tmp, "viberoots", "build-tools", "tools", "dev", "zx-init.mjs"),

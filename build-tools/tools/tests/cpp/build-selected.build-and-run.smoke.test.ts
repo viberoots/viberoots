@@ -4,8 +4,9 @@
 
 import fs from "fs-extra";
 import path from "node:path";
+import { runGluePipeline } from "../../buck/glue-pipeline";
 import { sanitizeAttrNameFromLabel } from "../../lib/labels";
-import { runInTemp } from "../lib/test-helpers";
+import { runBuildSelected, runInTemp } from "../lib/test-helpers";
 
 async function main() {
   await runInTemp("build-selected-smoke", async (tmp, $) => {
@@ -17,7 +18,6 @@ async function main() {
     await fs.ensureDir(path.join(tmp, "third_party", "providers"));
 
     const pairs: Array<[string, string]> = [
-      [path.join(repo, "flake.nix"), path.join(tmp, "flake.nix")],
       [
         path.join(repo, "build-tools", "tools", "nix"),
         path.join(tmp, "viberoots", "build-tools", "tools", "nix"),
@@ -84,23 +84,21 @@ async function main() {
     ].join("\n");
     await fs.writeFile(path.join(appDir, "TARGETS"), targets, "utf8");
 
-    // Ensure executable bit and run via zx-wrapper shebang
-    await $({ cwd: tmp })`chmod +x viberoots/build-tools/tools/dev/build-selected.ts`;
+    await runGluePipeline({
+      forceGraph: true,
+      workspaceRoot: tmp,
+      toolSourceRoot: process.env.VIBEROOTS_SOURCE_ROOT || path.join(tmp, "viberoots"),
+      env: process.env,
+    });
+
     const label = "//projects/apps/demo:demo";
     const cppTargetAttrSuffix = sanitizeAttrNameFromLabel(label);
-    const env = {
-      ...process.env,
-      BUCK_TARGET: label,
-      BUCK_TARGET_ATTR: cppTargetAttrSuffix,
-      BUCK_TEST_SRC: tmp,
-    } as any;
-    const cmd = $({
-      cwd: tmp,
-      env,
-      reject: false,
-      nothrow: true,
-    })`viberoots/build-tools/tools/dev/build-selected.ts`;
-    const { stdout, stderr, exitCode } = await cmd;
+    const { stdout, stderr, exitCode } = await runBuildSelected({
+      tmp,
+      $,
+      target: label,
+      stdio: "pipe",
+    });
     if (exitCode !== 0) {
       console.error("build-selected failed", stderr);
       process.exit(exitCode || 1);

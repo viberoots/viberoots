@@ -5,6 +5,7 @@ import { test } from "node:test";
 import { collectRemoteExecTargetMetadata } from "../../dev/verify/remote-target-policy";
 import { parseVerifyExecutionPolicy } from "../../dev/verify/remote-policy";
 import { validateRemoteExecTargets } from "../../dev/remote-exec-policy-check";
+import { remoteBuilderSmokeEvidence } from "./remote-builder-smoke-test-fixture";
 import { normalizeTargetLabel } from "../../lib/labels";
 import { inheritedBuckIsolation } from "../lib/test-helpers";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
@@ -35,6 +36,7 @@ test("first local conformance target has target-derived readiness evidence", asy
   assert.deepEqual(
     validateRemoteExecTargets({
       mode: "remote",
+      testOnlyRemoteBuilderSmokeEvidence: remoteBuilderSmokeEvidence,
       targets: metadata,
       allowedProfiles: ["linux-x86_64-default"],
     }),

@@ -21,10 +21,11 @@ let
     else builtins.throw "packages/default.nix requires nodeMods or mkNodeMods";
   filterRepo = import ./filter-repo.nix { inherit lib; };
   repoSnapshot = builtins.path { path = repoRoot; name = "repo"; filter = filterRepo repoRoot; };
-
+  remoteTools = import ./remote-worker-tools.nix { inherit pkgs zx-wrapper viberootsRoot; };
   importers = import ./importers.nix { inherit lib filterRepo repoSnapshot repoRoot; };
   graph = import ./graph.nix {
     inherit pkgs repoSnapshot uv2nixLib repoRoot viberootsRoot nixpkgsRegistry evaluationBundle;
+    artifactToolsRoot = remoteTools.remote-worker-tools;
     nodeMods = resolvedNodeMods;
   };
 
@@ -64,17 +65,19 @@ let
     nodeMods = resolvedNodeMods;
     importerDirs = importers.importerDirs;
     allowGenerate = importers.allowGenerate;
+    coverage = if evaluationBundle == null then false else evaluationBundle.selection.coverage or false;
   };
 
   toolchains = import ./toolchains.nix { inherit pkgs; };
   python = import ./python.nix { inherit pkgs repoRoot uv2nixLib; };
   pyWasiToolchain = import ../../toolchains/python-wasi.nix { inherit pkgs; };
-  testSeed = import ./test-seed.nix { inherit pkgs repoRoot; };
+  testSeed = import ./test-seed.nix {
+    inherit pkgs repoRoot evaluationBundle viberootsRoot;
+  };
   controlPlaneImage = import ./deployment-control-plane-image.nix {
     inherit pkgs filterRepo repoRoot repoSnapshot viberootsRoot;
     nodeMods = if viberootsNodeMods != null then viberootsNodeMods else resolvedNodeMods;
   };
-  remoteTools = import ./remote-worker-tools.nix { inherit pkgs zx-wrapper; };
   remoteWorkerBootstrap = import ./remote-worker-bootstrap.nix {
     inherit pkgs viberootsRoot;
     inherit (remoteTools) remote-worker-tools;
@@ -82,6 +85,7 @@ let
   viberootsCommand = import ../../packages/viberoots-command.nix {
     inherit pkgs zx-wrapper version releaseTag;
     viberootsSrc = viberootsRoot;
+    artifactToolsRoot = remoteTools.remote-worker-tools;
   };
 in
 {

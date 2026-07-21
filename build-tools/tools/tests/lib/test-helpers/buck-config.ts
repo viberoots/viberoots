@@ -2,6 +2,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { DEFAULT_GRAPH_PATH, WORKSPACE_BUCK_STATE_DIR } from "../../../lib/workspace-state-paths";
 import { BUCK_PROJECT_IGNORE_LINE } from "../../../lib/buck-project-ignore";
+import { readGlobalNixInputTargets } from "../../../lib/global-nix-input-targets";
 import "./worker-init";
 let cachedPreludePath: Promise<string> | null = null;
 interface TempRepoBuckConfigOptions {
@@ -143,7 +144,7 @@ export async function ensureBuckConfigForTempRepo(
     "[repositories]",
     "root = .",
     "viberoots = ./.viberoots/current",
-    "prelude = ./.viberoots/current/prelude",
+    "prelude = ./.viberoots/workspace/prelude",
     "toolchains = ./.viberoots/current/toolchains",
     "repo_toolchains = ./.viberoots/workspace/toolchains",
     "config = ./config",
@@ -155,7 +156,7 @@ export async function ensureBuckConfigForTempRepo(
     "[cells]",
     "root = .",
     "viberoots = ./.viberoots/current",
-    "prelude = ./.viberoots/current/prelude",
+    "prelude = ./.viberoots/workspace/prelude",
     "toolchains = ./.viberoots/current/toolchains",
     "repo_toolchains = ./.viberoots/workspace/toolchains",
     "config = ./config",
@@ -180,8 +181,18 @@ export async function ensureBuckConfigForTempRepo(
     '[ -e .viberoots/current ] || { if [ -e viberoots/prelude/prelude.bzl ] && [ -e viberoots/build-tools ]; then ln -s ../viberoots .viberoots/current; elif [ -n "${VIBEROOTS_ROOT:-}" ] && [ -e "$VIBEROOTS_ROOT/build-tools" ]; then ln -s "$VIBEROOTS_ROOT" .viberoots/current; elif [ -e build-tools ]; then ln -s .. .viberoots/current; else ln -s ../viberoots .viberoots/current; fi; }',
     '[ -e viberoots/build-tools ] || [ -L viberoots/build-tools ] || { if [ -n "${VIBEROOTS_ROOT:-}" ] && [ -e "$VIBEROOTS_ROOT/build-tools" ]; then ln -s "$VIBEROOTS_ROOT/build-tools" viberoots/build-tools; elif [ -e .viberoots/current/build-tools ]; then ln -s ../.viberoots/current/build-tools viberoots/build-tools; fi; }',
     "mkdir -p .viberoots/workspace",
-    'if [ ! -f .viberoots/workspace/flake.lock ]; then if [ -n "${VIBEROOTS_ROOT:-}" ] && [ -f "$VIBEROOTS_ROOT/.viberoots/workspace/flake.lock" ]; then cp "$VIBEROOTS_ROOT/.viberoots/workspace/flake.lock" .viberoots/workspace/flake.lock; elif [ -n "${VIBEROOTS_ROOT:-}" ] && [ -f "$(dirname "$VIBEROOTS_ROOT")/.viberoots/workspace/flake.lock" ]; then cp "$(dirname "$VIBEROOTS_ROOT")/.viberoots/workspace/flake.lock" .viberoots/workspace/flake.lock; elif [ -n "${VIBEROOTS_ROOT:-}" ] && [ -f "$VIBEROOTS_ROOT/flake.lock" ]; then cp "$VIBEROOTS_ROOT/flake.lock" .viberoots/workspace/flake.lock; elif [ -f flake.lock ]; then cp flake.lock .viberoots/workspace/flake.lock; else printf \'{"nodes":{},"root":"root","version":7}\\n\' > .viberoots/workspace/flake.lock; fi; fi',
+    preludePath
+      ? "[ -L .viberoots/workspace/prelude ] && [ ! -e .viberoots/workspace/prelude/prelude.bzl ] && rm -f .viberoots/workspace/prelude"
+      : ":",
+    preludePath
+      ? `[ -e .viberoots/workspace/prelude/prelude.bzl ] || [ -L .viberoots/workspace/prelude ] || ln -s "${preludePath}" .viberoots/workspace/prelude`
+      : ":",
+    'if [ ! -f .viberoots/workspace/flake.nix ]; then if [ -f flake.nix ]; then cp flake.nix .viberoots/workspace/flake.nix; elif [ -n "${VIBEROOTS_ROOT:-}" ] && [ -f "$VIBEROOTS_ROOT/.viberoots/workspace/flake.nix" ]; then cp "$VIBEROOTS_ROOT/.viberoots/workspace/flake.nix" .viberoots/workspace/flake.nix; else printf \'{ outputs = { self }: { }; }\\n\' > .viberoots/workspace/flake.nix; fi; fi',
+    'if [ ! -f .viberoots/workspace/flake.lock ]; then if [ -f flake.lock ]; then cp flake.lock .viberoots/workspace/flake.lock; elif [ -n "${VIBEROOTS_ROOT:-}" ] && [ -f "$VIBEROOTS_ROOT/.viberoots/workspace/flake.lock" ]; then cp "$VIBEROOTS_ROOT/.viberoots/workspace/flake.lock" .viberoots/workspace/flake.lock; elif [ -n "${VIBEROOTS_ROOT:-}" ] && [ -f "$(dirname "$VIBEROOTS_ROOT")/.viberoots/workspace/flake.lock" ]; then cp "$(dirname "$VIBEROOTS_ROOT")/.viberoots/workspace/flake.lock" .viberoots/workspace/flake.lock; elif [ -n "${VIBEROOTS_ROOT:-}" ] && [ -f "$VIBEROOTS_ROOT/flake.lock" ]; then cp "$VIBEROOTS_ROOT/flake.lock" .viberoots/workspace/flake.lock; else printf \'{"nodes":{},"root":"root","version":7}\\n\' > .viberoots/workspace/flake.lock; fi; fi',
     "test -f .viberoots/workspace/nixpkgs-source-registry-extension.nix || printf '{ inputs }: { profiles = { }; }\\n' > .viberoots/workspace/nixpkgs-source-registry-extension.nix",
+    "mkdir -p projects/config",
+    "test -f projects/config/node-modules.hashes.json || printf '{}\\n' > projects/config/node-modules.hashes.json",
+    "rm -f .viberoots/workspace/node-modules.hashes.json",
     'for base in config viberoots/config; do for cell in fbsource_stub fbcode_stub; do mkdir -p "$base/$cell"; printf "[buildfile]\\nname = TARGETS\\n" > "$base/$cell/.buckconfig"; printf "# stub %s cell for temp repositories\\n" "$cell" > "$base/$cell/TARGETS"; done; done',
     "mkdir -p config/go/constraints viberoots/config/go/constraints config/cpu viberoots/config/cpu config/os viberoots/config/os config/os/constraints viberoots/config/os/constraints",
     'for base in config viberoots/config; do printf "[buildfile]\\nname = TARGETS\\n" > "$base/.buckconfig"; printf "# temp repository config prelude placeholder\\n" > "$base/prelude.bzl"; printf "# temp repository config rules placeholder\\n" > "$base/rules.bzl"; done',
@@ -194,30 +205,11 @@ export async function ensureBuckConfigForTempRepo(
     "mkdir -p .viberoots/workspace/buck",
     "printf '[buildfile]\\nname = TARGETS\\n' > .viberoots/workspace/buck/.buckconfig",
     "printf '[]\\n' > .viberoots/workspace/buck/graph.json",
-    "printf 'WORKSPACE_ROOT=%s\\n' \"$PWD\" > .viberoots/workspace/buck/workspace-root.env",
-    '[ -n "${VIBEROOTS_ROOT:-}" ] && printf \'VIBEROOTS_ROOT=%s\\n\' "$VIBEROOTS_ROOT" >> .viberoots/workspace/buck/workspace-root.env || true',
-    '[ -n "${VIBEROOTS_SOURCE_ROOT:-}" ] && printf \'VIBEROOTS_SOURCE_ROOT=%s\\n\' "$VIBEROOTS_SOURCE_ROOT" >> .viberoots/workspace/buck/workspace-root.env || true',
-    '[ -n "${VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT:-}" ] && printf \'VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT=%s\\n\' "$VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT" >> .viberoots/workspace/buck/workspace-root.env || true',
-    '[ -n "${VIBEROOTS_FLAKE_INPUT_ROOT:-}" ] && printf \'VIBEROOTS_FLAKE_INPUT_ROOT=%s\\n\' "$VIBEROOTS_FLAKE_INPUT_ROOT" >> .viberoots/workspace/buck/workspace-root.env || true',
-    '[ -n "${ZX_INIT:-}" ] && printf \'ZX_INIT=%s\\n\' "$ZX_INIT" >> .viberoots/workspace/buck/workspace-root.env || true',
+    'printf "# Workspace root is derived from this declared input\'s sandbox path.\\n" > .viberoots/workspace/buck/workspace-root.env',
     "cat > .viberoots/workspace/buck/TARGETS <<'EOF'",
     'load("@prelude//:rules.bzl", "export_file")',
-    'export_file(name = "graph.json", src = "graph.json", visibility = ["PUBLIC"])',
+    'export_file(name = "graph.json", src = "graph.json", out = "graph.37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570.json", visibility = ["PUBLIC"])',
     'export_file(name = "workspace-root.env", src = "workspace-root.env", visibility = ["PUBLIC"])',
-    "EOF",
-    "cat > .viberoots/workspace/TARGETS <<'EOF'",
-    "# generated by viberoots/init-consumer",
-    "filegroup(",
-    '    name = "flake.lock",',
-    '    srcs = ["flake.lock"],',
-    '    visibility = ["PUBLIC"],',
-    ")",
-    "",
-    "filegroup(",
-    '    name = "nixpkgs-source-registry-extension",',
-    '    srcs = ["nixpkgs-source-registry-extension.nix"],',
-    '    visibility = ["PUBLIC"],',
-    ")",
     "EOF",
     "mkdir -p .viberoots/workspace/providers",
     "printf '[buildfile]\\nname = TARGETS\\n' > .viberoots/workspace/providers/.buckconfig",
@@ -323,26 +315,30 @@ export async function ensureBuckConfigForTempRepo(
     "EOF",
   ].join("\n");
   await $({ cwd: tmp })`bash --noprofile --norc -c ${setupScript}`;
+  await writeGlobalNixInputTargetFixtures(tmp);
+}
+
+export async function writeGlobalNixInputTargetFixtures(root: string): Promise<void> {
+  const globalTargets = await readGlobalNixInputTargets(root);
+  await Promise.all([
+    fsp.mkdir(path.join(root, "projects/config"), { recursive: true }),
+    fsp.mkdir(path.join(root, ".viberoots/workspace"), { recursive: true }),
+  ]);
+  await Promise.all([
+    fsp.writeFile(path.join(root, "projects/config/TARGETS"), globalTargets.projectsConfigTargets),
+    fsp.writeFile(path.join(root, ".viberoots/workspace/TARGETS"), globalTargets.workspaceTargets),
+  ]);
 }
 
 export async function ensureWorkspaceRootEnvFile(
   tmp: string,
   activeViberootsRoot?: string,
-  selectedViberootsInputRoot?: string,
 ): Promise<void> {
   try {
     const current = path.join(tmp, ".viberoots", "current");
     const currentZxInit = path.join(current, "build-tools", "tools", "dev", "zx-init.mjs");
     const buckToolsDir = path.join(tmp, WORKSPACE_BUCK_STATE_DIR);
     const viberootsRoot = activeViberootsRoot || process.env.VIBEROOTS_ROOT || "";
-    const viberootsSourceRoot =
-      activeViberootsRoot || process.env.VIBEROOTS_SOURCE_ROOT || viberootsRoot;
-    const viberootsInputRoot =
-      selectedViberootsInputRoot ||
-      process.env.VIBEROOTS_SOURCE_ROOT ||
-      process.env.VIBEROOTS_ROOT ||
-      process.env.VIBEROOTS_FLAKE_INPUT_ROOT ||
-      "";
     await fsp.mkdir(path.join(tmp, ".viberoots"), { recursive: true });
     const currentOk = await fsp
       .access(currentZxInit)
@@ -359,26 +355,9 @@ export async function ensureWorkspaceRootEnvFile(
       }
     }
     await fsp.mkdir(buckToolsDir, { recursive: true });
-    const zxInit =
-      process.env.ZX_INIT ||
-      (viberootsSourceRoot
-        ? path.join(viberootsSourceRoot, "build-tools", "tools", "dev", "zx-init.mjs")
-        : "");
     await fsp.writeFile(
       path.join(buckToolsDir, "workspace-root.env"),
-      [
-        `WORKSPACE_ROOT=${tmp}`,
-        viberootsRoot ? `VIBEROOTS_ROOT=${viberootsRoot}` : "",
-        viberootsSourceRoot ? `VIBEROOTS_SOURCE_ROOT=${viberootsSourceRoot}` : "",
-        process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT
-          ? `VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT=${process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT}`
-          : "",
-        viberootsInputRoot ? `VIBEROOTS_FLAKE_INPUT_ROOT=${viberootsInputRoot}` : "",
-        zxInit ? `ZX_INIT=${zxInit}` : "",
-        "",
-      ]
-        .filter((line, idx, arr) => line || idx === arr.length - 1)
-        .join("\n"),
+      "# Workspace root is derived from this declared input's sandbox path.\n",
       "utf8",
     );
     const graphPath = path.join(tmp, DEFAULT_GRAPH_PATH);

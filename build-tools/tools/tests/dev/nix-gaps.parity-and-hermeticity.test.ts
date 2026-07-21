@@ -4,13 +4,22 @@ import crypto from "node:crypto";
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
+import {
+  artifactSelectorNames,
+  canonicalArtifactToolsRoot,
+  isArtifactAffectingEnvName,
+} from "../../lib/artifact-environment";
+import { reconcileGeneratedGraph } from "../../patch/glue";
+import { createHermeticParityFixture } from "./nix-gaps.parity-and-hermeticity.helpers";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
 
 type BuildCase = {
   target: string;
+  attr?: string;
   validate: (outPath: string, $: any) => Promise<void>;
 };
 
@@ -35,97 +44,79 @@ async function firstFileInDir(dir: string): Promise<string> {
   return path.join(dir, names[0]);
 }
 
+async function createHostileToolDir(dir: string, sentinel: string): Promise<void> {
+  await fs.ensureDir(dir);
+  for (const tool of [
+    "c++",
+    "cargo",
+    "cc",
+    "clang",
+    "date",
+    "gcc",
+    "git",
+    "go",
+    "nix",
+    "node",
+    "pnpm",
+    "python3",
+    "rustc",
+    "uname",
+    "uv",
+  ]) {
+    const executable = path.join(dir, tool);
+    await fs.writeFile(
+      executable,
+      `#!/bin/sh\nprintf '%s\\n' ${JSON.stringify(tool)} >> ${JSON.stringify(sentinel)}\nexit 97\n`,
+    );
+    await fs.chmod(executable, 0o755);
+  }
+}
+
 async function selectedBuildOutPath(
   tmp: string,
   $: any,
   target: string,
-  nixBin: string,
   env: Record<string, string>,
+  attr = "graph-generator-selected",
 ): Promise<string> {
+  await reconcileGeneratedGraph({ workspaceRoot: tmp, target });
   const res = await $({
     cwd: tmp,
     stdio: "pipe",
-    env: {
-      ...env,
-      BUCK_TARGET: target,
-      BUCK_TEST_SRC: tmp,
-      BUCK_GRAPH_JSON: path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
-    },
-  })`${nixBin} build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`} --accept-flake-config --no-link --print-out-paths`;
+    env,
+  })`${path.join(canonicalArtifactToolsRoot(process.cwd()), "bin", "node")} --experimental-strip-types --import ${viberootsSourcePath("build-tools/tools/dev/zx-init.mjs")} ${viberootsSourcePath("build-tools/tools/dev/build-selected.ts")} --source=git --target ${target} --attr ${attr}`;
+  if (res.exitCode !== 0) {
+    throw new Error(`${String(res.stderr || "")}\n${String(res.stdout || "")}`.trim());
+  }
   const outPath = parseLastOutPath(res.stdout);
   assert.ok(outPath, `expected nix output path for ${target}`);
+  assert.match(
+    String(res.stderr || ""),
+    /"classification":"hermetic"/,
+    `${target} must pass release-class hermetic admission`,
+  );
   return outPath;
 }
 
 test(
-  "node/cpp/rust parity signals hold in a minimal environment",
+  "all supported artifact languages keep identical identities across hostile environments",
   { timeout: TEST_TIMEOUT_MS },
   async () => {
     await runInTemp("nix-gaps-parity", async (tmp, $) => {
-      const nodeImporter = "projects/apps/parity-node";
-      const nodeLock = `${nodeImporter}/pnpm-lock.yaml`;
-      const nodeLabel = `lockfile:${nodeLock}#${nodeImporter}`;
-
-      await fs.outputFile(path.join(tmp, nodeLock), "lockfileVersion: '9.0'\n", "utf8");
-      await fs.outputFile(
-        path.join(tmp, nodeImporter, "src", "input.txt"),
-        "node-parity\n",
-        "utf8",
-      );
-
-      await fs.outputFile(
-        path.join(tmp, "projects", "apps", "parity-cpp", "src", "main.cpp"),
-        '#include <iostream>\nint main(){ std::cout<<"cpp-parity\\n"; return 0; }\n',
-        "utf8",
-      );
-
-      await fs.outputFile(
-        path.join(tmp, "projects", "apps", "parity-rust", "src", "main.rs"),
-        "fn main() {}\n",
-        "utf8",
-      );
-
-      await fs.outputFile(
-        path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
-        JSON.stringify(
-          [
-            {
-              name: "//projects/apps/parity-node:gen_bin",
-              rule_type: "genrule",
-              labels: ["lang:node", "kind:bin", nodeLabel],
-              srcs: [`${nodeImporter}/src/input.txt`],
-              out: "parity-node.sh",
-              cmd: 'cat src/input.txt > "$OUT"',
-            },
-            {
-              name: "//projects/apps/parity-cpp:app",
-              rule_type: "cxx_binary",
-              labels: ["lang:cpp", "kind:bin"],
-              srcs: ["projects/apps/parity-cpp/src/main.cpp"],
-            },
-            {
-              name: "//projects/apps/parity-rust:app",
-              rule_type: "rust_binary",
-              labels: ["lang:rust", "kind:bin"],
-              srcs: ["projects/apps/parity-rust/src/main.rs"],
-            },
-          ],
-          null,
-          2,
-        ) + "\n",
-        "utf8",
-      );
-
-      const nixBin = String((await $({ cwd: tmp, stdio: "pipe" })`which nix`).stdout || "").trim();
-      assert.ok(nixBin, "expected nix on PATH");
+      await createHermeticParityFixture(tmp);
+      await reconcileTempDependencyInputs(tmp, $);
+      const hostileSentinel = path.join(tmp, "host-tool-used.log");
+      const hostileToolsA = path.join(tmp, "host-tools-a");
+      const hostileToolsB = path.join(tmp, "host-tools-b");
+      await createHostileToolDir(hostileToolsA, hostileSentinel);
+      await createHostileToolDir(hostileToolsB, hostileSentinel);
 
       const minimalEnv: Record<string, string> = {
-        HOME: String(process.env.HOME || ""),
+        ...(process.env as Record<string, string>),
+        HOME: path.join(tmp, "hostile-home-a"),
         USER: String(process.env.USER || ""),
-        PATH: [path.dirname(nixBin), "/usr/bin", "/bin"].join(path.delimiter),
-        XDG_CONFIG_HOME: String(
-          process.env.XDG_CONFIG_HOME || path.join(String(process.env.HOME || ""), ".config"),
-        ),
+        PATH: [hostileToolsA, String(process.env.PATH || "")].join(path.delimiter),
+        XDG_CONFIG_HOME: path.join(tmp, "hostile-config-a"),
         NIX_CONFIG: String(process.env.NIX_CONFIG || ""),
         NIX_SSL_CERT_FILE: String(process.env.NIX_SSL_CERT_FILE || ""),
         NIX_SSL_CERT_DIR: String(process.env.NIX_SSL_CERT_DIR || ""),
@@ -133,20 +124,61 @@ test(
         SSL_CERT_DIR: String(process.env.SSL_CERT_DIR || process.env.NIX_SSL_CERT_DIR || ""),
         TMPDIR: String(process.env.TMPDIR || "/tmp"),
         IN_NIX_SHELL: "1",
-        CC: "/usr/bin/false",
-        CXX: "/usr/bin/false",
-        GCC: "/usr/bin/false",
-        CLANG: "/usr/bin/false",
-        RUSTC: "/usr/bin/false",
-        NODE: "/usr/bin/false",
+        TZ: "Pacific/Honolulu",
+        LANG: "tr_TR.UTF-8",
+        LC_ALL: "tr_TR.UTF-8",
+        SOURCE_DATE_EPOCH: "999999999",
       };
+      for (const selector of artifactSelectorNames()) delete minimalEnv[selector];
+      for (const name of Object.keys(minimalEnv)) {
+        if (isArtifactAffectingEnvName(name)) delete minimalEnv[name];
+      }
+      delete minimalEnv.VBR_CANONICAL_ARTIFACT_ENTRYPOINT;
+      const alternateEnv: Record<string, string> = {
+        ...minimalEnv,
+        HOME: path.join(tmp, "hostile-home-b"),
+        PATH: [hostileToolsB, String(process.env.PATH || "")].join(path.delimiter),
+        XDG_CONFIG_HOME: path.join(tmp, "hostile-config-b"),
+        TZ: "Europe/Berlin",
+        LANG: "ja_JP.UTF-8",
+        LC_ALL: "ja_JP.UTF-8",
+        SOURCE_DATE_EPOCH: "123456789",
+      };
+
+      await assert.rejects(
+        selectedBuildOutPath(tmp, $, "//:hermetic_parity_gen_bin__planner", {
+          ...minimalEnv,
+          CC: path.join(hostileToolsA, "cc"),
+          CXX: path.join(hostileToolsA, "c++"),
+          GOROOT: path.join(tmp, "host-go"),
+          PYTHON: path.join(hostileToolsA, "python3"),
+          RUSTC: path.join(hostileToolsA, "rustc"),
+        }),
+        /artifact build rejects ambient selectors/,
+      );
+      await assert.rejects(
+        selectedBuildOutPath(tmp, $, "//:hermetic_parity_gen_bin__planner", {
+          ...minimalEnv,
+          NIX_REMOTE: "ssh://host-store",
+        }),
+        /rejects ambient NIX_REMOTE authority/,
+      );
+      await assert.rejects(
+        selectedBuildOutPath(tmp, $, "//:hermetic_parity_gen_bin__planner", {
+          ...minimalEnv,
+          NIX_SSL_CERT_FILE: "/tmp/host-cert.pem",
+        }),
+        /rejects unavailable NIX_SSL_CERT_FILE/,
+      );
 
       const expectedNodeHash = sha256Hex("node-parity\n");
       const cases: BuildCase[] = [
         {
-          target: "//projects/apps/parity-node:gen_bin",
+          // The public target is the Buck materialization wrapper. Its planner companion
+          // is the canonical Nix artifact target selected by that wrapper.
+          target: "//:hermetic_parity_gen_bin__planner",
           validate: async (outPath) => {
-            const outFile = path.join(outPath, "bin", "parity-node.sh");
+            const outFile = path.join(outPath, "parity-node.sh");
             const txt = await fs.readFile(outFile, "utf8");
             assert.equal(sha256Hex(txt), expectedNodeHash);
           },
@@ -170,12 +202,45 @@ test(
             assert.equal(String(run.stdout || "").trim(), "rust-binary:app");
           },
         },
+        {
+          target: "//projects/apps/parity-go:app",
+          validate: async (outPath, _$) => {
+            const bin = await firstFileInDir(path.join(outPath, "bin"));
+            const run = await _$({ stdio: "pipe", env: minimalEnv })`${bin}`;
+            assert.equal(String(run.stdout || "").trim(), "go-parity");
+          },
+        },
+        {
+          target: "//projects/apps/parity-python:app",
+          validate: async (outPath) => {
+            assert.ok(await fs.pathExists(path.join(outPath, "bin")));
+          },
+        },
+        {
+          target: "//projects/libs/parity-wasm-go:module",
+          attr: "graph-generator-selected-wasm",
+          validate: async (outPath) => {
+            assert.ok(await fs.pathExists(path.join(outPath, "lib", "top.wasm")));
+          },
+        },
       ];
 
+      await $({ cwd: tmp, stdio: "pipe" })`git add -A`;
+
       for (const c of cases) {
-        const outPath = await selectedBuildOutPath(tmp, $, c.target, nixBin, minimalEnv);
-        await c.validate(outPath, $);
+        const first = await selectedBuildOutPath(tmp, $, c.target, minimalEnv, c.attr);
+        const second = await selectedBuildOutPath(tmp, $, c.target, alternateEnv, c.attr);
+        assert.equal(second, first, `${c.target} identity changed under hostile environment`);
+        console.error(
+          `[hermetic-matrix] target=${c.target} first=${first} second=${second} equal=true`,
+        );
+        await c.validate(first, $);
       }
+      assert.equal(
+        await fs.pathExists(hostileSentinel),
+        false,
+        "artifact build executed a host tool",
+      );
     });
   },
 );

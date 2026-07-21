@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
-import { isGeneratedRepoStateRelPath } from "../../dev/verify/generated-state-excludes";
+import { isGeneratedRepoStateRelPath } from "../../lib/generated-repo-state";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 async function readRepoFile(relativePath: string): Promise<string> {
@@ -25,6 +25,8 @@ const generatedStatePaths = [
   ".viberoots/workspace/pr-logs/source-snapshot.log",
   ".viberoots/workspace/viberoots-flake-input/.nix-gcroots/devshell",
   ".viberoots/workspace/xdg-cache/nix/tarball-cache-v2",
+  "build-tools/tools/dev/toolchain-paths.json",
+  "toolchains/toolchain_paths.bzl",
   "viberoots/.DS_Store",
   "viberoots/.codex-logs/session.log",
   "viberoots/.codex-focused-verify.log",
@@ -35,12 +37,14 @@ const generatedStatePaths = [
   "viberoots/backups/snapshot.json",
   "viberoots/buck-out/v2/cache",
   "viberoots/build-tools/tmp/scratch",
+  "viberoots/build-tools/tools/dev/toolchain-paths.json",
   "viberoots/cache/pnpm/blob",
   "viberoots/codex-test-logs/focused.log",
   "viberoots/install-cache/state.json",
   "viberoots/nix-xdg-cache/nix/tarball-cache-v2",
   "viberoots/node_modules/.bin/tool",
   "viberoots/pr-logs/run.log",
+  "viberoots/toolchains/toolchain_paths.bzl",
   "viberoots/xdg-cache/pnpm/blob",
 ];
 
@@ -73,6 +77,8 @@ test("verify seed nix filters mirror split-root generated-state guardrail", asyn
     "viberoots/.DS_Store",
     "viberoots/.codex-",
     "viberoots/build-tools/tmp",
+    "toolchain-paths.json",
+    "toolchain_paths.bzl",
   ];
   for (const needle of sharedLiteralNeedles) {
     assert.match(filterSource, new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

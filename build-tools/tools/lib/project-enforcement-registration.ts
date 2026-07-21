@@ -1,4 +1,5 @@
 import * as fsp from "node:fs/promises";
+import crypto from "node:crypto";
 import path from "node:path";
 import { writeIfChanged } from "./fs-helpers";
 import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
@@ -36,12 +37,16 @@ export async function discoverProjectEnforcementRunners(
     .sort((left, right) => left.name.localeCompare(right.name));
 }
 
-export function renderWorkspaceBuckTargets(runners: readonly ProjectEnforcementRunner[]): string {
+export function renderWorkspaceBuckTargets(
+  runners: readonly ProjectEnforcementRunner[],
+  graphDigest = "",
+): string {
+  const graphOutput = graphDigest ? `graph.${graphDigest}.json` : "graph.json";
   const lines = [
     'load("@prelude//:rules.bzl", "export_file")',
     'load("@viberoots//build-tools/tools/buck:zx_test.bzl", "zx_test")',
     "",
-    'export_file(name = "graph.json", src = "graph.json", visibility = ["PUBLIC"])',
+    `export_file(name = "graph.json", src = "graph.json", out = ${JSON.stringify(graphOutput)}, visibility = ["PUBLIC"])`,
     'export_file(name = "workspace-root.env", src = "workspace-root.env", visibility = ["PUBLIC"])',
   ];
   for (const runner of runners) {
@@ -61,6 +66,16 @@ export function renderWorkspaceBuckTargets(runners: readonly ProjectEnforcementR
   return `${lines.join("\n")}\n`;
 }
 
+async function workspaceGraphDigest(dir: string): Promise<string> {
+  const contents = await fsp
+    .readFile(path.join(dir, "graph.json"), "utf8")
+    .catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return "[]\n";
+      throw error;
+    });
+  return crypto.createHash("sha256").update(contents).digest("hex");
+}
+
 export async function ensureProjectEnforcementRegistration(opts?: {
   workspaceRoot?: string;
   viberootsRoot?: string;
@@ -74,12 +89,13 @@ export async function ensureProjectEnforcementRegistration(opts?: {
   const runners = await discoverProjectEnforcementRunners(viberootsRoot);
   if (runners.length === 0) {
     throw new Error(
-      `project enforcement registration found no ${PROJECT_ENFORCEMENT_SUFFIX} runners`,
+      `project enforcement registration found no ${PROJECT_ENFORCEMENT_SUFFIX} runners under ${path.join(viberootsRoot, RUNNER_DIR)}`,
     );
   }
   await assertProjectEnforcementRunnerAdmission(runners, viberootsRoot);
   const dir = path.join(workspaceRoot, WORKSPACE_BUCK_STATE_DIR);
   await mkdirWithMacosMetadataExclusion(dir);
-  await writeIfChanged(path.join(dir, "TARGETS"), renderWorkspaceBuckTargets(runners));
+  const graphDigest = await workspaceGraphDigest(dir);
+  await writeIfChanged(path.join(dir, "TARGETS"), renderWorkspaceBuckTargets(runners, graphDigest));
   return runners;
 }

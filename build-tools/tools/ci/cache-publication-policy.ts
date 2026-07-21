@@ -8,6 +8,8 @@ export async function admitCachePublication(opts: {
   env: NodeJS.ProcessEnv;
   diagnosticImpure: boolean;
   toolNames?: string[];
+  artifactToolsRoot: string;
+  toolPaths?: Record<string, string | undefined>;
 }): Promise<void> {
   const sourceInventory = await inspectWorkspaceArtifactSource({
     workspaceRoot: process.cwd(),
@@ -20,9 +22,11 @@ export async function admitCachePublication(opts: {
       localDevelopment: sourceInventory.localDevelopment,
     }),
     purpose: "cache-publication",
-    impureEvaluation: true,
+    impureEvaluation: false,
     env: opts.env,
     workspaceRoot: process.cwd(),
     toolNames: ["git", ...(opts.toolNames || [])],
+    toolPaths: opts.toolPaths,
+    artifactToolsRoot: opts.artifactToolsRoot,
   });
 }

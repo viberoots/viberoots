@@ -10,16 +10,7 @@ import {
   targetPlatformArgsForPolicy,
   type VerifyExecutionPolicy,
 } from "../../dev/verify/remote-policy";
-
-const remotePolicy: VerifyExecutionPolicy = {
-  mode: "remote",
-  buckConfig: "/tmp/remote.buckconfig",
-  system: "x86_64-linux",
-  artifactDir: "/tmp/artifacts",
-  activationDir: "/tmp/activation",
-  profilePrefix: "linux-x86_64",
-  passProfiles: {},
-};
+import { REMOTE_TARGET_TEST_POLICY as remotePolicy } from "./remote-target-policy-fixture";
 
 function collectWithProvider(providerText: string, labels = ["remote:ready"]) {
   return collectRemoteExecTargetMetadata({
@@ -95,11 +86,12 @@ test("remote target policy collects cquery and provider metadata before Buck tes
 
 test("remote target policy extracts builder policy metadata from providers", () => {
   const metadata = collectWithProvider(
-    'DefaultInfo(metadata={"nix_builder_policy": "force_builders_file", "remote_builder_smoke": "force_builders_file"}) ExternalRunnerTestInfo(command=[cmd_args("runner", hidden=[<source helper.ts>])], run_from_project_root=True, use_project_relative_paths=True, local_resources={}, required_local_resources=[])',
+    'DefaultInfo(metadata={"nix_builder_policy": "force_builders_file", "remote_builder_smoke": "force_builders_file"}) NixRemoteActionPolicyInfo(remote_builder_smoke_path=<source build-tools/evidence/smoke.json>) ExternalRunnerTestInfo(command=[cmd_args("runner", hidden=[<source helper.ts>])], run_from_project_root=True, use_project_relative_paths=True, local_resources={}, required_local_resources=[])',
   );
 
   assert.equal(metadata[0]?.nixBuilderPolicy, "force_builders_file");
   assert.equal(metadata[0]?.remoteBuilderSmokePolicy, "force_builders_file");
+  assert.equal(metadata[0]?.remoteBuilderSmokePath, "build-tools/evidence/smoke.json");
 });
 
 test("remote target policy extracts stamped builder labels from provider text", () => {

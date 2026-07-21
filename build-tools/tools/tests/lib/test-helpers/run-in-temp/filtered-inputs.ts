@@ -13,6 +13,10 @@ import {
   materializeFilteredViberootsSource,
   type MaterializedPathInput,
 } from "../../../../dev/filtered-flake-viberoots-input";
+import {
+  buildCanonicalArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+} from "../../../../lib/artifact-environment";
 
 export function isGeneratedFilteredViberootsInputPath(value: string): boolean {
   const normalized = String(value || "")
@@ -129,7 +133,13 @@ export async function prepareFilteredViberootsInput(
         throw new Error(`runInTemp: filtered viberoots input retained ${excluded}`);
       }
     }
-    return await materializeFilteredViberootsSource(inputRoot);
+    const env = buildCanonicalArtifactEnvironment(process.cwd(), {
+      artifactToolsRoot: canonicalArtifactToolsRoot(
+        process.cwd(),
+        String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+      ),
+    });
+    return await materializeFilteredViberootsSource(inputRoot, env);
   } finally {
     await removeTreeWithWritableFallback(workDir, $);
   }

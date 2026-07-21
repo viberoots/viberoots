@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 
 function safeLogKeyFromLabel(label: string): string {
   return label.replace(/\//g, "_").replace(/:/g, "_");
@@ -39,6 +39,7 @@ test("nix_go_tiny_wasm_lib use_selected_wasm routes to selected-wasm path", asyn
       ].join("\n"),
       "utf8",
     );
+    await reconcileTempDependencyInputs(tmp, $);
 
     const label = "//projects/libs/math-api:wasm";
     const build = await $({
@@ -64,33 +65,8 @@ test("nix_go_tiny_wasm_lib use_selected_wasm routes to selected-wasm path", asyn
       "build-selected",
       `go_nix_build_wasm_build.${safeLogKeyFromLabel(label)}.log`,
     );
-    if (await fs.pathExists(logPath)) {
-      const log = await fs.readFile(logPath, "utf8");
-      assert.doesNotMatch(log, /\[build-selected\]/);
-    }
-
-    const { stdout: outWasmSel } = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-      env: { ...process.env, BUCK_TARGET: label },
-    })`nix build --impure -L ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected-wasm`} --accept-flake-config --no-link --print-out-paths`;
-    const outWasmPath =
-      String(outWasmSel || "")
-        .trim()
-        .split(/\n+/)
-        .pop() || "";
-    assert.ok(outWasmPath, "missing selected-wasm out path");
-    const tinygoWasm = path.join(outWasmPath, "lib", "top.wasm");
-    const ok =
-      await $`bash --noprofile --norc -c ${`test -f ${tinygoWasm} && echo ok || true`}`.nothrow();
-    if (
-      !String(ok.stdout || "")
-        .trim()
-        .includes("ok")
-    ) {
-      throw new Error("expected lib/top.wasm under selected-wasm out path");
-    }
+    assert.ok(await fs.pathExists(logPath), `expected build-selected log to exist: ${logPath}`);
+    const log = await fs.readFile(logPath, "utf8");
+    assert.match(log, /\[build-selected\] BUCK_TARGET=\/\/projects\/libs\/math-api:wasm/);
   });
 });

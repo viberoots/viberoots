@@ -15,7 +15,19 @@ test("node planner lazily imports node-modules inside mkApp", async () => {
   if (!txt.includes("mkApp = name: import ./node-app.nix")) {
     throw new Error(`${file} must delegate mkApp to node-app.nix`);
   }
+  if (!txt.includes('builtins.elem "node:cli-bundle"')) {
+    throw new Error(`${file} must distinguish bundled CLIs from generic generated binaries`);
+  }
+  if (!txt.includes("if isBundledCli name then import ./node-app.nix")) {
+    throw new Error(`${file} must build bundled CLIs without recursively executing Buck commands`);
+  }
   if (!appTxt.includes("import ../node-modules.nix")) {
     throw new Error(`${appFile} must keep node-modules import lazy inside mkApp path`);
+  }
+  if (!appTxt.includes("${pkgs.esbuild}/bin/esbuild")) {
+    throw new Error(`${appFile} must use the declared Nix esbuild tool`);
+  }
+  if (appTxt.includes("node_modules/.bin/esbuild")) {
+    throw new Error(`${appFile} must not require applications to declare the build-system tool`);
   }
 });

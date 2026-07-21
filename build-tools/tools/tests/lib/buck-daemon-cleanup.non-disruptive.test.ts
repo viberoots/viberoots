@@ -5,28 +5,15 @@ import path from "node:path";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { buckProcessTableLines } from "../../lib/process-inspection";
+import { rethrowAfterAsyncCleanup } from "./test-helpers/async-cleanup";
+import {
+  observeBuckCleanupChild,
+  requestBuckCleanupChildStop,
+  waitForBuckCleanupChildReady,
+} from "./buck-daemon-cleanup.fixture";
 import { runInTemp } from "./test-helpers";
 
 const BUCK_CLEANUP_RSYNC_ROOTS = "viberoots build-tools toolchains third_party/providers prelude";
-
-async function killAndWait(child: ReturnType<typeof spawn>, timeoutMs = 2000): Promise<void> {
-  const done =
-    child.exitCode !== null || child.signalCode !== null
-      ? Promise.resolve()
-      : new Promise<void>((resolve) => {
-          const timer = setTimeout(resolve, timeoutMs);
-          child.once("close", () => {
-            clearTimeout(timer);
-            resolve();
-          });
-        });
-  try {
-    child.kill("SIGKILL");
-  } catch {}
-  await done;
-  child.stdout?.destroy();
-  child.stderr?.destroy();
-}
 
 async function psForkserversForToken(token: string): Promise<string[]> {
   const lines = await buckProcessTableLines(2000);
@@ -67,34 +54,12 @@ test("buck cleanup: does not kill buck2 daemons belonging to other running temp 
     },
   );
 
-  let tmp = "";
-  let stdout = "";
-  let stderr = "";
-  let ready = false;
-  let exitCode: number | null = null;
-  child.stdout.setEncoding("utf8");
-  child.stdout.on("data", (d) => {
-    stdout += d;
-    const m = stdout.match(/TMP\s+(\S+)/);
-    if (m && m[1]) tmp = String(m[1]).trim();
-    if (stdout.includes("\nREADY\n") || stdout.trimEnd().endsWith("READY")) ready = true;
-  });
-  child.stderr.setEncoding("utf8");
-  child.stderr.on("data", (d) => {
-    stderr += d;
-  });
-  child.on("close", (code) => {
-    exitCode = code;
-  });
+  const state = observeBuckCleanupChild(child);
+  const cleanup = async () => await requestBuckCleanupChildStop(state);
 
   try {
-    const t0 = Date.now();
-    while ((!tmp || !ready) && Date.now() - t0 < 120_000) {
-      if (exitCode !== null) break;
-      await new Promise((r) => setTimeout(r, 50));
-    }
-    assert.ok(tmp, `expected child tmp path; got stdout:\n${stdout}\nstderr:\n${stderr}`);
-    assert.ok(ready, `expected child READY; got stdout:\n${stdout}\nstderr:\n${stderr}`);
+    await waitForBuckCleanupChildReady(state);
+    const tmp = state.tmp();
 
     const token = path.basename(tmp);
     await waitForPresent(token, 10_000);
@@ -116,14 +81,17 @@ test("buck cleanup: does not kill buck2 daemons belonging to other running temp 
     await fsp.writeFile(path.join(tmp, "go.signal"), "go\n", "utf8");
 
     const t1 = Date.now();
-    while (!stdout.includes("PING_OK") && Date.now() - t1 < 60_000) {
+    while (!state.stdout().includes("PING_OK") && Date.now() - t1 < 60_000) {
       await new Promise((r) => setTimeout(r, 50));
     }
     assert.ok(
-      stdout.includes("PING_OK"),
-      `expected child to complete second build; stdout:\n${stdout}`,
+      state.stdout().includes("PING_OK"),
+      `expected child to complete second build; stdout:\n${state.stdout()}`,
     );
-  } finally {
-    await killAndWait(child);
+  } catch (error) {
+    console.error(`buck cleanup child stdout before owned cleanup:\n${state.stdout()}`);
+    console.error(`buck cleanup child stderr before owned cleanup:\n${state.stderr()}`);
+    await rethrowAfterAsyncCleanup(error, cleanup);
   }
+  await cleanup();
 });

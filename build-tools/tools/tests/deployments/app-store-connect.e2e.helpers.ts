@@ -7,6 +7,7 @@ import {
   labelName,
   writePublisherConfig,
 } from "./mobile-release.e2e.helpers";
+import { reconcileSyntheticDeploymentGraph } from "./deployment-graph.fixture";
 
 export async function writeAppStoreConnectConfig(
   workspaceRoot: string,
@@ -74,6 +75,7 @@ export async function installAppStoreConnectTargets(
       );
     }),
   );
+  await reconcileSyntheticDeploymentGraph(workspaceRoot);
 }
 
 export function appStoreConnectFakeEnv(tmp: string): NodeJS.ProcessEnv {

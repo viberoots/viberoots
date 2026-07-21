@@ -1,6 +1,5 @@
-import fs from "node:fs";
 import path from "node:path";
-import { renderRemoteTestActivationConfigText } from "../../remote-exec/remote-test-activation";
+import { remoteActivationConfigPath } from "./remote-policy-activation";
 
 export type VerifyRemoteExecMode = "local" | "hybrid" | "remote" | "remote-only-conformance";
 export type VerifyRemoteExecSystem = "x86_64-linux" | "aarch64-linux" | "aarch64-darwin";
@@ -13,6 +12,14 @@ export type VerifyExecutionPolicy = {
   activationDir: string | null;
   profilePrefix: string | null;
   passProfiles: Record<string, string>;
+  remoteSmoke: {
+    remoteCiTools: string;
+    builderUri: string;
+    probeFlake: string;
+    builderIdentity: string;
+    reviewedBuilders: string;
+    reportPath: string;
+  } | null;
 };
 
 const REMOTE_MODES = new Set<VerifyRemoteExecMode>(["hybrid", "remote", "remote-only-conformance"]);
@@ -58,6 +65,21 @@ function parseAbsolutePath(raw: string, name: string): string {
   return normalized;
 }
 
+function parseNixStorePath(raw: string, name: string): string {
+  const parsed = parseAbsolutePath(raw, name);
+  if (!parsed.startsWith("/nix/store/")) throw new Error(`${name} must be a Nix store path`);
+  return parsed;
+}
+
+function requiredEnvValue(env: NodeJS.ProcessEnv, key: string): string {
+  const value = cleanEnvValue(env, key);
+  if (!value) throw new Error(`${key} is required for remote verify`);
+  if (value.includes("\0") || value.includes("\n") || value.includes("\r")) {
+    throw new Error(`${key} must be a single value`);
+  }
+  return value;
+}
+
 function envPassName(suffix: string): string {
   return suffix.toLowerCase().replaceAll("_", "-");
 }
@@ -95,6 +117,7 @@ export function parseVerifyExecutionPolicy(opts?: {
       activationDir: null,
       profilePrefix: null,
       passProfiles: {},
+      remoteSmoke: null,
     };
   }
   if (opts?.coverage) {
@@ -104,6 +127,10 @@ export function parseVerifyExecutionPolicy(opts?: {
   }
   const system = parseSystem(cleanEnvValue(env, "VBR_REMOTE_EXEC_SYSTEM"));
   const profilePrefix = PROFILE_PREFIX_BY_SYSTEM[system];
+  const artifactDir = parseAbsolutePath(
+    cleanEnvValue(env, "VBR_REMOTE_ARTIFACT_DIR"),
+    "VBR_REMOTE_ARTIFACT_DIR",
+  );
   return {
     mode,
     buckConfig: parseAbsolutePath(
@@ -111,16 +138,30 @@ export function parseVerifyExecutionPolicy(opts?: {
       "VBR_REMOTE_BUCK_CONFIG",
     ),
     system,
-    artifactDir: parseAbsolutePath(
-      cleanEnvValue(env, "VBR_REMOTE_ARTIFACT_DIR"),
-      "VBR_REMOTE_ARTIFACT_DIR",
-    ),
+    artifactDir,
     activationDir: parseAbsolutePath(
       cleanEnvValue(env, "VBR_REMOTE_TEST_ACTIVATION_DIR"),
       "VBR_REMOTE_TEST_ACTIVATION_DIR",
     ),
     profilePrefix,
     passProfiles: parsePassProfiles(env, profilePrefix),
+    remoteSmoke: {
+      remoteCiTools: parseNixStorePath(
+        requiredEnvValue(env, "VBR_REMOTE_CI_TOOLS"),
+        "VBR_REMOTE_CI_TOOLS",
+      ),
+      builderUri: requiredEnvValue(env, "VBR_REMOTE_BUILDER_URI"),
+      probeFlake: parseNixStorePath(
+        requiredEnvValue(env, "VBR_REMOTE_PROBE_FLAKE"),
+        "VBR_REMOTE_PROBE_FLAKE",
+      ),
+      builderIdentity: requiredEnvValue(env, "VBR_REMOTE_BUILDER_IDENTITY"),
+      reviewedBuilders: parseNixStorePath(
+        requiredEnvValue(env, "VBR_REMOTE_REVIEWED_BUILDERS"),
+        "VBR_REMOTE_REVIEWED_BUILDERS",
+      ),
+      reportPath: path.join(artifactDir, "remote-builder-smoke.json"),
+    },
   };
 }
 
@@ -149,26 +190,6 @@ export function buckCqueryArgsForExecutionPolicy(policy: VerifyExecutionPolicy):
   ];
 }
 
-function activationConfigPath(policy: VerifyExecutionPolicy, passName: string): string {
-  if (!policy.activationDir) {
-    throw new Error(
-      `remote verify selected test profile ${remoteProfileForPass(policy, passName) || "<none>"} for pass ${passName}, but VBR_REMOTE_TEST_ACTIVATION_DIR is required`,
-    );
-  }
-  const targetProfile = remoteProfileForPass(policy, passName);
-  if (!targetProfile)
-    throw new Error(`remote verify did not select a test profile for ${passName}`);
-  const configPath = path.join(policy.activationDir, `${passName}.buckconfig`);
-  const configText = renderRemoteTestActivationConfigText({
-    artifactDir: policy.activationDir,
-    passName,
-    targetProfile,
-  });
-  fs.mkdirSync(policy.activationDir, { recursive: true });
-  fs.writeFileSync(configPath, configText, { mode: 0o600 });
-  return configPath;
-}
-
 export function buckTestArgsForExecutionPolicy(
   policy: VerifyExecutionPolicy,
   passName: string,
@@ -184,7 +205,11 @@ export function buckTestArgsForExecutionPolicy(
   return [
     ...buckCqueryArgsForExecutionPolicy(policy),
     "--config-file",
-    activationConfigPath(policy, passName),
+    remoteActivationConfigPath({
+      activationDir: policy.activationDir,
+      passName,
+      targetProfile: remoteProfileForPass(policy, passName),
+    }),
     ...modeArgs,
     "--unstable-allow-compatible-tests-on-re",
   ];
@@ -203,6 +228,7 @@ export function executionPolicyForVerifyPass(
     activationDir: null,
     profilePrefix: null,
     passProfiles: {},
+    remoteSmoke: null,
   };
 }
 

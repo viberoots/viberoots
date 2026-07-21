@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { reconcileSyntheticDeploymentGraph } from "./deployment-graph.fixture";
 
 export const CLOUDFLARE_EXTRACTION_QUERY =
   "set(//projects/deployments/sample-webapp/staging:deploy //projects/apps/sample-webapp:app //projects/deployments/sample-webapp/shared:lane //projects/deployments/sample-webapp/shared:defaults //projects/deployments/sample-webapp/shared:lane_governance //projects/deployments/sample-webapp/shared:staging_release)";
@@ -141,4 +142,5 @@ export async function writeCloudflarePagesExtractionFixture(
     ].join("\n"),
     "utf8",
   );
+  await reconcileSyntheticDeploymentGraph(tmp);
 }

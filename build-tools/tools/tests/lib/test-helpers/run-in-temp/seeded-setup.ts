@@ -30,8 +30,11 @@ import {
   removeCppReqsIfRequested,
   removeInheritedBuildToolsSymlink,
 } from "./seeded-overlays";
-import { stableGoModCacheRoot, stableXdgCacheRoot } from "./test-roots";
-import { reconcileTempDependencyInputs } from "./dependency-reconcile";
+import { absoluteXdgCacheHome, stableGoModCacheRoot, stableXdgCacheRoot } from "./test-roots";
+import {
+  reconcileTempDependencyInputs,
+  registerTempCommandEnvironment,
+} from "./dependency-reconcile";
 
 function registerRunInTempBuckIsolation(iso: string, repoRoot: string): void {
   const stateFile = String(process.env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim();
@@ -58,7 +61,7 @@ export async function prepareSeededTemp(
     "runInTemp stableXdgCacheRoot",
     async () => await stableXdgCacheRoot(),
   );
-  const activeXdgCacheHome = process.env.XDG_CACHE_HOME || xdgCacheHome;
+  const activeXdgCacheHome = absoluteXdgCacheHome(process.env.XDG_CACHE_HOME, xdgCacheHome);
   await timeAsync("runInTemp ensureSharedNixTarballCacheRepo", async () => {
     await ensureSharedNixTarballCacheRepo(activeXdgCacheHome);
   });
@@ -159,6 +162,7 @@ export async function prepareSeededTemp(
   }
 
   const $setup = $({ cwd: tmp, env: tempSetupEnv, stdio: "pipe" });
+  registerTempCommandEnvironment($setup, tmp, tempSetupEnv);
   await timeAsync("runInTemp ensureBuckConfigForTempRepo", async () => {
     await ensureBuckConfigForTempRepo(tmp, $setup, {
       viberootsInputRoot: viberootsInput.storePath,
@@ -169,7 +173,7 @@ export async function prepareSeededTemp(
     await ensureWorkspaceProvidersPackage(tmp);
   });
   await timeAsync("runInTemp ensureWorkspaceRootEnvFile", async () => {
-    await ensureWorkspaceRootEnvFile(tmp, viberootsSourceRoot, viberootsInput.storePath);
+    await ensureWorkspaceRootEnvFile(tmp, viberootsSourceRoot);
   });
   await timeAsync("runInTemp ensureToolchainPathsForTempRepo", async () => {
     await ensureToolchainPathsForTempRepo(tmp, $setup);

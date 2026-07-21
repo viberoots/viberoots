@@ -5,12 +5,12 @@ import { test } from "node:test";
 import { DEFAULT_GRAPH_PATH } from "../../lib/workspace-state-paths";
 import { runInTemp } from "../lib/test-helpers";
 import { withScopedEnv } from "../lib/test-helpers/scoped-env";
-import { ensureGraph } from "../../buck/glue-run";
+import { reconcileGeneratedGraph } from "../../buck/glue-run";
 
-test("ensureGraph writes once; second call is a no-op", async () => {
+test("graph reconciliation writes once; second call is a no-op", async () => {
   await runInTemp("ensure-graph-idempotent", async (tmp) => {
     const graph = path.join(tmp, DEFAULT_GRAPH_PATH);
-    // Direct ensureGraph to operate on the temp workspace
+    // Direct reconciliation to operate on the temp workspace.
     await withScopedEnv(
       {
         WORKSPACE_ROOT: tmp,
@@ -20,14 +20,14 @@ test("ensureGraph writes once; second call is a no-op", async () => {
         BUCK_QUERY_ROOTS: "libs,apps,cpp,go,third_party",
       },
       async () => {
-        await ensureGraph();
+        await reconcileGeneratedGraph();
         const st1 = await fsp.stat(graph);
         // Ensure timestamp granularity can't mask a rewrite
         await new Promise((r) => setTimeout(r, 1100));
-        await ensureGraph();
+        await reconcileGeneratedGraph();
         const st2 = await fsp.stat(graph);
         if (st1.mtimeMs !== st2.mtimeMs) {
-          console.error("expected second ensureGraph() to be a no-op (mtime changed)", {
+          console.error("expected second reconciliation to be a no-op (mtime changed)", {
             first: st1.mtimeMs,
             second: st2.mtimeMs,
           });

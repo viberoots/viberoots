@@ -2,7 +2,7 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 
 test("nix_go_tiny_wasm_lib builds via Buck (smoke)", async () => {
   await runInTemp("go-tinygo-wasm-buck-build", async (tmp, $) => {
@@ -40,6 +40,7 @@ nix_go_tiny_wasm_lib(
 `,
       "utf8",
     );
+    await reconcileTempDependencyInputs(tmp, $);
 
     await $({
       cwd: tmp,

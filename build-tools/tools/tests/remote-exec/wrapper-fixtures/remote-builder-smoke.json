@@ -1,5 +1,25 @@
 {
-  "ok": true,
-  "builder_policy": "inherit_config",
-  "mode": "dry-run"
+  "schema": "viberoots.remote-builder-smoke-evidence.v2",
+  "status": "passed",
+  "supportedSystem": "x86_64-linux",
+  "builder": {
+    "policy": "inherit_config",
+    "identity": "reviewed:fixture-linux-builder"
+  },
+  "effectivePolicy": {
+    "inspection": "builder-reported",
+    "sandbox": true,
+    "sandboxFallback": false,
+    "hostPaths": [],
+    "multiUser": "daemon",
+    "substituters": "reviewed",
+    "publicKeys": "reviewed"
+  },
+  "probes": {
+    "store": { "result": "passed", "bounded": true, "owned": true },
+    "ordinaryHostRead": { "result": "denied", "bounded": true, "owned": true },
+    "ordinaryNetwork": { "result": "denied", "bounded": true, "owned": true },
+    "fixedOutputCorrectHash": { "result": "passed", "bounded": true, "owned": true },
+    "fixedOutputWrongHash": { "result": "denied", "bounded": true, "owned": true }
+  }
 }

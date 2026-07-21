@@ -16,6 +16,10 @@ pkgs.stdenvNoCC.mkDerivation rec {
 
   postUnpack = ''
     rm -rf package/dist/reflink.*node package/dist/vendor
+    for entrypoint in package/bin/pnpm.mjs package/bin/pnpm.cjs package/bin/pnpx.mjs package/bin/pnpx.cjs; do
+      substituteInPlace "$entrypoint" \
+        --replace-fail '#!/usr/bin/env node' '#!${pkgs.nodejs_22}/bin/node'
+    done
   '';
 
   installPhase = ''

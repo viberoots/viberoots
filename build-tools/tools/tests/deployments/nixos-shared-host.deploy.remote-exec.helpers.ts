@@ -19,6 +19,7 @@ import {
   prepareReviewedRemoteHostPaths,
 } from "./nixos-shared-host.remote-exec.install.helpers";
 import { waitFor } from "./nixos-shared-host.control-plane.helpers";
+import { reconcileSyntheticDeploymentGraph } from "./deployment-graph.fixture";
 export { installClientProfile } from "./nixos-shared-host.remote-exec.install.helpers";
 
 export const REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL =
@@ -148,13 +149,14 @@ export async function requireSampleWebappDevCheck(tmp: string): Promise<void> {
       "required checks fixture update did not persist to sample-webapp/shared TARGETS",
     );
   }
+  const queryEnv = await reconcileSyntheticDeploymentGraph(tmp);
   await waitFor(
     async () => {
       try {
         const deployment = await resolveDeploymentFromTarget(
           tmp,
           REVIEWED_SAMPLE_WEBAPP_DEPLOYMENT_LABEL,
-          { env: freshBuckQueryEnv(tmp) },
+          { env: queryEnv },
         );
         return deployment.admissionPolicy.requiredChecks.includes("deploy/sample-webapp-dev")
           ? deployment

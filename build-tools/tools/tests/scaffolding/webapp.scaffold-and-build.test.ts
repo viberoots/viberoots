@@ -44,7 +44,7 @@ test("webapp: scaffold, glue, build dist via Buck", { timeout: TEST_TIMEOUT_MS }
       try {
         await fsp.rm(path.join(appAbs, "node_modules"), { recursive: true, force: true });
       } catch {}
-      await reconcileTempDependencyInputs(tmp, $);
+      await reconcileTempDependencyInputs(tmp, _$);
       // Keep the fixture on the production filtered-snapshot build path.
       const outPath = await buildSelectedOutPath({
         tmp,

@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { reconcileSyntheticDeploymentGraph } from "./deployment-graph.fixture";
 
 export async function writeTempReadinessFrontDoorWorkspace(
   tmp: string,
@@ -9,6 +10,7 @@ export async function writeTempReadinessFrontDoorWorkspace(
   await writeAppTargets(tmp, opts);
   await writeSharedTargets(tmp);
   await writeDeploymentTarget(tmp);
+  await reconcileSyntheticDeploymentGraph(tmp);
 }
 
 async function writeAppTargets(tmp: string, opts: { crossAppDependency?: boolean }) {

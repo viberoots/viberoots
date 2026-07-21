@@ -1,4 +1,4 @@
-{ pkgs, repoSnapshot, uv2nixLib, repoRoot, viberootsRoot, nodeMods ? null, mkNodeMods ? null, nixpkgsRegistry ? null, evaluationBundle ? null }:
+{ pkgs, repoSnapshot, uv2nixLib, repoRoot, viberootsRoot, artifactToolsRoot, nodeMods ? null, mkNodeMods ? null, nixpkgsRegistry ? null, evaluationBundle ? null }:
 let
   resolvedNodeMods =
     if nodeMods != null then nodeMods
@@ -31,7 +31,7 @@ let
       inherit pkgs;
       src = repoSnapshot;
       nodeMods = resolvedNodeMods;
-      inherit viberootsRoot;
+      inherit viberootsRoot artifactToolsRoot;
       inherit nixpkgsRegistry;
       inherit evaluationBundle;
       graphJsonPath = graphArg;
@@ -60,7 +60,7 @@ let
     inherit pkgs;
     src = repoSnapshot;
     nodeMods = resolvedNodeMods;
-    inherit viberootsRoot;
+    inherit viberootsRoot artifactToolsRoot;
     inherit nixpkgsRegistry;
     inherit evaluationBundle;
     graphJsonPath =

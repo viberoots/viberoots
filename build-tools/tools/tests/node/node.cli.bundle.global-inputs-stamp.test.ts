@@ -44,6 +44,10 @@ test("nix_node_cli_bin(bundle=True) stamps global Nix inputs via labels", async 
       "expected lang:node label to be present",
     );
     assert.ok(
+      out.includes('"node:cli-bundle"'),
+      "expected bundled CLI semantics to be declared for the pure planner",
+    );
+    assert.ok(
       out.includes(":flake.lock"),
       "expected //.viberoots/workspace:flake.lock to be present via global_nix_inputs()",
     );

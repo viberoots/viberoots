@@ -7,26 +7,11 @@ import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
 } from "../lib/test-helpers/git-stage";
-import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
+import { publicBuildOutPath, reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 import { withGoModuleInputFingerprint } from "../../dev/install/go-consistency";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
-
-function ensureCertEnv(env: Record<string, string>): Record<string, string> {
-  const next = { ...env };
-  if (!next.SSL_CERT_FILE && next.NIX_SSL_CERT_FILE) {
-    next.SSL_CERT_FILE = next.NIX_SSL_CERT_FILE;
-  }
-  if (!next.SSL_CERT_FILE) {
-    const defaultCert = "/nix/var/nix/profiles/default/etc/ssl/certs/ca-bundle.crt";
-    if (fs.existsSync(defaultCert)) next.SSL_CERT_FILE = defaultCert;
-  }
-  if (!next.SSL_CERT_DIR && next.NIX_SSL_CERT_DIR) {
-    next.SSL_CERT_DIR = next.NIX_SSL_CERT_DIR;
-  }
-  return next;
-}
 
 test(
   "node_asset_stage: webapp output stages tinygo wasm",
@@ -111,35 +96,21 @@ node_asset_stage(
 `,
         );
 
-        await $({
-          cwd: appDir,
-          stdio: "inherit",
-          env: { ...process.env },
-        })`zx-wrapper ../../../viberoots/build-tools/tools/dev/install/deps-main.ts --verbose --glue-only`;
-        // deps-main --glue-only already runs glue-pipeline (graph export + provider sync + auto-map).
-        // Keep test setup single-pass to avoid avoidable verify-time contention.
         await stageTempRepoPaths({
           tmp,
           _$,
           recursiveRoots: ["projects/apps/demo-web", "projects/libs/demo-wasm"],
-          explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS],
+          explicitPaths: [...DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS, "pnpm-workspace.yaml"],
         });
 
-        await reconcileTempDependencyInputs(tmp, $);
-        const baseEnv =
-          typeof ($ as any).env === "object" && ($ as any).env
-            ? { ...($ as any).env }
-            : { ...process.env };
-        const build = await $({
-          cwd: tmp,
-          stdio: "pipe",
-          env: ensureCertEnv({ ...baseEnv, WEB_WASM_BACKEND: "wasi_single" }),
-        })`buck2 build --verbose 5 --target-platforms prelude//platforms:default --show-output //projects/apps/demo-web:app`;
-        const outText = String(build.stdout || build.stderr || "").trim();
-        const outLine = outText.split(/\n+/).pop() || "";
-        const outDir = outLine.split(/\s+/).pop() || "";
-        if (!outDir) throw new Error("no output dir from buck2 build for staged webapp");
-        const outPath = path.isAbsolute(outDir) ? outDir : path.join(tmp, outDir);
+        const target = "//projects/apps/demo-web:app";
+        await reconcileTempDependencyInputs(tmp, _$);
+        const outPath = await publicBuildOutPath({
+          tmp,
+          $,
+          target,
+          wasmBackend: "wasi_single",
+        });
         assert.ok(await fs.pathExists(path.join(outPath, "index.txt")));
         assert.ok(await fs.pathExists(path.join(outPath, "top.wasm")));
         assert.ok(await fs.pathExists(path.join(outPath, "wasm-inline", "index.js")));

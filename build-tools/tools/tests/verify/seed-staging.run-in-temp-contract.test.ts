@@ -1,6 +1,10 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
+import path from "node:path";
 import { test } from "node:test";
+import { overlayActiveViberootsIntoStage } from "../../dev/verify/seed-stage-source-overlay";
+import { mktemp } from "../lib/test-helpers";
 import { readRepoFile } from "./seed-staging-fixture";
 
 test("verify seed staging tests never use the shared production stage root", async () => {
@@ -47,6 +51,31 @@ test("runInTemp seed overlay refreshes active viberoots source", async () => {
   assert.match(runInTempSource, /rewriteTempViberootsInput after setup/);
   assert.match(runInTempSource, /path\.join\(root, "flake\.nix"\)/);
   assert.match(runInTempSource, /import\.meta\.url/);
+});
+
+test("verify seed overlay uses a remote consumer's declared current source", async () => {
+  const root = await mktemp("verify-seed-remote-current-");
+  const source = await mktemp("verify-seed-remote-source-");
+  const stage = await mktemp("verify-seed-remote-stage-");
+  try {
+    await fsp.mkdir(path.join(source, "build-tools", "tools", "dev"), { recursive: true });
+    await fsp.writeFile(
+      path.join(source, "build-tools", "tools", "dev", "zx-init.mjs"),
+      "export {};\n",
+      "utf8",
+    );
+    await fsp.mkdir(path.join(root, ".viberoots"), { recursive: true });
+    await fsp.symlink(source, path.join(root, ".viberoots", "current"));
+    await fsp.writeFile(path.join(root, "consumer-generated.txt"), "consumer\n", "utf8");
+    await $({ cwd: root, stdio: "pipe" })`git init -q`;
+
+    assert.deepEqual(await overlayActiveViberootsIntoStage(stage, root), []);
+    await assert.rejects(fsp.access(path.join(stage, "viberoots", "consumer-generated.txt")));
+  } finally {
+    await Promise.all(
+      [root, source, stage].map((dir) => fsp.rm(dir, { recursive: true, force: true })),
+    );
+  }
 });
 
 test("runInTemp seed overlay honors prepared seed marker version", async () => {

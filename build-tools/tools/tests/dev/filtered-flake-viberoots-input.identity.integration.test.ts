@@ -6,6 +6,10 @@ import path from "node:path";
 import { test } from "node:test";
 import { repairSnapshotViberootsInput } from "../../dev/filtered-flake-viberoots-input";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
+import {
+  buildCanonicalArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+} from "../../lib/artifact-environment";
 
 async function write(root: string, rel: string, content: string): Promise<void> {
   const file = path.join(root, rel);
@@ -23,6 +27,16 @@ async function makeConsumerSnapshot(root: string): Promise<string> {
   const flakeDir = path.join(root, ".viberoots", "workspace");
   await write(
     root,
+    "flake.nix",
+    '{ inputs.viberoots.url = "path:/tmp/random-live-source"; outputs = _: {}; }\n',
+  );
+  await write(
+    root,
+    "flake.lock",
+    `${JSON.stringify({ nodes: { viberoots: { locked: {}, original: {} } } })}\n`,
+  );
+  await write(
+    root,
     ".viberoots/workspace/flake.nix",
     '{ inputs.viberoots.url = "path:./viberoots-flake-input"; outputs = _: {}; }\n',
   );
@@ -31,7 +45,13 @@ async function makeConsumerSnapshot(root: string): Promise<string> {
     ".viberoots/workspace/flake.lock",
     `${JSON.stringify({ nodes: { viberoots: { locked: {}, original: {} } } })}\n`,
   );
-  const storePath = await repairSnapshotViberootsInput({ snapDir: root, flakeDir });
+  const env = buildCanonicalArtifactEnvironment(process.cwd(), {
+    artifactToolsRoot: canonicalArtifactToolsRoot(
+      process.cwd(),
+      String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+    ),
+  });
+  const storePath = await repairSnapshotViberootsInput({ snapDir: root, flakeDir, env });
   await assert.rejects(fsp.access(path.join(flakeDir, "viberoots-flake-input")), {
     code: "ENOENT",
   });
@@ -39,6 +59,13 @@ async function makeConsumerSnapshot(root: string): Promise<string> {
     await fsp.readFile(path.join(flakeDir, "flake.nix"), "utf8"),
     new RegExp(`path:${storePath}`),
   );
+  assert.match(
+    await fsp.readFile(path.join(root, "flake.nix"), "utf8"),
+    new RegExp(`path:${storePath}`),
+  );
+  const rootLock = JSON.parse(await fsp.readFile(path.join(root, "flake.lock"), "utf8"));
+  assert.equal(rootLock.nodes.viberoots.locked.path, storePath);
+  assert.equal(rootLock.nodes.viberoots.original.path, storePath);
   const lock = JSON.parse(await fsp.readFile(path.join(flakeDir, "flake.lock"), "utf8"));
   assert.equal(lock.nodes.viberoots.locked.path, storePath);
   assert.equal(lock.nodes.viberoots.original.path, storePath);
@@ -59,6 +86,7 @@ async function registrationTime(storePath: string): Promise<number> {
 test("independent consumer snapshots reuse one filtered viberoots store source", async () => {
   const first = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-input-identity-a-"));
   const second = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-input-identity-b-"));
+  const remote = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-input-identity-remote-"));
   try {
     const firstStorePath = await makeConsumerSnapshot(first);
     const firstRegistration = await registrationTime(firstStorePath);
@@ -69,8 +97,60 @@ test("independent consumer snapshots reuse one filtered viberoots store source",
     assert.equal(secondStorePath, firstStorePath);
     assert.equal(secondRegistration, firstRegistration);
     await fsp.access(path.join(secondStorePath, "build-tools", "untracked-sentinel.ts"));
+
+    for (const prefix of ["", ".viberoots/workspace/"]) {
+      await write(
+        remote,
+        `${prefix}flake.nix`,
+        '{ inputs.viberoots.url = "git+file:///tmp/random-live-source"; outputs = _: {}; }\n',
+      );
+      await write(
+        remote,
+        `${prefix}flake.lock`,
+        `${JSON.stringify({ nodes: { viberoots: { locked: {}, original: {} } } })}\n`,
+      );
+    }
+    let materializedInput = "";
+    const remoteStorePath = await repairSnapshotViberootsInput(
+      {
+        snapDir: remote,
+        flakeDir: path.join(remote, ".viberoots", "workspace"),
+        immutableInputRoot: firstStorePath,
+        env: { ...process.env, VIBEROOTS_ROOT: "/tmp/hostile-live-root" },
+      },
+      {
+        materializeInput: async (inputPath) => {
+          materializedInput = inputPath;
+          return {
+            storePath: firstStorePath,
+            locked: { narHash: "sha256-test", path: firstStorePath, type: "path" },
+          };
+        },
+      },
+    );
+    assert.equal(materializedInput, firstStorePath);
+    assert.equal(remoteStorePath, firstStorePath);
+    for (const prefix of ["", ".viberoots/workspace/"]) {
+      assert.doesNotMatch(
+        await fsp.readFile(path.join(remote, `${prefix}flake.nix`), "utf8"),
+        /tmp/,
+      );
+      const lock = JSON.parse(await fsp.readFile(path.join(remote, `${prefix}flake.lock`), "utf8"));
+      assert.equal(lock.nodes.viberoots.locked.path, firstStorePath);
+      assert.equal(lock.nodes.viberoots.original.path, firstStorePath);
+    }
+    await assert.rejects(
+      repairSnapshotViberootsInput({
+        snapDir: remote,
+        flakeDir: remote,
+        immutableInputRoot: "/tmp/not-an-immutable-source",
+        env: process.env,
+      }),
+      /declared viberoots input is not an immutable Nix-store source/,
+    );
   } finally {
     await fsp.rm(first, { recursive: true, force: true });
     await fsp.rm(second, { recursive: true, force: true });
+    await fsp.rm(remote, { recursive: true, force: true });
   }
 });

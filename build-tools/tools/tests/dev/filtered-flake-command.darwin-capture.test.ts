@@ -70,6 +70,31 @@ test("filtered flake commands capture concurrent child output without executor p
   );
 });
 
+test("filtered flake command capture does not pass Node-managed descriptors to worker children", async () => {
+  const result = await runCommand({
+    command: process.execPath,
+    args: [
+      "-e",
+      [
+        'const { Worker } = require("node:worker_threads")',
+        'const worker = new Worker("const { parentPort } = require(\\\"node:worker_threads\\\"); parentPort.postMessage(\\\"worker-ok\\\"); setInterval(() => {}, 1000)", { eval: true })',
+        'worker.once("message", (message) => worker.terminate().then(() => process.stdout.write(`${message}-teardown`)))',
+      ].join(";"),
+    ],
+  });
+  assert.equal(result.stdout, "worker-ok-teardown");
+
+  const source = await fsp.readFile(
+    path.join(root, "build-tools/tools/dev/filtered-flake-command-capture.ts"),
+    "utf8",
+  );
+  assert.doesNotMatch(source, /fsp\.open\(/);
+  assert.doesNotMatch(source, /\.fd[,\]]/);
+  assert.match(source, /stdio: \["inherit", "inherit", "inherit"\]/);
+  assert.doesNotMatch(source, /stdio: \["ignore", "ignore", "ignore"\]/);
+  assert.match(source, /exec "\$@" <\/dev\/null >"\$stdout" 2>"\$stderr"/);
+});
+
 test(
   "filtered flake command timeouts terminate the owned descendant process group",
   { skip: process.platform === "win32" },

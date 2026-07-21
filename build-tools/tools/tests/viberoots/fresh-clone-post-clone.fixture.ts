@@ -3,6 +3,10 @@ import os from "node:os";
 import path from "node:path";
 import type { TestContext } from "node:test";
 import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
+import {
+  buildCanonicalArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+} from "../../lib/artifact-environment";
 import { VIBEROOTS_SOURCE_ROOT } from "../lib/test-helpers/source-paths";
 import { execManaged } from "../lib/test-helpers/managed-exec";
 import { withGitAutoMaintenanceDisabledEnv } from "../../lib/git-auto-maintenance-env";
@@ -87,10 +91,27 @@ export async function createFreshCloneFixture(
     { env: localGitEnv },
   );
   await fsp.chmod(submoduleSource, 0o755);
+  const artifactEnv = buildCanonicalArtifactEnvironment(sourceRoot, {
+    artifactToolsRoot: canonicalArtifactToolsRoot(
+      process.cwd(),
+      String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+    ),
+  });
+  // Materialize the stable exported tree before Git creates mutable index, log,
+  // and object metadata. The repository initialized below remains the source
+  // used to exercise real submodule clone behavior.
+  const immutableSubmodule = await materializeFilteredViberootsSource(submoduleSource, artifactEnv);
+  if (
+    await fsp
+      .access(path.join(immutableSubmodule.storePath, ".git"))
+      .then(() => true)
+      .catch(() => false)
+  ) {
+    throw new Error("fresh-clone immutable source unexpectedly contains Git metadata");
+  }
   await git(submoduleSource, ["init", "-q", "--initial-branch=main"], localGitEnv);
   await commitAll(submoduleSource, "fixture: staged viberoots source", localGitEnv);
   const submoduleRev = await git(submoduleSource, ["rev-parse", "HEAD"], localGitEnv);
-  const immutableSubmodule = await materializeFilteredViberootsSource(submoduleSource);
   await git(consumerSource, ["init", "-q", "--initial-branch=main"], localGitEnv);
   await git(
     consumerSource,
@@ -107,7 +128,11 @@ export async function createFreshCloneFixture(
     path.join(consumerSource, consumerImporter, "pnpm-lock.yaml"),
     "lockfileVersion: '9.0'\n\nimporters:\n  .: {}\n",
   );
-  await fsp.writeFile(path.join(consumerSource, "projects", "node-modules.hashes.json"), "{}\n");
+  await fsp.mkdir(path.join(consumerSource, "projects", "config"), { recursive: true });
+  await fsp.writeFile(
+    path.join(consumerSource, "projects", "config", "node-modules.hashes.json"),
+    "{}\n",
+  );
   await writeFreshCloneShims(fakeBin);
   const devToolsRoot = path.join(sourceRoot, "build-tools", "tools", "dev");
   const commandEnv = {

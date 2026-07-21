@@ -10,10 +10,16 @@ async function readRepoFile(rel: string): Promise<string> {
 
 test("p selected runnable builds materialize final pnpm stores before filtered Nix builds", async () => {
   const source = await readRepoFile("build-tools/tools/dev/run-runnable-graph.ts");
+  const runner = await readRepoFile("build-tools/tools/dev/run-runnable-nix.ts");
   assert.match(source, /resolveFinalPnpmStore/);
   assert.doesNotMatch(source, /import \{ prepareExactPnpmStore \}/);
   assert.doesNotMatch(source, /NIX_PNPM_EXACT_STORE/);
   assert.match(source, /targetPackageFromLabel\(target\)/);
+  assert.match(source, /internal: sourceSelectors/);
+  assert.match(
+    runner,
+    /internal: \{ WORKSPACE_ROOT: opts\.workspaceRoot, \.\.\.\(opts\.internal \|\| \{\}\) \}/,
+  );
 });
 
 test("p selected webapp builds pass viberoots flake source into the planner", async () => {
@@ -34,8 +40,10 @@ test("p selected webapp builds pass viberoots flake source into the planner", as
 
 test("d static webapp dev prefers direct importer dev entrypoints over pnpm install paths", async () => {
   const source = await readRepoFile("build-tools/tools/dev/run-runnable.ts");
+  const devSpec = await readRepoFile("build-tools/tools/dev/run-runnable-dev-spec.ts");
   assert.match(source, /directStaticWebappDevSpec/);
+  assert.match(source, /directImporterDevSpec/);
   assert.match(source, /targetHints\.mode === "static"/);
-  assert.match(source, /\["zx-wrapper", "scripts\/dev\.ts"\]/);
-  assert.match(source, /"node_modules\/vite\/bin\/vite\.js"/);
+  assert.match(devSpec, /\["zx-wrapper", "scripts\/dev\.ts"\]/);
+  assert.match(devSpec, /"node_modules\/vite\/bin\/vite\.js"/);
 });

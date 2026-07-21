@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
+import { runGluePipeline } from "../../buck/glue-pipeline";
 import { runInTemp } from "../lib/test-helpers";
 
 function safeLogKeyFromLabel(label: string): string {
@@ -40,6 +41,12 @@ test("nix_go_tiny_wasm_lib builds via graph-aware selected path (build-selected.
     );
 
     const label = "//projects/libs/math-api:wasm";
+    await runGluePipeline({
+      forceGraph: true,
+      workspaceRoot: tmp,
+      toolSourceRoot: process.env.VIBEROOTS_SOURCE_ROOT || path.join(tmp, "viberoots"),
+      env: process.env,
+    });
     await $({
       cwd: tmp,
       stdio: "inherit",

@@ -1,6 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { reconcileSyntheticDeploymentGraph } from "./deployment-graph.fixture";
 
 export async function writeTempListedDeploymentWorkspace(tmp: string): Promise<void> {
   const appTargetsPath = path.join(tmp, "sandbox", "apps", "demo", "TARGETS");
@@ -83,6 +84,7 @@ export async function writeTempListedDeploymentWorkspace(tmp: string): Promise<v
     ].join("\n"),
     "utf8",
   );
+  await reconcileSyntheticDeploymentGraph(tmp);
 }
 
 export async function writeTempCloudflareValidationWorkspace(
@@ -206,4 +208,5 @@ export async function writeTempCloudflareValidationWorkspace(
       '{ "name": "demo-staging-pages", "account_id": "web-platform-staging" }\n',
     "utf8",
   );
+  await reconcileSyntheticDeploymentGraph(tmp);
 }

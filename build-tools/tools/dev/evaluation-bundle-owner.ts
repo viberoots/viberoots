@@ -4,12 +4,16 @@ import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { removeOwnedTempTree } from "../lib/owned-temp-cleanup";
-import { resolveWatchdogShell, watchdogEnvFor } from "../lib/managed-command-watchdog";
+import { watchdogEnvFor } from "../lib/managed-command-watchdog";
+import { ensureNixStoreToolPathSync } from "../lib/tool-paths";
 
 const markerName = ".viberoots-evaluation-bundle-owner";
 const processGroupName = ".viberoots-evaluation-bundle-process-group";
 
-export async function claimBundleTempRoot(root: string): Promise<{
+export async function claimBundleTempRoot(
+  root: string,
+  artifactEnv: NodeJS.ProcessEnv,
+): Promise<{
   cleanup: () => Promise<void>;
   recordProcessGroup: (processGroupId: number) => void;
 }> {
@@ -43,7 +47,7 @@ export async function claimBundleTempRoot(root: string): Promise<{
     "fi",
   ].join("\n");
   const watchdog = spawn(
-    resolveWatchdogShell(process.env),
+    ensureNixStoreToolPathSync("bash", artifactEnv),
     [
       "--noprofile",
       "--norc",
@@ -57,7 +61,7 @@ export async function claimBundleTempRoot(root: string): Promise<{
       processGroup,
     ],
     {
-      env: watchdogEnvFor(process.env),
+      env: watchdogEnvFor(artifactEnv),
       stdio: ["ignore", "ignore", "ignore", "pipe"],
       detached: true,
     },

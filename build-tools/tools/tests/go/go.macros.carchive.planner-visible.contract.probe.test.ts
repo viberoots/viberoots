@@ -3,24 +3,17 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 
 test("go macros: nix_go_carchive stamps labels, includes patch inputs, and builds a c-archive output (probe)", async () => {
   await runInTemp("go-carchive-planner-visible-contract-probe", async (tmp, $) => {
     // Minimal provider and auto_map mapping
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
-genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
-EOF'`;
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<'\''EOF'\''
-MODULE_PROVIDERS = {
-  "//projects/apps/demo:arc": ["//third_party/providers:prov"],
-}
-EOF'`;
-
+    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "third_party", "providers", "TARGETS"),
+      'genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])\n',
+      "utf8",
+    );
     const appDir = path.join(tmp, "projects", "apps", "demo");
     await fsp.mkdir(path.join(appDir, "pkg", "demo"), { recursive: true });
     await fsp.mkdir(path.join(appDir, "patches", "go"), { recursive: true });
@@ -54,6 +47,14 @@ EOF'`;
       ].join("\n"),
       "utf8",
     );
+    await reconcileTempDependencyInputs(tmp, $);
+    await $({
+      cwd: tmp,
+    })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<'\''EOF'\''
+MODULE_PROVIDERS = {
+  "//projects/apps/demo:arc": ["//third_party/providers:prov"],
+}
+EOF'`;
 
     const labelsProbe = await $({
       cwd: tmp,

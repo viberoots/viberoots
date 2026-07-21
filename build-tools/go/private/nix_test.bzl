@@ -1,5 +1,5 @@
 load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_bootstrap_env_core", "nix_calling_env_export_source_snapshot", "nix_timeout_wrapper_var")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_artifact_bash", "nix_bootstrap_env_core", "nix_calling_env_export_source_snapshot", "nix_timeout_wrapper_var")
 load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
 load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "stamp_remote_readiness_labels", "write_nix_test_stamp")
 load("@prelude//:build_mode.bzl", "BuildModeInfo")
@@ -27,9 +27,9 @@ def _go_nix_test_impl(ctx):
         + "if [ \"$(uname -s 2>/dev/null || true)\" = \"Darwin\" ]; then [ ! -e \"$WORKSPACE_ROOT/buck-out/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/buck-out/.metadata_never_index\"; [ ! -e \"$WORKSPACE_ROOT/buck-out/tmp/.metadata_never_index\" ] && : > \"$WORKSPACE_ROOT/buck-out/tmp/.metadata_never_index\"; [ ! -e \"$BUILD_SELECTED_LOG_DIR/.metadata_never_index\" ] && : > \"$BUILD_SELECTED_LOG_DIR/.metadata_never_index\"; fi; "
     )
     run_and_exec = (
-        "WORKSPACE_ROOT_ENV_ARG=\"${1:-}\"; "
+        "GRAPH_ARG=\"${1:-}\"; WORKSPACE_ROOT_ENV_ARG=\"${2:-}\"; "
         + "if [ -n \"$WORKSPACE_ROOT_ENV_ARG\" ] && [ -f \"$WORKSPACE_ROOT_ENV_ARG\" ]; then . \"$WORKSPACE_ROOT_ENV_ARG\" 2>/dev/null || true; fi; "
-        + nix_calling_env_export_source_snapshot(snapshot_root = "${2:-}", manifest_path = "${3:-}")
+        + nix_calling_env_export_source_snapshot(snapshot_root = "${3:-}", manifest_path = "${4:-}")
         + nix_bootstrap_env_core()
         + safe_log_path_prefix
         + ("echo '[go_nix_test] planner_label=%s' >&2; " % raw)
@@ -39,7 +39,7 @@ def _go_nix_test_impl(ctx):
             raw_var = "OUT_RAW",
             status_var = "NIX_STATUS",
             log_file = "$BUILD_SELECTED_LOG",
-            zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
+            graph_json_arg = "$GRAPH_ARG",
         )
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$OUT_PATH\" ]; then "
         + "  if [ -f \"$BUILD_SELECTED_LOG\" ]; then cat \"$BUILD_SELECTED_LOG\" >&2; fi; "
@@ -68,6 +68,7 @@ def _go_nix_test_impl(ctx):
     snapshot_labels = []
     if ctx.attrs.source_snapshot != None and ctx.attrs.source_snapshot_manifest != None:
         snapshot_labels = ["source-snapshot:declared-root", "source-snapshot:manifest", "source-snapshot:graph"]
+    snapshot_args = [ctx.attrs.source_snapshot or "", ctx.attrs.source_snapshot_manifest or ""]
     labels = stamp_remote_readiness_labels(ctx.attrs.labels + snapshot_labels)
     if "remote:ready" not in labels and "re_ignore_force_run_as_bundle" not in labels:
         labels.append("re_ignore_force_run_as_bundle")
@@ -80,7 +81,7 @@ def _go_nix_test_impl(ctx):
     ]
     command = external_runner_command(
         labels,
-        ["bash", "-c", run_and_exec, "go_nix_test", ctx.attrs._workspace_root_env] + snapshot_inputs,
+        [nix_artifact_bash(), "-c", run_and_exec, "go_nix_test", ctx.attrs._graph_json, ctx.attrs._workspace_root_env] + snapshot_args + declared_inputs,
         remote_command = remote_command,
         declared_inputs = declared_inputs,
         required_inputs = [

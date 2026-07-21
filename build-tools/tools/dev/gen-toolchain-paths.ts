@@ -2,7 +2,7 @@
 import { ensureToolchainPathsFiles } from "./toolchain-paths";
 import { repoRoot } from "../lib/repo";
 
-ensureToolchainPathsFiles(repoRoot())
+ensureToolchainPathsFiles(repoRoot(), { refresh: true })
   .then(() => {
     console.log("toolchain paths ready");
   })

@@ -2,7 +2,8 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
+import { exportGraphInTemp, runFilteredFlakeAttr } from "../lib/test-helpers/selected-build";
 
 test("python uv groups: base vs dev/test produce distinct, stable derivations", async () => {
   await runInTemp("py-uv-groups", async (tmp, _$) => {
@@ -18,14 +19,26 @@ test("python uv groups: base vs dev/test produce distinct, stable derivations", 
       "\n",
     );
     await fs.writeFile(path.join(appDir, "uv.lock"), lockText, "utf8");
+    await fs.writeFile(
+      path.join(appDir, "TARGETS"),
+      [
+        'load("@viberoots//build-tools/python:defs.bzl", "nix_python_library")',
+        "",
+        'nix_python_library(name = "pyenv_demo", srcs = [])',
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+    await exportGraphInTemp({ tmp, $ });
 
     // 2) Build base, dev, and test variants via flake outputs
     async function nixOut(attr: string): Promise<string> {
-      const { stdout } = await $({
-        cwd: tmp,
-        stdio: "pipe",
-        env: { ...process.env },
-      })`nix build --impure --accept-flake-config --no-link --print-out-paths ${`path:${await workspaceFlakeRef(tmp)}#${attr}`}`;
+      const { stdout } = await runFilteredFlakeAttr({
+        tmp,
+        $,
+        target: "//projects/apps/pyenv_demo:pyenv_demo",
+        attr,
+      });
       return String(stdout || "")
         .trim()
         .split(/\s+/)

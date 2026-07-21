@@ -1,10 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import path from "node:path";
-import * as fsp from "node:fs/promises";
-import { fileURLToPath } from "node:url";
 import { getArgvTokens } from "../lib/cli";
 import { findRepoRoot } from "../lib/repo";
-import type { RunnableExec } from "../lib/runnables";
 import { inferRunnableFromOutPath, type RunnableManifestEntry } from "../lib/runnables";
 import { validateSsrRunnableContract } from "../lib/runnable-contracts";
 import {
@@ -16,6 +13,9 @@ import {
   runCommand,
 } from "./run-runnable-core";
 import { buildRunnableManifest, buildSelectedOutPath } from "./run-runnable-graph";
+import { enterCanonicalArtifactEntrypoint } from "./canonical-artifact-entrypoint";
+import { canonicalArtifactToolsRoot } from "../lib/artifact-environment";
+import { directImporterDevSpec, directStaticWebappDevSpec } from "./run-runnable-dev-spec";
 
 function commandCwdForSpec(
   spec: { argv: string[]; cwd?: string },
@@ -38,78 +38,13 @@ function commandCwdForSpec(
   return undefined;
 }
 
-async function directImporterDevSpec(
-  workspaceRoot: string,
-  importer: string,
-  mode: "static" | "ssr",
-  framework: string,
-): Promise<RunnableExec | null> {
-  if (!importer || path.isAbsolute(importer) || importer.startsWith("../")) return null;
-  const importerRoot = path.join(workspaceRoot, importer);
-  const watchScript = path.join(importerRoot, "scripts", "dev-wasm-watch.mjs");
-  try {
-    const st = await fsp.stat(watchScript);
-    if (!st.isFile()) return null;
-  } catch {
-    return null;
-  }
-  const viberootsRoot = path.resolve(
-    path.dirname(fileURLToPath(import.meta.url)),
-    "..",
-    "..",
-    "..",
-  );
-  const devTool = path.join(viberootsRoot, "build-tools", "tools", "dev", "dev-with-wasm-watch.ts");
-  const viteCmd =
-    mode === "ssr"
-      ? framework === "next"
-        ? "node_modules/.bin/next dev -H 127.0.0.1 -p ${PORT:-4173}"
-        : "node server/dev.mjs"
-      : "node node_modules/vite/bin/vite.js --host 127.0.0.1 --port ${PORT:-5187} --strictPort --clearScreen false --logLevel info";
-  return {
-    argv: [
-      "zx-wrapper",
-      devTool,
-      "--vite-cmd",
-      viteCmd,
-      "--watch-cmd",
-      "node scripts/dev-wasm-watch.mjs",
-    ],
-    cwd: importerRoot,
-  };
-}
-
-async function directStaticWebappDevSpec(
-  workspaceRoot: string,
-  importer: string,
-): Promise<RunnableExec | null> {
-  if (!importer || path.isAbsolute(importer) || importer.startsWith("../")) return null;
-  const importerRoot = path.join(workspaceRoot, importer);
-  const devScript = path.join(importerRoot, "scripts", "dev.ts");
-  try {
-    const st = await fsp.stat(devScript);
-    if (st.isFile()) return { argv: ["zx-wrapper", "scripts/dev.ts"], cwd: importerRoot };
-  } catch {}
-  return {
-    argv: [
-      "node",
-      "node_modules/vite/bin/vite.js",
-      "--host",
-      "127.0.0.1",
-      "--port",
-      "${PORT:-5187}",
-      "--strictPort",
-      "--clearScreen",
-      "false",
-      "--logLevel",
-      "info",
-    ],
-    cwd: importerRoot,
-  };
-}
-
-async function main() {
-  const parsed = parseArgs(getArgvTokens());
+export async function runRunnable(opts: {
+  argv: string[];
+  workspaceRoot: string;
+  artifactToolsRoot: string;
+  resolveEntry?: (target: string) => Promise<RunnableManifestEntry | null>;
+}) {
+  const parsed = parseArgs(opts.argv);
   if (parsed.sourceError) {
     console.error(`[run-runnable] ${parsed.sourceError}`);
     process.exit(2);
@@ -120,15 +55,14 @@ async function main() {
     process.exit(2);
   }
   const cwd = process.cwd();
-  const workspaceRoot = await findRepoRoot(cwd);
+  const { workspaceRoot, artifactToolsRoot } = opts;
   const target = await resolveRunnableTargetLabel(workspaceRoot, parsed.target || ".", {
     baseDir: cwd,
   });
   let targetHints: { importer: string; mode: "static" | "ssr"; framework: string } | null = null;
   let entry: RunnableManifestEntry | null = null;
-  const testManifestPath = String(process.env.RUNNABLE_TEST_MANIFEST || "").trim();
-  if (testManifestPath) {
-    entry = await readManifestEntry(testManifestPath, target);
+  if (opts.resolveEntry) {
+    entry = await opts.resolveEntry(target);
   } else {
     // Fast path: use selected-target build + output-shape inference first.
     // This avoids full graph manifest materialization for one-target run commands.
@@ -136,11 +70,14 @@ async function main() {
     targetHints = hints;
     const importer = hints.importer;
     let selectedError: unknown = null;
+    let selectedOutPath = "";
     try {
-      const outPath = await buildSelectedOutPath(workspaceRoot, target, parsed.sourceMode);
+      selectedOutPath = await buildSelectedOutPath(workspaceRoot, target, parsed.sourceMode, {
+        artifactToolsRoot,
+      });
       const inferred = await inferRunnableFromOutPath({
         label: target,
-        outPath,
+        outPath: selectedOutPath,
         mode: hints.mode,
         framework: hints.framework || undefined,
         ...(importer ? { importer } : {}),
@@ -158,6 +95,9 @@ async function main() {
     }
     if (!entry) {
       if (targetHints?.mode === "ssr" && selectedError) throw selectedError;
+      if (!selectedError) {
+        throw new Error(`selected output is not runnable for ${target}: ${selectedOutPath}`);
+      }
       const currentManifestPath = path.join(
         workspaceRoot,
         "buck-out",
@@ -172,6 +112,7 @@ async function main() {
       const refreshedManifestPath = await buildRunnableManifest(workspaceRoot, {
         sourceMode: parsed.sourceMode,
         target,
+        artifactToolsRoot,
       });
       entry = await readManifestEntry(refreshedManifestPath, target);
     }
@@ -203,7 +144,7 @@ async function main() {
       spec = { argv: ["pnpm", "--dir", importer, devScript] };
     }
   }
-  if (parsed.mode === "dev" && spec && targetHints?.importer && !testManifestPath) {
+  if (parsed.mode === "dev" && spec && targetHints?.importer && !opts.resolveEntry) {
     spec =
       (targetHints.mode === "static"
         ? await directStaticWebappDevSpec(workspaceRoot, targetHints.importer)
@@ -225,10 +166,29 @@ async function main() {
     parsed.passthrough,
     commandCwdForSpec(spec, workspaceRoot),
   );
-  process.exit(exitCode);
+  process.exitCode = exitCode;
 }
 
-main().catch((e) => {
-  console.error(e instanceof Error ? e.message : String(e));
-  process.exit(1);
-});
+export async function enterRunnableEntrypoint(): Promise<{
+  argv: string[];
+  workspaceRoot: string;
+  artifactToolsRoot: string;
+}> {
+  const initial = parseArgs(getArgvTokens());
+  const workspaceRoot = await findRepoRoot(process.cwd());
+  const artifactToolsRoot =
+    initial.mode === "prod"
+      ? enterCanonicalArtifactEntrypoint(workspaceRoot)
+      : canonicalArtifactToolsRoot(workspaceRoot);
+  return { argv: getArgvTokens(), workspaceRoot, artifactToolsRoot };
+}
+
+const invoked = String(process.argv[1] || "").replaceAll("\\", "/");
+if (invoked.endsWith("/build-tools/tools/dev/run-runnable.ts")) {
+  enterRunnableEntrypoint()
+    .then((authority) => runRunnable(authority))
+    .catch((e) => {
+      console.error(e instanceof Error ? e.message : String(e));
+      process.exit(1);
+    });
+}

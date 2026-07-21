@@ -26,6 +26,8 @@ EOF
 esac
 
 # shellcheck source=/dev/null
+unset VBR_DEVSHELL_USE_GENERATED_AUTHORITY
+export VBR_DEVSHELL_RECONCILE=1
 . "$(cd "$(dirname "$0")" && pwd)/devshell.sh"
 
 run_ts "../dev/update.ts" "$@"

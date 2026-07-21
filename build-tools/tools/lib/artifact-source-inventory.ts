@@ -1,3 +1,5 @@
+import { isGeneratedRepoStateRelPath } from "./generated-repo-state";
+
 function normalizePath(value: string): string {
   return String(value || "").replace(/\\/g, "/");
 }
@@ -52,6 +54,10 @@ export function untrackedRequiresImpureForTargets(opts: {
   for (const raw of opts.untracked) {
     const path = normalizePath(raw);
     if (!path) continue;
+    if (isGeneratedRepoStateRelPath(path)) {
+      ignored.push(path);
+      continue;
+    }
     const targetRelevant = opts.targetPackages.some(
       (pkg) => path === pkg || path.startsWith(`${pkg}/`),
     );

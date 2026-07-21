@@ -1,7 +1,8 @@
 load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_cmd_prefix")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_artifact_bash", "nix_cmd_prefix")
 load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
 load("@viberoots//build-tools/lang:remote_action_policy.bzl", "run_nix_action")
+load("@viberoots//build-tools/lang:nix_artifact_inputs.bzl", "nix_artifact_action_inputs", "with_nix_artifact_action_attrs")
 
 def _go_nix_build_impl(ctx):
     raw = ctx.attrs.self_label
@@ -26,7 +27,7 @@ def _go_nix_build_impl(ctx):
             raw_var = "OUT_RAW",
             status_var = "NIX_STATUS",
             log_file = "$BUILD_SELECTED_LOG",
-            zx_wrapper = "path:$FLK_ROOT#zx-wrapper",
+            graph_json_arg = "$1",
         )
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then "
         + "  if [ -f \"$BUILD_SELECTED_LOG\" ]; then cat \"$BUILD_SELECTED_LOG\" >&2; fi; "
@@ -50,16 +51,17 @@ def _go_nix_build_impl(ctx):
         + "cp -f \"$CAND\" \"$DEST\"; "
     )
     out = ctx.actions.declare_output(ctx.attrs.out)
+    declared_inputs = nix_artifact_action_inputs(ctx)
     cmd = cmd_args(
-        ["bash", "-c", run_and_copy, out.as_output()],
-        hidden = ctx.attrs.srcs + ctx.attrs.nix_inputs,
+        [nix_artifact_bash(), "-c", run_and_copy, out.as_output(), ctx.attrs._graph_json, declared_inputs],
+        hidden = declared_inputs,
     )
-    policy_info = run_nix_action(ctx, cmd, category = "go_nix_build")
+    policy_info = run_nix_action(ctx, cmd, category = "go_nix_build", declared_inputs = declared_inputs)
     return [DefaultInfo(default_output = out)] + policy_info
 
 go_nix_build = rule(
     impl = _go_nix_build_impl,
-    attrs = {
+    attrs = with_nix_artifact_action_attrs({
         "self_label": attrs.string(),
         "kind": attrs.string(),  # "bin" | "lib"
         "out": attrs.string(),
@@ -73,5 +75,5 @@ go_nix_build = rule(
         "asan": attrs.bool(default = False),
         "race": attrs.bool(default = False),
         "cgo_enabled": attrs.option(attrs.bool(), default = None),
-    },
+    }),
 )

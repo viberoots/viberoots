@@ -11,17 +11,17 @@ const execFileAsync = promisify(execFile);
 const script = viberootsSourcePath("viberoots/build-tools/tools/dev/stale-names-lint.ts");
 const retiredInputContractTerm = ["secret", "spec"].join("");
 
-async function writeFixture(name: string, text: string): Promise<string> {
+async function writeFixture(name: string, text: string): Promise<{ cwd: string; file: string }> {
   await fsp.mkdir("buck-out/tmp", { recursive: true });
   const dir = await fsp.mkdtemp(path.join(process.cwd(), "buck-out/tmp/stale-names-"));
   const file = path.join(dir, name);
   await fsp.mkdir(path.dirname(file), { recursive: true });
   await fsp.writeFile(file, text, "utf8");
-  return file;
+  return { cwd: dir, file: name };
 }
 
 test("stale-names-lint rejects internal v1/v2 migration identifiers", async () => {
-  const file = await writeFixture(
+  const fixture = await writeFixture(
     "fixture.ts",
     [
       "const internal_helper_v2 = true;",
@@ -37,7 +37,7 @@ test("stale-names-lint rejects internal v1/v2 migration identifiers", async () =
     ].join("\n"),
   );
   await assert.rejects(
-    execFileAsync("zx-wrapper", [script, file], { cwd: process.cwd() }),
+    execFileAsync("zx-wrapper", [script, fixture.file], { cwd: fixture.cwd }),
     /internal v1\/v2 identifier/,
   );
 });
@@ -60,7 +60,7 @@ test("stale-names-lint reads parent-owned migration label skip paths", async () 
 });
 
 test("stale-names-lint keeps external version strings out of migration-label checks", async () => {
-  const file = await writeFixture(
+  const fixture = await writeFixture(
     "fixture.ts",
     [
       'const api = "/api/v1/status";',
@@ -70,29 +70,29 @@ test("stale-names-lint keeps external version strings out of migration-label che
       'const schema = "node-dist-server-v1";',
     ].join("\n"),
   );
-  const result = await execFileAsync("zx-wrapper", [script, file], { cwd: process.cwd() });
+  const result = await execFileAsync("zx-wrapper", [script, fixture.file], { cwd: fixture.cwd });
   assert.match(result.stderr, /no stale names found/);
 });
 
 test("stale-names-lint skips opaque binary asset content", async () => {
-  const file = await writeFixture("image.png", "bnx DemoStateV1 PR-7 legacy-helper\n");
-  const result = await execFileAsync("zx-wrapper", [script, file], { cwd: process.cwd() });
+  const fixture = await writeFixture("image.png", "bnx DemoStateV1 PR-7 legacy-helper\n");
+  const result = await execFileAsync("zx-wrapper", [script, fixture.file], { cwd: fixture.cwd });
   assert.match(result.stderr, /no stale names found/);
 });
 
 test("stale-names-lint rejects active doc command examples with stale labels", async () => {
-  const file = await writeFixture(
+  const fixture = await writeFixture(
     "fixture.md",
     "Run this:\n\n```bash\nnode viberoots/build-tools/tools/dev/PR-7-helper.ts\n```\n",
   );
   await assert.rejects(
-    execFileAsync("zx-wrapper", [script, file], { cwd: process.cwd() }),
+    execFileAsync("zx-wrapper", [script, fixture.file], { cwd: fixture.cwd }),
     /completed-plan PR number/,
   );
 });
 
 test("stale-names-lint rejects completed phase labels in operational examples", async () => {
-  const file = await writeFixture(
+  const fixture = await writeFixture(
     "fixture.md",
     [
       "```bash",
@@ -102,13 +102,13 @@ test("stale-names-lint rejects completed phase labels in operational examples", 
     ].join("\n"),
   );
   await assert.rejects(
-    execFileAsync("zx-wrapper", [script, file], { cwd: process.cwd() }),
+    execFileAsync("zx-wrapper", [script, fixture.file], { cwd: fixture.cwd }),
     /completed-plan phase number/,
   );
 });
 
 test("stale-names-lint rejects common active doc command shapes with completed labels", async () => {
-  const file = await writeFixture(
+  const fixture = await writeFixture(
     "fixture.md",
     [
       "```bash",
@@ -119,13 +119,13 @@ test("stale-names-lint rejects common active doc command shapes with completed l
     ].join("\n"),
   );
   await assert.rejects(
-    execFileAsync("zx-wrapper", [script, file], { cwd: process.cwd() }),
+    execFileAsync("zx-wrapper", [script, fixture.file], { cwd: fixture.cwd }),
     /completed-plan/,
   );
 });
 
 test("stale-names-lint rejects migration labels in active doc command examples", async () => {
-  const file = await writeFixture(
+  const fixture = await writeFixture(
     "fixture.md",
     [
       "```bash",
@@ -141,7 +141,7 @@ test("stale-names-lint rejects migration labels in active doc command examples",
     ].join("\n"),
   );
   await assert.rejects(
-    execFileAsync("zx-wrapper", [script, file], { cwd: process.cwd() }),
+    execFileAsync("zx-wrapper", [script, fixture.file], { cwd: fixture.cwd }),
     /legacy\* identifier/,
   );
 });
@@ -155,9 +155,9 @@ test("stale-names-lint rejects stale names in supplied file paths", async () => 
     `deployment-${retiredInputContractTerm}.ts`,
   ];
   for (const name of staleNames) {
-    const file = await writeFixture(name, "const ok = true;\n");
+    const fixture = await writeFixture(name, "const ok = true;\n");
     await assert.rejects(
-      execFileAsync("zx-wrapper", [script, file], { cwd: process.cwd() }),
+      execFileAsync("zx-wrapper", [script, fixture.file], { cwd: fixture.cwd }),
       /stale name|completed-plan|migration label/,
     );
   }
@@ -173,12 +173,12 @@ test("stale-names-lint rejects retired input-contract term everywhere", async ()
   );
   assert.match(result.stderr, /no stale names found/);
 
-  const mixed = await writeFixture(
+  const fixture = await writeFixture(
     "fixture.md",
     `Active docs must use SprinkleRef, not ${retiredInputContractTerm} terminology.\n`,
   );
   await assert.rejects(
-    execFileAsync("zx-wrapper", [script, mixed], { cwd: process.cwd() }),
+    execFileAsync("zx-wrapper", [script, fixture.file], { cwd: fixture.cwd }),
     /retired input-contract term/,
   );
 });

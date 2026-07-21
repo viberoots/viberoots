@@ -8,11 +8,12 @@ import { runInTemp } from "../lib/test-helpers";
 test("nix_cpp_library: includes package-local patch files as inputs, stamps patch_scope, and realizes provider edges", async () => {
   await runInTemp("cpp-lib-package-local-patch-inputs-and-labels", async (tmp, $) => {
     // Minimal provider target and auto_map mapping to verify provider-edge realization.
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
-genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
-EOF'`;
+    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "third_party", "providers", "TARGETS"),
+      'genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])\n',
+      "utf8",
+    );
     await $({
       cwd: tmp,
     })`bash --noprofile --norc -c 'cat > .viberoots/workspace/providers/auto_map.bzl <<'\''EOF'\''

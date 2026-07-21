@@ -5,6 +5,7 @@ import {
   ensureParentDir,
   writeStaticWebappTarget,
 } from "./nixos-shared-host.extraction.from-targets.helpers";
+import { reconcileSyntheticDeploymentGraph } from "./deployment-graph.fixture";
 
 export const CUTOVER_FAMILY = "cutover-demo";
 export const CUTOVER_APP = `//projects/apps/${CUTOVER_FAMILY}:app`;
@@ -41,6 +42,7 @@ export async function writeCutoverDeploymentFixture(tmp: string): Promise<void> 
   await writeDevTarget(tmp);
   await writeCloudflareTarget(tmp, "staging", "shared_nonprod", CUTOVER_STAGING);
   await writeCloudflareTarget(tmp, "prod", "production_facing", CUTOVER_PROD);
+  await reconcileSyntheticDeploymentGraph(tmp);
 }
 
 async function writeSharedTargets(tmp: string): Promise<void> {

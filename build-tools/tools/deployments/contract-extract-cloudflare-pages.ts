@@ -12,7 +12,6 @@ import {
   deploymentError,
   readSmokePolicy,
   pushRolloutPolicyFieldErrors,
-  pushTokenFieldErrors,
   readLabel,
   readLabelList,
   readPrerequisites,
@@ -33,9 +32,9 @@ import {
 import { readDeploymentRequirements } from "./deployment-requirements";
 import { pushCloudflareComponentKindErrors } from "./cloudflare-pages-capability-validation";
 import * as cloudflarePagesExtract from "./cloudflare-pages-extract-helpers";
-const TARGET_TOKEN_RE = /^[a-z0-9](?:[a-z0-9-]{0,126}[a-z0-9])?$/,
-  [SHARED_NONPROD, PRODUCTION_FACING] = ["shared_nonprod", "production_facing"];
-const CLOUDFLARE_PAGES_PROVISION_MODES = new Set(["managed", "manual"]);
+import { pushCloudflarePagesTargetFieldErrors } from "./contract-extract-cloudflare-pages-validation";
+
+const SHARED_NONPROD = "shared_nonprod";
 export function extractCloudflarePagesDeploymentsFromContext(
   context: DeploymentExtractionContext,
 ): CloudflarePagesDeployment[] {
@@ -91,61 +90,21 @@ export function extractCloudflarePagesDeploymentsFromContext(
         deploymentError(label, "cloudflare-pages does not support explicit rollout_policy"),
       );
     }
-    for (const [fieldPath, value, required] of [
-      ["provider_target.account", account, true],
-      ["provider_target.project", project, true],
-      ["provider_target.id", providerTarget.id || project, false],
-    ] as const) {
-      pushTokenFieldErrors({
-        errors: deploymentErrors,
-        label,
-        fieldPath,
-        value,
-        pattern: TARGET_TOKEN_RE,
-        required,
-        invalidMessage: `${fieldPath} must be lowercase alphanumeric plus internal hyphens`,
-      });
-    }
-    if (accountId && !/^[0-9a-f]{32}$/.test(accountId)) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          "provider_target.account_id must be a 32-character lowercase Cloudflare account id",
-        ),
-      );
-    }
-    if (!CLOUDFLARE_PAGES_PROVISION_MODES.has(provisionMode)) {
-      deploymentErrors.push(
-        deploymentError(label, 'provider_target.provision_mode must be "managed" or "manual"'),
-      );
-    }
-    if (provisionMode === "managed" && customDomain && !accountId) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          "managed cloudflare-pages custom-domain provisioning requires provider_target.account_id",
-        ),
-      );
-    }
-    if (protectionClass !== SHARED_NONPROD && protectionClass !== PRODUCTION_FACING) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          'cloudflare-pages deployments must use protection_class "shared_nonprod" or "production_facing"',
-        ),
-      );
-    }
-    if (publisher !== "wrangler-pages") {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          `unsupported cloudflare-pages publisher "${publisher || "<empty>"}"`,
-        ),
-      );
-    }
-    if (!publisherConfig) {
-      deploymentErrors.push(deploymentError(label, "missing required publisher_config"));
-    }
+    pushCloudflarePagesTargetFieldErrors({
+      errors: deploymentErrors,
+      label,
+      protectionClass,
+      publisher,
+      publisherConfig,
+      provisioner,
+      account,
+      accountId,
+      project,
+      targetId: providerTarget.id || "",
+      customDomain,
+      provisionMode,
+      releaseActionRefs,
+    });
     validateExplicitDeploymentRequirements({
       node,
       label,
@@ -160,22 +119,6 @@ export function extractCloudflarePagesDeploymentsFromContext(
       requirements: runtimeConfigRequirements,
       errors: deploymentErrors,
     });
-    if (provisioner) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          "deployment-owned provisioner is not supported for cloudflare-pages",
-        ),
-      );
-    }
-    if (releaseActionRefs.length > 0) {
-      deploymentErrors.push(
-        deploymentError(
-          label,
-          "cloudflare-pages does not support protected/shared release_actions",
-        ),
-      );
-    }
     cloudflarePagesExtract.pushCloudflarePreviewErrors(label, preview, deploymentErrors);
     pushSmokePolicyErrors({
       label,

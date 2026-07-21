@@ -83,6 +83,13 @@ test("install-time node module builders propagate selected nix to child processe
   const realizedStore = await readSource(
     "build-tools/tools/dev/update-pnpm-hash/realized-store.ts",
   );
+  const realizedStoreEval = await readSource(
+    "build-tools/tools/dev/update-pnpm-hash/realized-store-eval.ts",
+  );
+  if (!realizedStore.includes('from "./realized-store-eval"')) {
+    throw new Error("realized-store must delegate Nix evaluation authority to realized-store-eval");
+  }
+  const realizedStoreAuthority = `${realizedStore}\n${realizedStoreEval}`;
   const consumerBootstrap = await readSource("build-tools/tools/lib/consumer-bootstrap.ts");
   const workspaceLockRepair = await readSource("build-tools/tools/lib/workspace-lock-repair.ts");
   const verifySeed = await readSource("build-tools/tools/dev/verify/seed.ts");
@@ -100,7 +107,7 @@ test("install-time node module builders propagate selected nix to child processe
     ["filtered-flake-viberoots-input", filteredFlakeInput],
     ["nix-build-filtered-flake", nixBuildFilteredFlake],
     ["update-pnpm-hash/importer-lockfile", importerLockfile],
-    ["update-pnpm-hash/realized-store", realizedStore],
+    ["update-pnpm-hash/realized-store", realizedStoreAuthority],
     ["consumer-bootstrap", consumerBootstrap],
     ["workspace-lock-repair", workspaceLockRepair],
     ["verify/seed", verifySeed],
@@ -108,8 +115,17 @@ test("install-time node module builders propagate selected nix to child processe
     ["viberoots-cli", viberootsCli],
     ["startup-check", startupCheck],
   ] as const) {
-    if (!source.includes("envWithResolvedNixBin")) {
-      throw new Error(`${label} must propagate VBR_NIX_BIN to child Nix processes`);
+    const requiresExplicitNixAuthority =
+      label === "filtered-flake-viberoots-input" &&
+      source.includes("materializeFilteredViberootsSource requires an explicit env") &&
+      source.includes('ensureNixStoreToolPathSync("nix", nixEnv)');
+    if (
+      !requiresExplicitNixAuthority &&
+      !source.includes("envWithResolvedNixBin") &&
+      !source.includes("buildArtifactEnvironment") &&
+      !source.includes("buildCanonicalArtifactEnvironment")
+    ) {
+      throw new Error(`${label} must use canonical Nix environment authority for child processes`);
     }
   }
 
@@ -135,7 +151,7 @@ test("install-time node module builders propagate selected nix to child processe
     ["filtered-flake", selectedFilteredFlake],
     ["nix-build-filtered-flake", nixBuildFilteredFlake],
     ["update-pnpm-hash/importer-lockfile", importerLockfile],
-    ["update-pnpm-hash/realized-store", realizedStore],
+    ["update-pnpm-hash/realized-store", realizedStoreAuthority],
     ["consumer-bootstrap", consumerBootstrap],
     ["workspace-lock-repair", workspaceLockRepair],
     ["verify/seed", verifySeed],
@@ -189,8 +205,8 @@ test("install-time node module builders propagate selected nix to child processe
   if (!nodeModulesBuild.includes('"$NIX_BIN" build')) {
     throw new Error("node-modules-build timeout shell must invoke the selected nix binary");
   }
-  if (!runRunnable.includes("spawn(nixBin")) {
-    throw new Error("run-runnable-nix must spawn the resolved nix binary");
+  if (!runRunnable.includes("runBoundedArtifactCommand({")) {
+    throw new Error("run-runnable-nix must use the bounded artifact command authority");
   }
   if (importerLockfile.includes("}`nix ${")) {
     throw new Error("importer-lockfile must invoke the selected nix binary");

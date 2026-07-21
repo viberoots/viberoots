@@ -29,6 +29,53 @@ test("build consumers do not repair pnpm provisioning state", async () => {
   assert.doesNotMatch(nodeModulesBuild, /NIX_PNPM_EXACT_STORE/);
 });
 
+test("all Nix command surfaces share the repository pnpm 11 authority", async () => {
+  const devshell = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/nix/devshell.nix"),
+    "utf8",
+  );
+  const updateApp = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/nix/flake/outputs-apps.nix"),
+    "utf8",
+  );
+  const remoteWorker = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/nix/flake/packages/remote-worker-tools.nix"),
+    "utf8",
+  );
+  const nodePlanner = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/nix/planner/node-genlike.nix"),
+    "utf8",
+  );
+  const pnpm11 = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/nix/pnpm-11.nix"),
+    "utf8",
+  );
+
+  assert.match(devshell, /pnpm11 = import \.\/pnpm-11\.nix/);
+  assert.match(devshell, /pkgs\.go pnpm11 pkgs\.nodejs_22/);
+  assert.doesNotMatch(devshell, /pkgs\.go pkgs\.pnpm/);
+  assert.match(updateApp, /pnpm11 = import \.\.\/pnpm-11\.nix/);
+  assert.match(updateApp, /program = "\$\{pnpm11\}\/bin\/pnpm"/);
+  assert.match(remoteWorker, /pnpm11 = import \.\.\/\.\.\/pnpm-11\.nix/);
+  assert.match(remoteWorker, /workerPaths = \[[\s\S]*\bpnpm11\b[\s\S]*\];/);
+  assert.doesNotMatch(remoteWorker, /pkgs\.pnpm/);
+  assert.match(nodePlanner, /pnpm11 = import \.\.\/pnpm-11\.nix/);
+  assert.match(nodePlanner, /nativeBuildInputs =[\s\S]*pkgs\.nodejs_22 pnpm11/);
+  assert.doesNotMatch(nodePlanner, /pkgs\.pnpm/);
+  assert.match(pnpm11, /#!\$\{pkgs\.nodejs_22\}\/bin\/node/);
+});
+
+test("update pnpm test override remains an explicit executable authority", async () => {
+  const updatePnpm = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-command/pnpm.ts"),
+    "utf8",
+  );
+
+  assert.match(updatePnpm, /process\.env\.UPDATE_PNPM_BIN/);
+  assert.match(updatePnpm, /const command = override \|\| resolveToolPathSync\("node", env\)/);
+  assert.match(updatePnpm, /\.\.\.\(override \? \[\] : \[resolveToolPathSync\("pnpm", env\)\]\)/);
+});
+
 test("ordinary pnpm consumers cannot reconcile committed stores", async () => {
   const ordinaryFiles = [
     "build-tools/tools/dev/node-modules-build.ts",
@@ -48,7 +95,12 @@ test("ordinary pnpm consumers cannot reconcile committed stores", async () => {
     viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/realized-store.ts"),
     "utf8",
   );
-  assert.match(probe, /"eval"/);
+  const evalAuthority = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/update-pnpm-hash/realized-store-eval.ts"),
+    "utf8",
+  );
+  assert.match(probe, /finalPnpmStoreEvalArgs/);
+  assert.match(evalAuthority, /"eval"/);
   assert.match(probe, /"path-info"/);
   assert.match(probe, /probeRealizedFinalPnpmStore\(/);
   assert.doesNotMatch(probe, /prepareFinalPnpmStore|fetchExactPnpmStore|add-fixed/);

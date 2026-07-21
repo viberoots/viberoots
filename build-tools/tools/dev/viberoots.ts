@@ -13,6 +13,7 @@ import { runLiveBootstrap } from "../lib/live-bootstrap";
 import { withSanitizedInheritedNixConfig } from "../lib/nix-config-env";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
 import { repairGeneratedWorkspaceLock } from "../lib/workspace-lock-repair";
+import { installCanonicalArtifactToolsAuthority } from "../lib/artifact-tool-authority";
 
 type VersionStatus = ReturnType<typeof buildVersionStatus>;
 type CommandMeta = {
@@ -339,11 +340,16 @@ function printText(status: VersionStatus): void {
 
 async function initWorkspace(): Promise<void> {
   const workspaceRoot = selectedWorkspaceRootForCommand();
+  const shellEntry = getFlagBool("shell-entry");
   const result = await activateWorkspace({
     start: workspaceRoot,
     sourcePath: getFlagStr("source"),
-    shellEntry: getFlagBool("shell-entry"),
+    shellEntry,
   });
+  const declaredArtifactTools = String(process.env.VBR_ARTIFACT_TOOLS_ROOT || "").trim();
+  if (!shellEntry && declaredArtifactTools) {
+    await installCanonicalArtifactToolsAuthority(workspaceRoot, declaredArtifactTools);
+  }
   if (getFlagBool("json")) {
     console.log(JSON.stringify(result, null, 2));
     return;

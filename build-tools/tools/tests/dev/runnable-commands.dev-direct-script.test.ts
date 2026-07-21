@@ -30,16 +30,18 @@ test("d selected webapp dev bypasses pnpm-backed generated dev scripts", async (
         [
           {
             name: target,
-            rule_type: "node_webapp",
+            rule_type: "nix_node_gen",
             labels: [
               "lang:node",
-              "kind:app",
+              "kind:gen",
               "webapp:ssr",
               "framework:vite",
               `lockfile:${importer}/pnpm-lock.yaml#${importer}`,
             ],
-            srcs: [`${importer}/src/entry-server.ts`],
+            srcs: [],
             deps: [],
+            cmd: 'mkdir -p "$OUT/server" "$OUT/client"; printf "console.log(\\\"server\\\")\\n" > "$OUT/server/index.js"',
+            out: "dist",
           },
         ],
         null,

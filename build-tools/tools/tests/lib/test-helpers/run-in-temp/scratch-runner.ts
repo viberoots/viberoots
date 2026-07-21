@@ -11,7 +11,7 @@ import { applyTempNodePath, prependTempRepoBin } from "./command-shims";
 import { activeViberootsRootFromWorkspace, prepareFilteredViberootsInput } from "./filtered-inputs";
 import { rewriteTempViberootsInput } from "./flake-rewrite";
 import { withTempProcessEnv } from "./process-env";
-import { stableXdgCacheRoot } from "./test-roots";
+import { absoluteXdgCacheHome, stableXdgCacheRoot } from "./test-roots";
 
 export async function runScratchTemp<T>(
   allocation: TempAllocation,
@@ -46,7 +46,7 @@ export async function runScratchTemp<T>(
   exportEnv.TEST_NO_BROWSER = exportEnv.TEST_NO_BROWSER || "1";
   exportEnv[LOCAL_FIXTURE_SERVICE_ENV] = exportEnv[LOCAL_FIXTURE_SERVICE_ENV] || "1";
   exportEnv.HOME = home;
-  exportEnv.XDG_CACHE_HOME = exportEnv.XDG_CACHE_HOME || xdgCacheHome;
+  exportEnv.XDG_CACHE_HOME = absoluteXdgCacheHome(exportEnv.XDG_CACHE_HOME, xdgCacheHome);
   if (!exportEnv.BUCK2_REAL_HOME && realHome) {
     exportEnv.BUCK2_REAL_HOME = realHome;
   }

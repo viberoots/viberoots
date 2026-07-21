@@ -1,6 +1,7 @@
 load("@prelude//:rules.bzl", "genrule")
 load("@viberoots//build-tools/lang:defs_common.bzl", "default_lockfile_label_from_package", "default_lockfile_path_from_package", "ensure_default_lockfile_exists", "extract_lockfile_labels", "prepare_language_wiring")
-load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_build_out_path_cmd", "nix_calling_env_export_buck_graph_json", "nix_calling_genrule_bootstrap", "nix_calling_node_patch_requirements_preflight")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_calling_env_export_buck_graph_json", "nix_calling_genrule_bootstrap", "nix_calling_node_patch_requirements_preflight")
+load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
 load("@viberoots//build-tools/lang:remote_action_policy.bzl", "stamp_local_only_genrule_labels")
 load("@viberoots//build-tools/node/private:wasm_source_resolver.bzl", "asset_with_selector", "sh_quote", "validate_wasm_selector_args", "wasm_source_resolver_shell")
 MODULE_PROVIDERS = {}
@@ -48,13 +49,15 @@ def _selected_route_build_cmd(selected_route_target):
     return (
         ("VBR_NODE_ROUTE_TARGET=%s; " % sh_quote(selected_route_target))
         + "if [ -n \"$VBR_NODE_ROUTE_TARGET\" ]; then "
-        + nix_build_out_path_cmd(
-            "\"path:$FLK_ROOT#graph-generator-selected\"",
-            timeout_var = "TIMEOUT",
-            impure = True,
-            build_prefix = "env BUCK_TEST_SRC=\"$WORKSPACE_ROOT\" BUCK_TARGET=\"$VBR_NODE_ROUTE_TARGET\" ",
-            graph_target = "$VBR_NODE_ROUTE_TARGET",
+        + nix_action_build_selected_out_path_cmd(
+            target_label = "$VBR_NODE_ROUTE_TARGET",
+            out_var = "outPath",
+            raw_var = "OUT_RAW",
+            status_var = "NIX_STATUS",
+            log_file = "$WORKSPACE_ROOT/buck-out/tmp/build-selected/node_stage.log",
+            escape_cmd_subst = True,
         )
+        + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then cat \"$WORKSPACE_ROOT/buck-out/tmp/build-selected/node_stage.log\" >&2 2>/dev/null || true; exit \"${NIX_STATUS:-2}\"; fi; "
         + "fi; "
     )
 

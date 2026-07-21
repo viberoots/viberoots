@@ -2,16 +2,18 @@
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import fs from "fs-extra";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 
 test("cpp binary realizes provider edges from MODULE_PROVIDERS in deps()", async () => {
   await runInTemp("cpp-provider-edges-bin", async (tmp, $) => {
     // Minimal provider target
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<\'EOF'
-genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
-EOF'`;
+    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "third_party", "providers", "TARGETS"),
+      'genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])\n',
+      "utf8",
+    );
     // Map the demo binary to the provider
     await $({
       cwd: tmp,

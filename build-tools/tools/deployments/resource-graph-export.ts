@@ -68,9 +68,7 @@ export type ResourceGraphExportResult = {
 
 export async function exportDeploymentResourceGraph(opts: { workspaceRoot: string }) {
   const workspaceRoot = path.resolve(opts.workspaceRoot);
-  await ensureDeploymentGraph(workspaceRoot, undefined, {
-    force: await hasBuckProjectRoot(workspaceRoot),
-  });
+  await ensureDeploymentGraph(workspaceRoot);
   const { readDeploymentResourceEnvelopes } = await import("./resource-graph-envelope");
   const envelopeSet = await readDeploymentResourceEnvelopes({ workspaceRoot });
   if (envelopeSet.errors.length > 0) {
@@ -88,15 +86,6 @@ export async function exportDeploymentResourceGraph(opts: { workspaceRoot: strin
     nodeCount: documents.nodes.nodes.length,
     edgeCount: documents.edges.edges.length,
   };
-}
-
-async function hasBuckProjectRoot(workspaceRoot: string): Promise<boolean> {
-  try {
-    await fsp.access(path.join(workspaceRoot, ".buckconfig"));
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 export function createDeploymentResourceGraphDocuments(

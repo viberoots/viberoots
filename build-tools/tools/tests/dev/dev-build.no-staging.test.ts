@@ -2,6 +2,8 @@
 import "zx/globals";
 import { runInTemp } from "../lib/test-helpers";
 import { buildToolPath } from "../../dev/dev-build/paths";
+import { ensureBuckPreludeConfig } from "../../dev/dev-build/prelude";
+import { withoutArtifactEnvironmentInfluence } from "../../lib/artifact-environment";
 
 void (async function main() {
   console.log("TAP version 13");
@@ -11,12 +13,15 @@ void (async function main() {
     await $tmp`git init -q`;
     await $tmp`git config user.email test@example.com`;
     await $tmp`git config user.name test`;
-    await $tmp`git add -A && git commit -qm init`;
+    await ensureBuckPreludeConfig(tmp);
+    await $tmp`git add -A`;
+    await $tmp`git rm -rq --cached --ignore-unmatch .viberoots`;
+    await $tmp`git commit -qm init`;
 
     // Refresh glue and build via the helper
     await $tmp({
       env: {
-        ...process.env,
+        ...withoutArtifactEnvironmentInfluence(process.env),
         DEV_BUILD_LOW_SPACE_GB: "0",
       },
     })`${devBuild} build //.viberoots/workspace:flake.lock --no-materialize`;

@@ -6,23 +6,70 @@ function isExactTokenOrNixBin(token: string, binName: "nix" | "nix-store"): bool
   return token.endsWith(`/bin/${binName}`);
 }
 
+function executableIndex(tokens: string[]): number {
+  let index = 0;
+  const basename = (value: string) => value.slice(value.lastIndexOf("/") + 1);
+  if (basename(tokens[index] || "") === "sudo") {
+    index += 1;
+    while (index < tokens.length && tokens[index].startsWith("-")) {
+      const option = tokens[index++];
+      if (
+        [
+          "-C",
+          "-D",
+          "-g",
+          "-h",
+          "-p",
+          "-R",
+          "-r",
+          "-T",
+          "-t",
+          "-u",
+          "--chdir",
+          "--group",
+          "--host",
+          "--prompt",
+          "--role",
+          "--type",
+          "--user",
+        ].includes(option)
+      ) {
+        index += 1;
+      }
+    }
+  }
+  if (basename(tokens[index] || "") === "env") {
+    index += 1;
+    while (index < tokens.length) {
+      const token = tokens[index];
+      if (token === "-u" || token === "--unset") {
+        index += 2;
+        continue;
+      }
+      if (token.startsWith("-") || /^[A-Za-z_][A-Za-z0-9_]*=/.test(token)) {
+        index += 1;
+        continue;
+      }
+      break;
+    }
+  }
+  return index;
+}
+
 export function isNixGcCommand(cmd: string): boolean {
   const tokens = String(cmd || "")
     .trim()
     .split(/\s+/)
     .filter(Boolean);
   if (tokens.length === 0) return false;
-  for (let i = 0; i < tokens.length; i += 1) {
-    const token = tokens[i];
-    if (isExactTokenOrNixBin(token, "nix") && tokens[i + 1] === "store" && tokens[i + 2] === "gc") {
-      return true;
-    }
-    if (isExactTokenOrNixBin(token, "nix-store")) {
-      const rest = tokens.slice(i + 1);
-      if (rest.includes("--gc") || rest.includes("-gc")) return true;
-    }
+  const index = executableIndex(tokens);
+  const executable = tokens[index];
+  if (isExactTokenOrNixBin(executable, "nix")) {
+    return tokens[index + 1] === "store" && tokens[index + 2] === "gc";
   }
-  return false;
+  if (!isExactTokenOrNixBin(executable, "nix-store")) return false;
+  const args = tokens.slice(index + 1);
+  return args.includes("--gc") || args.includes("-gc");
 }
 
 export async function activeNixGcPids(): Promise<number[]> {

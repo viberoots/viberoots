@@ -3,6 +3,7 @@
 , viberootsSrc ? ../../../..
 , version ? "0.0.0-dev"
 , releaseTag ? "v${version}"
+, artifactToolsRoot ? null
 }:
 
 pkgs.writeShellScriptBin "viberoots" ''
@@ -23,6 +24,9 @@ pkgs.writeShellScriptBin "viberoots" ''
   fi
   export NIX_BIN="$VBR_NIX_BIN"
   export GIT_BIN="${pkgs.git}/bin/git"
+  ${pkgs.lib.optionalString (artifactToolsRoot != null) ''
+    export VBR_ARTIFACT_TOOLS_ROOT="${artifactToolsRoot}"
+  ''}
   export SSL_CERT_FILE="''${SSL_CERT_FILE:-${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt}"
   export NIX_SSL_CERT_FILE="''${NIX_SSL_CERT_FILE:-$SSL_CERT_FILE}"
   export NODE_EXTRA_CA_CERTS="''${NODE_EXTRA_CA_CERTS:-$SSL_CERT_FILE}"

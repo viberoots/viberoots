@@ -59,10 +59,7 @@ let
     import ../node-modules.nix {
       inherit pkgs repoFsRoot;
       repoRoot = repoRoot;
-      hashesPath =
-        if evaluationBundle != null
-        then repoRoot + "/projects/node-modules.hashes.json"
-        else ../node-modules.hashes.json;
+      hashesPath = repoRoot + "/projects/config/node-modules.hashes.json";
       allowLiveHashMap = evaluationBundle == null;
       prefetchedStorePathGlobal =
         let
@@ -75,7 +72,7 @@ let
     inherit pkgs;
     repoRoot = viberootsRoot;
     repoFsRoot = viberootsRoot;
-    hashesPath = ../node-modules.hashes.json;
+    hashesPath = viberootsRoot + "/build-tools/tools/nix/node-modules.hashes.json";
     allowLiveHashMap = false;
     prefetchedStorePathGlobal =
       let

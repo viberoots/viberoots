@@ -12,6 +12,7 @@ import { LOCAL_FIXTURE_SERVICE_ENV } from "./contracts";
 import { applyTempNodePath, prependPath, prependTempRepoBin } from "./command-shims";
 import { pinnedCacertPathOncePerWorker, pinnedNixpkgsPathOncePerWorker } from "./nix-support";
 import { configureTempPnpmEnv, nixPathHasNixpkgsEntry } from "./seeded-overlays";
+import { absoluteXdgCacheHome } from "./test-roots";
 
 export async function buildSeededRuntimeEnv(
   setup: SeededTempSetup,
@@ -91,7 +92,7 @@ export async function buildSeededRuntimeEnv(
   exportEnv.BUCKD_STARTUP_INIT_TIMEOUT =
     exportEnv.BUCKD_STARTUP_INIT_TIMEOUT || exportEnv.BUCKD_STARTUP_TIMEOUT;
   exportEnv.HOME = home;
-  exportEnv.XDG_CACHE_HOME = exportEnv.XDG_CACHE_HOME || xdgCacheHome;
+  exportEnv.XDG_CACHE_HOME = absoluteXdgCacheHome(exportEnv.XDG_CACHE_HOME, xdgCacheHome);
   if (!exportEnv.BUCK2_REAL_HOME && realHome) {
     exportEnv.BUCK2_REAL_HOME = realHome;
   }

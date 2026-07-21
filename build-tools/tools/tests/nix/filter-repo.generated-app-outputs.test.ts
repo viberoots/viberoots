@@ -23,6 +23,7 @@ test("filter-repo excludes generated app output directories from flake snapshots
     "install-cache",
     "nix-xdg-cache",
     "pr-logs",
+    "viberoots",
     "viberoots-flake-input",
     "xdg-cache",
   ]) {

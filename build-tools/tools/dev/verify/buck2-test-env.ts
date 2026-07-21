@@ -13,6 +13,7 @@ type VerifyBuck2TestEnvArgsOptions = {
   nodeTestTimeoutMs: number;
   testNixTimeoutSecs: number;
   executionPolicy?: VerifyExecutionPolicy;
+  artifactToolsRoot: string;
 };
 
 function verifyNestedBuckIsolation(iso: string, passName: string): string {
@@ -44,11 +45,14 @@ function buckdStartupInitTimeout(): string {
 
 export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): string[] {
   if (opts.executionPolicy && opts.executionPolicy.mode !== "local") {
-    return buildRemoteVerifyTestEnvArgs({
-      nestedIso: verifyNestedBuckIsolation(opts.iso, opts.passName),
-      nodeTestTimeoutMs: opts.nodeTestTimeoutMs,
-      testNixTimeoutSecs: opts.testNixTimeoutSecs,
-    });
+    return [
+      ...buildRemoteVerifyTestEnvArgs({
+        nestedIso: verifyNestedBuckIsolation(opts.iso, opts.passName),
+        nodeTestTimeoutMs: opts.nodeTestTimeoutMs,
+        testNixTimeoutSecs: opts.testNixTimeoutSecs,
+      }),
+      ...maybeEnvArg("VBR_ARTIFACT_TOOLS_ROOT", opts.artifactToolsRoot),
+    ];
   }
   const nestedIso = verifyNestedBuckIsolation(opts.iso, opts.passName);
   const extraEnvArgs: string[] = [];
@@ -81,6 +85,7 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     `NIX_PNPM_INSTALL_TIMEOUT=${opts.testNixTimeoutSecs}`,
     "--env",
     "VBR_GC_MODE=off",
+    ...maybeEnvArg("VBR_ARTIFACT_TOOLS_ROOT", opts.artifactToolsRoot),
     ...gitAutoMaintenanceDisabledTestEnvArgs(),
     ...maybeEnvArg("NIX_CONFIG", nixConfigEnv.NIX_CONFIG),
     ...maybeEnvArg("NIX_CONF_DIR", nixConfigEnv.NIX_CONF_DIR),

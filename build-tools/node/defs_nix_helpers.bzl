@@ -6,6 +6,24 @@ load(
     "extract_lockfile_labels",
     "prepare_language_wiring",
 )
+load("@viberoots//build-tools/lang:filtered_source_policy.bzl", "FILTERED_ARTIFACT_SOURCE_GLOB_EXCLUDES")
+
+def _node_importer_action_srcs(srcs):
+    if not isinstance(srcs, dict):
+        return srcs
+    importer = native.package_name()
+    declared = {}
+    for source in native.glob(
+        ["*", ".*", "**/*", "**/.*"],
+        exclude = FILTERED_ARTIFACT_SOURCE_GLOB_EXCLUDES,
+    ):
+        declared["%s/%s" % (importer, source)] = source
+    for destination, source in srcs.items():
+        relative = destination
+        if importer and not destination.startswith(importer + "/"):
+            relative = "%s/%s" % (importer, destination)
+        declared[relative] = source
+    return declared
 
 def fail_importer_arg_mismatch(macro_name, importer, lockfile_importer, lockfile_label):
     fail(
@@ -49,7 +67,7 @@ def prepare_node_importer_nix_calling_genrule_kwargs(
     return prepare_language_wiring(
         name = name,
         kwargs = kwargs,
-        srcs = srcs,
+        srcs = _node_importer_action_srcs(srcs),
         deps = deps,
         lang = "node",
         kind = kind,

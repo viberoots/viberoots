@@ -109,11 +109,7 @@ else
     ln -s "$NM_TARGET" node_modules
   fi
   phase_timer_end "node-modules-link" "$PHASE_T0"
-  if [ -x "node_modules/.bin/vitest" ] || [ -f "node_modules/.bin/vitest" ]; then
-    VITEST_BIN="node_modules/.bin/vitest"
-  else
-    VITEST_BIN=$(find node_modules -path "*/node_modules/vitest/*" -type f \( -name "vitest.mjs" -o -name "vitest.js" \) -print -quit 2>/dev/null || true)
-  fi
+  VITEST_BIN=$(find "$NM_TARGET" -path "*/node_modules/vitest/*" -type f \( -name "vitest.mjs" -o -name "vitest.js" \) -print -quit 2>/dev/null || true)
   if [ -z "$VITEST_BIN" ] || [ ! -e "$VITEST_BIN" ]; then
     echo "[nix] DEBUG: vitest binary not found; listing node_modules for diagnostics" >&2
     (find node_modules -maxdepth 3 -type d -print | sort | head -n 200) || true
@@ -130,6 +126,7 @@ else
 export default {
   cacheDir: ".vite",
   optimizeDeps: { disabled: true },
+  server: { host: "127.0.0.1", hmr: false },
 };
 EOF_VITE_CFG
 
@@ -145,7 +142,7 @@ EOF_VITE_CFG
     export NODE_OPTIONS="--max-old-space-size=1536 ${NODE_OPTIONS:-}"
 
     VITEST_TIMEOUT_SECS="${TEST_NIX_TIMEOUT_SECS:-${VERIFY_TIMEOUT_SECS:-${NIX_PNPM_INSTALL_TIMEOUT:-1800}}}"
-    mapfile -t PATTERN_ARGS < <(node -e '
+    mapfile -t PATTERN_ARGS < <("$NODE_BIN" -e '
 const fs = require("node:fs");
 const file = process.argv[1];
 if (!fs.existsSync(file)) {
@@ -172,37 +169,20 @@ for (const line of lines) {
       sed -n '1,20p' "$MATCHED_TESTS_FILE" >&2
     fi
     VITEST_T0="$(phase_timer_begin)"
-    if [ "$(basename "$VITEST_BIN")" = "vitest" ]; then
-      set +e
-      timeout -k 15s ${VITEST_TIMEOUT_SECS}s "$VITEST_BIN" run \
-        --pool forks \
-        --maxWorkers 1 \
-        --minWorkers 1 \
-        --no-file-parallelism \
-        --config "$VITE_CFG" \
-        --reporter=junit \
-        --outputFile=report/junit.xml \
-        --passWithNoTests \
-        "${COVERAGE_ARGS[@]}" \
-        "${PATTERN_ARGS[@]}"
-      VITEST_STATUS=$?
-      set -e
-    else
-      set +e
-      timeout -k 15s ${VITEST_TIMEOUT_SECS}s node "$VITEST_BIN" run \
-        --pool forks \
-        --maxWorkers 1 \
-        --minWorkers 1 \
-        --no-file-parallelism \
-        --config "$VITE_CFG" \
-        --reporter=junit \
-        --outputFile=report/junit.xml \
-        --passWithNoTests \
-        "${COVERAGE_ARGS[@]}" \
-        "${PATTERN_ARGS[@]}"
-      VITEST_STATUS=$?
-      set -e
-    fi
+    set +e
+    timeout -k 15s ${VITEST_TIMEOUT_SECS}s "$NODE_BIN" "$VITEST_BIN" run \
+      --pool forks \
+      --maxWorkers 1 \
+      --minWorkers 1 \
+      --no-file-parallelism \
+      --config "$VITE_CFG" \
+      --reporter=junit \
+      --outputFile=report/junit.xml \
+      --passWithNoTests \
+      "${COVERAGE_ARGS[@]}" \
+      "${PATTERN_ARGS[@]}"
+    VITEST_STATUS=$?
+    set -e
     phase_timer_end "vitest-run" "$VITEST_T0"
 
     if [ ! -s report/junit.xml ]; then
@@ -213,7 +193,7 @@ for (const line of lines) {
     if [ "${VITEST_STATUS:-0}" -ne 0 ]; then
       echo "[nix] vitest exited with status ${VITEST_STATUS}; failing testcases:" >&2
       JUNIT_T0="$(phase_timer_begin)"
-      node - <<'EOF_JUNIT_SUMMARY' report/junit.xml >&2 || true
+      "$NODE_BIN" - <<'EOF_JUNIT_SUMMARY' report/junit.xml >&2 || true
 const fs = require("node:fs");
 const file = process.argv[2];
 const xml = fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "";

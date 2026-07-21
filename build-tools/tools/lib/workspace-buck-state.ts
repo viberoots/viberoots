@@ -6,6 +6,9 @@ import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 import { DEFAULT_GRAPH_PATH, WORKSPACE_BUCK_STATE_DIR } from "./workspace-state-paths";
 import { ensureProjectEnforcementRegistration } from "./project-enforcement-registration";
 
+export const WORKSPACE_ROOT_ENV_CONTENT =
+  "# Workspace root is derived from this declared input's sandbox path.\n";
+
 async function writeIfMissing(file: string, text: string): Promise<void> {
   try {
     await fsp.access(file);
@@ -23,6 +26,6 @@ export async function ensureWorkspaceBuckStatePackage(
   await mkdirWithMacosMetadataExclusion(dir);
   await writeIfMissing(path.join(dir, ".buckconfig"), "[buildfile]\nname = TARGETS\n");
   await writeIfMissing(path.join(workspaceRoot, DEFAULT_GRAPH_PATH), "[]\n");
-  await writeIfChanged(path.join(dir, "workspace-root.env"), `WORKSPACE_ROOT=${workspaceRoot}\n`);
+  await writeIfChanged(path.join(dir, "workspace-root.env"), WORKSPACE_ROOT_ENV_CONTENT);
   await ensureProjectEnforcementRegistration({ workspaceRoot });
 }

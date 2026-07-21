@@ -17,7 +17,13 @@ import {
   staleConsumerTrackedInput,
   type GuardedConsumerTrackedPath,
 } from "./consumer-tracked-inputs";
+import {
+  generatedGlobalInputMarker,
+  readGlobalNixInputTargets,
+  renderGlobalNixInputTargets,
+} from "./global-nix-input-targets";
 import { writeIfChanged } from "./fs-helpers";
+import { isGeneratedRepoStateRelPath } from "./generated-repo-state";
 import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 import { withSanitizedInheritedNixConfig } from "./nix-config-env";
 import { writePostCloneWorkspaceLock } from "./post-clone-workspace-lock";
@@ -64,6 +70,8 @@ const bootstrapScaffoldPaths = [
   "projects/AGENTS.md",
   "projects/README.md",
   "projects/config/README.md",
+  "projects/config/TARGETS",
+  "projects/config/node-modules.hashes.json",
   "projects/config/shared.json",
 ];
 const viberootsInputExcludes = new Set([
@@ -79,7 +87,6 @@ const viberootsInputExcludes = new Set([
   ".turbo",
   ".cache",
   "dist",
-  "build",
   ".vite",
   ".next",
   ".wasm-producer",
@@ -159,6 +166,26 @@ async function writeGeneratedFile(
   await writeIfChanged(file, content);
 }
 
+async function reconcileGlobalInputTargets(workspaceRoot: string): Promise<void> {
+  const rendered = await readGlobalNixInputTargets(workspaceRoot);
+  const configTargets = path.join(workspaceRoot, "projects/config/TARGETS");
+  const currentConfig = await fsp.readFile(configTargets, "utf8").catch(() => "");
+  if (currentConfig && !currentConfig.includes(generatedGlobalInputMarker)) {
+    throw new Error(
+      "error: projects/config/TARGETS is owned by viberoots global-input configuration\nrepair: preserve custom rules in another package, then run viberoots update",
+    );
+  }
+  await writeIfChanged(configTargets, rendered.projectsConfigTargets);
+  await writeGeneratedFile(
+    workspaceRoot,
+    ".viberoots/workspace/TARGETS",
+    rendered.workspaceTargets,
+  );
+  const oldTargets = path.join(workspaceRoot, "projects/TARGETS");
+  const oldContent = await fsp.readFile(oldTargets, "utf8").catch(() => "");
+  if (oldContent.includes(generatedGlobalInputMarker)) await fsp.rm(oldTargets, { force: true });
+}
+
 function withoutGeneratedMarker(content: string) {
   return content.replace(new RegExp(`^# ${escapeRegExp(generatedMarker)}\\n`), "");
 }
@@ -202,10 +229,19 @@ async function writeHostPathIfUseful(workspaceRoot: string): Promise<void> {
 }
 
 function shouldExcludeViberootsInputRel(rel: string): boolean {
+  if (isGeneratedRepoStateRelPath(rel)) return true;
   const parts = rel.split(path.sep).filter(Boolean);
+  if (
+    rel === path.join("build-tools", "tools", "dev", "toolchain-paths.json") ||
+    rel === path.join("toolchains", "toolchain_paths.bzl")
+  ) {
+    return true;
+  }
   if (parts.some((part) => viberootsInputExcludes.has(part))) return true;
   const base = parts.at(-1) || "";
   return (
+    parts.slice(0, -1).includes("build") ||
+    rel === "build" ||
     base === ".metadata_never_index" ||
     base === ".source-fingerprint" ||
     base === ".node_modules.lockfile-guard" ||
@@ -216,7 +252,7 @@ function shouldExcludeViberootsInputRel(rel: string): boolean {
   );
 }
 
-async function copyViberootsInputTree(src: string, dst: string): Promise<void> {
+export async function copyViberootsInputTree(src: string, dst: string): Promise<void> {
   await fsp.rm(dst, { recursive: true, force: true });
   await fsp.mkdir(dst, { recursive: true });
   async function visit(dir: string): Promise<void> {
@@ -628,22 +664,6 @@ function rootFlakeNix(opts: InitConsumerOptions): string {
     );
 }
 
-function workspaceTargets(): string {
-  return `# ${generatedMarker}
-filegroup(
-    name = "flake.lock",
-    srcs = ["flake.lock"],
-    visibility = ["PUBLIC"],
-)
-
-filegroup(
-    name = "nixpkgs-source-registry-extension",
-    srcs = ["nixpkgs-source-registry-extension.nix"],
-    visibility = ["PUBLIC"],
-)
-`;
-}
-
 function emptyRegistryExtension(): string {
   return "{ inputs }: { profiles = { }; }\n";
 }
@@ -717,6 +737,10 @@ function projectConfigReadme(): string {
 
 This directory contains the project configuration surfaces used by viberoots-provided setup,
 deployment, secret, and runtime-value workflows.
+
+Viberoots owns \`TARGETS\` and \`node-modules.hashes.json\` in this package. Bootstrap creates them,
+\`u\` reconciles them, and read-only install/build entrypoints fail stale with \`repair: run u\`.
+Custom Buck rules belong in another consumer package.
 
 Read these viberoots docs before changing config shape or resolution behavior:
 
@@ -1011,7 +1035,35 @@ export async function initConsumer(opts: InitConsumerOptions): Promise<void> {
     ".viberoots/workspace/nixpkgs-source-registry-extension.nix",
     emptyRegistryExtension(),
   );
-  await writeGeneratedFile(opts.workspaceRoot, ".viberoots/workspace/TARGETS", workspaceTargets());
+  await writeIfMissing(opts.workspaceRoot, "projects/config/node-modules.hashes.json", "{}\n");
+  await fsp.rm(path.join(opts.workspaceRoot, ".viberoots/workspace/node-modules.hashes.json"), {
+    force: true,
+  });
+  const initialTargets = renderGlobalNixInputTargets({
+    hashesJson: await fsp.readFile(
+      path.join(opts.workspaceRoot, "projects/config/node-modules.hashes.json"),
+    ),
+    flakeNix: await fsp.readFile(path.join(opts.workspaceRoot, ".viberoots/workspace/flake.nix")),
+    flakeLock: await fsp
+      .readFile(path.join(opts.workspaceRoot, ".viberoots/workspace/flake.lock"))
+      .catch(() => Buffer.from("")),
+    registryExtension: await fsp.readFile(
+      path.join(opts.workspaceRoot, ".viberoots/workspace/nixpkgs-source-registry-extension.nix"),
+    ),
+  });
+  await writeGeneratedFile(
+    opts.workspaceRoot,
+    ".viberoots/workspace/TARGETS",
+    initialTargets.workspaceTargets,
+  );
+  const configTargetsPath = path.join(opts.workspaceRoot, "projects/config/TARGETS");
+  const existingConfigTargets = await fsp.readFile(configTargetsPath, "utf8").catch(() => "");
+  if (existingConfigTargets && !existingConfigTargets.includes(generatedGlobalInputMarker)) {
+    throw new Error(
+      "error: projects/config/TARGETS is owned by viberoots global-input configuration\nrepair: preserve custom rules in another package, then run viberoots update",
+    );
+  }
+  await writeIfChanged(configTargetsPath, initialTargets.projectsConfigTargets);
   await writeIfMissing(opts.workspaceRoot, "README.md", consumerReadme(sourceMode));
   await writeIfMissing(
     opts.workspaceRoot,
@@ -1037,6 +1089,7 @@ Project and application source belongs here.
       await repairGeneratedWorkspaceLock({ workspaceRoot: opts.workspaceRoot });
     }
   }
+  if (opts.lock !== false) await reconcileGlobalInputTargets(opts.workspaceRoot);
   await markBootstrapScaffoldVisibleToGit(opts.workspaceRoot);
   const activation = await activateWorkspace({
     start: opts.workspaceRoot,

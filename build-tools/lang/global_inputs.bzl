@@ -8,7 +8,10 @@ def global_nix_inputs():
     consume this helper instead of hardcoding labels in macros.
     """
     return [
+        "//.viberoots/workspace:flake.nix",
         "//.viberoots/workspace:flake.lock",
+        "//projects/config:node-modules.hashes.json",
+        "workspace_buck//:graph.json",
         "@viberoots//build-tools/tools/nix:nixpkgs_source_registry",
         "//.viberoots/workspace:nixpkgs-source-registry-extension",
     ]

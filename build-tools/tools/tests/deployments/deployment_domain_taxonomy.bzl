@@ -6,6 +6,19 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
 })
 
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
+    "build-tools/tools/tests/deployments/aws-account-local-sprinkleref.init-local.test.ts": True,
+    "build-tools/tools/tests/deployments/infisical-iac-bootstrap.auth.test.ts": True,
+    "build-tools/tools/tests/deployments/infisical-iac-bootstrap.deployment-fanout.helpers.ts": False,
+    "build-tools/tools/tests/deployments/infisical-iac-bootstrap.identity-tofu.helpers.ts": False,
+    "build-tools/tools/tests/deployments/infisical-iac-bootstrap.profile-materialization.helpers.ts": False,
+    "build-tools/tools/tests/deployments/infisical-iac-bootstrap.profile-selection.helpers.ts": False,
+    "build-tools/tools/tests/deployments/infisical-iac-bootstrap.resolver-keychain.test.ts": True,
+    "build-tools/tools/tests/deployments/infisical-iac-bootstrap.resolver-profiles.fixture.ts": False,
+    "build-tools/tools/tests/deployments/infisical-iac-bootstrap.resolver-validation.test.ts": True,
+    "build-tools/tools/tests/deployments/nixos-shared-host.jenkins-control-plane.fixture.ts": False,
+})
+
+REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/control-plane-credential-host-proof-exclusivity.test.ts": True,
 })
 

@@ -3,14 +3,10 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { localHarnessControlPlaneDatabaseUrl } from "../../deployments/nixos-shared-host-control-plane-backend";
 import { artifactIdentityForNixosSharedHostDir } from "../../deployments/nixos-shared-host-artifacts";
-import { startNixosSharedHostControlPlaneServer } from "../../deployments/nixos-shared-host-control-plane-server";
-import { startNixosSharedHostControlPlaneWorkerLoop } from "../../deployments/nixos-shared-host-control-plane-worker-loop";
 import { nixosSharedHostContainerRoot } from "../../deployments/nixos-shared-host-runtime";
-import { runInTemp } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 import { startNixosSharedHostPublicServer } from "./nixos-shared-host.public-server";
-import { memoryControlPlaneArtifactStore } from "./control-plane-artifact-store-test-helpers";
 import { ensureNixosSharedHostReviewedSourceRef } from "./nixos-shared-host.fixture";
 import { installFakeRemoteTransport } from "./nixos-shared-host.remote-transport.fake";
 import {
@@ -26,45 +22,10 @@ import {
 } from "./nixos-shared-host.jenkins.fixture";
 import { readBackendSnapshot } from "./nixos-shared-host.control-plane.helpers";
 import { viberootsToolScript } from "./deployment-command";
-import { writeAuthSession } from "./nixos-shared-host.service-auth-boundary.helpers";
-
-const CONTROL_PLANE_TOKEN = "test-control-plane-token";
-type RemoteControlPlaneRuntime = {
-  tmp: string;
-  remoteStatePath: string;
-  remoteRuntimeRoot: string;
-  remoteRecordsRoot: string;
-};
-async function startObjectBackedControlPlaneWorker(opts: RemoteControlPlaneRuntime) {
-  const objectStore = memoryControlPlaneArtifactStore();
-  const controlPlane = await startNixosSharedHostControlPlaneServer({
-    workspaceRoot: opts.tmp,
-    paths: {
-      statePath: opts.remoteStatePath,
-      hostRoot: opts.remoteRuntimeRoot,
-      recordsRoot: opts.remoteRecordsRoot,
-    },
-    backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(opts.remoteRecordsRoot),
-    token: CONTROL_PLANE_TOKEN,
-    objectStore,
-  });
-  const worker = startNixosSharedHostControlPlaneWorkerLoop({
-    workspaceRoot: opts.tmp,
-    recordsRoot: opts.remoteRecordsRoot,
-    backendDatabaseUrl: localHarnessControlPlaneDatabaseUrl(opts.remoteRecordsRoot),
-    objectStore,
-  });
-  return { controlPlane, worker };
-}
-async function writeJenkinsSubmitterAuthSession(recordsRoot: string, deployment: any) {
-  return await writeAuthSession({
-    recordsRoot,
-    deployment,
-    operationKind: "deploy",
-    principalId: "oidc:service-account-jenkins",
-    roles: ["submitter", "admission_reporter"],
-  });
-}
+import {
+  startObjectBackedControlPlaneWorker,
+  writeJenkinsSubmitterAuthSession,
+} from "./nixos-shared-host.jenkins-control-plane.fixture";
 
 test("jenkins wrapper stages the Sample webapp artifact, submits through the control plane, and emits stable JSON", async () => {
   await runInTemp("nixos-shared-host-jenkins-exec", async (tmp, $) => {
@@ -78,27 +39,13 @@ test("jenkins wrapper stages the Sample webapp artifact, submits through the con
     await installReviewedSampleWebappTargets(tmp);
     await requireServiceAuthForSampleWebapp(tmp);
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
+    await reconcileTempDependencyInputs(tmp, $);
     await prepareReviewedRemoteHostPaths({
       remoteStatePath,
       remoteRuntimeRoot,
       remoteRecordsRoot,
     });
-    const { controlPlane, worker } = await startObjectBackedControlPlaneWorker({
-      tmp,
-      remoteStatePath,
-      remoteRuntimeRoot,
-      remoteRecordsRoot,
-    });
     await writeArtifact(artifactDir, { "index.html": "<html>jenkins</html>\n", healthz: "ok\n" });
-    await installClientProfile(
-      $,
-      profileRoot,
-      tmp,
-      remoteStatePath,
-      remoteRuntimeRoot,
-      remoteRecordsRoot,
-      controlPlane.url,
-    );
     const { admissionEvidencePath } = await writeReviewedSampleWebappAdmissionEvidence(tmp, $);
     const admissionEvidence = JSON.parse(await fsp.readFile(admissionEvidencePath, "utf8"));
     const sourceRevision = String(
@@ -117,20 +64,36 @@ test("jenkins wrapper stages the Sample webapp artifact, submits through the con
     };
     await fsp.writeFile(admissionEvidencePath, JSON.stringify(admissionEvidence, null, 2), "utf8");
     const auth = await writeJenkinsAuthFiles(tmp);
-    const server = await startNixosSharedHostPublicServer({
-      deployment,
-      hostRoot: remoteRuntimeRoot,
+    const { controlPlane, worker } = await startObjectBackedControlPlaneWorker({
+      tmp,
+      remoteStatePath,
+      remoteRuntimeRoot,
+      remoteRecordsRoot,
     });
-    const authSessionId = await writeJenkinsSubmitterAuthSession(remoteRecordsRoot, deployment);
-    const jenkinsDeploy = viberootsToolScript(
-      "viberoots/build-tools/tools/bin/nixos-shared-host-jenkins-deploy",
-    );
-    const jenkinsCommand = (sessionId: string) =>
-      $({
-        cwd: tmp,
-        env: jenkinsExecEnv(env),
-      })`${jenkinsDeploy} --deployment //projects/deployments/sample-webapp/dev:deploy --admission-evidence-json ${admissionEvidencePath} --idempotency-key jenkins-sample-webapp-dev-1 --auth-session-id ${sessionId} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
+    let server: Awaited<ReturnType<typeof startNixosSharedHostPublicServer>> | undefined;
     try {
+      await installClientProfile(
+        $,
+        profileRoot,
+        tmp,
+        remoteStatePath,
+        remoteRuntimeRoot,
+        remoteRecordsRoot,
+        controlPlane.url,
+      );
+      server = await startNixosSharedHostPublicServer({
+        deployment,
+        hostRoot: remoteRuntimeRoot,
+      });
+      const authSessionId = await writeJenkinsSubmitterAuthSession(remoteRecordsRoot, deployment);
+      const jenkinsDeploy = viberootsToolScript(
+        "viberoots/build-tools/tools/bin/nixos-shared-host-jenkins-deploy",
+      );
+      const jenkinsCommand = (sessionId: string) =>
+        $({
+          cwd: tmp,
+          env: jenkinsExecEnv(env),
+        })`${jenkinsDeploy} --deployment //projects/deployments/sample-webapp/dev:deploy --admission-evidence-json ${admissionEvidencePath} --idempotency-key jenkins-sample-webapp-dev-1 --auth-session-id ${sessionId} --profile mini --profile-root ${profileRoot} --artifact-dir ${artifactDir} --ssh-identity-file ${auth.identityFile} --ssh-known-hosts ${auth.knownHostsFile} --smoke-connect-host 127.0.0.1 --smoke-connect-port ${String(server.port)} --smoke-connect-protocol https:`;
       const result = await jenkinsCommand(authSessionId);
       const summary = JSON.parse(String(result.stdout));
       assert.equal(summary.ok, true);
@@ -175,7 +138,7 @@ test("jenkins wrapper stages the Sample webapp artifact, submits through the con
       );
       assert.equal(await fsp.readFile(liveIndex, "utf8"), "<html>jenkins</html>\n");
     } finally {
-      await Promise.all([worker.close(), controlPlane.close(), server.close()]);
+      await Promise.all([worker.close(), controlPlane.close(), server?.close()]);
     }
   });
 });
@@ -202,38 +165,40 @@ test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid h
       "utf8",
     );
     await ensureNixosSharedHostReviewedSourceRef(tmp, $, deployment);
+    await reconcileTempDependencyInputs(tmp, $);
     await prepareReviewedRemoteHostPaths({
       remoteStatePath,
       remoteRuntimeRoot,
       remoteRecordsRoot,
     });
+    await writeArtifact(artifactDir, { "index.html": "<html>bootstrap</html>\n", healthz: "ok\n" });
+    const { admissionEvidencePath } = await writeReviewedSampleWebappAdmissionEvidence(tmp, $);
+    const auth = await writeJenkinsAuthFiles(tmp);
+    const jenkinsDeploy = viberootsToolScript(
+      "viberoots/build-tools/tools/bin/nixos-shared-host-jenkins-deploy",
+    );
     const { controlPlane, worker } = await startObjectBackedControlPlaneWorker({
       tmp,
       remoteStatePath,
       remoteRuntimeRoot,
       remoteRecordsRoot,
     });
-    await writeArtifact(artifactDir, { "index.html": "<html>bootstrap</html>\n", healthz: "ok\n" });
-    await installClientProfile(
-      $,
-      profileRoot,
-      tmp,
-      remoteStatePath,
-      remoteRuntimeRoot,
-      remoteRecordsRoot,
-      controlPlane.url,
-    );
-    const { admissionEvidencePath } = await writeReviewedSampleWebappAdmissionEvidence(tmp, $);
-    const auth = await writeJenkinsAuthFiles(tmp);
-    const jenkinsDeploy = viberootsToolScript(
-      "viberoots/build-tools/tools/bin/nixos-shared-host-jenkins-deploy",
-    );
-    const server = await startNixosSharedHostPublicServer({
-      deployment,
-      hostRoot: remoteRuntimeRoot,
-    });
-    const authSessionId = await writeJenkinsSubmitterAuthSession(remoteRecordsRoot, deployment);
+    let server: Awaited<ReturnType<typeof startNixosSharedHostPublicServer>> | undefined;
     try {
+      await installClientProfile(
+        $,
+        profileRoot,
+        tmp,
+        remoteStatePath,
+        remoteRuntimeRoot,
+        remoteRecordsRoot,
+        controlPlane.url,
+      );
+      server = await startNixosSharedHostPublicServer({
+        deployment,
+        hostRoot: remoteRuntimeRoot,
+      });
+      const authSessionId = await writeJenkinsSubmitterAuthSession(remoteRecordsRoot, deployment);
       const result = await $({
         cwd: tmp,
         env: jenkinsExecEnv(env),
@@ -247,7 +212,7 @@ test("jenkins wrapper forwards admit-and-deploy so bootstrap deploys can avoid h
         "ci_pipeline",
       );
     } finally {
-      await Promise.all([worker.close(), controlPlane.close(), server.close()]);
+      await Promise.all([worker.close(), controlPlane.close(), server?.close()]);
     }
   });
 });

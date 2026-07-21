@@ -71,6 +71,68 @@ test("importerLockfileNeedsRegen treats importer-local lockfile '.' as canonical
   });
 });
 
+test("importerLockfileNeedsRegen accepts a complete workspace-link-only lockfile", async () => {
+  await withTempDir("pnpm-importer-workspace-link", async (tmp) => {
+    const importerRel = "projects/apps/demo-cli";
+    const importerAbs = path.join(tmp, importerRel);
+    const linkedAbs = path.join(tmp, "projects/libs/demo-lib");
+    await fsp.mkdir(importerAbs, { recursive: true });
+    await fsp.mkdir(linkedAbs, { recursive: true });
+    await fsp.writeFile(
+      path.join(importerAbs, "package.json"),
+      JSON.stringify({ dependencies: { "@libs/demo-lib": "workspace:*" } }),
+    );
+    await fsp.writeFile(
+      path.join(linkedAbs, "package.json"),
+      JSON.stringify({ name: "@libs/demo-lib", version: "0.1.0" }),
+    );
+    await fsp.writeFile(
+      path.join(importerAbs, "pnpm-lock.yaml"),
+      [
+        "lockfileVersion: '9.0'",
+        "importers:",
+        "  .:",
+        "    dependencies:",
+        "      '@libs/demo-lib':",
+        "        specifier: workspace:*",
+        "        version: link:../../libs/demo-lib",
+        "packages: {}",
+        "",
+      ].join("\n"),
+    );
+
+    assert.equal(await importerLockfileNeedsRegen({ repoRootAbs: tmp, importerRel }), false);
+  });
+});
+
+test("importerLockfileNeedsRegen rejects an empty registry package graph", async () => {
+  await withTempDir("pnpm-importer-empty-registry", async (tmp) => {
+    const importerRel = "projects/apps/demo-cli";
+    const importerAbs = path.join(tmp, importerRel);
+    await fsp.mkdir(importerAbs, { recursive: true });
+    await fsp.writeFile(
+      path.join(importerAbs, "package.json"),
+      JSON.stringify({ dependencies: { react: "^18.3.1" } }),
+    );
+    await fsp.writeFile(
+      path.join(importerAbs, "pnpm-lock.yaml"),
+      [
+        "lockfileVersion: '9.0'",
+        "importers:",
+        "  .:",
+        "    dependencies:",
+        "      react:",
+        "        specifier: ^18.3.1",
+        "        version: 18.3.1",
+        "packages: {}",
+        "",
+      ].join("\n"),
+    );
+
+    assert.equal(await importerLockfileNeedsRegen({ repoRootAbs: tmp, importerRel }), true);
+  });
+});
+
 test("importerLockfileNeedsRegen preserves malformed lockfile failures", async () => {
   await withTempDir("pnpm-importer-lockfile-malformed", async (tmp) => {
     const importerRel = "app";

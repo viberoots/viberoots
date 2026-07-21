@@ -1,4 +1,10 @@
-load("@prelude//:rules.bzl", "filegroup")
+load("@prelude//:rules.bzl", "export_file", "filegroup")
+
+export_file(
+    name = "export-graph.ts",
+    src = "export-graph.ts",
+    visibility = ["PUBLIC"],
+)
 
 filegroup(
     name = "runtime_ts",

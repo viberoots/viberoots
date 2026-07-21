@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("cpp gtest include via nixpkg_deps at call site", async () => {
@@ -71,6 +71,7 @@ nix_cpp_test(
 )
 `;
     await fs.outputFile(path.join(appDir, "TARGETS"), targets);
+    await reconcileTempDependencyInputs(tmp, $);
 
     // Ensure local shim is not referenced anywhere (sanity)
     const rootTargets = await fs.readFile(path.join(tmp, "TARGETS"), "utf8").catch(() => "");

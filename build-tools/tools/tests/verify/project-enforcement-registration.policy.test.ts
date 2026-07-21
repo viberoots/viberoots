@@ -68,6 +68,36 @@ test("project enforcement registration follows suffix additions and removals", a
   assert.doesNotMatch(targets, /project_enforcement_alpha/);
 });
 
+test("workspace graph output identity follows canonical content", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "project-enforcement-graph-source-"));
+  const source = path.join(root, "source");
+  const runnerDir = path.join(source, "build-tools/tools/project-enforcement");
+  const graphDir = path.join(root, ".viberoots/workspace/buck");
+  await fsp.mkdir(runnerDir, { recursive: true });
+  await fsp.mkdir(graphDir, { recursive: true });
+  await fsp.writeFile(path.join(runnerDir, "alpha.project-enforcement.test.ts"), "export {};\n");
+  await fsp.writeFile(path.join(graphDir, "graph.json"), '[{"label":"first"}]\n');
+
+  await ensureProjectEnforcementRegistration({ workspaceRoot: root, viberootsRoot: source });
+  const firstTargets = await fsp.readFile(path.join(graphDir, "TARGETS"), "utf8");
+  const firstDigest = firstTargets.match(/out = "graph\.([a-f0-9]{64})\.json"/)?.[1];
+  assert.ok(firstDigest);
+  assert.match(firstTargets, /export_file\(name = "graph\.json"/);
+  assert.match(firstTargets, /src = "graph\.json"/);
+
+  await fsp.writeFile(path.join(graphDir, "graph.json"), '[{"label":"second"}]\n');
+  await ensureProjectEnforcementRegistration({ workspaceRoot: root, viberootsRoot: source });
+  const secondTargets = await fsp.readFile(path.join(graphDir, "TARGETS"), "utf8");
+  const secondDigest = secondTargets.match(/out = "graph\.([a-f0-9]{64})\.json"/)?.[1];
+  assert.ok(secondDigest);
+  assert.notEqual(secondDigest, firstDigest);
+  assert.doesNotMatch(secondTargets, new RegExp(`graph\\.${firstDigest}\\.json`));
+  assert.deepEqual(
+    (await fsp.readdir(graphDir)).filter((entry) => /^graph\.[a-f0-9]{64}\.json$/.test(entry)),
+    [],
+  );
+});
+
 test("project enforcement exports and registration share suffix discovery", async () => {
   const root = viberootsSourcePath("");
   const runnerDir = path.join(root, "build-tools/tools/project-enforcement");

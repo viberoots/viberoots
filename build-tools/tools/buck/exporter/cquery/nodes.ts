@@ -28,6 +28,18 @@ function coerceStringArray(v: any): string[] | undefined {
   return Array.isArray(v) ? (v as any[]).filter((x) => typeof x === "string") : undefined;
 }
 
+export function canonicalWorkspaceGraphOutput(label: string, output: unknown): unknown {
+  const unconfigured = String(label || "").split(" (")[0];
+  if (
+    (unconfigured === "workspace_buck//:graph.json" ||
+      unconfigured === "@workspace_buck//:graph.json") &&
+    typeof output === "string"
+  ) {
+    return "graph.json";
+  }
+  return output;
+}
+
 function resolveRelativeTarget(raw: string, ownerLabel: string): string {
   const s = String(raw || "").trim();
   if (!s) return "";
@@ -37,6 +49,32 @@ function resolveRelativeTarget(raw: string, ownerLabel: string): string {
   return `//${pkg}${s}`;
 }
 
+export function normalizeLocationMacrosForOwner(ownerLabel: string, command: string): string {
+  const marker = "$(location ";
+  let cursor = 0;
+  let output = "";
+  while (cursor < command.length) {
+    const start = command.indexOf(marker, cursor);
+    if (start < 0) return output + command.slice(cursor);
+
+    let depth = 1;
+    let end = start + marker.length;
+    for (; end < command.length; end += 1) {
+      const char = command[end];
+      if (char === "(") depth += 1;
+      if (char === ")") depth -= 1;
+      if (depth === 0) break;
+    }
+    if (depth !== 0) return output + command.slice(cursor);
+
+    const rawLabel = command.slice(start + marker.length, end).trim();
+    const normalized = normalizeTargetLabel(resolveRelativeTarget(rawLabel, ownerLabel));
+    output += `${command.slice(cursor, start)}${marker}${normalized})`;
+    cursor = end + 1;
+  }
+  return output;
+}
+
 function normalizeTargetsForOwner(ownerLabel: string, raw: unknown): string[] | undefined {
   const xs = coerceStringArray(raw) || [];
   if (xs.length === 0) return undefined;
@@ -44,6 +82,19 @@ function normalizeTargetsForOwner(ownerLabel: string, raw: unknown): string[] | 
     .map((d) => normalizeTargetLabel(resolveRelativeTarget(d, ownerLabel)))
     .filter(Boolean);
   return dedupePreserve(normalized);
+}
+
+function normalizeSourcesForOwner(ownerLabel: string, raw: unknown): string[] | undefined {
+  const xs = coerceStringArray(raw) || [];
+  if (xs.length === 0) return undefined;
+  return xs.map((source) => {
+    const trimmed = source.trim();
+    const targetLike =
+      trimmed.startsWith(":") ||
+      ((trimmed.startsWith("//") || /^[a-zA-Z0-9_.-]+\/\//u.test(trimmed)) &&
+        trimmed.includes(":"));
+    return targetLike ? normalizeTargetLabel(resolveRelativeTarget(trimmed, ownerLabel)) : source;
+  });
 }
 
 export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
@@ -66,6 +117,7 @@ export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
       coerceStringArray(a["srcs"]) ??
       coerceStringArray(a["buck.srcs"]) ??
       coerceStringArray(a["srcs"]);
+    const normalizedSrcs = normalizeSourcesForOwner(label, srcsArr);
 
     const moduleRaw = a["module"] ?? a["buck.module"];
     const module =
@@ -106,10 +158,14 @@ export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
     const node: any = {
       ...(a as any),
       name: clean,
+      out: canonicalWorkspaceGraphOutput(label, a["out"]),
       rule_type: ruleType || a["rule_type"] || "",
       deps: cleanDeps || deps || a["deps"],
       labels: uniqSorted(labelsArr || []),
-      srcs: srcsArr || a["srcs"],
+      srcs: normalizedSrcs || srcsArr || a["srcs"],
+      ...(typeof a["cmd"] === "string"
+        ? { cmd: normalizeLocationMacrosForOwner(clean, a["cmd"]) }
+        : {}),
       ...(module ? { module } : {}),
       ...(linkDeps ? { link_deps: linkDeps } : {}),
       ...(headerDeps ? { header_deps: headerDeps } : {}),

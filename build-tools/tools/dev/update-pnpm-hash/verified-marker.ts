@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
 import { withExclusiveInstallLock } from "../install/lock";
@@ -66,29 +67,20 @@ export function verifiedMarkerPath(repoRoot: string, importer: string): string {
   );
 }
 
-function sharedCacheRepoRoot(repoRoot: string): string {
+function sharedCacheRoot(): string {
   const explicitRoot = String(process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT || "").trim();
   if (explicitRoot && path.isAbsolute(explicitRoot)) {
     return path.resolve(explicitRoot);
   }
-  const workspaceRoot = String(process.env.WORKSPACE_ROOT || "").trim();
-  if (workspaceRoot && path.isAbsolute(workspaceRoot)) {
-    return path.resolve(workspaceRoot);
-  }
-  const liveRoot = String(process.env.REPO_ROOT || "").trim();
-  if (liveRoot && path.isAbsolute(liveRoot)) {
-    return path.resolve(liveRoot);
-  }
-  return repoRoot;
+  const xdgCache = String(process.env.XDG_CACHE_HOME || "").trim();
+  const cacheHome =
+    xdgCache && path.isAbsolute(xdgCache) ? xdgCache : path.join(os.homedir(), ".cache");
+  return path.join(cacheHome, "viberoots", "pnpm-store-hash-authority");
 }
 
-function sharedHashCachePath(
-  repoRoot: string,
-  builderFingerprint: string,
-  lockHash: string,
-): string {
+function sharedHashCachePath(builderFingerprint: string, lockHash: string): string {
   return path.join(
-    sharedCacheRepoRoot(repoRoot),
+    sharedCacheRoot(),
     ".viberoots",
     "workspace",
     "buck",
@@ -140,7 +132,7 @@ export async function readSharedHashCache(opts: {
   builderFingerprint: string;
   lockHash: string;
 }): Promise<string | null> {
-  const cachePath = sharedHashCachePath(opts.repoRoot, opts.builderFingerprint, opts.lockHash);
+  const cachePath = sharedHashCachePath(opts.builderFingerprint, opts.lockHash);
   try {
     const raw = await fsp.readFile(cachePath, "utf8");
     const entry = JSON.parse(raw) as Partial<SharedPnpmStoreHashCacheEntry>;
@@ -262,10 +254,10 @@ export async function writeVerifiedMarker(
 }
 
 export async function writeSharedHashCache(
-  repoRoot: string,
+  _repoRoot: string,
   entry: SharedPnpmStoreHashCacheEntry,
 ): Promise<void> {
-  const cachePath = sharedHashCachePath(repoRoot, entry.builderFingerprint, entry.lockHash);
+  const cachePath = sharedHashCachePath(entry.builderFingerprint, entry.lockHash);
   const tmpPath = `${cachePath}.tmp-${process.pid}`;
   await mkdirWithMacosMetadataExclusion(path.dirname(cachePath)).catch(() => {});
   await fsp.writeFile(tmpPath, JSON.stringify(entry, null, 2) + "\n", "utf8");
@@ -290,11 +282,11 @@ export async function withSharedHashCacheLock<T>(
   opts: { repoRoot: string; builderFingerprint: string; lockHash: string },
   fn: () => Promise<T>,
 ): Promise<T> {
-  const lockRoot = sharedCacheRepoRoot(opts.repoRoot);
+  const lockRoot = sharedCacheRoot();
   const lockKey = `pnpm-store-hash:${opts.builderFingerprint}:${opts.lockHash}`;
   return await withExclusiveInstallLock(lockKey, fn, {
-    timeoutMs: 15 * 60_000,
-    staleMs: 15 * 60_000,
+    timeoutMs: 45 * 60_000,
+    staleMs: 45 * 60_000,
     verbose: String(process.env.INSTALL_LOCK_VERBOSE || "").trim() === "1",
     scopeRootAbs: lockRoot,
   });

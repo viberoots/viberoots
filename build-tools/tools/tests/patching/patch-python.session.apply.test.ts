@@ -4,6 +4,7 @@ import path from "node:path";
 import { spawn } from "node:child_process";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 test("patch-python session applies on Ctrl-D and clears session", async () => {
   await runInTemp("patch-python-session-apply", async (tmp, $) => {
@@ -27,10 +28,12 @@ test("patch-python session applies on Ctrl-D and clears session", async () => {
     const origin = path.join(tmp, "pycache", "requests-2.32.3");
     await fs.mkdirp(origin);
     await fs.writeFile(path.join(origin, "readme.txt"), "A\n", "utf8");
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
 
     // Start a session to get a workspace (invoke TS entrypoint directly to avoid shell wrapper env requirements)
     const wsOut = await $({
       cwd: tmp,
+      env: graphEnv,
     })`NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
     })} NIX_PY_DEV_OVERRIDE_JSON={} ${process.execPath} --experimental-strip-types --import ${zxInit} viberoots/build-tools/tools/patch/patch-pkg.ts start python requests --importer ${importer}`;
@@ -46,7 +49,7 @@ test("patch-python session applies on Ctrl-D and clears session", async () => {
     await $({
       cwd: tmp,
       env: {
-        ...process.env,
+        ...graphEnv,
         WORKSPACE_ROOT: tmp,
         NIX_PY_TEST_RESOLVE_JSON: JSON.stringify({
           requests: { version: "2.32.3", originPath: origin },

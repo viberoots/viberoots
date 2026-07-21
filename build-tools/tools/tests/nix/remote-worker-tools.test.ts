@@ -60,6 +60,23 @@ test("remote worker and CI tool closures expose declared tools only from Nix sto
 
     assert.ok(worker.startsWith("/nix/store/"));
     assert.ok(ci.startsWith("/nix/store/"));
+    const restrictedEnv = {
+      HOME: tmp,
+      PATH: path.join(worker, "bin"),
+      TMPDIR: tmp,
+    };
+    const pnpmVersion = await execFileResult(path.join(worker, "bin", "pnpm"), ["--version"], {
+      cwd: tmp,
+      env: restrictedEnv,
+    });
+    const nodeVersion = await execFileResult(path.join(worker, "bin", "node"), ["--version"], {
+      cwd: tmp,
+      env: restrictedEnv,
+    });
+    assert.equal(pnpmVersion.code, 0, `${pnpmVersion.stdout}\n${pnpmVersion.stderr}`);
+    assert.equal(pnpmVersion.stdout.trim(), "11.5.3");
+    assert.equal(nodeVersion.code, 0, `${nodeVersion.stdout}\n${nodeVersion.stderr}`);
+    assert.match(nodeVersion.stdout.trim(), /^v22\./);
     const inventory = await fs.readFile(
       path.join(worker, "share", "viberoots", "remote-runtime-primitives.json"),
       "utf8",

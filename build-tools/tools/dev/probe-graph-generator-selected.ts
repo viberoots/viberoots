@@ -3,6 +3,7 @@ import { findRepoRoot } from "../lib/repo";
 import { getArgvTokens } from "../lib/cli";
 import { buildSelectedOutPath } from "./run-runnable-graph";
 import { resolveSelectedTargetLabel } from "./target-label-resolver";
+import { canonicalArtifactToolsRoot } from "../lib/artifact-environment";
 
 async function main() {
   const args = getArgvTokens();
@@ -41,12 +42,10 @@ async function main() {
   if (!String(process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC || "").trim()) {
     process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC = "25";
   }
-  const outPath = await buildSelectedOutPath(
-    root,
-    target,
-    sourceMode,
-    `probe selected target ${target}`,
-  );
+  const outPath = await buildSelectedOutPath(root, target, sourceMode, {
+    label: `probe selected target ${target}`,
+    artifactToolsRoot: canonicalArtifactToolsRoot(root),
+  });
   console.log(outPath);
 }
 

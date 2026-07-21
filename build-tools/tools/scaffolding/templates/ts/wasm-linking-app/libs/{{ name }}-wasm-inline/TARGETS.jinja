@@ -1,8 +1,16 @@
+load("@prelude//:rules.bzl", "export_file")
 load("@viberoots//build-tools/node:defs.bzl", "node_wasm_inline_module")
+
+export_file(
+    name = "package.json",
+    src = "package.json",
+    visibility = ["PUBLIC"],
+)
 
 node_wasm_inline_module(
     name = "wasm_inline",
     src = "//projects/libs/{{ name }}-api:wasm",
+    labels = ["kind:lib"],
     visibility = ["PUBLIC"],
 )
 
@@ -19,4 +27,3 @@ node_wasm_inline_module(
     out = "py.js",
     visibility = ["PUBLIC"],
 )
-

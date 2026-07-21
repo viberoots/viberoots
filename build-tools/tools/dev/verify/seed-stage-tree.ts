@@ -1,6 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { GENERATED_REPO_STATE_PATHS } from "./generated-state-excludes";
+import { GENERATED_REPO_STATE_PATHS } from "../../lib/generated-repo-state";
 import { PREPARED_MARKER } from "./seed-stage-layout";
 
 const REQUIRED_STAGE_FILES = [

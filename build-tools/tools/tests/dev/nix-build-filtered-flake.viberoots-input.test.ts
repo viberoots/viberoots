@@ -21,23 +21,29 @@ test("selected snapshots point at one immutable filtered viberoots input", async
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-selected-input-root-"));
   const snapshot = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-selected-input-snapshot-"));
   try {
-    await write(
-      root,
-      ".viberoots/workspace/flake.nix",
-      '{ inputs.viberoots.url = "path:./viberoots-flake-input"; outputs = _: {}; }\n',
-    );
-    await write(
-      root,
-      ".viberoots/workspace/flake.lock",
-      `${JSON.stringify({ nodes: { viberoots: { locked: {}, original: {} } } })}\n`,
-    );
+    const flakeText =
+      '{ inputs.viberoots.url = "path:./viberoots-flake-input"; outputs = _: {}; }\n';
+    const lockText = `${JSON.stringify({
+      nodes: {
+        root: { inputs: { viberoots: "viberoots" } },
+        viberoots: {
+          locked: { path: "./viberoots-flake-input", type: "path" },
+          original: { path: "./viberoots-flake-input", type: "path" },
+          parent: [],
+        },
+      },
+      root: "root",
+      version: 7,
+    })}\n`;
+    await write(root, "flake.nix", flakeText);
+    await write(root, "flake.lock", lockText);
+    await write(root, ".viberoots/workspace/flake.nix", flakeText);
+    await write(root, ".viberoots/workspace/flake.lock", lockText);
     for (const rel of [
-      "flake.nix",
-      "flake.lock",
       "package.json",
       "pnpm-lock.yaml",
       "pnpm-workspace.yaml",
-      "projects/node-modules.hashes.json",
+      "projects/config/node-modules.hashes.json",
       "projects/apps/sample/package.json",
       "projects/apps/sample/pnpm-lock.yaml",
       "viberoots/flake.nix",
@@ -109,9 +115,16 @@ test("selected snapshots point at one immutable filtered viberoots input", async
       await fsp.readFile(path.join(flakeDir, "flake.nix"), "utf8"),
       new RegExp(`viberoots\\.url = "path:${storePath}"`),
     );
-    const lock = JSON.parse(await fsp.readFile(path.join(flakeDir, "flake.lock"), "utf8"));
-    assert.equal(lock.nodes.viberoots.locked.path, storePath);
-    assert.equal(lock.nodes.viberoots.original.path, storePath);
+    for (const rewrittenDir of [snapshot, flakeDir]) {
+      assert.match(
+        await fsp.readFile(path.join(rewrittenDir, "flake.nix"), "utf8"),
+        new RegExp(`viberoots\\.url = "path:${storePath}"`),
+      );
+      const lock = JSON.parse(await fsp.readFile(path.join(rewrittenDir, "flake.lock"), "utf8"));
+      assert.equal(lock.nodes.viberoots.locked.path, storePath);
+      assert.equal(lock.nodes.viberoots.original.path, storePath);
+      assert.equal(lock.nodes.viberoots.parent, undefined);
+    }
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
     await fsp.rm(snapshot, { recursive: true, force: true });

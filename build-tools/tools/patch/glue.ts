@@ -3,85 +3,52 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { exportInlineGraph } from "../buck/export-inline";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
-import { getImporterRootsContract } from "../lib/importer-roots";
-import { normalizeTargetLabel } from "../lib/labels";
+import { artifactGraphQueryRoots } from "../buck/artifact-graph-query-roots";
 import { runNodeWithZx } from "../lib/node-run";
 import { resolveWorkspaceRootsSync } from "../lib/repo";
 import { ensureWorkspaceBuckStatePackage } from "../lib/workspace-buck-state";
-import { DEFAULT_AUTO_MAP_PATH } from "../lib/workspace-state-paths";
 import { buildToolPath, zxInitPath } from "../dev/dev-build/paths";
 import { isVbrVerbose } from "../lib/command-ui";
 import { runCommand } from "./run-command";
+import { buck2Present, graphContainsTarget, isJsonFile } from "./glue-graph";
+import { requireGeneratedGraph } from "../buck/generated-graph";
 
-async function buck2Present(): Promise<boolean> {
-  return (await runCommand("buck2", ["--version"], { stdio: "ignore" })).exitCode === 0;
-}
+export { runGlue } from "./run-glue";
 
-// ensureGraph: writes build-tools/tools/buck/graph.json if missing by invoking the exporter
-function parseGraphNodes(txt: string): any[] {
-  const data = JSON.parse(txt);
-  if (Array.isArray(data)) return data;
-  if (data && Array.isArray((data as any).nodes)) return (data as any).nodes;
-  return [];
-}
+type GraphWriteOptions = {
+  exportGraph?: () => Promise<void>;
+  workspaceRoot?: string;
+  target?: string;
+  queryRoots?: string[];
+  graphPath?: string;
+  force?: boolean;
+  env?: NodeJS.ProcessEnv;
+  nodeBin?: string;
+  buck2Bin?: string;
+  nixBin?: string;
+  toolSourceRoot?: string;
+};
 
-function graphContainsTarget(txt: string, wantTargetRaw: string): boolean {
-  const want = String(wantTargetRaw || "").trim();
-  if (!want) return true;
-  const normWant = normalizeTargetLabel(want);
-  const nodes = parseGraphNodes(txt);
-  return nodes.some(
-    (n: any) => typeof n?.name === "string" && normalizeTargetLabel(n.name) === normWant,
-  );
-}
-
-export async function ensureGraph(
-  opts: {
-    exportGraph?: () => Promise<void>;
-    workspaceRoot?: string;
-    target?: string;
-    queryRoots?: string[];
-    graphPath?: string;
-    force?: boolean;
-  } = {},
+async function writeGeneratedGraph(
+  opts: GraphWriteOptions,
+  publishWorkspaceIdentity: boolean,
 ): Promise<void> {
   const verbose = isVbrVerbose();
   const debug = (message: string): void => {
     if (verbose) console.error(message);
   };
+  const inherited = opts.env || process.env;
   const workspaceRoot = (
     opts.workspaceRoot ||
-    process.env.WORKSPACE_ROOT ||
-    process.env.BUCK_TEST_SRC ||
+    inherited.WORKSPACE_ROOT ||
+    inherited.BUCK_TEST_SRC ||
     process.cwd()
   ).trim();
   const graphPath = opts.graphPath || path.join(workspaceRoot, DEFAULT_GRAPH_PATH);
-  const forceInline = String(process.env.EXPORTER_FORCE_INLINE || "").trim() === "1";
-  async function isValidJsonFile(p: string): Promise<boolean> {
-    try {
-      const txt = await fsp.readFile(p, "utf8");
-      const trimmed = String(txt || "").trim();
-      if (!trimmed || trimmed === "[]") return false;
-      JSON.parse(trimmed);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-  async function isParseableJsonFile(p: string): Promise<boolean> {
-    try {
-      const txt = await fsp.readFile(p, "utf8");
-      const trimmed = String(txt || "").trim();
-      if (!trimmed) return false;
-      JSON.parse(trimmed);
-      return true;
-    } catch {
-      return false;
-    }
-  }
+  const forceInline = String(inherited.EXPORTER_FORCE_INLINE || "").trim() === "1";
   debug(`[ensureGraph] workspaceRoot=${workspaceRoot}`);
-  await ensureWorkspaceBuckStatePackage(workspaceRoot);
-  const wantTargetRaw = (opts.target || process.env.BUCK_TARGET || "").trim();
+  if (publishWorkspaceIdentity) await ensureWorkspaceBuckStatePackage(workspaceRoot);
+  const wantTargetRaw = (opts.target || inherited.BUCK_TARGET || "").trim();
   const shouldRegenerate = async (): Promise<boolean> => {
     if (opts.force) return true;
     try {
@@ -124,20 +91,27 @@ export async function ensureGraph(
     await fsp.writeFile(graphPath, "[]\n", "utf8");
   }
 
+  const publishGraphIdentity = async (): Promise<void> => {
+    if (publishWorkspaceIdentity) await ensureWorkspaceBuckStatePackage(workspaceRoot);
+  };
+
   const tryInjected = async (): Promise<boolean> => {
     if (!opts.exportGraph) return false;
     try {
       await opts.exportGraph();
-      return await isValidJsonFile(graphPath);
+      const valid = await isJsonFile(graphPath, false);
+      if (valid) await publishGraphIdentity();
+      return valid;
     } catch {
       return false;
     }
   };
   if (await tryInjected()) return;
 
-  const nodeBin = process.execPath;
+  const nodeBin = opts.nodeBin || process.execPath;
   const repoRoot =
-    (process.env.REPO_ROOT && process.env.REPO_ROOT.trim()) ||
+    opts.toolSourceRoot ||
+    (inherited.REPO_ROOT && inherited.REPO_ROOT.trim()) ||
     resolveWorkspaceRootsSync({ start: workspaceRoot }).viberootsRoot;
   const zxInit = zxInitPath(repoRoot);
   const exportScript = buildToolPath(repoRoot, "tools/buck/export-graph.ts");
@@ -149,11 +123,10 @@ export async function ensureGraph(
     target: string;
   }) => {
     debug(`[ensureGraph] inline export via buck2 → ${graphPath}`);
-    const importerRoots = getImporterRootsContract().workspaceRoots;
-    const defaultRoots = Array.from(new Set([...importerRoots, "go", "cpp", "third_party"]));
+    const defaultRoots = artifactGraphQueryRoots();
     const rawRoots = (
       opts.queryRoots?.join(",") ||
-      process.env.BUCK_QUERY_ROOTS ||
+      inherited.BUCK_QUERY_ROOTS ||
       defaultRoots.join(",")
     )
       .split(/[,\s]+/)
@@ -174,37 +147,40 @@ export async function ensureGraph(
       roots: existingRoots.length > 0 ? existingRoots : ["libs"],
       includeTargetPlatforms: inlineOpts.includeTargetPlatforms,
       normalizeLabels: inlineOpts.normalizeLabels,
+      env: passEnv,
+      buck2Bin: opts.buck2Bin,
     });
   };
 
-  const haveBuck = await buck2Present();
+  const passEnv = {
+    ...inherited,
+    WORKSPACE_ROOT: workspaceRoot,
+    BUCK_TEST_SRC: workspaceRoot,
+    REPO_ROOT: repoRoot,
+    VIBEROOTS_ROOT: inherited.VIBEROOTS_ROOT || repoRoot,
+    VIBEROOTS_SOURCE_ROOT: inherited.VIBEROOTS_SOURCE_ROOT || repoRoot,
+    ...(opts.queryRoots?.length ? { BUCK_QUERY_ROOTS: opts.queryRoots.join(",") } : {}),
+    ...(wantTargetRaw
+      ? {
+          BUCK_TARGET: wantTargetRaw,
+          BUCK_TARGET_PLATFORMS:
+            inherited.BUCK_TARGET_PLATFORMS ||
+            inherited.BUCK_TARGET_PLATFORM ||
+            "prelude//platforms:default",
+        }
+      : {}),
+  } as Record<string, string>;
+  const buck2Bin = opts.buck2Bin || "buck2";
+  const haveBuck = await buck2Present(buck2Bin, passEnv);
   if (forceInline) {
     await exportWithInline({
       includeTargetPlatforms: true,
       normalizeLabels: true,
       target: wantTargetRaw,
     });
+    await publishGraphIdentity();
     return;
   }
-
-  const passEnv = {
-    ...process.env,
-    WORKSPACE_ROOT: workspaceRoot,
-    BUCK_TEST_SRC: workspaceRoot,
-    REPO_ROOT: repoRoot,
-    VIBEROOTS_ROOT: process.env.VIBEROOTS_ROOT || repoRoot,
-    VIBEROOTS_SOURCE_ROOT: process.env.VIBEROOTS_SOURCE_ROOT || repoRoot,
-    ...(opts.queryRoots?.length ? { BUCK_QUERY_ROOTS: opts.queryRoots.join(",") } : {}),
-    ...(wantTargetRaw
-      ? {
-          BUCK_TARGET: wantTargetRaw,
-          BUCK_TARGET_PLATFORMS:
-            process.env.BUCK_TARGET_PLATFORMS ||
-            process.env.BUCK_TARGET_PLATFORM ||
-            "prelude//platforms:default",
-        }
-      : {}),
-  } as Record<string, string>;
 
   if (haveBuck) {
     await runNodeWithZx({
@@ -215,14 +191,15 @@ export async function ensureGraph(
       cwd: workspaceRoot,
       env: passEnv,
     });
-    if (!(await isParseableJsonFile(graphPath))) {
+    if (!(await isJsonFile(graphPath, true))) {
       throw new Error(`export-graph produced invalid JSON at ${graphPath}`);
     }
+    await publishGraphIdentity();
     return;
   }
 
   // Buck2 is not available; try running via nix (still uses the same exporter script).
-  const nixBin = process.env.NIX_BIN || process.env.VBR_NIX_BIN || "nix";
+  const nixBin = opts.nixBin || inherited.NIX_BIN || inherited.VBR_NIX_BIN || "nix";
   const nixRun = await runCommand(
     nixBin,
     ["run", "--accept-flake-config", `${repoRoot}#zx-wrapper`, "--", exportScript, ...exporterArgs],
@@ -232,17 +209,26 @@ export async function ensureGraph(
     throw new Error(`nix run zx-wrapper failed while exporting graph (exit ${nixRun.exitCode})`);
   }
   await fsp.access(graphPath);
-  if (!(await isParseableJsonFile(graphPath))) {
+  if (!(await isJsonFile(graphPath, true))) {
     throw new Error(`export-graph produced invalid JSON at ${graphPath}`);
   }
+  await publishGraphIdentity();
 }
 
-// runGlue: sync providers (all languages) then generate auto_map deterministically
-export async function runGlue(): Promise<void> {
-  // Delegate to the centralized glue pipeline to avoid drift between callsites.
-  const { runGluePipeline } = await import("../buck/glue-pipeline");
-  await runGluePipeline({
-    graphPath: DEFAULT_GRAPH_PATH,
-    outAutoMap: DEFAULT_AUTO_MAP_PATH,
+export async function reconcileGeneratedGraph(opts: GraphWriteOptions = {}): Promise<void> {
+  await writeGeneratedGraph(opts, true);
+}
+
+export async function materializeSelectedGraph(opts: GraphWriteOptions): Promise<void> {
+  const inherited = opts.env || process.env;
+  const workspaceRoot = (
+    opts.workspaceRoot ||
+    inherited.WORKSPACE_ROOT ||
+    inherited.BUCK_TEST_SRC ||
+    process.cwd()
+  ).trim();
+  await requireGeneratedGraph({
+    graphPath: opts.graphPath || path.join(workspaceRoot, DEFAULT_GRAPH_PATH),
+    target: opts.target || inherited.BUCK_TARGET,
   });
 }

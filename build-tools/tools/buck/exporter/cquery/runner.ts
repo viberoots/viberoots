@@ -2,10 +2,11 @@
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { getImporterRootsContract } from "../../../lib/importer-roots";
+import { artifactGraphQueryRoots } from "../../artifact-graph-query-roots";
 import { withSharedBuckIsolationStartupLock } from "../../../lib/shared-buck-isolation-lock";
 import { registerBuckIsolationSync } from "../../../dev/verify/owned-process-state";
 import { runManagedCommand } from "../../../lib/managed-command";
+import { ensureNixStoreToolPathSync } from "../../../lib/tool-paths";
 import { isRetryableCqueryError, resetBuckDaemon } from "./retry";
 
 export type CqueryRunnerOptions = {
@@ -45,8 +46,7 @@ export function computeRootsExpr(cwd: string): string {
   const target = String(process.env.BUCK_TARGET || "").trim();
   if (target) return `set(${target})`;
 
-  const importerRoots = getImporterRootsContract().workspaceRoots;
-  const defaultRoots = Array.from(new Set([...importerRoots, "third_party", "go", "cpp"]));
+  const defaultRoots = artifactGraphQueryRoots();
   const rootsFromEnv = parseCsvish(process.env.BUCK_QUERY_ROOTS || "");
   const rootsList = rootsFromEnv.length > 0 ? rootsFromEnv : defaultRoots;
   const existing = rootsList.filter((r) => {
@@ -192,9 +192,10 @@ export async function runCqueryMerged(opts: CqueryRunnerOptions): Promise<Record
       HOME: process.env.BUCK2_REAL_HOME || process.env.HOME,
       SSL_CERT_FILE: process.env.SSL_CERT_FILE || process.env.NIX_SSL_CERT_FILE,
     };
+    const buck2 = ensureNixStoreToolPathSync("buck2", buckEnv);
     const runBuck = async () => {
       const result = await runManagedCommand({
-        command: "buck2",
+        command: buck2,
         args: [
           ...quietFlags,
           ...isolationFlags,

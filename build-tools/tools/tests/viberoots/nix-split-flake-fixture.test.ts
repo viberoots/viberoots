@@ -44,7 +44,7 @@ async function materializeRealFilteredViberoots(tmp: string): Promise<string> {
     cwd: liveRoot,
     stdio: "pipe",
   })`rsync -a --chmod=Du+rwx,Dgo+rx,Fu+rw,Fgo+r --delete --relative ${filteredFlakeRsyncExcludeArgs()} ${defaultFilteredFlakeSnapshotRsyncSources(relPaths)} ${filteredRoot}/`;
-  return (await materializeFilteredViberootsSource(filteredRoot)).storePath;
+  return (await materializeFilteredViberootsSource(filteredRoot, process.env)).storePath;
 }
 
 test("viberoots Nix fixture receives workspaceSrc outside viberoots source", async () => {

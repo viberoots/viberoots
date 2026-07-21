@@ -153,8 +153,8 @@ async function ensureSourceFiles($: any): Promise<{ bzl: string; json: string }>
     cachedSource = (async () => {
       const root = resolveSourceRoot();
       const toolSourceRoot = await resolveToolSourceRoot(root);
-      const bzl = path.join(toolSourceRoot, "toolchains", "toolchain_paths.bzl");
-      const json = path.join(toolSourceRoot, "build-tools", "tools", "dev", "toolchain-paths.json");
+      const bzl = path.join(root, ".viberoots", "workspace", "toolchains", "toolchain_paths.bzl");
+      const json = path.join(root, ".viberoots", "workspace", "toolchain-paths.json");
 
       if (await hasValidGeneratedToolchainPaths(bzl, json)) return { bzl, json };
 
@@ -163,7 +163,7 @@ async function ensureSourceFiles($: any): Promise<{ bzl: string; json: string }>
         isReady: async () => await hasValidGeneratedToolchainPaths(bzl, json),
         fn: async () => {
           if (await hasValidGeneratedToolchainPaths(bzl, json)) return;
-          await ensureToolchainPathsFiles(toolSourceRoot);
+          await ensureToolchainPathsFiles(root);
         },
       });
 
@@ -211,14 +211,7 @@ export async function ensureToolchainPathsForTempRepo(tmp: string, $: any): Prom
   const workspaceToolchainsDir = path.join(tmp, ".viberoots", "workspace", "toolchains");
   const legacyBzlDst = path.join(legacyToolchainsDir, "toolchain_paths.bzl");
   const workspaceBzlDst = path.join(workspaceToolchainsDir, "toolchain_paths.bzl");
-  const jsonDst = path.join(
-    tmp,
-    "viberoots",
-    "build-tools",
-    "tools",
-    "dev",
-    "toolchain-paths.json",
-  );
+  const jsonDst = path.join(tmp, ".viberoots", "workspace", "toolchain-paths.json");
   await copyToolchainTree(toolchainSrcDir, legacyToolchainsDir);
   await copyToolchainTree(toolchainSrcDir, workspaceToolchainsDir);
   await copyFile(src.bzl, legacyBzlDst);

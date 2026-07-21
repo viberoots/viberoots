@@ -3,17 +3,14 @@ import { test } from "node:test";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
-test("gen-auto-map: empty labels produces empty MODULE_PROVIDERS", async () => {
+test("gen-auto-map: graph without provider labels produces empty MODULE_PROVIDERS", async () => {
   await runInTemp("auto-map-empty", async (tmp, $) => {
-    const graph = [];
-    await fsp.mkdir(path.join(tmp, ".viberoots", "workspace", "buck"), { recursive: true });
-    await fsp.writeFile(
-      path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
-      JSON.stringify(graph),
-      "utf8",
-    );
-    await $`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
+    await $({
+      env: graphEnv,
+    })`node viberoots/build-tools/tools/buck/gen-auto-map.ts --graph .viberoots/workspace/buck/graph.json --out .viberoots/workspace/providers/auto_map.bzl`;
     const out = await fsp.readFile(
       path.join(tmp, ".viberoots", "workspace", "providers", "auto_map.bzl"),
       "utf8",
@@ -24,7 +21,7 @@ test("gen-auto-map: empty labels produces empty MODULE_PROVIDERS", async () => {
     }
     // Should be no entries
     if (/^    ".*": \[/m.test(out)) {
-      console.error("expected no target entries for empty graph");
+      console.error("expected no provider entries for graph without provider labels");
       process.exit(2);
     }
   });

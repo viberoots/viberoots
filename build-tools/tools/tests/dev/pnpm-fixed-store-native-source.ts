@@ -6,6 +6,10 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
 import {
+  buildCanonicalArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+} from "../../lib/artifact-environment";
+import {
   defaultFilteredFlakeSnapshotRelPaths,
   defaultFilteredFlakeSnapshotRsyncSources,
   filteredFlakeRsyncExcludeArgs,
@@ -56,7 +60,13 @@ export async function immutableProductionSource(liveRoot: string): Promise<strin
       (await directorySizeKib(filtered)) <= FILTERED_SOURCE_MAX_KIB,
       "native reconciliation filtered source must stay below 64 MiB",
     );
-    const inputRoot = (await materializeFilteredViberootsSource(filtered)).storePath;
+    const env = buildCanonicalArtifactEnvironment(process.cwd(), {
+      artifactToolsRoot: canonicalArtifactToolsRoot(
+        process.cwd(),
+        String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+      ),
+    });
+    const inputRoot = (await materializeFilteredViberootsSource(filtered, env)).storePath;
     assert.match(inputRoot, /^\/nix\/store\/[a-z0-9]{32}-source$/);
     assert.ok(
       (await directorySizeKib(inputRoot)) <= FILTERED_SOURCE_MAX_KIB,

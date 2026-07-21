@@ -1,17 +1,19 @@
 #!/usr/bin/env zx-wrapper
 import fs from "fs-extra";
 import assert from "node:assert/strict";
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 
 test("python macros: provider wiring present in deps() for nix_python_library", async () => {
   await runInTemp("py-macros-providers-wired-lib", async (tmp, $) => {
-    await $({
-      cwd: tmp,
-    })`bash --noprofile --norc -c 'mkdir -p third_party/providers && cat > third_party/providers/TARGETS <<'\''EOF'\''
-genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])
-EOF'`;
+    await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
+    await fsp.writeFile(
+      path.join(tmp, "third_party", "providers", "TARGETS"),
+      'genrule(name="prov", out="prov.stamp", cmd=": > $OUT", visibility=["PUBLIC"])\n',
+      "utf8",
+    );
 
     await $({
       cwd: tmp,

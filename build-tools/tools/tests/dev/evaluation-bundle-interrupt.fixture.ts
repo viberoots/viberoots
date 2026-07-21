@@ -2,13 +2,25 @@
 import { spawn } from "node:child_process";
 import { materializeEvaluationBundle } from "../../dev/evaluation-bundle";
 import { resolveToolPathSync } from "../../lib/tool-paths";
+import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
+
+const artifactToolsRoot = canonicalArtifactToolsRoot(
+  process.cwd(),
+  String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+);
 
 const source = String(process.argv[2] || "");
 const mode = String(process.argv[3] || "sigterm");
 
 try {
   await materializeEvaluationBundle(
-    { stagedSource: source, attr: "graph-generator", classification: "hermetic" },
+    {
+      stagedSource: source,
+      attr: "graph-generator",
+      classification: "hermetic",
+      artifactToolsRoot,
+      selectorEnv: {},
+    },
     {
       register: async (_bundleRoot, recordProcessGroup) => {
         if (mode === "sigkill") {

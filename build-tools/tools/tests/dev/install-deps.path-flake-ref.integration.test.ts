@@ -151,7 +151,8 @@ test("install path selects flake refs by importer scope", async (t) => {
   await fsp.mkdir(path.join(authorityFixture, "build-tools/tools/dev"), { recursive: true });
   await fsp.writeFile(path.join(authorityFixture, "flake.nix"), "{ outputs = _: {}; }\n");
   await fsp.writeFile(path.join(authorityFixture, "build-tools/tools/dev/zx-init.mjs"), "\n");
-  const authority = (await materializeFilteredViberootsSource(authorityFixture)).storePath;
+  const authority = (await materializeFilteredViberootsSource(authorityFixture, process.env))
+    .storePath;
   const flakeRef = "path:/tmp/filtered-lock-input";
   assert.deepEqual(pnpmNixRunArgs(flakeRef, ["fetch"], { VIBEROOTS_FLAKE_INPUT_ROOT: authority }), [
     "--quiet",
@@ -225,16 +226,19 @@ test("install path selects flake refs by importer scope", async (t) => {
   }
 
   const nodeModulesBuild = await read("tools/dev/node-modules-build.ts");
-  if (!nodeModulesBuild.includes("workspaceFlakeRoot")) {
-    throw new Error("node-modules-build.ts must prefer the generated workspace flake");
+  if (
+    !nodeModulesBuild.includes("withNodeModulesEvaluationBundle") ||
+    !nodeModulesBuild.includes("makeFilteredFlakeRef")
+  ) {
+    throw new Error("node-modules-build.ts must realize cold outputs from an evaluation bundle");
   }
-  if (!nodeModulesBuild.includes('"projects", "node-modules.hashes.json"')) {
+  if (!nodeModulesBuild.includes('"projects", "config", "node-modules.hashes.json"')) {
     throw new Error("node-modules-build.ts must read project-owned node module hashes");
   }
   if (
-    !nodeModulesBuild.includes("--override-input") ||
-    !nodeModulesBuild.includes("viberootsOverrideArgs")
+    nodeModulesBuild.includes("workspaceFlakeRoot") ||
+    nodeModulesBuild.includes("viberootsOverrideArgs")
   ) {
-    throw new Error("node-modules-build.ts must override stale viberoots lock inputs");
+    throw new Error("node-modules-build.ts must not evaluate or override a live workspace flake");
   }
 });

@@ -98,16 +98,18 @@ export async function withExclusiveInstallLock<T>(
           if (e && e.code === "ENOTDIR") return await fsp.stat(p).catch(() => null);
           return null;
         });
-        let age = 0;
-        if (st) age = Date.now() - st.mtimeMs;
+        let age = st ? Date.now() - st.mtimeMs : 0;
         if (envForce || Date.now() - start > forceAfterMs) {
           if (verbose) console.error(`[install-lock] force-clearing lock ${p}`);
           await fsp.rm(p, { recursive: true, force: true }).catch(() => {});
           continue;
         }
+        let liveOwner = false;
         // If the owner pid is gone, consider the lock stale regardless of age
         try {
           const ownerFile = path.join(p, "owner.json");
+          const ownerStat = await fsp.stat(ownerFile).catch(() => null);
+          if (ownerStat) age = Date.now() - ownerStat.mtimeMs;
           const txt = await fsp.readFile(ownerFile, "utf8").catch(async () => {
             // Legacy file-based lock or missing owner file: read lock file itself best-effort
             try {
@@ -124,6 +126,9 @@ export async function withExclusiveInstallLock<T>(
             await fsp.rm(p, { recursive: true, force: true }).catch(() => {});
             continue;
           }
+          if (pid) {
+            liveOwner = true;
+          }
           // If no PID content could be parsed, treat as stale after a short grace
           if (!pid && age > Math.min(30_000, staleMs)) {
             if (verbose) console.error(`[install-lock] removing stale lock without pid ${p}`);
@@ -131,7 +136,7 @@ export async function withExclusiveInstallLock<T>(
             continue;
           }
         } catch {}
-        if (age > staleMs) {
+        if (!liveOwner && age > staleMs) {
           if (verbose)
             console.error(
               `[install-lock] removing stale lock ${p} (age ${(age / 1000).toFixed(1)}s)`,
@@ -167,33 +172,43 @@ export async function withExclusiveInstallLock<T>(
     }
 
     const ownerFile = path.join(p, "owner.json");
-    const payload =
-      JSON.stringify({ pid: process.pid, startedAt: new Date().toISOString() }) + "\n";
-    await fsp.writeFile(ownerFile, payload, "utf8");
+    const startedAt = new Date().toISOString();
+    const writeOwner = async () =>
+      await fsp.writeFile(
+        ownerFile,
+        `${JSON.stringify({ pid: process.pid, key, scope: opts?.scopeRootAbs || repoIdentity(), startedAt, heartbeatAt: new Date().toISOString() })}\n`,
+        "utf8",
+      );
+    await writeOwner();
     const cleanup = async () => {
       try {
         await fsp.rm(p, { recursive: true, force: true });
       } catch {}
     };
-    process.once("exit", () => void cleanup());
-    process.once("SIGINT", () => {
+    const onExit = () => void cleanup();
+    const onSigint = () => {
       void cleanup();
       process.exit(130);
-    });
-    process.once("SIGTERM", () => {
+    };
+    const onSigterm = () => {
       void cleanup();
       process.exit(143);
-    });
+    };
+    process.once("exit", onExit);
+    process.once("SIGINT", onSigint);
+    process.once("SIGTERM", onSigterm);
     const hb = setInterval(async () => {
       try {
-        const now = new Date();
-        await fsp.utimes(ownerFile, now, now).catch(() => {});
+        await writeOwner();
       } catch {}
     }, 4000);
     try {
       return await fn();
     } finally {
       clearInterval(hb);
+      process.off("exit", onExit);
+      process.off("SIGINT", onSigint);
+      process.off("SIGTERM", onSigterm);
       await cleanup();
     }
   }

@@ -4,6 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { scaffoldLib } from "../lib/lang-fixtures";
 import { runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 process.env.TEST_NEED_DEV_ENV = "1";
 
@@ -19,6 +20,7 @@ test("go lib: scaffold and build+test", { timeout: 600_000 }, async () => {
       // ensure git repo for glue scripts that use git
       await $`git init`;
       await scaffoldLib("go", "demo-lib", { tmp: _tmp, $ });
+      const graphEnv = await reconcileSyntheticGeneratedGraph(_tmp);
       const outLinkName = `buck-go-${Date.now()}`;
       const outLinkPath = path.join(_tmp, outLinkName);
       try {
@@ -27,7 +29,9 @@ test("go lib: scaffold and build+test", { timeout: 600_000 }, async () => {
       // Build the library target (avoid running tests to keep runtime bounded).
       // Note: runInTemp already wires Buck config + toolchains; scaffolding should be buildable without
       // running the full install-deps pipeline here (which is expensive and can dominate runtime).
-      await $`buck2 build //projects/libs/demo-lib:demo-lib --target-platforms //:no_cgo`;
+      await $({
+        env: graphEnv,
+      })`buck2 build //projects/libs/demo-lib:demo-lib --target-platforms //:no_cgo`;
     });
   } finally {
     if (prevRoots === undefined) delete process.env.TEST_RSYNC_ROOTS;

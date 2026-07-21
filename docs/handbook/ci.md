@@ -2,7 +2,7 @@
 
 CI runs zx-backed stages and does not commit generated glue.
 
-## Stages (via viberoots/build-tools/tools/ci/run-stage.ts)
+## Stages (via viberoots/build-tools/tools/ci/run-stage.sh)
 
 1. `export-graph`
 2. `sync-providers` (unified orchestrator; per-language drivers run conditionally)
@@ -13,7 +13,7 @@ CI runs zx-backed stages and does not commit generated glue.
 7. `buck-test`
 8. `cpp-addon-smoke`
 
-Run locally with `CI=true node viberoots/build-tools/tools/ci/run-stage.ts --stage <name>`.
+Run locally with `CI=true viberoots/build-tools/tools/ci/run-stage.sh --stage <name>`.
 
 CI and local wrappers use the same default Nix cache policy as developer commands:
 `VBR_NIX_CACHE_POLICY=auto` probes configured HTTP(S) substituters, disables unreachable configured
@@ -30,8 +30,8 @@ behavior; use `VBR_NIX_CACHE_POLICY=off` only to skip the dynamic probe.
 - **prebuild-guard**: Ensure glue exists and is fresh. Locally it can auto‑fix; CI fails fast with clear errors.
   - Reference: `docs/handbook/troubleshooting.md#prebuild-guard-glue-presence--freshness`.
 - **nix-build-graph-generator**: Build artifacts via Nix templates, warming the Nix store for the matrix.
-- **wheelhouse-preload**: Builds Python wheelhouse outputs (`py-wheelhouse-*`) for any importers with `uv.lock`, and if `NIX_CACHE_TO` is set (or `--to` is passed), pushes the closures to a binary cache via `nix copy`.
-  - Configure cache destination in CI via environment: `NIX_CACHE_TO=https://<cache-endpoint>`.
+- **wheelhouse-preload**: Builds Python wheelhouse outputs (`py-wheelhouse-*`) for any importers with `uv.lock`, and when `--to` is passed, pushes the closures to a binary cache via `nix copy`.
+  - Declare the cache destination in CI with `--to=https://<cache-endpoint>`.
   - Safe no-op when no Python importers exist.
 - **buck-test**: Resolves the same requested scope as local `v`, then runs the selected Buck tests through verify target-pass planning. Documentation-only changes are not treated as build-system changes just because they live under `build-tools/**`; reviewed deployment/operator docs use their compact documentation contract bucket. Coverage mode still flows through `COVERAGE=1`; CI defaults remain local unless a future lane explicitly provides remote verify policy env.
 - **cpp-addon-smoke**: Explicitly local-only direct Buck smoke stage for the temporary scaffold workspace. It scrubs broad `VBR_REMOTE_*` policy env before invoking Buck because the temp workspace does not yet carry the remote execution policy contract.

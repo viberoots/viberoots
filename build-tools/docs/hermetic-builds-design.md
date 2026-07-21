@@ -114,6 +114,12 @@ must be represented in the bundle or derivation. They must not be inherited. Thi
 host variables such as compiler flags, language search paths, package-manager homes, development
 overrides, and user configuration directories.
 
+Trusted shell ingress may receive `NIX_CFLAGS_COMPILE`, `NIX_PROFILES`,
+`NIX_USER_PROFILE_DIR`, and `XPC_FLAGS` as devshell session inputs. The shell removes them before
+canonical TypeScript admission; they never become bundle, derivation, or runtime inputs. Other
+caller compiler, language, and package selectors that differ from the trusted devshell baseline are
+restored so canonical admission can reject them explicitly.
+
 The environment builder must reject unknown artifact-affecting variables in CI. Local `b` should
 strip harmless unknown variables and fail on known build selectors. Remote execution must use the
 same policy, with an even smaller transport allowlist.

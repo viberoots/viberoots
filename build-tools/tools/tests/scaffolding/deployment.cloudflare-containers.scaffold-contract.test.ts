@@ -7,9 +7,9 @@ import { test } from "node:test";
 import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes";
 import { extractDeployments } from "../../deployments/contract";
 import { DEPLOYMENT_CQUERY_ATTRS } from "../../deployments/deployment-query-attrs";
-import { stableBuckIsolation } from "../../lib/buck-command-env";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
 import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 const accountId = "0123456789abcdef0123456789abcdef";
 
@@ -31,14 +31,10 @@ async function writeServiceApp(tmp: string): Promise<void> {
   );
 }
 
-function deployValidateEnv(tmp: string): NodeJS.ProcessEnv {
-  const env = { ...process.env };
+function deployValidateEnv(baseEnv: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const env = { ...baseEnv };
   delete env.CLOUDFLARE_API_TOKEN;
   delete env.CLOUDFLARE_REGISTRY_TOKEN;
-  env.BUCK_NESTED_ISO = stableBuckIsolation(
-    path.join(tmp, ".deployment-cloudflare-containers-validate"),
-    "zxtest-containers-validate",
-  );
   return env;
 }
 
@@ -49,6 +45,7 @@ test("deployment/cloudflare-containers scaffold renders Worker config and metada
     await $`scaf new deployment cloudflare-containers api-staging --component=//projects/apps/api:service_artifact --cloudflare_account_id=${accountId} --worker=api-staging --ingress_mode=public --domain=api.example.com --cloudflare_zone_id=${accountId} --sleep_after=20m --max_instances=3 --shared_package=demo-shared --yes`;
     await writeDefaults(tmp);
     await writeServiceApp(tmp);
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
     const deploymentRoot = path.join(tmp, "projects/deployments/api-staging");
     const targetsPath = path.join(deploymentRoot, "TARGETS");
     const wranglerPath = path.join(deploymentRoot, "wrangler.jsonc");
@@ -142,8 +139,8 @@ cloudflare_containers_deployment(
     const query =
       "set(//projects/deployments/api-staging:deploy //projects/apps/api:service_artifact //projects/deployments:defaults //projects/deployments/demo-shared:lane_governance //projects/deployments/demo-shared:lane //projects/deployments/demo-shared:dev_release)";
     const cquery = await $({
-      env: { ...process.env, HOME: process.env.BUCK2_REAL_HOME || process.env.HOME },
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-cloudflare-containers-scaffold")} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`;
+      env: { ...graphEnv, HOME: process.env.BUCK2_REAL_HOME || process.env.HOME },
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-cloudflare-containers-scaffold", graphEnv)} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`;
     const { deployments, errors } = extractDeployments(
       nodesFromCqueryJson(JSON.parse(String(cquery.stdout || "{}"))),
     );
@@ -162,6 +159,7 @@ test("deployment/cloudflare-containers default private scaffold validates throug
     await $`scaf new deployment cloudflare-containers api-default --component=//projects/apps/api:service_artifact --cloudflare_account_id=${accountId} --worker=api-default --shared_package=demo-shared --yes`;
     await writeDefaults(tmp);
     await writeServiceApp(tmp);
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
     const deploymentRoot = path.join(tmp, "projects/deployments/api-default");
     const targets = await fsp.readFile(path.join(deploymentRoot, "TARGETS"), "utf8");
     const wrangler = await fsp.readFile(path.join(deploymentRoot, "wrangler.jsonc"), "utf8");
@@ -172,7 +170,7 @@ test("deployment/cloudflare-containers default private scaffold validates throug
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-      env: deployValidateEnv(tmp),
+      env: deployValidateEnv(graphEnv),
     })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment //projects/deployments/api-default:deploy --validate-only`;
     const payload = JSON.parse(String(result.stdout));
     assert.equal(payload.schemaVersion, "deploy-validate@1");

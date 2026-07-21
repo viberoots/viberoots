@@ -2,6 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { validateRemoteExecTargets } from "../../dev/remote-exec-policy-check";
+import { remoteBuilderSmokeEvidence } from "./remote-builder-smoke-test-fixture";
 
 function messages(...labels: string[]): string {
   return validateRemoteExecTargets({
@@ -29,6 +30,7 @@ test("remote policy keeps deployment and external-mutating targets constrained",
   assert.deepEqual(
     validateRemoteExecTargets({
       mode: "remote",
+      testOnlyRemoteBuilderSmokeEvidence: remoteBuilderSmokeEvidence,
       lockCapabilities: ["external-mutating"],
       targets: [
         {
@@ -40,6 +42,7 @@ test("remote policy keeps deployment and external-mutating targets constrained",
           commandInputsDeclared: true,
           nixBuilderPolicy: "inherit_config",
           remoteBuilderSmokePolicy: "inherit_config",
+          remoteBuilderSmokeEvidence,
         },
       ],
     }),
@@ -101,6 +104,7 @@ test("resource labels pass when a compatible profile is selected", () => {
   assert.deepEqual(
     validateRemoteExecTargets({
       mode: "remote",
+      testOnlyRemoteBuilderSmokeEvidence: remoteBuilderSmokeEvidence,
       allowedProfiles: ["linux-x86_64-large"],
       targets: [
         {
@@ -112,6 +116,7 @@ test("resource labels pass when a compatible profile is selected", () => {
           commandInputsDeclared: true,
           nixBuilderPolicy: "inherit_config",
           remoteBuilderSmokePolicy: "inherit_config",
+          remoteBuilderSmokeEvidence,
         },
       ],
     }),
@@ -176,6 +181,7 @@ test("remote-ready Nix builder policy requires compatible builder evidence", () 
   assert.match(
     validateRemoteExecTargets({
       mode: "remote",
+      testOnlyRemoteBuilderSmokeEvidence: remoteBuilderSmokeEvidence,
       targets: [
         {
           ...base,
@@ -191,6 +197,23 @@ test("remote-ready Nix builder policy requires compatible builder evidence", () 
   assert.deepEqual(
     validateRemoteExecTargets({
       mode: "remote",
+      testOnlyRemoteBuilderSmokeEvidence: remoteBuilderSmokeEvidence,
+      targets: [
+        {
+          ...base,
+          nixBuilderPolicy: "inherit_config",
+          remoteBuilderSmokePolicy: "inherit_config",
+          remoteBuilderSmokeEvidence,
+        },
+      ],
+    }),
+    [],
+  );
+  assert.match(
+    validateRemoteExecTargets({
+      mode: "remote",
+      remoteSystem: "aarch64-linux",
+      testOnlyRemoteBuilderSmokeEvidence: remoteBuilderSmokeEvidence,
       targets: [
         {
           ...base,
@@ -198,8 +221,10 @@ test("remote-ready Nix builder policy requires compatible builder evidence", () 
           remoteBuilderSmokePolicy: "inherit_config",
         },
       ],
-    }),
-    [],
+    })
+      .map((f) => f.message)
+      .join("\n"),
+    /does not match active execution system/,
   );
   assert.match(
     validateRemoteExecTargets({

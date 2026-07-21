@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 
 test("python macros: nix_python_library and nix_python_binary build", async () => {
   await runInTemp("python-nix-builds-lib-bin", async (tmp, $) => {
@@ -30,6 +30,7 @@ test("python macros: nix_python_library and nix_python_binary build", async () =
       ].join("\n"),
       "utf8",
     );
+    await reconcileTempDependencyInputs(tmp, $);
 
     const res = await $({
       cwd: tmp,

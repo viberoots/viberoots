@@ -5,12 +5,19 @@ import path from "node:path";
 import process from "node:process";
 import { test } from "node:test";
 import { listDeploymentTargets } from "../../deployments/deployment-query";
-import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import { runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 test("deployment target discovery resolves projects/deployments labels from an isolated temp repo", async () => {
   await runInTemp("verify-deployment-target-discovery-projects", async (tmp) => {
-    const previousIsolation = process.env.BUCK_NESTED_ISO;
-    process.env.BUCK_NESTED_ISO = inheritedBuckIsolation("verify_deployment_target_discovery");
+    const isolationKeys = [
+      "BUCK_ISOLATION_DIR",
+      "BUCK_NESTED_ISO",
+      "BUCK_ISOLATION_DIR_EXPORTER",
+    ] as const;
+    const previousIsolation = Object.fromEntries(
+      isolationKeys.map((key) => [key, process.env[key]]),
+    );
     try {
       const appTargetsPath = path.join(tmp, "projects", "apps", "sample-app", "TARGETS");
       const sharedTargetsPath = path.join(
@@ -102,12 +109,17 @@ test("deployment target discovery resolves projects/deployments labels from an i
         ].join("\n"),
         "utf8",
       );
+      const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
+      for (const key of isolationKeys) process.env[key] = graphEnv[key];
 
       const targets = await listDeploymentTargets(tmp);
       assert.deepEqual(targets, ["//projects/deployments/sample/dev:deploy"]);
     } finally {
-      if (previousIsolation === undefined) delete process.env.BUCK_NESTED_ISO;
-      else process.env.BUCK_NESTED_ISO = previousIsolation;
+      for (const key of isolationKeys) {
+        const previous = previousIsolation[key];
+        if (previous === undefined) delete process.env[key];
+        else process.env[key] = previous;
+      }
     }
   });
 });

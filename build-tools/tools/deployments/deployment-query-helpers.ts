@@ -2,7 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { stableBuckIsolation } from "../lib/buck-command-env";
-import { ensureGraph } from "../buck/glue-run";
+import { requireGeneratedGraph } from "../buck/generated-graph";
 import { normalizeTargetLabel } from "../lib/labels";
 import { registerBuckIsolationSync } from "../dev/verify/owned-process-state";
 
@@ -33,12 +33,11 @@ export function deploymentQueryRootsExpr(workspaceRoot: string): string {
   return `set(${roots.map((root) => `//${root}/...`).join(" ")})`;
 }
 
-export async function ensureDeploymentGraph(
-  workspaceRoot: string,
-  target?: string,
-  opts: { force?: boolean } = {},
-): Promise<void> {
-  await ensureGraph({ workspaceRoot, target, queryRoots: deploymentGraphQueryRoots(), ...opts });
+export async function ensureDeploymentGraph(workspaceRoot: string, target?: string): Promise<void> {
+  await requireGeneratedGraph({
+    graphPath: path.join(workspaceRoot, ".viberoots/workspace/buck/graph.json"),
+    target,
+  });
 }
 
 export function deploymentBuckEnv(

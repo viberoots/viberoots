@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 test("prebuild-guard: Go patches present but no Go provider/index files — ok", async () => {
   await runInTemp("guard-go-no-provider-files", async (tmp, $) => {
@@ -17,11 +18,6 @@ test("prebuild-guard: Go patches present but no Go provider/index files — ok",
 
     // Minimal required glue presence
     await fsp.mkdir(path.join(tmp, "third_party/providers"), { recursive: true });
-    await fsp.writeFile(
-      path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
-      "[]",
-      "utf8",
-    );
     await fsp.writeFile(
       path.join(tmp, ".viberoots", "workspace", "buck", "node-lock-index.json"),
       "{}\n",
@@ -38,44 +34,13 @@ test("prebuild-guard: Go patches present but no Go provider/index files — ok",
       "utf8",
     );
 
-    // Ensure Buck mapping exists in temp repo
-    await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
-      printf '.\\n' > .buckroot
-      cat > .buckconfig <<'EOF'
-[buildfile]
-name = TARGETS
-
-[repositories]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[cells]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[build]
-prelude = prelude
-user_platform = prelude//platforms:default
-target_platforms = prelude//platforms:default
-EOF
-      mkdir -p toolchains
-      printf '[buildfile]\\nname = TARGETS\\n' > toolchains/.buckconfig
-    `}`;
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
 
     // Should pass without requiring Go TARGETS.go.auto or provider_index files
     await $({
       cwd: tmp,
       stdio: "inherit",
+      env: graphEnv,
     })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
   });
 });

@@ -8,7 +8,7 @@ import { readCompositeGraph } from "../lib/graph-view";
 // labels are kept for diagnostics and are intentionally ignored here.
 import { providersForLabels, parseLockfileLabel } from "../lib/labels";
 import { getFlagStr } from "../lib/cli";
-import { ensureGraph } from "./glue-run";
+import { requireGeneratedGraph } from "./generated-graph";
 import { isProviderPackageNode } from "../lib/graph-utils";
 import { isSupportedImporterLabel } from "../lib/importers";
 import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
@@ -28,16 +28,9 @@ const outPath = getFlagStr("out", DEFAULT_AUTO_MAP_PATH);
 // parsing moved to build-tools/tools/lib/labels.ts
 
 async function main() {
-  // Ensure graph exists if caller didn't generate it yet
-  try {
-    if (graphPath && graphPath.length > 0) {
-      await fsp.access(graphPath).catch(async () => {
-        await ensureGraph();
-      });
-    } else {
-      await ensureGraph();
-    }
-  } catch {}
+  await requireGeneratedGraph({
+    graphPath: graphPath || path.join(process.cwd(), ".viberoots/workspace/buck/graph.json"),
+  });
   await maybeAssumeUnchanged(outPath);
 
   const { nodes } = await readCompositeGraph({

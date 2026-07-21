@@ -1,8 +1,13 @@
 #!/usr/bin/env zx-wrapper
 import crypto from "node:crypto";
 import * as fsp from "node:fs/promises";
+import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
+import { runGluePipeline } from "../../buck/glue-pipeline";
+import { prebuildFingerprintFresh } from "../../buck/prebuild/fingerprint";
+import { glueFreshnessOutputs } from "../../dev/install/glue-freshness";
+import { withoutArtifactEnvironmentInfluence } from "../../lib/artifact-environment";
 import { runInTemp } from "../lib/test-helpers";
 
 async function writeMinimalBuckConfig(tmp: string) {
@@ -72,10 +77,46 @@ async function dirSnapshot(root: string): Promise<Map<string, string>> {
   return out;
 }
 
-test("glue stages run without node_modules and are idempotent", async () => {
+test("glue validation stages run without node_modules and are idempotent", async () => {
   await runInTemp("bootstrap-safe-glue", async (tmp, $) => {
     await writeMinimalBuckConfig(tmp);
     await seedMinimalGraph(tmp);
+
+    const callerRoot = path.join(tmp, "pipeline-caller");
+    await fsp.mkdir(callerRoot, { recursive: true });
+    const originalCwd = process.cwd();
+    try {
+      process.chdir(callerRoot);
+      await runGluePipeline({
+        forceGraph: true,
+        workspaceRoot: tmp,
+        toolSourceRoot: process.env.VIBEROOTS_SOURCE_ROOT || path.join(tmp, "viberoots"),
+        env: process.env,
+      });
+    } finally {
+      process.chdir(originalCwd);
+    }
+    assert.equal(
+      await fsp.stat(path.join(callerRoot, ".viberoots")).catch(() => null),
+      null,
+      "pipeline outputs must resolve beneath the declared workspace root",
+    );
+    const freshnessOutputs = glueFreshnessOutputs(tmp);
+    const missingOutputs = (
+      await Promise.all(
+        freshnessOutputs.map(async (output) => ({
+          output,
+          present: Boolean(await fsp.stat(path.resolve(tmp, output)).catch(() => null)),
+        })),
+      )
+    )
+      .filter(({ present }) => !present)
+      .map(({ output }) => output);
+    assert.deepEqual(missingOutputs, []);
+    assert.deepEqual(await prebuildFingerprintFresh({ root: tmp, outputs: freshnessOutputs }), {
+      fresh: true,
+      reason: "fresh",
+    });
 
     // Ensure node_modules is absent
     let nodeModsExists = false;
@@ -92,11 +133,11 @@ test("glue stages run without node_modules and are idempotent", async () => {
       await $({
         cwd: tmp,
         stdio: "inherit",
-        env: { ...process.env, ...(extraEnv || {}) },
+        env: { ...withoutArtifactEnvironmentInfluence(process.env), ...(extraEnv || {}) },
       })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/ci/run-stage.ts --stage ${name}`;
     };
 
-    // Run the canonical glue pipeline once (export graph + sync providers + auto-map).
+    // Validate the canonical metadata reconciled by the explicit update boundary.
     await runStage("glue");
     await runStage("prebuild-guard");
 

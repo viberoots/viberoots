@@ -3,12 +3,18 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { envWithStubbedNix } from "../lib/test-helpers";
+import { makeFilteredFlakeRef } from "../../dev/filtered-flake";
+import {
+  buildArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+  withoutArtifactEnvironmentInfluence,
+} from "../../lib/artifact-environment";
 import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
+import { prepareFilteredViberootsInput } from "../lib/test-helpers/run-in-temp/filtered-inputs";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
-import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
+import { ensureToolchainPathsForTempRepo } from "../lib/test-helpers/toolchain-paths";
 
-test("p auto source uses filtered flake when root viberoots input is generated workspace state", async () => {
+test("filtered runnable source uses immutable input when root input is generated state", async () => {
   const repoRoot = process.cwd();
   const fakeRoot = path.join(
     repoRoot,
@@ -18,6 +24,7 @@ test("p auto source uses filtered flake when root viberoots input is generated w
   await fsp.rm(fakeRoot, { recursive: true, force: true }).catch(() => {});
   try {
     const target = "//projects/apps/demo:demo";
+    const immutableInput = await prepareFilteredViberootsInput(viberootsSourcePath("."));
     const graphDir = path.join(fakeRoot, ".viberoots", "workspace", "buck");
     await fsp.mkdir(graphDir, { recursive: true });
     await fsp.mkdir(path.join(fakeRoot, "projects", "apps", "demo", "src"), {
@@ -42,10 +49,38 @@ test("p auto source uses filtered flake when root viberoots input is generated w
     );
     await fsp.writeFile(
       path.join(fakeRoot, "flake.lock"),
-      JSON.stringify({ nodes: { viberoots: {} }, root: "root", version: 7 }, null, 2) + "\n",
+      JSON.stringify(
+        {
+          nodes: {
+            root: { inputs: { viberoots: "viberoots" } },
+            viberoots: {
+              locked: {
+                path: "./.viberoots/workspace/viberoots-flake-input",
+                type: "path",
+              },
+              original: {
+                path: "./.viberoots/workspace/viberoots-flake-input",
+                type: "path",
+              },
+              parent: [],
+            },
+          },
+          root: "root",
+          version: 7,
+        },
+        null,
+        2,
+      ) + "\n",
       "utf8",
     );
-    await ensureBuckConfigForTempRepo(fakeRoot, $);
+    await fsp.symlink(
+      immutableInput.storePath,
+      path.join(fakeRoot, ".viberoots", "workspace", "viberoots-flake-input"),
+    );
+    await ensureBuckConfigForTempRepo(fakeRoot, $, {
+      viberootsInputRoot: immutableInput.storePath,
+    });
+    await ensureToolchainPathsForTempRepo(fakeRoot, $);
     await $({ cwd: fakeRoot, stdio: "pipe" })`git init`;
     await fsp.writeFile(
       path.join(fakeRoot, "projects", "apps", "demo", "src", "index.ts"),
@@ -83,73 +118,39 @@ test("p auto source uses filtered flake when root viberoots input is generated w
       "utf8",
     );
 
-    const stubBin = path.join(fakeRoot, "stub-bin");
-    const fakeOut = path.join(fakeRoot, "fake-selected-out");
-    const nixLog = path.join(fakeRoot, "nix-args.log");
-    const realNixBin = resolveToolPathSync("nix", envWithResolvedNixBin(process.env));
-    await fsp.mkdir(stubBin, { recursive: true });
-    await fsp.writeFile(
-      path.join(stubBin, "nix"),
-      [
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
-        `echo "$*" >> ${JSON.stringify(nixLog)}`,
-        'args="$*"',
-        'if [[ "$args" == flake\\ prefetch\\ --json\\ --no-use-registries\\ --option\\ flake-registry\\ \\ path:* ]]; then',
-        `  exec ${JSON.stringify(realNixBin)} "$@"`,
-        "fi",
-        'if [[ "$args" == store\\ add-path\\ --name\\ viberoots-evaluation-bundle\\ * ]]; then',
-        `  exec ${JSON.stringify(realNixBin)} "$@"`,
-        "fi",
-        `out=${JSON.stringify(fakeOut)}`,
-        'if [[ "$args" == *"#graph-generator-selected"* ]]; then',
-        '  mkdir -p "$out/bin"',
-        "  cat > \"$out/bin/demo\" <<'EOF'",
-        "#!/usr/bin/env bash",
-        "echo selected-prod-ok",
-        "EOF",
-        '  chmod +x "$out/bin/demo"',
-        '  echo "$out"',
-        "  exit 0",
-        "fi",
-        'echo "unexpected nix invocation: $args" >&2',
-        "exit 92",
-        "",
-      ].join("\n"),
-      "utf8",
-    );
-    await fsp.chmod(path.join(stubBin, "nix"), 0o755);
-
-    const tool = viberootsSourcePath("build-tools/tools/bin/p");
-    const run = await $({
-      cwd: fakeRoot,
-      stdio: "pipe",
-      env: {
-        ...envWithStubbedNix(stubBin),
-        WORKSPACE_ROOT: fakeRoot,
-        BUCK_TEST_SRC: fakeRoot,
-      },
-    })`${tool} ${target}`;
-    assert.match(String(run.stdout || ""), /selected-prod-ok/);
+    const artifactToolsRoot = canonicalArtifactToolsRoot(fakeRoot);
+    const artifactEnv = buildArtifactEnvironment({
+      baseEnv: withoutArtifactEnvironmentInfluence(process.env),
+      mode: "local",
+      stateRoot: path.join(fakeRoot, "buck-out", "tmp", "artifact-environment"),
+      workspaceRoot: fakeRoot,
+      artifactToolsRoot,
+    });
+    const source = await makeFilteredFlakeRef({
+      workspaceRoot: fakeRoot,
+      target,
+      attr: "graph-generator-selected",
+      logPrefix: "[runnable-generated-input]",
+      classification: "local-development",
+      env: artifactEnv,
+      selectorEnv: {},
+      immutableViberootsInputRoot: immutableInput.storePath,
+    });
     assert.match(
-      String(run.stderr || ""),
-      /bundling relevant untracked files as local development source/,
-      "the uncommitted fixture must be captured as an explicit local-development source",
+      source.flakeRef,
+      /^path:\/nix\/store\/[a-z0-9]{32}-viberoots-evaluation-bundle\?dir=source\/\.viberoots\/workspace#graph-generator-selected$/,
     );
-
-    const logTxt = await fsp.readFile(nixLog, "utf8");
-    const escapedRoot = fakeRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    assert.match(
-      logTxt,
-      /flake prefetch --json --no-use-registries --option flake-registry  path:.*\/viberoots/,
-      "generated workspace inputs must be materialized to immutable source identity",
+    const bundlePath = source.flakeRef.slice("path:".length).split("?", 1)[0];
+    const bundleLock = JSON.parse(
+      await fsp.readFile(
+        path.join(bundlePath, "source", ".viberoots", "workspace", "flake.lock"),
+        "utf8",
+      ),
     );
-    assert.match(
-      logTxt,
-      /build .*path:.*#graph-generator-selected/,
-      "the clean fixture must build through the immutable filtered flake",
-    );
-    assert.doesNotMatch(logTxt, new RegExp(`path:${escapedRoot}#`));
+    const bundledInput = String(bundleLock.nodes?.viberoots?.locked?.path || "");
+    assert.equal(bundledInput, immutableInput.storePath);
+    assert.doesNotMatch(bundledInput, new RegExp(fakeRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    await source.cleanup?.();
   } finally {
     await fsp.rm(fakeRoot, { recursive: true, force: true }).catch(() => {});
   }

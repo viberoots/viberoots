@@ -1,4 +1,4 @@
-{ pkgs, nodeMods, importerDirs, allowGenerate, repoRoot, uv2nixLib }:
+{ pkgs, nodeMods, importerDirs, allowGenerate, repoRoot, uv2nixLib, coverage ? false }:
 let
   sanitize = (import ../../templates-common.nix { inherit pkgs; }).sanitizeName;
   TAddon = import ../../templates/cpp-node-addon.nix { inherit pkgs; };
@@ -133,7 +133,6 @@ let
 
         patternsEnv = builtins.getEnv "NIX_NODE_TEST_PATTERNS";
         patternsValue = patternsEnv;
-        coverageEnv = builtins.getEnv "COVERAGE";
         innerPhaseDiagnostics =
           if (builtins.getEnv "TEST_TIMING" != "") || (builtins.getEnv "TEST_TIMING_SUMMARY" != "") then
             "1"
@@ -197,10 +196,11 @@ let
               set -euo pipefail
               export IMPORTER_DIR="${importerDir}"
               export NM_PATH="${nmPath}"
+              export NODE_BIN="${pkgs.nodejs_22}/bin/node"
               export HAS_NATIVE="${if hasNative then "1" else ""}"
               export ADDON_NAME="${addonName}"
               export ADDON_SRC="${addonSrc}"
-              export COVERAGE_ENV="${coverageEnv}"
+              export COVERAGE_ENV="${if coverage then "1" else ""}"
               export PATTERNS_VALUE='${builtins.toJSON patternsValue}'
               export VBR_NODE_PHASE_DIAGNOSTICS="${innerPhaseDiagnostics}"
               ${builtins.readFile ./node-test-buildPhase.sh}

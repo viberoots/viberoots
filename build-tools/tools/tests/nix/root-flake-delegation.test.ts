@@ -13,27 +13,36 @@ async function activeBuildToolPath(rel: string): Promise<string> {
   return path.join("viberoots", "build-tools", rel);
 }
 
+function selectedViberootsSource(flake: string): string {
+  const selected = flake.match(
+    /viberoots\.url\s*=\s*"path:(\/nix\/store\/[a-z0-9]{32}-source|\.\/viberoots-flake-input)"/,
+  )?.[1];
+  assert.ok(selected, "generated flake must select an immutable viberoots source capture");
+  return selected;
+}
+
 test("hidden workspace flake delegates workspace construction through the selected viberoots input", async () => {
   const flake = await fsp.readFile(path.join(".viberoots", "workspace", "flake.nix"), "utf8");
-  assert.match(flake, /viberoots\.url\s*=\s*"path:.*\/viberoots(?:-flake-input)?"/);
+  selectedViberootsSource(flake);
   assert.match(flake, /inputs\.viberoots\.lib\.mkWorkspace/);
-  assert.match(flake, /if root != "" then root else \.\.\/\.\./);
+  assert.match(flake, /workspaceSrc\s*=\s*\.\.\/\.\.;/);
   assert.match(flake, /viberootsInput\s*=\s*inputs\.viberoots/);
   assert.doesNotMatch(flake, /import\s+\.\/build-tools\/tools\/nix\/flake\/outputs\.nix/);
 });
 
 test("hidden workspace flake lock records the selected viberoots input", async () => {
+  const flake = await fsp.readFile(path.join(".viberoots", "workspace", "flake.nix"), "utf8");
+  const selectedSource = selectedViberootsSource(flake);
   const lock = JSON.parse(
     await fsp.readFile(path.join(".viberoots", "workspace", "flake.lock"), "utf8"),
   );
   assert.equal(lock.nodes.root.inputs.viberoots, "viberoots");
   const locked = lock.nodes.viberoots.locked;
-  if (locked.type === "path") {
-    assert.match(locked.path, /viberoots(?:-flake-input)?$/);
-  } else {
-    assert.equal(locked.type, "git");
-    assert.match(locked.url, /github\.com\/viberoots\/viberoots\.git$/);
-  }
+  assert.equal(locked.type, "path");
+  assert.match(locked.path, /^\/nix\/store\/[a-z0-9]{32}-source$/);
+  assert.equal(lock.nodes.viberoots.original.type, "path");
+  assert.equal(lock.nodes.viberoots.original.path, locked.path);
+  if (selectedSource.startsWith("/nix/store/")) assert.equal(locked.path, selectedSource);
 });
 
 test("graph planner packages use the workspace source under delegated flakes", async () => {
@@ -75,7 +84,7 @@ printf '%s\\n' "$status_json" | jq -e '.sourceMode == "local" and .currentPoints
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`nix develop --impure --accept-flake-config ${`path:${path.resolve(".viberoots", "workspace")}#default`} -c bash --noprofile --norc -c ${script}`;
+    })`nix develop --impure --accept-flake-config --no-write-lock-file ${`path:${path.resolve(".viberoots", "workspace")}#default`} -c bash --noprofile --norc -c ${script}`;
 
     assert.equal(
       result.exitCode,

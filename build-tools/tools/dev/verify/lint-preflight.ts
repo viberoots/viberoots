@@ -140,7 +140,20 @@ async function runVerifyNixGapsPolicyPreflight(
     "docs/handbook/nix-gaps-exceptions.json",
     "viberoots/docs/handbook/nix-gaps-exceptions.json",
   ]);
-  const args = ["--starlark-api", starlarkApi, "--nix-gaps", nixGaps, "--exceptions", exceptions];
+  const commandSitePolicy = await firstExisting(root, [
+    "docs/handbook/nix-command-site-policy.json",
+    "viberoots/docs/handbook/nix-command-site-policy.json",
+  ]);
+  const args = [
+    "--starlark-api",
+    starlarkApi,
+    "--nix-gaps",
+    nixGaps,
+    "--exceptions",
+    exceptions,
+    "--command-site-policy",
+    commandSitePolicy,
+  ];
   if (verbose()) {
     process.stderr.write(
       "[verify] nix-gaps policy preflight: running inventory + exception checks\n",

@@ -3,15 +3,14 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagStr } from "../../lib/cli";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
-import { getImporterRootsContract } from "../../lib/importer-roots";
+import { artifactGraphQueryRoots } from "../artifact-graph-query-roots";
 import type { Node } from "./types";
 
 export async function cqueryNodes(scope: string, attrs: string[]): Promise<Node[]> {
   const flags = attrs.flatMap((a) => ["--output-attribute", a]);
   const platformFlags = ["--target-platforms", "prelude//platforms:default"];
   // Limit scan roots to avoid parsing ephemeral or intentionally invalid packages (e.g., .tmp)
-  const importerRoots = getImporterRootsContract().workspaceRoots;
-  const defaultRoots = [...importerRoots, "third_party", "go", "cpp"];
+  const defaultRoots = artifactGraphQueryRoots();
   const rootsEnv = (process.env.BUCK_QUERY_ROOTS || "").trim();
   const rootsList = rootsEnv ? rootsEnv.split(/[\,\s]+/).filter(Boolean) : defaultRoots;
   // Filter to existing directories to avoid recursive spec errors in sparse/temp repos

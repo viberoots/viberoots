@@ -56,7 +56,7 @@ test(
         await fsp.readFile(contracts.tsManifestPath, "utf8"),
         "utf8",
       );
-      await reconcileTempDependencyInputs(tmp, $);
+      await reconcileTempDependencyInputs(tmp, _$);
       await pnpmInstallForDevTest({
         tmp,
         _$,

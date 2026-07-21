@@ -32,7 +32,7 @@ test("providers registry: node sync generates importer-scoped provider from pnpm
     await $({
       cwd: tmp,
       stdio: "inherit",
-    })`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node`;
+    })`node viberoots/build-tools/tools/buck/sync-providers.ts --lang node --no-glue`;
 
     const out = path.join(tmp, providerAutoTargetsPath("node"));
     const txt = await fsp.readFile(out, "utf8");

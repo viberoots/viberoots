@@ -131,7 +131,7 @@ EOF
           echo "node planner: missing vite in locked node_modules for ${importerDir}" >&2
           exit 2
         fi
-        "$VITE_BIN" build
+        ${pkgs.bash}/bin/bash "$VITE_BIN" build
         test -d dist
         stage_wasm_contract "src/wasm-contract/top.wasm" "dist" "dist/server/wasm"
       '' else if framework == "express" || framework == "vite" then ''
@@ -139,9 +139,9 @@ EOF
           echo "node planner: expected vite and tsc in locked node_modules for ${importerDir}" >&2
           exit 2
         fi
-        "$VITE_BIN" build --outDir dist/client
-        "$VITE_BIN" build --ssr src/entry-server.ts --outDir dist/server
-        "$TSC_BIN" -p tsconfig.server.json
+        ${pkgs.bash}/bin/bash "$VITE_BIN" build --outDir dist/client
+        ${pkgs.bash}/bin/bash "$VITE_BIN" build --ssr src/entry-server.ts --outDir dist/server
+        ${pkgs.bash}/bin/bash "$TSC_BIN" -p tsconfig.server.json
         test -d dist/client
         test -f dist/server/index.js
         stage_wasm_contract "src/wasm-contract/top.wasm" "dist/client" "dist/server/wasm"
@@ -156,8 +156,8 @@ EOF
           echo "node planner: expected next and tsc in locked node_modules for ${importerDir}" >&2
           exit 2
         fi
-        "$NEXT_BIN" build
-        "$TSC_BIN" -p tsconfig.server.json
+        ${pkgs.bash}/bin/bash "$NEXT_BIN" build
+        ${pkgs.bash}/bin/bash "$TSC_BIN" -p tsconfig.server.json
         test -d .next
         mkdir -p dist/client
         cp -R .next dist/client/.next

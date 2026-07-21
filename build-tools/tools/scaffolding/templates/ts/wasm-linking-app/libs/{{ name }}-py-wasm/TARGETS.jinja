@@ -1,5 +1,5 @@
-load("@prelude//:rules.bzl", "genrule")
 load("@viberoots//build-tools/python:defs.bzl", "nix_python_wasm_extension_module")
+load("@viberoots//build-tools/wasm:defs.bzl", "nix_wasm_artifact_export")
 
 nix_python_wasm_extension_module(
     name = "pyext",
@@ -10,20 +10,11 @@ nix_python_wasm_extension_module(
     visibility = ["PUBLIC"],
 )
 
-genrule(
+nix_wasm_artifact_export(
     name = "py_wasm",
-    srcs = [
-        ":pyext",
-        "uv.lock",
-        "native/ext.c",
-        "@viberoots//build-tools/tools/wasm:export-wasm-from-nix",
-    ],
+    target = "//projects/libs/{{ name }}-py-wasm:pyext",
+    artifact_dir = "site/pyext",
+    artifact_glob = "_native*",
     out = "pyext.wasm",
-    cmd = "WASM_TARGET=//projects/libs/{{ name }}-py-wasm:pyext "
-          + "WASM_DIR=site/pyext "
-          + "WASM_NAME=_native "
-          + "WASM_EXTS=.so,.wasm "
-          + "OUT_PATH=\"$OUT\" "
-          + "zx-wrapper \"$(location @viberoots//build-tools/tools/wasm:export-wasm-from-nix)\"",
     visibility = ["PUBLIC"],
 )

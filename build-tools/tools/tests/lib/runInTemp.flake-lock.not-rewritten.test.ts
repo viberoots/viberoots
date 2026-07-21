@@ -4,6 +4,27 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "./test-helpers";
+import { rewriteViberootsLockEntry } from "./test-helpers/run-in-temp/flake-rewrite";
+
+test("runInTemp replaces a prior immutable viberoots source without accepting other store paths", () => {
+  const priorSource = `/nix/store/${"1".repeat(32)}-source`;
+  const activeSource = `/nix/store/${"2".repeat(32)}-source`;
+  const entry = { type: "path", path: priorSource, narHash: "sha256-old" };
+
+  assert.equal(rewriteViberootsLockEntry(entry, activeSource, { narHash: "sha256-current" }), true);
+  assert.deepEqual(entry, {
+    type: "path",
+    path: activeSource,
+    narHash: "sha256-current",
+  });
+  assert.equal(
+    rewriteViberootsLockEntry(
+      { type: "path", path: `/nix/store/${"3".repeat(32)}-unrelated` },
+      activeSource,
+    ),
+    false,
+  );
+});
 
 test("runInTemp rewrites only the local viberoots lock path to its active temp source", async () => {
   const repoRoot = process.cwd();

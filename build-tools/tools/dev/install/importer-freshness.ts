@@ -74,7 +74,7 @@ async function readJsonFile(absPath: string): Promise<Record<string, string>> {
 
 async function readHashForLockfile(repoRoot: string, lockfileRel: string): Promise<string> {
   const candidates = [
-    path.join(repoRoot, "projects", "node-modules.hashes.json"),
+    path.join(repoRoot, "projects", "config", "node-modules.hashes.json"),
     path.join(repoRoot, "build-tools", "tools", "nix", "node-modules.hashes.json"),
     path.join(repoRoot, "viberoots", "build-tools", "tools", "nix", "node-modules.hashes.json"),
     path.join(

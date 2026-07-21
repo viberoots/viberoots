@@ -46,7 +46,7 @@ test(
       );
       assert.equal(wasmManifest.modules.length, 0);
       assert.equal(wasmManifest.defaultModuleKey, "");
-      await reconcileTempDependencyInputs(tmp, $);
+      await reconcileTempDependencyInputs(tmp, _$);
       await pnpmInstallForDevTest({
         tmp,
         _$,

@@ -10,7 +10,7 @@ test("cpp providers sync is a no-op (no TARGETS.cpp.auto header)", async () => {
     // Remove any pre-existing committed file in the temp copy
     await fsp.rm(out, { force: true });
     // Invoke provider sync for cpp only (should be a no-op)
-    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang=cpp`;
+    await $`node viberoots/build-tools/tools/buck/sync-providers.ts --lang=cpp --no-glue`;
     let exists = false;
     try {
       await fsp.access(out);

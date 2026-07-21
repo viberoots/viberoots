@@ -158,7 +158,7 @@ test(
       await $`scaf new ts webapp-ssr-next ${nextApp} --yes --no-tests --skip-lockfile-gen`;
       await assertNextContractFiles(tmp, nextApp);
       await assertPackageScriptsAndLabels(tmp, "webapp-ssr-next", "next", nextApp);
-      await reconcileTempDependencyInputs(tmp, $);
+      await reconcileTempDependencyInputs(tmp, _$);
       await runNextRuntimeSmoke(tmp, 'data-ssr-marker="next"', _$, nextApp);
     });
   },

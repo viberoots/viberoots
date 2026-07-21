@@ -2,6 +2,7 @@
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 // current-contract: Sparse checkout — ensure a lib with local patches builds and tests in a minimal repo
 test("sparse checkout: go lib with local patches builds and tests", async () => {
@@ -50,8 +51,11 @@ chmod +x ${stubPath}
     const patchDir = path.join(tmp, "projects", "libs", "demo-lib", "patches", "go");
     await $`mkdir -p ${patchDir}`;
     await $`bash --noprofile --norc -c 'printf "# sparse noop patch\n" > ${patchDir}/example.com__placeholder@v0.0.0.patch'`;
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
 
     // Build the library target directly in sparse context
-    await $`buck2 build //projects/libs/demo-lib:demo-lib --target-platforms //:no_cgo`;
+    await $({
+      env: graphEnv,
+    })`buck2 build //projects/libs/demo-lib:demo-lib --target-platforms //:no_cgo`;
   });
 });

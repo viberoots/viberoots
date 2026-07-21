@@ -6,7 +6,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { ensureBuckConfigForTempRepo } from "./test-helpers/buck-config";
 
-test("temp repo buck config propagates shared pnpm hash cache root into actions", async () => {
+test("temp repo buck config keeps host paths out of workspace flake state", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "buck-config-shared-pnpm-cache-"));
   const durableRoot = path.join(tmp, "durable-cache-root");
   const prevSharedRoot = process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT;
@@ -25,14 +25,8 @@ test("temp repo buck config propagates shared pnpm hash cache root into actions"
       path.join(tmp, ".viberoots", "workspace", "buck", "workspace-root.env"),
       "utf8",
     );
-    assert.match(
-      workspaceRootEnv,
-      new RegExp(
-        `^VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT=${durableRoot.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
-        "m",
-      ),
-      "workspace-root.env must preserve the durable shared pnpm hash cache root",
-    );
+    assert.doesNotMatch(workspaceRootEnv, new RegExp(tmp.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.doesNotMatch(workspaceRootEnv, /WORKSPACE_ROOT=|VIBEROOTS_ROOT=|ZX_INIT=/);
   } finally {
     if (prevSharedRoot === undefined) delete process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT;
     else process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = prevSharedRoot;

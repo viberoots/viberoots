@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 test("patch-python apply writes canonical patch and refreshes glue", async () => {
   await runInTemp("patch-python-apply", async (tmp, $) => {
@@ -18,11 +19,13 @@ test("patch-python apply writes canonical patch and refreshes glue", async () =>
     const origin = path.join(tmp, "pycache", "requests-2.32.3");
     await fs.mkdirp(origin);
     await fs.writeFile(path.join(origin, "readme.txt"), "A\n", "utf8");
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
 
     // Start a Python patch session
     await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
     const wsOut = await $({
       cwd: tmp,
+      env: graphEnv,
     })`NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
     })} NIX_PY_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg start python requests --importer ${importer}`;
@@ -36,6 +39,7 @@ test("patch-python apply writes canonical patch and refreshes glue", async () =>
     // Apply patch (importer-local directory for Python)
     await $({
       cwd: tmp,
+      env: graphEnv,
     })`NIX_PY_TEST_RESOLVE_JSON=${JSON.stringify({
       requests: { version: "2.32.3", originPath: origin },
     })} NIX_PY_DEV_OVERRIDE_JSON={} viberoots/build-tools/tools/bin/patch-pkg apply python requests --importer ${importer}`;

@@ -7,14 +7,15 @@ import {
   parseSelectedBuildOutPath,
   selectedNixBuildArgs,
 } from "../../dev/build-selected-nix-command";
-import { buildToolsRoot, buildToolPath } from "../../dev/dev-build/paths";
+import { artifactNixPolicyArgs } from "../../lib/artifact-nix-policy";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 function sourceFile(rel: string): string {
-  return buildToolPath(process.cwd(), rel);
+  return viberootsSourcePath(path.join("viberoots", "build-tools", rel));
 }
 
 function sourceRootFile(rel: string): string {
-  return path.join(path.resolve(buildToolsRoot(process.cwd()), ".."), rel);
+  return viberootsSourcePath(path.join("viberoots", rel));
 }
 
 test("build-selected runs node patch requirement preflight", async () => {
@@ -35,7 +36,7 @@ test("build-selected runs node patch requirement preflight", async () => {
   if (!txt.includes("withoutEvaluationSelectors")) {
     throw new Error(`${file} must strip former selectors before Nix evaluation`);
   }
-  if (!txt.includes("runMain(main)")) {
+  if (!txt.includes("runMain(async () => await main(artifactToolsRoot))")) {
     throw new Error(`${file} must use the shared runMain entrypoint`);
   }
   if (txt.includes("import.meta.url === `file://${process.argv[1]}`")) {
@@ -89,6 +90,7 @@ test("build-selected constructs selected nix build argv with no-link for normal 
   assert.deepEqual(selectedNixBuildArgs({ flakeRef: "path:/repo#graph-generator-selected" }), [
     "nix",
     "build",
+    ...artifactNixPolicyArgs(),
     "--no-write-lock-file",
     "--option",
     "eval-cache",
@@ -103,6 +105,7 @@ test("build-selected constructs selected nix build argv with no-link for normal 
     [
       "nix",
       "build",
+      ...artifactNixPolicyArgs(),
       "--no-write-lock-file",
       "--option",
       "eval-cache",

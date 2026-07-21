@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { REVIEWED_PUBLIC_KEYS, REVIEWED_SUBSTITUTERS } from "../../lib/artifact-nix-policy";
 import { runInTemp } from "../lib/test-helpers";
 
 test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async () => {
@@ -12,7 +13,7 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
-        'load("@viberoots//build-tools/lang:nix_shell.bzl", "escape_buck_cmd_subst")',
+        'load("@viberoots//build-tools/lang:nix_shell.bzl", "escape_buck_cmd_subst", "nix_build_out_path_cmd")',
         'load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_shell_prefix_core", "nix_action_export_graph_cmd", "nix_action_build_selected_out_path_cmd")',
         "",
         "genrule(",
@@ -21,7 +22,8 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
         "  cmd = escape_buck_cmd_subst(",
         "    nix_action_shell_prefix_core()",
         "    + nix_action_export_graph_cmd()",
-        '    + nix_action_build_selected_out_path_cmd("//projects/apps/probe:probe", zx_wrapper = "path:$FLK_ROOT#zx-wrapper")',
+        '    + nix_action_build_selected_out_path_cmd("//projects/apps/probe:probe")',
+        '    + nix_build_out_path_cmd(".#probe", timeout_var = "")',
         '    + "echo ok > $OUT"',
         "  ),",
         ")",
@@ -36,7 +38,7 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
       reject: false,
       nothrow: true,
     })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cmd //projects/apps/probe:probe`;
-    if (probe.exitCode !== 0) return;
+    assert.equal(probe.exitCode, 0, String(probe.stderr || probe.stdout || ""));
     const out = String(probe.stdout || "");
 
     const idxBootstrap = out.indexOf("export WORKSPACE_ROOT=");
@@ -62,12 +64,6 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
         out.includes(`${exportGraphPath}\\" --out`),
       "expected export-graph snippet to prefer direct node execution",
     );
-    assert.ok(
-      out.includes("path:$VIBEROOTS_ROOT#zx-wrapper") &&
-        out.includes(`${exportGraphPath}\\" --out`),
-      "expected export-graph nix fallback to use the viberoots flake source",
-    );
-
     const idxBuildSelected = out.indexOf(buildSelectedPath);
     assert.ok(
       idxBuildSelected > idxExportGraph,
@@ -75,24 +71,24 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
     );
 
     assert.ok(
-      out.includes("--accept-flake-config"),
-      "expected build-selected fallback invocation to pass --accept-flake-config",
-    );
-    assert.ok(
       out.includes(`VBR_NODE_ZX_INIT=\\"${zxInitPath}\\"`) &&
         out.includes("node --experimental-top-level-await") &&
-        out.includes(`${buildSelectedPath}\\"; else`),
-      "expected build-selected snippet to prefer direct node execution from VIBEROOTS_ROOT",
+        out.includes(
+          `${buildSelectedPath}\\" --target \\"//projects/apps/probe:probe\\" --attr graph-generator-selected --buck-action-inputs`,
+        ),
+      "expected build-selected to use explicit Buck action provenance",
     );
     assert.ok(
-      out.includes("ZX_WRAPPER_REF=") &&
-        out.includes('ZX_WRAPPER_REF=\\"path:$FLK_ROOT#zx-wrapper\\"') &&
-        !out.includes('if [ -f \\"$VIBEROOTS_ROOT/flake.nix\\" ]'),
-      "expected build-selected nix fallback to honor the caller-provided flake ref",
+      out.includes("env -u WORKSPACE_ROOT -u BUCK_TEST_SRC node"),
+      "expected ambient workspace selectors to be removed before canonical entry",
     );
     assert.ok(
-      out.includes('${TIMEOUT:+$TIMEOUT }nix run --accept-flake-config \\"$ZX_WRAPPER_REF\\"'),
-      "expected build-selected nix fallback to use the resolved wrapper flake",
+      out.includes("--workspace-root") &&
+        out.includes("--buck-test-src") &&
+        out.includes("--buck-graph-json") &&
+        out.includes("--artifact-tools-marker") &&
+        out.includes("--buck-action-state-root"),
+      "expected declared Buck selectors and owned state to cross the action boundary through argv",
     );
     assert.ok(
       out.includes("buck-out/tmp/build-selected"),
@@ -108,6 +104,11 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
       "expected build-selected stderr to avoid the global /tmp fallback",
     );
     assert.ok(out.includes("sed -E"), "expected build-selected out-path parsing to strip ANSI");
+    assert.ok(out.includes("--option substituters"), "expected exact action cache policy");
+    assert.ok(out.includes("--option trusted-public-keys"), "expected exact action key policy");
+    for (const value of [...REVIEWED_SUBSTITUTERS, ...REVIEWED_PUBLIC_KEYS]) {
+      assert.ok(out.includes(value), `expected reviewed action policy value ${value}`);
+    }
 
     assert.equal(
       out.includes("$WORKSPACE_ROOT/build-tools/tools/dev/zx-init.mjs"),

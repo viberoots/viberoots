@@ -32,6 +32,7 @@ import type {
   CloudflarePagesStaticDeployOptions,
   CloudflarePagesStaticSmokeRecord,
 } from "./cloudflare-pages-static-deploy-options";
+import { writeFailedCloudflarePagesStaticDeploy } from "./cloudflare-pages-static-deploy-failure";
 
 export async function runCloudflarePagesStaticDeploy(
   opts: CloudflarePagesStaticDeployOptions,
@@ -212,41 +213,18 @@ export async function runCloudflarePagesStaticDeploy(
     });
     return { record, recordPath: await writeCloudflarePagesDeployRecord(opts.recordsRoot, record) };
   } catch (error) {
-    const failedStep =
-      error && typeof error === "object" && "failedStep" in error && error.failedStep === "smoke"
-        ? "smoke"
-        : "publish";
-    const message = error instanceof Error ? error.message : String(error);
-    const record = createCloudflarePagesDeployRecord(opts.deployment, {
-      deployRunId: runId,
-      operationKind,
-      runClassification: operationKind,
-      publishMode,
-      finalOutcome: failedStep === "smoke" ? "smoke_failed_after_publish" : "publish_failed",
-      ...(opts.deployBatchId ? { deployBatchId: opts.deployBatchId } : {}),
-      ...(opts.parentRunId ? { parentRunId: opts.parentRunId } : {}),
-      ...(opts.releaseLineageId ? { releaseLineageId: opts.releaseLineageId } : {}),
-      artifactIdentity: opts.artifact.identity,
-      artifactStoredArtifactPath: opts.artifact.storedArtifactPath,
-      artifactProvenancePath: opts.artifact.provenancePath,
-      artifactLineageId: opts.artifactLineageId || opts.artifact.identity,
-      admittedContext: opts.admittedContext,
+    return await writeFailedCloudflarePagesStaticDeploy({
+      opts,
+      error,
       authority,
-      failedStep,
+      runId,
+      operationKind,
+      publishMode,
       effectiveRunTarget,
-      ...(opts.previewIdentitySelector
-        ? { previewIdentitySelector: opts.previewIdentitySelector }
-        : {}),
       deploymentMetadataFingerprint,
-      ...(executionPolicy ? { executionPolicy } : {}),
-      ...(providerConfigFingerprint ? { providerConfigFingerprint } : {}),
-      ...(replaySnapshotPath ? { replaySnapshotPath } : {}),
-      error: message,
-    });
-    const recordPath = await writeCloudflarePagesDeployRecord(opts.recordsRoot, record);
-    throw Object.assign(error instanceof Error ? error : new Error(message), {
-      record,
-      recordPath,
+      providerConfigFingerprint,
+      replaySnapshotPath,
+      executionPolicy,
     });
   }
 }

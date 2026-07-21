@@ -1,9 +1,17 @@
 import path from "node:path";
-import type { ArtifactBuildClassification, ArtifactJobPurpose } from "../lib/artifact-build-policy";
+import {
+  assertArtifactClassificationAdmitted,
+  type ArtifactBuildClassification,
+  type ArtifactJobPurpose,
+} from "../lib/artifact-build-policy";
 import { targetPackageFromLabel } from "../lib/artifact-source-inventory";
 import { admitArtifactContext, inspectWorkspaceArtifactSource } from "./artifact-policy-inspection";
 import { makeFilteredFlakeRef } from "./filtered-flake";
 import { evaluationBundleHasLanguageOverrides } from "./evaluation-bundle-selectors";
+import {
+  buildArtifactEnvironment,
+  withoutArtifactEnvironmentInfluence,
+} from "../lib/artifact-environment";
 
 function isLikelyTempWorkspace(workspaceRoot: string): boolean {
   const workspaceAbs = path.resolve(workspaceRoot);
@@ -21,15 +29,35 @@ export async function chooseRunnableFlakeRef(opts: {
   sourceMode: "auto" | "git" | "path";
   attr: "graph-generator" | "graph-generator-selected";
   purpose: ArtifactJobPurpose;
+  artifactToolsRoot: string;
 }): Promise<{
   flakeRef: string;
   classification: ArtifactBuildClassification;
   workspaceRoot?: string;
+  bundleDigest: string;
   cleanup?: () => Promise<void>;
 }> {
+  const pathSource =
+    opts.sourceMode === "path" ||
+    (opts.sourceMode === "auto" && isLikelyTempWorkspace(opts.workspaceRoot));
+  if (pathSource) {
+    assertArtifactClassificationAdmitted({
+      classification: "local-development",
+      purpose: opts.purpose,
+      impureEvaluation: false,
+    });
+  }
+  const baseEnv = withoutArtifactEnvironmentInfluence(process.env);
+  const artifactEnv = buildArtifactEnvironment({
+    baseEnv,
+    mode: String(process.env.CI || "").trim() ? "ci" : "local",
+    stateRoot: path.join(opts.workspaceRoot, "buck-out", "tmp", "artifact-environment"),
+    workspaceRoot: opts.workspaceRoot,
+    artifactToolsRoot: opts.artifactToolsRoot,
+    internal: opts.target ? { BUCK_TARGET: opts.target, WORKSPACE_ROOT: opts.workspaceRoot } : {},
+  });
   const targetPackages = opts.target ? [targetPackageFromLabel(opts.target)].filter(Boolean) : [];
   let classification: ArtifactBuildClassification;
-  const pathSource = opts.sourceMode === "path" || isLikelyTempWorkspace(opts.workspaceRoot);
   const languageOverrides = evaluationBundleHasLanguageOverrides(process.env);
 
   if (pathSource) {
@@ -38,6 +66,7 @@ export async function chooseRunnableFlakeRef(opts: {
     const inventory = await inspectWorkspaceArtifactSource({
       workspaceRoot: opts.workspaceRoot,
       targetPackages,
+      env: artifactEnv,
     });
     classification =
       languageOverrides || (opts.sourceMode !== "git" && inventory.localDevelopment)
@@ -54,7 +83,10 @@ export async function chooseRunnableFlakeRef(opts: {
     purpose: opts.purpose,
     impureEvaluation: false,
     workspaceRoot: opts.workspaceRoot,
+    internal: opts.target ? { BUCK_TARGET: opts.target, WORKSPACE_ROOT: opts.workspaceRoot } : {},
     toolNames: ["git"],
+    env: baseEnv,
+    artifactToolsRoot: opts.artifactToolsRoot,
   });
 
   const filtered = await makeFilteredFlakeRef({
@@ -63,11 +95,14 @@ export async function chooseRunnableFlakeRef(opts: {
     logPrefix: "[run-runnable]",
     target: opts.target,
     classification,
+    env: artifactEnv,
+    selectorEnv: process.env,
   });
   return {
     flakeRef: filtered.flakeRef,
     classification,
     workspaceRoot: filtered.workspaceRoot,
+    bundleDigest: filtered.bundleDigest,
     cleanup: filtered.cleanup,
   };
 }

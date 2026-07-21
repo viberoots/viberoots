@@ -35,6 +35,7 @@ export async function startVerifyPass(opts: {
   onProgressStart: (name: string) => void;
   onProgressUpdate: (name: string, state: { completed: number; failed: number }) => void;
   onProgressStop: (name: string, status: number) => void;
+  artifactToolsRoot: string;
 }): Promise<{ pgid: number; wait: () => Promise<number> } | null> {
   if (opts.shouldAbort()) return null;
   const passAnalysisDir = path.join(opts.analysisDir, `pass-${opts.passIndex + 1}`);
@@ -63,6 +64,7 @@ export async function startVerifyPass(opts: {
     executionPolicy: executionPolicyForVerifyPass(opts.executionPolicy, opts.pass.name),
     exactOverallTimeoutSecs: opts.exactOverallTimeoutSecs,
     suppressFailureOutputTail: opts.suppressFailureOutputTail,
+    artifactToolsRoot: opts.artifactToolsRoot,
     onProgressStart: opts.onProgressStart,
     onProgressUpdate: opts.onProgressUpdate,
     onProgressStop: opts.onProgressStop,

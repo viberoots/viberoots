@@ -7,6 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 
 const GLOBAL_INPUT_MARKERS = [
   ":flake.lock",
+  ":node-modules.hashes.json",
   ":nixpkgs_source_registry",
   ":nixpkgs-source-registry-extension",
 ];
@@ -14,7 +15,10 @@ const GLOBAL_INPUT_MARKERS = [
 test("node_webapp includes global Nix inputs as genrule srcs (action inputs)", async () => {
   await runInTemp("node-webapp-global-inputs-srcs", async (tmp, $) => {
     const dir = path.join(tmp, "projects", "apps", "web");
-    await fsp.mkdir(dir, { recursive: true });
+    await fsp.mkdir(path.join(dir, "src"), { recursive: true });
+    await fsp.writeFile(path.join(dir, "src", "index.ts"), "export {};\n", "utf8");
+    await fsp.writeFile(path.join(dir, "package.json"), '{"name":"web"}\n', "utf8");
+    await fsp.writeFile(path.join(dir, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n", "utf8");
     await fsp.writeFile(
       path.join(dir, "TARGETS"),
       [
@@ -39,6 +43,12 @@ test("node_webapp includes global Nix inputs as genrule srcs (action inputs)", a
     const out = String(probe.stdout || "");
     for (const marker of GLOBAL_INPUT_MARKERS) {
       assert.ok(out.includes(marker), `expected ${marker} in srcs via global_nix_inputs()`);
+    }
+    for (const relative of ["src/index.ts", "package.json", "pnpm-lock.yaml"]) {
+      assert.ok(
+        out.includes(`projects/apps/web/${relative}`),
+        `expected importer-layout action input for ${relative}`,
+      );
     }
 
     const labelsProbe = await $({

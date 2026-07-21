@@ -7,7 +7,11 @@ import path from "node:path";
 import { test } from "node:test";
 import { promisify } from "node:util";
 import { writeGlueFingerprint } from "../../dev/install/glue-freshness";
+import { derivePostCloneWorkspaceLock } from "../../lib/post-clone-workspace-lock";
+import { workspaceFlakeInputs } from "../../lib/workspace-flake-inputs";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
+import { prepareFilteredViberootsInput } from "../lib/test-helpers/run-in-temp/filtered-inputs";
+import { ensureToolchainPathsForTempRepo } from "../lib/test-helpers/toolchain-paths";
 
 const execFileAsync = promisify(execFile);
 
@@ -30,9 +34,26 @@ test("stale install fails before Nix materialization and u remains available", a
   await fsp.mkdir(path.join(root, "projects"), { recursive: true });
   await fsp.mkdir(path.join(root, "fake-bin"), { recursive: true });
   await fsp.symlink(sourceRoot, path.join(root, ".viberoots", "current"));
+  const immutableSource = await prepareFilteredViberootsInput(sourceRoot);
+  const consumerRoot = path.dirname(sourceRoot);
   await fsp.writeFile(path.join(root, ".buckroot"), ".\n");
   await fsp.writeFile(path.join(root, ".gitignore"), ".viberoots/workspace/\n");
-  await fsp.writeFile(path.join(root, "flake.nix"), "{ outputs = _: {}; }\n");
+  await fsp.copyFile(path.join(consumerRoot, "flake.nix"), path.join(root, "flake.nix"));
+  await fsp.copyFile(path.join(consumerRoot, "flake.lock"), path.join(root, "flake.lock"));
+  await fsp.writeFile(
+    path.join(root, ".viberoots", "workspace", "flake.nix"),
+    `{\n${workspaceFlakeInputs(`path:${immutableSource.storePath}`)}\n\n  outputs = inputs: inputs.viberoots.lib.mkWorkspace {\n    workspaceSrc = ../..;\n    viberootsInput = inputs.viberoots;\n    workspaceName = "stale-install-fixture";\n  };\n}\n`,
+  );
+  const workspaceLock = derivePostCloneWorkspaceLock({
+    rootLockText: await fsp.readFile(path.join(root, "flake.lock"), "utf8"),
+    workspaceFlakeDir: path.join(root, ".viberoots", "workspace"),
+    localInputPath: immutableSource.storePath,
+  });
+  await fsp.writeFile(
+    path.join(root, ".viberoots", "workspace", "flake.lock"),
+    `${JSON.stringify(workspaceLock, null, 2)}\n`,
+  );
+  await ensureToolchainPathsForTempRepo(root, $);
   await fsp.writeFile(
     path.join(root, "build-tools", "tools", "nix", "langs.json"),
     '{"enabled":["cpp"]}\n',

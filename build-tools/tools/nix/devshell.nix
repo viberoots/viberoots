@@ -6,6 +6,7 @@
 }:
 let
   zx-wrapper = import ./lib/zx-wrapper.nix { inherit pkgs; };
+  pnpm11 = import ./pnpm-11.nix { inherit pkgs; };
   viberootsCommand = import ./packages/viberoots-command.nix {
     inherit pkgs zx-wrapper version releaseTag;
     viberootsSrc = viberootsRoot;
@@ -253,7 +254,14 @@ EOF
         else
           vbr_flake_input_root="''${VIBEROOTS_FLAKE_INPUT_ROOT:-}"
           vbr_filtered_input="$PWD/.viberoots/workspace/viberoots-flake-input"
-          if [ -n "$vbr_flake_input_root" ] && [ -f "$vbr_flake_input_root/flake.nix" ]; then
+          if [ "''${VBR_DEVSHELL_USE_GENERATED_AUTHORITY:-}" != "1" ]; then
+            unset VIBEROOTS_ROOT
+            unset VIBEROOTS_SOURCE_ROOT
+            viberoots init-workspace --shell-entry >/dev/null || {
+              echo "(devShell) viberoots workspace activation failed" >&2
+              return 1 2>/dev/null || exit 1
+            }
+          elif [ -n "$vbr_flake_input_root" ] && [ -f "$vbr_flake_input_root/flake.nix" ]; then
             vbr_source_root="''${VIBEROOTS_SOURCE_ROOT:-$vbr_flake_input_root}"
             if [ -d "$PWD/viberoots" ] && [ -d "$vbr_filtered_input" ] && [ "$(cd "$vbr_source_root" 2>/dev/null && pwd -P || true)" = "$(cd "$vbr_filtered_input" 2>/dev/null && pwd -P || true)" ]; then
               vbr_source_root="$PWD/viberoots"
@@ -268,10 +276,10 @@ EOF
               return 1 2>/dev/null || exit 1
             }
           elif vbr_flake_input_root="$(_vbr_declared_local_input_root)"; then
-            export VIBEROOTS_FLAKE_INPUT_ROOT="$vbr_flake_input_root"
-            export VIBEROOTS_ROOT="$vbr_flake_input_root"
-            export VIBEROOTS_SOURCE_ROOT="$vbr_flake_input_root"
-            viberoots init-workspace --shell-entry --source "$vbr_flake_input_root" >/dev/null || {
+            VIBEROOTS_FLAKE_INPUT_ROOT="$vbr_flake_input_root" \
+              VIBEROOTS_ROOT="$vbr_flake_input_root" \
+              VIBEROOTS_SOURCE_ROOT="$vbr_flake_input_root" \
+              viberoots init-workspace --shell-entry --source "$vbr_flake_input_root" >/dev/null || {
               echo "(devShell) viberoots workspace activation failed" >&2
               return 1 2>/dev/null || exit 1
             }
@@ -297,6 +305,11 @@ EOF
       fi
       _vbr_prepare_tool_helpers
       _vbr_apply_dev_path
+      unset VIBEROOTS_FLAKE_INPUT_ROOT
+      if [ -f "$VIBEROOTS_ROOT/build-tools/tools/bin/artifact-ingress-env.sh" ]; then
+        . "$VIBEROOTS_ROOT/build-tools/tools/bin/artifact-ingress-env.sh"
+        artifact_ingress_record_devshell_selectors
+      fi
 
       # Prepare zsh/bash env for completions and aliases
       mkdir -p .nix-zsh
@@ -421,7 +434,7 @@ EOF
       # .viberoots/current/prelude; do not recreate a visible root prelude shim.
     '';
     buildInputs = [
-      pkgs.git pkgs.nix pkgs.buck2 pkgs.go pkgs.pnpm pkgs.nodejs_22 pkgs.python3 pkgs.uv zx-wrapper viberootsCommand pkgs.jq pkgs.rsync pkgs.copier pkgs.yq pkgs.prettier
+      pkgs.git pkgs.nix pkgs.buck2 pkgs.go pnpm11 pkgs.nodejs_22 pkgs.python3 pkgs.uv zx-wrapper viberootsCommand pkgs.jq pkgs.rsync pkgs.copier pkgs.yq pkgs.prettier
       pkgs.jc pkgs.bash pkgs.coreutils pkgs.gomod2nix pkgs.opentofu pkgs.infisical pkgs.awscli2 pkgs.dnsutils
       pkgs.openssl pkgs.postgresql_16
     ] ++ (if pkgs.stdenv.isDarwin then [ agent-safehouse ] else [])

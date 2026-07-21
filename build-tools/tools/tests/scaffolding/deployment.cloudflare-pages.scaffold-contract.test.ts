@@ -8,6 +8,7 @@ import { nodesFromCqueryJson } from "../../buck/exporter/cquery/nodes";
 import { extractDeployments } from "../../deployments/contract";
 import { DEPLOYMENT_CQUERY_ATTRS } from "../../deployments/deployment-query-attrs";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 async function writeDefaults(tmp: string): Promise<void> {
   await fsp.writeFile(
@@ -38,6 +39,7 @@ test("deployment/cloudflare-pages scaffold renders provider config and metadata"
   await runInTemp("deployment-cloudflare-pages-scaffold", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     await scaffoldCloudflarePages(tmp, $);
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
 
     const deploymentRoot = path.join(tmp, "projects/deployments/demo-pages");
     assert.equal(
@@ -53,8 +55,8 @@ test("deployment/cloudflare-pages scaffold renders provider config and metadata"
     const query =
       "set(//projects/deployments/demo-pages:deploy //projects/apps/demo:app //projects/deployments:defaults //projects/deployments/demo-shared:lane_governance //projects/deployments/demo-shared:lane //projects/deployments/demo-shared:dev_release)";
     const cquery = await $({
-      env: { ...process.env, HOME: process.env.BUCK2_REAL_HOME || process.env.HOME },
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-cloudflare-pages-scaffold")} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`;
+      env: { ...graphEnv, HOME: process.env.BUCK2_REAL_HOME || process.env.HOME },
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-cloudflare-pages-scaffold", graphEnv)} cquery --target-platforms prelude//platforms:default ${query} --json ${attrFlags}`;
     const { deployments, errors } = extractDeployments(
       nodesFromCqueryJson(JSON.parse(String(cquery.stdout || "{}"))),
     );
@@ -102,6 +104,7 @@ test("generated cloudflare-pages deployment fails validate-only on wrangler conf
   await runInTemp("deployment-cloudflare-pages-config-validation", async (tmp, _$) => {
     const $ = _$({ cwd: tmp, stdio: "pipe" });
     await scaffoldCloudflarePages(tmp, $);
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
     const deployment = "//projects/deployments/demo-pages:deploy";
     const wranglerPath = path.join(tmp, "projects/deployments/demo-pages/wrangler.jsonc");
 
@@ -109,7 +112,9 @@ test("generated cloudflare-pages deployment fails validate-only on wrangler conf
       await fsp.rm(wranglerPath);
       await assert.rejects(
         async () =>
-          await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment} --validate-only`,
+          await $({
+            env: graphEnv,
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment} --validate-only`,
         /cloudflare-pages provider config not found.*wrangler\.jsonc/,
       );
     });
@@ -118,7 +123,9 @@ test("generated cloudflare-pages deployment fails validate-only on wrangler conf
       await fsp.writeFile(wranglerPath, '{ "compatibility_date": ', "utf8");
       await assert.rejects(
         async () =>
-          await $`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment} --validate-only`,
+          await $({
+            env: graphEnv,
+          })`zx-wrapper ${viberootsToolScript("build-tools/tools/deployments/deploy.ts")} --deployment ${deployment} --validate-only`,
         /invalid wrangler config/,
       );
     });

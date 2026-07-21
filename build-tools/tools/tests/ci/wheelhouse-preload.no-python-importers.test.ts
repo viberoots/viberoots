@@ -2,6 +2,7 @@
 import { test } from "node:test";
 import path from "node:path";
 import * as fsp from "node:fs/promises";
+import { withoutArtifactEnvironmentInfluence } from "../../lib/artifact-environment";
 import { runInTemp } from "../lib/test-helpers";
 
 async function writeMinimalBuckConfig(tmp: string) {
@@ -52,7 +53,7 @@ test("wheelhouse-preload: no python importers → no-op and success", async () =
     const rc = await $({
       cwd: tmp,
       stdio: "inherit",
-      env: { ...process.env },
+      env: withoutArtifactEnvironmentInfluence(process.env),
     })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/ci/run-stage.ts --stage wheelhouse-preload`.nothrow();
     if (rc.exitCode !== 0) {
       console.error("wheelhouse-preload stage failed unexpectedly without python importers");

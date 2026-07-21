@@ -6,6 +6,7 @@ import type { RunInTempCallback, SeededTempSetup } from "./contracts";
 import { prepareOptionalDevEnv } from "./dev-env";
 import { withTempProcessEnv } from "./process-env";
 import { buildSeededRuntimeEnv } from "./runtime-env";
+import { registerTempCommandEnvironment } from "./dependency-reconcile";
 
 export async function runPreparedSeededTemp<T>(
   setup: SeededTempSetup,
@@ -22,6 +23,7 @@ export async function runPreparedSeededTemp<T>(
       const runtime = await buildSeededRuntimeEnv(setup, devEnv.envOut);
       tempPnpmStateRoot = runtime.tempPnpmStateRoot;
       cleanupCommand = $({ cwd: setup.tmp, env: runtime.exportEnv });
+      registerTempCommandEnvironment(cleanupCommand, setup.tmp, runtime.exportEnv);
       await timeAsync(
         "buck-daemon-reaper setup",
         async () => await ensureBuckReaperStarted(setup.tmp, cleanupCommand),

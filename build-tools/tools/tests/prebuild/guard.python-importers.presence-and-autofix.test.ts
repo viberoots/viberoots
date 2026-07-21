@@ -4,20 +4,21 @@ import path from "node:path";
 import { test } from "node:test";
 import {
   DEFAULT_AUTO_MAP_PATH,
-  DEFAULT_GRAPH_PATH,
   DEFAULT_INVALIDATION_REPORT_PATH,
   DEFAULT_NODE_LOCK_INDEX_PATH,
   providerAutoTargetsPath,
 } from "../../lib/workspace-state-paths";
 import { exists, runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 test("prebuild-guard: flags missing Python importer providers and auto-fixes locally", async () => {
   await runInTemp("prebuild-python-importers", async (tmp, $) => {
     const providersDir = path.dirname(path.join(tmp, DEFAULT_AUTO_MAP_PATH));
     await fsp.mkdir(providersDir, { recursive: true });
-    await fsp.mkdir(path.dirname(path.join(tmp, DEFAULT_GRAPH_PATH)), { recursive: true });
-    // Minimal glue outputs (graph + auto_map) present
-    await fsp.writeFile(path.join(tmp, DEFAULT_GRAPH_PATH), "[]\n", "utf8");
+    await fsp.mkdir(path.dirname(path.join(tmp, DEFAULT_NODE_LOCK_INDEX_PATH)), {
+      recursive: true,
+    });
+    // Minimal non-graph glue outputs are present; the graph fixture is reconciled below.
     await fsp.writeFile(path.join(tmp, DEFAULT_NODE_LOCK_INDEX_PATH), "{}\n", "utf8");
     await fsp.writeFile(
       path.join(tmp, DEFAULT_INVALIDATION_REPORT_PATH),
@@ -46,17 +47,20 @@ test("prebuild-guard: flags missing Python importer providers and auto-fixes loc
     // Initialize git so presence scan discovers uv.lock via git ls-files
     await $({ cwd: tmp })`git init`;
     await $({ cwd: tmp })`git add ${path.relative(tmp, uvLockPath)}`;
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
 
     // Run guard in no-fix mode first (should not error locally)
-    const env = { ...process.env, PREBUILD_GUARD_NO_FIX: "1" };
+    const env = { ...graphEnv, PREBUILD_GUARD_NO_FIX: "1" };
     await $({
       cwd: tmp,
+      env: graphEnv,
       env,
     })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
 
     // Now allow auto-fix and re-run; guard should regenerate Python providers
     await $({
       cwd: tmp,
+      env: graphEnv,
     })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
     const txt = await fsp.readFile(targetsPy, "utf8");
     if (

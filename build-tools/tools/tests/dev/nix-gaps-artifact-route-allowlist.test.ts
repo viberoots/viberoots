@@ -5,10 +5,12 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
+import { inspectProductionCommandSites } from "../../dev/nix-gaps-command-sites";
 
 const scriptPath = "viberoots/build-tools/tools/dev/nix-gaps-inventory-check.ts";
 const scriptSourcePath = viberootsSourcePath(scriptPath);
 const exceptionsPath = "docs/handbook/nix-gaps-exceptions.json";
+const commandSitePolicyPath = "docs/handbook/nix-command-site-policy.json";
 
 const starlarkApi = `# Starlark API reference
 
@@ -88,15 +90,42 @@ const exceptionsWithoutAllowlist = `{
 }
 `;
 
+const defsPublicFixture = `def nix_node_cli_bin(name, **kwargs):
+    pass
+`;
+
+async function writePublicFixture(tmp: string): Promise<void> {
+  await fs.outputFile(path.join(tmp, "viberoots/build-tools/node/defs.bzl"), defsPublicFixture);
+  const policy = {
+    schemaVersion: 1 as const,
+    expectedCount: 0,
+    expectedDigest: "",
+    classificationRules: [
+      {
+        pathPattern: "^build-tools/",
+        role: "non-artifact-orchestration" as const,
+        justification: "Private allowlist fixture sites exercise checker behavior only.",
+      },
+    ],
+  };
+  const actual = await inspectProductionCommandSites(path.join(tmp, "viberoots"), policy);
+  await fs.outputJson(
+    path.join(tmp, commandSitePolicyPath),
+    { ...policy, expectedCount: actual.count, expectedDigest: actual.digest },
+    { spaces: 2 },
+  );
+}
+
 test("nix-gaps inventory check passes when mixed route is explicitly allowlisted", async () => {
   await runInTemp("nix-gaps-artifact-route-allowlist-pass", async (tmp, $) => {
     await fs.outputFile(path.join(tmp, scriptPath), await fs.readFile(scriptSourcePath, "utf8"));
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsMixedRoute);
     await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsWithMixedAllowlist);
+    await writePublicFixture(tmp);
     await $({
       cwd: tmp,
-    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath}`;
+    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath} --command-site-policy ${commandSitePolicyPath}`;
   });
 });
 
@@ -106,10 +135,11 @@ test("nix-gaps inventory check fails when mixed route is not allowlisted", async
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsMixedRoute);
     await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsWithoutAllowlist);
+    await writePublicFixture(tmp);
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath}`.nothrow();
+    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath} --command-site-policy ${commandSitePolicyPath}`.nothrow();
     assert.notEqual(res.exitCode, 0);
     assert.match(String(res.stderr || ""), /Missing artifact route allowlist entries/);
   });
@@ -121,10 +151,11 @@ test("nix-gaps inventory check fails on stale artifact allowlist entries", async
     await fs.outputFile(path.join(tmp, "docs/handbook/starlark-api.md"), starlarkApi);
     await fs.outputFile(path.join(tmp, "docs/handbook/nix-gaps.md"), nixGapsNoRouteGap);
     await fs.outputFile(path.join(tmp, exceptionsPath), exceptionsWithMixedAllowlist);
+    await writePublicFixture(tmp);
     const res = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath}`.nothrow();
+    })`node ${scriptPath} --starlark-api docs/handbook/starlark-api.md --nix-gaps docs/handbook/nix-gaps.md --exceptions ${exceptionsPath} --command-site-policy ${commandSitePolicyPath}`.nothrow();
     assert.notEqual(res.exitCode, 0);
     assert.match(String(res.stderr || ""), /Stale artifactRouteAllowlist entries/);
   });

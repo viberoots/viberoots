@@ -39,6 +39,7 @@ const ROOT_EXCLUDED_DIR_NAMES = new Set([
 ]);
 
 export const DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS = [
+  "projects/config/TARGETS",
   "viberoots/build-tools/lang/importer_roots.bzl",
   "viberoots/build-tools/lang/nix_attr_aliases.bzl",
   path.join(WORKSPACE_BUCK_STATE_DIR, ".buckconfig"),
@@ -61,7 +62,7 @@ export const DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS = [
   "viberoots/build-tools/tools/buck/node-lock-index.json",
   DEFAULT_NODE_WORKSPACE_MAP_PATH,
   "viberoots/build-tools/tools/nix/langs.nix",
-  "projects/node-modules.hashes.json",
+  "projects/config/node-modules.hashes.json",
 ] as const;
 
 function normalizeRelPath(relPath: string): string {

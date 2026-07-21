@@ -127,7 +127,6 @@ nix_go_tiny_wasm_lib(
       tmp,
       $,
       target: "//projects/libs/math-core:core_emscripten",
-      env: { PLANNER_ONLY_CPP: "1" },
     });
     // Probe artifact names (lib/<sanitized>.js/.wasm)
     const libDir = path.join(outEmsPath, "lib");

@@ -5,6 +5,10 @@ import { inferRunnableFromOutPath } from "../../lib/runnables";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { buildToolPath, nodeBin, zxNodeBase } from "./paths";
 import { runNixBuildWithProgress } from "../run-runnable-nix";
+import { withoutEvaluationSelectors } from "../evaluation-bundle-env";
+import { withoutArtifactEnvironmentInfluence } from "../../lib/artifact-environment-policy";
+
+type NixBuildRunner = typeof runNixBuildWithProgress;
 
 function materializeTimeoutSec(): number {
   const raw = String(process.env.VBR_MATERIALIZE_TIMEOUT_SEC || "").trim();
@@ -16,15 +20,18 @@ function materializeTimeoutSec(): number {
 async function nixBuildPrintOutPaths(opts: {
   root: string;
   env: Record<string, string>;
+  internal: Record<string, string>;
   args: string[];
   label: string;
+  runNixBuild: NixBuildRunner;
 }): Promise<string> {
   const prev = process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC;
   process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC = String(materializeTimeoutSec());
   try {
-    return await runNixBuildWithProgress({
+    return await opts.runNixBuild({
       workspaceRoot: opts.root,
       env: opts.env,
+      internal: opts.internal,
       args: opts.args,
       label: opts.label,
     });
@@ -108,6 +115,7 @@ export async function maybePrintImpureMaterializedBins(opts: {
   impure: boolean;
   subcmd: string;
   restArgs: string[];
+  runNixBuild?: NixBuildRunner;
 }): Promise<void> {
   const verbose = isVbrVerbose();
   const ui = createCommandUi({ verbose });
@@ -137,12 +145,14 @@ export async function maybePrintImpureMaterializedBins(opts: {
         const selectedFlakeRef = await graphGeneratorSelectedFlakeRef(opts.root);
         const stdout = await nixBuildPrintOutPaths({
           root: opts.root,
-          env: {
-            ...process.env,
+          env: withoutArtifactEnvironmentInfluence(
+            withoutEvaluationSelectors(process.env),
+          ) as Record<string, string>,
+          internal: {
             BUCK_TEST_SRC: opts.root,
             BUCK_GRAPH_JSON: graphPath,
             BUCK_TARGET: sel,
-          } as Record<string, string>,
+          },
           args: [
             "--impure",
             "--no-write-lock-file",
@@ -155,6 +165,7 @@ export async function maybePrintImpureMaterializedBins(opts: {
             "-L",
           ],
           label: `impure materialize selected target ${sel}`,
+          runNixBuild: opts.runNixBuild ?? runNixBuildWithProgress,
         });
         const outPath =
           String(stdout || "")

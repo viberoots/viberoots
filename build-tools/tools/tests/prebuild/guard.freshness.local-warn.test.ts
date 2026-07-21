@@ -3,48 +3,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 test("prebuild-guard: local auto-fix runs when stale", async () => {
   await runInTemp("prebuild-fresh-local", async (tmp, $) => {
-    // Ensure Buck mapping exists in temp repo
-    await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
-      printf '.\n' > .buckroot
-      cat > .buckconfig <<'EOF'
-[buildfile]
-name = TARGETS
-
-[repositories]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[cells]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbcode_stub
-config = ./prelude
-
-[build]
-prelude = prelude
-user_platform = prelude//platforms:default
-target_platforms = prelude//platforms:default
-EOF
-      mkdir -p toolchains
-      printf '[buildfile]\nname = TARGETS\n' > toolchains/.buckconfig
-    `}`;
     await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
-    await fsp.writeFile(
-      path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
-      "[]",
-      "utf8",
-    );
     await fsp.writeFile(
       path.join(tmp, ".viberoots", "workspace", "buck", "node-lock-index.json"),
       "{}\n",
@@ -66,10 +29,12 @@ EOF
       "utf8",
     );
     // Touch an input to be newer than outputs
-    await fsp.writeFile(path.join(tmp, "TARGETS"), "# touch\n", "utf8");
+    await fsp.appendFile(path.join(tmp, "TARGETS"), "# freshness input\n", "utf8");
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
     await $({
       cwd: tmp,
       stdio: "inherit",
+      env: graphEnv,
     })`node --experimental-strip-types --import ./viberoots/build-tools/tools/dev/zx-init.mjs viberoots/build-tools/tools/buck/prebuild-guard.ts`;
   });
 });

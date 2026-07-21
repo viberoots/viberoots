@@ -13,6 +13,7 @@ import type {
   CredentialSink,
 } from "../../deployments/infisical-iac-bootstrap-types";
 import { reviewedMetadata } from "./infisical-iac-bootstrap.fixture";
+import { fakeCredentialApi } from "./infisical-iac-bootstrap.identity-tofu.helpers";
 
 class MemorySink implements CredentialSink {
   values = new Map<string, string>();
@@ -65,10 +66,7 @@ test("bootstrap credential creates current-machine secret when local secret is m
   assert.deepEqual(credential.remoteClientSecretRecordSummaries, [
     { id: "secret_other", description: "teammate laptop", createdAt: undefined },
   ]);
-  assert.equal(
-    api.descriptions[0],
-    "example-repo bootstrap on dev-laptop",
-  );
+  assert.equal(api.descriptions[0], "example-repo bootstrap on dev-laptop");
 });
 
 test("bootstrap credential rotation creates and stores a new client secret", async () => {
@@ -84,11 +82,15 @@ test("bootstrap credential rotation creates and stores a new client secret", asy
   assert.equal(credential.clientSecret, "new-secret");
   assert.equal(credential.status, "rotated");
   assert.equal(
-    sink.values.get("secret://bootstrap/viberoots/viberoots-iac-bootstrap/infisical/universal-auth/client-id"),
+    sink.values.get(
+      "secret://bootstrap/viberoots/viberoots-iac-bootstrap/infisical/universal-auth/client-id",
+    ),
     "client-id",
   );
   assert.equal(
-    sink.values.get("secret://bootstrap/viberoots/viberoots-iac-bootstrap/infisical/universal-auth/client-secret"),
+    sink.values.get(
+      "secret://bootstrap/viberoots/viberoots-iac-bootstrap/infisical/universal-auth/client-secret",
+    ),
     "new-secret",
   );
 });
@@ -235,18 +237,3 @@ test("--no-tofu-apply stops after the saved plan", async () => {
   });
   assert.deepEqual(calls, ["init", "plan"]);
 });
-
-function fakeCredentialApi(opts: { remoteSecrets: unknown[]; clientSecret?: string }) {
-  return {
-    descriptions: [] as string[],
-    request: async function (method: string, endpoint: string, body?: { description?: string }) {
-      if (endpoint.endsWith("/client-secrets") && method === "GET")
-        return { clientSecrets: opts.remoteSecrets };
-      if (endpoint.endsWith("/client-secrets") && method === "POST") {
-        this.descriptions.push(body?.description || "");
-        return { clientSecret: opts.clientSecret ?? "new-secret" };
-      }
-      return { identityUniversalAuth: { clientId: "client-id" } };
-    },
-  };
-}

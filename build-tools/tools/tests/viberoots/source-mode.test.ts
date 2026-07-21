@@ -47,10 +47,15 @@ async function writeMinimalSourceTree(root: string): Promise<void> {
 function fakeNixForRemoteSource(remoteSource: string): string {
   return `#!/usr/bin/env bash
 case "$*" in
-  flake\\ update*|flake\\ lock*) exit 0 ;;
+  flake\\ update*|flake\\ lock*)
+    mkdir -p .viberoots/workspace
+    printf '%s\\n' '{"nodes":{},"root":"root","version":7}' > .viberoots/workspace/flake.lock
+    exit 0
+    ;;
   eval*) printf '%s\\n' ${JSON.stringify(remoteSource)}; exit 0 ;;
 esac
-exit 0
+printf 'unexpected fake nix invocation: %s\\n' "$*" >&2
+exit 2
 `;
 }
 

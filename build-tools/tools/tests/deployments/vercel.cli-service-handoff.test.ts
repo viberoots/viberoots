@@ -24,7 +24,7 @@ import {
   appendTargetsFragment,
   labelDir,
   labelName,
-  writeTargetsFragments,
+  writeReconciledTargetsFragments,
 } from "./deployment-targets.install.fragments";
 import { renderRequirementList, renderStringRecordList } from "./deployment-targets.install.render";
 import { sharedPolicyTargetsByDir } from "./deployment-targets.install.shared-policies";
@@ -98,7 +98,7 @@ async function installVercelTargets(tmp: string, deployment: VercelDeployment) {
       "",
     ],
   });
-  await writeTargetsFragments(tmp, fragments);
+  await writeReconciledTargetsFragments(tmp, fragments);
   const configDir = path.join(tmp, labelDir(deployment.label));
   await fsp.writeFile(path.join(configDir, "vercel-prebuilt.jsonc"), '{"mode":"prebuilt"}\n');
 }

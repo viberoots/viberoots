@@ -1,159 +1,135 @@
 import * as fsp from "node:fs/promises";
-import os from "node:os";
-import path from "node:path";
 import { allDevOverrideEnvNames } from "../lib/dev-override-envs";
-import { copyTree, type CopyFileCloneMode } from "../lib/copy-tree";
-import { inventoryBundleSource, type BundleFile } from "./evaluation-bundle-manifest";
+import type { CopyFileCloneMode } from "../lib/copy-tree";
+import type { BundleFile } from "./evaluation-bundle-manifest";
+import {
+  captureLanguageOverrides,
+  normalizedDevOverrideValues,
+  type DevOverrideValues,
+  type OverrideMap,
+} from "./evaluation-bundle-dev-overrides";
 
-type OverrideMap = Record<string, string>;
+export {
+  canonicalDevOverrideArg,
+  encodeEvaluationBundleDevOverrides,
+  evaluationBundleDevOverrides,
+  evaluationBundleHasLanguageOverrides,
+  withoutCanonicalDevOverrideArgs,
+  type DevOverrideValues,
+} from "./evaluation-bundle-dev-overrides";
 
-const rejectedOverrideSegments = new Set([
-  ".aws",
-  ".cache",
-  ".direnv",
-  ".env",
-  ".git-credentials",
-  ".git",
-  ".netrc",
-  ".next",
-  ".pnpm-store",
-  ".pypirc",
-  ".ssh",
-  ".vite",
-  ".wasm-producer",
-  "buck-out",
-  "coverage",
-  "dist",
-  "node_modules",
-]);
-const MAX_OVERRIDE_FILES = 50_000;
-const MAX_OVERRIDE_BYTES = 512 * 1024 * 1024;
+export type VerifySeedSelection = {
+  excludeCppReqs: boolean;
+  partialCloneGoOnly: boolean;
+  rsyncRoots: string[];
+};
 
-function containsPath(parent: string, child: string): boolean {
-  const relative = path.relative(parent, child);
-  return relative === "" || (!relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+export function evaluationBundleWasmBackend(
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv = {},
+): string {
+  const values: string[] = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = String(argv[index] || "");
+    if (token === "--wasm-backend") values.push(String(argv[++index] || "").trim());
+    else if (token.startsWith("--wasm-backend=")) values.push(token.slice(15).trim());
+  }
+  const envValue = String(env.WEB_WASM_BACKEND || "").trim();
+  const declared = [...values, ...(envValue ? [envValue] : [])];
+  if (new Set(declared).size > 1 || values.length > 1) {
+    throw new Error("conflicting wasm backend selectors");
+  }
+  if (declared.some((value) => value !== "wasi_single")) {
+    throw new Error("invalid wasm backend: expected wasi_single");
+  }
+  return declared[0] || "";
 }
 
-async function reviewedOverrideFiles(source: string, bundleRoot: string): Promise<BundleFile[]> {
-  if (containsPath(source, bundleRoot)) {
-    throw new Error(
-      `evaluation bundle override source contains the bundle staging root: ${source}`,
-    );
+export function withoutWasmBackendArgs(argv: readonly string[]): string[] {
+  const out: string[] = [];
+  for (let index = 0; index < argv.length; index += 1) {
+    const token = String(argv[index] || "");
+    if (token === "--wasm-backend") index += 1;
+    else if (!token.startsWith("--wasm-backend=")) out.push(token);
   }
-  const broadRoots = await Promise.all(
-    [path.parse(source).root, os.homedir(), os.tmpdir()].map(
-      async (candidate) => await fsp.realpath(candidate).catch(() => path.resolve(candidate)),
-    ),
-  );
-  if (broadRoots.includes(source)) {
-    throw new Error(`evaluation bundle override source is too broad: ${source}`);
-  }
-  const pending = [source];
-  let fileCount = 0;
-  let bytes = 0;
-  while (pending.length > 0) {
-    const dir = pending.pop()!;
-    for (const entry of await fsp.readdir(dir, { withFileTypes: true })) {
-      const absolute = path.join(dir, entry.name);
-      const relative = path.relative(source, absolute).split(path.sep).join("/");
-      if (rejectedOverrideSegments.has(entry.name) || entry.name.startsWith(".env.")) {
-        throw new Error(`evaluation bundle override source contains excluded path: ${relative}`);
-      }
-      if (entry.isDirectory()) {
-        pending.push(absolute);
-        continue;
-      }
-      fileCount += 1;
-      if (fileCount > MAX_OVERRIDE_FILES) {
-        throw new Error(
-          `evaluation bundle override source exceeds ${MAX_OVERRIDE_FILES} files: ${source}`,
-        );
-      }
-      if (entry.isFile()) bytes += (await fsp.lstat(absolute)).size;
-      if (bytes > MAX_OVERRIDE_BYTES) {
-        throw new Error(`evaluation bundle override source exceeds 512 MiB: ${source}`);
-      }
+  return out;
+}
+
+function enabledBooleanSelector(envName: string, raw: string | undefined): boolean {
+  const value = String(raw || "").trim();
+  if (value === "" || value === "0") return false;
+  if (value === "1") return true;
+  throw new Error(`invalid ${envName} for evaluation bundle: expected 0 or 1`);
+}
+
+function captureVerifySeedSelection(env: NodeJS.ProcessEnv): VerifySeedSelection {
+  const roots = String(env.TEST_RSYNC_ROOTS || "")
+    .trim()
+    .split(/[,\s]+/u)
+    .filter(Boolean)
+    .map((root) => root.replace(/^\/+/, "").replace(/\/+$/, ""));
+  for (const root of roots) {
+    if (
+      !root ||
+      root.includes("\\") ||
+      root.split("/").some((segment) => segment === "" || segment === "." || segment === "..")
+    ) {
+      throw new Error(`invalid TEST_RSYNC_ROOTS for evaluation bundle: ${root || "<empty>"}`);
     }
   }
-  return await inventoryBundleSource(source);
-}
-
-function parseOverrideMap(envName: string, raw: string): OverrideMap {
-  if (!raw.trim()) return {};
-  let value: unknown;
-  try {
-    value = JSON.parse(raw);
-  } catch (error) {
-    throw new Error(`invalid ${envName}: expected a JSON object`, { cause: error });
-  }
-  if (!value || Array.isArray(value) || typeof value !== "object") {
-    throw new Error(`invalid ${envName}: expected a JSON object`);
-  }
-  const entries = Object.entries(value as Record<string, unknown>);
-  if (entries.some(([key, source]) => !key || typeof source !== "string" || !source.trim())) {
-    throw new Error(`invalid ${envName}: keys and source paths must be non-empty strings`);
-  }
-  return Object.fromEntries(entries.map(([key, source]) => [key, path.resolve(String(source))]));
-}
-
-export function evaluationBundleHasLanguageOverrides(env: NodeJS.ProcessEnv): boolean {
-  return allDevOverrideEnvNames().some(
-    (envName) => Object.keys(parseOverrideMap(envName, String(env[envName] || ""))).length > 0,
-  );
+  return {
+    excludeCppReqs: enabledBooleanSelector("TEST_EXCLUDE_CPP_REQS", env.TEST_EXCLUDE_CPP_REQS),
+    partialCloneGoOnly: enabledBooleanSelector(
+      "TEST_PARTIAL_CLONE_GO_ONLY",
+      env.TEST_PARTIAL_CLONE_GO_ONLY,
+    ),
+    rsyncRoots: [...new Set(roots)].sort(),
+  };
 }
 
 export async function captureEvaluationBundleSelectors(opts: {
   bundleRoot: string;
   env: NodeJS.ProcessEnv;
+  devOverrides?: DevOverrideValues;
   copyMode: CopyFileCloneMode;
+  wasmBackend?: string;
+  onlyCpp?: boolean;
+  coverage?: boolean;
 }): Promise<{
   languageOverrides: Record<string, OverrideMap>;
   onlyCpp: boolean;
   overrideFiles: BundleFile[];
+  verifySeed: VerifySeedSelection;
   wasmBackend: string;
+  coverage: boolean;
 }> {
-  const wasmBackend = String(opts.env.WEB_WASM_BACKEND || "").trim();
-  if (wasmBackend !== "" && wasmBackend !== "wasi_single") {
-    throw new Error(`invalid WEB_WASM_BACKEND for evaluation bundle: ${wasmBackend}`);
+  if (String(opts.env.WEB_WASM_BACKEND || "").trim()) {
+    throw new Error("WEB_WASM_BACKEND must be converted to --wasm-backend at ingress");
   }
-  const languageOverrides: Record<string, OverrideMap> = {};
-  const overrideFiles: BundleFile[] = [];
+  if (String(opts.env.PLANNER_ONLY_CPP || "").trim()) {
+    throw new Error("PLANNER_ONLY_CPP must be converted to --planner-only-cpp at ingress");
+  }
+  if (String(opts.env.COVERAGE || "").trim()) {
+    throw new Error("COVERAGE must be converted to --coverage at ingress");
+  }
+  const wasmBackend = evaluationBundleWasmBackend(
+    opts.wasmBackend ? [`--wasm-backend=${opts.wasmBackend}`] : [],
+  );
   const bundleRoot = await fsp.realpath(opts.bundleRoot);
-  for (const envName of allDevOverrideEnvNames()) {
-    const overrides = parseOverrideMap(envName, String(opts.env[envName] || ""));
-    const captured: OverrideMap = {};
-    for (const [index, key] of Object.keys(overrides).sort().entries()) {
-      const source = await fsp.realpath(overrides[key]!).catch((error) => {
-        throw new Error(`evaluation bundle override source is unavailable: ${envName} ${key}`, {
-          cause: error,
-        });
-      });
-      const stat = await fsp.lstat(source).catch((error) => {
-        throw new Error(`evaluation bundle override source is unavailable: ${envName} ${key}`, {
-          cause: error,
-        });
-      });
-      if (!stat.isDirectory()) {
-        throw new Error(`evaluation bundle override source must be a directory: ${envName} ${key}`);
-      }
-      await reviewedOverrideFiles(source, bundleRoot);
-      const relative = path.posix.join("overrides", envName, String(index).padStart(4, "0"));
-      const destination = path.join(bundleRoot, ...relative.split("/"));
-      if (containsPath(source, destination)) {
-        throw new Error(`evaluation bundle override source contains its destination: ${source}`);
-      }
-      await copyTree(source, destination, { cloneMode: opts.copyMode, force: true });
-      for (const file of await inventoryBundleSource(destination)) {
-        overrideFiles.push({ ...file, path: path.posix.join(relative, file.path) });
-      }
-      captured[key] = relative;
-    }
-    languageOverrides[envName] = captured;
+  if (allDevOverrideEnvNames().some((envName) => String(opts.env[envName] || "").trim())) {
+    throw new Error("dev override environment must be converted to canonical argv at ingress");
   }
+  const { languageOverrides, overrideFiles } = await captureLanguageOverrides({
+    bundleRoot,
+    devOverrides: normalizedDevOverrideValues(opts.devOverrides || {}),
+    copyMode: opts.copyMode,
+  });
   return {
     languageOverrides,
-    onlyCpp: String(opts.env.PLANNER_ONLY_CPP || "").trim() !== "",
+    onlyCpp: Boolean(opts.onlyCpp),
     overrideFiles: overrideFiles.sort((left, right) => left.path.localeCompare(right.path)),
+    verifySeed: captureVerifySeedSelection(opts.env),
     wasmBackend,
+    coverage: Boolean(opts.coverage),
   };
 }

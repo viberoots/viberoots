@@ -43,7 +43,7 @@ test(
           appTargetLabel: contracts.appTargetLabel,
           root: tmp,
         });
-        await reconcileTempDependencyInputs(tmp, $);
+        await reconcileTempDependencyInputs(tmp, _$);
         await pnpmInstallForDevTest({
           tmp,
           _$,

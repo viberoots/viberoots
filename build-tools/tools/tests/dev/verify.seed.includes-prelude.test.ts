@@ -3,9 +3,16 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { makeFilteredFlakeRef } from "../../dev/filtered-flake";
+import {
+  buildCanonicalArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+} from "../../lib/artifact-environment";
+import { artifactNixPolicyArgs } from "../../lib/artifact-nix-policy";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 import { workspaceFlakeRef } from "../lib/test-helpers";
 
-test("verify test-seed includes build-system paths needed by temp Buck repos", async () => {
+test("verify test-seed uses immutable tool source and excludes generated Prelude", async () => {
   const workspaceFlakeRoot = await workspaceFlakeRef(process.cwd());
   const workspaceLock = JSON.parse(
     await fsp.readFile(path.join(workspaceFlakeRoot, "flake.lock"), "utf8"),
@@ -18,13 +25,34 @@ test("verify test-seed includes build-system paths needed by temp Buck repos", a
   };
   const viberootsNodeName = workspaceLock.nodes?.[workspaceLock.root || ""]?.inputs?.viberoots;
   const viberootsNode = viberootsNodeName ? workspaceLock.nodes?.[viberootsNodeName] : undefined;
-  assert.equal(viberootsNode?.locked?.path, "./viberoots-flake-input");
-  assert.equal(viberootsNode?.original?.path, "./viberoots-flake-input");
+  const immutableSource = String(viberootsNode?.locked?.path || "");
+  assert.match(immutableSource, /^\/nix\/store\/[a-z0-9]{32}-source$/);
+  assert.equal(viberootsNode?.original?.path, immutableSource);
+  await fsp.access(path.join(immutableSource, "flake.nix"));
 
-  const flakeRef = `path:${workspaceFlakeRoot}#test-seed`;
-  const out = await $({
-    stdio: "pipe",
-  })`nix build --impure ${flakeRef} --accept-flake-config --no-link --print-out-paths`;
+  const artifactToolsRoot = canonicalArtifactToolsRoot(
+    process.cwd(),
+    String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+  );
+  const source = await makeFilteredFlakeRef({
+    workspaceRoot: process.cwd(),
+    attr: "test-seed",
+    classification: "hermetic",
+    logPrefix: "[verify-seed-test]",
+    env: buildCanonicalArtifactEnvironment(process.cwd(), { artifactToolsRoot }),
+    selectorEnv: {},
+    immutableViberootsInputRoot: immutableSource,
+  });
+  const nixBin = resolveToolPathSync("nix", process.env);
+  const args = [
+    "build",
+    ...artifactNixPolicyArgs(),
+    source.flakeRef,
+    "--accept-flake-config",
+    "--no-link",
+    "--print-out-paths",
+  ];
+  const out = await $({ stdio: "pipe" })`${nixBin} ${args}`.finally(source.cleanup);
   const seedPath = String(out.stdout || "")
     .trim()
     .split("\n")
@@ -33,21 +61,12 @@ test("verify test-seed includes build-system paths needed by temp Buck repos", a
   assert.ok(seedPath, "expected nix build .#test-seed to output a store path");
   assert.match(seedPath, /^\/nix\/store\/[a-z0-9]{32}-test-seed$/);
 
-  const seedCurrent = await fsp.realpath(path.join(seedPath, ".viberoots", "current"));
-  assert.match(
-    seedCurrent,
-    /^\/nix\/store\/[a-z0-9]{32}-(?:source|test-seed)(?:\/|$)/,
-    `expected seed current to resolve to immutable store content, got ${seedCurrent}`,
-  );
-  const liveViberoots = await fsp.realpath(path.resolve("viberoots"));
-  assert.notEqual(seedCurrent, liveViberoots, "seed current must not resolve to the live checkout");
+  await assert.rejects(fsp.lstat(path.join(seedPath, ".viberoots", "current")), {
+    code: "ENOENT",
+  });
 
   const prelude = path.join(seedPath, "viberoots", "prelude");
-  const preludeStat = await fsp.lstat(prelude);
-  assert.ok(
-    preludeStat.isDirectory() || preludeStat.isSymbolicLink(),
-    "expected prelude in verify test-seed snapshot",
-  );
+  await assert.rejects(fsp.lstat(prelude), { code: "ENOENT" });
 
   const deploymentDefs = path.join(seedPath, "viberoots", "build-tools", "deployments", "defs.bzl");
   const deploymentDefsStat = await fsp.lstat(deploymentDefs);

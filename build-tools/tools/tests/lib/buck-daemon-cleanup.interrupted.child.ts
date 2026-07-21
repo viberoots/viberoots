@@ -106,6 +106,7 @@ await runInTemp("buck-cleanup-interrupted", async (tmp, $) => {
     console.error(`buck cleanup child: forkserver ready at ${forkserverPath}`);
   }
   console.log("READY");
-  // Block forever so the parent can SIGKILL us (simulating an interruption).
-  await new Promise(() => {});
+  // Keep a real event-loop handle alive so the parent must SIGKILL us. A pending Promise alone
+  // does not keep Node running once the detached Buck child's stdio closes.
+  while (true) await new Promise((resolve) => setTimeout(resolve, 1_000));
 });

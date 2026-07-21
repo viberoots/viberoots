@@ -38,7 +38,9 @@ async function fileContainsDirectStamp(file: string): Promise<Violation[]> {
   const lines = data.split(/\r?\n/);
   const viols: Violation[] = [];
   const globalLabels = [
+    "//.viberoots/workspace:flake.nix",
     "//.viberoots/workspace:flake.lock",
+    "workspace_buck//:graph.json",
     "@viberoots//build-tools/tools/nix:nixpkgs_source_registry",
     "//.viberoots/workspace:nixpkgs-source-registry-extension",
   ];

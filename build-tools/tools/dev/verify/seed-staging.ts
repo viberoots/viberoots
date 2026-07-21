@@ -2,7 +2,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { copyTree } from "../../lib/copy-tree";
 import { mkdirWithMacosMetadataExclusion } from "../../lib/macos-metadata";
-import { isGeneratedRepoStateRelPath } from "./generated-state-excludes";
+import { isGeneratedRepoStateRelPath } from "../../lib/generated-repo-state";
 import { PREPARED_MARKER, seedStageDir } from "./seed-stage-layout";
 import {
   acquireSeedStageLock,

@@ -111,6 +111,8 @@ let
     (lib.hasPrefix "run." base && lib.hasSuffix ".out" base) ||
     (lib.hasPrefix "v." base && lib.hasSuffix ".out" base);
   isExcludedPath = rel:
+    rel == "build-tools/tools/dev/toolchain-paths.json" ||
+    rel == "toolchains/toolchain_paths.bzl" ||
     rel == ".viberoots/workspace/buck/graph.json" ||
     rel == ".viberoots/workspace/buck" ||
     (lib.hasPrefix ".viberoots/workspace/buck/" rel) ||
@@ -149,6 +151,8 @@ let
     (lib.hasPrefix "viberoots/.codex-" rel && lib.hasSuffix ".log" rel) ||
     rel == "viberoots/build-tools/tmp" ||
     (lib.hasPrefix "viberoots/build-tools/tmp/" rel) ||
+    rel == "viberoots/build-tools/tools/dev/toolchain-paths.json" ||
+    rel == "viberoots/toolchains/toolchain_paths.bzl" ||
     rel == ".viberoots/workspace/providers/nix_attr_map.bzl" ||
     (lib.hasPrefix ".viberoots/workspace/providers/TARGETS" rel && lib.hasSuffix ".auto" rel) ||
     rel == "build-tools/tools/buck/graph.json" ||

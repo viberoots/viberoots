@@ -29,7 +29,7 @@ export async function readToolchainPaths(): Promise<ToolchainPaths | null> {
   if (!cached) {
     cached = (async () => {
       const root = repoRoot();
-      const p = path.join(root, "build-tools", "tools", "dev", "toolchain-paths.json");
+      const p = path.join(root, ".viberoots", "workspace", "toolchain-paths.json");
       return await readJsonFile(p);
     })();
   }

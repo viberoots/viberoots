@@ -51,7 +51,6 @@ async function generateNodeLockIndex(outFile = DEFAULT_NODE_LOCK_INDEX_PATH) {
     return;
   }
   const nodes = Array.isArray(comp?.nodes) ? comp.nodes : [];
-  if (!nodes.length) return;
   const idx: Record<string, string> = {};
   for (const n of nodes) {
     const name = String(n?.name || "");

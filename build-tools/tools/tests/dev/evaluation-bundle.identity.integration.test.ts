@@ -5,6 +5,12 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { materializeEvaluationBundle } from "../../dev/evaluation-bundle";
+import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
+
+const artifactToolsRoot = canonicalArtifactToolsRoot(
+  process.cwd(),
+  String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+);
 
 async function sourceFixture(prefix: string): Promise<string> {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), prefix));
@@ -22,15 +28,53 @@ test("warm and independent copy modes reuse one evaluation bundle NAR identity",
   const secondRoot = await sourceFixture("evaluation-bundle-identity-b-");
   try {
     const first = await materializeEvaluationBundle(
-      { stagedSource: firstRoot, attr: "graph-generator", classification: "hermetic" },
+      {
+        stagedSource: firstRoot,
+        attr: "graph-generator",
+        classification: "hermetic",
+        artifactToolsRoot,
+        selectorEnv: {},
+      },
       { copyMode: "none" },
     );
     const second = await materializeEvaluationBundle(
-      { stagedSource: secondRoot, attr: "graph-generator", classification: "hermetic" },
+      {
+        stagedSource: secondRoot,
+        attr: "graph-generator",
+        classification: "hermetic",
+        artifactToolsRoot,
+        selectorEnv: {},
+      },
       { copyMode: "try" },
     );
     assert.equal(second.bundlePath, first.bundlePath);
     assert.equal(second.digest, first.digest);
+    const wasm = await materializeEvaluationBundle(
+      {
+        stagedSource: secondRoot,
+        attr: "graph-generator",
+        classification: "hermetic",
+        artifactToolsRoot,
+        selectorEnv: {},
+        wasmBackend: "wasi_single",
+      },
+      { copyMode: "try" },
+    );
+    assert.notEqual(wasm.bundlePath, first.bundlePath);
+    assert.notEqual(wasm.digest, first.digest);
+    const coverage = await materializeEvaluationBundle(
+      {
+        stagedSource: secondRoot,
+        attr: "graph-generator",
+        classification: "hermetic",
+        artifactToolsRoot,
+        selectorEnv: {},
+        coverage: true,
+      },
+      { copyMode: "try" },
+    );
+    assert.notEqual(coverage.bundlePath, first.bundlePath);
+    assert.notEqual(coverage.digest, first.digest);
     const schema = JSON.parse(
       await fsp.readFile(path.join(first.bundlePath, "schema.json"), "utf8"),
     );

@@ -41,6 +41,7 @@ export function spawnVerifyBuck2Tests(opts: {
   onProgressUpdate?: (passName: string, state: { completed: number; failed: number }) => void;
   onProgressStop?: (passName: string, status: number) => void;
   spawnImpl?: typeof spawn;
+  artifactToolsRoot: string;
 }): { pgid: number; nestedIso: string; wait: () => Promise<number> } {
   const minPerTestTimeoutSecs = 20 * 60;
   const passName = String(opts.passName || "shared");
@@ -79,6 +80,7 @@ export function spawnVerifyBuck2Tests(opts: {
     nodeTestTimeoutMs,
     testNixTimeoutSecs,
     executionPolicy: opts.executionPolicy,
+    artifactToolsRoot: opts.artifactToolsRoot,
   });
   const timeoutPath = resolveToolPathSync("timeout");
   const buck2Path = resolveToolPathSync("buck2");

@@ -7,9 +7,19 @@ import path from "node:path";
 import { test } from "node:test";
 import { setTimeout as sleep } from "node:timers/promises";
 import { promisify } from "node:util";
-import { buckconfig, initConsumer, type ConsumerSourceMode } from "../../lib/consumer-bootstrap";
+import {
+  buckconfig,
+  copyViberootsInputTree,
+  initConsumer,
+  type ConsumerSourceMode,
+} from "../../lib/consumer-bootstrap";
 import { envrc } from "../../lib/consumer-direnv";
 import { consumerGitignoreEntries } from "../../lib/consumer-tracked-inputs";
+import { renderGlobalNixInputTargets } from "../../lib/global-nix-input-targets";
+import {
+  GENERATED_REPO_STATE_PATHS,
+  normalizeGeneratedRelPath,
+} from "../../lib/generated-repo-state";
 import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
 import { envWithoutSelectedNix } from "../lib/test-helpers";
 
@@ -77,6 +87,9 @@ async function assertDirenvBootstrap(workspace: string): Promise<void> {
     "--exclude /node_modules",
     "--exclude /buck-out",
     "--exclude /.direnv",
+    "--exclude /build/",
+    "--exclude /build-tools/tools/dev/toolchain-paths.json",
+    "--exclude /toolchains/toolchain_paths.bzl",
   ]) {
     assert.match(stage0, new RegExp(excluded.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   }
@@ -110,11 +123,49 @@ async function withConsumerWorkspace(
   }
 }
 
+test("filtered local input excludes canonical generated repository state", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "viberoots-filtered-input-state-"));
+  const source = path.join(tmp, "source");
+  const filtered = path.join(tmp, "filtered");
+  try {
+    await fsp.mkdir(path.join(source, "build-tools", "tools", "bin"), { recursive: true });
+    await fsp.writeFile(path.join(source, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
+    await fsp.writeFile(path.join(source, "build-tools", "tools", "bin", "build"), "source\n");
+    for (const rel of GENERATED_REPO_STATE_PATHS.map(normalizeGeneratedRelPath)) {
+      await fsp.mkdir(path.join(source, rel), { recursive: true });
+      await fsp.writeFile(path.join(source, rel, "generated-marker"), "generated\n");
+    }
+
+    await copyViberootsInputTree(source, filtered);
+
+    assert.equal(
+      await fsp.readFile(path.join(filtered, "flake.nix"), "utf8"),
+      "{ outputs = _: {}; }\n",
+    );
+    assert.equal(
+      await fsp.readFile(path.join(filtered, "build-tools", "tools", "bin", "build"), "utf8"),
+      "source\n",
+    );
+    for (const rel of GENERATED_REPO_STATE_PATHS.map(normalizeGeneratedRelPath)) {
+      await assert.rejects(fsp.access(path.join(filtered, rel)), { code: "ENOENT" });
+    }
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 async function preparePostCloneTrackedInputs(
   workspace: string,
   sourceMode: ConsumerSourceMode,
 ): Promise<void> {
   await execFileAsync("git", ["init", "-q"], { cwd: workspace });
+  await fsp.mkdir(path.join(workspace, "projects", "config"), { recursive: true });
+  const globalTargets = renderGlobalNixInputTargets({
+    hashesJson: Buffer.from("{}\n"),
+    flakeNix: Buffer.from(""),
+    flakeLock: Buffer.from(""),
+    registryExtension: Buffer.from(""),
+  });
   await Promise.all([
     fsp.writeFile(path.join(workspace, ".buckroot"), ".\n", "utf8"),
     fsp.writeFile(path.join(workspace, ".buckconfig"), buckconfig(sourceMode), "utf8"),
@@ -124,10 +175,30 @@ async function preparePostCloneTrackedInputs(
       `# viberoots local workspace state\n${consumerGitignoreEntries.join("\n")}\n`,
       "utf8",
     ),
+    fsp.writeFile(
+      path.join(workspace, "projects", "config", "TARGETS"),
+      globalTargets.projectsConfigTargets,
+      "utf8",
+    ),
+    fsp.writeFile(
+      path.join(workspace, "projects", "config", "node-modules.hashes.json"),
+      "{}\n",
+      "utf8",
+    ),
   ]);
-  await execFileAsync("git", ["add", ".buckroot", ".buckconfig", ".envrc", ".gitignore"], {
-    cwd: workspace,
-  });
+  await execFileAsync(
+    "git",
+    [
+      "add",
+      ".buckroot",
+      ".buckconfig",
+      ".envrc",
+      ".gitignore",
+      "projects/config/TARGETS",
+      "projects/config/node-modules.hashes.json",
+    ],
+    { cwd: workspace },
+  );
 }
 
 function committedPostCloneLock(rev = "0123456789abcdef0123456789abcdef01234567") {
@@ -179,7 +250,7 @@ async function materializeMinimalViberootsSource(): Promise<string> {
   );
   try {
     await fsp.writeFile(path.join(fixture, "flake.nix"), "{ outputs = _: {}; }\n", "utf8");
-    return (await materializeFilteredViberootsSource(fixture)).storePath;
+    return (await materializeFilteredViberootsSource(fixture, process.env)).storePath;
   } finally {
     await fsp.rm(fixture, { recursive: true, force: true });
   }
@@ -752,6 +823,68 @@ test("viberoots init-consumer upgrades legacy unmarked generated targets without
   );
 });
 
+test("viberoots init-consumer preserves a custom old projects package", async () => {
+  await withConsumerWorkspace("viberoots-init-custom-projects-targets", async (workspace, root) => {
+    const projectsTargets = path.join(workspace, "projects", "TARGETS");
+    await fsp.mkdir(path.dirname(projectsTargets), { recursive: true });
+    await fsp.writeFile(projectsTargets, 'filegroup(name = "custom", srcs = [])\n');
+
+    await execFileAsync(
+      path.join(root, "build-tools", "tools", "bin", "viberoots"),
+      [
+        "init-consumer",
+        "--workspace-root",
+        workspace,
+        "--workspace-name",
+        "custom-projects-targets",
+        "--viberoots-url",
+        "path:viberoots",
+        "--source",
+        root,
+        "--no-lock",
+        "--no-direnv",
+      ],
+      { cwd: workspace, env: { ...process.env, NO_DEV_SHELL: "1" } },
+    );
+    assert.equal(
+      await fsp.readFile(projectsTargets, "utf8"),
+      'filegroup(name = "custom", srcs = [])\n',
+    );
+    await assert.rejects(fsp.access(path.join(workspace, ".viberoots", "workspace", "backups")), {
+      code: "ENOENT",
+    });
+  });
+});
+
+test("viberoots init-consumer fails closed on custom projects config TARGETS", async () => {
+  await withConsumerWorkspace("viberoots-init-custom-config-targets", async (workspace, root) => {
+    const targets = path.join(workspace, "projects/config/TARGETS");
+    await fsp.mkdir(path.dirname(targets), { recursive: true });
+    await fsp.writeFile(targets, 'filegroup(name = "custom", srcs = [])\n');
+    await assert.rejects(
+      execFileAsync(
+        path.join(root, "build-tools", "tools", "bin", "viberoots"),
+        [
+          "init-consumer",
+          "--workspace-root",
+          workspace,
+          "--workspace-name",
+          "custom-config-targets",
+          "--viberoots-url",
+          "path:viberoots",
+          "--source",
+          root,
+          "--no-lock",
+          "--no-direnv",
+        ],
+        { cwd: workspace, env: { ...process.env, NO_DEV_SHELL: "1" } },
+      ),
+      /projects\/config\/TARGETS is owned by viberoots/,
+    );
+    assert.equal(await fsp.readFile(targets, "utf8"), 'filegroup(name = "custom", srcs = [])\n');
+  });
+});
+
 test("viberoots init-consumer locks local submodule workspaces through filtered input", async () => {
   await withConsumerWorkspace("viberoots-init-filtered-lock", async (workspace, viberootsRoot) => {
     const fakeBin = path.join(workspace, ".fake-bin");
@@ -898,9 +1031,31 @@ exit 0
     await fsp.stat(
       path.join(workspace, ".viberoots", "workspace", "viberoots-flake-input", "flake.nix"),
     );
+    await fsp.stat(
+      path.join(
+        workspace,
+        ".viberoots",
+        "workspace",
+        "viberoots-flake-input",
+        "build-tools",
+        "tools",
+        "bin",
+        "build",
+      ),
+    );
     await assert.rejects(
       fsp.stat(path.join(workspace, ".viberoots", "workspace", "viberoots-flake-input", ".git")),
     );
+    for (const generated of [
+      "build-tools/tools/dev/toolchain-paths.json",
+      "toolchains/toolchain_paths.bzl",
+    ]) {
+      await assert.rejects(
+        fsp.stat(
+          path.join(workspace, ".viberoots", "workspace", "viberoots-flake-input", generated),
+        ),
+      );
+    }
 
     const malformedRootLock = "{ malformed root lock\n";
     await fsp.writeFile(path.join(workspace, "flake.lock"), malformedRootLock, "utf8");

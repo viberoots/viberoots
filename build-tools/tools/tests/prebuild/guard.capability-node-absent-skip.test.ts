@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { reconcileSyntheticGeneratedGraph } from "../lib/generated-graph.fixture";
 
 test("prebuild-guard: node sync is skipped when no pnpm-lock.yaml present", async () => {
   await runInTemp("prebuild-cap-node-skip", async (tmp, $) => {
@@ -10,11 +11,6 @@ test("prebuild-guard: node sync is skipped when no pnpm-lock.yaml present", asyn
     // Create minimal Go-only repo so glue runs
     await fsp.mkdir(path.join(tmp, ".viberoots", "workspace", "buck"), { recursive: true });
     await fsp.mkdir(path.join(tmp, "third_party", "providers"), { recursive: true });
-    await fsp.writeFile(
-      path.join(tmp, ".viberoots", "workspace", "buck", "graph.json"),
-      "[]",
-      "utf8",
-    );
     await fsp.writeFile(
       path.join(tmp, ".viberoots", "workspace", "buck", "node-lock-index.json"),
       "{}\n",
@@ -30,10 +26,12 @@ test("prebuild-guard: node sync is skipped when no pnpm-lock.yaml present", asyn
       "# generated\nMODULE_PROVIDERS = {}\n",
       "utf8",
     );
+    const graphEnv = await reconcileSyntheticGeneratedGraph(tmp);
     // Run prebuild-guard auto-fix path; should not error even without pnpm-lock.yaml
     await $({
       cwd: tmp,
       stdio: "inherit",
+      env: graphEnv,
     })`node viberoots/build-tools/tools/buck/prebuild-guard.ts`;
   });
 });

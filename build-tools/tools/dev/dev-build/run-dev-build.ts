@@ -25,7 +25,14 @@ import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 import { findRepoRoot } from "../../lib/repo";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { admitArtifactContext } from "../artifact-policy-inspection";
-import { evaluationBundleHasLanguageOverrides } from "../evaluation-bundle-selectors";
+import { runReadOnlyPnpmChecks } from "../consumer-consistency-check";
+import {
+  evaluationBundleDevOverrides,
+  evaluationBundleHasLanguageOverrides,
+  evaluationBundleWasmBackend,
+  withoutCanonicalDevOverrideArgs,
+  withoutWasmBackendArgs,
+} from "../evaluation-bundle-selectors";
 
 export async function missingOptionalPatchDirsForFreshIsolation(opts: {
   root: string;
@@ -54,7 +61,7 @@ export async function missingOptionalPatchDirsForFreshIsolation(opts: {
   return missing;
 }
 
-export async function runDevBuild(): Promise<void> {
+export async function runDevBuild(artifactToolsRoot: string): Promise<void> {
   const invocationCwd = process.cwd();
   const root = await findRepoRoot(invocationCwd);
   const verbose = isVbrVerbose();
@@ -88,7 +95,12 @@ export async function runDevBuild(): Promise<void> {
   }
 
   try {
-    const parsed0 = parseDevBuildArgs(getArgvTokens());
+    const ingressArgv = getArgvTokens();
+    const devOverrides = evaluationBundleDevOverrides(ingressArgv, {});
+    const wasmBackend = evaluationBundleWasmBackend(ingressArgv, {});
+    const parsed0 = parseDevBuildArgs(
+      withoutWasmBackendArgs(withoutCanonicalDevOverrideArgs(ingressArgv)),
+    );
     const parsed = {
       ...parsed0,
       restArgs: await normalizeDevBuildTargetArgs({
@@ -148,7 +160,7 @@ export async function runDevBuild(): Promise<void> {
     });
     const impure = auto.impure || parsed.impure;
     const classification =
-      auto.classification === "hermetic" && evaluationBundleHasLanguageOverrides(process.env)
+      auto.classification === "hermetic" && evaluationBundleHasLanguageOverrides(devOverrides)
         ? "local-development"
         : auto.classification;
     const materializeDecision = await shouldMaterializeByDefault({
@@ -173,10 +185,14 @@ export async function runDevBuild(): Promise<void> {
       }
     }
     await runStartupCheck(root);
+    await runReadOnlyPnpmChecks(root, {
+      viberootsInputRoot: path.join(artifactToolsRoot, "share", "viberoots-source"),
+    });
     await admitArtifactContext({
       classification,
       impureEvaluation: impure,
       workspaceRoot: root,
+      artifactToolsRoot,
       toolNames: ["git", "buck2"],
     });
     await ensureDevBuildStoreSpace({
@@ -197,7 +213,7 @@ export async function runDevBuild(): Promise<void> {
     let exportedGraphDuringMaterialize = false;
     if (!isCI && materialize) {
       delete process.env.DEVBUILD_EMPTY_GRAPH;
-      await refreshGlueAndExportGraph(root);
+      await refreshGlueAndExportGraph(root, artifactToolsRoot);
       exportedGraphDuringMaterialize = true;
       if (String(process.env.DEVBUILD_EMPTY_GRAPH || "").trim() === "1") {
         materialize = false;
@@ -229,6 +245,9 @@ export async function runDevBuild(): Promise<void> {
       materialize,
       impure,
       restArgs: parsed.restArgs,
+      devOverrides,
+      wasmBackend,
+      artifactToolsRoot,
     });
 
     if (materialize && impure && !exportedGraphDuringMaterialize) {
@@ -244,6 +263,8 @@ export async function runDevBuild(): Promise<void> {
       subcmd: parsed.subcmd,
       restArgs: parsed.restArgs,
       isolationFlags: iso.isolationFlags,
+      devOverrides,
+      artifactToolsRoot,
     });
 
     // `--no-materialize` is a strict no-glue path. If the build side-effects an

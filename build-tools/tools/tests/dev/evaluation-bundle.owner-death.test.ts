@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { materializeEvaluationBundle } from "../../dev/evaluation-bundle";
 import { runCommand } from "../../dev/filtered-flake-command";
 import { resolveToolPathSync } from "../../lib/tool-paths";
+import { artifactEnvForTmp } from "./evaluation-bundle-test-fixture";
 
 async function fixture(root: string): Promise<void> {
   await fsp.mkdir(path.join(root, ".viberoots", "workspace", "buck"), { recursive: true });
@@ -94,7 +95,13 @@ test("registration timeout stops its process group and cleans capture and bundle
   try {
     await assert.rejects(
       materializeEvaluationBundle(
-        { stagedSource: root, attr: "graph-generator", classification: "hermetic" },
+        {
+          stagedSource: root,
+          attr: "graph-generator",
+          classification: "hermetic",
+          artifactEnv: artifactEnvForTmp(tmp),
+          selectorEnv: {},
+        },
         {
           register: async (_bundleRoot, recordProcessGroup) => {
             await runCommand({
@@ -134,7 +141,13 @@ test("registration PGID-record failure awaits shutdown before preserving the pri
   try {
     await assert.rejects(
       materializeEvaluationBundle(
-        { stagedSource: root, attr: "graph-generator", classification: "hermetic" },
+        {
+          stagedSource: root,
+          attr: "graph-generator",
+          classification: "hermetic",
+          artifactEnv: artifactEnvForTmp(tmp),
+          selectorEnv: {},
+        },
         {
           register: async (_bundleRoot, recordProcessGroup) => {
             await runCommand({

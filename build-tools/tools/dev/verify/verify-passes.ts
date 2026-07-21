@@ -42,6 +42,7 @@ export async function runVerifyBuckPasses(opts: {
   exactOverallTimeoutSecs?: number;
   suppressFailureOutputTail?: () => boolean;
   shouldAbort?: () => boolean;
+  artifactToolsRoot: string;
 }): Promise<number> {
   const plan = await resolveVerifyTargetPlan({
     root: opts.root,
@@ -105,6 +106,7 @@ export async function runVerifyBuckPasses(opts: {
       exactOverallTimeoutSecs: opts.exactOverallTimeoutSecs,
       suppressFailureOutputTail: opts.suppressFailureOutputTail,
       shouldAbort,
+      artifactToolsRoot: opts.artifactToolsRoot,
       onPgid: opts.onPgid,
       onPgidDone: opts.onPgidDone,
       onNestedIso: opts.onNestedIso,

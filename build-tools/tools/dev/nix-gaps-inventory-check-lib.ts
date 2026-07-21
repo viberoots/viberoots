@@ -97,6 +97,14 @@ export function parseStarlarkIndexMacrosByModule(text: string): Record<string, s
   return byModule;
 }
 
+export function parsePublicStarlarkDefs(text: string): string[] {
+  return uniqStable(
+    [...text.matchAll(/^def\s+([a-z][a-z0-9_]*)\s*\(/gm)]
+      .map((match) => String(match[1] || ""))
+      .filter((name) => !name.startsWith("_")),
+  );
+}
+
 export function parseNixGapsInventory(text: string): string[] {
   const lines = text.split(/\r?\n/);
   const macros: string[] = [];

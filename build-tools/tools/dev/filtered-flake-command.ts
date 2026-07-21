@@ -79,9 +79,13 @@ export async function runCommand(opts: {
     async () => {
       try {
         return await new Promise((resolve, reject) => {
-          const proc = spawn(opts.command, opts.args, {
+          const commandEnv = opts.env || process.env;
+          const invocation = capture.redirect
+            ? capture.redirect(resolveWatchdogShell(commandEnv), opts.command, opts.args)
+            : { command: opts.command, args: opts.args };
+          const proc = spawn(invocation.command, invocation.args, {
             cwd: opts.cwd,
-            env: opts.env || process.env,
+            env: commandEnv,
             stdio: capture.stdio,
             detached: process.platform !== "win32",
           });
@@ -93,7 +97,6 @@ export async function runCommand(opts: {
           let timer: NodeJS.Timeout | null = null;
           let timeoutEscalation: Promise<void> | null = null;
           const pid = proc.pid || 0;
-          const commandEnv = opts.env || process.env;
           const signalOwnedProcess = (signal: NodeJS.Signals) => {
             if (process.platform !== "win32" && pid > 0) {
               try {

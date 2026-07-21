@@ -2,7 +2,8 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { reconcileTempDependencyInputs, runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
+import { runFilteredFlakeAttr } from "../lib/test-helpers/selected-build";
 
 test("node nix runner: minimal importer with no tests passes", async () => {
   await runInTemp("node-nix-runner-smoke", async (tmp, _$) => {
@@ -47,10 +48,16 @@ test("node nix runner: minimal importer with no tests passes", async () => {
       "",
     ].join("\n");
     await fsp.writeFile(path.join(app, "TARGETS"), targets, "utf8");
-    await reconcileTempDependencyInputs(tmp, $);
+    await reconcileTempDependencyInputs(tmp, _$);
     await $`buck2 cquery --target-platforms prelude//platforms:default "kind(nix_node_test, //projects/apps/mini:node_tests)"`;
     await $`buck2 test --target-platforms prelude//platforms:default //projects/apps/mini:node_tests`;
     // Supplemental no-link policy coverage for the Nix runner attr invoked by nix_node_test.
-    await $`nix build --no-link --print-out-paths --impure --accept-flake-config ${`path:${await workspaceFlakeRef(tmp)}#node-test.projects-apps-mini`} -L`;
+    await runFilteredFlakeAttr({
+      tmp,
+      $,
+      target: "//projects/apps/mini:node_tests",
+      attr: "node-test.projects-apps-mini",
+      stdio: "inherit",
+    });
   });
 });

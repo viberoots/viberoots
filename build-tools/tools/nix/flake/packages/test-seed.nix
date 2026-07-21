@@ -1,13 +1,12 @@
-{ pkgs, repoRoot }:
+{ pkgs, repoRoot, viberootsRoot, evaluationBundle ? null }:
 let
   lib = pkgs.lib;
-  # Read env-driven filter config here (the only impure site) rather than inside the
-  # filter function, so filter-seed-repo.nix stays a pure function of its arguments.
-  goOnly = builtins.getEnv "TEST_PARTIAL_CLONE_GO_ONLY" == "1";
-  excludeCppReqs = builtins.getEnv "TEST_EXCLUDE_CPP_REQS" == "1";
-  rootsEnv = lib.trim (builtins.getEnv "TEST_RSYNC_ROOTS");
-  rootsRaw = if rootsEnv == "" then [] else builtins.split "[,[:space:]]+" rootsEnv;
-  roots = lib.filter (r: r != "") (map (r: lib.removePrefix "/" r) rootsRaw);
+  seedSelection =
+    if evaluationBundle == null then { }
+    else evaluationBundle.selection.verifySeed or { };
+  goOnly = seedSelection.partialCloneGoOnly or false;
+  excludeCppReqs = seedSelection.excludeCppReqs or false;
+  roots = seedSelection.rsyncRoots or [ ];
   seedFilter = import ./filter-seed-repo.nix { inherit lib goOnly excludeCppReqs roots; };
   # The repo-root-relative predicate. Passed as the filter to every builtins.path call
   # below so that all exclusion logic (graph.json, nix_attr_map.bzl, etc.) is applied
@@ -69,7 +68,7 @@ let
   # (which produces an empty snap — harmless when copied into the output tree).
   # Note: `prelude` is intentionally omitted — it is a symlink and is handled via
   # rootFilesSnap above (see comment there for why mkSubSnap cannot handle symlinks).
-  subDirs = [".husky" ".viberoots" "build-tools" "cpp" "go" "lang" "node" "patches" "python" "tools" "third_party" "toolchains" "types" "viberoots"];
+  subDirs = [".husky" ".viberoots" "build-tools" "cpp" "go" "lang" "node" "patches" "python" "tools" "third_party" "toolchains" "types"];
 
   mkSubSnap = d:
     let
@@ -102,6 +101,8 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
 	  mkdir -p "$out"
 	  ${copyRootFileScript}
 	  ${copySubDirScript}
+  mkdir -p "$out/viberoots"
+  cp -a ${viberootsRoot}/. "$out/viberoots/"
   rm -rf \
     "$out/.DS_Store" \
     "$out/.codex-logs" \
@@ -124,6 +125,8 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
     "$out/.viberoots/workspace/viberoots-flake-input" \
     "$out/.viberoots/workspace/xdg-cache" \
     "$out/build-tools/tmp" \
+    "$out/build-tools/tools/dev/toolchain-paths.json" \
+    "$out/toolchains/toolchain_paths.bzl" \
     "$out/viberoots/.cache" \
     "$out/viberoots/.clinic" \
     "$out/viberoots/.codex-logs" \
@@ -138,6 +141,7 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
     "$out/viberoots/backups" \
     "$out/viberoots/buck-out" \
     "$out/viberoots/build-tools/tmp" \
+    "$out/viberoots/build-tools/tools/dev/toolchain-paths.json" \
     "$out/viberoots/cache" \
     "$out/viberoots/codex-test-logs" \
     "$out/viberoots/coverage" \
@@ -147,6 +151,7 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
     "$out/viberoots/pr-logs" \
     "$out/viberoots/result" \
     "$out/viberoots/test-logs" \
+    "$out/viberoots/toolchains/toolchain_paths.bzl" \
     "$out/viberoots/xdg-cache"
   chmod -R u+w "$out"
   export GIT_AUTHOR_NAME=seed

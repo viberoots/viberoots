@@ -38,7 +38,7 @@ async function makeRepo(importer = "projects/apps/app"): Promise<{
   const lockHash = await sha256Text(lockContent);
   await writeFile(path.join(repoRoot, importer, "pnpm-lock.yaml"), lockContent);
   await writeFile(
-    path.join(repoRoot, "projects", "node-modules.hashes.json"),
+    path.join(repoRoot, "projects", "config", "node-modules.hashes.json"),
     JSON.stringify({ [hashKeyForImporter(importer)]: "sha256-fixture" }, null, 2) + "\n",
   );
   return {

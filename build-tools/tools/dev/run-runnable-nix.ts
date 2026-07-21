@@ -1,9 +1,12 @@
-import { spawn, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
 import { processTableLines } from "../lib/process-inspection";
-import { envWithResolvedNixBin, resolveToolPathSync } from "../lib/tool-paths";
+import { ensureNixStoreToolPathSync, envWithResolvedNixBin } from "../lib/tool-paths";
+import { buildArtifactEnvironment } from "../lib/artifact-environment";
+import { artifactNixPolicyArgs } from "../lib/artifact-nix-policy";
+import { runBoundedArtifactCommand } from "../lib/artifact-command-runner";
 
 function runnableBuildTimeoutSec(): number {
   const raw = String(process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC || "").trim();
@@ -75,108 +78,54 @@ async function emitTimeoutDiagnostics(opts: {
 export async function runNixBuildWithProgress(opts: {
   workspaceRoot: string;
   env?: Record<string, string>;
+  internal?: Record<string, string>;
   args: string[];
   label: string;
+  artifactToolsRoot: string;
 }): Promise<string> {
   const timeoutSec = runnableBuildTimeoutSec();
-  const env = envWithResolvedNixBin((opts.env as NodeJS.ProcessEnv | undefined) ?? process.env);
-  const nixBin = resolveToolPathSync("nix", env);
-  const child = spawn(nixBin, ["build", ...opts.args], {
+  const inherited = envWithResolvedNixBin(
+    (opts.env as NodeJS.ProcessEnv | undefined) ?? process.env,
+  );
+  const env = buildArtifactEnvironment({
+    baseEnv: inherited,
+    mode: String(inherited.CI || "").trim() ? "ci" : "local",
+    stateRoot: path.join(opts.workspaceRoot, "buck-out", "tmp", "artifact-environment"),
+    workspaceRoot: opts.workspaceRoot,
+    artifactToolsRoot: opts.artifactToolsRoot,
+    internal: { WORKSPACE_ROOT: opts.workspaceRoot, ...(opts.internal || {}) },
+  });
+  const nixBin = ensureNixStoreToolPathSync("nix", env);
+  const result = await runBoundedArtifactCommand({
+    command: nixBin,
+    args: ["build", ...artifactNixPolicyArgs(), ...opts.args],
     cwd: opts.workspaceRoot,
     env,
-    stdio: ["ignore", "pipe", "pipe"],
-    detached: true,
+    timeoutMs: timeoutSec * 1000,
+    onStderr: (chunk) => {
+      try {
+        process.stderr.write(chunk);
+      } catch {}
+    },
   });
-  const killGroup = (sig: NodeJS.Signals) => {
-    try {
-      process.kill(-child.pid!, sig);
-    } catch {}
-  };
-  let settleExit: ((code: number) => void) | null = null;
-  let settled = false;
-  const settle = (code: number) => {
-    if (settled) return;
-    settled = true;
-    settleExit?.(code);
-  };
-  const sleep = (ms: number) =>
-    new Promise<void>((resolve) => {
-      setTimeout(resolve, ms);
-    });
-  const terminateProcessTree = async () => {
-    killGroup("SIGINT");
-    await sleep(1200);
-    if (settled) return;
-    killGroup("SIGTERM");
-    await sleep(1800);
-    if (settled) return;
-    killGroup("SIGKILL");
-  };
-  const onTerm = () => {
-    void terminateProcessTree();
-  };
-  const onInt = () => {
-    void terminateProcessTree();
-  };
-  process.once("SIGTERM", onTerm);
-  process.once("SIGINT", onInt);
-
-  let stdout = "";
-  let stderr = "";
-  let timedOut = false;
-  const exitPromise = new Promise<number>((resolve) => {
-    settleExit = (code: number) => resolve(code);
-  });
-
-  const killer = setTimeout(() => {
-    timedOut = true;
-    void (async () => {
-      await terminateProcessTree();
-      settle(124);
-    })();
-  }, timeoutSec * 1000);
-
-  child.stdout.on("data", (chunk) => {
-    stdout += String(chunk || "");
-  });
-  child.stderr.on("data", (chunk) => {
-    const s = String(chunk || "");
-    stderr += s;
-    try {
-      process.stderr.write(s);
-    } catch {}
-  });
-  child.once("close", (code, signal) => {
-    if (typeof code === "number") settle(code);
-    else settle(signal ? 130 : 1);
-  });
-  child.once("error", () => settle(1));
-
-  const exit = await exitPromise;
-  if (timedOut) {
+  if (result.timedOut) {
     await emitTimeoutDiagnostics({
       workspaceRoot: opts.workspaceRoot,
       label: opts.label,
       args: opts.args,
-      childPid: child.pid ?? -1,
+      childPid: result.childPid,
     });
-    clearTimeout(killer);
-    process.removeListener("SIGTERM", onTerm);
-    process.removeListener("SIGINT", onInt);
     throw new Error(
       `[run-runnable] ${opts.label} timed out after ${timeoutSec}s while running: nix build ${opts.args.join(" ")}`,
     );
   }
-  clearTimeout(killer);
-  process.removeListener("SIGTERM", onTerm);
-  process.removeListener("SIGINT", onInt);
-  if (exit !== 0) {
-    const errTail = stderr.trim();
+  if (result.exitCode !== 0 || result.interrupted) {
+    const errTail = result.stderr.trim();
     throw new Error(
-      `[run-runnable] ${opts.label} failed (exit ${exit}) while running: nix build ${opts.args.join(" ")}${
+      `[run-runnable] ${opts.label} failed (exit ${result.exitCode}) while running: nix build ${opts.args.join(" ")}${
         errTail ? `\n${errTail}` : ""
       }`,
     );
   }
-  return stdout;
+  return result.stdout;
 }

@@ -31,6 +31,7 @@ esac
 
 # shell helpers
 # shellcheck source=/dev/null
+export VBR_DEVSHELL_USE_GENERATED_AUTHORITY=1
 . "$(cd "$(dirname "$0")" && pwd)/devshell.sh"
 
 run_ts "../dev/install-deps.ts" "$@"
