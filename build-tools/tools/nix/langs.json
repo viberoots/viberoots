@@ -84,6 +84,33 @@
         "publicationAdmission": true,
         "reproducibilityMatrixIds": ["cpp-lib"]
       }
+    },
+    {
+      "id": "rust",
+      "displayName": "Rust",
+      "requiredPaths": [
+        "viberoots/build-tools/rust/defs.bzl",
+        "viberoots/build-tools/tools/nix/planner/rust.nix",
+        "viberoots/build-tools/tools/nix/templates/rust.nix",
+        "viberoots/build-tools/tools/nix/examples/rust/native-example/Cargo.toml",
+        "viberoots/build-tools/tools/nix/examples/rust/native-example/Cargo.lock",
+        "viberoots/build-tools/tools/nix/examples/rust/native-example/TARGETS"
+      ],
+      "optionalPaths": ["viberoots/build-tools/tools/tests/rust"],
+      "kinds": ["bin", "lib", "test"],
+      "templatesDir": "viberoots/build-tools/tools/nix/examples/rust",
+      "hermetic": {
+        "status": "scaffold",
+        "sourceRoles": true,
+        "dependencyReconciliation": false,
+        "immutableBundleInputs": true,
+        "storeQualifiedToolchain": true,
+        "selectorTransport": true,
+        "sandboxNetwork": false,
+        "remoteExecution": false,
+        "publicationAdmission": false,
+        "reproducibilityMatrixIds": []
+      }
     }
   ]
 }

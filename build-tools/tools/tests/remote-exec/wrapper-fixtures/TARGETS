@@ -18,7 +18,7 @@ source_snapshot(
         "noop.test.ts",
         "remote-ready-runner.sh",
     ],
-    graph = "fixture.txt",
+    graph = "graph.json",
 )
 
 zx_test(

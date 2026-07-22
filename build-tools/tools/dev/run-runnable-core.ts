@@ -64,8 +64,8 @@ export async function importerForTarget(workspaceRoot: string, target: string): 
 export async function runnableHintsForTarget(
   workspaceRoot: string,
   target: string,
-): Promise<{ importer: string; mode: "static" | "ssr"; framework: string }> {
-  const fallback = { importer: "", mode: "static" as const, framework: "" };
+): Promise<{ importer: string; mode: "static" | "ssr"; framework: string; targetKind: string }> {
+  const fallback = { importer: "", mode: "static" as const, framework: "", targetKind: "" };
   try {
     const graphTxt = await fsp.readFile(path.join(workspaceRoot, DEFAULT_GRAPH_PATH), "utf8");
     const raw = JSON.parse(graphTxt);
@@ -78,6 +78,7 @@ export async function runnableHintsForTarget(
       let importer = "";
       let mode: "static" | "ssr" = "static";
       let framework = "";
+      let targetKind = "";
       for (const label of labels) {
         const parsed = parseLockfileLabel(String(label || ""));
         if (parsed?.importer) importer = parsed.importer;
@@ -87,8 +88,9 @@ export async function runnableHintsForTarget(
         if (value === "framework:next") framework = "next";
         if (value === "framework:vite") framework = "vite";
         if (value === "framework:hatch") framework = "hatch";
+        if (value.startsWith("kind:")) targetKind = value.slice("kind:".length);
       }
-      return { importer, mode, framework };
+      return { importer, mode, framework, targetKind };
     }
   } catch {}
   return fallback;

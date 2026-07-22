@@ -144,11 +144,12 @@ test("source_snapshot rule builds a declared Buck snapshot artifact", async () =
     const dir = path.join(tmp, "tmp", "source_snapshot_rule");
     await fs.mkdir(dir, { recursive: true });
     await write(path.join(dir, "fixture.txt"), "hello\n");
+    await write(path.join(dir, "graph.json"), "[]\n");
     await write(
       path.join(dir, "TARGETS"),
       [
         'load("@viberoots//build-tools/lang:source_snapshot.bzl", "source_snapshot")',
-        'source_snapshot(name = "tiny", srcs = ["fixture.txt", "TARGETS"], graph = "fixture.txt")',
+        'source_snapshot(name = "tiny", srcs = ["fixture.txt", "TARGETS"], graph = "graph.json")',
       ].join("\n") + "\n",
     );
     const res = await $({
@@ -168,7 +169,7 @@ test("source_snapshot action uses declared zx-wrapper runner without flake or ha
 
   assert.match(
     command,
-    /cmd = \[[^,\]]*build-tools\/tools\/dev\/__source-snapshot-zx-wrapper__\/source-snapshot-zx-wrapper, --preserve-symlinks, --preserve-symlinks-main, --import, \.\/[^,\]]*build-tools\/tools\/dev\/__zx-init\.mjs__\/zx-init\.mjs, \.\/[^,\]]*source-snapshot-runner\.modules\/source-snapshot\.ts,/,
+    /cmd = \[[^,\]]*build-tools\/tools\/dev\/__source-snapshot-zx-wrapper__\/source-snapshot-zx-wrapper, --preserve-symlinks, --preserve-symlinks-main, --import, \.\/[^,\]]*build-tools\/tools\/dev\/__zx-init\.mjs__\/zx-init\.mjs, \.\/[^,\]]*source-snapshot-runner\.modules\/dev\/source-snapshot\.ts,/,
   );
   assert.doesNotMatch(command, /nix, run|path:\.#zx-wrapper/);
   assert.doesNotMatch(command, /cmd = \[[^,\]]*source-snapshot\.ts,/);
@@ -176,7 +177,7 @@ test("source_snapshot action uses declared zx-wrapper runner without flake or ha
   assert.doesNotMatch(command, /\bnode\b|command -v node|\[zx-wrapper,/);
   assert.match(
     command,
-    /--graph, \.viberoots\/current\/build-tools\/tools\/tests\/remote-exec\/wrapper-fixtures\/fixture\.txt/,
+    /--graph, \.viberoots\/current\/build-tools\/tools\/tests\/remote-exec\/wrapper-fixtures\/graph\.json/,
   );
   assert.match(
     command,
@@ -190,6 +191,7 @@ test("source_snapshot runtime is a declared Buck tool output", async () => {
   );
 
   assert.match(actions, /identifier = source-snapshot-zx-wrapper,\s+kind = write,/);
+  assert.match(actions, /source-snapshot\.manifest\.json/);
   assert.match(
     actions,
     /category = symlinked_dir,\s+identifier = source-snapshot-runner\.modules,\s+kind = symlinkeddir,/,
@@ -198,6 +200,12 @@ test("source_snapshot runtime is a declared Buck tool output", async () => {
     "source-snapshot.ts",
     "source-snapshot-graph.ts",
     "source-snapshot-policy.ts",
+    "source-plan-evidence-core.ts",
+    "source-selection.ts",
+    "target-label-normalization.ts",
+    "provider-names.ts",
+    "short-hash.ts",
+    "nix-attr-aliases.json",
   ]) {
     assert.match(actions, new RegExp(moduleName.replaceAll(".", "\\.")));
   }

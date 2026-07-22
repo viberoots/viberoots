@@ -7,11 +7,14 @@ import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-vib
 import {
   buildCanonicalArtifactEnvironment,
   canonicalArtifactToolsRoot,
+  withoutArtifactEnvironmentInfluence,
 } from "../../lib/artifact-environment";
+import { buckconfig } from "../../lib/consumer-bootstrap";
 import { derivePostCloneWorkspaceLock } from "../../lib/post-clone-workspace-lock";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { workspaceFlakeInputs } from "../../lib/workspace-flake-inputs";
 import { VIBEROOTS_SOURCE_ROOT } from "../lib/test-helpers/source-paths";
+import { writeGlobalNixInputTargetFixtures } from "../lib/test-helpers/buck-config";
 import { UPDATE_COMMAND_PROTECTED_PATHS } from "./update-command-launcher-protected-paths";
 
 const execFileAsync = promisify(execFile);
@@ -98,7 +101,7 @@ export async function runUpdateCommand(root: string, args: string[] = []) {
   return await execFileAsync(path.join(VIBEROOTS_SOURCE_ROOT, "build-tools/tools/bin/u"), args, {
     cwd: root,
     env: {
-      ...process.env,
+      ...withoutArtifactEnvironmentInfluence(process.env),
       NO_DEV_SHELL: "1",
       WORKSPACE_ROOT: root,
       VIBEROOTS_SOURCE_ROOT: immutableSource,
@@ -126,6 +129,7 @@ export async function createUpdateCommandFixture(name: string): Promise<string> 
   await fsp.mkdir(path.join(root, ".viberoots/bootstrap/transactions"), { recursive: true });
   await fsp.mkdir(path.join(root, ".viberoots/workspace"), { recursive: true });
   await fsp.writeFile(path.join(root, ".buckroot"), ".\n");
+  await fsp.writeFile(path.join(root, ".buckconfig"), buckconfig("submodule"), "utf8");
   await fsp.writeFile(
     path.join(root, ".gitmodules"),
     '[submodule "viberoots"]\n\tpath = viberoots\n\turl = https://example.invalid/viberoots.git\n',
@@ -158,6 +162,13 @@ export async function createUpdateCommandFixture(name: string): Promise<string> 
     `${JSON.stringify(workspaceLock, null, 2)}\n`,
     "utf8",
   );
+  await fsp.mkdir(path.join(root, "projects/config"), { recursive: true });
+  await fsp.writeFile(path.join(root, "projects/config/node-modules.hashes.json"), "{}\n");
+  await fsp.writeFile(
+    path.join(root, ".viberoots/workspace/nixpkgs-source-registry-extension.nix"),
+    "{ inputs }: { profiles = { }; }\n",
+  );
+  await writeGlobalNixInputTargetFixtures(root);
   await fsp.writeFile(
     path.join(root, ".viberoots/bootstrap/transactions/source-mode.json"),
     '{"mode":"submodule","status":"completed"}\n',

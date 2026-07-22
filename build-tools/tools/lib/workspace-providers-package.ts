@@ -34,7 +34,7 @@ const DEFS_CPP = [
   '        out = name + ".stamp",',
   "        attr = attr,",
   '        labels = ["lang:cpp", "nixpkg:%s" % attr],',
-  '        visibility = ["//visibility:public"],',
+  '        visibility = ["PUBLIC"],',
   "    )",
   "",
   "def nix_cxx_library(name, attr, headers_subdir = None, static = True, shared = False):",

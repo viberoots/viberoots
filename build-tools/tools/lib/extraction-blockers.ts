@@ -14,11 +14,12 @@ const ALLOWED_VISIBLE_ROOT_ENTRIES = new Set([
   "flake.lock",
   "flake.nix",
   "projects",
+  "test-tmp-paths.log",
   "viberoots",
 ]);
 
 const ALLOWED_VISIBLE_ROOT_ENTRIES_TEXT =
-  "AGENTS.md, README.md, buck-out, flake.lock, flake.nix, projects, and viberoots";
+  "AGENTS.md, README.md, buck-out, flake.lock, flake.nix, projects, test-tmp-paths.log, and viberoots";
 
 const ROOT_LEGACY_PATHS = [
   "build-tools",

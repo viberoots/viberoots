@@ -81,10 +81,12 @@ Notes on Nix-backed Python outputs:
 
 - `rust_library` → locked native Cargo build (`rust_nix_build` → `buildRustPackage`).
 - `rust_binary` → locked native Cargo build (`rust_nix_build` → `buildRustPackage`).
+- `rust_test` → compiled Cargo harnesses executed by the bounded Rust external runner.
 
-Both routes require one package-local `Cargo.toml` and `Cargo.lock`, use Nix-store Rust tools, and
+All routes require one package-local `Cargo.toml` and `Cargo.lock`, use Nix-store Rust tools, and
 reject placeholder output, stale locks, unsupported dependency sources, and cross-root Rust artifact
-injection.
+injection. Rust binaries publish `run.prod`; libraries and tests remain non-runnable. Declared
+native dependencies resolve through `nixpkg_deps`, `nixpkgs_profile`, and `nixpkg_pins`.
 
 ## Hermeticity risks (non-Nix paths)
 

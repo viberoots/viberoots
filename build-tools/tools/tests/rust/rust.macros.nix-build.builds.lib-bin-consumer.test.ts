@@ -3,6 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
+import { withoutArtifactEnvironmentInfluence } from "../../lib/artifact-environment";
 import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 
 test("rust macros: library, binary, and downstream consumer build via Nix-backed route", async () => {
@@ -22,6 +23,18 @@ test("rust macros: library, binary, and downstream consumer build via Nix-backed
     await fs.writeFile(
       path.join(appDir, "src", "consumer.rs"),
       'fn main(){println!("consumer:{}",rustapp::message());}\n',
+      "utf8",
+    );
+    await fs.writeFile(
+      path.join(appDir, "build.rs"),
+      [
+        "use std::process::Command;",
+        "fn main(){",
+        '  let status=Command::new("pkg-config").args(["--exists","zlib"]).status().expect("declared pkg-config must exist");',
+        '  assert!(status.success(), "declared zlib must resolve through the selected Nixpkgs source plan");',
+        "}",
+        "",
+      ].join("\n"),
       "utf8",
     );
     await fs.writeFile(
@@ -54,11 +67,12 @@ test("rust macros: library, binary, and downstream consumer build via Nix-backed
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_library")',
+        'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_library", "rust_test")',
         "",
-        'rust_library(name = "lib", crate = "rustapp", srcs = ["src/lib.rs"])',
-        'rust_binary(name = "app", crate = "rustapp", srcs = ["src/main.rs"], deps = [":lib"])',
-        'rust_binary(name = "consumer", crate = "rustapp", srcs = ["src/consumer.rs"], deps = [":lib"])',
+        'rust_library(name = "lib", crate = "rustapp", srcs = ["build.rs", "src/lib.rs"], nixpkg_deps = ["pkgs.zlib"])',
+        'rust_binary(name = "app", crate = "rustapp", srcs = ["build.rs", "src/main.rs"], deps = [":lib"], nixpkg_deps = ["pkgs.zlib"])',
+        'rust_binary(name = "consumer", crate = "rustapp", srcs = ["build.rs", "src/consumer.rs"], deps = [":lib"], nixpkg_deps = ["pkgs.zlib"])',
+        'rust_test(name = "test", crate = "rustapp", srcs = ["build.rs", "src/lib.rs"], deps = [":lib"], nixpkg_deps = ["pkgs.zlib"])',
         "",
       ].join("\n"),
       "utf8",
@@ -67,7 +81,7 @@ test("rust macros: library, binary, and downstream consumer build via Nix-backed
 
     const hostileDir = path.join(tmp, "hostile-bin");
     await fs.mkdirp(hostileDir);
-    for (const tool of ["cargo", "rustc", "cc"]) {
+    for (const tool of ["cargo", "rustc", "cc", "ld", "pkg-config"]) {
       await fs.writeFile(path.join(hostileDir, tool), "#!/bin/sh\nexit 99\n", { mode: 0o755 });
     }
     const build = await $({
@@ -78,6 +92,9 @@ test("rust macros: library, binary, and downstream consumer build via Nix-backed
       env: {
         ...process.env,
         PATH: `${hostileDir}:${process.env.PATH}`,
+        CC: path.join(hostileDir, "cc"),
+        LD: path.join(hostileDir, "ld"),
+        PKG_CONFIG: path.join(hostileDir, "pkg-config"),
         RUSTC: path.join(hostileDir, "rustc"),
         RUSTFLAGS: "--definitely-invalid-host-flag",
         RUSTUP_HOME: path.join(tmp, "hostile-rustup"),
@@ -98,6 +115,23 @@ test("rust macros: library, binary, and downstream consumer build via Nix-backed
     };
     assert.equal(await run("root//projects/apps/rustapp:app"), "first");
     assert.equal(await run("root//projects/apps/rustapp:consumer"), "consumer:first");
+
+    const runnableEnv = withoutArtifactEnvironmentInfluence(process.env);
+    const prod = await $({ cwd: tmp, stdio: "pipe", env: runnableEnv })`
+      viberoots/build-tools/tools/bin/p //projects/apps/rustapp:app
+    `;
+    assert.equal(String(prod.stdout || "").trim(), "first");
+    for (const [entrypoint, label, diagnostic] of [
+      ["d", "//projects/apps/rustapp:app", /run\.dev is not available/],
+      ["p", "//projects/apps/rustapp:lib", /library-only|not runnable/],
+      ["p", "//projects/apps/rustapp:test", /test-only|not runnable|no runnable/],
+    ] as const) {
+      const rejected = await $({ cwd: tmp, stdio: "pipe", env: runnableEnv, nothrow: true })`
+        ${path.join("viberoots", "build-tools", "tools", "bin", entrypoint)} ${label}
+      `;
+      assert.notEqual(rejected.exitCode, 0, `${entrypoint} unexpectedly accepted ${label}`);
+      assert.match(String(rejected.stderr || rejected.stdout), diagnostic);
+    }
 
     await fs.writeFile(
       path.join(appDir, "src", "lib.rs"),

@@ -32,10 +32,10 @@ export function renderGlobalNixInputTargets(inputs: {
   registryExtension: Buffer;
 }): GlobalNixInputTargets {
   const outputNames = {
-    "//projects/config:node-modules.hashes.json": `node-modules.hashes.${digest(inputs.hashesJson)}.json`,
-    "//.viberoots/workspace:flake.nix": `flake.${digest(inputs.flakeNix)}.nix`,
-    "//.viberoots/workspace:flake.lock": `flake.${digest(inputs.flakeLock)}.lock`,
-    "//.viberoots/workspace:nixpkgs-source-registry-extension": `nixpkgs-source-registry-extension.${digest(inputs.registryExtension)}.nix`,
+    "root//projects/config:node-modules.hashes.json": `node-modules.hashes.${digest(inputs.hashesJson)}.json`,
+    "root//.viberoots/workspace:flake.nix": `flake.${digest(inputs.flakeNix)}.nix`,
+    "root//.viberoots/workspace:flake.lock": `flake.${digest(inputs.flakeLock)}.lock`,
+    "root//.viberoots/workspace:nixpkgs-source-registry-extension": `nixpkgs-source-registry-extension.${digest(inputs.registryExtension)}.nix`,
   } as const;
   const header = `# ${generatedGlobalInputMarker}\nload("@prelude//:rules.bzl", "export_file")\n\n`;
   return {
@@ -45,17 +45,21 @@ export function renderGlobalNixInputTargets(inputs: {
       `${exportFile(
         "node-modules.hashes.json",
         "node-modules.hashes.json",
-        outputNames["//projects/config:node-modules.hashes.json"],
+        outputNames["root//projects/config:node-modules.hashes.json"],
       )}\n`,
     workspaceTargets:
       header +
       [
-        exportFile("flake.nix", "flake.nix", outputNames["//.viberoots/workspace:flake.nix"]),
-        exportFile("flake.lock", "flake.lock", outputNames["//.viberoots/workspace:flake.lock"]),
+        exportFile("flake.nix", "flake.nix", outputNames["root//.viberoots/workspace:flake.nix"]),
+        exportFile(
+          "flake.lock",
+          "flake.lock",
+          outputNames["root//.viberoots/workspace:flake.lock"],
+        ),
         exportFile(
           "nixpkgs-source-registry-extension",
           "nixpkgs-source-registry-extension.nix",
-          outputNames["//.viberoots/workspace:nixpkgs-source-registry-extension"],
+          outputNames["root//.viberoots/workspace:nixpkgs-source-registry-extension"],
         ),
       ].join("\n\n") +
       "\n",

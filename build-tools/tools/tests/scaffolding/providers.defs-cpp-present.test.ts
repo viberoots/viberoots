@@ -18,5 +18,13 @@ test("hidden providers/defs_cpp.bzl defines nix_cxx_library and nix_cxx_provider
       console.error("missing nix_cxx_provider in cpp provider defs");
       process.exit(2);
     }
+    if (!txt.includes('visibility = ["PUBLIC"]')) {
+      console.error("C++ provider targets are not visible across workspace cells");
+      process.exit(2);
+    }
+    if (txt.includes('visibility = ["//visibility:public"]')) {
+      console.error("C++ provider visibility is cell-relative instead of public");
+      process.exit(2);
+    }
   });
 });

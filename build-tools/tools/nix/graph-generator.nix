@@ -339,6 +339,12 @@ let
           else if kind == "test" then LANGS.python.mkTest buildLabel
           else if kind == "bin" then LANGS.python.mkApp buildLabel
           else LANGS.python.mkLib buildLabel
+      else if builtins.elem "lang:rust" labels then
+        let kind = LANGS.rust.kindOf n; in
+          if kind == "bin" then LANGS.rust.mkApp buildLabel
+          else if kind == "test" then LANGS.rust.mkTest buildLabel
+          else if kind == "lib" then LANGS.rust.mkLib buildLabel
+          else builtins.throw "planner dependency target has unsupported Rust kind: ${target}"
       else builtins.throw "planner dependency target has no supported language role: ${target}";
 
   modulesTomlDefault = if rootModulesTomlPath != null
@@ -536,6 +542,27 @@ let
         ) (builtins.attrNames goTargetsFromGraph);
       in builtins.listToAttrs (map (nm: { name = nm; value = goTargetsFromGraph.${nm}; }) goBinNames)
     );
+  rustOutPaths =
+    if onlyCpp then {}
+    else (
+      let
+        rustLabels = n: let value = get n "labels"; in if builtins.isList value then value else [];
+        safeRustNodes = builtins.filter (n:
+          let nm = ensureFullLabel n; rel = pkgPathOf nm;
+          in builtins.isString nm && nm != ""
+            && (lib.hasPrefix "projects/apps/" rel || lib.hasPrefix "projects/libs/" rel)
+            && builtins.elem "lang:rust" (rustLabels n)
+        ) nodesList;
+        rustTargets = builtins.listToAttrs (map (n:
+          let nm = ensureFullLabel n; kind = LANGS.rust.kindOf n;
+          in { name = nm; value = if kind == "bin" then LANGS.rust.mkApp nm else if kind == "test" then LANGS.rust.mkTest nm else LANGS.rust.mkLib nm; }
+        ) safeRustNodes);
+        binaryNames = builtins.filter (nm:
+          let matches = builtins.filter (n: ensureFullLabel n == nm) safeRustNodes;
+          in matches != [] && LANGS.rust.kindOf (builtins.head matches) == "bin"
+        ) (builtins.attrNames rustTargets);
+      in builtins.listToAttrs (map (nm: { name = nm; value = rustTargets.${nm}; }) binaryNames)
+    );
   cppTargets = cppTargetsFromGraph;
 
   # Provide a flake-friendly flat attrset whose keys are safe identifiers: t + [a-z0-9_]+
@@ -690,6 +717,7 @@ let
               ) else if k.template == "rust" then (
                 let A = adapterFor "rust"; in
                 if k.kind == "bin" then A.mkApp buildLabel
+                else if k.kind == "test" then A.mkTest buildLabel
                 else A.mkLib buildLabel
               ) else (
                 let A = adapterFor "cpp"; in
@@ -711,7 +739,7 @@ let
   # Build manifest and bin links (extracted module)
   Manifest = import (manifestBase + "/planner/manifest.nix") {
     inherit pkgs lib repoRootStr devOverrideJSON devOverrideCppJSON devOverridePyJSON isCI suppressDevOverrideLog
-            goOutPaths cppOutPaths nodeOutPaths modulesTomlFor pkgPathOf targetNameOf sanitize;
+            goOutPaths cppOutPaths nodeOutPaths rustOutPaths modulesTomlFor pkgPathOf targetNameOf sanitize;
     nodeDevImporters = nodeDevImporters;
     nodeRunnableMeta = nodeRunnableMeta;
     overridePresentList = overridePresentList;

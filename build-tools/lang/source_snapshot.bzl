@@ -66,9 +66,15 @@ def _source_snapshot_runner_impl(ctx):
     module_tree = ctx.actions.symlinked_dir(
         ctx.attrs.name + ".modules",
         {
-            "source-snapshot-graph.ts": ctx.attrs.graph_module,
-            "source-snapshot-policy.ts": ctx.attrs.policy_module,
-            "source-snapshot.ts": ctx.attrs.generator,
+            "dev/source-snapshot-graph.ts": ctx.attrs.graph_module,
+            "dev/source-snapshot-policy.ts": ctx.attrs.policy_module,
+            "dev/source-snapshot.ts": ctx.attrs.generator,
+            "buck/source-selection.ts": ctx.attrs.source_selection_module,
+            "lib/nix-attr-aliases.json": ctx.attrs.nix_attr_aliases,
+            "lib/provider-names.ts": ctx.attrs.provider_names_module,
+            "lib/short-hash.ts": ctx.attrs.short_hash_module,
+            "lib/source-plan-evidence-core.ts": ctx.attrs.source_plan_core_module,
+            "lib/target-label-normalization.ts": ctx.attrs.target_label_module,
         },
     )
     return [
@@ -82,7 +88,7 @@ def _source_snapshot_runner_impl(ctx):
             "--preserve-symlinks-main",
             "--import",
             cmd_args(ctx.attrs.zx_init, format = "./{}"),
-            cmd_args(module_tree, format = "./{}/source-snapshot.ts"),
+            cmd_args(module_tree, format = "./{}/dev/source-snapshot.ts"),
             hidden = [
                 module_tree,
                 ctx.attrs.zx_init,
@@ -97,6 +103,12 @@ source_snapshot_runner = rule(
         "generator": attrs.source(default = "@viberoots//build-tools/tools/dev:source-snapshot.ts"),
         "graph_module": attrs.source(default = "@viberoots//build-tools/tools/dev:source-snapshot-graph.ts"),
         "policy_module": attrs.source(default = "@viberoots//build-tools/tools/dev:source-snapshot-policy.ts"),
+        "source_selection_module": attrs.source(default = "@viberoots//build-tools/tools/buck:source-selection.ts"),
+        "nix_attr_aliases": attrs.source(default = "@viberoots//build-tools/tools/lib:nix-attr-aliases.json"),
+        "provider_names_module": attrs.source(default = "@viberoots//build-tools/tools/lib:provider-names.ts"),
+        "short_hash_module": attrs.source(default = "@viberoots//build-tools/tools/lib:short-hash.ts"),
+        "source_plan_core_module": attrs.source(default = "@viberoots//build-tools/tools/lib:source-plan-evidence-core.ts"),
+        "target_label_module": attrs.source(default = "@viberoots//build-tools/tools/lib:target-label-normalization.ts"),
         "zx_init": attrs.source(default = "@viberoots//build-tools/tools/dev:zx-init.mjs"),
         "zx_wrapper_tool": attrs.dep(
             default = "@viberoots//build-tools/tools/dev:source-snapshot-zx-wrapper",

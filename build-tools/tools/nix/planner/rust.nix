@@ -18,6 +18,10 @@ let
        else if lib.hasPrefix "projects/" repositoryPath then repositoryPath
        else "${packagePath name}/${repositoryPath}";
   rustNodes = builtins.filter (node: builtins.elem "lang:rust" (P.labelsOf node)) ctx.nodes;
+  nixpkgAttrsFor = name:
+    let labels = P.labelsOf (nodeFor name);
+    in builtins.sort (a: b: a < b) (map (lib.removePrefix "nixpkg:")
+      (builtins.filter (label: lib.hasPrefix "nixpkg:" label) labels));
   cargoRootFor = name:
     let
       node = nodeFor name;
@@ -80,8 +84,16 @@ let
       validatedPatchDirs = map (validatePatchDir name) (if patchDirs == null then [] else patchDirs);
       patchCandidates = map (dir: builtins.toPath "${ctx.repoRootStr}/${rootRel}/${dir}") validatedPatchDirs;
       patchInputs = builtins.filter builtins.pathExists patchCandidates;
-    in assert _deps; ctx.T.rustPackage {
-      inherit name kind cargoRoot cargoManifest cargoLock patchInputs;
+      nixpkgAttrs = nixpkgAttrsFor name;
+      nixpkgRecords = ctx.resolveNixpkgAttrs { target = node; attrs = nixpkgAttrs; };
+      missing = builtins.filter (record: record.package == null) nixpkgRecords;
+      sourcePlan = ctx.sourcePlanFor node;
+      template = ctx.T.rustForPkgs sourcePlan.base_pkgs;
+    in if missing != [] then builtins.throw
+      "Rust planner unresolved nixpkg deps for ${name}: ${lib.concatStringsSep ", " (map (record: record.attr) missing)}"
+    else assert _deps; template.rustPackage {
+      inherit name kind cargoRoot cargoManifest cargoLock patchInputs sourcePlan;
+      nixpkgDeps = map (record: record.package) nixpkgRecords;
       crate = if crate == null then lib.last (lib.splitString ":" name) else crate;
       features = if features == null then [] else features;
       defaultFeatures = if defaultFeatures == null then true else defaultFeatures;
@@ -100,10 +112,12 @@ in {
     name = P.nameOf n;
     config = {
       labelPriorityPre = [
+        { label = "kind:test"; kind = "test"; }
         { label = "kind:bin"; kind = "bin"; }
         { label = "kind:lib"; kind = "lib"; }
       ];
       ruleTypes.suffixes = [
+        { suffix = "_test"; kind = "test"; }
         { suffix = "_binary"; kind = "bin"; }
         { suffix = "_library"; kind = "lib"; }
       ];
@@ -113,4 +127,5 @@ in {
   modulesFileFor = _: null;
   mkApp = build "bin";
   mkLib = build "lib";
+  mkTest = build "test";
 }

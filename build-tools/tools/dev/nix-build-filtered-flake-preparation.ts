@@ -101,36 +101,32 @@ export async function copyWorkspaceControlIntoSnapshot(
     {
       relative: ".viberoots/workspace/flake.nix",
       candidates: compactPaths([
-        outputNames?.["//.viberoots/workspace:flake.nix"],
-        "flake.nix",
-        "__global_nix_inputs__/.viberoots-workspace-flake.nix",
+        outputNames?.["root//.viberoots/workspace:flake.nix"],
+        "__global_nix_inputs__/root.viberoots-workspace-flake.nix",
       ]),
       required: true,
     },
     {
       relative: ".viberoots/workspace/flake.lock",
       candidates: compactPaths([
-        outputNames?.["//.viberoots/workspace:flake.lock"],
-        "flake.lock",
-        "__global_nix_inputs__/.viberoots-workspace-flake.lock",
+        outputNames?.["root//.viberoots/workspace:flake.lock"],
+        "__global_nix_inputs__/root.viberoots-workspace-flake.lock",
       ]),
       required: true,
     },
     {
       relative: ".viberoots/workspace/nixpkgs-source-registry-extension.nix",
       candidates: compactPaths([
-        outputNames?.["//.viberoots/workspace:nixpkgs-source-registry-extension"],
-        "nixpkgs-source-registry-extension",
-        "__global_nix_inputs__/.viberoots-workspace-nixpkgs-source-registry-extension",
+        outputNames?.["root//.viberoots/workspace:nixpkgs-source-registry-extension"],
+        "__global_nix_inputs__/root.viberoots-workspace-nixpkgs-source-registry-extension",
       ]),
       required: false,
     },
     {
       relative: "projects/config/node-modules.hashes.json",
       candidates: compactPaths([
-        outputNames?.["//projects/config:node-modules.hashes.json"],
-        "node-modules.hashes.json",
-        "__global_nix_inputs__/projects-config-node-modules.hashes.json",
+        outputNames?.["root//projects/config:node-modules.hashes.json"],
+        "__global_nix_inputs__/rootprojects-config-node-modules.hashes.json",
       ]),
       required: true,
     },

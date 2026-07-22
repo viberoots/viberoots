@@ -11,11 +11,12 @@ import {
 import { runInTemp } from "../lib/test-helpers";
 
 const GLOBAL_INPUT_LABELS = [
-  "//.viberoots/workspace:flake.nix",
-  "//.viberoots/workspace:flake.lock",
+  "root//.viberoots/workspace:flake.nix",
+  "root//.viberoots/workspace:flake.lock",
+  "root//projects/config:node-modules.hashes.json",
   "workspace_buck//:graph.json",
   "@viberoots//build-tools/tools/nix:nixpkgs_source_registry",
-  "//.viberoots/workspace:nixpkgs-source-registry-extension",
+  "root//.viberoots/workspace:nixpkgs-source-registry-extension",
 ];
 
 function readLines(txt: string): string[] {

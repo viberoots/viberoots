@@ -65,6 +65,7 @@ test("extraction blocker detection enforces the visible root allowlist", async (
   const root = await tmpWorkspace("vbr-extraction-blockers-visible-root");
   try {
     await fsp.writeFile(path.join(root, "AGENTS.md"), "follow viberoots/AGENTS.md\n", "utf8");
+    await fsp.writeFile(path.join(root, "test-tmp-paths.log"), "/tmp/owned-fixture\n", "utf8");
     await fsp.writeFile(path.join(root, "Jenkinsfile"), "pipeline {}\n", "utf8");
     await fsp.mkdir(path.join(root, "buck-out"), { recursive: true });
     await fsp.mkdir(path.join(root, "plugins"), { recursive: true });

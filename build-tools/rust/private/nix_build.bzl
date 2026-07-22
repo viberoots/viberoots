@@ -79,6 +79,8 @@ rust_nix_build = rule(
         "profile": attrs.string(default = "release"),
         "target": attrs.string(default = ""),
         "local_patch_dirs": attrs.list(attrs.string(), default = []),
+        "nixpkgs_profile": attrs.string(default = "default"),
+        "nixpkg_pins": attrs.dict(key = attrs.string(), value = attrs.dict(key = attrs.string(), value = attrs.string()), default = {}),
         "labels": attrs.list(attrs.string(), default = []),
     }),
 )

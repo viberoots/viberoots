@@ -10,6 +10,9 @@ export function normalizeNixpkgPins(raw: unknown): NixpkgPins {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
     const normalizedAttr = normalizeNixAttr(attr);
     if (!normalizedAttr) continue;
+    if (Object.hasOwn(out, normalizedAttr)) {
+      throw new Error(`duplicate normalized nixpkg_pins key ${normalizedAttr}`);
+    }
     const pin: Record<string, string> = {};
     for (const [k, v] of Object.entries(entry as Record<string, unknown>)) {
       if (typeof v === "string") pin[k] = v;

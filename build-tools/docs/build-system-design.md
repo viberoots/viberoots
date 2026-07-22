@@ -99,6 +99,10 @@ to watch the importer worktree rather than an evaluation bundle.
 - Buck2 remains the **source of truth** for the dependency graph and test impact analysis. Native
   Rust targets use Buck `deps` for impact and ordering while Cargo manifests remain Rust source
   dependency authority within one package-local Cargo root.
+- Native Rust binaries, libraries, and tests use the shared target source-plan authority.
+  `nixpkgs_profile` selects the toolchain and ordinary `nixpkg_deps`; `nixpkg_pins` redirects only
+  declared native dependency attrs. Rust tests execute compiled Cargo harnesses through Buck's
+  bounded project-relative external runner, and only Rust binaries enter `run.prod` manifests.
 - Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.
 - Planner-visible probes/stubs are allowed only when explicitly documented as non-build exceptions.
 - Patching third-party modules is **ergonomic**, **idempotent**, and **cache-friendly**.
@@ -200,7 +204,7 @@ extra-experimental-features = nix-command flakes
 1. **Idempotent patches:** Re-applying the **same** patch must **not** cause rebuilds.
 1. **Sanitization (names/attrs):** All Starlark macros should use `//build-tools/lang:sanitize.bzl:sanitize_name` for artifact and attribute names. The Nix side mirrors this transform in `build-tools/tools/nix/lib/lang-helpers.nix:sanitizeName`. TypeScript tooling must not hand-roll this contract; use `build-tools/tools/lib/sanitize.ts:sanitizeName` so callsites stay drift-free.
    - **Nix “target label → attr suffix” mapping**: the canonical contract lives in `build-tools/tools/lib/labels.ts:sanitizeAttrNameFromLabel` and `//build-tools/lang:nix_attr.bzl:sanitize_nix_attr_from_target_label`. If this mapping changes, update both and keep `build-tools/tools/tests/labels/nix-attr-sanitize.parity.test.ts` passing.
-1. **Global inputs policy (PR‑5):** Treat repository‑level global inputs (e.g., `flake.lock`) primarily at the builder/Nix level. Macros must not hardcode `//.viberoots/workspace:flake.lock`. When a macro directly calls Nix, wire global inputs through `//build-tools/lang:defs_common.bzl:wire_global_nix_inputs(...)` (implemented in `//build-tools/lang:nix_calling_macros.bzl` and backed by `//build-tools/lang:global_inputs.bzl:global_nix_inputs()`).
+1. **Global inputs policy (PR‑5):** Treat repository‑level global inputs (e.g., `flake.lock`) primarily at the builder/Nix level. Macros must not hardcode `root//.viberoots/workspace:flake.lock`. Consumer-owned global inputs use explicit `root//` labels so macros instantiated from another cell cannot resolve them relative to that cell. When a macro directly calls Nix, wire global inputs through `//build-tools/lang:defs_common.bzl:wire_global_nix_inputs(...)` (implemented in `//build-tools/lang:nix_calling_macros.bzl` and backed by `//build-tools/lang:global_inputs.bzl:global_nix_inputs()`).
 
 1. **Nixpkgs source profiles:** Nix-backed selected builds use the target's `nixpkgs_profile` as the
    base package universe. C++ selected builds instantiate templates with that profile's `pkgs`, so

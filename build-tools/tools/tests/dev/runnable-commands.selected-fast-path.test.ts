@@ -1,5 +1,7 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import fs from "fs-extra";
+import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { withoutArtifactEnvironmentInfluence } from "../../lib/artifact-environment";
@@ -60,5 +62,25 @@ test("p keeps temp workspaces on path capture even with --source=git", async () 
     })`viberoots/build-tools/tools/bin/p ${selectedFastPathTarget} --source=git`;
     assert.match(String(run.stdout || ""), /selected-prod-ok/);
     assert.match(String(run.stderr || ""), /creating filtered source snapshot/i);
+  });
+});
+
+test("p rejects test targets before selected output-shape inference", async () => {
+  await runInTemp("runnable-selected-test-rejected", async (tmp, $) => {
+    await prepareSelectedFastPathFixture(tmp);
+    const targetsPath = path.join(tmp, "projects", "apps", "demo", "TARGETS");
+    const targets = await fs.readFile(targetsPath, "utf8");
+    await fs.writeFile(targetsPath, targets.replace('"kind:bin"', '"kind:test"'), "utf8");
+    await $`u`;
+
+    const run = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      nothrow: true,
+      env: withoutArtifactEnvironmentInfluence(process.env),
+    })`viberoots/build-tools/tools/bin/p ${selectedFastPathTarget}`;
+    assert.notEqual(run.exitCode, 0);
+    assert.match(String(run.stderr || run.stdout), /target is not runnable \(test-only\)/);
+    assert.doesNotMatch(String(run.stderr || ""), /creating filtered source snapshot/i);
   });
 });

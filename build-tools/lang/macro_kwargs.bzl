@@ -63,6 +63,8 @@ def pop_nixpkg_pins(kwargs):
         normalized = normalize_nix_attr(attr)
         if normalized == "":
             fail("nixpkg_pins contains an empty nixpkgs attr key")
+        if normalized in out:
+            fail("duplicate normalized nixpkg_pins key %s" % normalized)
         out[normalized] = _validate_pin_entry(normalized, entry)
     return out
 

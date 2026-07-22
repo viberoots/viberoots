@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import fs from "fs-extra";
+import path from "node:path";
 import test from "node:test";
+import { copyWorkspaceControlIntoSnapshot } from "../../dev/nix-build-filtered-flake-preparation";
 import { renderGlobalNixInputTargets } from "../../lib/global-nix-input-targets";
+import { runInScratchTemp } from "../lib/test-helpers";
 
 const base = {
   hashesJson: Buffer.from("{}\n"),
@@ -22,6 +26,55 @@ test("global Nix input TARGETS use stable labels and content-addressed outputs",
     /out = "nixpkgs-source-registry-extension\.[a-f0-9]{64}\.nix"/,
   );
   assert.doesNotMatch(first.projectsConfigTargets, /\/\/projects:/);
+  assert.deepEqual(Object.keys(first.outputNames).sort(), [
+    "root//.viberoots/workspace:flake.lock",
+    "root//.viberoots/workspace:flake.nix",
+    "root//.viberoots/workspace:nixpkgs-source-registry-extension",
+    "root//projects/config:node-modules.hashes.json",
+  ]);
+});
+
+test("filtered snapshots consume root-qualified synthetic global inputs", async () => {
+  await runInScratchTemp("root-global-inputs", async (tmp) => {
+    for (const [relative, contents] of [
+      ["__global_nix_inputs__/root.viberoots-workspace-flake.nix", "flake"],
+      ["__global_nix_inputs__/root.viberoots-workspace-flake.lock", "lock"],
+      [
+        "__global_nix_inputs__/root.viberoots-workspace-nixpkgs-source-registry-extension",
+        "registry",
+      ],
+      ["__global_nix_inputs__/rootprojects-config-node-modules.hashes.json", "hashes"],
+    ]) {
+      await fs.outputFile(path.join(tmp, relative), `${contents}\n`);
+    }
+    const snapshot = path.join(tmp, "snapshot");
+    await copyWorkspaceControlIntoSnapshot(tmp, snapshot);
+    assert.equal(
+      await fs.readFile(path.join(snapshot, ".viberoots/workspace/flake.nix"), "utf8"),
+      "flake\n",
+    );
+    assert.equal(
+      await fs.readFile(path.join(snapshot, "projects/config/node-modules.hashes.json"), "utf8"),
+      "hashes\n",
+    );
+  });
+});
+
+test("filtered snapshots reject legacy basename global inputs", async () => {
+  await runInScratchTemp("legacy-global-inputs", async (tmp) => {
+    for (const relative of [
+      "flake.nix",
+      "flake.lock",
+      "nixpkgs-source-registry-extension",
+      "node-modules.hashes.json",
+    ]) {
+      await fs.outputFile(path.join(tmp, relative), `${relative}\n`);
+    }
+    await assert.rejects(
+      copyWorkspaceControlIntoSnapshot(tmp, path.join(tmp, "snapshot")),
+      /missing declared \.viberoots\/workspace\/flake\.nix/,
+    );
+  });
 });
 
 test("each mutable global export changes only its declared output identity", () => {

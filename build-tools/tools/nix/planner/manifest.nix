@@ -10,6 +10,7 @@
 , goOutPaths
 , cppOutPaths
 , nodeOutPaths
+, rustOutPaths
 , nodeDevImporters ? {}
 , nodeRunnableMeta ? {}
 , modulesTomlFor
@@ -26,7 +27,7 @@ let
       presentOrdered = builtins.filter (l: builtins.elem l overridePresentList) order;
       toShort = l: if l == "python" then "py" else l;
     in lib.concatStringsSep " " (map toShort presentOrdered);
-  allDeps = (lib.attrValues goOutPaths) ++ (lib.attrValues cppOutPaths) ++ (lib.attrValues nodeOutPaths);
+  allDeps = (lib.attrValues goOutPaths) ++ (lib.attrValues cppOutPaths) ++ (lib.attrValues nodeOutPaths) ++ (lib.attrValues rustOutPaths);
   all = pkgs.runCommand "graph-outputs" { inherit allDeps; } ''
       set -eu
       mkdir -p $out
@@ -102,6 +103,29 @@ let
           fi
         ''
       ) cppOutPaths)}
+      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (n: p:
+        ''
+          ln -s "${p}" "$out/" || true
+          echo "== rust target: ${n} ==" >> $out/build.log
+          bins=""
+          first_bin=""
+          if [ -d "${p}/bin" ]; then
+            for f in "${p}/bin"/*; do
+              if [ -f "$f" ] && [ -x "$f" ]; then
+                if [ -z "$bins" ]; then bins="\"$f\""; else bins="$bins, \"$f\""; fi
+                if [ -z "$first_bin" ]; then first_bin="$f"; fi
+                ln -s "$f" "$out/bin/$(basename "$f")" || true
+                ln -s "$f" "$out/bin/rust-${sanitize n}" || true
+              fi
+            done
+          fi
+          if [ -n "$bins" ]; then
+            if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
+            echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [], \"runnable\": { \"kind\": \"native-bin\", \"run\": { \"prod\": { \"argv\": [ \"$first_bin\" ] } }, \"artifacts\": { \"bins\": [ $bins ] } } }" >> $out/manifest.json
+            first=0
+          fi
+        ''
+      ) rustOutPaths)}
       ${lib.concatStringsSep "\n" (lib.mapAttrsToList (n: p:
         ''
           ln -s "${p}" "$out/" || true

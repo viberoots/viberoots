@@ -6,6 +6,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
+import { installCanonicalArtifactToolsAuthority } from "../../lib/artifact-tool-authority";
 import { viberootsSourcePath } from "./test-helpers/source-paths";
 
 // The canonical tool authority rejects any asserted VBR_ARTIFACT_TOOLS_ROOT
@@ -37,6 +38,24 @@ test("canonicalArtifactToolsRoot rejects an empty asserted root when no manifest
     () => canonicalArtifactToolsRoot("/", ""),
     /canonical generated tool authority|Nix store directory/,
   );
+});
+
+test("canonicalArtifactToolsRoot rejects a distinct valid active store authority", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "artifact-authority-mismatch-"));
+  const toolsRoot = canonicalArtifactToolsRoot(process.cwd());
+  try {
+    await installCanonicalArtifactToolsAuthority(tmp, toolsRoot);
+    const nodePath = await fsp.realpath(path.join(toolsRoot, "bin", "node"));
+    const nodeStoreRoot = nodePath.match(/^(\/nix\/store\/[a-z0-9]{32}-[^/]+)/u)?.[1];
+    assert.ok(nodeStoreRoot, `node must resolve into a literal Nix store root: ${nodePath}`);
+    assert.notEqual(nodeStoreRoot, toolsRoot);
+    assert.throws(
+      () => canonicalArtifactToolsRoot(tmp, nodeStoreRoot),
+      /canonical artifact tool authority mismatch: generated=.* active=.*; run u && i/,
+    );
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
 });
 
 test("ordinary ingress does not replace a missing manifest with ambient tool authority", async () => {

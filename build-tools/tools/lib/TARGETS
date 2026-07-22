@@ -1,4 +1,34 @@
-load("@prelude//:rules.bzl", "filegroup")
+load("@prelude//:rules.bzl", "export_file", "filegroup")
+
+export_file(
+    name = "source-plan-evidence-core.ts",
+    src = "source-plan-evidence-core.ts",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "nix-attr-aliases.json",
+    src = "nix-attr-aliases.json",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "provider-names.ts",
+    src = "provider-names.ts",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "short-hash.ts",
+    src = "short-hash.ts",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
+    name = "target-label-normalization.ts",
+    src = "target-label-normalization.ts",
+    visibility = ["PUBLIC"],
+)
 
 filegroup(
     name = "runtime_ts",

@@ -14,6 +14,22 @@ import { removeTreeWithWritableFallback } from "../lib/test-helpers/remove-tree"
 
 const execFileAsync = promisify(execFile);
 
+async function addFixtureExportTarget(importer: string, source: string): Promise<void> {
+  await fsp.writeFile(
+    path.join(importer, "TARGETS"),
+    [
+      'load("@prelude//:rules.bzl", "export_file")',
+      "",
+      "export_file(",
+      '    name = "fixture-source",',
+      `    src = ${JSON.stringify(source)},`,
+      '    visibility = ["PUBLIC"],',
+      ")",
+      "",
+    ].join("\n"),
+  );
+}
+
 async function addOfflineSurfaces(root: string): Promise<void> {
   const importer = path.join(root, "projects/apps/mixed");
   const local = path.join(root, "projects/apps/local");
@@ -34,6 +50,7 @@ async function addOfflineSurfaces(root: string): Promise<void> {
     "[project]\nname='mixed'\nversion='0.0.0'\nrequires-python='>=3.11'\n",
   );
   await fsp.writeFile(path.join(importer, "main.cpp"), "int main() { return 0; }\n");
+  await addFixtureExportTarget(importer, "main.cpp");
   await execFileAsync("git", ["add", "projects"], { cwd: root });
 }
 
@@ -53,6 +70,7 @@ async function addOfflinePnpm(root: string, importer: string, version = 1): Prom
     path.join(importer, "pnpm-lock.yaml"),
     "lockfileVersion: '9.0'\nimporters:\n  .: {}\n",
   );
+  await addFixtureExportTarget(importer, "package.json");
 }
 
 test("real u repairs bounded offline language inputs without moving viberoots", async () => {

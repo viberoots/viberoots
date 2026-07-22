@@ -1,6 +1,11 @@
 import * as fsp from "node:fs/promises";
 import { isProviderPackageNode } from "../lib/graph-utils";
-import { packagePathFromLabel, parseLockfileLabel, normalizeTargetLabel } from "../lib/labels";
+import {
+  dropConfigSuffix,
+  packagePathFromLabel,
+  parseLockfileLabel,
+  normalizeTargetLabel,
+} from "../lib/labels";
 import {
   patchInvalidationStrategyForLang,
   type PatchScope,
@@ -11,9 +16,12 @@ import type { InvalidationRow } from "./invalidation-report-lib";
 type AutoMap = Record<string, string[]>;
 
 const GLOBAL_NIX_INPUT_LABELS = [
-  "//.viberoots/workspace:flake.lock",
-  "@viberoots//build-tools/tools/nix:nixpkgs_source_registry",
-  "//.viberoots/workspace:nixpkgs-source-registry-extension",
+  "root//.viberoots/workspace:flake.nix",
+  "root//.viberoots/workspace:flake.lock",
+  "root//projects/config:node-modules.hashes.json",
+  "workspace_buck//:graph.json",
+  "viberoots//build-tools/tools/nix:nixpkgs_source_registry",
+  "root//.viberoots/workspace:nixpkgs-source-registry-extension",
 ];
 
 export type InvalidationReportNode = {
@@ -57,16 +65,16 @@ function providerModelForLang(lang: string): ProviderModel | null {
 }
 
 function hasLabel(labels: string[], want: string): boolean {
-  return labels.some((l) => typeof l === "string" && l === want);
+  return labels.some((label) => typeof label === "string" && canonicalInputLabel(label) === want);
 }
 
 function hasGlobalNixInputs(values: string[]): boolean {
-  return GLOBAL_NIX_INPUT_LABELS.every((label) => values.some((v) => v === label));
+  const canonical = new Set(values.map(canonicalInputLabel));
+  return GLOBAL_NIX_INPUT_LABELS.every((label) => canonical.has(label));
 }
 
-function prefixKeys(obj: unknown, prefix: string): string[] {
-  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return [];
-  return Object.keys(obj as Record<string, unknown>).filter((k) => k.startsWith(prefix));
+function canonicalInputLabel(label: string): string {
+  return dropConfigSuffix(String(label || "").trim()).replace(/^@/, "");
 }
 
 function listValues(obj: unknown): string[] {
@@ -144,9 +152,7 @@ export function computeInvalidationRow(
   const globalNixLabelsStamped = GLOBAL_NIX_INPUT_LABELS.every((label) => hasLabel(labels, label));
   const globalNixObserved: string[] = [];
   const globalNixExpected =
-    hasGlobalNixInputs(listValues(n.srcs)) ||
-    prefixKeys(n.srcs, "__global_nix_inputs__/").length > 0 ||
-    hasGlobalNixInputs(listValues(n.nix_inputs));
+    hasGlobalNixInputs(listValues(n.srcs)) || hasGlobalNixInputs(listValues(n.nix_inputs));
 
   if (Array.isArray(n.srcs)) {
     const srcsList = n.srcs as unknown[];
@@ -185,7 +191,7 @@ export function computeInvalidationRow(
     }
   } else if (n.srcs && typeof n.srcs === "object") {
     const keys = Object.keys(n.srcs as Record<string, unknown>);
-    if (keys.some((k) => k.startsWith("__global_nix_inputs__/"))) {
+    if (hasGlobalNixInputs(listValues(n.srcs))) {
       globalNixObserved.push("srcs(dict)/__global_nix_inputs__");
     }
     if (keys.some((k) => k.startsWith("__patch_inputs__/"))) {
@@ -206,7 +212,7 @@ export function computeInvalidationRow(
     }
   } else if (n.nix_inputs && typeof n.nix_inputs === "object") {
     const keys = Object.keys(n.nix_inputs as Record<string, unknown>);
-    if (keys.some((k) => k.startsWith("__global_nix_inputs__/"))) {
+    if (hasGlobalNixInputs(listValues(n.nix_inputs))) {
       globalNixObserved.push("nix_inputs(dict)/__global_nix_inputs__");
     }
   }

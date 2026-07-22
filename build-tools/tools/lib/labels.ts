@@ -3,6 +3,11 @@ import path from "node:path";
 import { isSupportedImporterLabel } from "./importers";
 import { normalizeNixAttr, providerNameForImporter, providerNameForNixAttr } from "./providers";
 import { workspaceProviderLabel } from "./workspace-state-paths";
+import {
+  dropCellPrefix as canonicalDropCellPrefix,
+  dropConfigSuffix as canonicalDropConfigSuffix,
+  normalizeTargetLabel as canonicalNormalizeTargetLabel,
+} from "./target-label-normalization";
 
 function fqProviderLabel(name: string): string {
   return workspaceProviderLabel(name);
@@ -109,20 +114,17 @@ export function providersForLabels(labels: string[] | undefined): string[] {
 // Drop Buck's configuration suffix that appears after a space and "(...)".
 // Buck2 can emit multiple suffix shapes (e.g. "(config//...)" or "(root//:platform#...)").
 export function dropConfigSuffix(label: string): string {
-  return String(label || "").split(" (")[0];
+  return canonicalDropConfigSuffix(label);
 }
 
 // Convert labels like "root//projects/apps/foo:svc" or "prelude//build-tools/cpp:lib" to "//projects/apps/foo:svc" or "//build-tools/cpp:lib".
 export function dropCellPrefix(label: string): string {
-  const s = String(label || "");
-  if (s.startsWith("//")) return s;
-  const idx = s.indexOf("//");
-  return idx >= 0 ? "//" + s.slice(idx + 2) : s;
+  return canonicalDropCellPrefix(label);
 }
 
 // Normalize a fully-qualified Buck target for display/keys by dropping config suffixes and cell prefixes.
 export function normalizeTargetLabel(label: string): string {
-  return dropCellPrefix(dropConfigSuffix(label));
+  return canonicalNormalizeTargetLabel(label);
 }
 
 // Derive the Buck package path (without leading "//") from a target label.

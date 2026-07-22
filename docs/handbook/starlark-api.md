@@ -41,6 +41,7 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
 - `@viberoots//build-tools/rust:defs.bzl`
   - `rust_library`
   - `rust_binary`
+  - `rust_test`
 
 ## Additional public surfaces
 
@@ -1565,6 +1566,9 @@ Public args:
 - `profile` string. Native Cargo profile, `release` or `dev`; defaults to `release`.
 - `target` string. Reserved explicit target triple. PR-1 native builds require it to be empty.
 - `local_patch_dirs` list of strings. Normalized package-relative Rust patch input directories without traversal; defaults to `patches/rust`.
+- `nixpkg_deps` list of strings. Declared nixpkgs packages available to Cargo build scripts.
+- `nixpkgs_profile` string. Named source profile for the toolchain and unpinned native dependencies; defaults to `default`.
+- `nixpkg_pins` dict. Per-attribute source-profile overrides with a non-empty rationale.
 
 ### `rust_binary(name, **kwargs)`
 
@@ -1598,3 +1602,10 @@ Public args:
 - `profile` string. Native Cargo profile, `release` or `dev`; defaults to `release`.
 - `target` string. Reserved explicit target triple. PR-1 native builds require it to be empty.
 - `local_patch_dirs` list of strings. Normalized package-relative Rust patch input directories without traversal; defaults to `patches/rust`.
+- `nixpkg_deps`, `nixpkgs_profile`, and `nixpkg_pins` use the same source-selection contract as `rust_library`.
+
+### `rust_test(name, **kwargs)`
+
+Use this for native Cargo tests. It accepts the same Cargo, source-selection, dependency, patch,
+label, and visibility arguments as `rust_library`. Buck executes the Nix-built Cargo harnesses
+through a bounded project-relative external runner. Tests are not runnable application entries.

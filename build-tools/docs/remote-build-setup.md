@@ -1201,7 +1201,7 @@ Activation requires:
 - configuring authentication and TLS for the RE endpoint
 - adding at least one non-empty profile to `toolchains//:remote_test_execution` for test execution
 - keeping repo-owned test rules (`zx_test`, Node, Go, C++, and Python Nix tests) on their local default while allowing selected profiles to pass the chosen executor fields into `ExternalRunnerTestInfo`; Node, Go, C++, and Python selection is per-target, while `zx_test` also honors the PR7 `[test] viberoots_remote_profile` activation config
-- auditing Rust Nix build rules separately as build-action RE candidates; this repo does not currently expose a Rust external-runner test wrapper
+- keeping Rust external-runner tests local by default until PR-5 proves worker tool closure, source-snapshot materialization, environment filtering, and cleanup; the wrapper's executor fields and project-relative metadata are readiness plumbing, not remote-readiness evidence
 - ensuring remote-capable external-runner tests set `use_project_relative_paths = True` and `run_from_project_root = True`; CI may pass Buck2's `--unstable-allow-compatible-tests-on-re` only to allow compatible tests to run on RE, not to make incompatible tests compatible
 - adding a remote-enabled execution platform/executor config for build actions; the test remote execution toolchain alone does not make ordinary build/genrule actions remote
 - opting rule families into remote build execution only after their actions are hermetic

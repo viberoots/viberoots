@@ -50,10 +50,14 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
             nodes = [ node ];
             pkgPathOf = _: "projects/apps/rustapp";
             repoRootStr = ${JSON.stringify(tmp)};
-            T.rustPackage = args: {
-              manifest = builtins.toString args.cargoManifest;
-              lock = builtins.toString args.cargoLock;
-              patches = map builtins.toString args.patchInputs;
+            resolveNixpkgAttrs = _: [];
+            sourcePlanFor = _: { base_pkgs = pkgs; nixpkgs_profile = "default"; nixpkg_pins = {}; };
+            T.rustForPkgs = _: {
+              rustPackage = args: {
+                manifest = builtins.toString args.cargoManifest;
+                lock = builtins.toString args.cargoLock;
+                patches = map builtins.toString args.patchInputs;
+              };
             };
           };
           plugin = (import ./viberoots/build-tools/tools/nix/planner/rust.nix { inherit lib; }) ctx;

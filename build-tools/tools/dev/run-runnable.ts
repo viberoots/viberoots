@@ -59,7 +59,12 @@ export async function runRunnable(opts: {
   const target = await resolveRunnableTargetLabel(workspaceRoot, parsed.target || ".", {
     baseDir: cwd,
   });
-  let targetHints: { importer: string; mode: "static" | "ssr"; framework: string } | null = null;
+  let targetHints: {
+    importer: string;
+    mode: "static" | "ssr";
+    framework: string;
+    targetKind: string;
+  } | null = null;
   let entry: RunnableManifestEntry | null = null;
   if (opts.resolveEntry) {
     entry = await opts.resolveEntry(target);
@@ -68,6 +73,10 @@ export async function runRunnable(opts: {
     // This avoids full graph manifest materialization for one-target run commands.
     const hints = await runnableHintsForTarget(workspaceRoot, target);
     targetHints = hints;
+    if (hints.targetKind === "lib" || hints.targetKind === "test") {
+      console.error(`target is not runnable (${hints.targetKind}-only): ${target}`);
+      process.exit(2);
+    }
     const importer = hints.importer;
     let selectedError: unknown = null;
     let selectedOutPath = "";

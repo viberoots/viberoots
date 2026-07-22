@@ -16,7 +16,7 @@ function firstCqueryNode<T>(json: unknown): T | null {
   return null;
 }
 
-test("rust macros: rust_library and rust_binary use rust_nix_build", async () => {
+test("rust macros export native build, test, and source-selection contracts", async () => {
   await runInTemp("rust-nix-build-rule-types", async (tmp, $) => {
     const appDir = path.join(tmp, "projects", "apps", "rustapp");
     await fs.mkdirp(path.join(appDir, "src"));
@@ -42,10 +42,11 @@ test("rust macros: rust_library and rust_binary use rust_nix_build", async () =>
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_library")',
+        'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_library", "rust_test")',
         "",
-        'rust_library(name = "lib", crate = "rustapp", features = ["demo"], default_features = False, srcs = ["src/lib.rs"])',
+        'rust_library(name = "lib", crate = "rustapp", features = ["demo"], default_features = False, nixpkg_deps = ["pkgs.zlib"], nixpkgs_profile = "default", nixpkg_pins = {"pkgs.zlib": {"nixpkgs_profile": "default", "rationale": "fixture"}}, srcs = ["src/lib.rs"])',
         'rust_binary(name = "app", crate = "rustapp", srcs = ["src/main.rs"], deps = [":lib"])',
+        'rust_test(name = "test", crate = "rustapp", srcs = ["src/lib.rs"])',
         "",
       ].join("\n"),
       "utf8",
@@ -75,10 +76,20 @@ test("rust macros: rust_library and rust_binary use rust_nix_build", async () =>
     })`buck2 cquery --target-platforms //:no_cgo "kind(genrule, //projects/apps/rustapp:lib)"`;
     assert.equal(String(genruleProbe.stdout || "").trim(), "");
 
+    const testProbe = await $({ cwd: tmp, stdio: "pipe" })`
+      buck2 cquery --target-platforms //:no_cgo "kind(rust_nix_test, //projects/apps/rustapp:test)"
+    `;
+    assert.match(String(testProbe.stdout || ""), /rustapp:test/);
+
+    const crossCellExample = await $({ cwd: tmp, stdio: "pipe" })`
+      buck2 cquery --target-platforms //:no_cgo viberoots//build-tools/tools/nix/examples/rust/native-example:lib
+    `;
+    assert.match(String(crossCellExample.stdout || ""), /native-example:lib/);
+
     const fields = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cargo_manifest --output-attribute cargo_lock --output-attribute crate --output-attribute features --output-attribute default_features --output-attribute profile --output-attribute target --output-attribute local_patch_dirs --output-attribute deps --output-attribute srcs --output-attribute labels //projects/apps/rustapp:lib`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cargo_manifest --output-attribute cargo_lock --output-attribute crate --output-attribute features --output-attribute default_features --output-attribute profile --output-attribute target --output-attribute local_patch_dirs --output-attribute nixpkgs_profile --output-attribute nixpkg_pins --output-attribute deps --output-attribute srcs --output-attribute labels //projects/apps/rustapp:lib`;
     const serialized = String(fields.stdout || "");
     for (const expected of [
       "Cargo.toml",
@@ -94,11 +105,16 @@ test("rust macros: rust_library and rust_binary use rust_nix_build", async () =>
       default_features?: boolean;
       labels?: string[];
       local_patch_dirs?: string[];
+      nixpkgs_profile?: string;
+      nixpkg_pins?: Record<string, unknown>;
       srcs?: string[];
     }>(JSON.parse(serialized));
     assert.equal(node?.default_features, false);
+    assert.equal(node?.nixpkgs_profile, "default");
+    assert.ok(node?.nixpkg_pins?.["pkgs.zlib"]);
     assert.deepEqual(node?.local_patch_dirs, ["patches/rust"]);
     assert.ok(node?.labels?.includes("patch_scope:package-local"));
+    assert.ok(node?.labels?.includes("nixpkg:pkgs.zlib"));
     assert.ok(
       node?.srcs?.some((source) => String(source).endsWith("patches/rust/demo.patch")),
       `real Rust patch file is not a declared action input: ${JSON.stringify(node?.srcs)}`,

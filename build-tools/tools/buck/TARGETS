@@ -6,6 +6,12 @@ export_file(
     visibility = ["PUBLIC"],
 )
 
+export_file(
+    name = "source-selection.ts",
+    src = "source-selection.ts",
+    visibility = ["PUBLIC"],
+)
+
 filegroup(
     name = "runtime_ts",
     srcs = glob([

@@ -38,6 +38,9 @@ EOF
           };
           cppOutPaths = {};
           nodeOutPaths = {};
+          rustOutPaths = {
+            "//projects/apps/rust-cli:rust-cli" = mkBin;
+          };
           nodeDevImporters = {};
           modulesTomlFor = _: ./gomod2nix.toml;
           pkgPathOf = _: ".";
@@ -62,13 +65,22 @@ EOF
     // Assert only binaries are present (label ends with demo-cli target, not lib)
     const labels = arr.map((e) => String(e?.label || ""));
     const hasCli = labels.some((l) => /projects\/apps\/demo-cli:demo-cli/.test(l));
+    const hasRustCli = labels.some((l) => /projects\/apps\/rust-cli:rust-cli/.test(l));
     const hasLib = labels.some((l) => /projects\/libs\/demo-lib:demo-lib/.test(l));
-    if (!hasCli || hasLib) {
-      console.log("not ok 1 - manifest should contain only binaries (cli present, lib absent)");
+    if (!hasCli || !hasRustCli || hasLib) {
+      console.log("not ok 1 - manifest should contain only Go and Rust binaries (library absent)");
       console.log(`  ---\n  labels: ${JSON.stringify(labels)}\n  ...`);
       return false;
     }
-    console.log("ok 1 - manifest contains only binaries (library excluded)");
+    const goEntry = arr.find((entry) => entry.label === "//projects/apps/demo-cli:demo-cli");
+    const rustEntry = arr.find((entry) => entry.label === "//projects/apps/rust-cli:rust-cli");
+    if (goEntry?.runnable?.kind !== "native-bin" || rustEntry?.runnable?.kind !== "native-bin") {
+      console.log(
+        "not ok 1 - existing Go and new Rust runnable entries must retain native-bin semantics",
+      );
+      return false;
+    }
+    console.log("ok 1 - manifest contains only binaries and preserves existing Go semantics");
     return true;
   });
   console.log("1..1");

@@ -3,43 +3,13 @@ import assert from "node:assert/strict";
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { fileURLToPath } from "node:url";
-import { pinnedNixpkgsOutPathExpr } from "../../lib/pinned-nixpkgs";
 import { runInScratchTemp } from "../lib/test-helpers";
-
-const sourceRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
-
-async function pinnedNixpkgsPath($: any): Promise<string> {
-  const expr = pinnedNixpkgsOutPathExpr(path.join(sourceRoot, "flake.lock"));
-  const out = await $({
-    stdio: "pipe",
-  })`nix eval --impure --accept-flake-config --raw --expr ${expr}`;
-  return String(out.stdout || "").trim();
-}
-
-async function nixEvalJson($: any, cwd: string, expr: string): Promise<any> {
-  const out = await $({ cwd, stdio: "pipe" })`nix eval --impure --json --expr ${expr}`;
-  return JSON.parse(String(out.stdout || "null"));
-}
-
-function plannerContext(repoRoot: string, nixpkgsPath: string, nodesExpr: string): string {
-  return `
-    let
-      pkgs = import ${nixpkgsPath} {};
-      lib = pkgs.lib;
-      repoRoot = ${repoRoot};
-      nodes = ${nodesExpr};
-      get = attrs: k: attrs.\${k} or null;
-      pkgPathOf = name: ".";
-      resolveNixpkgAttrs = { target, attrs }:
-        map (attr: {
-          inherit attr;
-          profile_name = target.nixpkgs_profile or "default";
-          package = { marker = attr; profile = target.nixpkgs_profile or "default"; };
-        }) attrs;
-    in
-  `;
-}
+import {
+  nixEvalJson,
+  pinnedNixpkgsPath,
+  plannerContext,
+  sourceRoot,
+} from "./nixpkgs-source-selection.test-helpers";
 
 test("Go CGO selected paths resolve nixpkg attrs through the source-selection resolver", async () => {
   await runInScratchTemp("nixpkgs-profile-go-cgo-resolver", async (tmp, $) => {

@@ -60,16 +60,42 @@ contracts without preserving placeholder artifact behavior.
   and same-system artifact identity.
 - Remote and WASM work must exercise produced artifacts, not only labels or successful derivation
   evaluation.
-- Run focused `v` selectors for every PR. This plan explicitly authorizes Turbo Mode: defer, but do
-  not skip, full validation between the PR-2 native baseline, PR-5 lifecycle/initial-interop
-  checkpoint, PR-9 cross-language/WASM checkpoint, and PR-11 final hermeticity checkpoint. PR-4 and
-  PR-7 require conservative broader affected unions for their shared dependency and extension
-  surfaces. Escalate either to a full suite when the affected target set cannot bound indirect
-  consumers. Coverage remains opt-in unless separately required.
+- Run focused `v` selectors for every PR. The table below is authoritative for whether a PR requires
+  a full-scope suite or the explicitly accepted risk-based Turbo Mode process. Coverage remains
+  opt-in unless separately required.
 - Record elapsed time and bounded disk/Nix path evidence under the contributor handbook rules. Do
   not make performance claims without comparable evidence.
 
+### Per-PR Validation Mode
+
+`Full scope` means running `i && b && ALL_TESTS=1 v` from the parent workspace root, in addition to
+the PR's focused, platform, external-evidence, and independent-review gates. `Turbo risk-based`
+means following [`turbo-mode.md`](../../docs/history/process/turbo-mode.md): use the current committed
+checkpoint as `GITHUB_BASE_REF`, run formatting/lint, exact and previously failing selectors, a
+meaningful affected-target union, and independent scope review, while recording the deferred full
+suite in the integration debt ledger. A Turbo PR escalates to full scope before commit whenever its
+affected consumers cannot be bounded or validation exposes a cross-cutting regression.
+
+| PR    | Required validation mode | Required minimum beyond the common focused gate                         |
+| ----- | ------------------------ | ----------------------------------------------------------------------- |
+| PR-1  | Turbo risk-based         | Native build/failure and Rust macro/planner affected union              |
+| PR-2  | Full scope               | First native lifecycle baseline and supported configuration evidence    |
+| PR-3  | Turbo risk-based         | Install/update mutation, rollback, timeout, and process-lifecycle union |
+| PR-4  | Turbo risk-based         | Conservative patch/provider/dependency affected union                   |
+| PR-5  | Full scope               | Initial interop, WASM, scaffolding, remote, and platform checkpoint     |
+| PR-6  | Turbo risk-based         | Cross-root, crate-kind, proc-macro, and host/target affected union      |
+| PR-7  | Turbo risk-based         | Conservative Python/Node extension and packaging affected union         |
+| PR-8  | Turbo risk-based         | Bidirectional ABI, generated binding, and link-closure affected union   |
+| PR-9  | Full scope               | Cross-language/browser/component WASM checkpoint                        |
+| PR-10 | Turbo risk-based         | Developer, dependency-source, watcher, and tooling affected union       |
+| PR-11 | Turbo risk-based         | Conservative Tauri/scaffolding/cross-language/platform affected union   |
+| PR-12 | Full scope               | Final Rust and Tauri hermeticity, publication, builders, and assessment |
+
 ## Turbo Mode Policy
+
+The historical process note supplies the risk-based method, not this plan's milestone numbering.
+Its PR-3-through-PR-18 example cadence is reference history only; the table above defines the active
+Rust-flow cadence.
 
 - Record the viberoots base commit before PR-1. Every scoped `v` invocation must set
   `GITHUB_BASE_REF` to the current Rust-flow Turbo base rather than inheriting a prior range's base.
@@ -83,15 +109,18 @@ contracts without preserving placeholder artifact behavior.
 - Toolchain, dependency, remote-execution, cross-language ABI, shared test-harness, and publication
   changes remain high risk. Use broader targeted validation immediately and run the full suite early
   when their blast radius cannot be proven smaller.
-- PR-11 closes every deferred ledger item with `i && b && ALL_TESTS=1 v`, high-risk selector reruns,
-  plan/design assessments, and same-system independent-builder evidence.
+- PR-11 records its deferred full suite and Tauri-specific assumptions in the integration debt
+  ledger after its conservative affected union. PR-12 closes every Rust and Tauri ledger item with
+  `i && b && ALL_TESTS=1 v`, high-risk selector reruns, plan/design assessments, and same-system
+  independent-builder evidence.
 
 ## De-Risking Checkpoints
 
 1. After PR-1, a real native binary and library compile from locked Cargo inputs on one supported
    system, and invalid Rust fails the build.
-2. After PR-2, tests, runnable manifests, source selection, filtered builds, and all three supported
-   systems share the same native Rust contract.
+2. After PR-2, tests, runnable manifests, source selection, and filtered builds share the native
+   Rust contract on `aarch64-darwin`; the fail-closed three-system configuration is present, while
+   reviewed native Linux execution remains external evidence debt owned by PR-12.
 3. After PR-3, `i`, `u`, and `u --upgrade` have a complete Rust mutation and rollback boundary.
 4. After PR-4, package-local dependency patches and Cargo metadata inspection are deterministic and
    no TODO provider output remains.
@@ -107,24 +136,28 @@ contracts without preserving placeholder artifact behavior.
    component-model output.
 10. After PR-10, Rust has the same developer, lint, documentation, coverage, dependency-source, and
     local-development lifecycle expected of other enabled languages.
-11. After PR-11, sandbox, network, publication, provenance, and independent-builder evidence close
-    the hermeticity and first-class parity claims.
+11. After PR-11, a scaffolded Tauri desktop application consumes supported repository Rust, C/C++,
+    and WASM libraries through declared graph and artifact authorities without host-tool or runtime
+    path discovery.
+12. After PR-12, sandbox, network, publication, provenance, and independent-builder evidence close
+    the Rust and Tauri hermeticity and first-class parity claims.
 
 ## Integration Debt Ledger
 
-| Area                                | Introduced by    | Owner PR | Status | Closure evidence                                               |
-| ----------------------------------- | ---------------- | -------- | ------ | -------------------------------------------------------------- |
-| Placeholder artifact removal        | Current baseline | PR-1     | Closed | Real source-sensitive Cargo outputs and invalid-source failure |
-| Cross-system and runnable parity    | Current baseline | PR-2     | Open   | Native tests and full-suite checkpoint on supported systems    |
-| Cargo mutation ownership            | Current baseline | PR-3     | Open   | Production launcher, rollback, and pin-isolation fixtures      |
-| Patch/provider ambiguity            | Current baseline | PR-4     | Open   | Applied dependency patch and explicit no-provider contract     |
-| Initial interop, WASM, and remote   | Current baseline | PR-5     | Open   | Native/WASM execution and remote-policy checkpoint             |
-| Cross-root composition and outputs  | Parity review    | PR-6     | Open   | Multi-root build plus explicit crate-type and proc-macro tests |
-| Python and Node extensions          | Parity review    | PR-7     | Open   | Runtime import/load tests for native and WASM artifacts        |
-| Complete C and C++ interoperability | Parity review    | PR-8     | Open   | Bidirectional ABI and generated-binding tests                  |
-| WASM ecosystem breadth              | Parity review    | PR-9     | Open   | Static, browser, cross-language, and component execution       |
-| Developer and dependency lifecycle  | Parity review    | PR-10    | Open   | Tooling, coverage, dev, and dependency-source fixtures         |
-| Hermetic release proof              | Parity review    | PR-11    | Open   | Independent builders, protected publication, and final suite   |
+| Area                                 | Introduced by    | Owner PR | Status | Closure evidence                                               |
+| ------------------------------------ | ---------------- | -------- | ------ | -------------------------------------------------------------- |
+| Placeholder artifact removal         | Current baseline | PR-1     | Closed | Real source-sensitive Cargo outputs and invalid-source failure |
+| Cross-system and runnable parity     | Current baseline | PR-12    | Open   | Native tests and full-suite checkpoint on supported systems    |
+| Cargo mutation ownership             | Current baseline | PR-3     | Open   | Production launcher, rollback, and pin-isolation fixtures      |
+| Patch/provider ambiguity             | Current baseline | PR-4     | Open   | Applied dependency patch and explicit no-provider contract     |
+| Initial interop, WASM, and remote    | Current baseline | PR-5     | Open   | Native/WASM execution and remote-policy checkpoint             |
+| Cross-root composition and outputs   | Parity review    | PR-6     | Open   | Multi-root build plus explicit crate-type and proc-macro tests |
+| Python and Node extensions           | Parity review    | PR-7     | Open   | Runtime import/load tests for native and WASM artifacts        |
+| Complete C and C++ interoperability  | Parity review    | PR-8     | Open   | Bidirectional ABI and generated-binding tests                  |
+| WASM ecosystem breadth               | Parity review    | PR-9     | Open   | Static, browser, cross-language, and component execution       |
+| Developer and dependency lifecycle   | Parity review    | PR-10    | Open   | Tooling, coverage, dev, and dependency-source fixtures         |
+| Hermetic release proof               | Parity review    | PR-12    | Open   | Independent builders, protected publication, and final suite   |
+| Tauri repository-library composition | Product template | PR-11    | Open   | Scaffold, cross-language build/run tests, and platform proof   |
 
 ## PR-1: Replace Placeholder Outputs With Locked Native Cargo Builds
 
@@ -210,10 +243,13 @@ Complete the native Rust target lifecycle after real compilation exists.
 - Publish native binary `run.prod` entries and keep libraries out of runnable summaries.
 - Add `nixpkg_deps`, `nixpkgs_profile`, and `nixpkg_pins` to Rust macro, graph, planner, and Nix
   build-script inputs.
-- Preserve selected, full, filtered-bundle, source-snapshot, cache-manifest, and remote-prepared
-  source-plan identity.
+- Preserve Cargo and source-plan identity through selected and full canonical filtered bundles and
+  declared source snapshots, and prove a dry-run remote-preparation handoff for the selected
+  artifact. Protected cache manifests never duplicate checkout source-plan fields; Rust-specific
+  signed-aggregate cache binding, worker materialization, and admission remain PR-5 scope.
 - Add native Rust examples to the language registry prerequisites without enabling scaffolding yet.
-- Prove the same contract on `aarch64-darwin`, `aarch64-linux`, and `x86_64-linux`.
+- Prove the contract natively on `aarch64-darwin` and configure the two Linux systems fail closed;
+  PR-12 owns reviewed native Linux execution before the supported-system claim closes.
 
 ### 3. External prerequisites
 
@@ -227,7 +263,9 @@ native test execution.
   listed as runnable.
 - Default and non-default nixpkgs profiles plus pinned and unpinned native deps reach Cargo build
   scripts without host pkg-config or linker inputs.
-- Selected/full/filtered/remote-prepared inspections agree for Cargo and source-plan fields.
+- Selected/full canonical filtered-bundle and declared source-snapshot inspections agree for Cargo
+  and source-plan fields; a dry-run materialization manifest binds the immutable selected bundle
+  and output. Existing cache-manifest policy continues to reject checkout source-plan fields.
 - Run the first plan full-suite checkpoint.
 
 ### 5. Docs to be added or updated
@@ -242,8 +280,10 @@ remote snapshots, cache manifests, and generated planner registry data.
 
 ### 6. Acceptance criteria
 
-Native Rust libraries, binaries, and tests work on every supported system with the same explicit
-Cargo and source-plan contract. Runnables and tests use only reviewed tools and artifacts.
+Native Rust libraries, binaries, and tests work on `aarch64-darwin` with the same explicit Cargo
+and source-plan contract, and the Linux matrix configuration fails closed. Runnables and tests use
+only reviewed tools and artifacts. PR-12 must close native Linux execution evidence before Rust is
+claimed on every supported system.
 
 ### 7. Risks
 
@@ -391,7 +431,8 @@ Local path dependencies remain reviewed source rather than third-party patch tar
 - Patch removal restores behavior without provider glue, and repeated generation is byte-stable.
 - Protected jobs reject local overrides, while local development bundles consume the explicit
   override identity and report it visibly.
-- Run the second full-suite checkpoint.
+- Run a conservative broader patch/provider/dependency affected-target union. Escalate to the full
+  suite before commit if indirect consumers cannot be bounded.
 
 ### 5. Docs to be added or updated
 
@@ -481,7 +522,7 @@ remote execution policy, cache manifests, full macro inventory, verify selection
 
 The initial C ABI, freestanding WASM, WASI, scaffolding, and remote-policy paths have direct artifact
 evidence. Rust may be enabled as an experimental scaffolded language, but it is not described as
-feature-parity or release-hermetic until PR-11 passes.
+feature-parity or release-hermetic until PR-12 passes.
 
 ### 7. Risks
 
@@ -910,96 +951,199 @@ than other supported languages during normal development.
 The supported tool and dependency-source matrix increases maintenance work and the number of
 version-compatibility relationships controlled by the Nix lock.
 
-## PR-11: Prove Hermeticity, Publication Safety, And Final Language Parity
+## PR-11: Add A Cross-Language Tauri Desktop Scaffold
 
 ### 1. Intent
 
-Close the Rust rollout with the same artifact environment, sandbox, network, cache, publication,
-provenance, remote, and reproducibility evidence required of the repository's strongest language
-paths.
+Add one canonical Tauri desktop-application artifact and scaffold that can consume supported
+repository libraries without introducing another build, dependency, or runtime-discovery authority.
 
 ### 2. Scope of changes
 
-- Register every Rust artifact, extension, bridge, WASM, test, codegen, build-script, proc-macro, and
-  developer entrypoint with the canonical artifact/tool/environment/network policy authorities.
-- Ensure production builds expose only declared environment, immutable source/lock/tool inputs,
-  isolated Cargo homes, fixed dependency sources, deterministic locale/time settings, and reviewed
-  sandbox capabilities.
-- Deny network during every artifact-producing derivation and Buck action after dependency
-  materialization. Prove build scripts, proc macros, binding generators, and WASM tools cannot reach
-  undeclared host files, credentials, sockets, or executables.
-- Add Rust outcomes to protected CI/release/cache-publication/provenance/deployment admission,
-  signing, SBOM, cache manifest, artifact graph, and backout policies.
-- Prove independent same-system builders produce the same Nix output identity and semantic artifact
-  manifest for every representative Rust artifact family. Define explicit allowed differences for
-  debug/signing outputs rather than weakening the production contract.
-- Complete Buck RE and Nix remote-builder parity, store materialization, source snapshot equivalence,
-  cache read/write isolation, interruption/owner-death cleanup, and secret redaction.
-- Run an independent final design/plan assessment against all supported language capability
-  categories and close every integration-debt entry before enabling the first-class parity claim.
+- Add a `tauri_app` Rust target and planner/template outcome using pinned Nix `cargo-tauri`, Rust,
+  Node/pnpm, and platform WebView inputs. Consume a Buck-built frontend artifact as `frontendDist`
+  and reject `beforeBuildCommand` and `beforeDevCommand` as duplicate build authorities.
+- Add `scaf new rust tauri-app <name>` through the canonical template registry, generating checked-in
+  Cargo and pnpm locks, least-privilege Tauri configuration/capabilities/CSP, resources, tests,
+  TARGETS entries, and production/dev runnable metadata.
+- Model repository libraries through typed authorities: matching Cargo path dependencies and Buck
+  edges for Rust; `link_deps`, `header_deps`, and reviewed ABI bridges for C/C++; module surfaces and
+  asset staging for browser-side WASM; and explicit runtime closures for reviewed sidecars.
+- Keep ordinary `deps` as impact/ordering edges. Never infer native linking, WASM staging, sidecar
+  packaging, or runtime mode, and never copy built repository artifacts into scaffold source.
+- Make frontend outputs, locks, Tauri configuration, permissions, resources, sidecars, library
+  edges, global Nix inputs, and platform inputs declared action inputs with source-sensitive
+  invalidation.
+- Provide bounded production and dev behavior through shared runnable/process authorities. Reject
+  undeclared resources or sidecars, path escape, wildcard capabilities, ambient host tools, hidden
+  network access, and config/frontend mismatches.
+- Keep deterministic unsigned construction separate from signing and notarization. Protected release
+  admission requires reviewed external attestations without passing signing credentials into Buck
+  actions or Nix derivations.
+- Exclude mobile, updater, arbitrary plugins, direct unstable C++ ABI, host/global `cargo-tauri`, and
+  Windows until separate reviewed platform, runtime, toolchain, and signing contracts exist.
 
 ### 3. External prerequisites
 
-The repository's hermetic-build policy and publication gates must be available, and two independent
-builders for each claimed system must be able to build from the same reviewed source and lock
-identity without shared mutable Cargo state.
+Pinned nixpkgs inputs must provide Tauri, WebView, GUI, packaging, and system-library closures for
+each claimed platform. Reviewed builders and signing/notarization lanes must provide native package
+and launch evidence without sharing mutable Cargo, pnpm, GUI, or credential state.
 
 ### 4. Tests to be added
 
-- Sandbox and network-denial tests for Cargo, rustc, linker, build scripts, proc macros, binding
-  generators, extensions, all WASM tools, tests, and packaging actions.
-- Poisoned home, Cargo home, registry config, credentials, locale, timezone, PATH, compiler flags,
-  source replacement, and daemon environment tests with fail-closed diagnostics.
-- Protected publication rejects local overrides, dev bundles, untracked inputs, unresolved private
-  sources, impure flags, missing provenance, unsupported targets, and ambiguous tool authority.
-- Independent-builder tests compare Nix identities and semantic manifests for native bin/lib/test,
-  proc macro, Python extension, Node addon, C/C++ bridge, raw/WASI/browser/component WASM, and
-  cross-root composition.
-- Run the complete public `patch-pkg` Rust matrix on both builders, including apply/no-op/remove,
-  source disambiguation, override rejection in protected jobs, and identical post-patch artifacts.
-- Remote/cache tests prove cold materialization, warm reuse, no credential persistence, bounded disk
-  growth, owner-death cleanup, and local/remote result agreement.
-- Run the mandatory final `i && b && ALL_TESTS=1 v`, supported-system matrix, all Rust integration
-  examples, and an independent scope/design review.
+- In fresh temporary flake-input and submodule consumers, scaffold the default app and prove the
+  `u` → read-only `i` → `b` → `v` → `r` lifecycle without modifying the real consumer repository.
+- Prove the backend calls cross-root Rust and reviewed C/C++ libraries while the frontend loads
+  staged Rust, C/C++, and another supported producer's WASM through module-surface contracts.
+- Prove source-sensitive invalidation and reject missing Cargo/Buck agreement, undeclared native
+  inputs, ambiguous module surfaces, copied artifacts, and undeclared sidecars.
+- Prove the default scaffold builds with optional integrations empty and does not publish libraries,
+  tests, or helper targets as desktop runnables.
+- Exercise hostile tool/environment inputs, capability and CSP widening, traversal, config/frontend
+  mismatch, denied network, interruption, timeout, and owner-death cleanup.
+- Build, package, and launch on available `aarch64-darwin`; withhold Linux claims pending reviewed
+  native WebView/package/launch evidence and reject protected publication without required
+  provenance and signing attestation.
+- Run a conservative Tauri/scaffolding/cross-language/platform affected-target union, cold and warm
+  identity checks, and independent scope/design review. Record the deferred full suite in the Turbo
+  ledger and escalate before commit if indirect consumers cannot be bounded.
 
 ### 5. Docs to be added or updated
 
-Finalize the Rust design and usage status, hermetic artifact policy, remote/cache setup, publication,
-provenance/SBOM, deployment, security, troubleshooting, supported capability matrix, and backout
-runbook. Remove provisional language-status wording only after evidence passes.
+Add the Tauri application-composition contract to the Rust design and document scaffold usage,
+frontend ownership, Rust/C/C++/WASM integration, typed edges, runnable/dev behavior, capabilities,
+platform prerequisites, packaging, external signing, publication, and troubleshooting.
 
 ### 5.5. Expected regression scope
 
-All artifact policy authorities, environment filtering, Nix sandbox/network policy, filtered source,
-remote execution/builders, caches, publication/provenance, deployment admission, secrets, verify/CI,
-and every Rust integration added by PR-1 through PR-10.
+Rust macro/planner/template behavior, cross-root Cargo, C/C++ link closure and bridges, WASM module
+surfaces and staging, scaffolding, Node/pnpm frontend builds, runnable/dev ownership, platform
+packaging, artifact policy, publication admission, and generated registries.
 
 ### 6. Acceptance criteria
 
-Every Rust artifact family is built from declared immutable inputs with denied network and reviewed
-tools, passes protected publication and independent-builder checks, works through local and remote
-paths, and has direct tests/docs matching the capability breadth of other enabled languages.
+A newly scaffolded Tauri application builds and runs through reviewed tools, consumes repository
+Rust, C/C++, and WASM libraries through canonical typed authorities, and packages only declared
+frontend, native, module, resource, and sidecar inputs. No copied-artifact, host-tool, hidden-hook,
+ambient probing, network, or duplicate-dependency fallback exists. Full hermeticity and release
+claims remain provisional until PR-12.
 
 ### 7. Risks
 
-One extension or code-generation tool may retain timestamps, host paths, mutable registries, or
-network behavior that prevents reproducibility or safe publication.
+Tauri may encourage hidden frontend hooks, broad desktop permissions, platform-specific host
+libraries, mutable sidecar discovery, or signing steps that contaminate deterministic construction.
 
 ### 8. Mitigations
 
-Gate artifact families independently, normalize only understood nondeterminism, preserve failing
-evidence, fix or explicitly withhold unsupported families, and never restore an impure fallback to
-claim parity.
+Keep frontend building and every library mode as explicit typed inputs, generate least-privilege
+configuration, fail closed on undeclared platform/runtime requirements, use owned process and
+artifact-policy authorities, and separate unsigned construction from credentialed release admission.
 
 ### 9. Consequences of not implementing this PR
 
-Rust could have a broad feature surface without evidence that its artifacts are safe to cache,
-publish, deploy, or reproduce under the repository's hermetic contract.
+Desktop projects would need hand-written integration or copied library artifacts, bypassing the
+repository's graph, scaffolding, interop, runtime, and hermetic build contracts.
 
 ### 10. Downsides for implementing this PR
 
-Independent builders, complete artifact matrices, and protected publication tests have substantial
-validation and infrastructure cost.
+GUI/WebView platform matrices, cross-language fixtures, packaging, and external signing evidence add
+large tool closures and substantial validation and maintenance cost.
+
+## PR-12: Prove Hermeticity, Publication Safety, And Final Language Parity
+
+### 1. Intent
+
+Close the Rust and Tauri rollout with the artifact environment, sandbox, network, cache,
+publication, provenance, remote, and reproducibility evidence required of the repository's
+strongest language and application paths.
+
+### 2. Scope of changes
+
+- Register every Rust and Tauri artifact, extension, bridge, WASM, test, codegen, build-script,
+  proc-macro, sidecar, frontend, package, and developer entrypoint with canonical artifact, tool,
+  environment, network, and runtime policy authorities.
+- Expose only declared environment, immutable source/lock/tool/config inputs, isolated Cargo/pnpm
+  homes, fixed dependency sources, deterministic locale/time settings, and reviewed sandbox and
+  desktop capabilities.
+- Deny network during every artifact-producing derivation and Buck action after dependency
+  materialization. Prove build scripts, proc macros, binding generators, WASM tools, Tauri tooling,
+  frontend packaging, and sidecars cannot reach undeclared host files, credentials, or sockets.
+- Add every Rust and Tauri outcome to protected CI, cache publication, provenance, SBOM, deployment,
+  external signing/notarization admission, artifact graph, and backout policies.
+- Prove independent same-system builders produce the same Nix identity and semantic artifact
+  manifest for every representative Rust artifact family and the unsigned Tauri application.
+- Complete Buck RE and Nix remote-builder parity, materialization, source-snapshot equivalence,
+  cache isolation, interruption/owner-death cleanup, and secret redaction.
+- Run final plan/design assessments and close every Rust-flow and Tauri integration-debt entry before
+  enabling first-class, hermetic, platform, publication, or signed-release claims.
+
+### 3. External prerequisites
+
+The repository's hermetic-build and publication gates must be available. Two independent builders
+for each claimed system, plus reviewed signing/notarization lanes, must build from the same source
+and lock identity without shared mutable Cargo, pnpm, GUI, cache, or credential state.
+
+### 4. Tests to be added
+
+- Add sandbox/network-denial and poisoned environment/home/config/credential tests for all Rust,
+  WASM, extension, binding, packaging, Tauri, frontend, sidecar, and developer actions.
+- Protected publication rejects overrides, dev bundles, untracked inputs, unresolved private
+  sources, impure flags, missing provenance, unsupported platforms, unsigned-admission gaps, and
+  ambiguous tool or runtime authority.
+- Independent-builder tests compare identities and semantic manifests for native bin/lib/test,
+  proc macro, Python extension, Node addon, C/C++ bridge, raw/WASI/browser/component WASM,
+  cross-root composition, and the unsigned Tauri application package.
+- Run the complete public Rust patch matrix on both builders and prove Tauri consumers receive the
+  same patched or restored source identity.
+- Remote/cache tests prove cold materialization, warm reuse, no credential persistence, bounded disk
+  growth, cleanup, and local/remote agreement for Rust and Tauri outcomes.
+- Prove native Tauri package/launch behavior and reviewed external signing/notarization admission on
+  every claimed platform without placing signing secrets or nondeterministic signed bytes inside the
+  deterministic artifact identity.
+- Run the mandatory final `i && b && ALL_TESTS=1 v`, supported-system matrix, every Rust/Tauri
+  integration example, high-risk selector reruns, debt reconciliation, and independent assessments.
+
+### 5. Docs to be added or updated
+
+Finalize Rust and Tauri design and usage status, hermetic artifact policy, remote/cache setup,
+publication, provenance/SBOM, deployment, security, capabilities, platform support, external
+signing/notarization, troubleshooting, and the backout runbook. Remove provisional wording only
+after all evidence passes.
+
+### 5.5. Expected regression scope
+
+All artifact-policy authorities, environment filtering, sandbox/network policy, filtered source,
+remote execution/builders, caches, publication/provenance, deployment and signing admission,
+secrets, verify/CI, every Rust integration from PR-1 through PR-10, and Tauri from PR-11.
+
+### 6. Acceptance criteria
+
+Every Rust and Tauri artifact is built from declared immutable inputs with denied network and
+reviewed tools, passes protected publication and independent-builder checks, works through local
+and remote paths, and has direct tests and current documentation. Signed-release and platform claims
+are enabled only where external native evidence passes.
+
+### 7. Risks
+
+An extension, code generator, frontend tool, platform package, sidecar, or signing lane may retain
+timestamps, host paths, mutable state, or network behavior that prevents reproducibility or safe
+publication.
+
+### 8. Mitigations
+
+Gate artifact families independently, normalize only understood nondeterminism, keep deterministic
+unsigned construction separate from signing admission, preserve failures, explicitly withhold
+unsupported claims, and never restore an impure fallback.
+
+### 9. Consequences of not implementing this PR
+
+Rust and Tauri could have broad feature surfaces without evidence that their artifacts are safe to
+cache, publish, deploy, sign, or reproduce under the repository's hermetic contract.
+
+### 10. Downsides for implementing this PR
+
+Independent builders, GUI/WebView platform matrices, complete artifact families, and protected
+publication/signing tests have substantial validation and infrastructure cost.
 
 ## Rollout And Sequencing
 
@@ -1017,8 +1161,12 @@ validation and infrastructure cost.
 8. Land PR-8 before documenting direct Rust/C++ interoperability beyond the C ABI baseline.
 9. Land PR-9 before routing Rust WASM into general browser, component, or cross-language examples.
 10. Land PR-10 before calling the Rust developer experience comparable to other enabled languages.
-11. Land PR-11 last. Remove experimental status and call Rust first-class, hermetic, and
-    feature-parity only after its independent-builder and final full-suite evidence passes.
+11. Land PR-11 after PR-6, PR-8, and PR-9 provide its cross-root, native ABI, and WASM authorities.
+    Use the risk-based Tauri gate and keep platform, hermeticity, and signed-release claims
+    provisional.
+12. Land PR-12 last. Remove experimental Rust/Tauri status and enable platform or signed-release
+    claims only after independent builders, native packaging/launch evidence, protected admission,
+    debt reconciliation, assessments, and the final full-suite checkpoint pass.
 
 Each PR may ship independently with current unsupported features documented as such. A failed
 checkpoint blocks later rollout. Generated provider and graph files are regenerated only through
@@ -1038,5 +1186,5 @@ their owning tools.
 - If a Cargo schema or generated contract must roll back, roll back its consumers and producer in
   the same change, regenerate ignored outputs, and prove older checked-in Cargo projects receive an
   actionable unsupported-state diagnostic.
-- The final review maps every Rust design requirement to implementation, direct tests, and current
-  docs, and confirms every integration-debt row is closed.
+- The final reviews map every Rust and Tauri design requirement to implementation, direct tests, and
+  current docs, and confirm every integration-debt row is closed.

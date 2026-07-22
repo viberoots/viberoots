@@ -2,6 +2,7 @@ load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
 load("@viberoots//build-tools/lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "prepare_language_wiring")
 load("@viberoots//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
 load("@viberoots//build-tools/rust/private:nix_build.bzl", "rust_nix_build")
+load("@viberoots//build-tools/rust/private:nix_test.bzl", "rust_nix_test")
 
 _PUBLIC_ARGS = [
     "cargo_lock",
@@ -11,6 +12,9 @@ _PUBLIC_ARGS = [
     "features",
     "labels",
     "local_patch_dirs",
+    "nixpkg_deps",
+    "nixpkg_pins",
+    "nixpkgs_profile",
     "profile",
     "srcs",
     "target",
@@ -58,7 +62,7 @@ def _rust_nix_target(name, kind, out, kwargs):
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
     unknown = sorted([key for key in kw.keys() if key not in _PUBLIC_ARGS])
     if unknown:
-        fail("rust_%s: unknown arguments: %s" % ("binary" if kind == "bin" else "library", ", ".join(unknown)))
+        fail("rust_%s: unknown arguments: %s" % ("binary" if kind == "bin" else "library" if kind == "lib" else "test", ", ".join(unknown)))
     cargo_manifest = _single_cargo_file(kw.pop("cargo_manifest", None), "Cargo.toml", "cargo_manifest")
     cargo_lock = _single_cargo_file(kw.pop("cargo_lock", None), "Cargo.lock", "cargo_lock")
     crate = kw.pop("crate", name)
@@ -90,25 +94,31 @@ def _rust_nix_target(name, kind, out, kwargs):
     )
     prepared = wiring.kwargs
     cargo_root_srcs = native.glob(["**/*.rs"])
-    rust_nix_build(
-        name = name,
-        out = out,
-        kind = kind,
-        self_label = "//%s:%s" % (native.package_name(), name),
-        deps = wiring.deps,
-        srcs = dedupe_preserve((prepared.get("srcs", []) or []) + cargo_root_srcs),
-        labels = prepared.get("labels", []) or [],
-        nix_inputs = global_nix_inputs(),
-        cargo_manifest = cargo_manifest,
-        cargo_lock = cargo_lock,
-        crate = crate,
-        features = features,
-        default_features = default_features,
-        profile = profile,
-        target = target,
-        local_patch_dirs = wiring.local_patch_dirs,
-        visibility = prepared.get("visibility", []),
-    )
+    attrs = {
+        "name": name,
+        "out": out,
+        "kind": kind,
+        "self_label": "//%s:%s" % (native.package_name(), name),
+        "deps": wiring.deps,
+        "srcs": dedupe_preserve((prepared.get("srcs", []) or []) + cargo_root_srcs),
+        "labels": prepared.get("labels", []) or [],
+        "nix_inputs": global_nix_inputs(),
+        "cargo_manifest": cargo_manifest,
+        "cargo_lock": cargo_lock,
+        "crate": crate,
+        "features": features,
+        "default_features": default_features,
+        "profile": profile,
+        "target": target,
+        "local_patch_dirs": wiring.local_patch_dirs,
+        "nixpkgs_profile": prepared.get("nixpkgs_profile", "default"),
+        "nixpkg_pins": prepared.get("nixpkg_pins", {}),
+        "visibility": prepared.get("visibility", []),
+    }
+    if kind == "test":
+        rust_nix_test(**attrs)
+    else:
+        rust_nix_build(**attrs)
 
 def rust_library(name, **kwargs):
     _rust_nix_target(name = name, kind = "lib", out = name + ".stamp", kwargs = kwargs)
@@ -116,7 +126,11 @@ def rust_library(name, **kwargs):
 def rust_binary(name, **kwargs):
     _rust_nix_target(name = name, kind = "bin", out = name, kwargs = kwargs)
 
+def rust_test(name, **kwargs):
+    _rust_nix_target(name = name, kind = "test", out = name + ".stamp", kwargs = kwargs)
+
 __all__ = [
     "rust_binary",
     "rust_library",
+    "rust_test",
 ]

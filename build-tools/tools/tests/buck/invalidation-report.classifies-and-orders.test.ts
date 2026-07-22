@@ -41,16 +41,26 @@ test("invalidation-report: stable ordering, patch scope classification, and glob
             "kind:bundle",
             "patch_scope:importer-local",
             "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
-            "//.viberoots/workspace:flake.lock",
+            "root//.viberoots/workspace:flake.nix",
+            "root//.viberoots/workspace:flake.lock",
+            "root//projects/config:node-modules.hashes.json",
+            "workspace_buck//:graph.json",
             "@viberoots//build-tools/tools/nix:nixpkgs_source_registry",
-            "//.viberoots/workspace:nixpkgs-source-registry-extension",
+            "root//.viberoots/workspace:nixpkgs-source-registry-extension",
           ],
           srcs: {
-            "__global_nix_inputs__/flake_lock": "//.viberoots/workspace:flake.lock",
+            "__global_nix_inputs__/flake_nix":
+              "root//.viberoots/workspace:flake.nix (prelude//platforms:default#fixture)",
+            "__global_nix_inputs__/flake_lock":
+              "root//.viberoots/workspace:flake.lock (prelude//platforms:default#fixture)",
+            "__global_nix_inputs__/node_modules_hashes":
+              "root//projects/config:node-modules.hashes.json (prelude//platforms:default#fixture)",
+            "__global_nix_inputs__/graph":
+              "workspace_buck//:graph.json (prelude//platforms:default#fixture)",
             "__global_nix_inputs__/nixpkgs_source_registry":
-              "@viberoots//build-tools/tools/nix:nixpkgs_source_registry",
+              "viberoots//build-tools/tools/nix:nixpkgs_source_registry (prelude//platforms:default#fixture)",
             "__global_nix_inputs__/nixpkgs_source_registry_extension":
-              "//.viberoots/workspace:nixpkgs-source-registry-extension",
+              "root//.viberoots/workspace:nixpkgs-source-registry-extension (prelude//platforms:default#fixture)",
             "__patch_inputs__/projects_apps_web_patches_node":
               "root//projects/apps/web/patches/node/demo.patch",
           },
