@@ -6,6 +6,7 @@ import { findImporterLockfiles } from "../../lib/importers";
 export async function detectEnabledAndMissing(
   langs: Map<string, LangEntry>,
   enabledPref: Set<string>,
+  enabledDeclared: boolean,
   filterId: string,
 ): Promise<{
   enabled: string[];
@@ -14,7 +15,7 @@ export async function detectEnabledAndMissing(
   const enabled: string[] = [];
   const disabled: Array<{ id: string; missingPaths: string[] }> = [];
 
-  const prefer = (id: string) => (enabledPref.size === 0 ? true : enabledPref.has(id));
+  const prefer = (id: string) => (enabledDeclared ? enabledPref.has(id) : true);
   const root = await sourceRoot();
   const existsAbs = async (rel: string) => {
     if (path.isAbsolute(rel)) return pathExists(rel);
@@ -66,7 +67,7 @@ export async function detectEnabledAndMissing(
     for (const r of req) {
       if (!(await requiredPathPresent(r))) missing.push(r);
     }
-    if (prefer(id) && missing.length === 0) enabled.push(id);
+    if (prefer(id) && e.hermetic?.status === "graduated" && missing.length === 0) enabled.push(id);
     else disabled.push({ id, missingPaths: missing });
   }
 

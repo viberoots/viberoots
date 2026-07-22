@@ -2,7 +2,7 @@
 import fsSync from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import type { ScaffoldingLanguage } from "./lang-contracts";
+import type { LanguageHermeticContract, ScaffoldingLanguage } from "./lang-contracts";
 import { findImporterLockfiles } from "./importers";
 
 type ManifestLang = Partial<ScaffoldingLanguage> & { id: string };
@@ -13,7 +13,11 @@ type ManifestObj =
       languages?: ManifestLang[];
     };
 
-function readManifestSync(cwd: string): { enabled: string[]; languages: ScaffoldingLanguage[] } {
+function readManifestSync(cwd: string): {
+  enabled: string[];
+  enabledDeclared: boolean;
+  languages: ScaffoldingLanguage[];
+} {
   const cfgPath = path.join(cwd, "build-tools/tools/nix/langs.json");
   try {
     const raw = fsSync.readFileSync(cfgPath, "utf8");
@@ -42,16 +46,21 @@ function readManifestSync(cwd: string): { enabled: string[]; languages: Scaffold
             : [],
           kinds: Array.isArray((e as any).kinds) ? ((e as any).kinds as string[]) : [],
           templatesDir: String((e as any).templatesDir || ""),
+          hermetic: (e as any).hermetic as LanguageHermeticContract,
         };
       });
-    return { enabled, languages };
+    return {
+      enabled,
+      enabledDeclared: !Array.isArray(parsed) && Array.isArray(parsed.enabled),
+      languages,
+    };
   } catch {
-    return { enabled: [], languages: [] };
+    return { enabled: [], enabledDeclared: false, languages: [] };
   }
 }
 
 export async function detectEnabledLanguages(cwd = process.cwd()): Promise<ScaffoldingLanguage[]> {
-  const { enabled: preferred, languages } = readManifestSync(cwd);
+  const { enabled: preferred, enabledDeclared, languages } = readManifestSync(cwd);
   const exists = async (p: string) => {
     try {
       await fsp.access(path.join(cwd, p));
@@ -78,7 +87,8 @@ export async function detectEnabledLanguages(cwd = process.cwd()): Promise<Scaff
   }
   const out: ScaffoldingLanguage[] = [];
   for (const s of languages) {
-    if (preferred.length && !preferred.includes(s.id)) continue;
+    if (s.hermetic?.status !== "graduated") continue;
+    if (enabledDeclared && !preferred.includes(s.id)) continue;
     let ok = true;
     for (const req of s.requiredPaths) {
       const isGlob = /[*?]/.test(req) || /\*\*\//.test(req);

@@ -4,7 +4,6 @@ let
   wrPath = if wr != "" then (builtins.toPath wr) else null;
   srcRoot =
     if wr != "" then (builtins.path { path = builtins.toPath wr; name = "repo"; filter = filterRepo (builtins.toPath wr); }) else repoSnapshot;
-  allowGenerate = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
 
   appsListing =
     if (wrPath != null && builtins.pathExists (wrPath + "/projects/apps")) then (builtins.readDir (wrPath + "/projects/apps"))
@@ -27,7 +26,6 @@ let
     else (builtins.pathExists (repoRoot + "/pnpm-lock.yaml"));
 in
 {
-  inherit srcRoot allowGenerate importerDirs haveRootLock;
+  inherit srcRoot importerDirs haveRootLock;
 }
-
 

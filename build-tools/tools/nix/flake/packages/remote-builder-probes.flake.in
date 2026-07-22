@@ -1,0 +1,36 @@
+{
+  inputs.nixpkgs.url = "path:@NIXPKGS@";
+  outputs = { self, nixpkgs }:
+    let
+      pkgs = nixpkgs.legacyPackages.@SYSTEM@;
+      undeclaredStoreCanary = builtins.unsafeDiscardStringContext (toString self.outPath);
+      networkCanary = "https://cache.nixos.org/nix-cache-info";
+      deny = name: body: pkgs.runCommand name { } ''
+        ${body}
+        echo "viberoots-canary:${name}" >&2
+        exit 1
+      '';
+    in {
+      packages.@SYSTEM@ = {
+        remote-builder-fixed-output-correct-hash = pkgs.fetchurl {
+          url = networkCanary;
+          hash = "sha256-LJ3jc651pScWN2NQNERaXNOmrjWsbDBtQMDgZ2R4WJc=";
+        };
+        remote-builder-fixed-output-wrong-hash = pkgs.fetchurl {
+          url = networkCanary;
+          hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+        };
+        remote-builder-ordinary-host-read = deny "host-read-denied" ''
+          test ! -r '${undeclaredStoreCanary}/flake.nix'
+        '';
+        remote-builder-ordinary-network = pkgs.runCommand "network-denied" { } ''
+          if ${pkgs.curl}/bin/curl --fail --max-time 10 '${networkCanary}'; then
+            echo "ordinary derivation reached the network" >&2
+            exit 2
+          fi
+          echo "viberoots-canary:network-denied" >&2
+          exit 1
+        '';
+      };
+    };
+}

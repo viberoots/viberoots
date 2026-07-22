@@ -21,6 +21,18 @@ test("cpp present: validator passes and diagnose enables cpp", async () => {
           ],
           kinds: ["cli", "lib"],
           templatesDir: "viberoots/build-tools/tools/scaffolding/templates/go",
+          hermetic: {
+            status: "graduated",
+            sourceRoles: true,
+            dependencyReconciliation: true,
+            immutableBundleInputs: true,
+            storeQualifiedToolchain: true,
+            selectorTransport: true,
+            sandboxNetwork: true,
+            remoteExecution: true,
+            publicationAdmission: true,
+            reproducibilityMatrixIds: ["go-lib"],
+          },
         },
         {
           id: "cpp",
@@ -32,6 +44,18 @@ test("cpp present: validator passes and diagnose enables cpp", async () => {
           kinds: ["bin", "lib", "test"],
           templatesDir: "viberoots/build-tools/tools/scaffolding/templates/cpp",
           capabilities: { patching: false },
+          hermetic: {
+            status: "graduated",
+            sourceRoles: true,
+            dependencyReconciliation: true,
+            immutableBundleInputs: true,
+            storeQualifiedToolchain: true,
+            selectorTransport: true,
+            sandboxNetwork: true,
+            remoteExecution: true,
+            publicationAdmission: true,
+            reproducibilityMatrixIds: ["cpp-lib"],
+          },
         },
       ],
     } as any;
@@ -55,6 +79,10 @@ test("cpp present: validator passes and diagnose enables cpp", async () => {
     await copyViberootsSourcePath(
       "viberoots/build-tools/tools/dev/validate-langs.ts",
       path.join(tmp, "viberoots/build-tools/tools/dev/validate-langs.ts"),
+    );
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/lib/artifact-reproducibility-matrix.ts",
+      path.join(tmp, "viberoots/build-tools/tools/lib/artifact-reproducibility-matrix.ts"),
     );
     await copyViberootsSourcePath(
       "viberoots/build-tools/tools/dev/langs-diagnose.ts",

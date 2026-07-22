@@ -78,6 +78,7 @@ export async function materializeEvaluationBundle(
     coverage?: boolean;
     artifactEnv?: NodeJS.ProcessEnv;
     artifactToolsRoot?: string;
+    sourceRevision?: string;
   },
   deps: { register?: RegisterBundle; copyMode?: CopyFileCloneMode } = {},
 ): Promise<EvaluationBundle> {
@@ -169,18 +170,31 @@ export async function materializeEvaluationBundle(
       schema: "viberoots.evaluation-bundle-manifest.v1",
       files: [...files, ...selectors.overrideFiles],
     };
+    const sourceAuthority = opts.sourceRevision
+      ? {
+          schema: "viberoots.evaluation-bundle-source-authority.v1",
+          sourceRevision: opts.sourceRevision,
+        }
+      : undefined;
+    if (sourceAuthority && !/^[a-f0-9]{40,64}$/u.test(sourceAuthority.sourceRevision)) {
+      throw new Error("evaluation bundle source revision must be a full Git object identity");
+    }
     const digest = manifestDigest({
       selection,
       classification,
       dependencies,
       graphSha256: manifestDigest(graph.toString("base64")),
       manifest,
+      sourceAuthority,
     });
     await fsp.writeFile(path.join(bundleRoot, "graph.json"), graph);
     await writeJson(path.join(bundleRoot, "selection.json"), selection);
     await writeJson(path.join(bundleRoot, "classification.json"), classification);
     await writeJson(path.join(bundleRoot, "dependency-inputs.json"), dependencies);
     await writeJson(path.join(bundleRoot, "manifest.json"), manifest);
+    if (sourceAuthority) {
+      await writeJson(path.join(bundleRoot, "source-authority.json"), sourceAuthority);
+    }
     await writeJson(path.join(bundleRoot, "schema.json"), {
       schema: "viberoots.evaluation-bundle.v1",
       digest: `sha256:${digest}`,

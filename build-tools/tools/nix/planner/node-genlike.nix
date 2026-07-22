@@ -77,6 +77,7 @@ in
       export OUT=${buildOutEscaped}
       export SRCS=${srcsEscaped}
       export SRCDIR="$PWD"
+      export VBR_NODE_BIN=${pkgs.nodejs_22}/bin/node
       export TMPDIR="$PWD/.tmp"
       mkdir -p "$TMPDIR"
       ${pkgs.bash}/bin/bash -euo pipefail -c ${cmdEscaped}

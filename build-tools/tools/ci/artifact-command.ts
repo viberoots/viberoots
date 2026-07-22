@@ -13,6 +13,23 @@ import { ensureNixStoreToolPathSync, envWithResolvedNixBin } from "../lib/tool-p
 import { redactPublisherOutput } from "./publisher-credentials";
 
 export type ArtifactCommandResult = { stdout: string; stderr: string };
+export type ArtifactCommandInternalEnv = Partial<
+  Record<
+    | "GIT_AUTHOR_NAME"
+    | "GIT_AUTHOR_EMAIL"
+    | "GIT_AUTHOR_DATE"
+    | "GIT_COMMITTER_NAME"
+    | "GIT_COMMITTER_EMAIL"
+    | "GIT_COMMITTER_DATE"
+    | "VBR_UPDATE"
+    | "VBR_WORKSPACE_ROOT"
+    | "VBR_CONSUMER"
+    | "VBR_RUN_INSTALL"
+    | "VBR_DIRENV_ALLOW"
+    | "VBR_VIBEROOTS_URL",
+    string
+  >
+>;
 
 function declaredStoreExecutable(value: string): string {
   if (!/^\/nix\/store\/[a-z0-9]{32}-[^/]+\/bin\/[^/]+$/u.test(value)) {
@@ -34,14 +51,21 @@ export async function runArtifactTool(opts: {
   mode?: ArtifactEnvironmentMode;
   artifactToolsRoot: string;
   declaredToolPath?: string;
+  internalEnv?: ArtifactCommandInternalEnv;
 }): Promise<ArtifactCommandResult> {
   const inherited = envWithResolvedNixBin(opts.baseEnv || process.env);
+  const internal = reviewedArtifactCommandInternalEnv(
+    opts.internalEnv,
+    opts.workspaceRoot,
+    opts.artifactToolsRoot,
+  );
   const env = buildArtifactEnvironment({
     baseEnv: inherited,
     mode: opts.mode || (String(inherited.CI || "").trim() ? "ci" : "local"),
     stateRoot: path.join(opts.workspaceRoot, "buck-out", "tmp", "artifact-environment"),
     workspaceRoot: opts.workspaceRoot,
     artifactToolsRoot: opts.artifactToolsRoot,
+    internal,
   });
   const command = opts.declaredToolPath
     ? declaredStoreExecutable(opts.declaredToolPath)
@@ -54,6 +78,34 @@ export async function runArtifactTool(opts: {
   });
   assertArtifactCommandSucceeded(command, result);
   return { stdout: result.stdout, stderr: result.stderr };
+}
+
+export function reviewedArtifactCommandInternalEnv(
+  value: ArtifactCommandInternalEnv | undefined,
+  workspaceRoot: string,
+  artifactToolsRoot: string,
+): NodeJS.ProcessEnv | undefined {
+  if (!value) return undefined;
+  const fixed: Record<string, string> = {
+    GIT_AUTHOR_NAME: "Viberoots Reproducibility",
+    GIT_AUTHOR_EMAIL: "reproducibility@viberoots.invalid",
+    GIT_AUTHOR_DATE: "2000-01-01T00:00:00Z",
+    GIT_COMMITTER_NAME: "Viberoots Reproducibility",
+    GIT_COMMITTER_EMAIL: "reproducibility@viberoots.invalid",
+    GIT_COMMITTER_DATE: "2000-01-01T00:00:00Z",
+    VBR_UPDATE: "1",
+    VBR_WORKSPACE_ROOT: workspaceRoot,
+    VBR_CONSUMER: "flake",
+    VBR_RUN_INSTALL: "0",
+    VBR_DIRENV_ALLOW: "0",
+    VBR_VIBEROOTS_URL: `path:${path.join(artifactToolsRoot, "share/viberoots-source")}`,
+  };
+  for (const [name, supplied] of Object.entries(value)) {
+    if (fixed[name] !== supplied) {
+      throw new Error(`artifact command rejects unreviewed internal environment ${name}`);
+    }
+  }
+  return value;
 }
 
 export async function runDeclaredArtifactPublisher(opts: {

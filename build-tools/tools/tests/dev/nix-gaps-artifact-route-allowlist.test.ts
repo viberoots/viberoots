@@ -6,6 +6,7 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 import { inspectProductionCommandSites } from "../../dev/nix-gaps-command-sites";
+import { reviewedRootCommandSiteFixtureRules } from "./nix-gaps-inventory-check.fixture";
 
 const scriptPath = "viberoots/build-tools/tools/dev/nix-gaps-inventory-check.ts";
 const scriptSourcePath = viberootsSourcePath(scriptPath);
@@ -101,6 +102,7 @@ async function writePublicFixture(tmp: string): Promise<void> {
     expectedCount: 0,
     expectedDigest: "",
     classificationRules: [
+      ...reviewedRootCommandSiteFixtureRules,
       {
         pathPattern: "^build-tools/",
         role: "non-artifact-orchestration" as const,

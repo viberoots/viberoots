@@ -74,17 +74,23 @@ export function assertCanonicalArtifactIngressWiring(): void {
       bootstrap.lastIndexOf("workspace-root.env"),
     "artifact environment authority must be applied after workspace metadata",
   );
-  for (const file of [
-    "build-tools/tools/ci/publish-nix-cache-manifest.ts",
-    "build-tools/tools/ci/wheelhouse-preload.ts",
-  ]) {
-    const source = read(file);
-    assert.match(source, /runArtifactNix/);
-    assert.match(source, /chooseRunnableFlakeRef/);
-    assert.doesNotMatch(source, /--impure|\$`nix\b|\$`bash\b/);
-    assert.match(source, /bundleDigest|immutableSourceRoot/);
-    assert.doesNotMatch(source, /readSourceRevision|readFile\(["']flake\.lock/);
-  }
+  const publisher = read("build-tools/tools/ci/publish-nix-cache-manifest.ts");
+  assert.match(
+    publisher,
+    /if \(backend === "attic" \|\| backend === "cachix"\)[\s\S]*runDeclaredArtifactPublisher\([\s\S]*?\}\);[\s\S]*else \{[\s\S]*runArtifactNix\(/,
+  );
+  assert.match(publisher, /runDeclaredArtifactPublisher/);
+  assert.doesNotMatch(publisher, /runArtifactTool|chooseRunnableFlakeRef/);
+  assert.doesNotMatch(publisher, /--impure|\$`nix\b|\$`bash\b/);
+  assert.match(publisher, /reproducibilityAggregate/);
+  assert.doesNotMatch(publisher, /readSourceRevision|readFile\(["']flake\.lock/);
+  const wheelhouse = read("build-tools/tools/ci/wheelhouse-preload.ts");
+  assert.match(wheelhouse, /runArtifactNix/);
+  assert.match(wheelhouse, /chooseRunnableFlakeRef/);
+  assert.match(wheelhouse, /readSignedReproducibilityAggregate/);
+  assert.match(wheelhouse, /stageSystemReproducibilityOutputs/);
+  assert.doesNotMatch(wheelhouse, /runArtifactTool|--impure|\$`nix\b|\$`bash\b/);
+  assert.doesNotMatch(wheelhouse, /readSourceRevision|readFile\(["']flake\.lock/);
   for (const file of [
     "build-tools/node/defs_core.bzl",
     "build-tools/node/defs_nix.bzl",

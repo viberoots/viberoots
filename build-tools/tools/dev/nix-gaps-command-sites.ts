@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import {
+  activeSourceContains,
+  patternsForCommandSite,
+  productionCommandSiteSources,
+  sourceRequiresInventoryFingerprint,
+} from "./nix-gaps-command-site-sources";
 
 export type CommandSiteRole =
   | "canonical-artifact"
@@ -12,6 +18,7 @@ export type CommandSiteRule = {
   pathPattern: string;
   role: CommandSiteRole;
   justification: string;
+  allowedEscapes?: Array<"diagnostic-impure">;
 };
 
 export type CommandSiteInventoryPolicy = {
@@ -35,57 +42,6 @@ const allowedRoles = new Set<CommandSiteRole>([
   "update-install",
   "non-artifact-orchestration",
 ]);
-const sourceExtensions = new Set([".ts", ".js", ".mjs", ".cjs", ".bzl", ".nix", ".sh", ".bash"]);
-const excludedSegments = new Set([".git", ".viberoots", "buck-out", "node_modules", "tests"]);
-
-function patternsForExtension(ext: string): Array<{ kind: string; regex: RegExp }> {
-  if ([".ts", ".js", ".mjs", ".cjs"].includes(ext)) {
-    return [
-      {
-        kind: "process-call",
-        regex:
-          /(?<![.\w])(?:spawn|spawnSync|exec|execSync|execFile|execFileSync|runCommand|runBoundedArtifactCommand)\s*\(/g,
-      },
-      { kind: "zx-command", regex: /\$\s*(?:\([^`]*\))?\s*`/g },
-    ];
-  }
-  if (ext === ".bzl") {
-    return [
-      { kind: "buck-action", regex: /\bctx\.actions\.(?:run|run_shell)\s*\(/g },
-      { kind: "genrule", regex: /\b(?:native\.)?genrule\s*\(/g },
-      { kind: "action-command", regex: /^\s*(?:cmd|run_cmd)\s*=/g },
-    ];
-  }
-  if (ext === ".nix") {
-    return [
-      {
-        kind: "nix-derivation",
-        regex:
-          /\b(?:runCommandLocal|runCommand|stdenvNoCC\.mkDerivation|stdenv\.mkDerivation|mkDerivation|writeShellScriptBin|writeShellScript|writeScriptBin|writeScript)\b/g,
-      },
-    ];
-  }
-  return [{ kind: "shell-nix-buck", regex: /(^|[;&|({]\s*)(?:nix|nix-store|buck2)(?:\s|$)/g }];
-}
-
-async function productionSourceFiles(root: string): Promise<string[]> {
-  const files: string[] = [];
-  async function visit(abs: string, rel: string): Promise<void> {
-    const entries = await fsp.readdir(abs, { withFileTypes: true });
-    for (const entry of entries) {
-      if (entry.isSymbolicLink() || excludedSegments.has(entry.name)) continue;
-      const childRel = rel ? `${rel}/${entry.name}` : entry.name;
-      const childAbs = path.join(abs, entry.name);
-      if (entry.isDirectory()) {
-        await visit(childAbs, childRel);
-      } else if (entry.isFile() && sourceExtensions.has(path.extname(entry.name))) {
-        files.push(childRel);
-      }
-    }
-  }
-  await visit(path.join(root, "build-tools"), "build-tools");
-  return files.sort();
-}
 
 function validatePolicy(policy: CommandSiteInventoryPolicy): void {
   if (policy?.schemaVersion !== 1 || !Array.isArray(policy.classificationRules)) {
@@ -100,6 +56,11 @@ function validatePolicy(policy: CommandSiteInventoryPolicy): void {
       );
     }
     new RegExp(rule.pathPattern);
+    for (const escape of rule.allowedEscapes || []) {
+      if (escape !== "diagnostic-impure") {
+        throw new Error(`unsupported command-site escape allowance: ${String(escape)}`);
+      }
+    }
   }
 }
 
@@ -110,6 +71,10 @@ function classifySite(rel: string, rules: CommandSiteRule[]): CommandSiteRole | 
   return null;
 }
 
+function classificationRule(rel: string, rules: CommandSiteRule[]): CommandSiteRule | null {
+  return rules.find((rule) => new RegExp(rule.pathPattern).test(rel)) || null;
+}
+
 export async function inspectProductionCommandSites(
   root: string,
   policy: CommandSiteInventoryPolicy,
@@ -117,38 +82,62 @@ export async function inspectProductionCommandSites(
   validatePolicy(policy);
   const sites: CommandSite[] = [];
   const containingFiles = new Map<string, string>();
-  for (const rel of await productionSourceFiles(root)) {
-    const source = await fsp.readFile(path.join(root, rel), "utf8");
-    const ext = path.extname(rel);
-    const lines = source.split(/\r?\n/);
+  for (const rel of await productionCommandSiteSources(root)) {
+    const sourceBytes = await fsp.readFile(path.join(root, rel));
+    const source = sourceBytes.toString("utf8");
+    const fileRule = classificationRule(rel, policy.classificationRules);
+    const fileRole = fileRule?.role || null;
+    const requiresFingerprint = sourceRequiresInventoryFingerprint(rel);
+    if (requiresFingerprint && !fileRule) {
+      throw new Error(`unclassified production command source: ${rel}`);
+    }
+    if (
+      fileRole === "canonical-artifact" &&
+      activeSourceContains(
+        rel === "flake.nix" ? source.replace(/^\s*"NIX_PNPM_ALLOW_GENERATE"\s*$/mu, "") : source,
+        "NIX_PNPM_ALLOW_GENERATE",
+      )
+    ) {
+      throw new Error(
+        `canonical artifact route enables automatic pnpm lock generation: ${rel}. ` +
+          "Artifact builds must fail with the u repair instruction.",
+      );
+    }
+    if (
+      (fileRole === "canonical-artifact" ||
+        rel.startsWith("build-tools/tools/scaffolding/templates/")) &&
+      activeSourceContains(source, "--impure") &&
+      !fileRule?.allowedEscapes?.includes("diagnostic-impure")
+    ) {
+      throw new Error(
+        `canonical artifact route contains unapproved --impure evaluation: ${rel}. ` +
+          "Only the reviewed explicit diagnostic boundary may opt in.",
+      );
+    }
     let hasSite = false;
     const occurrences = new Map<string, number>();
-    for (let index = 0; index < lines.length; index += 1) {
-      const line = lines[index];
-      for (const { kind, regex } of patternsForExtension(ext)) {
-        regex.lastIndex = 0;
-        while (regex.exec(line)) {
-          const occurrence = (occurrences.get(kind) || 0) + 1;
-          occurrences.set(kind, occurrence);
-          const role = classifySite(rel, policy.classificationRules);
-          if (!role) throw new Error(`unclassified production command site: ${rel}:${index + 1}`);
-          sites.push({
-            path: rel,
-            kind,
-            line: index + 1,
-            signature: `${kind}#${occurrence}`,
-            role,
-          });
-          hasSite = true;
-          if (regex.lastIndex === 0) break;
-        }
+    for (const { kind, regex } of patternsForCommandSite(rel, source)) {
+      regex.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = regex.exec(source))) {
+        const occurrence = (occurrences.get(kind) || 0) + 1;
+        occurrences.set(kind, occurrence);
+        const line = source.slice(0, match.index).split(/\r?\n/).length;
+        const role = classifySite(rel, policy.classificationRules);
+        if (!role) throw new Error(`unclassified production command site: ${rel}:${line}`);
+        sites.push({
+          path: rel,
+          kind,
+          line,
+          signature: `${kind}#${occurrence}`,
+          role,
+        });
+        hasSite = true;
+        if (regex.lastIndex === 0) break;
       }
     }
-    if (hasSite) {
-      containingFiles.set(
-        rel,
-        createHash("sha256").update(source.replace(/\s+/g, "")).digest("hex"),
-      );
+    if (hasSite || requiresFingerprint) {
+      containingFiles.set(rel, createHash("sha256").update(sourceBytes).digest("hex"));
     }
   }
   sites.sort((a, b) =>

@@ -50,7 +50,7 @@ policy_probe(
         "materialization_manifest": {"path": "materialization-manifest.json"},
         "artifact_contract": {"path": "artifact-contract.json"},
         "builder_policy": "inherit_config",
-        "remote_builder_smoke": {"builder_policy": "inherit_config", "path": "remote-builder-smoke.json", "schema": "viberoots.remote-builder-smoke-evidence.v2", "validation": "actual-report-required"},
+        "remote_builder_smoke": {"builder_policy": "inherit_config", "path": "remote-builder-smoke.json", "schema": "viberoots.remote-builder-smoke-evidence.v4", "validation": "actual-report-required"},
         "tool_closure": {"path": "tool-closure.json"}, "remote_profile_compatibility": True,
     },
 )
@@ -73,7 +73,7 @@ test("remote action policy rejects remote-ready and hybrid actions without evide
     );
     await fs.writeFile(
       path.join(hybridDir, "TARGETS"),
-      'load("//tmp/policy_defs:defs.bzl", "policy_probe")\npolicy_probe(name = "t", mode = "hybrid", evidence = {"source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/.viberoots/workspace/buck/graph.json"}, "materialization_manifest": {"path": "materialization-manifest.json"}, "artifact_contract": {"path": "artifact-contract.json"}, "builder_policy": "inherit_config", "remote_builder_smoke": {"builder_policy": "inherit_config", "path": "remote-builder-smoke.json", "schema": "viberoots.remote-builder-smoke-evidence.v2", "validation": "actual-report-required"}, "tool_closure": {"path": "tool-closure.json"}, "remote_profile_compatibility": True})\n',
+      'load("//tmp/policy_defs:defs.bzl", "policy_probe")\npolicy_probe(name = "t", mode = "hybrid", evidence = {"source_snapshot": {"declared_root": "snapshot", "manifest": "snapshot.manifest.json", "graph_path": "snapshot/.viberoots/workspace/buck/graph.json"}, "materialization_manifest": {"path": "materialization-manifest.json"}, "artifact_contract": {"path": "artifact-contract.json"}, "builder_policy": "inherit_config", "remote_builder_smoke": {"builder_policy": "inherit_config", "path": "remote-builder-smoke.json", "schema": "viberoots.remote-builder-smoke-evidence.v4", "validation": "actual-report-required"}, "tool_closure": {"path": "tool-closure.json"}, "remote_profile_compatibility": True})\n',
       "utf8",
     );
     await fs.writeFile(path.join(valid, "TARGETS"), validTargets, "utf8");

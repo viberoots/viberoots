@@ -30,6 +30,12 @@ import { evaluateReadinessGatePolicies } from "./deployment-readiness-gates";
 import { DeploymentAdmissionError } from "./deployment-control-plane-errors";
 import { validatePhase0CurrentAdmission } from "./deployment-phase0-admission";
 import { deploymentPolicyResourceBindings } from "./deployment-policy-resources";
+import { canonicalArtifactToolsRoot } from "../lib/artifact-environment";
+import {
+  readProtectedReproducibilityAggregate,
+  type ProtectedReproducibilityAggregate,
+} from "../lib/protected-reproducibility-aggregate";
+import { runArtifactNix } from "../ci/artifact-command";
 
 export async function evaluateDeploymentAdmission(opts: {
   workspaceRoot: string;
@@ -43,6 +49,15 @@ export async function evaluateDeploymentAdmission(opts: {
   artifactLineageId?: string;
   evidence?: DeploymentAdmissionEvidence;
   governanceResolver?: DeploymentLaneGovernanceResolver;
+  protectedAggregateReader?: (
+    file: string,
+    evidenceStoreLocator: string,
+  ) => Promise<ProtectedReproducibilityAggregate>;
+  protectedPublicationOutputEnsurer?: (
+    outputPath: string,
+    evidenceStoreUri: string,
+  ) => Promise<void>;
+  staticWebappIdentityForOutput?: (outputPath: string) => Promise<string>;
 }): Promise<DeploymentAdmissionPolicyEvaluation> {
   requireBuiltInExecutionBoundary(opts.deployment);
   const admittedContext = opts.admittedContext;
@@ -79,11 +94,41 @@ export async function evaluateDeploymentAdmission(opts: {
     provisionerPlanFingerprint: opts.evidence?.provisionerPlanFingerprint,
     buildInputsFingerprint: opts.evidence?.buildInputsFingerprint,
   });
-  const attestation = evaluateAttestationPolicy({
+  const protectedAggregateReader =
+    opts.protectedAggregateReader ||
+    (async (file: string, evidenceStoreLocator: string) => {
+      const artifactToolsRoot = canonicalArtifactToolsRoot(opts.workspaceRoot);
+      return await readProtectedReproducibilityAggregate(
+        file,
+        evidenceStoreLocator,
+        async (args) =>
+          await runArtifactNix({
+            args,
+            workspaceRoot: opts.workspaceRoot,
+            artifactToolsRoot,
+          }),
+      );
+    });
+  const attestation = await evaluateAttestationPolicy({
+    deployment: opts.deployment,
     policy: opts.deployment.admissionPolicy,
     binding,
     admittedContext,
     evidence: opts.evidence?.attestations,
+    protectedAggregateReader,
+    protectedPublicationOutputEnsurer:
+      opts.protectedPublicationOutputEnsurer ||
+      (async (outputPath, evidenceStoreUri) => {
+        const artifactToolsRoot = canonicalArtifactToolsRoot(opts.workspaceRoot);
+        await runArtifactNix({
+          args: ["copy", "--from", evidenceStoreUri, outputPath],
+          workspaceRoot: opts.workspaceRoot,
+          artifactToolsRoot,
+        });
+      }),
+    ...(opts.staticWebappIdentityForOutput
+      ? { staticWebappIdentityForOutput: opts.staticWebappIdentityForOutput }
+      : {}),
   });
   const sbom = evaluateSbomPolicy({
     policy: opts.deployment.admissionPolicy,

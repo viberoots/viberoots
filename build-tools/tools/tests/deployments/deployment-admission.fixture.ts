@@ -6,6 +6,8 @@ import {
   type DeploymentAdmissionOperationKind,
 } from "../../deployments/deployment-admission-binding";
 import type { DeploymentAdmissionEvidence } from "../../deployments/deployment-admission-evidence";
+import type { ProtectedReproducibilityAggregate } from "../../lib/protected-reproducibility-aggregate";
+import { signedCacheAggregateFixture } from "../ci/cache-publication.fixture";
 import { reviewedLaneAdmissionEvidenceFixture } from "./deployment-lane-governance.fixture";
 
 type EvidenceOpts = {
@@ -24,11 +26,8 @@ type EvidenceOpts = {
   expiresAt?: string;
   prerequisiteHealth?: Array<{ deploymentId: string; status?: "healthy" | "unhealthy" }>;
   provisionerPlanFingerprint?: string;
-  attestationStatus?: "verified" | "expired" | "revoked" | "untrusted" | "invalid";
-  signatureStatus?: "verified" | "missing" | "untrusted";
-  builderIdentity?: string;
-  signerIdentities?: string[];
-  provenanceFormat?: string;
+  reproducibilityAggregateStorePath?: string;
+  publicationOutputPath?: string;
   sbomStatus?: "valid" | "invalid";
   sbomFormat?: string;
   supplyChainGates?: Array<{
@@ -43,6 +42,41 @@ type EvidenceOpts = {
     expiresAt: string;
   };
 };
+
+export const protectedArtifactIdentityDigest = `sha256:${"d".repeat(64)}`;
+export const protectedPublicationOutputPath = `/nix/store/${"b".repeat(32)}-static-webapp`;
+
+export function protectedAggregateFixture(opts: {
+  sourceRevision: string;
+  artifactIdentity: string;
+  builderIdentity?: string;
+  system?: string;
+  publicationOutputPath?: string;
+  deploymentLabel?: string;
+  target?: string;
+}): ProtectedReproducibilityAggregate {
+  const signed = structuredClone(signedCacheAggregateFixture());
+  signed.aggregate.sourceRevision = opts.sourceRevision;
+  const comparison = signed.aggregate.publicationComparisons.find(
+    ({ system }) => system === (opts.system || "x86_64-linux"),
+  )!;
+  comparison.artifactIdentity.sourceRevision = opts.sourceRevision;
+  comparison.artifactIdentity.outputPath =
+    opts.publicationOutputPath || protectedPublicationOutputPath;
+  comparison.artifactIdentity.subjectAuthority = {
+    kind: "publication",
+    subjectSetDigest: signed.aggregate.publicationSubjectSetDigest,
+    subjectId: comparison.subjectId,
+    target: opts.target || "//projects/apps/demoapp:app",
+    deploymentComponents: [opts.deploymentLabel || "//projects/deployments/demoapp-dev:deploy"],
+    outputRole: "static-webapp",
+  };
+  comparison.artifactIdentityDigest = protectedArtifactIdentityDigest;
+  if (opts.builderIdentity) {
+    comparison.builderAuthorities[0]!.identity = `reviewed:${opts.builderIdentity.replace(/^reviewed:/u, "")}`;
+  }
+  return signed;
+}
 
 export function admissionBindingFixture(opts: EvidenceOpts) {
   return createDeploymentAdmissionBinding({
@@ -124,16 +158,11 @@ export function deploymentAdmissionEvidenceFixture(
       ? {
           attestations: [
             {
-              builderIdentity: opts.builderIdentity || "builder:trusted",
-              provenanceFormat: opts.provenanceFormat || "slsa_provenance_v1",
-              artifactIdentity: opts.artifactIdentity || "artifact-123",
-              sourceRevision: opts.sourceRevision,
-              buildInputsFingerprint: opts.buildInputsFingerprint || "sha256:build-inputs",
-              status: opts.attestationStatus || "verified",
-              verifiedAt: "2026-04-06T12:03:00.000Z",
-              signerIdentities: opts.signerIdentities || ["signer:trusted"],
-              signatureStatus: opts.signatureStatus || "verified",
-              recordRef: "attestation://artifact",
+              reproducibilityAggregateStorePath:
+                opts.reproducibilityAggregateStorePath ||
+                `/nix/store/${"a".repeat(32)}-aggregate/aggregate.json`,
+              publicationOutputPath: opts.publicationOutputPath || protectedPublicationOutputPath,
+              evidenceStoreLocator: "s3://reviewed-evidence/reproducibility",
             },
           ],
         }

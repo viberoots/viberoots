@@ -21,6 +21,7 @@ import { withoutEvaluationSelectors } from "../dev/evaluation-bundle-env";
 import { requireArtifactGlue, requireArtifactGraph } from "../dev/artifact-graph-executor";
 import { enterCanonicalArtifactEntrypoint } from "../dev/canonical-artifact-entrypoint";
 import { buildCanonicalArtifactEnvironment } from "../lib/artifact-environment";
+import { runArtifactReproducibilityStage } from "./artifact-reproducibility-stage";
 
 const artifactToolsRoot = enterCanonicalArtifactEntrypoint();
 
@@ -38,6 +39,8 @@ type Stage =
   | "nix-build-graph-generator"
   | "buck-test"
   | "cpp-addon-smoke"
+  | "reproducibility-matrix-cell"
+  | "reproducibility-aggregate"
   | "wheelhouse-preload";
 
 const stage = getFlagStr("stage", "");
@@ -48,13 +51,8 @@ const viberootsBuildToolsRoot = buildToolsRoot(workspaceRoot);
 const viberootsRoot = path.resolve(viberootsBuildToolsRoot, "..");
 const zxInit = buildToolPath(workspaceRoot, "tools/dev/zx-init.mjs");
 
-function toolPath(rel: string): string {
-  return buildToolPath(workspaceRoot, rel);
-}
-
-function viberootsPath(rel: string): string {
-  return path.join(viberootsRoot, rel);
-}
+const toolPath = (rel: string): string => buildToolPath(workspaceRoot, rel);
+const viberootsPath = (rel: string): string => path.join(viberootsRoot, rel);
 
 async function runTool(script: string, args: string[] = []) {
   await runNodeWithZx({
@@ -92,143 +90,152 @@ async function main() {
     caps = norm.caps;
   } catch {}
 
-  switch (stage as Stage) {
-    case "codegen": {
-      const target = toolPath("tools/codegen.ts");
-      try {
-        await $`test -f ${target} || exit 0`;
+  const reproducibilityStage = await runArtifactReproducibilityStage({
+    stage,
+    runTool,
+    toolPath,
+    flag: getFlagStr,
+  });
+  if (!reproducibilityStage)
+    switch (stage as Stage) {
+      case "codegen": {
+        const target = toolPath("tools/codegen.ts");
+        try {
+          await $`test -f ${target} || exit 0`;
+          await runTool(target);
+        } catch {}
+        break;
+      }
+      case "langs-validate": {
+        const target = toolPath("tools/dev/validate-langs.ts");
         await runTool(target);
-      } catch {}
-      break;
-    }
-    case "langs-validate": {
-      const target = toolPath("tools/dev/validate-langs.ts");
-      await runTool(target);
-      break;
-    }
-    case "export-graph": {
-      await requireArtifactGraph({
-        workspaceRoot,
-        graphPath: path.join(workspaceRoot, DEFAULT_GRAPH_PATH),
-        artifactToolsRoot,
-      });
-      break;
-    }
-    case "glue": {
-      await requireArtifactGlue({
-        workspaceRoot,
-        graphPath: path.join(workspaceRoot, DEFAULT_GRAPH_PATH),
-        artifactToolsRoot,
-      });
-      break;
-    }
-    case "sync-providers": {
-      // Unified orchestrator: always run for enabled languages; drivers are no-ops if inactive
-      const target = toolPath("tools/buck/sync-providers.ts");
-      await runTool(target);
-      break;
-    }
-    case "gen-auto-map": {
-      // Generate only if any enabled language has patching or lockfileLabels capability
-      if (enabled.size) {
-        let any = false;
-        for (const id of enabled) {
-          const c = caps.get(id) || {};
-          if (c.patching || c.lockfileLabels) {
-            any = true;
-            break;
-          }
-        }
-        if (!any) break;
+        break;
       }
-      const target = toolPath("tools/buck/gen-auto-map.ts");
-      await runTool(target, ["--graph", DEFAULT_GRAPH_PATH, "--out", DEFAULT_AUTO_MAP_PATH]);
-      break;
-    }
-    case "nix-gaps-policy": {
-      const target = toolPath("tools/dev/nix-gaps-inventory-check.ts");
-      await runTool(target, [
-        "--starlark-api",
-        viberootsPath("docs/handbook/starlark-api.md"),
-        "--nix-gaps",
-        viberootsPath("docs/handbook/nix-gaps.md"),
-        "--exceptions",
-        viberootsPath("docs/handbook/nix-gaps-exceptions.json"),
-        "--command-site-policy",
-        viberootsPath("docs/handbook/nix-command-site-policy.json"),
-      ]);
-      break;
-    }
-    case "prebuild-guard": {
-      const target = toolPath("tools/buck/prebuild-guard.ts");
-      await runTool(target);
-      await runTool(toolPath("tools/scaffolding/gen-template-manifest-artifacts.ts"), ["--check"]);
-      break;
-    }
-    case "patches-lint": {
-      const target = toolPath("tools/dev/patches-lint.ts");
-      // Strict mode in CI; run for Go and Python (importer-local) to enforce parity
-      await runTool(target, ["--strict", "--lang", "go"]);
-      await runTool(target, ["--strict", "--lang", "python"]);
-      break;
-    }
-    case "file-size-lint": {
-      const target = toolPath("tools/dev/file-size-lint.ts");
-      await runTool(target, ["--scope=source", "--fail=true"]);
-      break;
-    }
-    case "nix-build-graph-generator": {
-      // Optional: if the flake doesn't expose graph-generator, skip gracefully in local runs
-      const source = await inspectWorkspaceArtifactSource({
-        workspaceRoot,
-        targetPackages: [],
-      });
-      await admitArtifactContext({
-        classification: classifyArtifactBuild({
-          diagnosticImpure: false,
-          localDevelopment: source.localDevelopment,
-        }),
-        purpose: "ci",
-        artifactToolsRoot,
-        impureEvaluation: false,
-        workspaceRoot,
-        toolNames: ["git"],
-      });
-      const bundle = await chooseRunnableFlakeRef({
-        workspaceRoot,
-        sourceMode: "git",
-        attr: "graph-generator",
-        purpose: "ci",
-        artifactToolsRoot,
-      });
-      try {
-        await runNixBuildWithProgress({
+      case "export-graph": {
+        await requireArtifactGraph({
           workspaceRoot,
-          env: withoutEvaluationSelectors(process.env) as Record<string, string>,
-          label: "CI graph-generator",
+          graphPath: path.join(workspaceRoot, DEFAULT_GRAPH_PATH),
           artifactToolsRoot,
-          args: ["--no-write-lock-file", bundle.flakeRef, "--accept-flake-config", "--no-link"],
         });
-      } finally {
-        await bundle.cleanup?.();
+        break;
       }
-      break;
+      case "glue": {
+        await requireArtifactGlue({
+          workspaceRoot,
+          graphPath: path.join(workspaceRoot, DEFAULT_GRAPH_PATH),
+          artifactToolsRoot,
+        });
+        break;
+      }
+      case "sync-providers": {
+        // Unified orchestrator: always run for enabled languages; drivers are no-ops if inactive
+        const target = toolPath("tools/buck/sync-providers.ts");
+        await runTool(target);
+        break;
+      }
+      case "gen-auto-map": {
+        // Generate only if any enabled language has patching or lockfileLabels capability
+        if (enabled.size) {
+          let any = false;
+          for (const id of enabled) {
+            const c = caps.get(id) || {};
+            if (c.patching || c.lockfileLabels) {
+              any = true;
+              break;
+            }
+          }
+          if (!any) break;
+        }
+        const target = toolPath("tools/buck/gen-auto-map.ts");
+        await runTool(target, ["--graph", DEFAULT_GRAPH_PATH, "--out", DEFAULT_AUTO_MAP_PATH]);
+        break;
+      }
+      case "nix-gaps-policy": {
+        const target = toolPath("tools/dev/nix-gaps-inventory-check.ts");
+        await runTool(target, [
+          "--starlark-api",
+          viberootsPath("docs/handbook/starlark-api.md"),
+          "--nix-gaps",
+          viberootsPath("docs/handbook/nix-gaps.md"),
+          "--exceptions",
+          viberootsPath("docs/handbook/nix-gaps-exceptions.json"),
+          "--command-site-policy",
+          viberootsPath("docs/handbook/nix-command-site-policy.json"),
+        ]);
+        break;
+      }
+      case "prebuild-guard": {
+        const target = toolPath("tools/buck/prebuild-guard.ts");
+        await runTool(target);
+        await runTool(toolPath("tools/scaffolding/gen-template-manifest-artifacts.ts"), [
+          "--check",
+        ]);
+        break;
+      }
+      case "patches-lint": {
+        const target = toolPath("tools/dev/patches-lint.ts");
+        // Strict mode in CI; run for Go and Python (importer-local) to enforce parity
+        await runTool(target, ["--strict", "--lang", "go"]);
+        await runTool(target, ["--strict", "--lang", "python"]);
+        break;
+      }
+      case "file-size-lint": {
+        const target = toolPath("tools/dev/file-size-lint.ts");
+        await runTool(target, ["--scope=source", "--fail=true"]);
+        break;
+      }
+      case "nix-build-graph-generator": {
+        // Optional: if the flake doesn't expose graph-generator, skip gracefully in local runs
+        const source = await inspectWorkspaceArtifactSource({
+          workspaceRoot,
+          targetPackages: [],
+        });
+        await admitArtifactContext({
+          classification: classifyArtifactBuild({
+            diagnosticImpure: false,
+            localDevelopment: source.localDevelopment,
+          }),
+          purpose: "ci",
+          artifactToolsRoot,
+          impureEvaluation: false,
+          workspaceRoot,
+          toolNames: ["git"],
+        });
+        const bundle = await chooseRunnableFlakeRef({
+          workspaceRoot,
+          sourceMode: "git",
+          attr: "graph-generator",
+          purpose: "ci",
+          artifactToolsRoot,
+        });
+        try {
+          await runNixBuildWithProgress({
+            workspaceRoot,
+            env: withoutEvaluationSelectors(process.env) as Record<string, string>,
+            label: "CI graph-generator",
+            artifactToolsRoot,
+            args: ["--no-write-lock-file", bundle.flakeRef, "--accept-flake-config", "--no-link"],
+          });
+        } finally {
+          await bundle.cleanup?.();
+        }
+        break;
+      }
+      case "buck-test":
+        await runCiBuckTestStage({ coverage, artifactToolsRoot });
+        break;
+      case "cpp-addon-smoke": {
+        const target = toolPath("tools/ci/cpp-addon-smoke.ts");
+        await runTool(target);
+        break;
+      }
+      case "wheelhouse-preload": {
+        await runWheelhousePreload(artifactToolsRoot);
+        break;
+      }
+      default:
+        throw new Error(`unknown stage: ${stage}`);
     }
-    case "buck-test":
-      await runCiBuckTestStage({ coverage, artifactToolsRoot });
-      break;
-    case "cpp-addon-smoke": {
-      const target = toolPath("tools/ci/cpp-addon-smoke.ts");
-      await runTool(target);
-      break;
-    }
-    case "wheelhouse-preload": {
-      await runWheelhousePreload(artifactToolsRoot);
-      break;
-    }
-    default:
-      throw new Error(`unknown stage: ${stage}`);
-  }
   // Post-stage housekeeping: best-effort cleanup of ephemeral temp outs
   try {
     await runTool(toolPath("tools/dev/clean-temp-outs.ts"));

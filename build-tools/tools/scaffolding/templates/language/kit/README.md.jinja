@@ -8,3 +8,7 @@ This scaffolds a minimal language integration with:
 - build-tools/tools/buck/providers/{{ lang_id }}.ts
 - patches/{{ lang_id }}/ (created)
  - build-tools/tools/tests/{{ lang_id }}/contract/basic.test.ts (contract scaffolding)
+
+The generated `langs.json` entry stays disabled with `hermetic.status = "scaffold"`. Complete the
+source, dependency, bundle, tool, selector, sandbox/network, remote execution, publication, and
+independent-builder matrix gates before marking it graduated and adding it to `enabled`.

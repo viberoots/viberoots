@@ -1,6 +1,7 @@
 export type Capabilities = Record<string, boolean>;
 
 import type { PatchInvalidationStrategy } from "../../lib/lang-contracts";
+import type { LanguageHermeticContract } from "../../lib/lang-contracts";
 
 export type LangEntry = {
   id: string;
@@ -10,6 +11,7 @@ export type LangEntry = {
   kinds?: string[];
   capabilities?: Capabilities;
   templatesDir?: string;
+  hermetic?: LanguageHermeticContract;
 };
 
 export type Manifest = { enabled?: string[]; languages?: LangEntry[] } | LangEntry[];
@@ -21,4 +23,5 @@ export type DiagnoseOutput = {
   plannerPlugins: string[];
   stages: string[];
   patchInvalidation: Record<string, PatchInvalidationStrategy | null>;
+  graduationGaps: Record<string, string[]>;
 };

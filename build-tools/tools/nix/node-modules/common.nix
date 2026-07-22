@@ -50,10 +50,7 @@ let
           haveLockStore = builtins.pathExists lockPathStore;
           haveLockLive = builtins.pathExists lockPathLive;
         in if haveLive && haveLockLive && (!haveLockStore) then repoFsRoot else (if haveStore || !haveLive then repoRoot else repoFsRoot);
-      genAllowed = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
       srcBaseStr = builtins.toString srcBase;
-      haveImporterLock = builtins.pathExists (srcBaseStr + "/" + importerDir + "/pnpm-lock.yaml");
-      ignoreImporterLock = genAllowed && (!haveImporterLock);
       impPkgJsonPath = srcBaseStr + "/" + importerDir + "/package.json";
       impNpmrcPath = srcBaseStr + "/" + importerDir + "/.npmrc";
       impPnpmWsPath = srcBaseStr + "/" + importerDir + "/pnpm-workspace.yaml";
@@ -95,14 +92,13 @@ let
         copy_file ${if impPnpmWs != null then builtins.toJSON (builtins.toString impPnpmWs) else "\"/nonexistent\""} "$imp_out_dir/pnpm-workspace.yaml"
       fi
 
-      # Include only the requested lockfile path, unless generation mode intentionally
-      # ignores a missing importer-local lockfile.
+      # Include only the requested lockfile path. Missing metadata is repaired by u.
       if [ -n "${lockDir}" ]; then
         mkdir -p "$out/${lockDir}"
       fi
-      if [ "${if ignoreImporterLock then "1" else "0"}" != "1" ] && [ -f ${if wantedLock != null then builtins.toJSON (builtins.toString wantedLock) else "\"/nonexistent\""} ]; then
+      if [ -f ${if wantedLock != null then builtins.toJSON (builtins.toString wantedLock) else "\"/nonexistent\""} ]; then
         copy_file ${if wantedLock != null then builtins.toJSON (builtins.toString wantedLock) else "\"/nonexistent\""} "$out/${lockfilePath}"
-      elif [ "${if ignoreImporterLock then "1" else "0"}" != "1" ] && [ -f ${if impLock != null then builtins.toJSON (builtins.toString impLock) else "\"/nonexistent\""} ]; then
+      elif [ -f ${if impLock != null then builtins.toJSON (builtins.toString impLock) else "\"/nonexistent\""} ]; then
         copy_file ${if impLock != null then builtins.toJSON (builtins.toString impLock) else "\"/nonexistent\""} "$out/${lockfilePath}"
       fi
 

@@ -5,6 +5,7 @@ import { sourcePath } from "./fs";
 
 export async function readManifest(manifestRelPath = "build-tools/tools/nix/langs.json"): Promise<{
   enabled: Set<string>;
+  enabledDeclared: boolean;
   caps: Map<string, Capabilities>;
   langs: Map<string, LangEntry>;
 }> {
@@ -12,6 +13,7 @@ export async function readManifest(manifestRelPath = "build-tools/tools/nix/lang
     ? manifestRelPath
     : await sourcePath(manifestRelPath);
   const enabled = new Set<string>();
+  let enabledDeclared = false;
   const caps = new Map<string, Capabilities>();
   const langs = new Map<string, LangEntry>();
 
@@ -27,10 +29,11 @@ export async function readManifest(manifestRelPath = "build-tools/tools/nix/lang
           if ((l as any).capabilities) caps.set(id, ((l as any).capabilities || {}) as any);
         }
       }
-      return { enabled, caps, langs };
+      return { enabled, enabledDeclared, caps, langs };
     }
 
     if (raw && typeof raw === "object") {
+      enabledDeclared = Array.isArray(raw.enabled);
       for (const id of raw.enabled || []) enabled.add(String(id));
       for (const l of raw.languages || []) {
         if (l && typeof (l as any).id === "string") {
@@ -40,9 +43,10 @@ export async function readManifest(manifestRelPath = "build-tools/tools/nix/lang
         }
       }
     }
-  } catch {
-    return { enabled, caps, langs };
+  } catch (error: any) {
+    if (error?.code === "ENOENT") return { enabled, enabledDeclared, caps, langs };
+    throw error;
   }
 
-  return { enabled, caps, langs };
+  return { enabled, enabledDeclared, caps, langs };
 }

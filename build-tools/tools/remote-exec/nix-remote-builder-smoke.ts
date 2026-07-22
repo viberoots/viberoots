@@ -4,6 +4,7 @@ import path from "node:path";
 import { getFlagStr } from "../lib/cli";
 import { runBoundedArtifactCommand } from "../lib/artifact-command-runner";
 import { ensureNixStoreToolPathSync } from "../lib/tool-paths";
+import { verifyProtectedStoreSignature } from "../lib/protected-store-signature";
 import {
   buildRemoteBuilderSmokeEvidence,
   parseRemoteBuilderSystem,
@@ -14,7 +15,22 @@ import {
 } from "./nix-remote-builder-config";
 import { artifactTransportEnvironment } from "../lib/artifact-environment";
 import { runRemoteBuilderProbes } from "./nix-remote-builder-probes";
+import {
+  canonicalJson,
+  installReviewedSshHostAuthority,
+  parseRemoteBuilderTransportFile,
+  parseReviewedRemoteBuilders,
+} from "./remote-builder-authority";
 const activeEvidence = new WeakSet<object>();
+
+export function assertTrustedRemoteStoreInfo(value: unknown): void {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("remote builder smoke requires trusted remote-store information");
+  }
+  if ((value as Record<string, unknown>).trusted !== true) {
+    throw new Error("remote builder smoke requires a trusted remote-store connection");
+  }
+}
 
 export function isActiveRemoteBuilderSmokeEvidence(
   value: unknown,
@@ -29,13 +45,17 @@ export function isActiveRemoteBuilderSmokeEvidence(
 export type RunRemoteBuilderSmokeOptions = {
   reportPath?: string;
   remoteCiTools: string;
-  builderUri: string;
+  transportFile: string;
   probeFlake: string;
   policy: RemoteBuilderPolicy;
   expectedSystem: RemoteBuilderSystem;
   builderIdentity: string;
   reviewedBuilders: string;
   baseEnv?: NodeJS.ProcessEnv;
+  probeStoreObservation?: {
+    before(runNix: (args: string[]) => Promise<{ stdout: string }>): Promise<void>;
+    after(runNix: (args: string[]) => Promise<{ stdout: string }>): Promise<void>;
+  };
 };
 function requiredFlag(name: string): string {
   const value = getFlagStr(name, "").trim();
@@ -44,7 +64,6 @@ function requiredFlag(name: string): string {
 }
 async function readBuilderPolicyAssertion(opts: {
   nix: string;
-  builderUri: string;
   identity: string;
   registryPath: string;
   env: NodeJS.ProcessEnv;
@@ -54,33 +73,21 @@ async function readBuilderPolicyAssertion(opts: {
   policyStorePath: string;
   probeFlakeStorePath: string;
 }> {
-  const registry = JSON.parse(await fs.readFile(opts.registryPath, "utf8")) as {
-    schema?: unknown;
-    builders?: unknown;
-  };
-  if (
-    registry.schema !== "viberoots.reviewed-remote-builders.v1" ||
-    !Array.isArray(registry.builders)
-  ) {
-    throw new Error("--reviewed-builders must contain the reviewed remote-builder registry");
-  }
-  const builders = registry.builders as Array<Record<string, unknown>>;
+  const registry = parseReviewedRemoteBuilders(
+    JSON.parse(await fs.readFile(opts.registryPath, "utf8")),
+  );
+  const builders = registry.builders;
   const selected = builders.find((entry) => entry.identity === opts.identity);
   const policyStorePath =
     typeof selected?.policyStorePath === "string" ? selected.policyStorePath : "";
   const probeFlakeStorePath =
     typeof selected?.probeFlakeStorePath === "string" ? selected.probeFlakeStorePath : "";
-  const reviewedBuilderUri =
-    typeof selected?.builderUri === "string" ? selected.builderUri.trim() : "";
   if (!opts.identity.startsWith("reviewed:") || !policyStorePath.startsWith("/nix/store/")) {
     throw new Error(`reviewed remote builder is not registered: ${opts.identity}`);
   }
-  if (!reviewedBuilderUri || opts.builderUri !== reviewedBuilderUri) {
-    throw new Error("--builder-uri does not match the reviewed builder registry");
-  }
   const result = await runBoundedArtifactCommand({
     command: opts.nix,
-    args: ["store", "cat", "--store", opts.builderUri, policyStorePath],
+    args: ["store", "cat", `${policyStorePath}/assertion.json`],
     env: opts.env,
     timeoutMs: 600_000,
   });
@@ -111,7 +118,6 @@ export async function runRemoteBuilderSmoke(
   opts: RunRemoteBuilderSmokeOptions,
 ): Promise<RemoteBuilderSmokeEvidence> {
   const env = remoteCiToolsPathEnv(opts.remoteCiTools, opts.baseEnv || process.env);
-  const builderUri = opts.builderUri;
   const probeFlake = opts.probeFlake;
   if (!probeFlake.startsWith("/nix/store/")) {
     throw new Error("--probe-flake must use the canonical immutable Nix-store source");
@@ -120,16 +126,54 @@ export async function runRemoteBuilderSmoke(
   const nix = ensureNixStoreToolPathSync("nix", env);
   const builderIdentity = opts.builderIdentity;
   const reviewedBuilders = path.resolve(opts.reviewedBuilders);
-  if (!/^\/nix\/store\/[a-z0-9]{32}-[^/]+(?:\/[^/]+)?$/u.test(reviewedBuilders)) {
+  if (!/^\/nix\/store\/[a-z0-9]{32}-[^/]+\/registry\.json$/u.test(reviewedBuilders)) {
     throw new Error("--reviewed-builders must be the canonical immutable registry");
   }
+  await verifyProtectedStoreSignature(reviewedBuilders, async (args) => {
+    const result = await runBoundedArtifactCommand({ command: nix, args, env });
+    if (result.exitCode !== 0 || result.timedOut || result.interrupted) {
+      throw new Error("reviewed remote-builder registry lacks a protected signature");
+    }
+    return result;
+  });
+  const registryText = await fs.readFile(reviewedBuilders, "utf8");
+  const registry = parseReviewedRemoteBuilders(JSON.parse(registryText));
+  if (registryText !== canonicalJson(registry)) {
+    throw new Error("--reviewed-builders must contain canonical registry bytes");
+  }
+  const selected = registry.builders.find(({ identity }) => identity === builderIdentity);
+  if (!selected) throw new Error(`reviewed remote builder is not registered: ${builderIdentity}`);
+  if (selected.supportedSystem !== opts.expectedSystem) {
+    throw new Error("reviewed remote builder system does not match active execution system");
+  }
+  const transport = parseRemoteBuilderTransportFile(opts.transportFile, selected.endpoint);
+  const remoteEnv = {
+    ...installReviewedSshHostAuthority(env, selected.endpoint),
+    NIX_REMOTE: transport.builderUri,
+  };
+  const remoteStoreInfo = await runBoundedArtifactCommand({
+    command: nix,
+    args: ["store", "info", "--json"],
+    env: remoteEnv,
+  });
+  if (remoteStoreInfo.exitCode !== 0 || remoteStoreInfo.timedOut || remoteStoreInfo.interrupted) {
+    throw new Error("reviewed remote builder did not provide trusted store information");
+  }
+  assertTrustedRemoteStoreInfo(JSON.parse(remoteStoreInfo.stdout));
+  const observedRemoteNix = async (args: string[]): Promise<{ stdout: string }> => {
+    const result = await runBoundedArtifactCommand({ command: nix, args, env: remoteEnv });
+    if (result.exitCode !== 0 || result.timedOut || result.interrupted) {
+      throw new Error("remote builder store observation failed");
+    }
+    return { stdout: result.stdout };
+  };
+  await opts.probeStoreObservation?.before(observedRemoteNix);
   const { assertion, reviewedIdentities, policyStorePath, probeFlakeStorePath } =
     await readBuilderPolicyAssertion({
       nix,
-      builderUri,
       identity: builderIdentity,
       registryPath: reviewedBuilders,
-      env,
+      env: remoteEnv,
     });
   const assertionSystem = String(
     assertion && typeof assertion === "object"
@@ -141,10 +185,29 @@ export async function runRemoteBuilderSmoke(
       `remote builder policy system does not match active execution system: expected=${opts.expectedSystem} actual=${assertionSystem || "<missing>"}`,
     );
   }
+  const assertionBuilder =
+    assertion && typeof assertion === "object"
+      ? (assertion as Record<string, unknown>).builder
+      : undefined;
+  const assertionEndpoint =
+    assertionBuilder && typeof assertionBuilder === "object"
+      ? (assertionBuilder as Record<string, unknown>).endpoint
+      : undefined;
+  if (canonicalJson(assertionEndpoint) !== canonicalJson(selected.endpoint)) {
+    throw new Error("builder policy assertion endpoint does not match the reviewed registry");
+  }
+  if (
+    String((assertion as Record<string, unknown>).probeFlakeStorePath || "") !== probeFlakeStorePath
+  ) {
+    throw new Error(
+      "builder policy assertion probe authority does not match the reviewed registry",
+    );
+  }
   if (probeFlake !== probeFlakeStorePath) {
     throw new Error("--probe-flake does not match the reviewed builder registry");
   }
-  await runRemoteBuilderProbes({ nix, builderUri, probeFlake, env });
+  await runRemoteBuilderProbes({ nix, probeFlake, env: remoteEnv });
+  await opts.probeStoreObservation?.after(observedRemoteNix);
   const report = buildRemoteBuilderSmokeEvidence(assertion, {
     policy,
     expectedSystem: opts.expectedSystem,
@@ -171,7 +234,7 @@ async function main() {
   await runRemoteBuilderSmoke({
     reportPath: requiredFlag("report"),
     remoteCiTools: getFlagStr("remote-ci-tools", process.env.VBR_REMOTE_CI_TOOLS || ""),
-    builderUri: requiredFlag("builder-uri"),
+    transportFile: requiredFlag("transport-file"),
     probeFlake: requiredFlag("probe-flake"),
     policy: requiredFlag("builder-policy") as RemoteBuilderPolicy,
     expectedSystem: parseRemoteBuilderSystem(requiredFlag("system")),

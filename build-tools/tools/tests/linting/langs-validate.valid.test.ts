@@ -20,6 +20,18 @@ test("langs.json valid passes validator", async () => {
           ],
           kinds: ["cli", "lib"],
           templatesDir: "viberoots/build-tools/tools/scaffolding/templates/go",
+          hermetic: {
+            status: "graduated",
+            sourceRoles: true,
+            dependencyReconciliation: true,
+            immutableBundleInputs: true,
+            storeQualifiedToolchain: true,
+            selectorTransport: true,
+            sandboxNetwork: true,
+            remoteExecution: true,
+            publicationAdmission: true,
+            reproducibilityMatrixIds: ["go-lib"],
+          },
         },
       ],
     } as any;
@@ -34,6 +46,10 @@ test("langs.json valid passes validator", async () => {
     await copyViberootsSourcePath(
       "viberoots/build-tools/tools/dev/validate-langs.ts",
       path.join(tmp, "viberoots/build-tools/tools/dev/validate-langs.ts"),
+    );
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/lib/artifact-reproducibility-matrix.ts",
+      path.join(tmp, "viberoots/build-tools/tools/lib/artifact-reproducibility-matrix.ts"),
     );
     const testNodeModules = String(process.env.ZX_TEST_NODE_MODULES_OUT || "").trim();
     const tempToolEnv = {

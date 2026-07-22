@@ -33,6 +33,7 @@ test("bundle manifests are identical for CoW and full-copy construction", async 
         classification: "hermetic",
         artifactToolsRoot,
         selectorEnv: {},
+        sourceRevision: "a".repeat(40),
       },
       { register, copyMode: "none" },
     );
@@ -43,11 +44,13 @@ test("bundle manifests are identical for CoW and full-copy construction", async 
         classification: "hermetic",
         artifactToolsRoot,
         selectorEnv: {},
+        sourceRevision: "a".repeat(40),
       },
       { register, copyMode: "try" },
     );
     assert.equal(cow.digest, none.digest);
     assert.equal(captures[1], captures[0]);
+    assert.match(captures[0]!, /source-authority\.json/);
     assert.match(none.flakeRef, /\?dir=source#graph-generator$/);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });

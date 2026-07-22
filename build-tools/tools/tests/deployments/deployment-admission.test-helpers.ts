@@ -39,6 +39,8 @@ export function admissionEvalBase(
   return {
     workspaceRoot,
     recordsRoot: deploymentRecordsRoot(workspaceRoot, provider),
+    protectedPublicationOutputEnsurer: async () => {},
+    staticWebappIdentityForOutput: async () => args.admittedContext.source.artifactIdentity || "",
     ...args,
   };
 }

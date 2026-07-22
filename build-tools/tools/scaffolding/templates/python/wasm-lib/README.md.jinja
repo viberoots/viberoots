@@ -5,18 +5,11 @@ that WASM apps can consume.
 
 ## Usage
 
-Build via planner-selected derivation (requires exported Buck graph):
+Build through the canonical Buck artifact route:
 
 ```bash
-node build-tools/tools/buck/export-graph.ts
-BUCK_TARGET=//projects/libs/{{ name }}:{{ name }} nix build --impure -L --accept-flake-config '.#graph-generator-selected' --no-link
+b //projects/libs/{{ name }}:{{ name }}
 ```
 
-Inspect the overlay metadata:
-
-```bash
-OUT=$(BUCK_TARGET=//projects/libs/{{ name }}:{{ name }} nix build --impure -L --accept-flake-config '.#graph-generator-selected' --print-out-paths)
-cat "$OUT/BUILD-INFO.json"
-```
-
+Consume the resulting overlay through a declared Buck dependency from the application target.
 

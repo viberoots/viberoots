@@ -6,7 +6,7 @@
     "lang": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["id", "displayName", "requiredPaths", "kinds", "templatesDir"],
+      "required": ["id", "displayName", "requiredPaths", "kinds", "templatesDir", "hermetic"],
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "displayName": { "type": "string", "minLength": 1 },
@@ -23,7 +23,57 @@
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 }
         },
-        "templatesDir": { "type": "string", "minLength": 1 }
+        "templatesDir": { "type": "string", "minLength": 1 },
+        "hermetic": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "status",
+            "sourceRoles",
+            "dependencyReconciliation",
+            "immutableBundleInputs",
+            "storeQualifiedToolchain",
+            "selectorTransport",
+            "sandboxNetwork",
+            "remoteExecution",
+            "publicationAdmission",
+            "reproducibilityMatrixIds"
+          ],
+          "properties": {
+            "status": { "enum": ["scaffold", "graduated"] },
+            "sourceRoles": { "type": "boolean" },
+            "dependencyReconciliation": { "type": "boolean" },
+            "immutableBundleInputs": { "type": "boolean" },
+            "storeQualifiedToolchain": { "type": "boolean" },
+            "selectorTransport": { "type": "boolean" },
+            "sandboxNetwork": { "type": "boolean" },
+            "remoteExecution": { "type": "boolean" },
+            "publicationAdmission": { "type": "boolean" },
+            "reproducibilityMatrixIds": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1 }
+            }
+          },
+          "allOf": [
+            {
+              "if": { "properties": { "status": { "const": "graduated" } } },
+              "then": {
+                "properties": {
+                  "sourceRoles": { "const": true },
+                  "dependencyReconciliation": { "const": true },
+                  "immutableBundleInputs": { "const": true },
+                  "storeQualifiedToolchain": { "const": true },
+                  "selectorTransport": { "const": true },
+                  "sandboxNetwork": { "const": true },
+                  "remoteExecution": { "const": true },
+                  "publicationAdmission": { "const": true },
+                  "reproducibilityMatrixIds": { "minItems": 1 }
+                }
+              }
+            }
+          ]
+        }
       }
     }
   },

@@ -77,10 +77,6 @@
       "justification": "Pre-existing oversized verify argument parser pending focused decomposition outside the remote-consumer final checkpoint."
     },
     {
-      "path": "dev/verify/lint-preflight.ts",
-      "justification": "Pre-existing oversized verify lint preflight pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
-    },
-    {
       "path": "dev/verify/verify-passes.ts",
       "justification": "Pre-existing oversized verify pass helper pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
     },
@@ -159,10 +155,6 @@
     {
       "path": "tests/dev/claude-wrapper.safehouse.test.ts",
       "justification": "Pre-existing oversized Claude wrapper safehouse test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
-    },
-    {
-      "path": "tests/dev/nix-gaps-inventory-check.test.ts",
-      "justification": "Pre-existing oversized nix-gaps inventory test pending focused decomposition; recorded so strict source validation can proceed without unrelated refactoring."
     },
     {
       "path": "tests/dev/startup-check.extraction-blockers.test.ts",

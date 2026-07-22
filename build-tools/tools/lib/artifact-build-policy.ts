@@ -3,7 +3,6 @@ import { isNixStorePath } from "./tool-paths";
 import { REVIEWED_PUBLIC_KEYS, REVIEWED_SUBSTITUTERS } from "./artifact-nix-policy";
 
 export { serializeArtifactPolicyEvidence } from "./artifact-policy-serialization";
-
 export type ArtifactBuildClassification = "hermetic" | "local-development" | "diagnostic-impure";
 export type ArtifactJobPurpose =
   | "local"
@@ -32,7 +31,6 @@ export type ArtifactPolicyEvidence = {
     network: "sandboxed-fixed-output-only" | "unrestricted" | "unknown";
   };
 };
-
 const protectedPurposes = new Set<ArtifactJobPurpose>([
   "ci",
   "release",
@@ -41,7 +39,6 @@ const protectedPurposes = new Set<ArtifactJobPurpose>([
   "deployment",
 ]);
 const validPurposes = new Set<ArtifactJobPurpose>(["local", ...protectedPurposes]);
-
 export function classifyArtifactBuild(opts: {
   diagnosticImpure: boolean;
   localDevelopment: boolean;
@@ -50,7 +47,6 @@ export function classifyArtifactBuild(opts: {
   if (opts.localDevelopment) return "local-development";
   return "hermetic";
 }
-
 export function artifactJobPurpose(env: NodeJS.ProcessEnv): ArtifactJobPurpose {
   const explicit = String(env.VBR_ARTIFACT_JOB || "").trim();
   if (explicit) {
@@ -62,7 +58,6 @@ export function artifactJobPurpose(env: NodeJS.ProcessEnv): ArtifactJobPurpose {
   }
   return String(env.CI || "").trim() ? "ci" : "local";
 }
-
 function configValue(config: unknown, key: string): unknown {
   if (!config || typeof config !== "object") return undefined;
   const entry = (config as Record<string, unknown>)[key];
@@ -71,7 +66,6 @@ function configValue(config: unknown, key: string): unknown {
   }
   return entry;
 }
-
 function listConfig(value: unknown): string[] | null {
   if (Array.isArray(value)) return value.map(String).filter(Boolean);
   if (value && typeof value === "object") return Object.keys(value);
@@ -140,13 +134,12 @@ export function buildArtifactPolicyEvidence(opts: {
       root: String(opts.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
       paths: Object.fromEntries(
         Object.entries(opts.toolPaths)
-          .filter(
-            ([tool, toolPath]) =>
-              Boolean(toolPath) &&
-              (isNixStorePath(String(toolPath)) ||
-                (tool === "nix" &&
-                  path.resolve(String(toolPath)) === "/nix/var/nix/profiles/default/bin/nix")),
-          )
+          .filter(([tool, toolPath]) => {
+            const bootstrapNix =
+              tool === "nix" &&
+              path.resolve(String(toolPath)) === "/nix/var/nix/profiles/default/bin/nix";
+            return Boolean(toolPath) && (isNixStorePath(String(toolPath)) || bootstrapNix);
+          })
           .sort(([left], [right]) => left.localeCompare(right))
           .map(([tool, toolPath]) => [tool, String(toolPath)]),
       ),

@@ -33,7 +33,7 @@ test("project enforcement is an earliest local cache-disabled sidecar", () => {
       VBR_REMOTE_ARTIFACT_DIR: "/tmp/artifacts",
       VBR_REMOTE_TEST_ACTIVATION_DIR: "/tmp/activation",
       VBR_REMOTE_CI_TOOLS: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-remote-ci-tools",
-      VBR_REMOTE_BUILDER_URI: "ssh-ng://builder",
+      VBR_REMOTE_BUILDER_TRANSPORT: "/tmp/remote-builder-transport.json",
       VBR_REMOTE_PROBE_FLAKE: "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-probe-flake",
       VBR_REMOTE_BUILDER_IDENTITY: "builder",
       VBR_REMOTE_REVIEWED_BUILDERS:

@@ -2,7 +2,11 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { evaluateDeploymentAdmission } from "../../deployments/deployment-admission-evaluator";
-import { deploymentAdmissionEvidenceFixture } from "./deployment-admission.fixture";
+import {
+  deploymentAdmissionEvidenceFixture,
+  protectedAggregateFixture,
+  protectedArtifactIdentityDigest,
+} from "./deployment-admission.fixture";
 import { admissionEvalBase, admittedContextFixture } from "./deployment-admission.test-helpers";
 import { nixosSharedHostDeploymentFixture } from "./nixos-shared-host.fixture";
 
@@ -20,8 +24,8 @@ test("admission evaluation includes first-class policy resource refs and version
           },
         ],
         attestation: {
-          trustedBuilderIdentities: ["builder:trusted"],
-          acceptedProvenanceFormats: ["slsa-provenance-release"],
+          trustedBuilderIdentities: [],
+          acceptedProvenanceFormats: ["viberoots.hermetic-artifact.v1"],
           artifactBinding: "source_revision_and_build_inputs",
           expiredBehavior: "fail_closed",
           revokedBehavior: "fail_closed",
@@ -51,7 +55,7 @@ test("admission evaluation includes first-class policy resource refs and version
       lockScope: "preview",
     },
   };
-  const admittedContext = admittedContextFixture(deployment);
+  const admittedContext = admittedContextFixture(deployment, { sourceRevision: "a".repeat(40) });
   const evaluation = await evaluateDeploymentAdmission({
     ...admissionEvalBase("nixos-shared-host", {
       deployment,
@@ -62,12 +66,18 @@ test("admission evaluation includes first-class policy resource refs and version
         operationKind: "deploy",
         sourceRevision: admittedContext.source.sourceRevision,
         artifactIdentity: admittedContext.source.artifactIdentity,
-        buildInputsFingerprint: "sha256:build-inputs",
-        provenanceFormat: "slsa-provenance-release",
+        buildInputsFingerprint: protectedArtifactIdentityDigest,
         supplyChainGates: [
           { name: "vuln/critical", category: "vulnerability", applyAt: "publish_admission" },
         ],
       }),
+      protectedAggregateReader: async () =>
+        protectedAggregateFixture({
+          sourceRevision: admittedContext.source.sourceRevision,
+          artifactIdentity: admittedContext.source.artifactIdentity!,
+          deploymentLabel: deployment.label,
+          target: deployment.components.find(({ kind }) => kind === "static-webapp")!.target,
+        }),
     }),
   });
   const refs = new Map(evaluation.policyResourceRefs.map((ref) => [ref.kind, ref]));

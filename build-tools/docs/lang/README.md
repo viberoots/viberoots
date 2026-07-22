@@ -34,6 +34,9 @@ repository enforcement contract, not only planner/macros/providers.
 5. Keep verify and CI gate behavior in scope:
    - New language rollout is not complete until the enforcement checks are part of required repo
      validation flow.
+   - Scaffolded languages remain disabled with `hermetic.status = "scaffold"`. Graduate them only
+     after every hermetic contract field is proven and `reproducibilityMatrixIds` names the
+     mandatory independent-builder evidence cases.
 
 6. Define command ownership and tool authority:
    - `u` is the intended owner for deterministic tracked language metadata repair. `b` and
@@ -77,6 +80,9 @@ A language rollout doc in this directory is only complete when it includes:
 - Validation commands that contributors can run before merge.
 - Explicit `u`/`i`/post-clone ownership, Nix-store tool authority, and runnable/toolchain wiring.
 - Focused temp-repo, manifest, execution-time, and disk-growth evidence appropriate to the language.
+- A graduated `langs.json` contract covering source roles, dependency reconciliation, immutable
+  bundle inputs, store-qualified tools, selector transport, sandbox/network policy, remote
+  execution, publication admission, and reproducibility matrix IDs.
 
 ## Canonical helper baseline
 

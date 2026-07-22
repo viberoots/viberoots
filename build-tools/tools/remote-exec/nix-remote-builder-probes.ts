@@ -8,19 +8,25 @@ type Probe = {
   denialPattern?: RegExp;
 };
 
-function remoteProbeSet(opts: { builderUri: string; probeFlake: string }): Probe[] {
+function remoteProbeSet(opts: { probeFlake: string }): Probe[] {
   const common = [
     "build",
-    "--store",
-    opts.builderUri,
-    ...artifactNixPolicyArgs({ allowReviewedRemoteBuilders: true }),
+    ...artifactNixPolicyArgs(),
+    "--option",
+    "substitute",
+    "false",
     "--no-link",
     "--rebuild",
   ];
   return [
     {
+      name: "undeclared-store-canary-present",
+      args: ["path-info", opts.probeFlake],
+      outcome: "pass",
+    },
+    {
       name: "store",
-      args: ["store", "info", "--store", opts.builderUri, "--json"],
+      args: ["store", "info", "--json"],
       outcome: "pass",
     },
     {
@@ -60,7 +66,7 @@ async function runProbe(nix: string, probe: Probe, env: NodeJS.ProcessEnv): Prom
     throw new Error(`remote builder ${probe.name} probe did not shut down cleanly`);
   }
   if (probe.outcome === "pass" && result.exitCode !== 0) {
-    throw new Error(`remote builder ${probe.name} probe failed: ${result.stderr.trim()}`);
+    throw new Error(`remote builder ${probe.name} probe failed; inspect builder-local diagnostics`);
   }
   if (probe.outcome === "deny") {
     if (result.exitCode === 0)
@@ -73,7 +79,6 @@ async function runProbe(nix: string, probe: Probe, env: NodeJS.ProcessEnv): Prom
 
 export async function runRemoteBuilderProbes(opts: {
   nix: string;
-  builderUri: string;
   probeFlake: string;
   env: NodeJS.ProcessEnv;
 }): Promise<void> {

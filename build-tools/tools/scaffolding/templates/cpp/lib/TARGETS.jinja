@@ -17,25 +17,3 @@ nix_cpp_test(
     ],
     labels = ["lang:cpp", "kind:test"],
 )
-
-
-load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_library", "nix_cpp_test")
-
-nix_cpp_library(
-    name = "{{ name }}",
-    srcs = glob(["src/**/*.cpp"]),
-    headers = glob(["include/**/*.h"]),
-    labels = ["lang:cpp", "kind:lib"],
-    visibility = ["PUBLIC"],
-)
-
-nix_cpp_test(
-    name = "{{ name }}_gtest",
-    srcs = ["tests/{{ name }}_gtest.cpp"],
-    deps = [
-        ":{{ name }}",
-        "workspace_providers//:nix_pkgs_googletest",
-    ],
-    labels = ["lang:cpp", "kind:test"],
-)
-

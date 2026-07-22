@@ -19,7 +19,7 @@ export function parseRemoteExecPolicyCli() {
     profiles: value("--profiles").split(",").filter(Boolean),
     locks: value("--locks").split(",").filter(Boolean),
     remoteCiTools: value("--remote-ci-tools"),
-    builderUri: value("--builder-uri"),
+    transportFile: value("--transport-file"),
     probeFlake: value("--probe-flake"),
     builderPolicy: value("--builder-policy"),
     builderIdentity: value("--builder-identity"),
@@ -52,7 +52,7 @@ export async function prepareRemoteExecPolicyCli() {
     activeRemoteBuilderSmokeEvidence = await runRemoteBuilderSmoke({
       reportPath: args.report || undefined,
       remoteCiTools: args.remoteCiTools,
-      builderUri: args.builderUri,
+      transportFile: args.transportFile,
       probeFlake: args.probeFlake,
       policy: remotePolicies[0] as "inherit_config" | "force_builders_file",
       expectedSystem: args.system,

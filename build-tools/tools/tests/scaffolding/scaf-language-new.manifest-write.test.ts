@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { copyViberootsSourcePath } from "../lib/test-helpers/source-paths";
 import { viberootsTool } from "./lib/viberoots-tools";
 
 test("scaf language new writes manifest and generates planner by default", async () => {
@@ -25,6 +26,13 @@ test("scaf language new writes manifest and generates planner by default", async
       }),
       "utf8",
     );
+    for (const rel of [
+      "viberoots/build-tools/tools/dev/langs.schema.json",
+      "viberoots/build-tools/tools/dev/validate-langs.ts",
+      "viberoots/build-tools/tools/lib/artifact-reproducibility-matrix.ts",
+    ]) {
+      await copyViberootsSourcePath(rel, path.join(tmp, rel));
+    }
     await fs.outputFile(
       path.join(tmp, "viberoots/build-tools/tools/scaffolding/templates/language/kit/copier.yaml"),
       "lang_id: toy\n",
@@ -61,7 +69,14 @@ test("scaf language new writes manifest and generates planner by default", async
     assert.ok(await fs.pathExists(manifest), "manifest should be written");
     assert.ok(await fs.pathExists(planner), "planner should be generated or present");
     const doc = JSON.parse(await fs.readFile(manifest, "utf8"));
-    const ids = (Array.isArray(doc.languages) ? doc.languages : []).map((e: any) => e.id);
+    const languages = Array.isArray(doc.languages) ? doc.languages : [];
+    const ids = languages.map((e: any) => e.id);
     assert.ok(ids.includes(id), "language id present in manifest.languages");
+    assert.ok(!doc.enabled.includes(id), "new language remains disabled until graduation");
+    assert.equal(languages.find((entry: any) => entry.id === id).hermetic.status, "scaffold");
+    assert.deepEqual(
+      languages.find((entry: any) => entry.id === id).hermetic.reproducibilityMatrixIds,
+      [],
+    );
   });
 });

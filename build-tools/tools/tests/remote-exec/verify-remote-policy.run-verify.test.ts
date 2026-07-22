@@ -12,7 +12,7 @@ const remoteEnv = {
   VBR_REMOTE_EXEC_SYSTEM: "x86_64-linux",
   VBR_REMOTE_TEST_ACTIVATION_DIR: "/tmp/vbr-remote/activation",
   VBR_REMOTE_CI_TOOLS: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-remote-ci-tools",
-  VBR_REMOTE_BUILDER_URI: "ssh-ng://builder",
+  VBR_REMOTE_BUILDER_TRANSPORT: "/tmp/remote-builder-transport.json",
   VBR_REMOTE_PROBE_FLAKE: "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-probe-flake",
   VBR_REMOTE_BUILDER_IDENTITY: "builder",
   VBR_REMOTE_REVIEWED_BUILDERS:

@@ -56,6 +56,13 @@ export function printHuman(out: DiagnoseOutput, filterId: string) {
     }
   }
 
+  sep();
+  console.log("Hermetic graduation:");
+  for (const id of Object.keys(out.graduationGaps).sort()) {
+    const gaps = out.graduationGaps[id];
+    console.log(`  ${id}: ${gaps.length === 0 ? "graduated" : `blocked (${gaps.join(", ")})`}`);
+  }
+
   if (!filterId || filterId === "cpp") {
     try {
       const attrs = readPatchedCppProviderAttrs();

@@ -130,6 +130,10 @@ classified:
 
 New, changed, or unclassified production command sites fail the checker. Updating the deterministic
 digest requires reviewing the affected site and its role; a path rule alone does not admit a change.
+Canonical artifact files also fail when they enable automatic pnpm lock generation or contain an
+unapproved `--impure` route. The only `diagnostic-impure` allowances belong on the exact explicit
+diagnostic command/helper rules in this same policy. Update/install routes retain lock generation
+ownership because only `u` may repair dependency metadata.
 
 ## Toolchains
 

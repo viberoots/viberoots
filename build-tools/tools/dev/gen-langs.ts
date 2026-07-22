@@ -18,14 +18,13 @@ type Manifest =
 
 async function readManifest(repo: string): Promise<Lang[]> {
   const p = buildToolPath(repo, "tools/nix/langs.json");
-  try {
-    const txt = await fsp.readFile(p, "utf8");
-    const doc = JSON.parse(txt) as Manifest;
-    const list: Lang[] = Array.isArray(doc) ? (doc as Lang[]) : doc.languages || [];
-    return (list || []).filter((l) => l && typeof l.id === "string");
-  } catch {
-    return [];
+  const txt = await fsp.readFile(p, "utf8");
+  const doc = JSON.parse(txt) as Manifest;
+  const list: Lang[] = Array.isArray(doc) ? (doc as Lang[]) : doc.languages || [];
+  if (!Array.isArray(list) || list.some((lang) => !lang || typeof lang.id !== "string")) {
+    throw new Error("langs.json must contain only language entries with string ids");
   }
+  return list;
 }
 
 function toNixBoolean(v: boolean): "true" | "false" {

@@ -123,15 +123,6 @@ async function main() {
     flakeRoot,
     workspaceRoot,
   );
-  const allowGenerate = String(process.env.NIX_PNPM_ALLOW_GENERATE || "") === "1";
-  const impureFlags = allowGenerate ? ["--impure"] : [];
-  // If generation is allowed, ensure no stale importer lockfile forces a frozen-lockfile path
-  if (allowGenerate) {
-    try {
-      const importerLock = path.join(workspaceRoot, importer, "pnpm-lock.yaml");
-      await fsp.unlink(importerLock).catch(() => {});
-    } catch {}
-  }
   dbg(
     "[VBR-BUNDLE-DEBUG] LOCAL_PNPM_STORE=%s NIX_USE_PREFETCHED_PNPM_STORE=%s",
     String(process.env.LOCAL_PNPM_STORE || ""),
@@ -151,10 +142,6 @@ async function main() {
     ...localOnlyNixBuilderArgs(),
     "-L",
   ];
-  // Only pass --impure when the caller explicitly requested the allow-generate path
-  if (allowGenerate) {
-    nixArgs.push("--impure");
-  }
   if (mj && mj !== "0") {
     nixArgs.push("--max-jobs", mj);
   }

@@ -8,18 +8,15 @@ This is a minimal Python WASM application scaffold.
 
 ## Usage
 
-Build via planner-selected derivation (requires exported Buck graph):
+Build through the canonical Buck artifact route:
 
 ```bash
-node build-tools/tools/buck/export-graph.ts
-BUCK_TARGET=//projects/apps/{{ name }}:{{ name }} nix build --impure -L --accept-flake-config '.#graph-generator-selected' --no-link
+b //projects/apps/{{ name }}:{{ name }}
 ```
 
 Run the tiny runner emitted by the WASM template:
 
 ```bash
-OUT=$(BUCK_TARGET=//projects/apps/{{ name }}:{{ name }} nix build --impure -L --accept-flake-config '.#graph-generator-selected' --print-out-paths)
-node "$OUT/bin/run.mjs"
+r //projects/apps/{{ name }}:{{ name }}
 ```
-
 

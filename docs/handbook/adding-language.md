@@ -100,9 +100,18 @@ semantics and transactional `Cargo.lock` rollback before project templates are c
   - `LanguageProviderSync` is the provider sync adapter surface used by `build-tools/tools/buck/sync-providers.ts`
   - `PlannerLanguage` is used by TS-side helpers that enumerate planner capabilities
 - The language registry is manifest‑driven via `build-tools/tools/nix/langs.json`. Discovery is partial‑clone safe:
-  - Only languages whose `requiredPaths` exist are considered enabled
+  - A language must be listed in `enabled`, have a graduated hermetic contract, and have every
+    `requiredPaths` entry present before discovery considers it enabled.
   - Orchestrators dynamically derive their registries from this manifest; missing languages are skipped without errors
 - When adding a new language, update `build-tools/tools/nix/langs.json` and ensure your `requiredPaths` gate enablement correctly.
+- `scaf language new` writes a disabled entry with `hermetic.status = "scaffold"`. It never adds the
+  language to `enabled`. Run `scaf language doctor` to see the remaining graduation gaps.
+- Change the status to `graduated` and add the language to `enabled` only after the manifest records
+  passing source-role, dependency-reconciliation, immutable-bundle, store-tool, selector,
+  sandbox/network, remote-execution, and publication gates. `reproducibilityMatrixIds` must name the
+  independent-builder cases that prove the language and its mixed-language routes.
+- Manifest validation fails when an enabled language is absent, scaffold-only, missing a gate, or
+  has no reproducibility matrix ID. Do not catch or downgrade these failures in scaffolding.
 
 ### Shared helpers (use these instead of rolling your own)
 
@@ -309,7 +318,8 @@ Stamping belongs in the macro. If your macro synthesizes helper targets (for exa
 7. Scaffolding
 
 - Add templates under `build-tools/tools/scaffolding/templates/<lang>`.
-- Register the language in `build-tools/tools/lib/langs.ts` (id, display name, requiredPaths, kinds, templatesDir).
+- Scaffold and review its `build-tools/tools/nix/langs.json` entry. Keep it disabled until the
+  hermetic graduation contract and matrix evidence are complete.
 - `scaf` will discover your language automatically and expose `scaf new <lang> <kind>`.
 
 8. Tests
@@ -327,6 +337,8 @@ Stamping belongs in the macro. If your macro synthesizes helper targets (for exa
     a negative manifest test for an absolute host or fake nested-store path
   - A temp consumer can run the language's minimal manifest/provider/toolchain path without reading
     undeclared files from the source checkout
+  - Separate checkouts on independent same-system builders match derivation, output, and NAR
+    identities for every named reproducibility matrix case, including forced rebuild and warm runs
 
 ## CI and glue
 

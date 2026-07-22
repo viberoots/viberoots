@@ -1,19 +1,89 @@
 {
-  "enabled": ["go", "cpp"],
+  "enabled": ["go", "node", "python", "cpp"],
   "languages": [
     {
       "id": "go",
       "displayName": "Go",
       "requiredPaths": ["viberoots/build-tools/go/defs.bzl"],
       "kinds": ["lib"],
-      "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/go"
+      "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/go",
+      "hermetic": {
+        "status": "graduated",
+        "sourceRoles": true,
+        "dependencyReconciliation": true,
+        "immutableBundleInputs": true,
+        "storeQualifiedToolchain": true,
+        "selectorTransport": true,
+        "sandboxNetwork": true,
+        "remoteExecution": true,
+        "publicationAdmission": true,
+        "reproducibilityMatrixIds": ["go-lib"]
+      }
+    },
+    {
+      "id": "node",
+      "displayName": "TypeScript / Node.js",
+      "requiredPaths": [
+        "viberoots/build-tools/node/defs.bzl",
+        "viberoots/build-tools/tools/nix/planner/node.nix",
+        "viberoots/build-tools/tools/buck/exporter/lang/node.ts"
+      ],
+      "kinds": ["lib"],
+      "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/ts",
+      "hermetic": {
+        "status": "graduated",
+        "sourceRoles": true,
+        "dependencyReconciliation": true,
+        "immutableBundleInputs": true,
+        "storeQualifiedToolchain": true,
+        "selectorTransport": true,
+        "sandboxNetwork": true,
+        "remoteExecution": true,
+        "publicationAdmission": true,
+        "reproducibilityMatrixIds": ["node-artifact", "mixed-artifact"]
+      }
+    },
+    {
+      "id": "python",
+      "displayName": "Python",
+      "requiredPaths": [
+        "viberoots/build-tools/python/defs.bzl",
+        "viberoots/build-tools/tools/nix/planner/python.nix",
+        "viberoots/build-tools/tools/buck/exporter/lang/python.ts"
+      ],
+      "kinds": ["app", "wasm"],
+      "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/python",
+      "hermetic": {
+        "status": "graduated",
+        "sourceRoles": true,
+        "dependencyReconciliation": true,
+        "immutableBundleInputs": true,
+        "storeQualifiedToolchain": true,
+        "selectorTransport": true,
+        "sandboxNetwork": true,
+        "remoteExecution": true,
+        "publicationAdmission": true,
+        "reproducibilityMatrixIds": ["python-artifact", "wasm-artifact"]
+      }
     },
     {
       "id": "cpp",
       "displayName": "C++",
       "requiredPaths": ["viberoots/build-tools/tools/nix/planner/cpp.nix"],
       "kinds": ["bin", "lib"],
-      "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/cpp"
+      "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/cpp",
+      "hermetic": {
+        "status": "graduated",
+        "sourceRoles": true,
+        "dependencyReconciliation": true,
+        "immutableBundleInputs": true,
+        "storeQualifiedToolchain": true,
+        "selectorTransport": true,
+        "sandboxNetwork": true,
+        "remoteExecution": true,
+        "publicationAdmission": true,
+        "reproducibilityMatrixIds": ["cpp-lib"]
+      }
     }
   ]
 }

@@ -203,7 +203,6 @@ def nix_node_cli_bin(
         + nix_calling_env_export_buck_graph_json()
         + nix_calling_node_patch_requirements_preflight(_importer)
         + nix_calling_env_export_nix_pnpm_fetch_timeout(default_sec = 600)
-        + "export NIX_PNPM_ALLOW_GENERATE=1; "
         + "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
         + (
             "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "

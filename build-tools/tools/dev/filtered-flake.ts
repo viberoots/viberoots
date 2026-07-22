@@ -49,6 +49,7 @@ export async function makeFilteredFlakeRef(opts: {
   wasmBackend?: string;
   onlyCpp?: boolean;
   coverage?: boolean;
+  sourceRevision?: string;
 }): Promise<{
   flakeRef: string;
   workspaceRoot: string;
@@ -160,6 +161,7 @@ export async function makeFilteredFlakeRef(opts: {
       wasmBackend: opts.wasmBackend,
       onlyCpp: opts.onlyCpp,
       coverage: opts.coverage,
+      sourceRevision: opts.sourceRevision,
     });
     await removeOwnedTempTree(workDir);
     return {

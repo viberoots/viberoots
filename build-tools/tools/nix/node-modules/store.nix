@@ -204,20 +204,14 @@ in {
       # Keep default fetch timeout aligned with update-pnpm-hash/install-deps primary path.
       ftVal = let v = builtins.getEnv "NIX_PNPM_FETCH_TIMEOUT"; in if v != "" then v else "600";
       installTimeoutVal = let v = builtins.getEnv "NIX_PNPM_INSTALL_TIMEOUT"; in if v != "" then v else "1800";
-      # Choose FOD hashing strategy:
-      # - When a lockfile is present, always fix the output to its committed hash.
-      # - When bootstrap generation is allowed without a lockfile, do NOT fix the output hash
-      #   because the derivation may have to synthesize initial metadata.
-      # - When lockfile is missing and generation is not allowed, keep a placeholder FOD digest to preserve previous behavior.
-      genAllowed = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
+      # A missing lockfile keeps the placeholder digest so evaluation can produce the
+      # explicit u repair diagnostic without generating metadata in an artifact build.
       reconcileAllowed = (builtins.getEnv "NIX_PNPM_RECONCILE") == "1";
       materializeAllowed = (builtins.getEnv "NIX_PNPM_MATERIALIZE") == "1";
       fixHashAttrs =
         if (hasLockFs || hasLockStore) then {
           outputHashMode = "recursive";
           outputHash = outHash;
-        } else if genAllowed then {
-          # Lockfile generation remains an intentional non-FOD bootstrap path.
         } else {
           outputHashMode = "recursive";
           outputHash = placeholderDigest;
@@ -264,24 +258,13 @@ in {
         # outside the FOD to avoid non-deterministic outputs across runs.
         LOCK_INPUT_PATH="${if lockInput != null then "${lockInput}" else "/nonexistent"}"
         echo "[nix] mkPnpmStore: lockInput=${if lockInput != null then "present" else "absent"} path=$LOCK_INPUT_PATH" >&2
-        if [ "${if genAllowed then "1" else "0"}" = "1" ] && [ ! -f pnpm-lock.yaml ]; then
-          echo "[nix] mkPnpmStore: allow-generate=1 and no lockfile in src; ignoring any provided lockfile input" >&2
-          LOCK_INPUT_PATH="/nonexistent"
-        fi
         if [ ! -f pnpm-lock.yaml ] && [ -f "$LOCK_INPUT_PATH" ]; then
           echo "[nix] mkPnpmStore: injecting importer lockfile input from $LOCK_INPUT_PATH" >&2
           cp "$LOCK_INPUT_PATH" pnpm-lock.yaml
         fi
         if [ ! -f pnpm-lock.yaml ]; then
-          if [ "${if genAllowed then "1" else "0"}" = "1" ]; then
-            echo "[nix] mkPnpmStore: no lockfile present but allow-generate=1; producing empty store and continuing" >&2
-            mkdir -p "$out/store" "$out/lockfile"
-            # Do not attempt any network; leave store empty. Downstream mkNodeModules will generate a lock offline.
-            touch "$out/lockfile/pnpm-lock.yaml" || true
-            runHook postBuild
-            exit 0
-          fi
-          echo "[nix] mkPnpmStore: no lockfile present; seed a lockfile first using build-tools/tools/dev/update-pnpm-hash.ts --lockfile ${relLock} (set NIX_PNPM_ALLOW_GENERATE=1 for generation)" >&2
+          echo "[nix] mkPnpmStore: no lockfile present for ${relLock}." >&2
+          echo "repair: run u" >&2
           exit 4
         fi
         # Force workspace root to current directory. The universal fixed store is

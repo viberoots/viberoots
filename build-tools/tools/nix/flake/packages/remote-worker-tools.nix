@@ -10,6 +10,8 @@ let
     pkgs.gnused
     pkgs.gawk
     pkgs.rsync
+    pkgs.lsof
+    pkgs.unixtools.ps
     pkgs.git
     pkgs.nodejs_22
     pkgs.python3

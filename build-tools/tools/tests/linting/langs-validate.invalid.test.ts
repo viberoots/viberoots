@@ -29,6 +29,10 @@ test("langs.json invalid fails validator with message", async () => {
       "viberoots/build-tools/tools/dev/validate-langs.ts",
       path.join(tmp, "viberoots/build-tools/tools/dev/validate-langs.ts"),
     );
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/lib/artifact-reproducibility-matrix.ts",
+      path.join(tmp, "viberoots/build-tools/tools/lib/artifact-reproducibility-matrix.ts"),
+    );
     const tempViberootsRoot = path.join(tmp, "viberoots");
     const testNodeModules = String(process.env.ZX_TEST_NODE_MODULES_OUT || "").trim();
     const tempToolEnv = {

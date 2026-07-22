@@ -1,0 +1,17 @@
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { stripTypeScriptTypes } from "node:module";
+
+const [sourcePath, addonPath, outputPath] = process.argv.slice(2);
+if (!sourcePath || !addonPath || !outputPath) {
+  throw new Error("usage: build.mjs SOURCE ADDON OUTPUT");
+}
+
+const source = await readFile(sourcePath, "utf8");
+const javascript = stripTypeScriptTypes(source, { mode: "transform", sourceMap: false });
+const nodeOutput = path.join(outputPath, "node", "index.mjs");
+const addonOutput = path.join(outputPath, "native", "napi_addon.node");
+await mkdir(path.dirname(nodeOutput), { recursive: true });
+await mkdir(path.dirname(addonOutput), { recursive: true });
+await writeFile(nodeOutput, javascript.endsWith("\n") ? javascript : `${javascript}\n`);
+await copyFile(addonPath, addonOutput);

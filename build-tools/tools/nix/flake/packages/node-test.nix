@@ -1,4 +1,4 @@
-{ pkgs, nodeMods, importerDirs, allowGenerate, repoRoot, uv2nixLib, coverage ? false }:
+{ pkgs, nodeMods, importerDirs, repoRoot, uv2nixLib, coverage ? false }:
 let
   sanitize = (import ../../templates-common.nix { inherit pkgs; }).sanitizeName;
   TAddon = import ../../templates/cpp-node-addon.nix { inherit pkgs; };
@@ -181,7 +181,7 @@ let
           };
 
           nmDrv = nodeMods.mkNodeModules { lockfilePath = importerDir + "/pnpm-lock.yaml"; inherit importerDir; };
-          nmPath = if allowGenerate && (!haveImporterLock) then "" else "${nmDrv}";
+          nmPath = "${nmDrv}";
           addonSrc = if hasNative then "${addonDrv}/lib/${sanitize addonName}.node" else "";
         in
         if (!lockHasVitest) then

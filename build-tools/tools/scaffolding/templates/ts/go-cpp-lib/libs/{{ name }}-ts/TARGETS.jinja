@@ -4,13 +4,12 @@ load("@viberoots//build-tools/node:defs.bzl", "nix_node_lib", "nix_node_test")
 # Provider sync can be added later; lockfile labels are inferred by default.
 nix_node_lib(
     name = "{{ name }}_ts_pkg",
-    srcs = glob(["src/**/*.ts"]),
-    out = "build.stamp",
-    cmd = "echo ok > $OUT",
+    srcs = ["build.mjs"] + glob(["src/**/*.ts"]) + ["//projects/libs/{{ name }}-native:napi_addon"],
+    deps = ["//projects/libs/{{ name }}-native:napi_addon"],
+    out = "dist",
+    cmd = "$VBR_NODE_BIN build.mjs src/node/index.ts $(location //projects/libs/{{ name }}-native:napi_addon) $OUT",
 )
 
 nix_node_test(
     name = "ts_unit",
 )
-
-

@@ -25,3 +25,19 @@ export function remoteCiToolsPathEnv(
     artifactToolsRoot: remoteCiTools,
   });
 }
+
+export function remoteAdminToolsPathEnv(
+  remoteCiTools: string,
+  baseEnv: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  if (!/^\/nix\/store\/[a-z0-9]{32}-[^/]+$/u.test(remoteCiTools)) {
+    throw new Error("remote administration requires an immutable remote-ci-tools authority");
+  }
+  return buildArtifactEnvironment({
+    baseEnv: { ...baseEnv, PATH: `${remoteCiTools}/bin` },
+    mode: "remote",
+    stateRoot: path.join(process.cwd(), "buck-out", "tmp", "remote-admin-environment"),
+    workspaceRoot: process.cwd(),
+    artifactToolsRoot: remoteCiTools,
+  });
+}

@@ -3,10 +3,13 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
 test("verify lint preflight resolves formatter tools from devshell PATH", async () => {
-  const source = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/verify/lint-preflight.ts",
-    "utf8",
-  );
+  const source = (
+    await Promise.all(
+      ["lint-preflight.ts", "lint-preflight-scope.ts"].map((file) =>
+        fsp.readFile(`viberoots/build-tools/tools/dev/verify/${file}`, "utf8"),
+      ),
+    )
+  ).join("\n");
   if (!source.includes('from "../../lib/repo-node-bin"')) {
     throw new Error("lint preflight must use repo node-bin resolution");
   }

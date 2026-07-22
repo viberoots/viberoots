@@ -1,25 +1,53 @@
-import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { getFlagBool, getFlagStr } from "../lib/cli";
 import { mkdirWithMacosMetadataExclusion } from "../lib/macos-metadata";
-import {
-  buildCacheManifest,
-  discoverWheelhouseCacheAttrs,
-  renderPublisherCommand,
-  writeManifest,
-} from "./cache-manifest";
+import { buildCacheManifest, renderPublisherCommand, writeManifest } from "./cache-manifest";
 import { admitCachePublication } from "./cache-publication-policy";
 import { chooseRunnableFlakeRef } from "../dev/run-runnable-source";
-import { readArtifactSystem, runArtifactNix, runArtifactTool } from "./artifact-command";
+import { readArtifactSystem, runArtifactNix } from "./artifact-command";
+import {
+  readSignedReproducibilityAggregate,
+  stageSystemReproducibilityOutputs,
+} from "./cache-publication-inputs";
 
 export async function runWheelhousePreload(artifactToolsRoot: string): Promise<void> {
+  const to = getFlagStr("to", "");
   await admitCachePublication({
     env: process.env,
     diagnosticImpure: getFlagBool("impure"),
     artifactToolsRoot,
   });
-  const to = getFlagStr("to", "");
+  const artifactContext = { workspaceRoot: process.cwd(), artifactToolsRoot };
+  const reproducibilityAggregate = to
+    ? await readSignedReproducibilityAggregate(
+        getFlagStr("reproducibility-aggregate", ""),
+        getFlagStr("evidence-store-locator", ""),
+        artifactContext,
+      )
+    : undefined;
   const manifestOut = getFlagStr("manifest-out", "buck-out/tmp/wheelhouse-cache-manifest.json");
+  const system = await readArtifactSystem(process.cwd(), process.env, artifactToolsRoot);
+  if (reproducibilityAggregate) {
+    await stageSystemReproducibilityOutputs(reproducibilityAggregate, system, artifactContext);
+    const manifest = buildCacheManifest({
+      system,
+      cacheEndpoint: to,
+      backend: "nix-copy",
+      reproducibilityAggregate,
+    });
+    await mkdirWithMacosMetadataExclusion(path.dirname(manifestOut));
+    writeManifest(manifestOut, manifest);
+    const command = renderPublisherCommand(manifest, to, reproducibilityAggregate);
+    await runArtifactNix({
+      args: command.slice(1),
+      workspaceRoot: process.cwd(),
+      artifactToolsRoot,
+    });
+    console.log(
+      `wheelhouse-preload: pushed ${manifest.attrs.length} protected outputs to ${manifest.cacheEndpointIdentity}`,
+    );
+    return;
+  }
   const source = await chooseRunnableFlakeRef({
     workspaceRoot: process.cwd(),
     sourceMode: "git",
@@ -29,8 +57,6 @@ export async function runWheelhousePreload(artifactToolsRoot: string): Promise<v
   });
   const flakeBase = source.flakeRef.replace(/#.*$/, "");
   try {
-    const system = await readArtifactSystem(process.cwd(), process.env, artifactToolsRoot);
-    const immutableSourceRoot = requiredImmutableSourceRoot(source.workspaceRoot);
     const keys = await packageKeys(system, flakeBase, artifactToolsRoot);
     const attrs = discoverWheelhouseCacheAttrs(keys);
     if (!attrs.length) {
@@ -43,88 +69,18 @@ export async function runWheelhousePreload(artifactToolsRoot: string): Promise<v
       workspaceRoot: process.cwd(),
       artifactToolsRoot,
     });
-    const pathsOut = await runArtifactNix({
-      args: ["path-info", ...refs],
-      workspaceRoot: process.cwd(),
-      artifactToolsRoot,
-    });
-    const outputPaths = Object.fromEntries(
-      attrs.map((attr) => [
-        attr,
-        String(pathsOut.stdout || "")
-          .trim()
-          .split(/\s+/)
-          .filter(Boolean),
-      ]),
-    );
-    const archiveOut = await runArtifactNix({
-      args: ["flake", "archive", "--json", flakeBase],
-      workspaceRoot: process.cwd(),
-      artifactToolsRoot,
-    });
-    const nixVersion = await runArtifactTool({
-      tool: "nix",
-      args: ["--version"],
-      workspaceRoot: process.cwd(),
-      artifactToolsRoot,
-    });
-    const nodeVersion = await runArtifactTool({
-      tool: "node",
-      args: ["--version"],
-      workspaceRoot: process.cwd(),
-      artifactToolsRoot,
-    });
-    const manifest = buildCacheManifest({
-      system,
-      sourceRevision: source.bundleDigest,
-      flakeLockText: await readImmutableFlakeLock(immutableSourceRoot),
-      attrs,
-      outputPaths,
-      flakeArchiveJson: JSON.parse(String(archiveOut.stdout || "{}")),
-      cacheEndpoint: to,
-      backend: to ? "nix-copy" : "none",
-      toolVersions: {
-        nix: String(nixVersion.stdout || "").trim(),
-        node: String(nodeVersion.stdout || "").trim(),
-      },
-      declaredRemoteExecutables: [],
-    });
-    await mkdirWithMacosMetadataExclusion(path.dirname(manifestOut));
-    writeManifest(manifestOut, manifest);
-    if (to && to.trim() !== "") {
-      const command = renderPublisherCommand(manifest, to);
-      if (command.length > 0) {
-        await runArtifactTool({
-          tool: command[0]!,
-          args: command.slice(1),
-          workspaceRoot: process.cwd(),
-          artifactToolsRoot,
-        });
-        console.log(
-          `wheelhouse-preload: pushed ${keys.length} outputs to ${manifest.cacheEndpointIdentity}`,
-        );
-      }
-    } else {
-      console.log("wheelhouse-preload: cache destination not provided; built locally only");
-    }
+    console.log(`wheelhouse-preload: built ${attrs.length} local wheelhouse outputs`);
   } finally {
     await source.cleanup?.();
   }
 }
 
-function requiredImmutableSourceRoot(workspaceRoot: string | undefined): string {
-  if (!workspaceRoot || !workspaceRoot.startsWith("/nix/store/")) {
-    throw new Error("cache publication requires an immutable evaluation-bundle source root");
-  }
-  return workspaceRoot;
-}
-
-async function readImmutableFlakeLock(sourceRoot: string): Promise<string> {
-  for (const relative of ["flake.lock", ".viberoots/workspace/flake.lock"]) {
-    const value = await fsp.readFile(path.join(sourceRoot, relative), "utf8").catch(() => "");
-    if (value) return value;
-  }
-  throw new Error("immutable evaluation-bundle source is missing flake.lock");
+function discoverWheelhouseCacheAttrs(packageNames: string[]): string[] {
+  return [
+    ...new Set(
+      packageNames.filter((name) => name.startsWith("py-wheelhouse-")).map((name) => `.#${name}`),
+    ),
+  ];
 }
 
 async function packageKeys(

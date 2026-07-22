@@ -13,7 +13,7 @@ test("helper tooling uses ts command path for TypeScript templates", async () =>
   assert.doesNotMatch(script, /scaf new node \$\{template\}/);
 });
 
-test("manifest discoverability does not publish macro-only TypeScript templates as planner languages", async () => {
+test("manifest discoverability keeps the TypeScript command namespace separate from Node planning", async () => {
   const raw = await fsp.readFile(
     viberootsSourcePath("viberoots/build-tools/tools/nix/langs.json"),
     "utf8",
@@ -23,5 +23,9 @@ test("manifest discoverability does not publish macro-only TypeScript templates 
   };
   const langs = Array.isArray(manifest.languages) ? manifest.languages : [];
   const node = langs.find((lang) => lang.id === "node");
-  assert.equal(node, undefined, "macro-only TypeScript templates must stay out of langs.json");
+  assert.equal(node?.templatesDir, "viberoots/build-tools/tools/scaffolding/templates/ts");
+  assert.equal(
+    langs.some((lang) => lang.id === "ts"),
+    false,
+  );
 });

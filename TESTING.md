@@ -196,7 +196,7 @@ Set:
 - `VBR_REMOTE_ARTIFACT_DIR=<absolute artifact directory>`
 - `VBR_REMOTE_TEST_ACTIVATION_DIR=<absolute activation directory>`
 - `VBR_REMOTE_CI_TOOLS=<immutable remote-ci-tools store path>`
-- `VBR_REMOTE_BUILDER_URI=<reviewed builder URI>`
+- `VBR_REMOTE_BUILDER_TRANSPORT=<absolute mode-0600 nofollow SSH transport JSON path>`
 - `VBR_REMOTE_PROBE_FLAKE=<immutable probe flake store path>`
 - `VBR_REMOTE_BUILDER_IDENTITY=<reviewed builder identity>`
 - `VBR_REMOTE_REVIEWED_BUILDERS=<immutable reviewed-builder registry path>`
@@ -205,6 +205,10 @@ Set:
 System names map to profile prefixes: `x86_64-linux` to `linux-x86_64`, `aarch64-linux` to `linux-aarch64`, and `aarch64-darwin` to `darwin-aarch64`. Remote mode rejects `--coverage` until raw coverage outputs are declared per test and verify can materialize them locally for `pnpm coverage:build`. Local `v --coverage` still writes raw V8 coverage under `buck-out/tmp/node-v8-coverage` and merged reports under `coverage/`.
 
 Before admitting a target with a remote Nix builder policy, the same `v` invocation runs the canonical remote-builder smoke with these immutable inputs. Saved smoke reports are audit artifacts, not reusable admission capabilities.
+
+The reviewed registry contains only a credential-free endpoint identity. SSH users, key paths, and
+other runtime transport data belong only in `VBR_REMOTE_BUILDER_TRANSPORT`; verify rejects symlinks,
+group/world permissions, and transports whose host or port differs from the reviewed endpoint.
 
 Local verify keeps the full local Buck process and test environment so existing tests continue to see seed-store paths, nested Buck daemon controls, local Nix daemon settings, local coverage output, and developer diagnostics. Remote verify uses separate Buck process and test child environment allowlists. It forwards only timeouts, `COVERAGE=0`, the nested Buck isolation name, generated remote-safe Nix/Pnpm inputs, pinned tool paths, and known certificate paths. It does not forward repo-root `buck-out`, `.direnv`, root `node_modules`, local seed pin directories, `NODE_V8_COVERAGE`, Nix daemon sockets, `TEST_RSYNC_ROOTS`, or developer override env vars.
 

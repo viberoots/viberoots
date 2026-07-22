@@ -14,7 +14,7 @@ export type VerifyExecutionPolicy = {
   passProfiles: Record<string, string>;
   remoteSmoke: {
     remoteCiTools: string;
-    builderUri: string;
+    transportFile: string;
     probeFlake: string;
     builderIdentity: string;
     reviewedBuilders: string;
@@ -150,7 +150,10 @@ export function parseVerifyExecutionPolicy(opts?: {
         requiredEnvValue(env, "VBR_REMOTE_CI_TOOLS"),
         "VBR_REMOTE_CI_TOOLS",
       ),
-      builderUri: requiredEnvValue(env, "VBR_REMOTE_BUILDER_URI"),
+      transportFile: parseAbsolutePath(
+        requiredEnvValue(env, "VBR_REMOTE_BUILDER_TRANSPORT"),
+        "VBR_REMOTE_BUILDER_TRANSPORT",
+      ),
       probeFlake: parseNixStorePath(
         requiredEnvValue(env, "VBR_REMOTE_PROBE_FLAKE"),
         "VBR_REMOTE_PROBE_FLAKE",

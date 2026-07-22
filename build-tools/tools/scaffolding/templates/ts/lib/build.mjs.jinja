@@ -1,0 +1,13 @@
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { stripTypeScriptTypes } from "node:module";
+
+const [sourcePath, outputPath] = process.argv.slice(2);
+if (!sourcePath || !outputPath) {
+  throw new Error("usage: build.mjs SOURCE OUTPUT");
+}
+
+const source = await readFile(sourcePath, "utf8");
+const javascript = stripTypeScriptTypes(source, { mode: "transform", sourceMap: false });
+await mkdir(path.dirname(outputPath), { recursive: true });
+await writeFile(outputPath, javascript.endsWith("\n") ? javascript : `${javascript}\n`);

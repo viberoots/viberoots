@@ -125,7 +125,10 @@ test("command-site inventory separates canonical builds from live development la
   const policy = JSON.parse(read("docs/handbook/nix-command-site-policy.json"));
   const rules = policy.classificationRules;
   const exceptions = JSON.parse(read("docs/handbook/nix-gaps-exceptions.json"));
-  const liveRule = rules.find((rule: { role: string }) => rule.role === "live-d");
+  const liveRule = rules.find(
+    (rule: { pathPattern: string; role: string }) =>
+      rule.role === "live-d" && rule.pathPattern.includes("dev-with-wasm-watch"),
+  );
   const canonicalDevBuildRule = rules.find(
     (rule: { pathPattern: string }) =>
       rule.pathPattern === "^build-tools/tools/dev/dev-build(?:\\.ts|/)",

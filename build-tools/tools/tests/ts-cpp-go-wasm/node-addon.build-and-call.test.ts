@@ -7,10 +7,12 @@ import { buildSelectedOutPath, runInTemp } from "../lib/test-helpers";
 
 test("Node N-API addon builds and returns add(2,3)=5 (temp repo)", async () => {
   await runInTemp("node-addon", async (tmp, $) => {
-    const sh = $({ cwd: tmp, stdio: "inherit" });
-
     // Enable C++ (and Go implicitly via planner) in this temp workspace for the planner path
-    await sh`bash --noprofile --norc -c 'mkdir -p build-tools/tools/nix && printf %s \'{"enabled":["cpp"]}\' > viberoots/build-tools/tools/nix/langs.json'`;
+    const langsDir = path.join(tmp, "viberoots/build-tools/tools/nix");
+    await fsp.mkdir(langsDir, { recursive: true });
+    await fsp.writeFile(path.join(langsDir, "langs.json"), '{"enabled":["cpp"]}\n');
+
+    const sh = $({ cwd: tmp, stdio: "inherit" });
 
     // projects/libs/math-core — minimal C++ core (not strictly required by the binding, but present per plan)
     await sh`bash --noprofile --norc -c 'mkdir -p projects/libs/math-core/include/core projects/libs/math-core/src/core'`;

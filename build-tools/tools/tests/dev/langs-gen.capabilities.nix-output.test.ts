@@ -81,3 +81,23 @@ test("gen-langs: generates langs.nix from manifest capabilities deterministicall
     assert.match(txt, /cpp = [\s\S]*patching = false;/);
   });
 });
+
+test("gen-langs: malformed manifest fails without replacing generated authority", async () => {
+  await runInTemp("gen-langs-malformed", async (tmp, $) => {
+    const manifestPath = path.join(tmp, "viberoots/build-tools/tools/nix/langs.json");
+    const outPath = path.join(tmp, "viberoots/build-tools/tools/nix/langs.nix");
+    await fs.outputFile(manifestPath, "{ malformed\n");
+    await fs.outputFile(outPath, "# preserved generated authority\n");
+    await copyViberootsSourcePath(
+      "viberoots/build-tools/tools/dev/gen-langs.ts",
+      path.join(tmp, "viberoots/build-tools/tools/dev/gen-langs.ts"),
+    );
+
+    const result = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`node viberoots/build-tools/tools/dev/gen-langs.ts`.nothrow();
+    assert.notEqual(result.exitCode, 0);
+    assert.equal(await fs.readFile(outPath, "utf8"), "# preserved generated authority\n");
+  });
+});

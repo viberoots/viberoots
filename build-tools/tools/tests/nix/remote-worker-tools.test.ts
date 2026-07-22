@@ -51,10 +51,20 @@ test("remote worker and CI tool closures expose declared tools only from Nix sto
     const worker = await build(tmp, $, "remote-worker-tools");
     const ci = await build(tmp, $, "remote-ci-tools");
 
-    for (const bin of ["bash", "git", "node", "pnpm", "buck2", "zx-wrapper", "timeout"]) {
+    for (const bin of [
+      "bash",
+      "git",
+      "node",
+      "pnpm",
+      "buck2",
+      "zx-wrapper",
+      "timeout",
+      "lsof",
+      "ps",
+    ]) {
       await expectBin(worker, bin);
     }
-    for (const bin of ["nix", "buck2", "node", "zx-wrapper", "attic", "cachix"]) {
+    for (const bin of ["nix", "buck2", "node", "zx-wrapper", "attic", "cachix", "lsof", "ps"]) {
       await expectBin(ci, bin);
     }
 

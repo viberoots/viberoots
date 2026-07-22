@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { test } from "node:test";
+import { assertTrustedRemoteStoreInfo } from "../../remote-exec/nix-remote-builder-smoke";
 import {
   assertRemoteBuilderSmokeEvidence,
   buildRemoteBuilderSmokeEvidence,
@@ -15,17 +16,39 @@ import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
 
 const identity = "reviewed:linux-builder-primary";
 const assertion = {
-  schema: "viberoots.remote-builder-policy-assertion.v1",
+  schema: "viberoots.remote-builder-policy-assertion.v3",
   supportedSystem: "x86_64-linux",
-  builder: { policy: "inherit_config", identity },
+  probeFlakeStorePath: "/nix/store/cccccccccccccccccccccccccccccccc-remote-probe-flake",
+  builder: {
+    identity,
+    endpoint: {
+      schema: "viberoots.remote-builder-endpoint.v2",
+      protocol: "ssh-ng",
+      host: "builder.example.com",
+      port: 22,
+      user: "nix",
+      hostKey: {
+        algorithm: "ssh-ed25519",
+        publicKey: "AAAAC3NzaC1lZDI1NTE5AAAAIHZs0h63XqwPCOe+Hw1bExE5FU8XeADMOijgI1J0/R9q",
+        fingerprint: "SHA256:hKX2WRrp0EaRIfb000oRGYXwjSTqwnV9h8n/vb2P9JA",
+      },
+    },
+  },
   effectivePolicy: {
-    inspection: "builder-reported",
+    inspection: "trusted-builder-daemon-with-live-canaries",
     sandbox: true,
     sandboxFallback: false,
     hostPaths: [],
     multiUser: "daemon",
     substituters: [...REVIEWED_SUBSTITUTERS],
     publicKeys: [...REVIEWED_PUBLIC_KEYS],
+  },
+  probes: {
+    ordinaryHostRead: "denied",
+    ordinaryNetwork: "denied",
+    fixedOutputCorrectHash: "passed",
+    fixedOutputWrongHash: "denied",
+    store: "passed",
   },
 };
 const authorities = {
@@ -48,9 +71,9 @@ function rejects(change: (value: any) => void, pattern: RegExp) {
   assert.throws(() => assertRemoteBuilderSmokeEvidence(value), pattern);
 }
 
-test("remote builder smoke emits strict v2 evidence for every supported system", () => {
+test("remote builder smoke emits strict v4 evidence for every supported system", () => {
   const x86 = evidence();
-  assert.equal(x86.schema, "viberoots.remote-builder-smoke-evidence.v2");
+  assert.equal(x86.schema, "viberoots.remote-builder-smoke-evidence.v4");
   assert.equal(x86.probes.store.bounded, true);
   const arm = buildRemoteBuilderSmokeEvidence(
     { ...structuredClone(assertion), supportedSystem: "aarch64-linux" },
@@ -68,6 +91,13 @@ test("remote builder smoke emits strict v2 evidence for every supported system",
     },
   );
   assert.equal(darwin.supportedSystem, "aarch64-darwin");
+});
+
+test("remote builder smoke requires a trusted live remote-store connection", () => {
+  assert.doesNotThrow(() =>
+    assertTrustedRemoteStoreInfo({ trusted: true, url: "ssh-ng://redacted" }),
+  );
+  assert.throws(() => assertTrustedRemoteStoreInfo({ trusted: false }), /trusted remote-store/);
 });
 
 test("remote builder smoke evidence is bound to the active execution system", () => {
@@ -99,11 +129,14 @@ test("remote builder smoke rejects non-hermetic effective builder policy", () =>
     /substituters/,
   );
   rejects((value) => (value.effectivePolicy.publicKeys = ["evil:key"]), /public keys/);
-  rejects((value) => (value.effectivePolicy.inspection = "client-reported"), /builder-reported/);
+  rejects(
+    (value) => (value.effectivePolicy.inspection = "client-reported"),
+    /builder-local daemon/,
+  );
 });
 
 test("remote builder smoke rejects stale schema, policy, system, and builder identity", () => {
-  rejects((value) => (value.schema = "v1"), /passed v2/);
+  rejects((value) => (value.schema = "v3"), /passed v4/);
   rejects((value) => (value.supportedSystem = "riscv64-linux"), /supported Nix system/);
   rejects((value) => (value.builder.identity = "reviewed:"), /nonempty reviewed/);
   rejects((value) => (value.authorities.probeFlakeStorePath = "/tmp/probe"), /probe flake/);
@@ -135,17 +168,38 @@ test("remote builder smoke orchestration is bounded and success-report-last", ()
     ),
     "utf8",
   );
+  const probeFlake = fs.readFileSync(
+    path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../../nix/flake/packages/remote-builder-probes.flake.in",
+    ),
+    "utf8",
+  );
   assert.match(source, /runRemoteBuilderProbes/);
   assert.match(probes, /runBoundedArtifactCommand/);
   assert.match(source, /await fs\.rm\(reportPath/);
   assert.match(source, /await runRemoteBuilderProbes[\s\S]*buildRemoteBuilderSmokeEvidence/);
+  assert.ok(
+    source.indexOf("await opts.probeStoreObservation?.before") <
+      source.indexOf("await runRemoteBuilderProbes") &&
+      source.indexOf("await runRemoteBuilderProbes") <
+        source.indexOf("await opts.probeStoreObservation?.after"),
+  );
   assert.match(source, /await atomicWrite\(reportPath/);
   assert.doesNotMatch(source, /\.nothrow\(|\$`|NIX_CONFIG/);
   assert.doesNotMatch(probes, /\.nothrow\(|\$`|NIX_CONFIG/);
-  assert.match(source, /"store", "cat", "--store", opts\.builderUri, policyStorePath/);
-  assert.match(source, /viberoots\.reviewed-remote-builders\.v1/);
+  assert.match(probes, /"substitute",\s*"false"/);
+  assert.match(probeFlake, /unsafeDiscardStringContext \(toString self\.outPath\)/);
+  assert.match(probeFlake, /networkCanary = "https:\/\/cache\.nixos\.org\/nix-cache-info"/);
+  assert.match(
+    probeFlake,
+    /if \$\{pkgs\.curl\}\/bin\/curl[\s\S]*ordinary derivation reached the network[\s\S]*exit 2[\s\S]*fi[\s\S]*viberoots-canary:network-denied/u,
+  );
+  assert.doesNotMatch(probeFlake, /! \$\{pkgs\.curl\}\/bin\/curl/u);
+  assert.match(source, /"store", "cat", `\$\{policyStorePath\}\/assertion\.json`/);
+  assert.match(source, /parseReviewedRemoteBuilders/);
   assert.match(source, /--reviewed-builders must be the canonical immutable registry/);
-  assert.match(source, /--builder-uri does not match the reviewed builder registry/);
+  assert.match(source, /parseRemoteBuilderTransportFile/);
   assert.match(source, /--probe-flake does not match the reviewed builder registry/);
   assert.doesNotMatch(source, /builder-policy-report/);
   for (const name of [

@@ -2,6 +2,11 @@
 import fs from "fs-extra";
 import path from "node:path";
 import { createRequire } from "node:module";
+import {
+  hasReproducibilityMatrixId,
+  reproducibilityMatrixCaseCoversLanguage,
+  reproducibilityMatrixCoverage,
+} from "../lib/artifact-reproducibility-matrix";
 
 const require = createRequire(import.meta.url);
 // Lazy load ajv so the script remains fast if not installed; provide a friendly hint.
@@ -65,6 +70,56 @@ async function main(): Promise<void> {
       console.error(`- ${err.instancePath || "."} ${err.message}`);
     }
     process.exit(1);
+  }
+  const enabled = new Set<string>(Array.isArray(doc) ? [] : (doc.enabled || []).map(String));
+  const languages = Array.isArray(doc) ? doc : doc.languages || [];
+  const byId = new Map(languages.map((language: any) => [String(language.id), language]));
+  for (const id of enabled) {
+    const language: any = byId.get(id);
+    if (!language) {
+      console.error(`langs.json validation failed: enabled language ${id} has no manifest entry`);
+      process.exit(1);
+    }
+    const hermetic = language.hermetic;
+    const booleanGates = [
+      "sourceRoles",
+      "dependencyReconciliation",
+      "immutableBundleInputs",
+      "storeQualifiedToolchain",
+      "selectorTransport",
+      "sandboxNetwork",
+      "remoteExecution",
+      "publicationAdmission",
+    ];
+    const gaps = booleanGates.filter((key) => hermetic[key] !== true);
+    if (hermetic.status !== "graduated") gaps.unshift("status");
+    if (hermetic.reproducibilityMatrixIds.length === 0) gaps.push("reproducibilityMatrixIds");
+    for (const matrixId of hermetic.reproducibilityMatrixIds) {
+      if (!hasReproducibilityMatrixId(String(matrixId))) {
+        gaps.push(`unknown reproducibilityMatrixId ${String(matrixId)}`);
+      } else if (!reproducibilityMatrixCaseCoversLanguage(String(matrixId), id)) {
+        gaps.push(`reproducibilityMatrixId ${String(matrixId)} does not cover language ${id}`);
+      }
+    }
+    const knownMatrixIds = hermetic.reproducibilityMatrixIds
+      .map(String)
+      .filter(hasReproducibilityMatrixId);
+    const coveredRoutes = reproducibilityMatrixCoverage(knownMatrixIds, id);
+    const requiredRoutes = new Set<string>(["base"]);
+    for (const kind of language.kinds.map(String)) {
+      if (["wasm", "mixed", "addon"].includes(kind)) requiredRoutes.add(kind);
+    }
+    for (const route of requiredRoutes) {
+      if (!coveredRoutes.has(route as "base")) {
+        gaps.push(`reproducibility matrix does not cover ${route} route for language ${id}`);
+      }
+    }
+    if (gaps.length > 0) {
+      console.error(
+        `langs.json validation failed: enabled language ${id} is not graduated: ${gaps.join(", ")}`,
+      );
+      process.exit(1);
+    }
   }
   console.log("langs.json: OK");
 }

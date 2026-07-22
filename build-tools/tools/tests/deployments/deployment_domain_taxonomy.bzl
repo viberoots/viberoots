@@ -106,6 +106,8 @@ REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
 
 REVIEWED_DEPLOYMENT_TEST_OWNERSHIP.update({
     "build-tools/tools/tests/deployments/deployment-admission.policy-resources.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-admission.hermetic-artifact.test.ts": True,
+    "build-tools/tools/tests/deployments/deployment-publication-evidence.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.resource-graph-assertions.helpers.ts": False,
     "build-tools/tools/tests/deployments/cloudflare-pages.resource-graph-embedded-reference.test.ts": True,
     "build-tools/tools/tests/deployments/cloudflare-pages.resource-graph-e2e.helpers.ts": False,

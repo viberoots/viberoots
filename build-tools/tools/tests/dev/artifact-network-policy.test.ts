@@ -16,6 +16,7 @@ test("policy command fixes sandbox, builders, substituters, and keys", () => {
     "sandbox",
     "sandbox-fallback",
     "sandbox-paths",
+    "extra-sandbox-paths",
     "builders",
     "substituters",
     "trusted-public-keys",
@@ -24,6 +25,8 @@ test("policy command fixes sandbox, builders, substituters, and keys", () => {
   }
   assert.equal(args[args.indexOf("sandbox") + 1], "true");
   assert.equal(args[args.indexOf("sandbox-fallback") + 1], "false");
+  assert.equal(args[args.indexOf("sandbox-paths") + 1], "");
+  assert.equal(args[args.indexOf("extra-sandbox-paths") + 1], "");
 });
 
 test("CI graph builds and cache admission cannot fail open or claim impure evaluation", () => {

@@ -1,39 +1,32 @@
 import path from "node:path";
 import process from "node:process";
 import * as fsp from "node:fs/promises";
-import fs from "node:fs";
 import "zx/globals";
 import { collectChangedPaths } from "../../lib/build-system-test-scope";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { runNodeWithZx } from "../../lib/node-run";
 import { repoNodeBinCandidates, resolveRepoNodeBin } from "../../lib/repo-node-bin";
 import { resolveToolPath } from "../../lib/tool-paths";
-import { buildToolsRoot, buildToolPath } from "../dev-build/paths";
 import {
   filterExistingLintPreflightPaths,
   resolveLintPreflightFilterPaths,
 } from "./lint-preflight-paths";
+import {
+  runVerifyFileSizePreflight,
+  runVerifyLanguagesPreflight,
+  runVerifyNixGapsPolicyPreflight,
+  runVerifyStaleNamesPreflight,
+  shouldRunBuildSystemPolicy,
+} from "./lint-policy-preflights";
+import {
+  isEslintPath,
+  isPrettierPath,
+  normalizeRepoPath,
+  shouldIgnoreLintPath,
+} from "./lint-preflight-scope";
 
 function verbose(): boolean {
   return isVbrVerbose();
-}
-
-function shouldRunBuildSystemPolicy(root: string): boolean {
-  const toolsRoot = fs.realpathSync.native(path.resolve(buildToolsRoot(root)));
-  const workspaceRoot = fs.realpathSync.native(path.resolve(root));
-  return (
-    toolsRoot === path.join(workspaceRoot, "build-tools") ||
-    toolsRoot.startsWith(`${workspaceRoot}${path.sep}`)
-  );
-}
-
-function printCapturedFailure(error: unknown): void {
-  const err = error as { stdout?: unknown; stderr?: unknown };
-  const details = [err?.stderr, err?.stdout]
-    .map((value) => String(value || "").trim())
-    .filter(Boolean)
-    .join("\n");
-  if (details) process.stderr.write(`${details}\n`);
 }
 
 async function firstExisting(root: string, relCandidates: string[]): Promise<string> {
@@ -47,41 +40,6 @@ async function firstExisting(root: string, relCandidates: string[]): Promise<str
   return relCandidates[0] || "";
 }
 
-async function runVerifyFileSizePreflight(
-  root: string,
-  zxInitPath: string,
-  opts: { changedOnly?: boolean; zxNodeModulesOut?: string | null } = {},
-): Promise<void> {
-  const script = buildToolPath(root, "tools/dev/file-size-lint.ts");
-  const args = ["--scope=source", "--fail=true"];
-  if (opts.changedOnly) {
-    args.push("--changed-only");
-  }
-  if (verbose()) {
-    process.stderr.write(
-      opts.changedOnly
-        ? "[verify] file-size preflight: running changed-file source file-size gate\n"
-        : "[verify] file-size preflight: running strict repo-owned file-size gate\n",
-    );
-  }
-  try {
-    await runNodeWithZx({
-      cwd: root,
-      script,
-      args,
-      zxInitPath,
-      env: envWithZxNodeModules(opts.zxNodeModulesOut),
-      stdio: verbose() ? "inherit" : "pipe",
-    });
-  } catch (error) {
-    printCapturedFailure(error);
-    process.stderr.write(
-      "error: file-size preflight failed; split oversized files and re-run 'v'\n",
-    );
-    process.exit(2);
-  }
-}
-
 function envWithZxNodeModules(zxNodeModulesOut?: string | null): NodeJS.ProcessEnv {
   const outPath = String(zxNodeModulesOut || "").trim();
   if (!outPath) return process.env;
@@ -91,144 +49,6 @@ function envWithZxNodeModules(zxNodeModulesOut?: string | null): NodeJS.ProcessE
     ZX_TEST_NODE_MODULES_OUT: outPath,
     NODE_PATH: [nodeModules, process.env.NODE_PATH || ""].filter(Boolean).join(path.delimiter),
   };
-}
-
-async function runVerifyStaleNamesPreflight(
-  root: string,
-  zxInitPath: string,
-  opts: { zxNodeModulesOut?: string | null } = {},
-): Promise<void> {
-  const script = buildToolPath(root, "tools/dev/stale-names-lint.ts");
-  if (verbose()) {
-    process.stderr.write(
-      "[verify] stale-names preflight: scanning active source for stale names\n",
-    );
-  }
-  try {
-    await runNodeWithZx({
-      cwd: root,
-      script,
-      args: ["--full"],
-      zxInitPath,
-      env: envWithZxNodeModules(opts.zxNodeModulesOut),
-      stdio: verbose() ? "inherit" : "pipe",
-    });
-  } catch (error) {
-    printCapturedFailure(error);
-    process.stderr.write(
-      "error: stale-names preflight failed; fix stale repo names, plan numbers, or migration labels and re-run 'v'\n",
-    );
-    process.exit(2);
-  }
-}
-
-async function runVerifyNixGapsPolicyPreflight(
-  root: string,
-  zxInitPath: string,
-  opts: { zxNodeModulesOut?: string | null } = {},
-): Promise<void> {
-  const script = buildToolPath(root, "tools/dev/nix-gaps-inventory-check.ts");
-  const starlarkApi = await firstExisting(root, [
-    "docs/handbook/starlark-api.md",
-    "viberoots/docs/handbook/starlark-api.md",
-  ]);
-  const nixGaps = await firstExisting(root, [
-    "docs/handbook/nix-gaps.md",
-    "viberoots/docs/handbook/nix-gaps.md",
-  ]);
-  const exceptions = await firstExisting(root, [
-    "docs/handbook/nix-gaps-exceptions.json",
-    "viberoots/docs/handbook/nix-gaps-exceptions.json",
-  ]);
-  const commandSitePolicy = await firstExisting(root, [
-    "docs/handbook/nix-command-site-policy.json",
-    "viberoots/docs/handbook/nix-command-site-policy.json",
-  ]);
-  const args = [
-    "--starlark-api",
-    starlarkApi,
-    "--nix-gaps",
-    nixGaps,
-    "--exceptions",
-    exceptions,
-    "--command-site-policy",
-    commandSitePolicy,
-  ];
-  if (verbose()) {
-    process.stderr.write(
-      "[verify] nix-gaps policy preflight: running inventory + exception checks\n",
-    );
-  }
-  try {
-    await runNodeWithZx({
-      cwd: root,
-      script,
-      args,
-      zxInitPath,
-      env: envWithZxNodeModules(opts.zxNodeModulesOut),
-      stdio: verbose() ? "inherit" : "pipe",
-    });
-  } catch (error) {
-    printCapturedFailure(error);
-    process.stderr.write(
-      "error: nix-gaps policy preflight failed; update docs/policy files and re-run 'v'\n",
-    );
-    process.exit(2);
-  }
-}
-
-function normalizeRepoPath(relPath: string): string {
-  return String(relPath || "")
-    .replace(/\\/g, "/")
-    .trim();
-}
-
-function shouldIgnoreLintPath(relPath: string): boolean {
-  if (!relPath) return true;
-  if (relPath === "viberoots" || relPath === ".viberoots/current") return true;
-  if (
-    relPath === ".buckconfig" ||
-    relPath === ".buckroot" ||
-    relPath === ".envrc" ||
-    relPath === ".gitignore" ||
-    relPath === "projects" ||
-    relPath === "projects/" ||
-    relPath === "README.md" ||
-    relPath === "projects/.metadata_never_index" ||
-    relPath === "projects/AGENTS.md" ||
-    relPath === "projects/README.md" ||
-    relPath === "projects/config/README.md" ||
-    relPath === "projects/config/shared.json"
-  ) {
-    return true;
-  }
-  if (relPath.includes("/node_modules/") || relPath.startsWith("node_modules/")) return true;
-  if (relPath.includes("/buck-out/") || relPath.startsWith("buck-out/")) return true;
-  if (relPath.includes("/coverage/") || relPath.startsWith("coverage/")) return true;
-  if (relPath.includes("/dist/") || relPath.startsWith("dist/")) return true;
-  if (relPath.includes("/.clinic/") || relPath.startsWith(".clinic/")) return true;
-  if (relPath.includes("/.vite-cache/") || relPath.startsWith(".vite-cache/")) return true;
-  if (relPath === ".direnv" || relPath.startsWith(".direnv/")) return true;
-  if (relPath === ".nix-zsh" || relPath.startsWith(".nix-zsh/")) return true;
-  return false;
-}
-
-function isEslintPath(relPath: string): boolean {
-  return relPath.endsWith(".ts") || relPath.endsWith(".tsx");
-}
-
-function isPrettierPath(relPath: string): boolean {
-  return (
-    relPath.endsWith(".ts") ||
-    relPath.endsWith(".tsx") ||
-    relPath.endsWith(".js") ||
-    relPath.endsWith(".mjs") ||
-    relPath.endsWith(".cjs") ||
-    relPath.endsWith(".md") ||
-    relPath.endsWith(".json") ||
-    relPath.endsWith(".yml") ||
-    relPath.endsWith(".yaml")
-  );
 }
 
 async function resolveVerifyNodeBin(
@@ -266,6 +86,11 @@ export async function runVerifyLintPreflight(
   const includeBuildSystemPolicy =
     opts.includeBuildSystemPolicy !== false && shouldRunBuildSystemPolicy(root);
   const skipLint = (process.env.VERIFY_SKIP_LINT || "").trim() === "1";
+  if (includeBuildSystemPolicy) {
+    await runVerifyLanguagesPreflight(root, zxInitPath, {
+      zxNodeModulesOut: opts.zxNodeModulesOut,
+    });
+  }
   if (skipLint) {
     process.stderr.write("[verify] lint preflight: skipped (VERIFY_SKIP_LINT=1)\n");
     if (includeBuildSystemPolicy) {

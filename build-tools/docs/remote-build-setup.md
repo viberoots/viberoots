@@ -37,7 +37,9 @@ Language-specific Buck rules call Nix through the selected-target path. The comm
 2. A public build, runnable, or CI wrapper admits the canonical tool closure and transports the
    selected target through argv or declared Buck action inputs.
 3. The filtered source and immutable evaluation bundle carry the graph, target selection, source
-   closure, and tool inputs into a pure Nix evaluation.
+   closure, full source revision authority, and tool inputs into a pure Nix evaluation. Protected
+   reproducibility materializes the bundle twice and accepts only identical content-addressed roots,
+   bundle digests, and matrix bindings.
 
 Ambient `BUCK_TARGET`, `BUCK_GRAPH_JSON`, and `WORKSPACE_ROOT` values are not public artifact
 authority. Ordinary `b`, `i`, post-clone, and devshell entry do not reconcile stale metadata or
@@ -152,35 +154,41 @@ Jenkins runs a matrix over:
 
 Each axis currently runs `build-tools/tools/ci/run-stage.sh --stage <name>` through `codegen`, `export-graph`, `sync-providers`, `gen-auto-map`, `prebuild-guard`, `nix-gaps-policy`, `cpp-addon-smoke`, `file-size-lint`, `patches-lint`, `nix-build-graph-generator`, `wheelhouse-preload`, `buck-test`, and a coverage pass that reruns `buck-test --coverage` before `pnpm coverage:build`.
 
-The `wheelhouse-preload` stage already has one implemented cache-push path:
+The `wheelhouse-preload` stage has a protected cache-push path:
 
 ```bash
-build-tools/tools/ci/run-stage.sh --stage wheelhouse-preload --to 's3://...'
-# or
-build-tools/tools/ci/run-stage.sh --stage wheelhouse-preload --to 's3://...'
+build-tools/tools/ci/run-stage.sh --stage wheelhouse-preload --to 's3://...' \
+  --evidence-store-locator s3://reviewed-evidence/reproducibility \
+  --reproducibility-aggregate /nix/store/...-aggregate/aggregate.json
 ```
 
-It discovers `py-wheelhouse-*` attrs, builds them, and runs `nix copy --to` when a destination is configured. Jenkins currently invokes the stage but does not configure the cache destination in the `Jenkinsfile`.
+Without `--to`, it discovers and builds `py-wheelhouse-*` attrs for local preload. With `--to`, it
+requires the signed full reproducibility aggregate, selects its production publication outputs for
+the current system, stages them from the registry-declared evidence store, and publishes only those
+roots, their closures, and the aggregate root. Matrix comparisons are qualification evidence, not
+cache-publication roots.
 
 `build-tools/tools/ci/publish-nix-cache-manifest.sh` is the generic dormant cache manifest path for
-remote-readiness lanes. In dry-run mode it builds the initial prewarm attrs with
-`--no-link --print-out-paths`, archives flake inputs with `nix flake archive --json`, and writes a
-manifest containing system, source revision, flake lock hash, attrs, exact output paths, selected
-graph/target outputs when provided, cache endpoint identity, and tool versions:
-When a selected graph or source-plan evidence file is supplied, the manifest also records the
-selected target's `nixpkgs_profile` and normalized `nixpkg_pins` attr/profile links. Pin rationales
-stay out of the cache manifest; the lockfile and registry evidence identify the package source.
+remote-readiness lanes. It requires the signed full reproducibility aggregate, selects its
+current-system production publication comparisons, stages them from the registry-declared evidence
+store, and writes a manifest containing only the aggregate-bound system, source revision,
+publication subject identities and exact output paths, cache endpoint identity, backend, and
+aggregate reference. It does
+not mix current-checkout lock, archive, graph, source-plan, or tool-version metadata with a signed
+aggregate from another checkout; those authorities remain inside the aggregate.
 
 ```bash
 build-tools/tools/ci/publish-nix-cache-manifest.sh \
   --dry-run \
+  --evidence-store-locator s3://reviewed-evidence/reproducibility \
+  --reproducibility-aggregate /nix/store/...-aggregate/aggregate.json \
   --out buck-out/tmp/nix-cache-manifest.json
 ```
 
-The initial attr set is `.#graph-generator`, `.#buck2-prelude`, `.#test-seed`,
-`.#remote-worker-tools`, `.#toolchains.go`, `.#toolchains.cxx`, `.#toolchains.python`, discovered
-`.#py-wheelhouse-*`, and discovered `.#node-modules.*`. Backend credentials stay outside the
-manifest; only redacted endpoint identity is recorded. CI can pass
+Default graph, prelude, seed, worker-tool, toolchain, wheelhouse, node-module, selected-graph, and
+selected-target roots are not publication evidence. They cannot be added to a protected manifest
+unless the canonical publication-subject authority is changed and rerun. Backend credentials stay outside
+the manifest; only redacted endpoint identity is recorded. CI can pass
 `--remote-ci-tools /nix/store/...-remote-ci-tools` to run child commands
 with `PATH` restricted to the declared CI closure. Writable-store publishing renders `nix copy --to`.
 Attic and Cachix publication also requires `--publisher-env-file` naming an absolute, regular,
@@ -404,14 +412,17 @@ cachix push <cache> "$out"
 
 Managed Cachix should use `cachix push`; Attic should use `attic push`. Harmonia and nix-serve serve an existing Nix store, so populate them by building on the cache host or copying closures to the host/store, then signing with host-owned cache keys. For generic writable Nix stores such as S3 or local file binary caches, CI publishers may need signing material through `secret-key-files`, `--extra-secret-key-files`, or the destination store's `secret-key`/`secret-keys` setting. Cache services and store-serving hosts should keep signing material with the cache service or host unless explicitly configured for local self-signing; CI should receive only the backend-specific write capability required for that model, not broad signing keys. For managed Cachix, publishers need Cachix write auth such as `CACHIX_AUTH_TOKEN`; Cachix signs server-side by default. Only self-signed Cachix caches need publisher-side signing material such as `CACHIX_SIGNING_KEY`. Readers should receive only trusted public keys and read credentials, never signing keys.
 
-Wheelhouse preload currently supports `nix copy`-compatible destinations through `--to`, such as S3, file, or SSH store URIs:
+Protected publication supports `nix copy`-compatible destinations through `--to`, such as S3, file,
+or SSH store URIs:
 
 ```bash
 build-tools/tools/ci/run-stage.sh --stage wheelhouse-preload \
-  --to "s3://bucket?region=us-east-2"
+  --to "s3://bucket?region=us-east-2" \
+  --evidence-store-locator s3://reviewed-evidence/reproducibility \
+  --reproducibility-aggregate /nix/store/...-aggregate/aggregate.json
 ```
 
-The wheelhouse path does not admit ambient `NIX_CONFIG` credentials. An authenticated generic
+This path does not admit ambient `NIX_CONFIG` credentials. An authenticated generic
 `nix copy` publisher needs its own reviewed, publisher-only secret-file boundary before that mode
 is enabled in CI.
 
@@ -477,7 +488,7 @@ selected for the active execution system:
 node --import build-tools/tools/dev/zx-init.mjs --experimental-strip-types \
   build-tools/tools/remote-exec/nix-remote-builder-smoke.ts \
   --remote-ci-tools /nix/store/<hash>-remote-ci-tools \
-  --builder-uri 'ssh-ng://nix-builder@builder-x86-linux.example.com?ssh-key=/etc/nix/builder_ed25519' \
+  --transport-file /run/viberoots/remote-builder-transport.json \
   --builder-policy force_builders_file \
   --system x86_64-linux \
   --builder-identity 'reviewed:linux-builder-primary' \
@@ -486,11 +497,197 @@ node --import build-tools/tools/dev/zx-init.mjs --experimental-strip-types \
   --report buck-out/tmp/nix-remote-builder-smoke.json
 ```
 
-The registry must bind the selected builder identity to its exact builder URI, immutable policy
-assertion, and probe flake. The assertion's system must match `--system`. The smoke runs bounded
+First run `nix-remote-builder-attest.ts` locally on the builder. It inspects the builder-local daemon
+configuration and trusted daemon store, runs the bounded live canaries, and registers a canonical
+one-file v3 policy assertion in the builder's store. The assertion binds the exact immutable probe
+flake used for those canaries. Then run `nix-remote-builder-register.ts` from an administrator
+environment. Registration uses the reviewed endpoint plus its external mode-0600 transport
+capability to copy the exact assertion and probe closure from that builder into the administrator's
+store. It recursively verifies both imported store roots before reading the assertion or changing
+the registry, then binds the reviewed identity, credential-free endpoint, immutable assertion, and
+probe flake in the identity-sorted v3 registry. `--dry-run` still performs and verifies this import,
+then prints the exact registry bytes without registering them. There is no local-path, substituter,
+or snapshot fallback. Re-registering an identical entry is idempotent; an identity-changing update
+fails closed.
+Distinct reviewed identities must also have distinct connection endpoints and distinct SSH host-key
+authorities. Aliases for one daemon do not count as independent builders and registry parsing rejects
+them before smoke or reproducibility aggregation.
+
+The reviewed endpoint JSON is credential-free and exact: schema
+`viberoots.remote-builder-endpoint.v2`, protocol `ssh-ng`, host, port, SSH user, and a
+`hostKey` object containing `algorithm: ssh-ed25519`, the base64 public key, and its
+`SHA256:<fingerprint>`. Registration recomputes the fingerprint; runtime constructs its isolated
+known-hosts authority from these signed bytes.
+
+```bash
+nix run .#remote-builder-attest -- \
+  --identity reviewed:linux-builder-primary \
+  --endpoint /etc/viberoots/builder-endpoint.json \
+  --system x86_64-linux \
+  --probe-flake /nix/store/<hash>-remote-builder-probes \
+  --remote-ci-tools /nix/store/<hash>-remote-worker-tools \
+  --output /var/tmp/viberoots-builder-attestation
+
+nix run .#remote-builder-register -- \
+  --identity reviewed:linux-builder-primary \
+  --endpoint ./reviewed-builder-endpoint.json \
+  --transport-file /run/viberoots/remote-builder-transport.json \
+  --policy-assertion /nix/store/<hash>-viberoots-remote-builder-policy-v3 \
+  --probe-flake /nix/store/<hash>-remote-builder-probes \
+  --evidence-store s3://reviewed-evidence/reproducibility \
+  --remote-ci-tools /nix/store/<hash>-remote-worker-tools \
+  --output ./reviewed-builders-v3
+
+nix run .#protected-store-sign -- \
+  --store-root /nix/store/<hash>-viberoots-reviewed-remote-builders-v3 \
+  --signing-key-file /run/secrets/viberoots-reviewed-evidence-signing-key \
+  --remote-ci-tools /nix/store/<hash>-remote-worker-tools
+```
+
+Those commands show one primitive registration, not a complete release registry. The protected lane
+requires exactly two independent daemon authorities for every release system. Run attestation on all
+six machines and give the registry administrator each returned immutable assertion path plus that
+builder's reviewed endpoint and separately materialized SSH transport capability. The registration
+command performs the sole content-addressed cross-host transfer; operators must not copy assertion
+files through a mutable filesystem staging area:
+
+| System           | Required reviewed identities                                 |
+| ---------------- | ------------------------------------------------------------ |
+| `aarch64-darwin` | `reviewed:darwin-aarch64-one`, `reviewed:darwin-aarch64-two` |
+| `aarch64-linux`  | `reviewed:linux-aarch64-one`, `reviewed:linux-aarch64-two`   |
+| `x86_64-linux`   | `reviewed:linux-x86_64-one`, `reviewed:linux-x86_64-two`     |
+
+On the administrator host, materialize each builder's
+`secret://ci/hermetic-builds/remote-builders/<reviewed-identity>/ssh-private-key` into the key path
+named by its owner-controlled nofollow mode-0600 transport file. Prepare a tab-separated
+`builders.tsv` in that order with six fields: system, identity, reviewed endpoint JSON, transport
+file, immutable policy-assertion root, and canonical probe-flake root. Build one registry authority
+by chaining every returned `registry.json` into the next
+registration. Every successor requires an exact canonical signed predecessor registry path and
+verifies its protected signature before reading it, so sign each intermediate root before continuing:
+
+```bash
+set -euo pipefail
+registry=
+index=0
+while IFS=$'\t' read -r system identity endpoint transport assertion probe; do
+  index=$((index + 1))
+  output="$(pwd)/reviewed-builders-v3-${index}"
+  previous=()
+  if [ -n "$registry" ]; then
+    previous=(--registry "$registry")
+  fi
+  next_registry="$(
+    nix run .#remote-builder-register -- \
+      --identity "$identity" \
+      --endpoint "$endpoint" \
+      --transport-file "$transport" \
+      --policy-assertion "$assertion" \
+      --probe-flake "$probe" \
+      --evidence-store s3://reviewed-evidence/reproducibility \
+      --remote-ci-tools /nix/store/<hash>-remote-worker-tools \
+      --output "$output" \
+      "${previous[@]}"
+  )"
+  next_registry_root="${next_registry%/registry.json}"
+  nix run .#protected-store-sign -- \
+    --store-root "$next_registry_root" \
+    --signing-key-file /run/secrets/viberoots-reviewed-evidence-signing-key \
+    --remote-ci-tools /nix/store/<hash>-remote-worker-tools
+  registry="$next_registry"
+done < builders.tsv
+test "$index" -eq 6
+registry_root="${registry%/registry.json}"
+nix copy --to s3://reviewed-evidence/reproducibility "$registry_root"
+```
+
+Every endpoint and SSH host key must be distinct; registry parsing rejects aliases. Preserve the
+exact final `registry` value as `VBR_REPRODUCIBILITY_REGISTRY_STORE_PATH`. Configuration management
+must hydrate that signed root on all six matrix agents and the aggregate agent before Jenkins starts;
+workers do not derive a bootstrap URI from an environment fallback.
+
+Provision runtime credentials outside the store with this exact layout, removing the `reviewed:`
+prefix from each filename:
+
+```text
+/run/viberoots/reproducibility-transports/
+├── aarch64-darwin/{darwin-aarch64-one,darwin-aarch64-two}.json
+├── aarch64-linux/{linux-aarch64-one,linux-aarch64-two}.json
+└── x86_64-linux/{linux-x86_64-one,linux-x86_64-two}.json
+```
+
+Set `VBR_REPRODUCIBILITY_TRANSPORT_ROOT` to that parent. Every JSON file and external SSH key it
+names must be owned by the Jenkins account, nofollow, and mode 0600. Pre-provision the immutable
+remote CI tools root and set `VBR_REPRODUCIBILITY_REMOTE_CI_TOOLS` to its exact store path.
+
+The logical identity of each SSH private key is the stable backend-neutral SprinkleRef reference
+`secret://ci/hermetic-builds/remote-builders/<reviewed-identity>/ssh-private-key` (omit the
+`reviewed:` prefix in `<reviewed-identity>`). Configuration management resolves those existing
+SprinkleRef contracts and materializes their values only into the corresponding ephemeral key files
+named by the transport JSON above. The registry and transport JSON contain endpoints and file
+locations, never secret values; Jenkins and these administration tools do not implement another
+secret resolver.
+
+The signed registry's credential-free S3 `storeUri` is the sole evidence-store endpoint authority.
+It is not duplicated in an environment-selected endpoint or capability file. Store the AWS shared
+credentials under the stable logical identity
+`secret://ci/hermetic-builds/reproducibility/evidence-store-aws-shared-credentials`, and configure
+the Jenkins file credential with that exact ID. Jenkins materializes it as an ephemeral
+owner-controlled, nofollow, mode-0600 file and passes only that path through
+`--evidence-store-aws-credentials-file`.
+
+Runtime validates the registry URI itself as S3, validates the delivered credentials file, scrubs
+all ambient `AWS_*` variables, disables AWS instance-metadata credentials, and exposes only
+`AWS_SHARED_CREDENTIALS_FILE` to the bounded `nix copy --to` child. It never uses the capability for
+reads or builds or permits it to select another endpoint. The concrete bucket,
+retention/access policy, credentials, and successful signed readback remain external
+release-administration prerequisites; replace the illustrative URI only with the actual provisioned
+authority before enabling the protected lane.
+
+Store the protected evidence private key under
+`secret://ci/hermetic-builds/reproducibility/evidence-signing-key` and configure the Jenkins file
+credential with that exact ID. SprinkleRef remains the logical identity authority; Jenkins file
+bindings and owner-only temporary files are delivery only and must never be printed or copied into
+the Nix store.
+
+The evidence store must permit matrix agents to upload content-addressed unsigned record roots and
+permit the aggregate agent to fetch and replace their metadata. The protected evidence path admits
+only the signed registry's credential-free S3 store authority and does not claim a portable
+server-side auto-signing contract. Matrix agents never receive the evidence private key. The aggregate job is
+the sole run-record signing boundary: after fetching every root and validating the complete fixed
+matrix, registry, subject, revision, checkout, builder, and artifact identities, it signs and verifies
+each accepted root with the fixed Jenkins credential, republishes those signed roots, and then signs,
+verifies, and publishes the aggregate. The key file is owner-controlled mode 0600, is available only
+to that aggregate job, and corresponds to the one committed reviewed-evidence public key.
+
+The runtime transport file is a nofollow mode-0600 JSON file with schema
+`viberoots.remote-builder-ssh-transport.v2` and a `builderUri`. The external SSH private key named
+by that URI must also be an owner-controlled nofollow mode-0600 file. It is never copied to the store,
+registry, report, argv, or logs. The registry binds only the selected builder identity to its exact
+credential-free endpoint, SSH user and Ed25519 host key/fingerprint, supported system derived from
+the validated policy assertion, immutable policy assertion, probe flake, and credential-free
+reviewed evidence store. Runtime derives strict host-key checking from that signed endpoint. The
+assertion's system must match `--system`. The smoke requires a trusted builder-local daemon, proves
+the undeclared host-store canary exists, proves the reviewed network endpoint is live through a
+forced non-substituted fixed-output fetch, and only then requires the corresponding ordinary reads
+to be denied. It runs bounded
 store, fixed-output, host-read, network, and wrong-hash probes and writes a machine-readable report
 only after all probes produce their required pass or denial evidence. A saved report is audit
 evidence; remote admission requires a smoke produced by the same active invocation.
+
+Registration deliberately emits an unsigned store root. The protected administrator step above
+accepts only an external owner-controlled mode-0600 signing key, signs the exact root, and immediately
+verifies it against the one committed reviewed-evidence public key. The key contents are never read
+by the orchestration code or written to reports. The registry, accepted run records, and final
+aggregate use this same key authority. Protected consumers reject unsigned records after aggregate
+handoff and reject an unsigned registry or aggregate at ingress.
+
+Artifact reproducibility evidence uses that same active invocation as its only builder authority.
+After the smoke passes, `withActiveReviewedRemoteNix` revalidates the exact immutable registry,
+registered identity, policy, system, probe, and mode-0600 transport. It runs the initial build,
+path inspection, store verification, forced rebuild, and warm build with `NIX_REMOTE` present only
+in each Nix child environment and builders disabled. Evidence schema v4 records the resulting
+`builderAuthority`; it does not accept a detached policy assertion or a local-build fallback.
 
 ## Distributed Test Execution Design
 
@@ -755,7 +952,7 @@ The worker must not need broad deployment credentials. It needs RE worker creden
 
 `build-tools/tools/remote-exec/render-buckconfig.ts` is the dormant renderer for CI/developer Buck RE config files. It writes `.buckconfig.remote.generated` under an explicit artifact directory such as `buck-out/tmp/remote-exec/<run-id>/`; repo root output is rejected. The renderer does not enable remote execution by itself, and local verify/Jenkins defaults do not read the generated file. A later opt-in lane must explicitly set `VBR_REMOTE_BUCK_CONFIG`.
 
-The verify wrapper accepts remote policy only when explicitly requested with `VBR_REMOTE_EXEC_MODE=hybrid|remote|remote-only-conformance`. Remote verify requires absolute `VBR_REMOTE_BUCK_CONFIG`, `VBR_REMOTE_ARTIFACT_DIR`, and `VBR_REMOTE_TEST_ACTIVATION_DIR` paths plus `VBR_REMOTE_EXEC_SYSTEM=x86_64-linux|aarch64-linux|aarch64-darwin`. It also requires `VBR_REMOTE_CI_TOOLS`, `VBR_REMOTE_PROBE_FLAKE`, and `VBR_REMOTE_REVIEWED_BUILDERS` to name immutable Nix-store authorities and requires `VBR_REMOTE_BUILDER_URI` and `VBR_REMOTE_BUILDER_IDENTITY` to select the reviewed builder. Before target admission, that same verify invocation runs the canonical remote-builder smoke; a saved report is audit-only and cannot authorize a later run. Invalid policy fails before local-only verify setup starts. `VBR_REMOTE_TEST_PROFILE_<PASS_NAME>` can override the default `<system-prefix>-default` test profile for a pass; system prefixes are `linux-x86_64`, `linux-aarch64`, and `darwin-aarch64`.
+The verify wrapper accepts remote policy only when explicitly requested with `VBR_REMOTE_EXEC_MODE=hybrid|remote|remote-only-conformance`. Remote verify requires absolute `VBR_REMOTE_BUCK_CONFIG`, `VBR_REMOTE_ARTIFACT_DIR`, and `VBR_REMOTE_TEST_ACTIVATION_DIR` paths plus `VBR_REMOTE_EXEC_SYSTEM=x86_64-linux|aarch64-linux|aarch64-darwin`. It also requires `VBR_REMOTE_CI_TOOLS`, `VBR_REMOTE_PROBE_FLAKE`, and `VBR_REMOTE_REVIEWED_BUILDERS` to name immutable Nix-store authorities and requires `VBR_REMOTE_BUILDER_TRANSPORT` and `VBR_REMOTE_BUILDER_IDENTITY` to select the reviewed builder. Before target admission, that same verify invocation runs the canonical remote-builder smoke; a saved report is audit-only and cannot authorize a later run. Invalid policy fails before local-only verify setup starts. `VBR_REMOTE_TEST_PROFILE_<PASS_NAME>` can override the default `<system-prefix>-default` test profile for a pass; system prefixes are `linux-x86_64`, `linux-aarch64`, and `darwin-aarch64`.
 
 Remote verify passes `--config-file <generated-config>`, `--config-file <activation-dir>/<pass>.buckconfig`, `--prefer-remote` for hybrid/remote lanes, `--remote-only` for conformance lanes, and `--unstable-allow-compatible-tests-on-re`. The generated remote Buck config only enables RE client/platform plumbing; profile maps are inert until the pass-specific activation config reaches Buck analysis. Verify rewrites the pass-specific activation config from the selected profile before spawning Buck, so stale files cannot silently diverge from `VBR_REMOTE_TEST_PROFILE_<PASS_NAME>`. Activation configs contain the selected profile name and the repo-owned execution-platform registration label only, not RE endpoints or credentials. If a remote pass maps to a profile but the activation directory is not selected, verify fails before spawning Buck. Keep the committed `toolchains//:remote_test_execution` default profile unset; do not set a default profile in local toolchain config.
 

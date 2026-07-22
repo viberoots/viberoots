@@ -1,4 +1,32 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { runManagedCommand, type ManagedCommandActivity } from "./managed-command";
+
+export type ArtifactCommandLifecycleSummary = {
+  managedCommandCount: number;
+  closedProcessGroupCount: number;
+  survivingProcessGroupCount: 0;
+  processGroups: Array<{
+    leaderPid: number;
+    processGroupId: number;
+    descendantInspection: "verified";
+    observedDescendantPids: number[];
+    descendantsClosed: true;
+  }>;
+};
+
+export type ArtifactCommandLifecycleRecorder = {
+  started(processGroupId: number): void;
+  closed(processGroupId: number): Promise<void>;
+};
+
+const lifecycleScope = new AsyncLocalStorage<ArtifactCommandLifecycleRecorder>();
+
+export async function withArtifactCommandLifecycle<T>(
+  recorder: ArtifactCommandLifecycleRecorder,
+  operation: () => Promise<T>,
+): Promise<T> {
+  return await lifecycleScope.run(recorder, operation);
+}
 
 export type ArtifactCommandResult = {
   exitCode: number;
@@ -40,7 +68,8 @@ export async function runBoundedArtifactCommand(opts: {
     stdoutBytes: 0,
     stderrBytes: 0,
   };
-  const result = await runManagedCommand({
+  const recorder = lifecycleScope.getStore();
+  const command = runManagedCommand({
     command: opts.command,
     args: opts.args,
     cwd: opts.cwd,
@@ -50,6 +79,14 @@ export async function runBoundedArtifactCommand(opts: {
     onStdout: opts.onStdout,
     onStderr: opts.onStderr,
     activity,
+  });
+  if (activity.childPid && activity.childPid > 0) {
+    recorder?.started(activity.childPid);
+  }
+  const result = await command.finally(async () => {
+    if (activity.childPid && activity.childPid > 0) {
+      await recorder?.closed(activity.childPid);
+    }
   });
   return {
     exitCode: result.code ?? -1,

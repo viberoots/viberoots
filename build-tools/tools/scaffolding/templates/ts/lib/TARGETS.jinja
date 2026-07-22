@@ -2,12 +2,11 @@ load("@viberoots//build-tools/node:defs.bzl", "nix_node_lib", "nix_node_test")
 
 nix_node_lib(
     name = "{{ name }}",
-    srcs = [],
-    out = "build.stamp",
-    cmd = "echo ok > $OUT",
+    srcs = ["build.mjs"] + glob(["src/**/*.ts"]),
+    out = "dist",
+    cmd = "$VBR_NODE_BIN build.mjs src/index.ts $OUT/index.mjs",
 )
 
 nix_node_test(
     name = "unit",
 )
-

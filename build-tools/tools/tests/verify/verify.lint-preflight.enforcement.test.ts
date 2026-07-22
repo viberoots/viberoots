@@ -3,11 +3,18 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
+async function readLintPreflightSources(): Promise<string> {
+  return (
+    await Promise.all(
+      ["lint-preflight.ts", "lint-policy-preflights.ts", "lint-preflight-scope.ts"].map((file) =>
+        fsp.readFile(`viberoots/build-tools/tools/dev/verify/${file}`, "utf8"),
+      ),
+    )
+  ).join("\n");
+}
+
 test("verify includes a bounded lint preflight (enforcement)", async () => {
-  const txt = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/verify/lint-preflight.ts",
-    "utf8",
-  );
+  const txt = await readLintPreflightSources();
   assert.ok(
     txt.includes("lint preflight"),
     "expected viberoots/build-tools/tools/bin/verify to include a lint preflight to avoid wasting time on verify when formatting/lint is dirty",
@@ -35,6 +42,10 @@ test("verify includes a bounded lint preflight (enforcement)", async () => {
   assert.ok(
     txt.includes("nix-gaps-inventory-check.ts"),
     "expected verify preflight to run nix-gaps inventory policy checks",
+  );
+  assert.ok(
+    txt.includes("validate-langs.ts") && txt.includes("runVerifyLanguagesPreflight"),
+    "expected verify preflight to enforce language graduation validation",
   );
   assert.ok(
     txt.includes("file-size-lint.ts"),
@@ -67,10 +78,7 @@ test("verify includes a bounded lint preflight (enforcement)", async () => {
 });
 
 test("verify lint-preflight invokes stale-names-lint for full active-source scan (enforcement)", async () => {
-  const txt = await fsp.readFile(
-    "viberoots/build-tools/tools/dev/verify/lint-preflight.ts",
-    "utf8",
-  );
+  const txt = await readLintPreflightSources();
 
   // The preflight module must call the stale-names-lint step.
   assert.ok(

@@ -127,4 +127,41 @@ export type ScaffoldingLanguage = {
   optionalPaths?: string[];
   kinds: string[];
   templatesDir: string;
+  hermetic: LanguageHermeticContract;
 };
+
+export type LanguageHermeticContract = {
+  status: "scaffold" | "graduated";
+  sourceRoles: boolean;
+  dependencyReconciliation: boolean;
+  immutableBundleInputs: boolean;
+  storeQualifiedToolchain: boolean;
+  selectorTransport: boolean;
+  sandboxNetwork: boolean;
+  remoteExecution: boolean;
+  publicationAdmission: boolean;
+  reproducibilityMatrixIds: string[];
+};
+
+const hermeticBooleanKeys = [
+  "sourceRoles",
+  "dependencyReconciliation",
+  "immutableBundleInputs",
+  "storeQualifiedToolchain",
+  "selectorTransport",
+  "sandboxNetwork",
+  "remoteExecution",
+  "publicationAdmission",
+] as const;
+
+export function languageGraduationGaps(contract?: LanguageHermeticContract): string[] {
+  if (!contract) return ["hermetic contract is missing"];
+  const gaps: string[] = hermeticBooleanKeys.filter((key) => contract[key] !== true);
+  if (
+    !Array.isArray(contract.reproducibilityMatrixIds) ||
+    contract.reproducibilityMatrixIds.length === 0
+  ) {
+    gaps.push("reproducibilityMatrixIds");
+  }
+  return gaps;
+}

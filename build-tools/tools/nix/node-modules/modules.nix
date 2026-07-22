@@ -62,7 +62,7 @@ NODE
   '';
   inherit repoRoot repoFsRoot prefetchedStorePathGlobal;
 in {
-  mkNodeModules = { lockfilePath, importerDir, npmrcPath ? null, packageJsonPath ? null, prefetchedStorePath ? prefetchedStorePathGlobal, ignoreImporterLock ? false }:
+  mkNodeModules = { lockfilePath, importerDir, npmrcPath ? null, packageJsonPath ? null, prefetchedStorePath ? prefetchedStorePathGlobal }:
     let
       relLock = lockfilePath;
       relLockDir = dirnameOf relLock;
@@ -88,7 +88,6 @@ in {
       lockInput = if hasLockFs then (builtins.path { path = lockAbsStrFs; name = "pnpm-lock.yaml"; }) else (if hasLockStore then (builtins.path { path = lockAbsStrStore; name = "pnpm-lock.yaml"; }) else null);
       ftVal = let v = builtins.getEnv "NIX_PNPM_FETCH_TIMEOUT"; in if v != "" then v else "600";
       installTimeoutVal = let v = builtins.getEnv "NIX_PNPM_INSTALL_TIMEOUT"; in if v != "" then v else "1800";
-      genAllowed = (builtins.getEnv "NIX_PNPM_ALLOW_GENERATE") == "1";
     in pkgs.stdenvNoCC.mkDerivation {
       pname = "node-modules";
       version = if (hasLockFs || hasLockStore) then "lock-${builtins.hashFile "sha256" (if hasLockFs then lockAbsStrFs else lockAbsStrStore)}" else "lock-missing";
@@ -220,41 +219,18 @@ in {
           echo "[VBR-MKNM-DEBUG] head -n5 pnpm-lock.yaml:" >&2
           head -n5 pnpm-lock.yaml >&2 || true
         fi
-        # If explicitly requested by caller, ignore any importer-local lockfile
-        if [ "${if ignoreImporterLock then "1" else "0"}" = "1" ]; then
-          debug_mknm "[VBR-MKNM-DEBUG] ignoreImporterLock=1; removing importer-local lockfile before install"
-          rm -f pnpm-lock.yaml >/dev/null 2>&1 || true
-        fi
-        # If generation is allowed, ignore lockfiles only when one is not already present in src.
-        # This prevents "outdated lockfile" mismatches when a temp importer has no lock yet,
-        # but still respects a real lockfile when it exists.
-        if [ "${if genAllowed then "1" else "0"}" = "1" ] && [ ! -f pnpm-lock.yaml ]; then
-          debug_mknm "[VBR-MKNM-DEBUG] allow-generate=1 and no lockfile in src; proceeding without an importer lockfile"
-        fi
         # Do not rely on pnpm cache from the store output; resolve strictly from lockfile + store
         # Ensure a lockfile is present: prefer using the exported lockfile from pnpm-store
         if [ ! -f pnpm-lock.yaml ]; then
-          if [ "${if ignoreImporterLock then "1" else "0"}" != "1" ] && [ -f "${store}/lockfile/pnpm-lock.yaml" ]; then
+          if [ -f "${store}/lockfile/pnpm-lock.yaml" ]; then
             echo "[nix] mkNodeModules: using exported lockfile from store"
             cp "${store}/lockfile/pnpm-lock.yaml" pnpm-lock.yaml
           elif [ -f ${if lockInput != null then "${lockInput}" else "/nonexistent"} ]; then
             echo "[nix] mkNodeModules: injecting importer lockfile input"
             cp ${if lockInput != null then "${lockInput}" else "/nonexistent"} pnpm-lock.yaml
-          elif [ "${if genAllowed then "1" else "0"}" = "1" ]; then
-            echo "[nix] mkNodeModules: offline install to create lockfile (allow-generate)"
-          debug_mknm "[VBR-MKNM-DEBUG] pnpm install (generate) --offline --force --no-frozen-lockfile --ignore-scripts --prod=false (IT=${installTimeoutVal}s)"
-          set +e
-          pnpm_log="$TMPDIR/pnpm-install-generate.log"
-          timeout "$IT"s env CI="1" NODE_OPTIONS="--no-warnings" PNPM_HOME="$PNPM_HOME" "$PNPM_BIN" install --offline --force --no-frozen-lockfile --ignore-scripts --ignore-pnpmfile --prod=false --reporter=append-only --lockfile-dir "." --dir "." $PNPM_TRUST_LOCKFILE_ARG >"$pnpm_log" 2>&1
-          status="$?"
-          set -e
-          if [ "$status" -ne 0 ]; then
-            echo "[nix] mkNodeModules: pnpm install (generate) failed with status $status" >&2
-            cat "$pnpm_log" >&2 || true
-            exit "$status"
-          fi
           else
-            echo "[nix] mkNodeModules: no lockfile present and generation not allowed; failing"
+            echo "[nix] mkNodeModules: no lockfile present." >&2
+            echo "repair: run u" >&2
             exit 3
           fi
         else

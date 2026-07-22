@@ -1,4 +1,4 @@
-{ pkgs, nodeMods, importerDirs, allowGenerate, filterRepo, repoSnapshot, repoRoot }:
+{ pkgs, nodeMods, importerDirs, filterRepo, repoSnapshot, repoRoot }:
 let
   sanitize = (import ../../templates-common.nix { inherit pkgs; }).sanitizeName;
   esbuild = pkgs.esbuild;
@@ -134,5 +134,4 @@ let
       };
 in
 builtins.listToAttrs (map (imp: { name = sanitize imp; value = makeCliBundle imp; }) importerDirs)
-
 

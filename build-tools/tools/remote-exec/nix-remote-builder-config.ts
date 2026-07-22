@@ -1,4 +1,6 @@
 import { REVIEWED_PUBLIC_KEYS, REVIEWED_SUBSTITUTERS } from "../lib/artifact-nix-policy";
+import { parseRemoteBuilderEndpoint, type RemoteBuilderEndpoint } from "./remote-builder-authority";
+import { assertRemoteBuilderPolicyAssertionV3 } from "./remote-builder-policy-assertion";
 export { remoteCiToolsPathEnv } from "./nix-remote-builder-environment";
 
 export type RemoteBuilderPolicy = "inherit_config" | "force_builders_file";
@@ -11,12 +13,13 @@ type ProbeResult = {
 };
 
 export type RemoteBuilderSmokeEvidence = {
-  schema: "viberoots.remote-builder-smoke-evidence.v2";
+  schema: "viberoots.remote-builder-smoke-evidence.v4";
   status: "passed";
   supportedSystem: RemoteBuilderSystem;
   builder: {
     policy: RemoteBuilderPolicy;
     identity: `reviewed:${string}`;
+    endpoint: RemoteBuilderEndpoint;
   };
   authorities: {
     registryStorePath: string;
@@ -24,7 +27,7 @@ export type RemoteBuilderSmokeEvidence = {
     probeFlakeStorePath: string;
   };
   effectivePolicy: {
-    inspection: "builder-reported";
+    inspection: "trusted-builder-daemon-with-live-canaries";
     sandbox: true;
     sandboxFallback: false;
     hostPaths: [];
@@ -40,11 +43,6 @@ export type RemoteBuilderSmokeEvidence = {
     fixedOutputWrongHash: ProbeResult & { result: "denied" };
   };
 };
-
-export type RemoteBuilderPolicyAssertion = Pick<
-  RemoteBuilderSmokeEvidence,
-  "supportedSystem" | "builder" | "effectivePolicy"
-> & { schema: "viberoots.remote-builder-policy-assertion.v1" };
 
 const SYSTEMS = new Set<RemoteBuilderSystem>(["aarch64-darwin", "aarch64-linux", "x86_64-linux"]);
 const POLICIES = new Set<RemoteBuilderPolicy>(["inherit_config", "force_builders_file"]);
@@ -103,10 +101,10 @@ export function assertRemoteBuilderSmokeEvidence(
     "top-level",
   );
   if (
-    evidence.schema !== "viberoots.remote-builder-smoke-evidence.v2" ||
+    evidence.schema !== "viberoots.remote-builder-smoke-evidence.v4" ||
     evidence.status !== "passed"
   ) {
-    throw new Error("remote builder smoke requires passed v2 evidence");
+    throw new Error("remote builder smoke requires passed v4 evidence");
   }
   if (!SYSTEMS.has(evidence.supportedSystem as RemoteBuilderSystem)) {
     throw new Error("remote builder smoke requires a supported Nix system");
@@ -117,7 +115,7 @@ export function assertRemoteBuilderSmokeEvidence(
     );
   }
   const builder = record(evidence.builder, "builder");
-  exactKeys(builder, ["identity", "policy"], "builder");
+  exactKeys(builder, ["endpoint", "identity", "policy"], "builder");
   if (!POLICIES.has(builder.policy as RemoteBuilderPolicy) || builder.policy !== opts.policy) {
     if (opts.policy) throw new Error("remote builder smoke policy does not match action policy");
     if (!POLICIES.has(builder.policy as RemoteBuilderPolicy)) {
@@ -128,6 +126,7 @@ export function assertRemoteBuilderSmokeEvidence(
   if (!identity.startsWith("reviewed:") || identity.length === "reviewed:".length) {
     throw new Error("remote builder smoke requires a nonempty reviewed builder identity");
   }
+  parseRemoteBuilderEndpoint(builder.endpoint);
   if (opts.reviewedBuilderIdentities && !opts.reviewedBuilderIdentities.includes(identity)) {
     throw new Error(`remote builder smoke rejects unreviewed builder identity: ${identity}`);
   }
@@ -154,8 +153,8 @@ export function assertRemoteBuilderSmokeEvidence(
     ],
     "effectivePolicy",
   );
-  if (policy.inspection !== "builder-reported")
-    throw new Error("remote builder smoke requires builder-reported policy");
+  if (policy.inspection !== "trusted-builder-daemon-with-live-canaries")
+    throw new Error("remote builder smoke requires builder-local daemon policy inspection");
   if (policy.sandbox !== true) throw new Error("remote builder smoke requires sandbox=true");
   if (policy.sandboxFallback !== false)
     throw new Error("remote builder smoke requires sandbox-fallback=false");
@@ -222,19 +221,12 @@ export function buildRemoteBuilderSmokeEvidence(
   },
 ): RemoteBuilderSmokeEvidence {
   const assertion = record(assertionValue, "builder policy assertion");
-  exactKeys(
-    assertion,
-    ["builder", "effectivePolicy", "schema", "supportedSystem"],
-    "builder policy assertion",
-  );
-  if (assertion.schema !== "viberoots.remote-builder-policy-assertion.v1") {
-    throw new Error("remote builder smoke requires a v1 builder policy assertion");
-  }
+  assertRemoteBuilderPolicyAssertionV3(assertion);
   const evidence = {
-    schema: "viberoots.remote-builder-smoke-evidence.v2",
+    schema: "viberoots.remote-builder-smoke-evidence.v4",
     status: "passed",
     supportedSystem: assertion.supportedSystem,
-    builder: assertion.builder,
+    builder: { ...(assertion.builder as object), policy: opts.policy },
     authorities: opts.authorities,
     effectivePolicy: assertion.effectivePolicy,
     probes: {

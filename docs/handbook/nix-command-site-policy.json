@@ -1,12 +1,79 @@
 {
   "schemaVersion": 1,
-  "expectedCount": 342,
-  "expectedDigest": "832da29cc5176c38edfdf94e08e6626313447fc58d3ba894fa50d9ace537d39b",
+  "expectedCount": 534,
+  "expectedDigest": "518db26e0308ea6b107f2c1cb80a52002b8fa2701d9d7554837e6326bf9bbd27",
   "classificationRules": [
+    {
+      "pathPattern": "^Jenkinsfile$",
+      "role": "canonical-artifact",
+      "justification": "Root CI shell entrypoints construct, test, compare, and publish protected artifact evidence under the canonical CI authorities."
+    },
+    {
+      "pathPattern": "^flake\\.nix$",
+      "role": "canonical-artifact",
+      "justification": "The root flake is an explicit reviewed fingerprint authority for canonical artifact construction."
+    },
+    {
+      "pathPattern": "^(?:\\.buck2_env\\.sh|\\.buck2_shim/bin/buck2)$",
+      "role": "canonical-artifact",
+      "justification": "The reviewed root Buck environment and pinned shim are canonical Buck execution authorities for artifact commands."
+    },
+    {
+      "pathPattern": "^\\.envrc$",
+      "role": "non-artifact-orchestration",
+      "justification": "The reviewed direnv entrypoint selects the developer shell without constructing or publishing repository artifacts."
+    },
+    {
+      "pathPattern": "^\\.husky/pre-commit$",
+      "role": "update-install",
+      "justification": "The reviewed pre-commit hook enters the tool shell to apply and restage explicit source formatting and lint reconciliation."
+    },
+    {
+      "pathPattern": "^build-tools/tools/bin/build$",
+      "role": "canonical-artifact",
+      "justification": "The public build front door exposes the reviewed diagnostic-only impure switch before canonical artifact admission.",
+      "allowedEscapes": ["diagnostic-impure"]
+    },
+    {
+      "pathPattern": "^build-tools/tools/bin/(?:artifact-ingress-env\\.sh|b|nix|p)$",
+      "role": "canonical-artifact",
+      "justification": "Public artifact and pinned Nix front doors enforce the canonical artifact environment before construction."
+    },
+    {
+      "pathPattern": "^build-tools/tools/bin/d$",
+      "role": "live-d",
+      "justification": "The public development launcher is the explicit live working-tree execution route."
+    },
+    {
+      "pathPattern": "^build-tools/tools/bin/(?:gc|gomod2nix|i|install-deps|patch-pkg|scaf|u)$",
+      "role": "update-install",
+      "justification": "Public maintenance, dependency, patch, scaffold, and update front doors own explicit reconciliation or mutation."
+    },
+    {
+      "pathPattern": "^build-tools/tools/bin/[^./]+$",
+      "role": "non-artifact-orchestration",
+      "justification": "Remaining reviewed public command aliases coordinate developer tools, verification, or deployment without constructing repository artifacts."
+    },
+    {
+      "pathPattern": "^third_party/uv2nix/flake\\.nix$",
+      "role": "canonical-artifact",
+      "justification": "The reviewed local uv2nix flake is imported by the canonical per-system Nix context and constructs Python artifacts."
+    },
+    {
+      "pathPattern": "^(?:bootstrap|init|post-clone)$",
+      "role": "update-install",
+      "justification": "Root bootstrap and initialization entrypoints own explicit workspace installation and reconciliation."
+    },
     {
       "pathPattern": "^build-tools/tools/dev/(?:dev-with-wasm-watch|run-runnable(?:\\.ts|-core\\.ts)|watch-wasm-(?:coordinator|coordinator-daemon))",
       "role": "live-d",
       "justification": "Live development launchers and watcher coordinators intentionally retain working-tree observation and cannot publish artifacts."
+    },
+    {
+      "pathPattern": "^build-tools/tools/dev/dev-build/(?:args|materialize-impure)\\.ts$",
+      "role": "canonical-artifact",
+      "justification": "The explicit development-only diagnostic switch is parsed and materialized only at these exact command boundary files.",
+      "allowedEscapes": ["diagnostic-impure"]
     },
     {
       "pathPattern": "^build-tools/tools/dev/dev-build(?:\\.ts|/)",
@@ -14,7 +81,13 @@
       "justification": "The public build command and its private orchestration implement canonical artifact admission and construction, including explicitly classified non-release development bundles."
     },
     {
-      "pathPattern": "^build-tools/(?:tools/(?:dev/(?:buck-global-input-handoff\\.ts$|install/|update|require-unified-pnpm-store)|lib/maintenance-gc|buck/prebuild/|patch/|scaffolding/)|tools/bin/devshell\\.sh)",
+      "pathPattern": "^build-tools/lang/nix_shell\\.bzl$",
+      "role": "canonical-artifact",
+      "justification": "The shared Nix action helper keeps an explicit diagnostic-only impure switch; normal artifact callers pass false.",
+      "allowedEscapes": ["diagnostic-impure"]
+    },
+    {
+      "pathPattern": "^build-tools/(?:tools/(?:bootstrap/|dev/(?:buck-global-input-handoff\\.ts$|install/|update|require-unified-pnpm-store)|lib/maintenance-gc|buck/prebuild/|patch/|scaffolding/)|tools/bin/devshell\\.sh)",
       "role": "update-install",
       "justification": "Explicit update, install, bootstrap, scaffolding, repair, and maintenance commands own mutation or reconciliation."
     },
@@ -42,6 +115,11 @@
       "pathPattern": "^build-tools/tools/(?:ci/|remote-exec/|buck/node-cli-bundle\\.ts$|lib/artifact-command-runner\\.ts$|dev/(?:artifact|build-selected|evaluation-bundle|filtered-flake|nix-build-filtered-flake|node-modules-build|run-runnable-(?:graph|nix)))",
       "role": "canonical-artifact",
       "justification": "Local, CI, remote, and Buck artifact executors share canonical environment, source, and policy authorities."
+    },
+    {
+      "pathPattern": "^build-tools/tools/lib/(?:artifact-reproducibility-node-contract|protected-reproducibility-aggregate|protected-store-signature)\\.ts$",
+      "role": "canonical-artifact",
+      "justification": "Protected artifact runtime verification, aggregate retrieval, and signing execute Nix only through the canonical immutable evidence authorities."
     },
     {
       "pathPattern": "^build-tools/tools/deployments/",

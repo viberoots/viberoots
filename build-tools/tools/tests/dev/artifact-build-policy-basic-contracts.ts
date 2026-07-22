@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import path from "node:path";
 import type { test } from "node:test";
-import { artifactJobPurpose, classifyArtifactBuild } from "../../lib/artifact-build-policy";
+import {
+  artifactJobPurpose,
+  assertArtifactBuildAdmitted,
+  buildArtifactPolicyEvidence,
+  classifyArtifactBuild,
+} from "../../lib/artifact-build-policy";
 import { REVIEWED_PUBLIC_KEYS, REVIEWED_SUBSTITUTERS } from "../../lib/artifact-nix-policy";
 import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
 import { canonicalArtifactGraphEnvironment } from "../../dev/artifact-graph-executor";
@@ -46,6 +51,23 @@ export function registerArtifactBuildPolicyBasicContracts(register: typeof test)
       () => artifactJobPurpose({ VBR_ARTIFACT_JOB: "maybe-release" }),
       /invalid VBR_ARTIFACT_JOB/,
     );
+  });
+
+  register("artifact admission rejects additional host sandbox paths", () => {
+    const evidence = buildArtifactPolicyEvidence({
+      classification: "hermetic",
+      purpose: "ci",
+      impureEvaluation: false,
+      env: {},
+      toolPaths: {},
+      nixConfig: {
+        ...EFFECTIVE_ARTIFACT_TEST_CONFIG,
+        "sandbox-paths": { value: ["/host/secret"] },
+      },
+      nixStoreUrl: "daemon",
+    });
+    assert.equal(evidence.nix.hostPaths, "configured");
+    assert.throws(() => assertArtifactBuildAdmitted(evidence), /hostPaths/);
   });
 
   register(

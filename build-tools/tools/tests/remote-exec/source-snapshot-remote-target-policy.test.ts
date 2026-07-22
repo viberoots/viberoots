@@ -21,7 +21,7 @@ const remotePolicy: VerifyExecutionPolicy = {
   passProfiles: {},
   remoteSmoke: {
     remoteCiTools: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-remote-ci-tools",
-    builderUri: "ssh-ng://builder",
+    transportFile: "/tmp/remote-builder-transport.json",
     probeFlake: "/nix/store/cccccccccccccccccccccccccccccccc-remote-probe-flake",
     builderIdentity: "builder-x86-linux",
     reviewedBuilders: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-reviewed-builders/registry.json",

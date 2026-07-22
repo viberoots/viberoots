@@ -14,6 +14,26 @@ let
     inherit (remoteTools) remote-worker-tools;
   };
   pnpm11 = import ../pnpm-11.nix { inherit pkgs; };
+  remoteAdmin = name: script: {
+    type = "app";
+    program = "${pkgs.writeShellScriptBin name ''
+      exec ${pkgs.nodejs_22}/bin/node \
+        --experimental-strip-types \
+        --import=${zxPackage}/lib/node_modules/zx/build/globals.js \
+        --import=${viberootsRoot}/build-tools/tools/dev/zx-init.mjs \
+        ${viberootsRoot}/build-tools/tools/remote-exec/${script} "$@"
+    ''}/bin/${name}";
+  };
+  deploymentTool = name: script: {
+    type = "app";
+    program = "${pkgs.writeShellScriptBin name ''
+      exec ${pkgs.nodejs_22}/bin/node \
+        --experimental-strip-types \
+        --import=${zxPackage}/lib/node_modules/zx/build/globals.js \
+        --import=${viberootsRoot}/build-tools/tools/dev/zx-init.mjs \
+        ${viberootsRoot}/build-tools/tools/deployments/${script} "$@"
+    ''}/bin/${name}";
+  };
 in
 {
   gomod2nix = {
@@ -50,4 +70,8 @@ in
     type = "app";
     program = "${bootstrap}/bin/remote-worker-bootstrap";
   };
+  remote-builder-attest = remoteAdmin "remote-builder-attest" "nix-remote-builder-attest.ts";
+  remote-builder-register = remoteAdmin "remote-builder-register" "nix-remote-builder-register.ts";
+  protected-store-sign = remoteAdmin "protected-store-sign" "nix-protected-store-sign.ts";
+  deployment-publication-evidence = deploymentTool "deployment-publication-evidence" "deployment-publication-evidence.ts";
 }

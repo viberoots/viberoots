@@ -1,10 +1,9 @@
 #!/usr/bin/env zx-wrapper
 import type { GraphNode } from "../lib/graph";
-
+import { REVIEWED_EVIDENCE_SIGNER_IDENTITY } from "../lib/artifact-nix-policy";
 export type DeploymentSupplyChainGateTiming = "build_admission" | "publish_admission" | "both";
 export type DeploymentSupplyChainGateCategory = "vulnerability" | "license" | "other";
 export type DeploymentAttestationTrustBehavior = "fail_closed";
-
 export type DeploymentAttestationPolicy = {
   trustedBuilderIdentities: string[];
   acceptedProvenanceFormats: string[];
@@ -28,16 +27,9 @@ export type DeploymentSupplyChainGatePolicy = {
 };
 
 export type DeploymentAttestationEvidence = {
-  builderIdentity: string;
-  provenanceFormat: string;
-  artifactIdentity: string;
-  sourceRevision: string;
-  buildInputsFingerprint: string;
-  status: "verified" | "expired" | "revoked" | "untrusted" | "invalid";
-  verifiedAt: string;
-  recordRef?: string;
-  signerIdentities?: string[];
-  signatureStatus?: "verified" | "missing" | "untrusted";
+  reproducibilityAggregateStorePath: string;
+  publicationOutputPath: string;
+  evidenceStoreLocator: string;
 };
 
 export type DeploymentSbomEvidence = {
@@ -57,16 +49,23 @@ export type DeploymentSupplyChainGateEvidence = {
   recordRef?: string;
 };
 
-export type DeploymentAttestationFact = Omit<DeploymentAttestationEvidence, "status">;
+export type DeploymentAttestationFact = DeploymentAttestationEvidence & {
+  builderIdentities: [string, string];
+  provenanceFormat: "viberoots.hermetic-artifact.v1";
+  artifactIdentity: string;
+  sourceRevision: string;
+  buildInputsFingerprint: string;
+  verifiedAt: string;
+  signatureStatus: "verified";
+  signerIdentities: [typeof REVIEWED_EVIDENCE_SIGNER_IDENTITY];
+};
 export type DeploymentSbomFact = Omit<DeploymentSbomEvidence, "status">;
 export type DeploymentSupplyChainGateFact = Omit<DeploymentSupplyChainGateEvidence, "status">;
-
 function readStringArray(node: GraphNode, key: string): string[] {
   return Array.isArray(node[key])
     ? node[key].filter((value): value is string => typeof value === "string" && value.trim() !== "")
     : [];
 }
-
 function readBoolean(node: GraphNode, key: string): boolean {
   return node[key] === true;
 }
@@ -148,61 +147,50 @@ export function readSupplyChainGatePolicies(node: GraphNode): DeploymentSupplyCh
 export function normalizeAttestationEvidence(value: unknown): DeploymentAttestationEvidence[] {
   return normalizeList(value, (entry) => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return undefined;
-    const builderIdentity =
-      typeof entry.builderIdentity === "string" ? entry.builderIdentity.trim() : "";
-    const provenanceFormat =
-      typeof entry.provenanceFormat === "string" ? entry.provenanceFormat.trim() : "";
-    const artifactIdentity =
-      typeof entry.artifactIdentity === "string" ? entry.artifactIdentity.trim() : "";
-    const sourceRevision =
-      typeof entry.sourceRevision === "string" ? entry.sourceRevision.trim() : "";
-    const buildInputsFingerprint =
-      typeof entry.buildInputsFingerprint === "string" ? entry.buildInputsFingerprint.trim() : "";
-    const status =
-      entry.status === "verified" ||
-      entry.status === "expired" ||
-      entry.status === "revoked" ||
-      entry.status === "untrusted" ||
-      entry.status === "invalid"
-        ? entry.status
-        : "";
-    const verifiedAt = typeof entry.verifiedAt === "string" ? entry.verifiedAt.trim() : "";
     if (
-      !builderIdentity ||
-      !provenanceFormat ||
-      !artifactIdentity ||
-      !sourceRevision ||
-      !buildInputsFingerprint ||
-      !status ||
-      !verifiedAt
+      Object.keys(entry).sort().join(",") !==
+      "evidenceStoreLocator,publicationOutputPath,reproducibilityAggregateStorePath"
+    )
+      return undefined;
+    const reproducibilityAggregateStorePath =
+      typeof entry.reproducibilityAggregateStorePath === "string"
+        ? entry.reproducibilityAggregateStorePath.trim()
+        : "";
+    const publicationOutputPath =
+      typeof entry.publicationOutputPath === "string" ? entry.publicationOutputPath.trim() : "";
+    const evidenceStoreLocator =
+      typeof entry.evidenceStoreLocator === "string" ? entry.evidenceStoreLocator.trim() : "";
+    if (
+      !/^\/nix\/store\/[a-z0-9]{32}-[^/]+\/aggregate\.json$/u.test(
+        reproducibilityAggregateStorePath,
+      ) ||
+      !/^\/nix\/store\/[a-z0-9]{32}-[^/]+$/u.test(publicationOutputPath) ||
+      !isCredentialFreeEvidenceStoreLocator(evidenceStoreLocator)
     ) {
       return undefined;
     }
-    const signerIdentities = Array.isArray(entry.signerIdentities)
-      ? entry.signerIdentities.filter(
-          (identity): identity is string => typeof identity === "string" && identity.trim() !== "",
-        )
-      : [];
-    const signatureStatus =
-      entry.signatureStatus === "verified" ||
-      entry.signatureStatus === "missing" ||
-      entry.signatureStatus === "untrusted"
-        ? entry.signatureStatus
-        : undefined;
-    const recordRef = typeof entry.recordRef === "string" ? entry.recordRef.trim() : "";
     return {
-      builderIdentity,
-      provenanceFormat,
-      artifactIdentity,
-      sourceRevision,
-      buildInputsFingerprint,
-      status,
-      verifiedAt,
-      ...(recordRef ? { recordRef } : {}),
-      ...(signerIdentities.length > 0 ? { signerIdentities } : {}),
-      ...(signatureStatus ? { signatureStatus } : {}),
+      reproducibilityAggregateStorePath,
+      publicationOutputPath,
+      evidenceStoreLocator,
     };
   });
+}
+
+function isCredentialFreeEvidenceStoreLocator(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return (
+      parsed.protocol === "s3:" &&
+      Boolean(parsed.hostname) &&
+      !parsed.username &&
+      !parsed.password &&
+      !parsed.search &&
+      !parsed.hash
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function normalizeSbomEvidence(value: unknown): DeploymentSbomEvidence[] {

@@ -9,6 +9,8 @@ import { runScafNodeTool } from "../command-runner";
 import { exists } from "../fs";
 import { formatScaffoldPaths } from "./new-helpers";
 import { cmdNew } from "./new";
+import { languageGraduationGaps } from "../../../lib/lang-contracts";
+import { readManifest } from "../../../dev/langs-diagnose/manifest";
 
 function languageKitFormatTargets(id: string): string[] {
   return [
@@ -38,8 +40,27 @@ export async function cmdLanguage(args: string[], flags: ScafFlags) {
   }
   if (sub === "doctor") {
     const json = flags["json"] === "true";
-    const payload = { languages: [], note: "diagnostics stub; implement in follow-up" } as const;
-    console.log(json ? JSON.stringify(payload, null, 2) : payload.note);
+    const { enabled, langs } = await readManifest();
+    const languages = [...langs.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([languageId, language]) => {
+        const gaps = languageGraduationGaps(language.hermetic);
+        if (language.hermetic?.status !== "graduated") gaps.unshift("status is scaffold");
+        if (enabled.has(languageId) && gaps.length > 0) gaps.unshift("enabled before graduation");
+        return { id: languageId, enabled: enabled.has(languageId), graduationGaps: gaps };
+      });
+    const payload = {
+      languages,
+      ok: languages.every((language) => language.graduationGaps.length === 0),
+    };
+    if (json) console.log(JSON.stringify(payload, null, 2));
+    else {
+      for (const language of languages) {
+        console.log(
+          `${language.id}: ${language.graduationGaps.length === 0 ? "graduated" : `blocked (${language.graduationGaps.join(", ")})`}`,
+        );
+      }
+    }
     return;
   }
   if (sub === "plan") {
@@ -97,15 +118,28 @@ export async function cmdLanguage(args: string[], flags: ScafFlags) {
       ],
       kinds,
       templatesDir: `viberoots/build-tools/tools/scaffolding/templates/${id}`,
+      hermetic: {
+        status: "scaffold",
+        sourceRoles: false,
+        dependencyReconciliation: false,
+        immutableBundleInputs: false,
+        storeQualifiedToolchain: false,
+        selectorTransport: false,
+        sandboxNetwork: false,
+        remoteExecution: false,
+        publicationAdmission: false,
+        reproducibilityMatrixIds: [],
+      },
     } as const;
 
     async function writeManifestEntry(): Promise<void> {
       const p = path.join("viberoots", "build-tools", "tools", "nix", "langs.json");
       const existsFile = await exists(p);
       if (!existsFile) {
-        const doc = { enabled: [id], languages: [fragment] } as any;
+        const doc = { enabled: [], languages: [fragment] } as any;
         await fsp.mkdir(path.dirname(p), { recursive: true });
         await fsp.writeFile(p, JSON.stringify(doc, null, 2) + "\n", "utf8");
+        await runScafNodeTool("build-tools/tools/dev/validate-langs.ts");
         return;
       }
       let raw: string = await fsp.readFile(p, "utf8").catch(() => "");
@@ -113,8 +147,8 @@ export async function cmdLanguage(args: string[], flags: ScafFlags) {
       let json: any;
       try {
         json = JSON.parse(raw);
-      } catch {
-        json = {};
+      } catch (error) {
+        throw new Error(`Cannot update invalid language manifest ${p}: ${String(error)}`);
       }
       if (Array.isArray(json)) {
         const arr = json as any[];
@@ -123,32 +157,19 @@ export async function cmdLanguage(args: string[], flags: ScafFlags) {
       } else if (json && typeof json === "object") {
         const langs = Array.isArray(json.languages) ? json.languages : [];
         if (!langs.find((e: any) => e && e.id === id)) langs.push(fragment);
-        const enabled = new Set<string>(Array.isArray(json.enabled) ? json.enabled : []);
-        enabled.add(id);
         json.languages = langs;
-        json.enabled = Array.from(enabled).sort();
+        json.enabled = Array.isArray(json.enabled) ? json.enabled : [];
         await fsp.writeFile(p, JSON.stringify(json, null, 2) + "\n", "utf8");
       } else {
-        const doc = { enabled: [id], languages: [fragment] } as any;
+        const doc = { enabled: [], languages: [fragment] } as any;
         await fsp.writeFile(p, JSON.stringify(doc, null, 2) + "\n", "utf8");
       }
-      try {
-        await runScafNodeTool("build-tools/tools/dev/validate-langs.ts");
-      } catch {}
+      await runScafNodeTool("build-tools/tools/dev/validate-langs.ts");
     }
 
     if (manifestMode === "write") await writeManifestEntry();
     else if (manifestMode === "print") {
       console.log(JSON.stringify({ manifestFragment: fragment }, null, 2));
-    }
-
-    const doCodegen = flags["no-codegen"] === "true" ? false : true;
-    if (doCodegen) {
-      try {
-        await runScafNodeTool("build-tools/tools/dev/codegen.ts");
-      } catch (e) {
-        console.warn("warning: codegen failed:", e);
-      }
     }
 
     await formatScaffoldPaths(languageKitFormatTargets(id));
@@ -159,7 +180,9 @@ export async function cmdLanguage(args: string[], flags: ScafFlags) {
         `- Edit build-tools/tools/buck/exporter/lang/${id}.ts to implement detection/labels`,
         `- Edit build-tools/tools/buck/providers/${id}.ts to add provider wiring`,
         `- Edit build-tools/tools/nix/planner/${id}.nix to route build kinds (bin/lib)`,
-        `- Add tests under build-tools/tools/tests/${id}/contract/ if desired`,
+        `- Complete every hermetic graduation gate and add matrix IDs before enabling ${id}`,
+        `- Add tests under build-tools/tools/tests/${id}/contract/`,
+        "- Run u after reviewing the scaffold to reconcile generated language metadata",
         `- Run: build-tools/tools/dev/langs-diagnose.ts --lang ${id} to verify status`,
       ].join("\n"),
     );

@@ -40,7 +40,6 @@ let
     inherit pkgs filterRepo repoSnapshot repoRoot;
     nodeMods = resolvedNodeMods;
     importerDirs = importers.importerDirs;
-    allowGenerate = importers.allowGenerate;
   };
 
   nodeWebapp = import ./node-webapp.nix {
@@ -64,7 +63,6 @@ let
     inherit pkgs uv2nixLib repoRoot;
     nodeMods = resolvedNodeMods;
     importerDirs = importers.importerDirs;
-    allowGenerate = importers.allowGenerate;
     coverage = if evaluationBundle == null then false else evaluationBundle.selection.coverage or false;
   };
 
@@ -82,6 +80,7 @@ let
     inherit pkgs viberootsRoot;
     inherit (remoteTools) remote-worker-tools;
   };
+  remoteBuilderProbes = import ./remote-builder-probes.nix { inherit pkgs; };
   viberootsCommand = import ../../packages/viberoots-command.nix {
     inherit pkgs zx-wrapper version releaseTag;
     viberootsSrc = viberootsRoot;
@@ -93,6 +92,7 @@ in
   zx-wrapper = zx-wrapper;
   viberoots = viberootsCommand;
   remote-worker-bootstrap = remoteWorkerBootstrap;
+  remote-builder-probes = remoteBuilderProbes;
 } // remoteTools // nodeModsPkgs // {
   graph-generator = graph.graphGen.all;
   graph-generator-cppTargets = graph.graphGen.cppTargetsFlat;
