@@ -96,7 +96,9 @@ source selects a visibly non-release `local-development` bundle locally and is r
 protected jobs. `b --impure` remains an explicit diagnostic path only. Live `d` commands continue
 to watch the importer worktree rather than an evaluation bundle.
 
-- Buck2 remains the **source of truth** for the dependency graph and test impact analysis.
+- Buck2 remains the **source of truth** for the dependency graph and test impact analysis. Native
+  Rust targets use Buck `deps` for impact and ordering while Cargo manifests remain Rust source
+  dependency authority within one package-local Cargo root.
 - Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.
 - Planner-visible probes/stubs are allowed only when explicitly documented as non-build exceptions.
 - Patching third-party modules is **ergonomic**, **idempotent**, and **cache-friendly**.

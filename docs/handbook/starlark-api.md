@@ -1544,7 +1544,7 @@ Public args:
   - Used for / scenarios: Defines the target label used by other targets and tooling. Use it to create a stable API name for the artifact in this package.
 - `srcs` list of file paths. Rust sources.
   - Example: `srcs = ["src/lib.rs"]`
-  - Used for / scenarios: Declares the source/input files that participate in analysis and invalidation. Use it to include the exact files that should trigger rebuilds when edited.
+  - Used for / scenarios: Adds explicit source inputs, including non-Rust assets. The macro also declares the package-local `**/*.rs` Cargo source closure for same-root dependency invalidation.
 - `deps` list of labels. Direct deps.
   - Example: `deps = [":core"]`
   - Used for / scenarios: Declares direct build/runtime dependencies. Use it when this target imports, links, or executes code from other repo targets.
@@ -1557,6 +1557,14 @@ Public args:
 - `extra_module_providers` list of labels. Optional normalized extra providers merged into deps.
   - Example: `extra_module_providers = ["//third_party/providers:lf_demo"]`
   - Used for / scenarios: Attaches additional module-surface providers to this target. Use it when downstream module discovery needs metadata from auxiliary producers.
+- `cargo_manifest` string. Defaults to and, in the native baseline, must equal the canonical package-local `Cargo.toml`.
+- `cargo_lock` string. Defaults to and, in the native baseline, must equal the canonical package-local `Cargo.lock`.
+- `crate` string. Cargo package name; defaults to the Buck target name.
+- `features` list of strings. Explicit Cargo features; defaults to empty.
+- `default_features` bool. Whether Cargo default features are enabled; defaults to `True`.
+- `profile` string. Native Cargo profile, `release` or `dev`; defaults to `release`.
+- `target` string. Reserved explicit target triple. PR-1 native builds require it to be empty.
+- `local_patch_dirs` list of strings. Normalized package-relative Rust patch input directories without traversal; defaults to `patches/rust`.
 
 ### `rust_binary(name, **kwargs)`
 
@@ -1569,7 +1577,7 @@ Public args:
   - Used for / scenarios: Defines the target label used by other targets and tooling. Use it to create a stable API name for the artifact in this package.
 - `srcs` list of file paths. Rust sources.
   - Example: `srcs = ["src/main.rs"]`
-  - Used for / scenarios: Declares the source/input files that participate in analysis and invalidation. Use it to include the exact files that should trigger rebuilds when edited.
+  - Used for / scenarios: Adds explicit source inputs, including non-Rust assets. The macro also declares the package-local `**/*.rs` Cargo source closure for same-root dependency invalidation.
 - `deps` list of labels. Direct deps.
   - Example: `deps = [":core"]`
   - Used for / scenarios: Declares direct build/runtime dependencies. Use it when this target imports, links, or executes code from other repo targets.
@@ -1582,3 +1590,11 @@ Public args:
 - `extra_module_providers` list of labels. Optional normalized extra providers merged into deps.
   - Example: `extra_module_providers = ["//third_party/providers:lf_demo"]`
   - Used for / scenarios: Attaches additional module-surface providers to this target. Use it when downstream module discovery needs metadata from auxiliary producers.
+- `cargo_manifest` string. Defaults to and, in the native baseline, must equal the canonical package-local `Cargo.toml`.
+- `cargo_lock` string. Defaults to and, in the native baseline, must equal the canonical package-local `Cargo.lock`.
+- `crate` string. Cargo package name; defaults to the Buck target name.
+- `features` list of strings. Explicit Cargo features; defaults to empty.
+- `default_features` bool. Whether Cargo default features are enabled; defaults to `True`.
+- `profile` string. Native Cargo profile, `release` or `dev`; defaults to `release`.
+- `target` string. Reserved explicit target triple. PR-1 native builds require it to be empty.
+- `local_patch_dirs` list of strings. Normalized package-relative Rust patch input directories without traversal; defaults to `patches/rust`.

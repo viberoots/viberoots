@@ -44,18 +44,23 @@ async function nixPathInfoOrBuild(root: string, $: any, attr: string): Promise<s
   return outPath;
 }
 
-test("toolchains.go and toolchains.python build and expose binaries", async () => {
+test("Go, Python, and Rust toolchains build and expose reviewed binaries", async () => {
   await runInTemp("toolchains-nix-build", async (tmp, $) => {
     const root = tmp;
     await fsp.access(path.join(root, ".viberoots", "workspace", "flake.nix"));
 
     const goOut = await nixPathInfoOrBuild(root, $, "toolchains.go");
     const pyOut = await nixPathInfoOrBuild(root, $, "toolchains.python");
+    const rustOut = await nixPathInfoOrBuild(root, $, "toolchains.rust");
 
     await fsp.access(path.join(goOut, "bin", "go"));
     await fsp.access(path.join(pyOut, "bin", "python3"));
+    for (const binary of ["cargo", "rustc", "rustdoc", "rustfmt", "clippy-driver"]) {
+      await fsp.access(path.join(rustOut, "bin", binary));
+    }
 
     assert.ok(goOut.includes("/nix/store/"));
     assert.ok(pyOut.includes("/nix/store/"));
+    assert.ok(rustOut.includes("/nix/store/"));
   });
 });

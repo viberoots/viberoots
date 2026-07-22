@@ -20,5 +20,6 @@ test("prewarm-toolchains: default attr list (LIST_ONLY)", async () => {
     "toolchains.cxx",
     "toolchains.emscripten",
     "toolchains.tinygo",
+    "toolchains.rust",
   ]);
 });

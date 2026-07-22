@@ -8,7 +8,7 @@
  *
  * Defaults:
  *   PREWARM_ATTRS: comma-separated list of flake attributes to build
- *     toolchains.go,toolchains.cxx,toolchains.emscripten,toolchains.tinygo
+ *     toolchains.go,toolchains.cxx,toolchains.emscripten,toolchains.tinygo,toolchains.rust
  *
  * Test aids:
  *   PREWARM_LIST_ONLY=1 → print JSON list of attributes and exit 0 (no `nix` calls)
@@ -25,7 +25,7 @@ function getEnvBool(name: string, def = false): boolean {
 }
 
 function isHeavyAttr(attr: string): boolean {
-  return attr === "toolchains.go" || attr === "toolchains.python";
+  return attr === "toolchains.go" || attr === "toolchains.python" || attr === "toolchains.rust";
 }
 
 function getAttrList(): string[] {
@@ -36,7 +36,13 @@ function getAttrList(): string[] {
       .map((s) => s.trim())
       .filter((s) => s.length > 0);
   }
-  return ["toolchains.go", "toolchains.cxx", "toolchains.emscripten", "toolchains.tinygo"];
+  return [
+    "toolchains.go",
+    "toolchains.cxx",
+    "toolchains.emscripten",
+    "toolchains.tinygo",
+    "toolchains.rust",
+  ];
 }
 
 async function buildAttr(attr: string, verbose: boolean): Promise<BuildResult> {

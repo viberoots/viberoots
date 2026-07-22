@@ -19,5 +19,11 @@ in
     pkgs.llvmPackages.lld
   ];
   python = toolchain "toolchain-python" pkgs.python3;
+  rust = toolchain "toolchain-rust" [
+    pkgs.cargo
+    pkgs.rustc
+    pkgs.rustfmt
+    pkgs.clippy
+  ];
   opentofu = toolchain "toolchain-opentofu" pkgs.opentofu;
 }

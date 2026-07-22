@@ -199,7 +199,7 @@ test(
               ? appPath
               : await firstFileInDir(path.join(outPath, "bin"));
             const run = await _$({ stdio: "pipe", env: minimalEnv })`${bin}`;
-            assert.equal(String(run.stdout || "").trim(), "rust-binary:app");
+            assert.equal(String(run.stdout || "").trim(), "rust-parity");
           },
         },
         {

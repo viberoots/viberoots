@@ -59,13 +59,25 @@ export async function createHermeticParityFixture(tmp: string): Promise<void> {
   );
 
   const rustDir = path.join(tmp, "projects", "apps", "parity-rust");
-  await fs.outputFile(path.join(rustDir, "src", "main.rs"), "fn main() {}\n", "utf8");
+  await fs.outputFile(
+    path.join(rustDir, "src", "main.rs"),
+    'fn main() { println!("rust-parity"); }\n',
+    "utf8",
+  );
+  await fs.outputFile(
+    path.join(rustDir, "Cargo.toml"),
+    '[package]\nname="parity-rust"\nversion="0.1.0"\nedition="2021"\n\n[[bin]]\nname="app"\npath="src/main.rs"\n',
+  );
+  await fs.outputFile(
+    path.join(rustDir, "Cargo.lock"),
+    'version = 3\n\n[[package]]\nname = "parity-rust"\nversion = "0.1.0"\n',
+  );
   await fs.outputFile(
     path.join(rustDir, "TARGETS"),
     [
       'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary")',
       "",
-      'rust_binary(name = "app", srcs = ["src/main.rs"])',
+      'rust_binary(name = "app", crate = "parity-rust", srcs = ["src/main.rs"])',
       "",
     ].join("\n"),
   );

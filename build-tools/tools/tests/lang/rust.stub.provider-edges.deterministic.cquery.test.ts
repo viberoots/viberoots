@@ -52,6 +52,16 @@ test("rust macros realize provider edges in deps deterministically (cquery)", as
     await fsp.mkdir(path.join(appDir, "src"), { recursive: true });
     await fsp.writeFile(path.join(appDir, "src", "lib.rs"), "pub fn demo() {}\n", "utf8");
     await fsp.writeFile(
+      path.join(appDir, "Cargo.toml"),
+      '[package]\nname="rustdemo"\nversion="0.1.0"\nedition="2021"\n',
+      "utf8",
+    );
+    await fsp.writeFile(
+      path.join(appDir, "Cargo.lock"),
+      'version = 3\n\n[[package]]\nname = "rustdemo"\nversion = "0.1.0"\n',
+      "utf8",
+    );
+    await fsp.writeFile(
       path.join(appDir, "TARGETS"),
       [
         "# test: rust.stub.provider-edges.deterministic.cquery.test.ts",

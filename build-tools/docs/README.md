@@ -72,8 +72,8 @@ viberoots pin.
 These docs describe active contracts or implementation models:
 
 - [`abstractions.md`](abstractions.md)
-- [`lang/rust-design.md`](lang/rust-design.md): current Rust placeholder baseline and first-class
-  language contract.
+- [`lang/rust-design.md`](lang/rust-design.md): current locked native Rust baseline and remaining
+  first-class language contract.
 - [`rust-language-plan.md`](rust-language-plan.md): implementation plan for first-class Rust
   support.
 - [`mapping-design.md`](mapping-design.md)

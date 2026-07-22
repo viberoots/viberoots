@@ -149,7 +149,9 @@ does not stop.
   - `.#toolchains.cxx`
   - `.#toolchains.emscripten`
   - `.#toolchains.tinygo`
-- Heavy toolchains (`toolchains.go`, `toolchains.python`) are skipped unless `PREWARM_HEAVY=1`.
+  - `.#toolchains.rust`
+- Heavy toolchains (`toolchains.go`, `toolchains.python`, `toolchains.rust`) are skipped unless
+  `PREWARM_HEAVY=1`.
 
 Notes:
 

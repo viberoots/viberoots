@@ -12,7 +12,7 @@ in {
   inherit cppForPkgs;
   inherit (Go)  goApp goLib goTest goCArchive goTinyWasmLib;
   inherit (Cpp) cppApp cppHeaders cppLib cppSharedLib cppTest cppNodeAddon cppWasmStaticLib cppWasmEmscriptenLib;
-  inherit (Rust) rustApp rustLib;
+  inherit (Rust) rustPackage;
   # Expose Node symbol bag for discoverability; planner's Node plugin remains authoritative.
   inherit Node;
   # Only expose Python symbols when available
@@ -24,4 +24,3 @@ in {
 } else {}) // (if PythonWasm != null then {
   inherit (PythonWasm) pyWasmApp pyWasmLib;
 } else {})
-

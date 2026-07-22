@@ -6,6 +6,14 @@ export interface Node {
   srcs?: string[];
   cmd?: string;
   out?: string;
+  cargo_manifest?: string;
+  cargo_lock?: string;
+  crate?: string;
+  features?: string[];
+  default_features?: boolean;
+  profile?: string;
+  target?: string;
+  local_patch_dirs?: string[];
 }
 
 export interface Tuple {

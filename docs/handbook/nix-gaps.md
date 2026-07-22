@@ -79,8 +79,12 @@ Notes on Nix-backed Python outputs:
 
 ## Rust macros
 
-- `rust_library` → Nix build (`rust_nix_build`).
-- `rust_binary` → Nix build (`rust_nix_build`).
+- `rust_library` → locked native Cargo build (`rust_nix_build` → `buildRustPackage`).
+- `rust_binary` → locked native Cargo build (`rust_nix_build` → `buildRustPackage`).
+
+Both routes require one package-local `Cargo.toml` and `Cargo.lock`, use Nix-store Rust tools, and
+reject placeholder output, stale locks, unsupported dependency sources, and cross-root Rust artifact
+injection.
 
 ## Hermeticity risks (non-Nix paths)
 

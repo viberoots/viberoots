@@ -34,7 +34,11 @@ def _rust_nix_build_impl(ctx):
         + "  echo \"rust_nix_build (%s): build-selected produced no output path\" >&2; " % raw
         + "  exit 2; "
         + "fi; "
-        + "if [ \"%s\" = \"lib\" ]; then : > \"$0\"; exit 0; fi; " % kind
+        + "if [ \"%s\" = \"lib\" ]; then " % kind
+        + ("  LIB=\"$outPath/lib/lib%s.rlib\"; " % ctx.attrs.crate)
+        + "  if [ ! -f \"$LIB\" ]; then echo \"rust_nix_build (%s): expected compiled library not found\" >&2; exit 2; fi; " % raw
+        + "  cp -f \"$LIB\" \"$0\"; exit 0; "
+        + "fi; "
         + ("TARGET_NAME=\"%s\"; " % target_name)
         + ("SANITIZED=\"%s\"; " % sanitized)
         + "CAND=\"\"; "
@@ -50,7 +54,7 @@ def _rust_nix_build_impl(ctx):
         + "DEST=\"$0\"; cp -f \"$CAND\" \"$DEST\"; "
     )
     out = ctx.actions.declare_output(ctx.attrs.out)
-    declared_inputs = nix_artifact_action_inputs(ctx)
+    declared_inputs = nix_artifact_action_inputs(ctx) + [ctx.attrs.cargo_manifest, ctx.attrs.cargo_lock]
     cmd = cmd_args(
         [nix_artifact_bash(), "-c", run_and_copy, out.as_output(), ctx.attrs._graph_json, declared_inputs],
         hidden = declared_inputs,
@@ -67,6 +71,14 @@ rust_nix_build = rule(
         "deps": attrs.list(attrs.dep(), default = []),
         "srcs": attrs.list(attrs.source(), default = []),
         "nix_inputs": attrs.list(attrs.source(), default = []),
+        "cargo_manifest": attrs.source(),
+        "cargo_lock": attrs.source(),
+        "crate": attrs.string(),
+        "features": attrs.list(attrs.string(), default = []),
+        "default_features": attrs.bool(default = True),
+        "profile": attrs.string(default = "release"),
+        "target": attrs.string(default = ""),
+        "local_patch_dirs": attrs.list(attrs.string(), default = []),
         "labels": attrs.list(attrs.string(), default = []),
     }),
 )
