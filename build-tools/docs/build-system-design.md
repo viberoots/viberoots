@@ -36,7 +36,7 @@
 
 ### Artifact build policy evidence
 
-Artifact construction has one provisional policy authority with three classifications:
+Artifact construction has one enforced policy authority with three classifications:
 
 - `hermetic` is the requested normal artifact contract.
 - `local-development` includes relevant live local source and is not publishable.
@@ -46,7 +46,8 @@ Artifact construction has one provisional policy authority with three classifica
 `deployment`. A nonempty `CI` always selects at least `ci`; it cannot be downgraded to `local`.
 Protected purposes reject explicit local-development and diagnostic-impure builds. They also fail
 closed when effective Nix configuration cannot be inspected or when sandbox, builder, or substituter
-state is unknown. The values themselves remain provisional diagnostics until the enforcement PR.
+state is unknown. These classifications are authoritative. Protected purposes fail before
+construction or publication when the effective policy cannot be proven.
 
 Source classification uses one strict, NUL-delimited untracked-file inventory. Inventory command
 failure, malformed records, and snapshot construction failure stop the build; none may be
@@ -61,10 +62,10 @@ set fixed purposes rather than trusting ambient job classification. Admission oc
 materializers, filtered snapshot construction, Nix evaluation, manifest writes, or publication.
 It reports only reviewed categories for effective sandbox, builders, substituters, tool authority,
 and the names of present selector variables. It never records selector values, raw paths, builder
-names, substituter URLs, credentials, timestamps, or machine identity. This PR leaves today's Nix
-arguments and artifact identity unchanged, so the record separately exposes the provisional
-`evaluation.impure` gap. Later hermetic-build PRs remove that gap before the public hermeticity
-claim is enabled.
+names, substituter URLs, credentials, timestamps, or machine identity. Normal artifact evaluation
+is pure and consumes immutable bundle inputs. The public hermeticity claim remains evidence-pending
+until the protected three-system, two-builder lane produces and retains its signed aggregate for a
+frozen revision.
 
 ### Immutable evaluation bundles
 

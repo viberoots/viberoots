@@ -177,6 +177,55 @@ bundles` whose first parent is `0ea3873d428cc2d79598be91b10a57b16d08a5da`. Paren
   independent-builder agreement remains explicit PR-5 scope; neither is concealed as deferred PR-3
   validation debt.
 
+### PR-4 Environment, Tool, Sandbox, And Network Checkpoint Record
+
+- Commit: `eb880edc012fedb51fbe62686fca44615913183a`; parent checkpoint:
+  `dd21b0176b421fe529cc9b0544d2b8dd88b0e1f5`.
+- Turbo Mode base: `83347852d8fcd3143aa4d7a542537ed7b2e9d98c` in viberoots.
+- Focused and lifecycle validation: the stale-global-input regression was preserved, reduced to the
+  single projects/config hash authority, and proven deterministically as stale failure, explicit
+  `u` repair, and immediate read-only `b` consumption. The meaningful related group and conservative
+  affected cold/warm union passed with bounded disk, identity, process, deleted-open-file, and owned
+  cleanup evidence. Independent scope/root-cause, storage, environment/tool, and sandbox/network
+  reviews found no material blocker.
+- Broad checkpoint: the completed mandatory run is recorded in
+  `.viberoots/workspace/buck/codex-test-logs/pr4-mandatory-final-replay-20260721-141826.log` and its
+  retained evidence. It reported one individual-test contract failure after the production paths
+  had passed; that test and its enforcement neighbor passed after the scoped fixture correction.
+  The later PR-5 mandatory full checkpoint passed the complete superset and closes the remaining
+  broad-validation debt without weakening PR-4's execution boundaries.
+- Ledger reconciliation: ambient environment, host-tool, sandbox, network, action isolation, and
+  cleanup debt is closed. Independent-builder release evidence remains PR-5 administration scope.
+
+### PR-5 Final Local Checkpoint And External Evidence Record
+
+- Commit: `3565f6308daa00fa64f6e64f32a715987285eb6a`; parent checkpoint: `5b55316`.
+- Focused validation: the exact seven-target regression set and independently expanded 31-target
+  conservative affected union passed. Cold/warm profiling of representative runnable and scaffold
+  tests showed stable warm identities and no persistent code time regression. The prior broad-run
+  slowdown was attributed to cold identity fanout plus host/GC contamination rather than a source
+  regression.
+- Mandatory local checkpoint: `env -u NODE_PATH VBR_GC_MODE=off i && b && ALL_TESTS=1 v` passed all
+  1,945 tests after an explicit `u` repaired the expected post-GC generated-language staleness.
+  Project enforcement passed 5/5, enforcement 46/46, isolated 14/14, isolated-bounded 15/15,
+  resource-limited 259/259, and shared 1,606/1,606. The supervising log is
+  `.viberoots/workspace/buck/codex-test-logs/pr5-mandatory-full-post-reboot-gc-after-u-20260721.log`;
+  the complete verify log is
+  `.viberoots/workspace/buck/verify-logs/verify-2026-07-22T06-44-14-370Z-12681-9288bce540038.log`.
+  Resource-limited completed in 64m43s and shared in 63m27s with no run-owned cleanup failure or
+  concurrent GC.
+- Reviews: independent material scope, plan, and design reviews found no remaining production or
+  test architecture bypass. The implementation includes the fixed six-family by three-system by
+  two-builder protected lane, signed registry/aggregate, readback, publication admission, language
+  graduation, and complete attestation/registration/import/sign administration.
+- External release evidence: not yet executed for this revision. This checkout has no prepared
+  Jenkins context, six reviewed builder authorities, owner-only transports, signed registry/store
+  administration, or protected Jenkins credentials. The deployment key is unrelated. The public
+  hermeticity claim must remain disabled until an administrator runs
+  `VBR_PROTECTED_REPRODUCIBILITY=1` for the frozen revision and retains the signed aggregate and
+  readback evidence. This is an external release-administration blocker, not deferred repository
+  implementation or local validation debt.
+
 ## PR-1: Establish Hermetic Policy Authority And Evidence
 
 ### 1. Intent

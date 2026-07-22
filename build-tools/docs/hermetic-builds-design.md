@@ -1,6 +1,6 @@
 # Hermetic Builds Design
 
-Status: proposed
+Status: implemented; independent-builder release evidence pending
 
 ## Purpose
 
@@ -21,21 +21,16 @@ same platform and declared inputs must be identical.
 
 ## Current State
 
-Artifact macros are Nix-backed, use store tools, and have no non-Nix artifact allowlist. Locks,
-hashes, patches, and filtered snapshots constrain inputs. CI avoids automatic impurity, while
-development runnables retain a live workspace for watchers.
+Artifact construction now uses one canonical policy, immutable evaluation bundles, reviewed store
+tools and environment, and fail-closed sandbox, network, publication, and deployment admission.
+Relevant local untracked input selects a non-release development bundle; protected jobs reject it.
+Normal `i` and `b` remain read-only, while `u` is the sole repair boundary. CI contains the protected
+six-family, three-system, two-builder reproducibility lane and signed aggregate authority.
 
-We cannot yet make the full hermeticity claim:
-
-- Local `b` can silently select impure mode when relevant untracked files exist.
-- Full graph materialization reads `BUCK_GRAPH_JSON` and other selectors from the environment and
-  invokes `nix build --impure`.
-- Build orchestration and Buck startup inherit broad portions of `process.env`.
-- CI does not centrally reject every explicit impure artifact build.
-- Startup validates Nix features but does not require the effective daemon and builder sandbox
-  policy.
-- We do not yet have a release gate comparing artifact identities across independent checkouts and
-  builders.
+The repository implementation and local validation gates are complete, but the full hermeticity
+claim remains disabled until release administration provisions six independent builder authorities,
+runs the protected lane for the frozen revision, and retains the signed aggregate and readback
+evidence. Ordinary local full-suite validation proves the machinery, not independent builders.
 
 ## Definitions
 
@@ -206,9 +201,10 @@ For representative Go, Node, Python, C++, WebAssembly, and mixed-language artifa
 5. Force a rebuild or Nix check-build and require byte-identical output.
 6. Repeat warm and assert no new source or fixed-output store identity.
 
-Local and remote builders must publish a small evidence manifest containing the revision, bundle
-digest, system, derivation path, output path, and NAR hash. The comparison excludes timestamps and
-machine identities.
+Every builder participating in the protected reproducibility lane must publish a small evidence
+manifest containing the revision, bundle digest, system, derivation path, output path, and NAR hash.
+The comparison excludes timestamps and machine identities. Ordinary local `b` emits policy evidence
+but is not a substitute for this protected independent-builder manifest.
 
 ### Boundary tests
 
