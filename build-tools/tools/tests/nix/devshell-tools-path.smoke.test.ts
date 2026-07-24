@@ -68,14 +68,45 @@ test("devshell exposes user-facing tools from Nix on PATH", async (t) => {
   })`direnv exec . bash --noprofile --norc -c ${`
 set -euo pipefail
 ROOT="$PWD"
-for bin in nix buck2 node pnpm go python3 uv jq rsync copier yq gomod2nix viberoots zx-wrapper s v i b; do
+for bin in nix buck2 node pnpm go python3 uv jq rsync copier yq gomod2nix happy happy-mcp viberoots zx-wrapper s v i b; do
   path="$(command -v "$bin")"
   case "$path" in
     */buck-out/zx_shims/*/bin/buck2) if [ "$bin" = buck2 ]; then continue; fi ;;
-    /nix/store/*|"$PWD"/.viberoots/current/build-tools/tools/bin/*|"$PWD"/.direnv/bin/*|"$PWD"/node_modules/.bin/*) ;;
+    /nix/store/*|"$PWD"/.viberoots/current/build-tools/tools/bin/*|"$PWD"/.viberoots/current/node_modules/.bin/*|"$PWD"/.direnv/bin/*|"$PWD"/node_modules/.bin/*) ;;
     *) echo "$bin resolved outside Nix/devshell paths: $path" >&2; exit 1 ;;
   esac
 done
+happy_path="$(command -v happy)"
+node --input-type=commonjs - "$happy_path" <<'NODE'
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const { createRequire } = require("node:module");
+
+const shimPath = process.argv[2];
+const nodeModulesRoot = path.resolve(path.dirname(shimPath), "..");
+const requireFromRoot = createRequire(path.join(nodeModulesRoot, ".viberoots-happy-probe.cjs"));
+let cursor = path.dirname(requireFromRoot.resolve("happy-coder"));
+let manifest = null;
+while (cursor !== path.dirname(cursor)) {
+  const candidate = path.join(cursor, "package.json");
+  if (fs.existsSync(candidate)) {
+    const parsed = JSON.parse(fs.readFileSync(candidate, "utf8"));
+    if (parsed.name === "happy-coder") {
+      manifest = parsed;
+      break;
+    }
+  }
+  cursor = path.dirname(cursor);
+}
+assert.ok(manifest, "expected happy shim installation to resolve to happy-coder");
+assert.equal(manifest.name, "happy-coder");
+assert.equal(manifest.version, "1.1.9");
+assert.deepEqual(manifest.bin, {
+  happy: "./bin/happy.mjs",
+  "happy-mcp": "./bin/happy-mcp.mjs",
+});
+NODE
 for bin in python3 uv; do
   case "$(command -v "$bin")" in
     /nix/store/*/bin/"$bin") ;;

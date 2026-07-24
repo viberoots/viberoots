@@ -74,3 +74,14 @@ When this test fails, the fix is to move the flagged logic behind the canonical 
 ## The `codex` wrapper (agent CLI)
 
 The repository ships a `codex` wrapper at `build-tools/tools/bin/codex` that layers a per-invocation macOS safehouse, worktree management, and a multi-account layer over the upstream `codex` CLI. The multi-account layer (rebinds `CODEX_HOME` per-account; supports `--account`, `--list-accounts`, `--remove-account`, guided `codex login`) is specified in [docs/history/designs/codex-wrapper-accounts-design.md](../history/designs/codex-wrapper-accounts-design.md). Account argv parsing, canonical resolution, structured auth inspection, login/removal lifecycle, listing, and NUL-delimited wrapper transport live in `build-tools/tools/dev/codex-accounts.ts` and its focused `codex-accounts/` modules. The Bash wrapper remains the tool-discovery, Safehouse, and worktree boundary.
+
+## The `happy` CLI
+
+The root tooling importer pins `happy-coder` exactly and exposes its `happy` and `happy-mcp`
+commands through the normal devshell `PATH`. This makes both commands available from consumer
+project directories after direnv activation without a user-level npm installation. The npm registry
+marks `happy-coder` as deprecated in favor of the renamed `happy` package; the existing pin keeps the
+requested package identity explicit until that migration is reviewed. Its dependency graph adds
+approximately 4 GiB to the shared pinned canonical `node_modules` realization and local Nix cache.
+That cost, together with the upstream rename, motivates reviewing a migration to `happy` rather than
+carrying the deprecated package indefinitely.
