@@ -130,14 +130,34 @@ __vbr_stage0_strip_nix_cache_overrides() {
 }
 
 __vbr_stage0_apply_nix_cache_health() {
-  [[ "\${VBR_NIX_CACHE_HEALTH_APPLIED:-}" != "1" ]] || return 0
-  export VBR_NIX_CACHE_HEALTH_APPLIED=1
-  [[ "\${VBR_NIX_CACHE_POLICY:-auto}" != "off" ]] || return 0
+  __vbr_stage0_cache_nix_args=()
+  local current_policy="\${VBR_NIX_CACHE_POLICY:-auto}"
+  if [[ "\${current_policy}" == "off" ]]; then
+    if [[ "\${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG+x}" == "x" ]]; then
+      export NIX_CONFIG="\${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG}"
+    fi
+    unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY
+    unset VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG
+    return 0
+  fi
+  if [[ "\${VBR_NIX_CACHE_HEALTH_APPLIED:-}" == "1" && "\${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG+x}" == "x" && "\${VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS+x}" == "x" && "\${VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS+x}" == "x" && "\${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG+x}" == "x" && "\${VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY:-}" == "\${current_policy}" ]]; then
+    __vbr_stage0_cache_nix_args=(--option substituters "\${VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS}" --option extra-substituters "\${VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS}" --option connect-timeout 3 --option stalled-download-timeout 10 --option fallback true)
+    return 0
+  fi
+  if [[ "\${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG+x}" == "x" ]]; then
+    export NIX_CONFIG="\${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG}"
+  fi
+  unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY
+  unset VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG
   command -v nix >/dev/null 2>&1 || return 0
 
   local config
-  config="$(nix config show 2>/dev/null || true)"
-  [[ -n "\${config}" ]] || return 0
+  if ! config="$(nix config show 2>/dev/null)"; then
+    echo "error: nix config show failed during cache health evaluation" 1>&2
+    unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY
+    return 1
+  fi
+  export VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG="\${config}"
 
   local required_substituters optional_substituters netrc_file
   required_substituters="$(printf "%s\\n" "\${config}" | awk '{
@@ -158,7 +178,15 @@ __vbr_stage0_apply_nix_cache_health() {
     gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
     if (key == "netrc-file") { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); print value }
   }')"
-  [[ -n "\${required_substituters}\${optional_substituters}" ]] || return 0
+  __vbr_stage0_cache_nix_args=(--option substituters "\${required_substituters}" --option extra-substituters "\${optional_substituters}" --option connect-timeout 3 --option stalled-download-timeout 10 --option fallback true)
+  if [[ -z "\${required_substituters}\${optional_substituters}" ]]; then
+    export VBR_NIX_CACHE_HEALTH_APPLIED=1
+    export VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG="\${NIX_CONFIG:-}"
+    export VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS="\${required_substituters}"
+    export VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS="\${optional_substituters}"
+    export VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY="\${current_policy}"
+    return 0
+  fi
 
   local available=()
   local removed=()
@@ -182,13 +210,22 @@ __vbr_stage0_apply_nix_cache_health() {
         local probe_status=1
         if command -v curl >/dev/null 2>&1; then
           local curl_args=(-fsS --connect-timeout 3 --max-time 5)
-          [[ -z "\${netrc_file}" ]] || curl_args+=(--netrc-file "\${netrc_file}")
+          [[ -z "\${netrc_file}" || ! -f "\${netrc_file}" || ! -r "\${netrc_file}" ]] || curl_args+=(--netrc-file "\${netrc_file}")
           if curl "\${curl_args[@]}" "\${cache_info_url}" >/dev/null 2>&1; then
             probe_status=0
           else
             probe_status="$?"
           fi
         fi
+        case "\${probe_status}" in
+          0|5|6|7|16|28|52|55|56|92) ;;
+          *)
+            echo "error: Nix cache probe rejected non-transport failure for \${cache_identity}: curl exit \${probe_status}" 1>&2
+            unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY
+            __vbr_stage0_cache_nix_args=()
+            return 1
+            ;;
+        esac
         if [[ "\${probe_status}" -eq 0 ]]; then
           available+=("\${substituter}")
         else
@@ -200,9 +237,18 @@ __vbr_stage0_apply_nix_cache_health() {
     esac
   done
 
-  [[ "\${#removed[@]}" -gt 0 ]] || return 0
-  if [[ "\${VBR_NIX_CACHE_POLICY:-auto}" == "strict" ]]; then
+  if [[ "\${#removed[@]}" -eq 0 ]]; then
+    export VBR_NIX_CACHE_HEALTH_APPLIED=1
+    export VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG="\${NIX_CONFIG:-}"
+    export VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS="\${required_substituters}"
+    export VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS="\${optional_substituters}"
+    export VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY="\${current_policy}"
+    return 0
+  fi
+  if [[ "\${current_policy}" == "strict" ]]; then
     echo "error: configured Nix substituter(s) unavailable: \${removed_identities[*]}" 1>&2
+    unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY
+    __vbr_stage0_cache_nix_args=()
     return 1
   fi
 
@@ -228,7 +274,13 @@ __vbr_stage0_apply_nix_cache_health() {
   retained="$(__vbr_stage0_strip_nix_cache_overrides)"
   required_joined="\${required_kept[*]-}"
   optional_kept_joined="\${optional_kept[*]-}"
+  __vbr_stage0_cache_nix_args=(--option substituters "\${required_joined}" --option extra-substituters "\${optional_kept_joined}" --option connect-timeout 3 --option stalled-download-timeout 10 --option fallback true)
   export NIX_CONFIG="\${retained}"$'\\n'"substituters = \${required_joined}"$'\\n'"extra-substituters = \${optional_kept_joined}"$'\\n''connect-timeout = 3'$'\\n''stalled-download-timeout = 10'$'\\n''fallback = true'
+  export VBR_NIX_CACHE_HEALTH_APPLIED=1
+  export VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG="\${NIX_CONFIG}"
+  export VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS="\${required_joined}"
+  export VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS="\${optional_kept_joined}"
+  export VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY="\${current_policy}"
   echo "[env] nix cache health: disabled unreachable substituter(s): \${removed_identities[*]}" 1>&2
   echo "[env] nix cache health: using optional substituter(s): \${optional_kept_identities[*]:-<none>}" 1>&2
 }
@@ -370,6 +422,7 @@ fi
 export WORKSPACE_ROOT="\${PWD}"
 
 __vbr_stage0_apply_nix_cache_health || return 1
+__vbr_flake_args+=("\${__vbr_stage0_cache_nix_args[@]}")
 
 if [[ ! -f .viberoots/workspace/flake.nix ]]; then
   echo "error: viberoots workspace flake is missing." 1>&2
@@ -406,7 +459,7 @@ if [[ -n "\${__vbr_source_root:-}" && -d "\${PWD}/viberoots" ]]; then
   fi
   unset __vbr_source_real __vbr_local_real
 fi
-unset __vbr_flake_input_root __vbr_source_root __vbr_flake_args
+unset __vbr_flake_input_root __vbr_source_root __vbr_flake_args __vbr_stage0_cache_nix_args
 unset -f __vbr_stage0_strip_nix_cache_overrides __vbr_stage0_apply_nix_cache_health __vbr_stage0_filtered_viberoots_input __vbr_stage0_align_workspace_flake_input __vbr_stage0_prune_workspace_flake_generated_roots
 `;
 }

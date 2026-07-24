@@ -33,6 +33,7 @@ import {
   withoutArtifactEnvironmentInfluence,
 } from "../lib/artifact-environment";
 import { artifactNixPolicyArgs } from "../lib/artifact-nix-policy";
+import { currentNixCachePolicyCapability } from "../lib/nix-cache-policy-capability";
 import {
   materializeDeclaredImporterInputs,
   materializeDeclaredProviderEdges,
@@ -72,7 +73,9 @@ async function main(declaredArtifactToolsRoot: string): Promise<void> {
   );
   const target = getFlagStr("target", "").trim();
   assertNoArtifactSelectorInjection(process.env, {
-    allow: buckAction ? ["VBR_ARTIFACT_TOOLS_ROOT", "VIBEROOTS_ROOT"] : ["VBR_ARTIFACT_TOOLS_ROOT"],
+    allow: buckAction
+      ? ["NIX_CONFIG", "VBR_ARTIFACT_TOOLS_ROOT", "VIBEROOTS_ROOT"]
+      : ["NIX_CONFIG", "VBR_ARTIFACT_TOOLS_ROOT"],
   });
   // Explicit --target is the canonical public authority. Downstream helpers still
   // read process.env.BUCK_TARGET as the internally declared selector; set it here
@@ -93,6 +96,7 @@ async function main(declaredArtifactToolsRoot: string): Promise<void> {
       BUCK_TARGET: target,
       WORKSPACE_ROOT: root,
     },
+    nixCachePolicyCapability: currentNixCachePolicyCapability(),
   });
   let immutableViberootsInputRoot = "";
   if (buckAction) {
@@ -303,6 +307,7 @@ async function main(declaredArtifactToolsRoot: string): Promise<void> {
           : {}),
         VBR_FILTERED_FLAKE_SNAPSHOT: "1",
       },
+      nixCachePolicyCapability: currentNixCachePolicyCapability(),
     });
     const nixBin = ensureNixStoreToolPathSync("nix", nixEnv);
     const fixedStore = await prewarmFinalStoreForTarget(bundleRoot, root, attr, flakeRef, nixEnv);

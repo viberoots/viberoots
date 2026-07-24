@@ -59,6 +59,27 @@ test("generated .envrc delegates to stable stage-0 helper before nix-direnv use 
   assert.doesNotMatch(stage0, /__vbr_stage0_prepare_final_pnpm_stores|prepare-final-pnpm-store/);
   assert.doesNotMatch(stage0, /eval "\$\{exact_env\}"|NIX_PNPM_EXACT_STORE/);
   assert.match(stage0, /__vbr_stage0_apply_nix_cache_health \|\| return 1/);
+  assert.match(
+    stage0,
+    /__vbr_stage0_apply_nix_cache_health \|\| return 1\n__vbr_flake_args\+=\("\$\{__vbr_stage0_cache_nix_args\[@\]\}"\)/,
+  );
+  assert.match(
+    stage0,
+    /__vbr_stage0_cache_nix_args=\(--option substituters .* --option extra-substituters .* --option connect-timeout 3 --option stalled-download-timeout 10 --option fallback true\)/,
+  );
+  assert.match(
+    stage0,
+    /current_policy="\$\{VBR_NIX_CACHE_POLICY:-auto\}"[\s\S]*current_policy.*== "off"[\s\S]*unset VBR_NIX_CACHE_HEALTH_APPLIED .*VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY/,
+  );
+  assert.match(stage0, /VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY:-.*== "\$\{current_policy\}"/);
+  assert.match(
+    stage0,
+    /current_policy.*== "off"[\s\S]*VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG\+x[\s\S]*export NIX_CONFIG="\$\{VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG\}"/,
+  );
+  assert.match(
+    stage0,
+    /VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG\+x.*VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY:-.*current_policy/,
+  );
   assert.match(stage0, /\[env\] nix cache health: disabled unreachable substituter\(s\):/);
   assert.match(stage0, /error: viberoots workspace flake is missing\./);
   assert.match(stage0, /run: viberoots bootstrap-check --repair-if-needed/);

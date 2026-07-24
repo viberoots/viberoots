@@ -1,7 +1,5 @@
 import * as fsp from "node:fs/promises";
-import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 import { runManagedCommand } from "../../lib/managed-command";
@@ -9,86 +7,20 @@ import { staleMetadataError } from "./metadata-mode";
 import { withFileRollback } from "../update-command/file-transaction";
 import { languageUpdateTimeoutMs } from "../update-command/languages";
 import { projectModuleDirs } from "../update-command/surfaces";
+import { assertSupportedCargoLockSources } from "./cargo-source-policy";
+import {
+  fixedSourcesFromCargoMetadata,
+  fixedSourceManifestMatches,
+  fixedSourceManifestPath,
+  materializeFixedSources,
+  mergeFixedSourceMaps,
+  type FixedSourceEntry,
+  type FixedSourceMap,
+} from "./cargo-fixed-sources";
+import { cargoSourceMaterialization } from "./cargo-source-materializer";
+import { cargoLocks, copyCargoRoot } from "./cargo-root-copy";
 
 type LockOutput = { destination: string; bytes?: Buffer };
-type CargoSourcePolicy = { supported_lock_sources?: unknown };
-const cargoSourcePolicyFile = fileURLToPath(
-  new URL("../../../rust/cargo-source-policy.json", import.meta.url),
-);
-const ignoredCopyEntries = new Set([".git", ".viberoots", "buck-out", "node_modules", "target"]);
-async function assertContainedSymlinks(root: string, dir = root): Promise<void> {
-  for (const entry of await fsp.readdir(dir, { withFileTypes: true })) {
-    if (ignoredCopyEntries.has(entry.name)) continue;
-    const file = path.join(dir, entry.name);
-    if (entry.isDirectory()) await assertContainedSymlinks(root, file);
-    if (!entry.isSymbolicLink()) continue;
-    const target = await fsp.readlink(file);
-    const resolved = path.resolve(path.dirname(file), target);
-    if (
-      path.isAbsolute(target) ||
-      (resolved !== root && !resolved.startsWith(`${root}${path.sep}`))
-    ) {
-      throw new Error(`Cargo temporary copy rejects external symlink: ${file} -> ${target}`);
-    }
-  }
-}
-
-async function cargoLocks(root: string): Promise<string[]> {
-  const locks: string[] = [];
-  async function visit(dir: string): Promise<void> {
-    for (const entry of await fsp.readdir(dir, { withFileTypes: true })) {
-      if (ignoredCopyEntries.has(entry.name)) continue;
-      const file = path.join(dir, entry.name);
-      if (entry.isDirectory()) await visit(file);
-      else if (entry.isFile() && entry.name === "Cargo.lock") locks.push(file);
-    }
-  }
-  await visit(root);
-  return locks.sort();
-}
-
-async function assertSupportedCargoLockSources(lockFile: string): Promise<void> {
-  const policy = JSON.parse(await fsp.readFile(cargoSourcePolicyFile, "utf8")) as CargoSourcePolicy;
-  if (
-    !Array.isArray(policy.supported_lock_sources) ||
-    policy.supported_lock_sources.some((source) => typeof source !== "string")
-  ) {
-    throw new Error("Rust Cargo source policy must declare supported_lock_sources strings");
-  }
-  const supported = new Set(policy.supported_lock_sources as string[]);
-  const content = await fsp.readFile(lockFile, "utf8");
-  for (const line of content.split(/\r?\n/)) {
-    const quotedAssignment = /^\s*(?:"(?:[^"\\]|\\.)*"|'[^']*')\s*=/.test(line);
-    if (quotedAssignment && !/^\s*(?:"source"|'source')\s*=/.test(line)) {
-      throw new Error(`Rust Cargo.lock contains unsupported quoted assignment key: ${line}`);
-    }
-    if (!/^\s*(?:source|"source"|'source')\s*=/.test(line)) continue;
-    const assignment = line.match(
-      /^\s*(?:source|"source"|'source')\s*=\s*(?:"([^"\\]*)"|'([^']*)')\s*(?:#.*)?$/,
-    );
-    if (!assignment) {
-      throw new Error(`Rust Cargo.lock contains unsupported source assignment syntax: ${line}`);
-    }
-    const source = assignment[1] ?? assignment[2];
-    if (!supported.has(source)) {
-      throw new Error(`Rust Cargo.lock contains unsupported dependency source: ${source}`);
-    }
-  }
-}
-
-async function copyCargoRoot(
-  source: string,
-): Promise<{ root: string; cleanup: () => Promise<void> }> {
-  await assertContainedSymlinks(source);
-  const owner = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-cargo-metadata-"));
-  const root = path.join(owner, path.basename(source));
-  await fsp.cp(source, root, {
-    recursive: true,
-    filter: (candidate) =>
-      candidate === source || !ignoredCopyEntries.has(path.basename(candidate)),
-  });
-  return { root, cleanup: async () => await fsp.rm(owner, { recursive: true, force: true }) };
-}
 
 export async function assertCargoConfigIsolation(
   cargoRoot: string,
@@ -118,7 +50,7 @@ async function runCargo(
   cwd: string,
   workspaceRoot: string,
   env: NodeJS.ProcessEnv = process.env,
-): Promise<void> {
+): Promise<string> {
   const commandEnv = { ...env };
   for (const key of Object.keys(commandEnv)) {
     if (key.startsWith("CARGO_") || ["RUSTC", "RUSTFLAGS", "RUSTUP_HOME"].includes(key)) {
@@ -135,7 +67,7 @@ async function runCargo(
     env: { ...commandEnv, CARGO_HOME: cargoHome, CARGO_NET_OFFLINE: "true" },
     timeoutMs: languageUpdateTimeoutMs(env),
   });
-  if (result.ok && !result.interrupted) return;
+  if (result.ok && !result.interrupted) return result.stdout;
   const reason = result.timedOut
     ? `timed out after ${languageUpdateTimeoutMs(env) / 1000}s`
     : result.interrupted
@@ -159,6 +91,7 @@ export async function assertRustTrackedMetadataReady(
   const roots = await projectModuleDirs(root, "Cargo.toml");
   if (roots.length === 0) return;
   const resolvedCargo = cargoBin || canonicalCargoBin(root);
+  const fixedSourceMaps: FixedSourceMap[] = [];
   for (const cargoRoot of roots) {
     const relativeLock = path.relative(root, path.join(cargoRoot, "Cargo.lock")) || "Cargo.lock";
     try {
@@ -166,13 +99,24 @@ export async function assertRustTrackedMetadataReady(
       await assertSupportedCargoLockSources(path.join(cargoRoot, "Cargo.lock"));
       const copy = await copyCargoRoot(cargoRoot);
       try {
-        await runCargo(resolvedCargo, lockedMetadataArgs, copy.root, root);
+        const metadataJSON = await runCargo(resolvedCargo, lockedMetadataArgs, copy.root, root);
+        fixedSourceMaps.push(
+          await fixedSourcesFromCargoMetadata(metadataJSON, path.join(copy.root, "Cargo.lock")),
+        );
       } finally {
         await copy.cleanup();
       }
     } catch (error) {
       throw staleMetadataError(relativeLock.replace(/\\/g, "/"), String(error));
     }
+  }
+  const expected = mergeFixedSourceMaps(fixedSourceMaps);
+  const manifest = fixedSourceManifestPath(root);
+  if (!(await fixedSourceManifestMatches(root, expected))) {
+    throw staleMetadataError(
+      path.relative(root, manifest).replace(/\\/g, "/"),
+      "Rust fixed-source metadata changed",
+    );
   }
 }
 
@@ -181,13 +125,17 @@ async function prepareCargoRoot(
   upgrade: boolean,
   cargoBin: string,
   workspaceRoot: string,
-): Promise<{ outputs: LockOutput[]; cleanup: () => Promise<void> }> {
+): Promise<{
+  outputs: LockOutput[];
+  fixedSources: FixedSourceMap;
+  cleanup: () => Promise<void>;
+}> {
   const before = await cargoLocks(cargoRoot);
   const copy = await copyCargoRoot(cargoRoot);
   try {
     if (upgrade) await runCargo(cargoBin, ["update", "--offline"], copy.root, workspaceRoot);
     else await runCargo(cargoBin, metadataArgs, copy.root, workspaceRoot);
-    await runCargo(cargoBin, lockedMetadataArgs, copy.root, workspaceRoot);
+    const metadataJSON = await runCargo(cargoBin, lockedMetadataArgs, copy.root, workspaceRoot);
     const after = await cargoLocks(copy.root);
     for (const lock of after) await assertSupportedCargoLockSources(lock);
     const relativeLocks = new Set([
@@ -204,7 +152,11 @@ async function prepareCargoRoot(
         return { destination: path.join(cargoRoot, relative), bytes };
       }),
     );
-    return { outputs, cleanup: copy.cleanup };
+    const fixedSources = await fixedSourcesFromCargoMetadata(
+      metadataJSON,
+      path.join(copy.root, "Cargo.lock"),
+    );
+    return { outputs, fixedSources, cleanup: copy.cleanup };
   } catch (error) {
     await copy.cleanup();
     throw error;
@@ -216,11 +168,20 @@ export async function repairRustDependencies(
   verbose: boolean,
   upgrade = false,
   cargoBin?: string,
+  materializeSource?: (
+    key: string,
+    entry: FixedSourceEntry,
+  ) => Promise<{ storePath: string; narHash: string }>,
+  runGitSource?: (command: string, args: string[], cwd: string) => Promise<string>,
 ): Promise<number> {
   const roots = await projectModuleDirs(root, "Cargo.toml");
   if (roots.length === 0) return 0;
   const resolvedCargo = cargoBin || canonicalCargoBin(root);
-  const prepared: Array<{ outputs: LockOutput[]; cleanup: () => Promise<void> }> = [];
+  const prepared: Array<{
+    outputs: LockOutput[];
+    fixedSources: FixedSourceMap;
+    cleanup: () => Promise<void>;
+  }> = [];
   try {
     for (const cargoRoot of roots) {
       if (verbose) {
@@ -230,7 +191,32 @@ export async function repairRustDependencies(
       }
       prepared.push(await prepareCargoRoot(cargoRoot, upgrade, resolvedCargo, root));
     }
-    const outputs = prepared.flatMap((entry) => entry.outputs);
+    const mergedFixedSources = mergeFixedSourceMaps(prepared.map((entry) => entry.fixedSources));
+    const materializedEntries = Object.values(mergedFixedSources).filter(
+      (entry) => entry.source.startsWith("registry+") || entry.source.startsWith("git+"),
+    );
+    const needsGit = materializedEntries.some((entry) => entry.source.startsWith("git+"));
+    const productionMaterialization =
+      (!materializeSource && materializedEntries.length > 0) || (needsGit && !runGitSource)
+        ? cargoSourceMaterialization(root)
+        : undefined;
+    const fixedSources = await materializeFixedSources(
+      mergedFixedSources,
+      materializeSource ||
+        productionMaterialization?.materialize ||
+        (async () => {
+          throw new Error("Cargo fixed-source materialization authority is unavailable");
+        }),
+      runGitSource || productionMaterialization?.runGit,
+    );
+    const fixedSourceManifest = fixedSourceManifestPath(root);
+    const outputs = [
+      ...prepared.flatMap((entry) => entry.outputs),
+      {
+        destination: fixedSourceManifest,
+        bytes: Buffer.from(`${JSON.stringify(fixedSources, null, 2)}\n`),
+      },
+    ];
     await withFileRollback(
       outputs.map((entry) => entry.destination),
       async () => {

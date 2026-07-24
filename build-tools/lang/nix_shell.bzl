@@ -1,9 +1,9 @@
 load(
     "@repo_toolchains//:toolchain_paths.bzl",
-    "NIX_ARTIFACT_SUBSTITUTERS",
     "NIX_ARTIFACT_TOOLS_ROOT",
     "NIX_ARTIFACT_TRUSTED_PUBLIC_KEYS",
 )
+load("@viberoots//build-tools/lang:nix_cache_health.bzl", "nix_cache_health_shell")
 
 def nix_artifact_bash():
     return NIX_ARTIFACT_TOOLS_ROOT + "/bin/bash"
@@ -23,7 +23,6 @@ def nix_canonical_dev_override_shell():
 def nix_artifact_policy_args():
     return (
         "--option sandbox true --option sandbox-fallback false --option sandbox-paths '' --option builders '' "
-        + "--option substituters '%s' " % " ".join(NIX_ARTIFACT_SUBSTITUTERS)
         + "--option trusted-public-keys '%s' " % " ".join(NIX_ARTIFACT_TRUSTED_PUBLIC_KEYS)
     )
 
@@ -41,7 +40,7 @@ def nix_artifact_tool_authority_shell():
 
 def nix_artifact_environment_shell():
     return (
-        "unset AR AS BUCK_GRAPH_JSON BUCK_QUERY_ROOTS BUCK_TARGET BUCK_TARGET_ATTR BUCK_TARGET_PLATFORM CC CFLAGS CLANG CPATH CPPFLAGS CXX CXXFLAGS GCC GOPATH GOROOT LD LDFLAGS LIBRARY_PATH NIX_CONFIG NIX_PATH NODE NODE_OPTIONS NODE_PATH NPM_CONFIG_PREFIX PKG_CONFIG_PATH PNPM PNPM_HOME PYTHON PYTHONHASHSEED PYTHONHOME PYTHONNOUSERSITE PYTHONPATH RUSTC RUSTFLAGS RUSTUP_HOME CARGO_HOME SDKROOT UV VBR_FILTERED_FLAKE_SNAPSHOT VBR_PNPM_FILTERED_SNAPSHOT_ROOT VBR_PNPM_FINAL_STORE VBR_PNPM_FINAL_STORE_IMPORTER; "
+        "unset AR AS BUCK_GRAPH_JSON BUCK_QUERY_ROOTS BUCK_TARGET BUCK_TARGET_ATTR BUCK_TARGET_PLATFORM CC CFLAGS CLANG CPATH CPPFLAGS CXX CXXFLAGS GCC GOPATH GOROOT LD LDFLAGS LIBRARY_PATH NIX_PATH NODE NODE_OPTIONS NODE_PATH NPM_CONFIG_PREFIX PKG_CONFIG_PATH PNPM PNPM_HOME PYTHON PYTHONHASHSEED PYTHONHOME PYTHONNOUSERSITE PYTHONPATH RUSTC RUSTFLAGS RUSTUP_HOME CARGO_HOME SDKROOT UV VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN VBR_FILTERED_FLAKE_SNAPSHOT VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG VBR_PNPM_FILTERED_SNAPSHOT_ROOT VBR_PNPM_FINAL_STORE VBR_PNPM_FINAL_STORE_IMPORTER; "
         + "for VBR_ENV_NAME in \"${!NIX_@}\"; do case \"$VBR_ENV_NAME\" in NIX_BIN|NIX_REMOTE|NIX_SSL_CERT_DIR|NIX_SSL_CERT_FILE) ;; *) unset \"$VBR_ENV_NAME\" ;; esac; done; "
         + "test -n \"${TMPDIR:-}\" || { echo 'artifact action requires runner-owned temporary state' >&2; exit 2; }; "
         + "VBR_ARTIFACT_STATE=\"`mktemp -d \"$TMPDIR/vbr-artifact-state.XXXXXX\"`\"; "
@@ -50,6 +49,25 @@ def nix_artifact_environment_shell():
         + "export HOME=\"$VBR_ARTIFACT_STATE/home\" TMPDIR=\"$VBR_ARTIFACT_STATE/tmp\" TMP=\"$VBR_ARTIFACT_STATE/tmp\" TEMP=\"$VBR_ARTIFACT_STATE/tmp\" XDG_CACHE_HOME=\"$VBR_ARTIFACT_STATE/xdg-cache\" XDG_CONFIG_HOME=\"$VBR_ARTIFACT_STATE/xdg-config\" XDG_DATA_HOME=\"$VBR_ARTIFACT_STATE/xdg-data\"; "
         + "export LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC SOURCE_DATE_EPOCH=1; "
     )
+
+def nix_action_final_exec_function_shell():
+    return (
+        "__vbr_action_final_exec() { "
+        + "unset NIX_CONFIG VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN; "
+        + nix_cache_health_shell()
+        + "unset VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN; "
+        + "if [ \"${VBR_NIX_CACHE_HEALTH_APPLIED:-}\" = \"1\" ] && [ \"${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG+x}\" = \"x\" ]; then "
+        + "VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN=\"${RANDOM}${RANDOM}-$$-${RANDOM}\"; "
+        + "exec {VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD}<<<\"$VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN\"; "
+        + "if [ \"$VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD\" -lt 10 ] || [ \"$VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD\" -gt 1024 ]; then echo 'action cache-review proof descriptor is out of bounds' >&2; return 1; fi; "
+        + "export VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN; "
+        + "fi; "
+        + "exec \"$@\"; "
+        + "}; export -f __vbr_action_final_exec; "
+    )
+
+def nix_action_final_exec_prefix():
+    return "\"$VBR_ARTIFACT_TOOLS_ROOT/bin/bash\" -c '__vbr_action_final_exec \"$@\"' vbr-action-final-exec "
 
 def nix_bootstrap_env_core():
     return (
@@ -96,6 +114,7 @@ def nix_bootstrap_env_core():
         + "export WORKSPACE_ROOT=\"${WORKSPACE_ROOT:-$PWD}\"; "
         + nix_artifact_tool_authority_shell()
         + nix_artifact_environment_shell()
+        + nix_action_final_exec_function_shell()
         + "FLK_ROOT=\"${FLK_ROOT:-}\"; "
         + "if [ -z \"${FLK_ROOT:-}\" ] || [ ! -f \"$FLK_ROOT/flake.nix\" ]; then "
         + "  FLK_ROOT=\"${WORKSPACE_ROOT:-${REPO_ROOT:-$PWD}}\"; "

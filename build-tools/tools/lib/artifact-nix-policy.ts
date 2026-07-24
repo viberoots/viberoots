@@ -1,7 +1,13 @@
-export const REVIEWED_SUBSTITUTERS = [
+export const REVIEWED_REQUIRED_SUBSTITUTERS = [
   "https://cache.nixos.org/",
-  "https://cache.home.kilty.io/main",
   "https://install.determinate.systems",
+] as const;
+
+export const REVIEWED_OPTIONAL_SUBSTITUTERS = ["https://cache.home.kilty.io/main"] as const;
+
+export const REVIEWED_SUBSTITUTERS = [
+  ...REVIEWED_REQUIRED_SUBSTITUTERS,
+  ...REVIEWED_OPTIONAL_SUBSTITUTERS,
 ] as const;
 
 export const REVIEWED_EVIDENCE_PUBLIC_KEY =
@@ -21,7 +27,9 @@ export const REVIEWED_PUBLIC_KEYS = [
   "cache.flakehub.com-10:2GqeNlIp6AKp4EF2MVbE1kBOp9iBSyo0UPR9KoR0o1Y=",
 ] as const;
 
-export function artifactNixPolicyArgs(opts?: { allowReviewedRemoteBuilders?: boolean }): string[] {
+export function artifactNixScopedPolicyArgs(opts?: {
+  allowReviewedRemoteBuilders?: boolean;
+}): string[] {
   return [
     "--option",
     "sandbox",
@@ -37,14 +45,33 @@ export function artifactNixPolicyArgs(opts?: { allowReviewedRemoteBuilders?: boo
     "",
     ...(opts?.allowReviewedRemoteBuilders ? [] : ["--option", "builders", ""]),
     "--option",
-    "substituters",
-    REVIEWED_SUBSTITUTERS.join(" "),
-    "--option",
     "trusted-public-keys",
     REVIEWED_PUBLIC_KEYS.join(" "),
   ];
 }
 
+export function artifactNixIndependentPolicyArgs(
+  cachePolicy: "reviewed" | "empty",
+  opts?: { allowReviewedRemoteBuilders?: boolean },
+): string[] {
+  const required = cachePolicy === "reviewed" ? REVIEWED_REQUIRED_SUBSTITUTERS.join(" ") : "";
+  return [
+    ...artifactNixScopedPolicyArgs(opts),
+    "--option",
+    "substituters",
+    required,
+    "--option",
+    "extra-substituters",
+    "",
+    "--option",
+    "fallback",
+    "true",
+  ];
+}
+
+/** Commands under a cache-health command scope inherit its exact reviewed NIX_CONFIG. */
+export const artifactNixPolicyArgs = artifactNixScopedPolicyArgs;
+
 export function artifactNixPolicyConfigArgs(): string[] {
-  return [...artifactNixPolicyArgs(), "config", "show", "--json"];
+  return [...artifactNixScopedPolicyArgs(), "config", "show", "--json"];
 }

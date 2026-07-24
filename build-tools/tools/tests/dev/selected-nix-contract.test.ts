@@ -5,9 +5,10 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { envWithResolvedNixBin } from "../../lib/tool-paths.ts";
+import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 async function readSource(rel: string): Promise<string> {
-  return await fsp.readFile(`viberoots/${rel}`, "utf8");
+  return await fsp.readFile(viberootsSourcePath(rel), "utf8");
 }
 
 test("bootstrap and submodule init export the selected nix binary", async () => {

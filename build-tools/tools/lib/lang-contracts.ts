@@ -91,8 +91,8 @@ export function patchPkgUsageNotes(): string[] {
       ? `Node also supports global patches under ${node.globalPatchDir.path} (effective-set matches only).`
       : null;
   const lines = [
-    "- Go/C++ default to local mode: apply/remove write/read patches under <pkg>/patches/<lang>.",
-    "  Removing a Go/C++ patch does not regenerate glue; Buck/Nix pick up the change via srcs.",
+    "- Go/C++/Rust default to local mode: apply/remove write/read patches under <pkg>/patches/<lang>.",
+    "  Removing a Go/C++/Rust patch does not regenerate glue; Buck/Nix pick up the change via srcs.",
     "- Node and Python remain importer-scoped: apply/remove regenerates providers and auto_map (glue).",
   ];
   if (nodeGlobal) lines.push(`  ${nodeGlobal}`);

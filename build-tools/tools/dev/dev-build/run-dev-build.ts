@@ -196,10 +196,7 @@ export async function runDevBuild(artifactToolsRoot: string): Promise<void> {
       workspaceRoot: root,
       artifactToolsRoot,
       toolNames: ["git", "buck2"],
-      internal:
-        cacheHealth.changed && cacheHealth.nixConfig
-          ? { NIX_CONFIG: cacheHealth.nixConfig }
-          : undefined,
+      internal: { NIX_CONFIG: cacheHealth.nixConfig },
     });
     await ensureDevBuildStoreSpace({
       subcmd: parsed.subcmd,
@@ -271,8 +268,7 @@ export async function runDevBuild(artifactToolsRoot: string): Promise<void> {
       isolationFlags: iso.isolationFlags,
       devOverrides,
       artifactToolsRoot,
-      internalNixConfig:
-        cacheHealth.changed && cacheHealth.nixConfig ? cacheHealth.nixConfig : undefined,
+      internalNixConfig: cacheHealth.nixConfig,
     });
 
     // `--no-materialize` is a strict no-glue path. If the build side-effects an

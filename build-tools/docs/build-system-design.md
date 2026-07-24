@@ -533,7 +533,9 @@ The outer CLI `patch-pkg` implements language/subcommand parsing and delegates t
     - **macOS:** APFS CoW clone (`cp -cR`) when available; otherwise `cp -a`.
     - **Other platforms:** `cp -a`.
   - Writes/updates the `NIX_GO_DEV_OVERRIDE_JSON` entry for `<module>`.
-  - If `$PATCH_EDITOR` is set, launch it with the temp dir.
+  - If `$PATCH_EDITOR` is set, launch it with the temp dir under the bounded
+    `PATCH_EDITOR_TIMEOUT_SECS` contract. Timeout clears session and override state while preserving
+    the temp dir for inspection.
 
 - **`reset <module>`**
   - Confirm abandonment, remove override entry, delete temp dir.
@@ -595,6 +597,8 @@ Here `patchesMap` is derived **directly from patch filenames** in `patches/go/*.
 4. **`PATCH_EDITOR`**
 
 - If set, executed with the temp dir; can be a GUI IDE or terminal editor.
+- Execution defaults to a 300-second bound. `PATCH_EDITOR_TIMEOUT_SECS` accepts a positive numeric
+  override.
 
 **Cross-Platform Strategy**
 

@@ -46,7 +46,7 @@ function usage(msg?: string) {
       "  sync-required <lang>     Check transitive required patches for an importer",
       "",
       "languages:",
-      "  go | cpp | node | python",
+      "  go | cpp | node | python | rust",
       "",
       "notes:",
       ...patchPkgUsageNotes().map((l) => `  ${l}`),
@@ -74,8 +74,16 @@ function positionalTokens(argv: string[]): string[] {
 
 const rawTokens = getArgvTokens();
 const parsed = removeKnownFlags(rawTokens, {
-  presence: ["--force", "--write-placeholders"],
-  takesValue: ["--importer", "--target", "--patch-dir", "--patchDir", "--lang"],
+  presence: ["--force", "--write-placeholders", "--echo-snippet"],
+  takesValue: [
+    "--importer",
+    "--target",
+    "--patch-dir",
+    "--patchDir",
+    "--lang",
+    "--version",
+    "--source",
+  ],
 });
 const [_subRaw, _lang, ...positional] = positionalTokens(parsed.argv);
 const sub = ((_subRaw as string) || "help").toLowerCase() as SubcommandName;
@@ -103,12 +111,16 @@ if (Object.prototype.hasOwnProperty.call(parsed.seen, "--force")) {
 if (Object.prototype.hasOwnProperty.call(parsed.seen, "--write-placeholders")) {
   rest.push("--write-placeholders");
 }
+for (const flag of ["--version", "--source"]) {
+  const value = parsed.seen[flag] || "";
+  if (value.trim() !== "") rest.push(flag, value);
+}
 
 async function main() {
   if (!sub || sub === "help") return usage();
   if (!lang) return usage("missing <language>");
 
-  if (lang !== "go" && lang !== "cpp" && lang !== "node" && lang !== "python")
+  if (lang !== "go" && lang !== "cpp" && lang !== "node" && lang !== "python" && lang !== "rust")
     return usage(`unsupported language: ${lang}`);
 
   // Resolve repo root to import the language handler robustly from any CWD
@@ -124,7 +136,11 @@ async function main() {
     lang === "python"
       ? await import(path.join(root, "build-tools/tools/patch/patch-python.ts"))
       : null;
-  const handler = (go ? go.default : node ? node.default : py ? py.default : cpp!.default) as {
+  const rust =
+    lang === "rust" ? await import(path.join(root, "build-tools/tools/patch/patch-rust.ts")) : null;
+  const handler = (
+    go ? go.default : node ? node.default : py ? py.default : rust ? rust.default : cpp!.default
+  ) as {
     start(args: string[]): Promise<void>;
     apply(args: string[]): Promise<void>;
     reset(args: string[]): Promise<void>;

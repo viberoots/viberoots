@@ -1,4 +1,4 @@
-# Patching Handbook (Go, C++, Node, and Python)
+# Patching Handbook (Go, C++, Node, Python, and Rust)
 
 Note: Go and C++ use per‑target local patching by default. Place patches under each target’s package directory (for example, `projects/apps/<app>/patches/go` or `projects/libs/<lib>/patches/cpp`) so they are included in that target’s `srcs` and Buck invalidation is precise. The global `patches/go` flow remains supported where applicable, but local patching is the default developer experience for new scaffolds. See `build-tools/docs/build-system-design.md` for details.
 
@@ -6,13 +6,13 @@ All scripts are zx TypeScript using `#!/usr/bin/env zx-wrapper`.
 
 ### Shared helpers (consistency across languages)
 
-This section is a quick index of “don’t re-implement this” utilities. Most patch and glue behavior is intentionally centralized so the Go/C++/Node/Python flows stay consistent and easy to reason about.
+This section is a quick index of “don’t re-implement this” utilities. Most patch and glue behavior is intentionally centralized so the Go/C++/Node/Python/Rust flows stay consistent and easy to reason about.
 
 - Patch handlers reuse `build-tools/tools/patch/lib/apply.ts: repoRoot()` for repo‑root detection.
 - Filesystem existence checks use `build-tools/tools/patch/lib/util.ts: pathExists()`.
 - Importer-scoped lockfile discovery uses `build-tools/tools/lib/importers.ts:findNearestLockfileForPackage(...)`. Patch tooling must not hand-roll upward directory walks for `uv.lock` or `pnpm-lock.yaml`.
-- Workspace-based patch handlers (Go and Python) share the control flow in `build-tools/tools/patch/lib/workspace-workflow.ts` (session reuse, no-op cleanup, patch verification, and consistent messages).
-- Avoid bespoke implementations; this keeps behavior consistent across Go/C++/Node/Python.
+- Workspace-based patch handlers (Go, Python, and Rust) share the control flow in `build-tools/tools/patch/lib/workspace-workflow.ts` (session reuse, no-op cleanup, patch verification, and consistent messages).
+- Avoid bespoke implementations; this keeps behavior consistent across Go/C++/Node/Python/Rust.
 - Default package-local patch directory selection is centralized in Starlark via `//build-tools/lang:defs_common.bzl: default_package_patch_dirs(lang)`. Go/C++ macros use this helper instead of hard‑coded strings (e.g., `["patches/go"]`).
 - Flat patch directory checks use `build-tools/tools/lib/provider-sync.ts: validateFlatDir()`; locally it warns, and in CI (or with `--strict`) it fails.
 - Go/Node/Python patch linting shares one core implementation for flat-dir scanning, filename-shape validation, and duplicate detection: `build-tools/tools/dev/patches-lint/flat-patch-dir-lint.ts`. This keeps codes and messages consistent across languages.
@@ -40,7 +40,9 @@ This section is a quick index of “don’t re-implement this” utilities. Most
   - macOS uses APFS CoW (`cp -cR`) when available; otherwise falls back to `cp -a`. Other platforms use `cp -a`.
   - Writes/updates the Go dev override env var (as defined by `build-tools/tools/lib/dev-override-envs.json`; currently `NIX_GO_DEV_OVERRIDE_JSON`) for the current `module@version` key (local-only dev override).
   - Optional: pass `--echo-snippet` to print `export NIX_GO_DEV_OVERRIDE_JSON='{\"<module@version>\":\"<abs/path>\"}'` to stderr (parity with C++), instead of setting the env var in-process. Tooling derives the env var name from the manifest.
-  - If `PATCH_EDITOR` is set, launches it with the workspace.
+  - If `PATCH_EDITOR` is set, launches it with the workspace. Editor execution is bounded to 300
+    seconds by default; set `PATCH_EDITOR_TIMEOUT_SECS` to a positive number for a different bound.
+    Timeout clears session and override state while preserving the workspace for inspection.
 
 - Apply: `patch-pkg apply go <importPath> [--target //<pkg>:name | --patch-dir <dir>]`
   - Produces a unified diff into the canonical filename under the target’s package‑local `patches/go/` directory (or into the directory passed via `--patch-dir`).
@@ -72,7 +74,7 @@ Encoding policy:
 
 Re-applying an unchanged workspace is a no-op. In that case we do not write a patch file; we still clear dev overrides and end the session so no stale override state leaks into later builds/tests.
 
-For Go/C++, apply does not run glue. For Node and Python, provider sync and auto_map generation run automatically.
+For Go/C++/Rust, apply does not run glue. For Node and Python, provider sync and auto_map generation run automatically.
 
 ## Patch invalidation strategy (contract)
 
@@ -83,7 +85,7 @@ This repo supports two patch invalidation strategies. Treat this as a cross-lang
 
 ### package-local
 
-Go and C++ use **package-local** patches. Patch files live under the Buck package of the target (for example `projects/libs/foo/patches/go/*.patch`). Those patch files are included in the target inputs (via `srcs` or an equivalent input attribute), so Buck invalidation is precise and no glue regeneration is required on apply/remove.
+Go, C++, and Rust use **package-local** patches. Patch files live under the Buck package of the target (for example `projects/libs/foo/patches/rust/*.patch`). Those patch files are included in the target inputs (via `srcs` or an equivalent input attribute), so Buck invalidation is precise and no glue regeneration is required on apply/remove.
 
 ### importer-local
 
@@ -93,7 +95,7 @@ Node and Python use **importer-local** patches. Patch files live under an import
 
 Targets are stamped with exactly one patch scope label derived from the language contract:
 
-- `patch_scope:package-local` (Go, C++)
+- `patch_scope:package-local` (Go, C++, Rust)
 - `patch_scope:importer-local` (Node, Python)
 
 This is applied at shared wiring helper boundaries, not in per-language macro implementations.
@@ -128,7 +130,7 @@ If you are unsure why a patch edit did or did not invalidate something, start wi
 
 ## Glue regeneration
 
-Node and Python only (Go/C++ don’t require glue for patch invalidation). Local glue is not committed. Regenerate after apply or on-demand:
+Node and Python only (Go/C++/Rust don’t require glue for patch invalidation). Local glue is not committed. Regenerate after apply or on-demand:
 
 - Export graph: `node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`
 - Sync providers: `node viberoots/build-tools/tools/buck/sync-providers.ts`
@@ -170,9 +172,9 @@ node viberoots/build-tools/tools/buck/graph-view.ts --graph .viberoots/workspace
 
 If a sidecar is missing, the Composite Graph API returns an empty object for that index and continues.
 
-Note on remove (Go/C++ vs Node/Python):
+Note on remove (Go/C++/Rust vs Node/Python):
 
-- Go/C++: `patch-pkg remove` does not regenerate glue. Local patches live under the target’s `patches/<lang>` directory and are included in the rule’s `srcs`, so removing a patch is picked up directly by Buck/Nix (precise invalidation, no provider/auto_map updates needed).
+- Go/C++/Rust: `patch-pkg remove` does not regenerate glue. Local patches live under the target’s `patches/<lang>` directory and are included in the rule’s `srcs`, so removing a patch is picked up directly by Buck/Nix (precise invalidation, no provider/auto_map updates needed).
 - Node/Python: still regenerate providers and `auto_map.bzl` on apply/remove because importer‑scoped providers are generated artifacts derived from the lockfile and the set of applicable patches.
 
 ## CI guardrails
@@ -403,6 +405,98 @@ patch-pkg apply python requests --importer projects/apps/api
 # Or, override the destination directory explicitly
 patch-pkg apply python requests --importer projects/apps/api --patch-dir projects/apps/api/patches/python
 ```
+
+### Rust — package-local locked dependency patches
+
+Rust resolves the requested crate against the selected Cargo root's checked-in `Cargo.lock`.
+Use `--target` or `--importer` when the current directory does not identify exactly one Cargo root.
+Renamed dependencies resolve through `Cargo.toml`. When multiple locked packages share a name,
+pass both `--version` and the exact source URL or full 64-hex SHA-256 source hash printed by the
+ambiguity diagnostic. Rust patch filenames use that complete digest; truncated hash prefixes are
+not valid selectors.
+Supplying both `--target` and `--importer` is allowed only when they resolve to the same Cargo root.
+
+The complete lifecycle is:
+
+```bash
+# Create or reuse a writable workspace for one exact locked identity.
+patch-pkg start rust serde --target //projects/apps/api:api
+
+# Inspect the active workspace interactively. Ctrl-D applies; Ctrl-C resets.
+patch-pkg session rust serde --target //projects/apps/api:api
+
+# Apply explicitly, using an exact disambiguator when required.
+patch-pkg apply rust serde --target //projects/apps/api:api \
+  --version 1.0.219 \
+  --source registry+https://github.com/rust-lang/crates.io-index
+
+# Abandon an active workspace and clear its local override.
+patch-pkg reset rust serde --target //projects/apps/api:api \
+  --version 1.0.219 \
+  --source registry+https://github.com/rust-lang/crates.io-index
+
+# Check declared required patches, optionally creating reviewed placeholders.
+patch-pkg sync-required rust --importer projects/apps/api
+patch-pkg sync-required rust --importer projects/apps/api --write-placeholders
+
+# Remove only this source-qualified package-local patch.
+patch-pkg remove rust serde --target //projects/apps/api:api
+```
+
+Rust supports this command/flag matrix:
+
+| Command         | Applicable shared flags                                                     |
+| --------------- | --------------------------------------------------------------------------- |
+| `start`         | `--target`, `--importer`, `--version`, `--source`, `--echo-snippet`         |
+| `apply`         | `--target`, `--importer`, `--version`, `--source`, `--patch-dir`, `--force` |
+| `reset`         | `--target`, `--importer`, `--version`, `--source`                           |
+| `session`       | all `start`/`apply` selectors; Ctrl-D applies and Ctrl-C resets             |
+| `remove`        | `--target`, `--importer`, `--version`, `--source`, `--patch-dir`            |
+| `sync-required` | `--target`, `--importer`, `--patch-dir`, `--write-placeholders`             |
+
+Relative Rust `--patch-dir` values are repository-relative, and the canonical destination must
+remain inside the selected Cargo root. Lexical traversal and symlink escape are rejected. Absolute
+paths are accepted only when their canonical destination is inside that same root.
+
+The canonical filename is
+`<encoded-crate>@<version>--<locked-source-sha256>.patch`. The full source digest prevents
+crates.io, Git, renamed, alternate-registry, and duplicate-version identities from colliding.
+The writable workspace comes from the exact entry in
+`.viberoots/workspace/cargo-home/viberoots-fixed-sources.json`. Entries are keyed by
+`<lowercase-name>@<version>#<exact-lock-source>` and bind the origin path, exact source, and registry
+checksum (or full Git revision metadata). Cache-directory scanning and first-match selection are
+not allowed. The canonical `u` Rust reconciliation writes this manifest from locked Cargo metadata;
+`i` rejects it as stale when the checked-in lock and resolved fixed-source identities differ.
+
+Patch generation verifies canonical `-p1` text against a clean copy before atomically replacing the
+package-local file. Any missing-session, editor, verification, write, reset, remove, or interruption
+path clears the session and override. Workspaces remain available for inspection after failure;
+`reset` removes the active workspace when one exists. A stale interactive owner is reaped on the
+next start without deleting its inspectable directory.
+
+`sync-required` reads `required-patches.json` in the selected Rust patch directory:
+
+```json
+{
+  "schema": "viberoots.rust-required-patches.v1",
+  "required": [
+    {
+      "name": "serde",
+      "version": "1.0.219",
+      "source": "registry+https://github.com/rust-lang/crates.io-index"
+    }
+  ]
+}
+```
+
+It compares those exact requirements and the whole `.patch` inventory with `Cargo.lock`, reporting
+missing, stale, and ambiguous entries in deterministic order. `--write-placeholders` creates only
+missing declared placeholders; replace them with real unified diffs before building.
+
+Rust patches and local overrides are explicit evaluation-bundle inputs. Override directories are
+copied into a bundle and their identities appear in local-development diagnostics. Rust Nix
+evaluation never reads `NIX_RUST_DEV_OVERRIDE_JSON` ambiently, and protected/hermetic bundle
+creation rejects every language override. No provider or auto-map glue is used.
 
 ### C++ — patching a nixpkgs dependency
 

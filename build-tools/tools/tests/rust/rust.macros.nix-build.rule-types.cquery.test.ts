@@ -44,7 +44,7 @@ test("rust macros export native build, test, and source-selection contracts", as
       [
         'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_library", "rust_test")',
         "",
-        'rust_library(name = "lib", crate = "rustapp", features = ["demo"], default_features = False, nixpkg_deps = ["pkgs.zlib"], nixpkgs_profile = "default", nixpkg_pins = {"pkgs.zlib": {"nixpkgs_profile": "default", "rationale": "fixture"}}, srcs = ["src/lib.rs"])',
+        'rust_library(name = "lib", crate = "rustapp", cargo_output_hashes = {"remote-1.0.0": "sha256-fixture"}, cargo_fixed_sources = {"remote@1.0.0#registry+https://registry.example/index": "{\\"source\\":\\"registry+https://registry.example/index\\"}"}, features = ["demo"], default_features = False, nixpkg_deps = ["pkgs.zlib"], nixpkgs_profile = "default", nixpkg_pins = {"pkgs.zlib": {"nixpkgs_profile": "default", "rationale": "fixture"}}, srcs = ["src/lib.rs"])',
         'rust_binary(name = "app", crate = "rustapp", srcs = ["src/main.rs"], deps = [":lib"])',
         'rust_test(name = "test", crate = "rustapp", srcs = ["src/lib.rs"])',
         "",
@@ -89,7 +89,7 @@ test("rust macros export native build, test, and source-selection contracts", as
     const fields = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cargo_manifest --output-attribute cargo_lock --output-attribute crate --output-attribute features --output-attribute default_features --output-attribute profile --output-attribute target --output-attribute local_patch_dirs --output-attribute nixpkgs_profile --output-attribute nixpkg_pins --output-attribute deps --output-attribute srcs --output-attribute labels //projects/apps/rustapp:lib`;
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute cargo_manifest --output-attribute cargo_lock --output-attribute cargo_output_hashes --output-attribute cargo_fixed_sources --output-attribute crate --output-attribute features --output-attribute default_features --output-attribute profile --output-attribute target --output-attribute local_patch_dirs --output-attribute nixpkgs_profile --output-attribute nixpkg_pins --output-attribute deps --output-attribute srcs --output-attribute labels //projects/apps/rustapp:lib`;
     const serialized = String(fields.stdout || "");
     for (const expected of [
       "Cargo.toml",
@@ -107,11 +107,18 @@ test("rust macros export native build, test, and source-selection contracts", as
       local_patch_dirs?: string[];
       nixpkgs_profile?: string;
       nixpkg_pins?: Record<string, unknown>;
+      cargo_output_hashes?: Record<string, string>;
+      cargo_fixed_sources?: Record<string, string>;
       srcs?: string[];
     }>(JSON.parse(serialized));
     assert.equal(node?.default_features, false);
     assert.equal(node?.nixpkgs_profile, "default");
     assert.ok(node?.nixpkg_pins?.["pkgs.zlib"]);
+    assert.equal(node?.cargo_output_hashes?.["remote-1.0.0"], "sha256-fixture");
+    assert.equal(
+      node?.cargo_fixed_sources?.["remote@1.0.0#registry+https://registry.example/index"],
+      '{"source":"registry+https://registry.example/index"}',
+    );
     assert.deepEqual(node?.local_patch_dirs, ["patches/rust"]);
     assert.ok(node?.labels?.includes("patch_scope:package-local"));
     assert.ok(node?.labels?.includes("nixpkg:pkgs.zlib"));

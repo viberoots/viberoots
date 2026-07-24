@@ -11,12 +11,15 @@ in {
     cargoRoot,
     cargoManifest,
     cargoLock,
+    cargoOutputHashes ? {},
+    cargoFixedSources ? {},
     crate,
     features ? [],
     defaultFeatures ? true,
     profile ? "release",
     target ? "",
     patchInputs ? [],
+    devOverrides ? {},
     nixpkgDeps ? [],
     sourcePlan ? { nixpkgs_profile = "default"; nixpkg_pins = {}; },
   }:
@@ -48,17 +51,30 @@ in {
         crate
       ] ++ kindFlags ++ featureFlags ++ testProfileFlags ++ [ "--target" cargoTarget ];
       testBuildCommand = lib.concatMapStringsSep " " lib.escapeShellArg testBuildFlags;
-    in assert _sources; assert _cargoConfig; pkgs.rustPlatform.buildRustPackage ({
+      vendorPlan = import ./rust-vendor.nix {
+        inherit pkgs cargoRoot cargoLock cargoOutputHashes cargoFixedSources;
+      };
+      vendorAuthorities = vendorPlan.vendorAuthorities;
+      patchPlan = import ./rust-patches.nix {
+        inherit pkgs cargoLock patchInputs vendorAuthorities;
+        inherit devOverrides;
+      };
+      _overrideTrace =
+        if devOverrides == {} then true
+        else builtins.trace
+          "[DEV OVERRIDES ACTIVE] Rust fixed sources are explicit local-development bundle inputs."
+          true;
+    in assert _sources; assert _cargoConfig; assert _overrideTrace;
+    pkgs.rustPlatform.buildRustPackage ({
       pname = "rust-${sanitized}";
       version = "0.1.0";
-      src = cargoRoot;
-      cargoLock.lockFile = cargoLock;
+      src = vendorPlan.sourceWithVendor;
+      cargoVendorDir = ".viberoots-cargo-vendor";
       cargoBuildType = cargoProfile;
       cargoBuildFlags = [ "--locked" "--package" crate ] ++ kindFlags ++ featureFlags ++ targetFlags;
       cargoTestFlags = [ "--package" crate ] ++ kindFlags ++ featureFlags ++ targetFlags;
       doCheck = false;
-      nativeBuildInputs = [ pkgs.cargo pkgs.rustc pkgs.pkg-config ]
-        ++ lib.optionals (kind == "test") [ pkgs.jq ]
+      nativeBuildInputs = [ pkgs.cargo pkgs.rustc pkgs.pkg-config pkgs.jq ]
         ++ nixpkgDeps;
       buildInputs = nixpkgDeps;
       RUSTC = "${pkgs.rustc}/bin/rustc";
@@ -69,6 +85,7 @@ in {
         test -f ${lib.escapeShellArg (builtins.toString cargoManifest)}
         test -f ${lib.escapeShellArg (builtins.toString cargoLock)}
         ${lib.concatMapStringsSep "\n" (input: "test -e ${lib.escapeShellArg (builtins.toString input)}") patchInputs}
+        ${patchPlan.postPatch}
       '';
       installPhase = if kind == "bin" then ''
         runHook preInstall
@@ -133,6 +150,13 @@ in {
         nixpkg_pins = sourcePlan.nixpkg_pins;
         cargo_manifest = builtins.toString cargoManifest;
         cargo_lock = builtins.toString cargoLock;
+        cargo_output_hashes = cargoOutputHashes;
+        cargo_fixed_sources = cargoFixedSources;
+        patch_vendor_authorities = vendorAuthorities;
+        cargo_packages = map (package: {
+          inherit (package) name version;
+          source = package.source or "";
+        }) ((builtins.fromTOML (builtins.readFile cargoLock)).package or []);
       };
     } // lib.optionalAttrs (kind == "test") {
       postBuild = ''

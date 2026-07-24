@@ -185,7 +185,7 @@ test("Nix store materialization uses bounded canonical command execution", () =>
   );
   assert.match(source, /buildCanonicalArtifactEnvironment/);
   assert.match(source, /ensureNixStoreToolPathSync\("nix"/);
-  assert.match(source, /artifactNixPolicyArgs/);
+  assert.match(source, /artifactNixIndependentPolicyArgs/);
   assert.match(source, /runBoundedArtifactCommand/);
   assert.doesNotMatch(source, /from "node:child_process"|\bspawn\(/);
 });
@@ -301,7 +301,7 @@ test("materialization helper CLI reads manifest files for dry-run", async () => 
   fs.writeFileSync(file, JSON.stringify(manifest), "utf8");
   const result = await $({
     stdio: "pipe",
-  })`zx-wrapper viberoots/build-tools/tools/remote-exec/nix-store-materialize.ts --manifest ${file} --dry-run`;
+  })`zx-wrapper ${viberootsSourcePath("build-tools/tools/remote-exec/nix-store-materialize.ts")} --manifest ${file} --dry-run`;
   assert.match(String(result.stdout), /remote-worker-tools/);
   assert.doesNotMatch(String(result.stdout), /token@/);
 });

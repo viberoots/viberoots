@@ -1,16 +1,15 @@
 #!/usr/bin/env bash
 
-# A long-lived parent shell may retain the result of an earlier network probe.
-# Only build/p call this in verified-ingress mode, after the artifact ingress
-# function has returned from its FD-authenticated direnv re-entry. All other
-# command front doors use standalone mode and always begin a fresh review.
+# A long-lived parent shell or cached direnv may retain an earlier network
+# probe. Every command front door begins a fresh review. build/p use
+# verified-ingress only to prove the shell authority before that review.
 vbr_cache_health_scope_mode="${1:-}"
 unset VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
 case "${vbr_cache_health_scope_mode}" in
 verified-ingress)
-	if [[ "${VBR_ARTIFACT_INGRESS_DIRENV_VERIFIED:-}" != "1" ]]; then
-		unset VBR_NIX_CACHE_HEALTH_APPLIED
-	fi
+	# Direnv may reuse a cached shell after the network changes. The verified
+	# ingress proves the shell authority, not the freshness of its cache probe.
+	unset VBR_NIX_CACHE_HEALTH_APPLIED
 	;;
 standalone)
 	unset VBR_ARTIFACT_INGRESS_DIRENV_VERIFIED

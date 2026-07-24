@@ -2,9 +2,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { materializePureGraphIfEnabled } from "../../dev/dev-build/materialize-pure";
+import { activateCanonicalNixCachePolicy } from "../../dev/canonical-reviewed-nix-config";
 import { runInTemp } from "../lib/test-helpers";
 
 test("materialize pure fails fast when nix build exceeds timeout", async () => {
+  process.env.VBR_CANONICAL_ARTIFACT_ENTRYPOINT = "1";
+  activateCanonicalNixCachePolicy(process.env, { applied: true, config: "" });
   await runInTemp("materialize-pure-timeout", async (tmp) => {
     const prevTimeout = process.env.VBR_MATERIALIZE_TIMEOUT_SEC;
     process.env.VBR_MATERIALIZE_TIMEOUT_SEC = "1";

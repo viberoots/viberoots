@@ -104,7 +104,7 @@ export async function runBuckCommand(opts: {
       BUCK_GRAPH_JSON: path.join(opts.root, DEFAULT_GRAPH_PATH),
       BUCK_ISOLATION_DIR: isolation,
       BUCK2_REAL_HOME: path.join(opts.root, "buck-out", "tmp", "artifact-environment", "home"),
-      ...(opts.internalNixConfig ? { NIX_CONFIG: opts.internalNixConfig } : {}),
+      ...(opts.internalNixConfig !== undefined ? { NIX_CONFIG: opts.internalNixConfig } : {}),
       WORKSPACE_ROOT: opts.root,
     },
   });

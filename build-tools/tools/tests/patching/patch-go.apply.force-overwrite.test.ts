@@ -114,6 +114,23 @@ test("patch-go apply supports --force overwrite when patch exists with different
       process.exit(2);
     }
 
+    // Failed writes clear session and override state. Start a fresh session before retrying.
+    const retryStartOut = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`WORKSPACE_ROOT=${tmp} NIX_GO_TEST_RESOLVE_JSON=${JSON.stringify(
+      resolveMap,
+    )} NIX_GO_DEV_OVERRIDE_JSON={} GOMODCACHE=${path.join(tmp, "gomodcache")} viberoots/build-tools/tools/bin/patch-pkg start go golang.org/x/net`;
+    const retryWs = String(retryStartOut.stdout || "")
+      .trim()
+      .split(/\s+/)
+      .pop() as string;
+    if (!retryWs) {
+      console.error("missing workspace path from retry start");
+      process.exit(2);
+    }
+    await fsp.writeFile(path.join(retryWs, "file.txt"), "C\n", "utf8");
+
     // Now apply with --force, should overwrite patch and verify via dry-run
     const applyForce = await $({
       cwd: tmp,

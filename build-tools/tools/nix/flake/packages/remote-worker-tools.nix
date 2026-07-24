@@ -5,10 +5,12 @@ let
     pkgs.bash
     pkgs.cacert
     pkgs.coreutils
+    pkgs.curl
     pkgs.findutils
     pkgs.gnugrep
     pkgs.gnused
     pkgs.gawk
+    pkgs.gnutar
     pkgs.rsync
     pkgs.lsof
     pkgs.unixtools.ps

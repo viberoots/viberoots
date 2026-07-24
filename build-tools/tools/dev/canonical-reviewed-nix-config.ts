@@ -5,6 +5,7 @@ import {
   artifactSelectorNames,
   assertNoArtifactSelectorInjection,
 } from "../lib/artifact-environment-policy";
+import { activateNixCachePolicyCapabilityAfterCanonicalEntry } from "../lib/nix-cache-policy-capability";
 
 const CANONICAL_ENV_KEYS = [
   "HOME",
@@ -115,15 +116,28 @@ export function attachCanonicalReviewedNixConfig(
   return env;
 }
 
-export function activateCanonicalReviewedNixConfig(
+export function activateCanonicalNixCachePolicy(
   env: NodeJS.ProcessEnv,
   outcome: ReviewedNixConfigOutcome,
 ): void {
-  if (!outcome.applied) return;
+  const policy = outcome.applied
+    ? ({ kind: "reviewed", config: outcome.config } as const)
+    : env.VBR_NIX_CACHE_POLICY === "off"
+      ? ({ kind: "off" } as const)
+      : null;
+  if (!policy) return;
+  if (env.VBR_CANONICAL_ARTIFACT_ENTRYPOINT !== "1") {
+    throw new Error("cannot activate Nix cache policy authority before canonical entry");
+  }
   delete env.VBR_CANONICAL_REVIEWED_NIX_CONFIG_DIGEST;
-  env.VBR_NIX_CACHE_HEALTH_APPLIED = "1";
-  if (outcome.config) env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG = outcome.config;
-  else delete env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG;
+  if (policy.kind === "reviewed") {
+    env.VBR_NIX_CACHE_HEALTH_APPLIED = "1";
+    env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG = policy.config;
+  } else {
+    delete env.VBR_NIX_CACHE_HEALTH_APPLIED;
+    delete env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG;
+  }
+  activateNixCachePolicyCapabilityAfterCanonicalEntry(env, policy);
 }
 
 export function canonicalArtifactEnvironmentDifferences(

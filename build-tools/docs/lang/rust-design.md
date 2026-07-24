@@ -7,7 +7,7 @@ is [`../rust-language-plan.md`](../rust-language-plan.md).
 ## Current Native Lifecycle
 
 The current Rust route compiles package-local Cargo libraries, binaries, and tests from checked-in
-manifests and locks. It provides the native lifecycle through PR-3, but is not yet the complete
+manifests and locks. It provides the native lifecycle through PR-4, but is not yet the complete
 first-class Rust lifecycle.
 
 | Surface              | Current behavior                                                                                                                                                                                                                              | Evidence                                                                                                              |
@@ -17,12 +17,13 @@ first-class Rust lifecycle.
 | Buck action          | `rust_nix_build` declares Cargo metadata, the package-local Rust source closure, explicit non-Rust sources, patches, dependencies, and global Nix inputs. Libraries materialize the compiled `.rlib`; binaries copy the selected executable.  | `build-tools/rust/private/nix_build.bzl`                                                                              |
 | Planner              | `lang:rust` plus `kind:bin`, `kind:lib`, or `kind:test` dispatches to the Rust planner.                                                                                                                                                       | `build-tools/tools/nix/planner/rust.nix`                                                                              |
 | Artifact             | One `buildRustPackage` authority uses Nix-store Cargo, rustc, rustdoc, rustfmt, and clippy. It emits real release executables and a stable compiled `.rlib` outcome.                                                                          | `build-tools/tools/nix/templates/rust.nix`, `build-tools/tools/nix/flake/packages/toolchains.nix`                     |
-| Providers            | Generic provider edges work when `MODULE_PROVIDERS` already contains entries. Rust provider sync emits only an empty or TODO file, and the language contract declares `providerModel: "none"`.                                                | `build-tools/tools/buck/providers/rust.ts`, `build-tools/tools/lib/lang-contracts.ts`                                 |
+| Providers            | Rust has an explicit deterministic no-provider adapter. Package-local patches are direct target inputs, so provider and auto-map glue are not patch invalidation authorities.                                                                 | `build-tools/tools/buck/providers/rust.ts`, `build-tools/tools/lib/lang-contracts.ts`                                 |
 | Tests                | Cquery covers routing, exported Cargo fields, inputs, provider order, and unknown-field rejection. Native fixtures execute two binaries, prove source sensitivity, and cover fail-closed Cargo diagnostics.                                   | `build-tools/tools/tests/rust/`, `build-tools/tools/tests/lang/rust.stub.provider-edges.deterministic.cquery.test.ts` |
 | Language registry    | Rust is not enabled in `build-tools/tools/nix/langs.json`; a native example exists only as a disabled registry prerequisite.                                                                                                                  | `build-tools/tools/nix/langs.json`, `build-tools/tools/nix/examples/rust/`                                            |
 | Dependency ownership | Cargo participates in the shared language lifecycle: read-only consumers verify locked offline metadata, while explicit `u` and `u --upgrade` transactionally reconcile every affected `Cargo.lock`.                                          | `build-tools/docs/update-command-design.md`                                                                           |
 | Runtime and tests    | `rust_test` executes compiled Cargo harnesses through a bounded project-relative external runner. Native binaries publish `run.prod`; libraries and tests stay out of runnable summaries.                                                     | Rust macro, runner, planner, and manifest implementations                                                             |
 | Source selection     | Native targets export `nixpkg_deps`, `nixpkgs_profile`, and `nixpkg_pins`. The shared source-plan resolver selects the Rust toolchain and declared build-script dependencies.                                                                 | Rust macro, graph attrs, planner, and template                                                                        |
+| Dependency patches   | `patch-pkg rust` resolves exact locked identities, authors source-qualified package-local patches, and applies them to Cargo's vendored dependency closure. Local overrides are explicit bundle inputs and forbidden in protected jobs.       | Rust patch handler, lock resolver, and Nix patch plan                                                                 |
 
 The stale TypeScript planner config that pointed at Go builders has been removed. The Nix Rust
 planner is the only language planner authority.
@@ -44,8 +45,8 @@ rust_binary(name = "demo", crate = "demo", srcs = ["src/main.rs"], deps = [":cor
 The package must check in the canonical `Cargo.toml` and `Cargo.lock`; alternate or cross-root Cargo
 metadata paths fail closed. Patch directories must be normalized package-relative paths without
 traversal. Cross-root Rust `deps`, non-native targets, unsupported lock sources, and stale locks
-also fail closed. Patch application, C interop, WASM, remote admission, and public scaffolding
-remain owned by later plan PRs.
+also fail closed. C interop, WASM, remote admission, and public scaffolding remain owned by later
+plan PRs.
 
 After editing a Cargo manifest, run `u` for conservative offline lock reconciliation or
 `u --upgrade` for an intentional offline dependency update. Both commands use Nix-store Cargo in a
@@ -138,9 +139,10 @@ temporary execution ancestors, and the workspace cache are checked for `config`/
 files because Cargo source replacement can preserve a crates.io lock identity while reading an
 alternate registry. Live ancestors outside the copied Cargo root cannot influence temporary Cargo
 execution and are not rejected. The Nix builder rejects source-root Cargo config by the same
-policy. Path dependencies and crates.io lock sources remain admitted; Git and alternate-registry
-locks are rejected before read-only success or transactional publication because the Nix builder
-does not admit them yet.
+policy. Path dependencies and crates.io lock sources remain admitted. Git sources require their
+source-qualified fixed-output hashes. Alternate registries require the verified pre-materialized
+authority described below; incomplete authority fails before read-only success or transactional
+publication.
 
 ## Nix Build And Planner Contract
 
@@ -168,18 +170,67 @@ Rust keeps the current package-local patch scope. Patch files are direct action 
 target in the owning Cargo root. This gives correct importer-level invalidation without requiring a
 provider rule per crate.
 
-`patch-pkg` gains a Rust handler using the shared workspace workflow. A patch key includes crate
+`patch-pkg` has a Rust handler using the shared workspace workflow. A patch key includes crate
 name, version, and source identity so crates.io, Git, and renamed dependencies cannot collide.
+The filename source selector is the complete 64-hex SHA-256 of the Cargo.lock source string; it is
+never truncated or treated as a prefix.
 Applying or removing a patch does not require provider glue when the package-local source input is
 authoritative.
 
+Authoring resolves only an exact entry from the reviewed Nix fixed-source manifest under the
+workspace Cargo home. The manifest key includes name, version, and the complete lock source; the
+entry binds that source plus its registry checksum or Git revision. Cache-directory scanning and
+first-match checksum selection are forbidden. Authoring reads only the manifest's immutable
+`buildInput.storePath`, never its diagnostic cache `originPath`; deleting or mutating the cache after
+publication cannot change workspace bytes. Nix patch application uses that same store/NAR authority.
+For Git, `u` requires the complete locked revision and reconstructs a detached local clone of the
+matching commit object rather than copying checkout bytes. Pinned Cargo validates the selected
+package in its full committed workspace, then `cargo package --offline --no-verify` applies Cargo's
+canonical file selection and manifest normalization. The normalized package is revalidated as a
+self-contained exact locked name/version authority before being materialized once. This preserves
+resolved workspace-inherited fields without ad hoc TOML rewriting. The builder constructs one
+offline Cargo vendor closure from
+those exact authorities and passes it to `buildRustPackage` through `cargoVendorDir`; unique and
+same-name/version Git packages use this same path rather than a separate fetch or nixpkgs'
+name/version-keyed `importCargoLock` API. Alternate registries cross the `u` boundary as
+pre-materialized Nix store paths with reviewed NAR hashes, exact lock sources, and registry
+checksums. Before any cache bytes reach `nix store add-path`, `u` validates the complete
+`.cargo-checksum.json`: its strict schema and unique canonical relative paths, the package checksum
+against the exact Cargo.lock source identity, the SHA-256 of every declared regular file, and the
+absence of missing, unexpected, symlink, or non-regular entries. It materializes a temporary copy
+made only from the verified bytes and preserves the validated checksum metadata. The update
+manifest publishes a path-free `buildInput` projection, separate from its authoring-only Cargo cache
+origin. Targets declare that projection plus the Cargo registry name through `cargo_fixed_sources`;
+Nix admits them with hash-checked `builtins.path` and never receives registry credentials or ambient
+Cargo cache paths. Missing or mismatched alternate-registry materialization fails closed. Crates.io
+remains checksum-bound and may use the same reviewed materialization while retaining nixpkgs'
+checksum fetch compatibility. Every patch record carries that source-qualified vendoring authority
+into application and selects by canonical source-tree identity, comparing all source paths and bytes
+while excluding only Cargo checksum, source-routing, publication metadata, and VCS administration.
+Vendoring preserves verified registry checksum metadata; after an intentional patch or development
+override, the patch boundary regenerates the complete file-hash map while retaining the locked
+package checksum.
+The authority selects the locked package name and version and fails on zero or multiple subtrees.
+Same-name/version sources cannot collide, and application fails on absent, mismatched, or duplicate
+identity without requiring publication-only `.cargo_vcs_info.json` metadata.
+
+`sync-required` consumes source-qualified required-patch metadata from the selected package-local
+patch directory. It deterministically reports missing, stale, and ambiguous identities and may
+write only explicit placeholder files requested by the shared `--write-placeholders` mode.
+
 Cargo metadata labels are diagnostic and inspection data. If exact per-crate provider mapping is
 later proven to improve invalidation beyond the importer-level contract, it requires a separate
-design change. The existing TODO Rust provider adapter must be removed or converted to the explicit
-no-provider implementation so it cannot imply unsupported generation.
+design change. The Rust provider adapter is an explicit no-provider implementation and emits no
+TODO surface.
 
-Local crate overrides are optional. If implemented, they are explicit development-bundle inputs,
-forbidden in protected jobs, visible in diagnostics, and never read from ambient evaluation state.
+Local crate overrides are explicit development-bundle inputs, forbidden in protected jobs, visible
+in diagnostics, and never read from ambient evaluation state. The graph generator passes the
+bundle's captured language-override map into the Rust planner; the template accepts only that
+explicit value and requires a `local-development` bundle when it is non-empty.
+
+The shared editor launch is bounded by `PATCH_EDITOR_TIMEOUT_SECS`, defaulting to 300 seconds.
+Timeout and signal cleanup clear Rust override/session state while retaining an interrupted
+workspace unless the operator chose reset.
 
 ## Native Linking And C Interop
 

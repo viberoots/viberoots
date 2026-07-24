@@ -98,6 +98,23 @@ test("patch-cpp apply supports --force overwrite when patch exists with differen
       process.exit(2);
     }
 
+    // Failed writes clear session state. Start a fresh session before retrying.
+    const retryStartOut = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`WORKSPACE_ROOT=${tmp} NIX_CPP_TEST_RESOLVE_JSON=${JSON.stringify(
+      resolveMap,
+    )} viberoots/build-tools/tools/bin/patch-pkg start cpp pkgs.zlib`;
+    const retryWs = String(retryStartOut.stdout || "")
+      .trim()
+      .split(/\s+/)
+      .pop() as string;
+    if (!retryWs) {
+      console.error("missing workspace path from cpp retry start");
+      process.exit(2);
+    }
+    await fsp.writeFile(path.join(retryWs, "file.txt"), "C\n", "utf8");
+
     // Apply with --force: should overwrite and verify via dry-run
     const applyForce = await $({
       cwd: tmp,

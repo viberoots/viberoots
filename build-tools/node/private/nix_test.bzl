@@ -1,5 +1,5 @@
 load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_artifact_bash", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_calling_env_export_buck_graph_json", "nix_calling_env_export_source_snapshot", "nix_declared_action_inputs_manifest_cmd", "nix_declared_action_transport_args", "nix_timeout_wrapper_var")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_action_final_exec_prefix", "nix_artifact_bash", "nix_bootstrap_env_core", "nix_bootstrap_env_pnpm_store", "nix_calling_env_export_buck_graph_json", "nix_calling_env_export_source_snapshot", "nix_declared_action_inputs_manifest_cmd", "nix_declared_action_transport_args", "nix_timeout_wrapper_var")
 load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "stamp_remote_readiness_labels", "write_nix_test_stamp")
 load("@prelude//:build_mode.bzl", "BuildModeInfo")
 load("@prelude//decls:re_test_common.bzl", "re_test_common")
@@ -69,7 +69,9 @@ def _node_nix_test_impl(ctx):
         + "JOBS_FLAG=\"\"; if [ -n \"$NIX_MAXJ\" ] && [ \"$NIX_MAXJ\" != \"0\" ]; then JOBS_FLAG=\"--max-jobs $NIX_MAXJ\"; fi; "
         + "CORES_FLAG=\"\"; if [ -n \"$NIX_CORES\" ] && [ \"$NIX_CORES\" != \"0\" ]; then CORES_FLAG=\"--option cores $NIX_CORES\"; fi; "
         + ("echo '[node_nix_test] phase=nix-build target=%s importer=%s attr=%s timeout='$TOUT's' >&2; " % (target_label, imp, imp_attr))
-        + ("node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$VIBEROOTS_ROOT/build-tools/tools/dev/command-heartbeat.ts\" --prefix \"[node_nix_test]\" --label \"target=%s importer=%s step=nix-build attr=%s\" --cwd \"$FLK_ROOT\" --timeout-ms $(( TOUT * 1000 )) --no-output-warn-sec 60 -- node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr \"node-test.%s\" --target \"%s\" --buck-action-inputs \"$VBR_BUCK_INPUTS\" " % (target_label, imp, imp_attr, imp_attr, target_label))
+        + ("node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$VIBEROOTS_ROOT/build-tools/tools/dev/command-heartbeat.ts\" --prefix \"[node_nix_test]\" --label \"target=%s importer=%s step=nix-build attr=%s\" --cwd \"$FLK_ROOT\" --timeout-ms $(( TOUT * 1000 )) --no-output-warn-sec 60 -- " % (target_label, imp, imp_attr))
+        + nix_action_final_exec_prefix()
+        + ("node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\" \"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr \"node-test.%s\" --target \"%s\" --buck-action-inputs \"$VBR_BUCK_INPUTS\" " % (imp_attr, target_label))
         + nix_declared_action_transport_args()
         + " $COVERAGE_ARG $VBR_DEV_OVERRIDE_ARG; "
     )

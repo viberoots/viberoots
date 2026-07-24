@@ -16,6 +16,10 @@ import {
   withoutArtifactEnvironmentInfluence,
 } from "../../lib/artifact-environment";
 import {
+  currentNixCachePolicyCapability,
+  type NixCachePolicyCapability,
+} from "../../lib/nix-cache-policy-capability";
+import {
   extractSpecificTargets,
   listBinArtifacts,
   printManifestRunnables,
@@ -30,25 +34,42 @@ function materializeTimeoutSec(defaultSec: number): number {
   return Math.floor(parsed);
 }
 
+export function materializePureEvaluationEnvironment(opts: {
+  root: string;
+  artifactToolsRoot: string;
+  nixCachePolicyCapability: NixCachePolicyCapability;
+  target?: string;
+}): NodeJS.ProcessEnv {
+  const graphPath = path.join(opts.root, DEFAULT_GRAPH_PATH);
+  return buildArtifactEnvironment({
+    baseEnv: withoutArtifactEnvironmentInfluence(process.env),
+    mode: String(process.env.CI || "").trim() ? "ci" : "local",
+    stateRoot: path.join(opts.root, "buck-out", "tmp", "artifact-environment"),
+    workspaceRoot: opts.root,
+    artifactToolsRoot: opts.artifactToolsRoot,
+    nixCachePolicyCapability: opts.nixCachePolicyCapability,
+    internal: {
+      BUCK_GRAPH_JSON: graphPath,
+      ...(opts.target ? { BUCK_TARGET: opts.target, WORKSPACE_ROOT: opts.root } : {}),
+    },
+  });
+}
+
 async function evaluationBundle(
   root: string,
   attr: string,
   devOverrides: DevOverrideValues,
   wasmBackend: string,
   artifactToolsRoot: string,
+  nixCachePolicyCapability: NixCachePolicyCapability,
   target = "",
 ) {
   const graphPath = path.join(root, DEFAULT_GRAPH_PATH);
-  const artifactEnv = buildArtifactEnvironment({
-    baseEnv: withoutArtifactEnvironmentInfluence(process.env),
-    mode: String(process.env.CI || "").trim() ? "ci" : "local",
-    stateRoot: path.join(root, "buck-out", "tmp", "artifact-environment"),
-    workspaceRoot: root,
+  const artifactEnv = materializePureEvaluationEnvironment({
+    root,
     artifactToolsRoot,
-    internal: {
-      BUCK_GRAPH_JSON: graphPath,
-      ...(target ? { BUCK_TARGET: target, WORKSPACE_ROOT: root } : {}),
-    },
+    nixCachePolicyCapability,
+    target,
   });
   const inventory = await inspectWorkspaceArtifactSource({
     workspaceRoot: root,
@@ -81,6 +102,7 @@ async function nixBuildPrintOutPaths(opts: {
   timeoutSec?: number;
   runNixBuild: NixBuildRunner;
   artifactToolsRoot: string;
+  nixCachePolicyCapability: NixCachePolicyCapability;
 }): Promise<string> {
   const tout = materializeTimeoutSec(opts.timeoutSec ?? 120);
   const previous = process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC;
@@ -93,6 +115,7 @@ async function nixBuildPrintOutPaths(opts: {
       args: opts.args,
       label: opts.label,
       artifactToolsRoot: opts.artifactToolsRoot,
+      nixCachePolicyCapability: opts.nixCachePolicyCapability,
     });
   } finally {
     if (previous === undefined) delete process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC;
@@ -112,6 +135,7 @@ export async function materializePureGraphIfEnabled(opts: {
   runNixBuild?: NixBuildRunner;
 }): Promise<void> {
   if (opts.isCI || !opts.materialize || opts.impure) return;
+  const nixCachePolicyCapability = currentNixCachePolicyCapability();
 
   const linkDir = path.resolve(opts.root, ".viberoots", "workspace", "buck", "tmp");
   await mkdirWithMacosMetadataExclusion(linkDir);
@@ -127,6 +151,7 @@ export async function materializePureGraphIfEnabled(opts: {
         opts.devOverrides,
         opts.wasmBackend || "",
         opts.artifactToolsRoot,
+        nixCachePolicyCapability,
         sel,
       );
       try {
@@ -146,6 +171,7 @@ export async function materializePureGraphIfEnabled(opts: {
           timeoutSec: 600,
           runNixBuild: opts.runNixBuild ?? runNixBuildWithProgress,
           artifactToolsRoot: opts.artifactToolsRoot,
+          nixCachePolicyCapability,
         });
         const outPath =
           String(selOut || "")
@@ -181,6 +207,7 @@ export async function materializePureGraphIfEnabled(opts: {
     opts.devOverrides,
     opts.wasmBackend || "",
     opts.artifactToolsRoot,
+    nixCachePolicyCapability,
   );
   const envFull = withoutArtifactEnvironmentInfluence(process.env);
   const pureOut = await nixBuildPrintOutPaths({
@@ -198,6 +225,7 @@ export async function materializePureGraphIfEnabled(opts: {
     timeoutSec: 420,
     runNixBuild: opts.runNixBuild ?? runNixBuildWithProgress,
     artifactToolsRoot: opts.artifactToolsRoot,
+    nixCachePolicyCapability,
   }).finally(bundle.cleanup);
   const purePath =
     String(pureOut || "")

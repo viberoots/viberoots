@@ -16,7 +16,7 @@ import { canonicalBuckActionTransport } from "./canonical-buck-action-transport"
 import { artifactWorkspaceRootTransport } from "./canonical-artifact-workspace-transport";
 import { buildCanonicalIngressEnvironment } from "./canonical-artifact-ingress-environment";
 import {
-  activateCanonicalReviewedNixConfig,
+  activateCanonicalNixCachePolicy,
   attachCanonicalReviewedNixConfig,
   canonicalArtifactEnvironmentDifferences,
   canonicalReviewedConfig,
@@ -164,7 +164,7 @@ export function enterCanonicalArtifactEntrypoint(
   };
   if (canonicalReentry && Object.values(reentryChecks).every(Boolean)) {
     process.argv = [...process.argv.slice(0, 2), ...workspaceTransport.argv];
-    activateCanonicalReviewedNixConfig(process.env, nixCacheHealth);
+    activateCanonicalNixCachePolicy(process.env, nixCacheHealth);
     return assertedTools;
   }
   if (canonicalReentry) {
@@ -199,7 +199,7 @@ export function enterCanonicalArtifactEntrypoint(
     isCanonicalArtifactEntrypointEnvironment(process.env, activeCanonicalEnv)
   ) {
     process.argv = [...process.argv.slice(0, 2), ...workspaceTransport.argv];
-    activateCanonicalReviewedNixConfig(process.env, nixCacheHealth);
+    activateCanonicalNixCachePolicy(process.env, nixCacheHealth);
     return toolsRoot;
   }
   const wrapper = path.join(toolsRoot, "bin", "zx-wrapper");

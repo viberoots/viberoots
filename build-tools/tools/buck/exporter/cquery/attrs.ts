@@ -32,6 +32,8 @@ export const attrList = Array.from(
     "nixpkg_pins",
     "cargo_manifest",
     "cargo_lock",
+    "cargo_output_hashes",
+    "cargo_fixed_sources",
     "crate",
     "features",
     "default_features",

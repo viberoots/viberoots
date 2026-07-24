@@ -2,9 +2,9 @@ import * as fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export type DevOverrideLang = "go" | "cpp" | "python";
+export type DevOverrideLang = "go" | "cpp" | "python" | "rust";
 
-export const DEV_OVERRIDE_LANGS: readonly DevOverrideLang[] = ["go", "cpp", "python"];
+export const DEV_OVERRIDE_LANGS: readonly DevOverrideLang[] = ["go", "cpp", "python", "rust"];
 
 type Manifest = Record<string, string>;
 

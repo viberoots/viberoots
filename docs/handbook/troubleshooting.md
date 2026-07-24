@@ -170,9 +170,11 @@
     full pre-merge command.
 - Symptom: `i`, `b`, or `v` logs `nix cache health: disabled unreachable substituter(s)`.
   - Meaning: default `VBR_NIX_CACHE_POLICY=auto` dynamically removed unreachable configured
-    HTTP(S) substituters for the current top-level command and kept Nix fallback enabled. Each new
-    command performs a bounded `nix-cache-info` request; nested children share that decision. This is not a local
-    validation failure by itself.
+    HTTP(S) substituters for the current top-level command and kept Nix fallback enabled. Canonical
+    artifact builds also classify the reviewed private accelerator as optional, so an off-network
+    DNS or transport failure falls back to public substituters or a local build. Each new command
+    performs a bounded `nix-cache-info` request; nested children share that decision. This is not a
+    local validation failure by itself.
   - Fix: no local action is required unless you are validating remote-build or cache readiness.
     Repair the named cache endpoint, credentials, DNS, or network route before treating the cache as
     production-ready.

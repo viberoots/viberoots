@@ -4,9 +4,12 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { materializePureGraphIfEnabled } from "../../dev/dev-build/materialize-pure";
+import { activateCanonicalNixCachePolicy } from "../../dev/canonical-reviewed-nix-config";
 import { runInTemp } from "../lib/test-helpers";
 
 test("materialize pure does not run redundant .#buck-graph build", async () => {
+  process.env.VBR_CANONICAL_ARTIFACT_ENTRYPOINT = "1";
+  activateCanonicalNixCachePolicy(process.env, { applied: true, config: "" });
   await runInTemp("materialize-pure-skip-buck-graph", async (tmp) => {
     await materializePureGraphIfEnabled({
       devOverrides: {},

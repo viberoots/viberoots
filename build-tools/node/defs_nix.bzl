@@ -7,6 +7,7 @@ load(
     "nix_calling_env_export_nix_pnpm_fetch_timeout",
     "nix_calling_genrule_bootstrap",
     "nix_calling_node_patch_requirements_preflight",
+    "nix_action_final_exec_prefix",
     "nix_declared_action_transport_args",
 )
 load("@viberoots//build-tools/node:defs_core.bzl", "nix_node_gen")
@@ -62,7 +63,7 @@ def node_webapp(
         + nix_calling_env_export_nix_pnpm_fetch_timeout(default_sec = 600)
         + "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
         + (
-            "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
+            "$TIMEOUT " + nix_action_final_exec_prefix() + "node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
             + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
             + ("\"node-webapp.%s\" --target \"//%s:%s\" --buck-action-inputs \"$VBR_BUCK_INPUTS\" " % (sanitize_importer_for_nix_attr(_importer), native.package_name(), name))
             + nix_declared_action_transport_args()
@@ -205,7 +206,7 @@ def nix_node_cli_bin(
         + nix_calling_env_export_nix_pnpm_fetch_timeout(default_sec = 600)
         + "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
         + (
-            "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
+            "$TIMEOUT " + nix_action_final_exec_prefix() + "node --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
             + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
             + ("\"node-cli.%s\" --target \"//%s:%s\" --buck-action-inputs \"$VBR_BUCK_INPUTS\" " % (sanitize_importer_for_nix_attr(_importer), native.package_name(), name))
             + nix_declared_action_transport_args()

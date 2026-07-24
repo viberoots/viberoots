@@ -7,6 +7,7 @@ import {
 } from "../../lib/nix-cache-readiness";
 import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
+import { probeNixCacheUrl } from "./nix-cache-probe";
 
 const execFileAsync = promisify(execFile);
 
@@ -23,14 +24,16 @@ export type NixCachePolicy = "auto" | "strict" | "off";
 export type NixCacheHealthDeps = {
   readEffectiveConfig?: () => Promise<string>;
   probeUrl?: (url: string, timeoutMs: number) => Promise<boolean>;
+  resolveCurlBin?: (env: NodeJS.ProcessEnv) => string;
   log?: (line: string) => void;
 };
 
 type CacheHealthResult = {
+  authority: "reviewed" | "off";
   changed: boolean;
   kept: string[];
   removed: string[];
-  nixConfig?: string;
+  nixConfig: string;
 };
 
 function unique(values: string[]): string[] {
@@ -46,6 +49,23 @@ function unique(values: string[]): string[] {
 
 function isProbeableUrl(value: string): boolean {
   return /^https?:\/\//.test(value);
+}
+
+function assertValidProbeableUrl(value: string): void {
+  if (!/^https?:/u.test(value)) return;
+  if (!/^https?:\/\/[^/]/u.test(value)) {
+    throw new Error(
+      `configured Nix substituter is malformed: ${nixCacheSubstituterIdentity(value)}`,
+    );
+  }
+  try {
+    const parsed = new URL(value);
+    if (!/^https?:$/u.test(parsed.protocol) || !parsed.hostname) throw new Error("invalid");
+  } catch {
+    throw new Error(
+      `configured Nix substituter is malformed: ${nixCacheSubstituterIdentity(value)}`,
+    );
+  }
 }
 
 function stripOverrideKeys(config: string): string {
@@ -65,53 +85,9 @@ async function defaultReadEffectiveConfig(): Promise<string> {
   const nixBin = resolveToolPathSync("nix", nixEnv);
   try {
     const res = await execFileAsync(nixBin, ["config", "show"], { env: nixEnv });
-    const stdout = String(res.stdout || "").trim();
-    if (stdout) return stdout;
-  } catch {
-    // Fall back to the explicit environment override below.
-  }
-  return String(process.env.NIX_CONFIG || "");
-}
-
-async function defaultProbeUrl(
-  url: string,
-  timeoutMs: number,
-  netrcFile: string,
-): Promise<boolean> {
-  const connectTimeout = String(Math.max(1, Math.ceil(timeoutMs / 1000)));
-  if (netrcFile) {
-    const commandEnv = withSanitizedInheritedNixConfig(envWithResolvedNixBin({ ...process.env }));
-    try {
-      const curlBin = resolveToolPathSync("curl", commandEnv);
-      await execFileAsync(
-        curlBin,
-        [
-          "-fsS",
-          "--connect-timeout",
-          connectTimeout,
-          "--max-time",
-          connectTimeout,
-          "--netrc-file",
-          netrcFile,
-          nixCacheInfoUrl(url),
-        ],
-        { env: commandEnv },
-      );
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(nixCacheInfoUrl(url), { signal: controller.signal });
-    return res.ok;
-  } catch {
-    return false;
-  } finally {
-    clearTimeout(timer);
+    return String(res.stdout || "").trim();
+  } catch (error) {
+    throw new Error("nix config show failed during cache health evaluation", { cause: error });
   }
 }
 
@@ -122,13 +98,6 @@ function configScalar(config: string, key: string): string {
     return line.slice(eq + 1).trim();
   }
   return "";
-}
-
-function nixCacheInfoUrl(raw: string): string {
-  const url = new URL(raw);
-  url.pathname = `${url.pathname.replace(/\/+$/, "")}/nix-cache-info`;
-  url.hash = "";
-  return url.toString();
 }
 
 function policyFromEnv(): NixCachePolicy {
@@ -144,15 +113,36 @@ export async function applyNixCacheHealthPolicy(
   const policy = policyFromEnv();
   if (process.env.VBR_NIX_CACHE_HEALTH_APPLIED === "1") {
     const reviewedConfig = String(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG || "");
-    delete process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG;
-    if (reviewedConfig) {
-      process.env.NIX_CONFIG = reviewedConfig;
-      return { changed: true, kept: [], removed: [], nixConfig: reviewedConfig };
+    const activeConfig = String(process.env.NIX_CONFIG || "");
+    if (activeConfig && activeConfig !== reviewedConfig) {
+      throw new Error("pre-applied Nix cache health config does not match its reviewed authority");
     }
-    return { changed: false, kept: [], removed: [] };
+    if (reviewedConfig) process.env.NIX_CONFIG = reviewedConfig;
+    else delete process.env.NIX_CONFIG;
+    return {
+      authority: "reviewed",
+      changed: activeConfig !== reviewedConfig,
+      kept: [],
+      removed: [],
+      nixConfig: reviewedConfig,
+    };
   }
-  process.env.VBR_NIX_CACHE_HEALTH_APPLIED = "1";
-  if (policy === "off") return { changed: false, kept: [], removed: [] };
+  delete process.env.VBR_NIX_CACHE_HEALTH_APPLIED;
+  delete process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG;
+  const reviewed = (result: CacheHealthResult): CacheHealthResult => {
+    process.env.VBR_NIX_CACHE_HEALTH_APPLIED = "1";
+    process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG = result.nixConfig;
+    return result;
+  };
+  if (policy === "off") {
+    return {
+      authority: "off",
+      changed: false,
+      kept: [],
+      removed: [],
+      nixConfig: String(process.env.NIX_CONFIG || ""),
+    };
+  }
 
   const log = deps.log || ((line: string) => process.stderr.write(`${line}\n`));
   const effectiveConfig = await (deps.readEffectiveConfig || defaultReadEffectiveConfig)();
@@ -160,15 +150,27 @@ export async function applyNixCacheHealthPolicy(
   const required = unique(parsed.get("substituters") || []);
   const optional = unique(parsed.get("extra-substituters") || []);
   const configured = unique([...required, ...optional]);
-  if (configured.length === 0) return { changed: false, kept: [], removed: [] };
+  if (configured.length === 0) {
+    return reviewed({
+      authority: "reviewed",
+      changed: false,
+      kept: [],
+      removed: [],
+      nixConfig: String(process.env.NIX_CONFIG || ""),
+    });
+  }
 
   const netrcFile = configScalar(effectiveConfig, "netrc-file");
+  const resolveCurlBin =
+    deps.resolveCurlBin || ((env: NodeJS.ProcessEnv) => resolveToolPathSync("curl", env));
   const probe =
     deps.probeUrl ||
-    (async (url: string, timeoutMs: number) => await defaultProbeUrl(url, timeoutMs, netrcFile));
+    (async (url: string, timeoutMs: number) =>
+      await probeNixCacheUrl(url, timeoutMs, netrcFile, resolveCurlBin));
   const available: string[] = [];
   const removed: string[] = [];
   for (const substituter of configured) {
+    assertValidProbeableUrl(substituter);
     if (!isProbeableUrl(substituter)) {
       available.push(substituter);
       continue;
@@ -180,7 +182,15 @@ export async function applyNixCacheHealthPolicy(
     }
   }
 
-  if (removed.length === 0) return { changed: false, kept: configured, removed };
+  if (removed.length === 0) {
+    return reviewed({
+      authority: "reviewed",
+      changed: false,
+      kept: configured,
+      removed,
+      nixConfig: String(process.env.NIX_CONFIG || ""),
+    });
+  }
   const removedIdentities = removed.map(nixCacheSubstituterIdentity);
   if (policy === "strict") {
     throw new Error(`configured Nix substituter(s) unavailable: ${removedIdentities.join(" ")}`);
@@ -204,10 +214,11 @@ export async function applyNixCacheHealthPolicy(
       optionalKept.map(nixCacheSubstituterIdentity).join(" ") || "<none>"
     }`,
   );
-  return {
+  return reviewed({
+    authority: "reviewed",
     changed: true,
     kept: unique([...requiredKept, ...optionalKept]),
     removed,
     nixConfig: process.env.NIX_CONFIG,
-  };
+  });
 }

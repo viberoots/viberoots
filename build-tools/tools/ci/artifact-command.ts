@@ -8,7 +8,7 @@ import {
   buildArtifactEnvironment,
   type ArtifactEnvironmentMode,
 } from "../lib/artifact-environment";
-import { artifactNixPolicyArgs } from "../lib/artifact-nix-policy";
+import { artifactNixIndependentPolicyArgs } from "../lib/artifact-nix-policy";
 import { ensureNixStoreToolPathSync, envWithResolvedNixBin } from "../lib/tool-paths";
 import { redactPublisherOutput } from "./publisher-credentials";
 
@@ -157,7 +157,7 @@ export async function runArtifactNix(opts: {
   return await runArtifactTool({
     ...opts,
     tool: "nix",
-    args: [...artifactNixPolicyArgs(), ...opts.args],
+    args: [...artifactNixIndependentPolicyArgs("reviewed"), ...opts.args],
   });
 }
 

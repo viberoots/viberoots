@@ -119,6 +119,11 @@ test("every direct artifact action threads canonical development overrides throu
       "nix_declared_action_transport_args()",
       `${file}: canonical Buck selector argv transport`,
     );
+    assertContains(
+      source,
+      "nix_action_final_exec_prefix()",
+      `${file}: final canonical consumer must perform an action-local cache review`,
+    );
     assertContains(source, "$VBR_DEV_OVERRIDE_ARG", `${file}: development override argv transport`);
   }
   for (const file of [
@@ -134,6 +139,22 @@ test("every direct artifact action threads canonical development overrides throu
       await read(file),
       "nix_action_build_selected_out_path_cmd(",
       `${file}: language runner must reuse the common canonical argv transport`,
+    );
+  }
+});
+
+test("canonical consumers admit NIX_CONFIG only after reviewed entrypoint activation", async () => {
+  for (const file of [
+    "viberoots/build-tools/tools/dev/build-selected.ts",
+    "viberoots/build-tools/tools/dev/nix-build-filtered-flake.ts",
+  ]) {
+    const source = await read(file);
+    const entrypoint = source.lastIndexOf("enterCanonicalArtifactEntrypoint(");
+    const admission = source.indexOf('["NIX_CONFIG",', source.indexOf("async function main"));
+    assert.ok(entrypoint > admission, `${file}: canonical entrypoint must execute before main`);
+    assert.ok(
+      admission >= 0,
+      `${file}: post-entry selector admission must include capability-authorized NIX_CONFIG`,
     );
   }
 });

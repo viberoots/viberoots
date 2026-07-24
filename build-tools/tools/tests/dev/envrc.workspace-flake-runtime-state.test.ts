@@ -45,7 +45,7 @@ use() {
         IN_NIX_SHELL: "",
         VBR_DEVSHELL_USE_GENERATED_AUTHORITY: "1",
         VBR_HOST_PATH: captured,
-        VBR_NIX_CACHE_HEALTH_APPLIED: "1",
+        VBR_NIX_CACHE_POLICY: "off",
       },
     });
 
@@ -93,7 +93,7 @@ use() { :; }
         ...process.env,
         HOME: path.join(root, "home"),
         IN_NIX_SHELL: "",
-        VBR_NIX_CACHE_HEALTH_APPLIED: "1",
+        VBR_NIX_CACHE_POLICY: "off",
         VIBEROOTS_FLAKE_INPUT_ROOT: localSource,
         VIBEROOTS_SOURCE_ROOT: localSource,
       },

@@ -105,8 +105,8 @@ artifact_ingress_trust_devshell_baseline() {
 artifact_ingress_publish_reviewed_nix_cache_config() {
   unset VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
   if [[ "${VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED:-}" == "1" && "${VBR_NIX_CACHE_HEALTH_APPLIED:-}" == "1" ]]; then
-    if [[ "${VBR_DEVSHELL_ARTIFACT_WAS_SET_NIX_CONFIG:-}" == "1" ]]; then
-      VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG="${VBR_DEVSHELL_ARTIFACT_VALUE_NIX_CONFIG:-}"
+    if declare -p NIX_CONFIG >/dev/null 2>&1; then
+      VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG="${NIX_CONFIG}"
       export VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
     fi
     return 0
@@ -114,6 +114,28 @@ artifact_ingress_publish_reviewed_nix_cache_config() {
   # An unverified shell application is not a reusable decision. Let the
   # TypeScript boundary perform the command's reviewed probe instead.
   unset VBR_NIX_CACHE_HEALTH_APPLIED
+}
+
+artifact_ingress_refresh_nix_cache_health() {
+  [[ "${VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED:-}" == "1" ]] || return 0
+  if [[ -n "${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG:-}" ]]; then
+    export NIX_CONFIG="${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG}"
+  elif [[ "${VBR_DEVSHELL_ARTIFACT_WAS_SET_NIX_CONFIG:-}" == "1" ]]; then
+    export NIX_CONFIG="${VBR_DEVSHELL_ARTIFACT_VALUE_NIX_CONFIG:-}"
+  else
+    unset NIX_CONFIG
+  fi
+  if [[ -z "${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG:-}" ]] && declare -F env_strip_nix_cache_overrides >/dev/null 2>&1; then
+    local retained
+    retained="$(env_strip_nix_cache_overrides)"
+    if [[ -n "${retained}" ]]; then
+      export NIX_CONFIG="${retained}"
+    else
+      unset NIX_CONFIG
+    fi
+  fi
+  unset VBR_NIX_CACHE_HEALTH_APPLIED
+  env_apply_nix_cache_health
 }
 
 artifact_ingress_capture_environment() {

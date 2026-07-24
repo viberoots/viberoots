@@ -32,6 +32,7 @@ import {
   inspectArtifactBuildPolicy,
 } from "./artifact-policy-inspection";
 import { enterCanonicalArtifactEntrypoint } from "./canonical-artifact-entrypoint";
+import { currentNixCachePolicyCapability } from "../lib/nix-cache-policy-capability";
 import {
   assertNoArtifactSelectorInjection,
   buildArtifactEnvironment,
@@ -187,8 +188,8 @@ async function main(artifactToolsRoot: string) {
   const buckActionRoot = buckActionInputs !== "";
   assertNoArtifactSelectorInjection(process.env, {
     allow: buckActionRoot
-      ? ["VBR_ARTIFACT_TOOLS_ROOT", "VIBEROOTS_ROOT"]
-      : ["VBR_ARTIFACT_TOOLS_ROOT"],
+      ? ["NIX_CONFIG", "VBR_ARTIFACT_TOOLS_ROOT", "VIBEROOTS_ROOT"]
+      : ["NIX_CONFIG", "VBR_ARTIFACT_TOOLS_ROOT"],
   });
   const workspaceRoot = await findRepoRoot(cwd);
   if (!(await workspaceFlakeDir(workspaceRoot))) {
@@ -225,6 +226,7 @@ async function main(artifactToolsRoot: string) {
       BUCK_TARGET: target,
       BUCK_GRAPH_JSON: graphPath,
     },
+    nixCachePolicyCapability: currentNixCachePolicyCapability(),
   });
   const activeArtifactToolsRoot = String(orchestrationEnv.VBR_ARTIFACT_TOOLS_ROOT || "");
   const canonicalViberootsSource = path.join(activeArtifactToolsRoot, "share", "viberoots-source");
@@ -297,6 +299,7 @@ async function main(artifactToolsRoot: string) {
       BUCK_GRAPH_JSON: graphPath,
       WORKSPACE_ROOT: workspaceRoot,
     },
+    nixCachePolicyCapability: currentNixCachePolicyCapability(),
   });
   const flakeSource = await chooseFlakeRef({
     workspaceRoot,

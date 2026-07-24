@@ -3,6 +3,14 @@ ctx:
 let
   P = import ./lib.nix { inherit lib; get = ctx.get; };
   clean = P.cleanLabel;
+  overrideEnv = "NIX_RUST_DEV_OVERRIDE_JSON";
+  rustDevOverrides = (ctx.languageOverrides or {}).${overrideEnv} or {};
+  _overrideClassification =
+    if rustDevOverrides != {}
+       && (ctx.evaluationClassification or "") != "local-development"
+    then builtins.throw
+      "Rust dev overrides require an explicit local-development evaluation bundle"
+    else true;
   nodeFor = name:
     let matches = builtins.filter (node: P.nameOf node == clean name) ctx.nodes;
     in if matches == [] then builtins.throw "Rust planner target is absent from graph: ${name}"
@@ -72,6 +80,11 @@ let
       manifestRel = sourcePath name (ctx.get node "cargo_manifest");
       lockRel = cargoLockFor name;
       crate = ctx.get node "crate";
+      cargoOutputHashesRaw = ctx.get node "cargo_output_hashes";
+      cargoOutputHashes = if cargoOutputHashesRaw == null then {} else cargoOutputHashesRaw;
+      cargoFixedSourcesRaw = ctx.get node "cargo_fixed_sources";
+      cargoFixedSources = builtins.mapAttrs (_: builtins.fromJSON)
+        (if cargoFixedSourcesRaw == null then {} else cargoFixedSourcesRaw);
       features = ctx.get node "features";
       defaultFeatures = ctx.get node "default_features";
       profile = ctx.get node "profile";
@@ -91,8 +104,9 @@ let
       template = ctx.T.rustForPkgs sourcePlan.base_pkgs;
     in if missing != [] then builtins.throw
       "Rust planner unresolved nixpkg deps for ${name}: ${lib.concatStringsSep ", " (map (record: record.attr) missing)}"
-    else assert _deps; template.rustPackage {
-      inherit name kind cargoRoot cargoManifest cargoLock patchInputs sourcePlan;
+    else assert _deps; assert _overrideClassification; template.rustPackage {
+      inherit name kind cargoRoot cargoManifest cargoLock cargoOutputHashes cargoFixedSources patchInputs sourcePlan;
+      devOverrides = rustDevOverrides;
       nixpkgDeps = map (record: record.package) nixpkgRecords;
       crate = if crate == null then lib.last (lib.splitString ":" name) else crate;
       features = if features == null then [] else features;

@@ -1,4 +1,4 @@
-load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_artifact_tool_authority_shell", "nix_bootstrap_env_core", "nix_declared_action_inputs_manifest_cmd", "nix_declared_action_transport_args")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_action_final_exec_prefix", "nix_artifact_tool_authority_shell", "nix_bootstrap_env_core", "nix_declared_action_inputs_manifest_cmd", "nix_declared_action_transport_args")
 load("@viberoots//build-tools/lang:importer_roots.bzl", "WORKSPACE_IMPORTER_ROOTS")
 
 
@@ -71,7 +71,9 @@ def nix_action_build_selected_out_path_cmd(
         + "VBR_NODE_ZX_INIT=\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\"; "
         + "set +e; "
         + ("%s=%s" % (raw_var, subst_open))
-        + " (cd \"$WORKSPACE_ROOT\" && env -u WORKSPACE_ROOT -u BUCK_TEST_SRC node --experimental-top-level-await --disable-warning=ExperimentalWarning "
+        + " (cd \"$WORKSPACE_ROOT\" && env -u WORKSPACE_ROOT -u BUCK_TEST_SRC "
+        + nix_action_final_exec_prefix()
+        + "node --experimental-top-level-await --disable-warning=ExperimentalWarning "
         + "--experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
         + ("\"$VIBEROOTS_ROOT/build-tools/tools/dev/build-selected.ts\" --target \"%s\" --attr %s --buck-action-inputs \"$VBR_BUCK_INPUTS\" " % (target_label, attr))
         + nix_declared_action_transport_args()

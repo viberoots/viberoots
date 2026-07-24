@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { REVIEWED_PUBLIC_KEYS, REVIEWED_SUBSTITUTERS } from "../../lib/artifact-nix-policy";
+import { REVIEWED_PUBLIC_KEYS } from "../../lib/artifact-nix-policy";
 import { runInTemp } from "../lib/test-helpers";
 
 test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async () => {
@@ -14,6 +14,7 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
       path.join(dir, "TARGETS"),
       [
         'load("@viberoots//build-tools/lang:nix_shell.bzl", "escape_buck_cmd_subst", "nix_build_out_path_cmd")',
+        'load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_action_final_exec_prefix")',
         'load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_shell_prefix_core", "nix_action_export_graph_cmd", "nix_action_build_selected_out_path_cmd")',
         "",
         "genrule(",
@@ -25,6 +26,40 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
         '    + nix_action_build_selected_out_path_cmd("//projects/apps/probe:probe")',
         '    + nix_build_out_path_cmd(".#probe", timeout_var = "")',
         '    + "echo ok > $OUT"',
+        "  ),",
+        ")",
+        "",
+        "genrule(",
+        '  name = "reviewed",',
+        '  out = "reviewed.txt",',
+        "  cmd = escape_buck_cmd_subst(",
+        '    "OUT_ABS=\\"$PWD/$OUT\\"; mkdir -p \\"${OUT_ABS%/*}\\"; "',
+        "    + nix_action_shell_prefix_core()",
+        "    + nix_action_final_exec_prefix()",
+        '    + "node --experimental-strip-types --import \\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\\" \\"$VIBEROOTS_ROOT/build-tools/tools/tests/dev/canonical-artifact-reviewed-config-handoff.fixture.ts\\" > \\"$OUT_ABS\\""',
+        "  ),",
+        ")",
+        "",
+        "genrule(",
+        '  name = "forged",',
+        '  out = "forged.txt",',
+        "  cmd = escape_buck_cmd_subst(",
+        '    "OUT_ABS=\\"$PWD/$OUT\\"; mkdir -p \\"${OUT_ABS%/*}\\"; "',
+        "    + nix_action_shell_prefix_core()",
+        '    + "export VBR_NIX_CACHE_HEALTH_APPLIED=1 VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG=forged; "',
+        '    + "node --experimental-strip-types --import \\"$VIBEROOTS_ROOT/build-tools/tools/dev/zx-init.mjs\\" \\"$VIBEROOTS_ROOT/build-tools/tools/tests/dev/canonical-artifact-reviewed-config-handoff.fixture.ts\\" > \\"$OUT_ABS\\""',
+        "  ),",
+        ")",
+        "",
+        "genrule(",
+        '  name = "off",',
+        '  out = "off.txt",',
+        "  cmd = escape_buck_cmd_subst(",
+        '    "OUT_ABS=\\"$PWD/$OUT\\"; mkdir -p \\"${OUT_ABS%/*}\\"; "',
+        "    + nix_action_shell_prefix_core()",
+        '    + "export VBR_NIX_CACHE_POLICY=off; "',
+        "    + nix_action_final_exec_prefix()",
+        '    + "node -e \'if (process.env.VBR_NIX_CACHE_POLICY !== \\"off\\" || process.env.VBR_NIX_CACHE_HEALTH_APPLIED || process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG || process.env.VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD || process.env.VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN) process.exit(1); process.stdout.write(\\"off\\\\n\\")\' > \\"$OUT_ABS\\""',
         "  ),",
         ")",
         "",
@@ -79,8 +114,21 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
       "expected build-selected to use explicit Buck action provenance",
     );
     assert.ok(
-      out.includes("env -u WORKSPACE_ROOT -u BUCK_TEST_SRC node"),
-      "expected ambient workspace selectors to be removed before canonical entry",
+      out.includes("env -u WORKSPACE_ROOT -u BUCK_TEST_SRC") &&
+        out.includes("__vbr_action_final_exec") &&
+        out.includes("vbr-action-final-exec node"),
+      "expected ambient workspace selectors to be removed before the reviewed final action exec",
+    );
+    assert.ok(
+      out.includes("unset NIX_CONFIG VBR_NIX_CACHE_HEALTH_APPLIED") &&
+        out.includes("VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD") &&
+        out.includes("VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN"),
+      "expected the final action exec to reject inherited cache review state and mint bounded proof",
+    );
+    assert.equal(
+      out.includes("artifact_ingress_exec"),
+      false,
+      "expected action-local cache review proof to avoid the mutable artifact ingress wrapper",
     );
     assert.ok(
       out.includes("--workspace-root") &&
@@ -104,9 +152,23 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
       "expected build-selected stderr to avoid the global /tmp fallback",
     );
     assert.ok(out.includes("sed -E"), "expected build-selected out-path parsing to strip ANSI");
-    assert.ok(out.includes("--option substituters"), "expected exact action cache policy");
+    assert.equal(
+      out.includes("--option substituters"),
+      false,
+      "artifact consumers must not reconstruct post-probe substituters",
+    );
+    assert.equal(
+      out.includes("--option extra-substituters"),
+      false,
+      "artifact consumers must not reconstruct post-probe optional substituters",
+    );
+    assert.equal(
+      out.includes("--option fallback true"),
+      false,
+      "artifact consumers must inherit fallback from command-scoped NIX_CONFIG",
+    );
     assert.ok(out.includes("--option trusted-public-keys"), "expected exact action key policy");
-    for (const value of [...REVIEWED_SUBSTITUTERS, ...REVIEWED_PUBLIC_KEYS]) {
+    for (const value of REVIEWED_PUBLIC_KEYS) {
       assert.ok(out.includes(value), `expected reviewed action policy value ${value}`);
     }
 
@@ -125,5 +187,30 @@ test("nix_action_runner helpers assemble stable cmd snippets (cquery)", async ()
       false,
       "expected build-selected source lookup to avoid FLK_ROOT",
     );
+
+    for (const name of ["reviewed", "forged", "off"] as const) {
+      const built = await $({
+        cwd: tmp,
+        stdio: "pipe",
+        reject: false,
+        nothrow: true,
+      })`buck2 build --target-platforms //:no_cgo --show-output //projects/apps/probe:${name}`;
+      assert.equal(built.exitCode, 0, String(built.stderr || built.stdout || ""));
+      const outputPath = String(built.stdout || "")
+        .trim()
+        .split(/\s+/u)
+        .at(-1);
+      assert.ok(outputPath, `expected ${name} action output path`);
+      const output = (await fsp.readFile(path.resolve(tmp, outputPath), "utf8")).trim();
+      if (name === "off") {
+        assert.equal(output, "off");
+      } else {
+        const result = JSON.parse(output);
+        assert.equal(result.appliedOutcome, name === "reviewed");
+        assert.equal(result.applied, "");
+        assert.equal(result.reviewedMarker, "");
+        assert.equal(result.token, "");
+      }
+    }
   });
 });

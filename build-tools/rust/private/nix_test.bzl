@@ -77,6 +77,8 @@ _ATTRS = with_nix_artifact_action_attrs({
     "nix_inputs": attrs.list(attrs.source(), default = []),
     "cargo_manifest": attrs.source(),
     "cargo_lock": attrs.source(),
+    "cargo_output_hashes": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
+    "cargo_fixed_sources": attrs.dict(key = attrs.string(), value = attrs.string(), default = {}),
     "crate": attrs.string(),
     "features": attrs.list(attrs.string(), default = []),
     "default_features": attrs.bool(default = True),

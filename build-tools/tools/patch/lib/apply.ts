@@ -126,7 +126,13 @@ export async function writePatchIfChanged(
     const code = (e && (e as any).code) || "";
     if (code !== "ENOENT") throw e;
   }
-  await fsp.writeFile(dst, data, "utf8");
+  const temporary = `${dst}.tmp-${process.pid}-${crypto.randomBytes(6).toString("hex")}`;
+  try {
+    await fsp.writeFile(temporary, data, "utf8");
+    await fsp.rename(temporary, dst);
+  } finally {
+    await fsp.rm(temporary, { force: true }).catch(() => {});
+  }
   return "written";
 }
 
@@ -143,7 +149,7 @@ async function cpRecursive(src: string, dst: string): Promise<void> {
 export async function verifyPatchDryRun(
   originPath: string,
   patchPath: string,
-  mode: "go" | "cpp" | "python",
+  mode: "go" | "cpp" | "python" | "rust",
 ): Promise<void> {
   const tmpRoot = await mkdtempNoindex(`viberoots-patch-verify-${mode}-`, {
     baseName: "viberoots-patch-verify",
@@ -171,5 +177,22 @@ export async function verifyPatchDryRun(
   if ((res.code || 0) !== 0) {
     const stderr = String(res.stderr || "").trim();
     throw new Error(stderr || "patch dry-run failed");
+  }
+}
+
+export async function verifyPatchTextDryRun(
+  originPath: string,
+  patchText: string,
+  mode: "go" | "cpp" | "python" | "rust",
+): Promise<void> {
+  const owner = await mkdtempNoindex(`viberoots-patch-candidate-${mode}-`, {
+    baseName: "viberoots-patch-candidate",
+  });
+  const candidate = path.join(owner, "candidate.patch");
+  try {
+    await fsp.writeFile(candidate, patchText, "utf8");
+    await verifyPatchDryRun(originPath, candidate, mode);
+  } finally {
+    await fsp.rm(owner, { recursive: true, force: true });
   }
 }

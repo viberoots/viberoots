@@ -70,6 +70,54 @@ export function registerArtifactBuildPolicyBasicContracts(register: typeof test)
     assert.throws(() => assertArtifactBuildAdmitted(evidence), /hostPaths/);
   });
 
+  register("artifact admission permits command-scoped local fallback without substituters", () => {
+    const artifactToolsRoot = canonicalArtifactToolsRoot(
+      process.cwd(),
+      String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+    );
+    const evidence = buildArtifactPolicyEvidence({
+      classification: "hermetic",
+      purpose: "local",
+      impureEvaluation: false,
+      env: { VBR_ARTIFACT_TOOLS_ROOT: artifactToolsRoot },
+      toolPaths: {
+        nix: "/nix/var/nix/profiles/default/bin/nix",
+        node: path.join(artifactToolsRoot, "bin/node"),
+      },
+      nixConfig: {
+        ...EFFECTIVE_ARTIFACT_TEST_CONFIG,
+        substituters: { value: [] },
+      },
+      nixStoreUrl: "daemon",
+    });
+    assert.equal(evidence.nix.substituters, "none");
+    assert.doesNotThrow(() => assertArtifactBuildAdmitted(evidence));
+  });
+
+  register("artifact admission never downgrades unreviewed trust or cache configuration", () => {
+    for (const nixConfig of [
+      {
+        ...EFFECTIVE_ARTIFACT_TEST_CONFIG,
+        substituters: { value: ["https://unreviewed-cache.invalid"] },
+      },
+      {
+        ...EFFECTIVE_ARTIFACT_TEST_CONFIG,
+        "trusted-public-keys": { value: ["unreviewed:invalid"] },
+      },
+    ]) {
+      const evidence = buildArtifactPolicyEvidence({
+        classification: "hermetic",
+        purpose: "local",
+        impureEvaluation: false,
+        env: {},
+        toolPaths: {},
+        nixConfig,
+        nixStoreUrl: "daemon",
+      });
+      assert.throws(() => assertArtifactBuildAdmitted(evidence), /reviewed Nix policy/);
+    }
+  });
+
   register(
     "canonical graph executor bypasses hostile host tools and declares selectors explicitly",
     () => {

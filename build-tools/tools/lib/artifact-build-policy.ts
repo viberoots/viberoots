@@ -179,7 +179,9 @@ export function assertArtifactBuildAdmitted(evidence: ArtifactPolicyEvidence): v
       evidence.nix.hostPaths !== "none" ? ["hostPaths"] : [],
       evidence.nix.multiUser !== "daemon" ? ["multiUser"] : [],
       evidence.nix.builders !== "local-only" ? ["builders"] : [],
-      evidence.nix.substituters !== "reviewed" ? ["substituters"] : [],
+      evidence.nix.substituters !== "reviewed" && evidence.nix.substituters !== "none"
+        ? ["substituters"]
+        : [],
       evidence.nix.publicKeys !== "reviewed" ? ["publicKeys"] : [],
       evidence.nix.network !== "sandboxed-fixed-output-only" ? ["network"] : [],
     );

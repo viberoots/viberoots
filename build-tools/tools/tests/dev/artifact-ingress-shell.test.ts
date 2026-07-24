@@ -131,7 +131,7 @@ test("shell ingress hands off only the exact FD-verified devshell cache decision
     "/bin/bash",
     [
       "-c",
-      '. "$1"; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1 VBR_NIX_CACHE_HEALTH_APPLIED=1 VBR_DEVSHELL_ARTIFACT_WAS_SET_NIX_CONFIG=1; VBR_DEVSHELL_ARTIFACT_VALUE_NIX_CONFIG="$2"; artifact_ingress_publish_reviewed_nix_cache_config; test "$VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG" = "$2"',
+      '. "$1"; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1 VBR_NIX_CACHE_HEALTH_APPLIED=1 NIX_CONFIG="$2"; artifact_ingress_publish_reviewed_nix_cache_config; test "$VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG" = "$2"',
       "artifact-ingress-test",
       ingressScript,
       reviewed,

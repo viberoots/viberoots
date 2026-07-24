@@ -11,6 +11,7 @@ import {
 } from "../../lib/artifact-environment";
 import { buildToolPath, nodeBin, zxInitPath } from "./paths";
 import { runGluePipeline } from "../../buck/glue-pipeline";
+import { currentNixCachePolicyCapability } from "../../lib/nix-cache-policy-capability";
 
 export async function cleanDevBuildWorkspace(root: string): Promise<void> {
   await $({
@@ -190,19 +191,28 @@ async function ensureNonEmptyGraphOrExit(root: string, graphPath: string): Promi
   process.exit(2);
 }
 
+export function glueChildArtifactEnvironment(
+  root: string,
+  artifactToolsRoot: string,
+  sourceEnv: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  return buildArtifactEnvironment({
+    baseEnv: withoutArtifactEnvironmentInfluence(sourceEnv),
+    mode: String(sourceEnv.CI || "").trim() ? "ci" : "local",
+    stateRoot: path.join(root, "buck-out", "tmp", "artifact-environment", "glue"),
+    workspaceRoot: root,
+    artifactToolsRoot,
+    nixCachePolicyCapability: currentNixCachePolicyCapability(),
+  });
+}
+
 export async function refreshGlueAndExportGraph(
   root: string,
   artifactToolsRoot: string,
 ): Promise<string> {
   const node = nodeBin();
   const verbose = isVbrVerbose() || String(process.env.DEVBUILD_DEBUG || "").trim() === "1";
-  const artifactEnv = buildArtifactEnvironment({
-    baseEnv: withoutArtifactEnvironmentInfluence(process.env),
-    mode: String(process.env.CI || "").trim() ? "ci" : "local",
-    stateRoot: path.join(root, "buck-out", "tmp", "artifact-environment", "glue"),
-    workspaceRoot: root,
-    artifactToolsRoot,
-  });
+  const artifactEnv = glueChildArtifactEnvironment(root, artifactToolsRoot);
   await runNodeWithZx({
     script: buildToolPath(root, "tools/dev/install-deps.ts"),
     args: ["--glue-only"],

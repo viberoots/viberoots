@@ -1,5 +1,5 @@
 load("@viberoots//build-tools/lang:sanitize.bzl", "sanitize_name")
-load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_artifact_bash", "nix_cmd_prefix", "nix_declared_action_inputs_manifest_cmd", "nix_declared_action_transport_args")
+load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_action_final_exec_prefix", "nix_artifact_bash", "nix_cmd_prefix", "nix_declared_action_inputs_manifest_cmd", "nix_declared_action_transport_args")
 load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_export_graph_cmd", "nix_action_workspace_setup_from_args")
 load("@viberoots//build-tools/lang:nix_artifact_inputs.bzl", "nix_artifact_action_inputs", "with_nix_artifact_action_attrs")
 load("@viberoots//build-tools/lang:remote_action_policy.bzl", "run_nix_action")
@@ -72,7 +72,7 @@ def _cpp_nix_build_impl(ctx):
         + "export BUCK_TEST_SRC=\"$WORKSPACE_ROOT\"; "
         + "OUT_PATHS_FILE=\"$TMP/vbr-nix-outpaths.txt\"; "
         + (
-            "$TIMEOUT node --experimental-top-level-await --disable-warning=ExperimentalWarning "
+            "$TIMEOUT " + nix_action_final_exec_prefix() + "node --experimental-top-level-await --disable-warning=ExperimentalWarning "
             + "--experimental-strip-types --import \"$VBR_NODE_ZX_INIT\" "
             + "\"$VIBEROOTS_ROOT/build-tools/tools/dev/nix-build-filtered-flake.ts\" --attr "
             + ("\"graph-generator-selected\" --target \"%s\" --buck-action-inputs \"$VBR_BUCK_INPUTS\" " % raw)

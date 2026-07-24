@@ -9,6 +9,8 @@ Use this index for day-to-day repo work. Build-system design references live und
 - [`conventions.md`](conventions.md): repository conventions.
 - [`tooling.md`](tooling.md): local tooling reference.
 - [`testing.md`](testing.md): validation commands and expectations.
+- [`repo-skills-token-efficiency.md`](repo-skills-token-efficiency.md): quality-preserving agent,
+  validation-log, and evidence handoff rules.
 - [`ci.md`](ci.md): CI stage responsibilities.
 - [`troubleshooting.md`](troubleshooting.md): common failures and fixes.
 

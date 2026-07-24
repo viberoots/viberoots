@@ -7,6 +7,7 @@ import { ensureNixStoreToolPathSync, envWithResolvedNixBin } from "../lib/tool-p
 import { buildArtifactEnvironment } from "../lib/artifact-environment";
 import { artifactNixPolicyArgs } from "../lib/artifact-nix-policy";
 import { runBoundedArtifactCommand } from "../lib/artifact-command-runner";
+import type { NixCachePolicyCapability } from "../lib/nix-cache-policy-capability";
 
 function runnableBuildTimeoutSec(): number {
   const raw = String(process.env.VBR_RUNNABLE_BUILD_TIMEOUT_SEC || "").trim();
@@ -75,26 +76,41 @@ async function emitTimeoutDiagnostics(opts: {
   console.error(`[run-runnable] timeout diagnostics: ${outPath}`);
 }
 
-export async function runNixBuildWithProgress(opts: {
+type RunnableNixEnvironmentOptions = {
   workspaceRoot: string;
   env?: Record<string, string>;
   internal?: Record<string, string>;
-  args: string[];
-  label: string;
   artifactToolsRoot: string;
-}): Promise<string> {
-  const timeoutSec = runnableBuildTimeoutSec();
+  nixCachePolicyCapability?: NixCachePolicyCapability;
+};
+
+export function runnableNixArtifactEnvironment(
+  opts: RunnableNixEnvironmentOptions,
+): NodeJS.ProcessEnv {
   const inherited = envWithResolvedNixBin(
     (opts.env as NodeJS.ProcessEnv | undefined) ?? process.env,
   );
-  const env = buildArtifactEnvironment({
+  return buildArtifactEnvironment({
     baseEnv: inherited,
     mode: String(inherited.CI || "").trim() ? "ci" : "local",
     stateRoot: path.join(opts.workspaceRoot, "buck-out", "tmp", "artifact-environment"),
     workspaceRoot: opts.workspaceRoot,
     artifactToolsRoot: opts.artifactToolsRoot,
+    ...(Object.prototype.hasOwnProperty.call(opts, "nixCachePolicyCapability")
+      ? { nixCachePolicyCapability: opts.nixCachePolicyCapability }
+      : {}),
     internal: { WORKSPACE_ROOT: opts.workspaceRoot, ...(opts.internal || {}) },
   });
+}
+
+export async function runNixBuildWithProgress(
+  opts: RunnableNixEnvironmentOptions & {
+    args: string[];
+    label: string;
+  },
+): Promise<string> {
+  const timeoutSec = runnableBuildTimeoutSec();
+  const env = runnableNixArtifactEnvironment(opts);
   const nixBin = ensureNixStoreToolPathSync("nix", env);
   const result = await runBoundedArtifactCommand({
     command: nixBin,

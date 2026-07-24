@@ -1,6 +1,5 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
-import { spawn } from "node:child_process";
 import { echoSnippetRequested } from "../../lib/cli";
 import { makeWorkspace } from "../cross-platform";
 import { setOverride, clearOverride, printOverrideSnippet } from "../dev-overrides";
@@ -9,9 +8,10 @@ import { deleteSession, getSession, setSession } from "../state";
 import type { SessionRecord } from "../types";
 import { NOOP_CLEARED_MSG } from "./messages";
 import { pathExists } from "./util";
-import { verifyPatchDryRun, writePatchIfChanged } from "./apply";
+import { verifyPatchTextDryRun, writePatchIfChanged } from "./apply";
+import { runPatchEditor } from "./editor";
 
-type WorkspaceWorkflowLang = "go" | "python";
+type WorkspaceWorkflowLang = "go" | "python" | "rust";
 
 type StartOpts = {
   lang: WorkspaceWorkflowLang;
@@ -22,6 +22,7 @@ type StartOpts = {
   overrideEnvName: string;
   echoSnippetEnv: string;
   moduleKeyForWorkspace: string;
+  ownerPid?: number;
   deps?: {
     makeWorkspace?: typeof makeWorkspace;
     pathExists?: typeof pathExists;
@@ -34,15 +35,15 @@ type ApplyOpts = {
   missingSessionError: string;
   overrideEnvName: string;
   patchPathAbs: string;
-  verifyMode: "go" | "python";
-  verifySubjectLabel: "Module" | "Distribution";
+  verifyMode: "go" | "python" | "rust";
+  verifySubjectLabel: "Module" | "Distribution" | "Crate";
   verifySubjectValue: string;
   forceWrite: boolean;
   skipVerify: boolean;
   afterApply?: () => Promise<void>;
   deps?: {
     makeUnifiedDiff?: typeof makeUnifiedDiff;
-    verifyPatchDryRun?: typeof verifyPatchDryRun;
+    verifyPatchDryRun?: typeof verifyPatchTextDryRun;
     writePatchIfChanged?: typeof writePatchIfChanged;
   };
 };
@@ -59,29 +60,16 @@ async function reuseWorkspaceOrNull(
   exists: typeof pathExists,
 ): Promise<string | null> {
   if (!existing) return null;
+  if (existing.ownerPid && existing.ownerPid !== process.pid) {
+    try {
+      process.kill(existing.ownerPid, 0);
+    } catch {
+      return null;
+    }
+  }
   if (existing.originPath !== originPath) return null;
   if (!(await exists(existing.workspacePath))) return null;
   return existing.workspacePath;
-}
-
-async function runPatchEditor(editor: string, cwd: string): Promise<void> {
-  await new Promise<void>((resolve, reject) => {
-    const child = spawn(editor, {
-      cwd,
-      stdio: "inherit",
-      shell: true,
-    });
-    child.once("error", reject);
-    child.once("exit", (code, signal) => {
-      if (code === 0 || code === null) {
-        resolve();
-        return;
-      }
-      reject(
-        new Error(`PATCH_EDITOR exited with code ${String(code)}${signal ? ` (${signal})` : ""}`),
-      );
-    });
-  });
 }
 
 export async function startWorkspaceWorkflow(opts: StartOpts): Promise<string> {
@@ -93,6 +81,10 @@ export async function startWorkspaceWorkflow(opts: StartOpts): Promise<string> {
   if (reused) {
     console.log(reused);
     return reused;
+  }
+  if (existing) {
+    clearOverride(opts.overrideEnvName, opts.key);
+    await deleteSession(opts.lang, opts.key);
   }
 
   const ws = await mkWs({
@@ -108,14 +100,21 @@ export async function startWorkspaceWorkflow(opts: StartOpts): Promise<string> {
     workspacePath: ws,
     createdAt: now,
     updatedAt: now,
+    ...(opts.ownerPid ? { ownerPid: opts.ownerPid } : {}),
   };
   await setSession(opts.lang, opts.key, rec);
 
   const echoSnippet = echoSnippetRequested({ env: opts.echoSnippetEnv });
-  if (echoSnippet) {
-    printOverrideSnippet(opts.overrideEnvName, { [opts.key]: ws });
-  } else {
-    setOverride(opts.overrideEnvName, opts.key, ws);
+  try {
+    if (echoSnippet) {
+      printOverrideSnippet(opts.overrideEnvName, { [opts.key]: ws });
+    } else {
+      setOverride(opts.overrideEnvName, opts.key, ws);
+    }
+  } catch (error) {
+    clearOverride(opts.overrideEnvName, opts.key);
+    await deleteSession(opts.lang, opts.key);
+    throw error;
   }
 
   console.log(ws);
@@ -123,18 +122,26 @@ export async function startWorkspaceWorkflow(opts: StartOpts): Promise<string> {
     const ed = process.env.PATCH_EDITOR;
     try {
       await runPatchEditor(ed, ws);
-    } catch {}
+    } catch (error) {
+      clearOverride(opts.overrideEnvName, opts.key);
+      await deleteSession(opts.lang, opts.key);
+      throw error;
+    }
   }
   return ws;
 }
 
 export async function applyWorkspaceWorkflow(opts: ApplyOpts): Promise<void> {
   const diffFn = opts.deps?.makeUnifiedDiff ?? makeUnifiedDiff;
-  const verifyFn = opts.deps?.verifyPatchDryRun ?? verifyPatchDryRun;
+  const verifyFn = opts.deps?.verifyPatchDryRun ?? verifyPatchTextDryRun;
   const writeFn = opts.deps?.writePatchIfChanged ?? writePatchIfChanged;
 
   const sess = await getSession(opts.lang, opts.key);
-  if (!sess) throw new Error(opts.missingSessionError);
+  if (!sess) {
+    clearOverride(opts.overrideEnvName, opts.key);
+    await deleteSession(opts.lang, opts.key);
+    throw new Error(opts.missingSessionError);
+  }
 
   const diff = await diffFn(sess.originPath, sess.workspacePath);
   if (!diff || diff.trim() === "") {
@@ -144,15 +151,12 @@ export async function applyWorkspaceWorkflow(opts: ApplyOpts): Promise<void> {
     return;
   }
 
-  const wrote = await writeFn(opts.patchPathAbs, diff, opts.forceWrite);
-  if (wrote === "written") {
-    console.error(`[patch-${opts.lang}] writing patch: ${opts.patchPathAbs}`);
-  }
-
   if (!opts.skipVerify) {
     try {
-      await verifyFn(sess.originPath, opts.patchPathAbs, opts.verifyMode);
+      await verifyFn(sess.originPath, diff, opts.verifyMode);
     } catch {
+      clearOverride(opts.overrideEnvName, opts.key);
+      await deleteSession(opts.lang, opts.key);
       throw new Error(
         `Patch verification failed: the generated diff did not apply cleanly with -p1 to the origin ${opts.verifySubjectLabel.toLowerCase()}.\n` +
           `${opts.verifySubjectLabel}: ${opts.verifySubjectValue}\n` +
@@ -160,6 +164,18 @@ export async function applyWorkspaceWorkflow(opts: ApplyOpts): Promise<void> {
           `Patch: ${opts.patchPathAbs}`,
       );
     }
+  }
+
+  let wrote: "no-op" | "written";
+  try {
+    wrote = await writeFn(opts.patchPathAbs, diff, opts.forceWrite);
+  } catch (error) {
+    clearOverride(opts.overrideEnvName, opts.key);
+    await deleteSession(opts.lang, opts.key);
+    throw error;
+  }
+  if (wrote === "written") {
+    console.error(`[patch-${opts.lang}] writing patch: ${opts.patchPathAbs}`);
   }
 
   clearOverride(opts.overrideEnvName, opts.key);
@@ -174,10 +190,15 @@ export async function applyWorkspaceWorkflow(opts: ApplyOpts): Promise<void> {
 
 export async function resetWorkspaceWorkflow(opts: ResetOpts): Promise<void> {
   const sess = await getSession(opts.lang, opts.key);
-  if (!sess) return;
   clearOverride(opts.overrideEnvName, opts.key);
   await deleteSession(opts.lang, opts.key);
+  if (!sess) return;
   try {
     await fsp.rm(sess.workspacePath, { recursive: true, force: true });
   } catch {}
+}
+
+export async function interruptWorkspaceWorkflow(opts: ResetOpts): Promise<void> {
+  clearOverride(opts.overrideEnvName, opts.key);
+  await deleteSession(opts.lang, opts.key);
 }

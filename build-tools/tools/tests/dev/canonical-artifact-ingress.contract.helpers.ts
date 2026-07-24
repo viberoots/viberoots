@@ -46,9 +46,11 @@ export function assertCanonicalArtifactIngressWiring(): void {
   assert.match(shell, /--option sandbox-fallback false/);
   assert.doesNotMatch(shell, /nix_cache_health_shell/);
   assert.match(shell, /NIX_ARTIFACT_TOOLS_ROOT/);
-  assert.match(shell, /NIX_ARTIFACT_SUBSTITUTERS/);
   assert.match(shell, /NIX_ARTIFACT_TRUSTED_PUBLIC_KEYS/);
-  assert.match(shell, /--option substituters/);
+  assert.doesNotMatch(shell, /--option substituters/);
+  assert.doesNotMatch(shell, /--option extra-substituters/);
+  assert.doesNotMatch(shell, /--option fallback/);
+  assert.doesNotMatch(shell, /unset [^;]*NIX_CONFIG/);
   assert.match(shell, /--option trusted-public-keys/);
   assert.match(shell, /VBR_ARTIFACT_TOOLS_ROOT/);
   assert.match(

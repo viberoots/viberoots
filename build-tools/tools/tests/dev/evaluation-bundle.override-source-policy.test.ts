@@ -52,6 +52,34 @@ test("bundle rejects generated state inside an override source", async () => {
   }
 });
 
+test("protected bundle classification rejects an explicit Rust override identity", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "bundle-rust-override-protected-"));
+  const source = path.join(tmp, "source");
+  const override = path.join(tmp, "override");
+  await sourceFixture(source);
+  await fsp.mkdir(override);
+  await fsp.writeFile(path.join(override, "lib.rs"), "pub fn value() -> u8 { 2 }\n");
+  try {
+    await assert.rejects(
+      materializeEvaluationBundle({
+        stagedSource: source,
+        attr: "graph-generator",
+        classification: "hermetic",
+        artifactToolsRoot,
+        selectorEnv: {},
+        devOverrides: {
+          NIX_RUST_DEV_OVERRIDE_JSON: JSON.stringify({
+            "dep@1.0.0#registry+https://registry.example/index": override,
+          }),
+        },
+      }),
+      /evaluation bundle with language overrides must be local-development/,
+    );
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
 test("bundle rejects an override ancestor that would recursively capture staging", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "bundle-override-recursive-"));
   const source = path.join(tmp, "source");

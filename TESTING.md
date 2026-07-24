@@ -165,9 +165,13 @@ PREWARM_ATTRS="toolchains.go,toolchains.cxx" node build-tools/tools/dev/prewarm-
 ## Optional Nix cache fallback
 
 `i`, `b`, `v`, and Buck Nix actions probe configured HTTP(S) substituters through
-`nix store info --store <substituter>` before using them. With the default
+a bounded request to `<substituter>/nix-cache-info` before using them. With the default
 `VBR_NIX_CACHE_POLICY=auto`, unreachable configured HTTP(S) caches are removed from the current
-process, Nix fallback stays enabled, and local builds continue. Logs look like:
+process, Nix fallback stays enabled, and local builds continue. Canonical artifact commands also
+classify the reviewed private cache as an `extra-substituter`, with the public caches remaining
+ordinary substituters. Transport and DNS failures can therefore fall back to the public caches or a
+local build. Malformed cache URLs, unreviewed keys, and signature failures are not admitted by this
+fallback. Logs look like:
 
 ```
 [env] nix cache health: disabled unreachable substituter(s): https://...
@@ -176,6 +180,10 @@ process, Nix fallback stays enabled, and local builds continue. Logs look like:
 
 Use `VBR_NIX_CACHE_POLICY=strict` only when cache reachability is the behavior under test. Use
 `VBR_NIX_CACHE_POLICY=off` to skip the dynamic cache probe entirely.
+
+When cache health, artifact Nix policy, command ingress, generated toolchain policy, or Buck Nix
+action shells change, run the cache-policy affected union documented in
+`docs/handbook/getting-started-on-a-pr.md`.
 
 ## Verify status output
 

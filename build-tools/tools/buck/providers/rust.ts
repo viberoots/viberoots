@@ -11,12 +11,11 @@ export async function syncRustProviders(opts?: {
 }) {
   const out = opts?.outFile || providerAutoTargetsPath("rust");
   const patchDir = opts?.patchDir || `patches/rust`;
-  if (!(await pathExists(patchDir))) {
-    await writeIfChanged(out, `# GENERATED FILE — DO NOT EDIT.\n# No patches present for rust.\n`);
-    return;
-  }
+  const suffix = (await pathExists(patchDir))
+    ? " Package-local patches are direct target inputs."
+    : "";
   await writeIfChanged(
     out,
-    `# GENERATED FILE — DO NOT EDIT.\n# TODO: implement rust provider sync.\n`,
+    `# GENERATED FILE — DO NOT EDIT.\n# Rust uses no generated providers.${suffix}\n`,
   );
 }

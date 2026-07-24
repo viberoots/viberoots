@@ -1,3 +1,5 @@
 {
-  "supported_lock_sources": ["registry+https://github.com/rust-lang/crates.io-index"]
+  "supported_lock_sources": ["registry+https://github.com/rust-lang/crates.io-index"],
+  "supported_lock_source_prefixes": ["registry+https://"],
+  "supported_git_source_pattern": "^git\\+https://.+#[0-9a-f]{40}$"
 }

@@ -11,9 +11,9 @@ Provider sync writes deterministic Buck provider glue from lockfiles and patch i
   - Python (uv): generated provider files when Python lockfiles/importers are present
   - Optional provider index: `.viberoots/workspace/providers/provider_index.bzl` when invoked with
     `--emit-index`
-- Go and C++ provider sync are **no-ops/removed** by design. Go and C++ macros use labels,
-  package-local patch inputs, and provider-edge helpers rather than generated language-specific
-  provider files (see `build-tools/docs/cpp-provider-sync-migration.md`).
+- Go and Rust provider sync are explicit deterministic **no-provider** adapters. C++ provider sync
+  remains curated. Go and Rust macros use labels, package-local patch inputs, and provider-edge
+  helpers rather than generated language-specific provider files.
 - **Idempotency**: re-running should not change output when inputs are unchanged.
 - **Tests**: create a single patch using fixtures and assert stable provider name and paths.
 

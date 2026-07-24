@@ -198,10 +198,12 @@ export async function enterRunnableEntrypoint(): Promise<{
   let nixCacheHealth: ReviewedNixConfigOutcome | undefined;
   if (initial.mode === "prod") {
     const cacheHealth = await applyNixCacheHealthPolicy(workspaceRoot);
-    nixCacheHealth = {
-      applied: true,
-      config: cacheHealth.changed ? String(cacheHealth.nixConfig || "") : "",
-    };
+    if (cacheHealth.authority === "reviewed") {
+      nixCacheHealth = {
+        applied: true,
+        config: cacheHealth.nixConfig,
+      };
+    }
   }
   return {
     argv: getArgvTokens(),

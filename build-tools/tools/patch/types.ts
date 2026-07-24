@@ -7,6 +7,7 @@ export type SessionRecord = {
   workspacePath: string;
   createdAt: string;
   updatedAt: string;
+  ownerPid?: number;
 };
 
 export type SessionStore = {

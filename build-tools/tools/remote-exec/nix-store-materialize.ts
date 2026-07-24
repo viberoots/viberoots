@@ -7,7 +7,7 @@ import {
   buildCanonicalArtifactEnvironment,
   canonicalArtifactToolsRoot,
 } from "../lib/artifact-environment";
-import { artifactNixPolicyArgs } from "../lib/artifact-nix-policy";
+import { artifactNixIndependentPolicyArgs } from "../lib/artifact-nix-policy";
 import { runBoundedArtifactCommand } from "../lib/artifact-command-runner";
 import { ensureNixStoreToolPathSync } from "../lib/tool-paths";
 import {
@@ -53,7 +53,7 @@ export function renderMaterializationCommand(
       "--option",
       "trusted-public-keys",
       manifest.substituter.trustedPublicKeys.join(" "),
-      ...artifactNixPolicyArgs(),
+      ...artifactNixIndependentPolicyArgs("empty"),
       entry.path,
     ];
   }
@@ -61,7 +61,7 @@ export function renderMaterializationCommand(
     nix,
     "build",
     `${manifest.sourceSnapshot}#${entry.attr}`,
-    ...artifactNixPolicyArgs(),
+    ...artifactNixIndependentPolicyArgs("reviewed"),
     "--no-link",
     "--print-out-paths",
   ];
@@ -135,7 +135,7 @@ export async function materializeNixStorePaths(opts: {
 }
 
 function pathInfoCommand(nix: string, entry: StorePathEntry): string[] {
-  return [nix, ...artifactNixPolicyArgs(), "path-info", entry.path];
+  return [nix, ...artifactNixIndependentPolicyArgs("empty"), "path-info", entry.path];
 }
 
 async function defaultRunner(

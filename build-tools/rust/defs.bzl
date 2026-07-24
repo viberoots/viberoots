@@ -7,6 +7,8 @@ load("@viberoots//build-tools/rust/private:nix_test.bzl", "rust_nix_test")
 _PUBLIC_ARGS = [
     "cargo_lock",
     "cargo_manifest",
+    "cargo_fixed_sources",
+    "cargo_output_hashes",
     "crate",
     "default_features",
     "features",
@@ -65,6 +67,15 @@ def _rust_nix_target(name, kind, out, kwargs):
         fail("rust_%s: unknown arguments: %s" % ("binary" if kind == "bin" else "library" if kind == "lib" else "test", ", ".join(unknown)))
     cargo_manifest = _single_cargo_file(kw.pop("cargo_manifest", None), "Cargo.toml", "cargo_manifest")
     cargo_lock = _single_cargo_file(kw.pop("cargo_lock", None), "Cargo.lock", "cargo_lock")
+    cargo_output_hashes = kw.pop("cargo_output_hashes", {})
+    cargo_fixed_sources = kw.pop("cargo_fixed_sources", {})
+    if not isinstance(cargo_output_hashes, dict):
+        fail("rust target cargo_output_hashes must be a dict of package-version to Nix hash")
+    if not isinstance(cargo_fixed_sources, dict):
+        fail("rust target cargo_fixed_sources must be a dict of source identity to reviewed JSON")
+    for key, value in cargo_fixed_sources.items():
+        if not isinstance(key, str) or not isinstance(value, str):
+            fail("rust target cargo_fixed_sources keys and reviewed JSON values must be strings")
     crate = kw.pop("crate", name)
     features = kw.pop("features", [])
     default_features = kw.pop("default_features", True)
@@ -105,6 +116,8 @@ def _rust_nix_target(name, kind, out, kwargs):
         "nix_inputs": global_nix_inputs(),
         "cargo_manifest": cargo_manifest,
         "cargo_lock": cargo_lock,
+        "cargo_output_hashes": cargo_output_hashes,
+        "cargo_fixed_sources": cargo_fixed_sources,
         "crate": crate,
         "features": features,
         "default_features": default_features,

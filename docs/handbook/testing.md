@@ -164,8 +164,11 @@ present, then `github/main`, `origin/main`, and `main`; if none exist, verify fa
 
 The local wrappers and Buck Nix actions use `VBR_NIX_CACHE_POLICY=auto` by default. They probe
 configured HTTP(S) substituters, disable unreachable configured caches for the current process, keep
-Nix fallback enabled, and continue locally. Use `VBR_NIX_CACHE_POLICY=strict` only when cache
-availability is itself under test; use `VBR_NIX_CACHE_POLICY=off` to skip the dynamic probe.
+Nix fallback enabled, and continue locally. Canonical artifact commands classify the reviewed
+private cache as optional while retaining public substituters. DNS and transport failures may fall
+back to those public caches or a local build; malformed configuration and untrusted or invalid
+artifacts still fail admission. Use `VBR_NIX_CACHE_POLICY=strict` only when cache availability is
+itself under test; use `VBR_NIX_CACHE_POLICY=off` to skip the dynamic probe.
 
 ## Nix GC preflight
 

@@ -1560,6 +1560,12 @@ Public args:
   - Used for / scenarios: Attaches additional module-surface providers to this target. Use it when downstream module discovery needs metadata from auxiliary producers.
 - `cargo_manifest` string. Defaults to and, in the native baseline, must equal the canonical package-local `Cargo.toml`.
 - `cargo_lock` string. Defaults to and, in the native baseline, must equal the canonical package-local `Cargo.lock`.
+- `cargo_output_hashes` dict. Nix hashes keyed by `package-version` for locked Git dependencies.
+  Registry dependencies use their lockfile checksums.
+- `cargo_fixed_sources` dict. Exact source-qualified package identities mapped to reviewed JSON
+  `buildInput` records emitted by `u`, plus the declared Cargo registry name. These path-free
+  records contain only the immutable Nix store path, NAR hash, lock source, and checksum used for
+  credential-free offline builds; authoring-only Cargo cache origins are rejected.
 - `crate` string. Cargo package name; defaults to the Buck target name.
 - `features` list of strings. Explicit Cargo features; defaults to empty.
 - `default_features` bool. Whether Cargo default features are enabled; defaults to `True`.
@@ -1596,6 +1602,9 @@ Public args:
   - Used for / scenarios: Attaches additional module-surface providers to this target. Use it when downstream module discovery needs metadata from auxiliary producers.
 - `cargo_manifest` string. Defaults to and, in the native baseline, must equal the canonical package-local `Cargo.toml`.
 - `cargo_lock` string. Defaults to and, in the native baseline, must equal the canonical package-local `Cargo.lock`.
+- `cargo_output_hashes` dict. Uses the same locked Git source contract as `rust_library`.
+- `cargo_fixed_sources` dict. Uses the same reviewed registry materialization contract as
+  `rust_library`.
 - `crate` string. Cargo package name; defaults to the Buck target name.
 - `features` list of strings. Explicit Cargo features; defaults to empty.
 - `default_features` bool. Whether Cargo default features are enabled; defaults to `True`.

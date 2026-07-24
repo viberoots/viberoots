@@ -227,7 +227,9 @@ let
     in if evaluationBundle != null then builtins.filter
          (lang: (evaluationBundle.languageOverrides.${builtins.getAttr lang Overrides} or { }) != { })
          langs
-       else builtins.filter (lang: (builtins.getEnv (builtins.getAttr lang Overrides)) != "") langs;
+       else builtins.filter
+         (lang: lang != "rust" && (builtins.getEnv (builtins.getAttr lang Overrides)) != "")
+         langs;
   # CI detection and optional suppression flag for planner dev-override logs
   isCI = (builtins.getEnv "CI") == "true";
   suppressDevOverrideLog = (builtins.getEnv "PLANNER_NO_DEV_OVERRIDE_LOG") != "";
@@ -275,6 +277,9 @@ let
     artifactToolsRoot = artifactToolsRoot;
     artifactToolsInput = artifactToolsRoot;
     evaluationGraphPath = if evaluationBundle == null then null else evaluationBundle.graphPath;
+    languageOverrides = if evaluationBundle == null then {} else evaluationBundle.languageOverrides;
+    evaluationClassification =
+      if evaluationBundle == null then "" else evaluationBundle.classification.classification;
     dependencyArtifactOf = dependencyArtifactOf;
     nodeMods = nodeMods;
     # Provide full nodes list so language plugins (e.g., C++) can walk deps

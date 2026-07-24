@@ -19,6 +19,7 @@ test("patch-go global echo snippet uses override env name from the manifest", as
         go: "NIX_GO_DEV_OVERRIDE_JSON_FROM_MANIFEST",
         cpp: "NIX_CPP_DEV_OVERRIDE_JSON",
         python: "NIX_PY_DEV_OVERRIDE_JSON",
+        rust: "NIX_RUST_DEV_OVERRIDE_JSON",
       },
       null,
       2,
