@@ -10,6 +10,7 @@ import {
 import { VIBEROOTS_SOURCE_ROOT } from "../lib/test-helpers/source-paths";
 import { execManaged } from "../lib/test-helpers/managed-exec";
 import { withGitAutoMaintenanceDisabledEnv } from "../../lib/git-auto-maintenance-env";
+import { stageFreshCloneConsistencyEntrypoint } from "./fresh-clone-post-clone-consistency-source";
 import { writeFreshCloneShims } from "./fresh-clone-post-clone-shims";
 
 export const requiredTrackedInputs = [".buckroot", ".buckconfig", ".envrc", ".gitignore"] as const;
@@ -54,8 +55,9 @@ async function underlyingGitPath(): Promise<string> {
 
 export async function createFreshCloneFixture(
   t: TestContext,
-  options: { sourceMode?: "flake" | "submodule" } = {},
+  options: { includeNodeImporter?: boolean; sourceMode?: "flake" | "submodule" } = {},
 ) {
+  const includeNodeImporter = options.includeNodeImporter ?? true;
   const sourceMode = options.sourceMode || "submodule";
   const sourceRoot = VIBEROOTS_SOURCE_ROOT;
   const tmp = await fsp.realpath(await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-fresh-clone-")));
@@ -91,6 +93,7 @@ export async function createFreshCloneFixture(
     { env: localGitEnv },
   );
   await fsp.chmod(submoduleSource, 0o755);
+  await stageFreshCloneConsistencyEntrypoint(submoduleSource);
   const artifactEnv = buildCanonicalArtifactEnvironment(sourceRoot, {
     artifactToolsRoot: canonicalArtifactToolsRoot(
       process.cwd(),
@@ -118,16 +121,18 @@ export async function createFreshCloneFixture(
     ["submodule", "add", "-q", `file://${submoduleSource}`, "viberoots"],
     localGitEnv,
   );
-  const consumerImporter = path.join("projects", "apps", "viberoots-site");
-  await fsp.mkdir(path.join(consumerSource, consumerImporter), { recursive: true });
-  await fsp.writeFile(
-    path.join(consumerSource, consumerImporter, "package.json"),
-    `${JSON.stringify({ name: "fresh-clone-importer", private: true }, null, 2)}\n`,
-  );
-  await fsp.writeFile(
-    path.join(consumerSource, consumerImporter, "pnpm-lock.yaml"),
-    "lockfileVersion: '9.0'\n\nimporters:\n  .: {}\n",
-  );
+  if (includeNodeImporter) {
+    const consumerImporter = path.join("projects", "apps", "viberoots-site");
+    await fsp.mkdir(path.join(consumerSource, consumerImporter), { recursive: true });
+    await fsp.writeFile(
+      path.join(consumerSource, consumerImporter, "package.json"),
+      `${JSON.stringify({ name: "fresh-clone-importer", private: true }, null, 2)}\n`,
+    );
+    await fsp.writeFile(
+      path.join(consumerSource, consumerImporter, "pnpm-lock.yaml"),
+      "lockfileVersion: '9.0'\n\nimporters:\n  .: {}\n",
+    );
+  }
   await fsp.mkdir(path.join(consumerSource, "projects", "config"), { recursive: true });
   await fsp.writeFile(
     path.join(consumerSource, "projects", "config", "node-modules.hashes.json"),
@@ -150,7 +155,6 @@ export async function createFreshCloneFixture(
     VBR_REAL_NODE: process.execPath,
     VBR_REAL_ZX_INIT: path.join(devToolsRoot, "zx-init.mjs"),
     VBR_REAL_COMMAND: path.join(devToolsRoot, "viberoots.ts"),
-    VBR_REAL_UPDATE_PNPM: path.join(devToolsRoot, "update-pnpm-hash.ts"),
     VBR_STALE_PNPM_LOCK: "projects/apps/viberoots-site/pnpm-lock.yaml",
   };
   const runCommand = (args: string[], cwd: string, env: NodeJS.ProcessEnv = commandEnv) =>

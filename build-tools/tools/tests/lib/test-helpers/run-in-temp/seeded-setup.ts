@@ -1,4 +1,5 @@
 import path from "node:path";
+import { sharedPnpmStoreHashCacheRoot } from "../../../../dev/update-pnpm-hash/verified-marker";
 import { registerBuckIsolationSync } from "../../../../dev/verify/owned-process-state";
 import { stableBuckIsolation } from "../../../../lib/buck-command-env";
 import { withGitAutoMaintenanceDisabledEnv } from "../../../../lib/git-auto-maintenance-env";
@@ -92,7 +93,7 @@ export async function prepareSeededTemp(
       VBR_RUN_IN_TEMP_REPO: "1",
       SCAF_ALLOW_LIVE_REPO: "1",
       REPO_ROOT: process.cwd(),
-      VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT: process.cwd(),
+      VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT: sharedPnpmStoreHashCacheRoot(process.env, realHome),
       HOME: home,
       XDG_CACHE_HOME: activeXdgCacheHome,
     }),

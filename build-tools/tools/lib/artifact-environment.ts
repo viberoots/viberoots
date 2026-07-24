@@ -16,6 +16,7 @@ export {
 } from "./artifact-environment-policy";
 export {
   canonicalArtifactToolsRoot,
+  MissingGeneratedArtifactToolAuthorityError,
   REQUIRED_ARTIFACT_TOOL_BINARIES,
   validateArtifactToolsRoot,
 } from "./artifact-tool-authority";
@@ -38,6 +39,7 @@ const TRANSPORT_ENV = new Set([
   // can locate the authority.
   "VBR_ARTIFACT_TOOLS_ROOT",
   "VBR_GC_MODE",
+  "VBR_NIX_CACHE_POLICY",
   "VBR_VERIFY_LOCK_DIR",
   "VBR_VERIFY_PROCESS_STATE_FILE",
 ]);

@@ -47,6 +47,24 @@ function printBuckFailure(proc: unknown): void {
   if (details) process.stderr.write(`${details}\n`);
 }
 
+export function assertReviewedBuckArtifactSelectors(
+  env: NodeJS.ProcessEnv,
+  internalNixConfig?: string,
+): void {
+  const reviewedNixConfig = String(internalNixConfig || "");
+  const actualNixConfig = String(env.NIX_CONFIG || "");
+  if (reviewedNixConfig.trim() && actualNixConfig !== reviewedNixConfig) {
+    throw new Error("Buck artifact ingress rejects mismatched internal NIX_CONFIG authority");
+  }
+  assertNoArtifactSelectorInjection(env, {
+    allow: [
+      "BUCK_GRAPH_JSON",
+      "VBR_ARTIFACT_TOOLS_ROOT",
+      ...(reviewedNixConfig.trim() && actualNixConfig === reviewedNixConfig ? ["NIX_CONFIG"] : []),
+    ],
+  });
+}
+
 export async function runBuckCommand(opts: {
   root: string;
   subcmd: string;
@@ -54,11 +72,10 @@ export async function runBuckCommand(opts: {
   isolationFlags: string[];
   devOverrides: DevOverrideValues;
   artifactToolsRoot: string;
+  internalNixConfig?: string;
 }): Promise<void> {
   assertNoUserDevOverrideConfig(opts.restArgs);
-  assertNoArtifactSelectorInjection(process.env, {
-    allow: ["BUCK_GRAPH_JSON", "VBR_ARTIFACT_TOOLS_ROOT"],
-  });
+  assertReviewedBuckArtifactSelectors(process.env, opts.internalNixConfig);
   const hasUserPlatform =
     opts.restArgs.includes("--target-platforms") || opts.restArgs.includes("--user-platform");
   const platformFlags = hasUserPlatform ? [] : ["--target-platforms", "prelude//platforms:default"];
@@ -87,6 +104,7 @@ export async function runBuckCommand(opts: {
       BUCK_GRAPH_JSON: path.join(opts.root, DEFAULT_GRAPH_PATH),
       BUCK_ISOLATION_DIR: isolation,
       BUCK2_REAL_HOME: path.join(opts.root, "buck-out", "tmp", "artifact-environment", "home"),
+      ...(opts.internalNixConfig ? { NIX_CONFIG: opts.internalNixConfig } : {}),
       WORKSPACE_ROOT: opts.root,
     },
   });

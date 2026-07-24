@@ -2,14 +2,8 @@
 let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
-  supportedRegistry = "registry+https://github.com/rust-lang/crates.io-index";
-  sourceLines = lockFile:
-    builtins.filter (line: lib.hasPrefix "source = \"" line)
-      (lib.splitString "\n" (builtins.readFile lockFile));
   validateLockSources = lockFile:
-    let unsupported = builtins.filter (line: line != "source = \"${supportedRegistry}\"") (sourceLines lockFile);
-    in if unsupported == [] then true else
-      builtins.throw "Rust Cargo.lock contains unsupported dependency source: ${builtins.head unsupported}";
+    import ../../../rust/cargo-source-policy.nix { inherit lockFile; };
 in {
   rustPackage = {
     name,
@@ -28,6 +22,13 @@ in {
   }:
     let
       _sources = validateLockSources cargoLock;
+      cargoConfigs = [
+        (cargoRoot + "/.cargo/config")
+        (cargoRoot + "/.cargo/config.toml")
+      ];
+      presentCargoConfigs = builtins.filter builtins.pathExists cargoConfigs;
+      _cargoConfig = if presentCargoConfigs == [] then true else
+        builtins.throw "Rust Cargo configuration is unsupported because it can replace dependency sources: ${builtins.toString (builtins.head presentCargoConfigs)}";
       targetName = lib.last (lib.splitString ":" name);
       sanitized = H.sanitizeName name;
       featureFlags = lib.optionals (!defaultFeatures) [ "--no-default-features" ]
@@ -47,7 +48,7 @@ in {
         crate
       ] ++ kindFlags ++ featureFlags ++ testProfileFlags ++ [ "--target" cargoTarget ];
       testBuildCommand = lib.concatMapStringsSep " " lib.escapeShellArg testBuildFlags;
-    in assert _sources; pkgs.rustPlatform.buildRustPackage ({
+    in assert _sources; assert _cargoConfig; pkgs.rustPlatform.buildRustPackage ({
       pname = "rust-${sanitized}";
       version = "0.1.0";
       src = cargoRoot;
@@ -135,7 +136,7 @@ in {
       };
     } // lib.optionalAttrs (kind == "test") {
       postBuild = ''
-        cargo metadata --offline --locked --no-deps --format-version 1 \
+        cargo metadata --offline --locked --format-version 1 \
           > .viberoots-cargo-metadata.json
         cargo test ${testBuildCommand} > .viberoots-cargo-artifacts.jsonl
       '';

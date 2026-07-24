@@ -12,15 +12,22 @@ test("fixed pnpm store reconciliation keeps outputHash and verifies updated meta
     viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash.ts"),
     "utf8",
   );
-  const state = await fsp.readFile(
+  const reconciliation = await fsp.readFile(
     viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash/fixed-store-reconcile.ts"),
+    "utf8",
+  );
+  const build = await fsp.readFile(
+    viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash/fixed-store-build.ts"),
     "utf8",
   );
   assert.match(store, /outputHashMode = "recursive"/);
   assert.match(store, /outputHash = outHash/);
-  assert.match(state, /snapshotNodeModulesHashesJson/);
-  assert.match(state, /await opts\.updateHash\(suggested\)[\s\S]*await opts\.runBuild\(false\)/);
-  assert.match(state, /restoreMetadataOrThrow/);
-  assert.match(state, /new AggregateError/);
-  assert.doesNotMatch(store + updater + state, /add-fixed|unfixed-build|mkPnpmStoreUnfixed/);
+  assert.match(reconciliation, /snapshotNodeModulesHashesJson/);
+  assert.match(build, /await opts\.updateHash\(suggested\)[\s\S]*await opts\.runBuild\(false\)/);
+  assert.match(build, /restoreMetadataOrThrow/);
+  assert.match(build, /new AggregateError/);
+  assert.doesNotMatch(
+    store + updater + reconciliation + build,
+    /add-fixed|unfixed-build|mkPnpmStoreUnfixed/,
+  );
 });

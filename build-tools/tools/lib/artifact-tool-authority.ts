@@ -27,6 +27,13 @@ function scopedManifestCandidates(workspaceRoot: string): string[] {
   return [path.join(absolute, ".viberoots", "workspace", "toolchain-paths.json")];
 }
 
+export class MissingGeneratedArtifactToolAuthorityError extends Error {
+  constructor(file: string) {
+    super(`artifact build requires canonical generated tool authority at ${file}; run u && i`);
+    this.name = "MissingGeneratedArtifactToolAuthorityError";
+  }
+}
+
 function readScopedManifest(workspaceRoot: string): {
   file: string;
   parsed: { artifactTools?: { root?: unknown } } | null;
@@ -90,9 +97,7 @@ export function canonicalArtifactToolsRoot(workspaceRoot: string, assertedRoot =
   if (parsed === null) {
     const asserted = String(assertedRoot || "").trim();
     if (asserted) return validateArtifactToolsRoot(asserted, "active artifact tool authority");
-    throw new Error(
-      `artifact build requires canonical generated tool authority at ${file}; run u && i`,
-    );
+    throw new MissingGeneratedArtifactToolAuthorityError(file);
   }
   const root = literalArtifactToolsRoot(
     String(parsed.artifactTools?.root || ""),

@@ -9,6 +9,11 @@ import {
   artifactToolsGcRootPath,
   ensureArtifactToolsGcRoot,
 } from "../../dev/update-command/artifact-tools-gc-root";
+import { repairArtifactToolchainAuthority } from "../../dev/update-command/toolchain";
+import {
+  canonicalArtifactToolsRoot,
+  MissingGeneratedArtifactToolAuthorityError,
+} from "../../lib/artifact-environment";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 function existingStorePath(): string {
@@ -127,8 +132,78 @@ test("toolchain repair roots bootstrap and final canonical artifact tools", asyn
     "utf8",
   );
   assert.match(source, /storePath: canonicalArtifactToolsRoot\(root\)/);
+  assert.match(source, /error instanceof MissingGeneratedArtifactToolAuthorityError/);
   assert.match(source, /storePath: bootstrap\.artifactTools\.root/);
   assert.match(source, /storePath: finalPaths\.artifactTools\.root/);
+});
+
+test("toolchain bootstrap recovery is identified only by a missing generated authority", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-toolchain-bootstrap-class-"));
+  try {
+    assert.throws(
+      () => canonicalArtifactToolsRoot(root),
+      (error: Error) => error instanceof MissingGeneratedArtifactToolAuthorityError,
+    );
+
+    const manifest = path.join(root, ".viberoots", "workspace", "toolchain-paths.json");
+    await fsp.mkdir(path.dirname(manifest), { recursive: true });
+    await fsp.writeFile(manifest, "{not-json\n");
+    assert.throws(
+      () => canonicalArtifactToolsRoot(root),
+      (error: Error) =>
+        !(error instanceof MissingGeneratedArtifactToolAuthorityError) &&
+        /canonical artifact tool authority is invalid/.test(error.message),
+    );
+
+    await fsp.rm(manifest);
+    await fsp.mkdir(manifest);
+    assert.throws(
+      () => canonicalArtifactToolsRoot(root),
+      (error: Error) =>
+        !(error instanceof MissingGeneratedArtifactToolAuthorityError) &&
+        /canonical artifact tool authority is unreadable/.test(error.message),
+    );
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("toolchain repair fails closed on malformed generated authority", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-toolchain-malformed-"));
+  try {
+    const manifest = path.join(root, ".viberoots", "workspace", "toolchain-paths.json");
+    await fsp.mkdir(path.dirname(manifest), { recursive: true });
+    await fsp.writeFile(manifest, "{not-json\n");
+    await assert.rejects(
+      repairArtifactToolchainAuthority(root),
+      /canonical artifact tool authority is invalid/,
+    );
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+test("toolchain repair fails closed on non-owned GC-root state", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-toolchain-gc-ownership-"));
+  try {
+    const manifest = path.join(root, ".viberoots", "workspace", "toolchain-paths.json");
+    await fsp.mkdir(path.dirname(manifest), { recursive: true });
+    await fsp.writeFile(
+      manifest,
+      JSON.stringify({
+        artifactTools: { root: canonicalArtifactToolsRoot(process.cwd()) },
+      }),
+    );
+    const gcRoot = artifactToolsGcRootPath(root);
+    await fsp.mkdir(path.dirname(gcRoot), { recursive: true });
+    await fsp.writeFile(gcRoot, "not-owned\n");
+    await assert.rejects(
+      repairArtifactToolchainAuthority(root),
+      /refusing to replace non-symlink artifact tools gc root/,
+    );
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
 });
 
 test("expected fixed-output hash discovery never waits for active GC", async () => {

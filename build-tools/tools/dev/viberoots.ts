@@ -346,6 +346,10 @@ async function initWorkspace(): Promise<void> {
     sourcePath: getFlagStr("source"),
     shellEntry,
   });
+  if (shellEntry && process.env.VBR_DEVSHELL_RECONCILE !== "1") {
+    const { runReadOnlyLanguageConsistencyCheck } = await import("./dependency-consistency");
+    await runReadOnlyLanguageConsistencyCheck(workspaceRoot, "rust");
+  }
   const declaredArtifactTools = String(process.env.VBR_ARTIFACT_TOOLS_ROOT || "").trim();
   if (!shellEntry && declaredArtifactTools) {
     await installCanonicalArtifactToolsAuthority(workspaceRoot, declaredArtifactTools);

@@ -144,8 +144,7 @@ should fail with a clear command-specific explanation rather than silently upgra
 
 ## Supported Language Behavior
 
-This model applies to every supported non-Rust language surface. Rust dependency management is
-explicitly out of scope for this design.
+This model applies to every supported language surface, including package-local Cargo roots.
 
 ### Node And TypeScript
 
@@ -194,6 +193,27 @@ explicitly out of scope for this design.
 - `u --upgrade` reports C++ as reconciliation-only because C++ has no upgradeable dependency
   authority. It must not opportunistically move nixpkgs packages or provider selections.
 - `viberoots update` must not upgrade C++ dependencies or source selections.
+
+### Rust And Cargo
+
+- `i`, post-clone, devshell entry, and `b` validate checked-in `Cargo.lock` state with Nix-store
+  Cargo using `metadata --locked --offline`; they never repair tracked files.
+- `u` runs ordinary offline Cargo metadata resolution in a temporary copy, then verifies the
+  result with `metadata --locked --offline` before transactionally publishing lock bytes.
+- `u --upgrade` runs bounded `cargo update --offline` in the same temporary-copy boundary, then
+  performs the same locked verification and transactional publication.
+- Failure, timeout, or interruption leaves every Cargo lock at its prior byte content or prior
+  absence. Neither mode changes source-mode state, viberoots gitlinks, or flake pins.
+- `.viberoots/workspace/cargo-home` is the sole Cargo resolution cache. Commands remove inherited
+  Cargo/Rust environment selectors and never use the network; a missing reviewed cache entry fails
+  closed because this PR does not add a networked cache-population path.
+- One shared source policy is consumed by update validation and the Nix builder. Path dependencies
+  and crates.io lock sources are admitted; Git and alternate registries are rejected before `u`
+  can publish a lock that `b` would reject. Cargo `config` and `config.toml` files at the project or
+  workspace cache roots also fail closed so source replacement cannot forge an admitted lock
+  identity. The command boundary checks the copied Cargo root, its temporary execution ancestors,
+  and cargo-home. Live ancestors outside the copy cannot influence execution and are not rejected.
+  The Nix builder rejects source-root Cargo config at evaluation time.
 
 ## Error Message Contract
 

@@ -4,8 +4,18 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
+import { parseUpdateCommandArgs, UPDATE_COMMAND_HELP } from "../../dev/update-command/args";
 import { repairGoDependencies, repairPythonDependencies } from "../../dev/update-command/languages";
 import { runUpdateCommand, type UpdateOperations } from "../../dev/update-command/run";
+
+test("help documents the edit workflow and does not advertise u deps", () => {
+  assert.deepEqual(parseUpdateCommandArgs(["--upgrade"]), { upgrade: true, verbose: false });
+  assert.equal(parseUpdateCommandArgs(["--help"]), "help");
+  assert.match(UPDATE_COMMAND_HELP, /u --upgrade/);
+  assert.match(UPDATE_COMMAND_HELP, /i && b && v/);
+  assert.doesNotMatch(UPDATE_COMMAND_HELP, /u deps/);
+  assert.throws(() => parseUpdateCommandArgs(["--unexpected"]), /unknown argument/);
+});
 
 test("language repair creates conservative Go and Python lock metadata", async () => {
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-update-languages-"));
@@ -180,8 +190,11 @@ test("u modes preserve source authority while plain u repairs C++ metadata", asy
     const makeOperations = (): UpdateOperations => ({
       repairToolchainAuthority: async () => ({
         artifactToolsRoot: "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-artifact-tools",
+        goBin: "/nix/store/dddddddddddddddddddddddddddddddd-go/bin/go",
+        pythonBin: "/nix/store/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee-python/bin/python3",
         viberootsSource: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-source",
       }),
+      validateTransactionTools: () => {},
       importers: async () => ["projects/apps/web"],
       repairPnpmLock: async () => {
         await fsp.writeFile(path.join(root, "projects/apps/web/pnpm-lock.yaml"), "repaired\n");
@@ -193,11 +206,12 @@ test("u modes preserve source authority while plain u repairs C++ metadata", asy
         );
       },
       reconcilePnpm: async () => {},
-      enabledLanguages: async () => ["go", "python", "cpp"],
+      enabledLanguages: async () => ["go", "python", "cpp", "rust"],
       languageUpdates: {
         go: async () => 0,
         python: async () => 0,
         cpp: async () => 0,
+        rust: async () => 0,
       },
       repairWorkspaceLock: async () => {},
       repairGeneratedMetadata: async () => {

@@ -14,8 +14,10 @@ import {
 } from "./run-runnable-core";
 import { buildRunnableManifest, buildSelectedOutPath } from "./run-runnable-graph";
 import { enterCanonicalArtifactEntrypoint } from "./canonical-artifact-entrypoint";
+import type { ReviewedNixConfigOutcome } from "./canonical-reviewed-nix-config";
 import { canonicalArtifactToolsRoot } from "../lib/artifact-environment";
 import { directImporterDevSpec, directStaticWebappDevSpec } from "./run-runnable-dev-spec";
+import { applyNixCacheHealthPolicy } from "./verify/nix-cache-health";
 
 function commandCwdForSpec(
   spec: { argv: string[]; cwd?: string },
@@ -42,6 +44,7 @@ export async function runRunnable(opts: {
   argv: string[];
   workspaceRoot: string;
   artifactToolsRoot: string;
+  nixCacheHealth?: ReviewedNixConfigOutcome;
   resolveEntry?: (target: string) => Promise<RunnableManifestEntry | null>;
 }) {
   const parsed = parseArgs(opts.argv);
@@ -83,6 +86,7 @@ export async function runRunnable(opts: {
     try {
       selectedOutPath = await buildSelectedOutPath(workspaceRoot, target, parsed.sourceMode, {
         artifactToolsRoot,
+        nixCacheHealth: opts.nixCacheHealth,
       });
       const inferred = await inferRunnableFromOutPath({
         label: target,
@@ -122,6 +126,7 @@ export async function runRunnable(opts: {
         sourceMode: parsed.sourceMode,
         target,
         artifactToolsRoot,
+        nixCacheHealth: opts.nixCacheHealth,
       });
       entry = await readManifestEntry(refreshedManifestPath, target);
     }
@@ -182,6 +187,7 @@ export async function enterRunnableEntrypoint(): Promise<{
   argv: string[];
   workspaceRoot: string;
   artifactToolsRoot: string;
+  nixCacheHealth?: ReviewedNixConfigOutcome;
 }> {
   const initial = parseArgs(getArgvTokens());
   const workspaceRoot = await findRepoRoot(process.cwd());
@@ -189,7 +195,20 @@ export async function enterRunnableEntrypoint(): Promise<{
     initial.mode === "prod"
       ? enterCanonicalArtifactEntrypoint(workspaceRoot)
       : canonicalArtifactToolsRoot(workspaceRoot);
-  return { argv: getArgvTokens(), workspaceRoot, artifactToolsRoot };
+  let nixCacheHealth: ReviewedNixConfigOutcome | undefined;
+  if (initial.mode === "prod") {
+    const cacheHealth = await applyNixCacheHealthPolicy(workspaceRoot);
+    nixCacheHealth = {
+      applied: true,
+      config: cacheHealth.changed ? String(cacheHealth.nixConfig || "") : "",
+    };
+  }
+  return {
+    argv: getArgvTokens(),
+    workspaceRoot,
+    artifactToolsRoot,
+    ...(nixCacheHealth ? { nixCacheHealth } : {}),
+  };
 }
 
 const invoked = String(process.argv[1] || "").replaceAll("\\", "/");

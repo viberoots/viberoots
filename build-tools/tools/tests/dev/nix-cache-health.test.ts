@@ -1,14 +1,17 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import * as os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 import { applyNixCacheHealthPolicy } from "../../dev/verify/nix-cache-health";
 import { evaluateNixCacheReadinessFromConfig } from "../../lib/nix-cache-readiness";
 
 const VIBEROOTS_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../..");
+const execFileAsync = promisify(execFile);
 
 function sourceFile(rel: string): string {
   return path.join(VIBEROOTS_ROOT, rel);
@@ -143,25 +146,32 @@ test("nix cache health off mode leaves NIX_CONFIG unchanged", async () => {
   );
 });
 
-test("nix cache health default probe uses Nix credentials", async () => {
+test("nix cache health default probe uses the configured netrc for a real HTTP request", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "nix-cache-health-"));
   const logPath = path.join(tmp, "probe.log");
+  const netrcPath = path.join(tmp, "reviewed.netrc");
   const nixPath = path.join(tmp, "nix");
+  const curlPath = path.join(tmp, "curl");
+  await fsp.writeFile(netrcPath, "machine auth.example login token password fixture-secret\n", {
+    mode: 0o600,
+  });
   await fsp.writeFile(
     nixPath,
     [
       "#!/usr/bin/env bash",
       'if [ "$1" = "config" ] && [ "$2" = "show" ]; then',
-      "  printf '%s\\n' 'extra-substituters = https://auth.example/cache'",
-      "  exit 0",
-      "fi",
-      'if [ "$1" = "store" ] && [ "$2" = "info" ]; then',
-      '  printf \'%s\\n\' "$*" >> "$NIX_PROBE_LOG"',
+      "  printf '%s\\n' 'extra-substituters = https://auth.example/cache?token=fixture-query'",
+      `  printf '%s\\n' 'netrc-file = ${netrcPath}'`,
       "  exit 0",
       "fi",
       "exit 1",
       "",
     ].join("\n"),
+    { mode: 0o755 },
+  );
+  await fsp.writeFile(
+    curlPath,
+    ["#!/usr/bin/env bash", 'printf \'%s\\n\' "$*" >> "$CURL_PROBE_LOG"', "exit 0", ""].join("\n"),
     { mode: 0o755 },
   );
 
@@ -170,18 +180,128 @@ test("nix cache health default probe uses Nix credentials", async () => {
       PATH: `${tmp}:${process.env.PATH || ""}`,
       VBR_NIX_BIN: nixPath,
       NIX_BIN: nixPath,
-      NIX_PROBE_LOG: logPath,
+      CURL_PROBE_LOG: logPath,
       VBR_NIX_CACHE_POLICY: "auto",
       VBR_NIX_CACHE_HEALTH_APPLIED: "",
     },
     async () => {
       const result = await applyNixCacheHealthPolicy("/tmp/repo");
       assert.equal(result.changed, false);
-      assert.deepEqual(result.kept, ["https://auth.example/cache"]);
-      assert.match(
-        await fsp.readFile(logPath, "utf8"),
-        /store info --store https:\/\/auth\.example\/cache/,
-      );
+      assert.deepEqual(result.kept, ["https://auth.example/cache?token=fixture-query"]);
+      const probe = await fsp.readFile(logPath, "utf8");
+      assert.match(probe, new RegExp(`--netrc-file ${netrcPath.replaceAll("/", "\\/")}`));
+      assert.match(probe, /https:\/\/auth\.example\/cache\/nix-cache-info\?token=fixture-query/);
+      assert.doesNotMatch(probe, /fixture-secret/);
+    },
+  );
+});
+
+test("nix cache health diagnostics redact URL userinfo and query credentials", async () => {
+  const failed = "https://operator:secret@down.example/cache?token=failed-secret";
+  const kept = "https://reader:secret@kept.example/cache?token=kept-secret";
+  const logs: string[] = [];
+  await withEnv({ VBR_NIX_CACHE_POLICY: "auto", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
+    await applyNixCacheHealthPolicy("/tmp/repo", {
+      readEffectiveConfig: async () => `substituters = ${failed}\nextra-substituters = ${kept}`,
+      probeUrl: async (url) => url === kept,
+      log: (line) => logs.push(line),
+    });
+  });
+  assert.match(logs.join("\n"), /https:\/\/<redacted>@down\.example\/cache/);
+  assert.match(logs.join("\n"), /https:\/\/<redacted>@kept\.example\/cache/);
+  assert.doesNotMatch(logs.join("\n"), /operator|reader|failed-secret|kept-secret/);
+
+  await withEnv({ VBR_NIX_CACHE_POLICY: "strict", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
+    await assert.rejects(
+      applyNixCacheHealthPolicy("/tmp/repo", {
+        readEffectiveConfig: async () => `substituters = ${failed}`,
+        probeUrl: async () => false,
+      }),
+      (error: Error) => {
+        assert.match(error.message, /https:\/\/<redacted>@down\.example\/cache/);
+        assert.doesNotMatch(error.message, /operator|secret|token=/);
+        return true;
+      },
+    );
+  });
+});
+
+test("nix cache health rejects nix store-info false positives when HTTP is unreachable", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "nix-cache-health-false-positive-"));
+  const nixPath = path.join(tmp, "nix");
+  const curlPath = path.join(tmp, "curl");
+  const nixLog = path.join(tmp, "nix.log");
+  await fsp.writeFile(
+    nixPath,
+    [
+      "#!/usr/bin/env bash",
+      'printf \'%s\\n\' "$*" >> "$NIX_LOG"',
+      'if [ "$1" = "config" ] && [ "$2" = "show" ]; then',
+      "  printf '%s\\n' 'substituters = https://unresolvable.example/cache'",
+      `  printf '%s\\n' 'netrc-file = ${path.join(tmp, "reviewed.netrc")}'`,
+      "fi",
+      "exit 0",
+      "",
+    ].join("\n"),
+    { mode: 0o755 },
+  );
+  await fsp.writeFile(curlPath, "#!/usr/bin/env bash\nexit 6\n", { mode: 0o755 });
+  await withEnv(
+    {
+      PATH: `${tmp}:${process.env.PATH || ""}`,
+      VBR_NIX_BIN: nixPath,
+      NIX_BIN: nixPath,
+      NIX_LOG: nixLog,
+      VBR_NIX_CACHE_POLICY: "auto",
+      VBR_NIX_CACHE_HEALTH_APPLIED: "",
+    },
+    async () => {
+      const result = await applyNixCacheHealthPolicy("/tmp/repo");
+      assert.deepEqual(result.removed, ["https://unresolvable.example/cache"]);
+      assert.doesNotMatch(await fsp.readFile(nixLog, "utf8"), /store info/);
+    },
+  );
+
+  const malformed = "https://operator:malformed-secret@?token=malformed-query-secret";
+  const malformedLogs: string[] = [];
+  await withEnv({ VBR_NIX_CACHE_POLICY: "auto", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
+    await applyNixCacheHealthPolicy("/tmp/repo", {
+      readEffectiveConfig: async () => `substituters = ${malformed}`,
+      probeUrl: async () => false,
+      log: (line) => malformedLogs.push(line),
+    });
+  });
+  assert.match(malformedLogs.join("\n"), /<invalid-substituter>/);
+  assert.doesNotMatch(malformedLogs.join("\n"), /operator|malformed-secret|token=/);
+
+  await withEnv({ VBR_NIX_CACHE_POLICY: "strict", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
+    await assert.rejects(
+      applyNixCacheHealthPolicy("/tmp/repo", {
+        readEffectiveConfig: async () => `substituters = ${malformed}`,
+        probeUrl: async () => false,
+      }),
+      (error: Error) => {
+        assert.match(error.message, /<invalid-substituter>/);
+        assert.doesNotMatch(error.message, /operator|malformed-secret|token=/);
+        return true;
+      },
+    );
+  });
+});
+
+test("pre-applied cache health consumes the exact reviewed config handoff once", async () => {
+  const reviewed = "builders =\nsubstituters =\nextra-substituters =\nfallback = true";
+  await withEnv(
+    {
+      VBR_NIX_CACHE_HEALTH_APPLIED: "1",
+      VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: reviewed,
+    },
+    async () => {
+      const result = await applyNixCacheHealthPolicy(process.cwd());
+      assert.equal(result.changed, true);
+      assert.equal(result.nixConfig, reviewed);
+      assert.equal(process.env.NIX_CONFIG, reviewed);
+      assert.equal(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG, undefined);
     },
   );
 });
@@ -249,6 +369,21 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
     "utf8",
   );
   assertOrder(devBuild, "await applyNixCacheHealthPolicy(root)", "await runStartupCheck(root)");
+  assert.match(
+    devBuild,
+    /const cacheHealth = await applyNixCacheHealthPolicy\(root\)[\s\S]*cacheHealth\.changed && cacheHealth\.nixConfig[\s\S]*\{ NIX_CONFIG: cacheHealth\.nixConfig \}/,
+  );
+  const build = await fsp.readFile(sourceFile("build-tools/tools/bin/build"), "utf8");
+  assertOrder(
+    build,
+    "artifact_ingress_trust_devshell_baseline",
+    "artifact_ingress_publish_reviewed_nix_cache_config",
+  );
+  assertOrder(
+    build,
+    "artifact_ingress_publish_reviewed_nix_cache_config",
+    "artifact_ingress_restore_or_remove_selectors",
+  );
 
   const prelude = await fsp.readFile(
     sourceFile("build-tools/tools/dev/dev-build/prelude.ts"),
@@ -287,31 +422,35 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   assert.match(buck, /VBR_NIX_CACHE_HEALTH_APPLIED/);
   assert.match(buck, /printf -v NIX_CONFIG '%s\\nsubstituters =%s\\nextra-substituters =%s/);
   assert.match(buck, /nix-cache-info/);
+  assert.match(buck, /NIX_CACHE_BASE=.*NIX_CACHE_SUB%%\\\\\?\*/);
+  assert.match(buck, /nix-cache-info\$\{NIX_CACHE_QUERY\}/);
   assert.match(buck, /curl -fsS --connect-timeout 3 --max-time 5/);
   assert.match(buck, /if curl -fsS --connect-timeout 3 --max-time 5/);
-  assert.match(buckShell, /if "\$NIX_BIN" store info --store/);
-  assert.ok(
-    buckShell.indexOf('if "$NIX_BIN" store info --store') <
-      buckShell.indexOf("elif command -v curl"),
-  );
+  assert.match(buckShell, /--netrc-file "\$NIX_CACHE_NETRC"/);
+  assert.match(buckShell, /NIX_CACHE_REMOVED_IDENTITIES/);
+  assert.match(buckShell, /<redacted>@/);
+  assert.doesNotMatch(buckShell, /unavailable:\$NIX_CACHE_REMOVED"/);
   assert.match(buck, /viberoots-nix-cache\.noindex/);
   assert.match(buck, /NIX_CACHE_TMPDIR\/\.metadata_never_index/);
   assert.doesNotMatch(
     buck,
     /curl -fsS --connect-timeout 3 --max-time 5[^;]+; NIX_CACHE_PROBE_STATUS/,
   );
-  assert.doesNotMatch(buck, /"\$NIX_BIN" store info --store[^;]+; NIX_CACHE_PROBE_STATUS/);
+  assert.doesNotMatch(buck, /store info --store/);
   assert.doesNotMatch(buck, /\$\(cat/);
   assert.doesNotMatch(buck, /\$\(printf/);
   assert.doesNotMatch(buck, /export NIX_CONFIG="[^"]*\\\\n/);
 
   assert.match(env, /nix-cache-info/);
-  assert.match(env, /curl -fsS --connect-timeout 3 --max-time 5/);
-  assert.match(env, /if curl -fsS --connect-timeout 3 --max-time 5 "\$\{cache_info_url\}"/);
-  assert.match(env, /if nix store info --store "\$\{substituter\}" --option connect-timeout 3/);
-  assert.ok(
-    env.indexOf('if nix store info --store "${substituter}"') < env.indexOf("elif command -v curl"),
-  );
+  assert.match(env, /cache_base="\$\{substituter%%\\\?\*\}"/);
+  assert.match(env, /nix-cache-info\$\{cache_query\}/);
+  assert.match(env, /local curl_args=\(-fsS --connect-timeout 3 --max-time 5\)/);
+  assert.match(env, /curl "\$\{curl_args\[@\]\}" "\$\{cache_info_url\}"/);
+  assert.match(env, /curl_args\+=\(--netrc-file "\$\{netrc_file\}"\)/);
+  assert.match(env, /removed_identities/);
+  assert.match(env, /<redacted>@/);
+  assert.doesNotMatch(env, /unavailable: \$\{removed\[\*\]\}/);
+  assert.doesNotMatch(env, /store info --store/);
   assert.match(env, /env_mark_macos_metadata_never_index "\$\{cache_dir\}"/);
   assert.match(env, /env_mark_macos_metadata_never_index "\$\{NODE_V8_COVERAGE\}"/);
 

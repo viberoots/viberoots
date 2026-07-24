@@ -16,6 +16,8 @@ let
     pkgs.nodejs_22
     pkgs.python3
     pkgs.uv
+    pkgs.cargo
+    pkgs.gomod2nix
     pkgs.nix
     pnpm11
     pkgs.yq

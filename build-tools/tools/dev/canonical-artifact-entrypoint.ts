@@ -7,10 +7,6 @@ import {
   validateArtifactToolsRoot,
 } from "../lib/artifact-environment";
 import {
-  artifactSelectorNames,
-  assertNoArtifactSelectorInjection,
-} from "../lib/artifact-environment-policy";
-import {
   canonicalDevOverrideArg,
   evaluationBundleDevOverrides,
   evaluationBundleWasmBackend,
@@ -19,56 +15,20 @@ import {
 import { canonicalBuckActionTransport } from "./canonical-buck-action-transport";
 import { artifactWorkspaceRootTransport } from "./canonical-artifact-workspace-transport";
 import { buildCanonicalIngressEnvironment } from "./canonical-artifact-ingress-environment";
+import {
+  activateCanonicalReviewedNixConfig,
+  attachCanonicalReviewedNixConfig,
+  canonicalArtifactEnvironmentDifferences,
+  canonicalReviewedConfig,
+  consumeArtifactIngressReviewedNixConfig,
+  isCanonicalArtifactEntrypointEnvironment,
+  type ReviewedNixConfigOutcome,
+} from "./canonical-reviewed-nix-config";
 
-const CANONICAL_ENV_KEYS = [
-  "HOME",
-  "LANG",
-  "LC_ALL",
-  "NIX_REMOTE",
-  "NIX_SSL_CERT_FILE",
-  "PATH",
-  "SSL_CERT_FILE",
-  "SOURCE_DATE_EPOCH",
-  "TMPDIR",
-  "TZ",
-  "VBR_ARTIFACT_TOOLS_ROOT",
-  "VBR_NIX_BIN",
-  "XDG_CACHE_HOME",
-  "XDG_CONFIG_HOME",
-  "XDG_DATA_HOME",
-  "ZX_INIT",
-] as const;
-
-export function isCanonicalArtifactEntrypointEnvironment(
-  actual: NodeJS.ProcessEnv,
-  expected: NodeJS.ProcessEnv,
-): boolean {
-  return canonicalArtifactEnvironmentDifferences(actual, expected).length === 0;
-}
-
-function canonicalArtifactEnvironmentDifferences(
-  actual: NodeJS.ProcessEnv,
-  expected: NodeJS.ProcessEnv,
-): string[] {
-  const differences: string[] = [];
-  if (actual.VBR_CANONICAL_ARTIFACT_ENTRYPOINT !== "1") differences.push("canonical-marker");
-  for (const name of CANONICAL_ENV_KEYS) {
-    if (actual[name] !== expected[name]) differences.push(name);
-  }
-  const allowed = new Set(["VBR_ARTIFACT_TOOLS_ROOT"]);
-  for (const name of artifactSelectorNames()) {
-    if (!allowed.has(name) && String(actual[name] || "").trim()) differences.push(name);
-  }
-  try {
-    assertNoArtifactSelectorInjection(actual, {
-      allow: [...allowed],
-      rejectUnknownArtifactAffecting: true,
-    });
-  } catch (error) {
-    differences.push(error instanceof Error ? error.message : "artifact-selector-injection");
-  }
-  return [...new Set(differences)];
-}
+export {
+  consumeArtifactIngressReviewedNixConfig,
+  isCanonicalArtifactEntrypointEnvironment,
+} from "./canonical-reviewed-nix-config";
 
 function canonicalZxInit(toolsRoot: string): string {
   const zxInit = path.join(
@@ -107,18 +67,22 @@ function environmentAfterCanonicalWrapper(
 export function canonicalArtifactReentryEnvironment(
   workspaceRoot: string,
   artifactToolsRoot: string,
+  opts: { nixCacheHealth?: ReviewedNixConfigOutcome } = {},
 ): NodeJS.ProcessEnv {
   const toolsRoot = validateArtifactToolsRoot(
     artifactToolsRoot,
     "canonical re-entry tool authority",
   );
-  return {
-    ...environmentBeforeCanonicalWrapper(
-      buildCanonicalArtifactEnvironment(workspaceRoot, { artifactToolsRoot: toolsRoot }),
-      toolsRoot,
-    ),
-    VBR_CANONICAL_ARTIFACT_ENTRYPOINT: "1",
-  };
+  return attachCanonicalReviewedNixConfig(
+    {
+      ...environmentBeforeCanonicalWrapper(
+        buildCanonicalArtifactEnvironment(workspaceRoot, { artifactToolsRoot: toolsRoot }),
+        toolsRoot,
+      ),
+      VBR_CANONICAL_ARTIFACT_ENTRYPOINT: "1",
+    },
+    opts.nixCacheHealth || { applied: false, config: "" },
+  );
 }
 
 function canonicalWrapperPathIsIntact(toolsRoot: string): boolean {
@@ -148,6 +112,7 @@ export function enterCanonicalArtifactEntrypoint(
     allowDevOverrides?: boolean;
   } = {},
 ): string {
+  const ingressReviewedNixConfig = consumeArtifactIngressReviewedNixConfig();
   const originalArgs = process.argv.slice(2);
   const workspaceTransport = artifactWorkspaceRootTransport(originalArgs, workspaceRoot);
   const buckTransport = canonicalBuckActionTransport(
@@ -168,6 +133,12 @@ export function enterCanonicalArtifactEntrypoint(
     : canonicalArtifactToolsRoot(scopedWorkspaceRoot);
   const assertedTools = String(process.env.VBR_ARTIFACT_TOOLS_ROOT || "").trim();
   const canonicalReentry = process.env.VBR_CANONICAL_ARTIFACT_ENTRYPOINT === "1";
+  const reentryReviewed = canonicalReviewedConfig(process.env);
+  const nixCacheHealth = canonicalReentry
+    ? reentryReviewed.valid
+      ? { applied: reentryReviewed.applied, config: reentryReviewed.config }
+      : { applied: false, config: "" }
+    : ingressReviewedNixConfig;
   const reentryTools = canonicalReentry
     ? assertCanonicalArtifactReentry(assertedTools, process.execPath)
     : "";
@@ -179,6 +150,7 @@ export function enterCanonicalArtifactEntrypoint(
         reentryTools,
       )
     : {};
+  attachCanonicalReviewedNixConfig(expectedReentryEnv, nixCacheHealth);
   const reentryChecks = {
     asserted: Boolean(assertedTools),
     storeShape: /^\/nix\/store\/[a-z0-9]{32}-[^/]+$/u.test(assertedTools),
@@ -187,10 +159,12 @@ export function enterCanonicalArtifactEntrypoint(
     wrapperPath: canonicalReentry && canonicalWrapperPathIsIntact(assertedTools),
     environment:
       canonicalReentry && isCanonicalArtifactEntrypointEnvironment(process.env, expectedReentryEnv),
+    reviewedConfig: !canonicalReentry || reentryReviewed.valid,
     wasmEnvironmentEmpty: !String(process.env.WEB_WASM_BACKEND || "").trim(),
   };
   if (canonicalReentry && Object.values(reentryChecks).every(Boolean)) {
     process.argv = [...process.argv.slice(0, 2), ...workspaceTransport.argv];
+    activateCanonicalReviewedNixConfig(process.env, nixCacheHealth);
     return assertedTools;
   }
   if (canonicalReentry) {
@@ -219,17 +193,21 @@ export function enterCanonicalArtifactEntrypoint(
     wasmBackend,
   });
   const activeCanonicalEnv = environmentAfterCanonicalWrapper(canonicalEnv, toolsRoot);
+  attachCanonicalReviewedNixConfig(activeCanonicalEnv, nixCacheHealth);
   if (
     fs.realpathSync(process.execPath) === fs.realpathSync(canonicalNode) &&
     isCanonicalArtifactEntrypointEnvironment(process.env, activeCanonicalEnv)
   ) {
     process.argv = [...process.argv.slice(0, 2), ...workspaceTransport.argv];
+    activateCanonicalReviewedNixConfig(process.env, nixCacheHealth);
     return toolsRoot;
   }
   const wrapper = path.join(toolsRoot, "bin", "zx-wrapper");
   const script = String(process.argv[1] || "").trim();
   if (!script) throw new Error("canonical artifact entrypoint requires a script path");
-  const env = canonicalArtifactReentryEnvironment(scopedWorkspaceRoot, toolsRoot);
+  const env = canonicalArtifactReentryEnvironment(scopedWorkspaceRoot, toolsRoot, {
+    nixCacheHealth,
+  });
   const argsWithoutDevOverrides = withoutCanonicalDevOverrideArgs(buckTransport.argv);
   const wasmArgs = argsWithoutDevOverrides.some(
     (arg) => arg === "--wasm-backend" || arg.startsWith("--wasm-backend="),

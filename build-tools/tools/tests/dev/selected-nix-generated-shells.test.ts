@@ -23,8 +23,25 @@ test("Buck-generated shell wrappers invoke the selected nix binary", async () =>
   if (!nixCacheHealthShell.includes('"$NIX_BIN" config show')) {
     throw new Error("nix cache health shell must read config through the selected nix binary");
   }
-  if (!nixCacheHealthShell.includes('"$NIX_BIN" store info --store')) {
-    throw new Error("nix cache health shell must probe caches through the selected nix binary");
+  if (!nixCacheHealthShell.includes("curl -fsS --connect-timeout 3 --max-time 5")) {
+    throw new Error("nix cache health shell must perform a bounded HTTP reachability probe");
+  }
+  if (nixCacheHealthShell.includes("store info --store")) {
+    throw new Error("nix store info is not a cache reachability probe");
+  }
+  if (!nixCacheHealthShell.includes('--netrc-file "$NIX_CACHE_NETRC"')) {
+    throw new Error("nix cache health shell must preserve reviewed file-backed credentials");
+  }
+  if (!nixCacheHealthShell.includes("nix-cache-info${NIX_CACHE_QUERY}")) {
+    throw new Error(
+      "nix cache health shell must preserve query credentials after the endpoint path",
+    );
+  }
+  if (
+    !nixCacheHealthShell.includes("NIX_CACHE_REMOVED_IDENTITIES") ||
+    !nixCacheHealthShell.includes("<redacted>@")
+  ) {
+    throw new Error("nix cache health shell must redact diagnostic endpoint identities");
   }
   if (!nixShellGenerated.includes('"$NIX_BIN" run --accept-flake-config')) {
     throw new Error("nix shell bootstrap must run helper tools through the selected nix binary");
@@ -62,7 +79,7 @@ test("Buck-generated shell wrappers invoke the selected nix binary", async () =>
   ] as const) {
     const raw = source
       .split("\n")
-      .filter((line) => /\bnix (?:build|run|config show|store info)\b/.test(line))
+      .filter((line) => /\bnix (?:build|run|config show)\b/.test(line))
       .filter((line) => !line.includes("$NIX_BIN"));
     assert.deepEqual(raw, [], `${label} must not invoke ambient nix:\n${raw.join("\n")}`);
   }

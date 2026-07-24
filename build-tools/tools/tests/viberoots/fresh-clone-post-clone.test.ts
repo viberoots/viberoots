@@ -25,6 +25,11 @@ test("fresh recursive clone runs real post-clone initialization without tracked 
     /cold importer metadata is fresh: projects\/apps\/viberoots-site\/pnpm-lock\.yaml/,
   );
   assert.equal(await fsp.readlink(path.join(clone, ".viberoots", "current")), "../viberoots");
+  const marketplace = JSON.parse(
+    await fsp.readFile(path.join(clone, ".agents", "plugins", "marketplace.json"), "utf8"),
+  );
+  assert.equal(marketplace.plugins[0].name, "repo-skills");
+  assert.equal(marketplace.plugins[0].policy.installation, "INSTALLED_BY_DEFAULT");
   for (const rel of ["flake.nix", "flake.lock", "TARGETS"]) {
     await fsp.access(path.join(clone, ".viberoots", "workspace", rel));
   }
@@ -62,6 +67,10 @@ test("fresh flake-mode clone runs cold post-clone from immutable source without 
   assert.match(stdout, /workspace initialized/);
   const currentSource = await fsp.realpath(path.join(clone, ".viberoots", "current"));
   assert.match(currentSource, /^\/nix\/store\//);
+  const marketplace = JSON.parse(
+    await fsp.readFile(path.join(clone, ".agents", "plugins", "marketplace.json"), "utf8"),
+  );
+  assert.equal(marketplace.plugins[0].source.path, "./.viberoots/current/plugins/repo-skills");
   const { stdout: statusText } = await fixture.runCommand(["status", "--json"], clone, {
     ...fixture.commandEnv,
     WORKSPACE_ROOT: clone,

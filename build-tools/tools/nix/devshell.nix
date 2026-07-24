@@ -330,7 +330,7 @@ if [[ -o interactive ]]; then
     eval "$(vbr completion zsh)"
   fi
   _u() {
-    _arguments -S '--upgrade[intentionally upgrade pnpm dependency versions]' '--verbose[show reconciliation steps]' '(-h --help)'{-h,--help}'[show help]'
+    _arguments -S '--upgrade[intentionally upgrade supported project dependency versions]' '--verbose[show reconciliation steps]' '(-h --help)'{-h,--help}'[show help]'
   }
   compdef _u u
 fi
@@ -394,7 +394,7 @@ if command -v vbr >/dev/null 2>&1; then
   eval "$(vbr completion zsh)"
 fi
 _u() {
-  _arguments -S '--upgrade[intentionally upgrade pnpm dependency versions]' '--verbose[show reconciliation steps]' '(-h --help)'{-h,--help}'[show help]'
+  _arguments -S '--upgrade[intentionally upgrade supported project dependency versions]' '--verbose[show reconciliation steps]' '(-h --help)'{-h,--help}'[show help]'
 }
 compdef _u u
 EOF
@@ -424,7 +424,7 @@ EOF
           eval "$(vbr completion zsh)"
         fi
         _u() {
-          _arguments -S '--upgrade[intentionally upgrade pnpm dependency versions]' '--verbose[show reconciliation steps]' '(-h --help)'{-h,--help}'[show help]'
+          _arguments -S '--upgrade[intentionally upgrade supported project dependency versions]' '--verbose[show reconciliation steps]' '(-h --help)'{-h,--help}'[show help]'
         }
         compdef _u u
       fi
@@ -434,7 +434,7 @@ EOF
       # .viberoots/current/prelude; do not recreate a visible root prelude shim.
     '';
     buildInputs = [
-      pkgs.git pkgs.nix pkgs.buck2 pkgs.go pnpm11 pkgs.nodejs_22 pkgs.python3 pkgs.uv zx-wrapper viberootsCommand pkgs.jq pkgs.rsync pkgs.copier pkgs.yq pkgs.prettier
+      pkgs.git pkgs.nix pkgs.buck2 pkgs.go pkgs.cargo pnpm11 pkgs.nodejs_22 pkgs.python3 pkgs.uv zx-wrapper viberootsCommand pkgs.jq pkgs.rsync pkgs.copier pkgs.yq pkgs.prettier
       pkgs.jc pkgs.bash pkgs.coreutils pkgs.gomod2nix pkgs.opentofu pkgs.infisical pkgs.awscli2 pkgs.dnsutils
       pkgs.openssl pkgs.postgresql_16
     ] ++ (if pkgs.stdenv.isDarwin then [ agent-safehouse ] else [])

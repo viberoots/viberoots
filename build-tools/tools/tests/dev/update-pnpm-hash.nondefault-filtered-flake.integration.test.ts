@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { makeFilteredFlakeRef } from "../../dev/update-pnpm-hash/filtered-flake";
+import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 import { ensureToolchainPathsForTempRepo } from "../lib/test-helpers/toolchain-paths";
 
@@ -44,7 +45,12 @@ test("root importer filtered snapshot excludes large generated Buck state", asyn
   let cleanup: (() => Promise<void>) | undefined;
   try {
     await fsp.mkdir(path.join(root, "build-tools", "tools", "dev"), { recursive: true });
-    await fsp.writeFile(path.join(root, "flake.nix"), "{ outputs = _: {}; }\n");
+    await fsp.mkdir(path.join(root, ".viberoots", "workspace"), { recursive: true });
+    await fsp.writeFile(path.join(root, "flake.nix"), "{ outputs = _: { probe = false; }; }\n");
+    await fsp.writeFile(
+      path.join(root, ".viberoots", "workspace", "flake.nix"),
+      "{ outputs = _: { probe = builtins.pathExists ../../package.json; }; }\n",
+    );
     await fsp.writeFile(path.join(root, "package.json"), '{"name":"viberoots","private":true}\n');
     await fsp.writeFile(path.join(root, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n");
     await fsp.writeFile(path.join(root, "build-tools", "tools", "dev", "zx-init.mjs"), "\n");
@@ -54,8 +60,17 @@ test("root importer filtered snapshot excludes large generated Buck state", asyn
     await fsp.mkdir(path.dirname(sentinel), { recursive: true });
     await fsp.writeFile(sentinel, Buffer.alloc(8 * 1024 * 1024, 0x61));
 
-    const filtered = await makeFilteredFlakeRef({ repoRoot: root, attr: "pnpm", importer: "." });
+    const filtered = await makeFilteredFlakeRef({ repoRoot: root, attr: "probe", importer: "." });
     cleanup = filtered.cleanup;
+    assert.equal(
+      filtered.flakeRef,
+      `path:${filtered.workspaceRoot}?dir=.viberoots/workspace#probe`,
+      "hidden workspace flakes must retain the complete snapshot as their path-input root",
+    );
+    const evaluated = await $({ cwd: root })`${ensureNixStoreToolPathSync(
+      "nix",
+    )} eval --no-write-lock-file --json ${filtered.flakeRef}`;
+    assert.equal(JSON.parse(String(evaluated.stdout || "")), true);
     await assert.rejects(
       fsp.access(
         path.join(filtered.workspaceRoot, ".viberoots", "workspace", "buck", "large-sentinel.bin"),

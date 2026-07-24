@@ -64,10 +64,13 @@ artifact_ingress_reexec_with_devshell() {
       artifact_ingress_record_devshell_selectors "${VBR_ARTIFACT_INGRESS_DIRENV_ROOT:-$(pwd -P)}"
       return 0
     fi
-    exec 9<&- 2>/dev/null || true
+    { exec 9<&-; } 2>/dev/null || true
   fi
   unset VBR_ARTIFACT_INGRESS_DIRENV_ROOT VBR_ARTIFACT_INGRESS_DIRENV_TOKEN
   unset VBR_ARTIFACT_INGRESS_DIRENV_VERIFIED
+  unset VBR_NIX_CACHE_HEALTH_COMMAND_ACTIVE
+  unset VBR_NIX_CACHE_HEALTH_APPLIED
+  unset VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
   local direnv_bin root parent tools_root token
   root="$(pwd -P)"
   while [[ "${root}" != "/" && ! -f "${root}/.envrc" ]]; do
@@ -97,6 +100,20 @@ artifact_ingress_trust_devshell_baseline() {
   if [[ "${VBR_DEVSHELL_ARTIFACT_TOOLS_ROOT:-}" == "${tools_root}" ]]; then
     VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1
   fi
+}
+
+artifact_ingress_publish_reviewed_nix_cache_config() {
+  unset VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
+  if [[ "${VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED:-}" == "1" && "${VBR_NIX_CACHE_HEALTH_APPLIED:-}" == "1" ]]; then
+    if [[ "${VBR_DEVSHELL_ARTIFACT_WAS_SET_NIX_CONFIG:-}" == "1" ]]; then
+      VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG="${VBR_DEVSHELL_ARTIFACT_VALUE_NIX_CONFIG:-}"
+      export VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
+    fi
+    return 0
+  fi
+  # An unverified shell application is not a reusable decision. Let the
+  # TypeScript boundary perform the command's reviewed probe instead.
+  unset VBR_NIX_CACHE_HEALTH_APPLIED
 }
 
 artifact_ingress_capture_environment() {
@@ -210,10 +227,18 @@ artifact_ingress_exec() {
   local workspace_root="$1"
   local script_relative="$2"
   shift 2
-  local tools_root source_root zx_init
+  local tools_root source_root zx_init token reviewed_config_fd
   tools_root="$(artifact_ingress_tools_root "${workspace_root}")"
   source_root="${tools_root}/share/viberoots-source"
   zx_init="${source_root}/build-tools/tools/dev/zx-init.mjs"
+  unset VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN
+  if [[ "${VBR_NIX_CACHE_HEALTH_APPLIED:-}" == "1" ]]; then
+    token="${RANDOM}${RANDOM}-$$-${RANDOM}"
+    exec {reviewed_config_fd}<<<"${token}"
+    VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD="${reviewed_config_fd}"
+    VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN="${token}"
+    export VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN
+  fi
   exec "${tools_root}/bin/zx-wrapper" --import "${zx_init}" \
     "${source_root}/${script_relative}" --artifact-workspace-root="${workspace_root}" "$@"
 }

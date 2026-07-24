@@ -7,6 +7,7 @@ import { timeAsync } from "../timing";
 import { repoNodeBinDirectories } from "../../../../lib/repo-node-bin";
 import { withGitAutoMaintenanceDisabledEnv } from "../../../../lib/git-auto-maintenance-env";
 import { withSanitizedInheritedNixConfig } from "../../../../lib/nix-config-env";
+import { sharedPnpmStoreHashCacheRoot } from "../../../../dev/update-pnpm-hash/verified-marker";
 import type { SeededTempSetup } from "./contracts";
 import { LOCAL_FIXTURE_SERVICE_ENV } from "./contracts";
 import { applyTempNodePath, prependPath, prependTempRepoBin } from "./command-shims";
@@ -47,7 +48,10 @@ export async function buildSeededRuntimeEnv(
     }
   }
   exportEnv.REPO_ROOT = process.cwd();
-  exportEnv.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = process.cwd();
+  exportEnv.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = sharedPnpmStoreHashCacheRoot(
+    process.env,
+    realHome,
+  );
   exportEnv.CGO_ENABLED = String(exportEnv.CGO_ENABLED || "").trim() || "0";
 
   const injected = String((envOut as any).stdout || "");

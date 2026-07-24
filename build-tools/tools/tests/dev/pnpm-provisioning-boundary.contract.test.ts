@@ -4,6 +4,13 @@ import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
+function assertNixListAuthority(source: string, binding: string, authority: string): void {
+  const body = source.match(new RegExp(`\\b${binding}\\s*=\\s*\\[([\\s\\S]*?)\\]`))?.[1];
+  assert.ok(body, `missing ${binding} Nix list`);
+  assert.match(body, new RegExp(`(?:^|\\s)${authority}(?:\\s|$)`));
+  assert.doesNotMatch(body, /(?:^|\s)pkgs\.pnpm(?:\s|$)/);
+}
+
 test("build consumers do not repair pnpm provisioning state", async () => {
   const nodeModulesBuild = await fsp.readFile(
     viberootsSourcePath("viberoots/build-tools/tools/dev/node-modules-build.ts"),
@@ -52,16 +59,19 @@ test("all Nix command surfaces share the repository pnpm 11 authority", async ()
   );
 
   assert.match(devshell, /pnpm11 = import \.\/pnpm-11\.nix/);
-  assert.match(devshell, /pkgs\.go pnpm11 pkgs\.nodejs_22/);
-  assert.doesNotMatch(devshell, /pkgs\.go pkgs\.pnpm/);
+  for (const authority of ["pkgs.go", "pkgs.cargo", "pnpm11", "pkgs.nodejs_22"]) {
+    assertNixListAuthority(devshell, "buildInputs", authority);
+  }
   assert.match(updateApp, /pnpm11 = import \.\.\/pnpm-11\.nix/);
   assert.match(updateApp, /program = "\$\{pnpm11\}\/bin\/pnpm"/);
   assert.match(remoteWorker, /pnpm11 = import \.\.\/\.\.\/pnpm-11\.nix/);
-  assert.match(remoteWorker, /workerPaths = \[[\s\S]*\bpnpm11\b[\s\S]*\];/);
-  assert.doesNotMatch(remoteWorker, /pkgs\.pnpm/);
+  for (const authority of ["pkgs.cargo", "pnpm11", "pkgs.nodejs_22"]) {
+    assertNixListAuthority(remoteWorker, "workerPaths", authority);
+  }
   assert.match(nodePlanner, /pnpm11 = import \.\.\/pnpm-11\.nix/);
-  assert.match(nodePlanner, /nativeBuildInputs =[\s\S]*pkgs\.nodejs_22 pnpm11/);
-  assert.doesNotMatch(nodePlanner, /pkgs\.pnpm/);
+  for (const authority of ["pnpm11", "pkgs.nodejs_22"]) {
+    assertNixListAuthority(nodePlanner, "nativeBuildInputs", authority);
+  }
   assert.match(pnpm11, /#!\$\{pkgs\.nodejs_22\}\/bin\/node/);
 });
 

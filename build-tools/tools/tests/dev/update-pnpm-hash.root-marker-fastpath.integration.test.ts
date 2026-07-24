@@ -18,10 +18,11 @@ test("committed stores refresh ignored markers only after the final path is veri
   );
   assert.match(
     reconcile,
-    /if \(opts\.markerMetadataMatches && !opts\.force\) \{[\s\S]*const realized = await opts\.probe\(\)[\s\S]*opts\.marker\?\.derivationIdentity === realized\.derivationIdentity[\s\S]*await persist\(opts\.currentHash, realized\.derivationIdentity\)/,
+    /if \(opts\.markerMetadataMatches && !opts\.force\) \{[\s\S]*const realized = await opts\.probe\(\)[\s\S]*opts\.marker\?\.derivationIdentity === realized\.derivationIdentity[\s\S]*await persist\([\s\S]*opts\.currentHash,[\s\S]*realized\.derivationIdentity,[\s\S]*\[realized\.derivationIdentity\][\s\S]*\)/,
   );
   assert.match(main, /marker\.hashValue === currentHash/);
-  assert.match(main, /acceptedBuilderFingerprints\.includes\(marker\.builderFingerprint\)/);
+  assert.match(main, /marker\.builderFingerprint === builderFingerprint/);
+  assert.doesNotMatch(main, /acceptedBuilderFingerprints|FingerprintCandidates/);
   assert.match(reconcile, /opts\.marker\?\.derivationIdentity === realized\.derivationIdentity/);
   assert.match(
     main,

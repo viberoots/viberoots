@@ -153,12 +153,22 @@ export async function stageTempRepoPaths(opts: {
   const sorted = Array.from(files).sort((a, b) => a.localeCompare(b));
   if (sorted.length === 0) return;
 
+  const nestedPrefix = "viberoots/";
+  const parentFiles = sorted.filter((file) => !file.startsWith(nestedPrefix));
+  const nestedFiles = sorted
+    .filter((file) => file.startsWith(nestedPrefix))
+    .map((file) => file.slice(nestedPrefix.length));
   const chunkSize = 128;
-  for (let idx = 0; idx < sorted.length; idx += chunkSize) {
-    const chunk = sorted.slice(idx, idx + chunkSize);
-    await opts._$({
-      cwd: opts.tmp,
-      stdio: "pipe",
-    })`git add -f -- ${chunk}`;
+  for (const [cwd, ownedFiles] of [
+    [opts.tmp, parentFiles],
+    [path.join(opts.tmp, "viberoots"), nestedFiles],
+  ] as const) {
+    for (let idx = 0; idx < ownedFiles.length; idx += chunkSize) {
+      const chunk = ownedFiles.slice(idx, idx + chunkSize);
+      await opts._$({
+        cwd,
+        stdio: "pipe",
+      })`git add -f -- ${chunk}`;
+    }
   }
 }

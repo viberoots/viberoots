@@ -70,3 +70,7 @@ The repository includes an enforcement-style test that scans patch tooling for k
 - Test: `build-tools/tools/tests/patching/patch-tooling.helper-boundaries.enforcement.test.ts`
 
 When this test fails, the fix is to move the flagged logic behind the canonical helper surfaces listed above. If the test is a false positive, tighten the patterns rather than disabling the enforcement.
+
+## The `codex` wrapper (agent CLI)
+
+The repository ships a `codex` wrapper at `build-tools/tools/bin/codex` that layers a per-invocation macOS safehouse, worktree management, and a multi-account layer over the upstream `codex` CLI. The multi-account layer (rebinds `CODEX_HOME` per-account; supports `--account`, `--list-accounts`, `--remove-account`, guided `codex login`) is specified in [docs/history/designs/codex-wrapper-accounts-design.md](../history/designs/codex-wrapper-accounts-design.md). Account argv parsing, canonical resolution, structured auth inspection, login/removal lifecycle, listing, and NUL-delimited wrapper transport live in `build-tools/tools/dev/codex-accounts.ts` and its focused `codex-accounts/` modules. The Bash wrapper remains the tool-discovery, Safehouse, and worktree boundary.

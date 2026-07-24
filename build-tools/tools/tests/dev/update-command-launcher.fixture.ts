@@ -3,7 +3,6 @@ import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
-import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
 import {
   buildCanonicalArtifactEnvironment,
   canonicalArtifactToolsRoot,
@@ -11,14 +10,16 @@ import {
 } from "../../lib/artifact-environment";
 import { buckconfig } from "../../lib/consumer-bootstrap";
 import { derivePostCloneWorkspaceLock } from "../../lib/post-clone-workspace-lock";
-import { resolveToolPathSync } from "../../lib/tool-paths";
 import { workspaceFlakeInputs } from "../../lib/workspace-flake-inputs";
+import { sharedPnpmStoreHashCacheRoot } from "../../dev/update-pnpm-hash/verified-marker";
 import { VIBEROOTS_SOURCE_ROOT } from "../lib/test-helpers/source-paths";
 import { writeGlobalNixInputTargetFixtures } from "../lib/test-helpers/buck-config";
+import { prepareFilteredViberootsInput } from "../lib/test-helpers/run-in-temp/filtered-inputs";
 import { UPDATE_COMMAND_PROTECTED_PATHS } from "./update-command-launcher-protected-paths";
 
 const execFileAsync = promisify(execFile);
 let immutableSourcePromise: Promise<string> | undefined;
+let immutableSourceNarHash = "";
 
 function generatedWorkspaceFlake(immutableSource: string): string {
   return `{
@@ -35,50 +36,9 @@ ${workspaceFlakeInputs(`path:${immutableSource}`)}
 
 async function immutableViberootsSource(): Promise<string> {
   immutableSourcePromise ||= (async () => {
-    const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-u-filtered-source-"));
-    const filtered = path.join(tmp, "input");
-    await fsp.mkdir(filtered);
-    try {
-      const consumerRoot = path.dirname(VIBEROOTS_SOURCE_ROOT);
-      const rootLock = JSON.parse(
-        await fsp.readFile(path.join(consumerRoot, "flake.lock"), "utf8"),
-      );
-      const nodeName = rootLock.nodes?.[rootLock.root]?.inputs?.viberoots;
-      const locked = nodeName ? rootLock.nodes?.[nodeName]?.locked : undefined;
-      const revision = String(locked?.rev || "");
-      const expectedNarHash = String(locked?.narHash || "");
-      if (
-        !/^[a-f0-9]{40}$/.test(revision) ||
-        !/^sha256-[A-Za-z0-9+/]{43}=$/.test(expectedNarHash)
-      ) {
-        throw new Error("launcher fixture requires a locked committed viberoots revision");
-      }
-      const archive = path.join(tmp, "source.tar");
-      await execFileAsync(
-        resolveToolPathSync("git", process.env),
-        ["archive", "--format=tar", `--output=${archive}`, revision],
-        { cwd: VIBEROOTS_SOURCE_ROOT },
-      );
-      await execFileAsync(resolveToolPathSync("tar", process.env), [
-        "-xf",
-        archive,
-        "-C",
-        filtered,
-      ]);
-      const env = buildCanonicalArtifactEnvironment(process.cwd(), {
-        artifactToolsRoot: canonicalArtifactToolsRoot(
-          process.cwd(),
-          String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
-        ),
-      });
-      const materialized = await materializeFilteredViberootsSource(filtered, env);
-      if (materialized.locked.narHash !== expectedNarHash) {
-        throw new Error("launcher fixture committed source does not match the root lock authority");
-      }
-      return materialized.storePath;
-    } finally {
-      await fsp.rm(tmp, { recursive: true, force: true });
-    }
+    const materialized = await prepareFilteredViberootsInput(VIBEROOTS_SOURCE_ROOT);
+    immutableSourceNarHash = materialized.locked.narHash;
+    return materialized.storePath;
   })();
   return await immutableSourcePromise;
 }
@@ -93,19 +53,36 @@ async function makeCheckoutWritable(root: string): Promise<void> {
   }
 }
 
-export async function runUpdateCommand(root: string, args: string[] = []) {
+export async function runUpdateCommand(
+  root: string,
+  args: string[] = [],
+  envOverrides: NodeJS.ProcessEnv = {},
+) {
   const immutableSource = await immutableViberootsSource();
+  const artifactToolsRoot = canonicalArtifactToolsRoot(
+    root,
+    String(envOverrides.VBR_ARTIFACT_TOOLS_ROOT || ""),
+  );
+  const artifactEnv = buildCanonicalArtifactEnvironment(root, { artifactToolsRoot });
   const timeoutSecs = Number(
     process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200",
   );
-  return await execFileAsync(path.join(VIBEROOTS_SOURCE_ROOT, "build-tools/tools/bin/u"), args, {
+  // Every temp consumer must inherit the single canonical shared pnpm hash
+  // authority so the launcher does not fall back to a fixture-local cache root
+  // and recompute recursive timestamp normalization for every run.
+  const sharedHashCacheRoot = sharedPnpmStoreHashCacheRoot(process.env, os.homedir());
+  return await execFileAsync(path.join(immutableSource, "build-tools/tools/bin/u"), args, {
     cwd: root,
     env: {
-      ...withoutArtifactEnvironmentInfluence(process.env),
+      ...withoutArtifactEnvironmentInfluence({ ...process.env, ...envOverrides }),
+      ...artifactEnv,
       NO_DEV_SHELL: "1",
       WORKSPACE_ROOT: root,
       VIBEROOTS_SOURCE_ROOT: immutableSource,
       VIBEROOTS_FLAKE_INPUT_ROOT: immutableSource,
+      VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT:
+        String(envOverrides.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT || "").trim() ||
+        sharedHashCacheRoot,
     },
     timeout: timeoutSecs * 1000,
     maxBuffer: 1024 * 1024 * 32,
@@ -142,7 +119,21 @@ export async function createUpdateCommandFixture(name: string): Promise<string> 
   await fsp.symlink(prelude, path.join(root, ".viberoots/workspace/prelude"));
   await fsp.copyFile(path.join(consumerRoot, "flake.nix"), path.join(root, "flake.nix"));
   await fsp.copyFile(path.join(consumerRoot, "flake.lock"), path.join(root, "flake.lock"));
+  await fsp.copyFile(
+    path.join(consumerRoot, ".viberoots/workspace/toolchain-paths.json"),
+    path.join(root, ".viberoots/workspace/toolchain-paths.json"),
+  );
   const immutableSource = await immutableViberootsSource();
+  const rootLockPath = path.join(root, "flake.lock");
+  const rootLock = JSON.parse(await fsp.readFile(rootLockPath, "utf8"));
+  const viberootsNode = rootLock.nodes[rootLock.nodes[rootLock.root].inputs.viberoots];
+  viberootsNode.locked = {
+    narHash: immutableSourceNarHash,
+    path: immutableSource,
+    type: "path",
+  };
+  viberootsNode.original = { path: immutableSource, type: "path" };
+  await fsp.writeFile(rootLockPath, `${JSON.stringify(rootLock, null, 2)}\n`, "utf8");
   await fsp.cp(immutableSource, path.join(root, "viberoots"), { recursive: true });
   await makeCheckoutWritable(path.join(root, "viberoots"));
   await fsp.symlink("../viberoots", path.join(root, ".viberoots/current"));

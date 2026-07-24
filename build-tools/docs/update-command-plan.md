@@ -170,12 +170,13 @@ focused reruns and avoiding unnecessary full-suite restarts.
 - Do not silently turn conservative lock repair into a broad package upgrade.
 - Do not add fallbacks that hide stale metadata, missing exact stores, unsupported lock repair, or
   source-mode drift.
-- Do not include Rust dependency/update behavior in this plan. Rust may use viberoots toolchains or
-  fixtures, but Rust dependency management is not part of this update-command design.
+- Rust dependency/update behavior is added by PR-3 of `rust-language-plan.md`; that later extension
+  uses this plan's existing read-only, managed-command, and transaction authorities.
 
 ## Supported Language Surfaces
 
-This plan covers every currently supported non-Rust language/dependency surface:
+This plan established the original non-Rust language surfaces. The Rust plan now extends the same
+command model with package-local Cargo metadata:
 
 - Node and TypeScript through pnpm importer lockfiles, pnpm hash metadata, exact pnpm store
   metadata, `node_modules` materialization, Node patches, and generated Node providers.
@@ -184,8 +185,8 @@ This plan covers every currently supported non-Rust language/dependency surface:
 - C++ through Nix package/provider/source-selection metadata, C++ patch metadata, and generated
   provider/glue state.
 
-Rust is intentionally excluded. If Rust gains first-class dependency metadata later, it should get a
-separate design update rather than being inferred into this command split.
+Rust uses Nix-store Cargo, offline metadata resolution, locked verification, temporary workspace
+copies, and byte-exact multi-root rollback. `u --upgrade` is its only broad update authority.
 
 Command responsibility by language:
 

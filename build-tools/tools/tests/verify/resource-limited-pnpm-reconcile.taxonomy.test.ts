@@ -39,14 +39,20 @@ test("tests that invoke public pnpm reconciliation use the resource-limited lane
     const invokesPublicUpdate =
       abs.startsWith(`${scaffoldingRoot}${path.sep}`) &&
       /viberoots\/build-tools\/tools\/bin\/u\b/.test(source);
-    if (!reconciles && !usesReconciledScaffold && !invokesPublicUpdate) continue;
+    const invokesUpdateLauncher =
+      /runUpdateCommand/.test(source) &&
+      /from\s+["']\.\/update-command-launcher\.fixture["']/.test(source);
+    if (!reconciles && !usesReconciledScaffold && !invokesPublicUpdate && !invokesUpdateLauncher) {
+      continue;
+    }
     const rel = path.relative(root, abs).split(path.sep).join(path.posix.sep);
-    if (invokesPublicUpdate) directPublicUpdateTests.push(rel);
+    if (invokesPublicUpdate || invokesUpdateLauncher) directPublicUpdateTests.push(rel);
     if (!taxonomy.includes(`${JSON.stringify(rel)}: True`)) missing.push(rel);
   }
 
   assert.deepEqual(missing, []);
   assert.deepEqual(directPublicUpdateTests.sort(), [
+    "build-tools/tools/tests/dev/update-command.launcher.integration.test.ts",
     "build-tools/tools/tests/scaffolding/go-app.auto-wires-go-tests.test.ts",
     "build-tools/tools/tests/scaffolding/go-cli.simple-patched-uuid.runtime.test.ts",
     "build-tools/tools/tests/scaffolding/go-lib.auto-wires-go-tests.test.ts",

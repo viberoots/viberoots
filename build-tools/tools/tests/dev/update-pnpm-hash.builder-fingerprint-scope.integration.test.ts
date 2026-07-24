@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 
-test("update-pnpm-hash separates verified marker and shared-cache fingerprints", async () => {
+test("update-pnpm-hash keeps local marker fingerprints and exact shared derivation authority", async () => {
   const txt = await fsp.readFile(
     "viberoots/build-tools/tools/dev/update-pnpm-hash/verified-marker.ts",
     "utf8",
@@ -47,17 +47,11 @@ test("update-pnpm-hash separates verified marker and shared-cache fingerprints",
       );
     }
   }
-  const provisioningList = txt.match(
-    /const exactStoreProvisioningFingerprintFiles = \[([\s\S]*?)\] as const;/,
-  )?.[1];
   if (
-    !provisioningList ||
-    !provisioningList.includes("fixed-store-reconcile.ts") ||
-    !provisioningList.includes("update-pnpm-hash/nix.ts")
+    txt.includes("exactStoreProvisioningFingerprintFiles") ||
+    txt.includes("currentVerifiedMarkerFingerprintCandidates")
   ) {
-    throw new Error(
-      "shared-cache fingerprints must include the native fixed-output reconciliation helpers",
-    );
+    throw new Error("verified markers must have one current fingerprint authority");
   }
   for (const deleted of ["nondefault.ts", "exact-store-fetch.ts", "exact-store-import.ts"]) {
     if (txt.includes(`update-pnpm-hash/${deleted}`)) {
@@ -78,42 +72,29 @@ test("update-pnpm-hash separates verified marker and shared-cache fingerprints",
       "current verified markers must not be invalidated by exact-store helper-only edits",
     );
   }
-  const sharedCacheFingerprintBody = txt.match(
-    /export async function currentSharedPnpmStoreHashCacheFingerprint\([\s\S]*?return await verifiedMarkerFingerprintForFiles\(([\s\S]*?)\);\n}/,
-  )?.[1];
+  if (txt.includes("currentSharedPnpmStoreHashCacheFingerprint")) {
+    throw new Error("shared pnpm-store cache must not retain an approximate file fingerprint");
+  }
+  const sharedLockBody = txt.match(/export async function withSharedHashCacheLock[\s\S]*?\n}/)?.[0];
   if (
-    !sharedCacheFingerprintBody ||
-    !sharedCacheFingerprintBody.includes("exactStoreProvisioningFingerprintFiles")
+    !sharedLockBody ||
+    !sharedLockBody.includes("const lockRoot = sharedPnpmStoreHashCacheRoot()") ||
+    !sharedLockBody.includes("scopeRootAbs: lockRoot")
   ) {
     throw new Error(
-      "shared pnpm-store hash cache keys must include exact-store provisioning helpers",
+      "shared pnpm-store authority must serialize equivalent temp repos through one global lock scope",
     );
-  }
-  const candidatesBody = txt.match(
-    /export async function currentVerifiedMarkerFingerprintCandidates\([\s\S]*?\n}/,
-  )?.[0];
-  if (
-    !candidatesBody ||
-    !candidatesBody.includes("currentVerifiedMarkerFingerprint") ||
-    !candidatesBody.includes("exactStoreProvisioningFingerprintFiles")
-  ) {
-    throw new Error(
-      "verified marker candidates must accept the recent exact-store provisioning fingerprint during migration",
-    );
-  }
-  if (!candidatesBody.includes("Array.from(new Set([current, exactStoreProvisioning]))")) {
-    throw new Error("verified marker candidates must include current and exact-store fingerprints");
   }
   const updateFlowTxt = `${updaterTxt}\n${reconciliationTxt}`;
   const persistCount = (updateFlowTxt.match(/persistVerifiedHash\(\{/g) || []).length;
-  const sharedPersistCount = (
-    updateFlowTxt.match(
-      /sharedCacheBuilderFingerprint(?:,|: opts\.sharedCacheBuilderFingerprint)/g,
-    ) || []
-  ).length;
-  if (persistCount === 0 || sharedPersistCount < persistCount + 1) {
+  if (
+    persistCount === 0 ||
+    !updateFlowTxt.includes("authorityDerivationIdentity") ||
+    !updateFlowTxt.includes("finalDerivationIdentity") ||
+    !updateFlowTxt.includes("evaluatePnpmStoreDerivationIdentity")
+  ) {
     throw new Error(
-      "all update-pnpm-hash persist/restore paths must use the shared-cache builder fingerprint",
+      "shared pnpm-store persist/restore must use exact evaluated derivation identities",
     );
   }
 });

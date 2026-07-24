@@ -8,5 +8,8 @@ description: Run this repository's validation flow in a delegated tester subagen
 Use this plugin skill as the direct entrypoint for delegated repo validation.
 
 1. Read [WORKFLOW.md](WORKFLOW.md) and use it as the source of truth for the rest of the task.
-2. Spawn a tester subagent and keep verbose validation output in repo-local log files.
-3. Keep persistent state out of user-global plugin or skill caches; this repo-local plugin skill is the shared source.
+2. Spawn the tester with isolated context (`fork_turns="none"` when supported). Provide only the
+   repository path, validation contract, selector, and required repo guidance paths.
+3. Keep verbose validation output in repo-local log files. Never send the parent conversation or
+   full logs to the tester.
+4. Keep persistent state out of user-global plugin or skill caches; this repo-local plugin skill is the shared source.

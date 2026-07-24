@@ -167,17 +167,15 @@ export async function makeFilteredFlakeRef(opts: {
     }
     const hiddenFlake = path.join(snapDirReal, ".viberoots", "workspace", "flake.nix");
     const rootFlake = path.join(snapDirReal, "flake.nix");
-    const flakeDir = (await fsp
+    const haveHiddenFlake = await fsp
       .access(hiddenFlake)
       .then(() => true)
-      .catch(() => false))
-      ? path.dirname(hiddenFlake)
-      : (await fsp
-            .access(rootFlake)
-            .then(() => true)
-            .catch(() => false))
-        ? snapDirReal
-        : "";
+      .catch(() => false);
+    const haveRootFlake = await fsp
+      .access(rootFlake)
+      .then(() => true)
+      .catch(() => false);
+    const flakeDir = haveHiddenFlake ? path.dirname(hiddenFlake) : haveRootFlake ? snapDirReal : "";
     if (!flakeDir) {
       throw new Error(
         "[update-pnpm-hash] filtered flake snapshot is missing .viberoots/workspace/flake.nix and flake.nix",
@@ -200,7 +198,12 @@ export async function makeFilteredFlakeRef(opts: {
         .storePath;
     }
     return {
-      flakeRef: `path:${flakeDir}#${opts.attr}`,
+      // Root the path input at the complete filtered snapshot. A path input
+      // rooted directly at the hidden flake directory cannot resolve its
+      // workspaceSrc = ../.. after Nix imports only that directory.
+      flakeRef: haveHiddenFlake
+        ? `path:${snapDirReal}?dir=.viberoots/workspace#${opts.attr}`
+        : `path:${snapDirReal}#${opts.attr}`,
       workspaceRoot: snapDirReal,
       viberootsInputRoot,
       cleanup: async () => await removeOwnedTempTree(workDir),

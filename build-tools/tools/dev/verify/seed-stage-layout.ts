@@ -4,8 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
-export const PREPARED_MARKER = ".seed-store-prepared-v7";
-export const STAGE_ROOT_PROTOCOL_DIR = "stage-v8";
+export const PREPARED_MARKER = ".seed-store-prepared-v8";
+export const STAGE_ROOT_PROTOCOL_DIR = "stage-v9";
 
 export function seedStageRootDirForTest(): string {
   const override = String(process.env.VBR_VERIFY_SEED_STAGE_ROOT || "").trim();

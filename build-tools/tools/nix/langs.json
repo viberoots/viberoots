@@ -102,7 +102,7 @@
       "hermetic": {
         "status": "scaffold",
         "sourceRoles": true,
-        "dependencyReconciliation": false,
+        "dependencyReconciliation": true,
         "immutableBundleInputs": true,
         "storeQualifiedToolchain": true,
         "selectorTransport": true,

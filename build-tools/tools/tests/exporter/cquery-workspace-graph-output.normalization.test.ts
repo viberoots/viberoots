@@ -33,3 +33,22 @@ test("non-workspace graph outputs retain their physical identity", () => {
   });
   assert.equal(node?.out, output);
 });
+
+test("generated global input outputs retain content-addressed graph identity", () => {
+  const label = "root//projects/config:node-modules.hashes.json";
+  const cold = nodesFromCqueryJson({
+    [label]: {
+      ...graphNode(`node-modules.hashes.${"a".repeat(64)}.json`),
+      name: label,
+    },
+  });
+  const warm = nodesFromCqueryJson({
+    [label]: {
+      ...graphNode(`node-modules.hashes.${"b".repeat(64)}.json`),
+      name: label,
+    },
+  });
+
+  assert.equal(cold[0]?.name, "//projects/config:node-modules.hashes.json");
+  assert.notDeepEqual(warm, cold);
+});

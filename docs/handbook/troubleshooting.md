@@ -1,5 +1,22 @@
 # Troubleshooting
 
+## Stale Cargo metadata
+
+- Symptom: `i`, post-clone, devshell entry, or `b` reports a stale `Cargo.lock` and `repair: run u`.
+- Run `u` after ordinary `Cargo.toml` edits. Use `u --upgrade` only when dependency versions should
+  intentionally move.
+- Cargo reconciliation is offline and uses only `.viberoots/workspace/cargo-home`; inherited
+  `CARGO_*` and Rust tool selectors are ignored. PR-3 provides no networked cache-population
+  command, so a missing crates.io index or crate entry fails closed and requires an explicitly
+  reviewed provisioning change rather than host Cargo or network access. Git and alternate
+  registries are not admitted sources and remain rejected even when an ambient cache contains them.
+  Copied-root and temporary-execution-ancestor `.cargo/config*`, workspace cargo-home `config*`,
+  and Nix source-root Cargo config files are rejected because source replacement can otherwise
+  hide an alternate registry behind crates.io lock identity. Live ancestors outside the copied
+  Cargo root cannot influence temporary execution and are not rejected.
+- A failed, timed-out, or interrupted update leaves every affected lock at its prior bytes or prior
+  absence. Preserve the failure output and fix the unsupported or unavailable dependency source.
+
 ## Bootstrap-safe glue
 
 - Glue and CI entrypoints are bootstrap-safe and do not depend on `fs-extra`. They can run before `node_modules` exists.
@@ -153,7 +170,8 @@
     full pre-merge command.
 - Symptom: `i`, `b`, or `v` logs `nix cache health: disabled unreachable substituter(s)`.
   - Meaning: default `VBR_NIX_CACHE_POLICY=auto` dynamically removed unreachable configured
-    HTTP(S) substituters for the current process and kept Nix fallback enabled. This is not a local
+    HTTP(S) substituters for the current top-level command and kept Nix fallback enabled. Each new
+    command performs a bounded `nix-cache-info` request; nested children share that decision. This is not a local
     validation failure by itself.
   - Fix: no local action is required unless you are validating remote-build or cache readiness.
     Repair the named cache endpoint, credentials, DNS, or network route before treating the cache as
@@ -166,8 +184,7 @@
 - Symptom: cache readiness fails under `VBR_NIX_CACHE_POLICY=strict`.
   - Meaning: strict mode is intentionally fail-closed and should be used only when cache
     availability is the thing being tested.
-  - Fix: rerun the readiness check after `nix store info --store <substituter>` succeeds for the
-    listed substituters, or
+  - Fix: rerun the readiness check after the listed substituters serve `nix-cache-info`, or
     switch back to the default `auto` policy for ordinary local validation.
 
 ## Verify scope or status looks surprising

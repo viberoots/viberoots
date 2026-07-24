@@ -2,6 +2,7 @@ import { runGoModTidyForMissingSum } from "./install/go-tidy";
 import { runGomod2nixGenerateIn } from "./install/gomod2nix";
 import { assertCppTrackedMetadataReady } from "./install/metadata-mode";
 import { runUvRefreshAll } from "./install/uv";
+import { assertRustTrackedMetadataReady } from "./install/cargo";
 import {
   projectLanguageSurfaces,
   projectModuleDirs,
@@ -32,6 +33,7 @@ export const defaultReadOnlyLanguageChecks: ReadOnlyLanguageChecks = {
   python: async (root) =>
     await withWorkspaceRoot(root, async () => await runUvRefreshAll(false, false, true)),
   cpp: async (root) => await assertCppTrackedMetadataReady(root, true),
+  rust: async (root) => await assertRustTrackedMetadataReady(root),
 };
 
 export async function runReadOnlyLanguageConsistencyChecks(
@@ -39,6 +41,16 @@ export async function runReadOnlyLanguageConsistencyChecks(
   checks: ReadOnlyLanguageChecks = defaultReadOnlyLanguageChecks,
 ): Promise<void> {
   for (const surface of projectLanguageSurfaces) {
-    if (await surface.enabled(root)) await checks[surface.id](root);
+    await runReadOnlyLanguageConsistencyCheck(root, surface.id, checks);
   }
+}
+
+export async function runReadOnlyLanguageConsistencyCheck(
+  root: string,
+  id: ProjectLanguageId,
+  checks: ReadOnlyLanguageChecks = defaultReadOnlyLanguageChecks,
+): Promise<void> {
+  const surface = projectLanguageSurfaces.find((candidate) => candidate.id === id);
+  if (!surface) throw new Error(`unknown project language consistency surface: ${id}`);
+  if (await surface.enabled(root)) await checks[id](root);
 }

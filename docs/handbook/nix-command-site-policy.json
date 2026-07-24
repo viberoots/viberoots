@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "expectedCount": 532,
-  "expectedDigest": "c73123525ab7ee0b87479dc66854e0a58ce856dbc90ab17da070fb8aa408a538",
+  "expectedCount": 534,
+  "expectedDigest": "aade2ee3de38bd4efe13fe726361574961e793a663a78861d15c961f0fc5de92",
   "classificationRules": [
     {
       "pathPattern": "^Jenkinsfile$",
@@ -68,6 +68,11 @@
       "pathPattern": "^build-tools/tools/dev/(?:dev-with-wasm-watch|run-runnable(?:\\.ts|-core\\.ts)|watch-wasm-(?:coordinator|coordinator-daemon))",
       "role": "live-d",
       "justification": "Live development launchers and watcher coordinators intentionally retain working-tree observation and cannot publish artifacts."
+    },
+    {
+      "pathPattern": "^build-tools/tools/dev/codex-accounts/",
+      "role": "non-artifact-orchestration",
+      "justification": "The Codex account controller invokes the reviewed upstream agent CLI for login and compatibility inspection without constructing repository artifacts."
     },
     {
       "pathPattern": "^build-tools/tools/dev/dev-build/(?:args|materialize-impure)\\.ts$",

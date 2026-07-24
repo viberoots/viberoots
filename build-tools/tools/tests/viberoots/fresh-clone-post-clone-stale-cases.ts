@@ -83,4 +83,17 @@ export async function assertStalePnpmPostCloneCase(fixture: Fixture): Promise<vo
   assert.deepEqual(await fsp.readFile(lock), before);
   assert.equal(await git(pnpmClone, ["status", "--short"]), "");
   await fixture.cleanupClone(pnpmClone);
+
+  const consistencyClone = await fixture.clone("stale-pnpm-consistency-clone");
+  const consistencyLock = path.join(consistencyClone, "projects/apps/stale-pnpm/pnpm-lock.yaml");
+  const consistencyBefore = await fsp.readFile(consistencyLock);
+  await assert.rejects(
+    fixture.postClone(consistencyClone, {
+      lockfile: "projects/apps/stale-pnpm/pnpm-lock.yaml",
+    }),
+    /tracked metadata is stale: projects\/apps\/stale-pnpm\/pnpm-lock\.yaml[\s\S]*no tracked files were modified[\s\S]*repair: run u/,
+  );
+  assert.deepEqual(await fsp.readFile(consistencyLock), consistencyBefore);
+  assert.equal(await git(consistencyClone, ["status", "--short"]), "");
+  await fixture.cleanupClone(consistencyClone);
 }

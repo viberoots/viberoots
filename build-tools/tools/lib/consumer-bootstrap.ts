@@ -8,6 +8,10 @@ import {
   initSprinkleRefConfigs,
 } from "../deployments/sprinkleref-templates";
 import { BUCK_PROJECT_IGNORE_LINE } from "./buck-project-ignore";
+import {
+  buildCanonicalArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+} from "./artifact-environment";
 import { createCommandUi } from "./command-ui";
 import { direnvStage0, envrc, filterCapturedHostPath } from "./consumer-direnv";
 import {
@@ -27,6 +31,7 @@ import { isGeneratedRepoStateRelPath } from "./generated-repo-state";
 import { mkdirWithMacosMetadataExclusion } from "./macos-metadata";
 import { withSanitizedInheritedNixConfig } from "./nix-config-env";
 import { writePostCloneWorkspaceLock } from "./post-clone-workspace-lock";
+import { writeRepoSkillsMarketplace } from "./repo-skills-marketplace";
 import { envWithResolvedNixBin, resolveToolPathSync } from "./tool-paths";
 import { activateWorkspace } from "./workspace-activation";
 import { workspaceFlakeInputs } from "./workspace-flake-inputs";
@@ -892,6 +897,32 @@ async function runPostClonePnpmMaterialization(
   );
 }
 
+async function runPostCloneConsistency(workspaceRoot: string, sourcePath: string): Promise<void> {
+  const script = path.join(
+    sourcePath,
+    "build-tools",
+    "tools",
+    "dev",
+    "consumer-consistency-check.ts",
+  );
+  const artifactToolsRoot = canonicalArtifactToolsRoot(
+    workspaceRoot,
+    String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+  );
+  const env = {
+    ...buildCanonicalArtifactEnvironment(workspaceRoot, { artifactToolsRoot }),
+    VIBEROOTS_ROOT: sourcePath,
+    VIBEROOTS_SOURCE_ROOT: sourcePath,
+    WORKSPACE_ROOT: workspaceRoot,
+  };
+  await runInherited(
+    path.join(artifactToolsRoot, "bin", "zx-wrapper"),
+    [script],
+    workspaceRoot,
+    env,
+  );
+}
+
 async function runInherited(
   command: string,
   args: string[],
@@ -1083,6 +1114,7 @@ Project and application source belongs here.
   await initLocalSprinkleRefValues(opts.workspaceRoot);
 
   await repairCurrentSymlinkForBootstrap(opts.workspaceRoot, opts.sourcePath);
+  await writeRepoSkillsMarketplace(opts.workspaceRoot);
   if (opts.lock !== false) {
     await runNixFlakeLock(opts);
     if (!isPostCloneBootstrap(opts)) {
@@ -1107,6 +1139,9 @@ Project and application source belongs here.
   }
   if (opts.runInstall && isPostCloneBootstrap(opts)) {
     await runPostClonePnpmMaterialization(opts.workspaceRoot, activation.sourcePath);
+  }
+  if (isPostCloneBootstrap(opts)) {
+    await runPostCloneConsistency(opts.workspaceRoot, activation.sourcePath);
   }
   if (opts.runInstall) await runInstall(opts.workspaceRoot, allowPnpmGenerate);
   ui.ok("workspace initialized", opts.workspaceRoot);

@@ -39,8 +39,8 @@ export async function evaluateNixCacheReadinessFromConfig(
   const parsed = parseNixCacheConfigValues(effectiveConfig);
   const required = unique(parsed.get("substituters") || []);
   const optional = unique(parsed.get("extra-substituters") || []);
-  const requiredIdentities = required.map(substituterIdentity);
-  const optionalIdentities = optional.map(substituterIdentity);
+  const requiredIdentities = required.map(nixCacheSubstituterIdentity);
+  const optionalIdentities = optional.map(nixCacheSubstituterIdentity);
   if (policy === "off")
     return readiness(policy, "disabled", requiredIdentities, optionalIdentities, []);
   if (required.length + optional.length === 0)
@@ -73,20 +73,20 @@ async function substituterStatus(
   role: "required" | "optional",
   probe: (url: string, timeoutMs: number) => Promise<boolean>,
 ): Promise<NixCacheSubstituterStatus> {
-  const identity = substituterIdentity(url);
+  const identity = nixCacheSubstituterIdentity(url);
   if (!/^https?:\/\//.test(url)) return { url: identity, role, kind: "local", state: "not_probed" };
   const ok = await probe(url, 3000).catch(() => false);
   return { url: identity, role, kind: "http", state: ok ? "reachable" : "unreachable" };
 }
 
-function substituterIdentity(raw: string): string {
+export function nixCacheSubstituterIdentity(raw: string): string {
   try {
     const url = new URL(raw);
     const auth = url.username || url.password ? "<redacted>@" : "";
     const path = url.pathname === "/" ? "/" : url.pathname.replace(/\/+$/, "");
     return `${url.protocol}//${auth}${url.host}${path}`;
   } catch {
-    return raw;
+    return "<invalid-substituter>";
   }
 }
 

@@ -10,41 +10,6 @@ import { glueFreshnessOutputs } from "../../dev/install/glue-freshness";
 import { withoutArtifactEnvironmentInfluence } from "../../lib/artifact-environment";
 import { runInTemp } from "../lib/test-helpers";
 
-async function writeMinimalBuckConfig(tmp: string) {
-  await $({ cwd: tmp })`bash --noprofile --norc -c ${`set -euo pipefail
-    printf '.\\n' > .buckroot
-    cat > .buckconfig <<'EOF'
-[buildfile]
-name = TARGETS
-
-[repositories]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbsource_stub
-config = ./prelude
-
-[cells]
-root = .
-prelude = ./prelude
-toolchains = ./toolchains
-repo_toolchains = ./toolchains
-fbsource = ./prelude/third-party/fbsource_stub
-fbcode = ./prelude/third-party/fbsource_stub
-config = ./prelude
-
-[build]
-prelude = prelude
-user_platform = prelude//platforms:default
-target_platforms = prelude//platforms:default
-EOF
-    mkdir -p toolchains
-    printf '[buildfile]\\nname = TARGETS\\n' > toolchains/.buckconfig
-  `}`;
-}
-
 async function seedMinimalGraph(tmp: string) {
   const graphDir = path.join(tmp, ".viberoots", "workspace", "buck");
   await fsp.mkdir(graphDir, { recursive: true });
@@ -79,7 +44,6 @@ async function dirSnapshot(root: string): Promise<Map<string, string>> {
 
 test("glue validation stages run without node_modules and are idempotent", async () => {
   await runInTemp("bootstrap-safe-glue", async (tmp, $) => {
-    await writeMinimalBuckConfig(tmp);
     await seedMinimalGraph(tmp);
 
     const callerRoot = path.join(tmp, "pipeline-caller");

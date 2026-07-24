@@ -19,7 +19,8 @@ export type PnpmStoreVerifiedMarker = {
 export type SharedPnpmStoreHashCacheEntry = {
   lockHash: string;
   hashValue: string;
-  builderFingerprint: string;
+  authorityDerivationIdentity: string;
+  finalDerivationIdentity: string;
 };
 
 const pnpmStoreBuilderFingerprintFiles = [
@@ -33,12 +34,6 @@ const pnpmStoreBuilderFingerprintFiles = [
   "viberoots/build-tools/tools/nix/node-modules/store.nix",
   "viberoots/build-tools/tools/nix/node-modules/modules.nix",
   "viberoots/build-tools/tools/nix/node-modules/supported-platforms.nix",
-] as const;
-
-const exactStoreProvisioningFingerprintFiles = [
-  ...pnpmStoreBuilderFingerprintFiles,
-  "viberoots/build-tools/tools/dev/update-pnpm-hash/fixed-store-reconcile.ts",
-  "viberoots/build-tools/tools/dev/update-pnpm-hash/nix.ts",
 ] as const;
 
 async function readFingerprintFile(repoRoot: string, rel: string): Promise<string> {
@@ -67,27 +62,79 @@ export function verifiedMarkerPath(repoRoot: string, importer: string): string {
   );
 }
 
-function sharedCacheRoot(): string {
-  const explicitRoot = String(process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT || "").trim();
+export function sharedPnpmStoreHashCacheRoot(
+  env: NodeJS.ProcessEnv = process.env,
+  homeDir = os.homedir(),
+): string {
+  const explicitRoot = String(env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT || "").trim();
   if (explicitRoot && path.isAbsolute(explicitRoot)) {
     return path.resolve(explicitRoot);
   }
-  const xdgCache = String(process.env.XDG_CACHE_HOME || "").trim();
-  const cacheHome =
-    xdgCache && path.isAbsolute(xdgCache) ? xdgCache : path.join(os.homedir(), ".cache");
+  const xdgCache = String(env.XDG_CACHE_HOME || "").trim();
+  const cacheHome = xdgCache && path.isAbsolute(xdgCache) ? xdgCache : path.join(homeDir, ".cache");
   return path.join(cacheHome, "viberoots", "pnpm-store-hash-authority");
 }
 
-function sharedHashCachePath(builderFingerprint: string, lockHash: string): string {
+function validDerivationIdentity(value: string): boolean {
+  return /^\/nix\/store\/[a-z0-9]{32}-[^/]+\.drv$/.test(value);
+}
+
+function sharedHashCachePath(authorityDerivationIdentity: string, lockHash: string): string {
+  const authorityKey = crypto
+    .createHash("sha256")
+    .update(authorityDerivationIdentity)
+    .digest("hex");
   return path.join(
-    sharedCacheRoot(),
+    sharedPnpmStoreHashCacheRoot(),
     ".viberoots",
     "workspace",
     "buck",
     "pnpm-store-hash-cache",
-    builderFingerprint,
+    authorityKey,
     `${lockHash}.json`,
   );
+}
+
+async function snapshotOwnedFile(file: string): Promise<{
+  restore: () => Promise<void>;
+}> {
+  const before = await fsp.readFile(file).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT" || error.code === "ENOTDIR") return null;
+    throw error;
+  });
+  return {
+    restore: async () => {
+      if (before === null) {
+        await fsp.rm(file, { force: true }).catch((error: NodeJS.ErrnoException) => {
+          if (error.code !== "ENOENT" && error.code !== "ENOTDIR") throw error;
+        });
+        return;
+      }
+      await fsp.mkdir(path.dirname(file), { recursive: true });
+      await fsp.writeFile(file, before);
+    },
+  };
+}
+
+async function restoreOwnedFilesOrThrow(
+  snapshots: Array<{ restore: () => Promise<void> }>,
+  primary: unknown,
+): Promise<void> {
+  const rollbackErrors: unknown[] = [];
+  for (const snapshot of snapshots.reverse()) {
+    try {
+      await snapshot.restore();
+    } catch (error) {
+      rollbackErrors.push(error);
+    }
+  }
+  if (rollbackErrors.length > 0) {
+    throw new AggregateError(
+      [primary, ...rollbackErrors],
+      "verified pnpm hash authority rollback failed after persistence failure",
+      { cause: primary },
+    );
+  }
 }
 
 export async function sha256File(absPath: string): Promise<string> {
@@ -129,26 +176,33 @@ export async function readVerifiedMarker(
 
 export async function readSharedHashCache(opts: {
   repoRoot: string;
-  builderFingerprint: string;
+  authorityDerivationIdentity: string;
   lockHash: string;
-}): Promise<string | null> {
-  const cachePath = sharedHashCachePath(opts.builderFingerprint, opts.lockHash);
+}): Promise<SharedPnpmStoreHashCacheEntry | null> {
+  const cachePath = sharedHashCachePath(opts.authorityDerivationIdentity, opts.lockHash);
   try {
     const raw = await fsp.readFile(cachePath, "utf8");
     const entry = JSON.parse(raw) as Partial<SharedPnpmStoreHashCacheEntry>;
     const lockHash = String(entry.lockHash || "").trim();
     const hashValue = String(entry.hashValue || "").trim();
-    const builderFingerprint = String(entry.builderFingerprint || "").trim();
+    const authorityDerivationIdentity = String(entry.authorityDerivationIdentity || "").trim();
+    const finalDerivationIdentity = String(entry.finalDerivationIdentity || "").trim();
     if (
       !lockHash ||
       !hashValue ||
-      !builderFingerprint ||
+      !validDerivationIdentity(authorityDerivationIdentity) ||
+      !validDerivationIdentity(finalDerivationIdentity) ||
       lockHash !== opts.lockHash ||
-      builderFingerprint !== opts.builderFingerprint
+      authorityDerivationIdentity !== opts.authorityDerivationIdentity
     ) {
       return null;
     }
-    return hashValue;
+    return {
+      lockHash,
+      hashValue,
+      authorityDerivationIdentity,
+      finalDerivationIdentity,
+    };
   } catch {
     return null;
   }
@@ -216,35 +270,6 @@ export async function currentVerifiedMarkerFingerprint(
   );
 }
 
-export async function currentSharedPnpmStoreHashCacheFingerprint(
-  repoRoot: string,
-  importer = ".",
-): Promise<string> {
-  return await verifiedMarkerFingerprintForFiles(
-    repoRoot,
-    importer,
-    exactStoreProvisioningFingerprintFiles,
-    {
-      includeImporterIdentity: false,
-      includeImporterPackageJson: false,
-    },
-  );
-}
-
-export async function currentVerifiedMarkerFingerprintCandidates(
-  repoRoot: string,
-  importer = ".",
-): Promise<string[]> {
-  const current = await currentVerifiedMarkerFingerprint(repoRoot, importer);
-  const exactStoreProvisioning = await verifiedMarkerFingerprintForFiles(
-    repoRoot,
-    importer,
-    exactStoreProvisioningFingerprintFiles,
-    { includeImporterInputs: true },
-  );
-  return Array.from(new Set([current, exactStoreProvisioning]));
-}
-
 export async function writeVerifiedMarker(
   markerPath: string,
   marker: PnpmStoreVerifiedMarker,
@@ -257,7 +282,7 @@ export async function writeSharedHashCache(
   _repoRoot: string,
   entry: SharedPnpmStoreHashCacheEntry,
 ): Promise<void> {
-  const cachePath = sharedHashCachePath(entry.builderFingerprint, entry.lockHash);
+  const cachePath = sharedHashCachePath(entry.authorityDerivationIdentity, entry.lockHash);
   const tmpPath = `${cachePath}.tmp-${process.pid}`;
   await mkdirWithMacosMetadataExclusion(path.dirname(cachePath)).catch(() => {});
   await fsp.writeFile(tmpPath, JSON.stringify(entry, null, 2) + "\n", "utf8");
@@ -268,22 +293,43 @@ export async function persistVerifiedHash(opts: {
   repoRoot: string;
   markerPath: string;
   marker: PnpmStoreVerifiedMarker;
-  sharedCacheBuilderFingerprint?: string;
+  sharedAuthorityDerivationIdentities: string[];
+  finalDerivationIdentity: string;
 }): Promise<void> {
-  await writeVerifiedMarker(opts.markerPath, opts.marker);
-  await writeSharedHashCache(opts.repoRoot, {
-    lockHash: opts.marker.lockHash,
-    hashValue: opts.marker.hashValue,
-    builderFingerprint: opts.sharedCacheBuilderFingerprint || opts.marker.builderFingerprint,
-  });
+  const authorityDerivationIdentities = Array.from(
+    new Set([...opts.sharedAuthorityDerivationIdentities, opts.finalDerivationIdentity]),
+  );
+  const cachePaths = authorityDerivationIdentities.map((authorityDerivationIdentity) =>
+    sharedHashCachePath(authorityDerivationIdentity, opts.marker.lockHash),
+  );
+  const tmpPaths = cachePaths.map((cachePath) => `${cachePath}.tmp-${process.pid}`);
+  const snapshots = await Promise.all(
+    [opts.markerPath, ...cachePaths, ...tmpPaths].map(
+      async (file) => await snapshotOwnedFile(file),
+    ),
+  );
+  try {
+    await writeVerifiedMarker(opts.markerPath, opts.marker);
+    for (const authorityDerivationIdentity of authorityDerivationIdentities) {
+      await writeSharedHashCache(opts.repoRoot, {
+        lockHash: opts.marker.lockHash,
+        hashValue: opts.marker.hashValue,
+        authorityDerivationIdentity,
+        finalDerivationIdentity: opts.finalDerivationIdentity,
+      });
+    }
+  } catch (error) {
+    await restoreOwnedFilesOrThrow(snapshots, error);
+    throw error;
+  }
 }
 
 export async function withSharedHashCacheLock<T>(
-  opts: { repoRoot: string; builderFingerprint: string; lockHash: string },
+  opts: { repoRoot: string; authorityDerivationIdentity: string; lockHash: string },
   fn: () => Promise<T>,
 ): Promise<T> {
-  const lockRoot = sharedCacheRoot();
-  const lockKey = `pnpm-store-hash:${opts.builderFingerprint}:${opts.lockHash}`;
+  const lockRoot = sharedPnpmStoreHashCacheRoot();
+  const lockKey = `pnpm-store-hash:${opts.authorityDerivationIdentity}:${opts.lockHash}`;
   return await withExclusiveInstallLock(lockKey, fn, {
     timeoutMs: 45 * 60_000,
     staleMs: 45 * 60_000,
@@ -297,22 +343,21 @@ export async function restoreHashFromSharedCache(opts: {
   key: string;
   importer: string;
   storeAttr: string;
-  builderFingerprint: string;
-  sharedCacheBuilderFingerprint?: string;
+  authorityDerivationIdentity: string;
   existingLockHash: string;
   existingHash: string;
   hasValidExistingHash: boolean;
   hashOwner?: HashesJsonOwner;
   hashRoot?: string;
-}): Promise<boolean> {
-  const sharedHash = await readSharedHashCache({
+}): Promise<SharedPnpmStoreHashCacheEntry | null> {
+  const sharedEntry = await readSharedHashCache({
     repoRoot: opts.repoRoot,
-    builderFingerprint: opts.sharedCacheBuilderFingerprint || opts.builderFingerprint,
+    authorityDerivationIdentity: opts.authorityDerivationIdentity,
     lockHash: opts.existingLockHash,
   });
-  if (!sharedHash) return false;
-  if (!opts.hasValidExistingHash || sharedHash !== opts.existingHash) {
-    await updateNodeModulesHashesJson(opts.key, sharedHash, {
+  if (!sharedEntry) return null;
+  if (!opts.hasValidExistingHash || sharedEntry.hashValue !== opts.existingHash) {
+    await updateNodeModulesHashesJson(opts.key, sharedEntry.hashValue, {
       owner: opts.hashOwner,
       root: opts.hashRoot || opts.repoRoot,
     });
@@ -320,5 +365,5 @@ export async function restoreHashFromSharedCache(opts: {
   console.log(
     `[update-pnpm-hash] importer=${opts.importer} step=shared-hash-cache attr=${opts.storeAttr} lockfile=${opts.key}`,
   );
-  return true;
+  return sharedEntry;
 }

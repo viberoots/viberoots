@@ -4,6 +4,7 @@ import path from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { runInTemp } from "../lib/test-helpers";
+import { stageTempRepoPaths } from "../lib/test-helpers/git-stage";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 
 test("planner imports plugins listed in langs.json when present", async () => {
@@ -59,10 +60,15 @@ test("planner imports plugins listed in langs.json when present", async () => {
 
     // Minimal graph.json (empty) so planner evaluates without needing Buck
     await fs.outputFile(path.join(tmp, DEFAULT_GRAPH_PATH), "[]\n");
-    await $({
-      cwd: tmp,
-      stdio: "pipe",
-    })`git add viberoots/build-tools/tools/nix/langs.json viberoots/build-tools/tools/nix/planner/toy.nix .viberoots/workspace/buck/graph.json`;
+    await stageTempRepoPaths({
+      tmp,
+      _$: $,
+      explicitPaths: [
+        "viberoots/build-tools/tools/nix/langs.json",
+        "viberoots/build-tools/tools/nix/planner/toy.nix",
+        DEFAULT_GRAPH_PATH,
+      ],
+    });
 
     // Eval-only check against planner/langs.nix so we avoid graph-generator/full-flake work.
     const manifestBase = JSON.stringify(path.join(tmp, "viberoots/build-tools/tools/nix"));

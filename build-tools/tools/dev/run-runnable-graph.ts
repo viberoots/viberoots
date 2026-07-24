@@ -15,6 +15,7 @@ import { chooseRunnableFlakeRef } from "./run-runnable-source";
 import { withoutEvaluationSelectors } from "./evaluation-bundle-env";
 import { runBoundedArtifactCommand } from "../lib/artifact-command-runner";
 import { canonicalArtifactReentryEnvironment } from "./canonical-artifact-entrypoint";
+import type { ReviewedNixConfigOutcome } from "./canonical-reviewed-nix-config";
 
 function runnableArtifactBaseEnv(): Record<string, string> {
   return withoutArtifactEnvironmentInfluence(withoutEvaluationSelectors(process.env)) as Record<
@@ -44,6 +45,7 @@ async function buildSelectedInCanonicalSubprocess(opts: {
   target: string;
   sourceMode: "auto" | "git" | "path";
   artifactToolsRoot: string;
+  nixCacheHealth?: ReviewedNixConfigOutcome;
 }): Promise<string> {
   const toolsRoot = opts.artifactToolsRoot;
   const wrapper = path.join(toolsRoot, "bin", "zx-wrapper");
@@ -55,7 +57,9 @@ async function buildSelectedInCanonicalSubprocess(opts: {
     command: wrapper,
     args: [script, "--target", opts.target, `--source=${opts.sourceMode}`],
     cwd: opts.workspaceRoot,
-    env: canonicalArtifactReentryEnvironment(opts.workspaceRoot, toolsRoot),
+    env: canonicalArtifactReentryEnvironment(opts.workspaceRoot, toolsRoot, {
+      nixCacheHealth: opts.nixCacheHealth,
+    }),
   });
   if (result.stderr) process.stderr.write(result.stderr);
   if (result.exitCode !== 0 || result.timedOut || result.interrupted) {
@@ -74,6 +78,7 @@ export async function buildRunnableManifest(
     target?: string;
     purpose?: ArtifactJobPurpose;
     artifactToolsRoot: string;
+    nixCacheHealth?: ReviewedNixConfigOutcome;
   },
 ): Promise<string> {
   const sourceMode = opts.sourceMode || "auto";
@@ -102,7 +107,10 @@ export async function buildRunnableManifest(
       return await runNixBuildWithProgress({
         workspaceRoot,
         env: baseEnv,
-        internal: sourceSelectors,
+        internal: {
+          ...sourceSelectors,
+          ...(opts.nixCacheHealth?.config ? { NIX_CONFIG: opts.nixCacheHealth.config } : {}),
+        },
         label: "build runnable manifest",
         artifactToolsRoot: opts.artifactToolsRoot,
         args: [
@@ -137,7 +145,12 @@ export async function buildSelectedOutPath(
   workspaceRoot: string,
   target: string,
   sourceMode: "auto" | "git" | "path",
-  options: { label?: string; purpose?: ArtifactJobPurpose; artifactToolsRoot: string },
+  options: {
+    label?: string;
+    purpose?: ArtifactJobPurpose;
+    artifactToolsRoot: string;
+    nixCacheHealth?: ReviewedNixConfigOutcome;
+  },
 ): Promise<string> {
   const artifactToolsRoot = options.artifactToolsRoot;
   if (!isCanonicalArtifactNode(artifactToolsRoot)) {
@@ -146,6 +159,7 @@ export async function buildSelectedOutPath(
       target,
       sourceMode,
       artifactToolsRoot,
+      nixCacheHealth: options.nixCacheHealth,
     });
   }
   const label = options.label || `build selected target ${target}`;
@@ -174,6 +188,9 @@ export async function buildSelectedOutPath(
           attrPath: pnpmStoreAttrFromImporter(targetImporter),
           env: {
             ...runnableArtifactBaseEnv(),
+            ...(options.nixCacheHealth?.config
+              ? { NIX_CONFIG: options.nixCacheHealth.config }
+              : {}),
             VBR_FILTERED_FLAKE_SNAPSHOT: "1",
             VBR_PNPM_FILTERED_SNAPSHOT_ROOT: source.workspaceRoot || workspaceRoot,
           },
@@ -189,7 +206,10 @@ export async function buildSelectedOutPath(
     stdout = await runNixBuildWithProgress({
       workspaceRoot,
       env: selectedEnv,
-      internal: sourceSelectors,
+      internal: {
+        ...sourceSelectors,
+        ...(options.nixCacheHealth?.config ? { NIX_CONFIG: options.nixCacheHealth.config } : {}),
+      },
       label,
       artifactToolsRoot,
       args: [

@@ -9,6 +9,8 @@ esac
 
 # shell helpers
 # shellcheck source=/dev/null
+. "${SCRIPT_DIR}/cache-health-command-scope.sh" standalone
+# shellcheck source=/dev/null
 . "${SCRIPT_DIR}/devshell.sh"
 
 cleanup_verify_root_buck_out() {

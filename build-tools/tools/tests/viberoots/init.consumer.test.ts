@@ -468,6 +468,13 @@ test("viberoots/init bootstraps and can install a bare consumer workspace", asyn
     assert.match(gitignore, /^node_modules$/m);
     assert.match(gitignore, /node_modules\//);
     assert.match(gitignore, /projects\/config\/local\.json/);
+    assert.match(gitignore, /\.agents\/plugins\/marketplace\.json/);
+    const marketplace = JSON.parse(
+      await fsp.readFile(path.join(workspace, ".agents", "plugins", "marketplace.json"), "utf8"),
+    );
+    assert.equal(marketplace.plugins[0].name, "repo-skills");
+    assert.equal(marketplace.plugins[0].source.path, "./.viberoots/current/plugins/repo-skills");
+    assert.equal(marketplace.plugins[0].policy.installation, "INSTALLED_BY_DEFAULT");
     if (process.platform === "darwin") {
       await fsp.stat(path.join(workspace, ".metadata_never_index"));
     }
@@ -735,6 +742,13 @@ test("viberoots init-consumer bootstraps a remote-flake consumer workspace", asy
     assert.match(gitignore, /^node_modules$/m);
     assert.match(gitignore, /node_modules\//);
     assert.match(gitignore, /projects\/config\/local\.json/);
+    assert.match(gitignore, /\.agents\/plugins\/marketplace\.json/);
+    const marketplace = JSON.parse(
+      await fsp.readFile(path.join(workspace, ".agents", "plugins", "marketplace.json"), "utf8"),
+    );
+    assert.equal(marketplace.plugins[0].name, "repo-skills");
+    assert.equal(marketplace.plugins[0].source.path, "./.viberoots/current/plugins/repo-skills");
+    assert.equal(marketplace.plugins[0].policy.installation, "INSTALLED_BY_DEFAULT");
     if (process.platform === "darwin") {
       await fsp.stat(path.join(workspace, ".metadata_never_index"));
     }

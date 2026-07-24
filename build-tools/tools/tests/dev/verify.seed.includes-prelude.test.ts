@@ -11,6 +11,7 @@ import {
 import { artifactNixPolicyArgs } from "../../lib/artifact-nix-policy";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { workspaceFlakeRef } from "../lib/test-helpers";
+import { discoverImportersWithLock } from "../../dev/install/importers";
 
 test("verify test-seed uses immutable tool source and excludes generated Prelude", async () => {
   const workspaceFlakeRoot = await workspaceFlakeRef(process.cwd());
@@ -78,4 +79,16 @@ test("verify test-seed uses immutable tool source and excludes generated Prelude
     localViberootsFlakeStat.isFile(),
     "expected local viberoots flake input in verify test-seed snapshot",
   );
+
+  const seedGit = $({ cwd: seedPath, stdio: "pipe" });
+  const nestedGit = $({ cwd: path.join(seedPath, "viberoots"), stdio: "pipe" });
+  const parentEntry = String(
+    (await seedGit`git -c ${`safe.directory=${seedPath}`} ls-files -s -- viberoots`).stdout || "",
+  ).trim();
+  const nestedPath = path.join(seedPath, "viberoots");
+  const nestedHead = String(
+    (await nestedGit`git -c ${`safe.directory=${nestedPath}`} rev-parse HEAD`).stdout || "",
+  ).trim();
+  assert.equal(parentEntry, `160000 ${nestedHead} 0\tviberoots`);
+  assert.deepEqual(await discoverImportersWithLock(seedPath, { cwd: seedPath }), ["viberoots"]);
 });

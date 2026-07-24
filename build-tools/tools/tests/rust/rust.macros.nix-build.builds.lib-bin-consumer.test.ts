@@ -129,8 +129,13 @@ test("rust macros: library, binary, and downstream consumer build via Nix-backed
       const rejected = await $({ cwd: tmp, stdio: "pipe", env: runnableEnv, nothrow: true })`
         ${path.join("viberoots", "build-tools", "tools", "bin", entrypoint)} ${label}
       `;
-      assert.notEqual(rejected.exitCode, 0, `${entrypoint} unexpectedly accepted ${label}`);
-      assert.match(String(rejected.stderr || rejected.stdout), diagnostic);
+      const output = `${String(rejected.stderr || "")}\n${String(rejected.stdout || "")}`;
+      assert.equal(
+        rejected.exitCode,
+        2,
+        `${entrypoint} rejection had unexpected status for ${label}: ${output}`,
+      );
+      assert.match(output, diagnostic);
     }
 
     await fs.writeFile(

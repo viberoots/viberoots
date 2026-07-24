@@ -16,6 +16,14 @@ async function mixedLanguageFixture(): Promise<string> {
   await fsp.writeFile(path.join(project, "go.mod"), "module example.test/mixed\n");
   await fsp.writeFile(path.join(project, "pyproject.toml"), "[project]\nname='mixed'\n");
   await fsp.writeFile(path.join(project, "main.cpp"), "int main() { return 0; }\n");
+  await fsp.writeFile(
+    path.join(project, "Cargo.toml"),
+    '[package]\nname="mixed"\nversion="0.1.0"\nedition="2021"\n',
+  );
+  await fsp.writeFile(
+    path.join(project, "Cargo.lock"),
+    'version = 3\n\n[[package]]\nname = "mixed"\nversion = "0.1.0"\n',
+  );
   await execFile("git", ["init", "-q"], root);
   await execFile("git", ["add", "projects"], root);
   return root;
@@ -32,23 +40,23 @@ test("language-wide consistency dispatches every enabled surface through one reg
   const root = await mixedLanguageFixture();
   const reached: string[] = [];
   const checks = Object.fromEntries(
-    ["go", "python", "cpp"].map((id) => [id, async () => reached.push(id)]),
+    ["go", "python", "cpp", "rust"].map((id) => [id, async () => reached.push(id)]),
   ) as ReadOnlyLanguageChecks;
   try {
     await runReadOnlyLanguageConsistencyChecks(root, checks);
-    assert.deepEqual(reached, ["go", "python", "cpp"]);
+    assert.deepEqual(reached, ["go", "python", "cpp", "rust"]);
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
   }
 });
 
 test("every language stale-state failure is read-only and points to u", async () => {
-  for (const id of ["go", "python", "cpp"] as const) {
+  for (const id of ["go", "python", "cpp", "rust"] as const) {
     const root = await mixedLanguageFixture();
     const marker = path.join(root, "projects/apps/mixed", `${id}.marker`);
     await fsp.writeFile(marker, "unchanged\n");
     const checks = Object.fromEntries(
-      ["go", "python", "cpp"].map((candidate) => [
+      ["go", "python", "cpp", "rust"].map((candidate) => [
         candidate,
         async () => {
           if (candidate === id) throw staleMetadataError(`${id}.lock`, `${id} stale fixture`);

@@ -7,6 +7,11 @@ import { withSharedBuckIsolationStartupLock } from "../../../lib/shared-buck-iso
 import { registerBuckIsolationSync } from "../../../dev/verify/owned-process-state";
 import { runManagedCommand } from "../../../lib/managed-command";
 import { ensureNixStoreToolPathSync } from "../../../lib/tool-paths";
+import {
+  generatedGlobalInputMarker,
+  GLOBAL_NIX_INPUT_TARGET_LABELS,
+} from "../../../lib/global-nix-input-targets";
+import { packagePathFromLabel } from "../../../lib/labels";
 import { isRetryableCqueryError, resetBuckDaemon } from "./retry";
 
 export type CqueryRunnerOptions = {
@@ -43,8 +48,18 @@ function computePlatformLabel(cwd: string): string {
 }
 
 export function computeRootsExpr(cwd: string): string {
+  const globalInputs = GLOBAL_NIX_INPUT_TARGET_LABELS.filter((label) => {
+    try {
+      return fs
+        .readFileSync(path.join(cwd, packagePathFromLabel(label), "TARGETS"), "utf8")
+        .includes(generatedGlobalInputMarker);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      return false;
+    }
+  });
   const target = String(process.env.BUCK_TARGET || "").trim();
-  if (target) return `set(${target})`;
+  if (target) return `set(${[target, ...globalInputs].join(" ")})`;
 
   const defaultRoots = artifactGraphQueryRoots();
   const rootsFromEnv = parseCsvish(process.env.BUCK_QUERY_ROOTS || "");
@@ -61,13 +76,13 @@ export function computeRootsExpr(cwd: string): string {
   // to //... here: metadata directories such as .git can mutate under Buck
   // while tests create commits, producing nondeterministic recursive-spec
   // failures. Callers that need sparse-package targets must pass BUCK_TARGET.
-  if (existing.length === 0) return "set()";
+  if (existing.length === 0 && globalInputs.length === 0) return "set()";
   const roots = existing;
   const patterns = roots.map((r) => {
     const root = r.startsWith("//") ? r : `//${r}`;
     return `${root}/...`;
   });
-  return `set(${patterns.join(" ")})`;
+  return `set(${[...patterns, ...globalInputs].join(" ")})`;
 }
 
 function stableExporterIsolation(cwd: string): string {

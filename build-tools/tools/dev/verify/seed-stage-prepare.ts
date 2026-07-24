@@ -28,6 +28,44 @@ async function gitStageRelPaths(stageDir: string, relPaths: string[]): Promise<v
   if (missing.length > 0) await git`git rm -q --ignore-unmatch -- ${missing}`;
 }
 
+async function commitNestedViberoots(stageDir: string): Promise<void> {
+  const nested = path.join(stageDir, "viberoots");
+  const git = $({
+    cwd: nested,
+    stdio: "pipe",
+    env: {
+      ...process.env,
+      GIT_AUTHOR_DATE: "1970-01-01T00:00:00Z",
+      GIT_COMMITTER_DATE: "1970-01-01T00:00:00Z",
+    },
+  });
+  const inside = await git`git rev-parse --is-inside-work-tree`.nothrow().quiet();
+  const top =
+    inside.exitCode === 0 && String(inside.stdout || "").trim() === "true"
+      ? String((await git`git rev-parse --show-toplevel`).stdout || "").trim()
+      : "";
+  if (path.resolve(top || stageDir) !== path.resolve(nested)) {
+    await fsp.rm(path.join(nested, ".git"), { recursive: true, force: true });
+    await git`git -c init.defaultBranch=main -c advice.defaultBranchName=false init -q`;
+    await git`git config gc.auto 0`;
+  }
+  await git`git add -A`;
+  const existingHead = await git`git rev-parse --verify HEAD`.nothrow().quiet();
+  const changed = await git`git diff --cached --quiet --exit-code`.nothrow().quiet();
+  if (existingHead.exitCode !== 0 || changed.exitCode === 1) {
+    await git`git -c user.name=tmp -c user.email=tmp@example.com commit -q -m seed-viberoots-overlay --allow-empty`;
+  } else if (changed.exitCode !== 0) {
+    throw new Error(String(changed.stderr || "nested viberoots staged diff failed"));
+  }
+  const head = String((await git`git rev-parse HEAD`).stdout || "").trim();
+  if (!/^[0-9a-f]{40}$/.test(head)) {
+    throw new Error(`verify seed nested viberoots HEAD is invalid: ${head}`);
+  }
+  const parent = $({ cwd: stageDir, stdio: "pipe" });
+  await parent`git rm -r --cached -q --ignore-unmatch -- viberoots`;
+  await parent`git update-index --add --cacheinfo ${`160000,${head},viberoots`}`;
+}
+
 async function trackedNpmrcDirs(stageDir: string): Promise<string[]> {
   const out = await $({ cwd: stageDir, stdio: "pipe" })`git ls-files -- "**/.npmrc"`
     .nothrow()
@@ -68,7 +106,14 @@ export async function prepareStageSeed(stageDir: string, workspaceRoot: string):
     ...(await rewriteStageViberootsInput(stageDir)),
   ];
   if (touched.length > 0) {
-    await gitStageRelPaths(stageDir, touched);
+    const nestedTouched = touched.some(
+      (rel) => rel === "viberoots" || rel.startsWith(`viberoots${path.sep}`),
+    );
+    if (nestedTouched) await commitNestedViberoots(stageDir);
+    await gitStageRelPaths(
+      stageDir,
+      touched.filter((rel) => rel !== "viberoots" && !rel.startsWith(`viberoots${path.sep}`)),
+    );
     await $({
       cwd: stageDir,
       stdio: "pipe",

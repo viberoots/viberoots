@@ -6,17 +6,25 @@ import { promisify } from "node:util";
 import test from "node:test";
 import { runInTemp } from "../lib/test-helpers/run-in-temp";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
+import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
+import { ensureToolchainPathsFiles } from "../../dev/toolchain-paths";
 
 const execFileAsync = promisify(execFile);
 const gitIdentity = ["-c", "user.name=Test", "-c", "user.email=test@example.com"];
 
 async function assertGitClean(root: string): Promise<void> {
-  const [{ stdout: diff }, { stdout: status }] = await Promise.all([
+  const [{ stdout: diff }, { stdout: status }, { stdout: nestedStatus }] = await Promise.all([
     execFileAsync("git", ["diff", "--no-ext-diff"], { cwd: root }),
     execFileAsync("git", ["status", "--short"], { cwd: root }),
+    execFileAsync("git", ["status", "--short"], { cwd: path.join(root, "viberoots") }),
   ]);
-  assert.equal(diff, "", `tracked diff after read-only command:\n${diff}`);
+  assert.equal(
+    diff,
+    "",
+    `tracked diff after read-only command:\n${diff}\nnested status:\n${nestedStatus}`,
+  );
   await execFileAsync("git", ["diff", "--exit-code"], { cwd: root });
+  assert.equal(nestedStatus, "", `nested status after read-only command:\n${nestedStatus}`);
   assert.equal(status, "", `status after read-only command:\n${status}`);
 }
 
@@ -45,6 +53,16 @@ async function configureIgnoredMaterialization(root: string): Promise<void> {
 
 async function commitSeedOverlay(root: string): Promise<void> {
   await configureIgnoredMaterialization(root);
+  const nestedRoot = path.join(root, "viberoots");
+  const { stdout: nestedStatus } = await execFileAsync("git", ["status", "--porcelain"], {
+    cwd: nestedRoot,
+  });
+  if (nestedStatus.trim()) {
+    await execFileAsync("git", ["add", "-A"], { cwd: nestedRoot });
+    await execFileAsync("git", [...gitIdentity, "commit", "-qm", "test: fixture nested baseline"], {
+      cwd: nestedRoot,
+    });
+  }
   await execFileAsync("git", ["add", "-A"], { cwd: root });
   await execFileAsync("git", [...gitIdentity, "commit", "-qm", "test: fixture baseline"], {
     cwd: root,
@@ -53,7 +71,22 @@ async function commitSeedOverlay(root: string): Promise<void> {
 
 test("real i and post-clone preserve tracked state on current and stale metadata", async () => {
   await runInTemp("read-only-commands-clean", async (root) => {
+    const immutableViberootsRoot = String(process.env.VIBEROOTS_FLAKE_INPUT_ROOT || "").trim();
+    assert.match(immutableViberootsRoot, /^\/nix\/store\/[a-z0-9]{32}-[^/]+$/);
+    assert.equal((await fsp.stat(immutableViberootsRoot)).isDirectory(), true);
+    const sharedRepoRoot = String(process.env.REPO_ROOT || "").trim();
+    assert.ok(path.isAbsolute(sharedRepoRoot));
+    assert.notEqual(path.resolve(sharedRepoRoot), path.resolve(root));
     await configureIgnoredMaterialization(root);
+    await ensureToolchainPathsFiles(root, { refresh: true });
+    const artifactToolsRoot = canonicalArtifactToolsRoot(root);
+    const commandEnv = {
+      ...process.env,
+      REPO_ROOT: sharedRepoRoot,
+      VIBEROOTS_FLAKE_INPUT_ROOT: immutableViberootsRoot,
+      VBR_ARTIFACT_TOOLS_ROOT: artifactToolsRoot,
+      WORKSPACE_ROOT: root,
+    };
     const install = path.join(root, "viberoots/build-tools/tools/bin/i");
     const installArgs = ["--without-secrets", "--skip-glue", "--skip-go-tidy"];
     const { stdout: lockfiles } = await execFileAsync("git", ["ls-files", "*pnpm-lock.yaml"], {
@@ -64,13 +97,13 @@ test("real i and post-clone preserve tracked state on current and stale metadata
     }
     await execFileAsync(install, installArgs, {
       cwd: root,
-      env: { ...process.env, WORKSPACE_ROOT: root, VBR_INSTALL_REFRESH_PNPM_HASHES: "1" },
+      env: { ...commandEnv, VBR_INSTALL_REFRESH_PNPM_HASHES: "1" },
     });
     await commitSeedOverlay(root);
     await assertGitClean(root);
     await execFileAsync(install, installArgs, {
       cwd: root,
-      env: { ...process.env, WORKSPACE_ROOT: root },
+      env: commandEnv,
     });
     await assertGitClean(root);
 
@@ -88,7 +121,7 @@ test("real i and post-clone preserve tracked state on current and stale metadata
     await assert.rejects(
       execFileAsync(install, installArgs, {
         cwd: root,
-        env: { ...process.env, WORKSPACE_ROOT: root },
+        env: commandEnv,
       }),
     );
     await assertGitClean(root);
@@ -103,8 +136,8 @@ test("real i and post-clone preserve tracked state on current and stale metadata
       });
     }
     const env = {
-      ...process.env,
-      PATH: `${fakeBin}${path.delimiter}${process.env.PATH || ""}`,
+      ...commandEnv,
+      PATH: `${fakeBin}${path.delimiter}${commandEnv.PATH || ""}`,
       NO_DEV_SHELL: "1",
       VBR_RUN_INSTALL: "0",
       VBR_DIRENV_ALLOW: "0",

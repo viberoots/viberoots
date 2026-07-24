@@ -4,6 +4,8 @@ script_dir="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=/dev/null
 . "${script_dir}/artifact-ingress-env.sh"
 artifact_ingress_reexec_with_devshell "$0" "$@"
+# shellcheck source=/dev/null
+. "${script_dir}/cache-health-command-scope.sh" verified-ingress
 artifact_ingress_clear_selectors
 
 # shellcheck source=/dev/null
@@ -11,5 +13,6 @@ export VBR_DEVSHELL_USE_GENERATED_AUTHORITY=1
 . "${script_dir}/devshell.sh"
 
 artifact_ingress_trust_devshell_baseline "${LIVE_ROOT}"
+artifact_ingress_publish_reviewed_nix_cache_config
 artifact_ingress_restore_or_remove_selectors
 artifact_ingress_exec "${LIVE_ROOT}" "build-tools/tools/dev/run-runnable.ts" --mode prod "$@"

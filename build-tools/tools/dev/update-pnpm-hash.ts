@@ -75,10 +75,6 @@ async function inner() {
     repoRoot,
     importer,
   );
-  const sharedCacheBuilderFingerprint =
-    await verifiedMarker.currentSharedPnpmStoreHashCacheFingerprint(repoRoot, importer);
-  const acceptedBuilderFingerprints =
-    await verifiedMarker.currentVerifiedMarkerFingerprintCandidates(repoRoot, importer);
   const marker = await verifiedMarker.readVerifiedMarker(markerPath);
   const markerMetadataMatches = Boolean(
     currentHash &&
@@ -87,7 +83,7 @@ async function inner() {
       marker.lockfile === key &&
       marker.lockHash === lockHash &&
       marker.hashValue === currentHash &&
-      acceptedBuilderFingerprints.includes(marker.builderFingerprint),
+      marker.builderFingerprint === builderFingerprint,
   );
 
   const probe = async (): Promise<{ fixedStorePath: string; derivationIdentity: string }> =>
@@ -132,6 +128,18 @@ async function inner() {
             env: { ...process.env, ...filteredEnv },
           })
         ).status,
+    );
+
+  const derivationIdentity = async (): Promise<string> =>
+    await withPnpmStoreBuildFlakeRef(
+      { repoRoot, importer, baseFlakeRef: flakeRef },
+      async (buildFlakeRef, filteredEnv) =>
+        await evaluatePnpmStoreDerivationIdentity({
+          repoRoot,
+          flakeRef: buildFlakeRef,
+          attrPath: storeAttr,
+          env: { ...process.env, ...filteredEnv },
+        }),
     );
 
   if (materializeCommitted) {
@@ -198,7 +206,7 @@ async function inner() {
     markerMetadataMatches,
     marker,
     builderFingerprint,
-    sharedCacheBuilderFingerprint,
+    derivationIdentity,
     probe,
     inspectForRebuild,
   });

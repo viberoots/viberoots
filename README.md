@@ -41,6 +41,7 @@ my-project/                         # consumer workspace root
 ├── projects/                        # application and library code
 ├── .envrc                           # generated shell entry
 ├── .buckconfig                      # generated Buck cells/config
+├── .agents/plugins/marketplace.json # ignored repo-local Codex plugin catalog
 └── .viberoots/
     ├── current -> /nix/store/...     # remote flake mode source pointer
     └── workspace/                    # hidden flake, lockfile, generated state
@@ -51,7 +52,13 @@ my-project/                         # submodule mode adds one visible source che
 └── .viberoots/current -> ../viberoots
 ```
 
-The bootstrap script creates or refreshes `projects/`, writes the shared viberoots files, records crash-safe upgrade intent under `.viberoots/bootstrap/transactions/`, installs missing `direnv`/`nix-direnv` support, installs Git from Nix if needed, runs `direnv allow` by default, runs `i` by default, and prints the next validation command. If your shell hook was already active, the environment should load automatically at the next prompt; otherwise open a new shell in the workspace.
+The bootstrap script creates or refreshes `projects/`, writes the shared viberoots files, exposes
+Repo Skills through the ignored repo-local Codex marketplace, records crash-safe upgrade intent
+under `.viberoots/bootstrap/transactions/`, installs missing `direnv`/`nix-direnv` support,
+installs Git from Nix if needed, runs `direnv allow` by default, runs `i` by default, and prints the
+next validation command. If your shell hook was already active, the environment should load
+automatically at the next prompt; otherwise open a new shell in the workspace. Start a new Codex
+session after bootstrap so plugin discovery can load the repo skills for the selected account.
 
 **Preferred for most users: remote flake import**
 
@@ -90,7 +97,12 @@ project dependency versions; use `u --upgrade` for that separate operation.
 
 **Existing Checkout / New Workstation**
 
-Use post-clone for a repo that is already checked in and has an existing `flake.lock`. It preserves the workspace's active viberoots source mode, repairs ignored local state such as `.viberoots/`, `.direnv/`, shell helper state, `.viberoots/current`, and `.viberoots/workspace/`, then runs `direnv allow` and `i` by default without advancing checked-in viberoots pins.
+Use post-clone for a repo that is already checked in and has an existing `flake.lock`. It preserves
+the workspace's active viberoots source mode, repairs ignored local state such as `.viberoots/`,
+`.direnv/`, shell helper state, `.viberoots/current`, `.viberoots/workspace/`, and the repo-local
+Codex marketplace, then runs `direnv allow` and `i` by default without advancing checked-in
+viberoots pins. Repo Skills become available to any selected Codex account in a new session; no
+account-specific marketplace command is required.
 
 Flake-mode workspaces use `nodes.viberoots.locked.rev` from the repo lockfile. Submodule-mode workspaces initialize the checked-in `viberoots/` submodule and keep the parent gitlink as the source of truth; an inactive leftover `viberoots/` submodule does not make a flake-mode workspace switch modes.
 

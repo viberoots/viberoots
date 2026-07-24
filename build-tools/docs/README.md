@@ -12,14 +12,14 @@ owning package under [`../../projects/`](../../projects/).
 ## Current References
 
 Ordinary `i` and post-clone materialize from committed metadata without changing tracked files.
-Stale pnpm, Go, uv, C++ provider/glue, or generated workspace-lock state fails closed, names the
+Stale pnpm, Go, uv, Cargo, C++ provider/glue, or generated workspace-lock state fails closed, names the
 stale file, and reports `repair: run u`. Source-mode or viberoots pin drift instead reports
 `repair: run viberoots update`. A scaffold that creates dependency inputs must complete its
 intentional prewarm/reconciliation step before read-only installation.
 
 After an ordinary project dependency edit, run `u`, then `i && b && v`. Use `u --upgrade` only for
-an intentional project dependency upgrade. Go and Python/uv use reviewed bounded upgrade policies;
-C++ is reconciliation-only and does not move Nix or flake authority. Neither mode changes the
+an intentional project dependency upgrade. Go, Python/uv, and Cargo use reviewed bounded upgrade
+policies; C++ is reconciliation-only and does not move Nix or flake authority. Neither mode changes the
 viberoots pin.
 
 - [`build-system-design.md`](build-system-design.md): main Buck2/Nix architecture reference.

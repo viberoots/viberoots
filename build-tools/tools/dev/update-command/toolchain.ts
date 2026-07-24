@@ -2,11 +2,16 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { makeFilteredFlakeRef } from "../update-pnpm-hash/filtered-flake";
 import { ensureToolchainPathsFiles } from "../toolchain-paths";
-import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
+import {
+  canonicalArtifactToolsRoot,
+  MissingGeneratedArtifactToolAuthorityError,
+} from "../../lib/artifact-environment";
 import { ensureArtifactToolsGcRoot } from "./artifact-tools-gc-root";
 
 export type RepairedArtifactToolchainAuthority = {
   artifactToolsRoot: string;
+  goBin: string;
+  pythonBin: string;
   viberootsSource: string;
 };
 
@@ -18,7 +23,8 @@ export async function repairArtifactToolchainAuthority(
       repoRoot: root,
       storePath: canonicalArtifactToolsRoot(root),
     });
-  } catch {
+  } catch (error) {
+    if (!(error instanceof MissingGeneratedArtifactToolAuthorityError)) throw error;
     // Only explicit `u` may recover a missing generated tool authority. Bootstrap
     // from the already-locked immutable workspace, then rebuild below from the
     // current filtered source so dirty tool changes still enter the final identity.
@@ -43,6 +49,8 @@ export async function repairArtifactToolchainAuthority(
     });
     return {
       artifactToolsRoot: finalPaths.artifactTools.root,
+      goBin: finalPaths.go.bin,
+      pythonBin: finalPaths.python.bin,
       viberootsSource: await fsp.realpath(
         path.join(finalPaths.artifactTools.root, "share", "viberoots-source"),
       ),

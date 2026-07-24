@@ -139,7 +139,7 @@ __vbr_stage0_apply_nix_cache_health() {
   config="$(nix config show 2>/dev/null || true)"
   [[ -n "\${config}" ]] || return 0
 
-  local required_substituters optional_substituters
+  local required_substituters optional_substituters netrc_file
   required_substituters="$(printf "%s\\n" "\${config}" | awk '{
     eq = index($0, "="); if (eq <= 0) next
     key = substr($0, 1, eq - 1); value = substr($0, eq + 1)
@@ -152,10 +152,17 @@ __vbr_stage0_apply_nix_cache_health() {
     gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
     if (key == "extra-substituters") { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); print value }
   }')"
+  netrc_file="$(printf "%s\\n" "\${config}" | awk '{
+    eq = index($0, "="); if (eq <= 0) next
+    key = substr($0, 1, eq - 1); value = substr($0, eq + 1)
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "", key)
+    if (key == "netrc-file") { gsub(/^[[:space:]]+|[[:space:]]+$/, "", value); print value }
+  }')"
   [[ -n "\${required_substituters}\${optional_substituters}" ]] || return 0
 
   local available=()
   local removed=()
+  local removed_identities=()
   local seen=" "
   local substituter
   for substituter in \${required_substituters} \${optional_substituters}; do
@@ -163,19 +170,30 @@ __vbr_stage0_apply_nix_cache_health() {
     seen="\${seen}\${substituter} "
     case "\${substituter}" in
       http://*|https://*)
-        local cache_info_url="\${substituter%/}/nix-cache-info"
-        local probe_status=0
-        if nix store info --store "\${substituter}" --option connect-timeout 3 >/dev/null 2>&1; then
-          probe_status=0
-        elif command -v curl >/dev/null 2>&1 && curl -fsS --connect-timeout 3 --max-time 5 "\${cache_info_url}" >/dev/null 2>&1; then
-          probe_status=0
-        else
-          probe_status=1
+        local cache_identity="\${substituter%%\\?*}"
+        cache_identity="\${cache_identity%%\\#*}"
+        local cache_scheme="\${cache_identity%%://*}://"
+        local cache_location="\${cache_identity#*://}"
+        [[ "\${cache_location%%/*}" != *@* ]] || cache_identity="\${cache_scheme}<redacted>@\${cache_location#*@}"
+        local cache_base="\${substituter%%\\?*}"
+        local cache_query=""
+        [[ "\${substituter}" != *\\?* ]] || cache_query="?\${substituter#*\\?}"
+        local cache_info_url="\${cache_base%/}/nix-cache-info\${cache_query}"
+        local probe_status=1
+        if command -v curl >/dev/null 2>&1; then
+          local curl_args=(-fsS --connect-timeout 3 --max-time 5)
+          [[ -z "\${netrc_file}" ]] || curl_args+=(--netrc-file "\${netrc_file}")
+          if curl "\${curl_args[@]}" "\${cache_info_url}" >/dev/null 2>&1; then
+            probe_status=0
+          else
+            probe_status="$?"
+          fi
         fi
         if [[ "\${probe_status}" -eq 0 ]]; then
           available+=("\${substituter}")
         else
           removed+=("\${substituter}")
+          removed_identities+=("\${cache_identity}")
         fi
         ;;
       *) available+=("\${substituter}") ;;
@@ -184,14 +202,23 @@ __vbr_stage0_apply_nix_cache_health() {
 
   [[ "\${#removed[@]}" -gt 0 ]] || return 0
   if [[ "\${VBR_NIX_CACHE_POLICY:-auto}" == "strict" ]]; then
-    echo "error: configured Nix substituter(s) unavailable: \${removed[*]}" 1>&2
+    echo "error: configured Nix substituter(s) unavailable: \${removed_identities[*]}" 1>&2
     return 1
   fi
 
   local optional_kept=()
+  local optional_kept_identities=()
   local required_kept=()
   for substituter in \${optional_substituters}; do
-    [[ " \${available[*]} " == *" \${substituter} "* ]] && optional_kept+=("\${substituter}")
+    if [[ " \${available[*]} " == *" \${substituter} "* ]]; then
+      optional_kept+=("\${substituter}")
+      local kept_identity="\${substituter%%\\?*}"
+      kept_identity="\${kept_identity%%\\#*}"
+      local kept_scheme="\${kept_identity%%://*}://"
+      local kept_location="\${kept_identity#*://}"
+      [[ "\${kept_location%%/*}" != *@* ]] || kept_identity="\${kept_scheme}<redacted>@\${kept_location#*@}"
+      optional_kept_identities+=("\${kept_identity}")
+    fi
   done
   for substituter in \${required_substituters}; do
     [[ " \${available[*]} " == *" \${substituter} "* ]] && required_kept+=("\${substituter}")
@@ -202,8 +229,8 @@ __vbr_stage0_apply_nix_cache_health() {
   required_joined="\${required_kept[*]-}"
   optional_kept_joined="\${optional_kept[*]-}"
   export NIX_CONFIG="\${retained}"$'\\n'"substituters = \${required_joined}"$'\\n'"extra-substituters = \${optional_kept_joined}"$'\\n''connect-timeout = 3'$'\\n''stalled-download-timeout = 10'$'\\n''fallback = true'
-  echo "[env] nix cache health: disabled unreachable substituter(s): \${removed[*]}" 1>&2
-  echo "[env] nix cache health: using optional substituter(s): \${optional_kept_joined:-<none>}" 1>&2
+  echo "[env] nix cache health: disabled unreachable substituter(s): \${removed_identities[*]}" 1>&2
+  echo "[env] nix cache health: using optional substituter(s): \${optional_kept_identities[*]:-<none>}" 1>&2
 }
 
 __vbr_stage0_filtered_viberoots_input() {

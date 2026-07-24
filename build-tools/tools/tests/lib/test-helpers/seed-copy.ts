@@ -224,7 +224,7 @@ async function copyTreeCow(srcRoot: string, dstRoot: string): Promise<void> {
   const repairPermissions =
     process.platform !== "darwin" ||
     !(await fsp
-      .access(path.join(srcRoot, ".seed-store-prepared-v7"))
+      .access(path.join(srcRoot, ".seed-store-prepared-v8"))
       .then(() => true)
       .catch(() => false));
   const result =

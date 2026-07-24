@@ -12,13 +12,17 @@ test("nondefault reconciliation recreates filtered input after a hash update", a
     viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash/fixed-store-reconcile.ts"),
     "utf8",
   );
+  const build = await fsp.readFile(
+    viberootsSourcePath("build-tools/tools/dev/update-pnpm-hash/fixed-store-build.ts"),
+    "utf8",
+  );
   assert.match(
     state,
     /const runBuild = async \(rebuild: boolean\) =>\s*await withPnpmStoreBuildFlakeRef/,
   );
   assert.match(
-    state,
+    build,
     /try \{\s*await opts\.updateHash\(suggested\);\s*second = await opts\.runBuild\(false\);\s*\} catch \(error\) \{\s*await restoreMetadataOrThrow\(opts\.restoreMetadata, error\)/,
   );
-  assert.doesNotMatch(main + state, /unfixed|add-fixed/);
+  assert.doesNotMatch(main + state + build, /unfixed|add-fixed/);
 });

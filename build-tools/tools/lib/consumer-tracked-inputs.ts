@@ -1,5 +1,6 @@
 export const consumerGitignoreEntries = [
   ".viberoots/",
+  ".agents/plugins/marketplace.json",
   "buck-out/",
   ".direnv/",
   ".nix-zsh/",

@@ -2,10 +2,12 @@ import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import { runArtifactNix } from "../../ci/artifact-command";
 import { makeFilteredFlakeRef } from "../../dev/filtered-flake";
 import {
   buildCanonicalArtifactEnvironment,
   canonicalArtifactToolsRoot,
+  withoutArtifactEnvironmentInfluence,
 } from "../../lib/artifact-environment";
 import {
   findViberootsRoot,
@@ -18,6 +20,8 @@ import { ensureToolchainPathsForTempRepo } from "../lib/test-helpers/toolchain-p
 
 const execFileAsync = promisify(execFile);
 export const target = "//projects/apps/rust-parity:app";
+
+const nixFlakeFeatures = ["--extra-experimental-features", "nix-command flakes"];
 
 export async function prepareRustConsumer(workspace: string, $: any): Promise<string> {
   const viberootsRoot = await findViberootsRoot();
@@ -40,9 +44,13 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
     { cwd: workspace, env: { ...process.env, NO_DEV_SHELL: "1" } },
   );
   await seedWorkspaceLockFromCommittedAuthority(workspace);
-  await execFileAsync(
-    path.join(canonicalArtifactToolsRoot(process.cwd()), "bin", "nix"),
-    [
+  const artifactToolsRoot = canonicalArtifactToolsRoot(process.cwd());
+  await runArtifactNix({
+    workspaceRoot: workspace,
+    artifactToolsRoot,
+    baseEnv: withoutArtifactEnvironmentInfluence(process.env),
+    args: [
+      ...nixFlakeFeatures,
       "flake",
       "lock",
       "--offline",
@@ -52,8 +60,7 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
       `path:${flakeInput}`,
       "path:.viberoots/workspace",
     ],
-    { cwd: workspace, maxBuffer: 16 * 1024 * 1024 },
-  );
+  });
   const hiddenLock = path.join(workspace, ".viberoots", "workspace", "flake.lock");
   const rootLock = path.join(workspace, "flake.lock");
   await fsp.copyFile(hiddenLock, rootLock);
@@ -192,9 +199,12 @@ export async function buildCanonicalBundle(
     immutableViberootsInputRoot,
   });
   try {
-    const { stdout } = await execFileAsync(
-      path.join(artifactToolsRoot, "bin", "nix"),
-      [
+    const { stdout } = await runArtifactNix({
+      workspaceRoot: workspace,
+      artifactToolsRoot,
+      baseEnv: withoutArtifactEnvironmentInfluence(process.env),
+      args: [
+        ...nixFlakeFeatures,
         "build",
         "--accept-flake-config",
         "--no-write-lock-file",
@@ -202,8 +212,7 @@ export async function buildCanonicalBundle(
         "--no-link",
         "--print-out-paths",
       ],
-      { cwd: workspace, maxBuffer: 32 * 1024 * 1024 },
-    );
+    });
     const outPath = String(stdout || "")
       .trim()
       .split(/\s+/)

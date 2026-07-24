@@ -93,7 +93,7 @@ test("verify seed staging invalidates older prepared marker versions", async () 
     const key = `seed-stage-marker-${process.pid}-${Date.now()}`;
     const staged = await stageSeedStore(seed, key, 60_000);
     await fsp.rename(
-      path.join(staged, ".seed-store-prepared-v7"),
+      path.join(staged, ".seed-store-prepared-v8"),
       path.join(staged, ".seed-store-prepared-v6"),
     );
     await fsp.writeFile(path.join(seed, "eslint.config.js"), "eslint.config.js changed\n", "utf8");
@@ -104,7 +104,7 @@ test("verify seed staging invalidates older prepared marker versions", async () 
       await fsp.readFile(path.join(rebuilt, "eslint.config.js"), "utf8"),
       "eslint.config.js changed\n",
     );
-    await fsp.access(path.join(rebuilt, ".seed-store-prepared-v7"));
+    await fsp.access(path.join(rebuilt, ".seed-store-prepared-v8"));
     await assert.rejects(fsp.access(path.join(rebuilt, ".seed-store-prepared-v6")));
   });
 });
@@ -114,7 +114,7 @@ test("verify seed staging rewrites lock metadata after placeholder mutation", as
   const prepare = await readRepoFile("build-tools/tools/dev/verify/seed-stage-prepare.ts");
   const flakeInput = await readRepoFile("build-tools/tools/dev/verify/seed-stage-flake-input.ts");
 
-  assert.match(layout, /\.seed-store-prepared-v7/);
+  assert.match(layout, /\.seed-store-prepared-v8/);
   assert.doesNotMatch(layout, /\.seed-store-prepared-v6/);
   assert.ok(
     prepare.indexOf("...(await ensurePnpmfilePlaceholders(stageDir)),") <

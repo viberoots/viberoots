@@ -31,13 +31,14 @@ import {
   generatedWorkspaceViberootsAuthority,
   repairGeneratedWorkspaceLock,
 } from "../../lib/workspace-lock-repair";
-import { envWithResolvedNixBin } from "../../lib/tool-paths";
+import { ensureNixStoreToolPathSync, envWithResolvedNixBin } from "../../lib/tool-paths";
 import { glueFingerprintFresh } from "./glue-freshness";
 import {
   assertCppTrackedMetadataReady,
   installMetadataMode,
   staleMetadataError,
 } from "./metadata-mode";
+import { assertRustTrackedMetadataReady } from "./cargo";
 
 type Flags = {
   force: boolean;
@@ -322,6 +323,7 @@ if (dryRun) {
         for (const imp of importers) {
           const commandCwd = repoRoot;
           const commandEnv = envWithResolvedNixBin(process.env);
+          const zxWrapper = ensureNixStoreToolPathSync("zx-wrapper", commandEnv);
           const relLock = path.join(imp, "pnpm-lock.yaml");
           const freshness = await importerInstallFreshness({
             repoRoot,
@@ -359,7 +361,7 @@ if (dryRun) {
               // Keep a bounded timeout, but avoid prematurely killing healthy runs.
               NIX_PNPM_FETCH_TIMEOUT: String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"),
             },
-          })`zx-wrapper ${absUpdate} --lockfile ${relLock} ${updateArgs}`;
+          })`${zxWrapper} ${absUpdate} --lockfile ${relLock} ${updateArgs}`;
           const updateRes = verbose
             ? await updateCmd
             : await withInstallProgress(`node_modules ${imp} update-pnpm-hash`, updateCmd, {
@@ -382,7 +384,7 @@ if (dryRun) {
               ZX_INIT: activeZxInit,
               NIX_PNPM_FETCH_TIMEOUT: String(process.env.NIX_PNPM_FETCH_TIMEOUT || "600"),
             },
-          })`zx-wrapper ${buildToolPath(repoRoot, "tools/dev/install/link-node.ts")} --importer ${imp} ${force ? "--force" : ""}`;
+          })`${zxWrapper} ${buildToolPath(repoRoot, "tools/dev/install/link-node.ts")} --importer ${imp} ${force ? "--force" : ""}`;
           const linkRes = verbose
             ? await linkCmd
             : await withInstallProgress(`node_modules ${imp} link-node`, linkCmd.quiet());
@@ -407,10 +409,12 @@ if (dryRun) {
 // Best-effort patches lint (non-fatal)
 try {
   const patchesLintAbs = buildToolPath(repoRoot, "tools/dev/patches-lint.ts");
+  const patchesLintEnv = envWithResolvedNixBin({ ...process.env, ZX_INIT: zxInitPath(repoRoot) });
+  const zxWrapper = ensureNixStoreToolPathSync("zx-wrapper", patchesLintEnv);
   await $({
     stdio: "inherit",
-    env: envWithResolvedNixBin({ ...process.env, ZX_INIT: zxInitPath(repoRoot) }),
-  })`zx-wrapper ${patchesLintAbs}`.nothrow();
+    env: patchesLintEnv,
+  })`${zxWrapper} ${patchesLintAbs}`.nothrow();
 } catch {}
 // Generate gomod2nix.toml at repo root (if present) and per project (projects/apps/*, projects/libs/*)
 if (!skipGoTidy) {
@@ -427,6 +431,7 @@ try {
 await runGomod2nixScanAll(dryRun, verbose, readOnlyGoMetadata);
 // Best-effort Python lock refresh (uv). No-ops if no uv.lock present.
 await runUvRefreshAll(dryRun, verbose, readOnlyMetadata);
+if (readOnlyMetadata) await assertRustTrackedMetadataReady(repoRoot);
 if (!skipGlue && readOnlyMetadata) {
   await assertCppTrackedMetadataReady(repoRoot);
   const freshness = await glueFingerprintFresh(repoRoot);

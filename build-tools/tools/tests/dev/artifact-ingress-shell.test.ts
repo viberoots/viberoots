@@ -7,6 +7,9 @@ import path from "node:path";
 import { test } from "node:test";
 
 const ingressScript = "viberoots/build-tools/tools/bin/artifact-ingress-env.sh";
+const cacheScopeScript = path.resolve(
+  "viberoots/build-tools/tools/bin/cache-health-command-scope.sh",
+);
 
 function writeManifest(workspace: string, root: string): void {
   const manifest = path.join(workspace, ".viberoots", "workspace", "toolchain-paths.json");
@@ -97,6 +100,58 @@ test("shell ingress consumes a valid re-entry proof exactly once", () => {
     { cwd: process.cwd(), encoding: "utf8" },
   );
   assert.equal(result.status, 0, result.stderr);
+});
+
+test("shell ingress clears hostile cache scope markers before authenticated re-entry", () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "artifact-ingress-cache-scope-"));
+  const token = "cache-scope-proof";
+  try {
+    const result = spawnSync(
+      "/bin/bash",
+      [
+        "-c",
+        '. "$1"; cd "$3"; export VBR_NIX_CACHE_HEALTH_COMMAND_ACTIVE=1 VBR_NIX_CACHE_HEALTH_APPLIED=1 VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG=hostile; artifact_ingress_reexec_with_devshell /bin/true; test -z "${VBR_NIX_CACHE_HEALTH_COMMAND_ACTIVE:-}"; test -z "${VBR_NIX_CACHE_HEALTH_APPLIED:-}"; test -z "${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG:-}"; exec 9<<<"$4"; export VBR_ARTIFACT_INGRESS_DIRENV_ROOT="$3" VBR_ARTIFACT_INGRESS_DIRENV_TOKEN="$4"; artifact_ingress_reexec_with_devshell /bin/true; test "${VBR_ARTIFACT_INGRESS_DIRENV_VERIFIED:-}" = 1; . "$2" verified-ingress; test "${VBR_NIX_CACHE_HEALTH_COMMAND_ACTIVE:-}" = 1; test -z "${VBR_NIX_CACHE_HEALTH_APPLIED:-}"; test -z "${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG:-}"',
+        "artifact-ingress-test",
+        ingressScript,
+        cacheScopeScript,
+        workspace,
+        token,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, result.stderr);
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test("shell ingress hands off only the exact FD-verified devshell cache decision", () => {
+  const reviewed = "substituters =\nextra-substituters =\nfallback = true";
+  const trusted = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      '. "$1"; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1 VBR_NIX_CACHE_HEALTH_APPLIED=1 VBR_DEVSHELL_ARTIFACT_WAS_SET_NIX_CONFIG=1; VBR_DEVSHELL_ARTIFACT_VALUE_NIX_CONFIG="$2"; artifact_ingress_publish_reviewed_nix_cache_config; test "$VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG" = "$2"',
+      "artifact-ingress-test",
+      ingressScript,
+      reviewed,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(trusted.status, 0, trusted.stderr);
+
+  const untrusted = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      '. "$1"; export VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG=hostile VBR_NIX_CACHE_HEALTH_APPLIED=1 VBR_DEVSHELL_ARTIFACT_WAS_SET_NIX_CONFIG=1 VBR_DEVSHELL_ARTIFACT_VALUE_NIX_CONFIG="$2"; artifact_ingress_publish_reviewed_nix_cache_config; test -z "${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG:-}"; test -z "${VBR_NIX_CACHE_HEALTH_APPLIED:-}"',
+      "artifact-ingress-test",
+      ingressScript,
+      reviewed,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(untrusted.status, 0, untrusted.stderr);
 });
 
 test("shell ingress removes trusted devshell session inputs before canonical admission", () => {

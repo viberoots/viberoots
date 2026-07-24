@@ -7,7 +7,7 @@ is [`../rust-language-plan.md`](../rust-language-plan.md).
 ## Current Native Lifecycle
 
 The current Rust route compiles package-local Cargo libraries, binaries, and tests from checked-in
-manifests and locks. It provides the native lifecycle through PR-2, but is not yet the complete
+manifests and locks. It provides the native lifecycle through PR-3, but is not yet the complete
 first-class Rust lifecycle.
 
 | Surface              | Current behavior                                                                                                                                                                                                                              | Evidence                                                                                                              |
@@ -20,7 +20,7 @@ first-class Rust lifecycle.
 | Providers            | Generic provider edges work when `MODULE_PROVIDERS` already contains entries. Rust provider sync emits only an empty or TODO file, and the language contract declares `providerModel: "none"`.                                                | `build-tools/tools/buck/providers/rust.ts`, `build-tools/tools/lib/lang-contracts.ts`                                 |
 | Tests                | Cquery covers routing, exported Cargo fields, inputs, provider order, and unknown-field rejection. Native fixtures execute two binaries, prove source sensitivity, and cover fail-closed Cargo diagnostics.                                   | `build-tools/tools/tests/rust/`, `build-tools/tools/tests/lang/rust.stub.provider-edges.deterministic.cquery.test.ts` |
 | Language registry    | Rust is not enabled in `build-tools/tools/nix/langs.json`; a native example exists only as a disabled registry prerequisite.                                                                                                                  | `build-tools/tools/nix/langs.json`, `build-tools/tools/nix/examples/rust/`                                            |
-| Dependency ownership | Cargo is deliberately excluded from the current `u`, `u --upgrade`, and read-only `i` contract.                                                                                                                                               | `build-tools/docs/update-command-design.md`                                                                           |
+| Dependency ownership | Cargo participates in the shared language lifecycle: read-only consumers verify locked offline metadata, while explicit `u` and `u --upgrade` transactionally reconcile every affected `Cargo.lock`.                                          | `build-tools/docs/update-command-design.md`                                                                           |
 | Runtime and tests    | `rust_test` executes compiled Cargo harnesses through a bounded project-relative external runner. Native binaries publish `run.prod`; libraries and tests stay out of runnable summaries.                                                     | Rust macro, runner, planner, and manifest implementations                                                             |
 | Source selection     | Native targets export `nixpkg_deps`, `nixpkgs_profile`, and `nixpkg_pins`. The shared source-plan resolver selects the Rust toolchain and declared build-script dependencies.                                                                 | Rust macro, graph attrs, planner, and template                                                                        |
 
@@ -44,8 +44,13 @@ rust_binary(name = "demo", crate = "demo", srcs = ["src/main.rs"], deps = [":cor
 The package must check in the canonical `Cargo.toml` and `Cargo.lock`; alternate or cross-root Cargo
 metadata paths fail closed. Patch directories must be normalized package-relative paths without
 traversal. Cross-root Rust `deps`, non-native targets, unsupported lock sources, and stale locks
-also fail closed. Cargo update, patch application, C interop, WASM, remote admission, and public
-scaffolding remain owned by later plan PRs.
+also fail closed. Patch application, C interop, WASM, remote admission, and public scaffolding
+remain owned by later plan PRs.
+
+After editing a Cargo manifest, run `u` for conservative offline lock reconciliation or
+`u --upgrade` for an intentional offline dependency update. Both commands use Nix-store Cargo in a
+temporary copy and publish lock bytes only after locked verification succeeds. Ordinary `i`,
+post-clone, devshell entry, and `b` are read-only and report `repair: run u` for stale Cargo state.
 
 ## Goals
 
@@ -122,6 +127,20 @@ rustc, rustdoc, clippy, rustfmt, and target support come from Nix store paths.
 - `u --upgrade` runs bounded offline `cargo update`, then the same locked verification.
 - Both update modes restore every affected `Cargo.lock` byte-for-byte, including prior absence, on
   failure or timeout. They do not change viberoots pins or source-mode metadata.
+
+Cargo resolution uses only `.viberoots/workspace/cargo-home` in the consumer workspace. The command
+boundary removes inherited `CARGO_*`, `RUSTC`, `RUSTFLAGS`, and `RUSTUP_HOME` values and forces
+offline mode, so an ambient user cache or network route cannot become dependency authority. The
+workspace cache is ignored runtime state, not a tracked or portable input: required registry index
+and crate bytes must already have been populated by a reviewed environment/fixture. PR-3 adds no
+networked cache-population command. Missing cache entries fail closed. The copied Cargo root, its
+temporary execution ancestors, and the workspace cache are checked for `config`/`config.toml`
+files because Cargo source replacement can preserve a crates.io lock identity while reading an
+alternate registry. Live ancestors outside the copied Cargo root cannot influence temporary Cargo
+execution and are not rejected. The Nix builder rejects source-root Cargo config by the same
+policy. Path dependencies and crates.io lock sources remain admitted; Git and alternate-registry
+locks are rejected before read-only success or transactional publication because the Nix builder
+does not admit them yet.
 
 ## Nix Build And Planner Contract
 

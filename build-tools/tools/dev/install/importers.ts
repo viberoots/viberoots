@@ -42,7 +42,7 @@ function trackedImporterCandidates(
   root: string,
   workspaceRoots: readonly string[],
 ): string[] | null {
-  const result = spawnSync("git", ["ls-files"], {
+  const result = spawnSync("git", ["-c", `safe.directory=${path.resolve(root)}`, "ls-files"], {
     cwd: root,
     encoding: "utf8",
   });

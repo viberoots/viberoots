@@ -7,7 +7,14 @@ description: Run this repository's validation flow in a delegated tester subagen
 
 ## Workflow
 
-Spawn one subagent and treat it as the tester for the current repository. The tester must validate from the current working tree, preserve user changes, write verbose build and test output to a log file, and keep the main conversation updated with concise progress while long commands run.
+Spawn one subagent with isolated context and treat it as the tester for the current repository. Use
+`fork_turns="none"` when the collaboration API supports it. Do not fork or summarize the parent
+conversation into the tester. The task prompt must contain only the repository path, validation
+contract, optional selector, and the repo guidance paths below.
+
+The tester must validate from the current working tree, preserve user changes, write verbose build
+and test output to a log file, and keep the main conversation updated with concise progress while
+long commands run.
 
 Use a prompt shaped like this, adjusted only for the current repository path and optional selector:
 
@@ -94,6 +101,11 @@ Set `v_args` from the selector the user provided. Leave it empty when no selecto
 Run this from the repo root using `bash -lc` or `zsh -lc` so direnv can export the environment into the shell that runs validation. If `direnv export bash` says the directory is blocked, run `direnv allow` once for this checkout, rerun the command, and mention that in the tester report.
 
 ## Main-Agent Behavior
+
+Treat reviewer and tester isolation as a correctness boundary. If a new subagent needs more context,
+send the smallest concrete follow-up: a file path, target, command, error signature, or acceptance
+criterion. Never send the full parent transcript, broad conversation summaries, or verbose test
+logs.
 
 After spawning the tester, keep working on any non-overlapping task if one exists. Relay useful tester progress while validation is running, especially for long full-suite runs. Keep updates brief and evidence-oriented: elapsed time, log path, current phase, and any short high-signal summary. Do not paste verbose logs.
 

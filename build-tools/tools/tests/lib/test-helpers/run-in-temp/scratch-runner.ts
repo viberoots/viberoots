@@ -3,6 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { withGitAutoMaintenanceDisabledEnv } from "../../../../lib/git-auto-maintenance-env";
 import { withSanitizedInheritedNixConfig } from "../../../../lib/nix-config-env";
+import { sharedPnpmStoreHashCacheRoot } from "../../../../dev/update-pnpm-hash/verified-marker";
 import { removeTreeWithWritableFallback } from "../remove-tree";
 import { timeAsync } from "../timing";
 import type { RunInTempCallback, TempAllocation } from "./contracts";
@@ -37,7 +38,10 @@ export async function runScratchTemp<T>(
   exportEnv.WORKSPACE_ROOT = tmp;
   exportEnv.BUCK_TEST_SRC = tmp;
   exportEnv.REPO_ROOT = tmp;
-  exportEnv.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = process.cwd();
+  exportEnv.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT = sharedPnpmStoreHashCacheRoot(
+    process.env,
+    realHome,
+  );
   exportEnv.VBR_RUN_IN_TEMP_REPO = "1";
   exportEnv.SCAF_ALLOW_LIVE_REPO = "1";
   exportEnv.VIBEROOTS_ROOT = activeViberootsRoot;

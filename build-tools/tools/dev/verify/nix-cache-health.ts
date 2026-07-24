@@ -1,7 +1,10 @@
 import process from "node:process";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { parseNixCacheConfigValues } from "../../lib/nix-cache-readiness";
+import {
+  nixCacheSubstituterIdentity,
+  parseNixCacheConfigValues,
+} from "../../lib/nix-cache-readiness";
 import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
 import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
 
@@ -70,19 +73,34 @@ async function defaultReadEffectiveConfig(): Promise<string> {
   return String(process.env.NIX_CONFIG || "");
 }
 
-async function defaultProbeUrl(url: string, timeoutMs: number): Promise<boolean> {
+async function defaultProbeUrl(
+  url: string,
+  timeoutMs: number,
+  netrcFile: string,
+): Promise<boolean> {
   const connectTimeout = String(Math.max(1, Math.ceil(timeoutMs / 1000)));
-  const nixEnv = withSanitizedInheritedNixConfig(envWithResolvedNixBin({ ...process.env }));
-  const nixBin = resolveToolPathSync("nix", nixEnv);
-  try {
-    await execFileAsync(
-      nixBin,
-      ["store", "info", "--store", url, "--option", "connect-timeout", connectTimeout],
-      { env: nixEnv },
-    );
-    return true;
-  } catch {
-    // Fall through to the unauthenticated HTTP probe.
+  if (netrcFile) {
+    const commandEnv = withSanitizedInheritedNixConfig(envWithResolvedNixBin({ ...process.env }));
+    try {
+      const curlBin = resolveToolPathSync("curl", commandEnv);
+      await execFileAsync(
+        curlBin,
+        [
+          "-fsS",
+          "--connect-timeout",
+          connectTimeout,
+          "--max-time",
+          connectTimeout,
+          "--netrc-file",
+          netrcFile,
+          nixCacheInfoUrl(url),
+        ],
+        { env: commandEnv },
+      );
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   const controller = new AbortController();
@@ -97,10 +115,18 @@ async function defaultProbeUrl(url: string, timeoutMs: number): Promise<boolean>
   }
 }
 
+function configScalar(config: string, key: string): string {
+  for (const line of config.split("\n")) {
+    const eq = line.indexOf("=");
+    if (eq <= 0 || line.slice(0, eq).trim() !== key) continue;
+    return line.slice(eq + 1).trim();
+  }
+  return "";
+}
+
 function nixCacheInfoUrl(raw: string): string {
   const url = new URL(raw);
   url.pathname = `${url.pathname.replace(/\/+$/, "")}/nix-cache-info`;
-  url.search = "";
   url.hash = "";
   return url.toString();
 }
@@ -117,6 +143,12 @@ export async function applyNixCacheHealthPolicy(
 ): Promise<CacheHealthResult> {
   const policy = policyFromEnv();
   if (process.env.VBR_NIX_CACHE_HEALTH_APPLIED === "1") {
+    const reviewedConfig = String(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG || "");
+    delete process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG;
+    if (reviewedConfig) {
+      process.env.NIX_CONFIG = reviewedConfig;
+      return { changed: true, kept: [], removed: [], nixConfig: reviewedConfig };
+    }
     return { changed: false, kept: [], removed: [] };
   }
   process.env.VBR_NIX_CACHE_HEALTH_APPLIED = "1";
@@ -130,7 +162,10 @@ export async function applyNixCacheHealthPolicy(
   const configured = unique([...required, ...optional]);
   if (configured.length === 0) return { changed: false, kept: [], removed: [] };
 
-  const probe = deps.probeUrl || defaultProbeUrl;
+  const netrcFile = configScalar(effectiveConfig, "netrc-file");
+  const probe =
+    deps.probeUrl ||
+    (async (url: string, timeoutMs: number) => await defaultProbeUrl(url, timeoutMs, netrcFile));
   const available: string[] = [];
   const removed: string[] = [];
   for (const substituter of configured) {
@@ -146,8 +181,9 @@ export async function applyNixCacheHealthPolicy(
   }
 
   if (removed.length === 0) return { changed: false, kept: configured, removed };
+  const removedIdentities = removed.map(nixCacheSubstituterIdentity);
   if (policy === "strict") {
-    throw new Error(`configured Nix substituter(s) unavailable: ${removed.join(" ")}`);
+    throw new Error(`configured Nix substituter(s) unavailable: ${removedIdentities.join(" ")}`);
   }
   const requiredKept = required.filter((substituter) => available.includes(substituter));
   const optionalKept = optional.filter((substituter) => available.includes(substituter));
@@ -160,9 +196,13 @@ export async function applyNixCacheHealthPolicy(
     "fallback = true",
   ];
   process.env.NIX_CONFIG = [retainedEnv, ...overrideLines].filter(Boolean).join("\n");
-  log(`[verify] nix cache health: disabled unreachable substituter(s): ${removed.join(" ")}`);
   log(
-    `[verify] nix cache health: using optional substituter(s): ${optionalKept.join(" ") || "<none>"}`,
+    `[verify] nix cache health: disabled unreachable substituter(s): ${removedIdentities.join(" ")}`,
+  );
+  log(
+    `[verify] nix cache health: using optional substituter(s): ${
+      optionalKept.map(nixCacheSubstituterIdentity).join(" ") || "<none>"
+    }`,
   );
   return {
     changed: true,

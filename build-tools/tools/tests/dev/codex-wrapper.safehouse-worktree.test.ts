@@ -11,6 +11,7 @@ import {
   safehouseLaunchPattern,
   scratchRoot,
 } from "./agent-wrapper-test-helpers.ts";
+import { sanitizedAccountWrapperEnv } from "./codex-wrapper.accounts-test-fixture.ts";
 
 const wrapper = binWrapper("codex");
 const makeFakeTools = (tmp: string, gitRoot: string) => makeFakeAgentTools(tmp, gitRoot, "codex");
@@ -36,14 +37,13 @@ test("codex --worktree creates through the CoW git wrapper and launches the work
     const res = await $({
       cwd: gitRoot,
       stdio: "pipe",
-      env: {
-        ...process.env,
+      env: sanitizedAccountWrapperEnv({
         ...managedCodexEnv(fake.bin),
         HOME: home,
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin:${process.env.PATH}`,
         VBR_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
         CODEX_HOME: path.join(home, ".codex"),
-      },
+      }),
     })`${wrapper} --worktree native-worker exec task`;
 
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
@@ -86,17 +86,19 @@ test("codex -w is an alias for the wrapper worktree path", async () => {
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));
   try {
     const gitRoot = path.join(tmp, "repo");
+    const home = path.join(tmp, "home");
     await fsp.mkdir(gitRoot, { recursive: true });
+    await fsp.mkdir(path.join(home, ".codex"), { recursive: true }); // legacy fallback (no ~/.codex-accounts/)
     const fake = await makeFakeTools(tmp, gitRoot);
     const res = await $({
       cwd: gitRoot,
       stdio: "pipe",
-      env: {
-        ...process.env,
+      env: sanitizedAccountWrapperEnv({
         ...managedCodexEnv(fake.bin),
+        HOME: home,
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin:${process.env.PATH}`,
         VBR_CODEX_GIT_WRAPPER_FOR_TEST: path.join(fake.bin, "git"),
-      },
+      }),
     })`${wrapper} -w shortcut-worker exec task`;
 
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
@@ -117,16 +119,18 @@ test("codex wrapper runs worktree agents through safehouse with unsafe flags", a
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));
   try {
     const worktreeRoot = path.join(tmp, ".codex", "worktrees", "worker-a");
+    const home = path.join(tmp, "home");
     await fsp.mkdir(worktreeRoot, { recursive: true });
+    await fsp.mkdir(path.join(home, ".codex"), { recursive: true }); // legacy fallback (no ~/.codex-accounts/)
     const fake = await makeFakeTools(tmp, worktreeRoot);
     const res = await $({
       cwd: worktreeRoot,
       stdio: "pipe",
-      env: {
-        ...process.env,
+      env: sanitizedAccountWrapperEnv({
         ...managedCodexEnv(fake.bin),
+        HOME: home,
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin:${process.env.PATH}`,
-      },
+      }),
     })`${wrapper} exec task`;
 
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));

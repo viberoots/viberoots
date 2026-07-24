@@ -9,6 +9,7 @@ const files = [
   "build-tools/tools/tests/viberoots/fresh-clone-post-clone.test.ts",
   "build-tools/tools/tests/viberoots/fresh-clone-post-clone-fail-closed.test.ts",
   "build-tools/tools/tests/viberoots/fresh-clone-post-clone-pnpm-stale.test.ts",
+  "build-tools/tools/tests/rust/rust.cargo-entrypoints.read-only.test.ts",
 ] as const;
 
 test("copy-heavy fresh-clone tests use one serial isolated pass", async () => {

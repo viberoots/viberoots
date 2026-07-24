@@ -19,7 +19,6 @@ import {
   sanitizeName,
 } from "./install/common";
 import {
-  currentVerifiedMarkerFingerprintCandidates,
   currentVerifiedMarkerFingerprint,
   readVerifiedMarker,
   sha256File,
@@ -181,17 +180,12 @@ async function hasFreshVerifiedMarker(lockfileRel: string, hashKey: string): Pro
   const lockHash = await sha256File(path.join(repoRoot, lockfileRel));
   if (!lockHash) return false;
   const builderFingerprint = await currentVerifiedMarkerFingerprint(repoRoot, importer);
-  const acceptedBuilderFingerprints = await currentVerifiedMarkerFingerprintCandidates(
-    repoRoot,
-    importer,
-  );
   const metadataMatches =
     marker.importer === importer &&
     marker.lockfile === hashKey &&
     marker.lockHash === lockHash &&
     marker.hashValue === (await readHashForLock(hashKey)) &&
-    (marker.builderFingerprint === builderFingerprint ||
-      acceptedBuilderFingerprints.includes(marker.builderFingerprint));
+    marker.builderFingerprint === builderFingerprint;
   if (!metadataMatches) return false;
   return true;
 }

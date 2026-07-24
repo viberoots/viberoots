@@ -194,12 +194,9 @@ find_codex_excluding_wrapper_dir() {
   return 1
 }
 
-real_codex="$(find_codex_excluding_wrapper_dir || true)"
-if [[ -z "$real_codex" ]]; then
-  exit 1
-fi
+real_codex="$(find_codex_excluding_wrapper_dir 2>/dev/null || true)"
 
-if [[ "$(uname -s 2>/dev/null || true)" == "Darwin" ]] && command -v xattr >/dev/null 2>&1; then
+if [[ -n "$real_codex" && "$(uname -s 2>/dev/null || true)" == "Darwin" ]] && command -v xattr >/dev/null 2>&1; then
   if xattr -p com.apple.quarantine "$real_codex" >/dev/null 2>&1; then
     echo "Error: viberoots-managed Codex is quarantined by macOS: $real_codex" >&2
     echo "Hint: fix the Nix Codex package/signing or quarantine state; refusing app or arg0 fallback." >&2
@@ -231,6 +228,93 @@ FORCE_REMOVE_WORKTREE=0
 WORKTREE_NAME=""
 REMOVE_WORKTREE_NAME=""
 CODEX_ARGS=()
+RESOLVED_CODEX_HOME=""
+ACCOUNT_ARGS=()
+ACCOUNT_WORKTREE_REEXEC_ARGS=()
+
+prepare_codex_account_invocation() {
+  local zx
+  local plan_file
+  local helper_status
+  local key
+  local value
+  local action=""
+  local exit_code=""
+  local reexec_args=()
+
+  zx="$(find_tool_excluding_wrapper_dir zx-wrapper || true)"
+  if [[ -z "$zx" ]]; then
+    echo "error: the codex account resolver requires zx-wrapper on PATH (not found)" >&2
+    echo "  enter the viberoots dev shell before running codex" >&2
+    exit 69
+  fi
+  plan_file="$(mktemp "${TMPDIR:-/tmp}/vbr-codex-account-plan.XXXXXX")"
+  cleanup_codex_account_plan() {
+    rm -f -- "$plan_file"
+  }
+  trap cleanup_codex_account_plan EXIT
+
+  set +e
+  VBR_CODEX_ACCOUNTS_ROOT="${HOME:-}/.codex-accounts" \
+    VBR_CODEX_LEGACY_ROOT="${HOME:-}/.codex" \
+    VBR_CODEX_REAL_BINARY="$real_codex" \
+    VBR_CODEX_ACCOUNT_PLAN="$plan_file" \
+    "$zx" \
+    --import "${VIBEROOTS_SOURCE_ROOT}/build-tools/tools/dev/zx-init.mjs" \
+    "${VIBEROOTS_SOURCE_ROOT}/build-tools/tools/dev/codex-accounts.ts" \
+    prepare -- "$@"
+  helper_status=$?
+  set -e
+  case "$helper_status" in
+    0) ;;
+    2) exit 2 ;;
+    3) exit 65 ;;
+    *)
+      echo "error: codex-accounts.ts exited abnormally (exit=${helper_status})" >&2
+      exit 70
+      ;;
+  esac
+
+  while IFS= read -r -d '' key && IFS= read -r -d '' value; do
+    case "$key" in
+      action) action="$value" ;;
+      exit-code) exit_code="$value" ;;
+      codex-home) RESOLVED_CODEX_HOME="$value" ;;
+      arg) ACCOUNT_ARGS+=("$value") ;;
+      worktree-reexec-arg) ACCOUNT_WORKTREE_REEXEC_ARGS+=("$value") ;;
+      reexec-arg) reexec_args+=("$value") ;;
+      *)
+        echo "error: codex account helper returned unknown plan field '${key}'" >&2
+        exit 70
+        ;;
+    esac
+  done <"$plan_file"
+  cleanup_codex_account_plan
+  trap - EXIT
+
+  case "$action" in
+    delegate)
+      if [[ -z "$real_codex" ]]; then
+        real_codex="$(find_codex_excluding_wrapper_dir || true)"
+        [[ -n "$real_codex" ]] || exit 1
+      fi
+      ;;
+    reexec)
+      exec "$SCRIPT_PATH" "${reexec_args[@]+"${reexec_args[@]}"}"
+      ;;
+    exit)
+      [[ "$exit_code" =~ ^[0-9]+$ ]] || {
+        echo "error: codex account helper returned an invalid exit plan" >&2
+        exit 70
+      }
+      exit "$exit_code"
+      ;;
+    *)
+      echo "error: codex account helper returned no executable plan" >&2
+      exit 70
+      ;;
+  esac
+}
 
 codex_args_request_sandbox() {
   local token
@@ -545,6 +629,7 @@ should_safehouse_codex() {
   local mode="${VBR_CODEX_SAFEHOUSE:-auto}"
   local root="$1"
 
+  [[ "$(uname -s 2>/dev/null || true)" == "Darwin" ]] || return 1
   if [[ "${VBR_CODEX_SAFEHOUSE_ACTIVE:-}" == "1" ]]; then
     if [[ -n "${VBR_CODEX_SAFEHOUSE_ROOT:-}" && "$(real_path "$root")" != "$(real_path "$VBR_CODEX_SAFEHOUSE_ROOT")" ]]; then
       echo "Error: cannot launch Codex worktree agent from inside another Safehouse sandbox: $root" >&2
@@ -677,7 +762,9 @@ run_codex_in_safehouse() {
     home_real="$(cd -- "$HOME" 2>/dev/null && pwd -P || true)"
   fi
   known_hosts="$(safehouse_known_hosts_path "$home_real")"
-  if [[ -n "${CODEX_HOME:-}" ]]; then
+  if [[ -n "${RESOLVED_CODEX_HOME:-}" ]]; then
+    codex_home="$RESOLVED_CODEX_HOME"
+  elif [[ -n "${CODEX_HOME:-}" ]]; then
     case "$CODEX_HOME" in
       /*) codex_home="$CODEX_HOME" ;;
       *) codex_home="$root_real/$CODEX_HOME" ;;
@@ -748,7 +835,8 @@ run_codex_in_safehouse() {
 }
 
 root="$(git_root || pwd -P)"
-parse_codex_worktree_args "$@"
+prepare_codex_account_invocation "$@"
+parse_codex_worktree_args "${ACCOUNT_ARGS[@]+"${ACCOUNT_ARGS[@]}"}"
 
 operation_count=0
 [[ "$LIST_WORKTREES_REQUESTED" == "1" ]] && operation_count=$((operation_count + 1))
@@ -811,10 +899,13 @@ if [[ "$WORKTREE_REQUESTED" == "1" ]]; then
   else
     exit $?
   fi
-  # Re-enter from the worktree so first launch and later resume use the same Safehouse path.
   cd -- "$root"
-  exec "$SCRIPT_PATH" "${CODEX_ARGS[@]}"
+  exec "$SCRIPT_PATH" \
+    "${ACCOUNT_WORKTREE_REEXEC_ARGS[@]+"${ACCOUNT_WORKTREE_REEXEC_ARGS[@]}"}" \
+    "${CODEX_ARGS[@]+"${CODEX_ARGS[@]}"}"
 fi
+
+POST_WORKTREE_ARGS=("${CODEX_ARGS[@]+"${CODEX_ARGS[@]}"}")
 
 if should_safehouse_codex "$root"; then
   safehouse="$(find_tool_excluding_wrapper_dir safehouse || true)"
@@ -824,16 +915,22 @@ if should_safehouse_codex "$root"; then
     exit 127
   fi
 
-  if is_worker_worktree "$root" && ! codex_args_are_top_level_introspection "$@"; then
-    run_codex_in_safehouse "$root" --dangerously-bypass-approvals-and-sandbox "$@"
+  if is_worker_worktree "$root" && ! codex_args_are_top_level_introspection "${POST_WORKTREE_ARGS[@]+"${POST_WORKTREE_ARGS[@]}"}"; then
+    run_codex_in_safehouse "$root" --dangerously-bypass-approvals-and-sandbox "${POST_WORKTREE_ARGS[@]+"${POST_WORKTREE_ARGS[@]}"}"
   fi
 
-  run_codex_in_safehouse "$root" "$@"
+  run_codex_in_safehouse "$root" "${POST_WORKTREE_ARGS[@]+"${POST_WORKTREE_ARGS[@]}"}"
 fi
 
 codex_launch_args=()
 while IFS= read -r -d '' arg; do
   codex_launch_args+=("$arg")
-done < <(codex_default_sandbox_args "$@")
+done < <(codex_default_sandbox_args "${POST_WORKTREE_ARGS[@]+"${POST_WORKTREE_ARGS[@]}"}")
 
+# Rebind CODEX_HOME to the resolved account before invoking upstream so per-account
+# state applies uniformly on both the safehouse and non-safehouse paths.
+if [[ -n "$RESOLVED_CODEX_HOME" ]]; then
+  export CODEX_HOME="$RESOLVED_CODEX_HOME"
+fi
+# If a help/-h flag was passed, upstream will emit its own help right after our addendum.
 exec "$real_codex" "${codex_launch_args[@]}"

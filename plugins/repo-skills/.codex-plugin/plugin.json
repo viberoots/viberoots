@@ -1,7 +1,10 @@
 {
   "name": "repo-skills",
-  "version": "0.2.2",
+  "version": "0.2.2+codex.20260724050946",
   "description": "Repo-local planning and PR workflow skills for this clone.",
+  "author": {
+    "name": "viberoots"
+  },
   "license": "UNLICENSED",
   "keywords": ["repo", "skills", "workflow"],
   "skills": "./skills/",

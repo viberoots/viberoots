@@ -10,6 +10,7 @@ import { runGlue } from "../install/glue";
 import { globalNixInputFingerprint } from "../global-nix-input-fingerprint";
 import { reconcilePnpmStore } from "../intentional-pnpm-store-reconcile";
 import { repairGoDependencies, repairPythonDependencies } from "./languages";
+import { repairRustDependencies } from "../install/cargo";
 import { updatePnpmLock } from "./pnpm";
 import { projectLanguageSurfaces, type ProjectLanguageId } from "./surfaces";
 import { repairArtifactToolchainAuthority } from "./toolchain";
@@ -42,6 +43,7 @@ export async function updateActivationSource(
 
 export type UpdateOperations = {
   repairToolchainAuthority: (root: string) => Promise<RepairedArtifactToolchainAuthority>;
+  validateTransactionTools: (env: NodeJS.ProcessEnv) => void;
   importers: (root: string) => Promise<string[]>;
   repairPnpmLock: (root: string, importer: string) => Promise<void>;
   upgradePnpm: (root: string, importer: string) => Promise<void>;
@@ -56,8 +58,17 @@ export type UpdateOperations = {
   ) => Promise<void>;
 };
 
+export function validateUpdateTransactionTools(env: NodeJS.ProcessEnv): void {
+  const resolved = ensureNixStoreToolPathSync("gomod2nix", env);
+  const expected = path.join(String(env.VBR_ARTIFACT_TOOLS_ROOT || ""), "bin", "gomod2nix");
+  if (resolved !== expected) {
+    throw new Error(`update transaction requires final artifact gomod2nix: ${expected}`);
+  }
+}
+
 export const defaultUpdateOperations: UpdateOperations = {
   repairToolchainAuthority: repairArtifactToolchainAuthority,
+  validateTransactionTools: validateUpdateTransactionTools,
   importers: async (root) => await discoverImportersWithLock(root, { cwd: process.cwd() }),
   repairPnpmLock: async (root, importer) =>
     await updatePnpmLock({ root, importer, upgrade: false }),
@@ -74,6 +85,7 @@ export const defaultUpdateOperations: UpdateOperations = {
     go: repairGoDependencies,
     python: repairPythonDependencies,
     cpp: async () => 0,
+    rust: repairRustDependencies,
   },
   repairWorkspaceLock: async (root, verbose, viberootsSource) => {
     await repairGeneratedWorkspaceLock({
@@ -102,8 +114,22 @@ export async function runUpdateCommand(opts: {
   const priorGlobalInputs = await globalNixInputFingerprint(opts.root);
   const repairedAuthority = await operations.repairToolchainAuthority(opts.root);
   const priorArtifactToolsRoot = process.env.VBR_ARTIFACT_TOOLS_ROOT;
+  const priorPath = process.env.PATH;
   process.env.VBR_ARTIFACT_TOOLS_ROOT = repairedAuthority.artifactToolsRoot;
+  process.env.PATH = [
+    path.dirname(repairedAuthority.goBin),
+    path.dirname(repairedAuthority.pythonBin),
+    path.join(repairedAuthority.artifactToolsRoot, "bin"),
+  ]
+    .filter((entry, index, entries) => entries.indexOf(entry) === index)
+    .join(path.delimiter);
   try {
+    operations.validateTransactionTools(process.env);
+    await operations.repairWorkspaceLock(
+      opts.root,
+      opts.verbose,
+      repairedAuthority.viberootsSource,
+    );
     const importers = await operations.importers(opts.root);
     let upgradedPnpm = 0;
     for (const importer of importers) {
@@ -127,12 +153,14 @@ export async function runUpdateCommand(opts: {
         await operations.languageUpdates[surface.id](opts.root, opts.verbose, opts.upgrade),
       );
     }
-    await operations.repairWorkspaceLock(
-      opts.root,
-      opts.verbose,
-      repairedAuthority.viberootsSource,
-    );
-    await operations.repairGeneratedMetadata(opts.root, opts.verbose, priorGlobalInputs);
+    const priorSkipPnpmHash = process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
+    process.env.INSTALL_GLUE_SKIP_PNPM_HASH = "1";
+    try {
+      await operations.repairGeneratedMetadata(opts.root, opts.verbose, priorGlobalInputs);
+    } finally {
+      if (priorSkipPnpmHash === undefined) delete process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
+      else process.env.INSTALL_GLUE_SKIP_PNPM_HASH = priorSkipPnpmHash;
+    }
     if (opts.upgrade) {
       console.log(`[update] pnpm: upgraded ${upgradedPnpm} importer(s)`);
       for (const surface of projectLanguageSurfaces) {
@@ -149,6 +177,8 @@ export async function runUpdateCommand(opts: {
       }
     }
   } finally {
+    if (priorPath === undefined) delete process.env.PATH;
+    else process.env.PATH = priorPath;
     if (priorArtifactToolsRoot === undefined) delete process.env.VBR_ARTIFACT_TOOLS_ROOT;
     else process.env.VBR_ARTIFACT_TOOLS_ROOT = priorArtifactToolsRoot;
   }

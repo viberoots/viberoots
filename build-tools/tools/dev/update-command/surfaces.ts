@@ -54,6 +54,13 @@ export const projectLanguageSurfaces = [
     countNoun: "project",
     enabled: hasTrackedCppProjectSurface,
   },
+  {
+    id: "rust",
+    displayName: "Rust/Cargo",
+    upgradePolicy: "bounded",
+    countNoun: "Cargo root",
+    enabled: async (root: string) => (await projectModuleDirs(root, "Cargo.toml")).length > 0,
+  },
 ] as const;
 
 export type ProjectLanguageId = (typeof projectLanguageSurfaces)[number]["id"];

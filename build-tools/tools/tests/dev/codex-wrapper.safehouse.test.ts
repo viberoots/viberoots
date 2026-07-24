@@ -5,6 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { binWrapper, makeFakeAgentTools, writeExecutable } from "./agent-wrapper-test-helpers.ts";
 import {
+  isolatedCodexAccountEnv,
   managedCodexEnv,
   prepareStaleCodexShell,
   withCodexRepoScratch,
@@ -27,7 +28,7 @@ test("codex wrapper uses only the managed Codex from PATH", async () => {
       cwd: gitRoot,
       stdio: "pipe",
       env: {
-        ...process.env,
+        ...(await isolatedCodexAccountEnv(tmp)),
         ...managedCodexEnv(fake.bin),
         PATH: `${path.dirname(wrapper)}:${unmanagedBin}:${fake.bin}:/usr/bin:/bin:${process.env.PATH}`,
       },
@@ -56,7 +57,7 @@ test("codex wrapper resolves managed Codex from VIBEROOTS_NODE_PATH", async () =
       cwd: gitRoot,
       stdio: "pipe",
       env: {
-        ...process.env,
+        ...(await isolatedCodexAccountEnv(tmp)),
         CODEX_CLI_PATH: "",
         VIBEROOTS_NODE_PATH: nodeModules,
         PATH: `${path.dirname(wrapper)}:${bin}:/usr/bin:/bin:${process.env.PATH}`,
@@ -73,12 +74,13 @@ test("codex wrapper accepts source-root managed Codex when VIBEROOTS_NODE_PATH c
   await withCodexScratch(async ({ tmp }) => {
     const { log, sourceBin, sourceRoot, staleNodeModules, wrapperCopy, wrapperDir } =
       await prepareStaleCodexShell(tmp, wrapper);
+    const accountEnv = await isolatedCodexAccountEnv(tmp);
 
     const res = await $({
       cwd: sourceRoot,
       stdio: "pipe",
       env: {
-        ...process.env,
+        ...accountEnv,
         CODEX_CLI_PATH: "",
         VIBEROOTS_NODE_PATH: staleNodeModules,
         PATH: `${wrapperDir}:${sourceBin}:/usr/bin:/bin`,
@@ -88,6 +90,7 @@ test("codex wrapper accepts source-root managed Codex when VIBEROOTS_NODE_PATH c
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
     const calls = await fsp.readFile(log, "utf8");
     assert.match(calls, /source-managed-codex --sandbox danger-full-access exec stale-shell/);
+    assert.match(calls, new RegExp(`CODEX_HOME=${path.join(tmp, "home", ".codex")}`));
     assert.doesNotMatch(calls, /node-path-codex/);
   });
 });
@@ -99,7 +102,7 @@ test("codex wrapper accepts CODEX_CLI_PATH only when it is the managed Codex", a
       cwd: gitRoot,
       stdio: "pipe",
       env: {
-        ...process.env,
+        ...(await isolatedCodexAccountEnv(tmp)),
         CODEX_CLI_PATH: path.join(fake.bin, "codex"),
         VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(fake.bin, "codex"),
         PATH: `${path.dirname(wrapper)}:/usr/bin:/bin:${process.env.PATH}`,
@@ -127,7 +130,7 @@ test("codex wrapper rejects unmanaged CODEX_CLI_PATH instead of redirecting", as
       stdio: "pipe",
       nothrow: true,
       env: {
-        ...process.env,
+        ...(await isolatedCodexAccountEnv(tmp)),
         CODEX_CLI_PATH: path.join(unmanagedBin, "codex"),
         VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(fake.bin, "codex"),
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin:${process.env.PATH}`,
@@ -156,7 +159,7 @@ test("codex wrapper rejects app Codex paths instead of falling back", async () =
       stdio: "pipe",
       nothrow: true,
       env: {
-        ...process.env,
+        ...(await isolatedCodexAccountEnv(tmp)),
         CODEX_CLI_PATH: appCli,
         VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(fake.bin, "codex"),
         PATH: `${path.dirname(wrapper)}:${fake.bin}:/usr/bin:/bin:${process.env.PATH}`,
@@ -197,7 +200,7 @@ test("codex wrapper rejects transient arg0 Codex shims instead of falling back",
       stdio: "pipe",
       nothrow: true,
       env: {
-        ...process.env,
+        ...(await isolatedCodexAccountEnv(tmp)),
         HOME: home,
         CODEX_CLI_PATH: "",
         VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(managedBin, "codex"),
@@ -219,7 +222,7 @@ test("codex wrapper fails clearly when managed Codex is missing", async () => {
       stdio: "pipe",
       nothrow: true,
       env: {
-        ...process.env,
+        ...(await isolatedCodexAccountEnv(tmp)),
         CODEX_CLI_PATH: "",
         VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(tmp, "missing", "codex"),
         PATH: `${path.dirname(wrapper)}:/usr/bin:/bin:${process.env.PATH}`,

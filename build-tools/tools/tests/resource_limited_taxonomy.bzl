@@ -3,6 +3,7 @@ RESOURCE_LIMITED_TESTS = {
     "build-tools/tools/tests/cpp/include-from-nixpkg.providers.test.ts": True,
     "build-tools/tools/tests/deployments/nixos-shared-host.deploy.jenkins.exec.test.ts": True,
     "build-tools/tools/tests/dev/nix-gaps.parity-and-hermeticity.test.ts": True,
+    "build-tools/tools/tests/dev/update-command.launcher.integration.test.ts": True,
     "build-tools/tools/tests/go/go.macros.carchive.planner-visible.contract.probe.test.ts": True,
     "build-tools/tools/tests/go/go.macros.providers-realized.srcs.carchive.test.ts": True,
     "build-tools/tools/tests/go/go.tinygo-wasm.build-via-buck.smoke.test.ts": True,

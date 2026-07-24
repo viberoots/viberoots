@@ -4,6 +4,7 @@ import path from "node:path";
 import { describe, test } from "node:test";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 import { runInTemp } from "../lib/test-helpers";
+import { stageTempRepoPaths } from "../lib/test-helpers/git-stage";
 
 process.env.TEST_NEED_DEV_ENV = "1";
 
@@ -36,8 +37,9 @@ describe("pre-commit hook (lint-staged with Prettier + ESLint)", () => {
     await runInTemp("linting", async (tmp, $) => {
       const eslintBin = ensureNixStoreToolPathSync("eslint", process.env);
       const toolNodeModules = await fsp.realpath(path.dirname(path.dirname(eslintBin)));
+      const nestedRoot = path.join(tmp, "viberoots");
       const fixture$ = $({
-        cwd: tmp,
+        cwd: nestedRoot,
         env: {
           ...process.env,
           NODE_PATH: [toolNodeModules, process.env.NODE_PATH || ""]
@@ -45,20 +47,18 @@ describe("pre-commit hook (lint-staged with Prettier + ESLint)", () => {
             .join(path.delimiter),
         },
       });
-      await fixture$`git init`;
       await fixture$`git config user.email tester@example.com`;
       await fixture$`git config user.name Tester`;
-      // Speed: avoid running pre-commit across the entire temp repo during the
-      // initial commit. Configure hooks after the first commit so the test only
-      // exercises the hook on the targeted commit(s) below.
-      await fixture$`git add .buckroot .buckconfig .viberoots viberoots config toolchains`;
-      await fixture$`git commit --allow-empty -m "chore: init"`;
-      await fixture$`git config core.hooksPath viberoots/.husky`;
+      await fixture$`git config core.hooksPath .husky`;
 
       const badFile = path.join(tmp, "viberoots", "build-tools", "tools", "dev", "bad.ts");
       await fsp.mkdir(path.dirname(badFile), { recursive: true });
       await fsp.writeFile(badFile, `const x = ;\n`, "utf8");
-      await fixture$`git add ${path.relative(tmp, badFile)}`;
+      await stageTempRepoPaths({
+        tmp,
+        _$: $,
+        explicitPaths: [path.relative(tmp, badFile)],
+      });
 
       let blocked = false;
       try {
@@ -72,7 +72,11 @@ describe("pre-commit hook (lint-staged with Prettier + ESLint)", () => {
       }
 
       await fsp.writeFile(badFile, `if (true) { console.log('ok'); }\n`, "utf8");
-      await fixture$`git add ${path.relative(tmp, badFile)}`;
+      await stageTempRepoPaths({
+        tmp,
+        _$: $,
+        explicitPaths: [path.relative(tmp, badFile)],
+      });
       await retryTransientNixStoreError(
         async () => await fixture$`git commit -m "style: fix lint issues"`,
       );

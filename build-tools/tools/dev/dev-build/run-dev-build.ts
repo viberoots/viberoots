@@ -26,6 +26,7 @@ import { findRepoRoot } from "../../lib/repo";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { admitArtifactContext } from "../artifact-policy-inspection";
 import { runReadOnlyPnpmChecks } from "../consumer-consistency-check";
+import { runReadOnlyLanguageConsistencyChecks } from "../dependency-consistency";
 import {
   evaluationBundleDevOverrides,
   evaluationBundleHasLanguageOverrides,
@@ -79,7 +80,7 @@ export async function runDevBuild(artifactToolsRoot: string): Promise<void> {
     process.chdir(root);
   } catch {}
 
-  await applyNixCacheHealthPolicy(root);
+  const cacheHealth = await applyNixCacheHealthPolicy(root);
 
   const removedDeadDevBuildIsos = await pruneDeadDevBuildIsolationDirs(root).catch(() => []);
   if (verbose && removedDeadDevBuildIsos.length > 0) {
@@ -188,12 +189,17 @@ export async function runDevBuild(artifactToolsRoot: string): Promise<void> {
     await runReadOnlyPnpmChecks(root, {
       viberootsInputRoot: path.join(artifactToolsRoot, "share", "viberoots-source"),
     });
+    await runReadOnlyLanguageConsistencyChecks(root);
     await admitArtifactContext({
       classification,
       impureEvaluation: impure,
       workspaceRoot: root,
       artifactToolsRoot,
       toolNames: ["git", "buck2"],
+      internal:
+        cacheHealth.changed && cacheHealth.nixConfig
+          ? { NIX_CONFIG: cacheHealth.nixConfig }
+          : undefined,
     });
     await ensureDevBuildStoreSpace({
       subcmd: parsed.subcmd,
@@ -265,6 +271,8 @@ export async function runDevBuild(artifactToolsRoot: string): Promise<void> {
       isolationFlags: iso.isolationFlags,
       devOverrides,
       artifactToolsRoot,
+      internalNixConfig:
+        cacheHealth.changed && cacheHealth.nixConfig ? cacheHealth.nixConfig : undefined,
     });
 
     // `--no-materialize` is a strict no-glue path. If the build side-effects an

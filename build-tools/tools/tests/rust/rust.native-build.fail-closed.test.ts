@@ -51,5 +51,25 @@ test("rust native build fails closed for invalid source, stale locks, and unsupp
     const unsupported = await build();
     assert.notEqual(unsupported.exitCode, 0);
     assert.match(String(unsupported.stderr || unsupported.stdout), /unsupported dependency source/);
+
+    await fsp.writeFile(
+      path.join(app, "Cargo.toml"),
+      '[package]\nname="rustapp"\nversion="0.1.0"\nedition="2021"\n\n[[bin]]\nname="app"\npath="src/main.rs"\n',
+    );
+    await fsp.writeFile(
+      path.join(app, "Cargo.lock"),
+      'version = 3\n\n[[package]]\nname = "rustapp"\nversion = "0.1.0"\n',
+    );
+    await fsp.mkdir(path.join(app, ".cargo"), { recursive: true });
+    await fsp.writeFile(
+      path.join(app, ".cargo/config.toml"),
+      '[source.crates-io]\nreplace-with = "alternate"\n',
+    );
+    const configured = await build();
+    assert.notEqual(configured.exitCode, 0);
+    assert.match(
+      String(configured.stderr || configured.stdout),
+      /Cargo configuration is unsupported/,
+    );
   });
 });

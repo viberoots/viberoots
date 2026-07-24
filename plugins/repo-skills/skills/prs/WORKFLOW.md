@@ -13,6 +13,23 @@ For each PR number in the range, spawn a fresh implementation subagent and instr
 
 Never push to a remote unless the original user prompt explicitly asks for a push. Do not infer push permission from a request to process a PR range.
 
+## Subagent Isolation
+
+Spawn every implementation, tester, reviewer, and assessment subagent with isolated context. Use
+`fork_turns="none"` when the collaboration API supports it. Do not fork the parent conversation and
+do not replace it with a broad transcript summary.
+
+Each prompt must contain only what that role needs:
+
+- the repository path and exact PR, selector, or assessment target;
+- the authoritative plan, design, workflow, and repo-guidance paths;
+- the role's read/write and validation boundaries;
+- the current timing baseline or concrete findings when relevant.
+
+For follow-ups, send only new task-local findings, file paths, failing targets, and acceptance
+criteria. Never send verbose logs or unrelated implementation history. Reviewer independence is a
+correctness boundary: do not tell a reviewer the implementer's reasoning or expected verdict.
+
 ## Prompt Shape
 
 Use the skill with a required numeric PR identifier or inclusive numeric range, plus an optional plan document path:
@@ -113,14 +130,14 @@ After a PR commit succeeds, update `references/full-suite-timing.local.md` with 
 
 For each PR number, in order:
 
-1. Spawn one fresh subagent.
+1. Spawn one fresh subagent with `fork_turns="none"` when supported.
 2. Tell the subagent it is not alone in the codebase, must preserve user changes, and must not revert unrelated work.
 3. Tell the subagent to use the `pr` skill for the exact PR number and plan document in pre-full-suite review mode.
 4. Give the subagent the current full-suite timing baseline from `references/full-suite-timing.local.md` when present, otherwise [references/full-suite-timing.md](references/full-suite-timing.md).
 5. Explicitly ask the subagent to stop before full-suite validation and report ready-for-review evidence after self-review and focused validation pass.
 6. Explicitly tell the subagent not to run full-suite validation until `$prs` says the scope review passed.
 7. Tell the subagent not to push to any remote unless the original `$prs` prompt explicitly allowed pushing.
-8. Spawn a separate reviewer subagent to review the implementation against the PR description in the plan document.
+8. Spawn a separate reviewer subagent with `fork_turns="none"` when supported to review the implementation against the PR description in the plan document.
 9. If the reviewer finds incomplete scope, send the findings back to the implementation subagent and tell it to finish the missing work, rerun self-review and focused validation, and report ready-for-review evidence again.
 10. Repeat implementation, validation, and review until the reviewer passes or the PR is genuinely blocked.
 11. After the reviewer passes, tell the implementation subagent to run full-suite validation through the `test` skill, check full-suite timing against the current baseline, run any required investigation loop, and report full-suite evidence.
@@ -187,6 +204,9 @@ If the original user prompt explicitly allowed pushing, replace `Do not push to 
 ## Pre-Full-Suite Scope Review
 
 Before authorizing full-suite validation for each PR, spawn one fresh reviewer subagent.
+
+The reviewer must receive an isolated prompt. Do not include the parent conversation,
+implementation reasoning, earlier reviewer conclusions, or a suggested verdict.
 
 The reviewer subagent must:
 
@@ -273,8 +293,8 @@ If notification delivery fails, report the notification failure in the chat summ
 
 After the current requested or extended range completes successfully, run assessment before declaring the `$prs` run complete:
 
-1. Spawn a subagent to use `$assess-plan <plan-document>` against the shared plan document.
-2. If a design document is known, spawn a subagent to use `$assess-design <design-document>`. If no design document is known, skip this step and report that it was skipped.
+1. Spawn an isolated subagent with `fork_turns="none"` to use `$assess-plan <plan-document>` against the shared plan document.
+2. If a design document is known, spawn a separate isolated subagent with `fork_turns="none"` to use `$assess-design <design-document>`. If no design document is known, skip this step and report that it was skipped.
 3. The assessment subagents must not run tests. They should follow their skills' workflows and assume the validation suite is already passing.
 4. If neither assessment reports findings that require additional implementation, declare the range complete.
 5. If either assessment reports findings that require additional implementation, use the `augment` skill to append new PR sections to the plan document for those findings.

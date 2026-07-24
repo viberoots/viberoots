@@ -9,7 +9,7 @@ usage: u [--upgrade] [--verbose]
 Make project dependency and generated metadata consistent after source edits.
 
 options:
-  --upgrade  intentionally upgrade pnpm, Go, and Python dependencies before reconciliation
+  --upgrade  intentionally upgrade supported project dependencies before reconciliation
   --verbose  show each reconciliation step
   -h, --help
 
@@ -18,7 +18,8 @@ After ordinary dependency edits, run:
   i && b && v
 
 Use u --upgrade only when dependency versions should move.
-C++ metadata is reconciled, but u does not move Nix or flake pins.
+C++ metadata is reconciled. Cargo resolution is offline and uses reviewed Nix-store tools.
+Neither mode moves Nix or flake pins.
 Use viberoots update when the viberoots pin itself should move.
 EOF
 		exit 0
@@ -26,8 +27,11 @@ EOF
 esac
 
 # shellcheck source=/dev/null
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+. "${SCRIPT_DIR}/cache-health-command-scope.sh" standalone
+# shellcheck source=/dev/null
 unset VBR_DEVSHELL_USE_GENERATED_AUTHORITY
 export VBR_DEVSHELL_RECONCILE=1
-. "$(cd "$(dirname "$0")" && pwd)/devshell.sh"
+. "${SCRIPT_DIR}/devshell.sh"
 
 run_ts "../dev/update.ts" "$@"

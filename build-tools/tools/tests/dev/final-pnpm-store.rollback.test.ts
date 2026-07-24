@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { reconcileFixedPnpmStore } from "../../dev/update-pnpm-hash/fixed-store-reconcile";
+import {
+  finalizeFixedPnpmStoreReconciliation,
+  reconcileFixedPnpmStore,
+} from "../../dev/update-pnpm-hash/fixed-store-reconcile";
 
 const hashA = `sha256-${Buffer.alloc(32, 1).toString("base64")}`;
 const hashB = `sha256-${Buffer.alloc(32, 2).toString("base64")}`;
@@ -117,4 +120,38 @@ test("a partially failed metadata update restores and preserves its error", asyn
     (error) => error === original,
   );
   assert.equal(restored, 1);
+});
+
+test("final probe and persistence failures restore tracked hash metadata", async () => {
+  for (const failureStage of ["probe", "persist"] as const) {
+    const original = new Error(`${failureStage} failed`);
+    let trackedHash = hashB;
+    let persisted = 0;
+    await assert.rejects(
+      finalizeFixedPnpmStoreReconciliation({
+        reconciledHash: hashB,
+        readFinalHash: async () => {
+          throw new Error("unexpected final hash read");
+        },
+        probe: async () => {
+          if (failureStage === "probe") throw original;
+          return {
+            fixedStorePath: "/nix/store/final-pnpm-store",
+            derivationIdentity: `/nix/store/${"c".repeat(32)}-${derivationName}.drv`,
+          };
+        },
+        persist: async () => {
+          persisted += 1;
+          if (failureStage === "persist") throw original;
+        },
+        restoreMetadata: async () => {
+          trackedHash = hashA;
+        },
+        key: "pnpm-lock.yaml",
+      }),
+      (error) => error === original,
+    );
+    assert.equal(trackedHash, hashA, `${failureStage} failure must restore the tracked hash`);
+    assert.equal(persisted, failureStage === "persist" ? 1 : 0);
+  }
 });

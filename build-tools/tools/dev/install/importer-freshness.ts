@@ -4,7 +4,7 @@ import path from "node:path";
 import { pathExists } from "../../lib/repo";
 import {
   readVerifiedMarker,
-  currentVerifiedMarkerFingerprintCandidates,
+  currentVerifiedMarkerFingerprint,
 } from "../update-pnpm-hash/verified-marker";
 import { currentPnpmStoreDerivationIdentity } from "../update-pnpm-hash/build-flake";
 import { flakeRefForImporter, pnpmStoreAttr, sanitizeName } from "./common";
@@ -114,16 +114,13 @@ async function hasFreshStoreMarker(
   );
   const marker = await readVerifiedMarker(markerPath);
   if (!marker) return false;
-  const acceptedFingerprints = await currentVerifiedMarkerFingerprintCandidates(
-    opts.repoRoot,
-    opts.importer,
-  );
+  const builderFingerprint = await currentVerifiedMarkerFingerprint(opts.repoRoot, opts.importer);
   const metadataMatches =
     marker.importer === opts.importer &&
     marker.lockfile === hashKeyForImporter(opts.importer) &&
     marker.lockHash === opts.lockHash &&
     marker.hashValue === opts.hashValue &&
-    acceptedFingerprints.includes(marker.builderFingerprint);
+    marker.builderFingerprint === builderFingerprint;
   if (!metadataMatches) return false;
   const derivationIdentity = await deps.currentDerivationIdentity({
     repoRoot: opts.repoRoot,

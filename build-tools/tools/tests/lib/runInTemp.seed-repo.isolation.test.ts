@@ -4,6 +4,7 @@ import fs from "node:fs";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { sharedPnpmStoreHashCacheRoot } from "../../dev/update-pnpm-hash/verified-marker";
 import { runInTemp } from "./test-helpers";
 
 test("runInTemp seed repo does not leak mutations across temp repos", async () => {
@@ -13,6 +14,7 @@ test("runInTemp seed repo does not leak mutations across temp repos", async () =
   );
 
   const realRepoRoot = process.cwd();
+  const canonicalSharedHashCacheRoot = sharedPnpmStoreHashCacheRoot();
   const targetRel = path.join(".viberoots", "workspace", "flake.nix");
   const realPath = path.join(realRepoRoot, targetRel);
   const original = await fsp.readFile(realPath, "utf8");
@@ -23,6 +25,11 @@ test("runInTemp seed repo does not leak mutations across temp repos", async () =
   });
 
   await runInTemp("seed-isolation-2", async (tmp, _$) => {
+    assert.equal(
+      process.env.VBR_SHARED_PNPM_STORE_HASH_CACHE_ROOT,
+      canonicalSharedHashCacheRoot,
+      "expected runInTemp to retain the canonical user-global pnpm hash authority",
+    );
     assert.ok(
       process.env.VIBEROOTS_FLAKE_INPUT_ROOT,
       "expected runInTemp to provide VIBEROOTS_FLAKE_INPUT_ROOT",
@@ -50,10 +57,18 @@ test("runInTemp seed repo does not leak mutations across temp repos", async () =
       "modules.nix",
     );
     const sourceModules = await fsp.readFile(sourceModulesPath, "utf8");
+    const nestedRoot = path.join(tmp, "viberoots");
     const tempHeadModules = await _$({
-      cwd: tmp,
+      cwd: nestedRoot,
       stdio: "pipe",
-    })`git show ${`HEAD:${tempModulesRel}`}`;
+    })`git show ${`HEAD:${path.relative("viberoots", tempModulesRel)}`}`;
+    const parentGitlink = String(
+      (await _$({ cwd: tmp, stdio: "pipe" })`git ls-files -s -- viberoots`).stdout || "",
+    ).trim();
+    const nestedHead = String(
+      (await _$({ cwd: nestedRoot, stdio: "pipe" })`git rev-parse HEAD`).stdout || "",
+    ).trim();
+    assert.equal(parentGitlink, `160000 ${nestedHead} 0\tviberoots`);
     const inputMatch = now.match(/viberoots\.url = "path:([^"]+)"/);
     assert.ok(inputMatch, "expected temp repo workspace flake to declare viberoots input");
     const immutableInputRoot = inputMatch[1];

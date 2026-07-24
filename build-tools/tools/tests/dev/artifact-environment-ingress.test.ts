@@ -14,6 +14,7 @@ import {
   assertCanonicalArtifactReentry,
   isCanonicalArtifactEntrypointEnvironment,
 } from "../../dev/canonical-artifact-entrypoint";
+import { assertReviewedBuckArtifactSelectors } from "../../dev/dev-build/buck";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("known local compiler and language selectors fail before sanitization", () => {
@@ -35,6 +36,22 @@ test("known local compiler and language selectors fail before sanitization", () 
   })) {
     assert.throws(() => assertNoArtifactSelectorInjection({ [name]: value }), new RegExp(name));
   }
+});
+
+test("Buck accepts only the exact cache-health NIX_CONFIG authority", () => {
+  const reviewed = "substituters =\nextra-substituters =\nfallback = true";
+  assert.doesNotThrow(() =>
+    assertReviewedBuckArtifactSelectors({ NIX_CONFIG: reviewed }, reviewed),
+  );
+  assert.throws(
+    () =>
+      assertReviewedBuckArtifactSelectors(
+        { NIX_CONFIG: `${reviewed}\nbuilders = ssh://host` },
+        reviewed,
+      ),
+    /mismatched internal NIX_CONFIG authority/,
+  );
+  assert.throws(() => assertReviewedBuckArtifactSelectors({ NIX_CONFIG: reviewed }), /NIX_CONFIG/);
 });
 
 test("canonical Node cannot admit a spoofed marker with ambient process state", () => {

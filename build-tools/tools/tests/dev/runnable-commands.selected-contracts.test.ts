@@ -15,7 +15,15 @@ test("p selected runnable builds materialize final pnpm stores before filtered N
   assert.doesNotMatch(source, /import \{ prepareExactPnpmStore \}/);
   assert.doesNotMatch(source, /NIX_PNPM_EXACT_STORE/);
   assert.match(source, /targetPackageFromLabel\(target\)/);
-  assert.match(source, /internal: sourceSelectors/);
+  assert.match(
+    source,
+    /env: canonicalArtifactReentryEnvironment\(opts\.workspaceRoot, toolsRoot, \{\s+nixCacheHealth: opts\.nixCacheHealth,\s+\}\)/,
+  );
+  assert.match(source, /artifactToolsRoot,\s+nixCacheHealth: options\.nixCacheHealth,\s+\}/);
+  assert.match(
+    source,
+    /internal: \{\s+\.\.\.sourceSelectors,\s+\.\.\.\(options\.nixCacheHealth\?\.config\s+\? \{ NIX_CONFIG: options\.nixCacheHealth\.config \}\s+: \{\}\),\s+\}/,
+  );
   assert.match(
     runner,
     /internal: \{ WORKSPACE_ROOT: opts\.workspaceRoot, \.\.\.\(opts\.internal \|\| \{\}\) \}/,

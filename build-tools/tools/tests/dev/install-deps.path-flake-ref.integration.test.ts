@@ -191,8 +191,13 @@ test("install path selects flake refs by importer scope", async (t) => {
   if (!filteredCompat.includes('".viberoots", "workspace", "flake.nix"')) {
     throw new Error("update-pnpm-hash filtered snapshots must support hidden workspace flakes");
   }
-  if (!filteredCompat.includes("flakeRef: `path:${flakeDir}#${opts.attr}`")) {
-    throw new Error("update-pnpm-hash filtered snapshots must return the resolved flake dir");
+  if (
+    !filteredCompat.includes("`path:${snapDirReal}?dir=.viberoots/workspace#${opts.attr}`") ||
+    !filteredCompat.includes("`path:${snapDirReal}#${opts.attr}`")
+  ) {
+    throw new Error(
+      "update-pnpm-hash filtered snapshots must root path inputs at the complete snapshot",
+    );
   }
 
   const hashNix = await read("tools/dev/update-pnpm-hash/nix.ts");

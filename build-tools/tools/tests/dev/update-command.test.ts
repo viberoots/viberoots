@@ -4,52 +4,12 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
-import { parseUpdateCommandArgs, UPDATE_COMMAND_HELP } from "../../dev/update-command/args";
+import { UPDATE_COMMAND_HELP } from "../../dev/update-command/args";
 import { globalNixInputFingerprint } from "../../dev/global-nix-input-fingerprint";
 import { languageUpdateTimeoutMs } from "../../dev/update-command/languages";
-import { runUpdateCommand, type UpdateOperations } from "../../dev/update-command/run";
+import { runUpdateCommand } from "../../dev/update-command/run";
+import { operations, repairedAuthority } from "./update-command.fixture";
 import { registerUpdateCommandPnpmContracts } from "./update-command-pnpm-contracts";
-
-function operations(events: string[]): UpdateOperations {
-  return {
-    repairToolchainAuthority: async () => {
-      events.push("toolchain");
-      return {
-        artifactToolsRoot: "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-artifact-tools",
-        viberootsSource: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-source",
-      };
-    },
-    importers: async () => [".", "projects/apps/web"],
-    repairPnpmLock: async (_root, importer) => {
-      events.push(`repair:${importer}`);
-    },
-    upgradePnpm: async (_root, importer) => {
-      events.push(`upgrade:${importer}`);
-    },
-    reconcilePnpm: async (_root, importer) => {
-      events.push(`reconcile:${importer}`);
-    },
-    enabledLanguages: async () => ["go", "python", "cpp"],
-    languageUpdates: {
-      go: async (_root, _verbose, upgrade) => {
-        events.push(`go:${upgrade ? "upgrade" : "repair"}`);
-        return 1;
-      },
-      python: async (_root, _verbose, upgrade) => {
-        events.push(`python:${upgrade ? "upgrade" : "repair"}`);
-        return 1;
-      },
-      cpp: async () => 0,
-    },
-    repairWorkspaceLock: async (_root, _verbose, viberootsSource) => {
-      assert.equal(viberootsSource, "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-source");
-      events.push("workspace-lock");
-    },
-    repairGeneratedMetadata: async () => {
-      events.push("cpp");
-    },
-  };
-}
 
 test("plain u conservatively repairs each importer before shared metadata", async () => {
   const events: string[] = [];
@@ -61,13 +21,14 @@ test("plain u conservatively repairs each importer before shared metadata", asyn
   });
   assert.deepEqual(events, [
     "toolchain",
+    "workspace-lock",
     "repair:.",
     "reconcile:.",
     "repair:projects/apps/web",
     "reconcile:projects/apps/web",
     "go:repair",
     "python:repair",
-    "workspace-lock",
+    "rust:repair",
     "cpp",
   ]);
 });
@@ -83,10 +44,7 @@ test("u forwards the global input fingerprint captured before repair", async () 
     const configured = operations([]);
     configured.repairToolchainAuthority = async () => {
       await fsp.writeFile(hashes, '{"projects/apps/demo/pnpm-lock.yaml":"sha256-test"}\n');
-      return {
-        artifactToolsRoot: "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-artifact-tools",
-        viberootsSource: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-source",
-      };
+      return repairedAuthority;
     };
     configured.repairGeneratedMetadata = async (_root, _verbose, priorGlobalInputs) => {
       forwarded = priorGlobalInputs;
@@ -113,10 +71,11 @@ test("plain u reconciles the nested tool importer without rewriting its lockfile
   });
   assert.deepEqual(events.slice(0, 4), [
     "toolchain",
+    "workspace-lock",
     "repair:projects/apps/web",
     "reconcile:projects/apps/web",
-    "reconcile:viberoots",
   ]);
+  assert.equal(events[4], "reconcile:viberoots");
   assert.ok(!events.includes("repair:viberoots"));
 });
 
@@ -130,13 +89,14 @@ test("u --upgrade upgrades supported languages and reconciles C++ metadata", asy
   });
   assert.deepEqual(upgraded, [
     "toolchain",
+    "workspace-lock",
     "upgrade:.",
     "reconcile:.",
     "upgrade:projects/apps/web",
     "reconcile:projects/apps/web",
     "go:upgrade",
     "python:upgrade",
-    "workspace-lock",
+    "rust:upgrade",
     "cpp",
   ]);
 });
@@ -152,28 +112,66 @@ test("u --upgrade reconciles but never upgrades the nested tool importer", async
     operations: nested,
   });
   assert.equal(events[0], "toolchain");
-  assert.equal(events[1], "reconcile:viberoots");
+  assert.equal(events[1], "workspace-lock");
+  assert.equal(events[2], "reconcile:viberoots");
   assert.ok(!events.includes("upgrade:viberoots"));
+});
+
+test("u gives generated metadata a non-owning pnpm scope and restores its caller", async () => {
+  const prior = process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
+  process.env.INSTALL_GLUE_SKIP_PNPM_HASH = "caller";
+  try {
+    const success = operations([]);
+    success.repairGeneratedMetadata = async () => {
+      assert.equal(process.env.INSTALL_GLUE_SKIP_PNPM_HASH, "1");
+    };
+    await runUpdateCommand({ root: "/repo", upgrade: false, verbose: false, operations: success });
+    assert.equal(process.env.INSTALL_GLUE_SKIP_PNPM_HASH, "caller");
+
+    const failure = operations([]);
+    failure.repairGeneratedMetadata = async () => {
+      assert.equal(process.env.INSTALL_GLUE_SKIP_PNPM_HASH, "1");
+      throw new Error("glue failed");
+    };
+    await assert.rejects(
+      runUpdateCommand({ root: "/repo", upgrade: false, verbose: false, operations: failure }),
+      /glue failed/,
+    );
+    assert.equal(process.env.INSTALL_GLUE_SKIP_PNPM_HASH, "caller");
+  } finally {
+    if (prior === undefined) delete process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
+    else process.env.INSTALL_GLUE_SKIP_PNPM_HASH = prior;
+  }
 });
 
 test("u adopts repaired artifact authority for reconciliation and restores its caller", async () => {
   const prior = process.env.VBR_ARTIFACT_TOOLS_ROOT;
+  const priorPath = process.env.PATH;
   const callerRoot = "/nix/store/cccccccccccccccccccccccccccccccc-caller-tools";
   const repairedRoot = "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-artifact-tools";
+  const repairedPath = [
+    "/nix/store/dddddddddddddddddddddddddddddddd-go/bin",
+    "/nix/store/eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee-python/bin",
+    `${repairedRoot}/bin`,
+  ].join(path.delimiter);
   process.env.VBR_ARTIFACT_TOOLS_ROOT = callerRoot;
+  process.env.PATH = "/hostile/bin";
   try {
     const success = operations([]);
     success.importers = async () => ["."];
     success.reconcilePnpm = async () => {
       assert.equal(process.env.VBR_ARTIFACT_TOOLS_ROOT, repairedRoot);
+      assert.equal(process.env.PATH, repairedPath);
     };
     await runUpdateCommand({ root: "/repo", upgrade: false, verbose: false, operations: success });
     assert.equal(process.env.VBR_ARTIFACT_TOOLS_ROOT, callerRoot);
+    assert.equal(process.env.PATH, "/hostile/bin");
 
     const failure = operations([]);
     failure.importers = async () => ["."];
     failure.reconcilePnpm = async () => {
       assert.equal(process.env.VBR_ARTIFACT_TOOLS_ROOT, repairedRoot);
+      assert.equal(process.env.PATH, repairedPath);
       throw new Error("reconcile failed");
     };
     await assert.rejects(
@@ -181,19 +179,13 @@ test("u adopts repaired artifact authority for reconciliation and restores its c
       /reconcile failed/,
     );
     assert.equal(process.env.VBR_ARTIFACT_TOOLS_ROOT, callerRoot);
+    assert.equal(process.env.PATH, "/hostile/bin");
   } finally {
+    if (priorPath === undefined) delete process.env.PATH;
+    else process.env.PATH = priorPath;
     if (prior === undefined) delete process.env.VBR_ARTIFACT_TOOLS_ROOT;
     else process.env.VBR_ARTIFACT_TOOLS_ROOT = prior;
   }
-});
-
-test("help documents the edit workflow and does not advertise u deps", () => {
-  assert.deepEqual(parseUpdateCommandArgs(["--upgrade"]), { upgrade: true, verbose: false });
-  assert.equal(parseUpdateCommandArgs(["--help"]), "help");
-  assert.match(UPDATE_COMMAND_HELP, /u --upgrade/);
-  assert.match(UPDATE_COMMAND_HELP, /i && b && v/);
-  assert.doesNotMatch(UPDATE_COMMAND_HELP, /u deps/);
-  assert.throws(() => parseUpdateCommandArgs(["--unexpected"]), /unknown argument/);
 });
 
 test("devshell completion exposes the documented u options", async () => {

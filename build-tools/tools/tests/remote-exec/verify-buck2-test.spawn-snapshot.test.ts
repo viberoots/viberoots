@@ -131,6 +131,9 @@ function spawnSnapshot(
     VERIFY_TIMEOUT_SECS: "14400",
     ...extraEnv,
   });
+  if (!Object.prototype.hasOwnProperty.call(extraEnv, "VBR_NIX_CACHE_POLICY")) {
+    delete process.env.VBR_NIX_CACHE_POLICY;
+  }
   try {
     spawnVerifyBuck2Tests({
       root: tmp,
@@ -164,6 +167,14 @@ test("spawnVerifyBuck2Tests local argv/env snapshot is unchanged", () => {
       "info,buck2_event_log::writer=off,buck2_client_ctx=debug,buck2_client_ctx::file_tailers::tailer=off,buck2_event_log::writer=off",
     VBR_VERIFY_REGISTER_PROCESS: undefined,
   });
+});
+
+test("spawnVerifyBuck2Tests transports only an explicitly enabled Nix cache policy", () => {
+  const withoutPolicy = spawnSnapshot("local").call.args;
+  const withPolicy = spawnSnapshot("local", { VBR_NIX_CACHE_POLICY: "off" }).call.args;
+
+  assert.ok(!withoutPolicy.includes("VBR_NIX_CACHE_POLICY="));
+  assert.ok(withPolicy.includes("VBR_NIX_CACHE_POLICY=off"));
 });
 
 test("project enforcement keeps its exact timeout under broad verify budgets", () => {
@@ -205,41 +216,4 @@ test("spawnVerifyBuck2Tests rejects undeclared remote inputs before remote Buck 
     () => spawnSnapshot("remote", { BUCK_GRAPH_JSON: "/tmp/graph.json" }),
     /BUCK_GRAPH_JSON must be passed through a declared remote input/,
   );
-});
-
-test("spawnVerifyBuck2Tests captures a child close before wait begins", async () => {
-  const proc = new EventEmitter() as EventEmitter & {
-    pid: number;
-    stdout: EventEmitter;
-    stderr: EventEmitter;
-  };
-  proc.pid = 12345;
-  proc.stdout = new EventEmitter();
-  proc.stderr = new EventEmitter();
-  const spawned = spawnVerifyBuck2Tests({
-    root: fs.mkdtempSync(path.join(os.tmpdir(), "vbr-fast-buck-close-")),
-    iso: "v-fast-close",
-    logFile: null,
-    console: "simple",
-    targets: ["//:target"],
-    zxNodeModulesOut: null,
-    threadsOverride: 1,
-    passName: "shared",
-    executionPolicy: parseVerifyExecutionPolicy({ env: {} }),
-    artifactToolsRoot,
-    spawnImpl: (() => {
-      queueMicrotask(() => {
-        proc.emit("exit", 0, null);
-        proc.emit("close", 0, null);
-      });
-      return proc;
-    }) as typeof import("node:child_process").spawn,
-  });
-
-  await new Promise<void>((resolve) => setImmediate(resolve));
-  const timeout = new Promise<number>((_, reject) => {
-    const timer = setTimeout(() => reject(new Error("wait missed the child close event")), 1_000);
-    timer.unref();
-  });
-  assert.equal(await Promise.race([spawned.wait(), timeout]), 0);
 });

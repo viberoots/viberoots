@@ -50,6 +50,25 @@ async function addOfflineSurfaces(root: string): Promise<void> {
     "[project]\nname='mixed'\nversion='0.0.0'\nrequires-python='>=3.11'\n",
   );
   await fsp.writeFile(path.join(importer, "main.cpp"), "int main() { return 0; }\n");
+  await fsp.mkdir(path.join(importer, "src"), { recursive: true });
+  await fsp.mkdir(path.join(importer, "rust-local", "src"), { recursive: true });
+  await fsp.writeFile(
+    path.join(importer, "Cargo.toml"),
+    '[package]\nname="mixed-rust"\nversion="0.1.0"\nedition="2021"\n\n[dependencies]\nrust-local={path="rust-local"}\n',
+  );
+  await fsp.writeFile(path.join(importer, "src", "lib.rs"), "pub fn mixed() -> u8 { 1 }\n");
+  await fsp.writeFile(
+    path.join(importer, "rust-local", "Cargo.toml"),
+    '[package]\nname="rust-local"\nversion="0.1.0"\nedition="2021"\n',
+  );
+  await fsp.writeFile(
+    path.join(importer, "rust-local", "src", "lib.rs"),
+    "pub fn local() -> u8 { 1 }\n",
+  );
+  await fsp.writeFile(
+    path.join(importer, "Cargo.lock"),
+    'version = 3\n\n[[package]]\nname = "mixed-rust"\nversion = "0.1.0"\ndependencies = [\n "rust-local",\n]\n\n[[package]]\nname = "rust-local"\nversion = "0.1.0"\n',
+  );
   await addFixtureExportTarget(importer, "main.cpp");
   await execFileAsync("git", ["add", "projects"], { cwd: root });
 }
@@ -78,8 +97,22 @@ test("real u repairs bounded offline language inputs without moving viberoots", 
   try {
     await addOfflineSurfaces(root);
     const before = await snapshot(root);
-    await run(root);
+    const hostile = path.join(root, "hostile-bin");
+    const hostileMarker = path.join(root, "host-cargo-used");
+    await fsp.mkdir(hostile);
+    await fsp.writeFile(
+      path.join(hostile, "cargo"),
+      `#!/bin/sh\ntouch ${JSON.stringify(hostileMarker)}\nexit 97\n`,
+      { mode: 0o755 },
+    );
+    await run(root, [], {
+      PATH: `${hostile}${path.delimiter}${process.env.PATH || ""}`,
+      RUSTFLAGS: "--hostile",
+      RUSTUP_HOME: path.join(root, "hostile-rustup"),
+      CARGO_HOME: path.join(root, "hostile-cargo-home"),
+    });
     assert.deepEqual(await snapshot(root), before);
+    await assert.rejects(fsp.access(hostileMarker), /ENOENT/);
     await fsp.access(path.join(root, "projects/apps/mixed/go.sum"));
     await fsp.access(path.join(root, "projects/apps/mixed/gomod2nix.toml"));
     assert.match(
@@ -106,12 +139,22 @@ test("real u --upgrade upgrades bounded offline languages and reconciles C++", a
   const root = await fixture("language-upgrade");
   try {
     await addOfflineSurfaces(root);
+    const localManifest = path.join(root, "projects/apps/mixed/rust-local/Cargo.toml");
+    await fsp.writeFile(
+      localManifest,
+      '[package]\nname="rust-local"\nversion="0.2.0"\nedition="2021"\n',
+    );
     const before = await snapshot(root);
     const result = await run(root, ["--upgrade"]);
     assert.deepEqual(await snapshot(root), before);
     assert.match(result.stdout, /Go: upgraded 2 module/);
     assert.match(result.stdout, /Python\/uv: upgraded 1 project/);
     assert.match(result.stdout, /C\+\+: reconciliation-only/);
+    assert.match(result.stdout, /Rust\/Cargo: upgraded 1 Cargo root/);
+    assert.match(
+      await fsp.readFile(path.join(root, "projects/apps/mixed/Cargo.lock"), "utf8"),
+      /name = "rust-local"\nversion = "0\.2\.0"/,
+    );
     await fsp.access(path.join(root, "projects/apps/mixed/go.sum"));
     await fsp.access(path.join(root, "projects/apps/mixed/gomod2nix.toml"));
     await fsp.access(path.join(root, "projects/apps/mixed/uv.lock"));
@@ -141,6 +184,22 @@ test("real u --upgrade upgrades a bounded offline pnpm importer without moving v
     const versionTwoLock = await fsp.readFile(lock, "utf8");
     assert.notEqual(versionTwoLock, versionOneLock);
     assert.match(versionTwoLock, /file:local-package-v2/);
+  } finally {
+    await removeTreeWithWritableFallback(root, $);
+  }
+});
+
+test("real u launcher rejects a conflicting explicit artifact-tool authority", async () => {
+  const root = await fixture("tool-authority-conflict");
+  try {
+    const lock = JSON.parse(await fsp.readFile(path.join(root, "flake.lock"), "utf8"));
+    const viberootsNode = lock.nodes[lock.nodes[lock.root].inputs.viberoots];
+    const conflictingRoot = String(viberootsNode.locked.path || "");
+    assert.match(conflictingRoot, /^\/nix\/store\/[a-z0-9]{32}-/);
+    await assert.rejects(
+      run(root, [], { VBR_ARTIFACT_TOOLS_ROOT: conflictingRoot }),
+      /canonical artifact tool authority mismatch/,
+    );
   } finally {
     await removeTreeWithWritableFallback(root, $);
   }

@@ -160,6 +160,15 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
   export GIT_COMMITTER_EMAIL=seed@example.com
   export GIT_AUTHOR_DATE=1970-01-01T00:00:00Z
   export GIT_COMMITTER_DATE=1970-01-01T00:00:00Z
+  # Preserve the consumer repository's submodule boundary.  The filtered
+  # viberoots source has no Git administration data, so first give it one
+  # deterministic commit.  Adding the outer repository afterwards records a
+  # real 160000 gitlink instead of flattening every viberoots file into the
+  # consumer index.
+  git -c init.defaultBranch=main -c advice.defaultBranchName=false init -q "$out/viberoots"
+  git -C "$out/viberoots" config gc.auto 0
+  git -C "$out/viberoots" add -A
+  git -C "$out/viberoots" commit -q -m seed-viberoots --allow-empty
   git -c init.defaultBranch=main -c advice.defaultBranchName=false init -q "$out"
   # Nix evaluates local git flakes by accessing blob objects as direct loose-object
   # filesystem paths (.git/objects/XY/...). If git auto-gc runs and packs blobs, those
