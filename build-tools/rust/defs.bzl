@@ -10,16 +10,22 @@ load(
 load("@viberoots//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
 load("@viberoots//build-tools/rust/private:nix_build.bzl", "rust_nix_build")
 load("@viberoots//build-tools/rust/private:nix_test.bzl", "rust_nix_test")
+load("@viberoots//build-tools/rust/private:composition_snapshot.bzl", "rust_composition_snapshot")
+load("@viberoots//build-tools/rust/private:macro_contract.bzl", "artifact_out", "crate_type_for", "fixed_artifact_contract", "has_nixpkg_inputs", "public_crate_for", "rust_macro_name", "single_cargo_file", "valid_features", "validate_local_patch_dirs", "validate_public_crate", "with_required_target")
 
 _PUBLIC_ARGS = [
     "artifact_contract",
     "cargo_lock",
     "cargo_manifest",
     "cargo_fixed_sources",
+    "cargo_package",
     "cargo_output_hashes",
     "crate",
+    "crate_type",
     "default_features",
     "features",
+    "generated_outputs",
+    "host_role",
     "labels",
     "header_deps",
     "link_closure",
@@ -30,6 +36,7 @@ _PUBLIC_ARGS = [
     "nixpkg_pins",
     "nixpkgs_profile",
     "profile",
+    "public_crate",
     "remote_builder_smoke",
     "srcs",
     "source_snapshot",
@@ -40,69 +47,6 @@ _PUBLIC_ARGS = [
     "materialization_manifest",
     "visibility",
 ]
-
-def _valid_features(features):
-    if not isinstance(features, list):
-        return False
-    for feature in features:
-        if not isinstance(feature, str) or feature == "":
-            return False
-    return True
-
-def _single_cargo_file(value, default_name, field):
-    resolved = value
-    if resolved == None:
-        matches = native.glob([default_name])
-        if len(matches) != 1:
-            fail("rust target requires exactly one package-local %s; found %s" % (default_name, len(matches)))
-        resolved = matches[0]
-    if isinstance(resolved, list):
-        if len(resolved) != 1:
-            fail("rust target %s must identify exactly one file" % field)
-        resolved = resolved[0]
-    if not isinstance(resolved, str) or resolved == "":
-        fail("rust target %s must be a non-empty file path" % field)
-    if resolved != default_name:
-        fail("rust target %s must be the canonical package-local %s" % (field, default_name))
-    return resolved
-
-def _validate_local_patch_dirs(value):
-    if not isinstance(value, list):
-        fail("rust target local_patch_dirs must be a list of normalized package-relative paths")
-    for directory in value:
-        if not isinstance(directory, str) or directory == "":
-            fail("rust target local_patch_dirs must contain non-empty strings")
-        parts = directory.split("/")
-        if directory.startswith("/") or "\\" in directory or ":" in directory or "" in parts or "." in parts or ".." in parts:
-            fail("rust target local_patch_dirs must remain within the package: %s" % directory)
-
-def _rust_macro_name(kind):
-    if kind == "bin":
-        return "rust_binary"
-    if kind == "lib":
-        return "rust_library"
-    if kind == "test":
-        return "rust_test"
-    if kind == "wasm":
-        return "rust_wasm_library"
-    if kind == "wasi":
-        return "rust_wasi_binary"
-    fail("unsupported Rust target kind: %s" % kind)
-
-def _with_required_target(kwargs, macro_name, required_target):
-    kw = dict(kwargs)
-    if "target" in kw and kw["target"] != required_target:
-        fail("%s: target must be %s" % (macro_name, required_target))
-    kw["target"] = required_target
-    return kw
-
-def _has_nixpkg_inputs(kwargs):
-    if kwargs.get("nixpkg_deps", []) or []:
-        return True
-    for label in kwargs.get("labels", []) or []:
-        if isinstance(label, str) and label.startswith("nixpkg:"):
-            return True
-    return False
 
 def _rust_nix_target(name, kind, out, kwargs):
     kw = dict(kwargs)
@@ -121,8 +65,8 @@ def _rust_nix_target(name, kind, out, kwargs):
     deps = kw.pop("deps", []) or []
     link_deps = kw.pop("link_deps", []) or []
     header_deps = kw.pop("header_deps", []) or []
-    if kind in ["wasm", "wasi"] and (link_deps or header_deps or _has_nixpkg_inputs(kw)):
-        fail("%s: link_deps, header_deps, and nixpkg dependencies are unsupported for non-native Rust targets; cross-language WebAssembly linking is not available" % _rust_macro_name(kind))
+    if kind in ["wasm", "wasi"] and (link_deps or header_deps or has_nixpkg_inputs(kw)):
+        fail("%s: link_deps, header_deps, and nixpkg dependencies are unsupported for non-native Rust targets; cross-language WebAssembly linking is not available" % rust_macro_name(kind))
     link_closure = kw.pop("link_closure", "direct") or "direct"
     link_closure_overrides = kw.pop("link_closure_overrides", {}) or {}
     validate_link_closure_overrides(link_deps, link_closure_overrides)
@@ -133,9 +77,9 @@ def _rust_nix_target(name, kind, out, kwargs):
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
     unknown = sorted([key for key in kw.keys() if key not in _PUBLIC_ARGS])
     if unknown:
-        fail("%s: unknown arguments: %s" % (_rust_macro_name(kind), ", ".join(unknown)))
-    cargo_manifest = _single_cargo_file(kw.pop("cargo_manifest", None), "Cargo.toml", "cargo_manifest")
-    cargo_lock = _single_cargo_file(kw.pop("cargo_lock", None), "Cargo.lock", "cargo_lock")
+        fail("%s: unknown arguments: %s" % (rust_macro_name(kind), ", ".join(unknown)))
+    cargo_manifest = single_cargo_file(kw.pop("cargo_manifest", None), "Cargo.toml", "cargo_manifest")
+    cargo_lock = single_cargo_file(kw.pop("cargo_lock", None), "Cargo.lock", "cargo_lock")
     cargo_output_hashes = kw.pop("cargo_output_hashes", {})
     cargo_fixed_sources = kw.pop("cargo_fixed_sources", {})
     if not isinstance(cargo_output_hashes, dict):
@@ -146,13 +90,34 @@ def _rust_nix_target(name, kind, out, kwargs):
         if not isinstance(key, str) or not isinstance(value, str):
             fail("rust target cargo_fixed_sources keys and reviewed JSON values must be strings")
     crate = kw.pop("crate", name)
+    cargo_package = kw.pop("cargo_package", crate)
+    public_crate = kw.pop("public_crate", crate.replace("-", "_"))
+    crate_type = crate_type_for(kind, kw.pop("crate_type", None))
+    host_role = kw.pop("host_role", "host" if crate_type == "proc-macro" else "target")
+    generated_outputs = kw.pop("generated_outputs", [out])
     features = kw.pop("features", [])
     default_features = kw.pop("default_features", True)
     profile = kw.pop("profile", "release")
     target = kw.pop("target", "")
     if not isinstance(crate, str) or crate == "":
         fail("rust target crate must be a non-empty string")
-    if not _valid_features(features):
+    if not isinstance(cargo_package, str) or cargo_package == "":
+        fail("rust target cargo_package must be a non-empty string")
+    validate_public_crate(public_crate)
+    if host_role not in ["host", "target"]:
+        fail("rust target host_role must be host or target")
+    if crate_type == "proc-macro" and host_role != "host":
+        fail("rust proc-macro targets must use the host role")
+    if not isinstance(generated_outputs, list) or not generated_outputs:
+        fail("rust target generated_outputs must be a non-empty list")
+    for generated_output in generated_outputs:
+        if not isinstance(generated_output, str) or generated_output == "":
+            fail("rust target generated_outputs must contain non-empty strings")
+    kw["labels"] = (kw.get("labels", []) or []) + [
+        "crate-type:" + crate_type,
+        "rust-role:" + host_role,
+    ]
+    if not valid_features(features):
         fail("rust target features must be a list of non-empty strings")
     if not isinstance(default_features, bool):
         fail("rust target default_features must be a bool")
@@ -164,7 +129,7 @@ def _rust_nix_target(name, kind, out, kwargs):
     if target != expected_target:
         fail("rust target target must be %s for kind %s" % (expected_target if expected_target else "empty", kind))
     if "local_patch_dirs" in kw:
-        _validate_local_patch_dirs(kw["local_patch_dirs"])
+        validate_local_patch_dirs(kw["local_patch_dirs"])
     wiring = prepare_language_wiring(
         name = name,
         kwargs = kw,
@@ -176,6 +141,9 @@ def _rust_nix_target(name, kind, out, kwargs):
     prepared = wiring.kwargs
     prepared.update(remote_kwargs)
     cargo_root_srcs = native.glob(["**/*.rs"])
+    owner_srcs = dedupe_preserve((prepared.get("srcs", []) or []) + native.glob(
+        ["src/**/*.rs", "build.rs", "benches/**/*.rs", "examples/**/*.rs", "tests/**/*.rs"],
+    ))
     attrs = {
         "name": name,
         "out": out,
@@ -191,9 +159,16 @@ def _rust_nix_target(name, kind, out, kwargs):
         "nix_inputs": global_nix_inputs(),
         "cargo_manifest": cargo_manifest,
         "cargo_lock": cargo_lock,
+        "cargo_root": native.package_name(),
+        "cargo_package": cargo_package,
+        "cargo_lock_identity": "%s/Cargo.lock" % native.package_name(),
         "cargo_output_hashes": cargo_output_hashes,
         "cargo_fixed_sources": cargo_fixed_sources,
         "crate": crate,
+        "public_crate": public_crate,
+        "crate_type": crate_type,
+        "host_role": host_role,
+        "generated_outputs": generated_outputs,
         "features": features,
         "default_features": default_features,
         "profile": profile,
@@ -203,6 +178,30 @@ def _rust_nix_target(name, kind, out, kwargs):
         "nixpkg_pins": prepared.get("nixpkg_pins", {}),
         "visibility": prepared.get("visibility", []),
     }
+    snapshot_attrs = {key: attrs[key] for key in [
+        "cargo_root", "cargo_package", "cargo_manifest", "cargo_lock",
+        "cargo_lock_identity", "public_crate", "crate_type", "host_role",
+        "generated_outputs",
+    ]}
+    snapshot_attrs["srcs"] = owner_srcs
+    snapshot_attrs["owner_label"] = "root//%s:%s" % (native.package_name(), name)
+    if "source_snapshot_bundle" in remote_kwargs:
+        rust_composition_snapshot(
+            name = name + "__rust_composition_snapshot",
+            base_bundle = remote_kwargs.pop("source_snapshot_bundle"),
+            deps = wiring.deps,
+            **snapshot_attrs
+        )
+        remote_kwargs["source_snapshot_bundle"] = ":" + name + "__rust_composition_snapshot"
+    elif "source_snapshot" in remote_kwargs or "source_snapshot_manifest" in remote_kwargs:
+        rust_composition_snapshot(
+            name = name + "__rust_composition_snapshot",
+            base_snapshot = remote_kwargs.pop("source_snapshot", None),
+            base_manifest = remote_kwargs.pop("source_snapshot_manifest", None),
+            deps = wiring.deps,
+            **snapshot_attrs
+        )
+        remote_kwargs["source_snapshot_bundle"] = ":" + name + "__rust_composition_snapshot"
     attrs.update(remote_kwargs)
     if kind == "test":
         rust_nix_test(**attrs)
@@ -210,7 +209,20 @@ def _rust_nix_target(name, kind, out, kwargs):
         rust_nix_build(**attrs)
 
 def rust_library(name, **kwargs):
-    _rust_nix_target(name = name, kind = "lib", out = name + ".stamp", kwargs = kwargs)
+    kw = fixed_artifact_contract(kwargs, "rust_library", "rlib", "target")
+    _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "rlib"), kwargs = kw)
+
+def rust_static_library(name, **kwargs):
+    kw = fixed_artifact_contract(kwargs, "rust_static_library", "staticlib", "target")
+    _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "staticlib"), kwargs = kw)
+
+def rust_cdylib(name, **kwargs):
+    kw = fixed_artifact_contract(kwargs, "rust_cdylib", "cdylib", "target")
+    _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "cdylib"), kwargs = kw)
+
+def rust_proc_macro(name, **kwargs):
+    kw = fixed_artifact_contract(kwargs, "rust_proc_macro", "proc-macro", "host")
+    _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "proc-macro"), kwargs = kw)
 
 def rust_binary(name, **kwargs):
     _rust_nix_target(name = name, kind = "bin", out = name, kwargs = kwargs)
@@ -219,16 +231,19 @@ def rust_test(name, **kwargs):
     _rust_nix_target(name = name, kind = "test", out = name + ".stamp", kwargs = kwargs)
 
 def rust_wasm_library(name, **kwargs):
-    kw = _with_required_target(kwargs, "rust_wasm_library", "wasm32-unknown-unknown")
+    kw = with_required_target(kwargs, "rust_wasm_library", "wasm32-unknown-unknown")
     _rust_nix_target(name = name, kind = "wasm", out = name + ".wasm", kwargs = kw)
 
 def rust_wasi_binary(name, **kwargs):
-    kw = _with_required_target(kwargs, "rust_wasi_binary", "wasm32-wasip1")
+    kw = with_required_target(kwargs, "rust_wasi_binary", "wasm32-wasip1")
     _rust_nix_target(name = name, kind = "wasi", out = name + ".wasm", kwargs = kw)
 
 __all__ = [
     "rust_binary",
+    "rust_cdylib",
     "rust_library",
+    "rust_proc_macro",
+    "rust_static_library",
     "rust_test",
     "rust_wasi_binary",
     "rust_wasm_library",

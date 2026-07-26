@@ -3,13 +3,16 @@ load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_artifact_bash", "nix_cal
 load("@viberoots//build-tools/lang:nix_action_runner.bzl", "nix_action_build_selected_out_path_cmd")
 load("@viberoots//build-tools/lang:remote_action_policy.bzl", "remote_ready_evidence", "run_nix_action")
 load("@viberoots//build-tools/lang:nix_artifact_inputs.bzl", "nix_artifact_action_inputs", "with_nix_artifact_action_attrs")
+load("@viberoots//build-tools/lang:native_link.bzl", "NativeLinkInfo", "native_runtime_outputs")
 load("@viberoots//build-tools/lang:source_snapshot.bzl", "SourceSnapshotInfo")
+load("@viberoots//build-tools/rust/private:crate_contract.bzl", "rust_crate_closure_inputs", "rust_crate_contract_attrs", "rust_crate_info")
 
 def _rust_nix_build_impl(ctx):
     raw = ctx.attrs.self_label
     planner_label = ctx.attrs.planner_label or raw
     planner_target_name = planner_label.split(":")[-1]
     kind = ctx.attrs.kind
+    crate_type = ctx.attrs.crate_type
     sanitized = sanitize_name(raw)
     target_name = ctx.label.name
     source_snapshot = ctx.attrs.source_snapshot
@@ -65,8 +68,15 @@ def _rust_nix_build_impl(ctx):
         + "  exit 2; "
         + "fi; "
         + "if [ \"%s\" = \"lib\" ]; then " % kind
-        + ("  LIB=\"$outPath/lib/lib%s.rlib\"; " % ctx.attrs.crate)
-        + "  if [ ! -f \"$LIB\" ]; then echo \"rust_nix_build (%s): expected compiled library not found\" >&2; exit 2; fi; " % raw
+        + ("  CRATE_TYPE=\"%s\"; PUBLIC_CRATE=\"%s\"; " % (crate_type, ctx.attrs.public_crate or ctx.attrs.crate))
+        + "  case \"$CRATE_TYPE\" in "
+        + "    rlib) LIB=\"$outPath/lib/lib$PUBLIC_CRATE.rlib\" ;; "
+        + "    staticlib) LIB=\"$outPath/lib/lib$PUBLIC_CRATE.a\" ;; "
+        + "    cdylib) LIB=\"$outPath/lib/lib$PUBLIC_CRATE.cdylib\" ;; "
+        + "    proc-macro) LIB=\"$outPath/lib/lib$PUBLIC_CRATE.proc-macro\" ;; "
+        + "    *) echo \"rust_nix_build (%s): unsupported crate type $CRATE_TYPE\" >&2; exit 2 ;; " % raw
+        + "  esac; "
+        + "  if [ ! -f \"$LIB\" ]; then echo \"rust_nix_build (%s): expected compiled $CRATE_TYPE not found\" >&2; exit 2; fi; " % raw
         + "  cp -f \"$LIB\" \"$0\"; exit 0; "
         + "fi; "
         + "if [ \"%s\" = \"wasm\" ] || [ \"%s\" = \"wasi\" ]; then " % (kind, kind)
@@ -97,7 +107,8 @@ def _rust_nix_build_impl(ctx):
         ctx.attrs.remote_builder_smoke,
     ]
     present_remote_inputs = [value for value in remote_inputs if value != None]
-    declared_inputs = nix_artifact_action_inputs(ctx) + [ctx.attrs.cargo_manifest, ctx.attrs.cargo_lock] + snapshot_inputs + present_remote_inputs + control_inputs
+    crate_closure_inputs = rust_crate_closure_inputs(ctx)
+    declared_inputs = nix_artifact_action_inputs(ctx) + [ctx.attrs.cargo_manifest, ctx.attrs.cargo_lock] + crate_closure_inputs + snapshot_inputs + present_remote_inputs + control_inputs
     cmd = cmd_args(
         [nix_artifact_bash(), "-c", run_and_copy, out.as_output(), ctx.attrs._graph_json] + snapshot_args + control_inputs + [declared_inputs],
         hidden = declared_inputs,
@@ -119,11 +130,21 @@ def _rust_nix_build_impl(ctx):
         mode = "remote-ready" if remote_requested else "local-only",
         evidence = evidence,
     )
-    return [DefaultInfo(default_output = out)] + policy_info
+    runtime_outputs = native_runtime_outputs(ctx.attrs.link_deps + ctx.attrs.header_deps)
+    providers = [
+        DefaultInfo(default_output = out, other_outputs = runtime_outputs),
+        rust_crate_info(ctx),
+    ]
+    if crate_type == "staticlib":
+        providers.append(NativeLinkInfo(
+            library = out,
+            link_kind = "static",
+            link_name = ctx.attrs.public_crate or ctx.attrs.crate,
+            runtime_outputs = runtime_outputs,
+        ))
+    return providers + policy_info
 
-rust_nix_build = rule(
-    impl = _rust_nix_build_impl,
-    attrs = with_nix_artifact_action_attrs({
+_ATTRS = {
         "self_label": attrs.string(),
         "planner_label": attrs.option(attrs.string(), default = None),
         "kind": attrs.string(),  # "bin" | "lib" | "wasm" | "wasi"
@@ -160,7 +181,12 @@ rust_nix_build = rule(
         "_node_modules_hashes": attrs.source(default = "root//projects/config:node-modules.hashes.json"),
         "_nixpkgs_registry_extension": attrs.source(default = "root//.viberoots/workspace:nixpkgs-source-registry-extension"),
         "_source_snapshot_validator": attrs.source(default = "@viberoots//build-tools/tools/dev:validate-source-snapshot.ts"),
-    }),
+}
+_ATTRS.update(rust_crate_contract_attrs())
+
+rust_nix_build = rule(
+    impl = _rust_nix_build_impl,
+    attrs = with_nix_artifact_action_attrs(_ATTRS),
 )
 
 __all__ = ["rust_nix_build"]

@@ -48,6 +48,50 @@ When you add or change a macro, keep the wiring table-driven through shared help
 - Scaffolding templates: `build-tools/tools/scaffolding/templates/<lang>/...` + language registry entry
 - Tests: zx tests using `build-tools/tools/tests/lib/lang-fixtures.ts`
 
+### Closure, artifact, and execution contracts
+
+Define these contracts before implementing a new language route:
+
+- **Source/provider closure authority:** name the graph edge or provider that owns every source root,
+  lockfile, generated input, patch, and fixed-source record. Compute the reachable closure from
+  declared dependency edges. When copying roots for metadata or remote execution, copy each
+  reachable root independently and stop traversal at nested language-root boundaries; never admit an
+  unrelated nested root merely because its ancestor is reachable.
+- **Stable public artifacts:** specify the public filename and ABI/link identifier separately from
+  the Buck target name and ecosystem package name. Validate identifiers with a conservative,
+  explicit grammar before using them in a path, shell fragment, linker name, or provider. Repeat the
+  validation at the Nix/template boundary so direct graph injection fails closed. The declared Buck
+  output name, installed Nix artifact, provider metadata, and downstream consumer must agree.
+- **Native link and runtime closure:** use the shared native-link provider for libraries consumed by
+  another language. Carry link kind, link name, link artifact, and runtime outputs. A static archive
+  may still require shared libraries or resources at runtime; propagate those packages through the
+  planner and prove the final mixed-language executable runs without the consumer redeclaring them.
+- **Host and target roles:** classify build scripts, macros/plugins, code generators, and target
+  artifacts explicitly. Host tools use the native host toolchain even during cross compilation;
+  target artifacts use the requested target toolchain. Both run through the existing managed
+  timeout/process-group boundary.
+- **Proof-bound snapshots:** a remote snapshot is evidence, not just copied bytes. Include the
+  selected target and its complete declared provider/source closure, record a canonical composition
+  manifest, and bind it with a digest. Assert selected evaluation, full evaluation, snapshot
+  metadata, and replay project the same identity-affecting fields.
+- **Generated-state ownership:** `u` is the only tracked repair owner. Temporary metadata copies,
+  remote snapshots, and build outputs are ignored/materialized state and must never publish
+  unrelated locks or rewrite tracked files. Every generated file needs one writer, deterministic
+  ordering, rollback behavior, and a read-only stale-state check.
+
+Required acceptance evidence should exercise behavior, not only source assertions:
+
+- Build every public artifact kind and check its exact filename, format, exported symbol, and
+  downstream use.
+- Run a mixed-language binary whose runtime succeeds only when transitive runtime outputs propagate.
+- Use the public patch command for start/apply/remove, run the affected artifact before/after, and
+  prove same-owner and transitive derivation identities change while an unrelated root stays stable.
+- Interrupt and time out real ecosystem host tools (for example a build script and compiler plugin),
+  verify their descendants are gone, then retry successfully through the production supervisor.
+- Test nested reachable and unrelated roots, external/escaping symlinks, hostile `PATH`/workspace
+  state, target/host mismatches, malformed public identifiers, missing graph edges, and remote replay
+  with the ambient checkout unavailable.
+
 ### Command ownership and tool authority
 
 A language is not integrated until its metadata lifecycle follows the repository command model:
@@ -364,6 +408,13 @@ Stamping belongs in the macro. If your macro synthesizes helper targets (for exa
 - Start with the smallest direct tests for the new registry, metadata repair/read-only boundary,
   provider/glue generation, Buck toolchain, and runnable manifest. Include a temp-repo test when
   source isolation or post-clone behavior is part of the contract.
+- At every planned scope-review checkpoint, compare the new language with the mature C++, Go,
+  Python, and Node implementations that are applicable at the same PR progression. Review
+  macro/provider contracts, artifact production, source filtering, remote execution, cache
+  identity, update behavior, tests, and documentation. Record any difference as implemented,
+  intentionally language-specific, or a gap in the current PR. Explicitly exclude capabilities
+  assigned to later PRs in the plan; a scope review must neither pull those capabilities forward
+  nor report their planned absence as a current-PR defect.
 - Measure elapsed time and disk before and after focused runs using the named-path inventory in
   `docs/handbook/getting-started-on-a-pr.md`. Do not broaden source snapshots or copy shared caches to
   make a fixture pass.

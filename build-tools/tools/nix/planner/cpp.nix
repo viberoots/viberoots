@@ -83,7 +83,16 @@ let
 in
 let
   Rec = rec {
-    repoCppLibPkgsFor = name: builtins.map mkLib (Deps.resolveRepoCppLibDepsFor name);
+    runtimePackages = package:
+      if package ? passthru && package.passthru ? viberootsRust
+      then package.passthru.viberootsRust.runtime_packages or []
+      else [];
+    repoCppLibPkgsFor = name:
+      lib.concatMap
+        (dep:
+          let package = ctx.dependencyArtifactOf dep;
+          in [ package ] ++ runtimePackages package)
+        (Deps.resolveRepoCppLibDepsFor name);
     repoCppHeaderPkgsFor = name: builtins.map mkHeaders (Deps.resolveRepoCppHeaderDepsFor name);
     Targets = import ./cpp-targets.nix {
       inherit lib T byName labelsOf linkModeOf pkgPathOf repoRoot normSrcsOf patchInputsFor;

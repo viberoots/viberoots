@@ -40,6 +40,9 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `nix_python_wasm_lib`
 - `@viberoots//build-tools/rust:defs.bzl`
   - `rust_library`
+  - `rust_static_library`
+  - `rust_cdylib`
+  - `rust_proc_macro`
   - `rust_binary`
   - `rust_test`
   - `rust_wasm_library`
@@ -1536,7 +1539,7 @@ Public args:
 
 Load from `@viberoots//build-tools/rust:defs.bzl`.
 
-All five public Rust macros accept the following remote-execution evidence labels:
+All eight public Rust macros accept the following remote-execution evidence labels:
 
 - `source_snapshot_bundle` supplies the typed `SourceSnapshotInfo` bundle containing the declared
   source root, source manifest, and graph. It is mutually exclusive with the lower-level
@@ -1586,6 +1589,12 @@ Public args:
   records contain only the immutable Nix store path, NAR hash, lock source, and checksum used for
   credential-free offline builds; authoring-only Cargo cache origins are rejected.
 - `crate` string. Cargo package name; defaults to the Buck target name.
+- `cargo_package` string. Reviewed Cargo package identity exported for composition diagnostics;
+  defaults to `crate`.
+- `public_crate` string. Cargo dependency key used by cross-root consumers; defaults to `crate`.
+- `crate_type` is fixed by the public artifact macro. `rust_library` is `rlib`.
+- `host_role` is `target` except for `rust_proc_macro`, which is built for the native host.
+- `generated_outputs` lists stable graph-visible outputs produced by the crate contract.
 - `features` list of strings. Explicit Cargo features; defaults to empty.
 - `default_features` bool. Whether Cargo default features are enabled; defaults to `True`.
 - `profile` string. Cargo profile, `release` or `dev`; defaults to `release`.
@@ -1600,6 +1609,28 @@ Public args:
   scripts.
 - `link_closure` string, `direct` or `transitive`; defaults to `direct`.
 - `link_closure_overrides` dict. Every key must be present in `link_deps`.
+
+Cross-root Rust entries in `deps` must match reviewed Cargo path dependencies exactly. The path
+must normalize to the dependency target's repository-relative Cargo root without escaping the
+repository. Package name, public crate name, and declared version must agree. Missing, extra,
+ambiguous, cyclic, external, and incompatible edges fail during planning. Cargo compiles the
+transitive source closure; Buck `.rlib` outputs are not injected into Cargo.
+
+### `rust_static_library(name, **kwargs)`
+
+Builds the Cargo library as `staticlib` and exposes a deterministic `lib<name>.a` Buck artifact.
+It accepts the native library arguments documented for `rust_library`.
+
+### `rust_cdylib(name, **kwargs)`
+
+Builds the Cargo library as `cdylib` and normalizes the platform dynamic-library output to the
+deterministic Buck artifact `lib<name>.cdylib`. Runtime native dependencies remain explicit.
+
+### `rust_proc_macro(name, **kwargs)`
+
+Builds the Cargo library as a host `proc-macro` and exposes `lib<name>.proc-macro` for artifact
+inspection. Cross-root Cargo consumers compile the proc-macro from its declared source path with
+Cargo's host toolchain; they do not consume this normalized inspection artifact.
 
 ### `rust_binary(name, **kwargs)`
 

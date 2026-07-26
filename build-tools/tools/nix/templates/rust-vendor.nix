@@ -1,4 +1,4 @@
-{ pkgs, cargoRoot, cargoLock, cargoOutputHashes ? {}, cargoFixedSources ? {} }:
+{ pkgs, cargoRoot, cargoRootRel ? ".", cargoLock, cargoOutputHashes ? {}, cargoFixedSources ? {}, sourceComposition ? null }:
 let
   lib = pkgs.lib;
   packages = builtins.filter (package: package ? source)
@@ -135,9 +135,9 @@ let
       destination = vendorDestinations.${key};
       checksum = if lib.hasPrefix "git+" package.source then null else package.checksum or null;
     in ''
-      mkdir -p "$out/${identity.directory}"
-      cp -R ${lib.escapeShellArg (builtins.toString vendorAuthorities.${key})} \
-        "$out/${destination}"
+      mkdir -p "$out/${destination}"
+      cp -R ${lib.escapeShellArg "${builtins.toString vendorAuthorities.${key}}/."} \
+        "$out/${destination}/"
       chmod -R u+w "$out/${destination}"
       ${if checksum == null then ''
         printf '%s\n' ${lib.escapeShellArg (builtins.toJSON {
@@ -155,12 +155,32 @@ let
     EOF
     ${lib.concatMapStringsSep "\n" copyFor packages}
   '';
+  rawCompositionRoots =
+    if sourceComposition == null
+    then [ { cargo_root = cargoRootRel; inherit cargoRoot; } ]
+    else sourceComposition.roots;
+  compositionRoots = map (root: root // {
+    cargoRoot = builtins.path {
+      path = root.cargoRoot;
+      name = "viberoots-rust-root-${sourceHash root.cargo_root}";
+    };
+  }) rawCompositionRoots;
+  copyCompositionRoot = root:
+    if root.cargo_root == "." then ''
+      cp -R ${lib.escapeShellArg (builtins.toString root.cargoRoot)}/. "$out/"
+      chmod -R u+w "$out"
+    '' else ''
+      mkdir -p "$out/$(dirname ${lib.escapeShellArg root.cargo_root})"
+      cp -R ${lib.escapeShellArg (builtins.toString root.cargoRoot)} \
+        "$out/${root.cargo_root}"
+      chmod -R u+w "$out/${root.cargo_root}"
+    '';
   sourceWithVendor = pkgs.runCommand "viberoots-rust-source-with-vendor" {} ''
     mkdir -p "$out"
-    cp -R ${lib.escapeShellArg (builtins.toString cargoRoot)}/. "$out/"
-    cp -R ${cargoVendor} "$out/.viberoots-cargo-vendor"
-    mkdir "$out/.cargo"
-    substitute ${cargoVendor}/.cargo/config "$out/.cargo/config" \
+    ${lib.concatMapStringsSep "\n" copyCompositionRoot compositionRoots}
+    cp -R ${cargoVendor} "$out/${cargoRootRel}/.viberoots-cargo-vendor"
+    mkdir "$out/${cargoRootRel}/.cargo"
+    substitute ${cargoVendor}/.cargo/config "$out/${cargoRootRel}/.cargo/config" \
       --replace-warn '@vendor@' '.viberoots-cargo-vendor'
   '';
 in assert _fixedSources; {

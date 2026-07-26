@@ -2,7 +2,7 @@
 
 **Prepared:** 2026-07-23
 
-**Last reconciled:** 2026-07-26, after PR-5 implementation, validation, and final independent review
+**Last reconciled:** 2026-07-26, after PR-6 implementation, validation, and final independent review
 
 **Workspace:** `/Users/kiltyj/Code/viberoots-site`
 
@@ -15,21 +15,21 @@ repository, staged and unstaged diffs, and the referenced logs before editing.
 
 ## 0. Current handoff: this section supersedes all older execution state below
 
-The active `$repo-skills:prs` item is PR-5, `Add Initial C Interop, WASM, Scaffolding, And Remote
-Proof`, from:
+The next `$repo-skills:prs` item is PR-7, `Add Rust Python Extensions And Node-API Addons`, from:
 
 ```text
 plan:   build-tools/docs/rust-language-plan.md
 design: build-tools/docs/lang/rust-design.md
 repo:   /Users/kiltyj/Code/viberoots-site/viberoots
-HEAD:   663027ac30b239e3a414db3e0be789335d870939 (detached)
+PR-6 commit: feat(rust): add cross-root crate composition (detached; inspect HEAD for the SHA)
 ```
 
-PR-5 implementation, its risk-based residual validation, and the locally supported
-`aarch64-darwin` Rust matrix are complete. The final fresh isolated post-fix scope review passed
-with no material findings. This handoff is included in the single
-`feat(build): complete Rust remote readiness` commit with all authorized submodule changes. That
-commit combines:
+PR-5 is complete in `55130076 feat(build): complete Rust remote readiness`. PR-6 implementation,
+risk-based validation, reviewer-fix loops, same-stage mature-language parity review, and final
+independent scope review are also complete in this handoff's
+`feat(rust): add cross-root crate composition` commit. No push is authorized.
+
+PR-5's commit combines:
 
 - the complete PR-5 implementation and fixes;
 - the `happy@1.2.0` development-environment correction;
@@ -54,12 +54,61 @@ Use `repo-skills:prs` in turbo mode, with minimal-context independent agents:
 5. Commit through `repo-skills:cc` only after implementation review, validation, timing checks, and
    scope review are green. Never push without explicit user authorization.
 
-After PR-5 is committed, PRs 6-12 remain. Continue them in numeric order with a fresh isolated
+After PR-6 is committed, PRs 7-12 remain. Continue them in numeric order with a fresh isolated
 implementation agent and separate isolated reviewer/tester roles for each PR. Use risk-based
-focused suites for PRs 6-8 and 10-11 because PR-5 just exercised a complete checkpoint and future
+focused suites for PRs 7-8 and 10-11 because PR-5 exercised a complete checkpoint and future
 checkpoint PRs will do so again. Run full checkpoints for PR-9 and PR-12, or earlier if a material
 cross-cutting change makes the focused evidence insufficient. Record elapsed timing and compare
 successful full checkpoints with the 10,684-second successful baseline.
+
+### PR-6 completion evidence
+
+PR-6 closes cross-root Cargo composition and the stable Rust artifact/provider contracts:
+
+- reviewed Buck/Cargo path dependencies compose a precise reachable source closure, including
+  Cargo workspace members while excluding unrelated nested roots and hostile symlinks;
+- `rlib`, `staticlib`, `cdylib`, and host-built proc-macro outputs have validated public names,
+  deterministic paths, explicit host/target roles, and generated/runtime metadata;
+- Rust static libraries export a native-link/runtime provider consumed by the C++ planner; the
+  runtime test links through Rust to a shared C++ dependency and executes successfully;
+- selected, full, filtered, snapshot, and replay composition manifests and digests are compared
+  exactly under one current immutable source authority, with stale/missing owner bytes rejected;
+- Cargo-compatible semver, null-composition layout, fixed macro argument rejection, and canonical
+  public-crate identifier validation are covered;
+- public `patch-pkg start/apply/remove` drives real runtime `1 -> 2 -> 1`, changes affected and
+  same-owner derivation identities, preserves an unrelated root, and restores baseline identities;
+  and
+- real Cargo build-script/proc-macro timeout and interruption tests use pinned tools under hostile
+  PATH, kill descendants, deny network/ambient authority, and prove retry.
+
+Final affected validation passed in 260 seconds:
+
+```text
+requested shared tests:       9/9
+resource-limited tests:       2/2
+project enforcement:          5/5
+failures:                     0
+authoritative log:
+  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/verify-logs/
+  verify-2026-07-26T21-05-35-903Z-82192-a18bba1915433.log
+```
+
+The exact selected/full/snapshot/replay parity selector also passed with enforcement 5/5 in 81
+seconds. Final static/read-only gates passed: changed-file Prettier and ESLint, nine changed Nix
+parses, `git diff --check`, strict 250-line enforcement, secret scan, process/temp cleanup, and Nix
+command-site inventory (536 sites; roles 296 canonical, 4 live-d, 68 update/install, 168
+non-artifact; reviewed digest
+`bb1c67cad43848a997c1bf6fd62c6dca21f46f75694d86b2fdb675c2e46458cc`).
+
+The final isolated scope review compared Rust with mature C++, Go, Python, and Node capabilities at
+the same PR progression and passed with no findings. It explicitly excluded extension packaging,
+full bidirectional ABI/generated bindings, expanded WASM, dependency/developer lifecycle, Tauri,
+and final publication/independent-builder proof assigned to PRs 7-12.
+
+The reusable `prs` scope-review workflow and `docs/handbook/adding-language.md` now require this
+same-stage mature-language comparison while excluding capabilities explicitly assigned to later
+plan PRs. The live cached Repo Skills workflow was synchronized for this account; restart the
+client after the commit so the installed plugin refreshes normally.
 
 ### PR-5 validation and failure investigation
 

@@ -88,11 +88,16 @@ async function doReset(args: string[]): Promise<void> {
 
 async function doRemove(args: string[]): Promise<void> {
   const request = await resolveRequest(args);
+  const patchDir = await rustPatchDir(request.cargoRoot, args);
   const patchPath = path.join(
-    await rustPatchDir(request.cargoRoot, args),
+    patchDir,
     rustPatchFilename(request.pkg.name, request.pkg.version, request.pkg.source),
   );
   await fsp.rm(patchPath, { force: true });
+  if (!readFlagStrFromTokens("patch-dir", "", args).trim()) {
+    await fsp.rmdir(patchDir).catch(() => {});
+    await fsp.rmdir(path.dirname(patchDir)).catch(() => {});
+  }
   await resetWorkspaceWorkflow({
     lang: "rust",
     key: request.key,

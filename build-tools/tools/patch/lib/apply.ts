@@ -95,6 +95,10 @@ function resolvePatchBin(): string {
   return executableEnvPath(process.env.PATCH_BIN) || resolveToolPathSync("patch");
 }
 
+function resolveGitBin(): string {
+  return executableEnvPath(process.env.GIT_BIN) || resolveToolPathSync("git");
+}
+
 export async function writePatchIfChanged(
   dst: string,
   data: string,
@@ -139,6 +143,7 @@ export async function writePatchIfChanged(
 async function cpRecursive(src: string, dst: string): Promise<void> {
   const st = await fsp.stat(src);
   if (st.isDirectory()) {
+    await fsp.mkdir(dst, { recursive: true });
     await copyTree(src, dst, { cloneMode: "try", force: true });
     return;
   }
@@ -155,8 +160,20 @@ export async function verifyPatchDryRun(
     baseName: "viberoots-patch-verify",
   });
   const tmpCopy = path.join(tmpRoot, path.basename(originPath));
-  const patchBin = resolvePatchBin();
   await cpRecursive(originPath, tmpCopy);
+  if (mode === "rust") {
+    const res = await runPatchCommand(
+      resolveGitBin(),
+      ["apply", "--check", "-p1", path.resolve(patchPath)],
+      { cwd: tmpCopy },
+    );
+    if ((res.code || 0) !== 0) {
+      const stderr = String(res.stderr || "").trim();
+      throw new Error(stderr || "git apply --check failed");
+    }
+    return;
+  }
+  const patchBin = resolvePatchBin();
   if (mode === "cpp") {
     // C++ path: run quiet, capture output; mirror existing behavior
     const res = await runPatchCommand(

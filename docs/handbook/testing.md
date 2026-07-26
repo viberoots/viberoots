@@ -136,6 +136,13 @@ native execution only on `aarch64-darwin`; `aarch64-linux` and `x86_64-linux` re
 fail-closed systems until later Rust execution evidence lands. The PR checkpoint remains
 `i && b && ALL_TESTS=1 v`; focused evidence does not replace it.
 
+For Rust PR-6 changes, the focused union must include cross-root path composition, crate-kind
+macro and artifact mapping, proc-macro host roles, Cargo planner boundary failures,
+source-selection identity parity, and the prior PR-5 C/WASM/remote checkpoint targets. Run from
+the parent consumer root in submodule mode so `.viberoots/current` and its proof-bound cache/tool
+authority select the current source. Ignored nested submodule workspace state is not command
+authority.
+
 ## Running
 
 - Default PR loop: `i && b && v`

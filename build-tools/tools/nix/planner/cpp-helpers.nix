@@ -32,9 +32,14 @@ let
       k = if depNode == null then null else kindOf depNode;
       labs = if depNode == null then [] else labelsOf depNode;
       haveLang = depNode != null && hasLangCpp depNode;
+      haveRustStatic = depNode != null
+        && builtins.elem "lang:rust" labs
+        && builtins.elem "kind:lib" labs
+        && builtins.elem "crate-type:staticlib" labs;
     in
       if depNode == null then failLinkDep consumer dep "unknown target (missing from exported graph)"
-      else if !haveLang then failLinkDep consumer dep ("expected lang:cpp; got labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
+      else if !haveLang && !haveRustStatic then failLinkDep consumer dep ("expected lang:cpp or a Rust static library; got labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
+      else if haveRustStatic then dep
       else if builtins.elem "kind:wasm" labs then failLinkDep consumer dep ("expected kind:lib for C++ helper contract; got labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
       else if k != "lib" then failLinkDep consumer dep ("expected kind:lib for C++ helper contract; got kind=" + (builtins.toString k) + " labels=" + (builtins.toString labs) + " rule_type=" + (builtins.toString rt))
       else dep;
@@ -84,5 +89,4 @@ in {
     ensureRepoCppHeaderDepInfo
     patchInputsFor;
 }
-
 

@@ -213,6 +213,11 @@ The reviewer subagent must:
 - Read the target PR section in the plan document.
 - Inspect the implementation diff and any relevant files.
 - Compare the implemented behavior, tests, docs, and wiring against the full scope described for that PR.
+- When the PR adds or advances a programming language, compare its capabilities with the repository's
+  mature language implementations at the same rollout stage. Review macro and provider contracts,
+  artifact kinds and consumers, dependency/update behavior, filtering and source selection,
+  cache/remote materialization, validation, and documentation. Treat an unexplained capability gap
+  as missing scope, but do not require capabilities that the plan explicitly assigns to later PRs.
 - Assume focused validation is already passing. Do not run tests or validation commands.
 - Do not modify files.
 - Report either `Scope review passed` or a concise list of missing/incomplete PR requirements with file or behavior references.
@@ -225,6 +230,8 @@ You are the scope reviewer for PR <pr-number> from <plan-document> in /absolute/
 Read the PR <pr-number> section in <plan-document>. Then inspect the current implementation diff and relevant files.
 
 Review only whether the implementation fully covers the PR description from the plan document, including behavior, tests, docs, and wiring that the PR requires.
+
+If this PR adds or advances a programming language, compare it with the repository's mature language implementations at the same rollout stage. Check equivalent macro/provider, artifact/consumer, dependency/update, filtering/source-selection, cache/remote, validation, and documentation capabilities. Report unexplained parity gaps, but exclude capabilities explicitly assigned to later PRs in the plan.
 
 Assume self-review and focused validation are already passing. Do not run tests, builds, formatters, full-suite validation, or validation commands. Do not modify files.
 

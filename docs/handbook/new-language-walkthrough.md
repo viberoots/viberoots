@@ -59,6 +59,10 @@ Steps
 
 - **Tests**
   - Copy the Go contract tests as a model and adjust for your language’s providers and labels. Keep tests one-per-file and wire via `TARGETS`.
+  - Complete the closure/artifact/execution checklist in
+    [`adding-language.md`](adding-language.md#closure-artifact-and-execution-contracts): canonical
+    public artifact names, provider/source closure authority, native runtime propagation, host/target
+    roles, proof-bound snapshot parity, and generated-state ownership all require runtime evidence.
   - Include a small test that proves your adapter's `validate(nodes)` rejects a misconfigured sample with a clear message.
   - Add command-boundary coverage: `u` repairs deterministic tracked metadata; `i`, `b`, post-clone,
     and devshell entry detect drift without rewriting it and never invoke reconciliation or upgrade.

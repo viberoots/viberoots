@@ -580,6 +580,12 @@ printf "%s = %s\\n" "\${TEST_CACHE_SETTING:-substituters}" "\${TEST_SUBSTITUTER:
         },
       );
     assert.equal((await runProvenBuck()).stdout, "0");
+    const concurrent = await Promise.all(Array.from({ length: 16 }, () => runProvenBuck()));
+    assert.deepEqual(
+      concurrent.map((result) => result.stdout),
+      Array.from({ length: 16 }, () => "0"),
+      "parallel test actions must bind reviewed cache roles in action-owned temporary state",
+    );
     assert.equal(
       (
         await runProvenBuck({

@@ -11,6 +11,7 @@ test("Rust native lifecycle has one source-plan, runner, and runnable authority"
   const defs = read("build-tools/rust/defs.bzl");
   const runner = read("build-tools/rust/private/nix_test.bzl");
   const planner = read("build-tools/tools/nix/planner/rust.nix");
+  const composition = read("build-tools/tools/nix/planner/rust-composition.nix");
   const toolchains = read("build-tools/tools/nix/flake/packages/toolchains.nix");
   const enabledDiagnosis = read("build-tools/tools/dev/langs-diagnose/enabled.ts");
   const languageContracts = read("build-tools/tools/lib/lang-contracts.ts");
@@ -22,6 +23,11 @@ test("Rust native lifecycle has one source-plan, runner, and runnable authority"
   assert.match(runner, /default_sec = 600/);
   assert.match(planner, /ctx\.sourcePlanFor node/);
   assert.match(planner, /ctx\.resolveNixpkgAttrs/);
+  assert.match(composition, /Cargo path dependency/);
+  assert.match(composition, /cross-root dependency cycle/);
+  for (const macro of ["rust_static_library", "rust_cdylib", "rust_proc_macro"]) {
+    assert.match(defs, new RegExp(`def ${macro}`));
+  }
   assert.match(graphGenerator, /binaryNames/);
   assert.match(
     graphGenerator,

@@ -97,7 +97,7 @@ export async function assertRustTrackedMetadataReady(
     try {
       await fsp.access(path.join(cargoRoot, "Cargo.lock"));
       await assertSupportedCargoLockSources(path.join(cargoRoot, "Cargo.lock"));
-      const copy = await copyCargoRoot(cargoRoot);
+      const copy = await copyCargoRoot(cargoRoot, root);
       try {
         const metadataJSON = await runCargo(resolvedCargo, lockedMetadataArgs, copy.root, root);
         fixedSourceMaps.push(
@@ -131,7 +131,7 @@ async function prepareCargoRoot(
   cleanup: () => Promise<void>;
 }> {
   const before = await cargoLocks(cargoRoot);
-  const copy = await copyCargoRoot(cargoRoot);
+  const copy = await copyCargoRoot(cargoRoot, workspaceRoot);
   try {
     if (upgrade) await runCargo(cargoBin, ["update", "--offline"], copy.root, workspaceRoot);
     else await runCargo(cargoBin, metadataArgs, copy.root, workspaceRoot);

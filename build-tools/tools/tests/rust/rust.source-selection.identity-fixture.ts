@@ -7,6 +7,7 @@ import {
   canonicalArtifactToolsRoot,
   withoutArtifactEnvironmentInfluence,
 } from "../../lib/artifact-environment";
+import { installCanonicalArtifactToolsAuthority } from "../../lib/artifact-tool-authority";
 import {
   findViberootsRoot,
   immutableViberootsInput,
@@ -15,6 +16,7 @@ import {
 } from "../viberoots/registry-extension-fixture";
 import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
 import { ensureToolchainPathsForTempRepo } from "../lib/test-helpers/toolchain-paths";
+import { buildCurrentArtifactTools } from "./rust.source-selection.identity-bundle";
 
 const execFileAsync = promisify(execFile);
 export const target = "//projects/apps/rust-parity:app";
@@ -37,7 +39,7 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
       "--viberoots-url",
       `path:${flakeInput}`,
       "--source",
-      viberootsRoot,
+      flakeInput,
       "--no-lock",
       "--no-direnv",
     ],
@@ -45,6 +47,7 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
   );
   await seedWorkspaceLockFromCommittedAuthority(workspace);
   const artifactToolsRoot = canonicalArtifactToolsRoot(process.cwd());
+  const currentToolsRoot = await buildCurrentArtifactTools(workspace, flakeInput);
   await runArtifactNix({
     workspaceRoot: workspace,
     artifactToolsRoot,
@@ -69,9 +72,10 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
   }
   await ensureBuckConfigForTempRepo(workspace, $, {
     viberootsInputRoot: flakeInput,
-    viberootsSourceRoot: viberootsRoot,
+    viberootsSourceRoot: flakeInput,
   });
   await ensureToolchainPathsForTempRepo(workspace, $);
+  await installCanonicalArtifactToolsAuthority(workspace, currentToolsRoot);
 
   const packageRoot = path.join(workspace, "projects", "apps", "rust-parity");
   await writeFixtureFile(
@@ -84,10 +88,12 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
       "rust_binary(",
       '    name = "app",',
       '    artifact_contract = "remote-evidence/artifact-contract.json",',
+      '    cargo_package = "rust-parity",',
       '    crate = "rust-parity",',
       '    labels = ["remote:ready"],',
       '    materialization_manifest = "remote-evidence/materialization-manifest.json",',
-      '    nixpkg_deps = ["pkgs.xz", "pkgs.zlib"],',
+      '    nixpkg_deps = ["pkgs.zlib"],',
+      '    public_crate = "rust_parity",',
       "    nixpkg_pins = {",
       '        "pkgs.zlib": {',
       '            "nixpkgs_profile": "default",',
@@ -103,10 +109,12 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
       "rust_test(",
       '    name = "app-test",',
       '    artifact_contract = "remote-evidence/artifact-contract.json",',
+      '    cargo_package = "rust-parity",',
       '    crate = "rust-parity",',
       '    labels = ["remote:ready"],',
       '    materialization_manifest = "remote-evidence/materialization-manifest.json",',
-      '    nixpkg_deps = ["pkgs.xz", "pkgs.zlib"],',
+      '    nixpkg_deps = ["pkgs.zlib"],',
+      '    public_crate = "rust_parity",',
       "    nixpkg_pins = {",
       '        "pkgs.zlib": {',
       '            "nixpkgs_profile": "default",',
@@ -150,28 +158,11 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
   );
   await writeFixtureFile(
     path.join(packageRoot, "src", "main.rs"),
-    [
-      'fn main() { println!("rust-source-selection-ok"); }',
-      "#[cfg(test)]",
-      "mod tests {",
-      "  #[test]",
-      '  fn prepared_worker_runs_tests() { assert_eq!(2 + 2, 4, "prepared Rust test failed"); }',
-      "}",
-      "",
-    ].join("\n"),
+    'fn main() {\n    println!("rust-source-selection-ok");\n}\n\n#[cfg(test)]\nmod tests {\n    #[test]\n    fn prepared_worker_runs_tests() {\n        assert_eq!(2 + 2, 4, "prepared Rust test failed");\n    }\n}\n',
   );
   await writeFixtureFile(
     path.join(packageRoot, "build.rs"),
-    [
-      "use std::process::Command;",
-      "fn main() {",
-      '  for package in ["zlib", "liblzma"] {',
-      '    let ok = Command::new("pkg-config").args(["--exists", package]).status().unwrap();',
-      '    assert!(ok.success(), "missing declared native package: {}", package);',
-      "  }",
-      "}",
-      "",
-    ].join("\n"),
+    'use std::process::Command;\n\nfn main() {\n    for package in ["zlib"] {\n        let ok = Command::new("pkg-config")\n            .args(["--exists", package])\n            .status()\n            .unwrap();\n        assert!(ok.success(), "missing declared native package: {}", package);\n    }\n}\n',
   );
   for (const relative of ["Cargo.lock", "Cargo.toml", "build.rs", path.join("src", "main.rs")]) {
     const source = path.join(packageRoot, relative);
@@ -186,7 +177,7 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
     "tool-closure.json",
   ]) {
     const source = path.join(
-      viberootsRoot,
+      flakeInput,
       "build-tools",
       "tools",
       "tests",
@@ -198,38 +189,45 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
     await fsp.mkdir(path.dirname(destination), { recursive: true });
     await fsp.copyFile(source, destination);
   }
-  const graphNode = (name: string, kind: "bin" | "test") => ({
-    name,
-    rule_type: "rust_binary",
-    labels: ["lang:rust", `kind:${kind}`, "nixpkg:pkgs.xz", "nixpkg:pkgs.zlib", "remote:ready"],
-    deps: [],
-    srcs: ["src/main.rs", "build.rs"],
-    cargo_manifest: "Cargo.toml",
-    cargo_lock: "Cargo.lock",
-    crate: "rust-parity",
-    features: [],
-    default_features: true,
-    profile: "release",
-    target: "",
-    local_patch_dirs: [],
-    nixpkgs_profile: "default",
-    nixpkg_pins: {
-      "pkgs.zlib": {
-        nixpkgs_profile: "default",
-        rationale: "Rust identity parity fixture pin.",
+  await writeFixtureFile(path.join(packageRoot, "graph.json"), "[]\n");
+  await ensureToolchainPathsForTempRepo(workspace, $);
+  await installCanonicalArtifactToolsAuthority(workspace, currentToolsRoot);
+  const pinnedGit = path.join(currentToolsRoot, "bin", "git");
+  await execFileAsync(pinnedGit, ["init", "--quiet"], { cwd: workspace });
+  await execFileAsync(pinnedGit, ["add", "-f", "projects"], { cwd: workspace });
+  await execFileAsync(
+    path.join(currentToolsRoot, "bin", "bash"),
+    [path.join(flakeInput, "build-tools", "tools", "bin", "u")],
+    {
+      cwd: workspace,
+      env: {
+        ...process.env,
+        PATH: path.join(currentToolsRoot, "bin"),
+        VBR_ARTIFACT_TOOLS_ROOT: currentToolsRoot,
+        VIBEROOTS_FLAKE_INPUT_ROOT: flakeInput,
       },
+      maxBuffer: 16 * 1024 * 1024,
     },
-  });
-  const graph =
-    JSON.stringify(
-      [graphNode(target, "bin"), { ...graphNode(testTarget, "test"), rule_type: "rust_test" }],
-      null,
-      2,
-    ) + "\n";
-  await writeFixtureFile(
-    path.join(workspace, ".viberoots", "workspace", "buck", "graph.json"),
-    graph,
   );
+  const graphPath = path.join(workspace, ".viberoots", "workspace", "buck", "graph.json");
+  const graph = await fsp.readFile(graphPath, "utf8");
+  const appNode = (JSON.parse(graph) as Array<Record<string, unknown>>).find(
+    (node) => node.name === target,
+  );
+  if (
+    appNode?.cargo_package !== "rust-parity" ||
+    appNode.public_crate !== "rust_parity" ||
+    appNode.crate_type !== "bin" ||
+    appNode.host_role !== "target"
+  ) {
+    throw new Error("canonical update exported stale Rust composition attributes");
+  }
+  for (const relative of ["Cargo.lock", "Cargo.toml", "build.rs", path.join("src", "main.rs")]) {
+    await fsp.copyFile(
+      path.join(packageRoot, relative),
+      path.join(packageRoot, "remote-src", relative),
+    );
+  }
   await writeFixtureFile(path.join(packageRoot, "graph.json"), graph);
   return flakeInput;
 }

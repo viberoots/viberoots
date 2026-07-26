@@ -10,6 +10,15 @@ test("Rust template independently rejects WASM and WASI target mismatches", asyn
   await runInTemp("rust-template-target-kind-boundaries", async (tmp, $) => {
     const template = "viberoots/build-tools/tools/nix/templates/rust.nix";
     await copyViberootsSourcePath(template, path.join(tmp, template));
+    const contract = "viberoots/build-tools/tools/nix/templates/rust-contract.nix";
+    await copyViberootsSourcePath(contract, path.join(tmp, contract));
+    const source = await fsp.readFile(path.join(tmp, template), "utf8");
+    assert.match(source, /cp -R "\$src" source/);
+    assert.match(source, /sourceRoot = "source\/\$\{cargoRootRel\}"/);
+    assert.match(
+      source,
+      /artifactDir = if hostRole == "host" then "target\/\$\{cargoProfile\}" else targetDir/,
+    );
 
     for (const mismatch of [
       {
@@ -34,6 +43,21 @@ test("Rust template independently rejects WASM and WASI target mismatches", asyn
       `;
       assert.notEqual(result.exitCode, 0);
       assert.match(String(result.stderr), mismatch.expected);
+    }
+    for (const publicCrate of ["bad/name", "bad-name", "9bad", "bad$HOME", "bad name"]) {
+      const expr = `
+        let
+          pkgs = import <nixpkgs> {};
+          contract = import ./viberoots/build-tools/tools/nix/templates/rust-contract.nix {
+            inherit (pkgs) lib;
+          };
+        in contract.validatePublicCrate ${JSON.stringify(publicCrate)}
+      `;
+      const result = await $({ cwd: tmp, stdio: "pipe", reject: false, nothrow: true })`
+        nix eval --impure --expr ${expr} --raw
+      `;
+      assert.notEqual(result.exitCode, 0);
+      assert.match(String(result.stderr), /publicCrate must match/);
     }
   });
 });

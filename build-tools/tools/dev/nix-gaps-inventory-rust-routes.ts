@@ -6,7 +6,10 @@ export const rustDefsBzlPath = "@viberoots//build-tools/rust:defs.bzl";
 
 const expectedRouteHelper: Record<string, string> = {
   rust_binary: "rust_nix_build",
+  rust_cdylib: "rust_nix_build",
   rust_library: "rust_nix_build",
+  rust_proc_macro: "rust_nix_build",
+  rust_static_library: "rust_nix_build",
   rust_test: "rust_nix_test",
   rust_wasi_binary: "rust_nix_build",
   rust_wasm_library: "rust_nix_build",

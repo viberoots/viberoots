@@ -10,6 +10,28 @@ import {
 const nixFlakeFeatures = ["--extra-experimental-features", "nix-command flakes"];
 const defaultTarget = "//projects/apps/rust-parity:app";
 
+export async function buildCurrentArtifactTools(
+  workspace: string,
+  immutableViberootsInputRoot: string,
+): Promise<string> {
+  const artifactToolsRoot = canonicalArtifactToolsRoot(process.cwd());
+  const result = await runArtifactNix({
+    workspaceRoot: workspace,
+    artifactToolsRoot,
+    baseEnv: withoutArtifactEnvironmentInfluence(process.env),
+    args: [
+      ...nixFlakeFeatures,
+      "build",
+      "--no-link",
+      "--print-out-paths",
+      `path:${immutableViberootsInputRoot}#remote-worker-tools`,
+    ],
+  });
+  const output = result.stdout.trim().split(/\s+/).at(-1);
+  if (!output) throw new Error("current immutable source did not build artifact tools");
+  return output;
+}
+
 export async function buildCanonicalBundle(
   workspace: string,
   attr: "graph-generator-selected" | "graph-generator",
@@ -17,7 +39,7 @@ export async function buildCanonicalBundle(
   baseEnv: NodeJS.ProcessEnv = process.env,
   selectedTarget: string = defaultTarget,
 ): Promise<{ outPath: string; bundleSource: string }> {
-  const artifactToolsRoot = canonicalArtifactToolsRoot(process.cwd());
+  const artifactToolsRoot = canonicalArtifactToolsRoot(workspace);
   const graphPath = path.join(workspace, ".viberoots", "workspace", "buck", "graph.json");
   const bundle = await makeFilteredFlakeRef({
     workspaceRoot: workspace,

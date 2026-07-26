@@ -8,9 +8,16 @@ export interface Node {
   out?: string;
   cargo_manifest?: string;
   cargo_lock?: string;
+  cargo_root?: string;
+  cargo_package?: string;
+  cargo_lock_identity?: string;
   cargo_output_hashes?: Record<string, string>;
   cargo_fixed_sources?: Record<string, string>;
   crate?: string;
+  public_crate?: string;
+  crate_type?: string;
+  host_role?: "host" | "target";
+  generated_outputs?: string[];
   features?: string[];
   default_features?: boolean;
   profile?: string;

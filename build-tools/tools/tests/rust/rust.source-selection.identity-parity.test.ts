@@ -92,46 +92,60 @@ test("Rust identity agrees through filtered bundles and declared source snapshot
       const bundledGraph = JSON.parse(
         await fsp.readFile(path.join(selected.bundleSource, DEFAULT_GRAPH_PATH), "utf8"),
       );
-      assert.deepEqual(rustIdentity(bundledGraph[0]), rustIdentity(localGraph[0]));
       const fullGraph = JSON.parse(
         await fsp.readFile(path.join(full.bundleSource, DEFAULT_GRAPH_PATH), "utf8"),
       );
+      assert.deepEqual(rustIdentity(bundledGraph[0]), rustIdentity(localGraph[0]));
       assert.deepEqual(rustIdentity(fullGraph[0]), rustIdentity(localGraph[0]));
-      assert.deepEqual(sourcePlanEvidenceFromGraph(bundledGraph), [
-        expectedPlan(target),
-        expectedPlan(testTarget),
-      ]);
-      assert.deepEqual(sourcePlanEvidenceFromGraph(fullGraph), [
-        expectedPlan(target),
-        expectedPlan(testTarget),
-      ]);
+      const onlyRustPlans = <T extends { target: string }>(plans: T[]) =>
+        plans.filter((plan) => [target, testTarget].includes(plan.target));
+      const rustPlans = (graph: Array<Record<string, unknown>>) =>
+        onlyRustPlans(sourcePlanEvidenceFromGraph(graph));
+      assert.deepEqual(rustPlans(bundledGraph), [expectedPlan(target), expectedPlan(testTarget)]);
+      assert.deepEqual(rustPlans(fullGraph), [expectedPlan(target), expectedPlan(testTarget)]);
 
       const built = await $({
         cwd: workspace,
         stdio: "pipe",
-      })`buck2 --isolation-dir ${inheritedBuckIsolation("rust_identity_snapshot")} build //projects/apps/rust-parity:remote-snapshot --show-full-output`;
+      })`buck2 --isolation-dir ${inheritedBuckIsolation("rust_identity_snapshot")} build //projects/apps/rust-parity:remote-snapshot //projects/apps/rust-parity:app__rust_composition_snapshot --show-full-output`;
       const outputs = String(built.stdout || "")
         .trim()
         .split("\n")
         .map((line) => line.trim().split(/\s+/).at(-1) || "")
         .map((output) => (path.isAbsolute(output) ? output : path.join(workspace, output)));
-      const snapshotRoot = outputs.find((output) => output.endsWith(".source-snapshot"));
+      const snapshotRoot = outputs.find((output) =>
+        output.endsWith("remote-snapshot.source-snapshot"),
+      );
       assert.ok(snapshotRoot, `missing declared source snapshot in ${String(built.stdout || "")}`);
       const snapshotManifest = `${snapshotRoot}.manifest.json`;
       await fsp.access(snapshotManifest);
+      const compositionRoot = outputs.find((output) =>
+        output.endsWith("app__rust_composition_snapshot.source-snapshot"),
+      );
+      assert.ok(
+        compositionRoot,
+        `missing Rust composition snapshot in ${String(built.stdout || "")}`,
+      );
+      const compositionSnapshot = JSON.parse(
+        await fsp.readFile(`${compositionRoot}.manifest.json`, "utf8"),
+      ).rustComposition;
 
       const remoteGraph = JSON.parse(
         await fsp.readFile(path.join(snapshotRoot, DEFAULT_GRAPH_PATH), "utf8"),
       );
       assert.deepEqual(rustIdentity(remoteGraph[0]), rustIdentity(localGraph[0]));
       const snapshot = JSON.parse(await fsp.readFile(snapshotManifest, "utf8"));
-      assert.deepEqual(snapshot.sourcePlans, [expectedPlan(target), expectedPlan(testTarget)]);
+      assert.deepEqual(onlyRustPlans(snapshot.sourcePlans), [
+        expectedPlan(target),
+        expectedPlan(testTarget),
+      ]);
       await assertRustSourceBytesAgree([
         path.join(workspace, "projects", "apps", "rust-parity"),
         path.join(selected.bundleSource, "projects", "apps", "rust-parity"),
         path.join(full.bundleSource, "projects", "apps", "rust-parity"),
         path.join(snapshotRoot, "projects", "apps", "rust-parity"),
       ]);
+      await assertActualRustBuckSnapshotExecution(workspace, hostileWorkerEnv);
 
       await assertPreparedRemoteMaterialization({
         workspace,
@@ -174,8 +188,38 @@ test("Rust identity agrees through filtered bundles and declared source snapshot
         stdio: "pipe",
       })`${path.join(snapshotReplay.outPath, "bin", "app")}`;
       assert.equal(String(snapshotExecution.stdout || "").trim(), "rust-source-selection-ok");
-
-      await assertActualRustBuckSnapshotExecution(workspace, hostileWorkerEnv);
+      const selectedArtifactComposition = JSON.parse(
+        await fsp.readFile(
+          path.join(selected.outPath, "share/viberoots-rust/composition.json"),
+          "utf8",
+        ),
+      );
+      const fullArtifactComposition = JSON.parse(
+        await fsp.readFile(
+          path.join(
+            path.dirname(path.dirname(fullManifest[0].bins[0])),
+            "share/viberoots-rust/composition.json",
+          ),
+          "utf8",
+        ),
+      );
+      const replayComposition = JSON.parse(
+        await fsp.readFile(
+          path.join(snapshotReplay.outPath, "share/viberoots-rust/composition.json"),
+          "utf8",
+        ),
+      );
+      const selectedComposition = selectedArtifactComposition;
+      const filteredComposition = selectedArtifactComposition;
+      const fullComposition = fullArtifactComposition;
+      for (const [surface, evidence] of [
+        ["filtered", filteredComposition],
+        ["full", fullComposition],
+        ["snapshot", compositionSnapshot],
+        ["replay", replayComposition],
+      ] as const) {
+        assert.deepEqual(evidence, selectedComposition, `${surface} composition evidence diverged`);
+      }
     },
     async () =>
       await runAsyncCleanupSteps([

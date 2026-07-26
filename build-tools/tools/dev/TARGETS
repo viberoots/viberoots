@@ -54,6 +54,12 @@ export_file(
 )
 
 export_file(
+    name = "rust-composition-evidence.ts",
+    src = "rust-composition-evidence.ts",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
     name = "zx-init.mjs",
     src = "zx-init.mjs",
     visibility = ["PUBLIC"],

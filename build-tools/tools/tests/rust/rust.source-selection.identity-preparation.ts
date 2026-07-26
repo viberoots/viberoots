@@ -20,7 +20,7 @@ export async function assertPreparedRemoteMaterialization(options: {
 }): Promise<void> {
   const { workspace, selectedBundleSource, immutableViberootsInputRoot, hostileWorkerEnv } =
     options;
-  const artifactToolsRoot = canonicalArtifactToolsRoot(process.cwd());
+  const artifactToolsRoot = canonicalArtifactToolsRoot(workspace);
   const immutableFlakeRoot = path.join(selectedBundleSource, ".viberoots", "workspace");
   await fsp.access(path.join(immutableFlakeRoot, "flake.nix"));
   const preparedBundleBuild = await runArtifactNix({

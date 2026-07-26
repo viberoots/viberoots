@@ -7,6 +7,7 @@ load("@viberoots//build-tools/lang:nix_artifact_inputs.bzl", "nix_artifact_actio
 load("@viberoots//build-tools/lang:nix_shell.bzl", "nix_artifact_bash", "nix_bootstrap_env_core", "nix_calling_env_export_source_snapshot", "nix_calling_env_materialize_source_snapshot_for_execution", "nix_declared_action_inputs_manifest_cmd", "nix_timeout_wrapper_var")
 load("@viberoots//build-tools/lang:remote_action_policy.bzl", "external_runner_command", "remote_ready_evidence", "stamp_remote_readiness_labels", "write_nix_test_stamp")
 load("@viberoots//build-tools/lang:source_snapshot.bzl", "SourceSnapshotInfo")
+load("@viberoots//build-tools/rust/private:crate_contract.bzl", "rust_crate_closure_inputs", "rust_crate_contract_attrs", "rust_crate_info")
 
 def _remote_test_attrs():
     test_attrs = re_test_common.test_args()
@@ -51,7 +52,7 @@ def _rust_nix_test_impl(ctx):
         ctx.attrs.tool_closure,
         ctx.attrs.remote_builder_smoke,
     ] if remote_requested else []
-    declared_inputs = nix_artifact_action_inputs(ctx) + [
+    declared_inputs = nix_artifact_action_inputs(ctx) + rust_crate_closure_inputs(ctx) + [
         ctx.attrs.cargo_manifest,
         ctx.attrs.cargo_lock,
     ] + snapshot_inputs + evidence_inputs + control_inputs
@@ -142,9 +143,9 @@ def _rust_nix_test_impl(ctx):
         executor_overrides = executor_overrides,
         run_from_project_root = True,
         use_project_relative_paths = True,
-    )) + [DefaultInfo(default_output = stamp)] + policy_info
+    )) + [DefaultInfo(default_output = stamp), rust_crate_info(ctx)] + policy_info
 
-_ATTRS = with_nix_artifact_action_attrs({
+_ATTRS = {
     "self_label": attrs.string(),
     "planner_label": attrs.option(attrs.string(), default = None),
     "kind": attrs.string(),
@@ -183,7 +184,9 @@ _ATTRS = with_nix_artifact_action_attrs({
     "_nixpkgs_registry_extension": attrs.source(default = "root//.viberoots/workspace:nixpkgs-source-registry-extension"),
     "_source_snapshot_validator": attrs.source(default = "@viberoots//build-tools/tools/dev:validate-source-snapshot.ts"),
     "_inject_test_env": attrs.default_only(attrs.dep(default = "prelude//test/tools:inject_test_env")),
-})
+}
+_ATTRS.update(rust_crate_contract_attrs())
+_ATTRS = with_nix_artifact_action_attrs(_ATTRS)
 _ATTRS.update(_remote_test_attrs())
 
 rust_nix_test = rule(impl = _rust_nix_test_impl, attrs = _ATTRS)

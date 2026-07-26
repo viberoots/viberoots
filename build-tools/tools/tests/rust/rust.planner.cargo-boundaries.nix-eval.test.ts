@@ -22,6 +22,7 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
     for (const rel of [
       "viberoots/build-tools/tools/nix/planner/lib.nix",
       "viberoots/build-tools/tools/nix/planner/rust.nix",
+      "viberoots/build-tools/tools/nix/planner/rust-composition.nix",
     ]) {
       await copyViberootsSourcePath(rel, path.join(tmp, rel));
     }

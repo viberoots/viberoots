@@ -154,14 +154,15 @@ export async function applyWorkspaceWorkflow(opts: ApplyOpts): Promise<void> {
   if (!opts.skipVerify) {
     try {
       await verifyFn(sess.originPath, diff, opts.verifyMode);
-    } catch {
+    } catch (error) {
       clearOverride(opts.overrideEnvName, opts.key);
       await deleteSession(opts.lang, opts.key);
+      const detail = error instanceof Error ? `\n${error.message}` : "";
       throw new Error(
         `Patch verification failed: the generated diff did not apply cleanly with -p1 to the origin ${opts.verifySubjectLabel.toLowerCase()}.\n` +
           `${opts.verifySubjectLabel}: ${opts.verifySubjectValue}\n` +
           `Origin: ${sess.originPath}\n` +
-          `Patch: ${opts.patchPathAbs}`,
+          `Patch: ${opts.patchPathAbs}${detail}`,
       );
     }
   }

@@ -6,17 +6,17 @@ is [`../rust-language-plan.md`](../rust-language-plan.md).
 
 ## Current Lifecycle
 
-The current Rust route compiles package-local Cargo libraries, binaries, tests, freestanding WASM,
-and WASI binaries from checked-in manifests and locks. It provides the lifecycle through PR-5, but
+The current Rust route compiles composed Cargo libraries, binaries, tests, freestanding WASM,
+and WASI binaries from checked-in manifests and locks. It provides the lifecycle through PR-6, but
 is not yet the complete
 first-class Rust lifecycle.
 
 | Surface              | Current behavior                                                                                                                                                                                                                                                                                                                                                                               | Evidence                                                                                                              |
 | -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Public macros        | Native, freestanding WASM, and WASI macros accept canonical package-local Cargo metadata plus explicit source-selection and native-link intent. Alternate metadata paths and unknown fields fail.                                                                                                                                                                                              | `build-tools/rust/defs.bzl`, `docs/handbook/starlark-api.md`                                                          |
+| Public macros        | Native, freestanding WASM, and WASI macros accept canonical package-local Cargo metadata plus explicit source-selection and native-link intent. Libraries expose explicit `rlib`, `staticlib`, `cdylib`, and `proc-macro` entrypoints. Alternate metadata paths and unknown fields fail.                                                                                                       | `build-tools/rust/defs.bzl`, `docs/handbook/starlark-api.md`                                                          |
 | Shared wiring        | Macros stamp `lang:rust`, `kind:*`, `patch_scope:package-local`, and remote-readiness labels. Package-local Rust and patch files become Buck inputs, and provider deps are merged deterministically.                                                                                                                                                                                           | `build-tools/lang/internal/package_local_wiring.bzl`                                                                  |
-| Buck action          | `rust_nix_build` declares Cargo metadata, the package-local Rust source closure, explicit non-Rust sources, patches, dependencies, and global Nix inputs. Libraries materialize the compiled `.rlib`; native binaries copy the selected executable; `kind:wasm` and `kind:wasi` targets materialize the selected `.wasm`.                                                                      | `build-tools/rust/private/nix_build.bzl`                                                                              |
-| Planner              | `lang:rust` plus `kind:bin`, `kind:lib`, `kind:test`, `kind:wasm`, or `kind:wasi` dispatches to the Rust planner.                                                                                                                                                                                                                                                                              | `build-tools/tools/nix/planner/rust.nix`                                                                              |
+| Buck action          | `rust_nix_build` exports a typed source-crate provider and declares the transitive Cargo-root source, manifest, and lock closure without passing dependency `.rlib` outputs to Cargo. Libraries materialize the selected stable artifact kind; native binaries copy the selected executable; `kind:wasm` and `kind:wasi` targets materialize the selected `.wasm`.                             | `build-tools/rust/private/nix_build.bzl`, `build-tools/rust/private/crate_contract.bzl`                               |
+| Planner              | `lang:rust` plus `kind:bin`, `kind:lib`, `kind:test`, `kind:wasm`, or `kind:wasi` dispatches to the Rust planner. The composition planner validates Cargo path dependencies against Buck edges and preserves every transitive repository-relative Cargo root.                                                                                                                                  | `build-tools/tools/nix/planner/rust.nix`, `build-tools/tools/nix/planner/rust-composition.nix`                        |
 | Artifact             | One `buildRustPackage` authority uses Nix-store Cargo, rustc, rustdoc, rustfmt, and clippy. It emits real release executables, a stable compiled `.rlib` outcome, and deterministic freestanding or WASI `.wasm` modules.                                                                                                                                                                      | `build-tools/tools/nix/templates/rust.nix`, `build-tools/tools/nix/flake/packages/toolchains.nix`                     |
 | Providers            | Rust has an explicit deterministic no-provider adapter. Package-local patches are direct target inputs, so provider and auto-map glue are not patch invalidation authorities.                                                                                                                                                                                                                  | `build-tools/tools/buck/providers/rust.ts`, `build-tools/tools/lib/lang-contracts.ts`                                 |
 | Tests                | Cquery covers routing, exported Cargo fields, inputs, provider order, and unknown-field rejection. Native fixtures execute two binaries, prove source sensitivity, and cover fail-closed Cargo diagnostics.                                                                                                                                                                                    | `build-tools/tools/tests/rust/`, `build-tools/tools/tests/lang/rust.stub.provider-edges.deterministic.cquery.test.ts` |
@@ -45,11 +45,17 @@ rust_library(name = "core", crate = "demo", srcs = ["src/lib.rs"])
 rust_binary(name = "demo", crate = "demo", srcs = ["src/main.rs"], deps = [":core"])
 ```
 
-The package must check in the canonical `Cargo.toml` and `Cargo.lock`; alternate or cross-root Cargo
-metadata paths fail closed. Patch directories must be normalized package-relative paths without
-traversal. Cross-root Rust `deps`, non-native targets, unsupported lock sources, and stale locks
-also fail closed. Cross-root Rust crates, broader ABI bridges, browser/component WASM, extensions,
-and final release hermeticity remain owned by later plan PRs.
+Each package must check in its canonical `Cargo.toml` and `Cargo.lock`; alternate metadata paths
+fail closed. A cross-root Rust `deps` edge must have exactly one matching Cargo path dependency.
+The canonical repository-relative path, package name, public crate name, and compatible version
+must agree. Missing, extra, ambiguous, cyclic, escaping, or version-incompatible composition fails
+before construction. Cargo compiles the preserved source closure; Buck artifacts are not injected
+as compiler-private Rust metadata. Broader ABI bridges, browser/component WASM, extensions, and
+final release hermeticity remain owned by later plan PRs.
+
+Compatible versions use Cargo requirement semantics for bare/caret, tilde, wildcard, exact-prefix,
+and comparator/range forms, including Cargo's special `0.x` caret behavior. A prerelease dependency
+version is admitted only when the requirement explicitly names a compatible prerelease.
 
 After editing a Cargo manifest, run `u` for conservative offline lock reconciliation or
 `u --upgrade` for an intentional offline dependency update. Both commands use Nix-store Cargo in a
@@ -92,6 +98,9 @@ Reviewed source inputs are authoritative. Generated graph, provider, and manifes
 The public surface is:
 
 - `rust_library`: compiles a reusable Rust library outcome.
+- `rust_static_library`: compiles a stable native `staticlib` outcome.
+- `rust_cdylib`: compiles a stable native `cdylib` outcome.
+- `rust_proc_macro`: compiles a native host proc macro for Cargo source consumers.
 - `rust_binary`: compiles a native executable and publishes `run.prod`.
 - `rust_test`: compiles and runs Cargo test targets through the repo test wrapper.
 - `rust_wasm_library`: compiles `wasm32-unknown-unknown` output.
@@ -103,6 +112,7 @@ Native macros share these explicit inputs where applicable:
 - `cargo_manifest`, defaulting to the package-local `Cargo.toml`.
 - `cargo_lock`, defaulting to the Cargo root `Cargo.lock`.
 - `crate`, `features`, `default_features`, `profile`, and optional `target`.
+- `cargo_package`, `public_crate`, `crate_type`, `host_role`, and `generated_outputs`.
 - `local_patch_dirs`, defaulting to `patches/rust`.
 - `nixpkg_deps`, `nixpkgs_profile`, and `nixpkg_pins` for build scripts and native libraries.
 - `link_deps`, `header_deps`, `link_closure`, and `link_closure_overrides` for explicit native
@@ -112,10 +122,11 @@ Macros reject unknown or inapplicable arguments. Configuration that changes Carg
 artifact identity must be exported as explicit graph fields, not encoded only in labels.
 
 `deps` remains the Buck impact and ordering graph. Rust source dependencies remain declared in the
-reviewed Cargo manifest. A dependency inside the same Cargo workspace is compiled by Cargo from the
-workspace source closure; a Rust dependency outside that root must use an explicitly designed
-source or artifact contract. The planner fails instead of assuming that a Buck `.rlib` can be
-injected into Cargo dependency resolution.
+reviewed Cargo manifest. Same-root workspace members and cross-root path dependencies are compiled
+by Cargo from the declared transitive source closure. The typed crate contract carries each Cargo
+root, package and lock identity, member manifest, sources, features, target/profile constraints,
+public crate, artifact kind, host role, and generated outputs. The planner fails instead of
+injecting a Buck `.rlib` into Cargo dependency resolution.
 
 ## Cargo And Update Authority
 
@@ -131,6 +142,10 @@ rustc, rustdoc, clippy, rustfmt, and target support come from Nix store paths.
 - `u --upgrade` runs bounded offline `cargo update`, then the same locked verification.
 - Both update modes restore every affected `Cargo.lock` byte-for-byte, including prior absence, on
   failure or timeout. They do not change viberoots pins or source-mode metadata.
+- Temporary update workspaces contain only the selected Cargo root and the recursively reachable
+  local path-dependency roots from normal, build, development, and target-specific dependency
+  tables. Missing roots, repository escapes, and escaping symlinks in that reachable closure fail
+  closed; unrelated Cargo roots are neither copied nor inspected.
 
 Cargo resolution uses only `.viberoots/workspace/cargo-home` in the consumer workspace. The command
 boundary removes inherited `CARGO_*`, `RUSTC`, `RUSTFLAGS`, and `RUSTUP_HOME` values and forces
@@ -162,10 +177,22 @@ bind admitted artifacts through signed aggregate evidence without copying checko
 fields. Dry-run remote preparation may prove the immutable bundle/output handoff, but Rust-specific
 aggregate binding, worker materialization, and admission remain part of the remote lifecycle gate.
 
+When a target supplies a declared source snapshot, the Rust rule derives a new action-owned
+snapshot by overlaying every transitive `RustCrateInfo` Cargo root at its normalized repository
+path. The resulting manifest and digest therefore cover the same composed roots as selected/full
+filtered builds; dependency roots cannot be recovered from an ambient checkout.
+
 Libraries emit real compiled outputs. Binaries emit executable files under `bin/`. Tests compile
 Cargo harnesses into the Nix output and expose a bounded `ExternalRunnerTestInfo` contract using
 project-relative paths. A failed harness fails Buck verification. No path may succeed by generating
 placeholder content.
+
+`rust_library`, `rust_static_library`, `rust_cdylib`, and `rust_proc_macro` fix their artifact kind
+and host/target role; explicitly passing an incompatible `crate_type` or `host_role` is an error.
+The rlib output is named from `public_crate`. A `rust_static_library` also exports the shared native
+link provider, including its runtime closure, so C/C++ `link_deps` can consume the archive without
+rebuilding the Rust package through a C++-specific path. When composition is absent, a root Cargo
+package is copied at the vendor source root rather than nested beneath an extra directory.
 
 ## Patches, Providers, And Invalidation
 
@@ -304,5 +331,6 @@ Rust is first-class only when all of the following are demonstrated:
 - Scaffolding, macro inventory, route policy, planner registry, docs, and verify selection remain in
   sync.
 
-PR-5 closes the initial interop, WASM/WASI, scaffold, and remote-policy baseline. Current references
+PR-6 closes source-based cross-root composition, explicit native crate kinds, and host proc-macro
+roles. Current references
 must still call Rust experimental rather than a complete first-class or release-hermetic toolchain.

@@ -124,17 +124,9 @@ let
        then builtins.throw
          "Rust planner target ${name} kind ${kind} does not support link_deps, header_deps, or nixpkg dependencies; cross-language WebAssembly linking is not available"
        else true;
-  validateDeps = name:
-    let
-      node = nodeFor name;
-      root = cargoRootFor name;
-      direct = map clean (P.depsOf node);
-      rustDeps = builtins.filter (dep:
-        builtins.any (candidate: P.nameOf candidate == dep) rustNodes
-      ) direct;
-      crossRoot = builtins.filter (dep: cargoRootFor dep != root) rustDeps;
-    in if crossRoot == [] then true else builtins.throw
-      "Rust target ${name} has unsupported cross-root Rust deps: ${lib.concatStringsSep ", " crossRoot}; declare Cargo path dependencies only within one package-local Cargo root";
+  composition = import ./rust-composition.nix {
+    inherit lib P ctx nodeFor rustNodes clean packagePath sourcePath cargoRootFor cargoLockFor;
+  };
   build = kind: name:
     let
       node = nodeFor name;
@@ -142,18 +134,28 @@ let
       manifestRel = sourcePath name (ctx.get node "cargo_manifest");
       lockRel = cargoLockFor name;
       crate = ctx.get node "crate";
-      cargoOutputHashesRaw = ctx.get node "cargo_output_hashes";
-      cargoOutputHashes = if cargoOutputHashesRaw == null then {} else cargoOutputHashesRaw;
-      cargoFixedSourcesRaw = ctx.get node "cargo_fixed_sources";
+      sourceComposition = composition.compositionFor name;
+      cargoOutputHashes = composition.mergeAuthorities
+        "cargo_output_hashes" sourceComposition.roots;
       cargoFixedSources = builtins.mapAttrs (_: builtins.fromJSON)
-        (if cargoFixedSourcesRaw == null then {} else cargoFixedSourcesRaw);
+        (composition.mergeAuthorities "cargo_fixed_sources" sourceComposition.roots);
       features = ctx.get node "features";
       defaultFeatures = ctx.get node "default_features";
       profile = ctx.get node "profile";
       target = validateKindTarget name kind (ctx.get node "target");
+      crateTypeRaw = ctx.get node "crate_type";
+      crateType =
+        if crateTypeRaw != null then crateTypeRaw
+        else if kind == "lib" then "rlib"
+        else if kind == "test" then "test"
+        else if kind == "wasm" then "cdylib"
+        else "bin";
+      hostRoleRaw = ctx.get node "host_role";
+      hostRole = if hostRoleRaw == null then "target" else hostRoleRaw;
+      publicCrateRaw = ctx.get node "public_crate";
+      generatedOutputsRaw = ctx.get node "generated_outputs";
       _nativeInputBoundary = validateNativeInputBoundary name kind;
       patchDirs = ctx.get node "local_patch_dirs";
-      _deps = validateDeps name;
       cargoRoot = builtins.toPath "${ctx.repoRootStr}/${rootRel}";
       cargoManifest = builtins.toPath "${ctx.repoRootStr}/${manifestRel}";
       cargoLock = builtins.toPath "${ctx.repoRootStr}/${lockRel}";
@@ -168,15 +170,22 @@ let
       nativeInputs = nativeInputsFor name;
     in if missing != [] then builtins.throw
       "Rust planner unresolved nixpkg deps for ${name}: ${lib.concatStringsSep ", " (map (record: record.attr) missing)}"
-    else assert _deps; assert _nativeInputBoundary; assert _overrideClassification; template.rustPackage {
-      inherit name kind cargoRoot cargoManifest cargoLock cargoOutputHashes cargoFixedSources patchInputs sourcePlan;
+    else assert _nativeInputBoundary; assert _overrideClassification; template.rustPackage {
+      inherit name kind cargoRoot cargoManifest cargoLock cargoOutputHashes cargoFixedSources sourcePlan sourceComposition;
       inherit nativeInputs;
+      patchInputs = lib.unique (patchInputs ++ sourceComposition.patchInputs);
       devOverrides = rustDevOverrides;
       nixpkgDeps = map (record: record.package) nixpkgRecords;
       crate = if crate == null then lib.last (lib.splitString ":" name) else crate;
       features = if features == null then [] else features;
       defaultFeatures = if defaultFeatures == null then true else defaultFeatures;
       profile = if profile == null then "release" else profile;
+      inherit crateType hostRole;
+      publicCrate = if publicCrateRaw == null
+        then lib.replaceStrings [ "-" ] [ "_" ]
+          (if crate == null then lib.last (lib.splitString ":" name) else crate)
+        else publicCrateRaw;
+      generatedOutputs = if generatedOutputsRaw == null then [] else generatedOutputsRaw;
       inherit target;
     };
 in {
