@@ -25,6 +25,7 @@ import {
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 import path from "node:path";
+import type { NixCachePolicyCapability } from "../../lib/nix-cache-policy-capability";
 
 function outputTail(value: unknown): string {
   const text = String(value || "").trim();
@@ -73,6 +74,7 @@ export async function runBuckCommand(opts: {
   devOverrides: DevOverrideValues;
   artifactToolsRoot: string;
   internalNixConfig?: string;
+  nixCachePolicyCapability: NixCachePolicyCapability;
 }): Promise<void> {
   assertNoUserDevOverrideConfig(opts.restArgs);
   assertReviewedBuckArtifactSelectors(process.env, opts.internalNixConfig);
@@ -99,12 +101,12 @@ export async function runBuckCommand(opts: {
     stateRoot: path.join(opts.root, "buck-out", "tmp", "artifact-environment"),
     workspaceRoot: opts.root,
     artifactToolsRoot: opts.artifactToolsRoot,
+    nixCachePolicyCapability: opts.nixCachePolicyCapability,
     internal: {
       BUCK_ROOT: opts.root,
       BUCK_GRAPH_JSON: path.join(opts.root, DEFAULT_GRAPH_PATH),
       BUCK_ISOLATION_DIR: isolation,
       BUCK2_REAL_HOME: path.join(opts.root, "buck-out", "tmp", "artifact-environment", "home"),
-      ...(opts.internalNixConfig !== undefined ? { NIX_CONFIG: opts.internalNixConfig } : {}),
       WORKSPACE_ROOT: opts.root,
     },
   });

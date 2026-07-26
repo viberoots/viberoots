@@ -11,6 +11,9 @@ test("Rust native lifecycle has one source-plan, runner, and runnable authority"
   const defs = read("build-tools/rust/defs.bzl");
   const runner = read("build-tools/rust/private/nix_test.bzl");
   const planner = read("build-tools/tools/nix/planner/rust.nix");
+  const toolchains = read("build-tools/tools/nix/flake/packages/toolchains.nix");
+  const enabledDiagnosis = read("build-tools/tools/dev/langs-diagnose/enabled.ts");
+  const languageContracts = read("build-tools/tools/lib/lang-contracts.ts");
   const graphGenerator = read("build-tools/tools/nix/graph-generator.nix");
   const manifest = read("build-tools/tools/nix/planner/manifest.nix");
   assert.match(defs, /def rust_test/);
@@ -20,18 +23,28 @@ test("Rust native lifecycle has one source-plan, runner, and runnable authority"
   assert.match(planner, /ctx\.sourcePlanFor node/);
   assert.match(planner, /ctx\.resolveNixpkgAttrs/);
   assert.match(graphGenerator, /binaryNames/);
-  assert.match(graphGenerator, /kindOf \(builtins\.head matches\) == "bin"/);
+  assert.match(
+    graphGenerator,
+    /builtins\.elem \(LANGS\.rust\.kindOf \(builtins\.head matches\)\) \[ "bin" "wasi" \]/,
+  );
   assert.match(manifest, /\) rustOutPaths/);
   assert.match(manifest, /native-bin/);
+  assert.match(toolchains, /wasm32-unknown-unknown/);
+  assert.match(toolchains, /wasm32-wasip1/);
+  assert.match(enabledDiagnosis, /languageEnablementGaps\(e\.hermetic\)/);
+  assert.match(languageContracts, /"scaffold" \| "experimental" \| "graduated"/);
+  assert.match(languageContracts, /experimentalHermeticBooleanKeys/);
+  assert.match(languageContracts, /reproducibilityMatrixIds/);
 });
 
-test("Rust is registered as a native prerequisite but remains disabled for scaffolding", () => {
+test("Rust is enabled only through its reviewed experimental native and WASM lifecycle", () => {
   const manifest = JSON.parse(read("build-tools/tools/nix/langs.json"));
   const rust = manifest.languages.find((entry: { id?: string }) => entry.id === "rust");
   assert.ok(rust);
-  assert.ok(!manifest.enabled.includes("rust"));
-  assert.deepEqual(rust.kinds, ["bin", "lib", "test"]);
-  assert.equal(rust.hermetic.status, "scaffold");
+  assert.ok(manifest.enabled.includes("rust"));
+  assert.deepEqual(rust.kinds, ["bin", "lib", "test", "wasm", "wasi"]);
+  assert.equal(rust.hermetic.status, "experimental");
+  assert.deepEqual(rust.hermetic.reproducibilityMatrixIds, ["rust-pr5"]);
   assert.ok(fs.existsSync(path.join(root, rust.templatesDir.replace(/^viberoots\//, ""))));
   for (const requiredPath of rust.requiredPaths) {
     assert.ok(fs.existsSync(path.join(process.cwd(), requiredPath)), requiredPath);
@@ -46,4 +59,17 @@ test("Rust native support claims only reviewed source-registry systems and withh
   }
   assert.match(design, /native execution evidence only for `aarch64-darwin`/);
   assert.match(design, /Linux support remains unclaimed/);
+  assert.match(
+    design,
+    /`kind:bin`, `kind:lib`, `kind:test`, `kind:wasm`, or `kind:wasi` dispatches/,
+  );
+  assert.match(design, /`kind:wasm` and `kind:wasi` targets materialize the selected `\.wasm`/);
+  assert.match(
+    design,
+    /Native and WASI binaries publish `runnable\.kind = "native-bin"` and `run\.prod`/,
+  );
+  assert.match(
+    design,
+    /executable wrapper that launches the module through the checked-in WASI runner/,
+  );
 });

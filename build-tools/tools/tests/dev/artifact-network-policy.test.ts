@@ -108,7 +108,7 @@ test("only cache-health renderers construct substituter configuration", () => {
   const allowed = new Set(
     [
       "build-tools/lang/nix_cache_health.bzl",
-      "build-tools/tools/bin/devshell.sh",
+      "build-tools/tools/bin/devshell-cache-health.sh",
       "build-tools/tools/dev/verify/nix-cache-health.ts",
       "build-tools/tools/lib/consumer-direnv.ts",
     ].map(viberootsSourcePath),

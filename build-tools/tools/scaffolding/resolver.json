@@ -24,6 +24,9 @@
     "app": "projects/apps/{name}",
     "lib": "projects/libs/{name}"
   },
+  "rust": {
+    "cli": "projects/apps/{name}"
+  },
   "ts": {
     "cli": "projects/apps/{name}",
     "cpp-addon": "projects",

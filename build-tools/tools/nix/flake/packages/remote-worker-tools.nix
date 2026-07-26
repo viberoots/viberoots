@@ -19,9 +19,11 @@ let
     pkgs.python3
     pkgs.uv
     pkgs.cargo
+    pkgs.copier
     pkgs.gomod2nix
     pkgs.nix
     pnpm11
+    pkgs.prettier
     pkgs.yq
     pkgs.buck2
     pkgs.direnv

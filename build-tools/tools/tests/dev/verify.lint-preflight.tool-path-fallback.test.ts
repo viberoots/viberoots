@@ -5,7 +5,7 @@ import { test } from "node:test";
 test("verify lint preflight resolves formatter tools from devshell PATH", async () => {
   const source = (
     await Promise.all(
-      ["lint-preflight.ts", "lint-preflight-scope.ts"].map((file) =>
+      ["lint-preflight.ts", "lint-preflight-scope.ts", "lint-preflight-tools.ts"].map((file) =>
         fsp.readFile(`viberoots/build-tools/tools/dev/verify/${file}`, "utf8"),
       ),
     )
@@ -20,6 +20,14 @@ test("verify lint preflight resolves formatter tools from devshell PATH", async 
   }
   if (!source.includes("const binEnv = envWithZxNodeModules(opts.zxNodeModulesOut)")) {
     throw new Error("lint preflight must resolve formatter tools from stable verify node_modules");
+  }
+  if (!source.includes("spawnSync(") || !source.includes("runFormatter(")) {
+    throw new Error(
+      "lint preflight must execute formatter shims directly with canonical Node PATH authority",
+    );
+  }
+  if (!source.includes("const canonicalNodeBin = path.dirname(process.execPath)")) {
+    throw new Error("lint preflight must bind formatter shims to the validated Node executable");
   }
   if (!source.includes("and PATH")) {
     throw new Error("missing-tool message should mention the PATH fallback");

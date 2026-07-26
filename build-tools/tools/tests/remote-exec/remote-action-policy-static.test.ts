@@ -17,6 +17,7 @@ const testStampFiles = [
   "viberoots/build-tools/python/private/nix_test.bzl",
   "viberoots/build-tools/cpp/private/nix_test.bzl",
   "viberoots/build-tools/node/private/nix_test.bzl",
+  "viberoots/build-tools/rust/private/nix_test.bzl",
   "viberoots/build-tools/tools/buck/zx_test.bzl",
 ];
 
@@ -56,6 +57,53 @@ test("Nix-backed action rules use the shared remote action policy helper", () =>
     assert.match(text, /run_nix_action\(/, file);
     assert.doesNotMatch(text, /ctx\.actions\.run\(/, file);
   }
+});
+
+test("Rust build and test readiness is bound to the complete declared evidence set", () => {
+  for (const file of [
+    "viberoots/build-tools/rust/private/nix_build.bzl",
+    "viberoots/build-tools/rust/private/nix_test.bzl",
+  ]) {
+    const text = read(file);
+    assert.match(text, /remote_ready_evidence\(/, file);
+    for (const field of [
+      "source_snapshot",
+      "source_snapshot_manifest",
+      "materialization_manifest",
+      "artifact_contract",
+      "tool_closure",
+      "remote_builder_smoke",
+    ]) {
+      assert.match(text, new RegExp(`ctx\\.attrs\\.${field}`), `${file}: ${field}`);
+    }
+    assert.match(text, /mode = (policy_mode|"remote-ready" if remote_requested)/, file);
+  }
+});
+
+test("Rust builds switch graph and workspace authority to the declared source snapshot", () => {
+  const text = read("viberoots/build-tools/rust/private/nix_build.bzl");
+  assert.match(text, /SourceSnapshotInfo/);
+  assert.match(text, /source_snapshot_bundle cannot be combined/);
+  assert.match(
+    text,
+    /nix_calling_env_export_source_snapshot\(snapshot_root = "\$\{2:-\}", manifest_path = "\$\{3:-\}"\)/,
+  );
+  assert.match(
+    text,
+    /nix_calling_env_materialize_source_snapshot_for_execution\([\s\S]*?snapshot_root = "\$\{2:-\}"/,
+  );
+  assert.match(text, /graph_json_arg = "\$\{BUCK_GRAPH_JSON:-\$1\}"/);
+  assert.match(text, /snapshot_args = \[source_snapshot or "", source_snapshot_manifest or ""\]/);
+});
+
+test("Rust remote-ready tests execute the real selected-build harness from the snapshot", () => {
+  const text = read("viberoots/build-tools/rust/private/nix_test.bzl");
+  assert.match(text, /ctx\.actions\.write\(/);
+  assert.match(text, /remote_runner/);
+  assert.match(text, /remote_command = \[remote_runner,/);
+  assert.match(text, /nix_calling_env_materialize_source_snapshot_for_execution/);
+  assert.match(text, /source_snapshot_validator/);
+  assert.doesNotMatch(text, /remote_command = \[ctx\.attrs\.remote_ready_runner\]/);
 });
 
 test("test wrapper default outputs use deterministic policy stamps", () => {

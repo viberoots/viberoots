@@ -3,9 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { runArtifactNix } from "../../ci/artifact-command";
-import { makeFilteredFlakeRef } from "../../dev/filtered-flake";
 import {
-  buildCanonicalArtifactEnvironment,
   canonicalArtifactToolsRoot,
   withoutArtifactEnvironmentInfluence,
 } from "../../lib/artifact-environment";
@@ -20,6 +18,8 @@ import { ensureToolchainPathsForTempRepo } from "../lib/test-helpers/toolchain-p
 
 const execFileAsync = promisify(execFile);
 export const target = "//projects/apps/rust-parity:app";
+export const testTarget = "//projects/apps/rust-parity:app-test";
+export { buildCanonicalBundle } from "./rust.source-selection.identity-bundle";
 
 const nixFlakeFeatures = ["--extra-experimental-features", "nix-command flakes"];
 
@@ -78,11 +78,15 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
     path.join(packageRoot, "TARGETS"),
     [
       'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary")',
+      'load("@viberoots//build-tools/rust:defs.bzl", "rust_test")',
       'load("@viberoots//build-tools/lang:source_snapshot.bzl", "source_snapshot")',
       "",
       "rust_binary(",
       '    name = "app",',
+      '    artifact_contract = "remote-evidence/artifact-contract.json",',
       '    crate = "rust-parity",',
+      '    labels = ["remote:ready"],',
+      '    materialization_manifest = "remote-evidence/materialization-manifest.json",',
       '    nixpkg_deps = ["pkgs.xz", "pkgs.zlib"],',
       "    nixpkg_pins = {",
       '        "pkgs.zlib": {',
@@ -91,18 +95,36 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
       "        },",
       "    },",
       '    srcs = ["src/main.rs"],',
+      '    remote_builder_smoke = "remote-evidence/remote-builder-smoke.json",',
+      '    source_snapshot_bundle = ":remote-snapshot",',
+      '    tool_closure = "remote-evidence/tool-closure.json",',
+      ")",
+      "",
+      "rust_test(",
+      '    name = "app-test",',
+      '    artifact_contract = "remote-evidence/artifact-contract.json",',
+      '    crate = "rust-parity",',
+      '    labels = ["remote:ready"],',
+      '    materialization_manifest = "remote-evidence/materialization-manifest.json",',
+      '    nixpkg_deps = ["pkgs.xz", "pkgs.zlib"],',
+      "    nixpkg_pins = {",
+      '        "pkgs.zlib": {',
+      '            "nixpkgs_profile": "default",',
+      '            "rationale": "Rust identity parity fixture pin.",',
+      "        },",
+      "    },",
+      '    srcs = ["src/main.rs"],',
+      '    remote_builder_smoke = "remote-evidence/remote-builder-smoke.json",',
+      '    source_snapshot_bundle = ":remote-snapshot",',
+      '    tool_closure = "remote-evidence/tool-closure.json",',
       ")",
       "",
       "source_snapshot(",
       '    name = "remote-snapshot",',
+      '    destination_prefix = "projects/apps/rust-parity",',
       '    graph = "graph.json",',
-      "    srcs = [",
-      '        "Cargo.lock",',
-      '        "Cargo.toml",',
-      '        "TARGETS",',
-      '        "build.rs",',
-      '        "src/main.rs",',
-      "    ],",
+      '    srcs = glob(["remote-src/**"]),',
+      '    strip_prefix = "remote-src",',
       ")",
       "",
     ].join("\n"),
@@ -128,7 +150,15 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
   );
   await writeFixtureFile(
     path.join(packageRoot, "src", "main.rs"),
-    'fn main() { println!("rust-source-selection-ok"); }\n',
+    [
+      'fn main() { println!("rust-source-selection-ok"); }',
+      "#[cfg(test)]",
+      "mod tests {",
+      "  #[test]",
+      '  fn prepared_worker_runs_tests() { assert_eq!(2 + 2, 4, "prepared Rust test failed"); }',
+      "}",
+      "",
+    ].join("\n"),
   );
   await writeFixtureFile(
     path.join(packageRoot, "build.rs"),
@@ -143,32 +173,56 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
       "",
     ].join("\n"),
   );
+  for (const relative of ["Cargo.lock", "Cargo.toml", "build.rs", path.join("src", "main.rs")]) {
+    const source = path.join(packageRoot, relative);
+    const destination = path.join(packageRoot, "remote-src", relative);
+    await fsp.mkdir(path.dirname(destination), { recursive: true });
+    await fsp.copyFile(source, destination);
+  }
+  for (const relative of [
+    "artifact-contract.json",
+    "materialization-manifest.json",
+    "remote-builder-smoke.json",
+    "tool-closure.json",
+  ]) {
+    const source = path.join(
+      viberootsRoot,
+      "build-tools",
+      "tools",
+      "tests",
+      "remote-exec",
+      "wrapper-fixtures",
+      relative,
+    );
+    const destination = path.join(packageRoot, "remote-evidence", relative);
+    await fsp.mkdir(path.dirname(destination), { recursive: true });
+    await fsp.copyFile(source, destination);
+  }
+  const graphNode = (name: string, kind: "bin" | "test") => ({
+    name,
+    rule_type: "rust_binary",
+    labels: ["lang:rust", `kind:${kind}`, "nixpkg:pkgs.xz", "nixpkg:pkgs.zlib", "remote:ready"],
+    deps: [],
+    srcs: ["src/main.rs", "build.rs"],
+    cargo_manifest: "Cargo.toml",
+    cargo_lock: "Cargo.lock",
+    crate: "rust-parity",
+    features: [],
+    default_features: true,
+    profile: "release",
+    target: "",
+    local_patch_dirs: [],
+    nixpkgs_profile: "default",
+    nixpkg_pins: {
+      "pkgs.zlib": {
+        nixpkgs_profile: "default",
+        rationale: "Rust identity parity fixture pin.",
+      },
+    },
+  });
   const graph =
     JSON.stringify(
-      [
-        {
-          name: target,
-          rule_type: "rust_binary",
-          labels: ["lang:rust", "kind:bin", "nixpkg:pkgs.xz", "nixpkg:pkgs.zlib"],
-          deps: [],
-          srcs: ["src/main.rs", "build.rs"],
-          cargo_manifest: "Cargo.toml",
-          cargo_lock: "Cargo.lock",
-          crate: "rust-parity",
-          features: [],
-          default_features: true,
-          profile: "release",
-          target: "",
-          local_patch_dirs: [],
-          nixpkgs_profile: "default",
-          nixpkg_pins: {
-            "pkgs.zlib": {
-              nixpkgs_profile: "default",
-              rationale: "Rust identity parity fixture pin.",
-            },
-          },
-        },
-      ],
+      [graphNode(target, "bin"), { ...graphNode(testTarget, "test"), rule_type: "rust_test" }],
       null,
       2,
     ) + "\n";
@@ -178,49 +232,4 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
   );
   await writeFixtureFile(path.join(packageRoot, "graph.json"), graph);
   return flakeInput;
-}
-
-export async function buildCanonicalBundle(
-  workspace: string,
-  attr: "graph-generator-selected" | "graph-generator",
-  immutableViberootsInputRoot: string,
-): Promise<{ outPath: string; bundleSource: string }> {
-  const artifactToolsRoot = canonicalArtifactToolsRoot(process.cwd());
-  const graphPath = path.join(workspace, ".viberoots", "workspace", "buck", "graph.json");
-  const bundle = await makeFilteredFlakeRef({
-    workspaceRoot: workspace,
-    attr,
-    target: attr === "graph-generator-selected" ? target : undefined,
-    graphPath,
-    logPrefix: "[rust-identity-parity]",
-    classification: "local-development",
-    env: buildCanonicalArtifactEnvironment(workspace, { artifactToolsRoot }),
-    selectorEnv: {},
-    immutableViberootsInputRoot,
-  });
-  try {
-    const { stdout } = await runArtifactNix({
-      workspaceRoot: workspace,
-      artifactToolsRoot,
-      baseEnv: withoutArtifactEnvironmentInfluence(process.env),
-      args: [
-        ...nixFlakeFeatures,
-        "build",
-        "--accept-flake-config",
-        "--no-write-lock-file",
-        bundle.flakeRef,
-        "--no-link",
-        "--print-out-paths",
-      ],
-    });
-    const outPath = String(stdout || "")
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .at(-1);
-    if (!outPath) throw new Error(`missing ${attr} output path`);
-    return { outPath, bundleSource: bundle.workspaceRoot };
-  } finally {
-    await bundle.cleanup();
-  }
 }

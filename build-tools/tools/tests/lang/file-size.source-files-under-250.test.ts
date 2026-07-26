@@ -39,6 +39,7 @@ test("repo-owned code files remain under the 250 LOC methodology gate", async ()
       "**/*.go",
       "**/*.rs",
       "**/*.nix",
+      "**/*.sh",
     ],
     exclude: [
       "**/dist/**",

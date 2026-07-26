@@ -26,6 +26,48 @@ let
        else if lib.hasPrefix "projects/" repositoryPath then repositoryPath
        else "${packagePath name}/${repositoryPath}";
   rustNodes = builtins.filter (node: builtins.elem "lang:rust" (P.labelsOf node)) ctx.nodes;
+  byName = builtins.listToAttrs (map (node: {
+    name = clean (P.nameOf node);
+    value = node;
+  }) ctx.nodes);
+  LC = import ./link-closure.nix { inherit lib; };
+  normalizeList = field: value:
+    if value == null then []
+    else if builtins.isList value && builtins.all builtins.isString value then map clean value
+    else builtins.throw "Rust planner ${field} must be a list of labels";
+  nativeInputsFor = name:
+    let
+      node = nodeFor name;
+      linkDeps = normalizeList "link_deps" (ctx.get node "link_deps");
+      headerDeps = normalizeList "header_deps" (ctx.get node "header_deps");
+      closureRaw = ctx.get node "link_closure";
+      closure = if closureRaw == null then "direct" else closureRaw;
+      overridesRaw = ctx.get node "link_closure_overrides";
+      overrides = if overridesRaw == null then {} else
+        builtins.listToAttrs (map (key: { name = clean key; value = overridesRaw.${key}; })
+          (builtins.attrNames overridesRaw));
+      missingOverrides = builtins.filter (key: !(builtins.elem key linkDeps)) (builtins.attrNames overrides);
+      _overrides = if missingOverrides == [] then true else builtins.throw
+        "Rust planner link_closure_overrides contains keys not present in link_deps: ${builtins.toString missingOverrides}";
+      linkDepsOf = dep:
+        normalizeList "link_deps for ${dep}" (ctx.get (nodeFor dep) "link_deps");
+      resolved = LC.resolveLinkClosure {
+        inherit byName overrides;
+        roots = linkDeps;
+        defaultClosure = closure;
+        linkDepsOf = linkDepsOf;
+      };
+      validate = role: dep:
+        let labels = P.labelsOf (nodeFor dep);
+        in if builtins.elem "lang:cpp" labels
+          && (builtins.elem "kind:lib" labels || (role == "header" && builtins.elem "kind:headers" labels))
+        then dep
+        else builtins.throw
+          "Rust planner ${role}_deps contains unsupported target ${dep}; expected a native C/C++ library${if role == "header" then " or headers target" else ""}";
+    in assert _overrides; {
+      libraries = map (dep: ctx.dependencyArtifactOf (validate "link" dep)) resolved;
+      headers = map (dep: ctx.dependencyArtifactOf (validate "header" dep)) headerDeps;
+    };
   nixpkgAttrsFor = name:
     let labels = P.labelsOf (nodeFor name);
     in builtins.sort (a: b: a < b) (map (lib.removePrefix "nixpkg:")
@@ -62,6 +104,26 @@ let
     in if raw == "" || lib.hasPrefix "/" raw || lib.hasInfix "\\" raw || lib.hasInfix ":" raw || invalidPart
        then builtins.throw "Rust target ${name} local_patch_dirs must remain within the package: ${raw}"
        else raw;
+  validateKindTarget = name: kind: value:
+    let
+      target = if value == null then "" else builtins.toString value;
+      expected =
+        if kind == "wasm" then "wasm32-unknown-unknown"
+        else if kind == "wasi" then "wasm32-wasip1"
+        else "";
+    in if target == expected then target else builtins.throw
+      "Rust planner target ${name} kind ${kind} requires target ${if expected == "" then "<empty>" else expected}; got ${if target == "" then "<empty>" else target}";
+  validateNativeInputBoundary = name: kind:
+    let
+      node = nodeFor name;
+      linkDeps = normalizeList "link_deps" (ctx.get node "link_deps");
+      headerDeps = normalizeList "header_deps" (ctx.get node "header_deps");
+      nixpkgAttrs = nixpkgAttrsFor name;
+    in if builtins.elem kind [ "wasm" "wasi" ]
+      && (linkDeps != [] || headerDeps != [] || nixpkgAttrs != [])
+       then builtins.throw
+         "Rust planner target ${name} kind ${kind} does not support link_deps, header_deps, or nixpkg dependencies; cross-language WebAssembly linking is not available"
+       else true;
   validateDeps = name:
     let
       node = nodeFor name;
@@ -88,7 +150,8 @@ let
       features = ctx.get node "features";
       defaultFeatures = ctx.get node "default_features";
       profile = ctx.get node "profile";
-      target = ctx.get node "target";
+      target = validateKindTarget name kind (ctx.get node "target");
+      _nativeInputBoundary = validateNativeInputBoundary name kind;
       patchDirs = ctx.get node "local_patch_dirs";
       _deps = validateDeps name;
       cargoRoot = builtins.toPath "${ctx.repoRootStr}/${rootRel}";
@@ -102,17 +165,19 @@ let
       missing = builtins.filter (record: record.package == null) nixpkgRecords;
       sourcePlan = ctx.sourcePlanFor node;
       template = ctx.T.rustForPkgs sourcePlan.base_pkgs;
+      nativeInputs = nativeInputsFor name;
     in if missing != [] then builtins.throw
       "Rust planner unresolved nixpkg deps for ${name}: ${lib.concatStringsSep ", " (map (record: record.attr) missing)}"
-    else assert _deps; assert _overrideClassification; template.rustPackage {
+    else assert _deps; assert _nativeInputBoundary; assert _overrideClassification; template.rustPackage {
       inherit name kind cargoRoot cargoManifest cargoLock cargoOutputHashes cargoFixedSources patchInputs sourcePlan;
+      inherit nativeInputs;
       devOverrides = rustDevOverrides;
       nixpkgDeps = map (record: record.package) nixpkgRecords;
       crate = if crate == null then lib.last (lib.splitString ":" name) else crate;
       features = if features == null then [] else features;
       defaultFeatures = if defaultFeatures == null then true else defaultFeatures;
       profile = if profile == null then "release" else profile;
-      target = if target == null then "" else target;
+      inherit target;
     };
 in {
   isTarget = n: P.isTargetByRuleTypeOrLabel {
@@ -127,10 +192,14 @@ in {
     config = {
       labelPriorityPre = [
         { label = "kind:test"; kind = "test"; }
+        { label = "kind:wasi"; kind = "wasi"; }
+        { label = "kind:wasm"; kind = "wasm"; }
         { label = "kind:bin"; kind = "bin"; }
         { label = "kind:lib"; kind = "lib"; }
       ];
       ruleTypes.suffixes = [
+        { suffix = "_wasi_binary"; kind = "wasi"; }
+        { suffix = "_wasm_library"; kind = "wasm"; }
         { suffix = "_test"; kind = "test"; }
         { suffix = "_binary"; kind = "bin"; }
         { suffix = "_library"; kind = "lib"; }
@@ -142,4 +211,6 @@ in {
   mkApp = build "bin";
   mkLib = build "lib";
   mkTest = build "test";
+  mkWasi = build "wasi";
+  mkWasm = build "wasm";
 }

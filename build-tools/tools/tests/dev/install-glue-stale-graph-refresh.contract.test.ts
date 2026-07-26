@@ -12,6 +12,7 @@ function read(relativePath: string): string {
 
 test("stale glue reconciliation explicitly regenerates the workspace graph", () => {
   const installGlue = read("build-tools/tools/dev/install/glue.ts");
+  const installDeps = read("build-tools/tools/dev/install/deps-main.ts");
   const pipeline = read("build-tools/tools/buck/glue-pipeline.ts");
   const isolation = read("build-tools/tools/dev/dev-build/isolation.ts");
   const handoff = read("build-tools/tools/dev/buck-global-input-handoff.ts");
@@ -74,6 +75,23 @@ test("stale glue reconciliation explicitly regenerates the workspace graph", () 
   assert.match(
     installGlue,
     /await handoffChangedGlobalInputConsumers\(wsRoot\);[\s\S]*await writeGlueFingerprint\(wsRoot\)/,
+  );
+  assert.match(
+    installDeps,
+    /const priorGlobalInputs = await globalNixInputFingerprint\(repoRoot\)/,
+  );
+  assert.equal(installDeps.match(/runGlue\(dryRun, verbose, priorGlobalInputs\)/g)?.length, 2);
+  assert.equal(
+    installDeps.match(/reconcileWorkspaceGlobalNixInputTargets\(priorGlobalInputs\)/g)?.length,
+    2,
+  );
+  assert.match(
+    installDeps,
+    /reconcileWorkspaceGlobalNixInputTargets\(priorGlobalInputs\);[\s\S]*writeFinalPrebuildFingerprint/,
+  );
+  assert.match(
+    installGlue,
+    /const graphAfter =[\s\S]*await ensureWorkspaceGlobalNixInputTargets\(true\);[\s\S]*const globalInputsAfter = await globalNixInputFingerprint\(wsRoot\);[\s\S]*await handoffChangedGlobalInputConsumers\(wsRoot\)/,
   );
   assert.match(pipeline, /await ensureWorkspaceBuckStatePackage\(repoRoot\)/);
   assert.match(registration, /const graphOutput = graphDigest \? `graph\.\$\{graphDigest\}\.json`/);

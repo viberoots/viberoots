@@ -77,11 +77,12 @@ The repository ships a `codex` wrapper at `build-tools/tools/bin/codex` that lay
 
 ## The `happy` CLI
 
-The root tooling importer pins `happy-coder` exactly and exposes its `happy` and `happy-mcp`
-commands through the normal devshell `PATH`. This makes both commands available from consumer
-project directories after direnv activation without a user-level npm installation. The npm registry
-marks `happy-coder` as deprecated in favor of the renamed `happy` package; the existing pin keeps the
-requested package identity explicit until that migration is reviewed. Its dependency graph adds
-approximately 4 GiB to the shared pinned canonical `node_modules` realization and local Nix cache.
-That cost, together with the upstream rename, motivates reviewing a migration to `happy` rather than
-carrying the deprecated package indefinitely.
+The root tooling importer pins `happy` exactly and exposes its `happy` and `happy-mcp` commands
+through the normal devshell `PATH`. This makes both commands available from consumer project
+directories after direnv activation without a user-level npm installation. The package replaces the
+deprecated `happy-coder` identity under the same upstream repository and maintainers. The consumer
+smoke test verifies the package identity, both binary mappings, and the Codex `--yolo` parser without
+starting authentication, a daemon, or an agent session.
+
+Its dependency graph adds approximately 4 GiB to the shared pinned canonical `node_modules`
+realization and local Nix cache.

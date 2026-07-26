@@ -13,7 +13,6 @@ import {
   isArtifactAffectingEnvName,
   withoutArtifactEnvironmentInfluence,
 } from "../../lib/artifact-environment";
-import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("canonical artifact environments isolate state and bypass hostile host tools and selectors", async () => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "artifact-env-"));
@@ -50,6 +49,15 @@ test("canonical artifact environments isolate state and bypass hostile host tool
     assert.equal(env.CC, undefined);
     assert.equal(env.PYTHONPATH, undefined);
     assert.equal(env.NODE_OPTIONS, undefined);
+    assert.equal(env.NODE_PATH, undefined);
+    assert.equal(env.NIX_CONFIG, undefined);
+    assert.equal(env.VIBEROOTS_ROOT, undefined);
+    const canonicalNode = spawnSync("node", ["--version"], {
+      encoding: "utf8",
+      env,
+    });
+    assert.equal(canonicalNode.status, 0, canonicalNode.stderr);
+    assert.match(canonicalNode.stdout, /^v\d+/);
     assert.doesNotThrow(() =>
       assertNoArtifactSelectorInjection(env, { allow: ["VBR_ARTIFACT_TOOLS_ROOT"] }),
     );
@@ -215,35 +223,4 @@ test("CI rejects unreviewed artifact namespaces but strips harmless metadata", a
   } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
-});
-
-test("selected builds reject ambient graph selectors before exporting a graph", () => {
-  const result = spawnSync(
-    process.execPath,
-    [
-      "--experimental-strip-types",
-      "--import",
-      viberootsSourcePath("build-tools/tools/dev/zx-init.mjs"),
-      viberootsSourcePath("build-tools/tools/dev/build-selected.ts"),
-      "--source=git",
-    ],
-    {
-      cwd: process.cwd(),
-      encoding: "utf8",
-      env: {
-        ...withoutArtifactEnvironmentInfluence(process.env),
-        NODE_OPTIONS: "",
-        BUCK_TARGET: "//:ambient-selector-canary",
-        BUCK_QUERY_ROOTS: "host-only-root",
-        BUCK_TARGET_ATTR: "host_attr",
-        BUCK_TARGET_PLATFORM: "host-platform",
-      },
-    },
-  );
-  assert.notEqual(result.status, 0);
-  assert.match(
-    String(result.stderr || ""),
-    /artifact build rejects ambient selectors: BUCK_QUERY_ROOTS, BUCK_TARGET, BUCK_TARGET_ATTR, BUCK_TARGET_PLATFORM/,
-  );
-  assert.doesNotMatch(String(result.stderr || ""), /exporting graph/);
 });

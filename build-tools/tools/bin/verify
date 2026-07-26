@@ -21,12 +21,21 @@ EOF
 		;;
 esac
 
-# shell helpers
+script_dir="$(cd "$(dirname "$0")" && pwd)"
 # shellcheck source=/dev/null
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-. "${SCRIPT_DIR}/cache-health-command-scope.sh" standalone
+. "${script_dir}/artifact-ingress-env.sh"
+artifact_ingress_reexec_with_devshell "$0" "$@"
 # shellcheck source=/dev/null
-. "${SCRIPT_DIR}/devshell.sh"
+. "${script_dir}/cache-health-command-scope.sh" verified-ingress
+artifact_ingress_clear_selectors
 
-# Substantive logic lives in TypeScript (zx). Keep this wrapper tiny for file-size linting.
-run_ts "../dev/verify.ts" "$@"
+# shellcheck source=/dev/null
+export VBR_DEVSHELL_USE_GENERATED_AUTHORITY=1
+. "${script_dir}/devshell.sh"
+
+artifact_ingress_trust_devshell_baseline "${LIVE_ROOT}"
+artifact_ingress_refresh_nix_cache_health
+artifact_ingress_publish_reviewed_nix_cache_config
+artifact_ingress_restore_or_remove_selectors
+artifact_ingress_clear_selectors
+artifact_ingress_exec "${LIVE_ROOT}" "build-tools/tools/dev/verify.ts" "$@"

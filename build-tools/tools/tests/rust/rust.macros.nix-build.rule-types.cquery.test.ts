@@ -42,11 +42,13 @@ test("rust macros export native build, test, and source-selection contracts", as
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_library", "rust_test")',
+        'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_library", "rust_test", "rust_wasi_binary", "rust_wasm_library")',
         "",
         'rust_library(name = "lib", crate = "rustapp", cargo_output_hashes = {"remote-1.0.0": "sha256-fixture"}, cargo_fixed_sources = {"remote@1.0.0#registry+https://registry.example/index": "{\\"source\\":\\"registry+https://registry.example/index\\"}"}, features = ["demo"], default_features = False, nixpkg_deps = ["pkgs.zlib"], nixpkgs_profile = "default", nixpkg_pins = {"pkgs.zlib": {"nixpkgs_profile": "default", "rationale": "fixture"}}, srcs = ["src/lib.rs"])',
         'rust_binary(name = "app", crate = "rustapp", srcs = ["src/main.rs"], deps = [":lib"])',
         'rust_test(name = "test", crate = "rustapp", srcs = ["src/lib.rs"])',
+        'rust_wasm_library(name = "raw", crate = "rustapp", srcs = ["src/lib.rs"])',
+        'rust_wasi_binary(name = "wasi", crate = "rustapp", srcs = ["src/main.rs"])',
         "",
       ].join("\n"),
       "utf8",
@@ -80,6 +82,12 @@ test("rust macros export native build, test, and source-selection contracts", as
       buck2 cquery --target-platforms //:no_cgo "kind(rust_nix_test, //projects/apps/rustapp:test)"
     `;
     assert.match(String(testProbe.stdout || ""), /rustapp:test/);
+    for (const name of ["raw", "wasi"]) {
+      const wasmProbe = await $({ cwd: tmp, stdio: "pipe" })`
+        buck2 cquery --target-platforms //:no_cgo "kind(rust_nix_build, //projects/apps/rustapp:${name})"
+      `;
+      assert.match(String(wasmProbe.stdout || ""), new RegExp(`rustapp:${name}`));
+    }
 
     const crossCellExample = await $({ cwd: tmp, stdio: "pipe" })`
       buck2 cquery --target-platforms //:no_cgo viberoots//build-tools/tools/nix/examples/rust/native-example:lib

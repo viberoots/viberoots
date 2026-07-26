@@ -2,10 +2,13 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { nodeFlagsWithZx } from "../../lib/node-run";
 import { buckProcessTableLines } from "../../lib/process-inspection";
+import { artifactBuckIsolation } from "./cache-isolation";
 import { buildToolPath, zxInitPath } from "./paths";
 
 export type Isolation = {
+  baseBuckIsolation: string;
   buckIsolation: string;
+  cachePolicyBinding: string;
   isolationFlags: string[];
   reuseDaemon: boolean;
   killOnExit: boolean;
@@ -17,6 +20,7 @@ export type Isolation = {
 };
 
 export type CreateIsolationOptions = {
+  cachePolicyBinding?: string;
   reuseDaemon?: boolean;
 };
 
@@ -94,7 +98,11 @@ export function createIsolation(opts: CreateIsolationOptions = {}): Isolation {
   const defaultIso = reuseDaemon
     ? sharedDevBuildIsolationName(process.cwd())
     : `devbuild-${process.pid}`;
-  const buckIsolation = inheritedIso ? inheritedIso : defaultIso;
+  const baseBuckIsolation = inheritedIso ? inheritedIso : defaultIso;
+  const cachePolicyBinding = String(opts.cachePolicyBinding || "").trim();
+  const buckIsolation = cachePolicyBinding
+    ? artifactBuckIsolation(baseBuckIsolation, cachePolicyBinding)
+    : baseBuckIsolation;
   const createdOwnIsolation = !inheritedIso && process.env.BUCK_NO_ISOLATION !== "1";
   const registerForCleanup = createdOwnIsolation && killOnExit;
   const isolationFlags: string[] =
@@ -154,7 +162,9 @@ export function createIsolation(opts: CreateIsolationOptions = {}): Isolation {
   }
 
   return {
+    baseBuckIsolation,
     buckIsolation,
+    cachePolicyBinding,
     isolationFlags,
     reuseDaemon,
     killOnExit,

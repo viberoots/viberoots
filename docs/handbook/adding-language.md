@@ -88,10 +88,14 @@ A language is not integrated until its metadata lifecycle follows the repository
   to a host tool. Nix itself is the bootstrap exception and may use
   `/nix/var/nix/profiles/default/bin/nix`.
 
-For a future Rust rollout, this means deciding up front whether Cargo metadata is importer-scoped or
-package-local, making `u` the only tracked repair owner, keeping `i` read-only, and store-qualifying
-`cargo`, `rustc`, and any runnable command. Its registry handler must define bounded Cargo upgrade
-semantics and transactional `Cargo.lock` rollback before project templates are considered complete.
+Rust is currently enabled as an experimental scaffolded language with package-local Cargo
+authority. Each Cargo root owns its checked-in `Cargo.toml` and `Cargo.lock`. Plain `u` performs
+bounded offline lock reconciliation, while `u --upgrade` performs the intentional offline dependency
+update; both run through the shared managed-command boundary and roll back every affected
+`Cargo.lock` byte-for-byte if any project fails. `i`, `b`, post-clone, and devshell entry remain
+read-only and report `repair: run u` for stale Cargo state. Rust scaffolds create the canonical
+package-local metadata and use only Nix-store Cargo, rustc, runners, and runnable tools. Keep these
+ownership, rollback, and tool-authority contracts intact while Rust remains experimental.
 
 ### Language contracts and manifest
 
@@ -100,18 +104,24 @@ semantics and transactional `Cargo.lock` rollback before project templates are c
   - `LanguageProviderSync` is the provider sync adapter surface used by `build-tools/tools/buck/sync-providers.ts`
   - `PlannerLanguage` is used by TS-side helpers that enumerate planner capabilities
 - The language registry is manifest‑driven via `build-tools/tools/nix/langs.json`. Discovery is partial‑clone safe:
-  - A language must be listed in `enabled`, have a graduated hermetic contract, and have every
-    `requiredPaths` entry present before discovery considers it enabled.
+  - A language must be listed in `enabled`, have an enablement-ready `experimental` or `graduated`
+    hermetic contract, and have every `requiredPaths` entry present before discovery considers it
+    enabled.
   - Orchestrators dynamically derive their registries from this manifest; missing languages are skipped without errors
 - When adding a new language, update `build-tools/tools/nix/langs.json` and ensure your `requiredPaths` gate enablement correctly.
 - `scaf language new` writes a disabled entry with `hermetic.status = "scaffold"`. It never adds the
   language to `enabled`. Run `scaf language doctor` to see the remaining graduation gaps.
-- Change the status to `graduated` and add the language to `enabled` only after the manifest records
-  passing source-role, dependency-reconciliation, immutable-bundle, store-tool, selector,
-  sandbox/network, remote-execution, and publication gates. `reproducibilityMatrixIds` must name the
-  independent-builder cases that prove the language and its mixed-language routes.
-- Manifest validation fails when an enabled language is absent, scaffold-only, missing a gate, or
-  has no reproducibility matrix ID. Do not catch or downgrade these failures in scaffolding.
+- An `experimental` language may be added to `enabled` after the manifest records passing
+  source-role, dependency-reconciliation, immutable-bundle, store-tool, selector, and
+  remote-execution gates. `reproducibilityMatrixIds` must name the configured builder cases that
+  prove its declared routes; system entries without native execution evidence must remain
+  explicitly fail-closed.
+- Change the status to `graduated` only after the additional sandbox/network and publication gates
+  pass. Graduation matrix evidence must come from independent builders for the language and its
+  mixed-language routes.
+- Manifest validation fails when an enabled language is absent, scaffold-only, missing a gate
+  applicable to its status, or has no reproducibility matrix ID. Do not catch or downgrade these
+  failures in scaffolding.
 
 ### Shared helpers (use these instead of rolling your own)
 
@@ -319,7 +329,9 @@ Stamping belongs in the macro. If your macro synthesizes helper targets (for exa
 
 - Add templates under `build-tools/tools/scaffolding/templates/<lang>`.
 - Scaffold and review its `build-tools/tools/nix/langs.json` entry. Keep it disabled until the
-  hermetic graduation contract and matrix evidence are complete.
+  experimental enablement contract and configured matrix evidence are complete. Keep it
+  experimental until the additional graduation-only sandbox/network and publication evidence is
+  complete.
 - `scaf` will discover your language automatically and expose `scaf new <lang> <kind>`.
 
 8. Tests

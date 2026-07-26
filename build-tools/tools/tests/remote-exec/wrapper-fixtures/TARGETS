@@ -2,6 +2,8 @@ load("@viberoots//build-tools/cpp/private:nix_test.bzl", "cpp_nix_test")
 load("@viberoots//build-tools/go/private:nix_test.bzl", "go_nix_test")
 load("@viberoots//build-tools/node/private:nix_test.bzl", "node_nix_test")
 load("@viberoots//build-tools/python/private:nix_test.bzl", "python_nix_test")
+load("@viberoots//build-tools/rust/private:nix_build.bzl", "rust_nix_build")
+load("@viberoots//build-tools/rust/private:nix_test.bzl", "rust_nix_test")
 load("@viberoots//build-tools/lang:source_snapshot.bzl", "source_snapshot")
 load("@viberoots//build-tools/tools/buck:zx_test.bzl", "zx_test")
 load("@prelude//:rules.bzl", "export_file")
@@ -19,6 +21,17 @@ source_snapshot(
         "remote-ready-runner.sh",
     ],
     graph = "graph.json",
+)
+
+source_snapshot(
+    name = "rust_ready_source_snapshot",
+    srcs = [
+        "Cargo.lock",
+        "Cargo.toml",
+        "src/main.rs",
+    ],
+    destination_prefix = "projects/fixtures/rust-remote-ready",
+    graph = "rust-graph.json",
 )
 
 zx_test(
@@ -128,6 +141,63 @@ cpp_nix_test(
     out = "cpp_local.stamp",
     planner = ":cpp_planner",
     planner_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_local__planner",
+)
+
+rust_nix_test(
+    name = "rust_local",
+    cargo_lock = "Cargo.lock",
+    cargo_manifest = "Cargo.toml",
+    crate = "rust_remote_fixture",
+    kind = "test",
+    labels = ["fixture:local", "existing:label", "verify:manual"],
+    out = "rust_local.stamp",
+    self_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:rust_local",
+)
+
+rust_nix_test(
+    name = "rust_remote",
+    cargo_lock = "Cargo.lock",
+    cargo_manifest = "Cargo.toml",
+    crate = "rust_remote_fixture",
+    kind = "test",
+    labels = ["fixture:remote", "existing:label", "verify:manual"],
+    out = "rust_remote.stamp",
+    remote_execution = "linux-x86_64-default",
+    self_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:rust_remote",
+)
+
+rust_nix_test(
+    name = "rust_ready_handles",
+    artifact_contract = "artifact-contract.json",
+    cargo_lock = "Cargo.lock",
+    cargo_manifest = "Cargo.toml",
+    crate = "rust_remote_fixture",
+    kind = "test",
+    labels = ["fixture:ready", "existing:label", "remote:ready", "verify:manual"],
+    materialization_manifest = "materialization-manifest.json",
+    out = "rust_ready_handles.stamp",
+    planner_label = "//projects/fixtures/rust-remote-ready:rust_ready_handles",
+    remote_builder_smoke = "remote-builder-smoke.json",
+    self_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:rust_ready_handles",
+    source_snapshot_bundle = ":rust_ready_source_snapshot",
+    tool_closure = "tool-closure.json",
+)
+
+rust_nix_build(
+    name = "rust_build_ready_policy",
+    artifact_contract = "artifact-contract.json",
+    cargo_lock = "Cargo.lock",
+    cargo_manifest = "Cargo.toml",
+    crate = "rust_remote_fixture",
+    kind = "bin",
+    labels = ["fixture:ready", "remote:ready", "verify:manual"],
+    materialization_manifest = "materialization-manifest.json",
+    out = "rust_build_ready_policy",
+    planner_label = "//projects/fixtures/rust-remote-ready:rust_remote_fixture",
+    remote_builder_smoke = "remote-builder-smoke.json",
+    self_label = "@viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:rust_build_ready_policy",
+    source_snapshot_bundle = ":rust_ready_source_snapshot",
+    tool_closure = "tool-closure.json",
 )
 
 cpp_nix_test(

@@ -40,7 +40,28 @@ def nix_artifact_tool_authority_shell():
 
 def nix_artifact_environment_shell():
     return (
-        "unset AR AS BUCK_GRAPH_JSON BUCK_QUERY_ROOTS BUCK_TARGET BUCK_TARGET_ATTR BUCK_TARGET_PLATFORM CC CFLAGS CLANG CPATH CPPFLAGS CXX CXXFLAGS GCC GOPATH GOROOT LD LDFLAGS LIBRARY_PATH NIX_PATH NODE NODE_OPTIONS NODE_PATH NPM_CONFIG_PREFIX PKG_CONFIG_PATH PNPM PNPM_HOME PYTHON PYTHONHASHSEED PYTHONHOME PYTHONNOUSERSITE PYTHONPATH RUSTC RUSTFLAGS RUSTUP_HOME CARGO_HOME SDKROOT UV VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN VBR_FILTERED_FLAKE_SNAPSHOT VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG VBR_PNPM_FILTERED_SNAPSHOT_ROOT VBR_PNPM_FINAL_STORE VBR_PNPM_FINAL_STORE_IMPORTER; "
+        "if [ -n \"${VBR_NIX_CACHE_ROLE_BINDING:-}\" ]; then "
+        + "VBR_ACTION_ROLE_NODE=\"${VBR_ARTIFACT_TOOLS_ROOT:-}/bin/node\"; test -x \"$VBR_ACTION_ROLE_NODE\" || { echo 'error: proven Nix cache roles require canonical node' >&2; exit 1; }; "
+        + "test \"${#VBR_NIX_CACHE_ROLE_BINDING}\" = 64 && case \"$VBR_NIX_CACHE_ROLE_BINDING\" in *[!0-9a-f]*) false ;; *) true ;; esac || { echo 'error: proven Nix cache role binding is malformed' >&2; exit 1; }; "
+        + "case \"${VBR_NIX_CACHE_ROLE_POLICY:-}\" in auto|strict) ;; *) echo 'error: proven Nix cache role policy is malformed' >&2; exit 1 ;; esac; "
+        + "fi; "
+        + "VBR_ACTION_EFFECTIVE_NETRC=\"\"; VBR_ACTION_EFFECTIVE_SUBSTITUTERS=\"\"; VBR_ACTION_UNREVIEWED_NIX_CONFIG=\"${NIX_CONFIG:-}\"; "
+        + "VBR_ACTION_CONFIG_FILE=\"`mktemp \"${TMPDIR:-${TMP:-/tmp}}/vbr-action-nix-config.XXXXXX\"`\"; "
+        + "if \"$NIX_BIN\" config show > \"$VBR_ACTION_CONFIG_FILE\" 2>/dev/null; then "
+        + "while IFS= read -r VBR_ACTION_CONFIG_LINE; do case \"$VBR_ACTION_CONFIG_LINE\" in netrc-file\\ =*) VBR_ACTION_EFFECTIVE_NETRC=\"${VBR_ACTION_CONFIG_LINE#*=}\"; VBR_ACTION_EFFECTIVE_NETRC=\"${VBR_ACTION_EFFECTIVE_NETRC#${VBR_ACTION_EFFECTIVE_NETRC%%[![:space:]]*}}\"; VBR_ACTION_EFFECTIVE_NETRC=\"${VBR_ACTION_EFFECTIVE_NETRC%${VBR_ACTION_EFFECTIVE_NETRC##*[![:space:]]}}\" ;; substituters\\ =*|extra-substituters\\ =*) VBR_ACTION_CONFIG_VALUE=\"${VBR_ACTION_CONFIG_LINE#*=}\"; VBR_ACTION_EFFECTIVE_SUBSTITUTERS=\"$VBR_ACTION_EFFECTIVE_SUBSTITUTERS $VBR_ACTION_CONFIG_VALUE\" ;; esac; done < \"$VBR_ACTION_CONFIG_FILE\"; "
+        + "fi; "
+        + "VBR_ACTION_BASELINE_SUBSTITUTERS=\"$VBR_ACTION_EFFECTIVE_SUBSTITUTERS\"; "
+        + "if [ -n \"${VBR_NIX_CACHE_ROLE_BINDING:-}\" ]; then "
+        + "VBR_ACTION_CONFIG_RETAINED=\"\"; while IFS= read -r VBR_ACTION_CONFIG_LINE; do case \"$VBR_ACTION_CONFIG_LINE\" in substituters\\ =*|extra-substituters\\ =*|connect-timeout\\ =*|stalled-download-timeout\\ =*|fallback\\ =*) ;; *) if [ -n \"$VBR_ACTION_CONFIG_LINE\" ]; then if [ -n \"$VBR_ACTION_CONFIG_RETAINED\" ]; then VBR_ACTION_CONFIG_RETAINED=\"${VBR_ACTION_CONFIG_RETAINED}\"$'\\n'\"${VBR_ACTION_CONFIG_LINE}\"; else VBR_ACTION_CONFIG_RETAINED=\"$VBR_ACTION_CONFIG_LINE\"; fi; fi ;; esac; done < \"$VBR_ACTION_CONFIG_FILE\"; "
+        + "printf -v NIX_CONFIG '%s\\nsubstituters = %s\\nextra-substituters = %s\\nconnect-timeout = 3\\nstalled-download-timeout = 10\\nfallback = true' \"$VBR_ACTION_CONFIG_RETAINED\" \"$VBR_NIX_CACHE_ROLE_REQUIRED\" \"$VBR_NIX_CACHE_ROLE_OPTIONAL\"; export NIX_CONFIG; "
+        + "VBR_ACTION_UNREVIEWED_NIX_CONFIG=\"$NIX_CONFIG\"; "
+        + "\"$NIX_BIN\" config show > \"$VBR_ACTION_CONFIG_FILE\" 2>/dev/null || { echo 'error: reconstructed Nix cache config is invalid' >&2; exit 1; }; "
+        + "VBR_ACTION_EFFECTIVE_SUBSTITUTERS=\"\"; while IFS= read -r VBR_ACTION_CONFIG_LINE; do case \"$VBR_ACTION_CONFIG_LINE\" in substituters\\ =*|extra-substituters\\ =*) VBR_ACTION_CONFIG_VALUE=\"${VBR_ACTION_CONFIG_LINE#*=}\"; VBR_ACTION_EFFECTIVE_SUBSTITUTERS=\"$VBR_ACTION_EFFECTIVE_SUBSTITUTERS $VBR_ACTION_CONFIG_VALUE\" ;; esac; done < \"$VBR_ACTION_CONFIG_FILE\"; "
+        + "export VBR_ACTION_BASELINE_SUBSTITUTERS VBR_ACTION_EFFECTIVE_SUBSTITUTERS; "
+        + "if ! \"$VBR_ACTION_ROLE_NODE\" -e 'const {createHash}=require(\"node:crypto\");const e=process.env,s=x=>[...new Set(String(x||\"\").trim().split(/\\s+/).filter(Boolean))].sort(),h=x=>createHash(\"sha256\").update(s(x).join(\"\\n\")).digest(\"hex\").slice(0,16),r=s(e.VBR_NIX_CACHE_ROLE_REQUIRED),o=s(e.VBR_NIX_CACHE_ROLE_OPTIONAL),u=[...new Set([...r,...o])].sort(),c=s(e.VBR_ACTION_EFFECTIVE_SUBSTITUTERS);if(u.length===c.length&&u.every((x,i)=>x===c[i]))process.exit(0);console.error(\"error: proven Nix cache roles do not match effective substituters \"+JSON.stringify({required:{count:r.length,digest:h(r.join(\" \"))},optional:{count:o.length,digest:h(o.join(\" \"))},boundUnion:{count:u.length,digest:h(u.join(\" \"))},baseline:{count:s(e.VBR_ACTION_BASELINE_SUBSTITUTERS).length,digest:h(e.VBR_ACTION_BASELINE_SUBSTITUTERS)},candidate:{count:c.length,digest:h(c.join(\" \"))}}));process.exit(1)'; then exit 1; fi; "
+        + "fi; "
+        + "rm -f \"$VBR_ACTION_CONFIG_FILE\"; "
+        + "unset AR AS BUCK_GRAPH_JSON BUCK_QUERY_ROOTS BUCK_TARGET BUCK_TARGET_ATTR BUCK_TARGET_PLATFORM CC CFLAGS CLANG CPATH CPPFLAGS CXX CXXFLAGS GCC GOPATH GOROOT LD LDFLAGS LIBRARY_PATH NIX_PATH NODE NODE_OPTIONS NODE_PATH NPM_CONFIG_PREFIX PKG_CONFIG_PATH PNPM PNPM_HOME PYTHON PYTHONHASHSEED PYTHONHOME PYTHONNOUSERSITE PYTHONPATH RUSTC RUSTFLAGS RUSTUP_HOME CARGO_HOME SDKROOT UV VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN VBR_FILTERED_FLAKE_SNAPSHOT VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG VBR_PNPM_FILTERED_SNAPSHOT_ROOT VBR_PNPM_FINAL_STORE VBR_PNPM_FINAL_STORE_IMPORTER; "
         + "for VBR_ENV_NAME in \"${!NIX_@}\"; do case \"$VBR_ENV_NAME\" in NIX_BIN|NIX_REMOTE|NIX_SSL_CERT_DIR|NIX_SSL_CERT_FILE) ;; *) unset \"$VBR_ENV_NAME\" ;; esac; done; "
         + "test -n \"${TMPDIR:-}\" || { echo 'artifact action requires runner-owned temporary state' >&2; exit 2; }; "
         + "VBR_ARTIFACT_STATE=\"`mktemp -d \"$TMPDIR/vbr-artifact-state.XXXXXX\"`\"; "
@@ -48,17 +69,34 @@ def nix_artifact_environment_shell():
         + "mkdir -p \"$VBR_ARTIFACT_STATE/home\" \"$VBR_ARTIFACT_STATE/tmp\" \"$VBR_ARTIFACT_STATE/xdg-cache\" \"$VBR_ARTIFACT_STATE/xdg-config\" \"$VBR_ARTIFACT_STATE/xdg-data\"; "
         + "export HOME=\"$VBR_ARTIFACT_STATE/home\" TMPDIR=\"$VBR_ARTIFACT_STATE/tmp\" TMP=\"$VBR_ARTIFACT_STATE/tmp\" TEMP=\"$VBR_ARTIFACT_STATE/tmp\" XDG_CACHE_HOME=\"$VBR_ARTIFACT_STATE/xdg-cache\" XDG_CONFIG_HOME=\"$VBR_ARTIFACT_STATE/xdg-config\" XDG_DATA_HOME=\"$VBR_ARTIFACT_STATE/xdg-data\"; "
         + "export LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC SOURCE_DATE_EPOCH=1; "
+        + "if [ -n \"$VBR_ACTION_EFFECTIVE_NETRC\" ] && [ -f \"$VBR_ACTION_EFFECTIVE_NETRC\" ] && [ -r \"$VBR_ACTION_EFFECTIVE_NETRC\" ]; then "
+        + "(umask 077; cp \"$VBR_ACTION_EFFECTIVE_NETRC\" \"$VBR_ARTIFACT_STATE/netrc\"); "
+        + "export VBR_ACTION_NETRC_MATERIALIZED=1 VBR_ACTION_NETRC_FILE=\"$VBR_ARTIFACT_STATE/netrc\"; "
+        + "VBR_ACTION_CONFIG_RETAINED=\"\"; while IFS= read -r VBR_ACTION_CONFIG_LINE; do case \"$VBR_ACTION_CONFIG_LINE\" in netrc-file\\ =*) ;; *) if [ -n \"$VBR_ACTION_CONFIG_LINE\" ]; then if [ -n \"$VBR_ACTION_CONFIG_RETAINED\" ]; then VBR_ACTION_CONFIG_RETAINED=\"${VBR_ACTION_CONFIG_RETAINED}\"$'\\n'\"${VBR_ACTION_CONFIG_LINE}\"; else VBR_ACTION_CONFIG_RETAINED=\"$VBR_ACTION_CONFIG_LINE\"; fi; fi ;; esac; done <<< \"$VBR_ACTION_UNREVIEWED_NIX_CONFIG\"; "
+        + "if [ -n \"$VBR_ACTION_CONFIG_RETAINED\" ]; then printf -v NIX_CONFIG '%s\\nnetrc-file = %s' \"$VBR_ACTION_CONFIG_RETAINED\" \"$VBR_ARTIFACT_STATE/netrc\"; else printf -v NIX_CONFIG 'netrc-file = %s' \"$VBR_ARTIFACT_STATE/netrc\"; fi; export NIX_CONFIG; "
+        + "elif [ -n \"$VBR_ACTION_UNREVIEWED_NIX_CONFIG\" ]; then export NIX_CONFIG=\"$VBR_ACTION_UNREVIEWED_NIX_CONFIG\"; else unset NIX_CONFIG; fi; "
+        + "if [ -n \"${VBR_NIX_CACHE_ROLE_BINDING:-}\" ]; then "
+        + "VBR_ACTION_BINDING_FILE=\"${VBR_ACTION_CONFIG_FILE}.binding\"; "
+        + "printf 'reviewed-cache-roles-v1\\0%s\\0%s\\0%s\\0%s' \"$VBR_NIX_CACHE_ROLE_POLICY\" \"$VBR_NIX_CACHE_ROLE_REQUIRED\" \"$VBR_NIX_CACHE_ROLE_OPTIONAL\" \"${NIX_CONFIG:-}\" | \"$VBR_ACTION_ROLE_NODE\" -e 'const {createHash}=require(\"node:crypto\");const b=[];process.stdin.on(\"data\",x=>b.push(x));process.stdin.on(\"end\",()=>{const raw=Buffer.concat(b),p=raw.toString(\"utf8\").split(\"\\0\"),h=x=>createHash(\"sha256\").update(x||\"\").digest(\"hex\").slice(0,16);process.stdout.write([createHash(\"sha256\").update(raw).digest(\"hex\"),h(p[1]),h(p[2]),h(p[3]),h(p[4]),Buffer.byteLength(p[4]||\"\")].join(\"\\t\")+\"\\n\")})' > \"$VBR_ACTION_BINDING_FILE\"; "
+        + "IFS=$'\\t' read -r VBR_NIX_CACHE_ROLE_BINDING VBR_NIX_CACHE_BOUND_POLICY_DIGEST VBR_NIX_CACHE_BOUND_REQUIRED_DIGEST VBR_NIX_CACHE_BOUND_OPTIONAL_DIGEST VBR_NIX_CACHE_BOUND_CONFIG_DIGEST VBR_NIX_CACHE_BOUND_CONFIG_BYTES < \"$VBR_ACTION_BINDING_FILE\" || { echo 'error: failed to bind proven Nix cache roles' >&2; exit 1; }; "
+        + "rm -f \"$VBR_ACTION_BINDING_FILE\"; export VBR_NIX_CACHE_ROLE_BINDING VBR_NIX_CACHE_BOUND_POLICY_DIGEST VBR_NIX_CACHE_BOUND_REQUIRED_DIGEST VBR_NIX_CACHE_BOUND_OPTIONAL_DIGEST VBR_NIX_CACHE_BOUND_CONFIG_DIGEST VBR_NIX_CACHE_BOUND_CONFIG_BYTES; "
+        + "fi; "
+        + "unset VBR_ACTION_EFFECTIVE_NETRC VBR_ACTION_EFFECTIVE_SUBSTITUTERS VBR_ACTION_BASELINE_SUBSTITUTERS VBR_ACTION_UNREVIEWED_NIX_CONFIG; "
     )
 
 def nix_action_final_exec_function_shell():
     return (
         "__vbr_action_final_exec() { "
-        + "unset NIX_CONFIG VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN; "
+        + "unset VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN; "
+        + "if [ \"${VBR_NIX_CACHE_POLICY:-auto}\" = \"off\" ]; then unset NIX_CONFIG VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY; exec \"$@\"; fi; "
+        + "unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY; "
         + nix_cache_health_shell()
         + "unset VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN; "
         + "if [ \"${VBR_NIX_CACHE_HEALTH_APPLIED:-}\" = \"1\" ] && [ \"${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG+x}\" = \"x\" ]; then "
+        + "case \"${VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY:-}\" in auto|strict) ;; *) echo 'action cache-review role policy is unavailable' >&2; return 1 ;; esac; "
         + "VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN=\"${RANDOM}${RANDOM}-$$-${RANDOM}\"; "
-        + "exec {VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD}<<<\"$VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN\"; "
+        + "VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_PROOF=\"vbr-nix-cache-review@1\"$'\\n'\"$VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN\"$'\\n'\"$VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY\"$'\\n'\"${VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS:-}\"$'\\n'\"${VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS:-}\"$'\\n'\"${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG:-}\"; "
+        + "exec {VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD}<<<\"$VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_PROOF\"; unset VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_PROOF; "
         + "if [ \"$VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD\" -lt 10 ] || [ \"$VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD\" -gt 1024 ]; then echo 'action cache-review proof descriptor is out of bounds' >&2; return 1; fi; "
         + "export VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN; "
         + "fi; "
@@ -361,6 +399,40 @@ def nix_calling_env_export_source_snapshot(snapshot_root = "${1:-}", manifest_pa
         + "export WORKSPACE_ROOT=\"$DECLARED_SOURCE_SNAPSHOT_ROOT\"; "
         + "export REPO_ROOT=\"$DECLARED_SOURCE_SNAPSHOT_ROOT\"; "
         + "export FLK_ROOT=\"$DECLARED_SOURCE_SNAPSHOT_ROOT\"; "
+        + "fi; "
+    )
+
+def nix_calling_env_materialize_source_snapshot_for_execution(
+        snapshot_root = "${1:-}",
+        execution_root = "$TMP/vbr-source-snapshot",
+        flake_file = "${2:-}",
+        flake_lock = "${3:-}",
+        node_modules_hashes = "${4:-}",
+        nixpkgs_registry_extension = "${5:-}"):
+    return (
+        ("SOURCE_SNAPSHOT_EXECUTION_ARG=\"%s\"; " % snapshot_root)
+        + "if [ -n \"$SOURCE_SNAPSHOT_EXECUTION_ARG\" ]; then "
+        + "test -d \"$SOURCE_SNAPSHOT_EXECUTION_ARG\" || { echo \"declared source snapshot is not a directory: $SOURCE_SNAPSHOT_EXECUTION_ARG\" >&2; exit 2; }; "
+        + ("SOURCE_SNAPSHOT_EXECUTION_ROOT=\"%s\"; " % execution_root)
+        + "mkdir -p \"$SOURCE_SNAPSHOT_EXECUTION_ROOT\"; "
+        + "\"$VBR_ARTIFACT_TOOLS_ROOT/bin/rsync\" -rlt --delete \"$SOURCE_SNAPSHOT_EXECUTION_ARG/\" \"$SOURCE_SNAPSHOT_EXECUTION_ROOT/\"; "
+        + "\"$VBR_ARTIFACT_TOOLS_ROOT/bin/rm\" -rf \"$SOURCE_SNAPSHOT_EXECUTION_ROOT/build-tools\"; "
+        + "mkdir -p \"$SOURCE_SNAPSHOT_EXECUTION_ROOT/build-tools\"; "
+        + "\"$VBR_ARTIFACT_TOOLS_ROOT/bin/rsync\" -rlt --chmod=u+rwX --delete \"$VIBEROOTS_ROOT/build-tools/\" \"$SOURCE_SNAPSHOT_EXECUTION_ROOT/build-tools/\"; "
+        + "mkdir -p \"$SOURCE_SNAPSHOT_EXECUTION_ROOT/.viberoots/workspace/buck\" \"$SOURCE_SNAPSHOT_EXECUTION_ROOT/projects/config\"; "
+        + ("cp -f \"%s\" \"$SOURCE_SNAPSHOT_EXECUTION_ROOT/.viberoots/workspace/flake.nix\"; " % flake_file)
+        + ("cp -f \"%s\" \"$SOURCE_SNAPSHOT_EXECUTION_ROOT/.viberoots/workspace/flake.lock\"; " % flake_lock)
+        + ("cp -f \"%s\" \"$SOURCE_SNAPSHOT_EXECUTION_ROOT/projects/config/node-modules.hashes.json\"; " % node_modules_hashes)
+        + ("if [ -n \"%s\" ]; then cp -f \"%s\" \"$SOURCE_SNAPSHOT_EXECUTION_ROOT/.viberoots/workspace/nixpkgs-source-registry-extension.nix\"; fi; " % (nixpkgs_registry_extension, nixpkgs_registry_extension))
+        + "\"$VBR_ARTIFACT_TOOLS_ROOT/bin/git\" -C \"$SOURCE_SNAPSHOT_EXECUTION_ROOT\" init -q; "
+        + "export WORKSPACE_ROOT=\"$SOURCE_SNAPSHOT_EXECUTION_ROOT\"; "
+        + "export REPO_ROOT=\"$SOURCE_SNAPSHOT_EXECUTION_ROOT\"; "
+        + "export FLK_ROOT=\"$SOURCE_SNAPSHOT_EXECUTION_ROOT/.viberoots/workspace\"; "
+        + "export BUCK_GRAPH_JSON=\"$SOURCE_SNAPSHOT_EXECUTION_ROOT/.viberoots/workspace/buck/graph.json\"; "
+        + "test -f \"$BUCK_GRAPH_JSON\" || { echo \"declared source snapshot is missing its graph: $BUCK_GRAPH_JSON\" >&2; exit 2; }; "
+        + "WS_ENV=\"$SOURCE_SNAPSHOT_EXECUTION_ROOT/.viberoots/workspace/buck/workspace-root.env\"; : > \"$WS_ENV\"; "
+        + "for VBR_MATERIALIZED_INPUT in \"$SOURCE_SNAPSHOT_EXECUTION_ROOT\" \"$BUCK_GRAPH_JSON\" \"$WS_ENV\" \"$FLK_ROOT/flake.nix\" \"$FLK_ROOT/flake.lock\" \"$SOURCE_SNAPSHOT_EXECUTION_ROOT/projects/config/node-modules.hashes.json\"; do realpath \"$VBR_MATERIALIZED_INPUT\" >> \"$VBR_BUCK_INPUTS\"; done; "
+        + "sort -u \"$VBR_BUCK_INPUTS\" -o \"$VBR_BUCK_INPUTS\"; "
         + "fi; "
     )
 

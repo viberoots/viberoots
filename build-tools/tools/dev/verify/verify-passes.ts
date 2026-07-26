@@ -13,6 +13,7 @@ import {
 import type { VerifyExecutionPolicy } from "./remote-policy";
 import { isVbrVerbose } from "../../lib/command-ui";
 import { appendVerifyPassLog, startVerifyPass } from "./verify-pass-runner";
+import type { CacheHealthResult } from "./nix-cache-health";
 
 function terminatePassProcessGroup(pgid: number): void {
   try {
@@ -43,6 +44,7 @@ export async function runVerifyBuckPasses(opts: {
   suppressFailureOutputTail?: () => boolean;
   shouldAbort?: () => boolean;
   artifactToolsRoot: string;
+  cacheHealth: CacheHealthResult;
 }): Promise<number> {
   const plan = await resolveVerifyTargetPlan({
     root: opts.root,
@@ -107,6 +109,7 @@ export async function runVerifyBuckPasses(opts: {
       suppressFailureOutputTail: opts.suppressFailureOutputTail,
       shouldAbort,
       artifactToolsRoot: opts.artifactToolsRoot,
+      cacheHealth: opts.cacheHealth,
       onPgid: opts.onPgid,
       onPgidDone: opts.onPgidDone,
       onNestedIso: opts.onNestedIso,

@@ -86,26 +86,39 @@ const { createRequire } = require("node:module");
 const shimPath = process.argv[2];
 const nodeModulesRoot = path.resolve(path.dirname(shimPath), "..");
 const requireFromRoot = createRequire(path.join(nodeModulesRoot, ".viberoots-happy-probe.cjs"));
-let cursor = path.dirname(requireFromRoot.resolve("happy-coder"));
+let cursor = path.dirname(requireFromRoot.resolve("happy"));
 let manifest = null;
 while (cursor !== path.dirname(cursor)) {
   const candidate = path.join(cursor, "package.json");
   if (fs.existsSync(candidate)) {
     const parsed = JSON.parse(fs.readFileSync(candidate, "utf8"));
-    if (parsed.name === "happy-coder") {
+    if (parsed.name === "happy") {
       manifest = parsed;
       break;
     }
   }
   cursor = path.dirname(cursor);
 }
-assert.ok(manifest, "expected happy shim installation to resolve to happy-coder");
-assert.equal(manifest.name, "happy-coder");
-assert.equal(manifest.version, "1.1.9");
+assert.ok(manifest, "expected happy shim installation to resolve to happy");
+assert.equal(manifest.name, "happy");
+assert.equal(manifest.version, "1.2.0");
 assert.deepEqual(manifest.bin, {
   happy: "./bin/happy.mjs",
   "happy-mcp": "./bin/happy-mcp.mjs",
 });
+const entrypoint = fs.readFileSync(path.join(cursor, "dist", "index.mjs"), "utf8");
+const bundleImport = entrypoint
+  .split(String.fromCharCode(10))
+  .find((line) => line.startsWith("import './index-") && line.endsWith(".mjs';"));
+assert.ok(bundleImport, "expected happy entrypoint to identify its source bundle");
+const bundleRelativePath = bundleImport.slice("import '".length, -2);
+const bundle = fs.readFileSync(path.join(cursor, "dist", bundleRelativePath), "utf8");
+const codexHandler = bundle.slice(
+  bundle.indexOf("async function handleCodexCommand(args)"),
+  bundle.indexOf("\\n}\\n\\n(async () =>", bundle.indexOf("async function handleCodexCommand(args)")),
+);
+assert.ok(codexHandler.includes('codexArgs.args[i] === "--yolo"'));
+assert.ok(codexHandler.includes('permissionMode = "yolo"'));
 NODE
 for bin in python3 uv; do
   case "$(command -v "$bin")" in

@@ -50,7 +50,51 @@ test("langs.json rejects enabling a scaffold-only language", async () => {
       stdio: "pipe",
     })`node viberoots/build-tools/tools/dev/validate-langs.ts`.nothrow();
     assert.notEqual(result.exitCode, 0);
-    assert.match(String(result.stderr), /enabled language toy is not graduated/);
+    assert.match(String(result.stderr), /enabled language toy is not ready/);
+  });
+});
+
+test("langs.json rejects an enabled experimental language without matrix evidence", async () => {
+  await runInTemp("langs-validate-experimental", async (tmp, $) => {
+    const source = path.join(tmp, "viberoots");
+    await fs.outputJson(path.join(source, "build-tools/tools/nix/langs.json"), {
+      enabled: ["toy"],
+      languages: [
+        {
+          id: "toy",
+          displayName: "Toy",
+          requiredPaths: [],
+          kinds: ["bin"],
+          templatesDir: "viberoots/build-tools/tools/scaffolding/templates/toy",
+          hermetic: {
+            status: "experimental",
+            sourceRoles: true,
+            dependencyReconciliation: true,
+            immutableBundleInputs: true,
+            storeQualifiedToolchain: true,
+            selectorTransport: true,
+            sandboxNetwork: true,
+            remoteExecution: true,
+            publicationAdmission: false,
+            reproducibilityMatrixIds: [],
+          },
+        },
+      ],
+    });
+    for (const rel of [
+      "viberoots/build-tools/tools/dev/langs.schema.json",
+      "viberoots/build-tools/tools/dev/validate-langs.ts",
+      "viberoots/build-tools/tools/lib/artifact-reproducibility-matrix.ts",
+    ]) {
+      await copyViberootsSourcePath(rel, path.join(tmp, rel));
+    }
+    const result = await $({
+      cwd: tmp,
+      env: { ...process.env, VIBEROOTS_SOURCE_ROOT: source },
+      stdio: "pipe",
+    })`node viberoots/build-tools/tools/dev/validate-langs.ts`.nothrow();
+    assert.notEqual(result.exitCode, 0);
+    assert.match(String(result.stderr), /reproducibilityMatrixIds/);
   });
 });
 

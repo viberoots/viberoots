@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "expectedCount": 536,
-  "expectedDigest": "2f6542bbe8fdc549bb99e646eac2473ce7712498fc029ae32f5836828a93da2b",
+  "expectedDigest": "17387e7d23ed5f5791327245d16e46cca2ff48f08d1347d9ad459cd27e7c7507",
   "classificationRules": [
     {
       "pathPattern": "^Jenkinsfile$",
@@ -38,6 +38,11 @@
       "pathPattern": "^build-tools/tools/bin/(?:artifact-ingress-env\\.sh|b|nix|p)$",
       "role": "canonical-artifact",
       "justification": "Public artifact and pinned Nix front doors enforce the canonical artifact environment before construction."
+    },
+    {
+      "pathPattern": "^build-tools/tools/bin/artifact-ingress-(?:cache|selectors)\\.sh$",
+      "role": "canonical-artifact",
+      "justification": "Sourced artifact ingress modules preserve the reviewed canonical environment and cache policy boundary."
     },
     {
       "pathPattern": "^build-tools/tools/bin/d$",
@@ -97,6 +102,11 @@
       "justification": "Explicit update, install, bootstrap, scaffolding, repair, and maintenance commands own mutation or reconciliation."
     },
     {
+      "pathPattern": "^build-tools/tools/bin/devshell-(?:cache-config|cache-health|workspace)\\.sh$",
+      "role": "update-install",
+      "justification": "Sourced development-shell modules preserve the reviewed installation and workspace-reconciliation boundary."
+    },
+    {
       "pathPattern": "^build-tools/(?:go|cpp|python|rust|node|wasm)/",
       "role": "canonical-artifact",
       "justification": "Language artifact rules must use canonical immutable inputs, tools, and artifact policy."
@@ -122,7 +132,7 @@
       "justification": "Local, CI, remote, and Buck artifact executors share canonical environment, source, and policy authorities."
     },
     {
-      "pathPattern": "^build-tools/tools/lib/(?:artifact-reproducibility-node-contract|protected-reproducibility-aggregate|protected-store-signature)\\.ts$",
+      "pathPattern": "^build-tools/tools/lib/(?:artifact-reproducibility-node-contract|nix-cache-role-provenance|protected-reproducibility-aggregate|protected-store-signature)\\.ts$",
       "role": "canonical-artifact",
       "justification": "Protected artifact runtime verification, aggregate retrieval, and signing execute Nix only through the canonical immutable evidence authorities."
     },

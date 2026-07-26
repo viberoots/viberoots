@@ -11,6 +11,11 @@ import { promisify } from "node:util";
 import { applyNixCacheHealthPolicy } from "../../dev/verify/nix-cache-health";
 import { evaluateNixCacheReadinessFromConfig } from "../../lib/nix-cache-readiness";
 import {
+  currentNixCachePolicyCapability,
+  nixCachePolicyBindingDigest,
+  outcomeFromNixCachePolicyCapability,
+} from "../../lib/nix-cache-policy-capability";
+import {
   NIX_CACHE_TRANSPORT_CURL_EXIT_CODES,
   NIX_CACHE_TRANSPORT_CURL_EXIT_CODES_SHELL,
 } from "../../lib/nix-cache-transport";
@@ -32,6 +37,36 @@ function buckCacheHealthShell(source: string): string {
   return literals.join("");
 }
 
+function starlarkFunctionBlock(source: string, name: string): string {
+  const start = source.indexOf(`def ${name}():`);
+  const end = source.indexOf("\ndef ", start + 1);
+  assert.ok(start >= 0 && end > start, `expected Starlark function ${name}`);
+  return source.slice(start, end);
+}
+
+function starlarkStringLiterals(source: string): string {
+  return [...source.matchAll(/"(?:\\.|[^"\\])*"/gu)].map((match) => JSON.parse(match[0])).join("");
+}
+
+function actionCacheHealthShell(nixShellSource: string, cacheHealthSource: string): string {
+  const environment = starlarkStringLiterals(
+    starlarkFunctionBlock(nixShellSource, "nix_artifact_environment_shell"),
+  );
+  const finalExecBlock = starlarkFunctionBlock(
+    nixShellSource,
+    "nix_action_final_exec_function_shell",
+  );
+  const [beforeHealth, afterHealth, ...extra] = finalExecBlock.split("+ nix_cache_health_shell()");
+  assert.equal(extra.length, 0);
+  assert.ok(afterHealth !== undefined, "final action exec must invoke cache health");
+  return [
+    environment,
+    starlarkStringLiterals(beforeHealth),
+    buckCacheHealthShell(cacheHealthSource),
+    starlarkStringLiterals(afterHealth),
+  ].join("");
+}
+
 function generatedStage0CacheHealthShell(): string {
   const source = direnvStage0();
   const start = source.indexOf("__vbr_stage0_strip_nix_cache_overrides() {");
@@ -41,11 +76,15 @@ function generatedStage0CacheHealthShell(): string {
 }
 
 async function generatedDevshellCacheHealthShell(): Promise<string> {
-  const source = await fsp.readFile(sourceFile("build-tools/tools/bin/devshell.sh"), "utf8");
-  const start = source.indexOf("env_mark_macos_metadata_never_index() {");
-  const end = source.indexOf("\nensure_viberoots_current() {", start);
-  assert.ok(start >= 0 && end > start);
-  return source.slice(start, end);
+  const config = await fsp.readFile(
+    sourceFile("build-tools/tools/bin/devshell-cache-config.sh"),
+    "utf8",
+  );
+  const health = await fsp.readFile(
+    sourceFile("build-tools/tools/bin/devshell-cache-health.sh"),
+    "utf8",
+  );
+  return `${config}\n${health}`;
 }
 
 async function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => Promise<T>): Promise<T> {
@@ -82,16 +121,16 @@ test("nix cache health removes unreachable optional extra-substituters dynamical
             "extra-substituters = https://stale.example/cache https://kept.example",
             "trusted-public-keys = cache.example-1:abc",
           ].join("\n"),
-        probeUrl: async (url) => url === "https://kept.example",
+        probeUrl: async (url) =>
+          url === "https://cache.nixos.org/" || url === "https://kept.example",
       });
 
       assert.equal(result.changed, true);
-      assert.deepEqual(result.removed, ["https://cache.nixos.org/", "https://stale.example/cache"]);
-      assert.deepEqual(result.kept, ["https://kept.example"]);
+      assert.deepEqual(result.removed, ["https://stale.example/cache"]);
+      assert.deepEqual(result.kept, ["https://cache.nixos.org/", "https://kept.example"]);
       assert.match(String(process.env.NIX_CONFIG), /builders =/);
-      assert.match(String(process.env.NIX_CONFIG), /substituters =\s*(\n|$)/);
+      assert.match(String(process.env.NIX_CONFIG), /substituters = https:\/\/cache\.nixos\.org\//);
       assert.match(String(process.env.NIX_CONFIG), /extra-substituters = https:\/\/kept\.example/);
-      assert.doesNotMatch(String(process.env.NIX_CONFIG), /cache\.nixos\.org/);
       assert.doesNotMatch(String(process.env.NIX_CONFIG), /stale\.example/);
       assert.equal(process.env.VBR_NIX_CACHE_HEALTH_APPLIED, "1");
       assert.equal(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG, process.env.NIX_CONFIG);
@@ -100,53 +139,73 @@ test("nix cache health removes unreachable optional extra-substituters dynamical
   );
 });
 
-test("nix cache health skips repeated probes after the environment is marked handled", async () => {
+test("forged cache-health markers cannot bypass TypeScript re-review", async () => {
+  let reads = 0;
   await withEnv(
     {
-      NIX_CONFIG: "",
+      NIX_CONFIG: "substituters = file:///reviewed",
       VBR_NIX_CACHE_HEALTH_APPLIED: "1",
-      VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: "",
+      VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: "substituters = file:///reviewed",
     },
     async () => {
       const result = await applyNixCacheHealthPolicy("/tmp/repo", {
         readEffectiveConfig: async () => {
-          throw new Error("should not read config after cache health is marked handled");
+          reads += 1;
+          return "substituters = file:///reviewed";
         },
         probeUrl: async () => {
-          throw new Error("should not probe after cache health is marked handled");
+          throw new Error("local substituters must not be probed");
         },
       });
       assert.equal(result.changed, false);
+      assert.equal(reads, 1);
+      assert.deepEqual(result.kept, ["file:///reviewed"]);
     },
   );
 });
 
-test("nix cache health auto mode disables unreachable primary substituters", async () => {
+test("nix cache health auto mode fails closed for unreachable required substituters", async () => {
   await withEnv({ VBR_NIX_CACHE_POLICY: "auto", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
-    const result = await applyNixCacheHealthPolicy("/tmp/repo", {
-      readEffectiveConfig: async () => "substituters = https://cache.nixos.org/",
-      probeUrl: async () => false,
-    });
-    assert.equal(result.changed, true);
-    assert.deepEqual(result.removed, ["https://cache.nixos.org/"]);
-    assert.match(String(process.env.NIX_CONFIG), /substituters =\s*(\n|$)/);
-    assert.doesNotMatch(String(process.env.NIX_CONFIG), /cache\.nixos\.org/);
-    assert.match(String(process.env.NIX_CONFIG), /fallback = true/);
+    await assert.rejects(
+      applyNixCacheHealthPolicy("/tmp/repo", {
+        readEffectiveConfig: async () => "substituters = https://cache.nixos.org/",
+        probeUrl: async () => false,
+      }),
+      /required Nix substituter unavailable: https:\/\/cache\.nixos\.org\//,
+    );
+    assert.equal(process.env.VBR_NIX_CACHE_HEALTH_APPLIED, undefined);
   });
 });
 
-test("nix cache health probes original query-bearing cache urls", async () => {
+test("nix cache health treats a dual-role substituter as required", async () => {
+  await withEnv({ VBR_NIX_CACHE_POLICY: "auto", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
+    await assert.rejects(
+      applyNixCacheHealthPolicy("/tmp/repo", {
+        readEffectiveConfig: async () =>
+          [
+            "substituters = https://dual.example/cache",
+            "extra-substituters = https://dual.example/cache",
+          ].join("\n"),
+        probeUrl: async () => false,
+      }),
+      /required Nix substituter unavailable: https:\/\/dual\.example\/cache/,
+    );
+  });
+});
+
+test("nix cache health probes original credential-free query-bearing cache urls", async () => {
   const probed: string[] = [];
   await withEnv({ VBR_NIX_CACHE_POLICY: "strict", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
     await applyNixCacheHealthPolicy("/tmp/repo", {
-      readEffectiveConfig: async () => "extra-substituters = https://cache.example/path?token=a=b",
+      readEffectiveConfig: async () =>
+        "extra-substituters = https://cache.example/path?priority=a=b",
       probeUrl: async (url) => {
         probed.push(url);
         return true;
       },
     });
   });
-  assert.deepEqual(probed, ["https://cache.example/path?token=a=b"]);
+  assert.deepEqual(probed, ["https://cache.example/path?priority=a=b"]);
 });
 
 test("nix cache health strict mode fails instead of rewriting substituters", async () => {
@@ -181,8 +240,9 @@ test("nix cache health off mode leaves NIX_CONFIG unchanged", async () => {
   );
 });
 
-test("nix cache health default probe uses the configured netrc for a real HTTP request", async () => {
+test("nix cache health default probe uses the configured netrc for a real HTTP request", async (t) => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "nix-cache-health-"));
+  t.after(async () => await fsp.rm(tmp, { recursive: true, force: true }));
   const logPath = path.join(tmp, "probe.log");
   const netrcPath = path.join(tmp, "reviewed.netrc");
   const nixPath = path.join(tmp, "nix");
@@ -195,7 +255,7 @@ test("nix cache health default probe uses the configured netrc for a real HTTP r
     [
       "#!/bin/sh",
       'if [ "$1" = "config" ] && [ "$2" = "show" ]; then',
-      "  printf '%s\\n' 'extra-substituters = https://auth.example/cache?token=fixture-query'",
+      "  printf '%s\\n' 'extra-substituters = https://auth.example/cache?tenant=fixture'",
       `  printf '%s\\n' 'netrc-file = ${netrcPath}'`,
       "  exit 0",
       "fi",
@@ -223,11 +283,17 @@ test("nix cache health default probe uses the configured netrc for a real HTTP r
       const result = await applyNixCacheHealthPolicy("/tmp/repo", {
         resolveCurlBin: () => curlPath,
       });
-      assert.equal(result.changed, false);
-      assert.deepEqual(result.kept, ["https://auth.example/cache?token=fixture-query"]);
+      assert.equal(result.changed, true);
+      assert.deepEqual(result.kept, ["https://auth.example/cache?tenant=fixture"]);
+      assert.match(
+        result.nixConfig,
+        new RegExp(`netrc-file = ${netrcPath.replaceAll("/", "\\/")}`),
+      );
+      assert.doesNotMatch(result.nixConfig, /fixture-secret/);
       const probe = await fsp.readFile(logPath, "utf8");
       assert.match(probe, new RegExp(`--netrc-file ${netrcPath.replaceAll("/", "\\/")}`));
-      assert.match(probe, /https:\/\/auth\.example\/cache\/nix-cache-info\?token=fixture-query/);
+      assert.match(probe, /https:\/\/auth\.example\/cache\/nix-cache-info\?tenant=fixture/);
+      assert.doesNotMatch(probe, /token=|fixture-secret/);
       assert.doesNotMatch(probe, /fixture-secret/);
     },
   );
@@ -313,7 +379,7 @@ test("TypeScript cache probe admits only a readable regular netrc and classifies
       },
       async () =>
         await applyNixCacheHealthPolicy("/tmp/repo", {
-          readEffectiveConfig: async () => "substituters = https://cache.example",
+          readEffectiveConfig: async () => "extra-substituters = https://cache.example",
           resolveCurlBin: () => curlPath,
         }),
     );
@@ -330,9 +396,18 @@ test("generated cache probes enforce netrc argv and curl exit policy behaviorall
     const nixPath = path.join(tmp, "nix");
     const curlPath = path.join(tmp, "curl");
     const logPath = path.join(tmp, "curl-argv.log");
+    const roleConfigDir = path.join(tmp, "nix-config");
+    await fsp.mkdir(roleConfigDir);
     await fsp.writeFile(
       nixPath,
-      '#!/usr/bin/env bash\nprintf "substituters = https://cache.example\\n"; [[ -z "${TEST_NETRC_FILE:-}" ]] || printf "netrc-file = %s\\n" "$TEST_NETRC_FILE"\n',
+      `#!/usr/bin/env bash
+if [[ "\${3:-}" == "--json" ]]; then
+  printf '{"substituters":{"defaultValue":["%s"],"value":["%s"]}}\\n' "\${TEST_SUBSTITUTER:-https://cache.example}" "\${TEST_SUBSTITUTER:-https://cache.example}"
+  exit 0
+fi
+printf "%s = %s\\n" "\${TEST_CACHE_SETTING:-substituters}" "\${TEST_SUBSTITUTER:-https://cache.example}"
+[[ -z "\${TEST_NETRC_FILE:-}" ]] || printf "netrc-file = %s\\n" "$TEST_NETRC_FILE"
+`,
       { mode: 0o755 },
     );
     await fsp.writeFile(
@@ -373,8 +448,12 @@ test("generated cache probes enforce netrc argv and curl exit policy behaviorall
       renderer: (typeof renderers)[number],
       netrcFile: string,
       exitCode: number,
+      substituter = "https://cache.example",
+      forgedMarkers = false,
+      setting = "substituters",
     ) => {
       await fsp.rm(logPath, { force: true });
+      await fsp.writeFile(path.join(roleConfigDir, "nix.conf"), `${setting} = ${substituter}\n`);
       const result = await execFileAsync(
         "/bin/bash",
         ["-c", `${renderer.source}\nset +e; health >/dev/null 2>&1; printf '%s' "$?"`],
@@ -385,12 +464,20 @@ test("generated cache probes enforce netrc argv and curl exit policy behaviorall
             CURL_EXIT: String(exitCode),
             NIX_BIN: nixPath,
             VBR_NIX_BIN: nixPath,
-            PATH: `${tmp}:/usr/bin:/bin`,
+            PATH: `${tmp}:${path.dirname(process.execPath)}:/usr/bin:/bin`,
+            ENV_SH_DIR: sourceFile("build-tools/tools/bin"),
+            NIX_CONF_DIR: roleConfigDir,
+            NIX_USER_CONF_FILES: "",
             TEST_NETRC_FILE: netrcFile,
+            TEST_SUBSTITUTER: substituter,
+            TEST_CACHE_SETTING: setting,
             TMPDIR: tmp,
             VBR_NIX_CACHE_POLICY: "auto",
-            VBR_NIX_CACHE_HEALTH_APPLIED: "",
-            VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: "",
+            NIX_CONFIG: forgedMarkers ? `substituters = ${substituter}` : "",
+            VBR_NIX_CACHE_HEALTH_APPLIED: forgedMarkers ? "1" : "",
+            VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: forgedMarkers
+              ? `substituters = ${substituter}`
+              : "",
           },
         },
       );
@@ -416,7 +503,7 @@ test("generated cache probes enforce netrc argv and curl exit policy behaviorall
           `${renderer.name}/${netrcCase.name}: netrc argv presence`,
         );
         if (netrcCase.expected) assert.equal(result.argv[netrcIndex + 1], netrcCase.path);
-        assert.equal(result.status, 0);
+        assert.equal(result.status, 0, `${renderer.name}/${netrcCase.name}: health status`);
       }
       for (const exitCode of [22, 2, 26]) {
         assert.equal(
@@ -427,12 +514,189 @@ test("generated cache probes enforce netrc argv and curl exit policy behaviorall
       }
       assert.equal(
         (await runRenderer(renderer, readable, 6)).status,
-        0,
-        `${renderer.name}: transport failure remains tolerated`,
+        1,
+        `${renderer.name}: required transport failure must fail closed`,
       );
+      assert.equal(
+        (
+          await runRenderer(
+            renderer,
+            readable,
+            6,
+            "https://cache.example",
+            false,
+            "extra-substituters",
+          )
+        ).status,
+        0,
+        `${renderer.name}: optional transport failure remains tolerated`,
+      );
+      for (const credentialUrl of [
+        "https://user:password@cache.example/cache",
+        "https://cache.example/cache?token=fixture-secret",
+        "https://cache.example/cache?to%6ben=fixture-secret",
+        "https://cache.example/cache#access_token=fixture-secret",
+        "https://cache.example/cache#tenant=x&token=fixture-secret",
+      ]) {
+        const result = await runRenderer(renderer, readable, 0, credentialUrl, true);
+        assert.equal(result.status, 1, `${renderer.name}: URL credentials must fail closed`);
+        assert.deepEqual(result.argv, [], `${renderer.name}: rejected URL must not reach curl`);
+      }
     }
+
+    const optionalUrl = "https://optional.example/cache";
+    const flattenedConfig = `substituters = ${optionalUrl}`;
+    const binding = nixCachePolicyBindingDigest({
+      kind: "reviewed",
+      config: flattenedConfig,
+      policy: "auto",
+      requiredSubstituters: [],
+      optionalSubstituters: [optionalUrl],
+    });
+    const runProvenBuck = async (overrides: NodeJS.ProcessEnv = {}) =>
+      await execFileAsync(
+        "/bin/bash",
+        ["-c", `${renderers[2].source}\nset +e; health >/dev/null 2>&1; printf '%s' "$?"`],
+        {
+          env: {
+            ...process.env,
+            CURL_ARGV_LOG: logPath,
+            CURL_EXIT: "22",
+            NIX_BIN: nixPath,
+            VBR_NIX_BIN: nixPath,
+            PATH: `${tmp}:/usr/bin:/bin`,
+            TEST_NETRC_FILE: readable,
+            TEST_SUBSTITUTER: optionalUrl,
+            TMPDIR: tmp,
+            VBR_ARTIFACT_TOOLS_ROOT: path.dirname(path.dirname(process.execPath)),
+            VBR_NIX_CACHE_POLICY: "auto",
+            NIX_CONFIG: flattenedConfig,
+            VBR_NIX_CACHE_ROLE_REQUIRED: "",
+            VBR_NIX_CACHE_ROLE_OPTIONAL: optionalUrl,
+            VBR_NIX_CACHE_ROLE_POLICY: "auto",
+            VBR_NIX_CACHE_ROLE_BINDING: binding,
+            ...overrides,
+          },
+        },
+      );
+    assert.equal((await runProvenBuck()).stdout, "0");
+    assert.equal(
+      (
+        await runProvenBuck({
+          VBR_NIX_CACHE_ROLE_REQUIRED: optionalUrl,
+          VBR_NIX_CACHE_ROLE_OPTIONAL: "",
+        })
+      ).stdout,
+      "1",
+    );
   } finally {
     await fsp.chmod(path.join(tmp, "unreadable.netrc"), 0o600).catch(() => {});
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("forged action cache markers cannot bypass final credential re-review", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "nix-cache-action-forged-"));
+  try {
+    const hostile = "https://cache.example/cache?to%6ben=fixture-secret";
+    const hostileConfig = `substituters = ${hostile}`;
+    const nixPath = path.join(tmp, "nix");
+    const curlPath = path.join(tmp, "curl");
+    const finalPath = path.join(tmp, "final-nix");
+    const curlSentinel = path.join(tmp, "curl-ran");
+    const finalSentinel = path.join(tmp, "final-ran");
+    await fsp.writeFile(
+      nixPath,
+      '#!/usr/bin/env bash\n[[ "$1 $2" == "config show" ]] || exit 2\nprintf "%s\\n" "${NIX_CONFIG:-}"\n',
+      { mode: 0o755 },
+    );
+    await fsp.writeFile(curlPath, '#!/usr/bin/env bash\n: > "$CURL_SENTINEL"\n', {
+      mode: 0o755,
+    });
+    await fsp.writeFile(finalPath, '#!/usr/bin/env bash\n: > "$FINAL_SENTINEL"\n', {
+      mode: 0o755,
+    });
+    const nixShellSource = await fsp.readFile(sourceFile("build-tools/lang/nix_shell.bzl"), "utf8");
+    const cacheHealthSource = await fsp.readFile(
+      sourceFile("build-tools/lang/nix_cache_health.bzl"),
+      "utf8",
+    );
+    const shell = actionCacheHealthShell(nixShellSource, cacheHealthSource);
+    await assert.rejects(
+      execFileAsync(
+        "/bin/bash",
+        ["-c", `set -euo pipefail; ${shell} __vbr_action_final_exec "$FINAL_BIN"`],
+        {
+          env: {
+            ...process.env,
+            CURL_SENTINEL: curlSentinel,
+            FINAL_BIN: finalPath,
+            FINAL_SENTINEL: finalSentinel,
+            NIX_BIN: nixPath,
+            NIX_CONFIG: hostileConfig,
+            PATH: `${tmp}:/usr/bin:/bin`,
+            TMPDIR: tmp,
+            VBR_NIX_BIN: nixPath,
+            VBR_NIX_CACHE_HEALTH_APPLIED: "1",
+            VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: hostileConfig,
+            VBR_NIX_CACHE_POLICY: "auto",
+          },
+        },
+      ),
+      (error: NodeJS.ErrnoException & { stderr?: string }) => {
+        assert.equal(error.code, 1);
+        assert.match(String(error.stderr), /embeds credentials/);
+        assert.doesNotMatch(String(error.stderr), /fixture-secret|to%6ben/);
+        return true;
+      },
+    );
+    await assert.rejects(fsp.access(curlSentinel));
+    await assert.rejects(fsp.access(finalSentinel));
+  } finally {
+    await fsp.rm(tmp, { recursive: true, force: true });
+  }
+});
+
+test("action cache reconstruction accepts exact role unions and fails closed on mismatch", async () => {
+  const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "nix-cache-action-roles-"));
+  try {
+    const nixPath = path.join(tmp, "nix");
+    const required = "file:///required-cache";
+    const optional = "file:///optional-cache";
+    await fsp.writeFile(
+      nixPath,
+      `#!/usr/bin/env bash\nprintf '%s\\n' 'substituters = ${required} ${optional}' 'extra-substituters = ${optional}' 'connect-timeout = 9' 'fallback = false'\n`,
+      { mode: 0o755 },
+    );
+    const nixShellSource = await fsp.readFile(sourceFile("build-tools/lang/nix_shell.bzl"), "utf8");
+    const environment = starlarkStringLiterals(
+      starlarkFunctionBlock(nixShellSource, "nix_artifact_environment_shell"),
+    );
+    const run = async (requiredRoles: string, binding = "a".repeat(64)) =>
+      await execFileAsync("/bin/bash", ["-c", `set -euo pipefail; ${environment}`], {
+        env: {
+          ...process.env,
+          NIX_BIN: nixPath,
+          PATH: `${path.dirname(process.execPath)}:/usr/bin:/bin`,
+          TMPDIR: tmp,
+          VBR_ARTIFACT_TOOLS_ROOT: path.dirname(path.dirname(process.execPath)),
+          VBR_NIX_CACHE_ROLE_BINDING: binding,
+          VBR_NIX_CACHE_ROLE_OPTIONAL: optional,
+          VBR_NIX_CACHE_ROLE_POLICY: "auto",
+          VBR_NIX_CACHE_ROLE_REQUIRED: requiredRoles,
+        },
+      });
+
+    await run(required);
+    await assert.rejects(run("file:///different-cache"), (error: { stderr?: string }) => {
+      assert.match(String(error.stderr), /roles do not match effective substituters/);
+      return true;
+    });
+    await assert.rejects(run(required, "not-a-binding"), (error: { stderr?: string }) => {
+      assert.match(String(error.stderr), /role binding is malformed/);
+      return true;
+    });
+  } finally {
     await fsp.rm(tmp, { recursive: true, force: true });
   }
 });
@@ -441,34 +705,33 @@ test("nix cache health diagnostics redact URL userinfo and query credentials", a
   const failed = "https://operator:secret@down.example/cache?token=failed-secret";
   const kept = "https://reader:secret@kept.example/cache?token=kept-secret";
   const logs: string[] = [];
-  await withEnv({ VBR_NIX_CACHE_POLICY: "auto", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
-    await applyNixCacheHealthPolicy("/tmp/repo", {
-      readEffectiveConfig: async () => `substituters = ${failed}\nextra-substituters = ${kept}`,
-      probeUrl: async (url) => url === kept,
-      log: (line) => logs.push(line),
+  for (const credentialUrl of [failed, kept]) {
+    await withEnv({ VBR_NIX_CACHE_POLICY: "auto", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
+      let probes = 0;
+      await assert.rejects(
+        applyNixCacheHealthPolicy("/tmp/repo", {
+          readEffectiveConfig: async () => `substituters = ${credentialUrl}`,
+          probeUrl: async () => {
+            probes += 1;
+            return true;
+          },
+          log: (line) => logs.push(line),
+        }),
+        (error: Error) => {
+          assert.match(error.message, /https:\/\/<redacted>@(?:down|kept)\.example\/cache/);
+          assert.doesNotMatch(error.message, /operator|reader|secret|token=/);
+          return true;
+        },
+      );
+      assert.equal(probes, 0);
     });
-  });
-  assert.match(logs.join("\n"), /https:\/\/<redacted>@down\.example\/cache/);
-  assert.match(logs.join("\n"), /https:\/\/<redacted>@kept\.example\/cache/);
-  assert.doesNotMatch(logs.join("\n"), /operator|reader|failed-secret|kept-secret/);
-
-  await withEnv({ VBR_NIX_CACHE_POLICY: "strict", VBR_NIX_CACHE_HEALTH_APPLIED: "" }, async () => {
-    await assert.rejects(
-      applyNixCacheHealthPolicy("/tmp/repo", {
-        readEffectiveConfig: async () => `substituters = ${failed}`,
-        probeUrl: async () => false,
-      }),
-      (error: Error) => {
-        assert.match(error.message, /https:\/\/<redacted>@down\.example\/cache/);
-        assert.doesNotMatch(error.message, /operator|secret|token=/);
-        return true;
-      },
-    );
-  });
+  }
+  assert.deepEqual(logs, []);
 });
 
-test("nix cache health rejects nix store-info false positives when HTTP is unreachable", async () => {
+test("nix cache health rejects nix store-info false positives when HTTP is unreachable", async (t) => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "nix-cache-health-false-positive-"));
+  t.after(async () => await fsp.rm(tmp, { recursive: true, force: true }));
   const nixPath = path.join(tmp, "nix");
   const curlPath = path.join(tmp, "curl");
   const nixLog = path.join(tmp, "nix.log");
@@ -478,7 +741,7 @@ test("nix cache health rejects nix store-info false positives when HTTP is unrea
       "#!/bin/sh",
       'printf \'%s\\n\' "$*" >> "$NIX_LOG"',
       'if [ "$1" = "config" ] && [ "$2" = "show" ]; then',
-      "  printf '%s\\n' 'substituters = https://unresolvable.example/cache'",
+      "  printf '%s\\n' 'extra-substituters = https://unresolvable.example/cache'",
       `  printf '%s\\n' 'netrc-file = ${path.join(tmp, "reviewed.netrc")}'`,
       "fi",
       "exit 0",
@@ -536,46 +799,100 @@ test("nix cache health rejects nix store-info false positives when HTTP is unrea
   });
 });
 
-test("nix cache health never downgrades non-transport probe failures", async () => {
+test("auto cache health disables optional HTTP failures but required and strict remain closed", async (t) => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "nix-cache-health-invalid-response-"));
+  t.after(async () => await fsp.rm(tmp, { recursive: true, force: true }));
   const nixPath = path.join(tmp, "nix");
   const curlPath = path.join(tmp, "curl");
-  await fsp.writeFile(
-    nixPath,
-    [
-      "#!/bin/sh",
-      'if [ "$1" = "config" ] && [ "$2" = "show" ]; then',
-      "  printf '%s\\n' 'extra-substituters = https://invalid-response.example/cache'",
-      "fi",
-      "exit 0",
-      "",
-    ].join("\n"),
-    { mode: 0o755 },
-  );
   await fsp.writeFile(curlPath, "#!/bin/sh\nexit 22\n", { mode: 0o755 });
+  const optional = "https://invalid-response.example/cache?priority=fixture-secret-must-redact";
+  const run = async (setting: "substituters" | "extra-substituters", policy: "auto" | "strict") => {
+    await fsp.writeFile(
+      nixPath,
+      [
+        "#!/bin/sh",
+        'if [ "$1" = "config" ] && [ "$2" = "show" ]; then',
+        `  printf '%s\\n' '${setting} = ${optional}'`,
+        "fi",
+        "exit 0",
+        "",
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+    return await withEnv(
+      {
+        PATH: `${tmp}:${process.env.PATH || ""}`,
+        VBR_NIX_BIN: nixPath,
+        NIX_BIN: nixPath,
+        VBR_NIX_CACHE_POLICY: policy,
+        VBR_NIX_CACHE_HEALTH_APPLIED: "",
+      },
+      async () => {
+        const logs: string[] = [];
+        return await applyNixCacheHealthPolicy("/tmp/repo", {
+          resolveCurlBin: () => curlPath,
+          log: (line) => logs.push(line),
+        }).then(
+          (result) => ({ result, logs, error: null }),
+          (error: Error) => ({ result: null, logs, error }),
+        );
+      },
+    );
+  };
+
+  const degraded = await run("extra-substituters", "auto");
+  assert.equal(degraded.error, null);
+  assert.deepEqual(degraded.result?.removed, [optional]);
+  assert.doesNotMatch(degraded.result?.nixConfig || "", /invalid-response/);
+  assert.match(degraded.logs.join("\n"), /disabled unreachable substituter/);
+  assert.doesNotMatch(degraded.logs.join("\n"), /fixture-secret-must-redact/);
+
+  for (const [setting, policy] of [
+    ["substituters", "auto"],
+    ["extra-substituters", "strict"],
+  ] as const) {
+    const closed = await run(setting, policy);
+    assert.equal(closed.result, null);
+    assert.match(
+      String(closed.error?.message),
+      /probe rejected non-transport failure.*curl exit 22/,
+    );
+    assert.doesNotMatch(String(closed.error?.message), /fixture-secret-must-redact/);
+  }
+});
+
+test("cache health recovers source roles only for an exact effective union", async () => {
+  const required = "https://required-role.example";
+  const optional = "https://optional-role.example";
   await withEnv(
     {
-      PATH: `${tmp}:${process.env.PATH || ""}`,
-      VBR_NIX_BIN: nixPath,
-      NIX_BIN: nixPath,
+      NIX_CONFIG: `substituters = ${required}\nextra-substituters = ${optional}`,
       VBR_NIX_CACHE_POLICY: "auto",
       VBR_NIX_CACHE_HEALTH_APPLIED: "",
     },
     async () => {
+      const result = await applyNixCacheHealthPolicy("/tmp/repo", {
+        readEffectiveConfig: async () => `substituters = ${required} ${optional}`,
+        probeUrl: async () => true,
+      });
+      assert.deepEqual(result.requiredSubstituters, [required]);
+      assert.deepEqual(result.optionalSubstituters, [optional]);
+
       await assert.rejects(
         applyNixCacheHealthPolicy("/tmp/repo", {
-          resolveCurlBin: () => curlPath,
+          readEffectiveConfig: async () =>
+            `substituters = ${required} https://different-role.example`,
+          probeUrl: async () => true,
         }),
-        /probe rejected non-transport failure.*curl exit 22/,
+        /source roles do not match effective substituters/,
       );
-      assert.equal(process.env.VBR_NIX_CACHE_HEALTH_APPLIED, undefined);
-      assert.equal(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG, undefined);
     },
   );
 });
 
-test("TypeScript cache health rejects nix config show failure without authority", async () => {
+test("TypeScript cache health rejects nix config show failure without authority", async (t) => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "nix-cache-config-show-failure-"));
+  t.after(async () => await fsp.rm(tmp, { recursive: true, force: true }));
   const nixPath = path.join(tmp, "nix");
   await fsp.writeFile(nixPath, "#!/usr/bin/env bash\nexit 42\n", { mode: 0o755 });
   await withEnv(
@@ -636,8 +953,9 @@ test("successful evaluated no-op publishes exact config while off remains unrevi
   );
 });
 
-test("pre-applied cache health retains the exact reviewed config for child commands", async () => {
+test("pre-applied cache health is re-reviewed before child commands", async () => {
   const reviewed = "builders =\nsubstituters =\nextra-substituters =\nfallback = true";
+  let reads = 0;
   await withEnv(
     {
       NIX_CONFIG: reviewed,
@@ -645,11 +963,17 @@ test("pre-applied cache health retains the exact reviewed config for child comma
       VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: reviewed,
     },
     async () => {
-      const result = await applyNixCacheHealthPolicy(process.cwd());
+      const result = await applyNixCacheHealthPolicy(process.cwd(), {
+        readEffectiveConfig: async () => {
+          reads += 1;
+          return "builders =";
+        },
+      });
       assert.equal(result.changed, false);
       assert.equal(result.nixConfig, reviewed);
       assert.equal(process.env.NIX_CONFIG, reviewed);
       assert.equal(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG, reviewed);
+      assert.equal(reads, 1);
     },
   );
 });
@@ -663,7 +987,9 @@ test("matching reviewed config still reaches b and p call sites", async () => {
       VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: reviewed,
     },
     async () => {
-      const result = await applyNixCacheHealthPolicy(process.cwd());
+      const result = await applyNixCacheHealthPolicy(process.cwd(), {
+        readEffectiveConfig: async () => "builders =",
+      });
       assert.equal(result.changed, false);
       assert.equal(result.nixConfig, reviewed);
     },
@@ -675,6 +1001,7 @@ test("matching reviewed config still reaches b and p call sites", async () => {
   );
   assert.match(build, /internal: \{ NIX_CONFIG: cacheHealth\.nixConfig \}/);
   assert.match(build, /internalNixConfig: cacheHealth\.nixConfig/);
+  assert.match(build, /nixCachePolicyCapability,/);
   assert.doesNotMatch(build, /cacheHealth\.changed && cacheHealth\.nixConfig/);
 
   const runnable = await fsp.readFile(sourceFile("build-tools/tools/dev/run-runnable.ts"), "utf8");
@@ -683,18 +1010,32 @@ test("matching reviewed config still reaches b and p call sites", async () => {
   assert.doesNotMatch(runnable, /cacheHealth\.changed \?/);
 });
 
-test("pre-applied cache health rejects a mismatched active config", async () => {
+test("forged pre-applied cache health cannot bypass credential validation", async () => {
+  let probes = 0;
   await withEnv(
     {
-      NIX_CONFIG: "substituters = https://hostile.invalid",
+      NIX_CONFIG: "substituters = https://hostile.invalid?token=fixture-secret",
       VBR_NIX_CACHE_HEALTH_APPLIED: "1",
       VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: "substituters =",
     },
     async () => {
       await assert.rejects(
-        applyNixCacheHealthPolicy(process.cwd()),
-        /does not match its reviewed authority/,
+        applyNixCacheHealthPolicy(process.cwd(), {
+          readEffectiveConfig: async () => String(process.env.NIX_CONFIG || ""),
+          probeUrl: async () => {
+            probes += 1;
+            return true;
+          },
+        }),
+        (error: Error) => {
+          assert.match(error.message, /embeds credentials/);
+          assert.doesNotMatch(error.message, /fixture-secret|token=/);
+          return true;
+        },
       );
+      assert.equal(probes, 0);
+      assert.equal(process.env.VBR_NIX_CACHE_HEALTH_APPLIED, undefined);
+      assert.equal(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG, undefined);
     },
   );
 });
@@ -718,12 +1059,47 @@ test("near-valid malformed HTTP substituters fail closed in auto and strict mode
   }
 });
 
+test("credential-bearing substituter URLs fail closed before review or probe", async () => {
+  for (const substituter of [
+    "https://user:password@cache.example/cache",
+    "https://cache.example/cache?token=fixture-secret",
+    "https://cache.example/cache?to%6ben=fixture-secret",
+    "https://cache.example/cache#access_token=fixture-secret",
+    "https://cache.example/cache#tenant=x&token=fixture-secret",
+  ]) {
+    await withEnv(
+      {
+        NIX_CONFIG: `extra-substituters = ${substituter}`,
+        VBR_NIX_CACHE_POLICY: "auto",
+        VBR_NIX_CACHE_HEALTH_APPLIED: "",
+        VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: "",
+      },
+      async () => {
+        let probes = 0;
+        await assert.rejects(
+          applyNixCacheHealthPolicy(process.cwd(), {
+            readEffectiveConfig: async () => `extra-substituters = ${substituter}`,
+            probeUrl: async () => {
+              probes += 1;
+              return true;
+            },
+          }),
+          /embeds credentials in its URL; use netrc-file authentication/,
+        );
+        assert.equal(probes, 0);
+        assert.equal(process.env.VBR_NIX_CACHE_HEALTH_APPLIED, undefined);
+        assert.equal(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG, undefined);
+      },
+    );
+  }
+});
+
 test("all cache-health renderers share the reviewed curl transport status set", async () => {
-  assert.deepEqual(NIX_CACHE_TRANSPORT_CURL_EXIT_CODES, [5, 6, 7, 16, 28, 52, 55, 56, 92]);
+  assert.deepEqual(NIX_CACHE_TRANSPORT_CURL_EXIT_CODES, [5, 6, 7, 16, 28, 35, 52, 55, 56, 92]);
   const expectedCase = `0|${NIX_CACHE_TRANSPORT_CURL_EXIT_CODES_SHELL}`;
   for (const rel of [
     "build-tools/lang/nix_cache_health.bzl",
-    "build-tools/tools/bin/devshell.sh",
+    "build-tools/tools/bin/devshell-cache-health.sh",
     "build-tools/tools/lib/consumer-direnv.ts",
   ]) {
     assert.match(
@@ -761,9 +1137,19 @@ test("Buck cache-health renderer publishes evaluated success but not off or fail
         expected: "1\u001f\u001e",
         policy: "auto",
       },
+      {
+        effective: "extra-substituters = https://optional.example/cache?priority=fixture-secret",
+        expected: `0\u001f1\u001e${full}\nsubstituters =\nextra-substituters =\nconnect-timeout = 3\nstalled-download-timeout = 10\nfallback = true`,
+        policy: "auto",
+      },
+      {
+        effective: "extra-substituters = https://optional.example/cache",
+        expected: "1\u001f\u001e",
+        policy: "strict",
+      },
       { effective: "", expected: "1\u001f\u001e", policy: "auto", status: "42" },
     ]) {
-      const { stdout } = await execFileAsync(
+      const { stdout, stderr } = await execFileAsync(
         "/bin/bash",
         [
           "-c",
@@ -775,6 +1161,7 @@ test("Buck cache-health renderer publishes evaluated success but not off or fail
             NIX_BIN: nix,
             VBR_NIX_BIN: nix,
             PATH: `${root}:/usr/bin:/bin`,
+            TMPDIR: root,
             NIX_CONFIG: full,
             TEST_EFFECTIVE_NIX_CONFIG: testCase.effective,
             TEST_NIX_CONFIG_STATUS: testCase.status || "0",
@@ -784,7 +1171,8 @@ test("Buck cache-health renderer publishes evaluated success but not off or fail
           },
         },
       );
-      assert.equal(stdout, testCase.expected);
+      assert.equal(stdout, testCase.expected, stderr);
+      assert.doesNotMatch(stderr, /fixture-secret/);
     }
   } finally {
     await fsp.rm(root, { recursive: true, force: true });
@@ -795,19 +1183,39 @@ test("generated stage0 refreshes stale authority and hands exact config to TypeS
   const root = await fsp.mkdtemp(path.join(os.tmpdir(), "stage0-cache-health-authority-"));
   try {
     const nix = path.join(root, "nix");
+    const curl = path.join(root, "curl");
     const callLog = path.join(root, "nix-calls");
     const emptyPath = path.join(root, "empty-path");
+    const reviewedNetrc = path.join(root, "reviewed.netrc");
     await fsp.mkdir(emptyPath);
+    await fsp.writeFile(
+      reviewedNetrc,
+      "machine auth.example login token password fixture-secret\n",
+      { mode: 0o600 },
+    );
     await fsp.writeFile(
       nix,
       `#!/usr/bin/env bash
 printf 'called\\n' >> ${JSON.stringify(callLog)}
 [[ "\${TEST_NIX_CONFIG_STATUS:-0}" == 0 ]] || exit "$TEST_NIX_CONFIG_STATUS"
-if [[ "\${TEST_EFFECTIVE_FROM_NIX_CONFIG:-}" == "1" ]]; then
+if [[ "\${3:-}" == "--json" ]]; then
+  if [[ -n "\${TEST_EFFECTIVE_NIX_CONFIG_JSON:-}" ]]; then printf '%s\\n' "$TEST_EFFECTIVE_NIX_CONFIG_JSON"; else printf '{}\\n'; fi
+elif [[ "\${TEST_EFFECTIVE_FROM_NIX_CONFIG:-}" == "1" ]]; then
   printf '%s\\n' "\${NIX_CONFIG:-}"
 else
   printf '%s\\n' "\${TEST_EFFECTIVE_NIX_CONFIG:-}"
 fi
+`,
+      { mode: 0o755 },
+    );
+    await fsp.writeFile(
+      curl,
+      `#!/usr/bin/env bash
+[[ "$*" != *removed.example* ]] || exit 6
+[[ "$*" != *invalid-response.example* ]] || exit 22
+[[ "$*" != *auth.example* ]] || [[ "$*" == *"--netrc-file ${reviewedNetrc}"* ]] || exit 22
+[[ -z "\${TEST_CURL_EXIT:-}" || "$*" != *late-action.example* ]] || exit "$TEST_CURL_EXIT"
+exit 0
 `,
       { mode: 0o755 },
     );
@@ -826,17 +1234,29 @@ fi
       nixConfig?: string;
       sourceConfig?: string;
       effectiveFromNixConfig?: boolean;
+      effectiveJson?: string;
+      nixConfDir?: string;
+      roleSourceRoot?: string;
     }) => {
       await fsp.rm(callLog, { force: true });
       const env: NodeJS.ProcessEnv = {
         ...process.env,
-        PATH: opts.nixAvailable === false ? emptyPath : `${root}:/usr/bin:/bin`,
+        PATH:
+          opts.nixAvailable === false
+            ? emptyPath
+            : `${root}:${path.dirname(process.execPath)}:/usr/bin:/bin`,
         NIX_CONFIG: opts.nixConfig ?? full,
         TEST_EFFECTIVE_NIX_CONFIG: opts.effective ?? "builders =",
+        TEST_EFFECTIVE_NIX_CONFIG_JSON: opts.effectiveJson || "",
         TEST_EFFECTIVE_FROM_NIX_CONFIG: opts.effectiveFromNixConfig ? "1" : "0",
         TEST_NIX_CONFIG_STATUS: opts.status || "0",
         VBR_NIX_CACHE_POLICY: opts.policy || "auto",
       };
+      if (opts.nixConfDir !== undefined) {
+        env.NIX_CONF_DIR = opts.nixConfDir;
+        env.NIX_USER_CONF_FILES = "";
+      }
+      if (opts.roleSourceRoot !== undefined) env.VIBEROOTS_ROOT = opts.roleSourceRoot;
       if (opts.applied !== undefined) env.VBR_NIX_CACHE_HEALTH_APPLIED = opts.applied;
       else delete env.VBR_NIX_CACHE_HEALTH_APPLIED;
       if (opts.reviewed !== undefined) env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG = opts.reviewed;
@@ -904,6 +1324,101 @@ fi
         "--option substituters  --option extra-substituters  --option connect-timeout 3 --option stalled-download-timeout 10 --option fallback true",
       calls: 1,
     });
+
+    const nixConfDir = path.join(root, "nix-conf");
+    await fsp.mkdir(nixConfDir);
+    await fsp.writeFile(
+      path.join(nixConfDir, "nix.conf"),
+      "extra-substituters = https://invalid-response.example/cache\n",
+    );
+    const flattenedRoles = await runStage0({
+      effective:
+        "substituters = https://required.example/cache https://invalid-response.example/cache",
+      effectiveJson: JSON.stringify({
+        substituters: {
+          defaultValue: ["https://required.example/cache"],
+          value: ["https://required.example/cache", "https://invalid-response.example/cache"],
+        },
+      }),
+      nixConfDir,
+      roleSourceRoot: VIBEROOTS_ROOT,
+    });
+    assert.equal(flattenedRoles.status, 0);
+    assert.equal(flattenedRoles.required, "https://required.example/cache");
+    assert.equal(flattenedRoles.optional, "");
+
+    const lateOptional = "https://late-action.example/cache";
+    await fsp.writeFile(
+      path.join(nixConfDir, "nix.conf"),
+      `extra-substituters = ${lateOptional}\n`,
+    );
+    const flattenedActionRoles = await runStage0({
+      effective: `substituters = https://required.example/cache ${lateOptional}`,
+      effectiveJson: JSON.stringify({
+        substituters: {
+          defaultValue: ["https://required.example/cache"],
+          value: ["https://required.example/cache", lateOptional],
+        },
+      }),
+      nixConfDir,
+      roleSourceRoot: VIBEROOTS_ROOT,
+    });
+    assert.equal(flattenedActionRoles.status, 0);
+    assert.equal(flattenedActionRoles.required, "https://required.example/cache");
+    assert.equal(flattenedActionRoles.optional, lateOptional);
+
+    const buckSource = await fsp.readFile(
+      sourceFile("build-tools/lang/nix_cache_health.bzl"),
+      "utf8",
+    );
+    const buckShell = buckCacheHealthShell(buckSource).replaceAll("exit 1", "return 1");
+    const runBoundAction = async (required: string[], optional: string[]) => {
+      const config = flattenedActionRoles.nixConfig;
+      const binding = nixCachePolicyBindingDigest({
+        kind: "reviewed",
+        config,
+        policy: "auto",
+        requiredSubstituters: required,
+        optionalSubstituters: optional,
+      });
+      const { stdout } = await execFileAsync(
+        "/bin/bash",
+        ["-c", `health() { ${buckShell} }; set +e; health >/dev/null 2>&1; printf '%s' "$?"`],
+        {
+          env: {
+            ...process.env,
+            NIX_BIN: nix,
+            VBR_NIX_BIN: nix,
+            PATH: `${root}:${path.dirname(process.execPath)}:/usr/bin:/bin`,
+            TEST_CURL_EXIT: "22",
+            TEST_EFFECTIVE_NIX_CONFIG: `substituters = https://required.example/cache ${lateOptional}`,
+            TEST_NIX_CONFIG_STATUS: "0",
+            TMPDIR: root,
+            VBR_ARTIFACT_TOOLS_ROOT: path.dirname(path.dirname(process.execPath)),
+            VBR_NIX_CACHE_POLICY: "auto",
+            NIX_CONFIG: config,
+            VBR_NIX_CACHE_ROLE_REQUIRED: required.join(" "),
+            VBR_NIX_CACHE_ROLE_OPTIONAL: optional.join(" "),
+            VBR_NIX_CACHE_ROLE_POLICY: "auto",
+            VBR_NIX_CACHE_ROLE_BINDING: binding,
+          },
+        },
+      );
+      return Number(stdout);
+    };
+    assert.equal(await runBoundAction(["https://required.example/cache"], [lateOptional]), 0);
+    assert.equal(await runBoundAction([lateOptional], []), 1);
+    assert.equal(await runBoundAction([lateOptional], [lateOptional]), 1);
+
+    const mismatchedJsonRoles = await runStage0({
+      effective: "substituters = file:///system-cache",
+      effectiveJson: "{}",
+      roleSourceRoot: VIBEROOTS_ROOT,
+    });
+    assert.equal(mismatchedJsonRoles.status, 1);
+    assert.equal(mismatchedJsonRoles.required, "");
+    assert.equal(mismatchedJsonRoles.optional, "");
+    assert.equal(mismatchedJsonRoles.nixArgs, "");
     await withEnv(
       {
         NIX_CONFIG: refreshed.nixConfig,
@@ -912,33 +1427,30 @@ fi
       },
       async () => {
         const result = await applyNixCacheHealthPolicy("/tmp/repo", {
-          readEffectiveConfig: async () => {
-            throw new Error("downstream TypeScript must reuse exact stage0 authority");
-          },
+          readEffectiveConfig: async () => "builders =",
         });
         assert.equal(result.authority, "reviewed");
         assert.equal(result.nixConfig, full);
       },
     );
 
-    const reused = await runStage0({
+    const reReviewed = await runStage0({
       applied: "1",
       reviewed: full,
       required: "",
       optional: "",
       reviewedPolicy: "auto",
       sourceConfig: "builders =",
-      status: "42",
     });
-    assert.equal(reused.status, 0);
-    assert.equal(reused.reviewed, full);
-    assert.equal(reused.reviewedPolicy, "auto");
-    assert.equal(reused.sourceConfig, "builders =");
+    assert.equal(reReviewed.status, 0);
+    assert.equal(reReviewed.reviewed, "builders =");
+    assert.equal(reReviewed.reviewedPolicy, "auto");
+    assert.equal(reReviewed.sourceConfig, "builders =");
     assert.equal(
-      reused.nixArgs,
+      reReviewed.nixArgs,
       "--option substituters  --option extra-substituters  --option connect-timeout 3 --option stalled-download-timeout 10 --option fallback true",
     );
-    assert.equal(reused.calls, 0);
+    assert.equal(reReviewed.calls, 1);
 
     const stale = await runStage0({ applied: "1", reviewed: full, status: "42" });
     assert.equal(stale.status, 1);
@@ -969,9 +1481,43 @@ fi
     const systemOnly = await runStage0({
       nixConfig: "builders =",
       effective: "substituters = file:///system-cache",
+      effectiveJson: JSON.stringify({
+        substituters: {
+          defaultValue: ["file:///system-cache"],
+          value: ["file:///system-cache"],
+        },
+      }),
+      nixConfDir: await fsp.mkdtemp(path.join(root, "system-nix-conf-")),
+      roleSourceRoot: VIBEROOTS_ROOT,
     });
     assert.equal(systemOnly.required, "file:///system-cache");
     assert.match(systemOnly.nixArgs, /--option substituters file:\/\/\/system-cache/);
+
+    const authenticated = await runStage0({
+      effective: [
+        "extra-substituters = https://auth.example/cache",
+        `netrc-file = ${reviewedNetrc}`,
+      ].join("\n"),
+    });
+    assert.equal(authenticated.status, 0);
+    assert.match(authenticated.reviewed, new RegExp(`netrc-file = ${reviewedNetrc}`));
+    assert.equal(authenticated.nixConfig, authenticated.reviewed);
+    assert.doesNotMatch(authenticated.reviewed, /fixture-secret/);
+
+    const credentialRejected = await runStage0({
+      effective: "extra-substituters = https://auth.example/cache?token=fixture-secret",
+      applied: "1",
+      reviewed: "extra-substituters = https://auth.example/cache?token=fixture-secret",
+      required: "",
+      optional: "https://auth.example/cache?token=fixture-secret",
+      reviewedPolicy: "auto",
+      sourceConfig: "extra-substituters = https://auth.example/cache?token=fixture-secret",
+    });
+    assert.equal(credentialRejected.status, 1);
+    assert.equal(credentialRejected.applied, "");
+    assert.equal(credentialRejected.reviewed, "");
+    assert.equal(credentialRejected.sourceConfig, "");
+    assert.doesNotMatch(credentialRejected.nixConfig, /fixture-secret|token=/);
 
     const removed = await runStage0({
       effective: [
@@ -982,6 +1528,28 @@ fi
     assert.equal(removed.required, "file:///system-cache");
     assert.equal(removed.optional, "file:///kept-optional");
     assert.doesNotMatch(removed.nixArgs, /removed\.example/);
+
+    const optionalHttpFailure = await runStage0({
+      effective:
+        "extra-substituters = https://invalid-response.example/cache?priority=fixture-secret",
+    });
+    assert.equal(optionalHttpFailure.status, 0);
+    assert.equal(optionalHttpFailure.applied, "1");
+    assert.doesNotMatch(optionalHttpFailure.nixConfig, /invalid-response|fixture-secret/);
+
+    const requiredHttpFailure = await runStage0({
+      effective: "substituters = https://invalid-response.example/cache",
+    });
+    assert.equal(requiredHttpFailure.status, 1);
+    assert.equal(requiredHttpFailure.applied, "");
+
+    const strictOptionalHttpFailure = await runStage0({
+      effective: "extra-substituters = https://invalid-response.example/cache",
+      policy: "strict",
+    });
+    assert.equal(strictOptionalHttpFailure.status, 1);
+    assert.equal(strictOptionalHttpFailure.applied, "");
+
     const removedReused = await runStage0({
       applied: removed.applied,
       reviewed: removed.reviewed,
@@ -989,10 +1557,10 @@ fi
       optional: removed.optional,
       reviewedPolicy: removed.reviewedPolicy,
       sourceConfig: removed.sourceConfig,
-      status: "42",
+      effective: removed.sourceConfig,
     });
     assert.equal(removedReused.status, 0);
-    assert.equal(removedReused.calls, 0);
+    assert.equal(removedReused.calls, 1);
     assert.doesNotMatch(removedReused.nixArgs, /removed\.example/);
 
     const degradedAutoToStrict = await runStage0({
@@ -1021,11 +1589,18 @@ fi
       sourceConfig: "substituters = file:///strict-cache",
       policy: "auto",
       effectiveFromNixConfig: true,
+      effectiveJson: JSON.stringify({
+        substituters: {
+          defaultValue: [],
+          value: ["file:///strict-cache"],
+        },
+      }),
+      roleSourceRoot: VIBEROOTS_ROOT,
     });
     assert.equal(strictToAuto.status, 0);
     assert.equal(strictToAuto.required, "file:///strict-cache");
     assert.equal(strictToAuto.reviewedPolicy, "auto");
-    assert.equal(strictToAuto.calls, 1);
+    assert.equal(strictToAuto.calls, 2);
 
     const empty = await runStage0({ effective: "" });
     assert.equal(empty.status, 0);
@@ -1100,6 +1675,14 @@ test("nix cache readiness reports reachable, absent, degraded, and strict states
   assert.equal(degraded.state, "degraded");
   assert.match(degraded.message, /https:\/\/stale\.dynamic\.example\/cache/);
 
+  const requiredUnavailable = await evaluateNixCacheReadinessFromConfig(
+    "substituters = https://required.dynamic.example/cache",
+    "auto",
+    async () => false,
+  );
+  assert.equal(requiredUnavailable.state, "failed");
+  assert.match(requiredUnavailable.message, /required cache policy failed/);
+
   const strict = await evaluateNixCacheReadinessFromConfig(
     "extra-substituters = https://strict.dynamic.example/cache",
     "strict",
@@ -1107,12 +1690,59 @@ test("nix cache readiness reports reachable, absent, degraded, and strict states
   );
   assert.equal(strict.state, "failed");
   assert.doesNotMatch(JSON.stringify(strict), /home\.kilty|kilty\.io/);
+
+  const optionalHttpFailure = await evaluateNixCacheReadinessFromConfig(
+    "extra-substituters = https://optional-http.example/cache",
+    "auto",
+    async () => {
+      throw new Error("curl exit 22");
+    },
+  );
+  assert.equal(optionalHttpFailure.state, "degraded");
+
+  const flattenedOptionalHttpFailure = await evaluateNixCacheReadinessFromConfig(
+    "substituters = https://required.example https://optional.example",
+    "auto",
+    async (url) => {
+      if (url.includes("optional")) throw new Error("curl exit 22");
+      return true;
+    },
+    {
+      requiredSubstituters: ["https://required.example"],
+      optionalSubstituters: ["https://optional.example"],
+    },
+  );
+  assert.equal(flattenedOptionalHttpFailure.state, "degraded");
+  await assert.rejects(
+    evaluateNixCacheReadinessFromConfig(
+      "substituters = https://required.example https://optional.example",
+      "auto",
+      async () => true,
+      {
+        requiredSubstituters: ["https://required.example"],
+        optionalSubstituters: ["https://forged.example"],
+      },
+    ),
+    /proven Nix cache roles do not match effective config/,
+  );
+
+  for (const [config, policy] of [
+    ["substituters = https://required-http.example/cache", "auto"],
+    ["extra-substituters = https://optional-http.example/cache", "strict"],
+  ] as const) {
+    await assert.rejects(
+      evaluateNixCacheReadinessFromConfig(config, policy, async () => {
+        throw new Error("curl exit 22");
+      }),
+      /curl exit 22/,
+    );
+  }
 });
 
-test("nix cache readiness redacts query and userinfo from recorded substituter identities", async () => {
+test("nix cache readiness preserves safe queries and rejects URL credentials before probing", async () => {
   const probed: string[] = [];
   const readiness = await evaluateNixCacheReadinessFromConfig(
-    "extra-substituters = https://operator:secret@cache.example/path?token=abc123",
+    "extra-substituters = https://cache.example/path?priority=40",
     "auto",
     async (url) => {
       probed.push(url);
@@ -1120,9 +1750,29 @@ test("nix cache readiness redacts query and userinfo from recorded substituter i
     },
   );
   assert.equal(readiness.state, "degraded");
-  assert.deepEqual(readiness.optionalSubstituters, ["https://<redacted>@cache.example/path"]);
-  assert.deepEqual(probed, ["https://operator:secret@cache.example/path?token=abc123"]);
-  assert.doesNotMatch(JSON.stringify(readiness), /secret|token=abc123/);
+  assert.deepEqual(readiness.optionalSubstituters, ["https://cache.example/path"]);
+  assert.deepEqual(probed, ["https://cache.example/path?priority=40"]);
+  for (const unsafe of [
+    "https://operator:secret@cache.example/path",
+    "https://cache.example/path?token=fixture-secret",
+    "https://cache.example/path?to%6ben=fixture-secret",
+    "https://cache.example/path#access_token=fixture-secret",
+    "https://cache.example/path#tenant=x&token=fixture-secret",
+  ]) {
+    const before = probed.length;
+    await assert.rejects(
+      evaluateNixCacheReadinessFromConfig(`extra-substituters = ${unsafe}`, "auto", async (url) => {
+        probed.push(url);
+        return true;
+      }),
+      (error: Error) => {
+        assert.match(error.message, /embeds credentials/);
+        assert.doesNotMatch(error.message, /fixture-secret|operator|secret|token=/);
+        return true;
+      },
+    );
+    assert.equal(probed.length, before);
+  }
 });
 
 test("nix cache health runs before dev-build and install nix entrypoints", async () => {
@@ -1164,7 +1814,11 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   );
   assertOrder(prelude, "await applyNixCacheHealthPolicy(root)", "if (");
 
-  const env = await fsp.readFile(sourceFile("build-tools/tools/bin/devshell.sh"), "utf8");
+  const env = [
+    await fsp.readFile(sourceFile("build-tools/tools/bin/devshell-cache-health.sh"), "utf8"),
+    await fsp.readFile(sourceFile("build-tools/tools/bin/devshell-workspace.sh"), "utf8"),
+    await fsp.readFile(sourceFile("build-tools/tools/bin/devshell.sh"), "utf8"),
+  ].join("\n");
   assertOrder(
     env,
     "env_apply_nix_cache_health || return 1",
@@ -1205,6 +1859,8 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
     /\[ -n "\$NIX_CACHE_NETRC" \] && \[ -f "\$NIX_CACHE_NETRC" \] && \[ -r "\$NIX_CACHE_NETRC" \]/,
   );
   assert.match(buckShell, /--netrc-file "\$NIX_CACHE_NETRC"/);
+  assert.match(buckShell, /NIX_CACHE_NETRC="\$VBR_ACTION_NETRC_FILE"/);
+  assert.match(buckShell, /embeds credentials in its URL; use netrc-file authentication/);
   assert.match(buckShell, /NIX_CACHE_REMOVED_IDENTITIES/);
   assert.match(buckShell, /<redacted>@/);
   assert.doesNotMatch(buckShell, /unavailable:\$NIX_CACHE_REMOVED"/);
@@ -1216,8 +1872,45 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   );
   assert.doesNotMatch(buck, /store info --store/);
   assert.doesNotMatch(buck, /\$\(cat/);
-  assert.doesNotMatch(buck, /\$\(printf/);
+  assert.match(
+    buckShell,
+    /NIX_CACHE_CREDENTIAL_URL="\$\(printf '%s' "\$NIX_CACHE_SUB" \| tr '\[:upper:\]' '\[:lower:\]'\)"/,
+  );
   assert.doesNotMatch(buck, /export NIX_CONFIG="[^"]*\\\\n/);
+
+  const actionShell = await fsp.readFile(sourceFile("build-tools/lang/nix_shell.bzl"), "utf8");
+  assert.match(actionShell, /VBR_ACTION_EFFECTIVE_NETRC/);
+  assert.doesNotMatch(actionShell, /VBR_ACTION_REVIEWED_NIX_CONFIG|VBR_ACTION_REVIEWED_NETRC/);
+  assert.match(actionShell, /proven Nix cache roles do not match effective substituters/);
+  assert.match(actionShell, /u\.every\(\(x,i\)=>x===c\[i\]\)/);
+  assert.match(actionShell, /JSON\.stringify\(\{required:/);
+  assert.match(actionShell, /\.slice\(0,16\)/);
+  assert.doesNotMatch(actionShell, /required:\s*r[,}]/);
+  assert.doesNotMatch(actionShell, /optional:\s*o[,}]/);
+  assert.doesNotMatch(actionShell, /baseline:\s*e\./);
+  assert.doesNotMatch(actionShell, /candidate:\s*e\./);
+  assert.match(actionShell, /\(umask 077; cp \\"\$VBR_ACTION_EFFECTIVE_NETRC\\"/);
+  assert.match(actionShell, /netrc-file = %s.*VBR_ARTIFACT_STATE\/netrc/);
+  assert.match(
+    actionShell,
+    /unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG [^"]*; "\s*\+ nix_cache_health_shell\(\)/,
+  );
+  assert.match(buckShell, /proven Nix cache roles do not match reviewed config bytes/);
+  assert.match(buckShell, /VBR_NIX_CACHE_ROLE_BINDING/);
+  assert.match(actionShell, /vbr-nix-cache-review@1/);
+  assert.doesNotMatch(actionShell, /cat \\"\$VBR_ACTION_EFFECTIVE_NETRC\\"/);
+  assert.doesNotMatch(actionShell, /cache\\.home|NETRC_SOURCE_|NETRC_COPY_/);
+
+  const verifyHealth = await fsp.readFile(
+    sourceFile("build-tools/tools/dev/verify/nix-cache-health.ts"),
+    "utf8",
+  );
+  const verifyHealthConfig = await fsp.readFile(
+    sourceFile("build-tools/tools/dev/verify/nix-cache-health-config.ts"),
+    "utf8",
+  );
+  assert.match(verifyHealth, /from "\.\/nix-cache-health-config"/);
+  assert.match(verifyHealthConfig, /import fs from "node:fs"/);
 
   assert.match(env, /nix-cache-info/);
   assert.match(env, /export VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG="\$\{NIX_CONFIG(?::-)?\}"/);
@@ -1252,7 +1945,9 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
     "utf8",
   );
   assert.match(verifyBuckEnv, /maybeEnvArg\("NIX_CONFIG"/);
-  assert.match(verifyBuckEnv, /maybeEnvArg\("VBR_NIX_CACHE_HEALTH_APPLIED"/);
+  assert.match(verifyBuckEnv, /assertSafeNixCacheConfig/);
+  assert.doesNotMatch(verifyBuckEnv, /maybeEnvArg\("VBR_NIX_CACHE_HEALTH_APPLIED"/);
+  assert.doesNotMatch(verifyBuckEnv, /maybeEnvArg\(\s*"VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG"/);
 });
 
 function assertOrder(source: string, first: string, second: string): void {
@@ -1266,3 +1961,32 @@ function assertOrder(source: string, first: string, second: string): void {
 function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
 }
+
+test("canonical cache re-review issues capability in the active module instance", async () => {
+  const required = "file:///required-cache";
+  const optional = "file:///optional-cache";
+  const reviewed = `builders =\nsubstituters = ${required}\nextra-substituters = ${optional}\nfallback = true`;
+  await withEnv(
+    {
+      NIX_CONFIG: reviewed,
+      VBR_CANONICAL_ARTIFACT_ENTRYPOINT: "1",
+      VBR_NIX_CACHE_HEALTH_APPLIED: "1",
+      VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: reviewed,
+      VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS: optional,
+      VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY: "auto",
+      VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS: required,
+    },
+    async () => {
+      await applyNixCacheHealthPolicy(process.cwd(), {
+        readEffectiveConfig: async () => "builders =",
+      });
+      assert.deepEqual(outcomeFromNixCachePolicyCapability(currentNixCachePolicyCapability()), {
+        kind: "reviewed",
+        config: reviewed,
+        policy: "auto",
+        requiredSubstituters: [required],
+        optionalSubstituters: [optional],
+      });
+    },
+  );
+});

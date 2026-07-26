@@ -63,3 +63,14 @@ test("restoreFlakeLock preserves preexisting user lock edits", async () => {
     );
   });
 });
+
+test("dev build reconciles global-input TARGETS after restoring the flake lock", async () => {
+  const source = await fsp.readFile(
+    new URL("../../dev/dev-build/run-dev-build.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(
+    source,
+    /await restoreFlakeLock\(root, flakeLockSnapshot\);\s+await reconcileWorkspaceGlobalNixInputTargets\(\);\s+await runHousekeeping/,
+  );
+});

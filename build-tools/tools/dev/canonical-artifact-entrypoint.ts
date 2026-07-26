@@ -112,7 +112,10 @@ export function enterCanonicalArtifactEntrypoint(
     allowDevOverrides?: boolean;
   } = {},
 ): string {
-  const ingressReviewedNixConfig = consumeArtifactIngressReviewedNixConfig();
+  const canonicalReentry = process.env.VBR_CANONICAL_ARTIFACT_ENTRYPOINT === "1";
+  const ingressReviewedNixConfig = canonicalReentry
+    ? ({ applied: false, config: "" } as const)
+    : consumeArtifactIngressReviewedNixConfig();
   const originalArgs = process.argv.slice(2);
   const workspaceTransport = artifactWorkspaceRootTransport(originalArgs, workspaceRoot);
   const buckTransport = canonicalBuckActionTransport(
@@ -132,11 +135,16 @@ export function enterCanonicalArtifactEntrypoint(
     ? buckTransport.artifactToolsRoot
     : canonicalArtifactToolsRoot(scopedWorkspaceRoot);
   const assertedTools = String(process.env.VBR_ARTIFACT_TOOLS_ROOT || "").trim();
-  const canonicalReentry = process.env.VBR_CANONICAL_ARTIFACT_ENTRYPOINT === "1";
   const reentryReviewed = canonicalReviewedConfig(process.env);
   const nixCacheHealth = canonicalReentry
     ? reentryReviewed.valid
-      ? { applied: reentryReviewed.applied, config: reentryReviewed.config }
+      ? {
+          applied: reentryReviewed.applied,
+          config: reentryReviewed.config,
+          policy: reentryReviewed.policy,
+          requiredSubstituters: reentryReviewed.requiredSubstituters,
+          optionalSubstituters: reentryReviewed.optionalSubstituters,
+        }
       : { applied: false, config: "" }
     : ingressReviewedNixConfig;
   const reentryTools = canonicalReentry

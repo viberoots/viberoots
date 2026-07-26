@@ -4,6 +4,7 @@ export const NIX_CACHE_TRANSPORT_CURL_EXIT_CODES = [
   7, // connection failure
   16, // HTTP/2 framing
   28, // timeout
+  35, // TLS connection failure
   52, // empty reply
   55, // send failure
   56, // receive failure

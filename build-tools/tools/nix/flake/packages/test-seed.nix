@@ -167,6 +167,8 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
   # consumer index.
   git -c init.defaultBranch=main -c advice.defaultBranchName=false init -q "$out/viberoots"
   git -C "$out/viberoots" config gc.auto 0
+  git -C "$out/viberoots" config gc.autoDetach false
+  git -C "$out/viberoots" config maintenance.auto false
   git -C "$out/viberoots" add -A
   git -C "$out/viberoots" commit -q -m seed-viberoots --allow-empty
   git -c init.defaultBranch=main -c advice.defaultBranchName=false init -q "$out"
@@ -176,6 +178,8 @@ pkgs.runCommand "test-seed" { nativeBuildInputs = [ pkgs.git ]; } ''
   # repo stays loose — tests that CoW-copy this seed and re-run git init get their own
   # fresh gc config, so this setting does not propagate beyond seed construction.
   git -C "$out" config gc.auto 0
+  git -C "$out" config gc.autoDetach false
+  git -C "$out" config maintenance.auto false
   git -C "$out" add -A
   git -C "$out" commit -q -m seed --allow-empty
 ''

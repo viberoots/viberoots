@@ -15,7 +15,7 @@ test("reproducibility matrix IDs are unique and cover every required family", as
   assert.equal(new Set(ids).size, ids.length);
   assert.deepEqual(
     [...new Set(ARTIFACT_REPRODUCIBILITY_MATRIX.map((entry) => entry.artifactFamily))].sort(),
-    ["cpp", "go", "mixed", "node", "python", "wasm"],
+    ["cpp", "go", "mixed", "node", "python", "rust", "wasm"],
   );
   assert.equal(hasReproducibilityMatrixId("go-lib"), true);
   assert.equal(hasReproducibilityMatrixId("invented"), false);
@@ -70,6 +70,18 @@ test("reproducibility matrix IDs are unique and cover every required family", as
   assert.match(nodePlanner, /export VBR_NODE_BIN=\$\{pkgs\.nodejs_22\}\/bin\/node/);
   const wasm = ARTIFACT_REPRODUCIBILITY_MATRIX.find(({ id }) => id === "wasm-artifact")!;
   assert.deepEqual(wasm.graphSelection.ruleTypes, ["python_nix_wasm_build"]);
+  const rust = ARTIFACT_REPRODUCIBILITY_MATRIX.find(({ id }) => id === "rust-pr5")!;
+  assert.deepEqual(rust.systems, ["aarch64-darwin", "aarch64-linux", "x86_64-linux"]);
+  assert.deepEqual(rust.systemEvidence, {
+    nativeExecution: ["aarch64-darwin"],
+    failClosedUntilExternalEvidence: ["aarch64-linux", "x86_64-linux"],
+  });
+  assert.deepEqual(rust.coverage.routeCapabilities, ["base", "wasm", "wasi"]);
+  assert.deepEqual(
+    rust.languageProofs.map(({ target }) => target),
+    ["//projects/apps/repro-rust:repro-rust-wasm", "//projects/apps/repro-rust:repro-rust-wasi"],
+  );
+  assert.equal(reproducibilityMatrixCaseCoversLanguage("rust-pr5", "rust"), true);
   const mixedGoTargets = await fs.readFile(
     viberootsSourcePath(
       "build-tools/tools/scaffolding/templates/ts/go-cpp-lib/libs/{{ name }}-go/TARGETS.jinja",
@@ -104,6 +116,7 @@ test("every matrix recipe binds the target emitted by its actual scaffold templa
     ["python-artifact", "python/app/TARGETS.jinja", "projects/apps/repro-python", "repro-python"],
     ["cpp-lib", "cpp/lib/TARGETS.jinja", "projects/libs/repro-cpp", "repro-cpp"],
     ["wasm-artifact", "python/wasm-lib/TARGETS.jinja", "projects/libs/repro-wasm", "repro-wasm"],
+    ["rust-pr5", "rust/cli/TARGETS.jinja", "projects/apps/repro-rust", "repro-rust"],
     [
       "mixed-artifact",
       "ts/go-cpp-lib/libs/{{ name }}-ts/TARGETS.jinja",

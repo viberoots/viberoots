@@ -388,6 +388,9 @@ cache's `nix-cache-info` endpoint using the reviewed `netrc-file` when configure
 per-process `NIX_CONFIG` while keeping any reachable configured caches and Nix fallback enabled. Set
 `VBR_NIX_CACHE_POLICY=strict` only when cache availability is the behavior under test, or
 `VBR_NIX_CACHE_POLICY=off` to skip the dynamic probe for debugging.
+Credential-bearing URL userinfo, query parameters, and fragments are rejected before probing or
+review. Keep non-secret cache options such as `priority` in the URL, and configure authentication
+only through the reviewed `netrc-file`.
 
 For Cachix-backed caches, the developer setup remains:
 
@@ -1201,7 +1204,10 @@ Activation requires:
 - configuring authentication and TLS for the RE endpoint
 - adding at least one non-empty profile to `toolchains//:remote_test_execution` for test execution
 - keeping repo-owned test rules (`zx_test`, Node, Go, C++, and Python Nix tests) on their local default while allowing selected profiles to pass the chosen executor fields into `ExternalRunnerTestInfo`; Node, Go, C++, and Python selection is per-target, while `zx_test` also honors the PR7 `[test] viberoots_remote_profile` activation config
-- keeping Rust external-runner tests local by default until PR-5 proves worker tool closure, source-snapshot materialization, environment filtering, and cleanup; the wrapper's executor fields and project-relative metadata are readiness plumbing, not remote-readiness evidence
+- admitting Rust build and external-runner actions through the same declared source snapshot,
+  materialization manifest, tool closure, environment filtering, cache identity, and cleanup checks
+  as other Nix-backed languages; tests remain local unless a reviewed remote profile supplies all
+  required evidence
 - ensuring remote-capable external-runner tests set `use_project_relative_paths = True` and `run_from_project_root = True`; CI may pass Buck2's `--unstable-allow-compatible-tests-on-re` only to allow compatible tests to run on RE, not to make incompatible tests compatible
 - adding a remote-enabled execution platform/executor config for build actions; the test remote execution toolchain alone does not make ordinary build/genrule actions remote
 - opting rule families into remote build execution only after their actions are hermetic
@@ -1325,7 +1331,22 @@ The expected fix is not to disable remote execution broadly. The expected fix is
 
 ### Local Conformance Checklist
 
-`viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles` is the only initial `remote:ready` target. It is a tiny local/dry-run conformance target used to prove the evidence contract before production remote execution is enabled. The remaining wrapper families stay `remote:local-only` until their source snapshot, command input, Nix materialization, artifact, tool closure, and policy evidence is complete.
+The initial `remote:ready` local/dry-run conformance targets are:
+
+- `//build-tools/tools/tests/remote-exec/wrapper-fixtures:cpp_ready_handles`
+- `//build-tools/tools/tests/remote-exec/wrapper-fixtures:go_ready_handles`
+- `//build-tools/tools/tests/remote-exec/wrapper-fixtures:node_ready_handles`
+- `//build-tools/tools/tests/remote-exec/wrapper-fixtures:python_ready_handles`
+- `//build-tools/tools/tests/remote-exec/wrapper-fixtures:rust_build_ready_policy`
+- `//build-tools/tools/tests/remote-exec/wrapper-fixtures:rust_ready_handles`
+- `//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles`
+
+These fixtures prove the complete declared evidence contract for the current wrapper families,
+including real Rust build and test execution from a dedicated snapshot containing the fixture's
+Cargo manifest, lock, source, and non-empty Rust graph. The conformance test executes the built
+binary and its Cargo harness; `aquery` remains supplemental structural evidence rather than the
+execution claim. Other targets remain `remote:local-only` until their source snapshot, command
+input, Nix materialization, artifact, tool closure, and policy evidence is complete.
 
 Local/dry-run conformance uses fixture or generated Buck config only:
 

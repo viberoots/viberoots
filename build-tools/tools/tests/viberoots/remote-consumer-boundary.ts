@@ -39,7 +39,6 @@ export function commandEnv(consumer: string, extra: NodeJS.ProcessEnv = {}): Nod
     NO_DEV_SHELL: "1",
     VERIFY_SKIP_LINT: "1",
     VERIFY_ALLOW_CONCURRENT: "1",
-    VBR_NIX_CACHE_POLICY: "off",
     PATH: `${currentToolBin}:${process.env.PATH || ""}`,
   };
   delete env.BUCK_ISOLATION_DIR;

@@ -2,6 +2,7 @@ import path from "node:path";
 import type { LangEntry } from "./types";
 import { pathExists, sourceRoot } from "./fs";
 import { findImporterLockfiles } from "../../lib/importers";
+import { languageEnablementGaps } from "../../lib/lang-contracts";
 
 export async function detectEnabledAndMissing(
   langs: Map<string, LangEntry>,
@@ -67,7 +68,8 @@ export async function detectEnabledAndMissing(
     for (const r of req) {
       if (!(await requiredPathPresent(r))) missing.push(r);
     }
-    if (prefer(id) && e.hermetic?.status === "graduated" && missing.length === 0) enabled.push(id);
+    const lifecycleReady = languageEnablementGaps(e.hermetic).length === 0;
+    if (prefer(id) && lifecycleReady && missing.length === 0) enabled.push(id);
     else disabled.push({ id, missingPaths: missing });
   }
 

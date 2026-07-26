@@ -23,6 +23,7 @@ import {
   writeRemoteBuckMaterializationMetadata,
 } from "./remote-buck-artifacts";
 import { exactTimeoutsForVerifyPass } from "./project-enforcement-execution-policy";
+import type { CacheHealthResult } from "./nix-cache-health";
 export { verifyBuck2Threads, type VerifyBuck2ThreadsOptions } from "./buck2-threads";
 export function spawnVerifyBuck2Tests(opts: {
   root: string;
@@ -42,6 +43,7 @@ export function spawnVerifyBuck2Tests(opts: {
   onProgressStop?: (passName: string, status: number) => void;
   spawnImpl?: typeof spawn;
   artifactToolsRoot: string;
+  cacheHealth: CacheHealthResult;
 }): { pgid: number; nestedIso: string; wait: () => Promise<number> } {
   const minPerTestTimeoutSecs = 20 * 60;
   const passName = String(opts.passName || "shared");
@@ -81,6 +83,7 @@ export function spawnVerifyBuck2Tests(opts: {
     testNixTimeoutSecs,
     executionPolicy: opts.executionPolicy,
     artifactToolsRoot: opts.artifactToolsRoot,
+    cacheHealth: opts.cacheHealth,
   });
   const timeoutPath = resolveToolPathSync("timeout");
   const buck2Path = resolveToolPathSync("buck2");
@@ -149,9 +152,13 @@ export function spawnVerifyBuck2Tests(opts: {
 
   if (opts.logFile) {
     const remotePolicySummary = remoteBuckPolicySummary(opts.executionPolicy, passName);
+    const cacheRoleSummary =
+      opts.cacheHealth.authority === "reviewed"
+        ? `[verify] cache role transport required_count=${opts.cacheHealth.requiredSubstituters.length} optional_count=${opts.cacheHealth.optionalSubstituters.length} bound=true\n`
+        : "[verify] cache role transport required_count=0 optional_count=0 bound=false\n";
     void fsp.appendFile(
       opts.logFile,
-      `${remotePolicySummary ? `${remotePolicySummary}\n` : ""}[verify] buck2 test begin iso=${opts.iso} pass=${passName} start_s=${startS} threads=${threads > 0 ? threads : "default"} nested_iso=${nestedIso} target_count=${opts.targets.length}\n`,
+      `${remotePolicySummary ? `${remotePolicySummary}\n` : ""}${cacheRoleSummary}[verify] buck2 test begin iso=${opts.iso} pass=${passName} start_s=${startS} threads=${threads > 0 ? threads : "default"} nested_iso=${nestedIso} target_count=${opts.targets.length}\n`,
       "utf8",
     );
   }

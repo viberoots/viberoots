@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import path from "node:path";
 import { test } from "node:test";
 import {
@@ -46,6 +47,16 @@ test("canonical re-entry binds exact reviewed config bytes to their digest", () 
     ),
     false,
   );
+  assert.equal(
+    isCanonicalArtifactEntrypointEnvironment(
+      {
+        ...expected,
+        VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS: "https://forged.example/cache",
+      },
+      expected,
+    ),
+    false,
+  );
 });
 
 test("canonical re-entry binds a healthy empty cache decision to its digest", () => {
@@ -62,6 +73,37 @@ test("canonical re-entry binds a healthy empty cache decision to its digest", ()
     ),
     false,
   );
+});
+
+test("canonical wrapper re-entry preserves nonempty role-bound review fields", () => {
+  const roleConfig = [
+    "substituters = https://required.example/cache",
+    "extra-substituters = https://optional.example/cache",
+    "fallback = true",
+  ].join("\n");
+  const env = canonicalArtifactReentryEnvironment(process.cwd(), toolsRoot, {
+    nixCacheHealth: {
+      applied: true,
+      config: roleConfig,
+      policy: "auto",
+      requiredSubstituters: ["https://required.example/cache"],
+      optionalSubstituters: ["https://optional.example/cache"],
+    },
+  });
+  const moduleUrl = new URL("../../dev/canonical-artifact-entrypoint.ts", import.meta.url).href;
+  const result = spawnSync(
+    path.join(toolsRoot, "bin", "zx-wrapper"),
+    [
+      "-e",
+      `const m = await import(${JSON.stringify(moduleUrl)}); m.enterCanonicalArtifactEntrypoint(process.cwd());`,
+    ],
+    {
+      cwd: process.cwd(),
+      encoding: "utf8",
+      env,
+    },
+  );
+  assert.equal(result.status, 0, result.stderr);
 });
 
 test("artifact environments reject missing and forged reviewed-config authority", () => {

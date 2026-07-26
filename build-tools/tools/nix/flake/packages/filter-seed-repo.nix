@@ -79,6 +79,11 @@ let
     "xdg-cache"
   ];
   isRootFile = rel: !(lib.hasInfix "/" rel) && rel != "";
+  isVcsMetadataPath = rel:
+    rel == ".git" ||
+    lib.hasPrefix ".git/" rel ||
+    lib.hasSuffix "/.git" rel ||
+    lib.hasInfix "/.git/" rel;
   isExcludedRootFile = base:
     base == ".DS_Store" ||
     base == ".envrc" ||
@@ -111,6 +116,7 @@ let
     (lib.hasPrefix "run." base && lib.hasSuffix ".out" base) ||
     (lib.hasPrefix "v." base && lib.hasSuffix ".out" base);
   isExcludedPath = rel:
+    isVcsMetadataPath rel ||
     rel == "build-tools/tools/dev/toolchain-paths.json" ||
     rel == "toolchains/toolchain_paths.bzl" ||
     rel == ".viberoots/workspace/buck/graph.json" ||

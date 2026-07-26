@@ -45,8 +45,11 @@ export async function cmdLanguage(args: string[], flags: ScafFlags) {
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([languageId, language]) => {
         const gaps = languageGraduationGaps(language.hermetic);
-        if (language.hermetic?.status !== "graduated") gaps.unshift("status is scaffold");
-        if (enabled.has(languageId) && gaps.length > 0) gaps.unshift("enabled before graduation");
+        if (language.hermetic?.status !== "graduated") {
+          gaps.unshift(`status is ${language.hermetic?.status || "missing"}`);
+        }
+        if (enabled.has(languageId) && gaps.length > 0)
+          gaps.unshift("enabled before lifecycle review");
         return { id: languageId, enabled: enabled.has(languageId), graduationGaps: gaps };
       });
     const payload = {

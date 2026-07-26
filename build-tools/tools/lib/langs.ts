@@ -2,7 +2,11 @@
 import fsSync from "node:fs";
 import fsp from "node:fs/promises";
 import path from "node:path";
-import type { LanguageHermeticContract, ScaffoldingLanguage } from "./lang-contracts";
+import {
+  languageEnablementGaps,
+  type LanguageHermeticContract,
+  type ScaffoldingLanguage,
+} from "./lang-contracts";
 import { findImporterLockfiles } from "./importers";
 
 type ManifestLang = Partial<ScaffoldingLanguage> & { id: string };
@@ -87,7 +91,7 @@ export async function detectEnabledLanguages(cwd = process.cwd()): Promise<Scaff
   }
   const out: ScaffoldingLanguage[] = [];
   for (const s of languages) {
-    if (s.hermetic?.status !== "graduated") continue;
+    if (languageEnablementGaps(s.hermetic).length > 0) continue;
     if (enabledDeclared && !preferred.includes(s.id)) continue;
     let ok = true;
     for (const req of s.requiredPaths) {

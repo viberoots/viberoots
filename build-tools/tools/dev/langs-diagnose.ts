@@ -36,7 +36,9 @@ async function main() {
       .filter(([id]) => !filterId || id === filterId)
       .map(([id, lang]) => {
         const gaps = languageGraduationGaps(lang.hermetic);
-        if (lang.hermetic?.status !== "graduated") gaps.unshift("status is scaffold");
+        if (lang.hermetic?.status !== "graduated") {
+          gaps.unshift(`status is ${lang.hermetic?.status || "missing"}`);
+        }
         return [id, gaps];
       }),
   );

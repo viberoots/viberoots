@@ -7,6 +7,7 @@ import {
   reproducibilityMatrixCaseCoversLanguage,
   reproducibilityMatrixCoverage,
 } from "../lib/artifact-reproducibility-matrix";
+import { languageEnablementGaps } from "../lib/lang-contracts";
 
 const require = createRequire(import.meta.url);
 // Lazy load ajv so the script remains fast if not installed; provide a friendly hint.
@@ -81,19 +82,7 @@ async function main(): Promise<void> {
       process.exit(1);
     }
     const hermetic = language.hermetic;
-    const booleanGates = [
-      "sourceRoles",
-      "dependencyReconciliation",
-      "immutableBundleInputs",
-      "storeQualifiedToolchain",
-      "selectorTransport",
-      "sandboxNetwork",
-      "remoteExecution",
-      "publicationAdmission",
-    ];
-    const gaps = booleanGates.filter((key) => hermetic[key] !== true);
-    if (hermetic.status !== "graduated") gaps.unshift("status");
-    if (hermetic.reproducibilityMatrixIds.length === 0) gaps.push("reproducibilityMatrixIds");
+    const gaps = languageEnablementGaps(hermetic);
     for (const matrixId of hermetic.reproducibilityMatrixIds) {
       if (!hasReproducibilityMatrixId(String(matrixId))) {
         gaps.push(`unknown reproducibilityMatrixId ${String(matrixId)}`);
@@ -105,18 +94,20 @@ async function main(): Promise<void> {
       .map(String)
       .filter(hasReproducibilityMatrixId);
     const coveredRoutes = reproducibilityMatrixCoverage(knownMatrixIds, id);
-    const requiredRoutes = new Set<string>(["base"]);
-    for (const kind of language.kinds.map(String)) {
-      if (["wasm", "mixed", "addon"].includes(kind)) requiredRoutes.add(kind);
-    }
-    for (const route of requiredRoutes) {
-      if (!coveredRoutes.has(route as "base")) {
-        gaps.push(`reproducibility matrix does not cover ${route} route for language ${id}`);
+    if (["experimental", "graduated"].includes(hermetic.status)) {
+      const requiredRoutes = new Set<string>(["base"]);
+      for (const kind of language.kinds.map(String)) {
+        if (["wasm", "wasi", "mixed", "addon"].includes(kind)) requiredRoutes.add(kind);
+      }
+      for (const route of requiredRoutes) {
+        if (!coveredRoutes.has(route as "base")) {
+          gaps.push(`reproducibility matrix does not cover ${route} route for language ${id}`);
+        }
       }
     }
     if (gaps.length > 0) {
       console.error(
-        `langs.json validation failed: enabled language ${id} is not graduated: ${gaps.join(", ")}`,
+        `langs.json validation failed: enabled language ${id} is not ready: ${gaps.join(", ")}`,
       );
       process.exit(1);
     }

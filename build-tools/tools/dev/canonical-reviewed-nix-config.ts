@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
-import fs from "node:fs";
 
 import {
   artifactSelectorNames,
   assertNoArtifactSelectorInjection,
 } from "../lib/artifact-environment-policy";
 import { activateNixCachePolicyCapabilityAfterCanonicalEntry } from "../lib/nix-cache-policy-capability";
+import { consumeReviewedNixConfigProof } from "./canonical-reviewed-nix-config-proof";
 
 const CANONICAL_ENV_KEYS = [
   "HOME",
@@ -21,6 +21,9 @@ const CANONICAL_ENV_KEYS = [
   "TZ",
   "VBR_ARTIFACT_TOOLS_ROOT",
   "VBR_CANONICAL_REVIEWED_NIX_CONFIG_DIGEST",
+  "VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS",
+  "VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY",
+  "VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS",
   "VBR_NIX_BIN",
   "XDG_CACHE_HOME",
   "XDG_CONFIG_HOME",
@@ -28,81 +31,93 @@ const CANONICAL_ENV_KEYS = [
   "ZX_INIT",
 ] as const;
 
-const MAX_REVIEWED_CONFIG_PROOF_BYTES = 128;
-const MAX_REVIEWED_CONFIG_PROOF_FD = 1024;
-
 export type ReviewedNixConfigOutcome = {
   applied: boolean;
   config: string;
+  policy?: "auto" | "strict";
+  requiredSubstituters?: string[];
+  optionalSubstituters?: string[];
 };
 
-function reviewedConfigDigest(config: string): string {
-  return createHash("sha256").update(`applied-v1\0${config}`).digest("hex");
+function reviewedConfigDigest(outcome: ReviewedNixConfigOutcome): string {
+  return createHash("sha256")
+    .update(
+      [
+        "applied-v2",
+        outcome.policy || "auto",
+        (outcome.requiredSubstituters || []).join(" "),
+        (outcome.optionalSubstituters || []).join(" "),
+        outcome.config,
+      ].join("\0"),
+    )
+    .digest("hex");
 }
 
 export function canonicalReviewedConfig(env: NodeJS.ProcessEnv): {
   applied: boolean;
   config: string;
   valid: boolean;
+  policy?: "auto" | "strict";
+  requiredSubstituters?: string[];
+  optionalSubstituters?: string[];
 } {
   const config = String(env.NIX_CONFIG || "");
   const digest = String(env.VBR_CANONICAL_REVIEWED_NIX_CONFIG_DIGEST || "");
   if (!digest) return { applied: false, config, valid: !config };
-  return {
+  const policy = String(env.VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY || "");
+  if (policy !== "auto" && policy !== "strict") return { applied: true, config, valid: false };
+  const requiredSubstituters = String(env.VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS || "")
+    .split(/\s+/u)
+    .filter(Boolean);
+  const optionalSubstituters = String(env.VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS || "")
+    .split(/\s+/u)
+    .filter(Boolean);
+  const outcome = {
     applied: true,
     config,
-    valid: digest === reviewedConfigDigest(config),
+    policy,
+    requiredSubstituters,
+    optionalSubstituters,
+  } as const;
+  return {
+    ...outcome,
+    valid: digest === reviewedConfigDigest(outcome),
   };
-}
-
-function reviewedConfigProofFd(env: NodeJS.ProcessEnv): number {
-  const raw = String(env.VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD || "");
-  if (!/^[0-9]+$/u.test(raw)) return -1;
-  const fd = Number(raw);
-  return Number.isSafeInteger(fd) && fd >= 10 && fd <= MAX_REVIEWED_CONFIG_PROOF_FD ? fd : -1;
-}
-
-function readBoundedReviewedConfigProof(fd: number): string {
-  const stat = fs.fstatSync(fd);
-  if (
-    (!stat.isFile() && !stat.isFIFO()) ||
-    (stat.isFile() && (stat.size < 2 || stat.size > MAX_REVIEWED_CONFIG_PROOF_BYTES))
-  ) {
-    return "";
-  }
-  const proof = Buffer.alloc(MAX_REVIEWED_CONFIG_PROOF_BYTES + 1);
-  const bytesRead = fs.readSync(fd, proof, 0, proof.length, null);
-  if (bytesRead < 2 || bytesRead > MAX_REVIEWED_CONFIG_PROOF_BYTES) return "";
-  const encoded = proof.subarray(0, bytesRead).toString("utf8");
-  if (!encoded.endsWith("\n") || encoded.slice(0, -1).includes("\n")) return "";
-  return encoded.slice(0, -1);
 }
 
 export function consumeArtifactIngressReviewedNixConfig(
   env: NodeJS.ProcessEnv = process.env,
 ): ReviewedNixConfigOutcome {
-  const proofFd = reviewedConfigProofFd(env);
   const token = String(env.VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN || "");
   const applied = env.VBR_NIX_CACHE_HEALTH_APPLIED === "1";
   const reviewed = String(env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG || "");
-  delete env.VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_FD;
-  delete env.VBR_ARTIFACT_INGRESS_REVIEWED_CONFIG_TOKEN;
+  const reviewedRequired = String(env.VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS || "");
+  const reviewedOptional = String(env.VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS || "");
+  const reviewedPolicy = String(env.VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY || "");
   delete env.VBR_NIX_CACHE_HEALTH_APPLIED;
   delete env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG;
-  if (!token || proofFd < 0) return { applied: false, config: "" };
-  let proof = "";
-  try {
-    proof = readBoundedReviewedConfigProof(proofFd);
-  } catch {
+  delete env.VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS;
+  delete env.VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS;
+  delete env.VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY;
+  const parsed = consumeReviewedNixConfigProof(env);
+  if (
+    !parsed ||
+    parsed.token !== token ||
+    !applied ||
+    parsed.config !== reviewed ||
+    parsed.requiredSubstituters.join(" ") !== reviewedRequired.trim() ||
+    parsed.optionalSubstituters.join(" ") !== reviewedOptional.trim() ||
+    parsed.policy !== reviewedPolicy
+  ) {
     return { applied: false, config: "" };
-  } finally {
-    try {
-      fs.closeSync(proofFd);
-    } catch {}
   }
-  return proof === token && applied
-    ? { applied: true, config: reviewed }
-    : { applied: false, config: "" };
+  return {
+    applied: true,
+    config: parsed.config,
+    policy: parsed.policy,
+    requiredSubstituters: parsed.requiredSubstituters,
+    optionalSubstituters: parsed.optionalSubstituters,
+  };
 }
 
 export function attachCanonicalReviewedNixConfig(
@@ -112,7 +127,14 @@ export function attachCanonicalReviewedNixConfig(
   if (!outcome.applied) return env;
   if (outcome.config) env.NIX_CONFIG = outcome.config;
   else delete env.NIX_CONFIG;
-  env.VBR_CANONICAL_REVIEWED_NIX_CONFIG_DIGEST = reviewedConfigDigest(outcome.config);
+  env.VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS = (
+    outcome.requiredSubstituters || []
+  ).join(" ");
+  env.VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS = (
+    outcome.optionalSubstituters || []
+  ).join(" ");
+  env.VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY = outcome.policy || "auto";
+  env.VBR_CANONICAL_REVIEWED_NIX_CONFIG_DIGEST = reviewedConfigDigest(outcome);
   return env;
 }
 
@@ -120,8 +142,35 @@ export function activateCanonicalNixCachePolicy(
   env: NodeJS.ProcessEnv,
   outcome: ReviewedNixConfigOutcome,
 ): void {
+  const parsedRoles = (() => {
+    const values = new Map<string, string[]>();
+    for (const line of outcome.config.split("\n")) {
+      const eq = line.indexOf("=");
+      if (eq <= 0) continue;
+      const key = line.slice(0, eq).trim();
+      if (key !== "substituters" && key !== "extra-substituters") continue;
+      values.set(
+        key,
+        line
+          .slice(eq + 1)
+          .trim()
+          .split(/\s+/u)
+          .filter(Boolean),
+      );
+    }
+    return {
+      required: outcome.requiredSubstituters || values.get("substituters") || [],
+      optional: outcome.optionalSubstituters || values.get("extra-substituters") || [],
+    };
+  })();
   const policy = outcome.applied
-    ? ({ kind: "reviewed", config: outcome.config } as const)
+    ? ({
+        kind: "reviewed",
+        config: outcome.config,
+        policy: outcome.policy || "auto",
+        requiredSubstituters: parsedRoles.required,
+        optionalSubstituters: parsedRoles.optional,
+      } as const)
     : env.VBR_NIX_CACHE_POLICY === "off"
       ? ({ kind: "off" } as const)
       : null;
@@ -133,9 +182,15 @@ export function activateCanonicalNixCachePolicy(
   if (policy.kind === "reviewed") {
     env.VBR_NIX_CACHE_HEALTH_APPLIED = "1";
     env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG = policy.config;
+    env.VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS = policy.requiredSubstituters.join(" ");
+    env.VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS = policy.optionalSubstituters.join(" ");
+    env.VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY = policy.policy;
   } else {
     delete env.VBR_NIX_CACHE_HEALTH_APPLIED;
     delete env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG;
+    delete env.VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS;
+    delete env.VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS;
+    delete env.VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY;
   }
   activateNixCachePolicyCapabilityAfterCanonicalEntry(env, policy);
 }

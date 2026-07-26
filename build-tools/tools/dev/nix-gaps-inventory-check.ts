@@ -19,7 +19,7 @@ import {
   type ArtifactRouteAllowlistEntry,
   type NixGapsException,
 } from "./nix-gaps-inventory-check-lib";
-import { enforceNodeImplementationRouteChecks } from "./nix-gaps-inventory-node-routes";
+import { enforceImplementationRouteChecks } from "./nix-gaps-inventory-routes";
 import {
   enforceProductionCommandSiteInventory,
   type CommandSiteInventoryPolicy,
@@ -223,7 +223,9 @@ async function main() {
     process.exit(1);
   }
 
-  await enforceNodeImplementationRouteChecks({
+  await enforceImplementationRouteChecks({
+    source,
+    starlarkByModule,
     hasNodeImplementationFiles,
     nixRouteDetailsByMacro,
   });

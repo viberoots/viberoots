@@ -142,6 +142,17 @@ async function ensureWorkspaceGlobalNixInputTargets(reconcile: boolean) {
   }
 }
 
+export async function reconcileWorkspaceGlobalNixInputTargets(
+  priorGlobalInputs = "",
+): Promise<void> {
+  const wsRoot = await workspaceRoot();
+  await ensureWorkspaceGlobalNixInputTargets(true);
+  const globalInputsAfter = await globalNixInputFingerprint(wsRoot);
+  if (priorGlobalInputs !== "" && globalInputsAfter !== priorGlobalInputs) {
+    await handoffChangedGlobalInputConsumers(wsRoot);
+  }
+}
+
 export async function runGlue(dryRun: boolean, verbose: boolean, priorGlobalInputs = "") {
   const ui = createCommandUi({ verbose });
   const nodeBin = process.execPath || "node";
@@ -309,6 +320,10 @@ export async function runGlue(dryRun: boolean, verbose: boolean, priorGlobalInpu
   }
   if (!dryRun) {
     const graphAfter = await fsp.readFile(graphPath, "utf8").catch(() => "");
+    // The pipeline may finalize node-modules.hashes.json. Re-render the
+    // content-addressed global-input TARGETS from that final state before
+    // fingerprinting or handing the graph back to Buck consumers.
+    await ensureWorkspaceGlobalNixInputTargets(true);
     const globalInputsAfter = await globalNixInputFingerprint(wsRoot);
     if (
       graphAfter !== graphBefore ||

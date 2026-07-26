@@ -132,7 +132,7 @@ export function proveGraduatedLanguageCoverage(
     }
     const requiredRoutes = new Set<string>(["base"]);
     for (const kind of Array.isArray(language.kinds) ? language.kinds.map(String) : []) {
-      if (["wasm", "mixed", "addon"].includes(kind)) requiredRoutes.add(kind);
+      if (["wasm", "wasi", "mixed", "addon"].includes(kind)) requiredRoutes.add(kind);
     }
     const covered = reproducibilityMatrixCoverage(matrixIds, languageId);
     for (const route of requiredRoutes) {

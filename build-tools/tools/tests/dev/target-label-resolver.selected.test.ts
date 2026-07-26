@@ -37,6 +37,13 @@ test("resolveSelectedTargetLabel supports label, relative, absolute, and dot inp
     });
     assert.equal(fromLabel, "//projects/apps/demo:app");
 
+    const fromCellQualifiedLabel = await resolveSelectedTargetLabel(
+      tmp,
+      "@viberoots//projects/apps/demo:app",
+      { baseDir: demoDir },
+    );
+    assert.equal(fromCellQualifiedLabel, "//projects/apps/demo:app");
+
     const fromRelative = await resolveSelectedTargetLabel(tmp, "projects/apps/demo", {
       baseDir: tmp,
     });

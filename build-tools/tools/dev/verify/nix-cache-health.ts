@@ -1,25 +1,29 @@
 import process from "node:process";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import {
+  assertSafeNixCacheConfig,
+  assertSafeProbeableNixCacheUrl,
   nixCacheSubstituterIdentity,
   parseNixCacheConfigValues,
 } from "../../lib/nix-cache-readiness";
-import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
-import { envWithResolvedNixBin, resolveToolPathSync } from "../../lib/tool-paths";
+import {
+  configScalar,
+  defaultReadEffectiveConfig,
+  isProbeableUrl,
+  policyFromEnv,
+  reviewedConfigWithNetrc,
+  stripOverrideKeys,
+  trustedCachePolicyOutcome,
+  unique,
+} from "./nix-cache-health-config";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 import { probeNixCacheUrl } from "./nix-cache-probe";
-
-const execFileAsync = promisify(execFile);
-
-const OVERRIDE_KEYS = new Set([
-  "substituters",
-  "extra-substituters",
-  "connect-timeout",
-  "stalled-download-timeout",
-  "fallback",
-]);
-
-export type NixCachePolicy = "auto" | "strict" | "off";
+import { activateNixCachePolicyCapabilityAfterCanonicalEntry } from "../../lib/nix-cache-policy-capability";
+import {
+  activateReviewedCacheCapability,
+  clearReviewedCacheEnvironment,
+  recordReviewedCacheResult,
+} from "./nix-cache-health-review";
+export type { NixCachePolicy } from "./nix-cache-health-config";
 
 export type NixCacheHealthDeps = {
   readEffectiveConfig?: () => Promise<string>;
@@ -28,139 +32,135 @@ export type NixCacheHealthDeps = {
   log?: (line: string) => void;
 };
 
-type CacheHealthResult = {
+export type CacheHealthResult = {
   authority: "reviewed" | "off";
   changed: boolean;
   kept: string[];
   removed: string[];
   nixConfig: string;
+  requiredSubstituters: string[];
+  optionalSubstituters: string[];
 };
-
-function unique(values: string[]): string[] {
-  const seen = new Set<string>();
-  const out: string[] = [];
-  for (const value of values) {
-    if (seen.has(value)) continue;
-    seen.add(value);
-    out.push(value);
-  }
-  return out;
-}
-
-function isProbeableUrl(value: string): boolean {
-  return /^https?:\/\//.test(value);
-}
-
-function assertValidProbeableUrl(value: string): void {
-  if (!/^https?:/u.test(value)) return;
-  if (!/^https?:\/\/[^/]/u.test(value)) {
-    throw new Error(
-      `configured Nix substituter is malformed: ${nixCacheSubstituterIdentity(value)}`,
-    );
-  }
-  try {
-    const parsed = new URL(value);
-    if (!/^https?:$/u.test(parsed.protocol) || !parsed.hostname) throw new Error("invalid");
-  } catch {
-    throw new Error(
-      `configured Nix substituter is malformed: ${nixCacheSubstituterIdentity(value)}`,
-    );
-  }
-}
-
-function stripOverrideKeys(config: string): string {
-  return config
-    .split("\n")
-    .filter((line) => {
-      const eq = line.indexOf("=");
-      if (eq <= 0) return true;
-      return !OVERRIDE_KEYS.has(line.slice(0, eq).trim());
-    })
-    .join("\n")
-    .trim();
-}
-
-async function defaultReadEffectiveConfig(): Promise<string> {
-  const nixEnv = withSanitizedInheritedNixConfig(envWithResolvedNixBin({ ...process.env }));
-  const nixBin = resolveToolPathSync("nix", nixEnv);
-  try {
-    const res = await execFileAsync(nixBin, ["config", "show"], { env: nixEnv });
-    return String(res.stdout || "").trim();
-  } catch (error) {
-    throw new Error("nix config show failed during cache health evaluation", { cause: error });
-  }
-}
-
-function configScalar(config: string, key: string): string {
-  for (const line of config.split("\n")) {
-    const eq = line.indexOf("=");
-    if (eq <= 0 || line.slice(0, eq).trim() !== key) continue;
-    return line.slice(eq + 1).trim();
-  }
-  return "";
-}
-
-function policyFromEnv(): NixCachePolicy {
-  const raw = String(process.env.VBR_NIX_CACHE_POLICY || "auto").trim();
-  if (raw === "strict" || raw === "off" || raw === "auto") return raw;
-  throw new Error(`unsupported VBR_NIX_CACHE_POLICY "${raw}"`);
-}
 
 export async function applyNixCacheHealthPolicy(
   _root: string,
   deps: NixCacheHealthDeps = {},
 ): Promise<CacheHealthResult> {
   const policy = policyFromEnv();
-  if (process.env.VBR_NIX_CACHE_HEALTH_APPLIED === "1") {
-    const reviewedConfig = String(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG || "");
-    const activeConfig = String(process.env.NIX_CONFIG || "");
-    if (activeConfig && activeConfig !== reviewedConfig) {
-      throw new Error("pre-applied Nix cache health config does not match its reviewed authority");
+  if (
+    process.env.VBR_CANONICAL_ARTIFACT_ENTRYPOINT === "1" &&
+    process.env.VBR_NIX_CACHE_HEALTH_APPLIED === "1"
+  ) {
+    const reviewedPolicy = String(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY || "");
+    if (reviewedPolicy !== "auto" && reviewedPolicy !== "strict") {
+      throw new Error("canonical Nix cache health authority has an invalid reviewed policy");
     }
-    if (reviewedConfig) process.env.NIX_CONFIG = reviewedConfig;
-    else delete process.env.NIX_CONFIG;
+    activateNixCachePolicyCapabilityAfterCanonicalEntry(process.env, {
+      kind: "reviewed",
+      config: String(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG || ""),
+      policy: reviewedPolicy,
+      requiredSubstituters: String(
+        process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS || "",
+      )
+        .split(/\s+/u)
+        .filter(Boolean),
+      optionalSubstituters: String(
+        process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS || "",
+      )
+        .split(/\s+/u)
+        .filter(Boolean),
+    });
+  }
+  const trusted =
+    process.env.VBR_CANONICAL_ARTIFACT_ENTRYPOINT === "1" ? trustedCachePolicyOutcome() : undefined;
+  if (trusted?.kind === "reviewed") {
+    const activeConfig = String(process.env.NIX_CONFIG || "");
+    const reviewedConfig = String(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG || "");
+    if (
+      process.env.VBR_NIX_CACHE_HEALTH_APPLIED !== "1" ||
+      activeConfig !== trusted.config ||
+      reviewedConfig !== trusted.config ||
+      process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY !== trusted.policy ||
+      String(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS || "") !==
+        trusted.requiredSubstituters.join(" ") ||
+      String(process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS || "") !==
+        trusted.optionalSubstituters.join(" ")
+    ) {
+      throw new Error("canonical Nix cache health authority does not match the active config");
+    }
+    assertSafeNixCacheConfig(trusted.config);
+    activateReviewedCacheCapability({
+      ...trusted,
+      requiredSubstituters: [...trusted.requiredSubstituters],
+      optionalSubstituters: [...trusted.optionalSubstituters],
+    });
     return {
       authority: "reviewed",
-      changed: activeConfig !== reviewedConfig,
+      changed: false,
       kept: [],
       removed: [],
-      nixConfig: reviewedConfig,
+      nixConfig: trusted.config,
+      requiredSubstituters: [...trusted.requiredSubstituters],
+      optionalSubstituters: [...trusted.optionalSubstituters],
     };
   }
-  delete process.env.VBR_NIX_CACHE_HEALTH_APPLIED;
-  delete process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG;
-  const reviewed = (result: CacheHealthResult): CacheHealthResult => {
-    process.env.VBR_NIX_CACHE_HEALTH_APPLIED = "1";
-    process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG = result.nixConfig;
-    return result;
-  };
+  clearReviewedCacheEnvironment();
+  const reviewed = (result: CacheHealthResult, required: string[], optional: string[]) =>
+    recordReviewedCacheResult(result, required, optional, policy);
   if (policy === "off") {
+    if (process.env.VBR_CANONICAL_ARTIFACT_ENTRYPOINT === "1") {
+      activateNixCachePolicyCapabilityAfterCanonicalEntry(process.env, { kind: "off" });
+    }
     return {
       authority: "off",
       changed: false,
       kept: [],
       removed: [],
       nixConfig: String(process.env.NIX_CONFIG || ""),
+      requiredSubstituters: [],
+      optionalSubstituters: [],
     };
   }
 
   const log = deps.log || ((line: string) => process.stderr.write(`${line}\n`));
   const effectiveConfig = await (deps.readEffectiveConfig || defaultReadEffectiveConfig)();
+  const priorConfig = String(process.env.NIX_CONFIG || "");
+  assertSafeNixCacheConfig(priorConfig);
   const parsed = parseNixCacheConfigValues(effectiveConfig);
-  const required = unique(parsed.get("substituters") || []);
-  const optional = unique(parsed.get("extra-substituters") || []);
+  const effectiveRequired = unique(parsed.get("substituters") || []);
+  const effectiveOptional = unique(parsed.get("extra-substituters") || []);
+  const priorParsed = parseNixCacheConfigValues(priorConfig);
+  const priorRequired = unique(priorParsed.get("substituters") || []);
+  const priorOptional = unique(priorParsed.get("extra-substituters") || []);
+  const effectiveSet = unique([...effectiveRequired, ...effectiveOptional]).sort();
+  const priorSet = unique([...priorRequired, ...priorOptional]).sort();
+  const priorRolesMatchEffective =
+    priorSet.length === effectiveSet.length &&
+    priorSet.every((substituter, index) => substituter === effectiveSet[index]);
+  if (priorSet.length > 0 && !priorRolesMatchEffective) {
+    throw new Error("reviewed Nix cache source roles do not match effective substituters");
+  }
+  const required = priorRolesMatchEffective ? priorRequired : effectiveRequired;
+  const optional = priorRolesMatchEffective ? priorOptional : effectiveOptional;
   const configured = unique([...required, ...optional]);
   if (configured.length === 0) {
-    return reviewed({
-      authority: "reviewed",
-      changed: false,
-      kept: [],
-      removed: [],
-      nixConfig: String(process.env.NIX_CONFIG || ""),
-    });
+    return reviewed(
+      {
+        authority: "reviewed",
+        changed: false,
+        kept: [],
+        removed: [],
+        nixConfig: String(process.env.NIX_CONFIG || ""),
+        requiredSubstituters: [],
+        optionalSubstituters: [],
+      },
+      [],
+      [],
+    );
   }
 
   const netrcFile = configScalar(effectiveConfig, "netrc-file");
+  const reviewedConfig = reviewedConfigWithNetrc(priorConfig, netrcFile);
   const resolveCurlBin =
     deps.resolveCurlBin || ((env: NodeJS.ProcessEnv) => resolveToolPathSync("curl", env));
   const probe =
@@ -170,26 +170,46 @@ export async function applyNixCacheHealthPolicy(
   const available: string[] = [];
   const removed: string[] = [];
   for (const substituter of configured) {
-    assertValidProbeableUrl(substituter);
+    assertSafeProbeableNixCacheUrl(substituter);
     if (!isProbeableUrl(substituter)) {
       available.push(substituter);
       continue;
     }
-    if (await probe(substituter, 3000)) {
+    const optionalOnly = optional.includes(substituter) && !required.includes(substituter);
+    let reachable = false;
+    try {
+      reachable = await probe(substituter, 3000);
+    } catch (error) {
+      if (policy !== "auto" || !optionalOnly) throw error;
+    }
+    if (reachable) {
       available.push(substituter);
     } else {
+      if (policy === "auto" && !optionalOnly) {
+        throw new Error(
+          `required Nix substituter unavailable: ${nixCacheSubstituterIdentity(substituter)}`,
+        );
+      }
       removed.push(substituter);
     }
   }
 
   if (removed.length === 0) {
-    return reviewed({
-      authority: "reviewed",
-      changed: false,
-      kept: configured,
-      removed,
-      nixConfig: String(process.env.NIX_CONFIG || ""),
-    });
+    if (reviewedConfig) process.env.NIX_CONFIG = reviewedConfig;
+    else delete process.env.NIX_CONFIG;
+    return reviewed(
+      {
+        authority: "reviewed",
+        changed: reviewedConfig !== priorConfig,
+        kept: configured,
+        removed,
+        nixConfig: reviewedConfig,
+        requiredSubstituters: [],
+        optionalSubstituters: [],
+      },
+      required,
+      optional,
+    );
   }
   const removedIdentities = removed.map(nixCacheSubstituterIdentity);
   if (policy === "strict") {
@@ -197,7 +217,7 @@ export async function applyNixCacheHealthPolicy(
   }
   const requiredKept = required.filter((substituter) => available.includes(substituter));
   const optionalKept = optional.filter((substituter) => available.includes(substituter));
-  const retainedEnv = stripOverrideKeys(String(process.env.NIX_CONFIG || ""));
+  const retainedEnv = stripOverrideKeys(reviewedConfig);
   const overrideLines = [
     `substituters = ${requiredKept.join(" ")}`,
     `extra-substituters = ${optionalKept.join(" ")}`,
@@ -214,11 +234,17 @@ export async function applyNixCacheHealthPolicy(
       optionalKept.map(nixCacheSubstituterIdentity).join(" ") || "<none>"
     }`,
   );
-  return reviewed({
-    authority: "reviewed",
-    changed: true,
-    kept: unique([...requiredKept, ...optionalKept]),
-    removed,
-    nixConfig: process.env.NIX_CONFIG,
-  });
+  return reviewed(
+    {
+      authority: "reviewed",
+      changed: true,
+      kept: unique([...requiredKept, ...optionalKept]),
+      removed,
+      nixConfig: process.env.NIX_CONFIG,
+      requiredSubstituters: [],
+      optionalSubstituters: [],
+    },
+    requiredKept,
+    optionalKept,
+  );
 }

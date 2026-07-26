@@ -1,0 +1,58 @@
+import path from "node:path";
+import { runArtifactNix } from "../../ci/artifact-command";
+import { makeFilteredFlakeRef } from "../../dev/filtered-flake";
+import {
+  buildCanonicalArtifactEnvironment,
+  canonicalArtifactToolsRoot,
+  withoutArtifactEnvironmentInfluence,
+} from "../../lib/artifact-environment";
+
+const nixFlakeFeatures = ["--extra-experimental-features", "nix-command flakes"];
+const defaultTarget = "//projects/apps/rust-parity:app";
+
+export async function buildCanonicalBundle(
+  workspace: string,
+  attr: "graph-generator-selected" | "graph-generator",
+  immutableViberootsInputRoot: string,
+  baseEnv: NodeJS.ProcessEnv = process.env,
+  selectedTarget: string = defaultTarget,
+): Promise<{ outPath: string; bundleSource: string }> {
+  const artifactToolsRoot = canonicalArtifactToolsRoot(process.cwd());
+  const graphPath = path.join(workspace, ".viberoots", "workspace", "buck", "graph.json");
+  const bundle = await makeFilteredFlakeRef({
+    workspaceRoot: workspace,
+    attr,
+    target: attr === "graph-generator-selected" ? selectedTarget : undefined,
+    graphPath,
+    logPrefix: "[rust-identity-parity]",
+    classification: "local-development",
+    env: buildCanonicalArtifactEnvironment(workspace, { artifactToolsRoot }),
+    selectorEnv: {},
+    immutableViberootsInputRoot,
+  });
+  try {
+    const { stdout } = await runArtifactNix({
+      workspaceRoot: workspace,
+      artifactToolsRoot,
+      baseEnv: withoutArtifactEnvironmentInfluence(baseEnv),
+      args: [
+        ...nixFlakeFeatures,
+        "build",
+        "--accept-flake-config",
+        "--no-write-lock-file",
+        bundle.flakeRef,
+        "--no-link",
+        "--print-out-paths",
+      ],
+    });
+    const outPath = String(stdout || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .at(-1);
+    if (!outPath) throw new Error(`missing ${attr} output path`);
+    return { outPath, bundleSource: bundle.workspaceRoot };
+  } finally {
+    await bundle.cleanup();
+  }
+}

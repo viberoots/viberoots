@@ -2,7 +2,8 @@
 import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
+import { killBuckIsolation } from "../../dev/verify/process-control";
 import { resolveAllDeployments } from "../../deployments/deployment-query";
 import { scanRepositoryRefs } from "../../deployments/sprinkleref-check-scan";
 import { inheritedBuckIsolation } from "../lib/test-helpers";
@@ -41,6 +42,9 @@ const REMOVED_DEPLOYMENT_TEMPLATE_RE =
 const removedLegacyDeploymentIdRe = new RegExp(
   `\\b(?:${REMOVED_LEGACY_PREFIX}-(?:console|web|worker)(?:-(?:dev|staging|prod))?|${REMOVED_LEGACY_UNDERSCORE})\\b`,
 );
+const deploymentGuardIsolation = inheritedBuckIsolation("deployment-package-guard");
+
+after(async () => await killBuckIsolation(process.cwd(), deploymentGuardIsolation));
 
 async function removedDeploymentRootEntries(): Promise<string[]> {
   const result = await $({ stdio: "pipe" })`git ls-files -- projects/deployments`;
@@ -65,7 +69,7 @@ test("deleted speculative deployment labels are not resolvable", async () => {
   const result = await $({
     env: { ...process.env, HOME: process.env.BUCK2_REAL_HOME || process.env.HOME },
     stdio: "pipe",
-  })`buck2 --isolation-dir ${inheritedBuckIsolation("deployment-package-guard")} cquery --target-platforms prelude//platforms:default ${`set(${REMOVED_LABELS.join(" ")})`}`.nothrow();
+  })`buck2 --isolation-dir ${deploymentGuardIsolation} cquery --target-platforms prelude//platforms:default ${`set(${REMOVED_LABELS.join(" ")})`}`.nothrow();
   assert.notEqual(result.exitCode, 0);
   assert.match(`${String(result.stdout)}\n${String(result.stderr)}`, /example|platform/);
 });

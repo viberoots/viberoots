@@ -7,6 +7,7 @@ import { cleanDevBuildWorkspace, refreshGlueAndExportGraph } from "./glue";
 import { captureFlakeLockSnapshot, restoreFlakeLock } from "./git";
 import { runHousekeeping } from "./housekeeping";
 import { createIsolation, type Isolation } from "./isolation";
+import { artifactBuckAuthorityBinding, reconcileArtifactBuckIsolation } from "./cache-isolation";
 import { materializePureGraphIfEnabled } from "./materialize-pure";
 import { maybePrintImpureMaterializedBins, exportGraphImpure } from "./materialize-impure";
 import { shouldMaterializeByDefault } from "./materialize-policy";
@@ -19,10 +20,12 @@ import { maybeAutoImpureFromUntrackedFiles } from "./untracked";
 import { pruneDeadDevBuildIsolationDirs } from "../clean-temp-outs-lib";
 import { registerBuckIsolationSync } from "../verify/owned-process-state";
 import { applyNixCacheHealthPolicy } from "../verify/nix-cache-health";
+import { killBuckIsolation } from "../verify/process-control";
 import { getArgvTokens } from "../../lib/cli";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
 import { DEFAULT_GRAPH_PATH } from "../../lib/graph-const";
 import { findRepoRoot } from "../../lib/repo";
+import { withSharedBuckIsolationStartupLock } from "../../lib/shared-buck-isolation-lock";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { admitArtifactContext } from "../artifact-policy-inspection";
 import { runReadOnlyPnpmChecks } from "../consumer-consistency-check";
@@ -34,6 +37,12 @@ import {
   withoutCanonicalDevOverrideArgs,
   withoutWasmBackendArgs,
 } from "../evaluation-bundle-selectors";
+import {
+  currentNixCachePolicyCapability,
+  nixCachePolicyBindingDigest,
+  outcomeFromNixCachePolicyCapability,
+} from "../../lib/nix-cache-policy-capability";
+import { reconcileWorkspaceGlobalNixInputTargets } from "../install/glue";
 
 export async function missingOptionalPatchDirsForFreshIsolation(opts: {
   root: string;
@@ -81,6 +90,15 @@ export async function runDevBuild(artifactToolsRoot: string): Promise<void> {
   } catch {}
 
   const cacheHealth = await applyNixCacheHealthPolicy(root);
+  const nixCachePolicyCapability = currentNixCachePolicyCapability();
+  const cachePolicyOutcome = outcomeFromNixCachePolicyCapability(nixCachePolicyCapability);
+  const cachePolicyBinding =
+    cachePolicyOutcome.kind === "reviewed" ? nixCachePolicyBindingDigest(cachePolicyOutcome) : "";
+  const isolationAuthorityBinding = artifactBuckAuthorityBinding({
+    cachePolicyBinding,
+    graphBytes: await fsp.readFile(graphPath).catch(() => Buffer.alloc(0)),
+    artifactToolsRoot,
+  });
 
   const removedDeadDevBuildIsos = await pruneDeadDevBuildIsolationDirs(root).catch(() => []);
   if (verbose && removedDeadDevBuildIsos.length > 0) {
@@ -128,8 +146,24 @@ export async function runDevBuild(artifactToolsRoot: string): Promise<void> {
     }
 
     iso = createIsolation({
+      cachePolicyBinding: isolationAuthorityBinding,
       reuseDaemon: useFreshIsolationForMissingPatchDirs ? false : undefined,
     });
+    if (iso.reuseDaemon && iso.cachePolicyBinding) {
+      const activeIsolation = iso;
+      await withSharedBuckIsolationStartupLock(
+        root,
+        activeIsolation.baseBuckIsolation,
+        async () => {
+          await reconcileArtifactBuckIsolation({
+            root,
+            baseIsolation: activeIsolation.baseBuckIsolation,
+            binding: activeIsolation.cachePolicyBinding,
+            killIsolation: killBuckIsolation,
+          });
+        },
+      );
+    }
     const stateFile = String(process.env.VBR_VERIFY_PROCESS_STATE_FILE || "").trim();
     if (stateFile && iso.buckIsolation && iso.registerForCleanup) {
       registerBuckIsolationSync({
@@ -269,6 +303,7 @@ export async function runDevBuild(artifactToolsRoot: string): Promise<void> {
       devOverrides,
       artifactToolsRoot,
       internalNixConfig: cacheHealth.nixConfig,
+      nixCachePolicyCapability,
     });
 
     // `--no-materialize` is a strict no-glue path. If the build side-effects an
@@ -285,6 +320,7 @@ export async function runDevBuild(artifactToolsRoot: string): Promise<void> {
     });
 
     await restoreFlakeLock(root, flakeLockSnapshot);
+    await reconcileWorkspaceGlobalNixInputTargets();
     await runHousekeeping({ isCI, root });
   } finally {
     if (iso) {

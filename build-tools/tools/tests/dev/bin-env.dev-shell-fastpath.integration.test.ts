@@ -1,14 +1,23 @@
 #!/usr/bin/env zx-wrapper
 import * as fsp from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
+import { execFile as execFileCb } from "node:child_process";
+import { promisify } from "node:util";
 import { test } from "node:test";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
+
+const execFileAsync = promisify(execFileCb);
 
 async function readRepoFile(rel: string): Promise<string> {
   return await fsp.readFile(viberootsSourcePath(rel), "utf8");
 }
 
 test("devshell.sh supports safe direnv bypass fast-path", async () => {
-  const txt = await readRepoFile("build-tools/tools/bin/devshell.sh");
+  const txt = [
+    await readRepoFile("build-tools/tools/bin/devshell.sh"),
+    await readRepoFile("build-tools/tools/bin/devshell-workspace.sh"),
+  ].join("\n");
   if (!txt.includes("BUCK_DEV_SHELL_FASTPATH")) {
     throw new Error("devshell.sh must expose BUCK_DEV_SHELL_FASTPATH toggle");
   }
@@ -19,8 +28,8 @@ test("devshell.sh supports safe direnv bypass fast-path", async () => {
     !txt.includes("devshell_inputs_stale") ||
     !txt.includes("devshell_stale_reload_allowed") ||
     !txt.includes(".source-fingerprint") ||
-    !txt.includes("build-tools/tools/bin/devshell.sh") ||
-    !txt.includes("build-tools/tools/dev/refresh-direnv-stage0.ts") ||
+    !txt.includes('find "${live_root}/viberoots" -type f -newer "${marker}"') ||
+    !txt.includes("-not -path '*/buck-out/*'") ||
     !txt.includes("re-running this command through direnv exec") ||
     !txt.includes("VBR_DEVSHELL_STALE_RELOAD_ATTEMPTED=1") ||
     !txt.includes('exec direnv exec "$live_root" "$@"')
@@ -93,3 +102,49 @@ test("devshell.sh supports safe direnv bypass fast-path", async () => {
     );
   }
 });
+
+test("devshell stale detection rejects divergent local and filtered source identities", async () => {
+  const source = await readRepoFile("build-tools/tools/bin/devshell-workspace.sh");
+  const start = source.indexOf("devshell_inputs_stale() {");
+  const end = source.indexOf("\ndevshell_stale_reload_allowed() {", start);
+  const fn = source.slice(start, end);
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-devshell-source-identity-"));
+  try {
+    const localFile = path.join(root, "viberoots", "build-tools", "lang", "nix_shell.bzl");
+    const marker = path.join(
+      root,
+      ".viberoots",
+      "workspace",
+      "viberoots-flake-input",
+      ".source-fingerprint",
+    );
+    await fsp.mkdir(path.dirname(localFile), { recursive: true });
+    await fsp.mkdir(path.dirname(marker), { recursive: true });
+    await fsp.writeFile(localFile, "identity-a\n");
+    await fsp.writeFile(marker, "");
+    const old = new Date(Date.now() - 10_000);
+    const fresh = new Date(Date.now() + 10_000);
+    await fsp.utimes(localFile, old, old);
+    await fsp.utimes(marker, new Date(), new Date());
+    await assertRejectsExit(fn, root, 1);
+    await fsp.writeFile(localFile, "identity-b\n");
+    await fsp.utimes(localFile, fresh, fresh);
+    await assertRejectsExit(fn, root, 0);
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+async function assertRejectsExit(fn: string, root: string, expected: number): Promise<void> {
+  const result = await execFileAsync(
+    "/bin/bash",
+    ["-c", `${fn}\ndevshell_inputs_stale "$1"`, "devshell-stale-test", root],
+    { env: process.env },
+  ).then(
+    () => 0,
+    (error: NodeJS.ErrnoException) => Number(error.code),
+  );
+  if (result !== expected) {
+    throw new Error(`expected stale detection exit ${expected}, got ${result}`);
+  }
+}

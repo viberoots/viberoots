@@ -15,6 +15,7 @@ export const SOURCE_FILES_SCOPE: FileSizeScope = {
     "**/*.go",
     "**/*.rs",
     "**/*.nix",
+    "**/*.sh",
   ],
   exclude: [
     "**/dist/**",

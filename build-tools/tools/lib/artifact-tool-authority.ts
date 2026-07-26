@@ -65,10 +65,12 @@ function readScopedManifest(workspaceRoot: string): {
 export const REQUIRED_ARTIFACT_TOOL_BINARIES = [
   "bash",
   "buck2",
+  "copier",
   "git",
   "nix",
   "node",
   "pnpm",
+  "prettier",
   "python3",
   "rsync",
   "sort",

@@ -262,8 +262,11 @@ async function main(artifactToolsRoot: string) {
   });
   await runNodeWithZx({
     cwd: workspaceRoot,
-    zxInitPath: zxInitPath(workspaceRoot),
-    script: buildToolPath(workspaceRoot, "tools/buck/enforce-node-patch-requirements.ts"),
+    zxInitPath: zxInitPath(canonicalViberootsSource),
+    script: buildToolPath(
+      canonicalViberootsSource,
+      "tools/buck/enforce-node-patch-requirements.ts",
+    ),
     args: ["--check"],
     env: orchestrationEnv,
     nodeBin: ensureNixStoreToolPathSync("node", orchestrationEnv),

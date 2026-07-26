@@ -36,6 +36,12 @@ export_file(
 )
 
 export_file(
+    name = "validate-source-snapshot.ts",
+    src = "validate-source-snapshot.ts",
+    visibility = ["PUBLIC"],
+)
+
+export_file(
     name = "source-snapshot-graph.ts",
     src = "source-snapshot-graph.ts",
     visibility = ["PUBLIC"],

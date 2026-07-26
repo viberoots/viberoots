@@ -94,6 +94,9 @@ test("verify seed nix filters mirror split-root generated-state guardrail", asyn
     "xdg-cache",
   ];
   assert.match(filterSource, /viberootsGeneratedRoots = \[/);
+  assert.match(filterSource, /isVcsMetadataPath = rel:/);
+  assert.match(filterSource, /lib\.hasInfix "\/\.git\/" rel/);
+  assert.match(filterSource, /isVcsMetadataPath rel \|\|/);
   assert.match(filterSource, /rel == "viberoots\/\$\{d\}"/);
   for (const generatedRoot of viberootsGeneratedRoots) {
     assert.match(filterSource, new RegExp(`"${generatedRoot}"`));

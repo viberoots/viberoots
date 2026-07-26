@@ -1,11 +1,8 @@
 import path from "node:path";
 import process from "node:process";
-import * as fsp from "node:fs/promises";
 import "zx/globals";
 import { collectChangedPaths } from "../../lib/build-system-test-scope";
 import { createCommandUi, isVbrVerbose } from "../../lib/command-ui";
-import { runNodeWithZx } from "../../lib/node-run";
-import { repoNodeBinCandidates, resolveRepoNodeBin } from "../../lib/repo-node-bin";
 import { resolveToolPath } from "../../lib/tool-paths";
 import {
   filterExistingLintPreflightPaths,
@@ -24,53 +21,15 @@ import {
   normalizeRepoPath,
   shouldIgnoreLintPath,
 } from "./lint-preflight-scope";
+import {
+  envWithZxNodeModules,
+  resolveEslintConfig,
+  resolveVerifyNodeBin,
+  runFormatter,
+} from "./lint-preflight-tools";
 
 function verbose(): boolean {
   return isVbrVerbose();
-}
-
-async function firstExisting(root: string, relCandidates: string[]): Promise<string> {
-  for (const rel of relCandidates) {
-    const candidate = path.join(root, rel);
-    try {
-      await fsp.access(candidate);
-      return rel;
-    } catch {}
-  }
-  return relCandidates[0] || "";
-}
-
-function envWithZxNodeModules(zxNodeModulesOut?: string | null): NodeJS.ProcessEnv {
-  const outPath = String(zxNodeModulesOut || "").trim();
-  if (!outPath) return process.env;
-  const nodeModules = path.join(outPath, "node_modules");
-  return {
-    ...process.env,
-    ZX_TEST_NODE_MODULES_OUT: outPath,
-    NODE_PATH: [nodeModules, process.env.NODE_PATH || ""].filter(Boolean).join(path.delimiter),
-  };
-}
-
-async function resolveVerifyNodeBin(
-  root: string,
-  name: string,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<string> {
-  try {
-    return await resolveRepoNodeBin(root, name, env);
-  } catch {}
-  const candidates = await repoNodeBinCandidates(root, name, env);
-  process.stderr.write(
-    `error: verify lint preflight requires ${name}; checked ${candidates.join(", ")} and PATH. Run 'i' to provision repo dev tools before re-running 'v'\n`,
-  );
-  process.exit(2);
-}
-
-async function resolveEslintConfig(root: string): Promise<string> {
-  return path.join(
-    root,
-    await firstExisting(root, ["eslint.config.js", "viberoots/eslint.config.js"]),
-  );
 }
 
 export async function runVerifyLintPreflight(
@@ -182,11 +141,30 @@ export async function runVerifyLintPreflight(
 
   const eslintRes =
     scoped && eslintTargets.length > 0
-      ? await $({
-          stdio: verbose() ? "inherit" : "pipe",
-          cwd: root,
-          reject: false,
-        })`${timeoutPath} -k 10s ${secs}s ${eslintPath} --config ${eslintConfig} --no-warn-ignored ${eslintTargets} --ext .ts,.tsx --max-warnings=0 --ignore-pattern buck-out --ignore-pattern coverage --ignore-pattern .clinic --ignore-pattern "**/.vite-cache/**"`
+      ? runFormatter(
+          timeoutPath,
+          secs,
+          eslintPath,
+          [
+            "--config",
+            eslintConfig,
+            "--no-warn-ignored",
+            ...eslintTargets,
+            "--ext",
+            ".ts,.tsx",
+            "--max-warnings=0",
+            "--ignore-pattern",
+            "buck-out",
+            "--ignore-pattern",
+            "coverage",
+            "--ignore-pattern",
+            ".clinic",
+            "--ignore-pattern",
+            "**/.vite-cache/**",
+          ],
+          root,
+          binEnv,
+        )
       : { exitCode: 0 };
   if (eslintRes.exitCode !== 0) {
     if (!verbose()) {
@@ -199,11 +177,14 @@ export async function runVerifyLintPreflight(
     process.exit(2);
   }
   if (scoped && prettierTargets.length > 0) {
-    const prettierRes = await $({
-      stdio: verbose() ? "inherit" : "pipe",
-      cwd: root,
-      reject: false,
-    })`${timeoutPath} -k 10s ${secs}s ${prettierPath} -c ${prettierTargets}`;
+    const prettierRes = runFormatter(
+      timeoutPath,
+      secs,
+      prettierPath,
+      ["-c", ...prettierTargets],
+      root,
+      binEnv,
+    );
     if (prettierRes.exitCode !== 0) {
       if (!verbose()) {
         process.stderr.write(String(prettierRes.stderr || prettierRes.stdout || ""));

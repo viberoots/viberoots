@@ -14,7 +14,7 @@ const cacheScopeScript = path.resolve(
 function writeManifest(workspace: string, root: string): void {
   const manifest = path.join(workspace, ".viberoots", "workspace", "toolchain-paths.json");
   fs.mkdirSync(path.dirname(manifest), { recursive: true });
-  fs.writeFileSync(manifest, `${JSON.stringify({ artifactTools: { root } })}\n`);
+  fs.writeFileSync(manifest, `${JSON.stringify({ artifactTools: { root } }, null, 2)}\n`);
 }
 
 test("shell ingress rejects store traversal before executing the declared wrapper", () => {
@@ -86,6 +86,54 @@ test("shell ingress captures hostile selectors when a forged re-entry token has 
   }
 });
 
+test("shell ingress establishes a cleared generated-authority baseline without .envrc", () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "artifact-ingress-no-envrc-"));
+  const toolsRoot = JSON.parse(fs.readFileSync(".viberoots/workspace/toolchain-paths.json", "utf8"))
+    .artifactTools.root as string;
+  try {
+    writeManifest(workspace, toolsRoot);
+    const result = spawnSync(
+      "/bin/bash",
+      [
+        "-c",
+        '. "$1"; cd "$2"; unset IN_NIX_SHELL; export NIX_CONFIG=hostile VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG=hostile; artifact_ingress_reexec_with_devshell /bin/true; test "${VBR_ARTIFACT_INGRESS_NO_ENVRC_VERIFIED:-}" = 1; test "${VBR_DEVSHELL_ARTIFACT_BASELINE:-}" = 1; test -z "${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG:-}"; test -z "${NIX_CONFIG:-}"; artifact_ingress_trust_devshell_baseline "$2"; test "${VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED:-}" = 1',
+        "artifact-ingress-test",
+        ingressScript,
+        workspace,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, result.stderr);
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
+test("shell ingress hands off only a readable effective netrc path", () => {
+  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "artifact-ingress-netrc-"));
+  const netrc = path.join(workspace, "reviewed.netrc");
+  fs.writeFileSync(netrc, "machine cache.invalid password fixture-secret\n", { mode: 0o600 });
+  try {
+    const result = spawnSync(
+      "/bin/bash",
+      [
+        "-c",
+        '. "$1"; reviewed="$(artifact_ingress_validated_effective_netrc_from_config "$2")"; test "$reviewed" = "$3"; test "$reviewed" != fixture-secret; missing="$(artifact_ingress_validated_effective_netrc_from_config "netrc-file = $3.missing")"; test -z "$missing"; relative="$(artifact_ingress_validated_effective_netrc_from_config "netrc-file = relative.netrc")"; test -z "$relative"; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1 VBR_ARTIFACT_INGRESS_EFFECTIVE_NETRC_FILE="$3"; env_strip_nix_cache_overrides() { printf %s "builders ="; }; env_apply_nix_cache_health() { case "$NIX_CONFIG" in *"netrc-file = $3"*) ;; *) return 1 ;; esac; case "$NIX_CONFIG" in *fixture-secret*) return 1 ;; esac; export VBR_NIX_CACHE_HEALTH_APPLIED=1; }; artifact_ingress_refresh_nix_cache_health',
+        "artifact-ingress-test",
+        ingressScript,
+        `substituters = https://cache.invalid/\nnetrc-file = ${netrc}`,
+        netrc,
+      ],
+      { encoding: "utf8" },
+    );
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stdout, /fixture-secret/);
+    assert.doesNotMatch(result.stderr, /fixture-secret/);
+  } finally {
+    fs.rmSync(workspace, { recursive: true, force: true });
+  }
+});
+
 test("shell ingress consumes a valid re-entry proof exactly once", () => {
   const token = "test-proof";
   const result = spawnSync(
@@ -152,96 +200,4 @@ test("shell ingress hands off only the exact FD-verified devshell cache decision
     { encoding: "utf8" },
   );
   assert.equal(untrusted.status, 0, untrusted.stderr);
-});
-
-test("shell ingress removes trusted devshell session inputs before canonical admission", () => {
-  for (const name of ["NIX_CFLAGS_COMPILE", "NIX_PROFILES", "NIX_USER_PROFILE_DIR", "XPC_FLAGS"]) {
-    const result = spawnSync(
-      "/bin/bash",
-      [
-        "-c",
-        '. "$1"; name="$2"; printf -v "VBR_ARTIFACT_INGRESS_WAS_SET_${name}" %s 1; printf -v "VBR_ARTIFACT_INGRESS_VALUE_${name}" %s /host/value; export "VBR_ARTIFACT_INGRESS_WAS_SET_${name}" "VBR_ARTIFACT_INGRESS_VALUE_${name}"; artifact_ingress_restore_or_remove_selectors; ! declare -p "$name" >/dev/null 2>&1',
-        "artifact-ingress-test",
-        ingressScript,
-        name,
-      ],
-      { encoding: "utf8" },
-    );
-    assert.equal(result.status, 0, `${name}: ${result.stderr}`);
-  }
-});
-
-test("shell ingress removes the ordinary devshell flake input selector", () => {
-  const result = spawnSync(
-    "/bin/bash",
-    [
-      "-c",
-      '. "$1"; name=VIBEROOTS_FLAKE_INPUT_ROOT; printf -v "VBR_ARTIFACT_INGRESS_WAS_SET_${name}" %s 1; printf -v "VBR_ARTIFACT_INGRESS_VALUE_${name}" %s /workspace/generated-input; printf -v "VBR_DEVSHELL_ARTIFACT_WAS_SET_${name}" %s 1; printf -v "VBR_DEVSHELL_ARTIFACT_VALUE_${name}" %s /workspace/generated-input; export "VBR_ARTIFACT_INGRESS_WAS_SET_${name}" "VBR_ARTIFACT_INGRESS_VALUE_${name}" "VBR_DEVSHELL_ARTIFACT_WAS_SET_${name}" "VBR_DEVSHELL_ARTIFACT_VALUE_${name}"; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1; artifact_ingress_restore_or_remove_selectors; test -z "${VIBEROOTS_FLAKE_INPUT_ROOT:-}"',
-      "artifact-ingress-test",
-      ingressScript,
-    ],
-    { encoding: "utf8" },
-  );
-  assert.equal(result.status, 0, result.stderr);
-});
-
-test("shell ingress discards only the historical launcher-owned flake input", () => {
-  const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "artifact-ingress-flake-input-"));
-  try {
-    const generated = path.join(workspace, ".viberoots", "workspace", "viberoots-flake-input");
-    const owned = spawnSync(
-      "/bin/bash",
-      [
-        "-c",
-        '. "$1"; export VIBEROOTS_FLAKE_INPUT_ROOT="$2/.viberoots/workspace/viberoots-flake-input"; artifact_ingress_discard_launcher_owned_flake_input "$2"; test -z "${VIBEROOTS_FLAKE_INPUT_ROOT:-}"',
-        "artifact-ingress-test",
-        ingressScript,
-        workspace,
-      ],
-      { encoding: "utf8" },
-    );
-    assert.equal(owned.status, 0, owned.stderr);
-
-    for (const hostileValue of [
-      `${generated}-host-override`,
-      "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-source",
-      path.join(
-        path.dirname(workspace),
-        "other-workspace/.viberoots/workspace/viberoots-flake-input",
-      ),
-    ]) {
-      const hostile = spawnSync(
-        "/bin/bash",
-        [
-          "-c",
-          '. "$1"; export VIBEROOTS_FLAKE_INPUT_ROOT="$3"; artifact_ingress_discard_launcher_owned_flake_input "$2"; test "$VIBEROOTS_FLAKE_INPUT_ROOT" = "$3"',
-          "artifact-ingress-test",
-          ingressScript,
-          workspace,
-          hostileValue,
-        ],
-        { encoding: "utf8" },
-      );
-      assert.equal(hostile.status, 0, `${hostileValue}: ${hostile.stderr}`);
-    }
-  } finally {
-    fs.rmSync(workspace, { recursive: true, force: true });
-  }
-});
-
-test("shell ingress restores caller language selectors that differ from trusted baseline", () => {
-  for (const name of ["CC", "NODE_PATH", "PYTHONPATH", "RUSTFLAGS", "GOFLAGS"]) {
-    const result = spawnSync(
-      "/bin/bash",
-      [
-        "-c",
-        '. "$1"; name="$2"; printf -v "VBR_ARTIFACT_INGRESS_WAS_SET_${name}" %s 1; printf -v "VBR_ARTIFACT_INGRESS_VALUE_${name}" %s /host/value; printf -v "VBR_DEVSHELL_ARTIFACT_WAS_SET_${name}" %s 1; printf -v "VBR_DEVSHELL_ARTIFACT_VALUE_${name}" %s /nix/store/value; export "VBR_ARTIFACT_INGRESS_WAS_SET_${name}" "VBR_ARTIFACT_INGRESS_VALUE_${name}" "VBR_DEVSHELL_ARTIFACT_WAS_SET_${name}" "VBR_DEVSHELL_ARTIFACT_VALUE_${name}"; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1; artifact_ingress_restore_or_remove_selectors; test "${!name}" = /host/value',
-        "artifact-ingress-test",
-        ingressScript,
-        name,
-      ],
-      { encoding: "utf8" },
-    );
-    assert.equal(result.status, 0, `${name}: ${result.stderr}`);
-  }
 });

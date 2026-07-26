@@ -103,6 +103,11 @@ to watch the importer worktree rather than an evaluation bundle.
   `nixpkgs_profile` selects the toolchain and ordinary `nixpkg_deps`; `nixpkg_pins` redirects only
   declared native dependency attrs. Rust tests execute compiled Cargo harnesses through Buck's
   bounded project-relative external runner, and only Rust binaries enter `run.prod` manifests.
+- Rust is an enabled **experimental** language at the PR-5 checkpoint. The reviewed baseline adds
+  direct/transitive C link intent, freestanding WebAssembly, a repository-owned WASI runner,
+  scaffolded CLI projects, and declared remote-ready evidence. Cross-root crates, broader ABI
+  bridges, browser/component packaging, release publication, and three-system execution
+  conformance remain planned in PR-6 through PR-12.
 - Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.
 - Planner-visible probes/stubs are allowed only when explicitly documented as non-build exceptions.
 - Patching third-party modules is **ergonomic**, **idempotent**, and **cache-friendly**.
@@ -123,7 +128,9 @@ Use these docs as the source of truth for migration scope and completion:
 
 Current status in those docs:
 
-- Phases 0 through 6 are complete (Go, Python, Node, C++, Rust, and enforcement closure).
+- The original Nix-route migration phases are complete. Rust's first-class rollout is separately
+  tracked: PR-1 through PR-5 establish the experimental baseline, while PR-6 through PR-12 remain
+  required before first-class/release-hermetic status.
 - `docs/handbook/nix-gaps.md` has no remaining artifact-producing non-Nix routes.
 - `docs/handbook/nix-gaps-exceptions.json` allows only explicit probe-only exceptions and currently has no artifact-route allowlist entries.
 

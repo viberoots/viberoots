@@ -4,7 +4,12 @@
 # probe. Every command front door begins a fresh review. build/p use
 # verified-ingress only to prove the shell authority before that review.
 vbr_cache_health_scope_mode="${1:-}"
+if [[ "${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG+x}" == "x" ]]; then
+	export NIX_CONFIG="${VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG}"
+fi
 unset VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
+unset VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS
+unset VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY
 case "${vbr_cache_health_scope_mode}" in
 verified-ingress)
 	# Direnv may reuse a cached shell after the network changes. The verified

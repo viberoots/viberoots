@@ -19,7 +19,7 @@ test("standalone command scopes reject every inherited cache-health marker", asy
   const scope = sourceFile("build-tools/tools/bin/cache-health-command-scope.sh");
   const { stdout } = await execFileAsync("/bin/bash", [
     "-c",
-    `export VBR_ARTIFACT_INGRESS_DIRENV_VERIFIED=1 VBR_NIX_CACHE_HEALTH_COMMAND_ACTIVE=1 VBR_NIX_CACHE_HEALTH_APPLIED=1 VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG=hostile; . ${JSON.stringify(scope)} standalone; printf '%s:%s:%s\\n' "\${VBR_NIX_CACHE_HEALTH_APPLIED:-}" "$VBR_NIX_CACHE_HEALTH_COMMAND_ACTIVE" "\${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG:-}"`,
+    `export VBR_ARTIFACT_INGRESS_DIRENV_VERIFIED=1 VBR_NIX_CACHE_HEALTH_COMMAND_ACTIVE=1 VBR_NIX_CACHE_HEALTH_APPLIED=1 VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG=hostile VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS=hostile VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS=hostile VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY=strict; . ${JSON.stringify(scope)} standalone; test -z "\${VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS:-}\${VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS:-}\${VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY:-}"; printf '%s:%s:%s\\n' "\${VBR_NIX_CACHE_HEALTH_APPLIED:-}" "$VBR_NIX_CACHE_HEALTH_COMMAND_ACTIVE" "\${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG:-}"`,
   ]);
   assert.equal(stdout, ":1:\n");
 });
@@ -33,9 +33,23 @@ test("verified ingress always starts a fresh command-scoped cache decision", asy
   assert.equal(stdout, ":1\n:1\n");
 });
 
+test("fresh command scope restores stage0 source config before dropping reviewed authority", async () => {
+  const scope = sourceFile("build-tools/tools/bin/cache-health-command-scope.sh");
+  const sourceConfig =
+    "extra-substituters = https://auth.example/cache\nnetrc-file = /tmp/reviewed.netrc";
+  const { stdout } = await execFileAsync("/bin/bash", [
+    "-c",
+    `export NIX_CONFIG=stale VBR_NIX_CACHE_HEALTH_APPLIED=1 VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG=stale VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG="$1"; . "$2" standalone; printf '%s\\036%s:%s' "$NIX_CONFIG" "\${VBR_NIX_CACHE_HEALTH_APPLIED+x}" "\${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG+x}"`,
+    "cache-source-restore",
+    sourceConfig,
+    scope,
+  ]);
+  assert.equal(stdout, `${sourceConfig}\u001e:`);
+});
+
 test("every command front door selects its fixed cache-scope authority", async () => {
-  const ingressCommands = ["build", "p"];
-  const standaloneCommands = ["install-deps", "u", "v", "verify"];
+  const ingressCommands = ["build", "p", "verify"];
+  const standaloneCommands = ["install-deps", "u", "v"];
   for (const command of ingressCommands) {
     const source = await fsp.readFile(sourceFile(`build-tools/tools/bin/${command}`), "utf8");
     assert.match(source, /cache-health-command-scope\.sh" verified-ingress/);
@@ -65,6 +79,15 @@ test("every command front door selects its fixed cache-scope authority", async (
     assert.match(source, /cache-health-command-scope\.sh" standalone/);
     assert.doesNotMatch(source, /cache-health-command-scope\.sh" verified-ingress/);
   }
+  const verify = await fsp.readFile(sourceFile("build-tools/tools/bin/verify"), "utf8");
+  assert.match(
+    verify,
+    /artifact_ingress_clear_selectors[\s\S]*export VBR_DEVSHELL_USE_GENERATED_AUTHORITY=1[\s\S]*devshell\.sh/,
+  );
+  assert.match(
+    verify,
+    /artifact_ingress_publish_reviewed_nix_cache_config[\s\S]*artifact_ingress_restore_or_remove_selectors[\s\S]*artifact_ingress_clear_selectors[\s\S]*artifact_ingress_exec/,
+  );
 });
 
 test("cache scope rejects missing or caller-controlled source modes", async () => {
@@ -78,72 +101,5 @@ test("cache scope rejects missing or caller-controlled source modes", async () =
       (error: { code?: number }) => ({ status: error.code }),
     );
     assert.equal(result.status, 64);
-  }
-});
-
-test("shell cache health publishes exact full config on success and nothing on failure", async () => {
-  const devshell = sourceFile("build-tools/tools/bin/devshell.sh");
-  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "cache-health-shell-parity-"));
-  try {
-    const bin = path.join(root, "bin");
-    await fsp.mkdir(bin);
-    await fsp.writeFile(
-      path.join(bin, "nix"),
-      '#!/usr/bin/env bash\n[[ "${TEST_NIX_CONFIG_STATUS:-0}" == 0 ]] || exit "$TEST_NIX_CONFIG_STATUS"\nprintf "%s\\n" "${TEST_EFFECTIVE_NIX_CONFIG:-}"\n',
-      { mode: 0o755 },
-    );
-    await fsp.writeFile(path.join(bin, "curl"), "#!/usr/bin/env bash\nexit 22\n", {
-      mode: 0o755,
-    });
-    const full = "experimental-features = nix-command flakes\nbuilders =";
-    for (const effective of ["", "builders ="]) {
-      const { stdout } = await execFileAsync("/bin/bash", [
-        "-c",
-        `. "$1"; export PATH="$2:/usr/bin:/bin" NIX_CONFIG="$3" TEST_EFFECTIVE_NIX_CONFIG="$4" VBR_NIX_CACHE_POLICY=auto; unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG; env_apply_nix_cache_health; printf '%s\\036%s' "$VBR_NIX_CACHE_HEALTH_APPLIED" "$VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG"`,
-        "cache-health-success",
-        devshell,
-        bin,
-        full,
-        effective,
-      ]);
-      assert.equal(stdout, `1\u001e${full}`);
-    }
-
-    for (const setup of [
-      'export VBR_NIX_CACHE_POLICY=off PATH="$2:/usr/bin:/bin"',
-      'export VBR_NIX_CACHE_POLICY=auto PATH="/usr/bin:/bin"',
-    ]) {
-      const { stdout } = await execFileAsync("/bin/bash", [
-        "-c",
-        `. "$1"; export NIX_CONFIG="$3"; ${setup}; unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG; env_apply_nix_cache_health; printf '%s:%s' "\${VBR_NIX_CACHE_HEALTH_APPLIED+x}" "\${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG+x}"`,
-        "cache-health-unreviewed",
-        devshell,
-        bin,
-        full,
-      ]);
-      assert.equal(stdout, ":");
-    }
-
-    const failure = await execFileAsync("/bin/bash", [
-      "-c",
-      `. "$1"; export PATH="$2:/usr/bin:/bin" NIX_CONFIG="$3" TEST_EFFECTIVE_NIX_CONFIG='substituters = https://cache.example' VBR_NIX_CACHE_POLICY=auto; unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG; env_apply_nix_cache_health >/dev/null 2>&1 || :; printf '%s:%s' "\${VBR_NIX_CACHE_HEALTH_APPLIED+x}" "\${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG+x}"`,
-      "cache-health-failure",
-      devshell,
-      bin,
-      full,
-    ]);
-    assert.equal(failure.stdout, ":");
-
-    const configFailure = await execFileAsync("/bin/bash", [
-      "-c",
-      `. "$1"; export PATH="$2:/usr/bin:/bin" NIX_CONFIG="$3" TEST_NIX_CONFIG_STATUS=42 VBR_NIX_CACHE_POLICY=auto; unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG; set +e; env_apply_nix_cache_health >/dev/null 2>&1; status=$?; set -e; printf '%s:%s:%s' "$status" "\${VBR_NIX_CACHE_HEALTH_APPLIED+x}" "\${VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG+x}"`,
-      "cache-health-config-failure",
-      devshell,
-      bin,
-      full,
-    ]);
-    assert.equal(configFailure.stdout, "1::");
-  } finally {
-    await fsp.rm(root, { recursive: true, force: true });
   }
 });

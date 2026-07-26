@@ -7,6 +7,9 @@ SourceSnapshotInfo = provider(fields = [
     "graph",
 ])
 
+def _trim_trailing_slash(value):
+    return value[:-1] if value.endswith("/") else value
+
 def _source_snapshot_impl(ctx):
     snapshot = ctx.actions.declare_output(ctx.attrs.name + ".source-snapshot", dir = True)
     manifest = ctx.actions.declare_output(ctx.attrs.name + ".source-snapshot.manifest.json")
@@ -24,7 +27,15 @@ def _source_snapshot_impl(ctx):
         ctx.attrs.graph,
     ]
     for src in ctx.attrs.srcs:
-        args.extend(["--file", src.short_path, src])
+        relative = src.short_path
+        if ctx.attrs.strip_prefix:
+            prefix = _trim_trailing_slash(ctx.attrs.strip_prefix) + "/"
+            if not relative.startswith(prefix):
+                fail("source_snapshot input %s is outside strip_prefix %s" % (relative, ctx.attrs.strip_prefix))
+            relative = relative[len(prefix):]
+        if ctx.attrs.destination_prefix:
+            relative = _trim_trailing_slash(ctx.attrs.destination_prefix) + "/" + relative
+        args.extend(["--file", relative, src])
     run_nix_action(
         ctx,
         cmd_args(
@@ -50,6 +61,8 @@ _source_snapshot = rule(
     attrs = {
         "srcs": attrs.list(attrs.source(), default = []),
         "graph": attrs.source(default = "workspace_buck//:graph.json"),
+        "destination_prefix": attrs.string(default = ""),
+        "strip_prefix": attrs.string(default = ""),
         "_runner": attrs.dep(
             default = "@viberoots//build-tools/tools/dev:source-snapshot-runner",
             providers = [RunInfo],
@@ -136,11 +149,21 @@ source_snapshot_zx_wrapper_tool = rule(
     },
 )
 
-def source_snapshot(name, srcs = [], graph = "workspace_buck//:graph.json"):
+def source_snapshot(
+        name,
+        srcs = [],
+        graph = "workspace_buck//:graph.json",
+        destination_prefix = "",
+        strip_prefix = ""):
     if len(srcs) == 0:
         fail("source_snapshot requires explicit declared srcs")
+    for value, field in [(destination_prefix, "destination_prefix"), (strip_prefix, "strip_prefix")]:
+        if value.startswith("/") or "\\" in value or ".." in value.split("/"):
+            fail("source_snapshot %s must be a normalized relative path" % field)
     _source_snapshot(
         name = name,
         srcs = srcs,
         graph = graph,
+        destination_prefix = destination_prefix,
+        strip_prefix = strip_prefix,
     )

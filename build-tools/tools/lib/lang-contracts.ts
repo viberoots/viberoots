@@ -131,7 +131,7 @@ export type ScaffoldingLanguage = {
 };
 
 export type LanguageHermeticContract = {
-  status: "scaffold" | "graduated";
+  status: "scaffold" | "experimental" | "graduated";
   sourceRoles: boolean;
   dependencyReconciliation: boolean;
   immutableBundleInputs: boolean;
@@ -153,6 +153,32 @@ const hermeticBooleanKeys = [
   "remoteExecution",
   "publicationAdmission",
 ] as const;
+
+const experimentalHermeticBooleanKeys = [
+  "sourceRoles",
+  "dependencyReconciliation",
+  "immutableBundleInputs",
+  "storeQualifiedToolchain",
+  "selectorTransport",
+  "remoteExecution",
+] as const;
+
+export function languageEnablementGaps(contract?: LanguageHermeticContract): string[] {
+  if (!contract) return ["hermetic contract is missing"];
+  if (!["experimental", "graduated"].includes(contract.status)) {
+    return ["status"];
+  }
+  const requiredKeys =
+    contract.status === "graduated" ? hermeticBooleanKeys : experimentalHermeticBooleanKeys;
+  const gaps: string[] = requiredKeys.filter((key) => contract[key] !== true);
+  if (
+    !Array.isArray(contract.reproducibilityMatrixIds) ||
+    contract.reproducibilityMatrixIds.length === 0
+  ) {
+    gaps.push("reproducibilityMatrixIds");
+  }
+  return gaps;
+}
 
 export function languageGraduationGaps(contract?: LanguageHermeticContract): string[] {
   if (!contract) return ["hermetic contract is missing"];

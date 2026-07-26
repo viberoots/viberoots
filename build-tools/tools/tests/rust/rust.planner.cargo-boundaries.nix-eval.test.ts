@@ -10,6 +10,11 @@ type PlannerFields = {
   cargo_manifest: string;
   cargo_lock: string;
   local_patch_dirs: string[];
+  kind?: "bin" | "wasm" | "wasi";
+  target?: string;
+  link_deps?: string[];
+  header_deps?: string[];
+  nixpkg_deps?: string[];
 };
 
 test("rust planner rejects noncanonical Cargo metadata and patch traversal", async () => {
@@ -26,7 +31,14 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
     await fsp.writeFile(path.join(cargoRoot, "Cargo.lock"), "version = 3\n");
 
     const evaluate = async (fields: PlannerFields) => {
+      const kind = fields.kind || "bin";
+      const target = fields.target || "";
       const patchDirs = fields.local_patch_dirs.map((value) => JSON.stringify(value)).join(" ");
+      const linkDeps = (fields.link_deps || []).map((value) => JSON.stringify(value)).join(" ");
+      const headerDeps = (fields.header_deps || []).map((value) => JSON.stringify(value)).join(" ");
+      const nixpkgLabels = (fields.nixpkg_deps || [])
+        .map((value) => JSON.stringify(`nixpkg:${value}`))
+        .join(" ");
       const expr = `
         let
           pkgs = import <nixpkgs> {};
@@ -34,15 +46,17 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
           node = {
             name = "root//projects/apps/rustapp:app";
             rule_type = "rust_nix_build";
-            labels = [ "lang:rust" "kind:bin" ];
+            labels = [ "lang:rust" "kind:${kind}" ${nixpkgLabels} ];
             deps = [];
+            link_deps = [ ${linkDeps} ];
+            header_deps = [ ${headerDeps} ];
             cargo_manifest = ${JSON.stringify(fields.cargo_manifest)};
             cargo_lock = ${JSON.stringify(fields.cargo_lock)};
             crate = "rustapp";
             features = [];
             default_features = true;
             profile = "release";
-            target = "";
+            target = ${JSON.stringify(target)};
             local_patch_dirs = [ ${patchDirs} ];
           };
           ctx = {
@@ -57,11 +71,12 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
                 manifest = builtins.toString args.cargoManifest;
                 lock = builtins.toString args.cargoLock;
                 patches = map builtins.toString args.patchInputs;
+                target = args.target;
               };
             };
           };
           plugin = (import ./viberoots/build-tools/tools/nix/planner/rust.nix { inherit lib; }) ctx;
-        in plugin.mkApp node.name
+        in plugin.${kind === "wasm" ? "mkWasm" : kind === "wasi" ? "mkWasi" : "mkApp"} node.name
       `;
       return await $({ cwd: tmp, stdio: "pipe", reject: false, nothrow: true })`
         nix eval --impure --expr ${expr} --json
@@ -74,6 +89,13 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
       local_patch_dirs: ["patches/rust"],
     });
     assert.equal(canonical.exitCode, 0, String(canonical.stderr || canonical.stdout));
+    const nativeNixpkg = await evaluate({
+      cargo_manifest: "root//projects/apps/rustapp/Cargo.toml",
+      cargo_lock: "root//projects/apps/rustapp/Cargo.lock",
+      local_patch_dirs: [],
+      nixpkg_deps: ["pkgs.zlib"],
+    });
+    assert.equal(nativeNixpkg.exitCode, 0, String(nativeNixpkg.stderr || nativeNixpkg.stdout));
 
     const alternateManifest = await evaluate({
       cargo_manifest: "root//projects/apps/rustapp/Alternate.toml",
@@ -101,5 +123,63 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
     });
     assert.notEqual(patchTraversal.exitCode, 0);
     assert.match(String(patchTraversal.stderr), /local_patch_dirs must remain within the package/);
+
+    for (const mismatch of [
+      {
+        kind: "wasm" as const,
+        target: "wasm32-wasip1",
+        expected: /Rust planner target .* kind wasm requires target wasm32-unknown-unknown/,
+      },
+      {
+        kind: "wasi" as const,
+        target: "wasm32-unknown-unknown",
+        expected: /Rust planner target .* kind wasi requires target wasm32-wasip1/,
+      },
+    ]) {
+      const result = await evaluate({
+        cargo_manifest: "root//projects/apps/rustapp/Cargo.toml",
+        cargo_lock: "root//projects/apps/rustapp/Cargo.lock",
+        local_patch_dirs: [],
+        kind: mismatch.kind,
+        target: mismatch.target,
+      });
+      assert.notEqual(result.exitCode, 0);
+      assert.match(String(result.stderr), mismatch.expected);
+    }
+
+    for (const unsupported of [
+      {
+        kind: "wasm" as const,
+        target: "wasm32-unknown-unknown",
+        link_deps: ["root//projects/libs/native:support"],
+      },
+      {
+        kind: "wasi" as const,
+        target: "wasm32-wasip1",
+        header_deps: ["root//projects/libs/native:headers"],
+      },
+      {
+        kind: "wasm" as const,
+        target: "wasm32-unknown-unknown",
+        nixpkg_deps: ["pkgs.zlib"],
+      },
+      {
+        kind: "wasi" as const,
+        target: "wasm32-wasip1",
+        nixpkg_deps: ["pkgs.openssl"],
+      },
+    ]) {
+      const result = await evaluate({
+        cargo_manifest: "root//projects/apps/rustapp/Cargo.toml",
+        cargo_lock: "root//projects/apps/rustapp/Cargo.lock",
+        local_patch_dirs: [],
+        ...unsupported,
+      });
+      assert.notEqual(result.exitCode, 0);
+      assert.match(
+        String(result.stderr),
+        /does not support link_deps, header_deps, or nixpkg dependencies; cross-language WebAssembly linking is not available/,
+      );
+    }
   });
 });

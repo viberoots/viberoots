@@ -144,20 +144,20 @@ Rust-flow cadence.
 
 ## Integration Debt Ledger
 
-| Area                                 | Introduced by    | Owner PR | Status | Closure evidence                                                 |
-| ------------------------------------ | ---------------- | -------- | ------ | ---------------------------------------------------------------- |
-| Placeholder artifact removal         | Current baseline | PR-1     | Closed | Real source-sensitive Cargo outputs and invalid-source failure   |
-| Cross-system and runnable parity     | Current baseline | PR-12    | Open   | Native tests and full-suite checkpoint on supported systems      |
-| Cargo mutation ownership             | Current baseline | PR-3     | Closed | Canonical Cargo lifecycle, rollback, process, and launcher proof |
-| Patch/provider ambiguity             | Current baseline | PR-4     | Open   | Applied dependency patch and explicit no-provider contract       |
-| Initial interop, WASM, and remote    | Current baseline | PR-5     | Open   | Native/WASM execution and remote-policy checkpoint               |
-| Cross-root composition and outputs   | Parity review    | PR-6     | Open   | Multi-root build plus explicit crate-type and proc-macro tests   |
-| Python and Node extensions           | Parity review    | PR-7     | Open   | Runtime import/load tests for native and WASM artifacts          |
-| Complete C and C++ interoperability  | Parity review    | PR-8     | Open   | Bidirectional ABI and generated-binding tests                    |
-| WASM ecosystem breadth               | Parity review    | PR-9     | Open   | Static, browser, cross-language, and component execution         |
-| Developer and dependency lifecycle   | Parity review    | PR-10    | Open   | Tooling, coverage, dev, and dependency-source fixtures           |
-| Hermetic release proof               | Parity review    | PR-12    | Open   | Independent builders, protected publication, and final suite     |
-| Tauri repository-library composition | Product template | PR-11    | Open   | Scaffold, cross-language build/run tests, and platform proof     |
+| Area                                 | Introduced by    | Owner PR | Status | Closure evidence                                                                                                         |
+| ------------------------------------ | ---------------- | -------- | ------ | ------------------------------------------------------------------------------------------------------------------------ |
+| Placeholder artifact removal         | Current baseline | PR-1     | Closed | Real source-sensitive Cargo outputs and invalid-source failure                                                           |
+| Cross-system and runnable parity     | Current baseline | PR-12    | Open   | `aarch64-darwin` PR-5 local evidence; Linux native execution remains fail-closed and deferred to reviewed PR-12 builders |
+| Cargo mutation ownership             | Current baseline | PR-3     | Closed | Canonical Cargo lifecycle, rollback, process, and launcher proof                                                         |
+| Patch/provider ambiguity             | Current baseline | PR-4     | Open   | Applied dependency patch and explicit no-provider contract                                                               |
+| Initial interop, WASM, and remote    | Current baseline | PR-5     | Open   | Native/WASM execution and remote-policy checkpoint                                                                       |
+| Cross-root composition and outputs   | Parity review    | PR-6     | Open   | Multi-root build plus explicit crate-type and proc-macro tests                                                           |
+| Python and Node extensions           | Parity review    | PR-7     | Open   | Runtime import/load tests for native and WASM artifacts                                                                  |
+| Complete C and C++ interoperability  | Parity review    | PR-8     | Open   | Bidirectional ABI and generated-binding tests                                                                            |
+| WASM ecosystem breadth               | Parity review    | PR-9     | Open   | Static, browser, cross-language, and component execution                                                                 |
+| Developer and dependency lifecycle   | Parity review    | PR-10    | Open   | Tooling, coverage, dev, and dependency-source fixtures                                                                   |
+| Hermetic release proof               | Parity review    | PR-12    | Open   | Independent builders, protected publication, and final suite                                                             |
+| Tauri repository-library composition | Product template | PR-11    | Open   | Scaffold, cross-language build/run tests, and platform proof                                                             |
 
 ## PR-1: Replace Placeholder Outputs With Locked Native Cargo Builds
 

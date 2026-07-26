@@ -1,0 +1,17 @@
+[package]
+name = "{{ name }}"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "{{ name }}"
+path = "src/main.rs"
+
+[[bin]]
+name = "{{ name }}-wasi"
+path = "src/main.rs"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]

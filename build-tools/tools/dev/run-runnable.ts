@@ -46,6 +46,8 @@ export async function runRunnable(opts: {
   artifactToolsRoot: string;
   nixCacheHealth?: ReviewedNixConfigOutcome;
   resolveEntry?: (target: string) => Promise<RunnableManifestEntry | null>;
+  buildSelected?: typeof buildSelectedOutPath;
+  executeCommand?: typeof runCommand;
 }) {
   const parsed = parseArgs(opts.argv);
   if (parsed.sourceError) {
@@ -84,10 +86,15 @@ export async function runRunnable(opts: {
     let selectedError: unknown = null;
     let selectedOutPath = "";
     try {
-      selectedOutPath = await buildSelectedOutPath(workspaceRoot, target, parsed.sourceMode, {
-        artifactToolsRoot,
-        nixCacheHealth: opts.nixCacheHealth,
-      });
+      selectedOutPath = await (opts.buildSelected || buildSelectedOutPath)(
+        workspaceRoot,
+        target,
+        parsed.sourceMode,
+        {
+          artifactToolsRoot,
+          nixCacheHealth: opts.nixCacheHealth,
+        },
+      );
       const inferred = await inferRunnableFromOutPath({
         label: target,
         outPath: selectedOutPath,
@@ -175,7 +182,7 @@ export async function runRunnable(opts: {
     console.error(`run.${parsed.mode} is not available for ${target}`);
     process.exit(2);
   }
-  const exitCode = await runCommand(
+  const exitCode = await (opts.executeCommand || runCommand)(
     spec.argv,
     parsed.passthrough,
     commandCwdForSpec(spec, workspaceRoot),

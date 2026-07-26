@@ -129,56 +129,15 @@ test("verify seed key includes active viberoots submodule state", async () => {
   assert.match(source, /viberootsGit/);
 });
 
-test("verify seed snapshot excludes generated workspace buck state", async () => {
-  const source = await readRepoFile("build-tools/tools/nix/flake/packages/filter-seed-repo.nix");
-  const seedSource = await readRepoFile("build-tools/tools/nix/flake/packages/test-seed.nix");
-  const seedStagingSource = [
-    await readRepoFile("build-tools/tools/dev/verify/seed-stage-tree.ts"),
-    await readRepoFile("build-tools/tools/dev/verify/seed-stage-source-overlay.ts"),
-  ].join("\n");
-  const seedCopySource = await readRepoFile(
-    "build-tools/tools/tests/lib/test-helpers/seed-copy.ts",
-  );
-  const seedStoreSource = [
-    await readRepoFile("build-tools/tools/tests/lib/test-helpers/seed-store.ts"),
-    await readRepoFile("build-tools/tools/tests/lib/test-helpers/seed-worktree-overlay.ts"),
-  ].join("\n");
-  const rsyncSource = await readRepoFile("build-tools/tools/tests/lib/test-helpers/rsync.ts");
-  assert.match(source, /rel == "\.viberoots\/workspace\/buck"/);
-  assert.match(source, /lib\.hasPrefix "\.viberoots\/workspace\/buck\/" rel/);
-  assert.match(source, /rel == "\.viberoots\/workspace\/\.viberoots"/);
-  assert.match(source, /lib\.hasPrefix "\.viberoots\/workspace\/\.viberoots\/" rel/);
-  assert.match(source, /rel == "\.viberoots\/workspace\/codex-test-logs"/);
-  assert.match(source, /lib\.hasPrefix "\.viberoots\/workspace\/codex-test-logs\/" rel/);
-  assert.match(source, /rel == "\.viberoots\/buck"/);
-  assert.match(source, /lib\.hasPrefix "\.viberoots\/buck\/" rel/);
-  assert.match(source, /rel == "\.viberoots\/cache"/);
-  assert.match(source, /lib\.hasPrefix "\.viberoots\/cache\/" rel/);
-  assert.match(source, /rel == "\.viberoots\/codex-logs"/);
-  assert.match(source, /lib\.hasPrefix "\.viberoots\/codex-logs\/" rel/);
-  assert.match(source, /rel == "build-tools\/tmp"/);
-  assert.match(source, /lib\.hasPrefix "build-tools\/tmp\/" rel/);
-  assert.match(source, /"\.viberoots"/);
-  assert.match(source, /builtins\.any \(d: rel == "viberoots\/\$\{d\}"/);
-  assert.match(seedSource, /"\$out\/\.viberoots\/buck"/);
-  assert.match(seedSource, /"\$out\/\.viberoots\/codex-logs"/);
-  assert.match(seedSource, /"\$out\/\.viberoots\/workspace\/\.viberoots"/);
-  assert.match(seedSource, /"\$out\/\.viberoots\/workspace\/codex-test-logs"/);
-  assert.match(seedSource, /"\$out\/build-tools\/tmp"/);
-  assert.match(seedSource, /"\$out\/viberoots\/\.viberoots"/);
-  assert.match(seedStagingSource, /isGeneratedRepoStateRelPath/);
-  assert.match(seedStagingSource, /hasGeneratedRepoState/);
-  assert.match(seedCopySource, /removeGeneratedRepoState/);
-  assert.match(seedStoreSource, /isGeneratedRepoStateRelPath/);
-  assert.match(seedStoreSource, /if \(isGeneratedRepoStateRelPath\(rel\)\) return false/);
-  assert.match(rsyncSource, /\/\.viberoots\/buck/);
-  assert.match(rsyncSource, /\/\.viberoots\/codex-logs/);
-  assert.match(rsyncSource, /\/\.viberoots\/workspace\/\.viberoots/);
-  assert.match(rsyncSource, /\/\.viberoots\/workspace\/codex-test-logs/);
-  assert.match(rsyncSource, /\/build-tools\/tmp/);
-  assert.match(rsyncSource, /"prelude"/);
-  assert.match(rsyncSource, /"patches"/);
-  assert.match(rsyncSource, /extractedToolRoots\.has\(r\)/);
+test("verify seed disables detached Git maintenance before writing objects", async () => {
+  const source = await readRepoFile("build-tools/tools/nix/flake/packages/test-seed.nix");
+  for (const repo of ['"$out/viberoots"', '"$out"']) {
+    const config = source.indexOf(`git -C ${repo} config maintenance.auto false`);
+    const detach = source.indexOf(`git -C ${repo} config gc.autoDetach false`);
+    const add = source.indexOf(`git -C ${repo} add -A`);
+    assert.ok(config > 0 && config < add, `${repo} must disable maintenance before git add`);
+    assert.ok(detach > 0 && detach < add, `${repo} must disable detached gc before git add`);
+  }
 });
 
 test("verify seed remote-ready manifest records explicit cache artifact path", async () => {

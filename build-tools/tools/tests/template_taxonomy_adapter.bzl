@@ -18,6 +18,7 @@ CANONICAL_TEMPLATE_IDS = [
     "python/lib",
     "python/wasm-app",
     "python/wasm-lib",
+    "rust/cli",
     "ts/cli",
     "ts/cpp-addon",
     "ts/go-addon",

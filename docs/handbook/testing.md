@@ -129,6 +129,13 @@ one stable cause: `project-change`, `explicit-project-selector`, `full-suite`, o
   - `v //<target>`
   - `v --coverage //<target>`
 
+For Rust PR-5 changes, the focused union must include the C interop artifact, freestanding/WASI
+artifact, Rust remote-policy fixture, scaffold files/lifecycle, language-registry validation,
+route-inventory, and `rust-pr5` reproducibility-matrix contracts. The matrix currently claims
+native execution only on `aarch64-darwin`; `aarch64-linux` and `x86_64-linux` remain configured
+fail-closed systems until later Rust execution evidence lands. The PR checkpoint remains
+`i && b && ALL_TESTS=1 v`; focused evidence does not replace it.
+
 ## Running
 
 - Default PR loop: `i && b && v`
@@ -166,9 +173,15 @@ The local wrappers and Buck Nix actions use `VBR_NIX_CACHE_POLICY=auto` by defau
 configured HTTP(S) substituters, disable unreachable configured caches for the current process, keep
 Nix fallback enabled, and continue locally. Canonical artifact commands classify the reviewed
 private cache as optional while retaining public substituters. DNS and transport failures may fall
-back to those public caches or a local build; malformed configuration and untrusted or invalid
-artifacts still fail admission. Use `VBR_NIX_CACHE_POLICY=strict` only when cache availability is
-itself under test; use `VBR_NIX_CACHE_POLICY=off` to skip the dynamic probe.
+back to those public caches or a local build. In `auto`, an HTTP/authentication response such as
+401 disables only an optional substituter; the same response from a required substituter fails
+closed. Because `nix config show` flattens `extra-substituters`, canonical ingress reconstructs roles
+from the authoritative Nix configuration sources and accepts them only when their combined members
+exactly match the effective configuration. The reviewed config bytes, policy, and role lists share
+one FD/capability binding across canonical re-entry and Buck action re-review; forged or mismatched
+role metadata fails closed. `strict` fails for either role. Malformed configuration and untrusted or
+invalid artifacts also fail admission. Use `VBR_NIX_CACHE_POLICY=strict` only when cache availability
+is itself under test; use `VBR_NIX_CACHE_POLICY=off` to skip the dynamic probe.
 
 ## Nix GC preflight
 

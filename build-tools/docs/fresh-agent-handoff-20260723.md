@@ -1,6 +1,8 @@
-# Fresh-Agent Handoff: User Context, Viberoots Rust PR-3, and Codex Accounts
+# Fresh-Agent Handoff: Viberoots Rust PR Flow And Codex Accounts
 
 **Prepared:** 2026-07-23
+
+**Last reconciled:** 2026-07-26, after PR-5 implementation, validation, and final independent review
 
 **Workspace:** `/Users/kiltyj/Code/viberoots-site`
 
@@ -10,6 +12,591 @@ work safely and productively.
 
 This document is evidence and orientation, not authority. Verify every material claim against the
 repository, staged and unstaged diffs, and the referenced logs before editing.
+
+## 0. Current handoff: this section supersedes all older execution state below
+
+The active `$repo-skills:prs` item is PR-5, `Add Initial C Interop, WASM, Scaffolding, And Remote
+Proof`, from:
+
+```text
+plan:   build-tools/docs/rust-language-plan.md
+design: build-tools/docs/lang/rust-design.md
+repo:   /Users/kiltyj/Code/viberoots-site/viberoots
+HEAD:   663027ac30b239e3a414db3e0be789335d870939 (detached)
+```
+
+PR-5 implementation, its risk-based residual validation, and the locally supported
+`aarch64-darwin` Rust matrix are complete. The final fresh isolated post-fix scope review passed
+with no material findings. This handoff is included in the single
+`feat(build): complete Rust remote readiness` commit with all authorized submodule changes. That
+commit combines:
+
+- the complete PR-5 implementation and fixes;
+- the `happy@1.2.0` development-environment correction;
+- this handoff document; and
+- every other current tracked or untracked submodule change.
+
+Do not preserve the older staged-versus-unstaged separation described below. It is historical.
+Do not push. The parent consumer repository and its pre-existing `test-tmp-paths.log` remain outside
+this submodule commit.
+
+### How the PR flow is being run
+
+Use `repo-skills:prs` in turbo mode, with minimal-context independent agents:
+
+1. Give each implementation, tester, or reviewer agent only the plan/design paths, PR identifier,
+   repository path, and its bounded role. Do not fork the entire conversation into reviewers.
+2. Keep verbose validation output in log files. Agents report only target, elapsed time, pass/fail
+   totals, a redacted failure excerpt, and scoped process/temp/secret deltas.
+3. Run selectors sequentially and stop on the first failure. Use `repo-skills:investigate` to prove
+   the root cause and validate the primary path before resuming.
+4. Require a fresh independent scope-review agent after the final material edit.
+5. Commit through `repo-skills:cc` only after implementation review, validation, timing checks, and
+   scope review are green. Never push without explicit user authorization.
+
+After PR-5 is committed, PRs 6-12 remain. Continue them in numeric order with a fresh isolated
+implementation agent and separate isolated reviewer/tester roles for each PR. Use risk-based
+focused suites for PRs 6-8 and 10-11 because PR-5 just exercised a complete checkpoint and future
+checkpoint PRs will do so again. Run full checkpoints for PR-9 and PR-12, or earlier if a material
+cross-cutting change makes the focused evidence insufficient. Record elapsed timing and compare
+successful full checkpoints with the 10,684-second successful baseline.
+
+### PR-5 validation and failure investigation
+
+The attempted full run completed in 17,834 seconds (4:57:14), exited `124`, and produced 1,903
+passes and 104 failures. Its authoritative logs are:
+
+```text
+outer:
+  /Users/kiltyj/Code/viberoots-site/.viberoots/buck/agent-test-logs/
+  pr5-all-tests-v-env-unset-node-path-20260725-131006.log
+canonical:
+  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/verify-logs/
+  verify-2026-07-25T18-11-01-565Z-975-1f34579ed790f.log
+```
+
+That run is not a successful timing baseline. Ninety-seven failures were directly attributable to
+external cache/network behavior, including a network outage. The remaining outliers were isolated
+and rerun after root-cause fixes instead of spending another five hours on a redundant full run.
+The overall slowdown was about 67% versus the 10,684-second checkpoint, not 4x. Evidence points to
+a cold/invalidated worktree plus network retry ladders; macOS was in High Power mode and reported
+no thermal or performance warning.
+
+Orphaned Buck processes were traced to temporary identity workspaces being removed before their
+isolated daemon was stopped. Teardown now kills the daemon before workspace removal, fixed
+isolation call sites have exact cleanup hooks, and a lint gate prevents the unsafe lifetime
+pattern. Subsequent selectors reported zero newly leaked scoped daemons, processes, or temporary
+workspaces.
+
+Cache tolerance was fixed generically, without hostname exceptions:
+
+- curl TLS exit 35 is classified as transport failure;
+- optional caches are disabled in `auto` mode on curl 22/HTTP failure, while required caches and
+  strict mode remain fail closed;
+- Nix config-source provenance reconstructs required `substituters` versus optional
+  `extra-substituters`, including include/reset/append ordering, and accepts roles only when their
+  exact set matches effective configuration;
+- reviewed policy, roles, configuration, and netrc authority are bound into the file-descriptor
+  proof rather than trusted ambient variables;
+- canonical re-entry consumes proof only on ordinary ingress;
+- credential-bearing URLs fail closed before probe/review, and credentials do not enter
+  environment variables, logs, or CAS inputs.
+- local verify consumes the same one-shot reviewed-config proof as build; the branded result is
+  threaded explicitly through verify passes and nested Buck tests instead of reconstructed from
+  flattened or ambient configuration;
+- post-health required/optional roles and the reviewed candidate config are bound together;
+  required and dual-role failures remain fail closed while unavailable optional caches cannot
+  reappear through system defaults or nested daemons; and
+- reusable Buck isolation identity includes cache binding plus authoritative graph/source
+  identity, so changed policy or graph state retires the prior exact daemon rather than reusing
+  stale analysis.
+
+The focused cache selector passed 26/26 in 58 seconds with zero scoped process/temp/fixture/secret
+deltas. The formerly failing scaffold-and-build selector passed 1/1 in 166 seconds, including the
+expected stale first build, reconciliation, optional-cache fallback, final build, bundle, and CLI
+help milestones.
+
+All seven non-cache residuals from the failed full run are now green:
+
+```text
+viberoots_maintenance_commands:                  21/21, about 18s
+lib_macos_metadata:                              11/11 direct; selector about 4s
+dev_runnable_commands_dev_direct_script:          1/1, 9.1s
+scaffolding_e2e_move_confirm:                      1/1, 15.9s
+scaffolding_e2e_validate_pass:                     1/1, 10.4s
+scaffolding_e2e_overwrite_guard:                   1/1, 19.7s
+nix_devshell_tools_path_smoke (Happy):             1/1, 13.8s
+```
+
+Each selector also passed the five project-enforcement checks and ended with zero fresh scoped
+process/temp/store/secret deltas. The Happy cold-store audit registered six paths totaling about
+26.5 MB, with none at or above 100 MiB.
+
+The fresh independent review initially found two real gaps: required caches could be silently
+removed on transport failure, and Rust remote readiness was asserted through `aquery` without
+executing Cargo from a Rust snapshot. Both were fixed. The final remote conformance selector:
+
+```text
+target:  viberoots//:remote_exec_remote_conformance_target
+result:  rc 0 in 90s; conformance 8/8, shared 1/1, project enforcement 5/5
+log:
+  .viberoots/workspace/buck/agent-test-logs/
+  remote-conformance-final-10-args-20260726-060130.log
+```
+
+The Rust build and test fixtures now use a dedicated, self-contained source snapshot containing
+Cargo metadata, Rust source, and a nonempty graph. Conformance executes the Cargo build artifact,
+asserts its source-owned marker, and executes the Rust test; `aquery` remains only supplemental
+structural evidence.
+
+The locally supported PR-5 Rust matrix is green:
+
+```text
+C interop:                 rc 0, 270s, project 5/5, artifact 1/1
+WASM/WASI:                 rc 0, 105s, project 5/5, artifact 1/1
+CLI scaffold lifecycle:    rc 0, 165s, project 5/5, shared 1/1
+source-selection parity:   rc 0,  90s, project 5/5, shared 1/1
+```
+
+Logs are:
+
+```text
+.viberoots/workspace/buck/agent-test-logs/pr5-rust-matrix-01-c-interop-20260726-060536.log
+.viberoots/workspace/buck/agent-test-logs/pr5-rust-matrix-02-wasm-wasi-20260726-061017.log
+.viberoots/workspace/buck/agent-test-logs/pr5-rust-matrix-03-cli-scaffold-tmp-containment-20260726-080822.log
+.viberoots/workspace/buck/agent-test-logs/pr5-rust-matrix-04-source-selection-parity-20260726-081303.log
+```
+
+Linux Rust execution remains explicitly fail closed and deferred to the protected builder work in
+PR-12; do not claim Linux execution evidence from this host. The user's explicit risk-based waiver
+covers not repeating the five-hour full suite after closing every residual cluster and running this
+host matrix.
+
+Additional root-cause fixes discovered by the matrix include:
+
+- canonical worker tools now include and validate Copier and Prettier for `NO_DEV_SHELL=1`
+  consumers;
+- update, install, and dev-build closeout re-render content-addressed global-input TARGETS after
+  their final lock/hash mutations and hand off changed consumers before recording final
+  fingerprints;
+- verify seed snapshots exclude nested `.git` metadata generically, eliminating transient pack-file
+  races; and
+- verify tmp cleanup compares logical and canonical realpaths, preserves an active workspace nested
+  under the cleanup root, and still deletes unrelated siblings. This closed the self-deleting
+  scaffold workspace failure without retaining scoped processes or temp roots.
+
+Final readiness evidence:
+
+```text
+final split affected suite:        56/56 passed across 8 files
+full ESLint:                       passed
+changed/untracked Prettier:        passed
+changed shell bash -n:             passed
+changed Nix parse:                 passed
+git diff --check:                  passed
+changed-source 250-line gate:      passed
+Nix command inventory:             536 sites
+inventory digest:                  17387e7d23ed5f5791327245d16e46cca2ff48f08d1347d9ad459cd27e7c7507
+inventory roles:                   canonical 296, live-d 4, update 68, nonartifact 168
+strong secret-indicator files:     0
+active scoped test processes:      0
+fresh scoped temp entries:         0
+source fingerprint:
+  dabcb4062ae1f436692548115f647839973e2359eba660f4dd0b86abb0c8f6d5
+protected original staged SHA-256:
+  691f436b0fa248624121e8e70be5c7b3bf437f617f6c6d09b7f2b4cf8b75e489
+```
+
+Repository-wide Prettier still reports six unchanged baseline files outside this diff. Every
+changed or untracked formatter-eligible file passes. All unexcepted in-scope files over 250 lines
+were split into cohesive helpers/modules; the largest resulting unexcepted file is exactly 250
+lines. The final split affected suite passed 56/56 and no matrix rerun was needed for purely
+structural splits.
+
+### Historical resume state from 2026-07-24
+
+The historical sections remain useful for design decisions and earlier evidence, but their claims
+that PR-3 is uncommitted and PR-4 has not started are obsolete. Treat everything below as historical
+evidence only when it conflicts with section 0.
+
+The user explicitly paused the active PR-5 implementation so another agent could take over. The
+implementation subagent was interrupted. The focused tester had already exited. No `i`, `b`, `v`,
+or PR-5 validation process was running when this handoff was reconciled.
+
+### Current repository topology
+
+Parent repository:
+
+```text
+root:   /Users/kiltyj/Code/viberoots-site
+branch: codex/hermetic-builds
+HEAD:   3bfffc7 chore: advance viberoots for hermetic Rust PR-3
+```
+
+The parent commit records submodule SHA `cb3609fa`, while the detached submodule is now at
+`663027ac`. Do not try to make the parent pointer or `flake.lock` coherent yet. The local detached
+submodule commits are not fetchable from GitHub until the user authorizes a push. A prior attempt to
+run the canonical parent update advanced the submodule back to remote `main`; that incidental state
+was caught and removed without committing it.
+
+Current parent status:
+
+```text
+ M viberoots
+?? test-tmp-paths.log
+```
+
+`test-tmp-paths.log` predates the current PR work. Preserve it and do not include it in a commit.
+
+Submodule:
+
+```text
+root:   /Users/kiltyj/Code/viberoots-site/viberoots
+state:  detached HEAD
+HEAD:   663027ac30b239e3a414db3e0be789335d870939
+```
+
+The submodule has 32 staged PR-5 paths, 612 insertions, and 73 deletions. Six separate unstaged paths
+belong to the Happy package correction and this handoff update:
+
+```text
+build-tools/docs/fresh-agent-handoff-20260723.md
+build-tools/tools/nix/node-modules.hashes.json
+build-tools/tools/tests/nix/devshell-tools-path.smoke.test.ts
+docs/handbook/tooling.md
+package.json
+pnpm-lock.yaml
+```
+
+There are no untracked submodule paths. At reconciliation time:
+
+```text
+git diff --cached --binary | shasum -a 256
+b448acdd43d54ab2b8496cd529d83e1617ecd86ca15f6e243bfbb9913c5dd556
+```
+
+Recompute this digest and inspect both staged and unstaged state before continuing. The digest is
+evidence, not an instruction to overwrite later legitimate changes.
+
+### Completed commits since the original handoff
+
+The relevant detached submodule history is:
+
+```text
+663027ac chore(dev): add happy-coder CLI
+f1d3d098 feat(build): add Rust patching and resilient cache policy
+cb3609fa feat(build): complete hermetic Rust PR-3
+68fc4748 feat(rust): complete native lifecycle contracts
+bec23703 feat(rust): add locked native Cargo builds
+```
+
+`cb3609fa` completed PR-3, the Codex multi-account wrapper, and the Repo Skills marketplace and
+subagent-isolation update described later in this document. The exact-state full checkpoint passed
+in 10,684 seconds as recorded in section 8.
+
+`f1d3d098` completed PR-4. It contains Rust dependency patching and vendoring, fixed-source
+integrity, and the reviewed optional-cache policy. Entry points must tolerate
+`cache.home.kilty.io` being unresolved because that cache exists only on the user's home network.
+The implementation is hostname-neutral:
+
+- optional cache policy is transported as a command-scoped capability;
+- strict reviewed cache requirements remain fail closed;
+- every canonical Node action re-reviews its action-local cache configuration;
+- stage0 passes normalized effective substituter lists explicitly to nix-direnv, preventing daemon
+  configuration from silently reintroducing optional private caches;
+- missing, unreadable, or non-regular netrc files are omitted, while real curl configuration errors
+  still fail closed.
+
+Do not reintroduce hostname-specific exceptions, cache-off bypasses, or ambient daemon authority.
+PR-4 passed its independent final scope review. Its post-review affected validation passed:
+
+```text
+47-selector complement:
+  outer:
+    .viberoots/workspace/buck/agent-test-logs/
+    i-b-v-bounded-47-pr4-curl-risk-complement-20260724T085221-0700.log
+  detailed:
+    .viberoots/workspace/buck/verify-logs/
+    verify-2026-07-24T15-54-03-777Z-49430-fb17d5160fd2.log
+  result: 52/52 including enforcement
+
+21-selector post-review gate:
+  outer:
+    .viberoots/workspace/buck/agent-test-logs/
+    i-b-v-bounded-21-pr4-post-review-risk-gate-reconciled-20260724T092805-0700.log
+  detailed:
+    .viberoots/workspace/buck/verify-logs/
+    verify-2026-07-24T16-29-37-792Z-28584-4f91cce55cc93.log
+  result: 26/26 including enforcement
+```
+
+The user had already authorized this risk-based evidence after the recent full PR-3 checkpoint. Do
+not rerun PR-4's full suite.
+
+`663027ac` adds npm package `happy-coder@1.1.9` to the canonical consumer dev environment. It exposes
+`happy` and `happy-mcp` through `.viberoots/current/node_modules/.bin` in any Viberoots consumer
+devshell. The upstream package is deprecated in favor of `happy`; that is documented. The change
+updates `package.json`, `pnpm-lock.yaml`, the fixed node-modules hash, a consumer-resolved static
+smoke test, and `docs/handbook/tooling.md`. Focused validation and an independent review passed. Do
+not invoke the upstream CLI merely to test `--version`; its behavior is not a reliable side-effect-
+free identity probe.
+
+After that commit, the user reported that `happy codex --yolo` did not work. Inspection proved that
+`happy-coder@1.1.9` drops Codex `--yolo` in its dispatcher. The official rename was verified through
+the deprecated package metadata, matching npm maintainers and publisher, matching repository and
+homepage, the official repository instructions, npm integrity, and a tarball inspection. The
+current unstaged follow-up replaces it with `happy@1.2.0`, whose Codex dispatcher maps `--yolo` to
+permission mode `yolo`.
+
+The rename has strong ownership-continuity evidence:
+
+- `happy-coder@1.1.9` is deprecated with an explicit instruction to install `happy`;
+- both npm packages list the same two maintainers, the same publisher, the same
+  `slopus/happy` repository, and the same homepage;
+- the official repository README now installs `happy` and explains that the old package was
+  migrated after the package name was donated;
+- npm supplied a registry signature and integrity digest for the 1.2.0 tarball;
+- the downloaded tarball matched the registry identity;
+- the package install hook only extracts already-bundled platform archives locally;
+- all bundled archive entries were checked for absolute paths, `..` traversal, and links, with none
+  found.
+
+No provenance attestation was published at npm's attestation endpoint. That absence is not evidence
+of malware, but do not claim a provenance-backed release. This was a bounded package-identity and
+tarball review, not a formal source-to-binary security audit.
+
+`pnpm audit` still reports repository-wide advisories. The Happy dependency paths reach the existing
+locked `fast-uri@3.1.0` advisories through AJV/Fastify. The high MCP advisories reported by the audit
+are for the repository's direct `@modelcontextprotocol/sdk@1.17.4`; Happy resolves 1.29.0. The
+reported vulnerable `ws` paths are under Wrangler, not Happy. Do not misrepresent this rename review
+as closing the repository's dependency-audit backlog.
+
+Validation for the correction:
+
+```text
+canonical update:
+  command: env -u NODE_PATH VBR_GC_MODE=off u
+  exit: 0
+  log:
+    .viberoots/workspace/buck/agent-test-logs/
+    happy-package-rename-update-20260724.log
+  result:
+    pnpm-store.viberoots hash updated and build succeeded
+
+canonical install:
+  command: env -u NODE_PATH VBR_GC_MODE=off i
+  exit: 0
+  log:
+    .viberoots/workspace/buck/agent-test-logs/
+    happy-package-rename-install-20260724.log
+
+corrected dependency state:
+  i: passed
+  b: passed
+
+final exact selector:
+  command:
+    env -u NODE_PATH VBR_GC_MODE=off v \
+      viberoots//:nix_devshell_tools_path_smoke
+  exit: 0
+  elapsed: 60 seconds
+  outer:
+    .viberoots/workspace/buck/agent-test-logs/
+    v-20260724-154957.log
+  detailed:
+    .viberoots/workspace/buck/verify-logs/
+    verify-2026-07-24T20-50-13-962Z-99574-798b6a12cd28e.log
+  project-enforcement: 5/5 passed
+  shared: 1/1 passed
+```
+
+Two earlier exact-selector attempts found and fixed only smoke-probe defects: template-string
+regular-expression cooking, then a missing `dist/` bundle path component. Production package
+resolution was not weakened. Keep this six-file correction separate from the staged PR-5 index.
+Before invoking `repo-skills:cc` for PR-5, resolve the Happy correction as its own coherent commit or
+obtain explicit direction to combine it. The `cc` skill commits all local changes and must not sweep
+this side change into PR-5 accidentally.
+
+### Active work: PR-5
+
+Continue `$repo-skills:prs` for PR-5 from:
+
+```text
+plan:   build-tools/docs/rust-language-plan.md
+design: build-tools/docs/lang/rust-design.md
+```
+
+PR-5 is `Add Initial C Interop, WASM, Scaffolding, And Remote Proof`. It is a full-scope checkpoint.
+The successful full-suite timing baseline is 10,684 seconds. Do not run the full suite until focused
+validation and a fresh independent scope review pass.
+
+The current staged implementation covers these areas:
+
+- Rust `link_deps`, `header_deps`, direct/transitive link closure, closure overrides, native
+  library inputs, and Cargo build-script link intent;
+- public `rust_wasm_library` for `wasm32-unknown-unknown`;
+- public `rust_wasi_binary` for `wasm32-wasip1`;
+- Rust planner, Nix template, graph generator, and private build/test rule wiring;
+- experimental Rust enablement in `langs.json` and its schema/validator;
+- a source-owned Rust CLI scaffold, resolver entry, and generated template taxonomy;
+- C interop, WASM/WASI artifact, scaffold-file, macro analysis, cquery, language validation, and
+  remote-policy tests;
+- Rust design, remote build setup, Nix gaps, Starlark API, and example documentation.
+
+The exact 32 staged paths are the index entries in `git status --short` in the submodule. The six
+Happy/handoff paths above must remain separate unstaged changes unless the next agent and user
+explicitly choose their commit destination. Do not restage unrelated paths or flatten
+staged/unstaged state.
+
+Static gates passed before the last focused retry:
+
+- ESLint;
+- Prettier;
+- strict file-size enforcement;
+- Nix parse;
+- template freshness;
+- `validate-langs`;
+- `git diff --check`;
+- canonical `u` after stable inputs.
+
+The first focused retry after those gates passed `i` and `b`, then verify preflight found that
+`docs/handbook/starlark-api.md` lacked the two new public macro index entries. Those entries were
+added, the static gates and canonical `u` passed again, and the staged diff was frozen.
+
+The next exact retry was:
+
+```text
+env -u NODE_PATH VBR_GC_MODE=off i &&
+env -u NODE_PATH VBR_GC_MODE=off b &&
+env -u NODE_PATH VBR_GC_MODE=off v \
+  viberoots//:rust_rust_c_interop_artifact \
+  viberoots//:rust_rust_wasm_wasi_artifacts
+```
+
+Evidence:
+
+```text
+outer log:
+  .viberoots/workspace/buck/agent-test-logs/
+  pr5-rust-interop-wasi-index-fix-20260724T151134-0500.log
+HEAD during run:
+  663027ac30b239e3a414db3e0be789335d870939
+staged digest during run:
+  8a12559d25691a04d580a48ced10fcbd28daedbc
+unstaged paths:
+  zero
+i:
+  passed
+b:
+  passed
+v:
+  exit 2 in command-site policy preflight before test lanes
+elapsed:
+  120 seconds
+```
+
+The failure was shared policy metadata, not a Rust artifact test failure:
+
+```text
+expected count=536
+expected digest=2f6542bbe8fdc549bb99e646eac2473ce7712498fc029ae32f5836828a93da2b
+actual count=536
+actual digest=b80b24d4489e92fab5369bae7e78f8c5e22aac3ab9f30962fdee60ca8e4cbae2
+```
+
+The count was unchanged. The digest change is consistent with edits to an existing Rust build
+command assembly site. Just before the user paused, the staged policy file was updated so its
+`expectedDigest` equals the reported actual digest
+`b80b24d4489e92fab5369bae7e78f8c5e22aac3ab9f30962fdee60ca8e4cbae2`. The implementation agent was
+interrupted before it reported the exact updater command or completed validation. Therefore:
+
+1. inspect the classified command-site delta and confirm it is exactly the intended PR-5 Rust
+   assembly change;
+2. confirm the policy update came from the canonical inventory workflow, or rerun only that
+   canonical updater if repository evidence requires it;
+3. do not edit the digest by guesswork;
+4. freeze the resulting staged digest;
+5. rerun the same two focused selectors through an isolated tester with full output kept only in a
+   log file.
+
+After those selectors pass, complete the remaining pre-full-suite work:
+
+1. Confirm the scaffold lifecycle and public-macro route drift coverage required by the PR-5 plan,
+   not only the static scaffold-file test.
+2. Run self-review and the smallest meaningful focused affected union.
+3. Spawn a fresh isolated scope reviewer with `fork_turns="none"`. Give it only the repository path,
+   PR-5 plan/design paths, and read-only scope-review contract. Do not provide the implementation
+   reasoning or expected verdict.
+4. Fix any material scope findings and repeat focused validation plus independent review.
+5. Only after scope review passes, run the canonical full-scope
+   `i && b && ALL_TESTS=1 v` checkpoint and the supported-system Rust matrix through the `test`
+   skill. Keep verbose output file-only and report only phase transitions, summaries, exit code,
+   elapsed time, and log paths.
+6. Compare the completed run with the 10,684-second baseline. A regression is significant when it
+   is both at least 25 percent slower and at least 120 seconds slower, unless current repo guidance
+   is stricter.
+7. Commit PR-5 through `repo-skills:cc` only after all required evidence passes. Do not push.
+
+Validation reports must include the absolute outer log path, final process exit code, every
+per-phase `Tests finished:` summary, and total elapsed seconds. A `Tests finished:` line is
+phase-local and does not prove that the whole process exited.
+
+### Workflow and agent-context requirements
+
+Use the installed `repo-skills:prs` workflow. The marketplace/plugin bootstrap change is already in
+`cb3609fa`; the user should not need a manual per-account plugin install after canonical bootstrap
+and post-clone have run. If plugin discovery is missing in a fresh account, diagnose generated
+marketplace state and the account's plugin cache rather than copying skills into the consumer.
+
+Implementation, tester, reviewer, and assessment subagents must be isolated with
+`fork_turns="none"`. Send only a minimal task-local packet. Never fork or summarize the complete
+conversation into those agents. Keep full test output in log files; subagents should consume only
+high-signal phase and failure summaries unless they are investigating a saved failure.
+
+### Exact remaining PRs flow and Turbo contract
+
+The active range is PR-5 through PR-12. Only PR-5 is open/in progress. PR-6 through PR-12 have not
+started. Keep implementation sequential. Turbo Mode changes the validation breadth for a PR; it
+does not authorize overlapping PR implementation.
+
+For every remaining PR:
+
+1. Start a fresh isolated implementation agent with only the repository path, exact PR number,
+   plan/design paths, repo guidance, validation mode, and current timing baseline.
+2. Implement, self-review, and run exact plus meaningful focused validation.
+3. Run a fresh isolated read-only scope reviewer before any full suite or commit.
+4. Fix material review findings, then repeat focused validation and scope review.
+5. Run the PR's required Full or Turbo gate.
+6. Commit through `repo-skills:cc` only after the gate passes. Never push without new explicit user
+   authorization.
+7. Record evidence, attempt ntfy without treating off-network failure as a PR failure, update the
+   timing or integration-debt record, and only then start the next PR.
+
+Full-scope PRs run `i && b && ALL_TESTS=1 v`, their required platform/external-evidence matrix, and
+the timing-regression comparison. Turbo risk-based PRs use the last committed full checkpoint as
+`GITHUB_BASE_REF`, then run formatting/lint, exact and previously failing selectors, a conservative
+affected-target union, and independent scope review. Record the deferred full suite and remaining
+assumptions in the integration debt ledger. Escalate a Turbo PR to full scope before commit if the
+blast radius cannot be bounded or a cross-cutting failure appears.
+
+| PR    | Mode             | Status and remaining work                                                                                                                                                                                     |
+| ----- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PR-5  | Full scope       | In progress. Finish command-site review, C/WASM focused retry, scaffold lifecycle and route-drift evidence, affected union, scope review, full suite, Rust supported-system matrix, timing check, and commit. |
+| PR-6  | Turbo risk-based | Not started. Add cross-root crate composition, complete crate/artifact kinds, proc macros, build scripts, host/target separation, focused union, review, and debt record.                                     |
+| PR-7  | Turbo risk-based | Not started. Add Rust Python extensions and Node-API addons with conservative extension, packaging, loader, and negative-path validation.                                                                     |
+| PR-8  | Turbo risk-based | Not started. Complete bidirectional C/C++ interop, generated bindings, ABI ownership, link closure, affected union, and review.                                                                               |
+| PR-9  | Full scope       | Not started. Reach cross-language WASM linking, browser harness, and component-model parity, then run the next full checkpoint and timing comparison.                                                         |
+| PR-10 | Turbo risk-based | Not started. Complete developer commands, dependency-source lifecycle, watchers, tooling, focused affected union, review, and debt record.                                                                    |
+| PR-11 | Turbo risk-based | Not started. Add the cross-language Tauri desktop scaffold consuming Rust, C/C++, and WASM through reviewed boundaries; record deferred full evidence.                                                        |
+| PR-12 | Full scope       | Not started. Close Rust/Tauri hermeticity, sandbox/network, publication, provenance, platform, independent-builder, and all deferred integration evidence.                                                    |
+
+After PR-12, spawn separate isolated `assess-plan` and `assess-design` agents. They do not run
+tests. If either finds implementation gaps, use `augment` to append the minimum follow-up PRs,
+extend the active range, update the progress denominator, and continue. The `$prs` flow is complete
+only when both assessments have no remaining implementation findings.
+
+No remote push is authorized. The default ntfy endpoint may be unreachable off the home network;
+notification failure is not a PR failure.
 
 ## 1. First response and read order
 

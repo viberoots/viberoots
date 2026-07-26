@@ -70,10 +70,22 @@ export async function runBuildSelected(args: {
   stdio?: "inherit" | "pipe";
   reject?: boolean;
   nothrow?: boolean;
+  source?: "auto" | "git" | "path";
+  attr?: string;
 }): Promise<ZxResult> {
-  const { tmp, $, target, env, stdio = "pipe", reject = false, nothrow = true } = args;
+  const {
+    tmp,
+    $,
+    target,
+    env,
+    stdio = "pipe",
+    reject = false,
+    nothrow = true,
+    source = "auto",
+    attr = "graph-generator-selected",
+  } = args;
   const root = activeViberootsRoot(tmp);
-  const nodeBin = path.join(canonicalArtifactToolsRoot(tmp), "bin", "node");
+  const entrypoint = path.join(root, "build-tools", "tools", "bin", "build-selected");
   return await timeAsync("selectedBuild runBuildSelected", async () => {
     return await $({
       cwd: tmp,
@@ -81,7 +93,7 @@ export async function runBuildSelected(args: {
       reject,
       nothrow,
       env: selectedBuildEnv({ tmp, env }),
-    })`${nodeBin} --experimental-top-level-await --disable-warning=ExperimentalWarning --experimental-strip-types --import ${path.join(root, "build-tools", "tools", "dev", "zx-init.mjs")} ${path.join(root, "build-tools", "tools", "dev", "build-selected.ts")} --artifact-workspace-root=${tmp} --target ${target}`;
+    })`${entrypoint} --artifact-workspace-root=${tmp} --source=${source} --target ${target} --attr ${attr}`;
   });
 }
 

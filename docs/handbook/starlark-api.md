@@ -42,6 +42,8 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `rust_library`
   - `rust_binary`
   - `rust_test`
+  - `rust_wasm_library`
+  - `rust_wasi_binary`
 
 ## Additional public surfaces
 
@@ -1534,6 +1536,23 @@ Public args:
 
 Load from `@viberoots//build-tools/rust:defs.bzl`.
 
+All five public Rust macros accept the following remote-execution evidence labels:
+
+- `source_snapshot_bundle` supplies the typed `SourceSnapshotInfo` bundle containing the declared
+  source root, source manifest, and graph. It is mutually exclusive with the lower-level
+  `source_snapshot` and `source_snapshot_manifest` arguments.
+- `materialization_manifest` declares the reviewed Nix store paths and immutable identities that
+  the action must materialize.
+- `artifact_contract` declares the expected output identity and artifact shape.
+- `tool_closure` declares the immutable executable/tool closure used by the action.
+- `remote_builder_smoke` declares the reviewed builder and toolchain smoke evidence.
+
+A target labeled `remote:ready` must provide the complete five-label evidence set. The evidence is
+part of the action's declared inputs: Rust build and test actions validate the source snapshot,
+materialize its declared state into action-owned writable storage, and execute the selected build or
+real Cargo test harness from that state. Local-only targets may omit the set; partial sets do not
+establish remote readiness.
+
 ### `rust_library(name, **kwargs)`
 
 Use this for Rust libraries.
@@ -1569,12 +1588,18 @@ Public args:
 - `crate` string. Cargo package name; defaults to the Buck target name.
 - `features` list of strings. Explicit Cargo features; defaults to empty.
 - `default_features` bool. Whether Cargo default features are enabled; defaults to `True`.
-- `profile` string. Native Cargo profile, `release` or `dev`; defaults to `release`.
-- `target` string. Reserved explicit target triple. PR-1 native builds require it to be empty.
+- `profile` string. Cargo profile, `release` or `dev`; defaults to `release`.
+- `target` string. Native macros require this to be empty. WASM macros set their reviewed triple.
 - `local_patch_dirs` list of strings. Normalized package-relative Rust patch input directories without traversal; defaults to `patches/rust`.
 - `nixpkg_deps` list of strings. Declared nixpkgs packages available to Cargo build scripts.
 - `nixpkgs_profile` string. Named source profile for the toolchain and unpinned native dependencies; defaults to `default`.
 - `nixpkg_pins` dict. Per-attribute source-profile overrides with a non-empty rationale.
+- `link_deps` list of native C/C++ library labels for `rust_library`, `rust_binary`, and
+  `rust_test`. Ordinary `deps` never implies native linking.
+- `header_deps` list of native C/C++ header or library labels available to native Cargo build
+  scripts.
+- `link_closure` string, `direct` or `transitive`; defaults to `direct`.
+- `link_closure_overrides` dict. Every key must be present in `link_deps`.
 
 ### `rust_binary(name, **kwargs)`
 
@@ -1608,8 +1633,8 @@ Public args:
 - `crate` string. Cargo package name; defaults to the Buck target name.
 - `features` list of strings. Explicit Cargo features; defaults to empty.
 - `default_features` bool. Whether Cargo default features are enabled; defaults to `True`.
-- `profile` string. Native Cargo profile, `release` or `dev`; defaults to `release`.
-- `target` string. Reserved explicit target triple. PR-1 native builds require it to be empty.
+- `profile` string. Cargo profile, `release` or `dev`; defaults to `release`.
+- `target` string. Native macros require this to be empty.
 - `local_patch_dirs` list of strings. Normalized package-relative Rust patch input directories without traversal; defaults to `patches/rust`.
 - `nixpkg_deps`, `nixpkgs_profile`, and `nixpkg_pins` use the same source-selection contract as `rust_library`.
 
@@ -1618,3 +1643,15 @@ Public args:
 Use this for native Cargo tests. It accepts the same Cargo, source-selection, dependency, patch,
 label, and visibility arguments as `rust_library`. Buck executes the Nix-built Cargo harnesses
 through a bounded project-relative external runner. Tests are not runnable application entries.
+
+### `rust_wasm_library(name, **kwargs)`
+
+Builds a freestanding `wasm32-unknown-unknown` Cargo `cdylib` and emits `<name>.wasm`. It accepts
+the shared Cargo, patch, and source-selection arguments. `link_deps` and `header_deps` are rejected;
+cross-language WebAssembly linking is deferred to the reviewed PR-9 contract.
+
+### `rust_wasi_binary(name, **kwargs)`
+
+Builds a `wasm32-wasip1` Cargo binary and emits `<name>.wasm` for a WASI preview1 runtime.
+`link_deps` and `header_deps` are rejected; cross-language WebAssembly linking is deferred to the
+reviewed PR-9 contract.

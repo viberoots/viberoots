@@ -323,3 +323,67 @@ test("verify macOS temp roots opt generated output trees out of metadata indexin
     await fsp.rm(root, { recursive: true, force: true });
   }
 });
+
+test("verify temp cleanup preserves a nested active workspace and global TARGETS", async () => {
+  const fixtureRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "verify-nested-tmp-root-"));
+  const user = os.userInfo().username || "";
+  const suffix = user ? `-${user}` : "";
+  const systemTmpRoot = path.join(fixtureRoot, "system-tmp");
+  const sharedTmpdir = path.join(systemTmpRoot, `viberoots-verify${suffix}.noindex`, "tmpdir");
+  const workspaceRoot = path.join(sharedTmpdir, "active-consumer");
+  const projectsTargets = path.join(workspaceRoot, "projects", "config", "TARGETS");
+  const workspaceTargets = path.join(workspaceRoot, ".viberoots", "workspace", "TARGETS");
+  const unrelatedSibling = path.join(sharedTmpdir, "stale-sibling", "file.txt");
+  const env: NodeJS.ProcessEnv = {};
+
+  try {
+    await fsp.mkdir(path.dirname(projectsTargets), { recursive: true });
+    await fsp.mkdir(path.dirname(workspaceTargets), { recursive: true });
+    await fsp.writeFile(projectsTargets, "projects authority\n", "utf8");
+    await fsp.writeFile(workspaceTargets, "workspace authority\n", "utf8");
+    await fsp.mkdir(path.dirname(unrelatedSibling), { recursive: true });
+    await fsp.writeFile(unrelatedSibling, "stale\n", "utf8");
+
+    await ensureRepoLocalTmpRoot(workspaceRoot, { env, platform: "darwin", systemTmpRoot });
+
+    assert.equal(await fsp.readFile(projectsTargets, "utf8"), "projects authority\n");
+    assert.equal(await fsp.readFile(workspaceTargets, "utf8"), "workspace authority\n");
+    await assert.rejects(fsp.stat(unrelatedSibling));
+    assert.equal(env.TMPDIR, await fsp.realpath(sharedTmpdir));
+  } finally {
+    await fsp.rm(fixtureRoot, { recursive: true, force: true });
+  }
+});
+
+test("verify temp cleanup preserves a workspace reached through a symlinked tmp child", async () => {
+  const fixtureRoot = await fsp.mkdtemp(path.join(os.tmpdir(), "verify-symlink-tmp-root-"));
+  const user = os.userInfo().username || "";
+  const suffix = user ? `-${user}` : "";
+  const systemTmpRoot = path.join(fixtureRoot, "system-tmp");
+  const sharedTmpdir = path.join(systemTmpRoot, `viberoots-verify${suffix}.noindex`, "tmpdir");
+  const actualWorkspace = path.join(fixtureRoot, "actual-consumer");
+  const linkedWorkspace = path.join(sharedTmpdir, "active-consumer");
+  const workspaceTargets = path.join(actualWorkspace, ".viberoots", "workspace", "TARGETS");
+  const unrelatedSibling = path.join(sharedTmpdir, "stale-sibling", "file.txt");
+
+  try {
+    await fsp.mkdir(path.dirname(workspaceTargets), { recursive: true });
+    await fsp.writeFile(workspaceTargets, "workspace authority\n", "utf8");
+    await fsp.mkdir(sharedTmpdir, { recursive: true });
+    await fsp.symlink(actualWorkspace, linkedWorkspace);
+    await fsp.mkdir(path.dirname(unrelatedSibling), { recursive: true });
+    await fsp.writeFile(unrelatedSibling, "stale\n", "utf8");
+
+    await ensureRepoLocalTmpRoot(linkedWorkspace, {
+      env: {},
+      platform: "darwin",
+      systemTmpRoot,
+    });
+
+    assert.equal(await fsp.readFile(workspaceTargets, "utf8"), "workspace authority\n");
+    assert.equal(await fsp.realpath(linkedWorkspace), await fsp.realpath(actualWorkspace));
+    await assert.rejects(fsp.stat(unrelatedSibling));
+  } finally {
+    await fsp.rm(fixtureRoot, { recursive: true, force: true });
+  }
+});

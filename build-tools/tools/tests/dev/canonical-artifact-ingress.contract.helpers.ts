@@ -44,13 +44,20 @@ export function assertCanonicalArtifactIngressWiring(): void {
   assert.doesNotMatch(declaredInputs, /\$\(/);
   assert.match(shell, /nix_artifact_tool_authority_shell/);
   assert.match(shell, /--option sandbox-fallback false/);
-  assert.doesNotMatch(shell, /nix_cache_health_shell/);
+  assert.match(
+    shell,
+    /load\("@viberoots\/\/build-tools\/lang:nix_cache_health\.bzl", "nix_cache_health_shell"\)/,
+  );
+  assert.match(shell, /\+ nix_cache_health_shell\(\)/);
   assert.match(shell, /NIX_ARTIFACT_TOOLS_ROOT/);
   assert.match(shell, /NIX_ARTIFACT_TRUSTED_PUBLIC_KEYS/);
   assert.doesNotMatch(shell, /--option substituters/);
   assert.doesNotMatch(shell, /--option extra-substituters/);
   assert.doesNotMatch(shell, /--option fallback/);
-  assert.doesNotMatch(shell, /unset [^;]*NIX_CONFIG/);
+  assert.match(
+    shell,
+    /unset NIX_CONFIG VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG/,
+  );
   assert.match(shell, /--option trusted-public-keys/);
   assert.match(shell, /VBR_ARTIFACT_TOOLS_ROOT/);
   assert.match(

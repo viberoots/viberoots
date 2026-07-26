@@ -40,7 +40,7 @@
             "reproducibilityMatrixIds"
           ],
           "properties": {
-            "status": { "enum": ["scaffold", "graduated"] },
+            "status": { "enum": ["scaffold", "experimental", "graduated"] },
             "sourceRoles": { "type": "boolean" },
             "dependencyReconciliation": { "type": "boolean" },
             "immutableBundleInputs": { "type": "boolean" },

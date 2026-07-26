@@ -1,0 +1,10 @@
+{
+  "language": "rust",
+  "template": "cli",
+  "description": "Experimental Rust command-line application",
+  "help": {
+    "usage": "scaf new rust cli <name> [--path=DEST]",
+    "notes": ["Creates locked Cargo metadata, a binary, and a test target."],
+    "examples": ["scaf new rust cli demo"]
+  }
+}

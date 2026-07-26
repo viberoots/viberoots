@@ -133,7 +133,7 @@ export function nixEnv(
   home: string,
   authority: "reconcile" | "materialize" = "reconcile",
 ): NodeJS.ProcessEnv {
-  return {
+  const env: NodeJS.ProcessEnv = {
     ...externalNodeToolEnv(),
     HOME: home,
     XDG_CACHE_HOME: path.join(home, "xdg-cache"),
@@ -142,6 +142,9 @@ export function nixEnv(
     NIX_PNPM_FETCH_TIMEOUT: String(NATIVE_PNPM_COMMAND_TIMEOUT_MS / 1000),
     NIX_PNPM_INSTALL_TIMEOUT: String(NATIVE_PNPM_COMMAND_TIMEOUT_MS / 1000),
   };
+  delete env.VBR_NIX_CACHE_HEALTH_APPLIED;
+  delete env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG;
+  return env;
 }
 
 export function buildArgs(printOutPaths = false): string[] {

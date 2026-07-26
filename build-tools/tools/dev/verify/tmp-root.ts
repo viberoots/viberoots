@@ -13,6 +13,47 @@ type TmpRootOptions = {
   systemTmpRoot?: string;
 };
 
+async function canonicalPath(value: string): Promise<string> {
+  return await fsp.realpath(value).catch(() => path.resolve(value));
+}
+
+function containsPath(parent: string, candidate: string): boolean {
+  return candidate === parent || candidate.startsWith(`${parent}${path.sep}`);
+}
+
+async function clearTmpdirExceptActiveWorkspace(tmpdir: string, liveRoot: string): Promise<void> {
+  const [canonicalLiveRoot, canonicalTmpdir] = await Promise.all([
+    canonicalPath(liveRoot),
+    canonicalPath(tmpdir),
+  ]);
+  const logicalLiveRoot = path.resolve(liveRoot);
+  const logicalTmpdir = path.resolve(tmpdir);
+  if (
+    logicalLiveRoot === logicalTmpdir ||
+    canonicalLiveRoot === canonicalTmpdir ||
+    (!containsPath(logicalTmpdir, logicalLiveRoot) &&
+      !containsPath(canonicalTmpdir, canonicalLiveRoot))
+  ) {
+    if (
+      !containsPath(logicalTmpdir, logicalLiveRoot) &&
+      !containsPath(canonicalTmpdir, canonicalLiveRoot)
+    ) {
+      await fsp.rm(tmpdir, { recursive: true, force: true }).catch(() => {});
+    }
+    return;
+  }
+  const entries = await fsp.readdir(tmpdir, { withFileTypes: true }).catch(() => []);
+  for (const entry of entries) {
+    const candidate = path.join(tmpdir, entry.name);
+    const canonicalCandidate = await canonicalPath(candidate);
+    const containsWorkspace =
+      containsPath(path.resolve(candidate), logicalLiveRoot) ||
+      containsPath(canonicalCandidate, canonicalLiveRoot);
+    if (containsWorkspace) continue;
+    await fsp.rm(candidate, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 export async function ensureRepoLocalTmpRoot(
   root: string,
   opts: TmpRootOptions = {},
@@ -54,7 +95,7 @@ export async function ensureRepoLocalTmpRoot(
   if (env.VERIFY_ALLOW_CONCURRENT !== "1") {
     await Promise.all([
       repoLocalTmpdir || platform === "darwin"
-        ? fsp.rm(tmpdir, { recursive: true, force: true }).catch(() => {})
+        ? clearTmpdirExceptActiveWorkspace(tmpdir, liveRoot)
         : Promise.resolve(),
       platform === "darwin"
         ? fsp.rm(staleRepoTmpdir, { recursive: true, force: true }).catch(() => {})

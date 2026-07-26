@@ -34,9 +34,11 @@ repository enforcement contract, not only planner/macros/providers.
 5. Keep verify and CI gate behavior in scope:
    - New language rollout is not complete until the enforcement checks are part of required repo
      validation flow.
-   - Scaffolded languages remain disabled with `hermetic.status = "scaffold"`. Graduate them only
-     after every hermetic contract field is proven and `reproducibilityMatrixIds` names the
-     mandatory independent-builder evidence cases.
+   - Scaffold-only languages remain disabled while `hermetic.status = "scaffold"`. An experimental
+     language may be enabled before graduation once its required paths exist, its applicable
+     lifecycle gates are true, and `reproducibilityMatrixIds` names its required native/variant
+     evidence. Graduation still requires every hermetic contract field and mandatory
+     independent-builder evidence.
 
 6. Define command ownership and tool authority:
    - `u` is the intended owner for deterministic tracked language metadata repair. `b` and
@@ -83,6 +85,11 @@ A language rollout doc in this directory is only complete when it includes:
 - A graduated `langs.json` contract covering source roles, dependency reconciliation, immutable
   bundle inputs, store-qualified tools, selector transport, sandbox/network policy, remote
   execution, publication admission, and reproducibility matrix IDs.
+
+An experimental language may be enabled before graduation only when its required paths exist, its
+applicable lifecycle gates are true, and its native/variant routes bind to named reproducibility
+matrix evidence. The manifest and diagnostics must preserve the `experimental` status; enablement
+must not be presented as publication admission or feature parity.
 
 ## Canonical helper baseline
 

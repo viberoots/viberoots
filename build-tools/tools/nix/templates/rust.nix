@@ -4,7 +4,16 @@ let
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
   validateLockSources = lockFile:
     import ../../../rust/cargo-source-policy.nix { inherit lockFile; };
+  validateKindTarget = kind: target:
+    let
+      expected =
+        if kind == "wasm" then "wasm32-unknown-unknown"
+        else if kind == "wasi" then "wasm32-wasip1"
+        else "";
+    in if target == expected then target else builtins.throw
+      "Rust template kind ${kind} requires target ${if expected == "" then "<empty>" else expected}; got ${if target == "" then "<empty>" else target}";
 in {
+  inherit validateKindTarget;
   rustPackage = {
     name,
     kind,
@@ -21,9 +30,11 @@ in {
     patchInputs ? [],
     devOverrides ? {},
     nixpkgDeps ? [],
+    nativeInputs ? { libraries = []; headers = []; },
     sourcePlan ? { nixpkgs_profile = "default"; nixpkg_pins = {}; },
-  }:
+    }:
     let
+      validatedTarget = validateKindTarget kind target;
       _sources = validateLockSources cargoLock;
       cargoConfigs = [
         (cargoRoot + "/.cargo/config")
@@ -36,11 +47,17 @@ in {
       sanitized = H.sanitizeName name;
       featureFlags = lib.optionals (!defaultFeatures) [ "--no-default-features" ]
         ++ lib.optionals (features != []) [ "--features" (lib.concatStringsSep "," features) ];
-      kindFlags = if kind == "bin" then [ "--bin" targetName ] else if kind == "test" then [ "--tests" ] else [ "--lib" ];
+      kindFlags = if kind == "bin" || kind == "wasi" then [ "--bin" targetName ] else if kind == "test" then [ "--tests" ] else [ "--lib" ];
       cargoProfile = if profile == "dev" then "debug" else "release";
-      targetFlags = lib.optionals (target != "") [ "--target" target ];
-      cargoTarget = if target == "" then pkgs.stdenv.targetPlatform.rust.rustcTargetSpec else target;
+      targetFlags = lib.optionals (validatedTarget != "") [ "--target" validatedTarget ];
+      cargoTarget = if validatedTarget == "" then pkgs.stdenv.targetPlatform.rust.rustcTargetSpec else validatedTarget;
       targetDir = "target/${cargoTarget}/${cargoProfile}";
+      targetPkgs =
+        if kind == "wasi" then pkgs.pkgsCross.wasi32
+        else pkgs;
+      rustc = if kind == "wasi" then targetPkgs.buildPackages.rustc else pkgs.rustc;
+      nativePackages = nativeInputs.libraries ++ nativeInputs.headers;
+      nativeLibraryFlags = map (package: "-Lnative=${package}/lib") nativeInputs.libraries;
       testProfileFlags = lib.optionals (cargoProfile == "release") [ "--release" ];
       testBuildFlags = [
         "--offline"
@@ -64,7 +81,7 @@ in {
         else builtins.trace
           "[DEV OVERRIDES ACTIVE] Rust fixed sources are explicit local-development bundle inputs."
           true;
-    in assert _sources; assert _cargoConfig; assert _overrideTrace;
+    in assert validatedTarget != null; assert _sources; assert _cargoConfig; assert _overrideTrace;
     pkgs.rustPlatform.buildRustPackage ({
       pname = "rust-${sanitized}";
       version = "0.1.0";
@@ -74,13 +91,16 @@ in {
       cargoBuildFlags = [ "--locked" "--package" crate ] ++ kindFlags ++ featureFlags ++ targetFlags;
       cargoTestFlags = [ "--package" crate ] ++ kindFlags ++ featureFlags ++ targetFlags;
       doCheck = false;
-      nativeBuildInputs = [ pkgs.cargo pkgs.rustc pkgs.pkg-config pkgs.jq ]
-        ++ nixpkgDeps;
-      buildInputs = nixpkgDeps;
-      RUSTC = "${pkgs.rustc}/bin/rustc";
-      RUSTDOC = "${pkgs.rustc}/bin/rustdoc";
+      nativeBuildInputs = [ pkgs.cargo rustc pkgs.pkg-config pkgs.jq pkgs.llvmPackages.lld ]
+        ++ nixpkgDeps ++ nativePackages;
+      buildInputs = nixpkgDeps ++ nativePackages;
+      RUSTC = "${rustc}/bin/rustc";
+      RUSTDOC = "${rustc}/bin/rustdoc";
       CARGO = "${pkgs.cargo}/bin/cargo";
-      RUSTFLAGS = "";
+      RUSTFLAGS = lib.concatStringsSep " " nativeLibraryFlags;
+      C_INCLUDE_PATH = lib.makeSearchPath "include" nativePackages;
+      LIBRARY_PATH = lib.makeLibraryPath nativeInputs.libraries;
+      VIBEROOTS_RUST_LINK_LIBRARY_PATHS = lib.makeLibraryPath nativeInputs.libraries;
       postPatch = ''
         test -f ${lib.escapeShellArg (builtins.toString cargoManifest)}
         test -f ${lib.escapeShellArg (builtins.toString cargoLock)}
@@ -90,6 +110,21 @@ in {
       installPhase = if kind == "bin" then ''
         runHook preInstall
         install -Dm755 "${targetDir}/${targetName}" "$out/bin/${targetName}"
+        runHook postInstall
+      '' else if kind == "wasi" then ''
+        runHook preInstall
+        install -Dm644 "${targetDir}/${targetName}.wasm" "$out/lib/${crate}.wasm"
+        install -Dm644 ${../../wasm/wasi-runner.mjs} "$out/libexec/viberoots/wasi-runner.mjs"
+        mkdir -p "$out/bin"
+        cat > "$out/bin/${targetName}" <<EOF
+        #!${pkgs.runtimeShell}
+        exec ${pkgs.nodejs}/bin/node "$out/libexec/viberoots/wasi-runner.mjs" "$out/lib/${crate}.wasm" "\$@"
+        EOF
+        chmod +x "$out/bin/${targetName}"
+        runHook postInstall
+      '' else if kind == "wasm" then ''
+        runHook preInstall
+        install -Dm644 "${targetDir}/${lib.replaceStrings ["-"] ["_"] crate}.wasm" "$out/lib/${crate}.wasm"
         runHook postInstall
       '' else if kind == "test" then ''
         runHook preInstall
@@ -144,7 +179,8 @@ in {
         runHook postInstall
       '';
       passthru.viberootsRust = {
-        inherit kind crate features profile target;
+        inherit kind crate features profile;
+        target = validatedTarget;
         default_features = defaultFeatures;
         nixpkgs_profile = sourcePlan.nixpkgs_profile;
         nixpkg_pins = sourcePlan.nixpkg_pins;
@@ -153,6 +189,8 @@ in {
         cargo_output_hashes = cargoOutputHashes;
         cargo_fixed_sources = cargoFixedSources;
         patch_vendor_authorities = vendorAuthorities;
+        native_link_inputs = map builtins.toString nativeInputs.libraries;
+        native_header_inputs = map builtins.toString nativeInputs.headers;
         cargo_packages = map (package: {
           inherit (package) name version;
           source = package.source or "";

@@ -187,7 +187,11 @@ test("public artifact executors enter through the canonical zx wrapper", () => {
 });
 
 test("artifact launch wrappers sanitize devshell selectors before canonical ingress", () => {
-  const sanitizer = read("bin/artifact-ingress-env.sh");
+  const sanitizer = [
+    read("bin/artifact-ingress-env.sh"),
+    read("bin/artifact-ingress-selectors.sh"),
+    read("bin/artifact-ingress-cache.sh"),
+  ].join("\n");
   for (const selector of [
     "CC",
     "NIX_CONFIG",

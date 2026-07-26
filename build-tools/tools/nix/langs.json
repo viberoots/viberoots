@@ -1,5 +1,5 @@
 {
-  "enabled": ["go", "node", "python", "cpp"],
+  "enabled": ["go", "node", "python", "cpp", "rust"],
   "languages": [
     {
       "id": "go",
@@ -92,24 +92,26 @@
         "viberoots/build-tools/rust/defs.bzl",
         "viberoots/build-tools/tools/nix/planner/rust.nix",
         "viberoots/build-tools/tools/nix/templates/rust.nix",
-        "viberoots/build-tools/tools/nix/examples/rust/native-example/Cargo.toml",
-        "viberoots/build-tools/tools/nix/examples/rust/native-example/Cargo.lock",
-        "viberoots/build-tools/tools/nix/examples/rust/native-example/TARGETS"
+        "viberoots/build-tools/tools/nix/flake/packages/toolchains.nix",
+        "viberoots/build-tools/tools/wasm/wasi-runner.mjs",
+        "viberoots/build-tools/tools/scaffolding/templates/rust/cli/Cargo.toml.jinja",
+        "viberoots/build-tools/tools/scaffolding/templates/rust/cli/Cargo.lock.jinja",
+        "viberoots/build-tools/tools/scaffolding/templates/rust/cli/TARGETS.jinja"
       ],
       "optionalPaths": ["viberoots/build-tools/tools/tests/rust"],
-      "kinds": ["bin", "lib", "test"],
-      "templatesDir": "viberoots/build-tools/tools/nix/examples/rust",
+      "kinds": ["bin", "lib", "test", "wasm", "wasi"],
+      "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/rust",
       "hermetic": {
-        "status": "scaffold",
+        "status": "experimental",
         "sourceRoles": true,
         "dependencyReconciliation": true,
         "immutableBundleInputs": true,
         "storeQualifiedToolchain": true,
         "selectorTransport": true,
         "sandboxNetwork": false,
-        "remoteExecution": false,
+        "remoteExecution": true,
         "publicationAdmission": false,
-        "reproducibilityMatrixIds": []
+        "reproducibilityMatrixIds": ["rust-pr5"]
       }
     }
   ]

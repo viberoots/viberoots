@@ -78,18 +78,21 @@ async function listSourceFilesFromRoot(root: string): Promise<string[]> {
 
 async function listChangedFilesFromRoot(root: string): Promise<string[]> {
   try {
-    const { stdout } = await execFileAsync(
-      "git",
-      ["diff", "--name-only", "--diff-filter=AMR", "HEAD", "-z"],
-      {
+    const [{ stdout: changedOutput }, { stdout: untrackedOutput }] = await Promise.all([
+      execFileAsync("git", ["diff", "--name-only", "--diff-filter=AMR", "HEAD", "-z"], {
         cwd: root,
         encoding: "utf8",
-      },
-    );
-    const changed = String(stdout || "")
-      .split("\0")
-      .filter(Boolean);
-    if (changed.length > 0) return changed;
+      }),
+      execFileAsync("git", ["ls-files", "--others", "--exclude-standard", "-z"], {
+        cwd: root,
+        encoding: "utf8",
+      }),
+    ]);
+    const changed = [
+      ...String(changedOutput || "").split("\0"),
+      ...String(untrackedOutput || "").split("\0"),
+    ].filter(Boolean);
+    if (changed.length > 0) return [...new Set(changed)];
   } catch {}
   return listSourceFilesFromRoot(root);
 }

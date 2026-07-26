@@ -79,14 +79,18 @@ Notes on Nix-backed Python outputs:
 
 ## Rust macros
 
-- `rust_library` → locked native Cargo build (`rust_nix_build` → `buildRustPackage`).
-- `rust_binary` → locked native Cargo build (`rust_nix_build` → `buildRustPackage`).
-- `rust_test` → compiled Cargo harnesses executed by the bounded Rust external runner.
+- `rust_library` → Nix build (`rust_nix_build` → locked native `buildRustPackage`).
+- `rust_binary` → Nix build (`rust_nix_build` → locked native `buildRustPackage`).
+- `rust_test` → Nix build (`rust_nix_test` → compiled Cargo harnesses and bounded runner).
+- `rust_wasm_library` → Nix build (`rust_nix_build` → locked `wasm32-unknown-unknown` Cargo).
+- `rust_wasi_binary` → Nix build (`rust_nix_build` → locked `wasm32-wasip1` Cargo).
 
 All routes require one package-local `Cargo.toml` and `Cargo.lock`, use Nix-store Rust tools, and
 reject placeholder output, stale locks, unsupported dependency sources, and cross-root Rust artifact
 injection. Rust binaries publish `run.prod`; libraries and tests remain non-runnable. Declared
 native dependencies resolve through `nixpkg_deps`, `nixpkgs_profile`, and `nixpkg_pins`.
+Native C/C++ inputs use explicit link intent, and WASM/WASI target components come from the Nix
+cross toolchain. Rust is scaffoldable as an experimental language.
 
 ## Hermeticity risks (non-Nix paths)
 

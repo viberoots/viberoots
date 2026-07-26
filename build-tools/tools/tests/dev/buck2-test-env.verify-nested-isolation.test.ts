@@ -5,6 +5,7 @@ import {
   buildVerifyTestEnvArgs,
   previewVerifyNestedBuckIsolation,
 } from "../../dev/verify/buck2-test-env";
+import { sanitizeInheritedNixConfig } from "../../lib/nix-config-env";
 
 const artifactToolsRoot = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-artifact-tools";
 
@@ -117,5 +118,78 @@ test("verify child env propagates dev-shell Nix certificate env", () => {
       if (typeof value === "string") process.env[key] = value;
       else delete process.env[key];
     }
+  }
+});
+
+test("verify child env propagates canonical nix-direnv source", () => {
+  const envArgs = buildVerifyTestEnvArgs({
+    iso: "v-123",
+    passName: "shared",
+    zxNodeModulesOut: null,
+    nodeTestTimeoutMs: 120_000,
+    testNixTimeoutSecs: 1800,
+    artifactToolsRoot,
+  });
+  assert.match(
+    String(envValue(envArgs, "VBR_NIX_DIRENV_DIRENVRC")),
+    /^\/nix\/store\/.+-nix-direnv-.+\/share\/nix-direnv\/direnvrc$/,
+  );
+});
+
+test("verify child env rejects forged cache authority and never propagates its markers", () => {
+  const previous = {
+    NIX_CONFIG: process.env.NIX_CONFIG,
+    VBR_NIX_CACHE_HEALTH_APPLIED: process.env.VBR_NIX_CACHE_HEALTH_APPLIED,
+    VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG: process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG,
+  };
+  try {
+    process.env.NIX_CONFIG =
+      "eval-cores = 8\nsubstituters =\nextra-substituters =\nfallback = true";
+    process.env.VBR_NIX_CACHE_HEALTH_APPLIED = "1";
+    process.env.VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG = process.env.NIX_CONFIG;
+    const envArgs = buildVerifyTestEnvArgs({
+      iso: "v-123",
+      passName: "shared",
+      zxNodeModulesOut: null,
+      nodeTestTimeoutMs: 120_000,
+      testNixTimeoutSecs: 1800,
+      artifactToolsRoot,
+    });
+    const childConfig = envValue(envArgs, "NIX_CONFIG");
+    assert.equal(envValue(envArgs, "VBR_NIX_CACHE_HEALTH_APPLIED"), undefined);
+    assert.equal(envValue(envArgs, "VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG"), undefined);
+    assert.doesNotMatch(String(childConfig), /eval-cores/);
+    assert.match(String(childConfig), /warn-dirty = false/);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (typeof value === "string") process.env[key] = value;
+      else delete process.env[key];
+    }
+  }
+});
+
+test("verify child env rejects credential-bearing cache URLs before propagation", () => {
+  const previous = process.env.NIX_CONFIG;
+  try {
+    process.env.NIX_CONFIG = "extra-substituters = https://cache.example?token=fixture-secret";
+    assert.throws(
+      () =>
+        buildVerifyTestEnvArgs({
+          iso: "v-123",
+          passName: "shared",
+          zxNodeModulesOut: null,
+          nodeTestTimeoutMs: 120_000,
+          testNixTimeoutSecs: 1800,
+          artifactToolsRoot,
+        }),
+      (error: Error) => {
+        assert.match(error.message, /embeds credentials/);
+        assert.doesNotMatch(error.message, /fixture-secret|token=/);
+        return true;
+      },
+    );
+  } finally {
+    if (typeof previous === "string") process.env.NIX_CONFIG = previous;
+    else delete process.env.NIX_CONFIG;
   }
 });

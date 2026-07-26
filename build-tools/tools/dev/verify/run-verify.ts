@@ -59,7 +59,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
     throw new Error("broad verify target //... rejected by VBR_VERIFY_FORBID_BROAD=1");
   }
   const zxInit = zxInitPath(root);
-  await timedPhase(
+  const cacheHealth = await timedPhase(
     "nix-cache-health",
     async () => await deps.applyNixCacheHealthPolicy(root),
   ).catch(cleanupEarlyFailure);
@@ -271,6 +271,7 @@ export async function runVerifyWithDeps(overrides: Partial<RunVerifyDeps> = {}):
           onNestedIsoDone: (nestedIso) => activeNestedIsos.delete(nestedIso),
           executionPolicy,
           artifactToolsRoot,
+          cacheHealth,
           suppressFailureOutputTail: () => requestedExitCode !== null,
           shouldAbort: () => requestedExitCode !== null,
         }),

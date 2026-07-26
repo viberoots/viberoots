@@ -5,14 +5,10 @@ import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
 import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
-import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
-import {
-  artifactSelectorNames,
-  canonicalArtifactToolsRoot,
-  isArtifactAffectingEnvName,
-} from "../../lib/artifact-environment";
+import { artifactSelectorNames, isArtifactAffectingEnvName } from "../../lib/artifact-environment";
 import { reconcileGeneratedGraph } from "../../patch/glue";
 import { createHermeticParityFixture } from "./nix-gaps.parity-and-hermeticity.helpers";
+import { runBuildSelected } from "../lib/test-helpers/selected-build";
 
 const TEST_TIMEOUT_MS =
   Number(process.env.TEST_NIX_TIMEOUT_SECS || process.env.VERIFY_TIMEOUT_SECS || "1200") * 1000;
@@ -80,11 +76,16 @@ async function selectedBuildOutPath(
   attr = "graph-generator-selected",
 ): Promise<string> {
   await reconcileGeneratedGraph({ workspaceRoot: tmp, target });
-  const res = await $({
-    cwd: tmp,
-    stdio: "pipe",
+  const res = await runBuildSelected({
+    tmp,
+    $,
+    target,
     env,
-  })`${path.join(canonicalArtifactToolsRoot(process.cwd()), "bin", "node")} --experimental-strip-types --import ${viberootsSourcePath("build-tools/tools/dev/zx-init.mjs")} ${viberootsSourcePath("build-tools/tools/dev/build-selected.ts")} --source=git --target ${target} --attr ${attr}`;
+    stdio: "pipe",
+    nothrow: true,
+    source: "git",
+    attr,
+  });
   if (res.exitCode !== 0) {
     throw new Error(`${String(res.stderr || "")}\n${String(res.stdout || "")}`.trim());
   }

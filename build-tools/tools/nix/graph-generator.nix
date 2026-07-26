@@ -349,6 +349,8 @@ let
           if kind == "bin" then LANGS.rust.mkApp buildLabel
           else if kind == "test" then LANGS.rust.mkTest buildLabel
           else if kind == "lib" then LANGS.rust.mkLib buildLabel
+          else if kind == "wasm" then LANGS.rust.mkWasm buildLabel
+          else if kind == "wasi" then LANGS.rust.mkWasi buildLabel
           else builtins.throw "planner dependency target has unsupported Rust kind: ${target}"
       else builtins.throw "planner dependency target has no supported language role: ${target}";
 
@@ -560,11 +562,17 @@ let
         ) nodesList;
         rustTargets = builtins.listToAttrs (map (n:
           let nm = ensureFullLabel n; kind = LANGS.rust.kindOf n;
-          in { name = nm; value = if kind == "bin" then LANGS.rust.mkApp nm else if kind == "test" then LANGS.rust.mkTest nm else LANGS.rust.mkLib nm; }
+          in { name = nm; value =
+            if kind == "bin" then LANGS.rust.mkApp nm
+            else if kind == "test" then LANGS.rust.mkTest nm
+            else if kind == "wasm" then LANGS.rust.mkWasm nm
+            else if kind == "wasi" then LANGS.rust.mkWasi nm
+            else LANGS.rust.mkLib nm;
+          }
         ) safeRustNodes);
         binaryNames = builtins.filter (nm:
           let matches = builtins.filter (n: ensureFullLabel n == nm) safeRustNodes;
-          in matches != [] && LANGS.rust.kindOf (builtins.head matches) == "bin"
+          in matches != [] && builtins.elem (LANGS.rust.kindOf (builtins.head matches)) [ "bin" "wasi" ]
         ) (builtins.attrNames rustTargets);
       in builtins.listToAttrs (map (nm: { name = nm; value = rustTargets.${nm}; }) binaryNames)
     );
@@ -723,6 +731,8 @@ let
                 let A = adapterFor "rust"; in
                 if k.kind == "bin" then A.mkApp buildLabel
                 else if k.kind == "test" then A.mkTest buildLabel
+                else if k.kind == "wasm" then A.mkWasm buildLabel
+                else if k.kind == "wasi" then A.mkWasi buildLabel
                 else A.mkLib buildLabel
               ) else (
                 let A = adapterFor "cpp"; in

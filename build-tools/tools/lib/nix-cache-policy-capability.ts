@@ -5,8 +5,30 @@ export type NixCachePolicyCapability = {
 };
 
 export type NixCachePolicyCapabilityOutcome =
-  | { kind: "reviewed"; config: string }
+  | {
+      kind: "reviewed";
+      config: string;
+      policy: "auto" | "strict";
+      requiredSubstituters: readonly string[];
+      optionalSubstituters: readonly string[];
+    }
   | { kind: "off" };
+
+export function nixCachePolicyBindingDigest(
+  outcome: Extract<NixCachePolicyCapabilityOutcome, { kind: "reviewed" }>,
+): string {
+  return createHash("sha256")
+    .update(
+      [
+        "reviewed-cache-roles-v1",
+        outcome.policy,
+        outcome.requiredSubstituters.join(" "),
+        outcome.optionalSubstituters.join(" "),
+        outcome.config,
+      ].join("\0"),
+    )
+    .digest("hex");
+}
 
 const issuedCapabilities = new WeakMap<object, NixCachePolicyCapabilityOutcome>();
 let activeCapability: NixCachePolicyCapability | undefined;
@@ -19,7 +41,18 @@ export function activateNixCachePolicyCapabilityAfterCanonicalEntry(
     throw new Error("cannot establish Nix cache policy authority before canonical entry");
   }
   const capability = Object.freeze({}) as NixCachePolicyCapability;
-  issuedCapabilities.set(capability, Object.freeze({ ...outcome }));
+  issuedCapabilities.set(
+    capability,
+    Object.freeze(
+      outcome.kind === "reviewed"
+        ? {
+            ...outcome,
+            requiredSubstituters: Object.freeze([...outcome.requiredSubstituters]),
+            optionalSubstituters: Object.freeze([...outcome.optionalSubstituters]),
+          }
+        : { ...outcome },
+    ),
+  );
   activeCapability = capability;
   return capability;
 }
@@ -33,6 +66,12 @@ export function currentNixCachePolicyCapability(): NixCachePolicyCapability {
   return activeCapability;
 }
 
+export function maybeCurrentNixCachePolicyCapability(): NixCachePolicyCapability | undefined {
+  return activeCapability && issuedCapabilities.has(activeCapability)
+    ? activeCapability
+    : undefined;
+}
+
 export function outcomeFromNixCachePolicyCapability(
   capability: NixCachePolicyCapability | undefined,
 ): NixCachePolicyCapabilityOutcome {
@@ -41,3 +80,4 @@ export function outcomeFromNixCachePolicyCapability(
   }
   return issuedCapabilities.get(capability) as NixCachePolicyCapabilityOutcome;
 }
+import { createHash } from "node:crypto";

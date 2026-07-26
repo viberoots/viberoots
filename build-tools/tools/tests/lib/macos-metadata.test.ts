@@ -184,7 +184,7 @@ test("zx_test bootstrap marks generated toolchains directory on Darwin", async (
   assert.match(source, /WORKSPACE_ROOT\/toolchains\/\.metadata_never_index/);
 });
 
-test("build-selected Starlark log snippets mark their buck-out log directory", async () => {
+test("build-selected Starlark log snippets mark their log directory", async () => {
   const testDir = path.dirname(fileURLToPath(import.meta.url));
   const root = path.resolve(testDir, "../../../..");
   const files = [
@@ -199,7 +199,10 @@ test("build-selected Starlark log snippets mark their buck-out log directory", a
   ];
   for (const rel of files) {
     const source = await fsp.readFile(path.join(root, rel), "utf8");
-    const buildSelectedLogCount = source.match(/buck-out\/tmp\/build-selected/g)?.length ?? 0;
+    const buildSelectedLogCount =
+      source.match(/BUILD_SELECTED_LOG=\\"[^"\n]*\/build-selected\//g)?.length ??
+      source.match(/BUILD_SELECTED_LOG_DIR=\\"[^"\n]*\/build-selected/g)?.length ??
+      0;
     const guardedMarkerCount =
       source.match(
         /\[ ! -e \\"\$BUILD_SELECTED_LOG_DIR\/\.metadata_never_index\\" \] && : > \\"\$BUILD_SELECTED_LOG_DIR\/\.metadata_never_index\\"/g,

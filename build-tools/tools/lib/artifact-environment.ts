@@ -8,6 +8,7 @@ import {
 } from "./artifact-environment-policy";
 import { canonicalArtifactToolsRoot, validateArtifactToolsRoot } from "./artifact-tool-authority";
 import {
+  nixCachePolicyBindingDigest,
   outcomeFromNixCachePolicyCapability,
   type NixCachePolicyCapability,
 } from "./nix-cache-policy-capability";
@@ -159,8 +160,19 @@ export function buildArtifactEnvironment(opts: {
   }
   if (hasCachePolicyCapability) {
     const policy = outcomeFromNixCachePolicyCapability(opts.nixCachePolicyCapability);
-    if (policy.kind === "reviewed") out.NIX_CONFIG = policy.config;
-    else delete out.NIX_CONFIG;
+    if (policy.kind === "reviewed") {
+      out.NIX_CONFIG = policy.config;
+      out.VBR_NIX_CACHE_ROLE_REQUIRED = policy.requiredSubstituters.join(" ");
+      out.VBR_NIX_CACHE_ROLE_OPTIONAL = policy.optionalSubstituters.join(" ");
+      out.VBR_NIX_CACHE_ROLE_POLICY = policy.policy;
+      out.VBR_NIX_CACHE_ROLE_BINDING = nixCachePolicyBindingDigest(policy);
+    } else {
+      delete out.NIX_CONFIG;
+      delete out.VBR_NIX_CACHE_ROLE_REQUIRED;
+      delete out.VBR_NIX_CACHE_ROLE_OPTIONAL;
+      delete out.VBR_NIX_CACHE_ROLE_POLICY;
+      delete out.VBR_NIX_CACHE_ROLE_BINDING;
+    }
   }
   for (const selector of ARTIFACT_SELECTORS) {
     if (!Object.prototype.hasOwnProperty.call(opts.internal || {}, selector)) delete out[selector];

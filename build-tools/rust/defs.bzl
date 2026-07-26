@@ -1,10 +1,18 @@
 load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
-load("@viberoots//build-tools/lang:defs_common.bzl", "dedupe_preserve", "normalize_labels", "prepare_language_wiring")
+load(
+    "@viberoots//build-tools/lang:defs_common.bzl",
+    "dedupe_preserve",
+    "merge_link_intent_deps",
+    "normalize_labels",
+    "prepare_language_wiring",
+    "validate_link_closure_overrides",
+)
 load("@viberoots//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
 load("@viberoots//build-tools/rust/private:nix_build.bzl", "rust_nix_build")
 load("@viberoots//build-tools/rust/private:nix_test.bzl", "rust_nix_test")
 
 _PUBLIC_ARGS = [
+    "artifact_contract",
     "cargo_lock",
     "cargo_manifest",
     "cargo_fixed_sources",
@@ -13,13 +21,23 @@ _PUBLIC_ARGS = [
     "default_features",
     "features",
     "labels",
+    "header_deps",
+    "link_closure",
+    "link_closure_overrides",
+    "link_deps",
     "local_patch_dirs",
     "nixpkg_deps",
     "nixpkg_pins",
     "nixpkgs_profile",
     "profile",
+    "remote_builder_smoke",
     "srcs",
+    "source_snapshot",
+    "source_snapshot_bundle",
+    "source_snapshot_manifest",
     "target",
+    "tool_closure",
+    "materialization_manifest",
     "visibility",
 ]
 
@@ -58,13 +76,64 @@ def _validate_local_patch_dirs(value):
         if directory.startswith("/") or "\\" in directory or ":" in directory or "" in parts or "." in parts or ".." in parts:
             fail("rust target local_patch_dirs must remain within the package: %s" % directory)
 
+def _rust_macro_name(kind):
+    if kind == "bin":
+        return "rust_binary"
+    if kind == "lib":
+        return "rust_library"
+    if kind == "test":
+        return "rust_test"
+    if kind == "wasm":
+        return "rust_wasm_library"
+    if kind == "wasi":
+        return "rust_wasi_binary"
+    fail("unsupported Rust target kind: %s" % kind)
+
+def _with_required_target(kwargs, macro_name, required_target):
+    kw = dict(kwargs)
+    if "target" in kw and kw["target"] != required_target:
+        fail("%s: target must be %s" % (macro_name, required_target))
+    kw["target"] = required_target
+    return kw
+
+def _has_nixpkg_inputs(kwargs):
+    if kwargs.get("nixpkg_deps", []) or []:
+        return True
+    for label in kwargs.get("labels", []) or []:
+        if isinstance(label, str) and label.startswith("nixpkg:"):
+            return True
+    return False
+
 def _rust_nix_target(name, kind, out, kwargs):
     kw = dict(kwargs)
-    deps = kw.pop("deps", [])
+    remote_kwargs = {}
+    for key in [
+        "artifact_contract",
+        "materialization_manifest",
+        "remote_builder_smoke",
+        "source_snapshot",
+        "source_snapshot_bundle",
+        "source_snapshot_manifest",
+        "tool_closure",
+    ]:
+        if key in kw:
+            remote_kwargs[key] = kw.pop(key)
+    deps = kw.pop("deps", []) or []
+    link_deps = kw.pop("link_deps", []) or []
+    header_deps = kw.pop("header_deps", []) or []
+    if kind in ["wasm", "wasi"] and (link_deps or header_deps or _has_nixpkg_inputs(kw)):
+        fail("%s: link_deps, header_deps, and nixpkg dependencies are unsupported for non-native Rust targets; cross-language WebAssembly linking is not available" % _rust_macro_name(kind))
+    link_closure = kw.pop("link_closure", "direct") or "direct"
+    link_closure_overrides = kw.pop("link_closure_overrides", {}) or {}
+    validate_link_closure_overrides(link_deps, link_closure_overrides)
+    kw["link_deps"] = link_deps
+    kw["header_deps"] = header_deps
+    kw["link_closure"] = link_closure
+    kw["link_closure_overrides"] = link_closure_overrides
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
     unknown = sorted([key for key in kw.keys() if key not in _PUBLIC_ARGS])
     if unknown:
-        fail("rust_%s: unknown arguments: %s" % ("binary" if kind == "bin" else "library" if kind == "lib" else "test", ", ".join(unknown)))
+        fail("%s: unknown arguments: %s" % (_rust_macro_name(kind), ", ".join(unknown)))
     cargo_manifest = _single_cargo_file(kw.pop("cargo_manifest", None), "Cargo.toml", "cargo_manifest")
     cargo_lock = _single_cargo_file(kw.pop("cargo_lock", None), "Cargo.lock", "cargo_lock")
     cargo_output_hashes = kw.pop("cargo_output_hashes", {})
@@ -91,8 +160,9 @@ def _rust_nix_target(name, kind, out, kwargs):
         fail("rust target profile must be release or dev")
     if not isinstance(target, str):
         fail("rust target target must be a string")
-    if target != "":
-        fail("rust target target is unsupported in the native PR-1 contract; leave it empty")
+    expected_target = "wasm32-unknown-unknown" if kind == "wasm" else "wasm32-wasip1" if kind == "wasi" else ""
+    if target != expected_target:
+        fail("rust target target must be %s for kind %s" % (expected_target if expected_target else "empty", kind))
     if "local_patch_dirs" in kw:
         _validate_local_patch_dirs(kw["local_patch_dirs"])
     wiring = prepare_language_wiring(
@@ -101,9 +171,10 @@ def _rust_nix_target(name, kind, out, kwargs):
         lang = "rust",
         kind = kind,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        deps = deps + extra,
+        deps = merge_link_intent_deps(deps, link_deps, header_deps) + extra,
     )
     prepared = wiring.kwargs
+    prepared.update(remote_kwargs)
     cargo_root_srcs = native.glob(["**/*.rs"])
     attrs = {
         "name": name,
@@ -111,6 +182,10 @@ def _rust_nix_target(name, kind, out, kwargs):
         "kind": kind,
         "self_label": "//%s:%s" % (native.package_name(), name),
         "deps": wiring.deps,
+        "link_deps": prepared.get("link_deps", []) or [],
+        "header_deps": prepared.get("header_deps", []) or [],
+        "link_closure": prepared.get("link_closure", link_closure),
+        "link_closure_overrides": prepared.get("link_closure_overrides", link_closure_overrides),
         "srcs": dedupe_preserve((prepared.get("srcs", []) or []) + cargo_root_srcs),
         "labels": prepared.get("labels", []) or [],
         "nix_inputs": global_nix_inputs(),
@@ -128,6 +203,7 @@ def _rust_nix_target(name, kind, out, kwargs):
         "nixpkg_pins": prepared.get("nixpkg_pins", {}),
         "visibility": prepared.get("visibility", []),
     }
+    attrs.update(remote_kwargs)
     if kind == "test":
         rust_nix_test(**attrs)
     else:
@@ -142,8 +218,18 @@ def rust_binary(name, **kwargs):
 def rust_test(name, **kwargs):
     _rust_nix_target(name = name, kind = "test", out = name + ".stamp", kwargs = kwargs)
 
+def rust_wasm_library(name, **kwargs):
+    kw = _with_required_target(kwargs, "rust_wasm_library", "wasm32-unknown-unknown")
+    _rust_nix_target(name = name, kind = "wasm", out = name + ".wasm", kwargs = kw)
+
+def rust_wasi_binary(name, **kwargs):
+    kw = _with_required_target(kwargs, "rust_wasi_binary", "wasm32-wasip1")
+    _rust_nix_target(name = name, kind = "wasi", out = name + ".wasm", kwargs = kw)
+
 __all__ = [
     "rust_binary",
     "rust_library",
     "rust_test",
+    "rust_wasi_binary",
+    "rust_wasm_library",
 ]

@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+selected_workspace_root=""
+selected_args=()
+for arg in "$@"; do
+	case "${arg}" in
+		--artifact-workspace-root=*)
+			selected_workspace_root="${arg#*=}"
+			export WORKSPACE_ROOT="${selected_workspace_root}"
+			;;
+		*)
+			selected_args+=("${arg}")
+			;;
+	esac
+done
+if [[ -z "${selected_workspace_root}" ]]; then
+	echo "build-selected requires --artifact-workspace-root" >&2
+	exit 64
+fi
+cd "${selected_workspace_root}"
+
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+# shellcheck source=/dev/null
+. "${script_dir}/artifact-ingress-env.sh"
+canonical_tools_root="$(artifact_ingress_tools_root "${selected_workspace_root}")"
+export PATH="${canonical_tools_root}/bin"
+artifact_ingress_reexec_with_devshell "$0" "$@"
+# shellcheck source=/dev/null
+. "${script_dir}/cache-health-command-scope.sh" verified-ingress
+artifact_ingress_clear_selectors
+
+# shellcheck source=/dev/null
+export VBR_DEVSHELL_USE_GENERATED_AUTHORITY=1
+. "${script_dir}/devshell.sh"
+
+unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG
+env_apply_nix_cache_health
+artifact_ingress_restore_or_remove_selectors
+unset WORKSPACE_ROOT
+artifact_ingress_exec \
+	"${selected_workspace_root}" \
+	"build-tools/tools/dev/build-selected.ts" \
+	"${selected_args[@]}"

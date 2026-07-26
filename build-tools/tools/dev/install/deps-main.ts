@@ -10,7 +10,7 @@ import {
 import { findRepoRoot } from "../../lib/repo";
 import { nodeModulesAttr } from "./common";
 import { runGoModTidyForMissingSum } from "./go-tidy";
-import { runGlue } from "./glue";
+import { reconcileWorkspaceGlobalNixInputTargets, runGlue } from "./glue";
 import { runGomod2nixGenerate, runGomod2nixScanAll } from "./gomod2nix";
 import { withExclusiveInstallLock } from "./lock";
 import { syncModuleContractsForWebapps } from "./module-contracts";
@@ -39,6 +39,7 @@ import {
   staleMetadataError,
 } from "./metadata-mode";
 import { assertRustTrackedMetadataReady } from "./cargo";
+import { globalNixInputFingerprint } from "../global-nix-input-fingerprint";
 
 type Flags = {
   force: boolean;
@@ -211,6 +212,7 @@ else ui.heading("viberoots install");
 const effSkipGoTidy =
   skipGoTidy || (glueOnly && String(process.env.INSTALL_DEPS_SKIP_GO_TIDY || "") !== "0");
 const repoRoot = await resolveWorkspaceRoot();
+const priorGlobalInputs = await globalNixInputFingerprint(repoRoot);
 const metadataMode = installMetadataMode();
 const refreshPnpmHashes = metadataMode === "reconcile";
 const readOnlyMetadata = metadataMode === "read-only";
@@ -250,7 +252,7 @@ if (glueOnly) {
   await runGomod2nixGenerate(dryRun, verbose, readOnlyGoMetadata);
   await runGomod2nixScanAll(dryRun, verbose, readOnlyGoMetadata);
   if (!skipGlue) {
-    await runGlue(dryRun, verbose);
+    await runGlue(dryRun, verbose, priorGlobalInputs);
   } else if (verbose) {
     console.log("[skip] glue regeneration");
   }
@@ -272,6 +274,9 @@ if (glueOnly) {
     }
   } else if (!dryRun && verbose) {
     console.log("[install-deps] final workspace lock repair skipped");
+  }
+  if (!dryRun && !skipGlue) {
+    await reconcileWorkspaceGlobalNixInputTargets(priorGlobalInputs);
   }
   await writeFinalPrebuildFingerprint({ dryRun, skipGlue });
   if (verbose) console.log("Glue refreshed.");
@@ -466,7 +471,7 @@ if (!skipGlue && readOnlyMetadata) {
   const prevSkipPnpmHash = process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
   process.env.INSTALL_GLUE_SKIP_PNPM_HASH = "1";
   try {
-    await runGlue(dryRun, verbose);
+    await runGlue(dryRun, verbose, priorGlobalInputs);
   } finally {
     if (prevSkipPnpmHash === undefined) {
       delete process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
@@ -519,6 +524,9 @@ if (!dryRun && !readOnlyMetadata && shouldRunFinalWorkspaceLockRepair()) {
   );
 } else if (!dryRun && verbose) {
   console.log("[install-deps] final workspace lock repair skipped");
+}
+if (!dryRun && !skipGlue) {
+  await reconcileWorkspaceGlobalNixInputTargets(priorGlobalInputs);
 }
 await writeFinalPrebuildFingerprint({ dryRun, skipGlue });
 if (verbose) console.log("Dependencies installed and node_modules linked.");

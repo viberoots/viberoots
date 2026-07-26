@@ -5,7 +5,8 @@ import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
-const load = 'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary")';
+const load =
+  'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_wasi_binary", "rust_wasm_library")';
 
 test("rust macros reject noncanonical Cargo inputs, patch traversal, and unknown attrs", async () => {
   await runInTemp("rust-cargo-input-analysis-errors", async (tmp, $) => {
@@ -85,5 +86,107 @@ test("rust macros reject noncanonical Cargo inputs, patch traversal, and unknown
     const unknown = await query();
     assert.notEqual(unknown.exitCode, 0);
     assert.match(String(unknown.stderr || unknown.stdout), /unknown arguments: imaginary_fallback/);
+
+    await fsp.writeFile(
+      targets,
+      `${load}\nrust_binary(name = "app", srcs = ["src/main.rs"], link_deps = [":native"], link_closure_overrides = {":other": "transitive"})\n`,
+    );
+    const invalidOverride = await query();
+    assert.notEqual(invalidOverride.exitCode, 0);
+    assert.match(String(invalidOverride.stderr || invalidOverride.stdout), /keys must be present/);
+
+    await fsp.writeFile(
+      targets,
+      `${load}\nrust_binary(name = "app", srcs = ["src/main.rs"], target = "wasm32-unknown-unknown")\n`,
+    );
+    const invalidNativeTarget = await query();
+    assert.notEqual(invalidNativeTarget.exitCode, 0);
+    assert.match(String(invalidNativeTarget.stderr || invalidNativeTarget.stdout), /must be empty/);
+
+    await fsp.writeFile(
+      targets,
+      `${load}\nrust_wasm_library(name = "app", srcs = ["src/main.rs"], target = "wasm32-wasip1")\n`,
+    );
+    const invalidWasmTarget = await query();
+    assert.notEqual(invalidWasmTarget.exitCode, 0);
+    assert.match(
+      String(invalidWasmTarget.stderr || invalidWasmTarget.stdout),
+      /rust_wasm_library: target must be wasm32-unknown-unknown/,
+    );
+
+    await fsp.writeFile(
+      targets,
+      `${load}\nrust_wasi_binary(name = "app", srcs = ["src/main.rs"], target = "wasm32-unknown-unknown")\n`,
+    );
+    const invalidWasiTarget = await query();
+    assert.notEqual(invalidWasiTarget.exitCode, 0);
+    assert.match(
+      String(invalidWasiTarget.stderr || invalidWasiTarget.stdout),
+      /rust_wasi_binary: target must be wasm32-wasip1/,
+    );
+
+    await fsp.writeFile(
+      targets,
+      `${load}\nrust_wasm_library(name = "app", srcs = ["src/main.rs"], link_deps = [":native"])\n`,
+    );
+    const wasmLinkDeps = await query();
+    assert.notEqual(wasmLinkDeps.exitCode, 0);
+    assert.match(
+      String(wasmLinkDeps.stderr || wasmLinkDeps.stdout),
+      /rust_wasm_library: link_deps, header_deps, and nixpkg dependencies are unsupported for non-native Rust targets/,
+    );
+
+    await fsp.writeFile(
+      targets,
+      `${load}\nrust_wasi_binary(name = "app", srcs = ["src/main.rs"], header_deps = [":headers"])\n`,
+    );
+    const wasiHeaderDeps = await query();
+    assert.notEqual(wasiHeaderDeps.exitCode, 0);
+    assert.match(
+      String(wasiHeaderDeps.stderr || wasiHeaderDeps.stdout),
+      /rust_wasi_binary: link_deps, header_deps, and nixpkg dependencies are unsupported for non-native Rust targets/,
+    );
+
+    for (const declaration of [
+      'rust_wasm_library(name = "app", srcs = ["src/main.rs"], nixpkg_deps = ["zlib"])',
+      'rust_wasi_binary(name = "app", srcs = ["src/main.rs"], labels = ["nixpkg:pkgs.zlib"])',
+    ]) {
+      await fsp.writeFile(targets, `${load}\n${declaration}\n`);
+      const result = await query();
+      assert.notEqual(result.exitCode, 0);
+      assert.match(
+        String(result.stderr || result.stdout),
+        /nixpkg dependencies are unsupported for non-native Rust targets/,
+      );
+    }
+
+    await fsp.writeFile(
+      targets,
+      `${load}\nrust_binary(name = "app", srcs = ["src/main.rs"], nixpkg_deps = ["zlib"])\n`,
+    );
+    const nativeNixpkg = await query();
+    assert.equal(nativeNixpkg.exitCode, 0, String(nativeNixpkg.stderr || nativeNixpkg.stdout));
+
+    await fsp.writeFile(
+      targets,
+      `${load}\nrust_wasm_library(name = "app", srcs = ["src/main.rs"], imaginary_fallback = True)\n`,
+    );
+    const unknownWasmArgument = await query();
+    assert.notEqual(unknownWasmArgument.exitCode, 0);
+    assert.match(
+      String(unknownWasmArgument.stderr || unknownWasmArgument.stdout),
+      /rust_wasm_library: unknown arguments: imaginary_fallback/,
+    );
+
+    await fsp.writeFile(
+      targets,
+      `${load}\nrust_wasi_binary(name = "app", srcs = ["src/main.rs"], imaginary_fallback = True)\n`,
+    );
+    const unknownWasiArgument = await query();
+    assert.notEqual(unknownWasiArgument.exitCode, 0);
+    assert.match(
+      String(unknownWasiArgument.stderr || unknownWasiArgument.stdout),
+      /rust_wasi_binary: unknown arguments: imaginary_fallback/,
+    );
   });
 });

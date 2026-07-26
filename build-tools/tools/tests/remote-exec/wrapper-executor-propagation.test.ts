@@ -2,20 +2,25 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { test } from "node:test";
+import { after, test } from "node:test";
+import { killBuckIsolation } from "../../dev/verify/process-control";
 import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import {
+  expectDeclaredHandles,
+  expectedReadyHandles,
+  expectLocalProvider,
+  expectProjectRelative,
+  expectRemoteProvider,
+  fixtureRoot,
+  readyTarget,
+  target,
+  wrappers,
+} from "./wrapper-executor-propagation-assertions";
 
-const fixtureRoot = "viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures";
-const wrappers = ["zx", "node", "go", "python", "cpp"];
 const activationConfig = ["-c", "test.viberoots_remote_profile=linux-x86_64-default"];
+const wrapperIsolation = inheritedBuckIsolation("remote-exec-wrapper-propagation");
 
-function target(wrapper: string, mode: "local" | "remote"): string {
-  return `${fixtureRoot}:${wrapper}_${mode}`;
-}
-
-function readyTarget(wrapper: string): string {
-  return `${fixtureRoot}:${wrapper}_ready_handles`;
-}
+after(async () => await killBuckIsolation(process.cwd(), wrapperIsolation));
 
 async function auditProviders(
   label: string,
@@ -25,7 +30,7 @@ async function auditProviders(
   const result = await $({
     cwd,
     stdio: "pipe",
-  })`buck2 --isolation-dir ${inheritedBuckIsolation("remote-exec-wrapper-propagation")} audit providers ${buckArgs} --target-platforms prelude//platforms:default ${label}`.nothrow();
+  })`buck2 --isolation-dir ${wrapperIsolation} audit providers ${buckArgs} --target-platforms prelude//platforms:default ${label}`.nothrow();
   assert.equal(result.exitCode, 0, `${label}\n${result.stderr}`);
   return String(result.stdout || "");
 }
@@ -33,57 +38,9 @@ async function auditProviders(
 async function cqueryAttrs(label: string, buckArgs: string[] = []): Promise<string> {
   const result = await $({
     stdio: "pipe",
-  })`buck2 --isolation-dir ${inheritedBuckIsolation("remote-exec-wrapper-propagation")} cquery ${buckArgs} --target-platforms prelude//platforms:default --json --output-attribute labels --output-attribute remote_execution ${label}`.nothrow();
+  })`buck2 --isolation-dir ${wrapperIsolation} cquery ${buckArgs} --target-platforms prelude//platforms:default --json --output-attribute labels --output-attribute remote_execution ${label}`.nothrow();
   assert.equal(result.exitCode, 0, `${label}\n${result.stderr}`);
   return String(result.stdout || "");
-}
-
-function expectProjectRelative(providerText: string): void {
-  assert.match(providerText, /run_from_project_root=True/);
-  assert.match(providerText, /use_project_relative_paths=True/);
-}
-
-function expectLocalProvider(providerText: string): void {
-  expectProjectRelative(providerText);
-  assert.match(providerText, /default_executor=None/);
-  assert.match(providerText, /executor_overrides={}/);
-  assert.match(providerText, /"existing:label"/);
-  assert.match(providerText, /"remote:local-only"/);
-}
-
-function expectRemoteProvider(providerText: string): void {
-  expectProjectRelative(providerText);
-  assert.match(providerText, /default_executor=CommandExecutorConfig/);
-  assert.match(providerText, /RemoteEnabledExecutorOptions/);
-  assert.match(providerText, /RemoteExecutorUseCase[\s\S]*"buck2-test"/);
-  assert.match(providerText, /"viberoots_remote_profile": "linux-x86_64-default"/);
-  assert.match(providerText, /"resource_class": "default"/);
-  assert.match(providerText, /executor_overrides=\{\s*"listing": CommandExecutorConfig/s);
-  assert.match(providerText, /"existing:label"/);
-  assert.match(providerText, /"remote:local-only"/);
-}
-
-function externalRunnerCommand(providerText: string): string {
-  const match = providerText.match(
-    /ExternalRunnerTestInfo\([\s\S]*?command=\[(?<body>[\s\S]*?)\],\n\s+env=/,
-  );
-  assert.ok(match?.groups?.body, "expected ExternalRunnerTestInfo command body");
-  return match.groups.body;
-}
-
-function expectDeclaredHandles(providerText: string, names: string[]): void {
-  const command = externalRunnerCommand(providerText);
-  const hidden = command.match(/hidden=\[(?<body>[\s\S]*?)\]/)?.groups?.body || "";
-  assert.match(command, /cmd_args\(/);
-  assert.match(command, /remote-ready-runner\.sh/);
-  for (const name of names) assert.match(hidden, new RegExp(name.replace(".", "\\.")));
-  const executableText = command.replace(/hidden=\[[\s\S]*?\]/g, "hidden=[]");
-  assert.doesNotMatch(executableText, /WORKSPACE_ROOT|FLK_ROOT|BUCK_TEST_SRC|"[^"]*build-tools\//);
-  assert.doesNotMatch(executableText, /"-c"/);
-  assert.doesNotMatch(
-    executableText,
-    /command -v|\bbash\b|\bnode\b|\bnix\b|\btimeout\b|\bgit\b|\bfind\b/,
-  );
 }
 
 test("repo-owned external-runner wrappers default to local executor fields", async () => {
@@ -106,71 +63,6 @@ test("repo-owned external-runner wrappers propagate explicit remote executor fie
     assert.match(attrs, /"existing:label"/);
   }
 });
-
-const expectedReadyHandles = new Map<string, string[]>([
-  [
-    "zx",
-    [
-      "noop.test.ts",
-      "fixture.txt",
-      "zx_ready_source_snapshot.source-snapshot",
-      "zx_ready_source_snapshot.source-snapshot.manifest.json",
-      "materialization-manifest.json",
-      "artifact-contract.json",
-      "tool-closure.json",
-      "remote-builder-smoke.json",
-      "remote-ready-runner.sh",
-      "zx-init.mjs",
-      "command-heartbeat.ts",
-      "node-modules-build.ts",
-    ],
-  ],
-  [
-    "node",
-    [
-      "fixture.txt",
-      "remote-ready-runner.sh",
-      "zx-init.mjs",
-      "command-heartbeat.ts",
-      "nix-build-filtered-flake.ts",
-      "graph.json",
-      "workspace-root.env",
-    ],
-  ],
-  [
-    "go",
-    [
-      "fixture.txt",
-      "remote-ready-runner.sh",
-      "zx-init.mjs",
-      "build-selected.ts",
-      "graph.json",
-      "workspace-root.env",
-    ],
-  ],
-  [
-    "python",
-    [
-      "fixture.txt",
-      "remote-ready-runner.sh",
-      "zx-init.mjs",
-      "build-selected.ts",
-      "graph.json",
-      "workspace-root.env",
-    ],
-  ],
-  [
-    "cpp",
-    [
-      "fixture.txt",
-      "remote-ready-runner.sh",
-      "zx-init.mjs",
-      "build-selected.ts",
-      "graph.json",
-      "workspace-root.env",
-    ],
-  ],
-]);
 
 test("single active remote-ready fixture carries declared input handles", async () => {
   const providerText = await auditProviders(readyTarget("zx"));

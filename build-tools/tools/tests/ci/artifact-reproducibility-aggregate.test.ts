@@ -24,6 +24,7 @@ import { deterministicRemoteBuilderHostKey } from "../remote-exec/remote-builder
 
 const registryStorePath = `/nix/store/${"9".repeat(32)}-registry/registry.json`;
 const toolClosureRoot = `/nix/store/${"f".repeat(32)}-remote-ci-tools`;
+const builderSlots = ["a", "b"] as const;
 const hash = (value: string) => `sha256:${value.repeat(64)}`;
 const store = (value: string, name: string) => `/nix/store/${value.repeat(32)}-${name}`;
 const publication: PublicationSubject = {
@@ -48,7 +49,7 @@ function authority(system: string, slot: string) {
 
 function registry() {
   const builders = RELEASE_BUILDER_SYSTEMS.flatMap((system, systemIndex) =>
-    ["a", "b"].map((slot, slotIndex) => {
+    builderSlots.map((slot, slotIndex) => {
       const builder = authority(system, slot);
       return {
         identity: builder.identity,
@@ -95,7 +96,7 @@ function operational(records: ArtifactReproducibilityRunRecord[]) {
 function records(): ArtifactReproducibilityRunRecord[] {
   const matrix = ARTIFACT_REPRODUCIBILITY_MATRIX.flatMap((matrixCase, matrixIndex) =>
     RELEASE_BUILDER_SYSTEMS.flatMap((system, systemIndex) =>
-      ["a", "b"].map((slot, slotIndex) => {
+      builderSlots.map((slot, slotIndex) => {
         const bindingDigest = hash(String.fromCharCode(97 + matrixIndex));
         return record(
           artifactReproducibilityEvidenceFixture({
@@ -126,7 +127,7 @@ function records(): ArtifactReproducibilityRunRecord[] {
     ),
   );
   const published = RELEASE_BUILDER_SYSTEMS.flatMap((system, systemIndex) =>
-    ["a", "b"].map((slot, slotIndex) =>
+    builderSlots.map((slot, slotIndex) =>
       record(
         artifactReproducibilityEvidenceFixture({
           sourceRevision: "f".repeat(40),
@@ -154,7 +155,10 @@ test("aggregate separates temp validation from production publication authority"
     expectedSourceRevision: "f".repeat(40),
     expectedToolClosureRoot: toolClosureRoot,
   });
-  assert.equal(aggregate.matrixComparisons.length, 18);
+  assert.equal(
+    aggregate.matrixComparisons.length,
+    ARTIFACT_REPRODUCIBILITY_MATRIX.length * RELEASE_BUILDER_SYSTEMS.length,
+  );
   assert.equal(aggregate.publicationComparisons.length, 3);
   assert.equal(aggregate.sourceRevision, "f".repeat(40));
   assert.notEqual(
@@ -184,7 +188,7 @@ test("aggregate rejects incomplete records and cross-builder matrix drift", () =
         expectedSourceRevision: "f".repeat(40),
         expectedToolClosureRoot: toolClosureRoot,
       }),
-    /exactly 42 records/,
+    new RegExp(`exactly ${complete.length} records`),
   );
   const drifted = structuredClone(complete);
   drifted[0]!.evidence.sourceRevision = "d".repeat(40);

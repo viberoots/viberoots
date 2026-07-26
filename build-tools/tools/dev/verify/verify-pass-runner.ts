@@ -7,6 +7,7 @@ import { killBuckIsolation } from "./process-control";
 import { executionPolicyForVerifyPass, type VerifyExecutionPolicy } from "./remote-policy";
 import { startVerifySafetyRails, summarizeVerifySafetyRailsTelemetry } from "./safety-rails";
 import type { VerifyTargetPass } from "./target-passes";
+import type { CacheHealthResult } from "./nix-cache-health";
 
 export async function appendVerifyPassLog(file: string | null, line: string): Promise<void> {
   if (!file) return;
@@ -36,6 +37,7 @@ export async function startVerifyPass(opts: {
   onProgressUpdate: (name: string, state: { completed: number; failed: number }) => void;
   onProgressStop: (name: string, status: number) => void;
   artifactToolsRoot: string;
+  cacheHealth: CacheHealthResult;
 }): Promise<{ pgid: number; wait: () => Promise<number> } | null> {
   if (opts.shouldAbort()) return null;
   const passAnalysisDir = path.join(opts.analysisDir, `pass-${opts.passIndex + 1}`);
@@ -65,6 +67,7 @@ export async function startVerifyPass(opts: {
     exactOverallTimeoutSecs: opts.exactOverallTimeoutSecs,
     suppressFailureOutputTail: opts.suppressFailureOutputTail,
     artifactToolsRoot: opts.artifactToolsRoot,
+    cacheHealth: opts.cacheHealth,
     onProgressStart: opts.onProgressStart,
     onProgressUpdate: opts.onProgressUpdate,
     onProgressStop: opts.onProgressStop,

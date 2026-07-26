@@ -11,7 +11,7 @@ type GraphNodeLike = {
 function isBuckLabelLike(raw: string): boolean {
   const s = String(raw || "").trim();
   if (!s) return false;
-  if (s.startsWith("//") || s.startsWith("root//")) return true;
+  if (s.startsWith("//") || /^[^/]+\/\//u.test(s)) return true;
   if (s.startsWith(":")) return true;
   if (s.includes(" (config//")) return true;
   return false;

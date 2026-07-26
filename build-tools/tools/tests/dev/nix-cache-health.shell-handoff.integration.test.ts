@@ -19,10 +19,9 @@ const PARENT_ROOT = path.dirname(VIBEROOTS_ROOT);
 
 async function configureNxdomainCache(env: NodeJS.ProcessEnv): Promise<void> {
   const home = String(env.HOME || "").trim();
-  const realHome = String(env.BUCK2_REAL_HOME || "").trim();
+  const nixDirenvSource = String(env.VBR_NIX_DIRENV_DIRENVRC || "").trim();
   assert.ok(home);
-  assert.ok(realHome);
-  const nixDirenvSource = path.join(realHome, ".nix-profile/share/nix-direnv/direnvrc");
+  assert.match(nixDirenvSource, /^\/nix\/store\/.+\/share\/nix-direnv\/direnvrc$/);
   const nixDirenvTarget = path.join(home, ".nix-profile/share/nix-direnv/direnvrc");
   await fsp.access(nixDirenvSource);
   await fsp.mkdir(path.dirname(nixDirenvTarget), { recursive: true });
@@ -35,6 +34,7 @@ async function configureNxdomainCache(env: NodeJS.ProcessEnv): Promise<void> {
   await fsp.writeFile(
     nixConfig,
     [
+      "substituters =",
       "extra-substituters = https://optional-cache.invalid/cache",
       "netrc-file = /dev/null",
       "fallback = false",

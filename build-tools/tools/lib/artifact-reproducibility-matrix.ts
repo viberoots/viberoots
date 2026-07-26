@@ -1,38 +1,16 @@
 import crypto from "node:crypto";
+import { reproducibilityNodeArtifact } from "./artifact-reproducibility-node-contract";
 import {
-  reproducibilityNodeArtifact,
-  type ReproducibilityNodeArtifact,
-} from "./artifact-reproducibility-node-contract";
+  coverage,
+  proof,
+  recipe,
+  selection,
+  type ReproducibilityMatrixCase,
+} from "./artifact-reproducibility-matrix-helpers";
 
 export const RELEASE_BUILDER_SYSTEMS = ["aarch64-darwin", "aarch64-linux", "x86_64-linux"] as const;
 
-export type ReproducibilityMatrixCase = {
-  id: string;
-  artifactFamily: "go" | "node" | "python" | "cpp" | "wasm" | "mixed";
-  systems: readonly string[];
-  scaffoldRecipe: {
-    language: "go" | "ts" | "python" | "cpp";
-    template: "lib" | "app" | "wasm-lib" | "go-cpp-lib";
-    name: string;
-    destination: string;
-  };
-  coverage: {
-    routeCapabilities: readonly ("base" | "wasm" | "mixed" | "addon")[];
-  };
-  graphSelection: {
-    attr: "graph-generator-selected";
-    ruleTypes: readonly string[];
-    requiredLabels: readonly string[];
-    outputRole: string;
-    target: string;
-  };
-  nodeArtifact?: ReproducibilityNodeArtifact;
-  languageProofs: readonly {
-    target: string;
-    ruleTypes: readonly string[];
-    requiredLabels: readonly string[];
-  }[];
-};
+export type { ReproducibilityMatrixCase } from "./artifact-reproducibility-matrix-helpers";
 
 const matrix = [
   {
@@ -95,6 +73,33 @@ const matrix = [
     languageProofs: [],
   },
   {
+    id: "rust-pr5",
+    artifactFamily: "rust",
+    systems: RELEASE_BUILDER_SYSTEMS,
+    systemEvidence: {
+      nativeExecution: ["aarch64-darwin"],
+      failClosedUntilExternalEvidence: ["aarch64-linux", "x86_64-linux"],
+    },
+    scaffoldRecipe: recipe("rust", "cli", "repro-rust", "projects/apps/repro-rust"),
+    coverage: coverage(["base", "wasm", "wasi"]),
+    graphSelection: selection(
+      ["rust_nix_build"],
+      "//projects/apps/repro-rust:repro-rust",
+      "executable",
+      ["lang:rust", "kind:bin"],
+    ),
+    languageProofs: [
+      proof(["rust_nix_build"], "//projects/apps/repro-rust:repro-rust-wasm", [
+        "lang:rust",
+        "kind:wasm",
+      ]),
+      proof(["rust_nix_build"], "//projects/apps/repro-rust:repro-rust-wasi", [
+        "lang:rust",
+        "kind:wasi",
+      ]),
+    ],
+  },
+  {
     id: "mixed-artifact",
     artifactFamily: "mixed",
     scaffoldRecipe: recipe("ts", "go-cpp-lib", "repro-mixed", "projects"),
@@ -125,8 +130,27 @@ const matrix = [
 ] as const;
 
 export const ARTIFACT_REPRODUCIBILITY_MATRIX: readonly ReproducibilityMatrixCase[] = matrix.map(
-  (entry) => ({ ...entry, systems: RELEASE_BUILDER_SYSTEMS }),
+  (entry) => ({
+    ...entry,
+    systems: "systems" in entry ? entry.systems : RELEASE_BUILDER_SYSTEMS,
+  }),
 );
+
+for (const entry of ARTIFACT_REPRODUCIBILITY_MATRIX) {
+  if (!entry.systemEvidence) continue;
+  const classified = [
+    ...entry.systemEvidence.nativeExecution,
+    ...entry.systemEvidence.failClosedUntilExternalEvidence,
+  ];
+  if (
+    new Set(classified).size !== classified.length ||
+    [...classified].sort().join("\0") !== [...entry.systems].sort().join("\0")
+  ) {
+    throw new Error(
+      `reproducibility matrix ${entry.id} system evidence must classify every configured system exactly once`,
+    );
+  }
+}
 
 export const ARTIFACT_REPRODUCIBILITY_MATRIX_DIGEST = `sha256:${crypto
   .createHash("sha256")
@@ -144,44 +168,6 @@ export function reproducibilityRecipeDigest(id: string): string {
     .createHash("sha256")
     .update(canonicalJson(reproducibilityMatrixCase(id).scaffoldRecipe))
     .digest("hex")}`;
-}
-
-function selection(
-  ruleTypes: readonly string[],
-  target: string,
-  outputRole: string,
-  requiredLabels: readonly string[],
-) {
-  return {
-    attr: "graph-generator-selected" as const,
-    ruleTypes,
-    requiredLabels,
-    outputRole,
-    target,
-  };
-}
-
-function coverage(
-  routeCapabilities: ReproducibilityMatrixCase["coverage"]["routeCapabilities"],
-): ReproducibilityMatrixCase["coverage"] {
-  return { routeCapabilities };
-}
-
-function proof(
-  ruleTypes: readonly string[],
-  target: string,
-  requiredLabels: readonly string[],
-): ReproducibilityMatrixCase["languageProofs"][number] {
-  return { requiredLabels, ruleTypes, target };
-}
-
-function recipe(
-  language: ReproducibilityMatrixCase["scaffoldRecipe"]["language"],
-  template: ReproducibilityMatrixCase["scaffoldRecipe"]["template"],
-  name: string,
-  destination: string,
-): ReproducibilityMatrixCase["scaffoldRecipe"] {
-  return { destination, language, name, template };
 }
 
 function canonicalJson(value: unknown): string {
@@ -206,7 +192,7 @@ export function reproducibilityMatrixCaseCoversLanguage(id: string, languageId: 
 export function reproducibilityMatrixCoverage(
   ids: readonly string[],
   languageId: string,
-): Set<"base" | "wasm" | "mixed" | "addon"> {
+): Set<"base" | "wasm" | "wasi" | "mixed" | "addon"> {
   return new Set(
     ids.flatMap((id) => {
       const entry = reproducibilityMatrixCase(id);

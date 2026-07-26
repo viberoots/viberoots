@@ -1,0 +1,36 @@
+[
+  {
+    "name": "//projects/fixtures/rust-remote-ready:rust_remote_fixture",
+    "rule_type": "rust_nix_build",
+    "labels": ["lang:rust", "kind:bin", "remote:ready"],
+    "deps": [],
+    "srcs": ["src/main.rs"],
+    "cargo_manifest": "Cargo.toml",
+    "cargo_lock": "Cargo.lock",
+    "crate": "rust_remote_fixture",
+    "features": [],
+    "default_features": true,
+    "profile": "release",
+    "target": "",
+    "local_patch_dirs": [],
+    "nixpkgs_profile": "default",
+    "nixpkg_pins": {}
+  },
+  {
+    "name": "//projects/fixtures/rust-remote-ready:rust_ready_handles",
+    "rule_type": "rust_nix_test",
+    "labels": ["lang:rust", "kind:test", "remote:ready"],
+    "deps": [],
+    "srcs": ["src/main.rs"],
+    "cargo_manifest": "Cargo.toml",
+    "cargo_lock": "Cargo.lock",
+    "crate": "rust_remote_fixture",
+    "features": [],
+    "default_features": true,
+    "profile": "release",
+    "target": "",
+    "local_patch_dirs": [],
+    "nixpkgs_profile": "default",
+    "nixpkg_pins": {}
+  }
+]

@@ -13,6 +13,12 @@ test("all artifact executors use canonical environment and Nix policy authoritie
   assertCanonicalArtifactIngressWiring();
 });
 
+test("remote consumer commands preserve cache policy ingress", () => {
+  const boundary = read("build-tools/tools/tests/viberoots/remote-consumer-boundary.ts");
+  const commandEnv = boundary.match(/export function commandEnv[\s\S]*?\n}\n/)?.[0] || "";
+  assert.doesNotMatch(commandEnv, /VBR_NIX_CACHE_POLICY:\s*"off"/);
+});
+
 test("Node genlike builds remain inside the strict Nix sandbox", () => {
   const planner = read("build-tools/tools/nix/planner/node-genlike.nix");
   const helpers = read("build-tools/tools/nix/lib/lang-helpers.nix");
@@ -47,9 +53,41 @@ test("selected-build fixtures remove inherited artifact influence before explici
   assert.doesNotMatch(selectedBuildEnv, /BUCK_TEST_SRC:/);
   assert.doesNotMatch(selectedBuildEnv, /WORKSPACE_ROOT:/);
   assert.match(helper, /--artifact-workspace-root=\$\{tmp\}/);
+  assert.match(helper, /"bin", "build-selected"/);
+  assert.doesNotMatch(
+    helper.match(/export async function runBuildSelected[\s\S]*?\n}\n/)?.[0] || "",
+    /build-selected\.ts/,
+  );
   assert.match(helper, /internal: \{\s*WORKSPACE_ROOT: tmp,\s*BUCK_TARGET: target,/);
   assert.match(helper, /canonicalArtifactToolsRoot\(tmp\)/);
-  assert.match(helper, /const nodeBin = path\.join\([^\n]*"bin", "node"\)/);
+
+  const entrypoint = read("build-tools/tools/bin/build-selected");
+  assert.match(entrypoint, /--artifact-workspace-root=\*\)/);
+  assert.match(entrypoint, /selected_workspace_root="\$\{arg#\*=\}"/);
+  assert.match(entrypoint, /selected_args\+=\("\$\{arg\}"\)/);
+  assert.match(entrypoint, /export WORKSPACE_ROOT="\$\{selected_workspace_root\}"/);
+  assert.match(
+    entrypoint,
+    /canonical_tools_root="\$\(artifact_ingress_tools_root "\$\{selected_workspace_root\}"\)"/,
+  );
+  assert.match(entrypoint, /export PATH="\$\{canonical_tools_root\}\/bin"/);
+  assert.ok(
+    entrypoint.indexOf('export PATH="${canonical_tools_root}/bin"') <
+      entrypoint.indexOf('artifact_ingress_reexec_with_devshell "$0" "$@"'),
+  );
+  assert.match(
+    entrypoint,
+    /unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG/,
+  );
+  assert.match(entrypoint, /env_apply_nix_cache_health/);
+  assert.match(
+    entrypoint,
+    /artifact_ingress_restore_or_remove_selectors\s*unset WORKSPACE_ROOT\s*artifact_ingress_exec/,
+  );
+  assert.match(
+    entrypoint,
+    /artifact_ingress_exec[\s\S]*"\$\{selected_workspace_root\}"[\s\S]*"build-tools\/tools\/dev\/build-selected\.ts"[\s\S]*"\$\{selected_args\[@\]\}"/,
+  );
 });
 
 test("artifact action bootstrap rejects ambient root authority", () => {
@@ -116,9 +154,11 @@ test("direct Node artifact routes declare the Buck target through explicit argv"
   assert.match(nodeNixTest, /--target \\"%s\\"/);
 });
 
-test("artifact worker closure includes the canonical lockfile parser", () => {
+test("artifact worker closure includes canonical lockfile and scaffold tools", () => {
   const closure = read("build-tools/tools/nix/flake/packages/remote-worker-tools.nix");
   assert.match(closure, /workerPaths = \[[\s\S]*pkgs\.yq[\s\S]*\];/);
+  assert.match(closure, /workerPaths = \[[\s\S]*pkgs\.copier[\s\S]*\];/);
+  assert.match(closure, /workerPaths = \[[\s\S]*pkgs\.prettier[\s\S]*\];/);
 });
 
 test("command-site inventory separates canonical builds from live development launchers", () => {
