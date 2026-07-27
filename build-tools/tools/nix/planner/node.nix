@@ -26,6 +26,9 @@ let
   nameOf = L.nameOf;
   byName = L.byName;
   srcsOf = L.srcsOf;
+  depsOfName = name:
+    let node = nodeOfName name;
+    in if node == null then [] else L.depsOf node;
   parseLock = L.parseImporterScopedLockfileLabel;
   extractLocks = L.extractLockfileLabels;
   lockInfoOfName = name:
@@ -46,6 +49,9 @@ let
       else (lib.baseNameOf (ctx.pkgPathOf n));
   nodeOfName = name:
     if builtins.hasAttr name byName then byName.${name} else null;
+  nativeAddons = import ./node-native-addons.nix {
+    inherit lib pkgs dependencyArtifactOf depsOfName nodeOfName labelsOf get;
+  };
   attrStringOr = n: key: fallback:
     let v = if n == null then null else get n key;
     in if builtins.isString v && v != "" then v else fallback;
@@ -64,8 +70,11 @@ let
   isBundledCli = name:
     let n = nodeOfName name;
     in n != null && builtins.elem "node:cli-bundle" (labelsOf n);
+  isService = name:
+    let n = nodeOfName name;
+    in n != null && builtins.elem "artifact:node-service" (labelsOf n);
   mkGenLike = import ./node-genlike.nix {
-    inherit pkgs H repoStoreRoot artifactToolsRoot declaredArtifactToolsRoot artifactToolsInput evaluationGraphPath dependencyArtifactOf lockInfoOfName nodeOfName get srcsOf targetNameOf;
+    inherit pkgs H repoStoreRoot artifactToolsRoot declaredArtifactToolsRoot artifactToolsInput evaluationGraphPath dependencyArtifactOf lockInfoOfName nodeOfName get srcsOf targetNameOf nativeAddons;
   };
 in {
   isTarget = n:
@@ -82,17 +91,20 @@ in {
     in
       if k == "app" && isWebappLike n then "webapp" else k;
   modulesFileFor = name: ctx.modulesTomlFor name;
-  mkApp = name: import ./node-app.nix {
-    inherit pkgs H repoStoreRoot repoFsRoot sharedNodeMods lockInfoOfName targetNameOf name;
-  };
+  mkApp = name:
+    if isService name then import ./node-service.nix {
+      inherit pkgs H repoStoreRoot repoFsRoot viberootsRoot sharedNodeMods lockInfoOfName labelsOf nodeOfName name nativeAddons;
+    } else import ./node-app.nix {
+      inherit pkgs H repoStoreRoot repoFsRoot sharedNodeMods lockInfoOfName targetNameOf name nativeAddons;
+    };
   mkGen = name: mkGenLike { inherit name; kind = "gen"; };
   mkLib = name: mkGenLike { inherit name; kind = "lib"; };
   mkBin = name:
     if isBundledCli name then import ./node-app.nix {
-      inherit pkgs H repoStoreRoot repoFsRoot sharedNodeMods lockInfoOfName targetNameOf name;
+      inherit pkgs H repoStoreRoot repoFsRoot sharedNodeMods lockInfoOfName targetNameOf name nativeAddons;
     } else mkGenLike { inherit name; kind = "bin"; };
   mkWebapp = name: import ./node-webapp.nix {
-    inherit pkgs H repoStoreRoot repoFsRoot viberootsRoot sharedNodeMods lockInfoOfName nodeOfName labelsOf name;
+    inherit pkgs H repoStoreRoot repoFsRoot viberootsRoot sharedNodeMods lockInfoOfName nodeOfName labelsOf name nativeAddons;
     frameworkMissingError =
       "node planner: SSR webapp target ${name} missing framework label (framework:express|framework:next|framework:vite)";
   };

@@ -2,9 +2,14 @@
 let
   Semver = import ./rust-semver.nix { inherit lib; };
   rustNames = map (node: clean (P.nameOf node)) rustNodes;
+  runtimeDepNames = node:
+    let value = ctx.get node "runtime_deps";
+    in if value == null then [] else map clean value;
   rustDepNames = node:
     builtins.filter (dep: builtins.elem dep rustNames)
-      (map clean (P.depsOf node));
+      (builtins.filter
+        (dep: !(builtins.elem dep (runtimeDepNames node)))
+        (map clean (P.depsOf node)));
   first = values:
     let present = builtins.filter (value: value != null) values;
     in if present == [] then null else builtins.head present;

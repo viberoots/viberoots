@@ -133,6 +133,7 @@ export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
 
     const linkDeps = normalizeTargetsForOwner(clean, a["link_deps"] ?? a["buck.link_deps"]);
     const headerDeps = normalizeTargetsForOwner(clean, a["header_deps"] ?? a["buck.header_deps"]);
+    const runtimeDeps = normalizeTargetsForOwner(clean, a["runtime_deps"]);
     const linkClosure =
       typeof a["link_closure"] === "string"
         ? (a["link_closure"] as string)
@@ -169,6 +170,7 @@ export function nodesFromCqueryJson(merged: Record<string, any>): Node[] {
       ...(module ? { module } : {}),
       ...(linkDeps ? { link_deps: linkDeps } : {}),
       ...(headerDeps ? { header_deps: headerDeps } : {}),
+      ...(runtimeDeps ? { runtime_deps: runtimeDeps } : {}),
       ...(linkClosure ? { link_closure: linkClosure } : {}),
       ...(overridesNormalized ? { link_closure_overrides: overridesNormalized } : {}),
       nixpkgs_profile: nixpkgsProfile,

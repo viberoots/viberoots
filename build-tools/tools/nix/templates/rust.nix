@@ -31,6 +31,14 @@ in {
     publicCrate ? crate,
     hostRole ? "target",
     generatedOutputs ? [],
+    module ? "",
+    buildPyDeps ? [],
+    pythonWheelhouse ? null,
+    runtimePackages ? [],
+    addonName ? "",
+    nodeApiVersion ? 0,
+    platform ? "",
+    pythonAbi ? "", artifactNixRoot ? "",
     }:
     let
       validatedTarget = validateKindTarget kind target;
@@ -39,6 +47,13 @@ in {
         else map (root: root.cargoRoot) sourceComposition.roots;
       _cargoConfig = Contract.validateCargoConfigs compositionRoots;
       _crateRole = Contract.validateCrateRole crateType hostRole validatedTarget;
+      _extension = Contract.validateExtension {
+        inherit kind module buildPyDeps addonName nodeApiVersion platform pythonAbi;
+        selectedPythonAbi =
+          "cp${lib.versions.major pkgs.python3.pythonVersion}${lib.versions.minor pkgs.python3.pythonVersion}";
+        selectedNodeApiVersion = 10;
+        system = pkgs.stdenv.hostPlatform.system;
+      };
       validatedPublicCrate = Contract.validatePublicCrate publicCrate;
       targetName = lib.last (lib.splitString ":" name);
       sanitized = H.sanitizeName name;
@@ -85,11 +100,30 @@ in {
         inherit pkgs cargoLock patchInputs vendorAuthorities;
         inherit devOverrides;
       };
-      baseInstallPhase = import ./rust-install.nix {
+      baseInstallPhase = if builtins.elem kind [ "pyext" "addon" ] then
+        import ./rust-extension-install.nix {
+          inherit pkgs lib kind crate module addonName targetDir dynamicExtension;
+        }
+      else import ./rust-install.nix {
         inherit pkgs lib kind crateType crate targetDir targetName
           artifactDir dynamicExtension;
         publicCrate = validatedPublicCrate;
       };
+      extensionRuntime = import ./rust-extension-runtime.nix { inherit pkgs lib kind;
+        runtimePackages = if builtins.elem kind [ "pyext" "addon" ] then runtimePackages else []; };
+      _pythonAuthority =
+        if buildPyDeps != [] && pythonWheelhouse == null then builtins.throw
+          "Rust Python extension build_py_deps require an importer-scoped uv.lock wheelhouse"
+        else true;
+      extensionPackages = runtimePackages
+        ++ lib.optionals (kind == "pyext") ([ pkgs.python3 ]
+          ++ lib.optional (pythonWheelhouse != null) pythonWheelhouse)
+        ++ lib.optionals (kind == "addon") [ pkgs.nodejs_22 ];
+      extensionRustFlags = lib.optionals
+        (pkgs.stdenv.isDarwin && builtins.elem kind [ "pyext" "addon" ])
+        [ "-C" "link-arg=-undefined" "-C" "link-arg=dynamic_lookup" ];
+      nodeApiContract = import ./rust-node-api.nix {
+        inherit pkgs lib kind nodeApiVersion targetDir crate dynamicExtension; };
       compositionEvidence = {
         manifest = if sourceComposition == null then [] else sourceComposition.manifest;
         digest = if sourceComposition == null then
@@ -101,6 +135,28 @@ in {
         cat > "$out/share/viberoots-rust/composition.json" <<'VIBEROOTS_RUST_COMPOSITION'
         ${builtins.toJSON compositionEvidence}
         VIBEROOTS_RUST_COMPOSITION
+        cat > "$out/share/viberoots-rust/materialization-manifest.json" <<VIBEROOTS_RUST_MATERIALIZATION
+        ${builtins.toJSON {
+          schemaVersion = "viberoots.nix-store-materialization.v1";
+          sourceRevision = compositionEvidence.digest;
+          sourceSnapshot = builtins.toString cargoRoot;
+          flakeLockFingerprint = sourcePlan.nixpkgs_profile;
+          substituter = {
+            endpointIdentity = "https://cache.home.kilty.io/main";
+            trustedPublicKeys = [ "main:N7uIAritMCBWpa9cdZJxHJ7gWfsXCwAsbyIJqrSQnLY=" ];
+          };
+          tools = { nix = if artifactNixRoot == "" then builtins.toString pkgs.nix else artifactNixRoot; };
+          storePaths = [{
+            attr = H.sanitizeName name;
+            path = "__VIBEROOTS_RUST_OUT__";
+            expectedOutputIdentity = "__VIBEROOTS_RUST_IDENTITY__";
+          }];
+        }}
+        VIBEROOTS_RUST_MATERIALIZATION
+        substituteInPlace "$out/share/viberoots-rust/materialization-manifest.json" \
+          --replace-fail "__VIBEROOTS_RUST_OUT__" "$out" \
+          --replace-fail "__VIBEROOTS_RUST_IDENTITY__" "$(basename "$out")"
+        ${extensionRuntime}
       '';
       _overrideTrace =
         if devOverrides == {} then true
@@ -108,7 +164,7 @@ in {
           "[DEV OVERRIDES ACTIVE] Rust fixed sources are explicit local-development bundle inputs."
           true;
     in assert validatedTarget != null; assert _sources; assert _cargoConfig;
-    assert _crateRole; assert _overrideTrace;
+    assert _crateRole; assert _extension; assert _pythonAuthority; assert _overrideTrace;
     pkgs.rustPlatform.buildRustPackage ({
       pname = "rust-${sanitized}";
       version = "0.1.0";
@@ -126,14 +182,21 @@ in {
       cargoTestFlags = [ "--package" crate ] ++ kindFlags ++ featureFlags ++ targetFlags;
       doCheck = false;
       nativeBuildInputs = [ pkgs.cargo rustc pkgs.pkg-config pkgs.jq pkgs.llvmPackages.lld ]
-        ++ nixpkgDeps ++ nativePackages;
-      buildInputs = nixpkgDeps ++ nativePackages;
+        ++ nixpkgDeps ++ nativePackages ++ extensionPackages;
+      buildInputs = nixpkgDeps ++ nativePackages ++ extensionPackages;
       RUSTC = "${rustc}/bin/rustc";
       RUSTDOC = "${rustc}/bin/rustdoc";
       CARGO = "${pkgs.cargo}/bin/cargo";
       CARGO_NET_OFFLINE = "true";
-      RUSTFLAGS = lib.concatStringsSep " " nativeLibraryFlags;
-      C_INCLUDE_PATH = lib.makeSearchPath "include" nativePackages;
+      RUSTFLAGS = lib.concatStringsSep " " (nativeLibraryFlags ++ extensionRustFlags);
+      PYO3_PYTHON = if kind == "pyext" then "${pkgs.python3}/bin/python" else "";
+      NAPI_VERSION = if kind == "addon" then builtins.toString nodeApiVersion else "";
+      BINDGEN_EXTRA_CLANG_ARGS = nodeApiContract.bindgenArgs;
+      PYTHONPATH = if kind == "pyext" && pythonWheelhouse != null
+        then "${pythonWheelhouse}/site"
+        else "";
+      C_INCLUDE_PATH = lib.concatStringsSep ":" (nodeApiContract.includePaths
+        ++ lib.optional (nativePackages != []) (lib.makeSearchPath "include" nativePackages));
       LIBRARY_PATH = lib.makeLibraryPath nativeInputs.libraries;
       VIBEROOTS_RUST_LINK_LIBRARY_PATHS = lib.makeLibraryPath nativeInputs.libraries;
       postPatch = ''
@@ -142,9 +205,18 @@ in {
         ${lib.concatMapStringsSep "\n" (input: "test -e ${lib.escapeShellArg (builtins.toString input)}") patchInputs}
         ${patchPlan.postPatch}
       '';
+      preBuild = lib.optionalString (kind == "pyext" && buildPyDeps != []) ''
+        export PYTHONNOUSERSITE=1
+        for package in ${lib.concatStringsSep " " (map lib.escapeShellArg buildPyDeps)}; do
+          ${pkgs.python3}/bin/python -c 'import importlib, sys; importlib.import_module(sys.argv[1])' "$package" ||
+            { echo "Rust Python extension build_py_deps package $package is not importable from the selected uv.lock wheelhouse" >&2; exit 2; }
+        done
+      '' + nodeApiContract.preBuild;
+      postBuild = nodeApiContract.postBuild;
       inherit installPhase;
       passthru.viberootsRust = {
         inherit kind crate features profile crateType hostRole generatedOutputs;
+        inherit module buildPyDeps addonName nodeApiVersion platform pythonAbi pythonWheelhouse;
         publicCrate = validatedPublicCrate;
         target = validatedTarget;
         default_features = defaultFeatures;
@@ -160,10 +232,9 @@ in {
         composition = if sourceComposition == null then [] else sourceComposition.diagnostics;
         composition_manifest = if sourceComposition == null then [] else sourceComposition.manifest;
         composition_digest = if sourceComposition == null then
-          builtins.hashString "sha256" (builtins.toJSON [])
-        else sourceComposition.digest;
-        runtime_closure = map builtins.toString nativePackages;
-        runtime_packages = nativePackages;
+          builtins.hashString "sha256" (builtins.toJSON []) else sourceComposition.digest;
+        runtime_closure = map builtins.toString runtimePackages;
+        runtime_packages = runtimePackages;
         cargo_packages = map (package: {
           inherit (package) name version;
           source = package.source or "";

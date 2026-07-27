@@ -47,6 +47,9 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `rust_test`
   - `rust_wasm_library`
   - `rust_wasi_binary`
+  - `rust_python_extension`
+  - `rust_python_wasm_extension`
+  - `rust_node_addon`
 
 ## Additional public surfaces
 
@@ -1539,7 +1542,7 @@ Public args:
 
 Load from `@viberoots//build-tools/rust:defs.bzl`.
 
-All eight public Rust macros accept the following remote-execution evidence labels:
+The artifact-producing Rust macros accept the following remote-execution evidence labels:
 
 - `source_snapshot_bundle` supplies the typed `SourceSnapshotInfo` bundle containing the declared
   source root, source manifest, and graph. It is mutually exclusive with the lower-level
@@ -1686,3 +1689,31 @@ cross-language WebAssembly linking is deferred to the reviewed PR-9 contract.
 Builds a `wasm32-wasip1` Cargo binary and emits `<name>.wasm` for a WASI preview1 runtime.
 `link_deps` and `header_deps` are rejected; cross-language WebAssembly linking is deferred to the
 reviewed PR-9 contract.
+
+### `rust_python_extension(name, module, **kwargs)`
+
+Build a native Cargo `cdylib` for CPython. `module` is the dotted import name. `python_abi` defaults
+to `selected`; an explicit `cp<major><minor>` value must match the selected Nix interpreter, which
+also supplies the extension suffix. Optional `build_py_deps` requires exactly one importer-scoped
+Python `uv.lock` label (inferred from the package by default) and resolves packages from that
+lock's uv2nix wheelhouse. `runtime_deps`, `link_deps`, and `header_deps` remain explicit graph
+inputs. Recursive runtime packages and their dynamic-library closure are relocated beside the
+extension. Python consumers stage the result through the shared `kind:pyext` contract.
+
+### `rust_python_wasm_extension(name, backend, **kwargs)`
+
+This macro currently fails closed because the pinned toolchains do not provide an importable
+Pyodide or WASI Rust dynamic-extension ABI. It never substitutes a raw WebAssembly placeholder.
+
+### `rust_node_addon(name, addon_name = None, node_api_version = 8, platform = "selected", **kwargs)`
+
+Build a Cargo `cdylib` as a stable `<addon_name>.node` Node-API artifact. `addon_name` must match
+`[A-Za-z_][A-Za-z0-9_-]*`, and consumers reject duplicate stable names. `node_api_version` must be
+8, 9, or 10. The build selects that pinned header contract, audits the binary for the corresponding
+API floor and absence of higher pinned APIs, requires Node's loader-visible version export, and
+load-probes the installed artifact with the managed runtime.
+`platform` defaults to the selected Nix system and an explicit mismatched system is rejected. The
+graph planner resolves transitive `kind:addon` dependencies through the same language-neutral
+artifact route used for C++ addons. Bundled CLIs stage them in `bin/native`, services in `native`,
+and webapps in `dist/native`; each staging route also carries the relocated runtime-library
+directory.

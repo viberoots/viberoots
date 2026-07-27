@@ -2,6 +2,7 @@
 ctx:
 let
   P = import ./lib.nix { inherit lib; get = ctx.get; };
+  pythonDepsFor = import ./rust-python-deps.nix { inherit P ctx normalizeList; };
   clean = P.cleanLabel;
   overrideEnv = "NIX_RUST_DEV_OVERRIDE_JSON";
   rustDevOverrides = (ctx.languageOverrides or {}).${overrideEnv} or {};
@@ -35,6 +36,7 @@ let
     if value == null then []
     else if builtins.isList value && builtins.all builtins.isString value then map clean value
     else builtins.throw "Rust planner ${field} must be a list of labels";
+  runtimePackagesFor = import ./rust-runtime-deps.nix { inherit lib ctx normalizeList; };
   nativeInputsFor = name:
     let
       node = nodeFor name;
@@ -154,6 +156,12 @@ let
       hostRole = if hostRoleRaw == null then "target" else hostRoleRaw;
       publicCrateRaw = ctx.get node "public_crate";
       generatedOutputsRaw = ctx.get node "generated_outputs";
+      module = ctx.get node "module";
+      runtimeDeps = normalizeList "runtime_deps" (ctx.get node "runtime_deps");
+      addonName = ctx.get node "addon_name";
+      nodeApiVersion = ctx.get node "node_api_version";
+      platform = ctx.get node "platform";
+      pythonAbi = ctx.get node "python_abi";
       _nativeInputBoundary = validateNativeInputBoundary name kind;
       patchDirs = ctx.get node "local_patch_dirs";
       cargoRoot = builtins.toPath "${ctx.repoRootStr}/${rootRel}";
@@ -167,12 +175,14 @@ let
       missing = builtins.filter (record: record.package == null) nixpkgRecords;
       sourcePlan = ctx.sourcePlanFor node;
       template = ctx.T.rustForPkgs sourcePlan.base_pkgs;
+      pythonDeps = pythonDepsFor { inherit name node sourcePlan; };
       nativeInputs = nativeInputsFor name;
     in if missing != [] then builtins.throw
       "Rust planner unresolved nixpkg deps for ${name}: ${lib.concatStringsSep ", " (map (record: record.attr) missing)}"
     else assert _nativeInputBoundary; assert _overrideClassification; template.rustPackage {
       inherit name kind cargoRoot cargoManifest cargoLock cargoOutputHashes cargoFixedSources sourcePlan sourceComposition;
       inherit nativeInputs;
+      artifactNixRoot = ctx.declaredArtifactNixRoot or "";
       patchInputs = lib.unique (patchInputs ++ sourceComposition.patchInputs);
       devOverrides = rustDevOverrides;
       nixpkgDeps = map (record: record.package) nixpkgRecords;
@@ -187,6 +197,13 @@ let
         else publicCrateRaw;
       generatedOutputs = if generatedOutputsRaw == null then [] else generatedOutputsRaw;
       inherit target;
+      module = if module == null then "" else module;
+      inherit (pythonDeps) buildPyDeps pythonWheelhouse;
+      runtimePackages = runtimePackagesFor runtimeDeps;
+      addonName = if addonName == null then "" else addonName;
+      nodeApiVersion = if nodeApiVersion == null then 0 else nodeApiVersion;
+      platform = if platform == null then "" else platform;
+      pythonAbi = if pythonAbi == null then "" else pythonAbi;
     };
 in {
   isTarget = n: P.isTargetByRuleTypeOrLabel {
@@ -200,6 +217,9 @@ in {
     name = P.nameOf n;
     config = {
       labelPriorityPre = [
+        { label = "kind:addon"; kind = "addon"; }
+        { label = "kind:pyext_wasm"; kind = "pyext_wasm"; }
+        { label = "kind:pyext"; kind = "pyext"; }
         { label = "kind:test"; kind = "test"; }
         { label = "kind:wasi"; kind = "wasi"; }
         { label = "kind:wasm"; kind = "wasm"; }
@@ -207,6 +227,9 @@ in {
         { label = "kind:lib"; kind = "lib"; }
       ];
       ruleTypes.suffixes = [
+        { suffix = "_node_addon"; kind = "addon"; }
+        { suffix = "_python_wasm_extension"; kind = "pyext_wasm"; }
+        { suffix = "_python_extension"; kind = "pyext"; }
         { suffix = "_wasi_binary"; kind = "wasi"; }
         { suffix = "_wasm_library"; kind = "wasm"; }
         { suffix = "_test"; kind = "test"; }
@@ -215,11 +238,13 @@ in {
       ];
     };
   };
-
   modulesFileFor = _: null;
   mkApp = build "bin";
+  mkAddon = build "addon";
   mkLib = build "lib";
   mkTest = build "test";
+  mkPyExt = build "pyext";
+  mkPyExtWasm = build "pyext_wasm";
   mkWasi = build "wasi";
   mkWasm = build "wasm";
 }

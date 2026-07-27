@@ -108,7 +108,10 @@ in
   node-cli = nodeCli;
   node-webapp = nodeWebapp;
   node-vercel-next = nodeVercelNext;
-  node-service = nodeService;
+  node-service =
+    if evaluationBundle == null || evaluationBundle.selection.target == ""
+    then nodeService
+    else lib.mapAttrs (_: _: graph.graphGen.selected) nodeService;
   node-test = nodeTest;
   py-wasi-toolchain = pyWasiToolchain;
   toolchains = toolchains;

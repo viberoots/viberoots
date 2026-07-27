@@ -274,6 +274,8 @@ let
     viberootsRoot = viberootsRoot;
     declaredArtifactToolsRoot =
       if evaluationBundle == null then "" else evaluationBundle.artifactToolsRoot;
+    declaredArtifactNixRoot =
+      if evaluationBundle == null then "" else evaluationBundle.artifactNixRoot;
     artifactToolsRoot = artifactToolsRoot;
     artifactToolsInput = artifactToolsRoot;
     evaluationGraphPath = if evaluationBundle == null then null else evaluationBundle.graphPath;
@@ -349,6 +351,9 @@ let
           if kind == "bin" then LANGS.rust.mkApp buildLabel
           else if kind == "test" then LANGS.rust.mkTest buildLabel
           else if kind == "lib" then LANGS.rust.mkLib buildLabel
+          else if kind == "addon" then LANGS.rust.mkAddon buildLabel
+          else if kind == "pyext" then LANGS.rust.mkPyExt buildLabel
+          else if kind == "pyext_wasm" then LANGS.rust.mkPyExtWasm buildLabel
           else if kind == "wasm" then LANGS.rust.mkWasm buildLabel
           else if kind == "wasi" then LANGS.rust.mkWasi buildLabel
           else builtins.throw "planner dependency target has unsupported Rust kind: ${target}"
@@ -567,6 +572,9 @@ let
             else if kind == "test" then LANGS.rust.mkTest nm
             else if kind == "wasm" then LANGS.rust.mkWasm nm
             else if kind == "wasi" then LANGS.rust.mkWasi nm
+            else if kind == "addon" then LANGS.rust.mkAddon nm
+            else if kind == "pyext" then LANGS.rust.mkPyExt nm
+            else if kind == "pyext_wasm" then LANGS.rust.mkPyExtWasm nm
             else LANGS.rust.mkLib nm;
           }
         ) safeRustNodes);
@@ -733,6 +741,9 @@ let
                 else if k.kind == "test" then A.mkTest buildLabel
                 else if k.kind == "wasm" then A.mkWasm buildLabel
                 else if k.kind == "wasi" then A.mkWasi buildLabel
+                else if k.kind == "addon" then A.mkAddon buildLabel
+                else if k.kind == "pyext" then A.mkPyExt buildLabel
+                else if k.kind == "pyext_wasm" then A.mkPyExtWasm buildLabel
                 else A.mkLib buildLabel
               ) else (
                 let A = adapterFor "cpp"; in

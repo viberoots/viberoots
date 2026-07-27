@@ -2,7 +2,8 @@
 
 **Prepared:** 2026-07-23
 
-**Last reconciled:** 2026-07-26, after PR-6 implementation, validation, and final independent review
+**Last reconciled:** 2026-07-26, after PR-7 implementation, validation, and terminal independent
+review
 
 **Workspace:** `/Users/kiltyj/Code/viberoots-site`
 
@@ -15,19 +16,20 @@ repository, staged and unstaged diffs, and the referenced logs before editing.
 
 ## 0. Current handoff: this section supersedes all older execution state below
 
-The next `$repo-skills:prs` item is PR-7, `Add Rust Python Extensions And Node-API Addons`, from:
+The next `$repo-skills:prs` item is PR-8, `Implement Bidirectional Rust And C/C++ Bridges`, from:
 
 ```text
 plan:   build-tools/docs/rust-language-plan.md
 design: build-tools/docs/lang/rust-design.md
 repo:   /Users/kiltyj/Code/viberoots-site/viberoots
-PR-6 commit: feat(rust): add cross-root crate composition (detached; inspect HEAD for the SHA)
+PR-7 commit: feat(rust): add Python and Node extensions (detached; inspect HEAD for the SHA)
 ```
 
-PR-5 is complete in `55130076 feat(build): complete Rust remote readiness`. PR-6 implementation,
-risk-based validation, reviewer-fix loops, same-stage mature-language parity review, and final
-independent scope review are also complete in this handoff's
-`feat(rust): add cross-root crate composition` commit. No push is authorized.
+PR-5 is complete in `55130076 feat(build): complete Rust remote readiness`. PR-6 is complete in
+`225de617 feat(rust): add cross-root crate composition`. PR-7 implementation, risk-based
+validation, repeated independent reviewer-fix loops, same-stage Python/Node/C++ parity review, and
+terminal independent scope review are complete in this handoff's
+`feat(rust): add Python and Node extensions` commit. No push is authorized.
 
 PR-5's commit combines:
 
@@ -54,12 +56,80 @@ Use `repo-skills:prs` in turbo mode, with minimal-context independent agents:
 5. Commit through `repo-skills:cc` only after implementation review, validation, timing checks, and
    scope review are green. Never push without explicit user authorization.
 
-After PR-6 is committed, PRs 7-12 remain. Continue them in numeric order with a fresh isolated
+After PR-7 is committed, PRs 8-12 remain. Continue them in numeric order with a fresh isolated
 implementation agent and separate isolated reviewer/tester roles for each PR. Use risk-based
-focused suites for PRs 7-8 and 10-11 because PR-5 exercised a complete checkpoint and future
+focused suites for PR-8 and PRs 10-11 because PR-5 exercised a complete checkpoint and future
 checkpoint PRs will do so again. Run full checkpoints for PR-9 and PR-12, or earlier if a material
 cross-cutting change makes the focused evidence insufficient. Record elapsed timing and compare
 successful full checkpoints with the 10,684-second successful baseline.
+
+### PR-7 completion evidence
+
+PR-7 closes native Rust extension packaging for Python and Node at the capability level expected at
+this point in the plan:
+
+- `rust_python_extension` produces an importable CPython extension with selected ABI,
+  `EXT_SUFFIX`, stable module naming, translated exceptions, importer-scoped uv/uv2nix build
+  dependencies, producer-language-neutral Python overlay staging, and fail-closed unsupported
+  Pyodide/WASI analysis;
+- `rust_node_addon` produces a stable `.node` artifact for an explicitly selected Node-API 8, 9,
+  or 10 contract, with pinned headers, API floor/ceiling symbol auditing, a loader-visible version
+  getter bound to the declaration, and an independent `dlopen`/`dlsym` pre-install probe;
+- CLI, service, and webapp consumers stage addons and their recursively expanded dynamic
+  `runtime_deps`; services retain final artifact identity and Kubernetes deployment-blob
+  admission;
+- native Python and Node runtime fixtures call through Rust into a transitive C/C++ shared-library
+  closure, including relocated runtime paths that cannot fall back to a warm host store;
+- signed, credential-free cache evidence consumes the production materialization manifest, copies
+  the full closure through a private cache into an isolated local store, proves addon-only failure
+  without the adjacent runtime closure, and loads the complete cold copy without mutating the
+  shared host store;
+- one public `patch-pkg start/apply/remove` workflow changes both real Python and Node extension
+  outputs and restores exact output/session identity;
+- the combined update transaction snapshots before toolchain-authority repair and restores exact
+  bytes, modes, symlinks, absent files, GC roots, `projects/TARGETS`, and the complete generated
+  workspace toolchain tree after a later Go/Python/Rust/glue failure;
+- extension-only macro attributes fail closed outside their owning target kind and wrapper,
+  including the private Python lockfile forwarding path; and
+- multi-addon runtime staging retains byte-identical same-basename libraries and rejects differing
+  bytes using pinned `diffutils`, rather than overwriting by traversal order.
+
+The absolute final affected gate passed:
+
+```text
+requested shared tests:       8/8
+project enforcement:          5/5
+shared elapsed:               2m 40s
+enforcement elapsed:          17s
+outer elapsed:                210s
+failures:                     0
+authoritative log:
+  .viberoots/workspace/buck/agent-test-logs/
+  pr7-final-eight-canonical-lockfile-label-20260726-192837.log
+```
+
+Final gates also passed changed-file Prettier and ESLint, all changed Nix parses,
+`git diff --check`, source and SSR 250-line enforcement, Nix-gaps inventory, secret scan,
+process/temp cleanup, and empty staging. The final source fingerprint was stable across the last
+audits:
+
+```text
+9a27dfeb7093a0f8eb48719dd405dd46fc5d7d4add0d09aa282594c6c4a72bed
+```
+
+The terminal read-only reviewer passed the complete workspace-toolchain rollback, collision-safe
+runtime merge, and non-spoofable Python lockfile forwarding fixes. Earlier independent passes also
+confirmed parity with mature Python, Node, and C++ routes at PR-7 while excluding intentional
+PR-8–12 work. No PR-7 scope finding remains open.
+
+### Remaining PRs
+
+- PR-8: bidirectional Rust and C/C++ bridges.
+- PR-9: browser/TypeScript and `wasm-bindgen` bindings; next full checkpoint.
+- PR-10: component-model/WIT integration.
+- PR-11: release/developer lifecycle work and the cross-language Tauri scaffold.
+- PR-12: final multi-system hermetic graduation, publication, protected-builder, and independent
+  assessment evidence.
 
 ### PR-6 completion evidence
 

@@ -23,6 +23,13 @@ export interface Node {
   profile?: string;
   target?: string;
   local_patch_dirs?: string[];
+  module?: string;
+  build_py_deps?: string[];
+  runtime_deps?: string[];
+  addon_name?: string;
+  node_api_version?: number;
+  platform?: string;
+  python_abi?: string;
 }
 
 export interface Tuple {

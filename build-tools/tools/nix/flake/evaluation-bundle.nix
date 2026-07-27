@@ -15,6 +15,7 @@ let
   selection = readJson "selection.json";
   classification = readJson "classification.json";
   dependencies = readJson "dependency-inputs.json";
+  artifactNixRoot = dependencies.artifactNixRoot or "";
   languageOverrides = builtins.mapAttrs (_envName: overrides:
     builtins.mapAttrs (_key: relative: bundleRoot + "/${relative}") overrides
   ) (selection.languageOverrides or { });
@@ -22,9 +23,12 @@ in
 assert schema.schema == "viberoots.evaluation-bundle.v1";
 assert builtins.elem classification.classification [ "hermetic" "local-development" ];
 assert builtins.match "/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-[^/]+" dependencies.artifactToolsRoot != null;
+assert artifactNixRoot == ""
+  || builtins.match "/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-[^/]+" artifactNixRoot != null;
 {
   inherit bundleRoot classification dependencies languageOverrides selection;
   artifactToolsRoot = dependencies.artifactToolsRoot;
+  inherit artifactNixRoot;
   graphPath = bundleRoot + "/graph.json";
   repoRoot = repoRoot;
   rootModulesTomlPath =

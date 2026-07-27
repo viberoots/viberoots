@@ -46,6 +46,7 @@ def node_service_artifact(
         "deployable:app",
         "deployment-component:service",
         "artifact:node-service",
+        "runtime_contract:%s" % runtime_contract,
     ] + list(labels or [])
     lockfile_label = apply_default_lockfile_label(
         lockfile_label,

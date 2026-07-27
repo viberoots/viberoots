@@ -1,4 +1,4 @@
-{ pkgs, H, repoStoreRoot, repoFsRoot, sharedNodeMods, lockInfoOfName, targetNameOf, name }:
+{ pkgs, H, repoStoreRoot, repoFsRoot, sharedNodeMods, lockInfoOfName, targetNameOf, name, nativeAddons }:
 let
   info = lockInfoOfName name;
   importerDir = info.importer;
@@ -15,12 +15,13 @@ let
   nm = nodeMods.mkNodeModules { lockfilePath = info.lockfilePath; inherit importerDir; };
   entryRel = "src/index.ts";
   outBase = targetNameOf name;
+  addons = nativeAddons.forTarget name;
 in
   pkgs.stdenvNoCC.mkDerivation {
     pname = "node-cli-" + (sanitize name);
     version = sanitize importerDir;
     src = repoStoreRoot;
-    nativeBuildInputs = [ pkgs.esbuild pkgs.nodejs_22 ];
+    nativeBuildInputs = [ pkgs.esbuild pkgs.nodejs_22 ] ++ nativeAddons.packages addons;
     buildPhase = ''
       set -euo pipefail
       cd ${importerDir}
@@ -151,5 +152,6 @@ in
       set -euo pipefail
       mkdir -p $out/bin
       install -m0755 ${outBase} $out/bin/${outBase}
+      ${nativeAddons.stage addons "$out/bin/native"}
     '';
   }

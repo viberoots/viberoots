@@ -161,8 +161,17 @@ export async function materializeEvaluationBundle(
     const rootModulesTomlPath = files.some((file) => file.path === "gomod2nix.toml")
       ? "gomod2nix.toml"
       : "";
+    const artifactToolsRoot = String(artifactEnv.VBR_ARTIFACT_TOOLS_ROOT || "");
+    const artifactNixExecutable = await fsp.realpath(path.join(artifactToolsRoot, "bin/nix"));
+    const artifactNixRoot = path.dirname(path.dirname(artifactNixExecutable));
+    if (!artifactNixRoot.startsWith("/nix/store/")) {
+      throw new Error(
+        `evaluation bundle Nix authority is not in the Nix store: ${artifactNixRoot}`,
+      );
+    }
     const dependencies = {
-      artifactToolsRoot: String(artifactEnv.VBR_ARTIFACT_TOOLS_ROOT || ""),
+      artifactToolsRoot,
+      artifactNixRoot,
       inputs: dependencyInputs(files),
       rootModulesTomlPath,
     };

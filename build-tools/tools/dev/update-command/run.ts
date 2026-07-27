@@ -11,10 +11,12 @@ import { globalNixInputFingerprint } from "../global-nix-input-fingerprint";
 import { reconcilePnpmStore } from "../intentional-pnpm-store-reconcile";
 import { repairGoDependencies, repairPythonDependencies } from "./languages";
 import { repairRustDependencies } from "../install/cargo";
+import { withFileRollback } from "./file-transaction";
 import { updatePnpmLock } from "./pnpm";
 import { projectLanguageSurfaces, type ProjectLanguageId } from "./surfaces";
 import { repairArtifactToolchainAuthority } from "./toolchain";
 import type { RepairedArtifactToolchainAuthority } from "./toolchain";
+import { updateTransactionFiles } from "./transaction-files";
 
 type LanguageUpdate = (root: string, verbose: boolean, upgrade: boolean) => Promise<number>;
 
@@ -112,70 +114,72 @@ export async function runUpdateCommand(opts: {
 }): Promise<void> {
   const operations = opts.operations || defaultUpdateOperations;
   const priorGlobalInputs = await globalNixInputFingerprint(opts.root);
-  const repairedAuthority = await operations.repairToolchainAuthority(opts.root);
   const priorArtifactToolsRoot = process.env.VBR_ARTIFACT_TOOLS_ROOT;
   const priorPath = process.env.PATH;
-  process.env.VBR_ARTIFACT_TOOLS_ROOT = repairedAuthority.artifactToolsRoot;
-  process.env.PATH = [
-    path.dirname(repairedAuthority.goBin),
-    path.dirname(repairedAuthority.pythonBin),
-    path.join(repairedAuthority.artifactToolsRoot, "bin"),
-  ]
-    .filter((entry, index, entries) => entries.indexOf(entry) === index)
-    .join(path.delimiter);
   try {
-    operations.validateTransactionTools(process.env);
-    await operations.repairWorkspaceLock(
-      opts.root,
-      opts.verbose,
-      repairedAuthority.viberootsSource,
-    );
-    const importers = await operations.importers(opts.root);
-    let upgradedPnpm = 0;
-    for (const importer of importers) {
-      if (opts.verbose) console.log(`[update] pnpm: ${importer}`);
-      // The nested tool importer owns its committed lockfile. Workspace u only
-      // reconciles that lock into the workspace-local exact-store authority.
-      if (importer !== "viberoots") {
-        if (opts.upgrade) {
-          await operations.upgradePnpm(opts.root, importer);
-          upgradedPnpm += 1;
-        } else await operations.repairPnpmLock(opts.root, importer);
-      }
-      await operations.reconcilePnpm(opts.root, importer);
-    }
-    const enabledLanguages = new Set(await operations.enabledLanguages(opts.root));
-    const languageCounts = new Map<ProjectLanguageId, number>();
-    for (const surface of projectLanguageSurfaces) {
-      if (!enabledLanguages.has(surface.id)) continue;
-      languageCounts.set(
-        surface.id,
-        await operations.languageUpdates[surface.id](opts.root, opts.verbose, opts.upgrade),
+    await withFileRollback(await updateTransactionFiles(opts.root), async () => {
+      const repairedAuthority = await operations.repairToolchainAuthority(opts.root);
+      process.env.VBR_ARTIFACT_TOOLS_ROOT = repairedAuthority.artifactToolsRoot;
+      process.env.PATH = [
+        path.dirname(repairedAuthority.goBin),
+        path.dirname(repairedAuthority.pythonBin),
+        path.join(repairedAuthority.artifactToolsRoot, "bin"),
+      ]
+        .filter((entry, index, entries) => entries.indexOf(entry) === index)
+        .join(path.delimiter);
+      operations.validateTransactionTools(process.env);
+      await operations.repairWorkspaceLock(
+        opts.root,
+        opts.verbose,
+        repairedAuthority.viberootsSource,
       );
-    }
-    const priorSkipPnpmHash = process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
-    process.env.INSTALL_GLUE_SKIP_PNPM_HASH = "1";
-    try {
-      await operations.repairGeneratedMetadata(opts.root, opts.verbose, priorGlobalInputs);
-    } finally {
-      if (priorSkipPnpmHash === undefined) delete process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
-      else process.env.INSTALL_GLUE_SKIP_PNPM_HASH = priorSkipPnpmHash;
-    }
-    if (opts.upgrade) {
-      console.log(`[update] pnpm: upgraded ${upgradedPnpm} importer(s)`);
+      const importers = await operations.importers(opts.root);
+      let upgradedPnpm = 0;
+      for (const importer of importers) {
+        if (opts.verbose) console.log(`[update] pnpm: ${importer}`);
+        // The nested tool importer owns its committed lockfile. Workspace u only
+        // reconciles that lock into the workspace-local exact-store authority.
+        if (importer !== "viberoots") {
+          if (opts.upgrade) {
+            await operations.upgradePnpm(opts.root, importer);
+            upgradedPnpm += 1;
+          } else await operations.repairPnpmLock(opts.root, importer);
+        }
+        await operations.reconcilePnpm(opts.root, importer);
+      }
+      const enabledLanguages = new Set(await operations.enabledLanguages(opts.root));
+      const languageCounts = new Map<ProjectLanguageId, number>();
       for (const surface of projectLanguageSurfaces) {
         if (!enabledLanguages.has(surface.id)) continue;
-        if (surface.upgradePolicy === "reconcile-only") {
-          console.log(
-            `[update] ${surface.displayName}: reconciliation-only (no upgradeable dependency authority)`,
-          );
-        } else {
-          console.log(
-            `[update] ${surface.displayName}: upgraded ${languageCounts.get(surface.id) || 0} ${surface.countNoun}(s)`,
-          );
+        languageCounts.set(
+          surface.id,
+          await operations.languageUpdates[surface.id](opts.root, opts.verbose, opts.upgrade),
+        );
+      }
+      const priorSkipPnpmHash = process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
+      process.env.INSTALL_GLUE_SKIP_PNPM_HASH = "1";
+      try {
+        await operations.repairGeneratedMetadata(opts.root, opts.verbose, priorGlobalInputs);
+      } finally {
+        if (priorSkipPnpmHash === undefined) delete process.env.INSTALL_GLUE_SKIP_PNPM_HASH;
+        else process.env.INSTALL_GLUE_SKIP_PNPM_HASH = priorSkipPnpmHash;
+      }
+      if (opts.upgrade) {
+        console.log(`[update] pnpm: upgraded ${upgradedPnpm} importer(s)`);
+        for (const surface of projectLanguageSurfaces) {
+          if (!enabledLanguages.has(surface.id)) continue;
+          if (surface.upgradePolicy === "reconcile-only") {
+            console.log(
+              `[update] ${surface.displayName}: reconciliation-only (no upgradeable dependency authority)`,
+            );
+          } else {
+            console.log(
+              `[update] ${surface.displayName}: upgraded ${languageCounts.get(surface.id) || 0} ${surface.countNoun}(s)`,
+            );
+          }
         }
       }
-    }
+    });
   } finally {
     if (priorPath === undefined) delete process.env.PATH;
     else process.env.PATH = priorPath;

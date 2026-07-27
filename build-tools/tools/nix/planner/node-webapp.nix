@@ -9,6 +9,7 @@
 , labelsOf
 , name
 , frameworkMissingError
+, nativeAddons
 }:
 let
   zx-wrapper = import ../lib/zx-wrapper.nix { inherit pkgs; };
@@ -16,6 +17,7 @@ let
   importerDir = info.importer;
   n = nodeOfName name;
   labs = if n == null then [] else labelsOf n;
+  addons = nativeAddons.forTarget name;
   hasSsr = builtins.elem "webapp:ssr" labs;
   framework =
     if builtins.elem "framework:next" labs then "next"
@@ -45,7 +47,7 @@ in
     pname = "node-webapp-" + (sanitize name);
     version = sanitize importerDir;
     src = repoStoreRoot;
-    nativeBuildInputs = [ pkgs.nodejs_22 zx-wrapper ];
+    nativeBuildInputs = [ pkgs.nodejs_22 zx-wrapper ] ++ nativeAddons.packages addons;
     buildPhase = ''
       set -euo pipefail
       REPO_ROOT="$PWD"
@@ -193,6 +195,7 @@ EOF
       set -euo pipefail
       mkdir -p "$out"
       cp -R dist "$out/dist"
+      ${nativeAddons.stage addons "$out/dist/native"}
       WEBAPP_FRAMEWORK="$(cat .viberoots-webapp-framework 2>/dev/null || printf static)"
       if [ "$WEBAPP_FRAMEWORK" != "static" ]; then
         ln -s "${nm}/node_modules" "$out/node_modules"

@@ -35,8 +35,11 @@ def validate_local_patch_dirs(value):
 
 def rust_macro_name(kind):
     names = {
+        "addon": "rust_node_addon",
         "bin": "rust_binary",
         "lib": "rust_library",
+        "pyext": "rust_python_extension",
+        "pyext_wasm": "rust_python_wasm_extension",
         "test": "rust_test",
         "wasm": "rust_wasm_library",
         "wasi": "rust_wasi_binary",
@@ -46,7 +49,7 @@ def rust_macro_name(kind):
     return names[kind]
 
 def crate_type_for(kind, value):
-    expected = "bin" if kind in ["bin", "wasi"] else "cdylib" if kind == "wasm" else "test" if kind == "test" else None
+    expected = "bin" if kind in ["bin", "wasi"] else "cdylib" if kind in ["addon", "pyext", "pyext_wasm", "wasm"] else "test" if kind == "test" else None
     crate_type = value or expected or "rlib"
     allowed = ["bin", "rlib", "staticlib", "cdylib", "proc-macro", "test"]
     if crate_type not in allowed:
@@ -114,6 +117,7 @@ def has_nixpkg_inputs(kwargs):
     return False
 
 __all__ = [
+    "RUST_PUBLIC_ARGS",
     "artifact_out",
     "crate_type_for",
     "fixed_artifact_contract",
@@ -125,4 +129,45 @@ __all__ = [
     "validate_local_patch_dirs",
     "validate_public_crate",
     "with_required_target",
+]
+RUST_PUBLIC_ARGS = [
+    "addon_name",
+    "artifact_contract",
+    "build_py_deps",
+    "cargo_fixed_sources",
+    "cargo_lock",
+    "cargo_manifest",
+    "cargo_output_hashes",
+    "cargo_package",
+    "crate",
+    "crate_type",
+    "default_features",
+    "features",
+    "generated_outputs",
+    "header_deps",
+    "host_role",
+    "labels",
+    "link_closure",
+    "link_closure_overrides",
+    "link_deps",
+    "local_patch_dirs",
+    "materialization_manifest",
+    "module",
+    "nixpkg_deps",
+    "nixpkg_pins",
+    "nixpkgs_profile",
+    "node_api_version",
+    "platform",
+    "profile",
+    "python_abi",
+    "public_crate",
+    "remote_builder_smoke",
+    "runtime_deps",
+    "source_snapshot",
+    "source_snapshot_bundle",
+    "source_snapshot_manifest",
+    "srcs",
+    "target",
+    "tool_closure",
+    "visibility",
 ]

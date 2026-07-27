@@ -34,15 +34,21 @@ test("rust macros export native build, test, and source-selection contracts", as
       path.join(appDir, "Cargo.lock"),
       'version = 3\n\n[[package]]\nname = "rustapp"\nversion = "0.1.0"\n',
     );
+    await fs.writeFile(path.join(appDir, "uv.lock"), "version = 1\n");
     await fs.mkdirp(path.join(appDir, "patches", "rust"));
     await fs.writeFile(
       path.join(appDir, "patches", "rust", "demo.patch"),
       "diff --git a/src/lib.rs b/src/lib.rs\n",
     );
+    await fs.mkdirp(path.join(appDir, "patches", "python"));
+    await fs.writeFile(
+      path.join(appDir, "patches", "python", "build-dep.patch"),
+      "fixture python patch input\n",
+    );
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_cdylib", "rust_library", "rust_proc_macro", "rust_static_library", "rust_test", "rust_wasi_binary", "rust_wasm_library")',
+        'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_cdylib", "rust_library", "rust_node_addon", "rust_proc_macro", "rust_python_extension", "rust_static_library", "rust_test", "rust_wasi_binary", "rust_wasm_library")',
         "",
         'rust_library(name = "lib", crate = "rustapp", cargo_output_hashes = {"remote-1.0.0": "sha256-fixture"}, cargo_fixed_sources = {"remote@1.0.0#registry+https://registry.example/index": "{\\"source\\":\\"registry+https://registry.example/index\\"}"}, features = ["demo"], default_features = False, nixpkg_deps = ["pkgs.zlib"], nixpkgs_profile = "default", nixpkg_pins = {"pkgs.zlib": {"nixpkgs_profile": "default", "rationale": "fixture"}}, srcs = ["src/lib.rs"])',
         'rust_binary(name = "app", crate = "rustapp", srcs = ["src/main.rs"], deps = [":lib"])',
@@ -52,6 +58,8 @@ test("rust macros export native build, test, and source-selection contracts", as
         'rust_static_library(name = "static", crate = "rustapp", public_crate = "rust_public", srcs = ["src/lib.rs"])',
         'rust_cdylib(name = "dynamic", crate = "rustapp", srcs = ["src/lib.rs"])',
         'rust_proc_macro(name = "derive_demo", crate = "rustapp", generated_outputs = ["generated.rs"], srcs = ["src/lib.rs"])',
+        'rust_python_extension(name = "pyext", module = "demo._native", crate = "rustapp", build_py_deps = ["setuptools"], lockfile_label = "lockfile:projects/apps/rustapp/uv.lock#projects/apps/rustapp", srcs = ["src/lib.rs"])',
+        'rust_node_addon(name = "addon", addon_name = "demo_native", node_api_version = 8, crate = "rustapp", srcs = ["src/lib.rs"])',
         "",
       ].join("\n"),
       "utf8",
@@ -88,11 +96,28 @@ test("rust macros export native build, test, and source-selection contracts", as
       buck2 cquery --target-platforms //:no_cgo "kind(rust_nix_test, //projects/apps/rustapp:test)"
     `;
     assert.match(String(testProbe.stdout || ""), /rustapp:test/);
-    for (const name of ["raw", "wasi"]) {
+    for (const name of ["raw", "wasi", "pyext", "addon"]) {
       const wasmProbe = await $({ cwd: tmp, stdio: "pipe" })`
         buck2 cquery --target-platforms //:no_cgo "kind(rust_nix_build, //projects/apps/rustapp:${name})"
       `;
       assert.match(String(wasmProbe.stdout || ""), new RegExp(`rustapp:${name}`));
+    }
+
+    const extensionFields = await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`buck2 cquery --target-platforms //:no_cgo --json --output-attribute module --output-attribute python_abi --output-attribute build_py_deps --output-attribute addon_name --output-attribute node_api_version --output-attribute platform --output-attribute labels "set(//projects/apps/rustapp:pyext //projects/apps/rustapp:addon)"`;
+    const extensionContract = String(extensionFields.stdout);
+    for (const expected of [
+      "demo._native",
+      "selected",
+      "setuptools",
+      "demo_native",
+      "kind:pyext",
+      "kind:addon",
+      "lockfile:projects/apps/rustapp/uv.lock#projects/apps/rustapp",
+    ]) {
+      assert.ok(extensionContract.includes(expected), `missing extension field ${expected}`);
     }
 
     const crossCellExample = await $({ cwd: tmp, stdio: "pipe" })`
@@ -159,6 +184,67 @@ test("rust macros export native build, test, and source-selection contracts", as
       "host",
     ]) {
       assert.match(artifactJson, new RegExp(expected));
+    }
+    const invalidDir = path.join(tmp, "projects", "apps", "invalid-addon");
+    await fs.mkdirp(path.join(invalidDir, "src"));
+    await fs.writeFile(path.join(invalidDir, "Cargo.toml"), '[package]\nname="invalid"\n');
+    await fs.writeFile(
+      path.join(invalidDir, "Cargo.lock"),
+      'version = 3\n\n[[package]]\nname = "invalid"\nversion = "0.1.0"\n',
+    );
+    await fs.writeFile(path.join(invalidDir, "src/lib.rs"), "");
+    for (const [declaration, expected] of [
+      [
+        'rust_node_addon(name="addon", addon_name="../escape", crate="invalid")',
+        "addon_name must match",
+      ],
+      [
+        'rust_node_addon(name="addon", addon_name="valid", node_api_version=999, crate="invalid")',
+        "node_api_version must be one of",
+      ],
+      [
+        'rust_binary(name="addon", crate="invalid", node_api_version=8)',
+        "node_api_version is only supported by rust_node_addon",
+      ],
+      [
+        'rust_node_addon(name="addon", crate="invalid", module="demo._native")',
+        "module is only supported by rust_python_extension",
+      ],
+      [
+        'rust_node_addon(name="addon", crate="invalid", build_py_deps=["setuptools"])',
+        "build_py_deps is only supported by rust_python_extension",
+      ],
+      [
+        'rust_python_extension(name="addon", module="demo._native", crate="invalid", addon_name="native")',
+        "addon_name is only supported by rust_node_addon",
+      ],
+      [
+        'rust_python_extension(name="addon", module="demo._native", crate="invalid", platform="selected")',
+        "platform is only supported by rust_node_addon",
+      ],
+      [
+        'rust_binary(name="addon", crate="invalid", python_lockfile_label="//projects/apps/invalid-addon:uv.lock")',
+        "unknown arguments: python_lockfile_label",
+      ],
+      [
+        'rust_python_extension(name="addon", module="demo._native", crate="invalid", python_lockfile_label="//projects/apps/invalid-addon:uv.lock")',
+        "unknown arguments: python_lockfile_label",
+      ],
+    ]) {
+      await fs.writeFile(
+        path.join(invalidDir, "TARGETS"),
+        `load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_node_addon", "rust_python_extension")\n${declaration}\n`,
+      );
+      const rejected = await $({
+        cwd: tmp,
+        stdio: "pipe",
+        nothrow: true,
+      })`buck2 cquery --target-platforms //:no_cgo //projects/apps/invalid-addon:addon`;
+      assert.notEqual(rejected.exitCode, 0);
+      assert.match(
+        `${String(rejected.stdout || "")}\n${String(rejected.stderr || "")}`,
+        new RegExp(expected),
+      );
     }
   });
 });

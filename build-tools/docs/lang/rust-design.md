@@ -7,7 +7,7 @@ is [`../rust-language-plan.md`](../rust-language-plan.md).
 ## Current Lifecycle
 
 The current Rust route compiles composed Cargo libraries, binaries, tests, freestanding WASM,
-and WASI binaries from checked-in manifests and locks. It provides the lifecycle through PR-6, but
+and WASI binaries from checked-in manifests and locks. It provides the lifecycle through PR-7, but
 is not yet the complete
 first-class Rust lifecycle.
 
@@ -262,6 +262,39 @@ The shared editor launch is bounded by `PATCH_EDITOR_TIMEOUT_SECS`, defaulting t
 Timeout and signal cleanup clear Rust override/session state while retaining an interrupted
 workspace unless the operator chose reset.
 
+## Managed Runtime Extensions
+
+`rust_python_extension` builds a Cargo `cdylib` and stages it at
+`site/<dotted-module><EXT_SUFFIX>`, where `EXT_SUFFIX` comes from the selected Nix CPython runtime.
+Python applications, libraries, and tests consume this through the shared `kind:pyext` overlay
+contract, so staging does not branch on the producer language. `build_py_deps` resolves only from
+the target's importer-scoped `uv.lock` through the same uv2nix wheelhouse authority used by native
+Python extensions. The lock label, Python patch inputs, and provider edges are declared inputs.
+Runtime and native link dependencies remain explicit graph inputs.
+
+`rust_node_addon` builds a Cargo `cdylib`, accepts Node-API 8, 9, or 10, compiles against the
+selected version's pinned Node headers, requires the version-specific API floor, rejects every
+higher-version pinned API symbol, and requires the loader-visible API-version export. The selected
+Node 22 runtime then load-probes the installed artifact. The macro also validates the selected
+platform identity and exposes a stable
+`<addon_name>.node`. Addon names match `[A-Za-z_][A-Za-z0-9_-]*`; staging rejects duplicate names
+instead of overwriting an earlier artifact. The Node planner collects transitive
+`kind:addon` dependencies through `dependencyArtifactOf`, using the same route for Rust and C++.
+Bundled CLIs stage under `bin/native`, services under `native`, and webapps under `dist/native`.
+Cargo metadata remains the source authority; napi-rs and PyO3-compatible Cargo projects use their
+checked-in locks and reviewed fixed-source manifests.
+
+Each extension output includes its production Nix-store materialization manifest. Recursive
+`runtime_deps` graph packages and their transitive dynamic-library references are copied beside the
+extension and rewritten to output-relative loader paths. Python overlays and Node CLI, service,
+webapp, and deployment staging carry that directory with the extension, and service identity is
+calculated only after addons enter the deployable tree.
+
+The pinned Rust/Python toolchains do not currently provide an importable Pyodide or WASI dynamic
+extension ABI. `rust_python_wasm_extension` therefore fails at analysis with an actionable
+diagnostic. It does not emit a raw-WASM placeholder. Browser packages and broader generated binding
+contracts remain later-PR scope.
+
 ## Native Linking And C Interop
 
 Rust supports C interop through explicit `link_deps` and `header_deps`. Ordinary `deps` remain graph
@@ -331,6 +364,6 @@ Rust is first-class only when all of the following are demonstrated:
 - Scaffolding, macro inventory, route policy, planner registry, docs, and verify selection remain in
   sync.
 
-PR-6 closes source-based cross-root composition, explicit native crate kinds, and host proc-macro
-roles. Current references
+PR-7 adds native Python and Node managed-runtime extension contracts and explicitly rejects the
+currently unavailable Python WASM ABI. Current references
 must still call Rust experimental rather than a complete first-class or release-hermetic toolchain.

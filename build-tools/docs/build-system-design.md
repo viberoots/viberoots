@@ -103,12 +103,16 @@ to watch the importer worktree rather than an evaluation bundle.
   `nixpkgs_profile` selects the toolchain and ordinary `nixpkg_deps`; `nixpkg_pins` redirects only
   declared native dependency attrs. Rust tests execute compiled Cargo harnesses through Buck's
   bounded project-relative external runner, and only Rust binaries enter `run.prod` manifests.
-- Rust is an enabled **experimental** language at the PR-6 checkpoint. The reviewed baseline adds
+- Rust is an enabled **experimental** language at the PR-7 checkpoint. The reviewed baseline adds
   direct/transitive C link intent, freestanding WebAssembly, a repository-owned WASI runner,
   scaffolded CLI projects, declared remote-ready evidence, source-based cross-root crates, and
-  explicit `rlib`, `staticlib`, `cdylib`, and host proc-macro outcomes. Broader ABI bridges,
-  browser/component packaging, release publication, and three-system execution conformance remain
-  planned in PR-7 through PR-12.
+  explicit `rlib`, `staticlib`, `cdylib`, host proc-macro, native CPython-extension, and Node-API
+  addon outcomes. CPython build dependencies use importer-scoped uv2nix wheelhouses; Node addons
+  enforce the selected managed runtime's Node-API contract and collision-free stable names.
+  Extension outputs publish Nix-store materialization evidence. Python WASM extensions fail closed
+  until the pinned toolchains provide an
+  importable ABI. Broader ABI bridges, browser/component packaging, release publication, and
+  three-system execution conformance remain planned in PR-8 through PR-12.
 - Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.
 - Planner-visible probes/stubs are allowed only when explicitly documented as non-build exceptions.
 - Patching third-party modules is **ergonomic**, **idempotent**, and **cache-friendly**.
@@ -130,7 +134,7 @@ Use these docs as the source of truth for migration scope and completion:
 Current status in those docs:
 
 - The original Nix-route migration phases are complete. Rust's first-class rollout is separately
-  tracked: PR-1 through PR-6 establish the experimental baseline, while PR-7 through PR-12 remain
+  tracked: PR-1 through PR-7 establish the experimental baseline, while PR-8 through PR-12 remain
   required before first-class/release-hermetic status.
 - `docs/handbook/nix-gaps.md` has no remaining artifact-producing non-Nix routes.
 - `docs/handbook/nix-gaps-exceptions.json` allows only explicit probe-only exceptions and currently has no artifact-route allowlist entries.

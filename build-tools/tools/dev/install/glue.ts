@@ -100,8 +100,8 @@ async function ensureAutoMapStubIfMissing() {
   );
 }
 
-async function ensureWorkspaceGlobalNixInputTargets(reconcile: boolean) {
-  const wsRoot = await workspaceRoot();
+async function ensureWorkspaceGlobalNixInputTargets(reconcile: boolean, explicitRoot?: string) {
+  const wsRoot = explicitRoot ? path.resolve(explicitRoot) : await workspaceRoot();
   const workspaceDir = path.join(wsRoot, ".viberoots", "workspace");
   const extensionPath = path.join(workspaceDir, "nixpkgs-source-registry-extension.nix");
   if (reconcile && !(await fsp.stat(extensionPath).catch(() => null))) {
@@ -144,9 +144,10 @@ async function ensureWorkspaceGlobalNixInputTargets(reconcile: boolean) {
 
 export async function reconcileWorkspaceGlobalNixInputTargets(
   priorGlobalInputs = "",
+  explicitRoot?: string,
 ): Promise<void> {
-  const wsRoot = await workspaceRoot();
-  await ensureWorkspaceGlobalNixInputTargets(true);
+  const wsRoot = explicitRoot ? path.resolve(explicitRoot) : await workspaceRoot();
+  await ensureWorkspaceGlobalNixInputTargets(true, wsRoot);
   const globalInputsAfter = await globalNixInputFingerprint(wsRoot);
   if (priorGlobalInputs !== "" && globalInputsAfter !== priorGlobalInputs) {
     await handoffChangedGlobalInputConsumers(wsRoot);

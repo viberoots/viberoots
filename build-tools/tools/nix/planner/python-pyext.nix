@@ -64,7 +64,7 @@ let
   mkApp = name:
     let
       pyExtDeps = collectPyExtDepsTransitive name;
-      overlays = map mkPyExt pyExtDeps;
+      overlays = map ctx.dependencyArtifactOf pyExtDeps;
     in T.pyApp {
       inherit name;
       lockfile = lockRelFor name;
@@ -76,7 +76,7 @@ let
   mkLib = name:
     let
       pyExtDeps = collectPyExtDepsTransitive name;
-      overlays = map mkPyExt pyExtDeps;
+      overlays = map ctx.dependencyArtifactOf pyExtDeps;
     in T.pyLib {
       inherit name;
       lockfile = lockRelFor name;
@@ -88,7 +88,7 @@ let
   mkTest = name:
     let
       pyExtDeps = collectPyExtDepsTransitive name;
-      overlays = map mkPyExt pyExtDeps;
+      overlays = map ctx.dependencyArtifactOf pyExtDeps;
     in T.pyTest {
       inherit name;
       lockfile = lockRelFor name;

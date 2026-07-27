@@ -1,4 +1,4 @@
-{ pkgs, H, repoStoreRoot, artifactToolsRoot, declaredArtifactToolsRoot, artifactToolsInput, evaluationGraphPath, dependencyArtifactOf, lockInfoOfName, nodeOfName, get, srcsOf, targetNameOf }:
+{ pkgs, H, repoStoreRoot, artifactToolsRoot, declaredArtifactToolsRoot, artifactToolsInput, evaluationGraphPath, dependencyArtifactOf, lockInfoOfName, nodeOfName, get, srcsOf, targetNameOf, nativeAddons }:
 { name, kind }:
 let
   pnpm11 = import ../pnpm-11.nix { inherit pkgs; };
@@ -54,6 +54,7 @@ let
   ) srcs;
   srcsEscaped = pkgs.lib.escapeShellArg (pkgs.lib.concatStringsSep " " resolvedSrcs);
   kindBin = kind == "bin";
+  addons = nativeAddons.forTarget name;
   sanitize = H.sanitizeName;
 in
   if cmd == "" then builtins.throw "node planner: missing genrule cmd for ${name}"
@@ -64,6 +65,7 @@ in
     nativeBuildInputs =
       [ pkgs.bash pkgs.coreutils pkgs.nodejs_22 pnpm11 ]
       ++ artifactToolsInputs
+      ++ nativeAddons.packages addons
       ++ map (source: source.artifact) targetArtifacts;
     buildPhase = ''
       set -euo pipefail
@@ -102,5 +104,6 @@ in
         cp "$out/$outRel" "$out/bin/$base"
         chmod +x "$out/bin/$base" || true
       '' else ""}
+      ${nativeAddons.stage addons "$out/native"}
     '';
   })

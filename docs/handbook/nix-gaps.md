@@ -87,6 +87,9 @@ Notes on Nix-backed Python outputs:
 - `rust_test` → Nix build (`rust_nix_test` → compiled Cargo harnesses and bounded runner).
 - `rust_wasm_library` → Nix build (`rust_nix_build` → locked `wasm32-unknown-unknown` Cargo).
 - `rust_wasi_binary` → Nix build (`rust_nix_build` → locked `wasm32-wasip1` Cargo).
+- `rust_python_extension` → Nix build (`rust_nix_build` → selected CPython extension site).
+- `rust_python_wasm_extension` → Nix build (`rust_nix_build` reserved fail-closed route).
+- `rust_node_addon` → Nix build (`rust_nix_build` → stable Node-API `.node` artifact).
 
 All routes require canonical package-local `Cargo.toml` and `Cargo.lock` files, use Nix-store Rust
 tools, and reject placeholder output, stale locks, unsupported dependency sources, and cross-root

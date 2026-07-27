@@ -33,4 +33,42 @@
     then builtins.throw
       "Rust template publicCrate must match [A-Za-z_][A-Za-z0-9_]*"
     else publicCrate;
+
+  validateExtension = {
+    kind,
+    module,
+    buildPyDeps,
+    addonName,
+    nodeApiVersion,
+    platform,
+    pythonAbi,
+    selectedPythonAbi,
+    selectedNodeApiVersion,
+    system,
+  }:
+    if kind == "pyext_wasm" then builtins.throw
+      "Rust Python WASM extensions are unavailable: the pinned toolchains do not provide an importable Pyodide or WASI dynamic-extension ABI"
+    else if kind == "pyext"
+      && (module == "" || builtins.match
+        "[A-Za-z_][A-Za-z0-9_]*([.][A-Za-z_][A-Za-z0-9_]*)*" module == null)
+    then builtins.throw "Rust Python extension module must be a dotted Python identifier"
+    else if kind == "pyext" && pythonAbi != "selected" && pythonAbi != selectedPythonAbi
+    then builtins.throw
+      "Rust Python extension ABI ${pythonAbi} does not match selected ${selectedPythonAbi}"
+    else if !(builtins.isList buildPyDeps && builtins.all builtins.isString buildPyDeps)
+    then builtins.throw "Rust Python extension buildPyDeps must be a list of package names"
+    else if kind == "addon"
+      && builtins.match "[A-Za-z_][A-Za-z0-9_-]*" addonName == null
+    then builtins.throw
+      "Rust Node-API addon name must match [A-Za-z_][A-Za-z0-9_-]*"
+    else if kind == "addon"
+      && !(builtins.elem nodeApiVersion [ 8 9 10 ])
+    then builtins.throw
+      "Rust Node-API addon version ${builtins.toString nodeApiVersion} is unsupported by the selected Node toolchain (maximum ${builtins.toString selectedNodeApiVersion})"
+    else if kind == "addon" && nodeApiVersion > selectedNodeApiVersion
+    then builtins.throw
+      "Rust Node-API addon version ${builtins.toString nodeApiVersion} exceeds selected Node-API ${builtins.toString selectedNodeApiVersion}"
+    else if kind == "addon" && platform != "selected" && platform != system
+    then builtins.throw "Rust Node-API addon platform ${platform} does not match selected ${system}"
+    else true;
 }

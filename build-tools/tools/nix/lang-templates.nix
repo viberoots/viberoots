@@ -6,11 +6,16 @@ let
   Node = import ./templates/node.nix { inherit pkgs; };
   Rust = import ./templates/rust.nix { inherit pkgs; };
   rustForPkgs = profilePkgs: import ./templates/rust.nix { pkgs = profilePkgs; };
+  pythonForPkgs = profilePkgs:
+    if uv2nixLib != null then import ./templates/python.nix {
+      pkgs = profilePkgs;
+      inherit uv2nixLib;
+    } else null;
   # Lazily import Python templates only when uv2nixLib is available.
   Python = if uv2nixLib != null then import ./templates/python.nix { inherit pkgs uv2nixLib; } else null;
   PythonWasm = if uv2nixLib != null then import ./templates/python/wasm.nix { inherit pkgs uv2nixLib; } else null;
 in {
-  inherit cppForPkgs rustForPkgs;
+  inherit cppForPkgs rustForPkgs pythonForPkgs;
   inherit (Go)  goApp goLib goTest goCArchive goTinyWasmLib;
   inherit (Cpp) cppApp cppHeaders cppLib cppSharedLib cppTest cppNodeAddon cppWasmStaticLib cppWasmEmscriptenLib;
   inherit (Rust) rustPackage;

@@ -79,6 +79,15 @@ def _rust_nix_build_impl(ctx):
         + "  if [ ! -f \"$LIB\" ]; then echo \"rust_nix_build (%s): expected compiled $CRATE_TYPE not found\" >&2; exit 2; fi; " % raw
         + "  cp -f \"$LIB\" \"$0\"; exit 0; "
         + "fi; "
+        + "if [ \"%s\" = \"pyext\" ]; then " % kind
+        + "  if [ ! -d \"$outPath/site\" ]; then echo \"rust_nix_build (%s): expected Python extension site directory not found\" >&2; exit 2; fi; " % raw
+        + "  echo rust_python_extension > \"$0\"; exit 0; "
+        + "fi; "
+        + "if [ \"%s\" = \"addon\" ]; then " % kind
+        + ("  ADDON=\"$outPath/lib/%s.node\"; " % ctx.attrs.addon_name)
+        + "  if [ ! -f \"$ADDON\" ]; then echo \"rust_nix_build (%s): expected Node-API addon not found\" >&2; exit 2; fi; " % raw
+        + "  cp -f \"$ADDON\" \"$0\"; exit 0; "
+        + "fi; "
         + "if [ \"%s\" = \"wasm\" ] || [ \"%s\" = \"wasi\" ]; then " % (kind, kind)
         + ("  WASM=\"$outPath/lib/%s.wasm\"; " % ctx.attrs.crate)
         + "  if [ ! -f \"$WASM\" ]; then echo \"rust_nix_build (%s): expected WebAssembly module not found\" >&2; exit 2; fi; " % raw
@@ -130,7 +139,7 @@ def _rust_nix_build_impl(ctx):
         mode = "remote-ready" if remote_requested else "local-only",
         evidence = evidence,
     )
-    runtime_outputs = native_runtime_outputs(ctx.attrs.link_deps + ctx.attrs.header_deps)
+    runtime_outputs = native_runtime_outputs(ctx.attrs.link_deps + ctx.attrs.header_deps + ctx.attrs.runtime_deps)
     providers = [
         DefaultInfo(default_output = out, other_outputs = runtime_outputs),
         rust_crate_info(ctx),
@@ -147,11 +156,12 @@ def _rust_nix_build_impl(ctx):
 _ATTRS = {
         "self_label": attrs.string(),
         "planner_label": attrs.option(attrs.string(), default = None),
-        "kind": attrs.string(),  # "bin" | "lib" | "wasm" | "wasi"
+        "kind": attrs.string(),  # "bin" | "lib" | "pyext" | "addon" | "wasm" | "wasi"
         "out": attrs.string(),
         "deps": attrs.list(attrs.dep(), default = []),
         "link_deps": attrs.list(attrs.dep(), default = []),
         "header_deps": attrs.list(attrs.dep(), default = []),
+        "runtime_deps": attrs.list(attrs.dep(), default = []),
         "link_closure": attrs.string(default = "direct"),
         "link_closure_overrides": attrs.dict(key = attrs.label(), value = attrs.string(), default = {}),
         "srcs": attrs.list(attrs.source(), default = []),
@@ -165,6 +175,12 @@ _ATTRS = {
         "default_features": attrs.bool(default = True),
         "profile": attrs.string(default = "release"),
         "target": attrs.string(default = ""),
+        "module": attrs.string(default = ""),
+        "build_py_deps": attrs.list(attrs.string(), default = []),
+        "addon_name": attrs.string(default = ""),
+        "node_api_version": attrs.int(default = 0),
+        "platform": attrs.string(default = ""),
+        "python_abi": attrs.string(default = ""),
         "source_snapshot": attrs.option(attrs.source(), default = None),
         "source_snapshot_bundle": attrs.option(attrs.dep(providers = [SourceSnapshotInfo]), default = None),
         "source_snapshot_manifest": attrs.option(attrs.source(), default = None),
