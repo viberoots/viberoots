@@ -40,7 +40,7 @@ let
   nodeOfName = nm: if builtins.hasAttr nm byName then byName.${nm} else null;
 
   Helpers = import ./cpp-helpers.nix {
-    inherit lib get cleanLabel ensureStringList nodeOfName kindOf labelsOf hasLangCpp;
+    inherit ctx lib get cleanLabel ensureStringList nodeOfName kindOf labelsOf hasLangCpp;
     dedupePreserveOrder = L.dedupePreserveOrder;
     normSrcsOf = normSrcsOf;
     pkgPathOf = pkgPathOf;
@@ -93,9 +93,13 @@ let
           let package = ctx.dependencyArtifactOf dep;
           in [ package ] ++ runtimePackages package)
         (Deps.resolveRepoCppLibDepsFor name);
-    repoCppHeaderPkgsFor = name: builtins.map mkHeaders (Deps.resolveRepoCppHeaderDepsFor name);
+    repoCppHeaderPkgsFor = name: builtins.map
+      (info: if info.kind == "artifact"
+        then ctx.dependencyArtifactOf info.name
+        else mkHeaders info.name)
+      (Deps.resolveRepoCppHeaderDepsFor name);
     Targets = import ./cpp-targets.nix {
-      inherit lib T byName labelsOf linkModeOf pkgPathOf repoRoot normSrcsOf patchInputsFor;
+      inherit lib get T byName labelsOf linkModeOf pkgPathOf repoRoot normSrcsOf patchInputsFor;
       inherit collectNixAttrsFor nixAttrsFromSelf repoCppHeaderPkgsFor repoCppLibPkgsFor;
       inherit repoGoCArchivesFor providerAttrsFallback;
       inherit (ctx) resolveNixpkgAttrs sourcePlanFor;

@@ -136,6 +136,14 @@ I separate “graph dependency” from “link intent”.
 
 This keeps the planner as the only place where “how do I translate Buck deps into Nix inputs” lives.
 
+Reviewed Rust bridge targets participate through this same route. C++ `link_deps` and
+`header_deps` accept only Rust libraries stamped `rust-interop:c` or `rust-interop:cxx`; ordinary
+Rust static libraries are not inferred as ABI-safe. `dependencyArtifactOf` supplies the generated
+headers, static/shared library, and Rust runtime closure from one source-profile-selected
+derivation. Planner validation compares the declared native/Rust module surface, selected source
+profile and pins, pinned LLVM identity, target triple, C11 or C++17 standard, and STL choice in
+both dependency directions.
+
 ## User-facing API (Starlark macros)
 
 ### Default behavior

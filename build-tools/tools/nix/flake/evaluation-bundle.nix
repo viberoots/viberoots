@@ -4,7 +4,10 @@ let
   bundleRootString = builtins.dirOf repoRootString;
   canonicalBundleCandidate =
     builtins.baseNameOf repoRootString == "source"
-    && builtins.match "/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-source" bundleRootString != null;
+    && (
+      builtins.match "/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-source" bundleRootString != null
+      || builtins.match "/nix/store/[0-9abcdfghijklmnpqrsvwxyz]{32}-viberoots-evaluation-bundle" bundleRootString != null
+    );
   schemaPathString = bundleRootString + "/schema.json";
 in
 if !canonicalBundleCandidate || !builtins.pathExists schemaPathString then null else

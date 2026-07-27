@@ -103,16 +103,19 @@ to watch the importer worktree rather than an evaluation bundle.
   `nixpkgs_profile` selects the toolchain and ordinary `nixpkg_deps`; `nixpkg_pins` redirects only
   declared native dependency attrs. Rust tests execute compiled Cargo harnesses through Buck's
   bounded project-relative external runner, and only Rust binaries enter `run.prod` manifests.
-- Rust is an enabled **experimental** language at the PR-7 checkpoint. The reviewed baseline adds
+- Rust is an enabled **experimental** language through the PR-8 checkpoint. The reviewed baseline adds
   direct/transitive C link intent, freestanding WebAssembly, a repository-owned WASI runner,
   scaffolded CLI projects, declared remote-ready evidence, source-based cross-root crates, and
   explicit `rlib`, `staticlib`, `cdylib`, host proc-macro, native CPython-extension, and Node-API
-  addon outcomes. CPython build dependencies use importer-scoped uv2nix wheelhouses; Node addons
+  addon outcomes plus reviewed generated C11 FFI and C++17 bridge libraries. CPython build
+  dependencies use importer-scoped uv2nix wheelhouses; Node addons
   enforce the selected managed runtime's Node-API contract and collision-free stable names.
-  Extension outputs publish Nix-store materialization evidence. Python WASM extensions fail closed
-  until the pinned toolchains provide an
-  importable ABI. Broader ABI bridges, browser/component packaging, release publication, and
-  three-system execution conformance remain planned in PR-8 through PR-12.
+  Extension and bridge outputs publish Nix-store materialization evidence. Bridge validation covers
+  immutable filtered source replay, generated ABI compilation, patch invalidation, and panic-abort
+  behavior on the selected current host; unavailable systems retain structural matrix coverage
+  without an execution claim. Python WASM extensions fail closed until the pinned toolchains provide
+  an importable ABI. Browser/component packaging, release publication, and three-system execution
+  conformance remain planned in PR-9 through PR-12.
 - Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.
 - Planner-visible probes/stubs are allowed only when explicitly documented as non-build exceptions.
 - Patching third-party modules is **ergonomic**, **idempotent**, and **cache-friendly**.
@@ -134,7 +137,7 @@ Use these docs as the source of truth for migration scope and completion:
 Current status in those docs:
 
 - The original Nix-route migration phases are complete. Rust's first-class rollout is separately
-  tracked: PR-1 through PR-7 establish the experimental baseline, while PR-8 through PR-12 remain
+  tracked: PR-1 through PR-8 establish the experimental baseline, while PR-9 through PR-12 remain
   required before first-class/release-hermetic status.
 - `docs/handbook/nix-gaps.md` has no remaining artifact-producing non-Nix routes.
 - `docs/handbook/nix-gaps-exceptions.json` allows only explicit probe-only exceptions and currently has no artifact-route allowlist entries.
@@ -1975,6 +1978,20 @@ process.exit(missing);
 // build-tools/tools/codegen.ts — run protobuf/gqlgen/oapi/ent, etc. If none, exit 0.
 process.exit(0);
 ```
+
+## Rust Native Interop Checkpoint
+
+Reviewed Rust native ABI targets use `rust_c_ffi_library` or `rust_cxx_bridge_library`; ordinary
+Rust libraries never become C ABI authority implicitly. A strict package-local
+`viberoots.rust-interop.v1` file drives deterministic C11/C++17 headers and genuine outbound
+`.c`/`.cc` shims. The supported contract is C layout only, abort-on-panic, send/sync transfer,
+explicit allocator/destructor ownership, and typed exception/callback fallbacks.
+
+The exported graph carries a versioned module surface plus source profile, exact pins, LLVM
+identity, target triple, language standard, and STL identity. Rust-to-native and native-to-Rust
+planners validate all axes before derivation construction. Tests compile and run real C and C++
+consumers and providers in both directions, cover static and shared artifacts, reject malformed
+schema/compatibility inputs, and verify patch invalidation and deterministic generator output.
 
 ## Misc
 

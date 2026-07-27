@@ -92,6 +92,17 @@ if kind == "bin" then ''
   fi
   extension=${if crateType == "proc-macro" then "proc-macro" else "cdylib"}
   install -Dm755 "$candidate" "$out/lib/lib${publicCrate}.$extension"
+  ${lib.optionalString (crateType == "cdylib") ''
+    install -Dm755 "$candidate" "$out/lib/lib${publicCrate}${dynamicExtension}"
+    ${lib.optionalString pkgs.stdenv.isDarwin ''
+      ${pkgs.darwin.cctools}/bin/install_name_tool \
+        -id "$out/lib/lib${publicCrate}${dynamicExtension}" \
+        "$out/lib/lib${publicCrate}${dynamicExtension}"
+      ${pkgs.darwin.cctools}/bin/install_name_tool \
+        -id "$out/lib/lib${publicCrate}.cdylib" \
+        "$out/lib/lib${publicCrate}.cdylib"
+    ''}
+  ''}
   runHook postInstall
 '' else ''
   runHook preInstall

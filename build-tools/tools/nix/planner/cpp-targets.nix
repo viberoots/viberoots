@@ -1,4 +1,5 @@
 { lib
+, get
 , T
 , byName
 , labelsOf
@@ -18,6 +19,20 @@
 }:
 let
   nodeFor = name: if builtins.hasAttr name byName then byName.${name} else {};
+  nativeContractFor = name:
+    let
+      node = nodeFor name;
+      selectedPkgs = (sourcePlanFor node).base_pkgs;
+      ABI = import ./native-abi.nix { pkgs = selectedPkgs; };
+      value = field: fallback:
+        let found = get node field;
+        in if found == null || found == "" then fallback else found;
+    in {
+      std = value "language_standard" "c++17";
+      stl = value "stl" "libc++";
+      compilerIdentity = ABI.resolveCompilerIdentity name (value "compiler_identity" "");
+      targetTriple = ABI.resolveTargetTriple name (value "target_triple" "");
+    };
 
   templateFor = name:
     let plan = sourcePlanFor (nodeFor name); in T.cppForPkgs plan.base_pkgs;
@@ -61,7 +76,7 @@ let
       attrs = collectNixAttrsFor name;
       resolvedNix = resolveNixFor name attrs;
       TP = templateFor name;
-    in TP.cppApp {
+    in TP.cppApp ({
       inherit name;
       srcRoot = repoRoot;
       subdir = pkgPathOf name;
@@ -71,7 +86,7 @@ let
       nixCxxSourcePlan = resolvedNix.sourcePlan;
       srcList = normSrcsOf name;
       patches = patchInputsFor name;
-    };
+    } // nativeContractFor name);
 
   mkLib = name:
     let
@@ -105,7 +120,7 @@ let
             nixCxxPkgs = resolveNixPkgsFor name attrs;
             srcList = normSrcsOf name;
             patches = patchInputsFor name;
-          };
+          } // nativeContractFor name;
           wasmAttrs =
             if isWasmStatic
             then { wasmTarget = if wantWasi then "wasm32-wasi" else "wasm32-unknown-unknown"; }

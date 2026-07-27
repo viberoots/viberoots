@@ -36,12 +36,12 @@ let
     if value == null then []
     else if builtins.isList value && builtins.all builtins.isString value then map clean value
     else builtins.throw "Rust planner ${field} must be a list of labels";
-  runtimePackagesFor = import ./rust-runtime-deps.nix { inherit lib ctx normalizeList; };
+  runtimePackagesFor = import ./rust-runtime-deps.nix { inherit lib ctx normalizeList; }; validateInteropProfile = import ./rust-interop-profile.nix { inherit ctx; };
   nativeInputsFor = name:
     let
       node = nodeFor name;
-      linkDeps = normalizeList "link_deps" (ctx.get node "link_deps");
-      headerDeps = normalizeList "header_deps" (ctx.get node "header_deps");
+      interopKind = ctx.get node "interop_kind"; interopConsumer = interopKind != null && interopKind != "";
+      linkDeps = normalizeList "link_deps" (ctx.get node "link_deps"); headerDeps = normalizeList "header_deps" (ctx.get node "header_deps");
       closureRaw = ctx.get node "link_closure";
       closure = if closureRaw == null then "direct" else closureRaw;
       overridesRaw = ctx.get node "link_closure_overrides";
@@ -60,10 +60,10 @@ let
         linkDepsOf = linkDepsOf;
       };
       validate = role: dep:
-        let labels = P.labelsOf (nodeFor dep);
+        let depNode = nodeFor dep; labels = P.labelsOf depNode;
         in if builtins.elem "lang:cpp" labels
           && (builtins.elem "kind:lib" labels || (role == "header" && builtins.elem "kind:headers" labels))
-        then dep
+        then if interopConsumer then validateInteropProfile node depNode role dep else dep
         else builtins.throw
           "Rust planner ${role}_deps contains unsupported target ${dep}; expected a native C/C++ library${if role == "header" then " or headers target" else ""}";
     in assert _overrides; {
@@ -158,8 +158,7 @@ let
       generatedOutputsRaw = ctx.get node "generated_outputs";
       module = ctx.get node "module";
       runtimeDeps = normalizeList "runtime_deps" (ctx.get node "runtime_deps");
-      addonName = ctx.get node "addon_name";
-      nodeApiVersion = ctx.get node "node_api_version";
+      addonName = ctx.get node "addon_name"; nodeApiVersion = ctx.get node "node_api_version";
       platform = ctx.get node "platform";
       pythonAbi = ctx.get node "python_abi";
       _nativeInputBoundary = validateNativeInputBoundary name kind;
@@ -168,12 +167,16 @@ let
       cargoManifest = builtins.toPath "${ctx.repoRootStr}/${manifestRel}";
       cargoLock = builtins.toPath "${ctx.repoRootStr}/${lockRel}";
       validatedPatchDirs = map (validatePatchDir name) (if patchDirs == null then [] else patchDirs);
-      patchCandidates = map (dir: builtins.toPath "${ctx.repoRootStr}/${rootRel}/${dir}") validatedPatchDirs;
-      patchInputs = builtins.filter builtins.pathExists patchCandidates;
+      patchCandidates = map (dir: "${ctx.repoRootStr}/${rootRel}/${dir}") validatedPatchDirs; patchInputs = map (candidate: builtins.path { path = builtins.toPath candidate;
+        name = "rust-package-patches"; }) (builtins.filter builtins.pathExists patchCandidates);
       nixpkgAttrs = nixpkgAttrsFor name;
       nixpkgRecords = ctx.resolveNixpkgAttrs { target = node; attrs = nixpkgAttrs; };
       missing = builtins.filter (record: record.package == null) nixpkgRecords;
       sourcePlan = ctx.sourcePlanFor node;
+      interop = import ./rust-interop.nix {
+        inherit ctx node name sourcePath;
+        pkgs = sourcePlan.base_pkgs;
+      };
       template = ctx.T.rustForPkgs sourcePlan.base_pkgs;
       pythonDeps = pythonDepsFor { inherit name node sourcePlan; };
       nativeInputs = nativeInputsFor name;
@@ -204,6 +207,7 @@ let
       nodeApiVersion = if nodeApiVersion == null then 0 else nodeApiVersion;
       platform = if platform == null then "" else platform;
       pythonAbi = if pythonAbi == null then "" else pythonAbi;
+      inherit interop;
     };
 in {
   isTarget = n: P.isTargetByRuleTypeOrLabel {
@@ -239,12 +243,8 @@ in {
     };
   };
   modulesFileFor = _: null;
-  mkApp = build "bin";
-  mkAddon = build "addon";
-  mkLib = build "lib";
-  mkTest = build "test";
-  mkPyExt = build "pyext";
-  mkPyExtWasm = build "pyext_wasm";
-  mkWasi = build "wasi";
-  mkWasm = build "wasm";
+  mkApp = build "bin"; mkAddon = build "addon";
+  mkLib = build "lib"; mkTest = build "test";
+  mkPyExt = build "pyext"; mkPyExtWasm = build "pyext_wasm";
+  mkWasi = build "wasi"; mkWasm = build "wasm";
 }

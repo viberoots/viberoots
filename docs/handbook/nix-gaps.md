@@ -82,6 +82,8 @@ Notes on Nix-backed Python outputs:
 - `rust_library` → Nix build (`rust_nix_build` → locked native `buildRustPackage`).
 - `rust_static_library` → Nix build (`rust_nix_build` → stable native `staticlib`).
 - `rust_cdylib` → Nix build (`rust_nix_build` → stable native `cdylib`).
+- `rust_c_ffi_library` → Nix build (`rust_nix_build` → generated C header plus static/shared ABI).
+- `rust_cxx_bridge_library` → Nix build (`rust_nix_build` → generated C/C++ bridge plus static/shared ABI).
 - `rust_proc_macro` → Nix build (`rust_nix_build` → native host `proc-macro`).
 - `rust_binary` → Nix build (`rust_nix_build` → locked native `buildRustPackage`).
 - `rust_test` → Nix build (`rust_nix_test` → compiled Cargo harnesses and bounded runner).

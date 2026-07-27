@@ -144,10 +144,10 @@ def _rust_nix_build_impl(ctx):
         DefaultInfo(default_output = out, other_outputs = runtime_outputs),
         rust_crate_info(ctx),
     ]
-    if crate_type == "staticlib":
+    if crate_type in ["staticlib", "cdylib"]:
         providers.append(NativeLinkInfo(
             library = out,
-            link_kind = "static",
+            link_kind = "static" if crate_type == "staticlib" else "shared",
             link_name = ctx.attrs.public_crate or ctx.attrs.crate,
             runtime_outputs = runtime_outputs,
         ))
@@ -163,6 +163,7 @@ _ATTRS = {
         "header_deps": attrs.list(attrs.dep(), default = []),
         "runtime_deps": attrs.list(attrs.dep(), default = []),
         "link_closure": attrs.string(default = "direct"),
+        "link_mode": attrs.string(default = ""),
         "link_closure_overrides": attrs.dict(key = attrs.label(), value = attrs.string(), default = {}),
         "srcs": attrs.list(attrs.source(), default = []),
         "nix_inputs": attrs.list(attrs.source(), default = []),
@@ -181,6 +182,20 @@ _ATTRS = {
         "node_api_version": attrs.int(default = 0),
         "platform": attrs.string(default = ""),
         "python_abi": attrs.string(default = ""),
+        "binding_config": attrs.string(default = ""),
+        "interop_kind": attrs.string(default = ""),
+        "interop_generator": attrs.string(default = ""),
+        "panic_strategy": attrs.string(default = ""),
+        "exception_policy": attrs.string(default = ""),
+        "allocator": attrs.string(default = ""),
+        "thread_safety": attrs.string(default = ""),
+        "cxx_standard": attrs.string(default = ""),
+        "c_standard": attrs.string(default = ""),
+        "compiler_family": attrs.string(default = ""),
+        "compiler_identity": attrs.string(default = ""),
+        "target_triple": attrs.string(default = ""),
+        "stl": attrs.string(default = ""),
+        "module_surface": attrs.string(default = ""),
         "source_snapshot": attrs.option(attrs.source(), default = None),
         "source_snapshot_bundle": attrs.option(attrs.dep(providers = [SourceSnapshotInfo]), default = None),
         "source_snapshot_manifest": attrs.option(attrs.source(), default = None),

@@ -42,7 +42,17 @@ async function writeJson(file: string, value: unknown): Promise<void> {
   await fsp.writeFile(file, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
-async function flakeSubdir(sourceRoot: string): Promise<string> {
+async function flakeSubdir(sourceRoot: string, preferRoot = false): Promise<string> {
+  const root = path.join(sourceRoot, "flake.nix");
+  if (
+    preferRoot &&
+    (await fsp
+      .access(root)
+      .then(() => true)
+      .catch(() => false))
+  ) {
+    return ".";
+  }
   const hidden = path.join(sourceRoot, ".viberoots", "workspace", "flake.nix");
   if (
     await fsp
@@ -52,7 +62,6 @@ async function flakeSubdir(sourceRoot: string): Promise<string> {
   ) {
     return ".viberoots/workspace";
   }
-  const root = path.join(sourceRoot, "flake.nix");
   if (
     await fsp
       .access(root)
@@ -79,6 +88,7 @@ export async function materializeEvaluationBundle(
     artifactEnv?: NodeJS.ProcessEnv;
     artifactToolsRoot?: string;
     sourceRevision?: string;
+    preferRootFlake?: boolean;
   },
   deps: { register?: RegisterBundle; copyMode?: CopyFileCloneMode } = {},
 ): Promise<EvaluationBundle> {
@@ -208,7 +218,7 @@ export async function materializeEvaluationBundle(
       schema: "viberoots.evaluation-bundle.v1",
       digest: `sha256:${digest}`,
     });
-    const subdir = await flakeSubdir(sourceRoot);
+    const subdir = await flakeSubdir(sourceRoot, opts.preferRootFlake);
     const storePath = await (deps.register || registerEvaluationBundle)(
       bundleRoot,
       claim.recordProcessGroup,

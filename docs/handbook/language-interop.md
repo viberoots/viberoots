@@ -1,3 +1,207 @@
+## Rust ↔ C/C++ Interoperability
+
+Rust consumes C and C++ only through `rust_c_ffi_library` or `rust_cxx_bridge_library` with
+explicit `link_deps`, `header_deps`, and a package-local reviewed binding configuration. Ordinary
+Rust macros reject native link/header intent, so a handwritten `extern` block cannot bypass the
+generated ABI contract; ordinary `deps` never implies native linking:
+
+```python
+load("@viberoots//build-tools/rust:defs.bzl", "rust_cxx_bridge_library")
+
+rust_cxx_bridge_library(
+    name = "core_ffi",
+    binding_config = "bindings.json",
+    crate = "core",
+    artifact = "static",
+    panic_strategy = "abort",
+    exception_policy = "noexcept",
+    visibility = ["PUBLIC"],
+)
+```
+
+The binding schema admits stable C-layout scalar and pointer shapes. Model strings and owned
+objects with explicit pointer/length and destructor functions, callbacks with context pointers,
+and errors with explicit status values. Never allow Rust panics or C++ exceptions to unwind across
+the boundary. Generated `.h`, `.hpp`, `.cc`, and manifest files live in the Nix output and are not
+checked-in source authority. C++ consumers declare the bridge in both `link_deps` and
+`header_deps`; the canonical planner carries direct/transitive closure, source profiles, pins, and
+runtime libraries.
+
+The planner's ordinary native closure machinery remains an internal implementation detail used by
+reviewed bridge construction. It intentionally does not apply bridge standard/STL compatibility
+checks to unrelated header-only graph edges, but it is not exposed as a second public FFI route.
+
+The JSON schema rejects unknown keys, ambient or parent-relative headers, duplicate names, and
+untyped fallback snippets. A Rust-owned pointer requires both an `ownership: "rust"` producer and
+an `ownership: "destructor"` function. With contained C++ callbacks, the exported callback
+function also requires a numeric `callback_error_value`.
+
+For Rust calling C, declare an import with `direction: "import"`, `native_name`, and a reviewed
+`.h` header. For Rust calling C++, use `cpp_name` and a reviewed C++ header. Bridge construction
+compiles the generated `.c` or `.cc` C-ABI shim with pinned Clang (`c11` or `c++17`/libc++) and
+supplies the crate-named shim to Cargo and the downstream runtime closure.
+`exception_policy = "contained"` requires an explicit error value and converts a thrown C++
+exception to that value.
+
+```json
+{
+  "schema": "viberoots.rust-interop.v1",
+  "headers": ["native.hpp"],
+  "functions": [
+    { "name": "rust_make", "return": "mut_void_ptr", "ownership": "rust", "params": [] },
+    {
+      "name": "rust_destroy",
+      "return": "void",
+      "ownership": "destructor",
+      "params": [{ "name": "value", "type": "mut_void_ptr" }]
+    },
+    {
+      "name": "vbr_native",
+      "direction": "import",
+      "cpp_name": "native_value",
+      "header": "native.hpp",
+      "return": "i32",
+      "error_value": -1,
+      "params": []
+    }
+  ]
+}
+```
+
+Only `panic_strategy = "abort"` and `thread_safety = "send-sync"` are implemented. The macros
+reject claimed containment or single-thread enforcement because metadata alone cannot provide
+those guarantees.
+
+### Complete Rust/C route
+
+Declare a C11 provider and reviewed header:
+
+```python
+nix_cpp_headers(
+    name = "native_headers",
+    language_standard = "c11",
+    stl = "none",
+    srcs = ["include/native.h"],
+)
+nix_cpp_library(
+    name = "native",
+    language_standard = "c11",
+    stl = "none",
+    srcs = ["src/native.c"],
+    header_deps = [":native_headers"],
+)
+```
+
+The binding file imports the C symbol and exports the Rust symbol:
+
+```json
+{
+  "schema": "viberoots.rust-interop.v1",
+  "headers": ["native.h"],
+  "functions": [
+    {
+      "name": "vbr_native_value",
+      "native_name": "native_value",
+      "direction": "import",
+      "header": "native.h",
+      "return": "i32",
+      "params": []
+    },
+    { "name": "rust_answer", "return": "i32", "params": [] }
+  ]
+}
+```
+
+Rust calls the generated declaration—there is no handwritten `extern` block:
+
+```rust
+#[no_mangle]
+pub extern "C" fn rust_answer() -> i32 {
+    unsafe { __viberoots_abi::vbr_native_value() + 2 }
+}
+```
+
+```python
+rust_c_ffi_library(
+    name = "bridge",
+    binding_config = "bindings.json",
+    srcs = ["src/lib.rs"],
+    link_deps = ["//projects/libs/native:native"],
+    header_deps = ["//projects/libs/native:native_headers"],
+)
+nix_cpp_binary(
+    name = "consumer",
+    language_standard = "c11",
+    stl = "none",
+    srcs = ["src/main.c"],
+    link_deps = [":bridge"],
+    header_deps = [":bridge"],
+)
+```
+
+The C consumer includes the generated `<crate>.h` and calls `rust_answer()`.
+
+### Complete Rust/C++ route
+
+Use a C++17/libc++ provider and headers, then declare `cpp_name`, a contained typed fallback, and
+the same generated Rust import:
+
+```json
+{
+  "schema": "viberoots.rust-interop.v1",
+  "namespace": "core_bridge",
+  "headers": ["native.hpp"],
+  "functions": [
+    {
+      "name": "vbr_native_value",
+      "cpp_name": "native::value",
+      "direction": "import",
+      "header": "native.hpp",
+      "return": "i32",
+      "error_value": -1,
+      "params": []
+    },
+    { "name": "rust_answer", "return": "i32", "params": [] }
+  ]
+}
+```
+
+```python
+rust_cxx_bridge_library(
+    name = "bridge",
+    binding_config = "bindings.json",
+    exception_policy = "contained",
+    srcs = ["src/lib.rs"],
+    link_deps = ["//projects/libs/native:native_cpp"],
+    header_deps = ["//projects/libs/native:native_cpp_headers"],
+)
+nix_cpp_binary(
+    name = "consumer",
+    srcs = ["src/main.cpp"],
+    link_deps = [":bridge"],
+    header_deps = [":bridge"],
+)
+```
+
+The C++ consumer includes `<crate>.hpp` and calls `core_bridge::rust_answer()`. Callbacks are
+supported only by contained C++ exports and must be exactly `(callback_i32, mut_void_ptr)` with a
+numeric `callback_error_value`; noexcept callbacks are rejected.
+
+### Rust interop troubleshooting
+
+- A `mismatched ...` planner error means the bridge and native target disagree on source profile,
+  exact pins, LLVM identity, target triple, C/C++ standard, STL, or module surface. Correct the
+  target declarations; do not bypass the comparison. Native macros stamp the canonical selected
+  target triple into the graph, and the planner derives compiler identity from each target's
+  selected source-plan Nix LLVM package.
+- A Rust function-pointer type error points to drift between `bindings.json` and the actual
+  exported Rust function. Update one source of truth so return and parameter types match exactly.
+- `import ... must name one declared header` means the header is absent from the root `headers`
+  array or is not package-relative.
+- Loader errors should be diagnosed from the built artifact (`otool -L` on Darwin or
+  `readelf -d` on Linux). Bridge runtime packages and output-relative loader paths must remain in
+  the selected graph; host `LD_LIBRARY_PATH`/`DYLD_LIBRARY_PATH` is not authority.
+
 ## Go ↔ C/C++ Interoperability
 
 This guide explains how to link C/C++ into Go (cgo) and how to call Go from C/C++ using a c-archive. It follows our build-system design and repository methodology: Buck2 orchestrates the graph, Nix provides hermetic toolchains, and macros keep TARGETS tidy.

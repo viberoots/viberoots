@@ -41,9 +41,23 @@ export async function repairSnapshotViberootsInput(
   );
   assertImmutableSourcePath(materialized.storePath);
   for (const flakeDir of await snapshotWorkspaceFlakeDirs(opts.snapDir, opts.flakeDir)) {
-    await rewriteViberootsInput(flakeDir, materialized);
+    const rewritten = await rewriteViberootsInput(flakeDir, materialized);
+    if (!rewritten && flakeDir === opts.flakeDir) {
+      await materializeSelfHostedBuildTools(flakeDir, materialized.storePath);
+    }
   }
   return materialized.storePath;
+}
+
+async function materializeSelfHostedBuildTools(
+  flakeDir: string,
+  immutableSource: string,
+): Promise<void> {
+  const destination = path.join(flakeDir, "build-tools");
+  const source = path.join(immutableSource, "build-tools");
+  await fsp.access(path.join(source, "tools/nix/flake/outputs.nix"));
+  await fsp.rm(destination, { recursive: true, force: true });
+  await fsp.cp(source, destination, { recursive: true });
 }
 
 async function snapshotWorkspaceFlakeDirs(snapDir: string, primary: string): Promise<string[]> {
@@ -133,10 +147,11 @@ export async function materializeFilteredViberootsSource(
 async function rewriteViberootsInput(
   flakeDir: string,
   materialized: MaterializedPathInput,
-): Promise<void> {
+): Promise<boolean> {
   const { storePath, locked } = materialized;
   const flakePath = path.join(flakeDir, "flake.nix");
   const text = await fsp.readFile(flakePath, "utf8");
+  if (!/\bviberoots\.url\s*=/.test(text)) return false;
   let next = text.replace(
     /(\bviberoots\.url\s*=\s*)"[^"]*"/,
     (_match, prefix: string) => `${prefix}"path:${storePath}"`,
@@ -157,6 +172,7 @@ async function rewriteViberootsInput(
   // an absolute store path makes Nix consider the otherwise-coherent lock stale.
   delete node.parent;
   await fsp.writeFile(lockPath, `${JSON.stringify(lock, null, 2)}\n`, "utf8");
+  return true;
 }
 
 function assertImmutableSourcePath(storePath: string): void {

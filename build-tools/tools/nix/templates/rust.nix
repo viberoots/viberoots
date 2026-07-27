@@ -9,21 +9,13 @@ let
 in {
   inherit validateKindTarget;
   rustPackage = {
-    name,
-    kind,
-    cargoRoot,
-    cargoManifest,
-    cargoLock,
-    cargoOutputHashes ? {},
-    cargoFixedSources ? {},
+    name, kind,
+    cargoRoot, cargoManifest, cargoLock,
+    cargoOutputHashes ? {}, cargoFixedSources ? {},
     crate,
-    features ? [],
-    defaultFeatures ? true,
-    profile ? "release",
-    target ? "",
-    patchInputs ? [],
-    devOverrides ? {},
-    nixpkgDeps ? [],
+    features ? [], defaultFeatures ? true,
+    profile ? "release", target ? "",
+    patchInputs ? [], devOverrides ? {}, nixpkgDeps ? [],
     nativeInputs ? { libraries = []; headers = []; },
     sourcePlan ? { nixpkgs_profile = "default"; nixpkg_pins = {}; },
     sourceComposition ? null,
@@ -39,6 +31,7 @@ in {
     nodeApiVersion ? 0,
     platform ? "",
     pythonAbi ? "", artifactNixRoot ? "",
+    interop ? {},
     }:
     let
       validatedTarget = validateKindTarget kind target;
@@ -130,7 +123,12 @@ in {
           builtins.hashString "sha256" (builtins.toJSON [])
         else sourceComposition.digest;
       };
+      interopContract = import ./rust-interop.nix {
+        inherit pkgs lib interop;
+        publicCrate = validatedPublicCrate; inherit nativePackages;
+      };
       installPhase = baseInstallPhase + ''
+        ${interopContract.install}
         mkdir -p "$out/share/viberoots-rust"
         cat > "$out/share/viberoots-rust/composition.json" <<'VIBEROOTS_RUST_COMPOSITION'
         ${builtins.toJSON compositionEvidence}
@@ -146,11 +144,11 @@ in {
             trustedPublicKeys = [ "main:N7uIAritMCBWpa9cdZJxHJ7gWfsXCwAsbyIJqrSQnLY=" ];
           };
           tools = { nix = if artifactNixRoot == "" then builtins.toString pkgs.nix else artifactNixRoot; };
-          storePaths = [{
-            attr = H.sanitizeName name;
-            path = "__VIBEROOTS_RUST_OUT__";
-            expectedOutputIdentity = "__VIBEROOTS_RUST_IDENTITY__";
-          }];
+          storePaths = [{ attr = H.sanitizeName name; path = "__VIBEROOTS_RUST_OUT__";
+            expectedOutputIdentity = "__VIBEROOTS_RUST_IDENTITY__"; }] ++ builtins.genList (index: let runtime = builtins.elemAt
+            interopContract.runtimePackages index; in { attr = "interop-runtime-${builtins.toString index}";
+            path = builtins.toString runtime; expectedOutputIdentity = baseNameOf (builtins.toString runtime); })
+          (builtins.length interopContract.runtimePackages);
         }}
         VIBEROOTS_RUST_MATERIALIZATION
         substituteInPlace "$out/share/viberoots-rust/materialization-manifest.json" \
@@ -182,13 +180,14 @@ in {
       cargoTestFlags = [ "--package" crate ] ++ kindFlags ++ featureFlags ++ targetFlags;
       doCheck = false;
       nativeBuildInputs = [ pkgs.cargo rustc pkgs.pkg-config pkgs.jq pkgs.llvmPackages.lld ]
-        ++ nixpkgDeps ++ nativePackages ++ extensionPackages;
-      buildInputs = nixpkgDeps ++ nativePackages ++ extensionPackages;
+        ++ nixpkgDeps ++ nativePackages ++ extensionPackages ++ interopContract.buildInputs;
+      buildInputs = nixpkgDeps ++ nativePackages ++ extensionPackages ++ interopContract.buildInputs;
       RUSTC = "${rustc}/bin/rustc";
       RUSTDOC = "${rustc}/bin/rustdoc";
       CARGO = "${pkgs.cargo}/bin/cargo";
       CARGO_NET_OFFLINE = "true";
-      RUSTFLAGS = lib.concatStringsSep " " (nativeLibraryFlags ++ extensionRustFlags);
+      RUSTFLAGS = lib.concatStringsSep " "
+        (nativeLibraryFlags ++ extensionRustFlags ++ interopContract.rustFlags);
       PYO3_PYTHON = if kind == "pyext" then "${pkgs.python3}/bin/python" else "";
       NAPI_VERSION = if kind == "addon" then builtins.toString nodeApiVersion else "";
       BINDGEN_EXTRA_CLANG_ARGS = nodeApiContract.bindgenArgs;
@@ -211,12 +210,13 @@ in {
           ${pkgs.python3}/bin/python -c 'import importlib, sys; importlib.import_module(sys.argv[1])' "$package" ||
             { echo "Rust Python extension build_py_deps package $package is not importable from the selected uv.lock wheelhouse" >&2; exit 2; }
         done
-      '' + nodeApiContract.preBuild;
+      '' + nodeApiContract.preBuild + interopContract.preBuild;
       postBuild = nodeApiContract.postBuild;
       inherit installPhase;
       passthru.viberootsRust = {
         inherit kind crate features profile crateType hostRole generatedOutputs;
         inherit module buildPyDeps addonName nodeApiVersion platform pythonAbi pythonWheelhouse;
+        interop = interopContract.passthru;
         publicCrate = validatedPublicCrate;
         target = validatedTarget;
         default_features = defaultFeatures;
@@ -233,8 +233,8 @@ in {
         composition_manifest = if sourceComposition == null then [] else sourceComposition.manifest;
         composition_digest = if sourceComposition == null then
           builtins.hashString "sha256" (builtins.toJSON []) else sourceComposition.digest;
-        runtime_closure = map builtins.toString runtimePackages;
-        runtime_packages = runtimePackages;
+        runtime_closure = map builtins.toString (runtimePackages ++ interopContract.runtimePackages);
+        runtime_packages = runtimePackages ++ interopContract.runtimePackages;
         cargo_packages = map (package: {
           inherit (package) name version;
           source = package.source or "";

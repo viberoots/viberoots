@@ -60,7 +60,11 @@ export function renderMaterializationCommand(
   return [
     nix,
     "build",
-    `${manifest.sourceSnapshot}#${entry.attr}`,
+    `${
+      manifest.flakeDir
+        ? `path:${manifest.sourceSnapshot}?dir=${manifest.flakeDir}`
+        : manifest.sourceSnapshot
+    }#${entry.attr}`,
     ...artifactNixIndependentPolicyArgs("reviewed"),
     "--no-link",
     "--print-out-paths",

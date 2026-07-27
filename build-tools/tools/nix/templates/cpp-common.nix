@@ -3,6 +3,7 @@ let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
   DevOverrideEnvs = import ../lib/dev-override-envs.nix { inherit pkgs; };
+  clang = "${pkgs.llvmPackages.clang}/bin/clang";
   clangxx = "${pkgs.llvmPackages.clang}/bin/clang++";
   llvmAr  = "${pkgs.llvmPackages.llvm}/bin/llvm-ar";
 
@@ -69,10 +70,9 @@ let
     if (builtins.hasAttr "nodejs_22" pkgs) then pkgs.nodejs_22
     else pkgs.nodejs;
 in {
-  inherit lib H clangxx llvmAr sorted joinInc joinDef joinExtraC
+  inherit lib H clang clangxx llvmAr sorted joinInc joinDef joinExtraC
           toIncludeBase toLibBase nixIncFlags nixLibFlags nixLibDirs nixRpathFlags
           devMap _ci_guard normalizeAttr getAtFromPkgs overridePkgIfAny resolveAttrsToPkgs
           hasGTestAttr gtestPkgsAllFor nodeToolchain;
 }
-
 

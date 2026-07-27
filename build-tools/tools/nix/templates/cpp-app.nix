@@ -3,6 +3,7 @@ let
   C = import ./cpp-common.nix { inherit pkgs; };
   lib = C.lib;
   H = C.H;
+  clang = C.clang;
   clangxx = C.clangxx;
   toIncludeBase = C.toIncludeBase;
   toLibBase = C.toLibBase;
@@ -24,6 +25,9 @@ in {
     cflags ? [],
     ldflags ? [],
     std ? "c++17",
+    stl ? "libc++",
+    compilerIdentity ? builtins.toString pkgs.llvmPackages.clang,
+    targetTriple ? "",
     nixCxxPkgs ? [],
     nixCxxAttrs ? [],
     nixCxxSourcePlan ? [],
@@ -32,6 +36,15 @@ in {
     patches ? [],
   }:
   let
+    _contract = if compilerIdentity != builtins.toString pkgs.llvmPackages.clang then
+      builtins.throw "cpp app requires compiler_identity from the selected pinned LLVM toolchain"
+      else if !builtins.elem std [ "c11" "c++17" ] then
+        builtins.throw "cpp app requires c11 or c++17"
+      else if (std == "c11") != (stl == "none") then
+        builtins.throw "cpp app requires c11/none or c++17/libc++"
+      else true;
+    targetFlag = lib.optionalString (targetTriple != "") "--target=${targetTriple}";
+    stlFlag = lib.optionalString (stl == "libc++") "-stdlib=libc++";
     pname = "cppapp-${H.sanitizeName name}";
     srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
     # Resolve nixCxxAttrs like "pkgs.gtest" into paths if provided at eval-time
@@ -50,14 +63,14 @@ in {
       "printf '%s\\n' " + (lib.concatStringsSep " " (map (s: "'" + s + "'") (lib.sort (a: b: a < b) srcList))) + " | sort"
     ) else (
       # Fallback: restrict to conventional source dir to avoid picking up tests/** by accident
-      "find ./src -type f \\( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \\) 2>/dev/null | sed 's#^./##' | sort"
+      "find ./src -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \\) 2>/dev/null | sed 's#^./##' | sort"
     );
     sourcePlanLog = lib.concatMapStringsSep "\n" (line:
       "printf '%s\\n' "
       + lib.escapeShellArg ("nixpkgsSourcePlan=" + line)
       + " >> \"$out/build.log\""
     ) nixCxxSourcePlan;
-  in pkgs.stdenv.mkDerivation {
+  in assert _contract; pkgs.stdenv.mkDerivation {
     inherit pname;
     version = "0.1.0";
     src = srcAbs;
@@ -80,12 +93,15 @@ in {
       mapfile -t SRCS < <(${srcsCmd})
       mapfile -t HDRS < <(find . -type f \( -name '*.h' -o -name '*.hpp' -o -name '*.hh' -o -name '*.hxx' \) | sort)
 
-      cflags_common="-std=${std} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe ${nixInc}"
+      cflags_common="-std=${std} ${stlFlag} ${targetFlag} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe ${nixInc}"
+      link_driver=${clang}
       for s in "''${SRCS[@]}"; do
         rel="''${s#./}"
         obj="$tmp/''${rel%.*}.o"
         mkdir -p "$(dirname "$obj")"
-        ${clangxx} $cflags_common ${incFlags} ${defFlags} ${extraC} -c "$s" -o "$obj"
+        compiler=${clangxx}; unit_flags="$cflags_common"
+        case "$s" in *.c) compiler=${clang}; unit_flags="-std=c11 ${targetFlag} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe ${nixInc}" ;; *) [ "${std}" = "c++17" ] || { echo "c11 target cannot compile C++ source $s" >&2; exit 2; }; link_driver=${clangxx} ;; esac
+        "$compiler" $unit_flags ${incFlags} ${defFlags} ${extraC} -c "$s" -o "$obj"
       done
 
       mapfile -t OBJS < <(find "$tmp" -type f -name '*.o' | sort)
@@ -113,7 +129,7 @@ in {
         fi
       done
       # Link resolved nix libraries first so -l flags can resolve
-      ${clangxx} ${platLD} ${nixLib} ${rpathFlags} ${extraLD} "''${OBJS[@]}" "''${LIBFLAGS[@]}" -o "$outbin"
+      "$link_driver" ${stlFlag} ${targetFlag} ${platLD} ${nixLib} ${rpathFlags} ${extraLD} "''${OBJS[@]}" "''${LIBFLAGS[@]}" -o "$outbin"
 
       for h in "''${HDRS[@]}"; do
         install -Dm644 "$h" "$out/include/''${h#./}"
@@ -124,6 +140,9 @@ in {
       echo "nixpkgsProfile=${nixpkgsProfile}" >> "$out/build.log"
       ${sourcePlanLog}
       echo "std=${std}" >> "$out/build.log"
+      echo "stl=${stl}" >> "$out/build.log"
+      echo "compilerIdentity=${compilerIdentity}" >> "$out/build.log"
+      echo "targetTriple=${targetTriple}" >> "$out/build.log"
       echo "includes=${incFlags}" >> "$out/build.log"
       echo "defines=${defFlags}" >> "$out/build.log"
       echo "cflags=${extraC}" >> "$out/build.log"

@@ -50,6 +50,7 @@ export async function makeFilteredFlakeRef(opts: {
   onlyCpp?: boolean;
   coverage?: boolean;
   sourceRevision?: string;
+  preferRootFlake?: boolean;
 }): Promise<{
   flakeRef: string;
   workspaceRoot: string;
@@ -121,17 +122,25 @@ export async function makeFilteredFlakeRef(opts: {
     }
     const hiddenFlake = path.join(snapDirReal, ".viberoots", "workspace", "flake.nix");
     const rootFlake = path.join(snapDirReal, "flake.nix");
-    const flakeDir = (await fsp
-      .access(hiddenFlake)
-      .then(() => true)
-      .catch(() => false))
-      ? path.dirname(hiddenFlake)
+    const preferRoot =
+      opts.preferRootFlake &&
+      (await fsp
+        .access(rootFlake)
+        .then(() => true)
+        .catch(() => false));
+    const flakeDir = preferRoot
+      ? snapDirReal
       : (await fsp
-            .access(rootFlake)
+            .access(hiddenFlake)
             .then(() => true)
             .catch(() => false))
-        ? snapDirReal
-        : "";
+        ? path.dirname(hiddenFlake)
+        : (await fsp
+              .access(rootFlake)
+              .then(() => true)
+              .catch(() => false))
+          ? snapDirReal
+          : "";
     if (!flakeDir) {
       throw new Error(
         `${opts.logPrefix} filtered source snapshot is missing .viberoots/workspace/flake.nix and flake.nix`,
@@ -162,6 +171,7 @@ export async function makeFilteredFlakeRef(opts: {
       onlyCpp: opts.onlyCpp,
       coverage: opts.coverage,
       sourceRevision: opts.sourceRevision,
+      preferRootFlake: opts.preferRootFlake,
     });
     await removeOwnedTempTree(workDir);
     return {

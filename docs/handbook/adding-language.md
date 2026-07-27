@@ -415,6 +415,11 @@ Stamping belongs in the macro. If your macro synthesizes helper targets (for exa
   intentionally language-specific, or a gap in the current PR. Explicitly exclude capabilities
   assigned to later PRs in the plan; a scope review must neither pull those capabilities forward
   nor report their planned absence as a current-PR defect.
+- For generated native bindings, keep a small source-owned schema and a pinned generator identity.
+  Make the schema and generator declared action inputs, emit headers/sources/manifests only inside
+  the derivation, and route the result through the mature native link, header, runtime-closure, and
+  source-profile authorities. Do not admit a new language merely from `kind:lib`; require an
+  explicit reviewed ABI label and fail closed on direct unstable ABI or unwind boundaries.
 - Measure elapsed time and disk before and after focused runs using the named-path inventory in
   `docs/handbook/getting-started-on-a-pr.md`. Do not broaden source snapshots or copy shared caches to
   make a fixture pass.

@@ -2,7 +2,7 @@
 
 **Prepared:** 2026-07-23
 
-**Last reconciled:** 2026-07-26, after PR-7 implementation, validation, and terminal independent
+**Last reconciled:** 2026-07-27, after PR-8 implementation, validation, and terminal independent
 review
 
 **Workspace:** `/Users/kiltyj/Code/viberoots-site`
@@ -16,20 +16,22 @@ repository, staged and unstaged diffs, and the referenced logs before editing.
 
 ## 0. Current handoff: this section supersedes all older execution state below
 
-The next `$repo-skills:prs` item is PR-8, `Implement Bidirectional Rust And C/C++ Bridges`, from:
+The next `$repo-skills:prs` item is PR-9, `Reach WASM Linking, Browser, And Component-Model Parity`,
+from:
 
 ```text
 plan:   build-tools/docs/rust-language-plan.md
 design: build-tools/docs/lang/rust-design.md
 repo:   /Users/kiltyj/Code/viberoots-site/viberoots
-PR-7 commit: feat(rust): add Python and Node extensions (detached; inspect HEAD for the SHA)
+PR-8 commit: feat(rust): add bidirectional native bridges (detached; inspect HEAD for the SHA)
 ```
 
 PR-5 is complete in `55130076 feat(build): complete Rust remote readiness`. PR-6 is complete in
-`225de617 feat(rust): add cross-root crate composition`. PR-7 implementation, risk-based
-validation, repeated independent reviewer-fix loops, same-stage Python/Node/C++ parity review, and
-terminal independent scope review are complete in this handoff's
-`feat(rust): add Python and Node extensions` commit. No push is authorized.
+`225de617 feat(rust): add cross-root crate composition`. PR-7 is complete in
+`572d1460 feat(rust): add Python and Node extensions`. PR-8 implementation, risk-based validation,
+repeated independent reviewer-fix loops, same-stage C++/other-language parity review, and terminal
+independent scope review are complete in this handoff's
+`feat(rust): add bidirectional native bridges` commit. No push is authorized.
 
 PR-5's commit combines:
 
@@ -56,12 +58,69 @@ Use `repo-skills:prs` in turbo mode, with minimal-context independent agents:
 5. Commit through `repo-skills:cc` only after implementation review, validation, timing checks, and
    scope review are green. Never push without explicit user authorization.
 
-After PR-7 is committed, PRs 8-12 remain. Continue them in numeric order with a fresh isolated
+After PR-8 is committed, PRs 9-12 remain. Continue them in numeric order with a fresh isolated
 implementation agent and separate isolated reviewer/tester roles for each PR. Use risk-based
-focused suites for PR-8 and PRs 10-11 because PR-5 exercised a complete checkpoint and future
-checkpoint PRs will do so again. Run full checkpoints for PR-9 and PR-12, or earlier if a material
+focused suites for PRs 10-11 because PR-5 exercised a complete checkpoint and future checkpoint
+PRs will do so again. Run full checkpoints for PR-9 and PR-12, or earlier if a material
 cross-cutting change makes the focused evidence insufficient. Record elapsed timing and compare
 successful full checkpoints with the 10,684-second successful baseline.
+
+### PR-8 completion evidence
+
+PR-8 closes the reviewed bidirectional native bridge contract:
+
+- public handwritten Rust/native FFI is no longer an ABI bypass; ordinary Rust macros reject native
+  link/header intent and direct callers to `rust_c_ffi_library` or `rust_cxx_bridge_library`, while
+  the private stamped bridge planner retains the canonical native closure;
+- a reviewed, repo-owned, versioned generator consumes strict package-local JSON and emits
+  deterministic C/C++ headers and shims, Rust import declarations, export signature checks, ABI
+  manifests, and typed module-surface metadata as Nix action outputs;
+- schema validation rejects unknown fields, absolute or undeclared headers, malformed C++ names,
+  unsupported callback shapes, untyped error fallbacks, ambiguous ownership/destruction, and
+  export-side aliases;
+- genuine C11 and C++17 providers and consumers execute both directions through generated
+  bindings, including static/shared artifacts, owned strings and values, callbacks, destruction,
+  typed errors, caught C++ exceptions, and Rust panic abort without unwinding across the ABI;
+- real construction binds the selected profile's compiler store identity, canonical target triple,
+  language standard, STL, nixpkgs profile/pins, module surface, and runtime closure; mismatches and
+  caller spoofing fail closed, including a real non-default LLVM profile;
+- Darwin dylib identities and runtime closure are normalized and inspected;
+- pure filtered selected bundles build from a declared immutable source snapshot, replay with the
+  explicit canonical tool closure under poisoned ambient Rust state, materialize the selected
+  output, compare replay identity, and execute the consumer on the supported current host;
+- other supported systems are covered honestly by structural fail-closed matrix evidence rather
+  than claimed as locally executed;
+- separate C and C++ routes exercise `bridge -> interop_core -> itoa`, transitive native
+  source/header patching, exact restoration, and bridge-specific override expansion with exact
+  `[native, support]` order, count, and uniqueness; and
+- the C++/Rust linking, interop, build-system, Rust design, Starlark API, troubleshooting, and
+  add-a-language documentation now describe the same generated-binding authority.
+
+Final-tree focused evidence:
+
+```text
+immutable filtered runtime + replay/materialization + panic:  1/1, 228.23s
+transitive C/C++ patch + override/order/restoration:           1/1, 286.50s
+bindings + real graph + target/compiler spoof rejection:       4/4, 27.63s
+profile/compiler/target compatibility construction:             3/3, 7.06s
+Rust ABI mismatch compile failure:                               1/1, 34.19s
+public bridge boundary + private closure:                        2/2, 27.04s
+filtered/system structural evidence:                             2/2
+materialization suite:                                          15/15
+```
+
+The user-authorized risk-based cadence applies to PR-8, so no redundant broad suite was run.
+Canonical broad verification was also temporarily blocked by the disk guard while current-source
+Nix closures were being built; normal test cleanup later recovered space. The final focused
+evidence uses the exact current source and immutable replay path rather than the installed
+pre-PR-8 artifact-tools source.
+
+Final static/read-only gates passed Prettier for changed TS/MJS/JSON/Markdown, all changed Nix
+parses, Node syntax checks for generator/schema modules, `git diff --check`, command-site inventory
+(538 reviewed sites), secret/temp/process scans, unchanged generated toolchain authority, empty
+staging, and the hard 250-line limit. The final terminal reviewer passed the selected-profile ABI
+identity, non-spoofable public boundary, exact bridge override/order evidence, documentation, and
+all split-file guardrails. No PR-8 scope finding remains open.
 
 ### PR-7 completion evidence
 
@@ -124,10 +183,10 @@ PR-8–12 work. No PR-7 scope finding remains open.
 
 ### Remaining PRs
 
-- PR-8: bidirectional Rust and C/C++ bridges.
-- PR-9: browser/TypeScript and `wasm-bindgen` bindings; next full checkpoint.
-- PR-10: component-model/WIT integration.
-- PR-11: release/developer lifecycle work and the cross-language Tauri scaffold.
+- PR-9: WASM linking, browser/TypeScript and `wasm-bindgen` bindings, component-model/WIT
+  integration, and the next full checkpoint.
+- PR-10: Rust developer and dependency lifecycle parity.
+- PR-11: the cross-language Tauri desktop scaffold.
 - PR-12: final multi-system hermetic graduation, publication, protected-builder, and independent
   assessment evidence.
 

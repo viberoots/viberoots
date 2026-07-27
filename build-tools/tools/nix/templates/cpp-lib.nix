@@ -3,6 +3,7 @@ let
   C = import ./cpp-common.nix { inherit pkgs; };
   lib = C.lib;
   H = C.H;
+  clang = C.clang;
   clangxx = C.clangxx;
   nixIncFlags = C.nixIncFlags;
   joinInc = C.joinInc;
@@ -22,6 +23,9 @@ in {
     cflags ? [],
     ldflags ? [],
     std ? "c++17",
+    stl ? "libc++",
+    compilerIdentity ? builtins.toString pkgs.llvmPackages.clang,
+    targetTriple ? "",
     nixCxxPkgs ? [],
     nixCxxAttrs ? [],
     nixpkgsProfile ? "default",
@@ -29,6 +33,15 @@ in {
     patches ? [],
   }:
   let
+    _contract = if compilerIdentity != builtins.toString pkgs.llvmPackages.clang then
+      builtins.throw "cpp library requires compiler_identity from the selected pinned LLVM toolchain"
+      else if !builtins.elem std [ "c11" "c++17" ] then
+        builtins.throw "cpp library requires c11 or c++17"
+      else if (std == "c11") != (stl == "none") then
+        builtins.throw "cpp library requires c11/none or c++17/libc++"
+      else true;
+    targetFlag = lib.optionalString (targetTriple != "") "--target=${targetTriple}";
+    stlFlag = lib.optionalString (stl == "libc++") "-stdlib=libc++";
     pname = "cpplib-${H.sanitizeName name}";
     srcAbs = lib.cleanSource (builtins.toPath ("${srcRoot}/" + subdir));
     resolvedPkgs = nixCxxPkgs ++ (resolveAttrsToPkgs nixCxxAttrs);
@@ -42,9 +55,9 @@ in {
       " | grep -E '\\.(c|cc|cpp|cxx)$' | sort"
     ) else (
       # Fallback: restrict to conventional source dir to avoid picking up tests/** by accident
-      "find ./src -type f \\( -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \\) 2>/dev/null | sed 's#^./##' | sort"
+      "find ./src -type f \\( -name '*.c' -o -name '*.cpp' -o -name '*.cc' -o -name '*.cxx' \\) 2>/dev/null | sed 's#^./##' | sort"
     );
-  in pkgs.stdenv.mkDerivation {
+  in assert _contract; pkgs.stdenv.mkDerivation {
     inherit pname;
     version = "0.1.0";
     src = srcAbs;
@@ -65,14 +78,16 @@ in {
       mapfile -t SRCS < <(${srcsCmd})
       mapfile -t HDRS < <(find . -type f \( -name '*.h' -o -name '*.hpp' -o -name '*.hh' -o -name '*.hxx' \) | sort)
 
-      cflags_common="-std=${std} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe ${nixInc}"
+      cflags_common="-std=${std} ${stlFlag} ${targetFlag} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe ${nixInc}"
       for s in "''${SRCS[@]}"; do
         rel="''${s#./}"
         key="''${rel%.*}"
         key="''${key//\//__}"
         key="''${key//[^A-Za-z0-9_]/_}"
         obj="$tmp/''${key}.o"
-        ${clangxx} $cflags_common ${incFlags} ${defFlags} ${extraC} -c "$s" -o "$obj"
+        compiler=${clangxx}; unit_flags="$cflags_common"
+        case "$s" in *.c) compiler=${clang}; unit_flags="-std=c11 ${targetFlag} -fno-record-gcc-switches -ffile-prefix-map=$PWD=. -g0 -O2 -pipe ${nixInc}" ;; *) [ "${std}" = "c++17" ] || { echo "c11 target cannot compile C++ source $s" >&2; exit 2; } ;; esac
+        "$compiler" $unit_flags ${incFlags} ${defFlags} ${extraC} -c "$s" -o "$obj"
       done
 
       mapfile -t OBJS < <(find "$tmp" -type f -name '*.o' | sort)
@@ -93,6 +108,9 @@ in {
       echo "name=${name}" >> "$out/build.log"
       echo "nixpkgsProfile=${nixpkgsProfile}" >> "$out/build.log"
       echo "std=${std}" >> "$out/build.log"
+      echo "stl=${stl}" >> "$out/build.log"
+      echo "compilerIdentity=${compilerIdentity}" >> "$out/build.log"
+      echo "targetTriple=${targetTriple}" >> "$out/build.log"
       echo "includes=${incFlags}" >> "$out/build.log"
       echo "defines=${defFlags}" >> "$out/build.log"
       echo "cflags=${extraC}" >> "$out/build.log"
@@ -101,4 +119,3 @@ in {
     '';
   };
 }
-

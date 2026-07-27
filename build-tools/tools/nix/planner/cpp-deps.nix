@@ -63,7 +63,7 @@ let
       headerDeps0 = labelsFromNodeAttr { inherit name; attr = "header_deps"; };
       headerDeps = dedupePreserveOrder headerDeps0;
       infos = builtins.map (dn: ensureRepoCppHeaderDepInfo name dn) headerDeps;
-    in builtins.map (info: info.name) infos;
+    in infos;
 
   isNixLabel = l: lib.hasPrefix "nixpkg:" l;
   attrFrom = l: lib.removePrefix "nixpkg:" l;

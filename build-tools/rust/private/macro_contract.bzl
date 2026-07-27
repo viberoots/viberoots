@@ -72,6 +72,10 @@ def validate_public_crate(value):
             fail("rust target public_crate must match [A-Za-z_][A-Za-z0-9_]*: %s" % value)
     return value
 
+def validate_crate_names(crate, cargo_package):
+    if not isinstance(crate, str) or crate == "" or not isinstance(cargo_package, str) or cargo_package == "":
+        fail("rust target crate and cargo_package must be non-empty strings")
+
 def public_crate_for(name, kwargs):
     crate = kwargs.get("crate", name)
     if not isinstance(crate, str) or crate == "":
@@ -127,6 +131,7 @@ __all__ = [
     "single_cargo_file",
     "valid_features",
     "validate_local_patch_dirs",
+    "validate_crate_names",
     "validate_public_crate",
     "with_required_target",
 ]
@@ -134,6 +139,7 @@ RUST_PUBLIC_ARGS = [
     "addon_name",
     "artifact_contract",
     "build_py_deps",
+    "binding_config",
     "cargo_fixed_sources",
     "cargo_lock",
     "cargo_manifest",
@@ -141,24 +147,35 @@ RUST_PUBLIC_ARGS = [
     "cargo_package",
     "crate",
     "crate_type",
+    "cxx_standard",
+    "c_standard",
+    "compiler_family",
+    "compiler_identity",
     "default_features",
     "features",
+    "exception_policy",
     "generated_outputs",
     "header_deps",
     "host_role",
+    "interop_generator",
+    "interop_kind",
     "labels",
     "link_closure",
     "link_closure_overrides",
     "link_deps",
+    "link_mode",
     "local_patch_dirs",
     "materialization_manifest",
     "module",
+    "module_surface",
     "nixpkg_deps",
     "nixpkg_pins",
     "nixpkgs_profile",
     "node_api_version",
+    "allocator",
     "platform",
     "profile",
+    "panic_strategy",
     "python_abi",
     "public_crate",
     "remote_builder_smoke",
@@ -168,6 +185,9 @@ RUST_PUBLIC_ARGS = [
     "source_snapshot_manifest",
     "srcs",
     "target",
+    "target_triple",
+    "thread_safety",
+    "stl",
     "tool_closure",
     "visibility",
 ]

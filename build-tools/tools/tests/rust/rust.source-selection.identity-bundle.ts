@@ -38,8 +38,10 @@ export async function buildCanonicalBundle(
   immutableViberootsInputRoot: string,
   baseEnv: NodeJS.ProcessEnv = process.env,
   selectedTarget: string = defaultTarget,
+  declaredArtifactToolsRoot = "",
+  preferRootFlake = false,
 ): Promise<{ outPath: string; bundleSource: string }> {
-  const artifactToolsRoot = canonicalArtifactToolsRoot(workspace);
+  const artifactToolsRoot = declaredArtifactToolsRoot || canonicalArtifactToolsRoot(workspace);
   const graphPath = path.join(workspace, ".viberoots", "workspace", "buck", "graph.json");
   const bundle = await makeFilteredFlakeRef({
     workspaceRoot: workspace,
@@ -50,7 +52,8 @@ export async function buildCanonicalBundle(
     classification: "local-development",
     env: buildCanonicalArtifactEnvironment(workspace, { artifactToolsRoot }),
     selectorEnv: {},
-    immutableViberootsInputRoot,
+    ...(immutableViberootsInputRoot ? { immutableViberootsInputRoot } : {}),
+    preferRootFlake,
   });
   try {
     const { stdout } = await runArtifactNix({

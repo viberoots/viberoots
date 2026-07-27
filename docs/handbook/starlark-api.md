@@ -42,6 +42,8 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `rust_library`
   - `rust_static_library`
   - `rust_cdylib`
+  - `rust_c_ffi_library`
+  - `rust_cxx_bridge_library`
   - `rust_proc_macro`
   - `rust_binary`
   - `rust_test`
@@ -1606,12 +1608,10 @@ Public args:
 - `nixpkg_deps` list of strings. Declared nixpkgs packages available to Cargo build scripts.
 - `nixpkgs_profile` string. Named source profile for the toolchain and unpinned native dependencies; defaults to `default`.
 - `nixpkg_pins` dict. Per-attribute source-profile overrides with a non-empty rationale.
-- `link_deps` list of native C/C++ library labels for `rust_library`, `rust_binary`, and
-  `rust_test`. Ordinary `deps` never implies native linking.
-- `header_deps` list of native C/C++ header or library labels available to native Cargo build
-  scripts.
-- `link_closure` string, `direct` or `transitive`; defaults to `direct`.
-- `link_closure_overrides` dict. Every key must be present in `link_deps`.
+- `link_deps`, `header_deps`, `link_closure`, and `link_closure_overrides` are not public ordinary
+  Rust arguments. They are accepted only by `rust_c_ffi_library` and
+  `rust_cxx_bridge_library`, where the generated binding configuration is ABI authority.
+  Handwritten `extern` declarations cannot opt an ordinary Rust target into native linking.
 
 Cross-root Rust entries in `deps` must match reviewed Cargo path dependencies exactly. The path
 must normalize to the dependency target's repository-relative Cargo root without escaping the
@@ -1622,12 +1622,32 @@ transitive source closure; Buck `.rlib` outputs are not injected into Cargo.
 ### `rust_static_library(name, **kwargs)`
 
 Builds the Cargo library as `staticlib` and exposes a deterministic `lib<name>.a` Buck artifact.
-It accepts the native library arguments documented for `rust_library`.
+It accepts the ordinary non-interop library arguments documented for `rust_library`.
 
 ### `rust_cdylib(name, **kwargs)`
 
 Builds the Cargo library as `cdylib` and normalizes the platform dynamic-library output to the
 deterministic Buck artifact `lib<name>.cdylib`. Runtime native dependencies remain explicit.
+
+### `rust_c_ffi_library(name, binding_config, artifact = "static", **kwargs)`
+
+Builds an explicit C ABI outcome. `artifact` is `static` or `shared`; the macro fixes Cargo to
+`staticlib` or `cdylib`. `binding_config` is package-local reviewed JSON using schema
+`viberoots.rust-interop.v1`. The pinned Nix generator installs `<public_crate>.h` and a binding
+manifest and injects generated Rust import declarations/export signature checks. Only
+`panic_strategy = "abort"` and `thread_safety = "send-sync"` are implemented; allocator ownership
+is checked against explicit producer/destructor annotations. Native `link_deps`, `header_deps`,
+`link_closure`, and `link_closure_overrides` are available here because this macro supplies the
+reviewed generated ABI boundary.
+
+### `rust_cxx_bridge_library(name, binding_config, artifact = "static", **kwargs)`
+
+Builds the same stable C ABI artifact plus generated `<public_crate>.hpp` and `.cc` C++ bridge
+outputs. `exception_policy` is `noexcept` or `contained`; `cxx_standard` must match the pinned
+`c++17`/libc++ bridge standard. Exported callbacks require `contained`, the exact callback/context
+shape, and a typed callback fallback; callbacks under `noexcept` are rejected.
+C++ consumers list the target in both `link_deps` and `header_deps`. Direct Rust C++ ABI exposure
+and cross-language unwinding are unsupported.
 
 ### `rust_proc_macro(name, **kwargs)`
 

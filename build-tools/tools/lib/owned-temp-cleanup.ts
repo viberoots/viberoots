@@ -9,9 +9,16 @@ async function makeOwnedTreeWritable(target: string): Promise<void> {
     throw error;
   });
   if (!stat || stat.isSymbolicLink()) return;
-  await fsp.chmod(target, stat.mode | (stat.isDirectory() ? 0o700 : 0o600));
+  await fsp
+    .chmod(target, stat.mode | (stat.isDirectory() ? 0o700 : 0o600))
+    .catch((error: NodeJS.ErrnoException) => {
+      if (error.code !== "ENOENT") throw error;
+    });
   if (!stat.isDirectory()) return;
-  const entries = await fsp.readdir(target);
+  const entries = await fsp.readdir(target).catch((error: NodeJS.ErrnoException) => {
+    if (error.code === "ENOENT") return [];
+    throw error;
+  });
   for (const entry of entries) await makeOwnedTreeWritable(path.join(target, entry));
 }
 

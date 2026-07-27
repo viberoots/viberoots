@@ -159,9 +159,14 @@ let
       generated_outputs = first [ (ctx.get node "generated_outputs") [] ];
       cargo_output_hashes = first [ (ctx.get node "cargo_output_hashes") {} ];
       cargo_fixed_sources = first [ (ctx.get node "cargo_fixed_sources") {} ];
-      patchInputs = builtins.filter builtins.pathExists
-        (map (dir: builtins.toPath "${ctx.repoRootStr}/${root}/${dir}")
-          (if patchDirs == null then [] else patchDirs));
+      patchInputs = map
+        (candidate: builtins.path {
+          path = builtins.toPath candidate;
+          name = "rust-package-patches";
+        })
+        (builtins.filter builtins.pathExists
+          (map (dir: "${ctx.repoRootStr}/${root}/${dir}")
+            (if patchDirs == null then [] else patchDirs)));
     };
 in {
   mergeAuthorities = field: roots:

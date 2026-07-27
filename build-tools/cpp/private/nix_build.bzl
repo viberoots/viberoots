@@ -150,6 +150,12 @@ cpp_nix_build = rule(
         "link_closure": attrs.string(default = "direct"),
         "link_closure_overrides": attrs.dict(key = attrs.label(), value = attrs.string(), default = {}),
         "link_mode": attrs.string(default = "static"),
+        "language_standard": attrs.string(default = "c++17"),
+        "compiler_family": attrs.string(default = "llvm"),
+        "compiler_identity": attrs.string(default = "selected-llvm"),
+        "stl": attrs.string(default = "libc++"),
+        "target_triple": attrs.string(),
+        "module_surface": attrs.string(default = ""),
         "nixpkgs_profile": attrs.string(default = "default"),
         "nixpkg_pins": attrs.dict(key = attrs.string(), value = attrs.dict(key = attrs.string(), value = attrs.string()), default = {}),
         "srcs": attrs.list(attrs.source(), default = []),  # include local patch files as inputs

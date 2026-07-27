@@ -12,6 +12,7 @@ export type NixStoreMaterializationManifest = {
   schemaVersion: "viberoots.nix-store-materialization.v1";
   sourceRevision: string;
   sourceSnapshot: string;
+  flakeDir?: string;
   flakeLockFingerprint: string;
   substituter: {
     endpointIdentity?: string;
@@ -28,6 +29,17 @@ export function parseMaterializationManifest(input: unknown): NixStoreMaterializ
   if (data?.schemaVersion !== SCHEMA) throw new Error(`manifest schemaVersion must be ${SCHEMA}`);
   requireString(data.sourceRevision, "sourceRevision");
   requireStorePath(data.sourceSnapshot, "sourceSnapshot");
+  if (data.flakeDir !== undefined) {
+    requireString(data.flakeDir, "flakeDir");
+    if (
+      String(data.flakeDir).startsWith("/") ||
+      String(data.flakeDir)
+        .split("/")
+        .some((part) => part === "" || part === "." || part === "..")
+    ) {
+      throw new Error("flakeDir must be a normalized relative path");
+    }
+  }
   requireString(data.flakeLockFingerprint, "flakeLockFingerprint");
   requireStorePath(data.tools?.nix, "tools.nix");
   if (data.substituter?.endpointIdentity) {

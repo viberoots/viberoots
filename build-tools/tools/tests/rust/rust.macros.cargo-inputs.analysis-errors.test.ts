@@ -93,7 +93,10 @@ test("rust macros reject noncanonical Cargo inputs, patch traversal, and unknown
     );
     const invalidOverride = await query();
     assert.notEqual(invalidOverride.exitCode, 0);
-    assert.match(String(invalidOverride.stderr || invalidOverride.stdout), /keys must be present/);
+    assert.match(
+      String(invalidOverride.stderr || invalidOverride.stdout),
+      /native link_deps\/header_deps are private bridge wiring/,
+    );
 
     await fsp.writeFile(
       targets,
