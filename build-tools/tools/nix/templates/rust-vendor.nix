@@ -1,4 +1,13 @@
-{ pkgs, cargoRoot, cargoRootRel ? ".", cargoLock, cargoOutputHashes ? {}, cargoFixedSources ? {}, sourceComposition ? null }:
+{
+  pkgs,
+  rustPlatform ? pkgs.viberootsRustPlatform,
+  cargoRoot,
+  cargoRootRel ? ".",
+  cargoLock,
+  cargoOutputHashes ? {},
+  cargoFixedSources ? {},
+  sourceComposition ? null,
+}:
 let
   lib = pkgs.lib;
   packages = builtins.filter (package: package ? source)
@@ -66,7 +75,7 @@ let
           "Rust registry materialization contains unsupported or ambient inputs for ${key}: ${lib.concatStringsSep ", " unsupportedFixedKeys}"
         else if fixed == null then
           if package.source == "registry+https://github.com/rust-lang/crates.io-index"
-          then "${pkgs.rustPlatform.importCargoLock { lockFile = singleLock; }}/${package.name}-${package.version}"
+          then "${rustPlatform.importCargoLock { lockFile = singleLock; }}/${package.name}-${package.version}"
           else builtins.throw "Rust alternate registry materialization is unavailable: ${key}"
         else if (fixed.source or "") != package.source
           || (fixed.checksum or "") != (package.checksum or "")

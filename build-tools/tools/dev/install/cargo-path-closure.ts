@@ -1,6 +1,5 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
-import fg from "fast-glob";
 
 function unquote(value: string): string {
   const trimmed = value.trim();
@@ -131,15 +130,15 @@ export function cargoManifestWorkspace(source: string): CargoWorkspace {
 
 async function workspaceMemberRoots(root: string, workspace: CargoWorkspace): Promise<string[]> {
   if (workspace.members.length === 0) return [];
-  const members = await fg(workspace.members, {
+  const members: string[] = [];
+  for await (const member of fsp.glob(workspace.members, {
     cwd: root,
-    onlyDirectories: true,
-    unique: true,
-    dot: true,
-    followSymbolicLinks: false,
-    ignore: workspace.exclude,
-  });
-  return members.map((member) => path.resolve(root, member)).sort();
+    exclude: workspace.exclude,
+  })) {
+    const entry = await fsp.lstat(path.join(root, member));
+    if (entry.isDirectory() && !entry.isSymbolicLink()) members.push(member);
+  }
+  return [...new Set(members)].map((member) => path.resolve(root, member)).sort();
 }
 
 export async function reachableCargoRoots(

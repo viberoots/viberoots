@@ -21,6 +21,8 @@ test("artifact transport constructs Nix authority from the canonical tool closur
     NIX_SSL_CERT_FILE: "/tmp/host-cert.pem",
     DEV_BUILD_LOW_SPACE_GB: "0",
     VBR_GC_MODE: "off",
+    VBR_NIX_DIRENV_DIRENVRC:
+      "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nix-direnv-3.1.0/share/nix-direnv/direnvrc",
     VBR_VERIFY_LOCK_DIR: "/tmp/verify-lock",
   });
   const env = remoteCiToolsPathEnv(tools, transport);
@@ -33,6 +35,10 @@ test("artifact transport constructs Nix authority from the canonical tool closur
   assert.equal(env.NIX_CONFIG, undefined);
   assert.equal(transport.DEV_BUILD_LOW_SPACE_GB, "0");
   assert.equal(transport.VBR_GC_MODE, "off");
+  assert.equal(
+    transport.VBR_NIX_DIRENV_DIRENVRC,
+    "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-nix-direnv-3.1.0/share/nix-direnv/direnvrc",
+  );
   assert.equal(transport.VBR_VERIFY_LOCK_DIR, "/tmp/verify-lock");
   assert.throws(
     () => remoteCiToolsPathEnv(tools, { WORKSPACE_ROOT: "/host/workspace" }),

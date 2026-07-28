@@ -6,6 +6,7 @@ import {
   canonicalArtifactToolsRoot,
   withoutArtifactEnvironmentInfluence,
 } from "../../lib/artifact-environment";
+import { artifactNixExperimentalFeatureArgs } from "../../lib/artifact-nix-policy";
 import {
   materializeNixStorePaths,
   parseMaterializationManifest,
@@ -28,8 +29,7 @@ export async function assertPreparedRemoteMaterialization(options: {
     artifactToolsRoot,
     baseEnv: withoutArtifactEnvironmentInfluence(hostileWorkerEnv),
     args: [
-      "--extra-experimental-features",
-      "nix-command flakes",
+      ...artifactNixExperimentalFeatureArgs(),
       "build",
       "--accept-flake-config",
       "--no-write-lock-file",

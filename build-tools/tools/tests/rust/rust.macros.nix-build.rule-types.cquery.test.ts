@@ -4,6 +4,12 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import {
+  assertRustNixRuleKinds,
+  assertWasmCqueryContract,
+  wasmDeclarations,
+  writeWasmContractFiles,
+} from "./rust-wasm-cquery-fixture";
 
 function firstCqueryNode<T>(json: unknown): T | null {
   if (Array.isArray(json)) return (json[0] as T) ?? null;
@@ -26,6 +32,7 @@ test("rust macros export native build, test, and source-selection contracts", as
       "utf8",
     );
     await fs.writeFile(path.join(appDir, "src", "main.rs"), "fn main(){}\n", "utf8");
+    await writeWasmContractFiles(appDir);
     await fs.writeFile(
       path.join(appDir, "Cargo.toml"),
       '[package]\nname="rustapp"\nversion="0.1.0"\nedition="2021"\n',
@@ -48,13 +55,14 @@ test("rust macros export native build, test, and source-selection contracts", as
     await fs.writeFile(
       path.join(appDir, "TARGETS"),
       [
-        'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_cdylib", "rust_library", "rust_node_addon", "rust_proc_macro", "rust_python_extension", "rust_static_library", "rust_test", "rust_wasi_binary", "rust_wasm_library")',
+        'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_cdylib", "rust_library", "rust_node_addon", "rust_proc_macro", "rust_python_extension", "rust_static_library", "rust_test", "rust_wasi_binary", "rust_wasm_browser_package", "rust_wasm_component", "rust_wasm_library", "rust_wasm_static_library")',
         "",
         'rust_library(name = "lib", crate = "rustapp", cargo_output_hashes = {"remote-1.0.0": "sha256-fixture"}, cargo_fixed_sources = {"remote@1.0.0#registry+https://registry.example/index": "{\\"source\\":\\"registry+https://registry.example/index\\"}"}, features = ["demo"], default_features = False, nixpkg_deps = ["pkgs.zlib"], nixpkgs_profile = "default", nixpkg_pins = {"pkgs.zlib": {"nixpkgs_profile": "default", "rationale": "fixture"}}, srcs = ["src/lib.rs"])',
         'rust_binary(name = "app", crate = "rustapp", srcs = ["src/main.rs"], deps = [":lib"])',
         'rust_test(name = "test", crate = "rustapp", srcs = ["src/lib.rs"])',
         'rust_wasm_library(name = "raw", crate = "rustapp", srcs = ["src/lib.rs"])',
         'rust_wasi_binary(name = "wasi", crate = "rustapp", srcs = ["src/main.rs"])',
+        ...wasmDeclarations,
         'rust_static_library(name = "static", crate = "rustapp", public_crate = "rust_public", srcs = ["src/lib.rs"])',
         'rust_cdylib(name = "dynamic", crate = "rustapp", srcs = ["src/lib.rs"])',
         'rust_proc_macro(name = "derive_demo", crate = "rustapp", generated_outputs = ["generated.rs"], srcs = ["src/lib.rs"])',
@@ -92,16 +100,8 @@ test("rust macros export native build, test, and source-selection contracts", as
     })`buck2 cquery --target-platforms //:no_cgo "kind(genrule, //projects/apps/rustapp:lib)"`;
     assert.equal(String(genruleProbe.stdout || "").trim(), "");
 
-    const testProbe = await $({ cwd: tmp, stdio: "pipe" })`
-      buck2 cquery --target-platforms //:no_cgo "kind(rust_nix_test, //projects/apps/rustapp:test)"
-    `;
-    assert.match(String(testProbe.stdout || ""), /rustapp:test/);
-    for (const name of ["raw", "wasi", "pyext", "addon"]) {
-      const wasmProbe = await $({ cwd: tmp, stdio: "pipe" })`
-        buck2 cquery --target-platforms //:no_cgo "kind(rust_nix_build, //projects/apps/rustapp:${name})"
-      `;
-      assert.match(String(wasmProbe.stdout || ""), new RegExp(`rustapp:${name}`));
-    }
+    await assertRustNixRuleKinds($);
+    await assertWasmCqueryContract(tmp, $);
 
     const extensionFields = await $({
       cwd: tmp,

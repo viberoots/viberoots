@@ -9,6 +9,7 @@
   targetName,
   artifactDir,
   dynamicExtension,
+  wasm ? {},
 }:
 if kind == "bin" then ''
   runHook preInstall
@@ -25,9 +26,67 @@ if kind == "bin" then ''
   EOF
   chmod +x "$out/bin/${targetName}"
   runHook postInstall
-'' else if kind == "wasm" then ''
+'' else if builtins.elem kind [ "wasm" "wasm_browser" "wasm_component" ] then ''
   runHook preInstall
   install -Dm644 "${targetDir}/${lib.replaceStrings ["-"] ["_"] crate}.wasm" "$out/lib/${crate}.wasm"
+  runHook postInstall
+'' else if builtins.elem kind [ "wasm_static" "wasi_static" ] then ''
+  runHook preInstall
+  candidate="${targetDir}/lib${lib.replaceStrings ["-"] ["_"] crate}.a"
+  test -f "$candidate" || { echo "rust WASM staticlib ${crate}: expected $candidate" >&2; exit 2; }
+  normalized="$TMPDIR/lib${publicCrate}.a"
+  members="$TMPDIR/viberoots-rust-wasm-members"
+  mkdir -p "$members"
+  ${pkgs.python3}/bin/python - "$candidate" "$members" <<'PY'
+  import pathlib, sys
+  source, destination = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+  data = source.read_bytes()
+  if not data.startswith(b"!<arch>\n"):
+      raise SystemExit("Rust WASM static archive has an unsupported container")
+  def trim_bsd_padding(payload):
+      cursor = 8
+      while cursor < len(payload):
+          if all(byte == 10 for byte in payload[cursor:]):
+              return payload[:cursor]
+          cursor += 1
+          size = 0
+          shift = 0
+          while cursor < len(payload):
+              byte = payload[cursor]
+              cursor += 1
+              size |= (byte & 127) << shift
+              if byte & 128 == 0:
+                  break
+              shift += 7
+          else:
+              raise SystemExit("Rust WASM static archive contains a truncated section size")
+          cursor += size
+          if cursor > len(payload):
+              raise SystemExit("Rust WASM static archive contains a truncated object member")
+      return payload
+  offset = 8
+  index = 0
+  while offset < len(data):
+      header = data[offset:offset + 60]
+      if len(header) != 60 or header[58:60] != b"`\n":
+          raise SystemExit("Rust WASM static archive has a malformed member header")
+      size = int(header[48:58].decode().strip())
+      name = header[:16].decode(errors="replace").strip()
+      payload = data[offset + 60:offset + 60 + size]
+      if name.startswith("#1/"):
+          name_size = int(name[3:])
+          name = payload[:name_size].rstrip(b"\0").decode(errors="replace")
+          payload = payload[name_size:]
+      if name.rstrip("/") not in {"", "__.SYMDEF", "__.SYMDEF SORTED"} and payload.startswith(b"\0asm"):
+          (destination / f"{index:06d}.o").write_bytes(trim_bsd_padding(payload))
+          index += 1
+      offset += 60 + size + (size % 2)
+  if index == 0:
+      raise SystemExit("Rust WASM static archive contains no WebAssembly object members")
+  PY
+  ${pkgs.llvmPackages.llvm}/bin/llvm-ar --format=gnu rcsD "$normalized" "$members"/*.o
+  install -Dm644 "$normalized" "$out/lib/lib${publicCrate}.a"
+  install -Dm644 ${wasm.header} "$out/include/$(basename ${wasm.header})"
   runHook postInstall
 '' else if kind == "test" then ''
   runHook preInstall

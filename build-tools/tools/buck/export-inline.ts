@@ -7,7 +7,7 @@ import { artifactGraphQueryRoots } from "./artifact-graph-query-roots";
 import { normalizeTargetLabel } from "../lib/labels";
 import { resolveWorkspaceRootSync } from "../lib/repo";
 import { normalizeNixpkgPins, normalizeNixpkgsProfile } from "./source-selection";
-import { DEPLOYMENT_CQUERY_ATTRS } from "../deployments/deployment-query-attrs";
+import { attrList } from "./exporter/cquery/attrs";
 import { canonicalWorkspaceGraphOutput } from "./exporter/cquery/nodes";
 
 type InlineExportOptions = {
@@ -20,82 +20,6 @@ type InlineExportOptions = {
   env?: NodeJS.ProcessEnv;
   buck2Bin?: string;
 };
-
-function buildAttrs(): string[] {
-  return Array.from(
-    new Set([
-      "name",
-      "rule_type",
-      "buck.type",
-      "module",
-      "build_py_deps",
-      "runtime_deps",
-      "addon_name",
-      "node_api_version",
-      "platform",
-      "python_abi",
-      "srcs",
-      "buck.srcs",
-      "nix_srcs",
-      "deps",
-      "link_deps",
-      "header_deps",
-      "link_closure",
-      "link_closure_overrides",
-      "link_mode",
-      "nixpkgs_profile",
-      "nixpkg_pins",
-      "cargo_manifest",
-      "cargo_lock",
-      "cargo_root",
-      "cargo_package",
-      "cargo_lock_identity",
-      "cargo_output_hashes",
-      "cargo_fixed_sources",
-      "crate",
-      "public_crate",
-      "crate_type",
-      "host_role",
-      "generated_outputs",
-      "binding_config",
-      "interop_kind",
-      "interop_generator",
-      "panic_strategy",
-      "exception_policy",
-      "allocator",
-      "thread_safety",
-      "cxx_standard",
-      "c_standard",
-      "compiler_family",
-      "compiler_identity",
-      "stl",
-      "module_surface",
-      "language_standard",
-      "target_triple",
-      "features",
-      "default_features",
-      "profile",
-      "target",
-      "local_patch_dirs",
-      "buck.link_mode",
-      "buck.link_kind",
-      "buck.deps",
-      "labels",
-      "buck.labels",
-      "args",
-      "env",
-      "cmd",
-      "out",
-      "main",
-      "main_class",
-      "includes",
-      "defines",
-      "cflags",
-      "ldflags",
-      ...DEPLOYMENT_CQUERY_ATTRS,
-    ]),
-  );
-}
 
 function buildIsolationArgs(env: NodeJS.ProcessEnv = process.env): {
   isoArgs: string[];
@@ -121,8 +45,7 @@ function buildQuery(opts: { target?: string; roots: string[] }): string {
 }
 
 export function buildInlinePlan(options: InlineExportOptions) {
-  const attrs = buildAttrs();
-  const flags = attrs.flatMap((a) => ["--output-attribute", a]);
+  const flags = attrList.flatMap((a) => ["--output-attribute", a]);
   const { isoArgs, useIso, iso } = buildIsolationArgs(options.env);
   const platformFlags = options.includeTargetPlatforms
     ? ["--target-platforms", "prelude//platforms:default"]

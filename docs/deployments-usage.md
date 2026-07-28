@@ -28,6 +28,8 @@ Use the deeper docs when needed:
   for reviewed provider-specific support and constraints
 - [Deployment Scenarios](deployment-scenarios.md)
   for canonical scenario-by-scenario expectations
+- [Rust WebAssembly Operations](handbook/rust-wasm-operations.md)
+  for manifest-driven browser, SSR/service, and component artifact consumption
 - [NixOS Shared Host Usage](nixos-shared-host-usage.md)
   for the reviewed `mini` host workflow and the start-here path for first-time
   `mini` setup

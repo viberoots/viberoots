@@ -8,12 +8,16 @@ import {
   materializeNixStorePaths,
   parseMaterializationManifest,
 } from "../../remote-exec/nix-store-materialize";
-import { REVIEWED_EVIDENCE_PUBLIC_KEY } from "../../lib/artifact-nix-policy";
+import {
+  artifactNixExperimentalFeatureArgs,
+  REVIEWED_EVIDENCE_PUBLIC_KEY,
+} from "../../lib/artifact-nix-policy";
 import {
   buildSelectedOutPath,
   reconcileTempDependencyInputs,
   runInTemp,
 } from "../lib/test-helpers";
+import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool";
 import { writeRustExtensionRuntimeFixture } from "./rust-extension-runtime-fixture";
 
 test("Rust extensions survive remote preparation and a credential-free binary cache handoff", async () => {
@@ -29,12 +33,13 @@ test("Rust extensions survive remote preparation and a credential-free binary ca
     await fs.mkdir(cache, { recursive: true });
     const artifactToolsRoot = canonicalArtifactToolsRoot(tmp);
     const nix = path.join(artifactToolsRoot, "bin/nix");
+    const nixFeatures = artifactNixExperimentalFeatureArgs();
     const secretKey = path.join(tmp, "test-cache-secret-key");
     const secret = String(
       await $({
         cwd: tmp,
         stdio: "pipe",
-      })`${nix} key generate-secret --key-name viberoots-test-cache-1`,
+      })`${nix} ${nixFeatures} key generate-secret --key-name viberoots-test-cache-1`,
     );
     await fs.writeFile(secretKey, secret, { mode: 0o600 });
     const testPublicKey = String(
@@ -42,16 +47,16 @@ test("Rust extensions survive remote preparation and a credential-free binary ca
         cwd: tmp,
         input: secret,
         stdio: "pipe",
-      })`${nix} key convert-secret-to-public`,
+      })`${nix} ${nixFeatures} key convert-secret-to-public`,
     ).trim();
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`${nix} copy --to ${`file://${cache}`} ${outputs}`;
+    })`${nix} ${nixFeatures} copy --to ${`file://${cache}`} ${outputs}`;
     await $({
       cwd: tmp,
       stdio: "pipe",
-    })`${nix} --store ${`file://${cache}`} store sign --key-file ${secretKey} --recursive ${outputs}`;
+    })`${nix} ${nixFeatures} --store ${`file://${cache}`} store sign --key-file ${secretKey} --recursive ${outputs}`;
     const generated = await Promise.all(
       outputs.map(async (output) =>
         JSON.parse(
@@ -82,7 +87,7 @@ test("Rust extensions survive remote preparation and a credential-free binary ca
         cwd: tmp,
         stdio: "pipe",
         nothrow: true,
-      })`${nix} --store ${coldUri} path-info ${output}`;
+      })`${nix} ${nixFeatures} --store ${coldUri} path-info ${output}`;
       assert.notEqual(coldProbe.exitCode, 0, `cold store unexpectedly contained ${output}`);
     }
     const reports = await materializeNixStorePaths({
@@ -114,17 +119,20 @@ test("Rust extensions survive remote preparation and a credential-free binary ca
     const isolatedNode = path.join(tmp, "isolated-runtime/node");
     await fs.cp(path.join(physical[0], "site"), isolatedPy, { recursive: true });
     await fs.cp(path.join(physical[1], "lib"), isolatedNode, { recursive: true });
+    assert.ok((await fs.readdir(path.join(isolatedNode, "runtime"))).length >= 2);
     const pyExtension = path.join(
       isolatedPy,
       "demo",
       (await fs.readdir(path.join(isolatedPy, "demo"))).find((file) => file.startsWith("_native"))!,
     );
     const addon = path.join(isolatedNode, "rust_native.node");
+    const readelf =
+      process.platform === "darwin" ? null : await resolvePinnedTestToolPath("readelf", $);
     for (const binary of [pyExtension, addon]) {
       const dependencyReport =
         process.platform === "darwin"
           ? await $({ cwd: tmp, stdio: "pipe" })`/usr/bin/otool -L ${binary}`
-          : await $({ cwd: tmp, stdio: "pipe" })`readelf -d ${binary}`;
+          : await $({ cwd: tmp, stdio: "pipe" })`${readelf!} -d ${binary}`;
       assert.doesNotMatch(
         String(dependencyReport.stdout),
         /\/nix\/store\/.*extension-(?:base|c)/,
@@ -156,7 +164,7 @@ test("Rust extensions survive remote preparation and a credential-free binary ca
       cwd: tmp,
       stdio: "pipe",
       nothrow: true,
-    })`${process.execPath} -e "require(process.argv[1])" ${noRuntimeAddon}`;
+    })`${process.execPath} -e "require(process.argv[1]).answer()" ${noRuntimeAddon}`;
     assert.notEqual(
       noFallback.exitCode,
       0,

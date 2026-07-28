@@ -19,6 +19,7 @@
   cpp = {
     plannerStubs = [ { nameSuffix = "__planner"; kind = "test"; } ];
     labelPriorityPre = [
+      { label = "kind:wasm"; kind = "lib"; }
       { label = "kind:test"; kind = "test"; }
       { label = "kind:bin"; kind = "bin"; }
       { label = "kind:headers"; kind = "headers"; }

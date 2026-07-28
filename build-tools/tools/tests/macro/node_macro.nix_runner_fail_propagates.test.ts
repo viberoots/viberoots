@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { nestedBuckTestArgs, runInTemp } from "../lib/test-helpers";
 import {
   DEFAULT_TEMP_REPO_GLUE_STAGE_PATHS,
   stageTempRepoPaths,
@@ -99,7 +99,7 @@ test(
         cwd: tmp,
         stdio: "pipe",
         env: graphEnv,
-      })`buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit`.nothrow();
+      })`buck2 test --target-platforms prelude//platforms:default //projects/libs/demo:unit -- ${nestedBuckTestArgs}`.nothrow();
       if (res.exitCode === 0) {
         console.error("[debug] buck2 exitCode=", res.exitCode);
         if (res.stdout) console.error("[debug] buck2 stdout:\n" + res.stdout);

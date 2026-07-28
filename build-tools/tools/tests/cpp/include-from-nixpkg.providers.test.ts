@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
+import { nestedBuckTestArgs, reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 import { copyViberootsSourcePath, viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 test("cpp gtest include via nixpkg_deps at call site", async () => {
@@ -78,6 +78,6 @@ nix_cpp_test(
     assert.ok(!rootTargets.includes("third_party/cpp:gtest"));
 
     // Build and run the test; explicit platform to bind toolchains
-    await $`buck2 test --target-platforms prelude//platforms:default //projects/apps/demo:demo_gtest`;
+    await $`buck2 test --target-platforms prelude//platforms:default //projects/apps/demo:demo_gtest -- ${nestedBuckTestArgs}`;
   });
 });

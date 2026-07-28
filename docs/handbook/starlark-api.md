@@ -10,6 +10,7 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `nix_go_test`
   - `nix_go_carchive`
   - `nix_go_tiny_wasm_lib`
+  - `nix_go_tiny_wasm_static_lib`
 - `@viberoots//build-tools/cpp:defs.bzl`
   - `nix_cpp_library`
   - `nix_cpp_binary`
@@ -49,6 +50,9 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `rust_test`
   - `rust_wasm_library`
   - `rust_wasi_binary`
+  - `rust_wasm_static_library`
+  - `rust_wasm_browser_package`
+  - `rust_wasm_component`
   - `rust_python_extension`
   - `rust_python_wasm_extension`
   - `rust_node_addon`
@@ -311,6 +315,14 @@ Public args:
 ### `nix_go_tiny_wasm_lib(name, **kwargs)`
 
 Use this for a TinyGo WebAssembly library output.
+
+`nix_go_tiny_wasm_static_lib` uses the same source and link-intent arguments but emits a
+deterministic static WebAssembly archive. It requires a package-local `wasm_header`, accepts
+`wasm_abi = "bare"`, and publishes exact target, allocator, libc, exception, and link-only runtime
+authority for compatible Rust and C++ consumers. A TinyGo WASI static archive is rejected because
+its allocator symbols conflict with final WASI runtime ownership. TinyGo module consumers support
+bare or WASI and accept reviewed Rust and C++ static producers; TinyGo-to-TinyGo archive linking is
+not supported.
 
 Public args:
 
@@ -1698,17 +1710,53 @@ Use this for native Cargo tests. It accepts the same Cargo, source-selection, de
 label, and visibility arguments as `rust_library`. Buck executes the Nix-built Cargo harnesses
 through a bounded project-relative external runner. Tests are not runnable application entries.
 
-### `rust_wasm_library(name, **kwargs)`
+### `rust_wasm_library(name, wasm_abi = "bare", **kwargs)`
 
-Builds a freestanding `wasm32-unknown-unknown` Cargo `cdylib` and emits `<name>.wasm`. It accepts
-the shared Cargo, patch, and source-selection arguments. `link_deps` and `header_deps` are rejected;
-cross-language WebAssembly linking is deferred to the reviewed PR-9 contract.
+Builds a Cargo `cdylib` for `wasm32-unknown-unknown` or `wasm32-wasip1` and emits `<name>.wasm`.
+It accepts the shared Cargo, patch, and source-selection arguments. Compatible Rust/C++ static WASM
+libraries may be supplied through `link_deps`, `link_closure`, and `link_closure_overrides`.
+See [Rust WebAssembly Operations](rust-wasm-operations.md) for browser, component, staging, and
+deployment workflows.
 
 ### `rust_wasi_binary(name, **kwargs)`
 
 Builds a `wasm32-wasip1` Cargo binary and emits `<name>.wasm` for a WASI preview1 runtime.
-`link_deps` and `header_deps` are rejected; cross-language WebAssembly linking is deferred to the
-reviewed PR-9 contract.
+Compatible WASI static libraries use the same explicit link-intent arguments.
+
+### `rust_wasm_static_library(name, wasm_abi = "bare", **kwargs)`
+
+Builds a Cargo `staticlib` for `wasm32-unknown-unknown` or `wasm32-wasip1`. `wasm_header` is a
+required package-local C header installed beside the archive. The target publishes a versioned
+module-surface companion and may participate in Rust and TinyGo direct/transitive link closure.
+`wasm_optimize` and `wasm_debug` set the Rust compile-time optimization and debuginfo policy for
+every relocatable member; final-module Binaryen transforms are intentionally not applied. Static libraries reject
+`exported_functions` because the final linked module, rather than an archive, owns its exports.
+
+### `rust_wasm_browser_package(name, **kwargs)`
+
+Builds a freestanding Cargo `cdylib`, runs pinned wasm-bindgen, and exposes a directory containing
+JavaScript, TypeScript declarations, `<crate>_bg.wasm`, and `package.json`. `exported_functions`
+is an optional allowlist; `wasm_optimize` is `none`, `speed`, or `size`; `wasm_debug` controls
+stripping; and `wasm_source_map` explicitly enables a source map. The directory can be consumed by
+`node_asset_stage`; its background module can also be selected by `artifact_name` for staging or
+inline generation.
+
+### `rust_wasm_component(name, wit, wit_world, **kwargs)`
+
+Builds and validates a component from a package-local WIT file and explicit world.
+`component_adapter` is `none` or `wasi-preview1-reactor`; WASI requires the pinned reactor adapter
+and bare components require `none`. Command components are not exposed through this library-shaped
+macro. The Nix output includes the component, normalized WIT, and a provenance manifest naming all
+tools and the selected adapter. `exported_functions` is validated against the emitted component WIT
+world, not merely against pre-component core-WASM symbols.
+
+All Rust WASM macros accept `wasm_optimize` and `wasm_debug`. Module, WASI binary, browser, and
+component macros accept `exported_functions`; it is an enforced output allowlist, with only
+ABI-required runtime exports retained. Components apply it to the selected WIT world. Only browser
+packages accept `wasm_source_map`. Public Buck outputs are typed family directories preserving the
+primary artifact, reviewed header or normalized WIT, and producer manifests. WASM targets reject
+native `header_deps` and nixpkg inputs and compare ABI, target, allocator, exception, and runtime
+authority on every static link edge.
 
 ### `rust_python_extension(name, module, **kwargs)`
 

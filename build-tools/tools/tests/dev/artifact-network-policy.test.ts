@@ -29,6 +29,7 @@ function productionFiles(root: string): string[] {
 
 test("policy command fixes sandbox, builders, and keys without rebuilding cache policy", () => {
   const args = artifactNixPolicyArgs();
+  assert.equal(args[args.indexOf("--extra-experimental-features") + 1], "nix-command flakes");
   for (const required of [
     "sandbox",
     "sandbox-fallback",
@@ -110,6 +111,7 @@ test("only cache-health renderers construct substituter configuration", () => {
       "build-tools/lang/nix_cache_health.bzl",
       "build-tools/tools/bin/devshell-cache-health.sh",
       "build-tools/tools/dev/verify/nix-cache-health.ts",
+      "build-tools/tools/dev/verify/nix-cache-health-config.ts",
       "build-tools/tools/lib/consumer-direnv.ts",
     ].map(viberootsSourcePath),
   );

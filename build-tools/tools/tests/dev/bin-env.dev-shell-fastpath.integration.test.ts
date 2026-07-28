@@ -70,9 +70,16 @@ test("devshell.sh supports safe direnv bypass fast-path", async () => {
     throw new Error("devshell.sh fast-path must preserve BUCK_CONFIG_LOCK on direct exec");
   }
   if (
-    !txt.includes('[[ -f "${cwd_root}/build-tools/tools/dev/viberoots.ts" && -x "${cwd_tool}" ]]')
+    !txt.includes(
+      '[[ ! -f "${cwd_source_root}/build-tools/tools/dev/viberoots.ts" && -f "${cwd_root}/viberoots/build-tools/tools/dev/viberoots.ts" ]]',
+    ) ||
+    !txt.includes(
+      '[[ -f "${cwd_source_root}/build-tools/tools/dev/viberoots.ts" && -x "${cwd_tool}" ]]',
+    )
   ) {
-    throw new Error("devshell.sh must only re-exec root build-tools from a viberoots source root");
+    throw new Error(
+      "devshell.sh must re-exec source-owned build-tools before stale generated authority",
+    );
   }
   if (
     !txt.includes('local prelude_path="${live_root}/.viberoots/workspace/prelude"') ||
@@ -100,6 +107,58 @@ test("devshell.sh supports safe direnv bypass fast-path", async () => {
     throw new Error(
       "devshell.sh prelude materialization must override and cache by the selected viberoots flake input root",
     );
+  }
+});
+
+test("stale generated wrappers re-exec the consumer's source-owned command", async () => {
+  const source = await readRepoFile("build-tools/tools/bin/devshell.sh");
+  const start = source.indexOf("env_reexec_from_cwd_repo() {");
+  const end = source.indexOf("\nenv_init_paths() {", start);
+  const fn = source.slice(start, end);
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-devshell-source-reexec-"));
+  try {
+    const staleBin = path.join(root, "stale/build-tools/tools/bin");
+    const sourceBin = path.join(root, "consumer/viberoots/build-tools/tools/bin");
+    const fakeBin = path.join(root, "fake-bin");
+    await Promise.all([
+      fsp.mkdir(staleBin, { recursive: true }),
+      fsp.mkdir(sourceBin, { recursive: true }),
+      fsp.mkdir(path.join(root, "consumer/viberoots/build-tools/tools/dev"), {
+        recursive: true,
+      }),
+      fsp.mkdir(fakeBin, { recursive: true }),
+    ]);
+    await fsp.writeFile(
+      path.join(sourceBin, "u"),
+      "#!/usr/bin/env bash\nprintf 'source-owned\\n'\n",
+      { mode: 0o755 },
+    );
+    await fsp.writeFile(
+      path.join(root, "consumer/viberoots/build-tools/tools/dev/viberoots.ts"),
+      "",
+    );
+    await fsp.writeFile(
+      path.join(fakeBin, "git"),
+      `#!/usr/bin/env bash\nprintf '%s\\n' ${JSON.stringify(path.join(root, "consumer"))}\n`,
+      { mode: 0o755 },
+    );
+    const { stdout } = await execFileAsync(
+      "/bin/bash",
+      [
+        "-c",
+        `${fn}\nexport ENV_SH_DIR="$1" PATH="$2:/usr/bin:/bin"; cd "$3"; env_reexec_from_cwd_repo`,
+        "u",
+        staleBin,
+        fakeBin,
+        path.join(root, "consumer"),
+      ],
+      { env: process.env },
+    );
+    if (stdout !== "source-owned\n") {
+      throw new Error(`expected source-owned wrapper re-exec, got ${JSON.stringify(stdout)}`);
+    }
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
   }
 });
 

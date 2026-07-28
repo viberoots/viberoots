@@ -34,6 +34,40 @@ When you add or change a macro, keep the wiring table-driven through shared help
   - Use `prepare_language_wiring(...)` with `wasm_variant = "<variant>"`.
     - This helper is non-mutating at the call-site boundary. Do not rely on helper-side mutation ordering; use the returned prepared `kwargs` for the underlying rule.
   - For planner-visible package-local WASM stubs, use `wire_package_local_wasm_planner_visible_stub(...)`.
+
+- **Typed WASM artifact families (Rust parity pattern)**
+  - Stamp ABI, target, link kind, allocator, exception, and runtime as typed exported attributes;
+    labels remain selection hints, not compatibility authority.
+  - Stamp libc authority independently from the target. Bare producers use `none`; reviewed WASI
+    producers use `wasi-libc`. Never infer missing producer authority from its language label.
+  - Resolve static archives through `dependencyArtifactOf` and the shared direct/transitive closure
+    so Rust, C++, and TinyGo do not grow language-pair-specific side channels.
+  - Make browser packages real directory outputs and give every artifact a versioned companion
+    module surface. Node staging then uses the existing bounded file/directory source resolver.
+  - Treat WIT world, adapter flavor, and tool identities as declared inputs and provenance. Required
+    adapters fail closed; optional cache/materialization integrations retain their existing
+    tolerance and must not become hidden host-tool fallbacks.
+  - Pin component adapter source/runtime versions whose declared Rust MSRV is no newer than the
+    reviewed compiler. Do not compile a moving runtime adapter with a newer fallback toolchain.
+  - Treat runtime evidence as a matrix over every advertised ABI and language direction. Compile
+    and execute each supported cell; reject an unimplemented cell during analysis and remove it
+    from public compatibility tables. Planner-only compatibility is not runtime evidence.
+  - A browser-target package needs a pinned real browser engine in its Nix closure. Exercise a
+    generated page and assert application behavior through that engine; Node, a DOM shim, and
+    structural HTML checks are useful secondary checks but are not browser evidence.
+  - Reject static artifacts whose runtime or allocator symbols cannot compose with the final
+    runtime. For example, a TinyGo WASI archive and Rust WASI libc both own allocator symbols; do
+    not advertise that archive direction from planner-only compatibility.
+  - Keep deployment consumption manifest-driven. Stage exact artifact names, content hashes, and
+    immutable producer identities, then make deployment packaging consume that manifest without
+    rescanning or rebuilding the producer.
+  - When consumers may select older nixpkgs pins, do not assume a versioned package attribute
+    exists. Thread a dedicated locked package-set input for the exact runtime and vendor closure;
+    do not re-vendor it with the consumer's older fetcher or apply a version-only override.
+  - When filtered consumers rewrite an immutable build-system input, migrate every exact lock input
+    owned by that build-system source. Copy the source lock's exact ref and node for missing, stale,
+    and already-present consumer states while preserving consumer-owned pins such as primary
+    `nixpkgs`.
 - **Dict-shaped `srcs`** (when wiring patches/providers/global inputs into dict-safe keys)
   - Do not hardcode reserved synthetic key prefixes. Import `PATCH_INPUTS_KEY_PREFIX`, `PROVIDER_EDGES_KEY_PREFIX`, `GLOBAL_NIX_INPUTS_KEY_PREFIX` from `//build-tools/lang:defs_common.bzl`.
   - Guardrails:
@@ -70,6 +104,9 @@ Define these contracts before implementing a new language route:
   artifacts explicitly. Host tools use the native host toolchain even during cross compilation;
   target artifacts use the requested target toolchain. Both run through the existing managed
   timeout/process-group boundary.
+- **Artifact-side Nix authority:** pass required reviewed experimental features (for example,
+  `nix-command flakes`) explicitly in the Nix argv. Never rely on ambient `NIX_CONFIG`; every
+  invocation must also carry the canonical reviewed or explicitly empty cache policy.
 - **Proof-bound snapshots:** a remote snapshot is evidence, not just copied bytes. Include the
   selected target and its complete declared provider/source closure, record a canonical composition
   manifest, and bind it with a digest. Assert selected evaluation, full evaluation, snapshot
@@ -131,6 +168,17 @@ A language is not integrated until its metadata lifecycle follows the repository
   `build-tools/tools/lib/tool-paths.ts` or emit an explicit Nix-store path from Nix. Do not fall back
   to a host tool. Nix itself is the bootstrap exception and may use
   `/nix/var/nix/profiles/default/bin/nix`.
+- Test and deployment helpers follow the same rule: resolve the canonical store-backed executable
+  explicitly and pass its absolute path to the process runner. Never invoke a bare executable and
+  depend on ambient `PATH`, even when artifact evidence has already admitted that tool.
+- Language and toolchain overlays may add `NIX_*_FOR_TARGET` and
+  `NIX_*_WRAPPER_TARGET_TARGET_*` variables to the development shell. Canonical command ingress
+  must capture these as verified devshell state and clear them before artifact admission. Add a
+  regression using the overlay's concrete variable names so ordinary `b` and `v` invocations do
+  not require caller-side environment cleanup.
+- Store-owned tool entrypoints must not resolve undeclared packages through `NODE_PATH`. Prefer a
+  pinned runtime built-in when it provides the required behavior; otherwise add the package to the
+  entrypoint's explicit store closure.
 
 Rust is currently enabled as an experimental scaffolded language with package-local Cargo
 authority. Each Cargo root owns its checked-in `Cargo.toml` and `Cargo.lock`. Plain `u` performs
@@ -344,6 +392,10 @@ Importer-local patch attachment uses `native.glob(...)`, which cannot reach acro
   - Per-module style: `module:<import>@<version>`
   - Lockfile style: `lockfile:<path>#<importer>`
 - Keep label strings stable; `gen-auto-map.ts` will map these to provider names.
+- Give semantically distinct target families distinct exported kinds and planner routes. For example,
+  bare and WASI static artifacts need separate kind labels, planner constructors, graph-dispatch
+  branches, and parity inventory. Do not relabel one family as another and rely on a later ABI field
+  to repair the route.
 
 4. Provider sync (optional/when patches exist)
 

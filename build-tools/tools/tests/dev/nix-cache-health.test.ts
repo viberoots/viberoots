@@ -89,6 +89,17 @@ async function generatedDevshellCacheHealthShell(): Promise<string> {
 
 async function withEnv<T>(env: NodeJS.ProcessEnv, fn: () => Promise<T>): Promise<T> {
   const prev = { ...process.env };
+  for (const key of [
+    "NIX_CONFIG",
+    "VBR_CANONICAL_ARTIFACT_ENTRYPOINT",
+    "VBR_NIX_CACHE_HEALTH_APPLIED",
+    "VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG",
+    "VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS",
+    "VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS",
+    "VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY",
+  ]) {
+    delete process.env[key];
+  }
   Object.assign(process.env, env);
   try {
     return await fn();
@@ -456,7 +467,7 @@ printf "%s = %s\\n" "\${TEST_CACHE_SETTING:-substituters}" "\${TEST_SUBSTITUTER:
       await fsp.writeFile(path.join(roleConfigDir, "nix.conf"), `${setting} = ${substituter}\n`);
       const result = await execFileAsync(
         "/bin/bash",
-        ["-c", `${renderer.source}\nset +e; health >/dev/null 2>&1; printf '%s' "$?"`],
+        ["-c", `${renderer.source}\nset +e; health >/dev/null; printf '%s' "$?"`],
         {
           env: {
             ...process.env,
@@ -472,6 +483,7 @@ printf "%s = %s\\n" "\${TEST_CACHE_SETTING:-substituters}" "\${TEST_SUBSTITUTER:
             TEST_SUBSTITUTER: substituter,
             TEST_CACHE_SETTING: setting,
             TMPDIR: tmp,
+            VIBEROOTS_SOURCE_ROOT: VIBEROOTS_ROOT,
             VBR_NIX_CACHE_POLICY: "auto",
             NIX_CONFIG: forgedMarkers ? `substituters = ${substituter}` : "",
             VBR_NIX_CACHE_HEALTH_APPLIED: forgedMarkers ? "1" : "",
@@ -485,7 +497,28 @@ printf "%s = %s\\n" "\${TEST_CACHE_SETTING:-substituters}" "\${TEST_SUBSTITUTER:
         .readFile(logPath, "utf8")
         .then((value) => value.trim().split("\n"))
         .catch(() => []);
-      return { argv, status: Number(result.stdout) };
+      return { argv, status: Number(result.stdout), stderr: result.stderr };
+    };
+    const assertNoCredentialResidue = async (credentialUrl: string) => {
+      const entries = await fsp.readdir(tmp, { recursive: true });
+      for (const relative of entries) {
+        if (!relative.split(path.sep).some((part) => part.startsWith("vbr-nix-cache-health."))) {
+          continue;
+        }
+        const candidate = path.join(tmp, relative);
+        if (!(await fsp.stat(candidate)).isFile()) continue;
+        const content = await fsp.readFile(candidate, "utf8");
+        assert.equal(
+          content.includes(credentialUrl),
+          false,
+          `credential URL persisted in ${candidate}`,
+        );
+        assert.doesNotMatch(
+          content,
+          /fixture-secret|user:password/iu,
+          `credential residue persisted in ${candidate}`,
+        );
+      }
     };
 
     for (const renderer of renderers) {
@@ -503,7 +536,11 @@ printf "%s = %s\\n" "\${TEST_CACHE_SETTING:-substituters}" "\${TEST_SUBSTITUTER:
           `${renderer.name}/${netrcCase.name}: netrc argv presence`,
         );
         if (netrcCase.expected) assert.equal(result.argv[netrcIndex + 1], netrcCase.path);
-        assert.equal(result.status, 0, `${renderer.name}/${netrcCase.name}: health status`);
+        assert.equal(
+          result.status,
+          0,
+          `${renderer.name}/${netrcCase.name}: health status\n${result.stderr}`,
+        );
       }
       for (const exitCode of [22, 2, 26]) {
         assert.equal(
@@ -534,6 +571,7 @@ printf "%s = %s\\n" "\${TEST_CACHE_SETTING:-substituters}" "\${TEST_SUBSTITUTER:
       for (const credentialUrl of [
         "https://user:password@cache.example/cache",
         "https://cache.example/cache?token=fixture-secret",
+        "https://cache.example/cache?ToKeN=fixture-secret",
         "https://cache.example/cache?to%6ben=fixture-secret",
         "https://cache.example/cache#access_token=fixture-secret",
         "https://cache.example/cache#tenant=x&token=fixture-secret",
@@ -541,6 +579,7 @@ printf "%s = %s\\n" "\${TEST_CACHE_SETTING:-substituters}" "\${TEST_SUBSTITUTER:
         const result = await runRenderer(renderer, readable, 0, credentialUrl, true);
         assert.equal(result.status, 1, `${renderer.name}: URL credentials must fail closed`);
         assert.deepEqual(result.argv, [], `${renderer.name}: rejected URL must not reach curl`);
+        await assertNoCredentialResidue(credentialUrl);
       }
     }
 
@@ -805,13 +844,13 @@ test("nix cache health rejects nix store-info false positives when HTTP is unrea
   });
 });
 
-test("auto cache health disables optional HTTP failures but required and strict remain closed", async (t) => {
+test("auto cache health degrades an optional HTTP 401 (curl 22) while required and strict remain closed", async (t) => {
   const tmp = await fsp.mkdtemp(path.join(os.tmpdir(), "nix-cache-health-invalid-response-"));
   t.after(async () => await fsp.rm(tmp, { recursive: true, force: true }));
   const nixPath = path.join(tmp, "nix");
   const curlPath = path.join(tmp, "curl");
   await fsp.writeFile(curlPath, "#!/bin/sh\nexit 22\n", { mode: 0o755 });
-  const optional = "https://invalid-response.example/cache?priority=fixture-secret-must-redact";
+  const optional = "https://unauthorized.example/cache?priority=fixture-secret-must-redact";
   const run = async (setting: "substituters" | "extra-substituters", policy: "auto" | "strict") => {
     await fsp.writeFile(
       nixPath,
@@ -849,7 +888,7 @@ test("auto cache health disables optional HTTP failures but required and strict 
   const degraded = await run("extra-substituters", "auto");
   assert.equal(degraded.error, null);
   assert.deepEqual(degraded.result?.removed, [optional]);
-  assert.doesNotMatch(degraded.result?.nixConfig || "", /invalid-response/);
+  assert.doesNotMatch(degraded.result?.nixConfig || "", /unauthorized/);
   assert.match(degraded.logs.join("\n"), /disabled unreachable substituter/);
   assert.doesNotMatch(degraded.logs.join("\n"), /fixture-secret-must-redact/);
 
@@ -1878,10 +1917,11 @@ test("nix cache health runs before dev-build and install nix entrypoints", async
   );
   assert.doesNotMatch(buck, /store info --store/);
   assert.doesNotMatch(buck, /\$\(cat/);
-  assert.match(
-    buckShell,
-    /NIX_CACHE_CREDENTIAL_URL="\$\(printf '%s' "\$NIX_CACHE_SUB" \| tr '\[:upper:\]' '\[:lower:\]'\)"/,
-  );
+  assert.match(buckShell, /mkfifo "\$NIX_CACHE_CONFIG_PIPE"/);
+  assert.match(buckShell, /shopt -s nocasematch/);
+  assert.doesNotMatch(buckShell, /credential-url\.txt|NIX_CACHE_CREDENTIAL_FILE/);
+  assert.doesNotMatch(buckShell, /config\.txt/);
+  assert.doesNotMatch(buckShell, /\$\(/);
   assert.doesNotMatch(buck, /export NIX_CONFIG="[^"]*\\\\n/);
 
   const actionShell = await fsp.readFile(sourceFile("build-tools/lang/nix_shell.bzl"), "utf8");

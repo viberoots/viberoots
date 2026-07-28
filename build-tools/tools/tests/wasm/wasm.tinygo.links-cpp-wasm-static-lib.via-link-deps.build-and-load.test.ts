@@ -107,6 +107,7 @@ func main() {}
 nix_go_tiny_wasm_lib(
     name = "wasm",
     srcs = ["main.go"],
+    wasm_abi = "wasi",
     link_deps = ["//projects/libs/math-core:core_wasm"],
     visibility = ["PUBLIC"],
 )

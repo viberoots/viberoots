@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import fs from "fs-extra";
 import path from "node:path";
-import { inheritedBuckIsolation, runInTemp } from "../lib/test-helpers";
+import { inheritedBuckIsolation, nestedBuckTestArgs, runInTemp } from "../lib/test-helpers";
 
 test("nix_cpp_test follows transitive link_deps with link_closure=transitive", async () => {
   await runInTemp("cpp-test-link-closure-transitive", async (tmp, $) => {
@@ -125,6 +125,6 @@ test("nix_cpp_test follows transitive link_deps with link_closure=transitive", a
     })`node viberoots/build-tools/tools/buck/export-graph.ts --out .viberoots/workspace/buck/graph.json`;
     await $({
       cwd: tmp,
-    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_test_link_closure")} test --target-platforms prelude//platforms:default //projects/apps/demo:t`;
+    })`buck2 --isolation-dir ${inheritedBuckIsolation("cpp_test_link_closure")} test --target-platforms prelude//platforms:default //projects/apps/demo:t -- ${nestedBuckTestArgs}`;
   });
 });

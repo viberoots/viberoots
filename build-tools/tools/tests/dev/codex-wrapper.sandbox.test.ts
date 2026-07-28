@@ -6,18 +6,12 @@ import { test } from "node:test";
 import {
   binWrapper,
   externalScratchRoot,
+  managedCodexEnv,
   makeFakeAgentTools,
 } from "./agent-wrapper-test-helpers.ts";
 
 const wrapper = binWrapper("codex");
 const makeFakeTools = (tmp: string, gitRoot: string) => makeFakeAgentTools(tmp, gitRoot, "codex");
-
-function managedCodexEnv(bin: string): Record<string, string> {
-  return {
-    CODEX_CLI_PATH: "",
-    VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(bin, "codex"),
-  };
-}
 
 test("codex wrapper passes top-level help without default sandbox args", async () => {
   await fsp.mkdir(externalScratchRoot, { recursive: true });

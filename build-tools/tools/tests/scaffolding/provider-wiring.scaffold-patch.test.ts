@@ -3,6 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp, workspaceFlakeRef } from "../lib/test-helpers";
+import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool";
 
 test("provider wiring present only on affected target after patch", async () => {
   await runInTemp("prov-wiring", async (_tmp, _$) => {
@@ -15,7 +16,8 @@ test("provider wiring present only on affected target after patch", async () => 
       return;
     }
     const moduleDir = path.join(_tmp, "projects", "libs", "demo-lib");
-    await $({ cwd: moduleDir })`go mod edit -require golang.org/x/text@v0.14.0`;
+    const goBin = await resolvePinnedTestToolPath("go", $);
+    await $({ cwd: moduleDir })`${goBin} mod edit -require golang.org/x/text@v0.14.0`;
     await fsp.mkdir(path.join(moduleDir, "pkg", "dependency"), { recursive: true });
     await fsp.writeFile(
       path.join(moduleDir, "pkg", "dependency", "keep.go"),

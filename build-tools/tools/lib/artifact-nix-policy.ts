@@ -13,6 +13,7 @@ export const REVIEWED_SUBSTITUTERS = [
 export const REVIEWED_EVIDENCE_PUBLIC_KEY =
   "main:N7uIAritMCBWpa9cdZJxHJ7gWfsXCwAsbyIJqrSQnLY=" as const;
 export const REVIEWED_EVIDENCE_SIGNER_IDENTITY = "nix:main" as const;
+export const REVIEWED_NIX_EXPERIMENTAL_FEATURES = "nix-command flakes" as const;
 
 export const REVIEWED_PUBLIC_KEYS = [
   "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=",
@@ -27,10 +28,15 @@ export const REVIEWED_PUBLIC_KEYS = [
   "cache.flakehub.com-10:2GqeNlIp6AKp4EF2MVbE1kBOp9iBSyo0UPR9KoR0o1Y=",
 ] as const;
 
+export function artifactNixExperimentalFeatureArgs(): string[] {
+  return ["--extra-experimental-features", REVIEWED_NIX_EXPERIMENTAL_FEATURES];
+}
+
 export function artifactNixScopedPolicyArgs(opts?: {
   allowReviewedRemoteBuilders?: boolean;
 }): string[] {
   return [
+    ...artifactNixExperimentalFeatureArgs(),
     "--option",
     "sandbox",
     "true",

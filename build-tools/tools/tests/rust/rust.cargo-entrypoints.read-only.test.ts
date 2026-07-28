@@ -94,6 +94,7 @@ test("real i, devshell entry, and b reject stale Cargo metadata without changing
       NO_DEV_SHELL: "1",
       VBR_DIRENV_ALLOW: "0",
       VBR_GC_MODE: "off",
+      VBR_NIX_CACHE_POLICY: "off",
       VBR_RUN_INSTALL: "0",
     };
     const direnv = ensureNixStoreToolPathSync("direnv", {

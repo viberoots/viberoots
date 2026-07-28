@@ -17,6 +17,7 @@ function activeViberootsRoot(tmp: string): string {
     process.env.VIBEROOTS_SOURCE_ROOT || "",
     process.env.VIBEROOTS_ROOT || "",
     path.join(tmp, "viberoots"),
+    path.join(tmp, ".viberoots", "current"),
     tmp,
   ];
   for (const candidate of candidates) {

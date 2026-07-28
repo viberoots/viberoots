@@ -16,6 +16,7 @@ test("Buck-generated shell wrappers invoke the selected nix binary", async () =>
   const nixShell = await readSource("build-tools/lang/nix_shell.bzl");
   const zxTest = await readSource("build-tools/tools/buck/zx_test.bzl");
   const buck2TestEnv = await readSource("build-tools/tools/dev/verify/buck2-test-env.ts");
+  const localTools = await readSource("build-tools/tools/dev/verify/buck2-test-local-tools.ts");
   const nixCacheHealthShell = generatedShellSource(nixCacheHealth);
   const nixShellGenerated = generatedShellSource(nixShell);
   const zxTestGenerated = generatedShellSource(zxTest);
@@ -54,16 +55,16 @@ test("Buck-generated shell wrappers invoke the selected nix binary", async () =>
   if (!zxTestGenerated.includes('PRE_OUT=$("$NIX_BIN" build')) {
     throw new Error("zx_test prelude materialization must build through the selected nix binary");
   }
-  if (!buck2TestEnv.includes("process.env.VBR_NIX_BIN || process.env.NIX_BIN")) {
+  if (!localTools.includes("process.env.VBR_NIX_BIN || process.env.NIX_BIN")) {
     throw new Error("verify child env must prefer VBR_NIX_BIN before NIX_BIN");
   }
   if (buck2TestEnv.includes("path.dirname(nixBin)")) {
     throw new Error("verify child env must not depend on PATH for selected nix");
   }
-  if (!buck2TestEnv.includes('maybeEnvArg("VBR_NIX_BIN", nixBin)')) {
+  if (!buck2TestEnv.includes('maybeEnvArg("VBR_NIX_BIN", tools.NIX_BIN)')) {
     throw new Error("verify child env must export VBR_NIX_BIN");
   }
-  if (!buck2TestEnv.includes('maybeEnvArg("NIX_BIN", nixBin)')) {
+  if (!buck2TestEnv.includes("Object.entries(tools)")) {
     throw new Error("verify child env must export NIX_BIN for compatibility");
   }
   if (buck2TestEnv.includes('maybeEnvArg("PATH"')) {

@@ -103,7 +103,7 @@ to watch the importer worktree rather than an evaluation bundle.
   `nixpkgs_profile` selects the toolchain and ordinary `nixpkg_deps`; `nixpkg_pins` redirects only
   declared native dependency attrs. Rust tests execute compiled Cargo harnesses through Buck's
   bounded project-relative external runner, and only Rust binaries enter `run.prod` manifests.
-- Rust is an enabled **experimental** language through the PR-8 checkpoint. The reviewed baseline adds
+- Rust is an enabled **experimental** language through the PR-9 implementation checkpoint. The reviewed baseline adds
   direct/transitive C link intent, freestanding WebAssembly, a repository-owned WASI runner,
   scaffolded CLI projects, declared remote-ready evidence, source-based cross-root crates, and
   explicit `rlib`, `staticlib`, `cdylib`, host proc-macro, native CPython-extension, and Node-API
@@ -114,8 +114,11 @@ to watch the importer worktree rather than an evaluation bundle.
   immutable filtered source replay, generated ABI compilation, patch invalidation, and panic-abort
   behavior on the selected current host; unavailable systems retain structural matrix coverage
   without an execution claim. Python WASM extensions fail closed until the pinned toolchains provide
-  an importable ABI. Browser/component packaging, release publication, and three-system execution
-  conformance remain planned in PR-9 through PR-12.
+  an importable ABI. PR-9 adds Rust bare/WASI static archives, web-target wasm-bindgen packages,
+  explicit WIT components, typed WASM link authority, and declared Node asset edges. Positive WASI
+  execution still requires a compatible cached toolchain or builder on hosts that cannot construct
+  the cross standard library inside their sandbox. Release publication and three-system execution
+  conformance remain planned in PR-10 through PR-12.
 - Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.
 - Planner-visible probes/stubs are allowed only when explicitly documented as non-build exceptions.
 - Patching third-party modules is **ergonomic**, **idempotent**, and **cache-friendly**.

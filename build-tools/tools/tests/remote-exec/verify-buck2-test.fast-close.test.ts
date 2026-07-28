@@ -8,6 +8,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { spawnVerifyBuck2Tests } from "../../dev/verify/buck2-test";
 import { parseVerifyExecutionPolicy } from "../../dev/verify/remote-policy";
+import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
 
 test("spawnVerifyBuck2Tests captures a child close before wait begins", async () => {
   const proc = new EventEmitter() as EventEmitter & {
@@ -28,7 +29,10 @@ test("spawnVerifyBuck2Tests captures a child close before wait begins", async ()
     threadsOverride: 1,
     passName: "shared",
     executionPolicy: parseVerifyExecutionPolicy({ env: {} }),
-    artifactToolsRoot: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-artifact-tools",
+    artifactToolsRoot: canonicalArtifactToolsRoot(
+      process.cwd(),
+      String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+    ),
     spawnImpl: (() => {
       queueMicrotask(() => {
         proc.emit("exit", 0, null);

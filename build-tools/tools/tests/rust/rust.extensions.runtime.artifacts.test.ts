@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { artifactNixExperimentalFeatureArgs } from "../../lib/artifact-nix-policy";
 import {
   buildSelectedOutPath,
   reconcileTempDependencyInputs,
@@ -12,7 +13,7 @@ import {
 } from "../lib/test-helpers";
 import { writeRustExtensionRuntimeFixture } from "./rust-extension-runtime-fixture";
 
-test("Rust CPython and Node extensions execute through managed runtimes and call C", async () => {
+test("Rust CPython and Node extensions execute and stage native runtime dependencies", async () => {
   await runInTemp("rust-managed-runtime-extensions", async (tmp, $) => {
     await writeRustExtensionRuntimeFixture(tmp);
     await fs.writeFile(
@@ -21,7 +22,7 @@ test("Rust CPython and Node extensions execute through managed runtimes and call
     );
     await fs.appendFile(
       path.join(tmp, "projects/libs/rust_pyext/TARGETS"),
-      'rust_python_extension(name="extension_with_pydep", module="demo._native", crate="rust_pyext", srcs=["build.rs", "src/lib.rs"], build_py_deps=["packaging"], link_deps=["//projects/libs/extension-c:answer"], runtime_deps=["//projects/libs/extension-c:answer"])\n',
+      'rust_python_extension(name="extension_with_pydep", module="demo._native", crate="rust_pyext", srcs=["build.rs", "src/lib.rs"], build_py_deps=["packaging"], runtime_deps=["//projects/libs/extension-c:answer"])\n',
     );
     const packagingRoot = path.join(tmp, "python-build-packaging");
     await fs.mkdir(path.join(packagingRoot, "packaging"), { recursive: true });
@@ -68,6 +69,7 @@ test("Rust CPython and Node extensions execute through managed runtimes and call
     });
     const pyDepTarget = "//projects/libs/rust_pyext:extension_with_pydep";
     const nix = path.join(String(process.env.VBR_ARTIFACT_TOOLS_ROOT), "bin/nix");
+    const nixFeatures = artifactNixExperimentalFeatureArgs();
     const pyDepBuild = await $({
       cwd: tmp,
       stdio: "pipe",
@@ -79,7 +81,7 @@ test("Rust CPython and Node extensions execute through managed runtimes and call
           packaging: { version: "25.0", originPath: packagingRoot },
         }),
       },
-    })`${nix} build --impure --accept-flake-config --builders "" --no-link --print-out-paths ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`}`;
+    })`${nix} ${nixFeatures} build --impure --accept-flake-config --builders "" --no-link --print-out-paths ${`path:${await workspaceFlakeRef(tmp)}#graph-generator-selected`}`;
     const pyDepOut = String(pyDepBuild.stdout).trim().split(/\n+/).pop()!;
     await fs.access(path.join(pyDepOut, "site/demo"));
     const pyAppOut = await buildSelectedOutPath({

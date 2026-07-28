@@ -19,9 +19,14 @@ env_reexec_from_cwd_repo() {
 	fi
 	[[ -n "${cwd_root}" ]] || return 0
 	cwd_root="$(cd "${cwd_root}" && pwd)"
-	[[ "${cwd_root}" != "${script_root}" ]] || return 0
-	local cwd_tool="${cwd_root}/build-tools/tools/bin/${tool_name}"
-	if [[ -f "${cwd_root}/build-tools/tools/dev/viberoots.ts" && -x "${cwd_tool}" ]]; then
+	local cwd_source_root="${cwd_root}"
+	if [[ ! -f "${cwd_source_root}/build-tools/tools/dev/viberoots.ts" && -f "${cwd_root}/viberoots/build-tools/tools/dev/viberoots.ts" ]]; then
+		cwd_source_root="${cwd_root}/viberoots"
+	fi
+	cwd_source_root="$(cd "${cwd_source_root}" && pwd)"
+	[[ "${cwd_source_root}" != "${script_root}" ]] || return 0
+	local cwd_tool="${cwd_source_root}/build-tools/tools/bin/${tool_name}"
+	if [[ -f "${cwd_source_root}/build-tools/tools/dev/viberoots.ts" && -x "${cwd_tool}" ]]; then
 		exec "${cwd_tool}" "$@"
 	fi
 }

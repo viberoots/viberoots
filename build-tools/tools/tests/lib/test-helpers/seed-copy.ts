@@ -100,7 +100,7 @@ async function makeDirectoryPublishable(dir: string): Promise<void> {
   await fsp.chmod(dir, st.mode | 0o700).catch(() => {});
 }
 
-async function makeTreeWritable(root: string): Promise<void> {
+export async function makeTreeWritable(root: string): Promise<void> {
   const stack = [root];
   while (stack.length) {
     const dir = stack.pop() as string;

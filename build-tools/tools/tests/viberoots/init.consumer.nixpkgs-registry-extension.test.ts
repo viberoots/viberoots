@@ -139,27 +139,24 @@ test("consumer registry extension adds a locked input used by a selected target"
       env: buildCanonicalArtifactEnvironment(workspace, { artifactToolsRoot }),
       selectorEnv: {},
     });
-    const { stdout } = await execFileAsync(
-      "nix",
-      ["build", "--accept-flake-config", bundle.flakeRef, "--no-link", "--print-out-paths"],
-      {
-        cwd: workspace,
-        maxBuffer: 1024 * 1024 * 32,
-      },
-    );
-    const outPath =
-      String(stdout || "")
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean)
-        .at(-1) || "";
-    assert.ok(outPath.startsWith("/nix/store/"), stdout);
-    const buildLog = await fsp.readFile(path.join(outPath, "build.log"), "utf8");
-    assert.match(buildLog, /nixpkgsProfile=default/);
-    assert.match(
-      buildLog,
-      /nixpkgsSourcePlan=pkgs\.zlib -> nixpkgs-23_11 \(nixpkg_pin; rationale=Use consumer extension profile in selected fixture\.\)/,
-    );
+    try {
+      const { stdout } = await execFileAsync(
+        "nix",
+        ["eval", "--accept-flake-config", `${bundle.flakeRef}.passthru.viberootsCpp`, "--json"],
+        {
+          cwd: workspace,
+          maxBuffer: 1024 * 1024 * 16,
+        },
+      );
+      assert.deepEqual(JSON.parse(stdout), {
+        nixCxxSourcePlan: [
+          "pkgs.zlib -> nixpkgs-23_11 (nixpkg_pin; rationale=Use consumer extension profile in selected fixture.)",
+        ],
+        nixpkgsProfile: "default",
+      });
+    } finally {
+      await bundle.cleanup();
+    }
   } finally {
     await fsp.rm(workspace, { recursive: true, force: true });
   }

@@ -46,10 +46,11 @@ export async function assertResolvedNativeInputs(
   tmp: string,
   generator: string,
   graph: string,
+  rustPkgsExpression: string,
 ): Promise<void> {
   const expression = `
     let planned = import ${JSON.stringify(generator)} {
-      pkgs = import <nixpkgs> {};
+      pkgs = ${rustPkgsExpression};
       src = ./.;
       graphJsonPath = ${JSON.stringify(graph)};
     }; in planned.selected.passthru.viberootsRust.native_link_inputs

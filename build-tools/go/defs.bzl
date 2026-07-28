@@ -6,7 +6,7 @@ load("@viberoots//build-tools/go/private:nix_build.bzl", "go_nix_build")
 load("@viberoots//build-tools/go/private:nix_test.bzl", "go_nix_test")
 load("@viberoots//build-tools/go/private:cgo_wiring.bzl", "apply_go_rule_stable_defaults", "apply_go_tuple_labels", "configure_cgo_kwargs")
 load("@viberoots//build-tools/go/private:auto_tests.bzl", "maybe_autowire_go_binary_test", "maybe_autowire_go_library_test")
-load("@viberoots//build-tools/go:defs_wasm.bzl", _nix_go_tiny_wasm_lib = "nix_go_tiny_wasm_lib")
+load("@viberoots//build-tools/go:defs_wasm.bzl", _nix_go_tiny_wasm_lib = "nix_go_tiny_wasm_lib", _nix_go_tiny_wasm_static_lib = "nix_go_tiny_wasm_static_lib")
 
 
 def _apply_go_nix_rule_attrs(attrs, prepared):
@@ -204,3 +204,5 @@ def nix_go_carchive(name, **kwargs):
 
 def nix_go_tiny_wasm_lib(name, **kwargs):
     _nix_go_tiny_wasm_lib(name = name, **kwargs)
+def nix_go_tiny_wasm_static_lib(name, **kwargs):
+    _nix_go_tiny_wasm_static_lib(name = name, **kwargs)

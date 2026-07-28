@@ -12,6 +12,7 @@
 , nixAttrsFromSelf
 , repoCppHeaderPkgsFor
 , repoCppLibPkgsFor
+, repoWasmLinkPkgsFor
 , repoGoCArchivesFor
 , providerAttrsFallback
 , resolveNixpkgAttrs
@@ -19,6 +20,7 @@
 }:
 let
   nodeFor = name: if builtins.hasAttr name byName then byName.${name} else {};
+  WasmContract = import ./cpp-wasm-contract.nix { inherit lib get byName labelsOf; };
   nativeContractFor = name:
     let
       node = nodeFor name;
@@ -30,8 +32,8 @@ let
     in {
       std = value "language_standard" "c++17";
       stl = value "stl" "libc++";
-      compilerIdentity = ABI.resolveCompilerIdentity name (value "compiler_identity" "");
-      targetTriple = ABI.resolveTargetTriple name (value "target_triple" "");
+      compilerIdentity = ABI.resolveCompilerIdentity name (value "compiler_identity" "selected-llvm");
+      targetTriple = ABI.resolveTargetTriple name (value "target_triple" ABI.selectedTargetTriple);
     };
 
   templateFor = name:
@@ -105,10 +107,15 @@ let
         else if (n ? "buck.exported_functions") && builtins.isList n."buck.exported_functions" then n."buck.exported_functions"
         else null;
       headerPkgsForWasm =
-        if isWasmStatic then (repoCppHeaderPkgsFor name) else [];
+        if isWasmStatic
+        then lib.unique ((repoCppHeaderPkgsFor name) ++ (repoWasmLinkPkgsFor name))
+        else [];
       includeRootsForWasm = builtins.map (p: "${p}/include") headerPkgsForWasm;
       mode = linkModeOf name;
+      wasmDependenciesValid = if isWasmStatic
+        then WasmContract.validateDirectDependencies name else true;
     in
+      assert wasmDependenciesValid;
       (
         let
           baseAttrs = {
@@ -120,7 +127,11 @@ let
             nixCxxPkgs = resolveNixPkgsFor name attrs;
             srcList = normSrcsOf name;
             patches = patchInputsFor name;
-          } // nativeContractFor name;
+          } // lib.optionalAttrs (!(isWasmStatic || isEmscripten)) (nativeContractFor name)
+            // lib.optionalAttrs (isWasmStatic || isEmscripten) {
+              std = let claimed = get n "language_standard";
+                in if claimed == null || claimed == "" then "c++17" else claimed;
+            };
           wasmAttrs =
             if isWasmStatic
             then { wasmTarget = if wantWasi then "wasm32-wasi" else "wasm32-unknown-unknown"; }

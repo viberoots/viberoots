@@ -3,11 +3,33 @@
   validateKindTarget = kind: target:
     let
       expected =
-        if kind == "wasm" then "wasm32-unknown-unknown"
+        if kind == "wasm"
+        then [ "wasm32-unknown-unknown" "wasm32-wasip1" ]
+        else if builtins.elem kind [ "wasm_static" "wasm_browser" ]
+        then [ "wasm32-unknown-unknown" ]
         else if kind == "wasi" then "wasm32-wasip1"
-        else "";
-    in if target == expected then target else builtins.throw
-      "Rust template kind ${kind} requires target ${if expected == "" then "<empty>" else expected}; got ${if target == "" then "<empty>" else target}";
+        else if builtins.elem kind [ "wasi_static" "wasm_component" ] then [ target ]
+        else [ "" ];
+      allowed = if builtins.isList expected then expected else [ expected ];
+      rendered = lib.concatStringsSep " or " (map (value:
+        if value == "" then "<empty>" else value) allowed);
+    in if builtins.elem target allowed then target else builtins.throw
+      "Rust template kind ${kind} requires target ${rendered}; got ${if target == "" then "<empty>" else target}";
+
+  validateWasmTarget = kind: target: wasm:
+    if !builtins.elem kind [
+      "wasm" "wasi" "wasm_static" "wasi_static" "wasm_browser" "wasm_component"
+    ] then true
+    else
+      let
+        abi = wasm.abi or "";
+        declared = wasm.target or "";
+        expected = if abi == "wasi" then "wasm32-wasip1"
+          else if abi == "bare" then "wasm32-unknown-unknown"
+          else builtins.throw "Rust template WASM authority requires ABI bare or wasi";
+      in if target != expected || declared != expected then builtins.throw
+        "Rust template WASM authority ${abi} requires target ${expected}; got target ${target} and manifest target ${declared}"
+      else true;
 
   validateCargoConfigs = roots:
     let

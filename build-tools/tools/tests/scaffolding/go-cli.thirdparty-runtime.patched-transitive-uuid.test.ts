@@ -38,11 +38,12 @@ function resolvedToolEnv(): NodeJS.ProcessEnv {
 async function seedUuidModuleCache(
   tmp: string,
   sh: any,
+  goBin: string,
   gomodcacheOverride?: string,
 ): Promise<{ proxyRoot: string; gomodcache: string }> {
   const gomodcache =
     gomodcacheOverride ||
-    String((await sh({ cwd: tmp, stdio: "pipe" })`go env GOMODCACHE`).stdout || "").trim();
+    String((await sh({ cwd: tmp, stdio: "pipe" })`${goBin} env GOMODCACHE`).stdout || "").trim();
   if (!gomodcache) throw new Error("GOMODCACHE not found");
   const moduleDir = path.join(gomodcache, "github.com", "google", "uuid@v1.6.0");
   const fixtureDir = new URL("../fixtures/go/github.com/google/uuid@v1.6.0", import.meta.url)
@@ -83,12 +84,13 @@ async function startPatchPkgSession(
   sh: any,
   tmp: string,
   goEnv: NodeJS.ProcessEnv,
+  goBin: string,
 ): Promise<{ origin: string; ws: string }> {
   const { stdout: gomodcacheOut } = await sh({
     cwd: tmp,
     stdio: "pipe",
     env: { ...process.env, ...goEnv },
-  })`go env GOMODCACHE`;
+  })`${goBin} env GOMODCACHE`;
   const gomodcache = String(gomodcacheOut || "").trim();
   if (!gomodcache) throw new Error("GOMODCACHE not found");
   const origin = path.join(gomodcache, "github.com/google/uuid@v1.6.0");
@@ -151,7 +153,12 @@ async function applyPatchPkg(
   })`viberoots/build-tools/tools/bin/patch-pkg apply go github.com/google/uuid --target //projects/apps/demo-cli:demo-cli --force`;
 }
 
-async function scaffoldHelperLib(sh: any, tmp: string, goEnv: NodeJS.ProcessEnv): Promise<boolean> {
+async function scaffoldHelperLib(
+  sh: any,
+  tmp: string,
+  goEnv: NodeJS.ProcessEnv,
+  goBin: string,
+): Promise<boolean> {
   await sh`scaf new go lib helper-lib --yes --path=projects/libs/helper-lib`;
   if (
     !(await fsp.stat(path.join(tmp, "projects", "libs", "helper-lib", "go.mod")).catch(() => null))
@@ -162,12 +169,12 @@ async function scaffoldHelperLib(sh: any, tmp: string, goEnv: NodeJS.ProcessEnv)
     cwd: path.join(tmp, "projects", "libs", "helper-lib"),
     stdio: "inherit",
     env: { ...process.env, ...goEnv },
-  })`go get github.com/google/uuid@v1.6.0`;
+  })`${goBin} get github.com/google/uuid@v1.6.0`;
   await sh({
     cwd: path.join(tmp, "projects", "libs", "helper-lib"),
     stdio: "inherit",
     env: { ...process.env, ...goEnv },
-  })`go mod tidy`;
+  })`${goBin} mod tidy`;
   await writeFileAbs(
     path.join(tmp, "projects", "libs", "helper-lib", "pkg", "helper-lib", "helper-lib.go"),
     [
@@ -486,9 +493,10 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
     // Initialize git so patch-pkg can create and apply patches
     await $`git init`;
     await ensureBuckConfigForTempRepo(_tmp, $);
+    const goBin = await resolvePinnedTestToolPath("go", $);
 
     const moduleCache = path.join(_tmp, ".gomodcache");
-    const { proxyRoot, gomodcache } = await seedUuidModuleCache(_tmp, $, moduleCache);
+    const { proxyRoot, gomodcache } = await seedUuidModuleCache(_tmp, $, goBin, moduleCache);
     const goEnv = {
       GOPROXY: `file://${proxyRoot},off`,
       GOSUMDB: "off",
@@ -496,17 +504,17 @@ test("go cli with transitive third-party patched uuid runtime", async () => {
       ...(gomodcache ? { GOMODCACHE: gomodcache } : {}),
     };
 
-    if (!(await scaffoldHelperLib($, _tmp, goEnv))) return;
+    if (!(await scaffoldHelperLib($, _tmp, goEnv, goBin))) return;
     if (!(await scaffoldDemoLib($, _tmp))) return;
     if (!(await scaffoldCli($, _tmp))) return;
     await $({
       cwd: path.join(_tmp, "projects", "apps", "demo-cli"),
       stdio: "inherit",
       env: { ...process.env, ...goEnv },
-    })`go mod tidy`;
+    })`${goBin} mod tidy`;
 
     // Create a uuid patch in a temporary workspace and apply it via patch-pkg
-    const { origin, ws } = await startPatchPkgSession($, _tmp, goEnv);
+    const { origin, ws } = await startPatchPkgSession($, _tmp, goEnv, goBin);
     await patchUuidWorkspace(ws);
     {
       const T = Number(process.env.TEST_CMD_TIMEOUT_S || "300");

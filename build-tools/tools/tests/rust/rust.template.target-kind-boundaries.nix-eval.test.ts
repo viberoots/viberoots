@@ -12,6 +12,8 @@ test("Rust template independently rejects WASM and WASI target mismatches", asyn
     await copyViberootsSourcePath(template, path.join(tmp, template));
     const contract = "viberoots/build-tools/tools/nix/templates/rust-contract.nix";
     await copyViberootsSourcePath(contract, path.join(tmp, contract));
+    const wasmRustflags = "viberoots/build-tools/tools/nix/templates/rust-wasm-rustflags.nix";
+    await copyViberootsSourcePath(wasmRustflags, path.join(tmp, wasmRustflags));
     const source = await fsp.readFile(path.join(tmp, template), "utf8");
     assert.match(source, /cp -R "\$src" source/);
     assert.match(source, /sourceRoot = "source\/\$\{cargoRootRel\}"/);
@@ -23,8 +25,8 @@ test("Rust template independently rejects WASM and WASI target mismatches", asyn
     for (const mismatch of [
       {
         kind: "wasm",
-        target: "wasm32-wasip1",
-        expected: /Rust template kind wasm requires target wasm32-unknown-unknown/,
+        target: "wasm32-wasi",
+        expected: /Rust template kind wasm requires target wasm32-unknown-unknown or wasm32-wasip1/,
       },
       {
         kind: "wasi",
@@ -58,6 +60,56 @@ test("Rust template independently rejects WASM and WASI target mismatches", asyn
       `;
       assert.notEqual(result.exitCode, 0);
       assert.match(String(result.stderr), /publicCrate must match/);
+    }
+    for (const [abi, target] of [
+      ["bare", "wasm32-unknown-unknown"],
+      ["wasi", "wasm32-wasip1"],
+    ]) {
+      const expr = `
+        let
+          pkgs = import <nixpkgs> {};
+          contract = import ./viberoots/build-tools/tools/nix/templates/rust-contract.nix {
+            inherit (pkgs) lib;
+          };
+        in contract.validateWasmTarget "wasm" ${JSON.stringify(target)} {
+          abi = ${JSON.stringify(abi)};
+          target = ${JSON.stringify(target)};
+        }
+      `;
+      assert.equal(
+        (
+          await $({ cwd: tmp, stdio: "pipe" })`nix eval --impure --expr ${expr} --json`
+        ).stdout.trim(),
+        "true",
+      );
+    }
+    for (const [optimize, debug, expected] of [
+      ["none", false, ["-C", "debuginfo=0", "-C", "opt-level=0"]],
+      ["none", true, ["-C", "debuginfo=2", "-C", "opt-level=0"]],
+      ["speed", false, ["-C", "debuginfo=0", "-C", "opt-level=2"]],
+      ["speed", true, ["-C", "debuginfo=2", "-C", "opt-level=2"]],
+      ["size", false, ["-C", "debuginfo=0", "-C", "opt-level=z"]],
+      ["size", true, ["-C", "debuginfo=2", "-C", "opt-level=z"]],
+    ] as const) {
+      const expr = `
+        let
+          pkgs = import <nixpkgs> {};
+          flags = import ./viberoots/build-tools/tools/nix/templates/rust-wasm-rustflags.nix {
+            inherit (pkgs) lib;
+            kind = "wasm_static";
+            wasm = {
+              optimize = ${JSON.stringify(optimize)};
+              debug = ${debug};
+            };
+          };
+        in flags
+      `;
+      assert.deepEqual(
+        JSON.parse(
+          (await $({ cwd: tmp, stdio: "pipe" })`nix eval --impure --expr ${expr} --json`).stdout,
+        ),
+        expected,
+      );
     }
   });
 });

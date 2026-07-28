@@ -15,6 +15,7 @@ import { ecrRegistryProfileForImage } from "./control-plane-registry-profile.fix
 import { privateLinkSupabaseProfile } from "./control-plane-supabase-postgres.fixture";
 import { viberootsRepoPath } from "./deployment-command";
 import { runInScratchTemp } from "../lib/test-helpers";
+import { resolveToolPathSync } from "../../lib/tool-paths";
 const sh = promisify(exec);
 const DIGEST = `sha256:${"e".repeat(64)}`;
 const IMAGE = `registry.example.com/platform/deployment-control-plane@${DIGEST}`;
@@ -199,8 +200,9 @@ async function startServer(tmp: string) {
 async function localCertificate(tmp: string) {
   const key = path.join(tmp, "local.key");
   const cert = path.join(tmp, "local.crt");
+  const openssl = process.env.OPENSSL_BIN || resolveToolPathSync("openssl");
   await sh(
-    `openssl req -x509 -newkey rsa:2048 -nodes -keyout ${shellQuote(key)} -out ${shellQuote(cert)} -days 1 -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1`,
+    `${shellQuote(openssl)} req -x509 -newkey rsa:2048 -nodes -keyout ${shellQuote(key)} -out ${shellQuote(cert)} -days 1 -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1`,
   );
   return { key: await fsp.readFile(key), cert: await fsp.readFile(cert) };
 }

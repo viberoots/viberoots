@@ -59,13 +59,13 @@ test("all Nix command surfaces share the repository pnpm 11 authority", async ()
   );
 
   assert.match(devshell, /pnpm11 = import \.\/pnpm-11\.nix/);
-  for (const authority of ["pkgs.go", "pkgs.cargo", "pnpm11", "pkgs.nodejs_22"]) {
+  for (const authority of ["pkgs.go", "pkgs.viberootsRustToolchain", "pnpm11", "pkgs.nodejs_22"]) {
     assertNixListAuthority(devshell, "buildInputs", authority);
   }
   assert.match(updateApp, /pnpm11 = import \.\.\/pnpm-11\.nix/);
   assert.match(updateApp, /program = "\$\{pnpm11\}\/bin\/pnpm"/);
   assert.match(remoteWorker, /pnpm11 = import \.\.\/\.\.\/pnpm-11\.nix/);
-  for (const authority of ["pkgs.cargo", "pnpm11", "pkgs.nodejs_22"]) {
+  for (const authority of ["pkgs.viberootsRustToolchain", "pnpm11", "pkgs.nodejs_22"]) {
     assertNixListAuthority(remoteWorker, "workerPaths", authority);
   }
   assert.match(nodePlanner, /pnpm11 = import \.\.\/pnpm-11\.nix/);

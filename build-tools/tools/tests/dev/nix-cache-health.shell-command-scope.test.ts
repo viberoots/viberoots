@@ -24,7 +24,7 @@ test("shell cache health publishes exact full config on success and nothing on f
     );
     await fsp.writeFile(
       path.join(bin, "curl"),
-      '#!/usr/bin/env bash\nif [[ "${TEST_CURL_REQUIRED_OK:-}" == 1 && "$*" == *required.example* ]]; then exit 0; fi\nexit "${TEST_CURL_EXIT:-22}"\n',
+      '#!/usr/bin/env bash\nif [[ "${TEST_CURL_REQUIRED_OK:-}" == 1 && ( "$*" == *required.example* || "$*" == *cache.nixos.org* ) ]]; then exit 0; fi\nexit "${TEST_CURL_EXIT:-22}"\n',
       { mode: 0o755 },
     );
     const full = "experimental-features = nix-command flakes\nbuilders =";
@@ -129,6 +129,52 @@ test("shell cache health publishes exact full config on success and nothing on f
     assert.match(
       flattenedOptional.stderr,
       /disabled unreachable substituter.*optional\.example\/cache/,
+    );
+
+    const bootstrapRoot = path.join(root, "bootstrap-workspace");
+    await Promise.all(
+      [".viberoots/current/build-tools/tools/dev", ".viberoots/workspace/prelude"].map((relative) =>
+        fsp.mkdir(path.join(bootstrapRoot, relative), { recursive: true }),
+      ),
+    );
+    await fsp.writeFile(path.join(bootstrapRoot, ".buckconfig"), "[repositories]\\n");
+    await fsp.writeFile(
+      path.join(bootstrapRoot, ".viberoots/current/build-tools/tools/dev/zx-init.mjs"),
+      "",
+    );
+    await fsp.writeFile(
+      path.join(bootstrapRoot, ".viberoots/workspace/prelude/prelude.bzl"),
+      "# fixture\n",
+    );
+    await fsp.writeFile(
+      path.join(configRoot, "nix.conf"),
+      "extra-substituters = https://cache.home.kilty.io/main\n",
+    );
+    const privateCache = "https://cache.home.kilty.io/main";
+    const bootstrap = await execFileAsync("/bin/bash", [
+      "-c",
+      `. "$1"; export PATH="$2:$3:/usr/bin:/bin" NIX_CONF_DIR="$4" NIX_USER_CONF_FILES= NIX_CONFIG="$5" TEST_EFFECTIVE_NIX_CONFIG="$6" TEST_EFFECTIVE_NIX_CONFIG_JSON="$7" TEST_CURL_REQUIRED_OK=1 TEST_CURL_EXIT=6 VBR_NIX_CACHE_POLICY=auto; unset VBR_NIX_CACHE_HEALTH_APPLIED VBR_NIX_CACHE_HEALTH_REVIEWED_CONFIG; set +e; ensure_buck_prelude "$8"; status=$?; set -e; printf '%s:%s:%s:%s\\036%s' "$status" "$VBR_NIX_CACHE_HEALTH_APPLIED" "$VBR_NIX_CACHE_HEALTH_REVIEWED_REQUIRED_SUBSTITUTERS" "$VBR_NIX_CACHE_HEALTH_REVIEWED_OPTIONAL_SUBSTITUTERS" "$NIX_CONFIG"`,
+      "cache-health-private-bootstrap",
+      devshell,
+      bin,
+      path.dirname(process.execPath),
+      configRoot,
+      full,
+      `substituters = https://cache.nixos.org/ ${privateCache}`,
+      JSON.stringify({
+        substituters: {
+          defaultValue: ["https://cache.nixos.org/"],
+          value: ["https://cache.nixos.org/", privateCache],
+        },
+      }),
+      bootstrapRoot,
+    ]);
+    const [bootstrapRoles, bootstrapConfig] = bootstrap.stdout.split("\u001e");
+    assert.equal(bootstrapRoles, "0:1:https://cache.nixos.org/:");
+    assert.doesNotMatch(bootstrapConfig, /cache\.home\.kilty\.io/u);
+    assert.match(
+      bootstrap.stderr,
+      /disabled unreachable substituter.*cache\.home\.kilty\.io\/main/,
     );
 
     await fsp.writeFile(

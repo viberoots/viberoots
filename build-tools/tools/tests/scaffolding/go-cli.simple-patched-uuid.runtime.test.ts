@@ -47,12 +47,13 @@ async function startPatchPkgSession(
   $: any,
   tmp: string,
   goEnv: NodeJS.ProcessEnv,
+  goBin: string,
 ): Promise<{ origin: string; ws: string }> {
   const { stdout: gomodcacheOut } = await $({
     cwd: tmp,
     stdio: "pipe",
     env: { ...process.env, ...goEnv },
-  })`go env GOMODCACHE`;
+  })`${goBin} env GOMODCACHE`;
   const gomodcache = String(gomodcacheOut || "").trim();
   if (!gomodcache) throw new Error("GOMODCACHE not found");
   const origin = path.join(gomodcache, "github.com/google/uuid@v1.6.0");
@@ -84,11 +85,12 @@ async function startPatchPkgSession(
 async function seedUuidModuleCache(
   tmp: string,
   sh: any,
+  goBin: string,
   gomodcacheOverride?: string,
 ): Promise<{ proxyRoot: string; gomodcache: string }> {
   const gomodcache =
     gomodcacheOverride ||
-    String((await sh({ cwd: tmp, stdio: "pipe" })`go env GOMODCACHE`).stdout || "").trim();
+    String((await sh({ cwd: tmp, stdio: "pipe" })`${goBin} env GOMODCACHE`).stdout || "").trim();
   if (!gomodcache) throw new Error("GOMODCACHE not found");
   const moduleDir = path.join(gomodcache, "github.com", "google", "uuid@v1.6.0");
   const fixtureDir = new URL("../fixtures/go/github.com/google/uuid@v1.6.0", import.meta.url)
@@ -174,12 +176,13 @@ async function writeGoSumFromDownload(
   $: any,
   moduleDir: string,
   goEnv: NodeJS.ProcessEnv,
+  goBin: string,
 ): Promise<void> {
   const { stdout } = await $({
     cwd: moduleDir,
     stdio: "pipe",
     env: { ...process.env, ...goEnv },
-  })`go mod download -json github.com/google/uuid@v1.6.0`;
+  })`${goBin} mod download -json github.com/google/uuid@v1.6.0`;
   const payload = String(stdout || "").trim();
   if (!payload) throw new Error("go mod download did not return JSON output");
   const data = JSON.parse(payload);
@@ -241,6 +244,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
   await runInTemp("go-cli-simple-patched-uuid", async (_tmp, _$) => {
     const $ = _$({ stdio: "pipe" });
     await ensureBuckConfigForTempRepo(_tmp, $);
+    const goBin = await resolvePinnedTestToolPath("go", $);
 
     // Scaffold a CLI app that directly imports github.com/google/uuid
     await $`scaf new go cli demo-cli --yes --path=projects/apps/demo-cli`;
@@ -273,7 +277,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     );
     const moduleCache = path.join(_tmp, ".gomodcache");
     await fsp.mkdir(moduleCache, { recursive: true });
-    const { proxyRoot, gomodcache } = await seedUuidModuleCache(_tmp, $, moduleCache);
+    const { proxyRoot, gomodcache } = await seedUuidModuleCache(_tmp, $, goBin, moduleCache);
     const goEnv = {
       GOPROXY: `file://${proxyRoot},off`,
       GOSUMDB: "off",
@@ -287,8 +291,8 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
         ...process.env,
         ...goEnv,
       },
-    })`go mod tidy`;
-    await writeGoSumFromDownload($, path.join(_tmp, "projects", "apps", "demo-cli"), goEnv);
+    })`${goBin} mod tidy`;
+    await writeGoSumFromDownload($, path.join(_tmp, "projects", "apps", "demo-cli"), goEnv, goBin);
 
     await $({
       cwd: _tmp,
@@ -300,7 +304,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
     await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
 
     // Start a patch session and patch uuid to zero
-    const { origin, ws } = await startPatchPkgSession($, _tmp, goEnv);
+    const { origin, ws } = await startPatchPkgSession($, _tmp, goEnv, goBin);
     await patchUuidWorkspaceToZero($, ws);
     await applyPatchPkg($, _tmp, origin, goEnv);
     // Regenerate providers and auto_map after writing patch
@@ -312,7 +316,7 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
       cwd: path.join(_tmp, "projects", "apps", "demo-cli"),
       stdio: "inherit",
       env: { ...process.env, ...goEnv },
-    })`go mod vendor`;
+    })`${goBin} mod vendor`;
     const vendUuidDir = path.join(
       _tmp,
       "projects",
@@ -380,7 +384,9 @@ test("go cli (no local replaces) + patched uuid runtime -> zero UUID", async () 
         dbg("vendor uuid dir sha256:", String(h2.stdout || h2.stderr || "").trim());
       } catch {}
       try {
-        const envOut = await $({ stdio: "pipe" })`go env GOPATH GOMODCACHE GOTOOLDIR`.nothrow();
+        const envOut = await $({
+          stdio: "pipe",
+        })`${goBin} env GOPATH GOMODCACHE GOTOOLDIR`.nothrow();
         dbg("go env:", String(envOut.stdout || envOut.stderr || "").trim());
       } catch {}
     }

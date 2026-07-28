@@ -18,6 +18,7 @@ import {
   defaultFilteredFlakeSnapshotRsyncSources,
   filteredFlakeRsyncExcludeArgs,
 } from "../../dev/nix-build-filtered-flake-lib";
+import { artifactNixExperimentalFeatureArgs } from "../../lib/artifact-nix-policy";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 
 const execFileAsync = promisify(execFile);
@@ -101,6 +102,7 @@ async function productionConfig(): Promise<{ pnpm: string; universalMarkers: str
     /"build-tools\/tools\/tests\/dev\/pnpm-store\.exact-platform-filter\.integration\.test\.ts": True/,
   );
   const nix = resolveToolPathSync("nix");
+  const nixFeatures = artifactNixExperimentalFeatureArgs();
   const inputRoot = await immutableProductionSource();
   const system = `${process.arch === "arm64" ? "aarch64" : "x86_64"}-${
     process.platform === "darwin" ? "darwin" : "linux"
@@ -108,6 +110,7 @@ async function productionConfig(): Promise<{ pnpm: string; universalMarkers: str
   const { stdout: pnpmStdout } = await execFileAsync(
     nix,
     [
+      ...nixFeatures,
       "eval",
       "--raw",
       "--no-write-lock-file",
@@ -129,12 +132,12 @@ async function productionConfig(): Promise<{ pnpm: string; universalMarkers: str
   `;
   const { stdout: pnpmDrvStdout } = await execFileAsync(
     nix,
-    ["eval", "--raw", "--impure", "--expr", derivationExpression],
+    [...nixFeatures, "eval", "--raw", "--impure", "--expr", derivationExpression],
     { timeout: 30_000, maxBuffer: 4 * 1024 * 1024 },
   );
   const { stdout: pnpmOutStdout } = await execFileAsync(
     nix,
-    ["build", "--no-link", "--print-out-paths", `${pnpmDrvStdout.trim()}^out`],
+    [...nixFeatures, "build", "--no-link", "--print-out-paths", `${pnpmDrvStdout.trim()}^out`],
     { timeout: 120_000, maxBuffer: 4 * 1024 * 1024 },
   );
   assert.equal(path.dirname(path.dirname(pnpm)), pnpmOutStdout.trim());
@@ -148,7 +151,7 @@ async function productionConfig(): Promise<{ pnpm: string; universalMarkers: str
   `;
   const { stdout } = await execFileAsync(
     nix,
-    ["eval", "--impure", "--json", "--expr", expression],
+    [...nixFeatures, "eval", "--impure", "--json", "--expr", expression],
     {
       timeout: 30_000,
       maxBuffer: 4 * 1024 * 1024,

@@ -156,6 +156,11 @@ test("source_snapshot rule builds a declared Buck snapshot artifact", async () =
       cwd: tmp,
       stdio: "pipe",
       nothrow: true,
+      env: {
+        ...process.env,
+        NODE_OPTIONS: "--import=/definitely/missing/ambient-zx-init.mjs",
+        NODE_PATH: "/definitely/missing/ambient-node-modules",
+      },
     })`buck2 --isolation-dir ${inheritedBuckIsolation("source_snapshot_rule")} build //tmp/source_snapshot_rule:tiny --show-output`;
     assert.equal(res.exitCode, 0, String(res.stderr || ""));
     assert.match(String(res.stdout || ""), /tiny\.source-snapshot/);
@@ -192,10 +197,7 @@ test("source_snapshot runtime is a declared Buck tool output", async () => {
 
   assert.match(actions, /identifier = source-snapshot-zx-wrapper,\s+kind = write,/);
   assert.match(actions, /source-snapshot\.manifest\.json/);
-  assert.match(
-    actions,
-    /category = symlinked_dir,\s+identifier = source-snapshot-runner\.modules,\s+kind = symlinkeddir,/,
-  );
+  assert.match(actions, /identifier = source-snapshot\.ts,/);
   for (const moduleName of [
     "source-snapshot.ts",
     "source-snapshot-graph.ts",

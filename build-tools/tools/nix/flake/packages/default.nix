@@ -1,4 +1,5 @@
 { pkgs
+, wasmtimePkgs ? pkgs
 , zx-wrapper
 , repoRoot
 , viberootsRoot
@@ -24,7 +25,7 @@ let
   remoteTools = import ./remote-worker-tools.nix { inherit pkgs zx-wrapper viberootsRoot; };
   importers = import ./importers.nix { inherit lib filterRepo repoSnapshot repoRoot; };
   graph = import ./graph.nix {
-    inherit pkgs repoSnapshot uv2nixLib repoRoot viberootsRoot nixpkgsRegistry evaluationBundle;
+    inherit pkgs wasmtimePkgs repoSnapshot uv2nixLib repoRoot viberootsRoot nixpkgsRegistry evaluationBundle;
     artifactToolsRoot = remoteTools.remote-worker-tools;
     nodeMods = resolvedNodeMods;
   };
@@ -66,7 +67,7 @@ let
     coverage = if evaluationBundle == null then false else evaluationBundle.selection.coverage or false;
   };
 
-  toolchains = import ./toolchains.nix { inherit pkgs; };
+  toolchains = import ./toolchains.nix { inherit pkgs wasmtimePkgs; };
   python = import ./python.nix { inherit pkgs repoRoot uv2nixLib; };
   pyWasiToolchain = import ../../toolchains/python-wasi.nix { inherit pkgs; };
   testSeed = import ./test-seed.nix {

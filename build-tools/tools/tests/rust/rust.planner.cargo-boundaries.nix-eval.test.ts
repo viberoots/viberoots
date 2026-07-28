@@ -12,6 +12,9 @@ type PlannerFields = {
   local_patch_dirs: string[];
   kind?: "bin" | "wasm" | "wasi";
   target?: string;
+  wasm_abi?: string;
+  wasm_target?: string;
+  wasm_link_kind?: string;
   link_deps?: string[];
   header_deps?: string[];
   nixpkg_deps?: string[];
@@ -34,6 +37,12 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
     const evaluate = async (fields: PlannerFields) => {
       const kind = fields.kind || "bin";
       const target = fields.target || "";
+      const wasmAbi = fields.wasm_abi ?? (kind === "wasi" ? "wasi" : kind === "wasm" ? "bare" : "");
+      const wasmTarget =
+        fields.wasm_target ??
+        (kind === "wasi" ? "wasm32-wasip1" : kind === "wasm" ? "wasm32-unknown-unknown" : "");
+      const wasmLinkKind =
+        fields.wasm_link_kind ?? (kind === "wasi" || kind === "wasm" ? "module" : "");
       const patchDirs = fields.local_patch_dirs.map((value) => JSON.stringify(value)).join(" ");
       const linkDeps = (fields.link_deps || []).map((value) => JSON.stringify(value)).join(" ");
       const headerDeps = (fields.header_deps || []).map((value) => JSON.stringify(value)).join(" ");
@@ -58,6 +67,9 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
             default_features = true;
             profile = "release";
             target = ${JSON.stringify(target)};
+            wasm_abi = ${JSON.stringify(wasmAbi)};
+            wasm_target = ${JSON.stringify(wasmTarget)};
+            wasm_link_kind = ${JSON.stringify(wasmLinkKind)};
             local_patch_dirs = [ ${patchDirs} ];
           };
           ctx = {
@@ -150,11 +162,6 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
 
     for (const unsupported of [
       {
-        kind: "wasm" as const,
-        target: "wasm32-unknown-unknown",
-        link_deps: ["root//projects/libs/native:support"],
-      },
-      {
         kind: "wasi" as const,
         target: "wasm32-wasip1",
         header_deps: ["root//projects/libs/native:headers"],
@@ -177,10 +184,7 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
         ...unsupported,
       });
       assert.notEqual(result.exitCode, 0);
-      assert.match(
-        String(result.stderr),
-        /does not support link_deps, header_deps, or nixpkg dependencies; cross-language WebAssembly linking is not available/,
-      );
+      assert.match(String(result.stderr), /does not support header_deps or nixpkg dependencies/);
     }
   });
 });

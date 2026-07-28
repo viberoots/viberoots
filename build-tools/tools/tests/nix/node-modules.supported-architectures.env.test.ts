@@ -4,6 +4,7 @@ import { execFile } from "node:child_process";
 import * as fsp from "node:fs/promises";
 import { test } from "node:test";
 import { promisify } from "node:util";
+import { artifactNixExperimentalFeatureArgs } from "../../lib/artifact-nix-policy";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
 
@@ -53,7 +54,7 @@ test("evaluated universal markers retain both Linux libcs while exact Nix marker
   `;
   const { stdout } = await execFileAsync(
     resolveToolPathSync("nix"),
-    ["eval", "--impure", "--json", "--expr", expression],
+    [...artifactNixExperimentalFeatureArgs(), "eval", "--impure", "--json", "--expr", expression],
     { timeout: 30_000 },
   );
   const evaluated = JSON.parse(stdout) as {

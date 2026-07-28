@@ -127,7 +127,7 @@ export async function prepareFilteredViberootsInput(
     await mkdirWithMacosMetadataExclusion(inputRoot);
     await $({
       cwd: sourceRoot,
-    })`rsync -a --delete --relative ${filteredFlakeRsyncExcludeArgs()} ${sources} ${inputRoot}/`;
+    })`rsync -a --relative ${filteredFlakeRsyncExcludeArgs()} ${sources} ${inputRoot}/`;
     for (const excluded of [".viberoots", "buck-out", "node_modules"]) {
       if (await pathExists(path.join(inputRoot, excluded))) {
         throw new Error(`runInTemp: filtered viberoots input retained ${excluded}`);
@@ -166,7 +166,7 @@ export async function prepareFilteredConsumerSnapshot(
     await mkdirWithMacosMetadataExclusion(snapshotRoot);
     await $({
       cwd: consumerRoot,
-    })`rsync -a --delete --relative ${filteredFlakeRsyncExcludeArgs()} ${sources} ${snapshotRoot}/`;
+    })`rsync -a --relative ${filteredFlakeRsyncExcludeArgs()} ${sources} ${snapshotRoot}/`;
     for (const excluded of [
       ".viberoots/current",
       ".viberoots/workspace/prelude",

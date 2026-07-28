@@ -434,7 +434,7 @@ EOF
       # .viberoots/current/prelude; do not recreate a visible root prelude shim.
     '';
     buildInputs = [
-      pkgs.git pkgs.nix pkgs.buck2 pkgs.go pkgs.cargo pnpm11 pkgs.nodejs_22 pkgs.python3 pkgs.uv zx-wrapper viberootsCommand pkgs.jq pkgs.rsync pkgs.copier pkgs.yq pkgs.prettier
+      pkgs.git pkgs.nix pkgs.buck2 pkgs.go pkgs.viberootsRustToolchain pnpm11 pkgs.nodejs_22 pkgs.python3 pkgs.uv zx-wrapper viberootsCommand pkgs.jq pkgs.rsync pkgs.copier pkgs.yq pkgs.prettier
       pkgs.jc pkgs.bash pkgs.coreutils pkgs.curl pkgs.gomod2nix pkgs.opentofu pkgs.infisical pkgs.awscli2 pkgs.dnsutils
       pkgs.openssl pkgs.postgresql_16
     ] ++ (if pkgs.stdenv.isDarwin then [ agent-safehouse ] else [])

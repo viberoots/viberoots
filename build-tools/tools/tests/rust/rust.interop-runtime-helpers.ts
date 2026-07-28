@@ -9,7 +9,9 @@ import {
   materializeNixStorePaths,
   parseMaterializationManifest,
 } from "../../remote-exec/nix-store-materialize";
+import { artifactNixExperimentalFeatureArgs } from "../../lib/artifact-nix-policy";
 import { exportGraphInTemp } from "../lib/test-helpers";
+import { makeTreeWritable } from "../lib/test-helpers/seed-copy";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 import { buildCanonicalBundle } from "./rust.source-selection.identity-bundle";
 
@@ -68,16 +70,18 @@ async function assertRemotePreparedReplay(options: {
     sourceRoot,
     "build-tools/tools/dev/zx-init.mjs",
   )} ${path.join(sourceRoot, "build-tools/tools/dev/source-snapshot.ts")} ${snapshotArgs}`;
+  await makeTreeWritable(snapshot);
   const snapshotEvidence = await readJson(snapshotManifest);
   assert.equal(snapshotEvidence.declaredSnapshotRoot, snapshot);
   const nix = ensureNixStoreToolPathSync("nix");
+  const nixFeatures = artifactNixExperimentalFeatureArgs();
   const immutableSnapshot =
     String(
       (
         await $({
           cwd: tmp,
           stdio: "pipe",
-        })`${nix} --extra-experimental-features ${"nix-command flakes"} store add-path ${snapshot}`
+        })`${nix} ${nixFeatures} store add-path ${snapshot}`
       ).stdout,
     ).trim() || "";
   assert.match(immutableSnapshot, /^\/nix\/store\//);

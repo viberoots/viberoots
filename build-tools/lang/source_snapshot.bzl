@@ -136,7 +136,17 @@ def _source_snapshot_zx_wrapper_tool_impl(ctx):
     _require_nix_bin(ctx.attrs.zx_wrapper, "NIX_ZX_WRAPPER_BIN")
     out = ctx.actions.write(
         ctx.attrs.name,
-        "#!/bin/sh\nexec %s \"$@\"\n" % ctx.attrs.zx_wrapper,
+        (
+            "#!/bin/sh\n"
+            + "unset NODE_OPTIONS NODE_PATH\n"
+            + "_previous=\"\"\n"
+            + "for _argument in \"$@\"; do\n"
+            + "  if [ \"$_previous\" = \"--import\" ]; then export ZX_INIT=\"$_argument\"; break; fi\n"
+            + "  case \"$_argument\" in --import=*) export ZX_INIT=\"${_argument#--import=}\"; break ;; esac\n"
+            + "  _previous=\"$_argument\"\n"
+            + "done\n"
+            + "exec %s \"$@\"\n" % ctx.attrs.zx_wrapper
+        ),
         is_executable = True,
     )
     return [

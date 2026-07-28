@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
+import { artifactNixExperimentalFeatureArgs } from "../../lib/artifact-nix-policy";
 import { materializeFilteredViberootsSource } from "../../dev/filtered-flake-viberoots-input";
 import {
   defaultFilteredFlakeSnapshotRelPaths,
@@ -113,10 +114,11 @@ test("real viberoots mkWorkspace exposes metadata for external workspace source"
     );
 
     const nixBin = process.env.VBR_NIX_BIN || process.env.NIX_BIN || "nix";
+    const nixFeatures = artifactNixExperimentalFeatureArgs();
     const result = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`${nixBin} eval --json --accept-flake-config ${`path:${await workspaceFlakeRef(tmp)}#probe`}`;
+    })`${nixBin} ${nixFeatures} eval --json --accept-flake-config ${`path:${await workspaceFlakeRef(tmp)}#probe`}`;
     const probe = JSON.parse(String(result.stdout || "{}"));
     assert.equal(probe.workspaceName, "external-probe");
     assert.equal(probe.version, "0.0.0-dev");

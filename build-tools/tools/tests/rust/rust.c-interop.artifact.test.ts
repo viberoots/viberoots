@@ -4,6 +4,7 @@ import * as fs from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { rustPkgsExpression } from "./rust-nixpkgs-authority";
 
 test("public ordinary Rust macros cannot bypass reviewed generated native bindings", async () => {
   await runInTemp("rust-native-abi-public-boundary", async (tmp, $) => {
@@ -85,7 +86,7 @@ test("internal Rust planner retains targeted diagnostics for invalid native clos
         BUCK_TARGET: "//projects/apps/rust-unsupported:rust-unsupported",
       },
       stdio: "pipe",
-    })`nix build --impure --accept-flake-config --file viberoots/build-tools/tools/nix/graph-generator.nix selected --arg pkgs 'import <nixpkgs> {}' --arg src ./. --argstr system ${system} --arg graphJsonPath ${graphPath} --no-link --print-out-paths`.nothrow();
+    })`nix build --impure --accept-flake-config --file viberoots/build-tools/tools/nix/graph-generator.nix selected --arg pkgs ${rustPkgsExpression} --arg src ./. --argstr system ${system} --arg graphJsonPath ${graphPath} --no-link --print-out-paths`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(
       String(result.stderr),

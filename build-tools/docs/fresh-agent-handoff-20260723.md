@@ -2,8 +2,8 @@
 
 **Prepared:** 2026-07-23
 
-**Last reconciled:** 2026-07-27, after PR-8 implementation, validation, and terminal independent
-review
+**Last reconciled:** 2026-07-28, after PR-9 full-suite investigation, focused recovery, and terminal
+scope review
 
 **Workspace:** `/Users/kiltyj/Code/viberoots-site`
 
@@ -16,8 +16,8 @@ repository, staged and unstaged diffs, and the referenced logs before editing.
 
 ## 0. Current handoff: this section supersedes all older execution state below
 
-The next `$repo-skills:prs` item is PR-9, `Reach WASM Linking, Browser, And Component-Model Parity`,
-from:
+The current `$repo-skills:prs` item is PR-9, `Reach WASM Linking, Browser, And Component-Model
+Parity`, from:
 
 ```text
 plan:   build-tools/docs/rust-language-plan.md
@@ -33,16 +33,67 @@ repeated independent reviewer-fix loops, same-stage C++/other-language parity re
 independent scope review are complete in this handoff's
 `feat(rust): add bidirectional native bridges` commit. No push is authorized.
 
-PR-5's commit combines:
+PR-9 is implemented but deliberately **not committed**. The earlier disk-capacity and Rust
+`wasm32-wasip1` realization blockers are resolved: the current filesystem has about 194 GiB free,
+and the pinned Rust 1.88 WASM artifact target has passed. Successive scope reviews found five
+bounded issues, all corrected in the current tree:
 
-- the complete PR-5 implementation and fixes;
-- the `happy@1.2.0` development-environment correction;
-- this handoff document; and
-- every other current tracked or untracked submodule change.
+1. The Rust overlay now selects the Rust 1.88 `minimal` profile with
+   `wasm32-unknown-unknown` and `wasm32-wasip1`. It preserves Cargo, rustc, and the PR-9 WASM tool
+   closure without exposing the PR-10-owned clippy or rustfmt commands. The upstream minimal rustc
+   component also contains the `rustdoc` executable; PR-10 owns its developer-tool authority and
+   integration rather than the bundled binary's existence.
+2. This handoff now records the current repository state and the real pinned-Firefox browser
+   evidence instead of the obsolete claim that no browser-engine harness exists.
+3. The WASM component claim now matches implementation: components use pinned wasm-tools and
+   preview1 adapters, not cargo-component.
+4. The Rust design distinguishes current PR-9 Cargo/rustc/WASM authority from PR-10's planned
+   rustfmt, clippy, rustdoc-workflow, editor, and verify integration.
+5. Local nested verify resolves patch, Git, OpenSSL, and gzip only from the validated artifact tool
+   closure. Hostile `PATH`, ambient overrides, and a missing canonical tool fail to provide a
+   fallback.
 
-Do not preserve the older staged-versus-unstaged separation described below. It is historical.
-Do not push. The parent consumer repository and its pre-existing `test-tmp-paths.log` remain outside
-this submodule commit.
+The terminal PR-9 scope review then found five additional contract gaps. They are corrected:
+
+- exported-function lists now prune final core modules, component allowlists equal the selected WIT
+  world, component transforms run before componentization, and static controls are honestly
+  compile-time rustc controls rather than invalid Binaryen transforms on relocatable members;
+- both bare and preview1-reactor public components execute through manifest-pinned Wasmtime;
+- public Buck outputs are typed WASM-family directories preserving headers, normalized WIT, and
+  producer/materialization manifests; the C++ fixture consumes the transported Rust header;
+- Node staging records portable copy identity separately from immutable Nix producer
+  store/output/source-revision lineage, and deployment evidence covers static webapp, SSR, service,
+  and component artifact families; and
+- the WASI runner invokes transported store Node under a hostile `PATH`.
+
+A final recovery review found five more bounded gaps. They are also corrected:
+
+- the Rust WASM Starlark contract loads every dependency before executable statements;
+- CLI inline modules carry immutable producer lineage and participate in deployment admission;
+- static control evidence covers explicit false/none and positive modes on the real object that
+  defines the exported function, with adversarial Cargo profile settings;
+- component export equality is selected-world and interface aware, including duplicate-name and
+  missing-interface negatives; and
+- all five bare/WASI static, browser, and bare/WASI component families execute through real
+  remote-ready Buck actions, declared tool identities, and immutable-snapshot replay.
+
+The exact PR-9 acceptance target passed 1/1 in 984.246 seconds after the final source-snapshot
+runner correction. Its remote phase freshly analyzed the pinned immutable viberoots cell, rejected
+ambient Node import state, executed all five remote-ready action categories under hostile host
+tool resolution, replayed them from a standalone immutable snapshot while the live owner source was
+poisoned, and preserved source/store identities. The shared source-snapshot contract passed 5/5,
+the real Buck WASM analysis-error gate passed 16/16, the Nix boundary gate passed 1/1, and `u && i`
+converged afterward. The acceptance log was written under the generated workspace log directory;
+the subsequent required `u` refresh removed that generated directory, so retain the TAP totals and
+elapsed time here rather than claiming the transient log still exists.
+
+PR-9 implementation and recovery validation are complete. Its terminal independent scope review is
+green. Do not advance to PR-10 until PR-9 is committed through `repo-skills:cc`.
+
+Do not preserve the older staged-versus-unstaged separation described below. It is historical. Do
+not push. The parent consumer repository currently has a modified `viberoots` pointer and its
+pre-existing untracked `test-tmp-paths.log`; preserve both and keep the log outside this submodule
+commit.
 
 ### How the PR flow is being run
 
@@ -52,18 +103,189 @@ Use `repo-skills:prs` in turbo mode, with minimal-context independent agents:
    repository path, and its bounded role. Do not fork the entire conversation into reviewers.
 2. Keep verbose validation output in log files. Agents report only target, elapsed time, pass/fail
    totals, a redacted failure excerpt, and scoped process/temp/secret deltas.
-3. Run selectors sequentially and stop on the first failure. Use `repo-skills:investigate` to prove
-   the root cause and validate the primary path before resuming.
+3. Run focused selectors sequentially and stop on the first failure. Use `repo-skills:investigate`
+   to prove the root cause and validate the primary path before resuming.
 4. Require a fresh independent scope-review agent after the final material edit.
 5. Commit through `repo-skills:cc` only after implementation review, validation, timing checks, and
    scope review are green. Never push without explicit user authorization.
 
-After PR-8 is committed, PRs 9-12 remain. Continue them in numeric order with a fresh isolated
+PR-8 is committed, so PRs 9-12 remain. Continue them in numeric order with a fresh isolated
 implementation agent and separate isolated reviewer/tester roles for each PR. Use risk-based
 focused suites for PRs 10-11 because PR-5 exercised a complete checkpoint and future checkpoint
 PRs will do so again. Run full checkpoints for PR-9 and PR-12, or earlier if a material
 cross-cutting change makes the focused evidence insufficient. Record elapsed timing and compare
 successful full checkpoints with the 10,684-second successful baseline.
+
+For a required full-suite run, stop only for a deterministic failure observed within the first five
+minutes. Once the run has crossed five minutes, continue to its final exit and collect every
+failure before investigation. Do not terminate a long full suite at the first later failure.
+
+### PR-9 current uncommitted status
+
+Current source repository:
+
+```text
+root:   /Users/kiltyj/Code/viberoots-site/viberoots
+state:  detached HEAD
+HEAD:   4d9598ba6fd7b0407fba9321bed0f06a85e5d4ab
+parent: /Users/kiltyj/Code/viberoots-site
+```
+
+At the final refresh, the source tree had 171 modified paths, 42 untracked paths, no staged paths,
+and 213 changed/untracked paths total. Preserve all of them. The fingerprint below covers the
+sorted path, file mode, and SHA-256 content digest for the other 212 changed/untracked paths. It
+excludes this handoff file to avoid a self-referential digest:
+
+```text
+949f1d52cdec3a93ec9d5a2c9e509dc52e8c43f3fd5a10dda42c93d52368d662
+```
+
+Implemented scope includes:
+
+- Rust raw, WASI, deterministic static, wasm-bindgen browser-package, and WIT/component macros with
+  typed ABI/target/link/libc/allocator/exception/runtime/export/profile/adapter/module-surface
+  metadata;
+- pinned wasm-bindgen, Binaryen, wasm-tools, wasmtime, and official preview1 adapter authority;
+- deterministic Rust BSD-staticlib normalization into GNU WASM archives, with Darwin fixup disabled
+  so TinyGo/wasm-ld can consume the exact archive;
+- proven C++ bare static -> Rust raw, Rust static -> TinyGo, TinyGo static -> Rust, and transitive
+  C++ consumer directions, plus explicit bare/WASI compatibility and fail-closed matrix entries;
+- genuine wasm-bindgen Node execution, raw instantiation, component execution in pinned wasmtime,
+  component byte reproducibility, optimization/debug/source-map/export/WIT negatives, and Rust
+  panic/authority checks;
+- direct declared Rust Buck edges through production Node static/SSR/service/CLI staging, portable
+  `buck:<label>#sha256-...` manifest identities, production service identity, Kubernetes artifact
+  admission, and admitted blob byte/path identity;
+- signed credential-free cache export, production materialization manifests, cold local-store raw
+  and browser execution, exact source/store identity checks, and all available full-lane WASI
+  outputs selected for cache/materialization when the builder provides them;
+- public patch lifecycle changing browser, component, raw, static, WASI static, WASI component, and
+  WASI binary outputs and runtime behavior, with the same locked Cargo/patch identity and exact
+  output/manifest restoration;
+- content-sensitive Rust producer lineage derived from the immutable filtered source bundle,
+  Cargo.lock bytes, and content-addressed patch identity, while the structural composition digest
+  remains separately named; source mutation and patch apply/remove tests prove change and exact
+  restoration through Rust manifests and Node/deployment staging;
+- package-local header/WIT enforcement, exact WIT identifier allowlists, external-label rejection,
+  and honest remote-worker/publication limitations in docs; and
+- reusable adding-language guidance for cross-language WASM authority and deterministic archive
+  normalization.
+
+Key final focused evidence:
+
+```text
+terminal five-finding combined artifact gate:                   1/1, 6m42s
+  verify-2026-07-28T07-39-05-024Z-99872-5be22a620b2e7.log
+contract analysis negatives:                                    1/1, 2m23s
+portable producer/copy identity:                                1/1, 11s
+expanded combined artifact/cross-language/Node/cache/patch gate: 1/1, 433.43s
+native provenance direct immutable-input regression:            1/1, 85.57s
+portable asset identity unit:                                   1/1, 12.38s
+mixed-producer node_asset_stage integration:                     1/1, 13.58s
+WIT regex-injection analysis rejection:                          1/1, 12.17s
+WASI/cross-language authority matrix:                            7/7, 8.95s
+```
+
+The browser evidence is real browser execution, not a Node proxy. The acceptance target imports
+`build-tools/tools/tests/rust/rust-wasm-browser-runtime.ts`, reads the pinned Nix-store Firefox path
+from `share/viberoots-rust/wasm-manifest.json`, launches Firefox headlessly with an isolated
+profile, loads the emitted `browser-harness.html`, invokes the exported `answer()` probe, and
+requires the browser report `{ probe: "answer", result: 42 }`. The latest recorded passing target
+evidence is:
+
+```text
+target:
+  viberoots//:rust_rust_wasm_wasi_artifacts
+result:
+  passed in 8:02.6
+verify log:
+  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/verify-logs/
+  verify-2026-07-28T05-21-35-526Z-50772-1ca1d4d1f0986.log
+```
+
+That broader focused run found four unrelated environment/cache transport failures. After their
+repairs, an exact integrated rerun passed all four targets:
+
+```text
+i: 23s
+b: 82s
+v: 107s
+supervising runtime: 240s
+supervising log:
+  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/agent-test-logs/
+  i-b-v-pr9-transportfix-20260727.log
+verify log:
+  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/verify-logs/
+  verify-2026-07-28T05-50-45-170Z-42084-b2075ad2573f6.log
+```
+
+The exact passing targets were cache-role provenance, nested verify isolation, verify spawn
+snapshots, and the Rust library/binary consumer. Direct artifact-transport and nested-cache-role
+contracts also passed 3/3 each. Changed-source LOC, command-site inventory, targeted
+Prettier/ESLint, and `git diff --check` passed.
+
+The required PR-9 full suite then ran to true process exit:
+
+```text
+command: NIX_BUILD_CORES=4 i &&
+         NIX_BUILD_CORES=4 b &&
+         NIX_BUILD_CORES=4 ALL_TESTS=1 v
+i:       19s, exit 0
+b:       63s, exit 0
+v:       11,933s, exit 32
+total:   12,015s (3h 20m 15s)
+log:
+  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/agent-test-logs/
+  pr9-full-suite-retry-20260728T113532Z.log
+```
+
+The run was 1,340 seconds below the 13,355-second significant-regression threshold. Its first four
+lanes passed 82/82; resource-limited passed 270/274 and shared passed 1,671/1,690. Investigation
+reduced the 23 failures to deterministic tool/config/test issues plus a required-cache outage burst.
+All deterministic or repeatable failures were fixed and passed exact or grouped focused reruns.
+The user authorized risk-based closeout instead of repeating the full suite because another
+checkpoint is planned for later Rust PRs.
+
+The final PR-9/PR-10 tool boundary check passed after selecting the minimal Rust distribution:
+
+```text
+command:
+  i && b && v viberoots//:dev_toolchains_nix_build_go_python
+i: 21s
+b: 82s
+v: 120s
+requested target: passed in 1:12.8
+supervising log:
+  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/agent-test-logs/
+  i-b-v-dev-toolchains-restart-20260727-230816.log
+verify log:
+  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/verify-logs/
+  verify-2026-07-28T06-10-20-377Z-77141-e193e68699ea.log
+```
+
+The later local verify-tool authority correction passed its exact integrated selector set:
+
+```text
+command:
+  i && b && v \
+    viberoots//:dev_artifact_environment_ingress \
+    viberoots//:dev_buck2_test_env_verify_nested_isolation \
+    viberoots//:remote_exec_verify_buck2_test_spawn_snapshot
+i: 20s
+b: 108s
+v: 53s
+requested targets: 3/3 passed
+supervising log:
+  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/agent-test-logs/
+  i-b-v-ingress-transport-20260727-232822.log
+verify log:
+  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/verify-logs/
+  verify-2026-07-28T06-30-53-110Z-16288-d946c6c112f8b.log
+```
+
+Direct contracts also passed local/nested tool environment 8/8, spawn snapshots 5/5, and artifact
+ingress 10/10. A fresh independent scope review remains required because the tool authority and
+documentation corrections are material edits.
 
 ### PR-8 completion evidence
 
@@ -183,8 +405,8 @@ PR-8–12 work. No PR-7 scope finding remains open.
 
 ### Remaining PRs
 
-- PR-9: WASM linking, browser/TypeScript and `wasm-bindgen` bindings, component-model/WIT
-  integration, and the next full checkpoint.
+- PR-9: implementation, full checkpoint investigation, focused recovery, and terminal scope review
+  are complete; commit the current tree before advancing.
 - PR-10: Rust developer and dependency lifecycle parity.
 - PR-11: the cross-language Tauri desktop scaffold.
 - PR-12: final multi-system hermetic graduation, publication, protected-builder, and independent
@@ -366,6 +588,15 @@ Additional root-cause fixes discovered by the matrix include:
 Final readiness evidence:
 
 ```text
+complete Rust WASM acceptance:      1/1 passed in 984.246s
+remote-only immutable replay:       1/1 passed in 88.5s
+focused patch/lineage lifecycle:    1/1 passed in 133.9s
+focused WASI static consumer:       1/1 passed in 37.1s
+Node producer lineage transport:    1/1 passed in 12.9s
+Rust static lifecycle contracts:    3/3 passed
+full suite to process exit:         12,015s; 23 failures collected and investigated
+post-suite deterministic fixes:    all exact/grouped focused reruns passed
+final u && i:                       passed
 final split affected suite:        56/56 passed across 8 files
 full ESLint:                       passed
 changed/untracked Prettier:        passed
@@ -373,14 +604,15 @@ changed shell bash -n:             passed
 changed Nix parse:                 passed
 git diff --check:                  passed
 changed-source 250-line gate:      passed
-Nix command inventory:             536 sites
-inventory digest:                  17387e7d23ed5f5791327245d16e46cca2ff48f08d1347d9ad459cd27e7c7507
-inventory roles:                   canonical 296, live-d 4, update 68, nonartifact 168
+reviewed oversized exceptions:     8 known, 0 unknown
+Nix command inventory:             538 sites
+inventory digest:                  789b8b3d0b6ce2489e25bd854cd622c944a1e41c7f8919e01c9715f2af96a9a8
+inventory roles:                   canonical 298, live-d 4, update 68, nonartifact 168
 strong secret-indicator files:     0
 active scoped test processes:      0
 fresh scoped temp entries:         0
 source fingerprint:
-  dabcb4062ae1f436692548115f647839973e2359eba660f4dd0b86abb0c8f6d5
+  949f1d52cdec3a93ec9d5a2c9e509dc52e8c43f3fd5a10dda42c93d52368d662
 protected original staged SHA-256:
   691f436b0fa248624121e8e70be5c7b3bf437f617f6c6d09b7f2b4cf8b75e489
 ```
@@ -388,8 +620,11 @@ protected original staged SHA-256:
 Repository-wide Prettier still reports six unchanged baseline files outside this diff. Every
 changed or untracked formatter-eligible file passes. All unexcepted in-scope files over 250 lines
 were split into cohesive helpers/modules; the largest resulting unexcepted file is exactly 250
-lines. The final split affected suite passed 56/56 and no matrix rerun was needed for purely
-structural splits.
+lines. The PR-9 recovery splits leave the acceptance fixture at 208 lines, remote runtime at 194,
+patch lifecycle at 227, Rust template at 239, and Rust identity fixture at 237. Durable recovery
+logs are under the parent
+workspace `.codex-logs/pr9-final/`; `rust-wasm-acceptance-complete.log` is the final start-to-exit
+acceptance record.
 
 ### Historical resume state from 2026-07-24
 

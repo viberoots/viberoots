@@ -2,7 +2,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
-import { runInTemp } from "../lib/test-helpers";
+import { nestedBuckTestArgs, runInTemp } from "../lib/test-helpers";
 
 test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
   // Avoid dev env export (which can trigger GitHub 429 during flake eval) by not including "go" in name
@@ -29,7 +29,7 @@ test("go app: adding *_test.go auto-wires nix_go_test and runs", async () => {
     await $`viberoots/build-tools/tools/dev/install-deps.ts --glue-only`;
     // Add a short, actionable external timeout message if the test stalls on stdlib
     try {
-      await $`buck2 test //projects/apps/demo-cli:demo-cli_test --target-platforms //:no_cgo`;
+      await $`buck2 test //projects/apps/demo-cli:demo-cli_test --target-platforms //:no_cgo -- ${nestedBuckTestArgs}`;
     } catch (e) {
       console.error(
         "go app auto-wires: buck2 test stalled or failed — ensure go stdlib toolchain built; rerun test or check Buck logs for go_build_stdlib",

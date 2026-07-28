@@ -6,6 +6,7 @@ load("@viberoots//build-tools/lang:nix_artifact_inputs.bzl", "nix_artifact_actio
 load("@viberoots//build-tools/lang:native_link.bzl", "NativeLinkInfo", "native_runtime_outputs")
 load("@viberoots//build-tools/lang:source_snapshot.bzl", "SourceSnapshotInfo")
 load("@viberoots//build-tools/rust/private:crate_contract.bzl", "rust_crate_closure_inputs", "rust_crate_contract_attrs", "rust_crate_info")
+load("@viberoots//build-tools/rust/private:wasm_contract.bzl", "wasm_contract_rule_attrs")
 
 def _rust_nix_build_impl(ctx):
     raw = ctx.attrs.self_label
@@ -91,7 +92,21 @@ def _rust_nix_build_impl(ctx):
         + "if [ \"%s\" = \"wasm\" ] || [ \"%s\" = \"wasi\" ]; then " % (kind, kind)
         + ("  WASM=\"$outPath/lib/%s.wasm\"; " % ctx.attrs.crate)
         + "  if [ ! -f \"$WASM\" ]; then echo \"rust_nix_build (%s): expected WebAssembly module not found\" >&2; exit 2; fi; " % raw
-        + "  cp -f \"$WASM\" \"$0\"; exit 0; "
+        + "  mkdir -p \"$0\"; cp -R \"$outPath/.\" \"$0/\"; chmod -R u+w \"$0\"; exit 0; "
+        + "fi; "
+        + "if [ \"%s\" = \"wasm_static\" ] || [ \"%s\" = \"wasi_static\" ]; then " % (kind, kind)
+        + ("  ARCHIVE=\"$outPath/lib/lib%s.a\"; " % ctx.attrs.public_crate)
+        + "  test -f \"$ARCHIVE\" || { echo \"rust_nix_build (%s): expected WASM archive not found\" >&2; exit 2; }; " % raw
+        + "  mkdir -p \"$0\"; cp -R \"$outPath/.\" \"$0/\"; chmod -R u+w \"$0\"; exit 0; "
+        + "fi; "
+        + "if [ \"%s\" = \"wasm_browser\" ]; then " % kind
+        + "  test -f \"$outPath/pkg/package.json\" || { echo \"rust_nix_build (%s): expected browser package not found\" >&2; exit 2; }; " % raw
+        + "  mkdir -p \"$0\"; cp -R \"$outPath/.\" \"$0/\"; chmod -R u+w \"$0\"; exit 0; "
+        + "fi; "
+        + "if [ \"%s\" = \"wasm_component\" ]; then " % kind
+        + ("  COMPONENT=\"$outPath/lib/%s.component.wasm\"; " % ctx.attrs.crate)
+        + "  test -f \"$COMPONENT\" || { echo \"rust_nix_build (%s): expected component not found\" >&2; exit 2; }; " % raw
+        + "  mkdir -p \"$0\"; cp -R \"$outPath/.\" \"$0/\"; chmod -R u+w \"$0\"; exit 0; "
         + "fi; "
         + ("TARGET_NAME=\"%s\"; " % target_name)
         + ("PLANNER_TARGET_NAME=\"%s\"; " % planner_target_name)
@@ -108,7 +123,8 @@ def _rust_nix_build_impl(ctx):
         + "fi; "
         + "DEST=\"$0\"; cp -f \"$CAND\" \"$DEST\"; "
     )
-    out = ctx.actions.declare_output(ctx.attrs.out)
+    wasm_family = kind in ["wasm", "wasi", "wasm_static", "wasi_static", "wasm_browser", "wasm_component"]
+    out = ctx.actions.declare_output(ctx.attrs.out, dir = wasm_family)
     remote_inputs = [
         ctx.attrs.materialization_manifest,
         ctx.attrs.artifact_contract,
@@ -116,8 +132,9 @@ def _rust_nix_build_impl(ctx):
         ctx.attrs.remote_builder_smoke,
     ]
     present_remote_inputs = [value for value in remote_inputs if value != None]
+    wasm_inputs = [value for value in [ctx.attrs.wasm_header, ctx.attrs.wit] if value != None]
     crate_closure_inputs = rust_crate_closure_inputs(ctx)
-    declared_inputs = nix_artifact_action_inputs(ctx) + [ctx.attrs.cargo_manifest, ctx.attrs.cargo_lock] + crate_closure_inputs + snapshot_inputs + present_remote_inputs + control_inputs
+    declared_inputs = nix_artifact_action_inputs(ctx) + [ctx.attrs.cargo_manifest, ctx.attrs.cargo_lock] + crate_closure_inputs + wasm_inputs + snapshot_inputs + present_remote_inputs + control_inputs
     cmd = cmd_args(
         [nix_artifact_bash(), "-c", run_and_copy, out.as_output(), ctx.attrs._graph_json] + snapshot_args + control_inputs + [declared_inputs],
         hidden = declared_inputs,
@@ -144,7 +161,7 @@ def _rust_nix_build_impl(ctx):
         DefaultInfo(default_output = out, other_outputs = runtime_outputs),
         rust_crate_info(ctx),
     ]
-    if crate_type in ["staticlib", "cdylib"]:
+    if crate_type in ["staticlib", "cdylib"] and not wasm_family:
         providers.append(NativeLinkInfo(
             library = out,
             link_kind = "static" if crate_type == "staticlib" else "shared",
@@ -214,6 +231,7 @@ _ATTRS = {
         "_source_snapshot_validator": attrs.source(default = "@viberoots//build-tools/tools/dev:validate-source-snapshot.ts"),
 }
 _ATTRS.update(rust_crate_contract_attrs())
+_ATTRS.update(wasm_contract_rule_attrs())
 
 rust_nix_build = rule(
     impl = _rust_nix_build_impl,

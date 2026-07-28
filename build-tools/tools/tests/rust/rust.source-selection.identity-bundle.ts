@@ -6,8 +6,9 @@ import {
   canonicalArtifactToolsRoot,
   withoutArtifactEnvironmentInfluence,
 } from "../../lib/artifact-environment";
+import { artifactNixExperimentalFeatureArgs } from "../../lib/artifact-nix-policy";
 
-const nixFlakeFeatures = ["--extra-experimental-features", "nix-command flakes"];
+const nixFlakeFeatures = artifactNixExperimentalFeatureArgs();
 const defaultTarget = "//projects/apps/rust-parity:app";
 
 export async function buildCurrentArtifactTools(

@@ -3,6 +3,9 @@ import path from "node:path";
 import { ensureNixStoreToolPathSync } from "../lib/tool-paths";
 import { isCanonicalSha256SRI } from "../lib/nix-sri";
 import { runCommand } from "./filtered-flake-command";
+import { syncExactViberootsInputs } from "./filtered-flake-lock-inputs";
+
+export { syncExactViberootsInputs } from "./filtered-flake-lock-inputs";
 
 export interface MaterializedPathInput {
   storePath: string;
@@ -166,6 +169,22 @@ async function rewriteViberootsInput(
   };
   const node = lock.nodes?.viberoots;
   if (!node) throw new Error(`[filtered-flake] snapshot lock does not contain viberoots input`);
+  if (await hasFlake(storePath)) {
+    const sourceLockPath = path.join(storePath, "flake.lock");
+    let sourceLockText = "";
+    try {
+      sourceLockText = await fsp.readFile(sourceLockPath, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+        throw new Error(
+          `[filtered-flake] immutable viberoots source has flake.nix but no flake.lock: ${sourceLockPath}`,
+        );
+      }
+      throw error;
+    }
+    const sourceLock = JSON.parse(sourceLockText) as SnapshotFlakeLock;
+    syncExactViberootsInputs(lock as SnapshotFlakeLock, sourceLock);
+  }
   node.locked = { ...locked, path: storePath };
   node.original = { type: "path", path: storePath };
   // `parent` is meaningful for a relative path input. Keeping it after rewriting to

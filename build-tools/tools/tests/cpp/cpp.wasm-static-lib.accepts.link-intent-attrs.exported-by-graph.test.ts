@@ -15,12 +15,6 @@ function normalizeLabelList(xs: unknown): string[] {
 test("cpp wasm static lib preserves link intent attrs in .viberoots/workspace/buck/graph.json", async () => {
   await runInTemp("cpp-wasm-static-lib-link-intent-exported", async (tmp, $) => {
     await fs.outputFile(
-      path.join(tmp, "viberoots", "build-tools", "tools", "nix", "langs.json"),
-      JSON.stringify({ enabled: ["cpp"] }, null, 2) + "\n",
-      "utf8",
-    );
-
-    await fs.outputFile(
       path.join(tmp, "libs", "hdrs", "include", "demo.h"),
       ["#pragma once", "inline int demo_answer() { return 42; }", ""].join("\n"),
       "utf8",

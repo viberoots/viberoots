@@ -27,7 +27,7 @@ test("Rust resolution uses only canonical Nix-store Cargo", async () => {
   assert.doesNotMatch(source, /UPDATE_CARGO_BIN|process\.env\.CARGO\b/);
   assert.match(
     await read("build-tools/tools/nix/flake/packages/remote-worker-tools.nix"),
-    /workerPaths = \[[\s\S]*pkgs\.cargo[\s\S]*pkgs\.gomod2nix[\s\S]*\];/,
+    /workerPaths = \[[\s\S]*pkgs\.viberootsRustToolchain[\s\S]*pkgs\.gomod2nix[\s\S]*\];/,
   );
   assert.match(
     await read("build-tools/tools/dev/update-command/run.ts"),
@@ -35,7 +35,7 @@ test("Rust resolution uses only canonical Nix-store Cargo", async () => {
   );
   assert.match(
     await read("build-tools/tools/nix/devshell.nix"),
-    /buildInputs = \[[\s\S]*pkgs\.cargo/,
+    /buildInputs = \[[\s\S]*pkgs\.viberootsRustToolchain/,
   );
 });
 

@@ -8,8 +8,14 @@ import { test } from "node:test";
 
 const ingressScript = "viberoots/build-tools/tools/bin/artifact-ingress-env.sh";
 
-test("shell ingress removes trusted devshell session inputs before canonical admission", () => {
-  for (const name of ["NIX_CFLAGS_COMPILE", "NIX_PROFILES", "NIX_USER_PROFILE_DIR", "XPC_FLAGS"]) {
+test("shell ingress removes canonicalized session inputs before canonical admission", () => {
+  for (const name of [
+    "NIX_CFLAGS_COMPILE",
+    "NIX_PROFILES",
+    "NIX_USER_PROFILE_DIR",
+    "NODE_PATH",
+    "XPC_FLAGS",
+  ]) {
     const result = spawnSync(
       "/bin/bash",
       [
@@ -119,7 +125,7 @@ test("shell ingress discards only the historical launcher-owned flake input", ()
 });
 
 test("shell ingress restores caller language selectors that differ from trusted baseline", () => {
-  for (const name of ["CC", "NODE_PATH", "PYTHONPATH", "RUSTFLAGS", "GOFLAGS"]) {
+  for (const name of ["CC", "PYTHONPATH", "RUSTFLAGS", "GOFLAGS"]) {
     const result = spawnSync(
       "/bin/bash",
       [
@@ -133,4 +139,74 @@ test("shell ingress restores caller language selectors that differ from trusted 
     );
     assert.equal(result.status, 0, `${name}: ${result.stderr}`);
   }
+});
+
+test("verified ingress removes Nix target selectors contributed by the devshell", () => {
+  const names = [
+    "NIX_BINTOOLS_FOR_TARGET",
+    "NIX_BINTOOLS_WRAPPER_TARGET_TARGET_arm64_apple_darwin",
+    "NIX_CC_FOR_TARGET",
+    "NIX_CC_WRAPPER_TARGET_TARGET_arm64_apple_darwin",
+    "NIX_CFLAGS_COMPILE_FOR_TARGET",
+    "NIX_LDFLAGS_FOR_TARGET",
+  ];
+  const result = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      '. "$1"; shift; for name in "$@"; do export "${name}=/nix/store/devshell"; done; artifact_ingress_capture_environment; artifact_ingress_record_devshell_selectors; artifact_ingress_clear_selectors; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1; artifact_ingress_restore_or_remove_selectors; for name in "$@"; do ! declare -p "$name" >/dev/null 2>&1 || exit 1; done',
+      "artifact-ingress-test",
+      ingressScript,
+      ...names,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("verified ingress removes stale Nix toolchain selectors across a devshell refresh", () => {
+  const names = [
+    "NIX_BINTOOLS_FOR_TARGET",
+    "NIX_BINTOOLS_WRAPPER_TARGET_TARGET_arm64_apple_darwin",
+    "NIX_CC_FOR_TARGET",
+    "NIX_CC_WRAPPER_TARGET_TARGET_arm64_apple_darwin",
+    "NIX_CFLAGS_COMPILE_FOR_TARGET",
+    "NIX_LDFLAGS",
+    "NIX_LDFLAGS_FOR_TARGET",
+  ];
+  const result = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      '. "$1"; shift; for name in "$@"; do export "${name}=/nix/store/old-devshell"; done; artifact_ingress_capture_environment; for name in "$@"; do export "${name}=/nix/store/new-devshell"; done; artifact_ingress_record_devshell_selectors; artifact_ingress_clear_selectors; export VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED=1; artifact_ingress_restore_or_remove_selectors; for name in "$@"; do ! declare -p "$name" >/dev/null 2>&1 || exit 1; done',
+      "artifact-ingress-test",
+      ingressScript,
+      ...names,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("verified ingress removes Nix target selectors introduced after capture", () => {
+  const names = [
+    "NIX_BINTOOLS_FOR_TARGET",
+    "NIX_BINTOOLS_WRAPPER_TARGET_TARGET_arm64_apple_darwin",
+    "NIX_CC_FOR_TARGET",
+    "NIX_CC_WRAPPER_TARGET_TARGET_arm64_apple_darwin",
+    "NIX_CFLAGS_COMPILE_FOR_TARGET",
+    "NIX_LDFLAGS_FOR_TARGET",
+  ];
+  const result = spawnSync(
+    "/bin/bash",
+    [
+      "-c",
+      '. "$1"; shift; artifact_ingress_capture_environment; for name in "$@"; do export "${name}=/nix/store/selected-devshell"; done; artifact_ingress_restore_or_remove_selectors; for name in "$@"; do ! declare -p "$name" >/dev/null 2>&1 || exit 1; done',
+      "artifact-ingress-test",
+      ingressScript,
+      ...names,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
 });

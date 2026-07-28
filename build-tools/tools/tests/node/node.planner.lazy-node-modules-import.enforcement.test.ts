@@ -12,8 +12,12 @@ test("node planner lazily imports node-modules inside mkApp", async () => {
   if (txt.includes(topLevelLegacy)) {
     throw new Error(`${file} must not import node-modules at planner module top-level`);
   }
-  if (!txt.includes("mkApp = name: import ./node-app.nix")) {
-    throw new Error(`${file} must delegate mkApp to node-app.nix`);
+  if (
+    !/mkApp = name:\s*\n\s*if isService name then import \.\/node-service\.nix[\s\S]*?\} else import \.\/node-app\.nix/u.test(
+      txt,
+    )
+  ) {
+    throw new Error(`${file} must delegate service apps and ordinary apps to their lazy planners`);
   }
   if (!txt.includes('builtins.elem "node:cli-bundle"')) {
     throw new Error(`${file} must distinguish bundled CLIs from generic generated binaries`);

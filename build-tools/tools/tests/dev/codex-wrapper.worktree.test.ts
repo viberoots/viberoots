@@ -6,6 +6,7 @@ import { test } from "node:test";
 import {
   binWrapper,
   escapeRegExp,
+  managedCodexEnv,
   makeFakeAgentTools,
   repoRoot,
   safehouseLaunchPattern,
@@ -14,12 +15,6 @@ import {
 
 const wrapper = binWrapper("codex");
 const makeFakeTools = (tmp: string, gitRoot: string) => makeFakeAgentTools(tmp, gitRoot, "codex");
-function managedCodexEnv(bin: string): Record<string, string> {
-  return {
-    CODEX_CLI_PATH: "",
-    VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(bin, "codex"),
-  };
-}
 test("codex --worktree attaches to an existing named worktree", async () => {
   await fsp.mkdir(scratchRoot, { recursive: true });
   const tmp = await fsp.mkdtemp(path.join(scratchRoot, "codex-wrapper-"));

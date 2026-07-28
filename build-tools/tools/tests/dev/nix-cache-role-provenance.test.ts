@@ -97,6 +97,14 @@ test("provenance CLI owns no persistent compile-cache file", (t) => {
     ].join("\n"),
     { mode: 0o755 },
   );
+  const childEnv = {
+    ...process.env,
+    NIX_CONFIG: "",
+    NIX_CONF_DIR: config,
+    NIX_USER_CONF_FILES: "",
+    NODE_DISABLE_COMPILE_CACHE: "1",
+  };
+  delete childEnv.NODE_COMPILE_CACHE;
   const result = spawnSync(
     process.execPath,
     [
@@ -106,13 +114,7 @@ test("provenance CLI owns no persistent compile-cache file", (t) => {
     ],
     {
       encoding: "utf8",
-      env: {
-        ...process.env,
-        NIX_CONF_DIR: config,
-        NIX_USER_CONF_FILES: "",
-        NODE_COMPILE_CACHE: compileCache,
-        NODE_DISABLE_COMPILE_CACHE: "1",
-      },
+      env: childEnv,
     },
   );
   assert.equal(result.status, 0, result.stderr);

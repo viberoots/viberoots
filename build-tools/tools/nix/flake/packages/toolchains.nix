@@ -1,20 +1,23 @@
-{ pkgs }:
+{ pkgs, wasmtimePkgs ? pkgs }:
 let
+  rustWasmTools = import ../../templates/rust-wasm-tools.nix {
+    inherit pkgs wasmtimePkgs;
+    rustToolchain = pkgs.viberootsRustToolchain;
+    rustPlatform = pkgs.viberootsRustPlatform;
+  };
   toolchain = name: packages:
     pkgs.symlinkJoin {
       name = name;
       paths = if builtins.isList packages then packages else [ packages ];
     };
   rustTargetClosure = pkgs.runCommand "toolchain-rust-target-components" {
-    nativeBuildInputs = [
-      pkgs.rustc
-      pkgs.pkgsCross.wasi32.buildPackages.rustc
-    ];
+    nativeBuildInputs = [ pkgs.viberootsRustToolchain ];
   } ''
     set -eu
     mkdir -p "$out/nix-support"
-    raw_target="$(${pkgs.rustc}/bin/rustc --print target-libdir --target wasm32-unknown-unknown)"
-    wasi_target="$(${pkgs.pkgsCross.wasi32.buildPackages.rustc}/bin/rustc --print target-libdir --target wasm32-wasip1)"
+    test "$(${pkgs.viberootsRustToolchain}/bin/rustc --version)" = "rustc 1.88.0 (6b00bc388 2025-06-23)"
+    raw_target="$(${pkgs.viberootsRustToolchain}/bin/rustc --print target-libdir --target wasm32-unknown-unknown)"
+    wasi_target="$(${pkgs.viberootsRustToolchain}/bin/rustc --print target-libdir --target wasm32-wasip1)"
     test -d "$raw_target"
     test -d "$wasi_target"
     printf '%s\n%s\n' "$raw_target" "$wasi_target" > "$out/nix-support/rust-target-libdirs"
@@ -34,15 +37,17 @@ in
   ];
   python = toolchain "toolchain-python" pkgs.python3;
   rust = toolchain "toolchain-rust" [
-    pkgs.cargo
-    pkgs.rustc
-    pkgs.rustfmt
-    pkgs.clippy
+    pkgs.viberootsRustToolchain
     pkgs.llvmPackages.lld
     # Keep both reviewed target component closures in the exported toolchain
     # rather than relying on a worker's ambient Rust setup.
-    pkgs.pkgsCross.wasi32.buildPackages.rustc
     rustTargetClosure
+    rustWasmTools.wasmBindgen
+    rustWasmTools.wasmTools
+    rustWasmTools.wasmOpt
+    rustWasmTools.wasmtime
+    rustWasmTools.adapters.reactor
+    rustWasmTools.adapters.command
   ];
   opentofu = toolchain "toolchain-opentofu" pkgs.opentofu;
 }

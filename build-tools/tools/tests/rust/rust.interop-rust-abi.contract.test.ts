@@ -4,6 +4,7 @@ import * as fs from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { exportGraphInTemp, runInTemp } from "../lib/test-helpers";
+import { rustPkgsExpression } from "./rust-nixpkgs-authority";
 
 test("generated Rust ABI verification rejects schema/source signature drift", async () => {
   await runInTemp("rust-interop-rust-abi-mismatch", async (tmp, $) => {
@@ -43,7 +44,7 @@ test("generated Rust ABI verification rejects schema/source signature drift", as
       cwd: tmp,
       env: { ...process.env, BUCK_TARGET: "//projects/libs/abi_mismatch:bridge" },
       stdio: "pipe",
-    })`nix build --impure --accept-flake-config --file ${generator} selected --arg pkgs ${"import <nixpkgs> {}"} --arg src ./. --argstr system ${system} --argstr graphJsonPath ${graph} --no-link`.nothrow();
+    })`nix build --impure --accept-flake-config --file ${generator} selected --arg pkgs ${rustPkgsExpression} --arg src ./. --argstr system ${system} --argstr graphJsonPath ${graph} --no-link`.nothrow();
     assert.notEqual(result.exitCode, 0);
     assert.match(String(result.stderr), /expected fn pointer.*i64|mismatched types/s);
   });

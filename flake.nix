@@ -36,8 +36,13 @@
     buck2.url = "github:facebook/buck2/201beb86106fecdc84e30260b0f1abb5bf576988";
     gomod2nix.url = "github:nix-community/gomod2nix";
     gomod2nix.inputs.nixpkgs.follows = "nixpkgs";
+    rust-overlay.url = "github:oxalica/rust-overlay/c67ce00525464a710971351c183ce67acb6ca827";
+    rust-overlay.inputs.nixpkgs.follows = "nixpkgs";
+    wasmtime-nixpkgs.url = "github:NixOS/nixpkgs/d407951447dcd00442e97087bf374aad70c04cea";
   };
 
-  outputs = { self, nixpkgs, buck2, gomod2nix }:
-    import ./build-tools/tools/nix/flake/outputs.nix { inherit self nixpkgs buck2 gomod2nix; };
+  outputs = { self, nixpkgs, buck2, gomod2nix, rust-overlay, wasmtime-nixpkgs }:
+    import ./build-tools/tools/nix/flake/outputs.nix {
+      inherit self nixpkgs buck2 gomod2nix rust-overlay wasmtime-nixpkgs;
+    };
 }

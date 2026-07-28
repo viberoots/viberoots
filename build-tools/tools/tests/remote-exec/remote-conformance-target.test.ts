@@ -8,9 +8,8 @@ import { parseVerifyExecutionPolicy } from "../../dev/verify/remote-policy";
 import { validateRemoteExecTargets } from "../../dev/remote-exec-policy-check";
 import { remoteBuilderSmokeEvidence } from "./remote-builder-smoke-test-fixture";
 import { normalizeTargetLabel } from "../../lib/labels";
-import { inheritedBuckIsolation } from "../lib/test-helpers";
+import { inheritedBuckIsolation, nestedBuckTestArgs } from "../lib/test-helpers";
 import { viberootsSourcePath } from "../lib/test-helpers/source-paths";
-import { consumeNestedCacheRoleTransport } from "../../dev/verify/nested-cache-role-transport";
 
 const tinyTarget =
   "viberoots//build-tools/tools/tests/remote-exec/wrapper-fixtures:zx_ready_handles";
@@ -38,7 +37,7 @@ const rustSnapshotIsolation = inheritedBuckIsolation("rust_remote_snapshot_actio
 const rustBuildIsolation = inheritedBuckIsolation("rust_remote_snapshot_build");
 const rustTestIsolation = inheritedBuckIsolation("rust_remote_snapshot_test");
 const readyQueryIsolation = inheritedBuckIsolation("remote_conformance_only_ready");
-const nestedCacheTestArgs = consumeNestedCacheRoleTransport(process.env);
+const nestedCacheTestArgs = nestedBuckTestArgs;
 
 after(async () => await killBuckIsolation(process.cwd(), metadataIsolation));
 after(async () => await killBuckIsolation(process.cwd(), providersIsolation));

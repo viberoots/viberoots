@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "fs-extra";
 import path from "node:path";
 import { test } from "node:test";
-import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
+import { nestedBuckTestArgs, reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 
 test("python macros: nix_python_test runs via Nix-backed runner", async () => {
   await runInTemp("python-nix-test-runs", async (tmp, $) => {
@@ -71,7 +71,7 @@ test("python macros: nix_python_test runs via Nix-backed runner", async () => {
       stdio: "pipe",
       reject: false,
       nothrow: true,
-    })`buck2 test --target-platforms prelude//platforms:default //projects/apps/pytester:pytester_test`;
+    })`buck2 test --target-platforms prelude//platforms:default //projects/apps/pytester:pytester_test -- ${nestedBuckTestArgs}`;
     assert.equal(res.exitCode, 0, `buck2 test failed:\n${String(res.stderr || res.stdout)}`);
   });
 });

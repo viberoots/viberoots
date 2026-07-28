@@ -41,6 +41,23 @@ export function stripOverrideKeys(config: string): string {
     .trim();
 }
 
+export function renderReviewedNixCacheConfig(
+  config: string,
+  requiredSubstituters: string[],
+  optionalSubstituters: string[],
+): string {
+  return [
+    stripOverrideKeys(config),
+    `substituters = ${requiredSubstituters.join(" ")}`,
+    `extra-substituters = ${optionalSubstituters.join(" ")}`,
+    "connect-timeout = 3",
+    "stalled-download-timeout = 10",
+    "fallback = true",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 export async function defaultReadEffectiveConfig(): Promise<string> {
   const nixEnv = withSanitizedInheritedNixConfig(envWithResolvedNixBin({ ...process.env }));
   const nixBin = resolveToolPathSync("nix", nixEnv);

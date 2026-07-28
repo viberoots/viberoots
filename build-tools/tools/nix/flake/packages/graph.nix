@@ -1,4 +1,4 @@
-{ pkgs, repoSnapshot, uv2nixLib, repoRoot, viberootsRoot, artifactToolsRoot, nodeMods ? null, mkNodeMods ? null, nixpkgsRegistry ? null, evaluationBundle ? null }:
+{ pkgs, wasmtimePkgs ? pkgs, repoSnapshot, uv2nixLib, repoRoot, viberootsRoot, artifactToolsRoot, nodeMods ? null, mkNodeMods ? null, nixpkgsRegistry ? null, evaluationBundle ? null }:
 let
   resolvedNodeMods =
     if nodeMods != null then nodeMods
@@ -28,7 +28,7 @@ let
         if (builtins.pathExists graphPath) then (builtins.path { path = graphPath; name = "graph.json"; }) else null;
     in
     pkgs.callPackage ../../graph-generator.nix {
-      inherit pkgs;
+      inherit pkgs wasmtimePkgs;
       src = repoSnapshot;
       nodeMods = resolvedNodeMods;
       inherit viberootsRoot artifactToolsRoot;

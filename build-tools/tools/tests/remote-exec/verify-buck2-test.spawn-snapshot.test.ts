@@ -7,6 +7,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { spawnVerifyBuck2Tests } from "../../dev/verify/buck2-test";
 import { parseVerifyExecutionPolicy } from "../../dev/verify/remote-policy";
+import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
 import {
   localArgvSnapshot,
   normalizeSpawnArg,
@@ -28,7 +29,10 @@ type Snapshot = {
   call: SpawnCall;
 };
 
-const artifactToolsRoot = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-artifact-tools";
+const artifactToolsRoot = canonicalArtifactToolsRoot(
+  process.cwd(),
+  String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+);
 
 function captureSpawn(calls: SpawnCall[]) {
   return ((command: string, args: string[], options: SpawnCall["options"]) => {
@@ -109,6 +113,7 @@ function spawnSnapshot(
 
   const prev = { ...process.env };
   scrubInheritedGitConfigEnv();
+  delete process.env.XDG_CONFIG_HOME;
   Object.assign(process.env, {
     BUCK_LOG: "warn,buck2_event_log::writer=off,buck2_execute=trace",
     NODE_V8_COVERAGE: path.join(tmp, "coverage", "raw"),

@@ -95,6 +95,10 @@ test("install-time node module builders propagate selected nix to child processe
   const workspaceLockRepair = await readSource("build-tools/tools/lib/workspace-lock-repair.ts");
   const verifySeed = await readSource("build-tools/tools/dev/verify/seed.ts");
   const nixCacheHealth = await readSource("build-tools/tools/dev/verify/nix-cache-health.ts");
+  const nixCacheHealthConfig = await readSource(
+    "build-tools/tools/dev/verify/nix-cache-health-config.ts",
+  );
+  const nixCacheHealthAuthority = `${nixCacheHealth}\n${nixCacheHealthConfig}`;
   const viberootsCli = await readSource("build-tools/tools/dev/viberoots.ts");
   const startupCheck = await readSource("build-tools/tools/dev/startup-check.ts");
 
@@ -112,7 +116,7 @@ test("install-time node module builders propagate selected nix to child processe
     ["consumer-bootstrap", consumerBootstrap],
     ["workspace-lock-repair", workspaceLockRepair],
     ["verify/seed", verifySeed],
-    ["verify/nix-cache-health", nixCacheHealth],
+    ["verify/nix-cache-health", nixCacheHealthAuthority],
     ["viberoots-cli", viberootsCli],
     ["startup-check", startupCheck],
   ] as const) {
@@ -137,7 +141,7 @@ test("install-time node module builders propagate selected nix to child processe
     ["consumer-bootstrap", consumerBootstrap],
     ["workspace-lock-repair", workspaceLockRepair],
     ["verify/seed", verifySeed],
-    ["verify/nix-cache-health", nixCacheHealth],
+    ["verify/nix-cache-health", nixCacheHealthAuthority],
     ["viberoots-cli", viberootsCli],
     ["startup-check", startupCheck],
   ] as const) {
@@ -156,7 +160,7 @@ test("install-time node module builders propagate selected nix to child processe
     ["consumer-bootstrap", consumerBootstrap],
     ["workspace-lock-repair", workspaceLockRepair],
     ["verify/seed", verifySeed],
-    ["verify/nix-cache-health", nixCacheHealth],
+    ["verify/nix-cache-health", nixCacheHealthAuthority],
     ["viberoots-cli", viberootsCli],
     ["startup-check", startupCheck],
   ] as const) {
@@ -185,7 +189,7 @@ test("install-time node module builders propagate selected nix to child processe
   if (!verifySeed.includes('resolveToolPathSync("nix", seedEnv)')) {
     throw new Error("verify seed must resolve nix from the same env passed to nix");
   }
-  if (!nixCacheHealth.includes('resolveToolPathSync("nix", nixEnv)')) {
+  if (!nixCacheHealthAuthority.includes('resolveToolPathSync("nix", nixEnv)')) {
     throw new Error("nix cache health must resolve nix from the same env passed to nix");
   }
   if (!viberootsCli.includes('resolveToolPathSync("nix", env)')) {

@@ -1,6 +1,8 @@
 { nixpkgs
 , buck2
 , gomod2nix
+, rust-overlay
+, wasmtime-nixpkgs
 , workspaceSrc
 , viberootsInput
 , workspaceName ? "workspace"
@@ -10,7 +12,7 @@
 }:
 let
   sys = import ./for-all-systems.nix {
-    inherit nixpkgs buck2 gomod2nix workspaceSrc viberootsInput version releaseTag nixpkgsRegistryExtension;
+    inherit nixpkgs buck2 gomod2nix rust-overlay wasmtime-nixpkgs workspaceSrc viberootsInput version releaseTag nixpkgsRegistryExtension;
   };
 in
 {

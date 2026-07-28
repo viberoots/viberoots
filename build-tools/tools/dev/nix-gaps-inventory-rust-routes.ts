@@ -17,7 +17,10 @@ const expectedRouteHelper: Record<string, string> = {
   rust_static_library: "rust_nix_build",
   rust_test: "rust_nix_test",
   rust_wasi_binary: "rust_nix_build",
+  rust_wasm_browser_package: "rust_nix_build",
+  rust_wasm_component: "rust_nix_build",
   rust_wasm_library: "rust_nix_build",
+  rust_wasm_static_library: "rust_nix_build",
 };
 
 export function rustImplementationRouteErrors(opts: {

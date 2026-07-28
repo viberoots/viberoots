@@ -28,8 +28,11 @@ in {
     # For determinism diagnostics (planner-provided; not used for building)
     linkClosureOverridesSummary ? "",
     # Build options
-    # TinyGo target: "wasm" (bare) or "wasi" (WASI single-artifact backend)
+    # TinyGo target: "wasm", host-independent "wasm-unknown", or "wasi"
     target ? "wasm",
+    outputKind ? "module",
+    artifactName ? H.sanitizeName name,
+    wasmHeader ? null,
     optimize ? "2",          # TinyGo -opt level (0,1,2 or "z" for size)
     panicMode ? "trap",      # TinyGo -panic mode (trap|print|external)
     scheduler ? "none",      # TinyGo -scheduler (none|tasks)
@@ -48,7 +51,7 @@ in {
     version = "0.1.0";
     src = srcAbs;
     # TinyGo toolchain and LLVM are sufficient for bare wasm builds
-    nativeBuildInputs = [ pkgs.tinygo pkgs.llvmPackages.lld pkgs.llvmPackages.clang ];
+    nativeBuildInputs = [ pkgs.tinygo pkgs.llvmPackages.lld pkgs.llvmPackages.clang pkgs.llvmPackages.llvm ];
     dontStrip = true;
     doCheck = false;
     dontConfigure = true;
@@ -118,7 +121,7 @@ in {
       done
       # TinyGo does not reliably thread CGO_* env vars into its CGo clang invocation.
       # Instead, generate a tiny Go file that injects deterministic `#cgo` directives.
-      pkgName="$(grep -R --include='*.go' -h -m1 -E '^package[[:space:]]+[A-Za-z0-9_]+' . | awk '{print $2}' || true)"
+      pkgName="$(grep -R --include='*.go' -h -m1 -E '^package[[:space:]]+[A-Za-z0-9_]+' . | head -n 1 | awk '{print $2}' || true)"
       if [ -z "$pkgName" ]; then
         echo "goTinyWasmLib(${name}): could not determine Go package name (no 'package ...' found)" >&2
         exit 2
@@ -136,13 +139,18 @@ EOF
       # Build the TinyGo module; keep it pure compute for portability
       # Note: we do not require symbol references to C/C++ at this stage.
       tinygo build \
-        -o "$outTmp/lib/top.wasm" \
+        -o "$outTmp/lib/${if outputKind == "static" then artifactName + ".o" else "top.wasm"}" \
         -target ${target} \
         -no-debug \
         -panic ${panicMode} \
         -scheduler ${scheduler} \
         -opt ${optimize} \
         .
+      ${lib.optionalString (outputKind == "static") ''
+        ${pkgs.llvmPackages.llvm}/bin/llvm-ar --format=gnu rcsD \
+          "$outTmp/lib/lib${artifactName}.a" "$outTmp/lib/${artifactName}.o"
+        install -Dm644 ${wasmHeader} "$outTmp/include/$(basename ${wasmHeader})"
+      ''}
       runHook postBuild
     '';
     installPhase = ''
@@ -151,6 +159,7 @@ EOF
       mkdir -p "$out/lib" "$out/include"
       if [ -d "$outTmp/include" ]; then cp -R "$outTmp/include/." "$out/include/"; fi
       if [ -f "$outTmp/lib/top.wasm" ]; then cp -f "$outTmp/lib/top.wasm" "$out/lib/top.wasm"; fi
+      if [ -f "$outTmp/lib/lib${artifactName}.a" ]; then cp -f "$outTmp/lib/lib${artifactName}.a" "$out/lib/lib${artifactName}.a"; fi
       : > "$out/build.log"
       echo "name=${name}" >> "$out/build.log"
       echo "subdir=${subdir}" >> "$out/build.log"
@@ -158,6 +167,7 @@ EOF
       echo "wasmStaticLibLabels=${lib.concatStringsSep "," wasmStaticLibLabels}" >> "$out/build.log"
       echo "linkClosureOverrides=${linkClosureOverridesSummary}" >> "$out/build.log"
       echo "target=${target}" >> "$out/build.log"
+      echo "outputKind=${outputKind}" >> "$out/build.log"
       echo "opt=${optimize}" >> "$out/build.log"
       echo "panic=${panicMode}" >> "$out/build.log"
       echo "scheduler=${scheduler}" >> "$out/build.log"
@@ -165,5 +175,3 @@ EOF
     '';
   };
 }
-
-

@@ -14,13 +14,18 @@ const staleTarget = "workspace_buck//:project_enforcement_stale_names";
 type TempShell = Parameters<Parameters<typeof runInTemp>[1]>[1];
 
 async function runBuck($: TempShell, target: string, envOverrides: NodeJS.ProcessEnv = {}) {
-  const env = { ...process.env, VERIFY_SKIP_LINT: "1", ...envOverrides };
+  const env = {
+    ...process.env,
+    VERIFY_SKIP_LINT: "1",
+    VBR_NIX_CACHE_POLICY: "off",
+    ...envOverrides,
+  };
   const timeoutSeconds = target === allTargets ? 60 : 30;
   return await $({
     env,
     nothrow: true,
     quiet: true,
-  })`buck2 test --local-only --no-remote-cache --target-platforms prelude//platforms:default ${target} -- --timeout ${timeoutSeconds}`;
+  })`buck2 test --local-only --no-remote-cache --target-platforms prelude//platforms:default ${target} -- --env VBR_NIX_CACHE_POLICY=off --timeout ${timeoutSeconds}`;
 }
 
 async function treeFingerprint(root: string): Promise<string> {

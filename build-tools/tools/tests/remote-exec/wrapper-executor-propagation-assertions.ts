@@ -104,8 +104,8 @@ export const expectedReadyHandles = new Map<string, string[]>([
     "rust",
     [
       "graph.json",
-      "zx_ready_source_snapshot.source-snapshot",
-      "zx_ready_source_snapshot.source-snapshot.manifest.json",
+      "rust_ready_source_snapshot.source-snapshot",
+      "rust_ready_source_snapshot.source-snapshot.manifest.json",
       "materialization-manifest.json",
       "artifact-contract.json",
       "tool-closure.json",

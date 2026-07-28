@@ -7,6 +7,7 @@ import {
   canonicalArtifactToolsRoot,
   withoutArtifactEnvironmentInfluence,
 } from "../../lib/artifact-environment";
+import { artifactNixExperimentalFeatureArgs } from "../../lib/artifact-nix-policy";
 import { installCanonicalArtifactToolsAuthority } from "../../lib/artifact-tool-authority";
 import {
   findViberootsRoot,
@@ -17,13 +18,14 @@ import {
 import { ensureBuckConfigForTempRepo } from "../lib/test-helpers/buck-config";
 import { ensureToolchainPathsForTempRepo } from "../lib/test-helpers/toolchain-paths";
 import { buildCurrentArtifactTools } from "./rust.source-selection.identity-bundle";
+import { rustIdentityUpdateEnvironment } from "./rust.source-selection.identity-update-environment";
 
 const execFileAsync = promisify(execFile);
 export const target = "//projects/apps/rust-parity:app";
 export const testTarget = "//projects/apps/rust-parity:app-test";
 export { buildCanonicalBundle } from "./rust.source-selection.identity-bundle";
 
-const nixFlakeFeatures = ["--extra-experimental-features", "nix-command flakes"];
+const nixFlakeFeatures = artifactNixExperimentalFeatureArgs();
 
 export async function prepareRustConsumer(workspace: string, $: any): Promise<string> {
   const viberootsRoot = await findViberootsRoot();
@@ -195,16 +197,18 @@ export async function prepareRustConsumer(workspace: string, $: any): Promise<st
   const pinnedGit = path.join(currentToolsRoot, "bin", "git");
   await execFileAsync(pinnedGit, ["init", "--quiet"], { cwd: workspace });
   await execFileAsync(pinnedGit, ["add", "-f", "projects"], { cwd: workspace });
+  const updateEnv = await rustIdentityUpdateEnvironment(workspace, currentToolsRoot);
   await execFileAsync(
     path.join(currentToolsRoot, "bin", "bash"),
     [path.join(flakeInput, "build-tools", "tools", "bin", "u")],
     {
       cwd: workspace,
       env: {
-        ...process.env,
-        PATH: path.join(currentToolsRoot, "bin"),
-        VBR_ARTIFACT_TOOLS_ROOT: currentToolsRoot,
+        ...updateEnv,
+        NO_DEV_SHELL: "1",
+        WORKSPACE_ROOT: workspace,
         VIBEROOTS_FLAKE_INPUT_ROOT: flakeInput,
+        VIBEROOTS_SOURCE_ROOT: flakeInput,
       },
       maxBuffer: 16 * 1024 * 1024,
     },

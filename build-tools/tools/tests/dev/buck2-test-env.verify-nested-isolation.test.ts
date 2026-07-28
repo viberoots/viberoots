@@ -5,9 +5,14 @@ import {
   buildVerifyTestEnvArgs,
   previewVerifyNestedBuckIsolation,
 } from "../../dev/verify/buck2-test-env";
+import { localVerifyToolPaths } from "../../dev/verify/buck2-test-local-tools";
+import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
 import { sanitizeInheritedNixConfig } from "../../lib/nix-config-env";
 
-const artifactToolsRoot = "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-artifact-tools";
+const artifactToolsRoot = canonicalArtifactToolsRoot(
+  process.cwd(),
+  String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+);
 
 function envValue(envArgs: string[], name: string): string | undefined {
   const prefix = `${name}=`;
@@ -53,6 +58,43 @@ test("verify child env reuses a shared nested buck isolation per pass", () => {
   assert.ok(
     envArgs.some((arg) => arg.startsWith("GIT_BIN=")),
     "verify should pass an absolute git path into Buck test actions",
+  );
+  assert.ok(envArgs.some((arg) => arg.startsWith("OPENSSL_BIN=")));
+  assert.ok(envArgs.some((arg) => arg.startsWith("GZIP_BIN=")));
+  if (process.platform === "darwin") assert.ok(envArgs.includes("OTOOL_BIN=/usr/bin/otool"));
+});
+
+test("local verify tools ignore hostile PATH and ambient tool overrides", () => {
+  const prior = {
+    PATH: process.env.PATH,
+    PATCH_BIN: process.env.PATCH_BIN,
+    GIT_BIN: process.env.GIT_BIN,
+    OPENSSL_BIN: process.env.OPENSSL_BIN,
+    GZIP_BIN: process.env.GZIP_BIN,
+  };
+  try {
+    process.env.PATH = "/tmp/hostile-bin";
+    for (const name of ["PATCH_BIN", "GIT_BIN", "OPENSSL_BIN", "GZIP_BIN"] as const) {
+      process.env[name] = `/tmp/hostile-bin/${name.toLowerCase()}`;
+    }
+    const tools = localVerifyToolPaths(artifactToolsRoot);
+    assert.equal(tools.PATCH_BIN, `${artifactToolsRoot}/bin/patch`);
+    assert.equal(tools.GIT_BIN, `${artifactToolsRoot}/bin/git`);
+    assert.equal(tools.OPENSSL_BIN, `${artifactToolsRoot}/bin/openssl`);
+    assert.equal(tools.GZIP_BIN, `${artifactToolsRoot}/bin/gzip`);
+  } finally {
+    for (const [name, value] of Object.entries(prior)) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
+    }
+  }
+});
+
+test("local verify tools fail closed when canonical tool authority is missing", () => {
+  assert.throws(
+    () =>
+      localVerifyToolPaths("/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-missing-artifact-tools"),
+    /canonical artifact tool authority is missing store-backed patch/,
   );
 });
 

@@ -1,4 +1,5 @@
 { pkgs
+, wasmtimePkgs ? pkgs
 , src ? ../../.
 , graphJsonPath ? null
 , rootModulesTomlPath ? null
@@ -195,7 +196,7 @@ let
     then appsLibsSrc
     else appsLibsSrc;
   # Load language templates from the chosen manifest base (temp repo when set)
-  T = import (manifestBase + "/lang-templates.nix") { inherit pkgs uv2nixLib; };
+  T = import (manifestBase + "/lang-templates.nix") { inherit pkgs wasmtimePkgs uv2nixLib; };
   M = if builtins.pathExists ./mapping.nix then (
         let raw = import ./mapping.nix;
             attempt = builtins.tryEval (raw {});
@@ -356,6 +357,10 @@ let
           else if kind == "pyext_wasm" then LANGS.rust.mkPyExtWasm buildLabel
           else if kind == "wasm" then LANGS.rust.mkWasm buildLabel
           else if kind == "wasi" then LANGS.rust.mkWasi buildLabel
+          else if kind == "wasm_static" then LANGS.rust.mkWasmStatic buildLabel
+          else if kind == "wasi_static" then LANGS.rust.mkWasiStatic buildLabel
+          else if kind == "wasm_browser" then LANGS.rust.mkWasmBrowser buildLabel
+          else if kind == "wasm_component" then LANGS.rust.mkWasmComponent buildLabel
           else builtins.throw "planner dependency target has unsupported Rust kind: ${target}"
       else builtins.throw "planner dependency target has no supported language role: ${target}";
 
@@ -572,6 +577,10 @@ let
             else if kind == "test" then LANGS.rust.mkTest nm
             else if kind == "wasm" then LANGS.rust.mkWasm nm
             else if kind == "wasi" then LANGS.rust.mkWasi nm
+            else if kind == "wasm_static" then LANGS.rust.mkWasmStatic nm
+            else if kind == "wasi_static" then LANGS.rust.mkWasiStatic nm
+            else if kind == "wasm_browser" then LANGS.rust.mkWasmBrowser nm
+            else if kind == "wasm_component" then LANGS.rust.mkWasmComponent nm
             else if kind == "addon" then LANGS.rust.mkAddon nm
             else if kind == "pyext" then LANGS.rust.mkPyExt nm
             else if kind == "pyext_wasm" then LANGS.rust.mkPyExtWasm nm
@@ -741,6 +750,10 @@ let
                 else if k.kind == "test" then A.mkTest buildLabel
                 else if k.kind == "wasm" then A.mkWasm buildLabel
                 else if k.kind == "wasi" then A.mkWasi buildLabel
+                else if k.kind == "wasm_static" then A.mkWasmStatic buildLabel
+                else if k.kind == "wasi_static" then A.mkWasiStatic buildLabel
+                else if k.kind == "wasm_browser" then A.mkWasmBrowser buildLabel
+                else if k.kind == "wasm_component" then A.mkWasmComponent buildLabel
                 else if k.kind == "addon" then A.mkAddon buildLabel
                 else if k.kind == "pyext" then A.mkPyExt buildLabel
                 else if k.kind == "pyext_wasm" then A.mkPyExtWasm buildLabel

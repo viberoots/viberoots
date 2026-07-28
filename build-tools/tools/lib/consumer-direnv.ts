@@ -506,13 +506,18 @@ unset __vbr_flake_input_is_generated_filtered
 
 __nix_direnv_direnvrc=""
 for __candidate in \\
+  "\${VBR_NIX_DIRENV_DIRENVRC:-}" \\
   "\${HOME}/.nix-profile/share/nix-direnv/direnvrc" \\
   "/nix/var/nix/profiles/default/share/nix-direnv/direnvrc"
 do
-  if [[ -f "\${__candidate}" ]]; then
-    __nix_direnv_direnvrc="\${__candidate}"
-    break
-  fi
+  [[ -f "\${__candidate}" ]] || continue
+  __candidate="$(realpath "\${__candidate}")" || continue
+  case "\${__candidate}" in
+    /nix/store/*-nix-direnv-*/share/nix-direnv/direnvrc)
+      __nix_direnv_direnvrc="\${__candidate}"
+      break
+      ;;
+  esac
 done
 
 if [[ -z "\${__nix_direnv_direnvrc}" ]]; then
@@ -522,6 +527,7 @@ if [[ -z "\${__nix_direnv_direnvrc}" ]]; then
   return 1
 fi
 
+export VBR_NIX_DIRENV_DIRENVRC="\${__nix_direnv_direnvrc}"
 source "\${__nix_direnv_direnvrc}"
 unset __nix_direnv_direnvrc
 unset __candidate

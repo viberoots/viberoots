@@ -38,7 +38,7 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
     """
     kw = dict(kwargs)
     cpp_source_roots = kw.pop("cpp_source_roots", ["."])
-    _ = _apply_wasm_abi(kw)
+    wasm_target = _apply_wasm_abi(kw)
     deps = kw.pop("deps", []) or []
     link_deps = kw.pop("link_deps", []) or []
     header_deps = kw.pop("header_deps", []) or []
@@ -63,6 +63,14 @@ def nix_cpp_wasm_static_lib(name, **kwargs):
         name = name,
         out = sanitize_name("//%s:%s" % (native.package_name(), name)) + ".a",
         kind = "lib",
+        target_triple = wasm_target,
+        wasm_abi = "wasi" if wasm_target == "wasm32-wasi" else "bare",
+        wasm_target = wasm_target,
+        wasm_link_kind = "static",
+        wasm_allocator = "none",
+        wasm_libc = "wasi-libc" if wasm_target == "wasm32-wasi" else "none",
+        wasm_exception_policy = "trap",
+        wasm_runtime = "link-only",
         self_label = "//%s:%s" % (native.package_name(), name),
         deps = wiring.deps,
         link_deps = prepared.get("link_deps", []) or [],
@@ -132,6 +140,7 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
         srcs = prepared.get("srcs", []) or [],
         labels = prepared.get("labels", []) or [],
         exported_functions = prepared.get("exported_functions", []) or [],
+        target_triple = "wasm32-unknown-emscripten",
         nix_inputs = cpp_runtime_nix_inputs(),
         visibility = prepared.get("visibility", []),
     )

@@ -114,7 +114,9 @@
       "inputs": {
         "buck2": "buck2",
         "gomod2nix": "gomod2nix",
-        "nixpkgs": "nixpkgs_2"
+        "nixpkgs": "nixpkgs_2",
+        "rust-overlay": "rust-overlay_2",
+        "wasmtime-nixpkgs": "wasmtime-nixpkgs"
       }
     },
     "rust-overlay": {
@@ -135,6 +137,27 @@
       "original": {
         "owner": "oxalica",
         "repo": "rust-overlay",
+        "type": "github"
+      }
+    },
+    "rust-overlay_2": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1785131767,
+        "narHash": "sha256-VNbQv2P0zgaNh96mT4LrnX7hdXgiC5nBH+uvyrrVX7U=",
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "c67ce00525464a710971351c183ce67acb6ca827",
+        "type": "github"
+      },
+      "original": {
+        "owner": "oxalica",
+        "repo": "rust-overlay",
+        "rev": "c67ce00525464a710971351c183ce67acb6ca827",
         "type": "github"
       }
     },
@@ -165,6 +188,22 @@
       "original": {
         "owner": "nix-systems",
         "repo": "default",
+        "type": "github"
+      }
+    },
+    "wasmtime-nixpkgs": {
+      "locked": {
+        "lastModified": 1783224372,
+        "narHash": "sha256-8i/87eeoqiGE4yOTjwSA3Eh/ziJRQEmd/unYU+K27sk=",
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "d407951447dcd00442e97087bf374aad70c04cea",
+        "type": "github"
+      },
+      "original": {
+        "owner": "NixOS",
+        "repo": "nixpkgs",
+        "rev": "d407951447dcd00442e97087bf374aad70c04cea",
         "type": "github"
       }
     }

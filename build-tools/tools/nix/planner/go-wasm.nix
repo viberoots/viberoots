@@ -12,6 +12,7 @@
   dedupePreserveOrder,
   labelsOfName,
   nodeOfName,
+  dependencyArtifactOf,
   wasmBackend
 }:
 let
@@ -26,6 +27,17 @@ let
       };
     in builtins.map toImportedPath rels;
   hasLabel = nm: l: builtins.elem l (labelsOfName nm);
+  value = node: field: fallback:
+    let found = get node field;
+    in if found == null || found == "" then fallback else found;
+  sourcePathFor = name: raw:
+    let
+      clean = lib.replaceStrings [ ":" ] [ "/" ] raw;
+      relative =
+        if lib.hasPrefix "root//" clean then lib.removePrefix "root//" clean
+        else if lib.hasPrefix "//" clean then lib.removePrefix "//" clean
+        else "${pkgPathOf name}/${clean}";
+    in repoRoot + "/${relative}";
   linkDepsOf = nm:
     let
       n = nodeOfName nm;
@@ -40,12 +52,12 @@ let
     in normalizeLabelList "header_deps for '${nm}'" raw;
   ensureSupportedWasmProducer = name: dep:
     let
-      expected = "lang:cpp, kind:wasm, wasm:static";
+      expected = "wasm:static plus lang:cpp or lang:rust";
       got = builtins.toString (labelsOfName dep);
       ok =
-        (hasLabel dep "lang:cpp") &&
         (hasLabel dep "kind:wasm") &&
-        (hasLabel dep "wasm:static");
+        (hasLabel dep "wasm:static") &&
+        ((hasLabel dep "lang:cpp") || (hasLabel dep "lang:rust"));
     in if ok then true
        else builtins.throw "go planner (mkTinyWasm): ${name} link_dep '${dep}' is unsupported; expected labels ${expected}; got labels ${got}";
   ensureVariantCompatible = name: tinyTarget: dep:
@@ -57,6 +69,31 @@ let
        else if (!wantWasi) && depIsWasi
        then builtins.throw "go planner (mkTinyWasm): ${name} (target=wasm) cannot link '${dep}' (dep is stamped wasm:wasi)"
        else true;
+  ensureAuthorityCompatible = name: tinyTarget: dep:
+    let
+      node = nodeOfName dep;
+      cpp = hasLabel dep "lang:cpp";
+      expectedTarget = if tinyTarget == "wasi" then "wasm32-wasip1"
+        else "wasm32-unknown-unknown";
+      claimedTarget = value node "wasm_target" "";
+      targetCompatible = claimedTarget == expectedTarget
+        || (cpp && tinyTarget == "wasi" && claimedTarget == "wasm32-wasi");
+      allocator = value node "wasm_allocator" "";
+      libc = value node "wasm_libc" "";
+      expectedLibc = if tinyTarget == "wasi" then "wasi-libc" else "none";
+      exceptionPolicy = value node "wasm_exception_policy" "";
+      runtime = value node "wasm_runtime" "";
+    in if !targetCompatible then builtins.throw
+      "go planner (mkTinyWasm): ${name} link_dep '${dep}' has incompatible target authority ${claimedTarget}"
+    else if !(builtins.elem allocator [ "none" "rust" ]) then builtins.throw
+      "go planner (mkTinyWasm): ${name} link_dep '${dep}' has incompatible allocator authority ${allocator}"
+    else if libc != expectedLibc then builtins.throw
+      "go planner (mkTinyWasm): ${name} link_dep '${dep}' has incompatible libc authority ${libc}; expected ${expectedLibc}"
+    else if !(builtins.elem exceptionPolicy [ "none" "trap" ]) then builtins.throw
+      "go planner (mkTinyWasm): ${name} link_dep '${dep}' has incompatible exception authority ${exceptionPolicy}"
+    else if runtime != "link-only" then builtins.throw
+      "go planner (mkTinyWasm): ${name} link_dep '${dep}' has incompatible runtime authority ${runtime}"
+    else true;
   ensureSupportedHeaderDep = dep: hd:
     let
       expected = "lang:cpp, kind:headers";
@@ -100,7 +137,15 @@ in {
           entries = builtins.map (dep: "${dep}=${overrides.${dep}}") ordered;
         in lib.concatStringsSep "," entries;
       backend = wasmBackend;
-      tinyTarget = if backend == "wasi_single" then "wasi" else "wasm";
+      linkKind = value consumer "wasm_link_kind" "module";
+      abiExplicit = value consumer "wasm_abi_explicit" false;
+      abi =
+        if abiExplicit
+        then value consumer "wasm_abi" "bare"
+        else if backend == "wasi_single" then "wasi" else "bare";
+      tinyTarget = if abi == "wasi" then "wasi" else "wasm";
+      compilerTarget =
+        if linkKind == "static" && tinyTarget == "wasm" then "wasm-unknown" else tinyTarget;
       wasmTarget = if tinyTarget == "wasi" then "wasm32-wasi" else "wasm32-unknown-unknown";
 
       resolved = LC.resolveLinkClosure {
@@ -113,18 +158,21 @@ in {
 
       validated = builtins.map (dep:
         builtins.seq (ensureSupportedWasmProducer name dep)
-          (builtins.seq (ensureVariantCompatible name tinyTarget dep) dep)
+          (builtins.seq (ensureVariantCompatible name tinyTarget dep)
+            (builtins.seq (ensureAuthorityCompatible name tinyTarget dep) dep))
       ) resolved;
 
-      repoWasmLibs = builtins.map (dep: T.cppWasmStaticLib {
-        name = dep;
-        srcRoot = repoRoot;
-        subdir = (pkgPathOf dep);
-        srcList = L.srcsOf dep;
-        patches = patchInputsFor dep;
-        includes = headerIncludeRootsFor dep;
-        wasmTarget = wasmTarget;
-      }) validated;
+      repoWasmLibs = builtins.map (dep:
+        if hasLabel dep "lang:rust" then dependencyArtifactOf dep
+        else T.cppWasmStaticLib {
+          name = dep;
+          srcRoot = repoRoot;
+          subdir = (pkgPathOf dep);
+          srcList = L.srcsOf dep;
+          patches = patchInputsFor dep;
+          includes = headerIncludeRootsFor dep;
+          wasmTarget = wasmTarget;
+        }) validated;
     in T.goTinyWasmLib {
       inherit name;
       srcRoot = repoRoot;
@@ -132,6 +180,10 @@ in {
       wasmStaticLibs = repoWasmLibs;
       wasmStaticLibLabels = validated;
       linkClosureOverridesSummary = overridesSummary;
-      target = tinyTarget;
+      target = compilerTarget;
+      outputKind = linkKind;
+      artifactName = builtins.elemAt (lib.splitString ":" name) 1;
+      wasmHeader = let header = get consumer "wasm_header";
+        in if header == null then null else sourcePathFor name header;
     };
 }

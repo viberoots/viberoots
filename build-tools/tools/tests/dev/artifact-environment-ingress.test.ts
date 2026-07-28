@@ -10,6 +10,7 @@ import {
   validateArtifactToolsRoot,
 } from "../../lib/artifact-environment";
 import { assertNoArtifactSelectorInjection } from "../../lib/artifact-environment-policy";
+import { buildCanonicalIngressEnvironment } from "../../dev/canonical-artifact-ingress-environment";
 import {
   assertCanonicalArtifactReentry,
   isCanonicalArtifactEntrypointEnvironment,
@@ -36,6 +37,27 @@ test("known local compiler and language selectors fail before sanitization", () 
   })) {
     assert.throws(() => assertNoArtifactSelectorInjection({ [name]: value }), new RegExp(name));
   }
+});
+
+test("canonical ingress preserves a validated build concurrency cap", () => {
+  const toolsRoot = canonicalArtifactToolsRoot(process.cwd());
+  const withConcurrency = buildCanonicalIngressEnvironment({
+    env: { NIX_BUILD_CORES: "4" },
+    workspaceRoot: process.cwd(),
+    toolsRoot,
+    wasmBackend: "",
+  });
+  assert.equal(withConcurrency.NIX_BUILD_CORES, "4");
+  assert.throws(
+    () =>
+      buildCanonicalIngressEnvironment({
+        env: { NIX_BUILD_CORES: "unbounded" },
+        workspaceRoot: process.cwd(),
+        toolsRoot,
+        wasmBackend: "",
+      }),
+    /rejects invalid NIX_BUILD_CORES/,
+  );
 });
 
 test("Buck accepts only the exact cache-health NIX_CONFIG authority", () => {

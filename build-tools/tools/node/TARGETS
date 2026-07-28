@@ -5,3 +5,9 @@ export_file(
     src = "gen-wasm-inline-module.ts",
     visibility = ["PUBLIC"],
 )
+
+export_file(
+    name = "wasm-asset-manifest.ts",
+    src = "wasm-asset-manifest.ts",
+    visibility = ["PUBLIC"],
+)

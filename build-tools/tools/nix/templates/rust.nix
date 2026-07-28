@@ -1,10 +1,14 @@
-{ pkgs }:
+{
+  pkgs,
+  wasmtimePkgs ? pkgs,
+  rustToolchain ? pkgs.viberootsRustToolchain,
+  rustPlatform ? pkgs.viberootsRustPlatform,
+}:
 let
   lib = pkgs.lib;
   H = import ../lib/lang-helpers.nix { inherit pkgs; };
   Contract = import ./rust-contract.nix { inherit lib; };
-  validateLockSources = lockFile:
-    import ../../../rust/cargo-source-policy.nix { inherit lockFile; };
+  validateLockSources = lockFile: import ../../../rust/cargo-source-policy.nix { inherit lockFile; };
   validateKindTarget = Contract.validateKindTarget;
 in {
   inherit validateKindTarget;
@@ -29,12 +33,12 @@ in {
     runtimePackages ? [],
     addonName ? "",
     nodeApiVersion ? 0,
-    platform ? "",
-    pythonAbi ? "", artifactNixRoot ? "",
-    interop ? {},
+    platform ? "", pythonAbi ? "", artifactNixRoot ? "",
+    interop ? {}, wasm ? {},
     }:
     let
       validatedTarget = validateKindTarget kind target;
+      _wasmTarget = Contract.validateWasmTarget kind validatedTarget wasm;
       _sources = validateLockSources cargoLock;
       compositionRoots = if sourceComposition == null then [ cargoRoot ]
         else map (root: root.cargoRoot) sourceComposition.roots;
@@ -59,12 +63,9 @@ in {
       targetDir = "target/${cargoTarget}/${cargoProfile}";
       artifactDir = if hostRole == "host" then "target/${cargoProfile}" else targetDir;
       dynamicExtension = pkgs.stdenv.hostPlatform.extensions.sharedLibrary;
-      targetPkgs =
-        if kind == "wasi" then pkgs.pkgsCross.wasi32
-        else pkgs;
-      rustc = if kind == "wasi" then targetPkgs.buildPackages.rustc else pkgs.rustc;
+      rustc = rustToolchain;
       nativePackages = nativeInputs.libraries ++ nativeInputs.headers;
-      nativeLibraryFlags = map (package: "-Lnative=${package}/lib") nativeInputs.libraries;
+      nativeLibraryFlags = map (package: "-Lnative=${package}/lib") nativeInputs.libraries ++ map (linkName: "-lstatic=${linkName}") (nativeInputs.linkNames or []);
       testProfileFlags = lib.optionals (cargoProfile == "release") [ "--release" ];
       testBuildFlags = [
         "--offline"
@@ -76,7 +77,8 @@ in {
       ] ++ kindFlags ++ featureFlags ++ testProfileFlags ++ [ "--target" cargoTarget ];
       testBuildCommand = lib.concatMapStringsSep " " lib.escapeShellArg testBuildFlags;
       vendorPlan = import ./rust-vendor.nix {
-        inherit pkgs cargoRoot cargoLock cargoOutputHashes cargoFixedSources sourceComposition;
+        inherit pkgs rustPlatform cargoRoot cargoLock cargoOutputHashes cargoFixedSources
+          sourceComposition;
         cargoRootRel =
           if sourceComposition == null then "."
           else (builtins.head (builtins.filter
@@ -100,7 +102,10 @@ in {
       else import ./rust-install.nix {
         inherit pkgs lib kind crateType crate targetDir targetName
           artifactDir dynamicExtension;
-        publicCrate = validatedPublicCrate;
+          publicCrate = validatedPublicCrate; inherit wasm;
+        };
+      wasmPostprocess = import ./rust-wasm-postprocess.nix {
+        inherit pkgs wasmtimePkgs rustToolchain rustPlatform lib kind crate wasm;
       };
       extensionRuntime = import ./rust-extension-runtime.nix { inherit pkgs lib kind;
         runtimePackages = if builtins.elem kind [ "pyext" "addon" ] then runtimePackages else []; };
@@ -115,6 +120,7 @@ in {
       extensionRustFlags = lib.optionals
         (pkgs.stdenv.isDarwin && builtins.elem kind [ "pyext" "addon" ])
         [ "-C" "link-arg=-undefined" "-C" "link-arg=dynamic_lookup" ];
+      wasmRustFlags = import ./rust-wasm-rustflags.nix { inherit lib kind wasm; };
       nodeApiContract = import ./rust-node-api.nix {
         inherit pkgs lib kind nodeApiVersion targetDir crate dynamicExtension; };
       compositionEvidence = {
@@ -123,33 +129,25 @@ in {
           builtins.hashString "sha256" (builtins.toJSON [])
         else sourceComposition.digest;
       };
+      producerLineage = import ./rust-producer-lineage.nix {
+        inherit cargoLock patchInputs;
+        sourceBundle = cargoRoot;
+      };
       interopContract = import ./rust-interop.nix {
         inherit pkgs lib interop;
         publicCrate = validatedPublicCrate; inherit nativePackages;
       };
       installPhase = baseInstallPhase + ''
-        ${interopContract.install}
+        ${interopContract.install} ${wasmPostprocess.install}
         mkdir -p "$out/share/viberoots-rust"
         cat > "$out/share/viberoots-rust/composition.json" <<'VIBEROOTS_RUST_COMPOSITION'
         ${builtins.toJSON compositionEvidence}
         VIBEROOTS_RUST_COMPOSITION
         cat > "$out/share/viberoots-rust/materialization-manifest.json" <<VIBEROOTS_RUST_MATERIALIZATION
-        ${builtins.toJSON {
-          schemaVersion = "viberoots.nix-store-materialization.v1";
-          sourceRevision = compositionEvidence.digest;
-          sourceSnapshot = builtins.toString cargoRoot;
-          flakeLockFingerprint = sourcePlan.nixpkgs_profile;
-          substituter = {
-            endpointIdentity = "https://cache.home.kilty.io/main";
-            trustedPublicKeys = [ "main:N7uIAritMCBWpa9cdZJxHJ7gWfsXCwAsbyIJqrSQnLY=" ];
-          };
-          tools = { nix = if artifactNixRoot == "" then builtins.toString pkgs.nix else artifactNixRoot; };
-          storePaths = [{ attr = H.sanitizeName name; path = "__VIBEROOTS_RUST_OUT__";
-            expectedOutputIdentity = "__VIBEROOTS_RUST_IDENTITY__"; }] ++ builtins.genList (index: let runtime = builtins.elemAt
-            interopContract.runtimePackages index; in { attr = "interop-runtime-${builtins.toString index}";
-            path = builtins.toString runtime; expectedOutputIdentity = baseNameOf (builtins.toString runtime); })
-          (builtins.length interopContract.runtimePackages);
-        }}
+        ${builtins.toJSON (import ./rust-materialization.nix {
+          inherit H name sourcePlan artifactNixRoot pkgs compositionEvidence
+            producerLineage wasmPostprocess interopContract;
+        })}
         VIBEROOTS_RUST_MATERIALIZATION
         substituteInPlace "$out/share/viberoots-rust/materialization-manifest.json" \
           --replace-fail "__VIBEROOTS_RUST_OUT__" "$out" \
@@ -161,9 +159,9 @@ in {
         else builtins.trace
           "[DEV OVERRIDES ACTIVE] Rust fixed sources are explicit local-development bundle inputs."
           true;
-    in assert validatedTarget != null; assert _sources; assert _cargoConfig;
+    in assert validatedTarget != null; assert _wasmTarget; assert _sources; assert _cargoConfig;
     assert _crateRole; assert _extension; assert _pythonAuthority; assert _overrideTrace;
-    pkgs.rustPlatform.buildRustPackage ({
+    rustPlatform.buildRustPackage ({
       pname = "rust-${sanitized}";
       version = "0.1.0";
       src = vendorPlan.sourceWithVendor;
@@ -177,17 +175,17 @@ in {
       cargoVendorDir = ".viberoots-cargo-vendor";
       cargoBuildType = cargoProfile;
       cargoBuildFlags = [ "--locked" "--package" crate ] ++ kindFlags ++ featureFlags ++ targetFlags;
-      cargoTestFlags = [ "--package" crate ] ++ kindFlags ++ featureFlags ++ targetFlags;
-      doCheck = false;
-      nativeBuildInputs = [ pkgs.cargo rustc pkgs.pkg-config pkgs.jq pkgs.llvmPackages.lld ]
-        ++ nixpkgDeps ++ nativePackages ++ extensionPackages ++ interopContract.buildInputs;
+      cargoTestFlags = [ "--package" crate ] ++ kindFlags ++ featureFlags ++ targetFlags; doCheck = false;
+      dontStrip = builtins.elem kind [ "wasm" "wasi" "wasm_static" "wasi_static" "wasm_browser" "wasm_component" ]; nativeBuildInputs = [ rustc pkgs.pkg-config pkgs.jq pkgs.llvmPackages.lld ]
+        ++ lib.optionals (builtins.elem kind [ "wasm_static" "wasi_static" ]) [ pkgs.python3 pkgs.llvmPackages.llvm ]
+        ++ nixpkgDeps ++ nativePackages ++ extensionPackages ++ interopContract.buildInputs ++ wasmPostprocess.buildInputs;
       buildInputs = nixpkgDeps ++ nativePackages ++ extensionPackages ++ interopContract.buildInputs;
       RUSTC = "${rustc}/bin/rustc";
       RUSTDOC = "${rustc}/bin/rustdoc";
-      CARGO = "${pkgs.cargo}/bin/cargo";
+      CARGO = "${rustToolchain}/bin/cargo";
       CARGO_NET_OFFLINE = "true";
       RUSTFLAGS = lib.concatStringsSep " "
-        (nativeLibraryFlags ++ extensionRustFlags ++ interopContract.rustFlags);
+        (nativeLibraryFlags ++ extensionRustFlags ++ wasmRustFlags ++ interopContract.rustFlags);
       PYO3_PYTHON = if kind == "pyext" then "${pkgs.python3}/bin/python" else "";
       NAPI_VERSION = if kind == "addon" then builtins.toString nodeApiVersion else "";
       BINDGEN_EXTRA_CLANG_ARGS = nodeApiContract.bindgenArgs;
@@ -204,6 +202,10 @@ in {
         ${lib.concatMapStringsSep "\n" (input: "test -e ${lib.escapeShellArg (builtins.toString input)}") patchInputs}
         ${patchPlan.postPatch}
       '';
+      buildPhase = import ./rust-wasm-build.nix {
+        inherit pkgs rustToolchain lib validatedTarget cargoProfile crate kindFlags
+          featureFlags targetFlags;
+      };
       preBuild = lib.optionalString (kind == "pyext" && buildPyDeps != []) ''
         export PYTHONNOUSERSITE=1
         for package in ${lib.concatStringsSep " " (map lib.escapeShellArg buildPyDeps)}; do
@@ -213,33 +215,20 @@ in {
       '' + nodeApiContract.preBuild + interopContract.preBuild;
       postBuild = nodeApiContract.postBuild;
       inherit installPhase;
-      passthru.viberootsRust = {
-        inherit kind crate features profile crateType hostRole generatedOutputs;
-        inherit module buildPyDeps addonName nodeApiVersion platform pythonAbi pythonWheelhouse;
-        interop = interopContract.passthru;
-        publicCrate = validatedPublicCrate;
-        target = validatedTarget;
-        default_features = defaultFeatures;
-        nixpkgs_profile = sourcePlan.nixpkgs_profile;
-        nixpkg_pins = sourcePlan.nixpkg_pins;
-        cargo_manifest = builtins.toString cargoManifest;
-        cargo_lock = builtins.toString cargoLock;
-        cargo_output_hashes = cargoOutputHashes;
-        cargo_fixed_sources = cargoFixedSources;
-        patch_vendor_authorities = vendorAuthorities;
-        native_link_inputs = map builtins.toString nativeInputs.libraries;
-        native_header_inputs = map builtins.toString nativeInputs.headers;
-        composition = if sourceComposition == null then [] else sourceComposition.diagnostics;
-        composition_manifest = if sourceComposition == null then [] else sourceComposition.manifest;
-        composition_digest = if sourceComposition == null then
-          builtins.hashString "sha256" (builtins.toJSON []) else sourceComposition.digest;
-        runtime_closure = map builtins.toString (runtimePackages ++ interopContract.runtimePackages);
-        runtime_packages = runtimePackages ++ interopContract.runtimePackages;
-        cargo_packages = map (package: {
-          inherit (package) name version;
-          source = package.source or "";
-        }) ((builtins.fromTOML (builtins.readFile cargoLock)).package or []);
+      passthru.viberootsRust = import ./rust-passthru.nix {
+        inherit kind crate features profile crateType hostRole generatedOutputs
+          module buildPyDeps addonName nodeApiVersion platform pythonAbi
+          pythonWheelhouse interopContract validatedPublicCrate validatedTarget
+          defaultFeatures sourcePlan producerLineage cargoOutputHashes
+          cargoFixedSources vendorAuthorities nativeInputs sourceComposition
+          runtimePackages wasm wasmPostprocess cargoLock;
       };
+    } // lib.optionalAttrs (builtins.elem kind [ "wasm_static" "wasi_static" ]) {
+      "CARGO_PROFILE_${lib.toUpper cargoProfile}_DEBUG" = if wasm.debug then "2" else "0";
+      "CARGO_PROFILE_${lib.toUpper cargoProfile}_OPT_LEVEL" =
+        if wasm.optimize == "speed" then "2"
+        else if wasm.optimize == "size" then "z"
+        else "0";
     } // lib.optionalAttrs (kind == "test") {
       postBuild = ''
         cargo metadata --offline --locked --format-version 1 \

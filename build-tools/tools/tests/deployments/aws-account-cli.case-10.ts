@@ -65,7 +65,7 @@ test("aws-account check fails closed only under explicit strict cache policy", a
       }
       const evidence = await readToolsEvidence(tmp);
       assert.equal(evidence.cacheReadiness.state, "failed");
-      assert.match(evidence.cacheReadiness.message, /strict cache policy failed/);
+      assert.match(evidence.cacheReadiness.message, /required cache policy failed/);
     });
   });
 });

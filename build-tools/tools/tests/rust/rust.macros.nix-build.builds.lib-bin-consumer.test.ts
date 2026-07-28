@@ -4,7 +4,16 @@ import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
 import { withoutArtifactEnvironmentInfluence } from "../../lib/artifact-environment";
-import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
+import {
+  exportGraphInTemp,
+  inheritedBuckIsolation,
+  nestedBuckCommandEnv,
+  runInTemp,
+} from "../lib/test-helpers";
+import { prepareFilteredViberootsInput } from "../lib/test-helpers/run-in-temp/filtered-inputs";
+import { pinTempViberootsInput } from "./rust-immutable-current-input";
+
+const sourceRoot = path.resolve(path.basename(process.cwd()) === "viberoots" ? "." : "viberoots");
 
 test("rust macros: library, binary, and downstream consumer build via Nix-backed route", async () => {
   await runInTemp("rust-nix-builds-lib-bin-consumer", async (tmp, $) => {
@@ -77,29 +86,38 @@ test("rust macros: library, binary, and downstream consumer build via Nix-backed
       ].join("\n"),
       "utf8",
     );
-    await reconcileTempDependencyInputs(tmp, $);
+    const current = await prepareFilteredViberootsInput(sourceRoot);
+    await pinTempViberootsInput(tmp, current);
+    await exportGraphInTemp({
+      tmp,
+      $,
+      env: { VIBEROOTS_FLAKE_INPUT_ROOT: current.storePath },
+    });
 
     const hostileDir = path.join(tmp, "hostile-bin");
     await fs.mkdirp(hostileDir);
     for (const tool of ["cargo", "rustc", "cc", "ld", "pkg-config"]) {
       await fs.writeFile(path.join(hostileDir, tool), "#!/bin/sh\nexit 99\n", { mode: 0o755 });
     }
+    const commandEnv = {
+      ...withoutArtifactEnvironmentInfluence(process.env),
+      ...nestedBuckCommandEnv,
+      PATH: `${hostileDir}:${process.env.PATH}`,
+      CC: path.join(hostileDir, "cc"),
+      LD: path.join(hostileDir, "ld"),
+      PKG_CONFIG: path.join(hostileDir, "pkg-config"),
+      RUSTC: path.join(hostileDir, "rustc"),
+      RUSTFLAGS: "--definitely-invalid-host-flag",
+      RUSTUP_HOME: path.join(tmp, "hostile-rustup"),
+    };
+    const buckIsolation = inheritedBuckIsolation("rust_nix_builds_lib_bin_consumer", commandEnv);
     const build = await $({
       cwd: tmp,
       stdio: "pipe",
       reject: false,
       nothrow: true,
-      env: {
-        ...process.env,
-        PATH: `${hostileDir}:${process.env.PATH}`,
-        CC: path.join(hostileDir, "cc"),
-        LD: path.join(hostileDir, "ld"),
-        PKG_CONFIG: path.join(hostileDir, "pkg-config"),
-        RUSTC: path.join(hostileDir, "rustc"),
-        RUSTFLAGS: "--definitely-invalid-host-flag",
-        RUSTUP_HOME: path.join(tmp, "hostile-rustup"),
-      },
-    })`buck2 build --show-output //projects/apps/rustapp:app //projects/apps/rustapp:consumer`;
+      env: commandEnv,
+    })`buck2 --isolation-dir ${buckIsolation} build --show-output //projects/apps/rustapp:app //projects/apps/rustapp:consumer`;
     assert.equal(build.exitCode, 0, `buck2 build failed:\n${String(build.stderr || build.stdout)}`);
     const outputs = new Map(
       String(build.stdout || "")
@@ -117,8 +135,10 @@ test("rust macros: library, binary, and downstream consumer build via Nix-backed
     assert.equal(await run("root//projects/apps/rustapp:consumer"), "consumer:first");
 
     const runnableEnv = withoutArtifactEnvironmentInfluence(process.env);
+    const tool = (entrypoint: string) =>
+      path.join(current.storePath, "build-tools", "tools", "bin", entrypoint);
     const prod = await $({ cwd: tmp, stdio: "pipe", env: runnableEnv })`
-      viberoots/build-tools/tools/bin/p //projects/apps/rustapp:app
+      ${tool("p")} //projects/apps/rustapp:app
     `;
     assert.equal(String(prod.stdout || "").trim(), "first");
     for (const [entrypoint, label, diagnostic] of [
@@ -127,7 +147,7 @@ test("rust macros: library, binary, and downstream consumer build via Nix-backed
       ["p", "//projects/apps/rustapp:test", /test-only|not runnable|no runnable/],
     ] as const) {
       const rejected = await $({ cwd: tmp, stdio: "pipe", env: runnableEnv, nothrow: true })`
-        ${path.join("viberoots", "build-tools", "tools", "bin", entrypoint)} ${label}
+        ${tool(entrypoint)} ${label}
       `;
       const output = `${String(rejected.stderr || "")}\n${String(rejected.stdout || "")}`;
       assert.equal(
@@ -142,10 +162,16 @@ test("rust macros: library, binary, and downstream consumer build via Nix-backed
       path.join(appDir, "src", "lib.rs"),
       'pub fn message()->&\'static str{"second"}\n',
     );
+    await exportGraphInTemp({
+      tmp,
+      $,
+      env: { VIBEROOTS_FLAKE_INPUT_ROOT: current.storePath },
+    });
     const rebuilt = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`buck2 build --show-output //projects/apps/rustapp:consumer`;
+      env: commandEnv,
+    })`buck2 --isolation-dir ${buckIsolation} build --show-output //projects/apps/rustapp:consumer`;
     const rebuiltPath = String(rebuilt.stdout || "")
       .trim()
       .split(/\s+/)

@@ -1,4 +1,4 @@
-{ self, nixpkgs, buck2, gomod2nix }:
+{ self, nixpkgs, buck2, gomod2nix, rust-overlay, wasmtime-nixpkgs }:
 let
   version = "0.0.0-dev";
   releaseTag = "v${version}";
@@ -9,7 +9,7 @@ let
     , nixpkgsRegistryExtension ? { profiles = { }; }
     }:
       import ./workspace.nix {
-        inherit nixpkgs buck2 gomod2nix workspaceSrc viberootsInput workspaceName version releaseTag nixpkgsRegistryExtension;
+        inherit nixpkgs buck2 gomod2nix rust-overlay wasmtime-nixpkgs workspaceSrc viberootsInput workspaceName version releaseTag nixpkgsRegistryExtension;
       };
   workspace = mkWorkspace {
     workspaceSrc = ../../../..;

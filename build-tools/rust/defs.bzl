@@ -1,12 +1,5 @@
 load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
-load(
-    "@viberoots//build-tools/lang:defs_common.bzl",
-    "dedupe_preserve",
-    "merge_link_intent_deps",
-    "normalize_labels",
-    "prepare_language_wiring",
-    "validate_link_closure_overrides",
-)
+load("@viberoots//build-tools/lang:defs_common.bzl", "dedupe_preserve", "merge_link_intent_deps", "normalize_labels", "prepare_language_wiring", "validate_link_closure_overrides")
 load("@viberoots//build-tools/lang:global_inputs.bzl", "global_nix_inputs")
 load("@viberoots//build-tools/rust/private:nix_build.bzl", "rust_nix_build")
 load("@viberoots//build-tools/rust/private:nix_test.bzl", "rust_nix_test")
@@ -14,6 +7,7 @@ load("@viberoots//build-tools/rust/private:composition_snapshot.bzl", "rust_comp
 load("@viberoots//build-tools/rust/private:extension_contract.bzl", "prepare_python_build_wiring", "validate_addon_name", "validate_extension_kind_args", "validate_node_api_version")
 load("@viberoots//build-tools/rust/private:interop_contract.bzl", "prepare_interop_kwargs")
 load("@viberoots//build-tools/rust/private:macro_contract.bzl", "RUST_PUBLIC_ARGS", "artifact_out", "crate_type_for", "fixed_artifact_contract", "has_nixpkg_inputs", "public_crate_for", "rust_macro_name", "single_cargo_file", "valid_features", "validate_crate_names", "validate_local_patch_dirs", "validate_public_crate", "with_required_target")
+load("@viberoots//build-tools/rust/private:wasm_contract.bzl", "is_wasm_kind", "prepare_wasm_contract", "rust_wasm_module_surface")
 def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, interop = False):
     kw = dict(kwargs)
     validate_extension_kind_args(kind, kw)
@@ -32,9 +26,9 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
     deps = kw.pop("deps", []) or []
     link_deps = kw.pop("link_deps", []) or []
     header_deps = kw.pop("header_deps", []) or []
-    if kind in ["wasm", "wasi"] and (link_deps or header_deps or has_nixpkg_inputs(kw)):
-        fail("%s: link_deps, header_deps, and nixpkg dependencies are unsupported for non-native Rust targets; cross-language WebAssembly linking is not available" % rust_macro_name(kind))
-    if not interop and (link_deps or header_deps):
+    if is_wasm_kind(kind) and (header_deps or has_nixpkg_inputs(kw)):
+        fail("%s: header_deps and nixpkg dependencies are unsupported for Rust WASM targets" % rust_macro_name(kind))
+    if not interop and not is_wasm_kind(kind) and (link_deps or header_deps):
         fail("%s: native link_deps/header_deps are private bridge wiring; use rust_c_ffi_library or rust_cxx_bridge_library with a reviewed binding_config" % rust_macro_name(kind))
     link_closure = kw.pop("link_closure", "direct") or "direct"
     link_mode = kw.pop("link_mode", "")
@@ -48,6 +42,7 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
     unknown = sorted([key for key in kw.keys() if key not in RUST_PUBLIC_ARGS])
     if unknown:
         fail("%s: unknown arguments: %s" % (rust_macro_name(kind), ", ".join(unknown)))
+    wasm_attrs = prepare_wasm_contract(kind, kw)
     cargo_manifest = single_cargo_file(kw.pop("cargo_manifest", None), "Cargo.toml", "cargo_manifest")
     cargo_lock = single_cargo_file(kw.pop("cargo_lock", None), "Cargo.lock", "cargo_lock")
     cargo_output_hashes = kw.pop("cargo_output_hashes", {})
@@ -108,7 +103,7 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
     if not isinstance(runtime_deps, list):
         fail("rust target runtime_deps must be a list of labels")
     runtime_deps = normalize_labels(native.package_name(), runtime_deps)
-    expected_target = "wasm32-unknown-unknown" if kind == "wasm" else "wasm32-wasip1" if kind == "wasi" else ""
+    expected_target = wasm_attrs.get("wasm_target", "")
     if target != expected_target:
         fail("rust target target must be %s for kind %s" % (expected_target if expected_target else "empty", kind))
     if "local_patch_dirs" in kw:
@@ -137,7 +132,6 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
         "header_deps": prepared.get("header_deps", []) or [],
         "link_closure": prepared.get("link_closure", link_closure),
         "link_closure_overrides": prepared.get("link_closure_overrides", link_closure_overrides),
-        "link_mode": link_mode,
         "srcs": dedupe_preserve((prepared.get("srcs", []) or []) + cargo_root_srcs),
         "labels": prepared.get("labels", []) or [],
         "nix_inputs": global_nix_inputs(),
@@ -162,9 +156,9 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
         "nixpkg_pins": prepared.get("nixpkg_pins", {}),
         "visibility": prepared.get("visibility", []),
     }
-    attrs.update(interop_attrs)
     if kind != "test":
         attrs.update({
+            "link_mode": link_mode,
             "module": module,
             "build_py_deps": build_py_deps,
             "runtime_deps": runtime_deps,
@@ -173,6 +167,8 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
             "platform": platform,
             "python_abi": python_abi,
         })
+        attrs.update(interop_attrs)
+        attrs.update(wasm_attrs)
     snapshot_attrs = {key: attrs[key] for key in [
         "cargo_root", "cargo_package", "cargo_manifest", "cargo_lock",
         "cargo_lock_identity", "public_crate", "crate_type", "host_role",
@@ -203,33 +199,38 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
     else:
         rust_nix_build(**attrs)
 def rust_library(name, **kwargs):
-    kw = fixed_artifact_contract(kwargs, "rust_library", "rlib", "target")
-    _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "rlib"), kwargs = kw)
+    kw = fixed_artifact_contract(kwargs, "rust_library", "rlib", "target"); _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "rlib"), kwargs = kw)
 def rust_static_library(name, **kwargs):
-    kw = fixed_artifact_contract(kwargs, "rust_static_library", "staticlib", "target")
-    _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "staticlib"), kwargs = kw)
+    kw = fixed_artifact_contract(kwargs, "rust_static_library", "staticlib", "target"); _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "staticlib"), kwargs = kw)
 def rust_cdylib(name, **kwargs):
-    kw = fixed_artifact_contract(kwargs, "rust_cdylib", "cdylib", "target")
-    _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "cdylib"), kwargs = kw)
+    kw = fixed_artifact_contract(kwargs, "rust_cdylib", "cdylib", "target"); _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "cdylib"), kwargs = kw)
 def rust_c_ffi_library(name, binding_config, artifact = "static", panic_strategy = "abort", allocator = "caller", thread_safety = "send-sync", c_standard = "c11", compiler_family = "llvm", **kwargs):
-    kw = prepare_interop_kwargs(kwargs, "rust_c_ffi_library", "c", binding_config, artifact, panic_strategy, "none", allocator, thread_safety, c_standard, compiler_family, "none")
-    _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), kw["crate_type"]), kwargs = kw, interop = True)
+    kw = prepare_interop_kwargs(kwargs, "rust_c_ffi_library", "c", binding_config, artifact, panic_strategy, "none", allocator, thread_safety, c_standard, compiler_family, "none"); _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), kw["crate_type"]), kwargs = kw, interop = True)
 def rust_cxx_bridge_library(name, binding_config, artifact = "static", panic_strategy = "abort", exception_policy = "noexcept", allocator = "caller", thread_safety = "send-sync", cxx_standard = "c++17", compiler_family = "llvm", stl = "libc++", **kwargs):
-    kw = prepare_interop_kwargs(kwargs, "rust_cxx_bridge_library", "cxx", binding_config, artifact, panic_strategy, exception_policy, allocator, thread_safety, cxx_standard, compiler_family, stl)
-    _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), kw["crate_type"]), kwargs = kw, interop = True)
+    kw = prepare_interop_kwargs(kwargs, "rust_cxx_bridge_library", "cxx", binding_config, artifact, panic_strategy, exception_policy, allocator, thread_safety, cxx_standard, compiler_family, stl); _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), kw["crate_type"]), kwargs = kw, interop = True)
 def rust_proc_macro(name, **kwargs):
-    kw = fixed_artifact_contract(kwargs, "rust_proc_macro", "proc-macro", "host")
-    _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "proc-macro"), kwargs = kw)
+    kw = fixed_artifact_contract(kwargs, "rust_proc_macro", "proc-macro", "host"); _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "proc-macro"), kwargs = kw)
 def rust_binary(name, **kwargs):
     _rust_nix_target(name = name, kind = "bin", out = name, kwargs = kwargs)
 def rust_test(name, **kwargs):
     _rust_nix_target(name = name, kind = "test", out = name + ".stamp", kwargs = kwargs)
-def rust_wasm_library(name, **kwargs):
-    kw = with_required_target(kwargs, "rust_wasm_library", "wasm32-unknown-unknown")
-    _rust_nix_target(name = name, kind = "wasm", out = name + ".wasm", kwargs = kw)
+def rust_wasm_library(name, wasm_abi = "bare", **kwargs):
+    if wasm_abi not in ["bare", "wasi"]:
+        fail("rust_wasm_library: wasm_abi must be bare or wasi")
+    kw = dict(kwargs)
+    kw["wasm_abi"] = wasm_abi
+    target = "wasm32-wasip1" if wasm_abi == "wasi" else "wasm32-unknown-unknown"
+    kw = with_required_target(kw, "rust_wasm_library", target); _rust_nix_target(name = name, kind = "wasm", out = name + ".wasm", kwargs = kw); rust_wasm_module_surface(name, "module")
 def rust_wasi_binary(name, **kwargs):
-    kw = with_required_target(kwargs, "rust_wasi_binary", "wasm32-wasip1")
-    _rust_nix_target(name = name, kind = "wasi", out = name + ".wasm", kwargs = kw)
+    kw = with_required_target(kwargs, "rust_wasi_binary", "wasm32-wasip1"); _rust_nix_target(name = name, kind = "wasi", out = name + ".wasm", kwargs = kw); rust_wasm_module_surface(name, "module")
+def rust_wasm_static_library(name, wasm_abi = "bare", **kwargs):
+    kw = dict(kwargs); kw["wasm_abi"] = wasm_abi
+    kind = "wasi_static" if wasm_abi == "wasi" else "wasm_static"
+    _rust_nix_target(name = name, kind = kind, out = "lib" + public_crate_for(name, kw) + ".a", kwargs = kw); rust_wasm_module_surface(name, "static")
+def rust_wasm_browser_package(name, **kwargs):
+    _rust_nix_target(name = name, kind = "wasm_browser", out = name + ".browser", kwargs = kwargs); rust_wasm_module_surface(name, "browser")
+def rust_wasm_component(name, **kwargs):
+    _rust_nix_target(name = name, kind = "wasm_component", out = name + ".component.wasm", kwargs = kwargs); rust_wasm_module_surface(name, "component")
 def rust_python_extension(name, module, python_abi = "selected", lockfile_label = None, **kwargs):
     ident_chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_0123456789"
     if not isinstance(module, str) or module == "" or not all([part != "" and part[0] not in "0123456789" and all([char in ident_chars for char in part.elems()]) for part in module.split(".")]):
@@ -244,7 +245,5 @@ def rust_python_wasm_extension(name, backend, **kwargs):
     _rust_nix_target(name = name, kind = "pyext_wasm", out = name + ".pyext-wasm.stamp", kwargs = kwargs)
 def rust_node_addon(name, addon_name = None, node_api_version = 8, platform = "selected", **kwargs):
     resolved_name = validate_addon_name(addon_name or name); validate_node_api_version(node_api_version)
-    kw = fixed_artifact_contract(kwargs, "rust_node_addon", "cdylib", "target")
-    kw.update({"addon_name": resolved_name, "node_api_version": node_api_version, "platform": platform})
-    _rust_nix_target(name = name, kind = "addon", out = resolved_name + ".node", kwargs = kw)
-__all__ = ["rust_binary", "rust_c_ffi_library", "rust_cdylib", "rust_cxx_bridge_library", "rust_library", "rust_node_addon", "rust_proc_macro", "rust_python_extension", "rust_python_wasm_extension", "rust_static_library", "rust_test", "rust_wasi_binary", "rust_wasm_library"]
+    kw = fixed_artifact_contract(kwargs, "rust_node_addon", "cdylib", "target"); kw.update({"addon_name": resolved_name, "node_api_version": node_api_version, "platform": platform}); _rust_nix_target(name = name, kind = "addon", out = resolved_name + ".node", kwargs = kw)
+__all__ = ["rust_binary", "rust_c_ffi_library", "rust_cdylib", "rust_cxx_bridge_library", "rust_library", "rust_node_addon", "rust_proc_macro", "rust_python_extension", "rust_python_wasm_extension", "rust_static_library", "rust_test", "rust_wasi_binary", "rust_wasm_browser_package", "rust_wasm_component", "rust_wasm_library", "rust_wasm_static_library"]

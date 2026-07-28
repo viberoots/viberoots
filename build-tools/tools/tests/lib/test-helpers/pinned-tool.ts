@@ -12,6 +12,16 @@ function packageExprForTool(tool: string): { packageExpr: string; binRel: string
   switch (tool) {
     case "buildifier":
       return { packageExpr: "pkgs.buildifier", binRel: path.join("bin", "buildifier") };
+    case "clang":
+      return { packageExpr: "pkgs.clang", binRel: path.join("bin", "clang") };
+    case "go":
+      return { packageExpr: "pkgs.go", binRel: path.join("bin", "go") };
+    case "patch":
+      return { packageExpr: "pkgs.patch", binRel: path.join("bin", "patch") };
+    case "readelf":
+      return { packageExpr: "pkgs.binutils", binRel: path.join("bin", "readelf") };
+    case "tofu":
+      return { packageExpr: "pkgs.opentofu", binRel: path.join("bin", "tofu") };
     case "zip":
       return { packageExpr: "pkgs.zip", binRel: path.join("bin", "zip") };
     default:

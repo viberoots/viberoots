@@ -19,6 +19,11 @@ import {
   planVerifyTargetPasses,
   VERIFY_RESOURCE_LIMITED_LABEL,
 } from "../../dev/verify/target-passes";
+import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
+const artifactToolsRoot = canonicalArtifactToolsRoot(
+  process.cwd(),
+  String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+);
 
 const remoteEnv = {
   VBR_REMOTE_EXEC_MODE: "hybrid",
@@ -226,7 +231,7 @@ test("verify remote policy does not emit local zx node_modules env when unavaila
       zxNodeModulesOut: null,
       nodeTestTimeoutMs: 1200000,
       testNixTimeoutSecs: 1200,
-      artifactToolsRoot: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-artifact-tools",
+      artifactToolsRoot,
     }).filter((arg) => arg.includes("ZX_TEST_NODE_MODULES_OUT")),
     [],
   );

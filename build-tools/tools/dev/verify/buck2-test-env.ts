@@ -1,17 +1,15 @@
 import crypto from "node:crypto";
-import fs from "node:fs";
-import path from "node:path";
 import process from "node:process";
 import { gitAutoMaintenanceDisabledTestEnvArgs } from "../../lib/git-auto-maintenance-env";
 import { assertSafeNixCacheConfig } from "../../lib/nix-cache-readiness";
 import { nixCachePolicyBindingDigest } from "../../lib/nix-cache-policy-capability";
 import { withSanitizedInheritedNixConfig } from "../../lib/nix-config-env";
-import { resolveToolPathSync } from "../../lib/tool-paths";
 import { buildRemoteVerifyTestEnvArgs } from "./buck2-test-remote-env";
+import { localVerifyToolPaths, resolveNixDirenvDirenvrc } from "./buck2-test-local-tools";
 import type { VerifyExecutionPolicy } from "./remote-policy";
 import type { CacheHealthResult } from "./nix-cache-health";
 import { nestedCacheRoleTransportEnv } from "./nested-cache-role-transport";
-import { stripOverrideKeys } from "./nix-cache-health-config";
+import { renderReviewedNixCacheConfig } from "./nix-cache-health-config";
 
 type VerifyBuck2TestEnvArgsOptions = {
   iso: string;
@@ -35,56 +33,12 @@ function maybeEnvArg(name: string, value: string | undefined): string[] {
   return typeof value === "string" ? ["--env", `${name}=${value}`] : [];
 }
 
-function resolveOptionalToolPath(tool: string): string | undefined {
-  try {
-    return resolveToolPathSync(tool);
-  } catch {
-    return undefined;
-  }
-}
-
-function resolveNixDirenvDirenvrc(): string | undefined {
-  const explicit = String(process.env.VBR_NIX_DIRENV_DIRENVRC || "").trim();
-  const profiles = String(process.env.NIX_PROFILES || "")
-    .split(/\s+/u)
-    .filter(Boolean);
-  const candidates = [
-    explicit,
-    ...profiles.map((profile) => path.join(profile, "share", "nix-direnv", "direnvrc")),
-    path.join(String(process.env.HOME || ""), ".nix-profile", "share", "nix-direnv", "direnvrc"),
-    "/nix/var/nix/profiles/default/share/nix-direnv/direnvrc",
-  ].filter(Boolean);
-  for (const candidate of candidates) {
-    try {
-      const resolved = fs.realpathSync.native(candidate);
-      if (/^\/nix\/store\/[^/]+-nix-direnv-[^/]+\/share\/nix-direnv\/direnvrc$/u.test(resolved)) {
-        return resolved;
-      }
-    } catch {}
-  }
-  return undefined;
-}
-
 function buckdStartupTimeout(): string {
   return process.env.BUCKD_STARTUP_TIMEOUT || "300";
 }
 
 function buckdStartupInitTimeout(): string {
   return process.env.BUCKD_STARTUP_INIT_TIMEOUT || buckdStartupTimeout();
-}
-
-function reviewedChildNixConfig(cacheHealth: CacheHealthResult): string {
-  const retained = stripOverrideKeys(cacheHealth.nixConfig);
-  return [
-    retained,
-    `substituters = ${cacheHealth.requiredSubstituters.join(" ")}`,
-    `extra-substituters = ${cacheHealth.optionalSubstituters.join(" ")}`,
-    "connect-timeout = 3",
-    "stalled-download-timeout = 10",
-    "fallback = true",
-  ]
-    .filter(Boolean)
-    .join("\n");
 }
 
 export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): string[] {
@@ -105,13 +59,15 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
   const nodeExtraCaCerts = process.env.NODE_EXTRA_CA_CERTS || sslCertFile;
   const nixDaemonSocketPath = process.env.NIX_DAEMON_SOCKET_PATH || "/var/run/nix-daemon.socket";
   const nixRemote = process.env.NIX_REMOTE || "daemon";
-  const nixBin = process.env.VBR_NIX_BIN || process.env.NIX_BIN || resolveOptionalToolPath("nix");
-  const patchBin = process.env.PATCH_BIN || resolveOptionalToolPath("patch");
-  const gitBin = process.env.GIT_BIN || resolveOptionalToolPath("git");
+  const tools = localVerifyToolPaths(opts.artifactToolsRoot);
   const nixConfigEnv = withSanitizedInheritedNixConfig({
     NIX_CONFIG:
       opts.cacheHealth?.authority === "reviewed"
-        ? reviewedChildNixConfig(opts.cacheHealth)
+        ? renderReviewedNixCacheConfig(
+            opts.cacheHealth.nixConfig,
+            opts.cacheHealth.requiredSubstituters,
+            opts.cacheHealth.optionalSubstituters,
+          )
         : process.env.NIX_CONFIG,
     NIX_CONF_DIR: process.env.NIX_CONF_DIR,
   });
@@ -212,10 +168,8 @@ export function buildVerifyTestEnvArgs(opts: VerifyBuck2TestEnvArgsOptions): str
     `NIX_DAEMON_SOCKET_PATH=${nixDaemonSocketPath}`,
     "--env",
     `NIX_REMOTE=${nixRemote}`,
-    ...maybeEnvArg("VBR_NIX_BIN", nixBin),
-    ...maybeEnvArg("NIX_BIN", nixBin),
-    ...maybeEnvArg("PATCH_BIN", patchBin),
-    ...maybeEnvArg("GIT_BIN", gitBin),
+    ...maybeEnvArg("VBR_NIX_BIN", tools.NIX_BIN),
+    ...Object.entries(tools).flatMap(([name, value]) => maybeEnvArg(name, value)),
     "--env",
     `BUCK_NESTED_ISO=${nestedIso}`,
     "--env",

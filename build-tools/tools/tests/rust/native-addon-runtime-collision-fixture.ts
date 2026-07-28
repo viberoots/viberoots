@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import * as fs from "node:fs/promises";
 import path from "node:path";
+import { artifactNixExperimentalFeatureArgs } from "../../lib/artifact-nix-policy";
 import { workspaceFlakeRef } from "../lib/test-helpers";
 
 async function writeArtifact(root: string, addon: string, runtime: string): Promise<void> {
@@ -31,8 +32,12 @@ async function stageScript(tmp: string, destination: string, artifacts: string[]
     };
   in native.stage [ ${addons} ] ${JSON.stringify(destination)}`;
   const nix = path.join(String(process.env.VBR_ARTIFACT_TOOLS_ROOT), "bin/nix");
+  const nixFeatures = artifactNixExperimentalFeatureArgs();
   return String(
-    await $({ cwd: tmp, stdio: "pipe" })`${nix} eval --impure --raw --expr ${expression}`,
+    await $({
+      cwd: tmp,
+      stdio: "pipe",
+    })`${nix} ${nixFeatures} eval --impure --raw --expr ${expression}`,
   );
 }
 

@@ -10,6 +10,7 @@ import {
   consumeNestedCacheRoleTransport,
   nestedCacheRoleTransportEnv,
 } from "../../dev/verify/nested-cache-role-transport";
+import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
 import { nixCachePolicyBindingDigest } from "../../lib/nix-cache-policy-capability";
 import { sanitizeInheritedNixConfig } from "../../lib/nix-config-env";
 import { parseNixCacheConfigValues } from "../../lib/nix-cache-readiness";
@@ -21,7 +22,10 @@ const baseOptions: Parameters<typeof buildVerifyTestEnvArgs>[0] = {
   zxNodeModulesOut: null,
   nodeTestTimeoutMs: 120_000,
   testNixTimeoutSecs: 1800,
-  artifactToolsRoot: "/nix/store/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-artifact-tools",
+  artifactToolsRoot: canonicalArtifactToolsRoot(
+    process.cwd(),
+    String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+  ),
 };
 
 function envValue(envArgs: string[], name: string): string | undefined {

@@ -71,14 +71,14 @@ test("generated .envrc delegates to stable stage-0 helper before nix-direnv use 
     stage0,
     /current_policy="\$\{VBR_NIX_CACHE_POLICY:-auto\}"[\s\S]*current_policy.*== "off"[\s\S]*unset VBR_NIX_CACHE_HEALTH_APPLIED .*VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY/,
   );
-  assert.match(stage0, /VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY:-.*== "\$\{current_policy\}"/);
+  assert.doesNotMatch(stage0, /VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY:-.*== "\$\{current_policy\}"/);
   assert.match(
     stage0,
     /current_policy.*== "off"[\s\S]*VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG\+x[\s\S]*export NIX_CONFIG="\$\{VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG\}"/,
   );
   assert.match(
     stage0,
-    /VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG\+x.*VBR_NIX_CACHE_HEALTH_REVIEWED_POLICY:-.*current_policy/,
+    /VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG\+x[\s\S]*export NIX_CONFIG="\$\{VBR_NIX_CACHE_HEALTH_SOURCE_CONFIG\}"[\s\S]*unset VBR_NIX_CACHE_HEALTH_APPLIED/,
   );
   assert.match(stage0, /\[env\] nix cache health: disabled unreachable substituter\(s\):/);
   assert.match(stage0, /error: viberoots workspace flake is missing\./);

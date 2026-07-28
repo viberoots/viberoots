@@ -42,14 +42,18 @@ def rust_macro_name(kind):
         "pyext_wasm": "rust_python_wasm_extension",
         "test": "rust_test",
         "wasm": "rust_wasm_library",
+        "wasm_browser": "rust_wasm_browser_package",
+        "wasm_component": "rust_wasm_component",
+        "wasm_static": "rust_wasm_static_library",
         "wasi": "rust_wasi_binary",
+        "wasi_static": "rust_wasm_static_library",
     }
     if kind not in names:
         fail("unsupported Rust target kind: %s" % kind)
     return names[kind]
 
 def crate_type_for(kind, value):
-    expected = "bin" if kind in ["bin", "wasi"] else "cdylib" if kind in ["addon", "pyext", "pyext_wasm", "wasm"] else "test" if kind == "test" else None
+    expected = "bin" if kind in ["bin", "wasi"] else "staticlib" if kind in ["wasm_static", "wasi_static"] else "cdylib" if kind in ["addon", "pyext", "pyext_wasm", "wasm", "wasm_browser", "wasm_component"] else "test" if kind == "test" else None
     crate_type = value or expected or "rlib"
     allowed = ["bin", "rlib", "staticlib", "cdylib", "proc-macro", "test"]
     if crate_type not in allowed:
@@ -190,4 +194,13 @@ RUST_PUBLIC_ARGS = [
     "stl",
     "tool_closure",
     "visibility",
+    "component_adapter",
+    "exported_functions",
+    "wasm_abi",
+    "wasm_debug",
+    "wasm_header",
+    "wasm_optimize",
+    "wasm_source_map",
+    "wit",
+    "wit_world",
 ]

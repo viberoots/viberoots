@@ -10,6 +10,7 @@ import {
   wrapper,
   writeExecutable,
 } from "./git-wrapper-test-helpers.ts";
+import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool";
 
 async function initRepo(root: string, gitPath: string): Promise<void> {
   await $({ cwd: root, stdio: "pipe" })`${gitPath} init -q`;
@@ -76,10 +77,11 @@ int main(int argc, char **argv) {
 `,
     "utf8",
   );
+  const clang = await resolvePinnedTestToolPath("clang", $);
   await $({
     stdio: "pipe",
     env: { ...process.env, TMPDIR: tmp },
-  })`clang -Wall -Wextra -O2 -o ${binary} ${source}`;
+  })`${clang} -Wall -Wextra -O2 -o ${binary} ${source}`;
   return binary;
 }
 
@@ -131,7 +133,10 @@ test("git wrapper Darwin path creates an actual APFS CoW clone", async () => {
     await assert.rejects(fsp.access(hostPythonMarker));
     await $({ stdio: "pipe" })`/bin/cp ${marker} ${plainCopy}`;
 
-    await $({ stdio: "pipe" })`cmp -s ${path.join(target, "large-untracked.bin")} ${marker}`;
+    assert.deepEqual(
+      await fsp.readFile(path.join(target, "large-untracked.bin")),
+      await fsp.readFile(marker),
+    );
     const cloned = await $({
       stdio: "pipe",
     })`${cloneChecker} ${marker} ${path.join(target, "large-untracked.bin")}`;
@@ -198,7 +203,10 @@ test("git wrapper Linux path creates direct reflink CoW copies", async () => {
 
     assert.equal(res.exitCode, 0, String(res.stderr || res.stdout));
     assert.equal(await fsp.readFile(path.join(target, "tracked.txt"), "utf8"), "tracked\n");
-    await $({ stdio: "pipe" })`cmp -s ${path.join(target, "large-untracked.bin")} ${marker}`;
+    assert.deepEqual(
+      await fsp.readFile(path.join(target, "large-untracked.bin")),
+      await fsp.readFile(marker),
+    );
     await assert.rejects(
       fsp.stat(path.join(target, ".codex", "worktrees", "old-agent", "sentinel.txt")),
       /ENOENT/,

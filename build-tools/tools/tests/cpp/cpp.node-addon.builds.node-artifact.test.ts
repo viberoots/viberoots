@@ -1,5 +1,6 @@
 #!/usr/bin/env zx-wrapper
 import { test } from "node:test";
+import path from "node:path";
 import { runInTemp } from "../lib/test-helpers";
 
 test("cpp Node-API addon builds a .node artifact (nix template smoke)", async () => {
@@ -64,13 +65,21 @@ EOF'`;
     await $({ cwd: tmp })`bash --noprofile --norc -c 'test -f "${out}/lib/demo_addon.node"'`;
 
     // otool -L (Darwin) or ldd (Linux) should succeed; no strict assertions on content
-    const probe = await $({
-      cwd: tmp,
-      stdio: "pipe",
-      reject: false,
-      nothrow: true,
-    })`bash --noprofile --norc -c 'if [ "$(uname -s)" = "Darwin" ]; then otool -L "${out}/lib/demo_addon.node"; else ldd "${out}/lib/demo_addon.node" || true; fi'`;
-    if (probe.exitCode !== 0) {
+    const probe =
+      process.platform === "darwin"
+        ? await $({
+            cwd: tmp,
+            stdio: "pipe",
+            reject: false,
+            nothrow: true,
+          })`${process.env.OTOOL_BIN || "/usr/bin/otool"} -L ${path.join(out, "lib/demo_addon.node")}`
+        : await $({
+            cwd: tmp,
+            stdio: "pipe",
+            reject: false,
+            nothrow: true,
+          })`ldd ${path.join(out, "lib/demo_addon.node")}`;
+    if (process.platform === "darwin" && probe.exitCode !== 0) {
       console.error(probe.stdout + "\n" + probe.stderr);
       throw new Error("linkage probe failed");
     }

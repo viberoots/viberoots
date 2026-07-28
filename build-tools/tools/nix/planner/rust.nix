@@ -37,6 +37,7 @@ let
     else if builtins.isList value && builtins.all builtins.isString value then map clean value
     else builtins.throw "Rust planner ${field} must be a list of labels";
   runtimePackagesFor = import ./rust-runtime-deps.nix { inherit lib ctx normalizeList; }; validateInteropProfile = import ./rust-interop-profile.nix { inherit ctx; };
+  Wasm = import ./rust-wasm.nix { inherit lib P ctx nodeFor normalizeList; };
   nativeInputsFor = name:
     let
       node = nodeFor name;
@@ -109,10 +110,8 @@ let
   validateKindTarget = name: kind: value:
     let
       target = if value == null then "" else builtins.toString value;
-      expected =
-        if kind == "wasm" then "wasm32-unknown-unknown"
-        else if kind == "wasi" then "wasm32-wasip1"
-        else "";
+      expected = if Wasm.isWasmKind kind
+        then (Wasm.contractFor name kind).target else "";
     in if target == expected then target else builtins.throw
       "Rust planner target ${name} kind ${kind} requires target ${if expected == "" then "<empty>" else expected}; got ${if target == "" then "<empty>" else target}";
   validateNativeInputBoundary = name: kind:
@@ -121,10 +120,10 @@ let
       linkDeps = normalizeList "link_deps" (ctx.get node "link_deps");
       headerDeps = normalizeList "header_deps" (ctx.get node "header_deps");
       nixpkgAttrs = nixpkgAttrsFor name;
-    in if builtins.elem kind [ "wasm" "wasi" ]
-      && (linkDeps != [] || headerDeps != [] || nixpkgAttrs != [])
+    in if Wasm.isWasmKind kind
+      && (headerDeps != [] || nixpkgAttrs != [])
        then builtins.throw
-         "Rust planner target ${name} kind ${kind} does not support link_deps, header_deps, or nixpkg dependencies; cross-language WebAssembly linking is not available"
+         "Rust planner target ${name} kind ${kind} does not support header_deps or nixpkg dependencies"
        else true;
   composition = import ./rust-composition.nix {
     inherit lib P ctx nodeFor rustNodes clean packagePath sourcePath cargoRootFor cargoLockFor;
@@ -150,7 +149,8 @@ let
         if crateTypeRaw != null then crateTypeRaw
         else if kind == "lib" then "rlib"
         else if kind == "test" then "test"
-        else if kind == "wasm" then "cdylib"
+        else if builtins.elem kind [ "wasm_static" "wasi_static" ] then "staticlib"
+        else if builtins.elem kind [ "wasm" "wasm_browser" "wasm_component" ] then "cdylib"
         else "bin";
       hostRoleRaw = ctx.get node "host_role";
       hostRole = if hostRoleRaw == null then "target" else hostRoleRaw;
@@ -179,7 +179,15 @@ let
       };
       template = ctx.T.rustForPkgs sourcePlan.base_pkgs;
       pythonDeps = pythonDepsFor { inherit name node sourcePlan; };
-      nativeInputs = nativeInputsFor name;
+      wasmContractRaw = Wasm.contractFor name kind;
+      wasmContract = wasmContractRaw // lib.optionalAttrs (Wasm.isWasmKind kind) {
+        header = if wasmContractRaw.header == null then null else
+          builtins.toPath "${ctx.repoRootStr}/${sourcePath name wasmContractRaw.header}";
+        wit = if wasmContractRaw.wit == null then null else
+          builtins.toPath "${ctx.repoRootStr}/${sourcePath name wasmContractRaw.wit}";
+      };
+      nativeInputs = if Wasm.isWasmKind kind
+        then Wasm.inputsFor name kind else nativeInputsFor name;
     in if missing != [] then builtins.throw
       "Rust planner unresolved nixpkg deps for ${name}: ${lib.concatStringsSep ", " (map (record: record.attr) missing)}"
     else assert _nativeInputBoundary; assert _overrideClassification; template.rustPackage {
@@ -208,6 +216,7 @@ let
       platform = if platform == null then "" else platform;
       pythonAbi = if pythonAbi == null then "" else pythonAbi;
       inherit interop;
+      wasm = wasmContract;
     };
 in {
   isTarget = n: P.isTargetByRuleTypeOrLabel {
@@ -219,32 +228,15 @@ in {
     labels = P.labelsOf n;
     ruleType = P.ruleTypeOf n;
     name = P.nameOf n;
-    config = {
-      labelPriorityPre = [
-        { label = "kind:addon"; kind = "addon"; }
-        { label = "kind:pyext_wasm"; kind = "pyext_wasm"; }
-        { label = "kind:pyext"; kind = "pyext"; }
-        { label = "kind:test"; kind = "test"; }
-        { label = "kind:wasi"; kind = "wasi"; }
-        { label = "kind:wasm"; kind = "wasm"; }
-        { label = "kind:bin"; kind = "bin"; }
-        { label = "kind:lib"; kind = "lib"; }
-      ];
-      ruleTypes.suffixes = [
-        { suffix = "_node_addon"; kind = "addon"; }
-        { suffix = "_python_wasm_extension"; kind = "pyext_wasm"; }
-        { suffix = "_python_extension"; kind = "pyext"; }
-        { suffix = "_wasi_binary"; kind = "wasi"; }
-        { suffix = "_wasm_library"; kind = "wasm"; }
-        { suffix = "_test"; kind = "test"; }
-        { suffix = "_binary"; kind = "bin"; }
-        { suffix = "_library"; kind = "lib"; }
-      ];
-    };
+    config = import ./rust-kind-config.nix;
   };
   modulesFileFor = _: null;
   mkApp = build "bin"; mkAddon = build "addon";
   mkLib = build "lib"; mkTest = build "test";
   mkPyExt = build "pyext"; mkPyExtWasm = build "pyext_wasm";
   mkWasi = build "wasi"; mkWasm = build "wasm";
+  mkWasmBrowser = build "wasm_browser";
+  mkWasmComponent = build "wasm_component";
+  mkWasmStatic = build "wasm_static";
+  mkWasiStatic = build "wasi_static";
 }

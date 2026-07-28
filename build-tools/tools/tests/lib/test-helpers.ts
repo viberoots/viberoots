@@ -3,6 +3,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import process from "node:process";
 import { registerBuckIsolationSync } from "../../dev/verify/owned-process-state";
+import { consumeNestedCacheRoleTransport } from "../../dev/verify/nested-cache-role-transport";
 import "./test-helpers/worker-init";
 
 export { getTimingCountForLabel } from "./test-helpers/timing";
@@ -21,6 +22,16 @@ export {
   runBuildSelected,
 } from "./test-helpers/selected-build";
 export { publicBuildOutPath, runPublicBuild } from "./test-helpers/public-build";
+
+export const nestedBuckTestArgs = consumeNestedCacheRoleTransport(process.env);
+export const nestedBuckCommandEnv = Object.fromEntries(
+  nestedBuckTestArgs.flatMap((value, index, values) => {
+    if (value !== "--env") return [];
+    const assignment = values[index + 1] || "";
+    const separator = assignment.indexOf("=");
+    return separator < 1 ? [] : [[assignment.slice(0, separator), assignment.slice(separator + 1)]];
+  }),
+);
 
 const ownedBuckIsolations = new Map<string, string>();
 let buckIsolationCleanupRegistered = false;

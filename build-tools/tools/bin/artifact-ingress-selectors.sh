@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
 artifact_ingress_selector_is_canonicalized() {
+  case "$1" in
+    NIX_*_FOR_TARGET|NIX_*_WRAPPER_TARGET_HOST_*|NIX_*_WRAPPER_TARGET_TARGET_*) return 0 ;;
+  esac
   case " ${VBR_ARTIFACT_INGRESS_CANONICALIZED_SELECTORS} " in
     *" $1 "*) return 0 ;;
     *) return 1 ;;
@@ -25,7 +28,7 @@ artifact_ingress_record_devshell_selectors() {
   for name in ${!NIX_@}; do
     case "${name}" in
       NIX_DAEMON_SOCKET_PATH|NIX_REMOTE|NIX_SSL_CERT_DIR|NIX_SSL_CERT_FILE) continue ;;
-      NIX_*_WRAPPER_TARGET_HOST_*)
+      NIX_*_FOR_TARGET|NIX_*_WRAPPER_TARGET_HOST_*|NIX_*_WRAPPER_TARGET_TARGET_*)
         VBR_DEVSHELL_ARTIFACT_DYNAMIC_SELECTORS="${VBR_DEVSHELL_ARTIFACT_DYNAMIC_SELECTORS} ${name}"
         marker="VBR_DEVSHELL_ARTIFACT_WAS_SET_${name}"
         value="VBR_DEVSHELL_ARTIFACT_VALUE_${name}"
@@ -136,7 +139,7 @@ artifact_ingress_capture_environment() {
   done
   for name in ${!NIX_@}; do
     case "${name}" in
-      NIX_*_WRAPPER_TARGET_HOST_*)
+      NIX_*_FOR_TARGET|NIX_*_WRAPPER_TARGET_HOST_*|NIX_*_WRAPPER_TARGET_TARGET_*)
         VBR_ARTIFACT_INGRESS_DYNAMIC_SELECTORS="${VBR_ARTIFACT_INGRESS_DYNAMIC_SELECTORS} ${name}"
         printf -v "VBR_ARTIFACT_INGRESS_WAS_SET_${name}" '%s' 1
         printf -v "VBR_ARTIFACT_INGRESS_VALUE_${name}" '%s' "${!name}"
@@ -177,12 +180,19 @@ artifact_ingress_restore_or_remove_selectors() {
     baseline_marker="VBR_DEVSHELL_ARTIFACT_WAS_SET_${name}"
     baseline_value="VBR_DEVSHELL_ARTIFACT_VALUE_${name}"
     captured="${!value:-}"
-    if [[ "${!marker:-}" == "1" && -n "${captured}" && ( "${VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED:-}" != "1" || "${!baseline_marker:-}" != "1" || "${captured}" != "${!baseline_value:-}" ) ]]; then
+    if artifact_ingress_selector_is_canonicalized "${name}"; then
+      unset "${name}"
+    elif [[ "${!marker:-}" == "1" && -n "${captured}" && ( "${VBR_DEVSHELL_ARTIFACT_BASELINE_TRUSTED:-}" != "1" || "${!baseline_marker:-}" != "1" || "${captured}" != "${!baseline_value:-}" ) ]]; then
       export "${name}=${captured}"
     else
       unset "${name}"
     fi
     unset "${marker}" "${value}" "${baseline_marker}" "${baseline_value}"
+  done
+  for name in ${!NIX_@}; do
+    if artifact_ingress_selector_is_canonicalized "${name}"; then
+      unset "${name}"
+    fi
   done
   unset VBR_ARTIFACT_INGRESS_DIRENV_ROOT VBR_ARTIFACT_INGRESS_DIRENV_TOKEN
   unset VBR_ARTIFACT_INGRESS_DIRENV_VERIFIED

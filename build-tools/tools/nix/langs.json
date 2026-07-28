@@ -69,7 +69,11 @@
     {
       "id": "cpp",
       "displayName": "C++",
-      "requiredPaths": ["viberoots/build-tools/tools/nix/planner/cpp.nix"],
+      "requiredPaths": [
+        "viberoots/build-tools/tools/nix/planner/cpp.nix",
+        "viberoots/build-tools/tools/nix/planner/cpp-targets.nix",
+        "viberoots/build-tools/tools/nix/planner/cpp-wasm-contract.nix"
+      ],
       "kinds": ["bin", "lib"],
       "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/cpp",
       "hermetic": {

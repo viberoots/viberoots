@@ -6,9 +6,27 @@ import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
 
 const load =
-  'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_wasi_binary", "rust_wasm_library")';
+  'load("@viberoots//build-tools/rust:defs.bzl", "rust_binary", "rust_wasi_binary", "rust_wasm_browser_package", "rust_wasm_component", "rust_wasm_library", "rust_wasm_static_library")';
 
 test("rust macros reject noncanonical Cargo inputs, patch traversal, and unknown attrs", async () => {
+  await runInTemp("rust-cargo-input-analysis-errors-missing", async (tmp, $) => {
+    const app = path.join(tmp, "projects/apps/rustapp");
+    await fsp.mkdir(path.join(app, "src"), { recursive: true });
+    await fsp.writeFile(path.join(app, "src/main.rs"), "fn main() {}\n");
+    await fsp.writeFile(
+      path.join(app, "TARGETS"),
+      `${load}\nrust_binary(name = "app", srcs = ["src/main.rs"])\n`,
+    );
+    const missing = await $({
+      cwd: tmp,
+      stdio: "pipe",
+      reject: false,
+      nothrow: true,
+    })`buck2 cquery --target-platforms //:no_cgo //projects/apps/rustapp:app`;
+    assert.notEqual(missing.exitCode, 0);
+    assert.match(String(missing.stderr || missing.stdout), /exactly one package-local Cargo\.toml/);
+  });
+
   await runInTemp("rust-cargo-input-analysis-errors", async (tmp, $) => {
     const app = path.join(tmp, "projects/apps/rustapp");
     await fsp.mkdir(path.join(app, "src"), { recursive: true });
@@ -21,11 +39,6 @@ test("rust macros reject noncanonical Cargo inputs, patch traversal, and unknown
         reject: false,
         nothrow: true,
       })`buck2 cquery --target-platforms //:no_cgo //projects/apps/rustapp:app`;
-
-    await fsp.writeFile(targets, `${load}\nrust_binary(name = "app", srcs = ["src/main.rs"])\n`);
-    const missing = await query();
-    assert.notEqual(missing.exitCode, 0);
-    assert.match(String(missing.stderr || missing.stdout), /exactly one package-local Cargo\.toml/);
 
     await fsp.writeFile(
       path.join(app, "Cargo.toml"),
@@ -130,13 +143,13 @@ test("rust macros reject noncanonical Cargo inputs, patch traversal, and unknown
 
     await fsp.writeFile(
       targets,
-      `${load}\nrust_wasm_library(name = "app", srcs = ["src/main.rs"], link_deps = [":native"])\n`,
+      `${load}\nrust_wasm_library(name = "app", srcs = ["src/main.rs"], header_deps = [":native"])\n`,
     );
     const wasmLinkDeps = await query();
     assert.notEqual(wasmLinkDeps.exitCode, 0);
     assert.match(
       String(wasmLinkDeps.stderr || wasmLinkDeps.stdout),
-      /rust_wasm_library: link_deps, header_deps, and nixpkg dependencies are unsupported for non-native Rust targets/,
+      /header_deps and nixpkg dependencies are unsupported for Rust WASM targets/,
     );
 
     await fsp.writeFile(
@@ -147,7 +160,7 @@ test("rust macros reject noncanonical Cargo inputs, patch traversal, and unknown
     assert.notEqual(wasiHeaderDeps.exitCode, 0);
     assert.match(
       String(wasiHeaderDeps.stderr || wasiHeaderDeps.stdout),
-      /rust_wasi_binary: link_deps, header_deps, and nixpkg dependencies are unsupported for non-native Rust targets/,
+      /header_deps and nixpkg dependencies are unsupported for Rust WASM targets/,
     );
 
     for (const declaration of [
@@ -159,16 +172,9 @@ test("rust macros reject noncanonical Cargo inputs, patch traversal, and unknown
       assert.notEqual(result.exitCode, 0);
       assert.match(
         String(result.stderr || result.stdout),
-        /nixpkg dependencies are unsupported for non-native Rust targets/,
+        /header_deps and nixpkg dependencies are unsupported for Rust WASM targets/,
       );
     }
-
-    await fsp.writeFile(
-      targets,
-      `${load}\nrust_binary(name = "app", srcs = ["src/main.rs"], nixpkg_deps = ["zlib"])\n`,
-    );
-    const nativeNixpkg = await query();
-    assert.equal(nativeNixpkg.exitCode, 0, String(nativeNixpkg.stderr || nativeNixpkg.stdout));
 
     await fsp.writeFile(
       targets,
@@ -191,5 +197,12 @@ test("rust macros reject noncanonical Cargo inputs, patch traversal, and unknown
       String(unknownWasiArgument.stderr || unknownWasiArgument.stdout),
       /rust_wasi_binary: unknown arguments: imaginary_fallback/,
     );
+
+    await fsp.writeFile(
+      targets,
+      `${load}\nrust_binary(name = "app", srcs = ["src/main.rs"], nixpkg_deps = ["zlib"])\n`,
+    );
+    const nativeNixpkg = await query();
+    assert.equal(nativeNixpkg.exitCode, 0, String(nativeNixpkg.stderr || nativeNixpkg.stdout));
   });
 });

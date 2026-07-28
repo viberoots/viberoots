@@ -75,6 +75,9 @@ in {
     version = "0.1.0";
     src = srcAbs;
     inherit patches;
+    passthru.viberootsCpp = {
+      inherit nixpkgsProfile nixCxxSourcePlan;
+    };
     nativeBuildInputs = [ pkgs.llvmPackages.clang pkgs.llvmPackages.llvm ];
     buildInputs = resolvedPkgs;
     dontStrip = true;

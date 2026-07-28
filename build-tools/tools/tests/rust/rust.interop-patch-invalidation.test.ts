@@ -13,6 +13,7 @@ import {
   rustLeafPatchText,
   version,
 } from "./rust.interop-patch-fixture";
+import { rustPkgsExpression } from "./rust-nixpkgs-authority";
 
 const sourceRoot = path.resolve(path.basename(process.cwd()) === "viberoots" ? "." : "viberoots");
 
@@ -205,14 +206,14 @@ test("interop patches invalidate each bridge direction and restore exact outputs
       const system = process.platform === "darwin" ? "aarch64-darwin" : "x86_64-linux";
       const target = "//projects/apps/interop_consumer:app";
       await exportGraphInTemp({ tmp, $ });
-      await assertResolvedNativeInputs($, tmp, generator, graph);
+      await assertResolvedNativeInputs($, tmp, generator, graph, rustPkgsExpression);
       const build = async () => {
         await exportGraphInTemp({ tmp, $ });
         const result = await $({
           cwd: tmp,
           env: { ...process.env, BUCK_TARGET: target },
           stdio: "pipe",
-        })`nix build --impure --accept-flake-config --file ${generator} selected --arg pkgs ${"import <nixpkgs> {}"} --arg src ./. --argstr system ${system} --argstr graphJsonPath ${graph} --no-link --print-out-paths`;
+        })`nix build --impure --accept-flake-config --file ${generator} selected --arg pkgs ${rustPkgsExpression} --arg src ./. --argstr system ${system} --argstr graphJsonPath ${graph} --no-link --print-out-paths`;
         const output = String(result.stdout).trim().split("\n").at(-1);
         assert.ok(output?.startsWith("/nix/store/"));
         const executable = path.join(output, "bin/projects-apps-interop_consumer-app");

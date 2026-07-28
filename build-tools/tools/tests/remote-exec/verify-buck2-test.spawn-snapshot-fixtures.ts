@@ -1,17 +1,21 @@
 import path from "node:path";
 
 export type RemoteMode = "hybrid" | "remote" | "remote-only-conformance";
-
 export function normalizeSpawnArg(arg: string): string {
   if (path.basename(arg) === "buck2") return "buck2";
   if (arg.startsWith("NIX_SSL_CERT_FILE=")) return "NIX_SSL_CERT_FILE=<cert>";
   if (arg.startsWith("SSL_CERT_FILE=")) return "SSL_CERT_FILE=<cert>";
   if (arg.startsWith("NODE_EXTRA_CA_CERTS=")) return "NODE_EXTRA_CA_CERTS=<cert>";
   if (arg.startsWith("NIX_CONF_DIR=")) return "NIX_CONF_DIR=<nix-conf-dir>";
+  if (arg.startsWith("VBR_NIX_DIRENV_DIRENVRC=")) {
+    return "VBR_NIX_DIRENV_DIRENVRC=<nix-direnv-direnvrc>";
+  }
   if (arg.startsWith("VBR_NIX_BIN=")) return "VBR_NIX_BIN=<nix>";
   if (arg.startsWith("NIX_BIN=")) return "NIX_BIN=<nix>";
   if (arg.startsWith("PATCH_BIN=")) return "PATCH_BIN=<patch>";
   if (arg.startsWith("GIT_BIN=")) return "GIT_BIN=<git>";
+  if (arg.startsWith("OPENSSL_BIN=")) return "OPENSSL_BIN=<openssl>";
+  if (arg.startsWith("GZIP_BIN=")) return "GZIP_BIN=<gzip>";
   if (arg.startsWith("VBR_ARTIFACT_TOOLS_ROOT=")) return "VBR_ARTIFACT_TOOLS_ROOT=<tools>";
   return arg;
 }
@@ -33,6 +37,8 @@ function commonTestEnvArgs(): string[] {
     "--env",
     "VBR_ARTIFACT_TOOLS_ROOT=<tools>",
     "--env",
+    "VBR_NIX_DIRENV_DIRENVRC=<nix-direnv-direnvrc>",
+    "--env",
     "GIT_CONFIG_COUNT=3",
     "--env",
     "GIT_CONFIG_KEY_0=maintenance.auto",
@@ -50,8 +56,6 @@ function commonTestEnvArgs(): string[] {
     "NIX_CONFIG=experimental-features = nix-command flakes\nwarn-dirty = false\nbuilders =\nbuild-hook =\nmax-jobs = auto",
     "--env",
     "NIX_CONF_DIR=<nix-conf-dir>",
-    "--env",
-    "VBR_NIX_CACHE_HEALTH_APPLIED=1",
     "--env",
     "VBR_BUCK_REAPER_STATE_FILE=",
     "--env",
@@ -100,6 +104,12 @@ function commonTestEnvArgs(): string[] {
     "PATCH_BIN=<patch>",
     "--env",
     "GIT_BIN=<git>",
+    "--env",
+    "OPENSSL_BIN=<openssl>",
+    "--env",
+    "GZIP_BIN=<gzip>",
+    "--env",
+    "OTOOL_BIN=/usr/bin/otool",
     "--env",
     "BUCK_NESTED_ISO=verify-nested-17a5591c2ed6",
     "--env",
@@ -153,6 +163,10 @@ function remoteTestEnvArgs(): string[] {
     "PATCH_BIN=<patch>",
     "--env",
     "GIT_BIN=<git>",
+    "--env",
+    "OPENSSL_BIN=<openssl>",
+    "--env",
+    "GZIP_BIN=<gzip>",
     "--env",
     "VBR_ARTIFACT_TOOLS_ROOT=<tools>",
   ];

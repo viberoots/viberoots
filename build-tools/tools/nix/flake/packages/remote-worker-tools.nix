@@ -11,6 +11,9 @@ let
     pkgs.gnused
     pkgs.gawk
     pkgs.gnutar
+    pkgs.gzip
+    pkgs.patch
+    pkgs.openssl
     pkgs.rsync
     pkgs.lsof
     pkgs.unixtools.ps
@@ -18,7 +21,7 @@ let
     pkgs.nodejs_22
     pkgs.python3
     pkgs.uv
-    pkgs.cargo
+    pkgs.viberootsRustToolchain
     pkgs.copier
     pkgs.gomod2nix
     pkgs.nix

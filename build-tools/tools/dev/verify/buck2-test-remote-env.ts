@@ -98,6 +98,8 @@ export function buildRemoteVerifyTestEnvArgs(opts: RemoteVerifyTestEnvArgsOption
     ["NIX_BIN", remoteToolPath("NIX_BIN", "nix")],
     ["PATCH_BIN", remoteToolPath("PATCH_BIN", "patch")],
     ["GIT_BIN", remoteToolPath("GIT_BIN", "git")],
+    ["OPENSSL_BIN", remoteToolPath("OPENSSL_BIN", "openssl")],
+    ["GZIP_BIN", remoteToolPath("GZIP_BIN", "gzip")],
   ].filter((entry): entry is [string, string] => entry !== null);
   return [
     "--env",

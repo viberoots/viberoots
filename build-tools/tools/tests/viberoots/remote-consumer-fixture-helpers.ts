@@ -1,5 +1,6 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
+import { artifactNixExperimentalFeatureArgs } from "../../lib/artifact-nix-policy";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
 
 export const REPO_ROOT = path.resolve(new URL("../../../../", import.meta.url).pathname);
@@ -56,9 +57,10 @@ export async function makeRemoteSource(root: string, $: typeof globalThis.$): Pr
   })`git --git-dir=${bareSource} update-ref refs/heads/release/v1.4.2 ${revision}`;
 
   const nixBin = ensureNixStoreToolPathSync("nix");
+  const nixFeatures = artifactNixExperimentalFeatureArgs();
   const added = await $({
     stdio: "pipe",
-  })`${nixBin} store add-path --name viberoots-remote-git ${bareSource}`;
+  })`${nixBin} ${nixFeatures} store add-path --name viberoots-remote-git ${bareSource}`;
   const storePath = String(added.stdout || "").trim();
   if (!/^\/nix\/store\/[a-z0-9]{32}-viberoots-remote-git$/.test(storePath)) {
     throw new Error(`expected literal immutable remote Git source, got: ${storePath || "<empty>"}`);

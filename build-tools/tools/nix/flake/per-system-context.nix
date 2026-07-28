@@ -1,6 +1,8 @@
 { nixpkgs
 , buck2
 , gomod2nix
+, rust-overlay
+, wasmtime-nixpkgs
 , system
 , workspaceSrc
 , viberootsInput
@@ -17,6 +19,18 @@ let
   repoRoot = workspaceRootPath;
   viberootsRoot = viberootsRootPath;
   evaluationBundle = import ./evaluation-bundle.nix { inherit repoRoot; };
+  rustToolchainOverlay = final: _prev:
+    let
+      toolchain = final.rust-bin.stable."1.88.0".minimal.override {
+        targets = [ "wasm32-unknown-unknown" "wasm32-wasip1" ];
+      };
+    in {
+      viberootsRustToolchain = toolchain;
+      viberootsRustPlatform = final.makeRustPlatform {
+        cargo = toolchain;
+        rustc = toolchain;
+      };
+    };
   pkgs = import nixpkgs {
     inherit system;
     overlays =
@@ -26,12 +40,13 @@ let
         cppOverlays =
           if (haveCppOverlayFile && useCppOverlay) then [ (import ../overlays/cpp-patches.nix) ] else [ ];
       in
-      [ gomod2nix.overlays.default ]
+      [ gomod2nix.overlays.default rust-overlay.overlays.default rustToolchainOverlay ]
       ++ cppOverlays
       ++ (if evaluationBundle == null then [ ] else [
         (_final: _prev: { viberootsEvaluationBundle = evaluationBundle; })
       ]);
   };
+  wasmtimePkgs = wasmtime-nixpkgs.legacyPackages.${system};
   nixpkgsRegistry = import ../nixpkgs-source-registry.nix {
     inputs = { inherit nixpkgs; };
   };
@@ -102,7 +117,7 @@ let
     };
 in
 {
-  inherit pkgs system zx-wrapper devshell prelude uv2nixLib evaluationBundle liveFsRoot mkNodeMods repoRoot viberootsRoot viberootsNodeMods version releaseTag;
+  inherit pkgs wasmtimePkgs system zx-wrapper devshell prelude uv2nixLib evaluationBundle liveFsRoot mkNodeMods repoRoot viberootsRoot viberootsNodeMods version releaseTag;
   nixpkgsRegistry = resolvedNixpkgsRegistry;
   buck2Input = buck2;
 } // (if includeNodeMods then { nodeMods = mkNodeMods { }; } else { })

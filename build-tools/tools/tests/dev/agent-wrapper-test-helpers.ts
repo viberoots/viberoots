@@ -32,6 +32,14 @@ export function binWrapper(name: string): string {
   return path.join(viberootsRoot, "build-tools", "tools", "bin", name);
 }
 
+export function managedCodexEnv(bin: string): Record<string, string> {
+  return {
+    CODEX_CLI_PATH: "",
+    CODEX_HOME: path.join(path.dirname(bin), "codex-home"),
+    VBR_CODEX_MANAGED_PATH_FOR_TEST: path.join(bin, "codex"),
+  };
+}
+
 export async function writeExecutable(file: string, text: string): Promise<void> {
   await fsp.writeFile(file, text, "utf8");
   await fsp.chmod(file, 0o755);
@@ -59,6 +67,7 @@ export async function makeFakeAgentTools(
   const safehouseEnv =
     toolName === "claude" ? "VBR_CLAUDE_SAFEHOUSE_ACTIVE" : "VBR_CODEX_SAFEHOUSE_ACTIVE";
   await fsp.mkdir(bin, { recursive: true });
+  if (toolName === "codex") await fsp.mkdir(path.join(tmp, "codex-home"), { recursive: true });
   await writeExecutable(
     path.join(bin, "git"),
     `#!/usr/bin/env bash

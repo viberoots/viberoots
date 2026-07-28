@@ -180,7 +180,7 @@ test("Node CLI, service, and webapp stage a transitive Rust addon", async () => 
 
     await fs.appendFile(
       path.join(tmp, "projects/libs/rust_addon/TARGETS"),
-      'rust_node_addon(name="addon_duplicate", addon_name="rust_native", node_api_version=8, crate="rust_addon", srcs=["build.rs", "src/lib.rs"], link_deps=["//projects/libs/extension-c:answer"], visibility=["PUBLIC"])\n',
+      'rust_node_addon(name="addon_duplicate", addon_name="rust_native", node_api_version=8, crate="rust_addon", srcs=["build.rs", "src/lib.rs"], visibility=["PUBLIC"])\n',
     );
     await fs.writeFile(
       path.join(tmp, "projects/apps/native-cli/TARGETS"),

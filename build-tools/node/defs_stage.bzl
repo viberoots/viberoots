@@ -6,12 +6,11 @@ load("@viberoots//build-tools/lang:remote_action_policy.bzl", "stamp_local_only_
 load("@viberoots//build-tools/node/private:wasm_source_resolver.bzl", "asset_with_selector", "sh_quote", "validate_wasm_selector_args", "wasm_source_resolver_shell")
 MODULE_PROVIDERS = {}
 load("@workspace_providers//:auto_map.bzl", "MODULE_PROVIDERS")
+WASM_ASSET_MANIFEST_TOOL = "@viberoots//build-tools/tools/node:wasm-asset-manifest.ts"
 def _is_label_ref(v):
     return isinstance(v, str) and (v.startswith("//") or v.startswith(":"))
 def _to_abs_label(v):
-    if v.startswith(":"):
-        return "//%s:%s" % (native.package_name(), v[1:])
-    return v
+    return "//%s:%s" % (native.package_name(), v[1:]) if v.startswith(":") else v
 def _label_package(v):
     if not _is_label_ref(v):
         return ""
@@ -19,9 +18,7 @@ def _label_package(v):
         return native.package_name()
     trimmed = v[2:]
     i = trimmed.find(":")
-    if i < 0:
-        return trimmed
-    return trimmed[:i]
+    return trimmed if i < 0 else trimmed[:i]
 def _apply_default_lockfile_label(lockfile_label, labels, macro_name):
     if (lockfile_label == None or lockfile_label == "") and len(extract_lockfile_labels(labels or [])) == 0:
         default_path = default_lockfile_path_from_package()
@@ -60,7 +57,6 @@ def _selected_route_build_cmd(selected_route_target):
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then cat \"$WORKSPACE_ROOT/buck-out/tmp/build-selected/node_stage.log\" >&2 2>/dev/null || true; exit \"${NIX_STATUS:-2}\"; fi; "
         + "fi; "
     )
-
 def _finish_node_nix_genrule(kw, out, cmd):
     kw.update({"out": out, "cmd": cmd, "labels": stamp_local_only_genrule_labels(kw.get("labels", []) or [])})
     genrule(**kw)
@@ -84,8 +80,7 @@ def node_asset_stage(
     if _is_label_ref(app):
         app_ref = "$(location %s)" % _to_abs_label(app)
         app_pkg = _label_package(app)
-
-    stage_srcs = [app]
+    stage_srcs = [app, WASM_ASSET_MANIFEST_TOOL]
     copy_assets = []
     for a in assets:
         selected = asset_with_selector(a)
@@ -113,8 +108,8 @@ def node_asset_stage(
             + "if [ \"$DEST_DIR\" = \"$DEST\" ]; then DEST_DIR=\"$OUT_ABS\"; fi; "
             + "mkdir -p \"$DEST_DIR\"; "
             + "if [ \"$ASSET_SRC\" != \"$DEST\" ]; then cp -f \"$ASSET_SRC\" \"$DEST\"; fi; "
+            + ("NODE_OPTIONS= \"$VBR_ARTIFACT_TOOLS_ROOT/bin/node\" --experimental-strip-types \"$SRCDIR/wasm-asset-manifest.ts\" \"$ASSET_RAW\" \"$ASSET_SRC\" %s \"$DEST\" \"$ASSET_MANIFEST\"; " % sh_quote(dest))
         )
-
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
         + nix_calling_genrule_bootstrap(
@@ -144,6 +139,8 @@ def node_asset_stage(
         + "    if [ \"`cd \"$APP_OUT\" && pwd -P`\" != \"`cd \"$OUT_ABS\" && pwd -P`\" ]; then cp -R \"$APP_OUT\"/. \"$OUT_ABS\"; fi; "
         + "  elif [ \"$APP_OUT\" != \"$OUT_ABS\" ]; then cp -f \"$APP_OUT\" \"$OUT_ABS\"; fi; "
         + "fi; "
+        + "ASSET_MANIFEST=\"$OUT_ABS/asset-manifest.json\"; "
+        + "printf '%s\\n' '{\"schemaVersion\":\"viberoots.node-wasm-assets.v1\",\"assets\":[]}' > \"$ASSET_MANIFEST\"; "
         + "".join(copy_assets)
     )
     kw = dict(kwargs) if kwargs != None else {}
@@ -157,7 +154,6 @@ def node_asset_stage(
     )
     kw = wiring.kwargs
     _finish_node_nix_genrule(kw, out, cmd)
-
 def node_wasm_inline_module(
         name,
         src,
@@ -180,14 +176,14 @@ def node_wasm_inline_module(
         src_ref = "$(location %s)" % _to_abs_label(src)
     cmd = (
         "SCRATCH=\"$PWD\"; OUT_ABS=\"$SCRATCH/$OUT\"; "
-        + ("VBR_NODE_ROUTE_TARGET=%s; " % sh_quote(selected_route_target))
-        + "if [ -n \"$VBR_NODE_ROUTE_TARGET\" ]; then "
         + nix_calling_genrule_bootstrap(
             timeout_var = "TIMEOUT",
             timeout_sec = 180,
             include_pnpm_store = False,
             source_workspace_root_env = True,
         )
+        + ("VBR_NODE_ROUTE_TARGET=%s; " % sh_quote(selected_route_target))
+        + "if [ -n \"$VBR_NODE_ROUTE_TARGET\" ]; then "
         + nix_calling_env_export_buck_graph_json()
         + nix_calling_node_patch_requirements_preflight(native.package_name())
         + _selected_route_build_cmd(selected_route_target)
@@ -217,11 +213,13 @@ def node_wasm_inline_module(
         + "resolve_node_wasm_artifact node_wasm_inline_module \"$SRC_RAW\" \"$SRC_PATH\" \"$SRC_NAME\" \"$SRC_GLOB\" || exit $?; "
         + "SRC_PATH=\"$VBR_WASM_RESOLVED_PATH\"; "
         + "if [ ! -f \"$SRC_PATH\" ]; then echo \"node_wasm_inline_module: source not found: $SRC_PATH\" >&2; exit 2; fi; "
+        + "PRODUCER_JSON=`NODE_OPTIONS= \"$VBR_ARTIFACT_TOOLS_ROOT/bin/node\" --experimental-strip-types \"$SRCDIR/wasm-asset-manifest.ts\" --lineage \"$SRC_PATH\"`; "
         + "b64=\"\"; b64=`base64 < \"$SRC_PATH\" | tr -d '\\n'`; "
         + "OUT_DIR=\"${OUT_ABS%/*}\"; "
         + "mkdir -p \"$OUT_DIR\"; "
         + "printf '%s\\n' "
         + "\"export const wasmBytesBase64 = '$b64';\" "
+        + "\"export const wasmProducer = $PRODUCER_JSON;\" "
         + "\"const decodeBase64 = (value) => {\" "
         + "\"  if (typeof atob === \\\"function\\\") {\" "
         + "\"    const bin = atob(value);\" "
@@ -245,7 +243,7 @@ def node_wasm_inline_module(
     wiring = _prepare_node_nix_calling_genrule(
         name = name,
         kwargs = kw,
-        srcs = [src],
+        srcs = [src, WASM_ASSET_MANIFEST_TOOL],
         deps = wiring_deps,
         labels = labels,
         lockfile_label = lockfile_label,

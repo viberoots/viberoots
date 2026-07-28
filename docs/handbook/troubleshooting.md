@@ -1,5 +1,8 @@
 # Troubleshooting
 
+For Rust browser packages, WASI link closures, component-model execution, and deployment staging,
+start with [Rust WebAssembly Operations](rust-wasm-operations.md#troubleshooting).
+
 ## Stale Cargo metadata
 
 - Symptom: `i`, post-clone, devshell entry, or `b` reports a stale `Cargo.lock` and `repair: run u`.

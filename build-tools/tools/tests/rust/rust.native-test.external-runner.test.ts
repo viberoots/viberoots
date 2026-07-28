@@ -3,7 +3,7 @@ import fs from "fs-extra";
 import assert from "node:assert/strict";
 import path from "node:path";
 import { test } from "node:test";
-import { reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
+import { nestedBuckTestArgs, reconcileTempDependencyInputs, runInTemp } from "../lib/test-helpers";
 
 type Fixture = { name: string; body: string; procMacro?: boolean };
 
@@ -63,17 +63,17 @@ test("rust_test executes Cargo harnesses through Buck's external runner", async 
     await reconcileTempDependencyInputs(tmp, $);
 
     const pass = await $({ cwd: tmp, stdio: "pipe", reject: false, nothrow: true })`
-      buck2 test --target-platforms prelude//platforms:default //projects/apps/passing:test //projects/apps/ignored:test //projects/apps/empty:test
+      buck2 test --target-platforms prelude//platforms:default //projects/apps/passing:test //projects/apps/ignored:test //projects/apps/empty:test -- ${nestedBuckTestArgs}
     `;
     assert.equal(pass.exitCode, 0, String(pass.stderr || pass.stdout));
 
     const filtered = await $({ cwd: tmp, stdio: "pipe", reject: false, nothrow: true })`
-      buck2 test --target-platforms prelude//platforms:default //projects/apps/filtered:test -- --test-arg selected_passes
+      buck2 test --target-platforms prelude//platforms:default //projects/apps/filtered:test -- ${nestedBuckTestArgs} --test-arg selected_passes
     `;
     assert.equal(filtered.exitCode, 0, String(filtered.stderr || filtered.stdout));
 
     const failure = await $({ cwd: tmp, stdio: "pipe", reject: false, nothrow: true })`
-      buck2 test --target-platforms prelude//platforms:default //projects/apps/failing:test
+      buck2 test --target-platforms prelude//platforms:default //projects/apps/failing:test -- ${nestedBuckTestArgs}
     `;
     assert.notEqual(failure.exitCode, 0);
     assert.match(String(failure.stderr || failure.stdout), /fails|assertion.*failed/i);

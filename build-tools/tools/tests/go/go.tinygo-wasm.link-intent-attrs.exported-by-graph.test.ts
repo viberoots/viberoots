@@ -51,6 +51,18 @@ test("exporter: nix_go_tiny_wasm_lib preserves link intent attrs in .viberoots/w
         '  visibility = ["PUBLIC"],',
         ")",
         "",
+        "nix_go_tiny_wasm_lib(",
+        '  name = "explicit_bare",',
+        '  srcs = ["src/main.go"],',
+        '  wasm_abi = "bare",',
+        ")",
+        "",
+        "nix_go_tiny_wasm_lib(",
+        '  name = "explicit_wasi",',
+        '  srcs = ["src/main.go"],',
+        '  wasm_abi = "wasi",',
+        ")",
+        "",
       ].join("\n"),
       "utf8",
     );
@@ -87,5 +99,14 @@ test("exporter: nix_go_tiny_wasm_lib preserves link intent attrs in .viberoots/w
     }
     const depA = `//${appRel.replace(/\\/g, "/")}:dep_a`;
     assert.equal(overrideKeyToValue.get(depA), "transitive");
+
+    assert.equal(n.wasm_abi, "bare");
+    assert.equal(n.wasm_abi_explicit, false);
+    const explicitBare = nodes.find((x) => String(x.name || "").endsWith(":explicit_bare"));
+    assert.equal(explicitBare?.wasm_abi, "bare");
+    assert.equal(explicitBare?.wasm_abi_explicit, true);
+    const explicitWasi = nodes.find((x) => String(x.name || "").endsWith(":explicit_wasi"));
+    assert.equal(explicitWasi?.wasm_abi, "wasi");
+    assert.equal(explicitWasi?.wasm_abi_explicit, true);
   });
 });

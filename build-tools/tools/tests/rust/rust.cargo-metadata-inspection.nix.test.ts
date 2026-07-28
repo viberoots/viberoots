@@ -4,6 +4,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import test from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { rustPkgsExpression } from "./rust-nixpkgs-authority";
 
 test("Rust derivation exports exact cargo_packages inspection metadata", async () => {
   await runInTemp("rust-cargo-metadata-inspection", async (tmp, $) => {
@@ -27,9 +28,9 @@ test("Rust derivation exports exact cargo_packages inspection metadata", async (
     );
     const expression = `
       let
-        base = import <nixpkgs> {};
-        pkgs = base // {
-          rustPlatform = {
+        authority = ${rustPkgsExpression};
+        pkgs = authority // {
+          viberootsRustPlatform = {
             buildRustPackage = args: args;
           };
         };

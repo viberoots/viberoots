@@ -98,9 +98,15 @@ let
         then ctx.dependencyArtifactOf info.name
         else mkHeaders info.name)
       (Deps.resolveRepoCppHeaderDepsFor name);
+    repoWasmLinkPkgsFor = name:
+      let
+        node = if builtins.hasAttr name byName then byName.${name} else {};
+        raw = get node "link_deps";
+        deps = if raw == null then [] else raw;
+      in map ctx.dependencyArtifactOf deps;
     Targets = import ./cpp-targets.nix {
       inherit lib get T byName labelsOf linkModeOf pkgPathOf repoRoot normSrcsOf patchInputsFor;
-      inherit collectNixAttrsFor nixAttrsFromSelf repoCppHeaderPkgsFor repoCppLibPkgsFor;
+      inherit collectNixAttrsFor nixAttrsFromSelf repoCppHeaderPkgsFor repoCppLibPkgsFor repoWasmLinkPkgsFor;
       inherit repoGoCArchivesFor providerAttrsFallback;
       inherit (ctx) resolveNixpkgAttrs sourcePlanFor;
     };

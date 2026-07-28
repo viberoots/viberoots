@@ -40,7 +40,7 @@ function plannerContext(repoRoot: string, nixpkgsPath: string, nodeExpr: string)
         }) attrs;
       cppTargets = ${path.join(sourceRoot, "build-tools", "tools", "nix", "planner", "cpp-targets.nix")};
       targetsFor = template: import cppTargets {
-        inherit lib byName resolveNixpkgAttrs;
+        inherit lib get byName resolveNixpkgAttrs;
         T.cppForPkgs = profilePkgs: template;
         labelsOf = n: n.labels or [];
         linkModeOf = name: "static";
@@ -52,6 +52,7 @@ function plannerContext(repoRoot: string, nixpkgsPath: string, nodeExpr: string)
         nixAttrsFromSelf = name: [ "pkgs.profileProbe" ];
         repoCppHeaderPkgsFor = name: [];
         repoCppLibPkgsFor = name: [];
+        repoWasmLinkPkgsFor = name: [];
         repoGoCArchivesFor = name: [];
         providerAttrsFallback = [];
         sourcePlanFor = target: {

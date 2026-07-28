@@ -9,44 +9,19 @@ import { validateAwsFoundationProfile } from "../../deployments/cloud-control-aw
 import { validateAwsTopologyEvidence } from "../../deployments/cloud-control-aws-topology-validate";
 import { foundationFromTopology, privateLinkAwsTopology } from "./cloud-control-cutover-fixture";
 import { viberootsRepoPath } from "./deployment-command";
+import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool";
+import {
+  awsFoundationModuleDir as moduleDir,
+  awsFoundationModuleSource as moduleSource,
+  awsFoundationVariableNames as expectedVariableNames,
+  escapeRegExp,
+} from "./cloud-control-aws-foundation-module-fixture";
 
 const opts = {
   expectedRegion: "us-east-1",
   expectedAccountId: "123456789012",
   maxAgeMinutes: 60,
 };
-const moduleDir = viberootsRepoPath(
-  "build-tools/deployments/aws-control-plane-foundation/opentofu",
-);
-const expectedVariableNames = `
-  region name_prefix tags vpc_cidr existing_vpc_id existing_internet_gateway_id
-  public_subnet_cidrs private_subnet_cidrs availability_zones outbound_https_cidrs
-  artifact_bucket_name artifact_prefix state_bucket_name state_lock_table_name
-  ecr_enabled ecr_repository_name ecr_image_tag_mutability ecr_scan_on_push
-  ecr_lifecycle_policy_json ecr_repository_policy_json ecr_kms_key_arn
-  ecr_import_adoption_metadata
-  ec2_host_mode ec2_asg_name ec2_ami_id ec2_ami_build_identity ec2_ami_evidence_path
-  ec2_instance_type ec2_instance_profile_arn ec2_private_subnet_ids ec2_security_group_ids
-  ec2_user_data_base64 ec2_user_data_path ec2_user_data_digest
-  ec2_service_capacity ec2_worker_capacity ec2_import_adoption_metadata
-  kms_deletion_window_days ingress_enabled ingress_type ingress_public_host
-  ingress_callback_host ingress_callback_path ingress_service_port ingress_target_instance_id
-  ingress_service_process ingress_service_unit ingress_image_digest ingress_config_digest
-  ingress_target_health_status ingress_certificate_arn ingress_certificate_not_before
-  ingress_certificate_not_after ingress_certificate_sans
-  ingress_certificate_validation_ownership_reference ingress_certificate_validation_ownership_digest
-  ingress_certificate_renewal_reference ingress_certificate_renewal_digest
-  ingress_certificate_dns_validation_reference ingress_certificate_dns_validation_digest
-  ingress_route53_zone_id ingress_allowed_client_cidrs ingress_waf_enabled
-  supabase_privatelink_enabled supabase_privatelink_ram_share_arn
-  supabase_privatelink_resource_configuration_arn
-  supabase_privatelink_endpoint_subnet_ids
-  supabase_privatelink_service_network_identifier
-  supabase_privatelink_private_dns_enabled
-  supabase_privatelink_connection_mode supabase_privatelink_import_adoption_metadata
-`
-  .trim()
-  .split(/\s+/);
 
 test("AWS foundation OpenTofu module has concrete NAT and public HTTPS egress path", () => {
   const source = moduleSource();
@@ -87,11 +62,12 @@ test("AWS foundation OpenTofu variable split preserves interface and methodology
 test("AWS foundation OpenTofu module validates after variable split", async () => {
   const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), "aws-foundation-tofu-"));
   try {
+    const tofu = await resolvePinnedTestToolPath("tofu", $);
     for (const file of fs.readdirSync(moduleDir).filter((entry) => entry.endsWith(".tf"))) {
       await fsp.copyFile(path.join(moduleDir, file), path.join(workDir, file));
     }
-    await $({ cwd: workDir })`tofu init -backend=false -input=false`.quiet();
-    const validate = await $({ cwd: workDir })`tofu validate -json`.quiet();
+    await $({ cwd: workDir })`${tofu} init -backend=false -input=false`.quiet();
+    const validate = await $({ cwd: workDir })`${tofu} validate -json`.quiet();
     const result = JSON.parse(String(validate.stdout || "{}"));
     assert.equal(result.valid, true);
     assert.equal(result.error_count, 0);
@@ -239,12 +215,3 @@ test("foundation profile carries and live inspection checks S3 VPC endpoint iden
     /describe-vpc-endpoints/,
   );
 });
-
-function moduleSource(): string {
-  const tfFiles = fs.readdirSync(moduleDir).filter((file) => file.endsWith(".tf"));
-  return tfFiles.map((file) => fs.readFileSync(path.join(moduleDir, file), "utf8")).join("\n");
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}

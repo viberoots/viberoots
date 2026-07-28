@@ -1,11 +1,18 @@
-{ pkgs, uv2nixLib ? null }:
+{ pkgs, wasmtimePkgs ? pkgs, uv2nixLib ? null }:
 let
   Go  = import ./templates/go.nix  { inherit pkgs; };
   Cpp = import ./templates/cpp.nix { inherit pkgs; };
   cppForPkgs = profilePkgs: import ./templates/cpp.nix { pkgs = profilePkgs; };
   Node = import ./templates/node.nix { inherit pkgs; };
-  Rust = import ./templates/rust.nix { inherit pkgs; };
-  rustForPkgs = profilePkgs: import ./templates/rust.nix { pkgs = profilePkgs; };
+  rustToolchain = pkgs.viberootsRustToolchain;
+  rustPlatform = pkgs.viberootsRustPlatform;
+  Rust = import ./templates/rust.nix {
+    inherit pkgs wasmtimePkgs rustToolchain rustPlatform;
+  };
+  rustForPkgs = profilePkgs: import ./templates/rust.nix {
+    pkgs = profilePkgs;
+    inherit wasmtimePkgs rustToolchain rustPlatform;
+  };
   pythonForPkgs = profilePkgs:
     if uv2nixLib != null then import ./templates/python.nix {
       pkgs = profilePkgs;

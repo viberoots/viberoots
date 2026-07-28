@@ -104,7 +104,7 @@ test("producer surfaces expose deterministic contract attrs", async () => {
     const out = String(probe.stdout || "");
     assert.match(out, /"module_kind"\s*:\s*"wasm"/);
     assert.match(out, /"module_kind"\s*:\s*"ts"/);
-    assert.match(out, /"artifact_mapping_policy"\s*:\s*"go-tiny-wasm-v1"/);
+    assert.match(out, /"artifact_mapping_policy"\s*:\s*"go-tiny-wasm-v2-module"/);
     assert.match(out, /"artifact_mapping_policy"\s*:\s*"cpp-static-wasm-v1"/);
     assert.match(out, /"artifact_mapping_policy"\s*:\s*"python-wasm-app-v1"/);
     assert.match(out, /"artifact_mapping_policy"\s*:\s*"python-wasm-lib-v1"/);

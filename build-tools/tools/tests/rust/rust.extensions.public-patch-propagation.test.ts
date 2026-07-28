@@ -91,7 +91,7 @@ test("one public Rust dependency patch changes and restores Python and Node exte
     const imported = await $({
       cwd: tmp,
       stdio: "pipe",
-    })`nix build --impure --out-link ${path.join(tmp, "itoa-vendor-root")} --print-out-paths --expr ${importExpression}`;
+    })`nix build --impure --no-link --print-out-paths --expr ${importExpression}`;
     const vendorRoot = String(imported.stdout).trim();
     const dependencyDir = (await fs.readdir(vendorRoot)).find((entry) =>
       entry.startsWith(`${dependency}-`),

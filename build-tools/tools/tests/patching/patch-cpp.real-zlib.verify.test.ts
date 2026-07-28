@@ -3,9 +3,11 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { runInTemp } from "../lib/test-helpers";
+import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool";
 
 test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVersion()", async () => {
   await runInTemp("patch-cpp-real-zlib", async (tmp, $) => {
+    process.env.PATCH_BIN = await resolvePinnedTestToolPath("patch", $);
     // Ensure CLI is executable
     await $`chmod +x viberoots/build-tools/tools/bin/patch-pkg`;
 
@@ -132,7 +134,8 @@ test("patch-cpp applies overlay to real nixpkgs zlib and changes runtime zlibVer
       "",
     ].join("\n");
     await fsp.writeFile(path.join(tmp, "main.c"), mainC, "utf8");
-    await $({ cwd: tmp })`cc -I${ws} main.c -o zver`;
+    const clang = await resolvePinnedTestToolPath("clang", $);
+    await $({ cwd: tmp })`${clang} -I${ws} main.c -o zver`;
     const runOut = await $({ cwd: tmp })`./zver`;
     const printed = String(runOut.stdout || "").trim();
     if (printed !== "9.9.9-viberoots") {

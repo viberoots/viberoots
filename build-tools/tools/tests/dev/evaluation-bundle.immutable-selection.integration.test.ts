@@ -6,6 +6,7 @@ import path from "node:path";
 import { test } from "node:test";
 import { materializeEvaluationBundle } from "../../dev/evaluation-bundle";
 import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
+import { artifactNixExperimentalFeatureArgs } from "../../lib/artifact-nix-policy";
 import { resolveToolPathSync } from "../../lib/tool-paths";
 
 test("pure flake evaluation reads immutable selection with hostile selectors unset", async () => {
@@ -34,6 +35,7 @@ test("pure flake evaluation reads immutable selection with hostile selectors uns
     selectorEnv: {},
   });
   try {
+    const nixFeatures = artifactNixExperimentalFeatureArgs();
     const result = await $({
       cwd: root,
       env: {
@@ -45,7 +47,7 @@ test("pure flake evaluation reads immutable selection with hostile selectors uns
         WORKSPACE_ROOT: "/host/poison",
       },
       stdio: "pipe",
-    })`${resolveToolPathSync("nix")} eval --raw --no-write-lock-file --accept-flake-config ${bundle.flakeRef}`;
+    })`${resolveToolPathSync("nix")} ${nixFeatures} eval --raw --no-write-lock-file --accept-flake-config ${bundle.flakeRef}`;
     assert.equal(String(result.stdout).trim(), "//projects/apps/example:app:1:1:wasi_single");
     assert.doesNotMatch(bundle.flakeRef, /\/source(?:\/|#)/);
   } finally {

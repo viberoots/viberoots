@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 import { sampleInfisicalOpenTofuModule } from "./sample-infisical-opentofu.fixture";
+import { resolvePinnedTestToolPath } from "../lib/test-helpers/pinned-tool";
 
 async function withSampleModule<T>(prefix: string, fn: (workDir: string) => Promise<T>) {
   const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), prefix));
@@ -18,9 +19,10 @@ async function withSampleModule<T>(prefix: string, fn: (workDir: string) => Prom
 
 test("sample Infisical OpenTofu module stays local, formatted, and non-secret", async () => {
   await withSampleModule("sample-infisical-tofu-", async (workDir) => {
-    await $({ cwd: workDir })`tofu fmt -check`.quiet();
-    await $({ cwd: workDir })`tofu init -backend=false -input=false`.quiet();
-    const validate = await $({ cwd: workDir })`tofu validate -json`.quiet();
+    const tofu = await resolvePinnedTestToolPath("tofu", $);
+    await $({ cwd: workDir })`${tofu} fmt -check`.quiet();
+    await $({ cwd: workDir })`${tofu} init -backend=false -input=false`.quiet();
+    const validate = await $({ cwd: workDir })`${tofu} validate -json`.quiet();
     const result = JSON.parse(String(validate.stdout || "{}"));
     assert.equal(result.valid, true);
     assert.equal(result.error_count, 0);
@@ -47,6 +49,7 @@ test("sample Infisical OpenTofu module stays local, formatted, and non-secret", 
 
 test("sample Infisical OpenTofu rendered plan emits reviewed site URL", async () => {
   await withSampleModule("sample-infisical-render-", async (workDir) => {
+    const tofu = await resolvePinnedTestToolPath("tofu", $);
     await fsp.writeFile(
       path.join(workDir, "site-url.tftest.hcl"),
       `
@@ -71,8 +74,8 @@ run "reviewed_site_url" {
 }
 `.trimStart(),
     );
-    await $({ cwd: workDir })`tofu init -backend=false -input=false`.quiet();
-    const rendered = await $({ cwd: workDir })`tofu test -verbose`.quiet();
+    await $({ cwd: workDir })`${tofu} init -backend=false -input=false`.quiet();
+    const rendered = await $({ cwd: workDir })`${tofu} test -verbose`.quiet();
     const stdout = String(rendered.stdout || "");
     assert.match(stdout, /deployment_runtime_metadata/);
     assert.match(stdout, /site_url\s+= "https:\/\/app\.infisical\.com"/);

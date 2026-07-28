@@ -10,6 +10,7 @@ import {
   buildCanonicalArtifactEnvironment,
   canonicalArtifactToolsRoot,
 } from "../../lib/artifact-environment";
+import { artifactNixExperimentalFeatureArgs } from "../../lib/artifact-nix-policy";
 
 async function write(root: string, rel: string, content: string): Promise<void> {
   const file = path.join(root, rel);
@@ -17,12 +18,27 @@ async function write(root: string, rel: string, content: string): Promise<void> 
   await fsp.writeFile(file, content, "utf8");
 }
 
-async function makeConsumerSnapshot(root: string): Promise<string> {
+async function makeConsumerSnapshot(root: string, includeSourceLock = true): Promise<string> {
   await write(
     root,
     "viberoots/flake.nix",
     '{ outputs = _: { marker = "stable-filtered-input"; }; }\n',
   );
+  if (includeSourceLock) {
+    await write(
+      root,
+      "viberoots/flake.lock",
+      `${JSON.stringify({
+        version: 7,
+        root: "root",
+        nodes: {
+          root: { inputs: { "rust-overlay": "rust-overlay", "wasmtime-nixpkgs": "nixpkgs" } },
+          "rust-overlay": { locked: { type: "path", path: "/fixture/rust-overlay" } },
+          nixpkgs: { locked: { type: "path", path: "/fixture/nixpkgs" } },
+        },
+      })}\n`,
+    );
+  }
   await write(root, "viberoots/build-tools/untracked-sentinel.ts", "export const sentinel = 1;\n");
   const flakeDir = path.join(root, ".viberoots", "workspace");
   await write(
@@ -75,13 +91,26 @@ async function makeConsumerSnapshot(root: string): Promise<string> {
 async function registrationTime(storePath: string): Promise<number> {
   const nixEnv = envWithResolvedNixBin(process.env);
   const nixBin = resolveToolPathSync("nix", nixEnv);
+  const nixFeatures = artifactNixExperimentalFeatureArgs();
   const result = await $({
     env: nixEnv,
     stdio: "pipe",
-  })`${nixBin} path-info --json-format 1 --json ${storePath}`;
+  })`${nixBin} ${nixFeatures} path-info --json-format 1 --json ${storePath}`;
   const info = JSON.parse(String(result.stdout || "{}"))[storePath];
   return Number(info?.registrationTime || 0);
 }
+
+test("filtered flake reports an immutable source missing its lock explicitly", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-input-missing-lock-"));
+  try {
+    await assert.rejects(
+      makeConsumerSnapshot(root, false),
+      /immutable viberoots source has flake\.nix but no flake\.lock/,
+    );
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
 
 test("independent consumer snapshots reuse one filtered viberoots store source", async () => {
   const first = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-input-identity-a-"));

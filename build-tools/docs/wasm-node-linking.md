@@ -58,6 +58,20 @@ Default directory resolution contract for `src`:
 - otherwise use exactly one `*.wasm` match from a bounded scan,
 - fail (deterministic, actionable) on zero or multiple matches.
 
+Rust browser packages are directory outputs. Select `<crate>_bg.wasm` with `artifact_name` when the
+whole generated JS/TypeScript package is not the desired asset. Raw Rust modules are ordinary file
+outputs and need no selector. The same rules apply to static, Vite SSR, Next SSR, CLI, service, and
+library staging destinations.
+
+The consuming Node artifact records a portable `resolvedSource`, the staged destination, and the
+content SHA-256 in `asset-manifest.json` (`schema = "viberoots.node-wasm-assets.v1"`). Store-owned
+sources retain their exact `/nix/store/...` identity. Generated Buck sources use the declared label
+plus content hash, and other sources use a content-only identity; workspace, temporary, and
+`buck-out` paths are never serialized. Webapps stage client assets under `client/wasm/`, services
+stage server assets under `server/wasm/`, and CLIs may publish an inline wrapper under
+`lib/wasm/`. A deployment packager consuming that manifest must copy these declared paths; it must
+not rediscover WASM by scanning a producer output or rebuilding wasm-bindgen bindings.
+
 This keeps the Wasm asset staging explicit and deterministic and does not require new build phases inside Vite.
 
 ### 2) Template pattern for webapps

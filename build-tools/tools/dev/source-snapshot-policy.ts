@@ -66,10 +66,22 @@ const VIBEROOTS_ROOT_DIR_EXCLUDES = new Set([
 ]);
 
 export const GRAPH_PATH_IN_SNAPSHOT = [".viberoots", "workspace", "buck", "graph.json"].join("/");
+export const GRAPH_PACKAGE_FILES_IN_SNAPSHOT = [
+  ".viberoots/workspace/buck/.buckconfig",
+  ".viberoots/workspace/buck/TARGETS",
+  ".viberoots/workspace/buck/workspace-root.env",
+] as const;
 
 export function forbiddenSnapshotPath(rel: string): boolean {
   const normalized = rel.replaceAll("\\", "/").replace(/^\/+/, "").replace(/\/+$/, "");
-  if (normalized === GRAPH_PATH_IN_SNAPSHOT) return false;
+  if (
+    normalized === GRAPH_PATH_IN_SNAPSHOT ||
+    GRAPH_PACKAGE_FILES_IN_SNAPSHOT.includes(
+      normalized as (typeof GRAPH_PACKAGE_FILES_IN_SNAPSHOT)[number],
+    )
+  ) {
+    return false;
+  }
   for (const exclude of SOURCE_SNAPSHOT_EXCLUDES) {
     if (!exclude.includes("/")) continue;
     if (normalized === exclude || normalized.startsWith(`${exclude}/`)) return true;

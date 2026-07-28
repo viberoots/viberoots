@@ -9,16 +9,19 @@ export const ARTIFACT_TRANSPORT_ENV = new Set([
   "CI",
   "DEV_BUILD_LOW_SPACE_GB",
   "IN_NIX_SHELL",
+  "NIX_BUILD_CORES",
   "TERM",
   "VBR_ARTIFACT_JOB",
   "VBR_ARTIFACT_TOOLS_ROOT",
   "VBR_GC_MODE",
   "VBR_NIX_CACHE_POLICY",
+  "VBR_NIX_DIRENV_DIRENVRC",
   "VBR_VERIFY_LOCK_DIR",
   "VBR_VERIFY_PROCESS_STATE_FILE",
 ]);
 
 export function artifactTransportEnvironment(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  assertBuildConcurrency(env);
   const nixRemote = String(env.NIX_REMOTE || "").trim();
   if (nixRemote && nixRemote !== "daemon") {
     throw new Error(`artifact transport rejects ambient NIX_REMOTE authority: ${nixRemote}`);
@@ -34,6 +37,7 @@ export function assertCanonicalArtifactTransport(
   env: NodeJS.ProcessEnv,
   artifactToolsRoot: string,
 ): string {
+  assertBuildConcurrency(env);
   const nixRemote = String(env.NIX_REMOTE || "").trim();
   if (nixRemote && nixRemote !== "daemon") {
     throw new Error(`artifact build rejects ambient NIX_REMOTE authority: ${nixRemote}`);
@@ -53,6 +57,13 @@ export function assertCanonicalArtifactTransport(
     }
   }
   return cert.path;
+}
+
+function assertBuildConcurrency(env: NodeJS.ProcessEnv): void {
+  const cores = String(env.NIX_BUILD_CORES || "").trim();
+  if (cores && !/^[1-9][0-9]*$/u.test(cores)) {
+    throw new Error(`artifact transport rejects invalid NIX_BUILD_CORES: ${cores}`);
+  }
 }
 
 function canonicalArtifactCertificateFile(artifactToolsRoot: string): {

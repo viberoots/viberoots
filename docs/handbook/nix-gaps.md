@@ -16,6 +16,7 @@ This document maps every public Starlark macro to its build path. I use it to tr
 - `nix_go_test` → Nix build (`graph-generator-selected`).
 - `nix_go_carchive` → Nix build (`goCArchive`).
 - `nix_go_tiny_wasm_lib` → Nix build (`go_nix_build_wasm`).
+- `nix_go_tiny_wasm_static_lib` → Nix build (`go_nix_build_wasm`).
 - Enforcement evidence: `build-tools/tools/tests/go/go.macros.nix-build.rule-types.cquery.test.ts`
   asserts both positive (`go_nix_build` / `go_nix_test`) and negative (`go_library` /
   `go_binary` / `go_test` must be empty) route checks for migrated public Go macros.
@@ -89,6 +90,9 @@ Notes on Nix-backed Python outputs:
 - `rust_test` → Nix build (`rust_nix_test` → compiled Cargo harnesses and bounded runner).
 - `rust_wasm_library` → Nix build (`rust_nix_build` → locked `wasm32-unknown-unknown` Cargo).
 - `rust_wasi_binary` → Nix build (`rust_nix_build` → locked `wasm32-wasip1` Cargo).
+- `rust_wasm_static_library` → Nix build (`rust_nix_build` → bare/WASI static archive plus reviewed header).
+- `rust_wasm_browser_package` → Nix build (`rust_nix_build` → pinned wasm-bindgen JS/TS/WASM package directory).
+- `rust_wasm_component` → Nix build (`rust_nix_build` → explicit WIT world, pinned adapter, validated component).
 - `rust_python_extension` → Nix build (`rust_nix_build` → selected CPython extension site).
 - `rust_python_wasm_extension` → Nix build (`rust_nix_build` reserved fail-closed route).
 - `rust_node_addon` → Nix build (`rust_nix_build` → stable Node-API `.node` artifact).
@@ -98,8 +102,17 @@ tools, and reject placeholder output, stale locks, unsupported dependency source
 compiler-artifact injection. Reviewed cross-root Cargo path dependencies compose from declared
 source roots. Rust binaries publish `run.prod`; libraries and tests remain non-runnable. Declared
 native dependencies resolve through `nixpkg_deps`, `nixpkgs_profile`, and `nixpkg_pins`.
-Native C/C++ inputs use explicit link intent, and WASM/WASI target components come from the Nix
-cross toolchain. Rust is scaffoldable as an experimental language.
+Native C/C++ inputs use explicit link intent. Rust, C++, and TinyGo WASM static inputs use the same
+direct/transitive closure model and fail closed on ABI, target, libc, allocator, exception, or
+runtime mismatch.
+wasm-bindgen, wasm-tools, Binaryen, Wasmtime, and the preview1 adapters come from the selected Nix
+toolchain and are recorded in artifact provenance. Rust is scaffoldable as an experimental language.
+
+On macOS, a locally compiled nixpkgs `wasm32-wasip1` Rust standard library may require a large
+cross-LLVM closure. If that closure cannot build inside the configured Nix sandbox, use a reviewed
+binary-cache/toolchain artifact or a compatible builder. Do not add a host `rustup` fallback or
+weaken the sandbox. Freestanding, browser, bare component, and bare static artifacts do not depend
+on that WASI standard-library build.
 
 ## Hermeticity risks (non-Nix paths)
 

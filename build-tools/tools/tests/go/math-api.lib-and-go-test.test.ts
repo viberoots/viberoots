@@ -3,7 +3,7 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { test } from "node:test";
 import { withGoModuleInputFingerprint } from "../../dev/install/go-consistency";
-import { runInTemp } from "../lib/test-helpers";
+import { nestedBuckTestArgs, runInTemp } from "../lib/test-helpers";
 
 test("go math-api lib builds and go test passes (scaffolded with temp math-core)", async () => {
   await runInTemp("go-math-api", async (tmp, _$) => {
@@ -85,6 +85,6 @@ chmod +x ${stubPath}
     // Build ensures acceptance: //projects/libs/math-api:lib builds
     await $`buck2 build --target-platforms //:no_cgo //projects/libs/math-api:lib`;
     await $`buck2 cquery --target-platforms //:no_cgo "kind(go_nix_test, //projects/libs/math-api:lib_test)"`;
-    await $`buck2 test --target-platforms //:no_cgo //projects/libs/math-api:lib_test`;
+    await $`buck2 test --target-platforms //:no_cgo //projects/libs/math-api:lib_test -- ${nestedBuckTestArgs}`;
   });
 });
