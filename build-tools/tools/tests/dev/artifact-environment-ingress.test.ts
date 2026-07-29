@@ -60,6 +60,37 @@ test("canonical ingress preserves a validated build concurrency cap", () => {
   );
 });
 
+test("development ingress strips uncaptured ambient artifact influence", () => {
+  const toolsRoot = canonicalArtifactToolsRoot(process.cwd());
+  const env = {
+    NIX_BUILD_CORES: "4",
+    NIX_RUST_DEV_OVERRIDE_JSON: '{"crate":"/explicit"}',
+    RUST_WATCH_AMBIENT_SENTINEL: "must-not-reach-build",
+    VIBEROOTS_ROOT: "/host/source",
+  };
+  assert.throws(
+    () =>
+      buildCanonicalIngressEnvironment({
+        env,
+        workspaceRoot: process.cwd(),
+        toolsRoot,
+        wasmBackend: "",
+      }),
+    /RUST_WATCH_AMBIENT_SENTINEL|VIBEROOTS_ROOT/u,
+  );
+  const stripped = buildCanonicalIngressEnvironment({
+    env,
+    workspaceRoot: process.cwd(),
+    toolsRoot,
+    wasmBackend: "",
+    stripAmbientArtifactInfluence: true,
+  });
+  assert.equal(stripped.NIX_BUILD_CORES, "4");
+  assert.equal(stripped.NIX_RUST_DEV_OVERRIDE_JSON, undefined);
+  assert.equal(stripped.RUST_WATCH_AMBIENT_SENTINEL, undefined);
+  assert.equal(stripped.VIBEROOTS_ROOT, undefined);
+});
+
 test("Buck accepts only the exact cache-health NIX_CONFIG authority", () => {
   const reviewed = "substituters =\nextra-substituters =\nfallback = true";
   assert.doesNotThrow(() =>

@@ -551,6 +551,8 @@ __vbr_stage0_prune_workspace_flake_generated_roots
 
 watch_file .viberoots/workspace/flake.nix
 watch_file .viberoots/workspace/flake.lock
+watch_file .viberoots/workspace/toolchain-paths.json
+watch_file .viberoots/workspace/toolchains/toolchain_paths.bzl
 [[ -f viberoots/flake.nix ]] && watch_file viberoots/flake.nix
 
 if [[ "\${NIX_PNPM_ALLOW_GENERATE:-}" == "1" ]]; then

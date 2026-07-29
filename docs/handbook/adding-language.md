@@ -482,6 +482,25 @@ Stamping belongs in the macro. If your macro synthesizes helper targets (for exa
 
 - If your language’s `requiredPaths` are missing, the repo remains fully usable for other languages. Scaffolding and glue skip missing languages gracefully.
 
+## Reusable lifecycle lessons
+
+Language support is not complete when compilation first works. A lifecycle PR should make
+the formatter, analyzer, linter, documentation tool, coverage producer, debugger/linker, and
+watcher members of one pinned tool closure and then prove hostile `PATH` cannot select host
+tools. Keep coverage an explicit evaluation input rather than an untracked ambient variable,
+and carry its output through the same test collection path used by mature languages.
+
+Dependency metadata should be emitted once, next to the artifact materialization manifest,
+with stable package identities and edges. License, advisory, SBOM, and provenance systems can
+then consume that inventory without each language integration inventing a second dependency
+resolver. Credentials belong only at pre-materialization boundaries and must never be copied
+into derivations, snapshots, logs, or evidence.
+
+A development watcher is a lifecycle feature, not a second build system. It should select one
+canonical runnable, invoke the production build/run path, bound its watch roots, restart the
+whole process group, and clean up on every termination signal. Explicit development bundles
+remain authoritative.
+
 ## Example references
 
 - Go implementation in this repo:

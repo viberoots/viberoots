@@ -11,6 +11,7 @@ const ALLOWED_VISIBLE_ROOT_ENTRIES = new Set([
   "AGENTS.md",
   "README.md",
   "buck-out",
+  "coverage",
   "flake.lock",
   "flake.nix",
   "projects",
@@ -19,7 +20,7 @@ const ALLOWED_VISIBLE_ROOT_ENTRIES = new Set([
 ]);
 
 const ALLOWED_VISIBLE_ROOT_ENTRIES_TEXT =
-  "AGENTS.md, README.md, buck-out, flake.lock, flake.nix, projects, test-tmp-paths.log, and viberoots";
+  "AGENTS.md, README.md, buck-out, coverage, flake.lock, flake.nix, projects, test-tmp-paths.log, and viberoots";
 
 const ROOT_LEGACY_PATHS = [
   "build-tools",

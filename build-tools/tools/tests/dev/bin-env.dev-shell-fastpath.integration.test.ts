@@ -194,11 +194,40 @@ test("devshell stale detection rejects divergent local and filtered source ident
   }
 });
 
-async function assertRejectsExit(fn: string, root: string, expected: number): Promise<void> {
+test("devshell stale detection rejects divergent generated and active artifact authority", async () => {
+  const source = await readRepoFile("build-tools/tools/bin/devshell-workspace.sh");
+  const start = source.indexOf("devshell_inputs_stale() {");
+  const end = source.indexOf("\ndevshell_stale_reload_allowed() {", start);
+  const fn = source.slice(start, end);
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-devshell-tool-authority-"));
+  try {
+    const manifest = path.join(root, ".viberoots/workspace/toolchain-paths.json");
+    await fsp.mkdir(path.dirname(manifest), { recursive: true });
+    await fsp.writeFile(
+      manifest,
+      `${JSON.stringify({ artifactTools: { root: "/nix/store/generated-tools" } }, null, 2)}\n`,
+    );
+    await assertRejectsExit(fn, root, 1, {
+      VBR_DEVSHELL_ARTIFACT_TOOLS_ROOT: "/nix/store/generated-tools",
+    });
+    await assertRejectsExit(fn, root, 0, {
+      VBR_DEVSHELL_ARTIFACT_TOOLS_ROOT: "/nix/store/stale-tools",
+    });
+  } finally {
+    await fsp.rm(root, { recursive: true, force: true });
+  }
+});
+
+async function assertRejectsExit(
+  fn: string,
+  root: string,
+  expected: number,
+  env: NodeJS.ProcessEnv = {},
+): Promise<void> {
   const result = await execFileAsync(
     "/bin/bash",
     ["-c", `${fn}\ndevshell_inputs_stale "$1"`, "devshell-stale-test", root],
-    { env: process.env },
+    { env: { ...process.env, ...env } },
   ).then(
     () => 0,
     (error: NodeJS.ErrnoException) => Number(error.code),

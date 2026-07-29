@@ -5,6 +5,7 @@ import { ensureToolchainPathsFiles } from "../toolchain-paths";
 import {
   canonicalArtifactToolsRoot,
   MissingGeneratedArtifactToolAuthorityError,
+  UnavailableGeneratedArtifactToolAuthorityError,
 } from "../../lib/artifact-environment";
 import { ensureArtifactToolsGcRoot } from "./artifact-tools-gc-root";
 
@@ -24,7 +25,12 @@ export async function repairArtifactToolchainAuthority(
       storePath: canonicalArtifactToolsRoot(root),
     });
   } catch (error) {
-    if (!(error instanceof MissingGeneratedArtifactToolAuthorityError)) throw error;
+    if (
+      !(error instanceof MissingGeneratedArtifactToolAuthorityError) &&
+      !(error instanceof UnavailableGeneratedArtifactToolAuthorityError)
+    ) {
+      throw error;
+    }
     // Only explicit `u` may recover a missing generated tool authority. Bootstrap
     // from the already-locked immutable workspace, then rebuild below from the
     // current filtered source so dirty tool changes still enter the final identity.

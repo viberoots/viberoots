@@ -1,0 +1,3 @@
+load("@viberoots//build-tools/rust:defs.bzl", "rust_python_extension")
+
+rust_python_extension(name = "{{ name }}", crate = "{{ name }}", module = "{{ name }}", srcs = ["src/lib.rs"])

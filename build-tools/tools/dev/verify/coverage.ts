@@ -1,9 +1,11 @@
 import "zx/globals";
 import * as fsp from "node:fs/promises";
+import { createRequire } from "node:module";
 import path from "node:path";
 import process from "node:process";
 import { buildToolPath } from "../dev-build/paths";
 import { mkdirWithMacosMetadataExclusion, mkdtempNoindex } from "../../lib/macos-metadata";
+import { publishMergedLcovReport } from "./coverage-lcov-report";
 
 async function pathExists(p: string): Promise<boolean> {
   try {
@@ -11,6 +13,43 @@ async function pathExists(p: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function mergeRustLcov(root: string): Promise<void> {
+  const rustRoot = path.join(root, "coverage", "rust");
+  const inputs: string[] = [];
+  const visit = async (current: string): Promise<void> => {
+    for (const entry of await fsp.readdir(current, { withFileTypes: true }).catch(() => [])) {
+      const absolute = path.join(current, entry.name);
+      if (entry.isDirectory()) await visit(absolute);
+      else if (entry.isFile() && entry.name === "lcov.info") inputs.push(absolute);
+    }
+  };
+  await visit(rustRoot);
+  if (inputs.length === 0) return;
+  const merged = await Promise.all(
+    inputs.sort().map(async (input) => {
+      const content = await fsp.readFile(input, "utf8");
+      return content.endsWith("\n") ? content : `${content}\n`;
+    }),
+  );
+  await fsp.appendFile(path.join(root, "coverage", "lcov.info"), merged.join(""));
+}
+
+export async function resolveCoverageC8(root: string): Promise<string | null> {
+  const workspaceC8 = path.join(root, "node_modules", "c8", "bin", "c8.js");
+  if (await pathExists(workspaceC8)) return workspaceC8;
+  const artifactToolsRoot = String(process.env.VBR_ARTIFACT_TOOLS_ROOT || "");
+  const artifactC8 = path.join(artifactToolsRoot, "node_modules", "c8", "bin", "c8.js");
+  if (artifactToolsRoot.startsWith("/nix/store/") && (await pathExists(artifactC8))) {
+    return artifactC8;
+  }
+  try {
+    const managedC8 = createRequire(import.meta.url).resolve("c8/bin/c8.js");
+    return managedC8.startsWith("/nix/store/") ? managedC8 : null;
+  } catch {
+    return null;
   }
 }
 
@@ -70,15 +109,21 @@ export async function runMergedCoverageReport(opts: {
   root: string;
   rawDir: string;
 }): Promise<void> {
-  const c8Js = path.join(opts.root, "node_modules", "c8", "bin", "c8.js");
-  if (!(await pathExists(c8Js))) {
-    process.stderr.write(`error: coverage enabled but c8 is missing at ${c8Js}\n`);
-    process.stderr.write("hint: run 'i' to ensure node_modules are linked.\n");
+  const c8Js = await resolveCoverageC8(opts.root);
+  if (!c8Js) {
+    process.stderr.write(
+      `error: coverage enabled but c8 is missing from ${path.join(opts.root, "node_modules")} and the managed tool closure\n`,
+    );
+    process.stderr.write("hint: run 'i' and ensure the viberoots tool closure is complete.\n");
     process.exit(2);
     return;
   }
 
-  const nodeBin = process.env.NODE_BIN || "node";
+  const nodeBin = process.env.NODE_BIN || process.execPath;
+  const artifactToolsRoot = String(process.env.VBR_ARTIFACT_TOOLS_ROOT || "");
+  const managedBinDir = artifactToolsRoot.startsWith("/nix/store/")
+    ? path.join(artifactToolsRoot, "bin")
+    : path.dirname(nodeBin);
 
   await $({
     stdio: "ignore",
@@ -88,14 +133,20 @@ export async function runMergedCoverageReport(opts: {
   await $({
     stdio: "inherit",
     cwd: opts.root,
-    env: { ...process.env, NODE_V8_COVERAGE: opts.rawDir },
+    env: {
+      ...process.env,
+      NODE_V8_COVERAGE: opts.rawDir,
+      PATH: `${managedBinDir}:${process.env.PATH || ""}`,
+    },
   })`${nodeBin} ${c8Js} report --clean=false --temp-directory ${opts.rawDir} --reports-dir ${path.join(
     opts.root,
     "coverage",
   )} --reporter=json-summary --reporter=lcov --reporter=html --merge-async --extension .ts --allowExternal --src ${opts.root} --include **/*.ts --exclude node_modules/** --exclude buck-out/** --exclude .clinic/** --exclude **/*.d.ts`;
 
+  await mergeRustLcov(opts.root);
   await $({
     stdio: "ignore",
     cwd: opts.root,
   })`${nodeBin} ${buildToolPath(opts.root, "tools/dev/coverage-normalize.mjs")}`.nothrow();
+  await publishMergedLcovReport(opts.root);
 }

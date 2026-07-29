@@ -27,6 +27,7 @@ export const GENERATED_REPO_STATE_PATHS = [
   path.join(".viberoots", "workspace", "viberoots-flake-input"),
   path.join(".viberoots", "workspace", "xdg-cache"),
   "buck-out",
+  "coverage",
   path.join("build-tools", "tmp"),
   path.join("build-tools", "tools", "dev", "toolchain-paths.json"),
   path.join("toolchains", "toolchain_paths.bzl"),

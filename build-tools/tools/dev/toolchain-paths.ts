@@ -127,7 +127,10 @@ async function writeGeneratedIfWritable(file: string, data: string): Promise<voi
   }
 }
 
-async function readExistingToolchainPaths(repo: string): Promise<ToolchainPaths | null> {
+async function readExistingToolchainPaths(
+  repo: string,
+  frozenArtifactToolsRoot = "",
+): Promise<ToolchainPaths | null> {
   const jsonPath = toolchainJsonPath(repo);
   let raw = "";
   try {
@@ -143,7 +146,9 @@ async function readExistingToolchainPaths(repo: string): Promise<ToolchainPaths 
     const goRoot = String(parsed?.go?.root || "").trim();
     const pyBin = String(parsed?.python?.bin || "").trim();
     const zxWrapperBin = String(parsed?.zxWrapper?.bin || "").trim();
-    const artifactToolsRoot = String(parsed?.artifactTools?.root || "").trim();
+    const artifactToolsRoot =
+      String(frozenArtifactToolsRoot || "").trim() ||
+      String(parsed?.artifactTools?.root || "").trim();
     if (!goBin || !pyBin || !zxWrapperBin || !artifactToolsRoot) return null;
     if (
       !isNixStorePath(goBin) ||
@@ -186,19 +191,23 @@ async function readExistingToolchainPaths(repo: string): Promise<ToolchainPaths 
 
 export async function ensureToolchainPathsFiles(
   root?: string,
-  opts: { refresh?: boolean; artifactToolsFlakeRef?: string } = {},
+  opts: {
+    refresh?: boolean;
+    artifactToolsFlakeRef?: string;
+    frozenArtifactToolsRoot?: string;
+  } = {},
 ): Promise<ToolchainPaths> {
   const repo = root || repoRoot();
-  const existing = opts.refresh ? null : await readExistingToolchainPaths(repo);
+  const existing = opts.refresh
+    ? null
+    : await readExistingToolchainPaths(repo, opts.frozenArtifactToolsRoot);
   if (existing) return existing;
   const goOut = await resolveToolchainOut(repo, "toolchains.go");
   const pyOut = await resolveToolchainOut(repo, "toolchains.python");
   const zxWrapperOut = await resolveToolchainOut(repo, "zx-wrapper");
-  const artifactToolsRoot = await resolveToolchainOut(
-    repo,
-    "remote-worker-tools",
-    opts.artifactToolsFlakeRef,
-  );
+  const artifactToolsRoot =
+    String(opts.frozenArtifactToolsRoot || "").trim() ||
+    (await resolveToolchainOut(repo, "remote-worker-tools", opts.artifactToolsFlakeRef));
   const goBin = path.join(goOut, "bin", "go");
   const pyBin = path.join(pyOut, "bin", "python3");
   const zxWrapperBin = path.join(zxWrapperOut, "bin", "zx-wrapper");

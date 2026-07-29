@@ -1,0 +1,3 @@
+load("@viberoots//build-tools/rust:defs.bzl", "rust_proc_macro")
+
+rust_proc_macro(name = "{{ name }}", crate = "{{ name }}", srcs = ["src/lib.rs"])

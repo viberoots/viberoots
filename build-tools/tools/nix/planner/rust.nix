@@ -217,6 +217,7 @@ let
       pythonAbi = if pythonAbi == null then "" else pythonAbi;
       inherit interop;
       wasm = wasmContract;
+      coverage = ctx.coverageEnabled or false;
     };
 in {
   isTarget = n: P.isTargetByRuleTypeOrLabel {

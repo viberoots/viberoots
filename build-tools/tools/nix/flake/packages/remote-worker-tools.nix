@@ -1,4 +1,4 @@
-{ pkgs, zx-wrapper, viberootsRoot }:
+{ pkgs, zx-wrapper, viberootsRoot, viberootsNodeModules ? null }:
 let
   pnpm11 = import ../../pnpm-11.nix { inherit pkgs; };
   workerPaths = [
@@ -68,6 +68,9 @@ let
         postBuild = ''
           mkdir -p "$out/share/viberoots"
           ln -s ${viberootsRoot} "$out/share/viberoots-source"
+          ${pkgs.lib.optionalString (viberootsNodeModules != null) ''
+            ln -s ${viberootsNodeModules}/node_modules "$out/node_modules"
+          ''}
           cp ${primitiveInventoryFile} "$out/share/viberoots/remote-runtime-primitives.json"
         '';
       };

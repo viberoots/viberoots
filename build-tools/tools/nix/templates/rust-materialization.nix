@@ -1,6 +1,6 @@
 {
   H, name, sourcePlan, artifactNixRoot, pkgs, compositionEvidence,
-  producerLineage, wasmPostprocess, interopContract,
+  producerLineage, wasmPostprocess, interopContract, dependencyInventory,
 }:
 {
   schemaVersion = "viberoots.nix-store-materialization.v1";
@@ -8,6 +8,7 @@
   compositionDigest = compositionEvidence.digest;
   sourceIdentity = producerLineage.sourceIdentity;
   sourceSnapshot = builtins.toString producerLineage.sourceSnapshot;
+  packages = dependencyInventory;
   flakeLockFingerprint = sourcePlan.nixpkgs_profile;
   substituter = {
     endpointIdentity = "https://cache.home.kilty.io/main";

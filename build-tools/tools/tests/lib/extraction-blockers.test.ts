@@ -68,6 +68,7 @@ test("extraction blocker detection enforces the visible root allowlist", async (
     await fsp.writeFile(path.join(root, "test-tmp-paths.log"), "/tmp/owned-fixture\n", "utf8");
     await fsp.writeFile(path.join(root, "Jenkinsfile"), "pipeline {}\n", "utf8");
     await fsp.mkdir(path.join(root, "buck-out"), { recursive: true });
+    await fsp.mkdir(path.join(root, "coverage"), { recursive: true });
     await fsp.mkdir(path.join(root, "plugins"), { recursive: true });
 
     const blockers = findExtractionBlockers(root).map((b) => `${b.kind}:${b.path}`);

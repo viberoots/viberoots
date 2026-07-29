@@ -1,6 +1,7 @@
 import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { ensureToolchainPathsFiles } from "../../../dev/toolchain-paths";
+import { canonicalArtifactToolsRoot } from "../../../lib/artifact-tool-authority";
 import { setTimeout as sleep } from "node:timers/promises";
 import { repoRoot, pathExists } from "../../../lib/repo";
 
@@ -163,7 +164,11 @@ async function ensureSourceFiles($: any): Promise<{ bzl: string; json: string }>
         isReady: async () => await hasValidGeneratedToolchainPaths(bzl, json),
         fn: async () => {
           if (await hasValidGeneratedToolchainPaths(bzl, json)) return;
-          await ensureToolchainPathsFiles(root);
+          const frozenArtifactToolsRoot = canonicalArtifactToolsRoot(
+            root,
+            String(process.env.VBR_ARTIFACT_TOOLS_ROOT || ""),
+          );
+          await ensureToolchainPathsFiles(root, { frozenArtifactToolsRoot });
         },
       });
 

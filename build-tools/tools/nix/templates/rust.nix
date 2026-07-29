@@ -34,7 +34,7 @@ in {
     addonName ? "",
     nodeApiVersion ? 0,
     platform ? "", pythonAbi ? "", artifactNixRoot ? "",
-    interop ? {}, wasm ? {},
+    interop ? {}, wasm ? {}, coverage ? false,
     }:
     let
       validatedTarget = validateKindTarget kind target;
@@ -53,6 +53,7 @@ in {
       };
       validatedPublicCrate = Contract.validatePublicCrate publicCrate;
       targetName = lib.last (lib.splitString ":" name);
+      packagePath = lib.removePrefix "//" (builtins.head (lib.splitString ":" name));
       sanitized = H.sanitizeName name;
       featureFlags = lib.optionals (!defaultFeatures) [ "--no-default-features" ]
         ++ lib.optionals (features != []) [ "--features" (lib.concatStringsSep "," features) ];
@@ -133,27 +134,19 @@ in {
         inherit cargoLock patchInputs;
         sourceBundle = cargoRoot;
       };
+      dependencyInventory = import ./rust-dependency-inventory.nix { inherit cargoLock; };
       interopContract = import ./rust-interop.nix {
         inherit pkgs lib interop;
         publicCrate = validatedPublicCrate; inherit nativePackages;
       };
-      installPhase = baseInstallPhase + ''
-        ${interopContract.install} ${wasmPostprocess.install}
-        mkdir -p "$out/share/viberoots-rust"
-        cat > "$out/share/viberoots-rust/composition.json" <<'VIBEROOTS_RUST_COMPOSITION'
-        ${builtins.toJSON compositionEvidence}
-        VIBEROOTS_RUST_COMPOSITION
-        cat > "$out/share/viberoots-rust/materialization-manifest.json" <<VIBEROOTS_RUST_MATERIALIZATION
-        ${builtins.toJSON (import ./rust-materialization.nix {
-          inherit H name sourcePlan artifactNixRoot pkgs compositionEvidence
-            producerLineage wasmPostprocess interopContract;
-        })}
-        VIBEROOTS_RUST_MATERIALIZATION
-        substituteInPlace "$out/share/viberoots-rust/materialization-manifest.json" \
-          --replace-fail "__VIBEROOTS_RUST_OUT__" "$out" \
-          --replace-fail "__VIBEROOTS_RUST_IDENTITY__" "$(basename "$out")"
-        ${extensionRuntime}
-      '';
+      quality = import ./rust-quality.nix {
+        inherit pkgs lib rustToolchain crate packagePath featureFlags coverage;
+      };
+      installPhase = baseInstallPhase + import ./rust-evidence-install.nix {
+        inherit lib kind coverage interopContract wasmPostprocess compositionEvidence
+          dependencyInventory extensionRuntime H name sourcePlan artifactNixRoot pkgs
+          producerLineage;
+      };
       _overrideTrace =
         if devOverrides == {} then true
         else builtins.trace
@@ -177,6 +170,7 @@ in {
       cargoBuildFlags = [ "--locked" "--package" crate ] ++ kindFlags ++ featureFlags ++ targetFlags;
       cargoTestFlags = [ "--package" crate ] ++ kindFlags ++ featureFlags ++ targetFlags; doCheck = false;
       dontStrip = builtins.elem kind [ "wasm" "wasi" "wasm_static" "wasi_static" "wasm_browser" "wasm_component" ]; nativeBuildInputs = [ rustc pkgs.pkg-config pkgs.jq pkgs.llvmPackages.lld ]
+        ++ lib.optionals (kind == "test") [ pkgs.viberootsCargoLlvmCov ]
         ++ lib.optionals (builtins.elem kind [ "wasm_static" "wasi_static" ]) [ pkgs.python3 pkgs.llvmPackages.llvm ]
         ++ nixpkgDeps ++ nativePackages ++ extensionPackages ++ interopContract.buildInputs ++ wasmPostprocess.buildInputs;
       buildInputs = nixpkgDeps ++ nativePackages ++ extensionPackages ++ interopContract.buildInputs;
@@ -222,6 +216,7 @@ in {
           defaultFeatures sourcePlan producerLineage cargoOutputHashes
           cargoFixedSources vendorAuthorities nativeInputs sourceComposition
           runtimePackages wasm wasmPostprocess cargoLock;
+        inherit dependencyInventory;
       };
     } // lib.optionalAttrs (builtins.elem kind [ "wasm_static" "wasi_static" ]) {
       "CARGO_PROFILE_${lib.toUpper cargoProfile}_DEBUG" = if wasm.debug then "2" else "0";
@@ -230,10 +225,12 @@ in {
         else if wasm.optimize == "size" then "z"
         else "0";
     } // lib.optionalAttrs (kind == "test") {
+      preBuild = quality.checks;
       postBuild = ''
         cargo metadata --offline --locked --format-version 1 \
           > .viberoots-cargo-metadata.json
         cargo test ${testBuildCommand} > .viberoots-cargo-artifacts.jsonl
+        ${quality.coverage}
       '';
     });
 }

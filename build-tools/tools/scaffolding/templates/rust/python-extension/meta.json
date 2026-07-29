@@ -1,0 +1,6 @@
+{
+  "language": "rust",
+  "template": "python-extension",
+  "description": "Experimental Rust Python extension",
+  "resolverDestination": "projects/libs/{name}"
+}

@@ -58,8 +58,18 @@ test("Go, Python, and Rust toolchains build and expose reviewed binaries", async
     for (const binary of ["cargo", "rustc", "wasm-bindgen", "wasm-opt", "wasm-tools", "wasmtime"]) {
       await fsp.access(path.join(rustOut, "bin", binary));
     }
-    for (const pr10Binary of ["clippy-driver", "rustfmt"]) {
-      await assert.rejects(fsp.access(path.join(rustOut, "bin", pr10Binary)));
+    for (const pr10Binary of [
+      "cargo-clippy",
+      "cargo-llvm-cov",
+      "clang",
+      "clippy-driver",
+      "ld.lld",
+      "lldb",
+      "rust-analyzer",
+      "rustdoc",
+      "rustfmt",
+    ]) {
+      await fsp.access(path.join(rustOut, "bin", pr10Binary));
     }
 
     assert.ok(goOut.includes("/nix/store/"));

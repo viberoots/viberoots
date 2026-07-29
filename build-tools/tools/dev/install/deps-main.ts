@@ -40,6 +40,7 @@ import {
 } from "./metadata-mode";
 import { assertRustTrackedMetadataReady } from "./cargo";
 import { globalNixInputFingerprint } from "../global-nix-input-fingerprint";
+import { ensureArtifactToolsGcRoot } from "../update-command/artifact-tools-gc-root";
 
 type Flags = {
   force: boolean;
@@ -234,7 +235,17 @@ try {
     process.env.BUCK_TEST_SRC = repoRoot;
   }
 } catch {}
-await ensureToolchainPathsFiles(repoRoot, { refresh: metadataMode === "reconcile" });
+const toolchainPaths = await ensureToolchainPathsFiles(repoRoot, {
+  refresh: metadataMode === "reconcile",
+  frozenArtifactToolsRoot:
+    metadataMode === "read-only" ? String(process.env.VBR_ARTIFACT_TOOLS_ROOT || "") : "",
+});
+if (metadataMode === "read-only") {
+  await ensureArtifactToolsGcRoot({
+    repoRoot,
+    storePath: toolchainPaths.artifactTools.root,
+  });
+}
 if (glueOnly) {
   if (verbose) console.log("[install-deps] glue-only mode");
   try {

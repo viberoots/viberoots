@@ -27,6 +27,7 @@ export {
   canonicalArtifactToolsRoot,
   MissingGeneratedArtifactToolAuthorityError,
   REQUIRED_ARTIFACT_TOOL_BINARIES,
+  UnavailableGeneratedArtifactToolAuthorityError,
   validateArtifactToolsRoot,
 } from "./artifact-tool-authority";
 export { artifactTransportEnvironment } from "./artifact-environment-transport";

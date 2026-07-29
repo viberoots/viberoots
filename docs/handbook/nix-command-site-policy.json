@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "expectedCount": 538,
-  "expectedDigest": "789b8b3d0b6ce2489e25bd854cd622c944a1e41c7f8919e01c9715f2af96a9a8",
+  "expectedCount": 539,
+  "expectedDigest": "78ca69d3ee0d657384372923b2f14e3d40842183acf03e8491fa06260dbfc624",
   "classificationRules": [
     {
       "pathPattern": "^Jenkinsfile$",
@@ -70,7 +70,12 @@
       "justification": "Root bootstrap and initialization entrypoints own explicit workspace installation and reconciliation."
     },
     {
-      "pathPattern": "^build-tools/tools/dev/(?:dev-with-wasm-watch|run-runnable(?:\\.ts|-core\\.ts)|watch-wasm-(?:coordinator|coordinator-daemon))",
+      "pathPattern": "^build-tools/tools/dev/rust-dev-watch-child\\.ts$",
+      "role": "canonical-artifact",
+      "justification": "The private Rust watcher child is the sole canonical ingress that captures the reviewed Rust development override bundle."
+    },
+    {
+      "pathPattern": "^build-tools/tools/dev/(?:dev-with-wasm-watch|run-runnable(?:\\.ts|-core\\.ts)|rust-dev-watch\\.ts|watch-wasm-(?:coordinator|coordinator-daemon))",
       "role": "live-d",
       "justification": "Live development launchers and watcher coordinators intentionally retain working-tree observation and cannot publish artifacts."
     },

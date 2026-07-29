@@ -77,6 +77,7 @@ def _rust_nix_test_impl(ctx):
             nixpkgs_registry_extension = "${8:-}",
         ) +
         safe_log +
+        "COVERAGE_ARG=\"\"; case \"${COVERAGE:-}\" in \"\"|0) ;; 1) COVERAGE_ARG=--coverage ;; *) echo 'rust_nix_test: COVERAGE must be empty, 0, or 1' >&2; exit 2 ;; esac; unset COVERAGE; " +
         nix_action_build_selected_out_path_cmd(
             target_label = planner_label,
             out_var = "OUT_PATH",
@@ -84,6 +85,7 @@ def _rust_nix_test_impl(ctx):
             status_var = "NIX_STATUS",
             log_file = "$BUILD_SELECTED_LOG",
             graph_json_arg = "${BUCK_GRAPH_JSON:-$GRAPH_ARG}",
+            extra_args = "$COVERAGE_ARG",
         ) +
         "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$OUT_PATH\" ]; then " +
         "  test ! -f \"$BUILD_SELECTED_LOG\" || cat \"$BUILD_SELECTED_LOG\" >&2; " +
@@ -91,6 +93,10 @@ def _rust_nix_test_impl(ctx):
         "  echo 'rust_nix_test: build-selected produced no output path' >&2; exit 2; " +
         "fi; TEST_BIN=\"$OUT_PATH/bin/%s\"; " % ctx.label.name +
         "if [ ! -x \"$TEST_BIN\" ]; then echo 'rust_nix_test: expected test runner is absent' >&2; exit 2; fi; " +
+        "if [ -n \"$COVERAGE_ARG\" ] && [ -f \"$OUT_PATH/coverage/lcov.info\" ]; then " +
+        "  COVERAGE_DIR=\"$WORKSPACE_ROOT/coverage/rust/$SAFE_LOG_KEY\"; mkdir -p \"$COVERAGE_DIR\"; " +
+        "  cp \"$OUT_PATH/coverage/lcov.info\" \"$COVERAGE_DIR/lcov.info\"; " +
+        "fi; " +
         "shift %s; " % (9 + len(declared_inputs)) +
         nix_timeout_wrapper_var(var_name = "TIMEOUT", default_sec = 600) +
         "$TIMEOUT \"$TEST_BIN\" \"$@\""

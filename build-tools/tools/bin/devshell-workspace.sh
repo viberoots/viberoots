@@ -147,6 +147,26 @@ ensure_buck_prelude() {
 devshell_inputs_stale() {
 	local live_root="$1"
 	local marker="${live_root}/.viberoots/workspace/viberoots-flake-input/.source-fingerprint"
+	local toolchain_manifest="${live_root}/.viberoots/workspace/toolchain-paths.json"
+	local generated_artifact_tools=""
+	local active_artifact_tools="${VBR_DEVSHELL_ARTIFACT_TOOLS_ROOT:-${VBR_ARTIFACT_TOOLS_ROOT:-}}"
+	if [[ -f "${toolchain_manifest}" ]]; then
+		generated_artifact_tools="$(
+			awk '
+				/"artifactTools"[[:space:]]*:/ { in_tools = 1; next }
+				in_tools && /"root"[[:space:]]*:/ {
+					line = $0
+					sub(/^[^:]*:[[:space:]]*"/, "", line)
+					sub(/".*$/, "", line)
+					print line
+					exit
+				}
+			' "${toolchain_manifest}"
+		)"
+	fi
+	if [[ -n "${generated_artifact_tools}" && -n "${active_artifact_tools}" && "${generated_artifact_tools}" != "${active_artifact_tools}" ]]; then
+		return 0
+	fi
 	[[ -d "${live_root}/viberoots" ]] || return 1
 	[[ -f "${marker}" ]] || return 0
 	local changed_source=""

@@ -1,0 +1,57 @@
+use core::ffi::{c_char, c_int, c_void};
+
+#[repr(C)]
+struct PyObject {
+    ob_refcnt: isize,
+    ob_type: *mut c_void,
+}
+#[repr(C)]
+struct PyModuleDefBase {
+    ob_base: PyObject,
+    m_init: *mut c_void,
+    m_index: isize,
+    m_copy: *mut c_void,
+}
+#[repr(C)]
+struct PyModuleDef {
+    m_base: PyModuleDefBase,
+    m_name: *const c_char,
+    m_doc: *const c_char,
+    m_size: isize,
+    m_methods: *mut c_void,
+    m_slots: *mut c_void,
+    m_traverse: *mut c_void,
+    m_clear: *mut c_void,
+    m_free: *mut c_void,
+}
+unsafe impl Sync for PyModuleDef {}
+
+unsafe extern "C" {
+    fn PyModule_Create2(definition: *mut PyModuleDef, api_version: c_int) -> *mut PyObject;
+}
+
+static mut MODULE: PyModuleDef = PyModuleDef {
+    m_base: PyModuleDefBase {
+        ob_base: PyObject {
+            ob_refcnt: 1,
+            ob_type: core::ptr::null_mut(),
+        },
+        m_init: core::ptr::null_mut(),
+        m_index: 0,
+        m_copy: core::ptr::null_mut(),
+    },
+    m_name: c"{{ name }}".as_ptr(),
+    m_doc: c"viberoots Rust extension".as_ptr(),
+    m_size: -1,
+    m_methods: core::ptr::null_mut(),
+    m_slots: core::ptr::null_mut(),
+    m_traverse: core::ptr::null_mut(),
+    m_clear: core::ptr::null_mut(),
+    m_free: core::ptr::null_mut(),
+};
+
+#[allow(non_snake_case)]
+#[no_mangle]
+pub unsafe extern "C" fn PyInit_{{ name }}() -> *mut PyObject {
+    PyModule_Create2(&raw mut MODULE, 1013)
+}

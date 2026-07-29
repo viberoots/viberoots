@@ -26,9 +26,15 @@ const artifactToolsRoot = canonicalArtifactToolsRoot(
 );
 const execFileAsync = promisify(execFile);
 const DEV_OVERRIDE_CHILD = "--canonical-dev-override-child";
+const RUST_WATCH_CHILD = "--rust-watch-dev-override-child";
 
-if (process.argv.includes(DEV_OVERRIDE_CHILD)) {
-  enterCanonicalArtifactEntrypoint(process.cwd(), { allowDevOverrides: true });
+if (process.argv.includes(DEV_OVERRIDE_CHILD) || process.argv.includes(RUST_WATCH_CHILD)) {
+  enterCanonicalArtifactEntrypoint(
+    process.cwd(),
+    process.argv.includes(RUST_WATCH_CHILD)
+      ? { allowedDevOverrideNames: ["NIX_RUST_DEV_OVERRIDE_JSON"] }
+      : { allowDevOverrides: true },
+  );
   process.stdout.write(
     `${JSON.stringify({
       argv: process.argv.slice(2),
@@ -186,6 +192,28 @@ test("canonical re-exec transports a validated development override only through
   assert.equal(result.argv.includes(DEV_OVERRIDE_CHILD), true);
   assert.equal(result.argv.filter((arg) => arg.startsWith("--dev-overrides=")).length, 1);
   assert.deepEqual(result.env, {});
+});
+
+test("Rust watcher ingress rejects competing development override authority", async () => {
+  const source = fileURLToPath(import.meta.url);
+  const zxInit = path.resolve("viberoots/build-tools/tools/dev/zx-init.mjs");
+  const override = JSON.stringify({ dependency: process.cwd() });
+  await assert.rejects(
+    execFileAsync(
+      path.join(artifactToolsRoot, "bin", "node"),
+      ["--experimental-strip-types", "--import", zxInit, source, RUST_WATCH_CHILD],
+      {
+        cwd: process.cwd(),
+        env: {
+          HOME: os.homedir(),
+          PATH: path.join(artifactToolsRoot, "bin"),
+          NIX_GO_DEV_OVERRIDE_JSON: override,
+          NIX_RUST_DEV_OVERRIDE_JSON: override,
+        },
+      },
+    ),
+    /does not admit development overrides/,
+  );
 });
 
 test("canonical ingress rejects duplicate workspace-root transport", async () => {

@@ -37,7 +37,7 @@ in
   ];
   python = toolchain "toolchain-python" pkgs.python3;
   rust = toolchain "toolchain-rust" [
-    pkgs.viberootsRustToolchain
+    pkgs.viberootsRustDeveloperTools
     pkgs.llvmPackages.lld
     # Keep both reviewed target component closures in the exported toolchain
     # rather than relying on a worker's ambient Rust setup.

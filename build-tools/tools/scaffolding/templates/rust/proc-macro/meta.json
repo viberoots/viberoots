@@ -1,0 +1,6 @@
+{
+  "language": "rust",
+  "template": "proc-macro",
+  "description": "Experimental Rust procedural macro",
+  "resolverDestination": "projects/libs/{name}"
+}

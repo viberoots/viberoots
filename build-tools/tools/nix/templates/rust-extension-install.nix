@@ -26,6 +26,8 @@ if kind == "pyext" then ''
   fi
   module_rel=${lib.escapeShellArg (lib.replaceStrings [ "." ] [ "/" ] module)}
   install -Dm755 "$candidate" "$out/site/$module_rel$EXT_SUFFIX"
+  PYTHONPATH="$out/site" ${pkgs.python3}/bin/python -c \
+    'import importlib, sys; importlib.import_module(sys.argv[1])' ${lib.escapeShellArg module}
   runHook postInstall
 '' else if kind == "addon" then ''
   runHook preInstall

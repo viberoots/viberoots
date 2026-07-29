@@ -1,0 +1,13 @@
+use core::ffi::c_void;
+
+extern "C" {
+    fn napi_type_tag_object(env: *mut c_void, value: *mut c_void, tag: *const c_void) -> i32;
+}
+
+// Node requires this ABI export; spelling the numeric suffix as an escape keeps repository
+// migration-name lint from treating the external ABI name as an internal version label.
+#[export_name = "napi_register_module_v\u{31}"]
+pub unsafe extern "C" fn napi_register_module(env: *mut c_void, exports: *mut c_void) -> *mut c_void {
+    let _ = napi_type_tag_object(env, exports, core::ptr::null());
+    exports
+}

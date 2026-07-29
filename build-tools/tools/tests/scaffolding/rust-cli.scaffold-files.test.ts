@@ -26,6 +26,7 @@ test("Rust CLI scaffold renders locked Cargo, build, test, and runnable inputs",
     assert.match(targets, /rust_wasm_library\(/);
     assert.match(targets, /rust_wasi_binary\(/);
     assert.match(manifest, /name = "rust_demo-wasi"/);
+    assert.match(manifest, /crate-type = \["cdylib", "rlib"\]/);
     assert.match(source, /hello from rust_demo/);
     assert.match(wasmSource, /scaffold_answer/);
     await fs.access(path.join(root, "README.md"));

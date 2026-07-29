@@ -1,0 +1,8 @@
+load("@viberoots//build-tools/rust:defs.bzl", "rust_cxx_bridge_library")
+
+rust_cxx_bridge_library(
+    name = "{{ name }}",
+    crate = "{{ name }}",
+    binding_config = "bindings.json",
+    srcs = ["src/lib.rs"],
+)

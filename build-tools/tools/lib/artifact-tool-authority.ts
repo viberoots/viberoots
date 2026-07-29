@@ -34,6 +34,13 @@ export class MissingGeneratedArtifactToolAuthorityError extends Error {
   }
 }
 
+export class UnavailableGeneratedArtifactToolAuthorityError extends Error {
+  constructor(message: string, cause: unknown) {
+    super(message, { cause });
+    this.name = "UnavailableGeneratedArtifactToolAuthorityError";
+  }
+}
+
 function readScopedManifest(workspaceRoot: string): {
   file: string;
   parsed: { artifactTools?: { root?: unknown } } | null;
@@ -104,17 +111,25 @@ export function canonicalArtifactToolsRoot(workspaceRoot: string, assertedRoot =
     if (asserted) return validateArtifactToolsRoot(asserted, "active artifact tool authority");
     throw new MissingGeneratedArtifactToolAuthorityError(file);
   }
-  const root = literalArtifactToolsRoot(
-    String(parsed.artifactTools?.root || ""),
-    `canonical artifact tool authority at ${file}`,
-  );
+  let root: string;
+  try {
+    root = validateArtifactToolsRoot(
+      String(parsed.artifactTools?.root || ""),
+      `canonical artifact tool authority at ${file}`,
+    );
+  } catch (error) {
+    throw new UnavailableGeneratedArtifactToolAuthorityError(
+      error instanceof Error ? error.message : String(error),
+      error,
+    );
+  }
   const asserted = String(assertedRoot || "").trim();
   if (asserted && literalArtifactToolsRoot(asserted, "active artifact tool authority") !== root) {
     throw new Error(
       `canonical artifact tool authority mismatch: generated=${root} active=${asserted}; run u && i`,
     );
   }
-  return validateArtifactToolsRoot(root, "canonical artifact tool authority");
+  return root;
 }
 
 export async function installCanonicalArtifactToolsAuthority(

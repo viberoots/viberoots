@@ -7,7 +7,10 @@ import {
 import { targetPackageFromLabel } from "../lib/artifact-source-inventory";
 import { admitArtifactContext, inspectWorkspaceArtifactSource } from "./artifact-policy-inspection";
 import { makeFilteredFlakeRef } from "./filtered-flake";
-import { evaluationBundleHasLanguageOverrides } from "./evaluation-bundle-selectors";
+import {
+  evaluationBundleDevOverrides,
+  evaluationBundleHasLanguageOverrides,
+} from "./evaluation-bundle-selectors";
 import {
   buildArtifactEnvironment,
   withoutArtifactEnvironmentInfluence,
@@ -58,7 +61,8 @@ export async function chooseRunnableFlakeRef(opts: {
   });
   const targetPackages = opts.target ? [targetPackageFromLabel(opts.target)].filter(Boolean) : [];
   let classification: ArtifactBuildClassification;
-  const languageOverrides = evaluationBundleHasLanguageOverrides(process.env);
+  const devOverrides = evaluationBundleDevOverrides(process.argv.slice(2), {});
+  const languageOverrides = evaluationBundleHasLanguageOverrides(devOverrides);
 
   if (pathSource) {
     classification = "local-development";
@@ -96,7 +100,8 @@ export async function chooseRunnableFlakeRef(opts: {
     target: opts.target,
     classification,
     env: artifactEnv,
-    selectorEnv: process.env,
+    selectorEnv: baseEnv,
+    devOverrides,
   });
   return {
     flakeRef: filtered.flakeRef,

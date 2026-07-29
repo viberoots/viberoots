@@ -2,6 +2,16 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RunnableExec } from "../lib/runnables";
+import { withoutArtifactEnvironmentInfluence } from "../lib/artifact-environment";
+import { externalNodeToolEnv } from "../lib/external-node-env";
+
+export function directRustDevEnvironment(
+  inherited: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  const env = externalNodeToolEnv(withoutArtifactEnvironmentInfluence(inherited));
+  delete env.VBR_CANONICAL_ARTIFACT_ENTRYPOINT;
+  return env;
+}
 
 export async function directImporterDevSpec(
   workspaceRoot: string,
@@ -70,5 +80,33 @@ export async function directStaticWebappDevSpec(
       "info",
     ],
     cwd: importerRoot,
+  };
+}
+
+export function directRustDevSpec(
+  workspaceRoot: string,
+  target: string,
+  artifactToolsRoot: string,
+  canonicalDevOverrideArg = "",
+): RunnableExec {
+  const viberootsRoot = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "..",
+    "..",
+  );
+  return {
+    argv: [
+      path.join(artifactToolsRoot, "bin", "zx-wrapper"),
+      path.join(viberootsRoot, "build-tools", "tools", "dev", "rust-dev-watch.ts"),
+      "--target",
+      target,
+      "--workspace-root",
+      workspaceRoot,
+      "--artifact-tools-root",
+      artifactToolsRoot,
+      ...(canonicalDevOverrideArg ? [canonicalDevOverrideArg] : []),
+    ],
+    cwd: workspaceRoot,
   };
 }

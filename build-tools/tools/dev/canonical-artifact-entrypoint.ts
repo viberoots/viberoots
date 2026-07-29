@@ -110,6 +110,8 @@ export function enterCanonicalArtifactEntrypoint(
   opts: {
     declaredBuckAction?: boolean;
     allowDevOverrides?: boolean;
+    allowedDevOverrideNames?: readonly string[];
+    stripAmbientArtifactInfluence?: boolean;
   } = {},
 ): string {
   const canonicalReentry = process.env.VBR_CANONICAL_ARTIFACT_ENTRYPOINT === "1";
@@ -125,7 +127,11 @@ export function enterCanonicalArtifactEntrypoint(
   );
   const wasmBackend = evaluationBundleWasmBackend(workspaceTransport.argv, process.env);
   const devOverrides = evaluationBundleDevOverrides(workspaceTransport.argv, process.env);
-  if (!opts.allowDevOverrides && Object.keys(devOverrides).length > 0) {
+  const allowedDevOverrides = new Set(opts.allowedDevOverrideNames || []);
+  const rejectedDevOverrides = Object.keys(devOverrides).filter(
+    (name) => !opts.allowDevOverrides && !allowedDevOverrides.has(name),
+  );
+  if (rejectedDevOverrides.length > 0) {
     throw new Error("this artifact entrypoint does not admit development overrides");
   }
   const scopedWorkspaceRoot = opts.declaredBuckAction
@@ -199,6 +205,7 @@ export function enterCanonicalArtifactEntrypoint(
     workspaceRoot: scopedWorkspaceRoot,
     toolsRoot,
     wasmBackend,
+    stripAmbientArtifactInfluence: opts.stripAmbientArtifactInfluence,
   });
   const activeCanonicalEnv = environmentAfterCanonicalWrapper(canonicalEnv, toolsRoot);
   attachCanonicalReviewedNixConfig(activeCanonicalEnv, nixCacheHealth);

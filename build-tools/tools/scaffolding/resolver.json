@@ -25,7 +25,13 @@
     "lib": "projects/libs/{name}"
   },
   "rust": {
-    "cli": "projects/apps/{name}"
+    "cli": "projects/apps/{name}",
+    "cxx-bridge": "projects/libs/{name}",
+    "lib": "projects/libs/{name}",
+    "node-addon": "projects/libs/{name}",
+    "proc-macro": "projects/libs/{name}",
+    "python-extension": "projects/libs/{name}",
+    "wasm": "projects/libs/{name}"
   },
   "ts": {
     "cli": "projects/apps/{name}",

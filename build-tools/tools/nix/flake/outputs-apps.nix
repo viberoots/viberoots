@@ -1,8 +1,10 @@
-{ pkgs, zx-wrapper, viberootsRoot, version, releaseTag, ... }:
+{ pkgs, zx-wrapper, viberootsRoot, viberootsNodeMods ? null, version, releaseTag, ... }:
 let
   zxPackage = if pkgs ? zx then pkgs.zx else pkgs.nodePackages.zx;
   remoteTools = import ./packages/remote-worker-tools.nix {
     inherit pkgs zx-wrapper viberootsRoot;
+    viberootsNodeModules =
+      if viberootsNodeMods == null then null else viberootsNodeMods.node-modules;
   };
   viberoots = import ../packages/viberoots-command.nix {
     inherit pkgs zx-wrapper version releaseTag;

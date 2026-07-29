@@ -1,0 +1,6 @@
+{
+  "language": "rust",
+  "template": "node-addon",
+  "description": "Experimental Rust Node-API addon",
+  "resolverDestination": "projects/libs/{name}"
+}

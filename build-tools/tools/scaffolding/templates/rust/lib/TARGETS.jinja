@@ -1,0 +1,4 @@
+load("@viberoots//build-tools/rust:defs.bzl", "rust_library", "rust_test")
+
+rust_library(name = "{{ name }}", crate = "{{ name }}", srcs = ["src/lib.rs"])
+rust_test(name = "{{ name }}-test", crate = "{{ name }}", srcs = ["src/lib.rs"])

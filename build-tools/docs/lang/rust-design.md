@@ -7,9 +7,9 @@ is [`../rust-language-plan.md`](../rust-language-plan.md).
 ## Current Lifecycle
 
 The current Rust route compiles composed Cargo libraries, binaries, tests, native bridges, and the
-PR-9 freestanding, WASI, static-linkable, browser-package, and component-model WASM families from
-checked-in manifests and locks. It provides the lifecycle through PR-9, but is not yet the complete
-first-class Rust lifecycle.
+freestanding, WASI, static-linkable, browser-package, and component-model WASM families from
+checked-in manifests and locks. PR-10 adds the managed developer and dependency lifecycle. Release,
+publication, and independent three-system conformance remain later work.
 
 | Surface              | Current behavior                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | Evidence                                                                                                                                      |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -17,10 +17,10 @@ first-class Rust lifecycle.
 | Shared wiring        | Macros stamp `lang:rust`, `kind:*`, `patch_scope:package-local`, and remote-readiness labels. Package-local Rust and patch files become Buck inputs, and provider deps are merged deterministically.                                                                                                                                                                                                                                                                                                    | `build-tools/lang/internal/package_local_wiring.bzl`                                                                                          |
 | Buck action          | `rust_nix_build` exports typed source-crate and WASM-family providers and declares the transitive Cargo-root source, manifest, lock, patch, WIT, header, and link closure without passing dependency `.rlib` outputs to Cargo. It materializes stable native outcomes plus raw, WASI, static-linkable, browser-package, and component-model WASM families with their manifests and public interface files.                                                                                              | `build-tools/rust/private/nix_build.bzl`, `build-tools/rust/private/crate_contract.bzl`, `build-tools/rust/private/wasm_contract.bzl`         |
 | Planner              | `lang:rust` plus native, raw/WASI WASM, WASM static-library, browser-package, and component kinds dispatches to the Rust planner. The composition planner validates Cargo path dependencies against Buck edges and preserves every transitive repository-relative Cargo root; the WASM planner validates target, ABI, link, export, profile, adapter, WIT, and module-surface contracts.                                                                                                                | `build-tools/tools/nix/planner/rust.nix`, `build-tools/tools/nix/planner/rust-composition.nix`, `build-tools/tools/nix/planner/rust-wasm.nix` |
-| Artifact             | One `buildRustPackage` authority uses the minimal Nix-store Rust 1.88 Cargo/rustc toolchain with the reviewed native and WASM targets. The exported PR-9 tool closure adds pinned wasm-bindgen, Binaryen, wasm-tools, Wasmtime, and preview1 adapters. It emits native artifacts plus deterministic raw, WASI, static-linkable, browser-package, and component WASM outcomes. Rustfmt and clippy are intentionally absent until PR-10.                                                                  | `build-tools/tools/nix/templates/rust.nix`, `build-tools/tools/nix/flake/packages/toolchains.nix`                                             |
+| Artifact             | One `buildRustPackage` authority uses the Nix-store Rust 1.88 closure with rust-analyzer, rustfmt, Clippy, rustdoc, llvm-cov, LLD, LLDB, and the reviewed native and WASM tools. Test construction applies formatting, lint, documentation, benchmark-compile, and optional coverage gates. It emits a stable dependency inventory next to materialization evidence.                                                                                                                                    | `build-tools/tools/nix/templates/rust.nix`, `build-tools/tools/nix/flake/packages/toolchains.nix`                                             |
 | Providers            | Rust has an explicit deterministic no-provider adapter. Package-local patches are direct target inputs, so provider and auto-map glue are not patch invalidation authorities.                                                                                                                                                                                                                                                                                                                           | `build-tools/tools/buck/providers/rust.ts`, `build-tools/tools/lib/lang-contracts.ts`                                                         |
 | Tests                | Cquery covers routing, exported Cargo fields, inputs, provider order, and unknown-field rejection. Native fixtures execute two binaries, prove source sensitivity, and cover fail-closed Cargo diagnostics.                                                                                                                                                                                                                                                                                             | `build-tools/tools/tests/rust/`, `build-tools/tools/tests/lang/rust.stub.provider-edges.deterministic.cquery.test.ts`                         |
-| Language registry    | Rust is enabled as an experimental CLI scaffold after its macro, planner, template, Cargo metadata, source, and test paths are validated.                                                                                                                                                                                                                                                                                                                                                               | `build-tools/tools/nix/langs.json`, `build-tools/tools/scaffolding/templates/rust/`                                                           |
+| Language registry    | Rust is enabled experimentally with binary, library, proc-macro, Python-extension, Node-addon, C++-bridge, and WASM scaffolds.                                                                                                                                                                                                                                                                                                                                                                          | `build-tools/tools/nix/langs.json`, `build-tools/tools/scaffolding/templates/rust/`                                                           |
 | Dependency ownership | Cargo participates in the shared language lifecycle: read-only consumers verify locked offline metadata, while explicit `u` and `u --upgrade` transactionally reconcile every affected `Cargo.lock`.                                                                                                                                                                                                                                                                                                    | `build-tools/docs/update-command-design.md`                                                                                                   |
 | Runtime and tests    | `rust_test` executes compiled Cargo harnesses through a bounded project-relative external runner. Its remote-ready runner is designed to perform the same selected build and harness execution from a validated declared snapshot; current evidence exercises that route locally and does not claim a production remote worker. Native and WASI binaries publish `run.prod`; libraries, tests, and freestanding WASM stay out of runnable summaries.                                                    | Rust macro, runner, planner, template, and manifest implementations                                                                           |
 | Source selection     | Native targets export `nixpkg_deps`, `nixpkgs_profile`, and `nixpkg_pins`. The shared source-plan resolver selects the Rust toolchain and declared build-script dependencies.                                                                                                                                                                                                                                                                                                                           | Rust macro, graph attrs, planner, and template                                                                                                |
@@ -51,7 +51,7 @@ The canonical repository-relative path, package name, public crate name, and com
 must agree. Missing, extra, ambiguous, cyclic, escaping, or version-incompatible composition fails
 before construction. Cargo compiles the preserved source closure; Buck artifacts are not injected
 as compiler-private Rust metadata. PR-8 adds reviewed generated C11 FFI and C++17 bridge boundaries;
-Developer tooling and dependency lifecycle parity remain owned by PR-10, while final release
+Developer tooling and dependency lifecycle parity are implemented by PR-10, while final release
 hermeticity remains owned by PR-12.
 
 Compatible versions use Cargo requirement semantics for bare/caret, tilde, wildcard, exact-prefix,
@@ -140,11 +140,11 @@ injecting a Buck `.rlib` into Cargo dependency resolution.
 
 ## Cargo And Update Authority
 
-`Cargo.toml` and `Cargo.lock` are tracked dependency authority. Cargo, rustc, the reviewed native
-and WASM targets, and PR-9's WASM transformation/runtime tools come from Nix store paths. The
-minimal upstream rustc component also contains the `rustdoc` executable, but current workflows do
-not claim rustdoc integration. Rustfmt, clippy, rustdoc workflow authority, and their verify/editor
-integration remain planned PR-10 scope.
+`Cargo.toml` and `Cargo.lock` are tracked dependency authority. Cargo, rustc, rust-analyzer,
+rustfmt, Clippy, rustdoc, llvm-cov, the reviewed native and WASM targets, and WASM
+transformation/runtime tools come from Nix store paths. The devshell exports their exact discovery
+paths, while `rust_test` owns formatting, lint, documentation, benchmark-compile, and opt-in LCOV
+coverage checks.
 
 - `i`, post-clone, and devshell entry validate the lock and generated Rust metadata without
   rewriting tracked files. Stale state reports `repair: run u`.
@@ -270,6 +270,9 @@ Local crate overrides are explicit development-bundle inputs, forbidden in prote
 in diagnostics, and never read from ambient evaluation state. The graph generator passes the
 bundle's captured language-override map into the Rust planner; the template accepts only that
 explicit value and requires a `local-development` bundle when it is non-empty.
+The bounded Rust watcher marks its artifact child ingress explicitly. That ingress admits only the
+Rust override selector, while ordinary runnable production ingress and competing language override
+selectors remain fail-closed.
 
 The shared editor launch is bounded by `PATCH_EDITOR_TIMEOUT_SECS`, defaulting to 300 seconds.
 Timeout and signal cleanup clear Rust override/session state while retaining an interrupted
@@ -447,8 +450,12 @@ Native and WASI binaries publish `runnable.kind = "native-bin"` and `run.prod`; 
 tests, and freestanding WASM remain absent from runnable summaries. A dev command is published only
 when an explicit stable contract exists.
 
-Rust has an experimental enabled language-manifest entry backed by source-owned CLI templates.
-Scaffolds create checked-in Cargo metadata, a binary, and a test without invoking host Rust tools.
+Rust has an experimental enabled language-manifest entry backed by source-owned templates for CLI
+binaries, libraries, proc macros, Python extensions, Node addons, C++ bridges, and raw/WASI WASM.
+Every scaffold creates checked-in Cargo metadata and deterministic locks without invoking host Rust
+tools. Shape-specific lifecycle checks compile or run the applicable binary, library and doc tests,
+proc macro expansion, CPython import, Node addon load, C++ bridge consumer, or raw/WASI module;
+non-runnable shapes reject `r` and `d` before attempting a selected build.
 
 Native execution evidence must come from a builder matching `aarch64-darwin`, `aarch64-linux`, or
 `x86_64-linux`; cross-evaluation is not native evidence. Rust tests remain local unless a reviewed

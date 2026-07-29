@@ -52,7 +52,8 @@ def nix_action_build_selected_out_path_cmd(
         log_file = "$WORKSPACE_ROOT/buck-out/tmp/build-selected/build-selected.log",
         attr = "graph-generator-selected",
         escape_cmd_subst = False,
-        graph_json_arg = ""):
+        graph_json_arg = "",
+        extra_args = ""):
     subst_open = "`" if escape_cmd_subst else "$("
     subst_close = "`" if escape_cmd_subst else ")"
     return (
@@ -78,6 +79,7 @@ def nix_action_build_selected_out_path_cmd(
         + ("\"$VIBEROOTS_ROOT/build-tools/tools/dev/build-selected.ts\" --target \"%s\" --attr %s --buck-action-inputs \"$VBR_BUCK_INPUTS\" " % (target_label, attr))
         + nix_declared_action_transport_args()
         + " $VBR_DEV_OVERRIDE_ARG "
+        + (" %s " % extra_args)
         + ("2> \"$VBR_BUILD_SELECTED_LOG\")%s; " % subst_close)
         + ("%s=$?; set -e; " % status_var)
         + (

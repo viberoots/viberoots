@@ -61,11 +61,36 @@ export async function importerForTarget(workspaceRoot: string, target: string): 
   return hints.importer;
 }
 
+export type RunnableTargetHints = {
+  importer: string;
+  mode: "static" | "ssr";
+  framework: string;
+  targetKind: string;
+  language: string;
+};
+
+export function nonRunnableTargetReason(hints: RunnableTargetHints): string {
+  if (!hints.targetKind) return "";
+  if (hints.language === "rust" && hints.targetKind !== "bin" && hints.targetKind !== "wasi") {
+    return `${hints.targetKind}-only`;
+  }
+  if (hints.targetKind === "lib" || hints.targetKind === "test") {
+    return `${hints.targetKind}-only`;
+  }
+  return "";
+}
+
 export async function runnableHintsForTarget(
   workspaceRoot: string,
   target: string,
-): Promise<{ importer: string; mode: "static" | "ssr"; framework: string; targetKind: string }> {
-  const fallback = { importer: "", mode: "static" as const, framework: "", targetKind: "" };
+): Promise<RunnableTargetHints> {
+  const fallback = {
+    importer: "",
+    mode: "static" as const,
+    framework: "",
+    targetKind: "",
+    language: "",
+  };
   try {
     const graphTxt = await fsp.readFile(path.join(workspaceRoot, DEFAULT_GRAPH_PATH), "utf8");
     const raw = JSON.parse(graphTxt);
@@ -79,6 +104,7 @@ export async function runnableHintsForTarget(
       let mode: "static" | "ssr" = "static";
       let framework = "";
       let targetKind = "";
+      let language = "";
       for (const label of labels) {
         const parsed = parseLockfileLabel(String(label || ""));
         if (parsed?.importer) importer = parsed.importer;
@@ -89,8 +115,9 @@ export async function runnableHintsForTarget(
         if (value === "framework:vite") framework = "vite";
         if (value === "framework:hatch") framework = "hatch";
         if (value.startsWith("kind:")) targetKind = value.slice("kind:".length);
+        if (value.startsWith("lang:")) language = value.slice("lang:".length);
       }
-      return { importer, mode, framework, targetKind };
+      return { importer, mode, framework, targetKind, language };
     }
   } catch {}
   return fallback;
@@ -119,7 +146,12 @@ function signalChildGroup(child: ChildProcess, signal: NodeJS.Signals): void {
   }
 }
 
-export async function runCommand(argv: string[], extra: string[], cwd?: string): Promise<number> {
+export async function runCommand(
+  argv: string[],
+  extra: string[],
+  cwd?: string,
+  env: NodeJS.ProcessEnv = externalNodeToolEnv(),
+): Promise<number> {
   let cmd = String(argv[0] || "").trim();
   if (!cmd) return 2;
   const tool = path.basename(cmd);
@@ -134,7 +166,7 @@ export async function runCommand(argv: string[], extra: string[], cwd?: string):
   const child = spawn(cmd, args, {
     cwd: cwd || process.cwd(),
     stdio: "inherit",
-    env: externalNodeToolEnv(),
+    env,
     detached: true,
   });
   let stopping = false;

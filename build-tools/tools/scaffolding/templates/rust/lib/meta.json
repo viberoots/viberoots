@@ -1,0 +1,6 @@
+{
+  "language": "rust",
+  "template": "lib",
+  "description": "Experimental Rust library",
+  "resolverDestination": "projects/libs/{name}"
+}

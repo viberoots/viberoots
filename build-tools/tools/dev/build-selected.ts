@@ -114,6 +114,7 @@ async function chooseFlakeRef(opts: {
   devOverrides: DevOverrideValues;
   wasmBackend?: string;
   onlyCpp?: boolean;
+  coverage?: boolean;
 }): Promise<{
   flakeRef: string;
   workspaceRoot?: string;
@@ -162,6 +163,7 @@ async function chooseFlakeRef(opts: {
     devOverrides: opts.devOverrides,
     wasmBackend: opts.wasmBackend,
     onlyCpp: opts.onlyCpp,
+    coverage: opts.coverage,
   });
   return {
     flakeRef: filtered.flakeRef,
@@ -314,6 +316,7 @@ async function main(artifactToolsRoot: string) {
     devOverrides,
     wasmBackend: getFlagStr("wasm-backend", "").trim(),
     onlyCpp: getFlagBool("planner-only-cpp"),
+    coverage: getFlagBool("coverage"),
   });
   const flakeEnv = flakeSource.workspaceRoot
     ? {

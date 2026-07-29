@@ -1,0 +1,6 @@
+{
+  "language": "rust",
+  "template": "wasm",
+  "description": "Experimental Rust bare-WASM and WASI modules",
+  "resolverDestination": "projects/libs/{name}"
+}

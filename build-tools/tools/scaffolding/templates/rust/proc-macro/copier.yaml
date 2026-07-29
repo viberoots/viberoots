@@ -1,0 +1,5 @@
+version: 1
+name: ""
+language: "rust"
+template: "proc-macro"
+_tasks: []

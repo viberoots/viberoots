@@ -45,6 +45,16 @@ in {
       fi
       export _VIBEROOTS_DEVSHELL_ACTIVE=1
       export _VIBEROOTS_DEVSHELL_ROOT="$dev_root"
+      export RUST_ANALYZER_PATH="${pkgs.rust-analyzer}/bin/rust-analyzer"
+      export RUSTFMT="${pkgs.viberootsRustToolchain}/bin/rustfmt"
+      export RUSTDOC="${pkgs.viberootsRustToolchain}/bin/rustdoc"
+      export CARGO_LLVM_COV="${pkgs.viberootsCargoLlvmCov}/bin/cargo-llvm-cov"
+      export RUST_SRC_PATH="${pkgs.viberootsRustToolchain}/lib/rustlib/src/rust/library"
+      rust_editor_dir="$dev_root/.viberoots/workspace/editor"
+      mkdir -p "$rust_editor_dir"
+      cat > "$rust_editor_dir/rust-tools.json" <<EOF
+{"cargo":"${pkgs.viberootsRustToolchain}/bin/cargo","clippy":"${pkgs.viberootsRustToolchain}/bin/cargo-clippy","llvmCov":"${pkgs.viberootsCargoLlvmCov}/bin/cargo-llvm-cov","rustAnalyzer":"${pkgs.rust-analyzer}/bin/rust-analyzer","rustdoc":"${pkgs.viberootsRustToolchain}/bin/rustdoc","rustfmt":"${pkgs.viberootsRustToolchain}/bin/rustfmt","source":"${pkgs.viberootsRustToolchain}/lib/rustlib/src/rust/library"}
+EOF
       is_interactive=0
       case "$-" in
         *i*) is_interactive=1 ;;
@@ -434,7 +444,7 @@ EOF
       # .viberoots/current/prelude; do not recreate a visible root prelude shim.
     '';
     buildInputs = [
-      pkgs.git pkgs.nix pkgs.buck2 pkgs.go pkgs.viberootsRustToolchain pnpm11 pkgs.nodejs_22 pkgs.python3 pkgs.uv zx-wrapper viberootsCommand pkgs.jq pkgs.rsync pkgs.copier pkgs.yq pkgs.prettier
+      pkgs.git pkgs.nix pkgs.buck2 pkgs.go pkgs.viberootsRustDeveloperTools pnpm11 pkgs.nodejs_22 pkgs.python3 pkgs.uv zx-wrapper viberootsCommand pkgs.jq pkgs.rsync pkgs.copier pkgs.yq pkgs.prettier
       pkgs.jc pkgs.bash pkgs.coreutils pkgs.curl pkgs.gomod2nix pkgs.opentofu pkgs.infisical pkgs.awscli2 pkgs.dnsutils
       pkgs.openssl pkgs.postgresql_16
     ] ++ (if pkgs.stdenv.isDarwin then [ agent-safehouse ] else [])

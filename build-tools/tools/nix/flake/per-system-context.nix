@@ -22,14 +22,40 @@ let
   rustToolchainOverlay = final: _prev:
     let
       toolchain = final.rust-bin.stable."1.88.0".minimal.override {
+        extensions = [ "clippy" "llvm-tools-preview" "rust-src" "rustfmt" ];
         targets = [ "wasm32-unknown-unknown" "wasm32-wasip1" ];
       };
-    in {
-      viberootsRustToolchain = toolchain;
-      viberootsRustPlatform = final.makeRustPlatform {
+      rustPlatform = final.makeRustPlatform {
         cargo = toolchain;
         rustc = toolchain;
       };
+      cargoLlvmCov = (final.cargo-llvm-cov.override {
+        inherit rustPlatform;
+      }).overrideAttrs (old: {
+        # The pinned package's upstream integration check hangs on Darwin after
+        # successfully compiling the executable; repository tests exercise the tool.
+        doCheck = false;
+        meta = old.meta // {
+          # The pinned nixpkgs package is marked broken with its older Rust builder.
+          # This overlay rebuilds it with the repository's supported Rust 1.88 closure.
+          broken = false;
+        };
+      });
+    in {
+      viberootsRustToolchain = toolchain;
+      viberootsCargoLlvmCov = cargoLlvmCov;
+      viberootsRustDeveloperTools = final.symlinkJoin {
+        name = "viberoots-rust-developer-tools";
+        paths = [
+          toolchain
+          final.rust-analyzer
+          cargoLlvmCov
+          final.llvmPackages.clang
+          final.llvmPackages.lldb
+          final.llvmPackages.lld
+        ];
+      };
+      viberootsRustPlatform = rustPlatform;
     };
   pkgs = import nixpkgs {
     inherit system;

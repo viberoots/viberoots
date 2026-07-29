@@ -7,18 +7,28 @@ import { validateSsrRunnableContract } from "../lib/runnable-contracts";
 import {
   parseArgs,
   importerForTarget,
+  nonRunnableTargetReason,
   resolveRunnableTargetLabel,
   runnableHintsForTarget,
   readManifestEntry,
   runCommand,
+  type RunnableTargetHints,
 } from "./run-runnable-core";
 import { buildRunnableManifest, buildSelectedOutPath } from "./run-runnable-graph";
 import { enterCanonicalArtifactEntrypoint } from "./canonical-artifact-entrypoint";
 import type { ReviewedNixConfigOutcome } from "./canonical-reviewed-nix-config";
-import { canonicalArtifactToolsRoot } from "../lib/artifact-environment";
-import { directImporterDevSpec, directStaticWebappDevSpec } from "./run-runnable-dev-spec";
+import {
+  directImporterDevSpec,
+  directRustDevEnvironment,
+  directRustDevSpec,
+  directStaticWebappDevSpec,
+} from "./run-runnable-dev-spec";
 import { applyNixCacheHealthPolicy } from "./verify/nix-cache-health";
-
+import {
+  canonicalDevOverrideArg,
+  evaluationBundleDevOverrides,
+  withoutCanonicalDevOverrideArgs,
+} from "./evaluation-bundle-selectors";
 function commandCwdForSpec(
   spec: { argv: string[]; cwd?: string },
   workspaceRoot: string,
@@ -49,7 +59,8 @@ export async function runRunnable(opts: {
   buildSelected?: typeof buildSelectedOutPath;
   executeCommand?: typeof runCommand;
 }) {
-  const parsed = parseArgs(opts.argv);
+  const canonicalOverrideArg = canonicalDevOverrideArg(evaluationBundleDevOverrides(opts.argv, {}));
+  const parsed = parseArgs(withoutCanonicalDevOverrideArgs(opts.argv));
   if (parsed.sourceError) {
     console.error(`[run-runnable] ${parsed.sourceError}`);
     process.exit(2);
@@ -64,22 +75,17 @@ export async function runRunnable(opts: {
   const target = await resolveRunnableTargetLabel(workspaceRoot, parsed.target || ".", {
     baseDir: cwd,
   });
-  let targetHints: {
-    importer: string;
-    mode: "static" | "ssr";
-    framework: string;
-    targetKind: string;
-  } | null = null;
+  let targetHints: RunnableTargetHints | null = null;
+  let sanitizeRustWatcherEnvironment = false;
   let entry: RunnableManifestEntry | null = null;
   if (opts.resolveEntry) {
     entry = await opts.resolveEntry(target);
   } else {
-    // Fast path: use selected-target build + output-shape inference first.
-    // This avoids full graph manifest materialization for one-target run commands.
     const hints = await runnableHintsForTarget(workspaceRoot, target);
     targetHints = hints;
-    if (hints.targetKind === "lib" || hints.targetKind === "test") {
-      console.error(`target is not runnable (${hints.targetKind}-only): ${target}`);
+    const nonRunnableReason = nonRunnableTargetReason(hints);
+    if (nonRunnableReason) {
+      console.error(`target is not runnable (${nonRunnableReason}): ${target}`);
       process.exit(2);
     }
     const importer = hints.importer;
@@ -158,8 +164,12 @@ export async function runRunnable(opts: {
       process.exit(2);
     }
     const hints = targetHints || (await runnableHintsForTarget(workspaceRoot, target));
+    if (hints.language === "rust" && hints.targetKind === "bin") {
+      spec = directRustDevSpec(workspaceRoot, target, artifactToolsRoot, canonicalOverrideArg);
+      sanitizeRustWatcherEnvironment = true;
+    }
     const importer = hints.importer || (await importerForTarget(workspaceRoot, target));
-    if (importer) {
+    if (!spec && importer) {
       const devScript =
         entry.runnable.kind === "webapp-ssr" || hints.mode === "ssr" ? "dev:ssr" : "dev";
       spec = { argv: ["pnpm", "--dir", importer, devScript] };
@@ -186,6 +196,7 @@ export async function runRunnable(opts: {
     spec.argv,
     parsed.passthrough,
     commandCwdForSpec(spec, workspaceRoot),
+    sanitizeRustWatcherEnvironment ? directRustDevEnvironment() : undefined,
   );
   process.exitCode = exitCode;
 }
@@ -198,10 +209,10 @@ export async function enterRunnableEntrypoint(): Promise<{
 }> {
   const initial = parseArgs(getArgvTokens());
   const workspaceRoot = await findRepoRoot(process.cwd());
-  const artifactToolsRoot =
-    initial.mode === "prod"
-      ? enterCanonicalArtifactEntrypoint(workspaceRoot)
-      : canonicalArtifactToolsRoot(workspaceRoot);
+  const artifactToolsRoot = enterCanonicalArtifactEntrypoint(
+    workspaceRoot,
+    initial.mode === "dev" ? { allowDevOverrides: true, stripAmbientArtifactInfluence: true } : {},
+  );
   let nixCacheHealth: ReviewedNixConfigOutcome | undefined;
   if (initial.mode === "prod") {
     const cacheHealth = await applyNixCacheHealthPolicy(workspaceRoot);

@@ -28,6 +28,9 @@ let
   selectedTargetName = if evaluationBundle == null
     then builtins.getEnv "BUCK_TARGET"
     else evaluationBundle.selection.target;
+  coverageEnabled = if evaluationBundle == null
+    then (builtins.getEnv "COVERAGE") == "1"
+    else evaluationBundle.selection.coverage or false;
   # build-tools/tools/{dev,buck} needed for node-webapp sync-module-contracts during Nix build.
   # Use suffix/infix matching (like projects/*) to stay robust to /var vs /private/var path aliases.
   keepAppsLibsPath = path: type:
@@ -267,7 +270,7 @@ let
 
   # Build planner context and import language plugins if present
   ctx = {
-    inherit lib T repoRoot repoRootStr localModuleOverrides onlyCpp pkgPathOf pkgs;
+    inherit lib T repoRoot repoRootStr localModuleOverrides onlyCpp pkgPathOf pkgs coverageEnabled;
     inherit (SourceSelection) nixpkgsRegistry pkgsForProfile sourcePlanFor resolveNixpkgAttr resolveNixpkgAttrs;
     repoSnapshot = src;
     repoStoreRoot = repoStoreRoot;

@@ -177,9 +177,14 @@ test("public artifact executors enter through the canonical zx wrapper", () => {
   assert.match(publication, /const artifactToolsRoot = enterCanonicalArtifactEntrypoint/);
   assert.match(publication, /artifactToolsRoot,/);
   const runnable = read("dev/run-runnable.ts");
-  assert.match(runnable, /initial\.mode === "prod"[\s\S]*?enterCanonicalArtifactEntrypoint/);
+  assert.match(runnable, /const artifactToolsRoot = enterCanonicalArtifactEntrypoint/);
+  assert.doesNotMatch(runnable, /allowedDevOverrideNames/);
+  assert.match(runnable, /allowDevOverrides: true,[\s\S]*?stripAmbientArtifactInfluence: true/);
+  assert.match(
+    read("dev/rust-dev-watch-child.ts"),
+    /allowedDevOverrideNames: \[devOverrideEnvNameForLang\("rust"\)\]/,
+  );
   assert.match(runnable, /artifactToolsRoot,/);
-  assert.doesNotMatch(runnable, /parsed\.mode === "dev".*enterCanonicalArtifactEntrypoint/);
   assert.doesNotMatch(
     `${read("dev/dev-build/glue.ts")}\n${read("lib/artifact-tool-authority.ts")}`,
     /resolveCanonicalArtifactAuthority/,

@@ -1,0 +1,3 @@
+load("@viberoots//build-tools/rust:defs.bzl", "rust_node_addon")
+
+rust_node_addon(name = "{{ name }}", crate = "{{ name }}", node_api_version = 8, srcs = ["src/lib.rs"])

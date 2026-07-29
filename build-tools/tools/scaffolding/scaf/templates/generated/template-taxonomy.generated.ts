@@ -21,7 +21,7 @@ export const TEMPLATE_TAXONOMY = {
   go: ["cli", "lib"],
   language: ["kit"],
   python: ["app", "lib", "wasm-app", "wasm-lib"],
-  rust: ["cli"],
+  rust: ["cli", "cxx-bridge", "lib", "node-addon", "proc-macro", "python-extension", "wasm"],
   ts: [
     "cli",
     "cpp-addon",

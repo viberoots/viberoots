@@ -1,0 +1,6 @@
+{
+  "language": "rust",
+  "template": "cxx-bridge",
+  "description": "Experimental Rust C++ bridge",
+  "resolverDestination": "projects/libs/{name}"
+}

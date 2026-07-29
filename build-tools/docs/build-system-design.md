@@ -103,7 +103,7 @@ to watch the importer worktree rather than an evaluation bundle.
   `nixpkgs_profile` selects the toolchain and ordinary `nixpkg_deps`; `nixpkg_pins` redirects only
   declared native dependency attrs. Rust tests execute compiled Cargo harnesses through Buck's
   bounded project-relative external runner, and only Rust binaries enter `run.prod` manifests.
-- Rust is an enabled **experimental** language through the PR-9 implementation checkpoint. The reviewed baseline adds
+- Rust is an enabled **experimental** language through the PR-10 implementation checkpoint. The reviewed baseline adds
   direct/transitive C link intent, freestanding WebAssembly, a repository-owned WASI runner,
   scaffolded CLI projects, declared remote-ready evidence, source-based cross-root crates, and
   explicit `rlib`, `staticlib`, `cdylib`, host proc-macro, native CPython-extension, and Node-API
@@ -117,8 +117,11 @@ to watch the importer worktree rather than an evaluation bundle.
   an importable ABI. PR-9 adds Rust bare/WASI static archives, web-target wasm-bindgen packages,
   explicit WIT components, typed WASM link authority, and declared Node asset edges. Positive WASI
   execution still requires a compatible cached toolchain or builder on hosts that cannot construct
-  the cross standard library inside their sandbox. Release publication and three-system execution
-  conformance remain planned in PR-10 through PR-12.
+  the cross standard library inside their sandbox. PR-10 adds a Nix-owned analyzer/formatter/lint/
+  documentation/coverage/debug closure, the Rust quality gate, direct bounded `run.dev` watching,
+  dependency inventories, private-source hygiene, and the Rust scaffold matrix. Tauri integration,
+  release publication, sandbox certification, and three-system execution conformance remain
+  planned in PR-11 and PR-12.
 - Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.
 - Planner-visible probes/stubs are allowed only when explicitly documented as non-build exceptions.
 - Patching third-party modules is **ergonomic**, **idempotent**, and **cache-friendly**.
@@ -140,8 +143,8 @@ Use these docs as the source of truth for migration scope and completion:
 Current status in those docs:
 
 - The original Nix-route migration phases are complete. Rust's first-class rollout is separately
-  tracked: PR-1 through PR-8 establish the experimental baseline, while PR-9 through PR-12 remain
-  required before first-class/release-hermetic status.
+  tracked: PR-1 through PR-10 establish the current experimental baseline, while PR-11 and PR-12
+  remain required before first-class/release-hermetic status.
 - `docs/handbook/nix-gaps.md` has no remaining artifact-producing non-Nix routes.
 - `docs/handbook/nix-gaps-exceptions.json` allows only explicit probe-only exceptions and currently has no artifact-route allowlist entries.
 

@@ -4,7 +4,7 @@
   pythonWheelhouse, interopContract, validatedPublicCrate, validatedTarget,
   defaultFeatures, sourcePlan, producerLineage, cargoOutputHashes,
   cargoFixedSources, vendorAuthorities, nativeInputs, sourceComposition,
-  runtimePackages, wasm, wasmPostprocess, cargoLock,
+  runtimePackages, wasm, wasmPostprocess, cargoLock, dependencyInventory,
 }:
 {
   inherit kind crate features profile crateType hostRole generatedOutputs
@@ -31,8 +31,5 @@
     (runtimePackages ++ interopContract.runtimePackages);
   runtime_packages = runtimePackages ++ interopContract.runtimePackages;
   wasm = wasm // wasmPostprocess.passthru;
-  cargo_packages = map (package: {
-    inherit (package) name version;
-    source = package.source or "";
-  }) ((builtins.fromTOML (builtins.readFile cargoLock)).package or []);
+  cargo_packages = dependencyInventory;
 }

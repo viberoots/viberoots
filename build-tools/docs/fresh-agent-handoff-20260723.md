@@ -2,8 +2,7 @@
 
 **Prepared:** 2026-07-23
 
-**Last reconciled:** 2026-07-28, after PR-9 full-suite investigation, focused recovery, and terminal
-scope review
+**Last reconciled:** 2026-07-28, after PR-10 focused validation and terminal scope review
 
 **Workspace:** `/Users/kiltyj/Code/viberoots-site`
 
@@ -16,79 +15,54 @@ repository, staged and unstaged diffs, and the referenced logs before editing.
 
 ## 0. Current handoff: this section supersedes all older execution state below
 
-The current `$repo-skills:prs` item is PR-9, `Reach WASM Linking, Browser, And Component-Model
-Parity`, from:
+The next `$repo-skills:prs` item is PR-11, `Add A Cross-Language Tauri Desktop Scaffold`, from:
 
 ```text
 plan:   build-tools/docs/rust-language-plan.md
 design: build-tools/docs/lang/rust-design.md
 repo:   /Users/kiltyj/Code/viberoots-site/viberoots
-PR-8 commit: feat(rust): add bidirectional native bridges (detached; inspect HEAD for the SHA)
+PR-9 commit: 9748d651 feat(rust): add WASM linking and component parity
 ```
 
-PR-5 is complete in `55130076 feat(build): complete Rust remote readiness`. PR-6 is complete in
-`225de617 feat(rust): add cross-root crate composition`. PR-7 is complete in
-`572d1460 feat(rust): add Python and Node extensions`. PR-8 implementation, risk-based validation,
-repeated independent reviewer-fix loops, same-stage C++/other-language parity review, and terminal
-independent scope review are complete in this handoff's
-`feat(rust): add bidirectional native bridges` commit. No push is authorized.
+PR-10 implementation, risk-based validation, repeated independent reviewer-fix loops,
+same-progression parity review, and terminal independent scope review are complete in the commit
+containing this handoff; inspect `HEAD` for its SHA. No push is authorized. PR-11 is next.
 
-PR-9 is implemented but deliberately **not committed**. The earlier disk-capacity and Rust
-`wasm32-wasip1` realization blockers are resolved: the current filesystem has about 194 GiB free,
-and the pinned Rust 1.88 WASM artifact target has passed. Successive scope reviews found five
-bounded issues, all corrected in the current tree:
+PR-10 adds the Nix-owned Rust 1.88 developer closure and editor authority; rustfmt, Clippy,
+rustdoc/doc tests, benchmark compilation, real cargo-llvm-cov aggregation, dependency inventory,
+private-source hygiene, serialized bounded `run.dev` watching, explicit local override handling,
+and seven scaffold families. Fresh flake and real submodule lifecycles exercise CLI, library,
+proc-macro, Python extension, Node addon, C++ bridge, and raw/WASI WASM shapes. Non-runnable shapes
+reject `r` and `d` before selected builds.
 
-1. The Rust overlay now selects the Rust 1.88 `minimal` profile with
-   `wasm32-unknown-unknown` and `wasm32-wasip1`. It preserves Cargo, rustc, and the PR-9 WASM tool
-   closure without exposing the PR-10-owned clippy or rustfmt commands. The upstream minimal rustc
-   component also contains the `rustdoc` executable; PR-10 owns its developer-tool authority and
-   integration rather than the bundled binary's existence.
-2. This handoff now records the current repository state and the real pinned-Firefox browser
-   evidence instead of the obsolete claim that no browser-engine harness exists.
-3. The WASM component claim now matches implementation: components use pinned wasm-tools and
-   preview1 adapters, not cargo-component.
-4. The Rust design distinguishes current PR-9 Cargo/rustc/WASM authority from PR-10's planned
-   rustfmt, clippy, rustdoc-workflow, editor, and verify integration.
-5. Local nested verify resolves patch, Git, OpenSSL, and gzip only from the validated artifact tool
-   closure. Hostile `PATH`, ambient overrides, and a missing canonical tool fail to provide a
-   fallback.
+The final override route is intentionally asymmetric. Public `p` remains fail-closed even if an
+obsolete passthrough marker is spoofed. Public `d` accepts only an explicit Rust override from
+canonical argv, strips ambient artifact-affecting variables, and delegates to a private
+manifest-backed child. Tests prove two child spawns after an override edit, both expected outputs,
+absence of the ambient sentinel, and cleanup. Read-only prebuilds freeze generated artifact-tool
+authority; explicit `u` alone may reconcile it. The generated manifest, artifact-tools GC root, and
+fresh direnv shell must resolve to the same store path.
 
-The terminal PR-9 scope review then found five additional contract gaps. They are corrected:
+The terminal exact ten-selector run passed shared 10/10 and enforcement 5/5 in 394 seconds. The
+source fingerprint remained
+`78ac564914960219716b313f90be8d3fcbe321485b954c4b24c87ffd00b5dc98`; the manifest, GC root, and
+fresh direnv authority remained
+`/nix/store/21l6n0hpxc2064rzclrx08164p8a37k4-remote-worker-tools`; and the manifest mtime was
+unchanged. Authoritative logs:
 
-- exported-function lists now prune final core modules, component allowlists equal the selected WIT
-  world, component transforms run before componentization, and static controls are honestly
-  compile-time rustc controls rather than invalid Binaryen transforms on relocatable members;
-- both bare and preview1-reactor public components execute through manifest-pinned Wasmtime;
-- public Buck outputs are typed WASM-family directories preserving headers, normalized WIT, and
-  producer/materialization manifests; the C++ fixture consumes the transported Rust header;
-- Node staging records portable copy identity separately from immutable Nix producer
-  store/output/source-revision lineage, and deployment evidence covers static webapp, SSR, service,
-  and component artifact families; and
-- the WASI runner invokes transported store Node under a hostile `PATH`.
+```text
+outer:
+  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/agent-test-logs/
+  v-terminal-final-ten-20260728-175235.log
+verify:
+  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/verify-logs/
+  verify-2026-07-29T00-52-57-008Z-92548-11c1720f75c1b.log
+```
 
-A final recovery review found five more bounded gaps. They are also corrected:
-
-- the Rust WASM Starlark contract loads every dependency before executable statements;
-- CLI inline modules carry immutable producer lineage and participate in deployment admission;
-- static control evidence covers explicit false/none and positive modes on the real object that
-  defines the exported function, with adversarial Cargo profile settings;
-- component export equality is selected-world and interface aware, including duplicate-name and
-  missing-interface negatives; and
-- all five bare/WASI static, browser, and bare/WASI component families execute through real
-  remote-ready Buck actions, declared tool identities, and immutable-snapshot replay.
-
-The exact PR-9 acceptance target passed 1/1 in 984.246 seconds after the final source-snapshot
-runner correction. Its remote phase freshly analyzed the pinned immutable viberoots cell, rejected
-ambient Node import state, executed all five remote-ready action categories under hostile host
-tool resolution, replayed them from a standalone immutable snapshot while the live owner source was
-poisoned, and preserved source/store identities. The shared source-snapshot contract passed 5/5,
-the real Buck WASM analysis-error gate passed 16/16, the Nix boundary gate passed 1/1, and `u && i`
-converged afterward. The acceptance log was written under the generated workspace log directory;
-the subsequent required `u` refresh removed that generated directory, so retain the TAP totals and
-elapsed time here rather than claiming the transient log still exists.
-
-PR-9 implementation and recovery validation are complete. Its terminal independent scope review is
-green. Do not advance to PR-10 until PR-9 is committed through `repo-skills:cc`.
+The terminal review found no implementation, security, lifecycle, authority, validation, parity, or
+methodology gap. Its only final findings were two stale documentation statements claiming that
+PR-9/10 remained and that Rust scaffolding was CLI-only; both are corrected in the commit containing
+this handoff, and the follow-up review passed.
 
 Do not preserve the older staged-versus-unstaged separation described below. It is historical. Do
 not push. The parent consumer repository currently has a modified `viberoots` pointer and its
@@ -109,36 +83,18 @@ Use `repo-skills:prs` in turbo mode, with minimal-context independent agents:
 5. Commit through `repo-skills:cc` only after implementation review, validation, timing checks, and
    scope review are green. Never push without explicit user authorization.
 
-PR-8 is committed, so PRs 9-12 remain. Continue them in numeric order with a fresh isolated
+PR-10 is complete, so PRs 11-12 remain. Continue them in numeric order with a fresh isolated
 implementation agent and separate isolated reviewer/tester roles for each PR. Use risk-based
-focused suites for PRs 10-11 because PR-5 exercised a complete checkpoint and future checkpoint
-PRs will do so again. Run full checkpoints for PR-9 and PR-12, or earlier if a material
-cross-cutting change makes the focused evidence insufficient. Record elapsed timing and compare
-successful full checkpoints with the 10,684-second successful baseline.
+focused suites for PR-11 because PR-9 exercised a complete checkpoint and PR-12 will do so again.
+Run the final full checkpoint for PR-12, or earlier if a material cross-cutting change makes the
+focused evidence insufficient. Record elapsed timing and compare successful full checkpoints with
+the 10,684-second successful baseline.
 
 For a required full-suite run, stop only for a deterministic failure observed within the first five
 minutes. Once the run has crossed five minutes, continue to its final exit and collect every
 failure before investigation. Do not terminate a long full suite at the first later failure.
 
-### PR-9 current uncommitted status
-
-Current source repository:
-
-```text
-root:   /Users/kiltyj/Code/viberoots-site/viberoots
-state:  detached HEAD
-HEAD:   4d9598ba6fd7b0407fba9321bed0f06a85e5d4ab
-parent: /Users/kiltyj/Code/viberoots-site
-```
-
-At the final refresh, the source tree had 171 modified paths, 42 untracked paths, no staged paths,
-and 213 changed/untracked paths total. Preserve all of them. The fingerprint below covers the
-sorted path, file mode, and SHA-256 content digest for the other 212 changed/untracked paths. It
-excludes this handoff file to avoid a self-referential digest:
-
-```text
-949f1d52cdec3a93ec9d5a2c9e509dc52e8c43f3fd5a10dda42c93d52368d662
-```
+### PR-9 completion evidence
 
 Implemented scope includes:
 
@@ -246,7 +202,7 @@ All deterministic or repeatable failures were fixed and passed exact or grouped 
 The user authorized risk-based closeout instead of repeating the full suite because another
 checkpoint is planned for later Rust PRs.
 
-The final PR-9/PR-10 tool boundary check passed after selecting the minimal Rust distribution:
+The PR-9/PR-10 tool boundary check passed after selecting the minimal Rust distribution:
 
 ```text
 command:
@@ -284,8 +240,7 @@ verify log:
 ```
 
 Direct contracts also passed local/nested tool environment 8/8, spawn snapshots 5/5, and artifact
-ingress 10/10. A fresh independent scope review remains required because the tool authority and
-documentation corrections are material edits.
+ingress 10/10. PR-9's later independent scope review passed before commit.
 
 ### PR-8 completion evidence
 
@@ -405,9 +360,6 @@ PR-8–12 work. No PR-7 scope finding remains open.
 
 ### Remaining PRs
 
-- PR-9: implementation, full checkpoint investigation, focused recovery, and terminal scope review
-  are complete; commit the current tree before advancing.
-- PR-10: Rust developer and dependency lifecycle parity.
 - PR-11: the cross-language Tauri desktop scaffold.
 - PR-12: final multi-system hermetic graduation, publication, protected-builder, and independent
   assessment evidence.
