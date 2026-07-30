@@ -5,6 +5,7 @@ import { bzlDefBody, parsePublicStarlarkDefs } from "./nix-gaps-inventory-check-
 export const rustDefsBzlPath = "@viberoots//build-tools/rust:defs.bzl";
 
 const expectedRouteHelper: Record<string, string> = {
+  tauri_app: "rust_nix_build",
   rust_binary: "rust_nix_build",
   rust_c_ffi_library: "rust_nix_build",
   rust_cdylib: "rust_nix_build",

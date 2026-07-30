@@ -140,6 +140,7 @@ test("filtered-flake rsync excludes generated workspace state that churns source
     ".viberoots/codex-logs",
     ".viberoots/workspace/buck",
     ".viberoots/workspace/cache",
+    ".viberoots/workspace/cargo-home",
     ".viberoots/workspace/codex-test-logs",
     ".viberoots/workspace/install-cache",
     ".viberoots/workspace/nix-xdg-cache",
@@ -159,6 +160,47 @@ test("filtered-flake rsync excludes generated workspace state that churns source
     assert.ok(
       FILTERED_FLAKE_RSYNC_EXCLUDES.includes(rel),
       `missing filtered-flake exclude: ${rel}`,
+    );
+  }
+});
+
+test("filtered snapshots stay stable when Cargo mutates its generated cache", async () => {
+  const root = await fsp.mkdtemp(path.join(os.tmpdir(), "filtered-cargo-cache-root-"));
+  const first = await fsp.mkdtemp(path.join(os.tmpdir(), "filtered-cargo-cache-first-"));
+  const second = await fsp.mkdtemp(path.join(os.tmpdir(), "filtered-cargo-cache-second-"));
+  const changed = await fsp.mkdtemp(path.join(os.tmpdir(), "filtered-cargo-cache-changed-"));
+  try {
+    const cargoCache = path.join(root, ".viberoots/workspace/cargo-home/.global-cache");
+    const cargoRegistry = path.join(root, ".viberoots/workspace/cargo-home/registry/cache.bin");
+    const flake = path.join(root, ".viberoots/workspace/flake.nix");
+    const project = path.join(root, "projects/apps/demo/source.txt");
+    for (const file of [cargoCache, cargoRegistry, flake, project]) {
+      await fsp.mkdir(path.dirname(file), { recursive: true });
+    }
+    await fsp.writeFile(cargoCache, "before\n");
+    await fsp.writeFile(cargoRegistry, "before\n");
+    await fsp.writeFile(flake, "{}\n");
+    await fsp.writeFile(project, "stable\n");
+    const sources = ["./.viberoots", "./projects"];
+    const excludes = FILTERED_FLAKE_RSYNC_EXCLUDES.flatMap((value) => ["--exclude", value]);
+    await $({ cwd: root })`rsync -a --relative ${excludes} ${sources} ${first}/`;
+    await fsp.writeFile(cargoCache, "after\n");
+    await fsp.writeFile(cargoRegistry, "after\n");
+    await $({ cwd: root })`rsync -a --relative ${excludes} ${sources} ${second}/`;
+    await assert.rejects(fsp.access(path.join(first, ".viberoots/workspace/cargo-home")));
+    assert.equal(
+      await fsp.readFile(path.join(second, project.slice(root.length + 1)), "utf8"),
+      "stable\n",
+    );
+    await $`diff -qr ${first} ${second}`;
+    await fsp.writeFile(project, "declared change\n");
+    await $({ cwd: root })`rsync -a --relative ${excludes} ${sources} ${changed}/`;
+    assert.notEqual((await $({ nothrow: true })`diff -qr ${second} ${changed}`).exitCode, 0);
+  } finally {
+    await Promise.all(
+      [root, first, second, changed].map((value) =>
+        fsp.rm(value, { recursive: true, force: true }),
+      ),
     );
   }
 });

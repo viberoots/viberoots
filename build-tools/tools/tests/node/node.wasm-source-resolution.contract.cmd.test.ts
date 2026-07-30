@@ -47,6 +47,10 @@ test("node wasm source resolver contract is wired into stage and inline macros",
     assert.match(stagedCmd, /resolve_node_wasm_artifact/);
     assert.match(stagedCmd, /ASSET_NAME='named\.wasm'/);
     assert.match(stagedCmd, /ambiguous wasm artifacts/);
+    assert.match(stagedCmd, /resolve_node_wasm_surface_file/);
+    assert.match(stagedCmd, /typed wasm module surface escaped its artifact root/);
+    assert.match(stagedCmd, /0061736d/);
+    assert.match(stagedCmd, /rejected metadata\/manifest output/);
 
     const inline = await $({
       cwd: tmp,
@@ -59,5 +63,7 @@ test("node wasm source resolver contract is wired into stage and inline macros",
     assert.match(inlineCmd, /resolve_node_wasm_artifact/);
     assert.match(inlineCmd, /SRC_GLOB='\*\.wasm'/);
     assert.match(inlineCmd, /artifact_glob/);
+    assert.match(inlineCmd, /resolve_node_wasm_surface_file/);
+    assert.match(inlineCmd, /0061736d/);
   });
 });

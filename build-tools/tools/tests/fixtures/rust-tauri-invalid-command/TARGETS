@@ -1,0 +1,11 @@
+load("@prelude//:rules.bzl", "filegroup")
+load("@viberoots//build-tools/rust:defs.bzl", "tauri_app")
+
+filegroup(name = "frontend", srcs = [])
+
+tauri_app(
+    name = "desktop",
+    app_commands = ["status; false #"],
+    frontend_dist = ":frontend",
+    icons = ["icon.png"],
+)

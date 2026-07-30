@@ -5,6 +5,7 @@ load("@viberoots//build-tools/node:defs_vercel.bzl", _node_vercel_next_artifact 
 load("@viberoots//build-tools/lang:collections.bzl", "dedupe_preserve")
 load("@viberoots//build-tools/lang:label_stamping.bzl", "normalize_labels")
 load("@viberoots//build-tools/lang:module_surface.bzl", "module_surface")
+load("@viberoots//build-tools/node/private:asset_contract.bzl", "asset_metadata", "module_surface_labels")
 load(
     "@viberoots//build-tools/node:defs_stage.bzl",
     _node_asset_stage = "node_asset_stage",
@@ -77,34 +78,6 @@ def _runtime_mapping_policy(labels):
     if "framework:vite" in labs:
         return "node-vite-v1"
     return "node-static-v1"
-
-def _normalize_module_dep_label(dep):
-    if not isinstance(dep, str) or dep == "":
-        fail("node_asset_stage: module_deps entries must be non-empty string labels")
-    if dep.startswith(":"):
-        if len(dep) == 1:
-            fail("node_asset_stage: module_deps local label cannot be empty")
-        return "//%s:%s" % (native.package_name(), dep[1:])
-    if not dep.startswith("//"):
-        fail("node_asset_stage: module_deps entries must start with // or :")
-    if ":" in dep:
-        return dep
-    pkg = dep[2:]
-    if pkg == "":
-        fail("node_asset_stage: module_deps package label cannot be empty")
-    pkg_parts = pkg.split("/")
-    base = pkg_parts[-1]
-    if base == "":
-        fail("node_asset_stage: module_deps package label cannot end with '/'")
-    return "%s:%s" % (dep, base)
-
-def _surface_label_for_module_dep(dep):
-    normalized = _normalize_module_dep_label(dep)
-    body = normalized[2:]
-    parts = body.split(":")
-    if len(parts) != 2 or parts[0] == "" or parts[1] == "":
-        fail("node_asset_stage: failed to normalize module_dep '%s'" % dep)
-    return "//%s:%s__surface" % (parts[0], parts[1])
 
 def node_webapp(
         name,
@@ -181,7 +154,10 @@ def node_asset_stage(
         **kwargs):
     kw = dict(kwargs)
     labels = kw.get("labels", []) or []
-    inferred_surface_deps = [_surface_label_for_module_dep(d) for d in module_deps]
+    kw["labels"] = dedupe_preserve(
+        labels + asset_metadata(native.package_name(), assets),
+    )
+    inferred_surface_deps = module_surface_labels(native.package_name(), module_deps)
     explicit_surface_deps = normalize_labels(native.package_name(), module_surface_deps)
     merged_surface_deps = dedupe_preserve(inferred_surface_deps + explicit_surface_deps)
     merged_deps = dedupe_preserve((deps or []) + merged_surface_deps)

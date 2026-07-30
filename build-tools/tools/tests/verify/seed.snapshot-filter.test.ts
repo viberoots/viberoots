@@ -35,6 +35,8 @@ test("verify seed snapshot excludes generated workspace buck state", async () =>
   assert.match(source, /lib\.hasPrefix "\.viberoots\/workspace\/\.viberoots\/" rel/);
   assert.match(source, /rel == "\.viberoots\/workspace\/codex-test-logs"/);
   assert.match(source, /lib\.hasPrefix "\.viberoots\/workspace\/codex-test-logs\/" rel/);
+  assert.match(source, /rel == "\.viberoots\/workspace\/cargo-home"/);
+  assert.match(source, /lib\.hasPrefix "\.viberoots\/workspace\/cargo-home\/" rel/);
   assert.match(source, /rel == "\.viberoots\/buck"/);
   assert.match(source, /lib\.hasPrefix "\.viberoots\/buck\/" rel/);
   assert.match(source, /rel == "\.viberoots\/cache"/);
@@ -60,6 +62,7 @@ test("verify seed snapshot excludes generated workspace buck state", async () =>
   assert.match(rsyncSource, /\/\.viberoots\/codex-logs/);
   assert.match(rsyncSource, /\/\.viberoots\/workspace\/\.viberoots/);
   assert.match(rsyncSource, /\/\.viberoots\/workspace\/codex-test-logs/);
+  assert.match(rsyncSource, /\/\.viberoots\/workspace\/cargo-home/);
   assert.match(rsyncSource, /\/build-tools\/tmp/);
   assert.match(rsyncSource, /"prelude"/);
   assert.match(rsyncSource, /"patches"/);

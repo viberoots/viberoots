@@ -1,0 +1,8 @@
+load("@viberoots//build-tools/rust:defs.bzl", "tauri_app")
+
+tauri_app(
+    name = "desktop",
+    crate = "desktop",
+    frontend_dist = ":frontend",
+    tauri_platform = "x86_64-linux",
+)

@@ -126,3 +126,30 @@ export async function terminateChildTree(child: ChildProcess, graceMs = 5000): P
   if (child.exitCode != null) return;
   signalPids(targets, "SIGKILL");
 }
+
+export type ProcessTreeRow = {
+  pid: number;
+  ppid: number;
+  pgid?: number;
+  command: string;
+};
+
+export function exactDescendantCommandPids(
+  rows: ProcessTreeRow[],
+  rootPid: number,
+  executable: string,
+): number[] {
+  const parents = new Map(rows.map((row) => [row.pid, row.ppid]));
+  return rows
+    .filter((row) => row.command === executable || row.command.startsWith(`${executable} `))
+    .filter((row) => {
+      if (row.pid === rootPid) return true;
+      let ancestor = row.ppid;
+      while (ancestor > 1) {
+        if (ancestor === rootPid) return true;
+        ancestor = parents.get(ancestor) || 0;
+      }
+      return false;
+    })
+    .map((row) => row.pid);
+}

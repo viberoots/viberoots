@@ -1,0 +1,9 @@
+{
+  "identifier": "default",
+  "permissions": [
+    "core:default",
+    "allow-report-composition-evidence",
+    "allow-report-composition-failure"
+  ],
+  "windows": ["main"]
+}

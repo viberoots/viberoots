@@ -1,0 +1,15 @@
+{
+  "build": { "frontendDist": "frontend-dist" },
+  "app": {
+    "withGlobalTauri": false,
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' ipc: http://ipc.localhost",
+      "capabilities": ["default"]
+    },
+    "windows": [{ "label": "main" }]
+  },
+  "bundle": {
+    "icon": ["icons/icon.png"],
+    "resources": { "help.txt": "help/help.txt" }
+  }
+}

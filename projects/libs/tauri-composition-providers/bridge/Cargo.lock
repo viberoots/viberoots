@@ -1,0 +1,10 @@
+version = 3
+
+[[package]]
+name = "composition_backend"
+version = "0.1.0"
+
+[[package]]
+name = "composition_bridge"
+version = "0.1.0"
+dependencies = ["composition_backend"]

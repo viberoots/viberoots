@@ -7,6 +7,7 @@ import { runInTemp } from "../lib/test-helpers";
 import { copyViberootsSourcePath } from "../lib/test-helpers/source-paths";
 
 type PlannerFields = {
+  cargo_root?: string;
   cargo_manifest: string;
   cargo_lock: string;
   local_patch_dirs: string[];
@@ -33,6 +34,12 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
     await fsp.mkdir(cargoRoot, { recursive: true });
     await fsp.writeFile(path.join(cargoRoot, "Cargo.toml"), "[package]\nname='rustapp'\n");
     await fsp.writeFile(path.join(cargoRoot, "Cargo.lock"), "version = 3\n");
+    await fsp.mkdir(path.join(cargoRoot, "src-tauri"), { recursive: true });
+    await fsp.writeFile(
+      path.join(cargoRoot, "src-tauri", "Cargo.toml"),
+      "[package]\nname='rustapp'\n",
+    );
+    await fsp.writeFile(path.join(cargoRoot, "src-tauri", "Cargo.lock"), "version = 3\n");
 
     const evaluate = async (fields: PlannerFields) => {
       const kind = fields.kind || "bin";
@@ -60,6 +67,7 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
             deps = [];
             link_deps = [ ${linkDeps} ];
             header_deps = [ ${headerDeps} ];
+            cargo_root = ${JSON.stringify(fields.cargo_root ?? "projects/apps/rustapp")};
             cargo_manifest = ${JSON.stringify(fields.cargo_manifest)};
             cargo_lock = ${JSON.stringify(fields.cargo_lock)};
             crate = "rustapp";
@@ -81,6 +89,7 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
             sourcePlanFor = _: { base_pkgs = pkgs; nixpkgs_profile = "default"; nixpkg_pins = {}; };
             T.rustForPkgs = _: {
               rustPackage = args: {
+                root = builtins.toString args.cargoRoot;
                 manifest = builtins.toString args.cargoManifest;
                 lock = builtins.toString args.cargoLock;
                 patches = map builtins.toString args.patchInputs;
@@ -102,6 +111,24 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
       local_patch_dirs: ["patches/rust"],
     });
     assert.equal(canonical.exitCode, 0, String(canonical.stderr || canonical.stdout));
+    assert.equal(
+      JSON.parse(String(canonical.stdout)).root,
+      path.join(tmp, "projects/apps/rustapp"),
+    );
+    const srcTauri = await evaluate({
+      cargo_root: "projects/apps/rustapp/src-tauri",
+      cargo_manifest: "root//projects/apps/rustapp/src-tauri/Cargo.toml",
+      cargo_lock: "root//projects/apps/rustapp/src-tauri/Cargo.lock",
+      local_patch_dirs: [],
+    });
+    assert.equal(srcTauri.exitCode, 0, String(srcTauri.stderr || srcTauri.stdout));
+    assert.deepEqual(JSON.parse(String(srcTauri.stdout)), {
+      lock: path.join(tmp, "projects/apps/rustapp/src-tauri/Cargo.lock"),
+      manifest: path.join(tmp, "projects/apps/rustapp/src-tauri/Cargo.toml"),
+      patches: [],
+      root: path.join(tmp, "projects/apps/rustapp/src-tauri"),
+      target: "",
+    });
     const nativeNixpkg = await evaluate({
       cargo_manifest: "root//projects/apps/rustapp/Cargo.toml",
       cargo_lock: "root//projects/apps/rustapp/Cargo.lock",
@@ -128,6 +155,15 @@ test("rust planner rejects noncanonical Cargo metadata and patch traversal", asy
     });
     assert.notEqual(crossRootLock.exitCode, 0);
     assert.match(String(crossRootLock.stderr), /cargo_lock must be canonical package-local/);
+
+    const crossPackageRoot = await evaluate({
+      cargo_root: "projects/apps/other",
+      cargo_manifest: "root//projects/apps/other/Cargo.toml",
+      cargo_lock: "root//projects/apps/other/Cargo.lock",
+      local_patch_dirs: [],
+    });
+    assert.notEqual(crossPackageRoot.exitCode, 0);
+    assert.match(String(crossPackageRoot.stderr), /Cargo root must remain within package/);
 
     const patchTraversal = await evaluate({
       cargo_manifest: "root//projects/apps/rustapp/Cargo.toml",

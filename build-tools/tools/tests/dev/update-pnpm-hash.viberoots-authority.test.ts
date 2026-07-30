@@ -179,9 +179,28 @@ test("bundle dir refs use the immutable authority in their own lock", async () =
       )}\n`,
     );
     assert.deepEqual(activeViberootsOverride(`path:${root}?dir=source/consumer#probe`, {}), []);
+    assert.deepEqual(
+      activeViberootsOverride(`path:${root}?dir=source/consumer#probe`, {
+        VIBEROOTS_FLAKE_INPUT_ROOT: "/tmp/spoofed-ambient-source",
+      }),
+      [],
+      "the sealed bundle lock must win without consulting a spoofed ambient selector",
+    );
     assert.throws(
       () => activeViberootsOverride(`path:${root}?dir=../consumer#probe`, {}),
       /requires an immutable Nix-store/,
+    );
+    const lockPath = path.join(flakeDir, "flake.lock");
+    const mismatched = JSON.parse(await fsp.readFile(lockPath, "utf8"));
+    mismatched.nodes.viberoots.locked.path = "/nix/store/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb-source";
+    await fsp.writeFile(lockPath, `${JSON.stringify(mismatched, null, 2)}\n`);
+    assert.throws(
+      () =>
+        activeViberootsOverride(`path:${root}?dir=source/consumer#probe`, {
+          VIBEROOTS_FLAKE_INPUT_ROOT: materialized.storePath,
+        }),
+      /flake\.lock does not match immutable viberoots input/,
+      "an ambient selector must not repair a mismatched sealed bundle lock",
     );
   } finally {
     await fsp.rm(root, { recursive: true, force: true });

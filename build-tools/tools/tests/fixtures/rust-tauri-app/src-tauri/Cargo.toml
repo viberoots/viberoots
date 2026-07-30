@@ -1,0 +1,4 @@
+[package]
+name = "desktop_src_tauri"
+version = "0.1.0"
+edition = "2021"

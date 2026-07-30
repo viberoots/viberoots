@@ -1,0 +1,29 @@
+{
+  "productName": "{{ name }}",
+  "version": "0.1.0",
+  "identifier": "{{ tauri_identifier }}",
+  "build": {
+    "frontendDist": "frontend-dist"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "security": {
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' ipc: http://ipc.localhost",
+      "capabilities": ["default"]
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "{{ name }}",
+        "width": 800,
+        "height": 600
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "icon": ["icons/icon.png"],
+    "resources": { "help.txt": "help/help.txt" },
+    "targets": ["app"]
+  }
+}

@@ -4,6 +4,7 @@ import path from "node:path";
 import { normalizeTargetLabel } from "./labels";
 import { resolveServerWasmContractArtifact } from "./runnable-wasm-artifacts";
 import { SSR_FRAMEWORKS } from "./runnable-contracts";
+import { inferTauriRunnable } from "./runnable-tauri";
 import { ensureNixStoreToolPathSync } from "./tool-paths";
 
 export type RunnableExec = {
@@ -143,6 +144,8 @@ export async function inferRunnableFromOutPath(opts: {
   } catch {}
 
   if (bins.length > 0) {
+    const tauri = await inferTauriRunnable(opts.outPath, opts.label, bins);
+    if (tauri) return tauri;
     return {
       kind: "native-bin",
       run: { prod: { argv: [bins[0]] } },

@@ -8,11 +8,13 @@ start with [Rust WebAssembly Operations](rust-wasm-operations.md#troubleshooting
 - Symptom: `i`, post-clone, devshell entry, or `b` reports a stale `Cargo.lock` and `repair: run u`.
 - Run `u` after ordinary `Cargo.toml` edits. Use `u --upgrade` only when dependency versions should
   intentionally move.
-- Cargo reconciliation is offline and uses only `.viberoots/workspace/cargo-home`; inherited
-  `CARGO_*` and Rust tool selectors are ignored. PR-3 provides no networked cache-population
-  command, so a missing crates.io index or crate entry fails closed and requires an explicitly
-  reviewed provisioning change rather than host Cargo or network access. Git and alternate
-  registries are not admitted sources and remain rejected even when an ambient cache contains them.
+- Cargo reconciliation uses only `.viberoots/workspace/cargo-home`; inherited `CARGO_*` and Rust
+  tool selectors are ignored. Explicit `u` may fetch the graph already fixed by `Cargo.lock` into
+  that workspace-owned cache. Resolution, metadata checks, fixed-source publication, ordinary
+  install, and builds remain offline. Modern Cargo caches are attested from the corresponding
+  `.crate` archive: its SHA-256 must match the lock before bounded extraction, and unsafe paths,
+  links, devices, or archive bytes outside the canonical workspace Cargo home fail closed.
+  Unsupported lock sources remain rejected even when an ambient cache contains them.
   Copied-root and temporary-execution-ancestor `.cargo/config*`, workspace cargo-home `config*`,
   and Nix source-root Cargo config files are rejected because source replacement can otherwise
   hide an alternate registry behind crates.io lock identity. Live ancestors outside the copied

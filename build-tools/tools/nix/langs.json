@@ -95,12 +95,15 @@
       "requiredPaths": [
         "viberoots/build-tools/rust/defs.bzl",
         "viberoots/build-tools/tools/nix/planner/rust.nix",
+        "viberoots/build-tools/tools/nix/planner/rust-tauri.nix",
         "viberoots/build-tools/tools/nix/templates/rust.nix",
+        "viberoots/build-tools/tools/nix/templates/rust-tauri.nix",
         "viberoots/build-tools/tools/nix/templates/rust-quality.nix",
         "viberoots/build-tools/tools/nix/templates/rust-dependency-inventory.nix",
         "viberoots/build-tools/tools/nix/templates/rust-evidence-install.nix",
         "viberoots/build-tools/tools/nix/flake/packages/toolchains.nix",
         "viberoots/build-tools/tools/dev/rust-dev-watch.ts",
+        "viberoots/build-tools/tools/dev/tauri-dev.ts",
         "viberoots/build-tools/tools/dev/verify/coverage-lcov-report.ts",
         "viberoots/build-tools/tools/wasm/wasi-runner.mjs",
         "viberoots/build-tools/tools/scaffolding/templates/rust/cli/Cargo.toml.jinja",
@@ -111,10 +114,11 @@
         "viberoots/build-tools/tools/scaffolding/templates/rust/python-extension/TARGETS.jinja",
         "viberoots/build-tools/tools/scaffolding/templates/rust/node-addon/TARGETS.jinja",
         "viberoots/build-tools/tools/scaffolding/templates/rust/cxx-bridge/TARGETS.jinja",
-        "viberoots/build-tools/tools/scaffolding/templates/rust/wasm/TARGETS.jinja"
+        "viberoots/build-tools/tools/scaffolding/templates/rust/wasm/TARGETS.jinja",
+        "viberoots/build-tools/tools/scaffolding/templates/rust/tauri-app/TARGETS.jinja"
       ],
       "optionalPaths": ["viberoots/build-tools/tools/tests/rust"],
-      "kinds": ["bin", "lib", "test", "wasm", "wasi"],
+      "kinds": ["app", "bin", "lib", "test", "wasm", "wasi"],
       "templatesDir": "viberoots/build-tools/tools/scaffolding/templates/rust",
       "hermetic": {
         "status": "experimental",

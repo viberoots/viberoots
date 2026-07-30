@@ -1,5 +1,6 @@
 {
   labelPriorityPre = [
+    { label = "app:tauri"; kind = "tauri"; }
     { label = "kind:addon"; kind = "addon"; }
     { label = "kind:pyext_wasm"; kind = "pyext_wasm"; }
     { label = "kind:pyext"; kind = "pyext"; }
@@ -14,6 +15,7 @@
     { label = "kind:lib"; kind = "lib"; }
   ];
   ruleTypes.suffixes = [
+    { suffix = "_tauri_app"; kind = "tauri"; }
     { suffix = "_node_addon"; kind = "addon"; }
     { suffix = "_python_wasm_extension"; kind = "pyext_wasm"; }
     { suffix = "_python_extension"; kind = "pyext"; }

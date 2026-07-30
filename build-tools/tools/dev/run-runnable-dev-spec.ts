@@ -110,3 +110,31 @@ export function directRustDevSpec(
     cwd: workspaceRoot,
   };
 }
+
+export function directTauriDevSpec(
+  workspaceRoot: string,
+  target: string,
+  artifactToolsRoot: string,
+  canonicalDevOverrideArg = "",
+): RunnableExec {
+  const viberootsRoot = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "..",
+    "..",
+  );
+  return {
+    argv: [
+      path.join(artifactToolsRoot, "bin", "zx-wrapper"),
+      path.join(viberootsRoot, "build-tools", "tools", "dev", "tauri-dev.ts"),
+      "--target",
+      target,
+      "--workspace-root",
+      workspaceRoot,
+      "--artifact-tools-root",
+      artifactToolsRoot,
+      ...(canonicalDevOverrideArg ? [canonicalDevOverrideArg] : []),
+    ],
+    cwd: workspaceRoot,
+  };
+}

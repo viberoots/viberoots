@@ -1,0 +1,5 @@
+version = 3
+
+[[package]]
+name = "composition_rust_wasm"
+version = "0.1.0"

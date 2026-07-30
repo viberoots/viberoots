@@ -48,11 +48,30 @@ export async function publicBuildOutPath(args: {
 }): Promise<string> {
   const result = await runPublicBuild({ ...args, showOutput: true });
   const output = `${String(result.stdout || "")}\n${String(result.stderr || "")}`;
-  const targetFragment = args.target.replace(/^\/\//, "//");
-  for (const line of output.trim().split(/\n+/).reverse()) {
-    if (!line.includes(targetFragment) || !line.includes("buck-out/")) continue;
-    const outPath = line.trim().split(/\s+/).pop() || "";
-    if (outPath) return path.isAbsolute(outPath) ? outPath : path.join(args.tmp, outPath);
+  return parsePublicBuildOutPath(output, args.target, args.tmp);
+}
+
+export function parsePublicBuildOutPath(
+  output: string,
+  target: string,
+  workspaceRoot: string,
+): string {
+  const matches = output
+    .trim()
+    .split(/\n+/)
+    .map((line) => line.trim().split(/\s+/))
+    .filter(
+      (fields) =>
+        fields.length === 2 &&
+        (fields[0] === target || /^[A-Za-z0-9_.-]+\/\//.test(fields[0])) &&
+        fields[0].endsWith(target) &&
+        fields[1].startsWith("buck-out/"),
+    )
+    .map((fields) => fields[1]);
+  if (matches.length !== 1) {
+    throw new Error(
+      `expected one public build output for ${target}, found ${matches.length}\n${output.slice(-8000)}`,
+    );
   }
-  throw new Error(`no public build output for ${args.target}\n${output.slice(-8000)}`);
+  return path.join(workspaceRoot, matches[0]);
 }

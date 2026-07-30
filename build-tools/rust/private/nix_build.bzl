@@ -6,6 +6,7 @@ load("@viberoots//build-tools/lang:nix_artifact_inputs.bzl", "nix_artifact_actio
 load("@viberoots//build-tools/lang:native_link.bzl", "NativeLinkInfo", "native_runtime_outputs")
 load("@viberoots//build-tools/lang:source_snapshot.bzl", "SourceSnapshotInfo")
 load("@viberoots//build-tools/rust/private:crate_contract.bzl", "rust_crate_closure_inputs", "rust_crate_contract_attrs", "rust_crate_info")
+load("@viberoots//build-tools/rust/private:tauri_contract.bzl", "tauri_action_inputs", "tauri_rule_attrs")
 load("@viberoots//build-tools/rust/private:wasm_contract.bzl", "wasm_contract_rule_attrs")
 
 def _rust_nix_build_impl(ctx):
@@ -13,6 +14,7 @@ def _rust_nix_build_impl(ctx):
     planner_label = ctx.attrs.planner_label or raw
     planner_target_name = planner_label.split(":")[-1]
     kind = ctx.attrs.kind
+    action_timeout_sec = 1200 if kind == "tauri" else 600
     crate_type = ctx.attrs.crate_type
     sanitized = sanitize_name(raw)
     target_name = ctx.label.name
@@ -42,7 +44,7 @@ def _rust_nix_build_impl(ctx):
         + "if [ \"$(uname -s 2>/dev/null || true)\" = \"Darwin\" ]; then [ ! -e \"$BUILD_SELECTED_LOG_DIR/.metadata_never_index\" ] && : > \"$BUILD_SELECTED_LOG_DIR/.metadata_never_index\"; fi; "
     )
     run_and_copy = (
-        nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = 600, include_pnpm_store = False, escape_cmd_subst = True)
+        nix_cmd_prefix(timeout_var = "TIMEOUT", timeout_sec = action_timeout_sec, include_pnpm_store = False, escape_cmd_subst = True)
         + nix_declared_action_inputs_manifest_cmd()
         + nix_calling_env_export_source_snapshot(snapshot_root = "${2:-}", manifest_path = "${3:-}")
         + "if [ -n \"${2:-}\" ]; then \"$VBR_ARTIFACT_TOOLS_ROOT/bin/node\" --disable-warning=ExperimentalWarning --experimental-strip-types \"${8:-}\" \"${2:-}\" \"${3:-}\"; fi; "
@@ -62,6 +64,9 @@ def _rust_nix_build_impl(ctx):
             log_file = "$BUILD_SELECTED_LOG",
             graph_json_arg = "${BUCK_GRAPH_JSON:-$1}",
         )
+        + "if [ \"$NIX_STATUS\" -eq 124 ] || [ \"$NIX_STATUS\" -eq 137 ]; then "
+        + "  echo \"rust_nix_build (%s): bounded %s action timed out after %ss; a trailing Nix 'interrupted by the user' line is timeout-wrapper termination, not user input\" >&2; " % (raw, kind, action_timeout_sec)
+        + "fi; "
         + "if [ \"$NIX_STATUS\" -ne 0 ] || [ -z \"$outPath\" ]; then "
         + "  if [ -f \"$BUILD_SELECTED_LOG\" ]; then cat \"$BUILD_SELECTED_LOG\" >&2; fi; "
         + "  if [ \"$NIX_STATUS\" -ne 0 ]; then exit \"$NIX_STATUS\"; fi; "
@@ -108,6 +113,10 @@ def _rust_nix_build_impl(ctx):
         + "  test -f \"$COMPONENT\" || { echo \"rust_nix_build (%s): expected component not found\" >&2; exit 2; }; " % raw
         + "  mkdir -p \"$0\"; cp -R \"$outPath/.\" \"$0/\"; chmod -R u+w \"$0\"; exit 0; "
         + "fi; "
+        + "if [ \"%s\" = \"tauri\" ]; then " % kind
+        + "  test -d \"$outPath/app\" || { echo \"rust_nix_build (%s): expected Tauri application bundle not found\" >&2; exit 2; }; " % raw
+        + "  mkdir -p \"$0\"; cp -R \"$outPath/.\" \"$0/\"; chmod -R u+w \"$0\"; exit 0; "
+        + "fi; "
         + ("TARGET_NAME=\"%s\"; " % target_name)
         + ("PLANNER_TARGET_NAME=\"%s\"; " % planner_target_name)
         + ("SANITIZED=\"%s\"; " % sanitized)
@@ -123,8 +132,9 @@ def _rust_nix_build_impl(ctx):
         + "fi; "
         + "DEST=\"$0\"; cp -f \"$CAND\" \"$DEST\"; "
     )
+    directory_family = kind in ["tauri", "wasm", "wasi", "wasm_static", "wasi_static", "wasm_browser", "wasm_component"]
     wasm_family = kind in ["wasm", "wasi", "wasm_static", "wasi_static", "wasm_browser", "wasm_component"]
-    out = ctx.actions.declare_output(ctx.attrs.out, dir = wasm_family)
+    out = ctx.actions.declare_output(ctx.attrs.out, dir = directory_family)
     remote_inputs = [
         ctx.attrs.materialization_manifest,
         ctx.attrs.artifact_contract,
@@ -134,7 +144,7 @@ def _rust_nix_build_impl(ctx):
     present_remote_inputs = [value for value in remote_inputs if value != None]
     wasm_inputs = [value for value in [ctx.attrs.wasm_header, ctx.attrs.wit] if value != None]
     crate_closure_inputs = rust_crate_closure_inputs(ctx)
-    declared_inputs = nix_artifact_action_inputs(ctx) + [ctx.attrs.cargo_manifest, ctx.attrs.cargo_lock] + crate_closure_inputs + wasm_inputs + snapshot_inputs + present_remote_inputs + control_inputs
+    declared_inputs = nix_artifact_action_inputs(ctx) + [ctx.attrs.cargo_manifest, ctx.attrs.cargo_lock] + crate_closure_inputs + wasm_inputs + tauri_action_inputs(ctx) + snapshot_inputs + present_remote_inputs + control_inputs
     cmd = cmd_args(
         [nix_artifact_bash(), "-c", run_and_copy, out.as_output(), ctx.attrs._graph_json] + snapshot_args + control_inputs + [declared_inputs],
         hidden = declared_inputs,
@@ -231,11 +241,10 @@ _ATTRS = {
         "_source_snapshot_validator": attrs.source(default = "@viberoots//build-tools/tools/dev:validate-source-snapshot.ts"),
 }
 _ATTRS.update(rust_crate_contract_attrs())
+_ATTRS.update(tauri_rule_attrs())
 _ATTRS.update(wasm_contract_rule_attrs())
-
 rust_nix_build = rule(
     impl = _rust_nix_build_impl,
     attrs = with_nix_artifact_action_attrs(_ATTRS),
 )
-
 __all__ = ["rust_nix_build"]

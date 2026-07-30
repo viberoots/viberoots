@@ -1,0 +1,12 @@
+# {{ name }}
+
+This experimental Tauri application consumes `:frontend`, a Buck-built and staged static frontend.
+Its canonical bundle identifier is `{{ tauri_identifier }}`.
+The frontend imports the module-based `@tauri-apps/api` surface; no global Tauri object is enabled.
+The Tauri config intentionally has no build or dev command hooks. Testable backend code lives in
+`src/lib.rs`; the scaffold includes `//projects/apps/{{ name }}:{{ name }}-test`, which tests that
+library without compiling the GUI entrypoint or requiring staged frontend assets. Run it with `v`. Run
+`b //projects/apps/{{ name }}:{{ name }}`
+for the credential-free platform-ad-hoc production artifact (not release-signed or
+release-admitted), `p` for its production executable, and `d` for the supervised
+source watcher. Current reviewed native packaging and launch evidence is limited to aarch64-darwin.

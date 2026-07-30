@@ -63,6 +63,10 @@ function pickTargetForImporter(
     if (matches.length === 1) return matches[0] || null;
   }
   if (normalizedTargets.length === 1) return normalizedTargets[0] || null;
+  const stagedStaticApps = normalizedTargets.filter((target) =>
+    labelsForTarget(nodesByTarget, target).includes("webapp:static"),
+  );
+  if (stagedStaticApps.length === 1) return stagedStaticApps[0] || null;
   const preferredKinds = ["lib", "app", "bin"];
   for (const kind of preferredKinds) {
     const match = normalizedTargets.filter((t) =>

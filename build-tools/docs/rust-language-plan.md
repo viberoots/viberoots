@@ -977,9 +977,10 @@ repository libraries without introducing another build, dependency, or runtime-d
 - Provide bounded production and dev behavior through shared runnable/process authorities. Reject
   undeclared resources or sidecars, path escape, wildcard capabilities, ambient host tools, hidden
   network access, and config/frontend mismatches.
-- Keep deterministic unsigned construction separate from signing and notarization. Protected release
-  admission requires reviewed external attestations without passing signing credentials into Buck
-  actions or Nix derivations.
+- Keep the required Apple Silicon linker-generated ad-hoc platform envelope credential-free and
+  separate from credentialed signing and notarization. Protected release admission requires
+  reviewed external attestations without passing signing credentials into Buck actions or Nix
+  derivations.
 - Exclude mobile, updater, arbitrary plugins, direct unstable C++ ABI, host/global `cargo-tauri`, and
   Windows until separate reviewed platform, runtime, toolchain, and signing contracts exist.
 
@@ -992,7 +993,9 @@ and launch evidence without sharing mutable Cargo, pnpm, GUI, or credential stat
 ### 4. Tests to be added
 
 - In fresh temporary flake-input and submodule consumers, scaffold the default app and prove the
-  `u` → read-only `i` → `b` → `v` → `r` lifecycle without modifying the real consumer repository.
+  `u` → read-only `i` → `b` → targeted `v` → production-run lifecycle without modifying the real
+  consumer repository. The repository's production-run front door is `p`; `r` in older generic
+  plan language does not name a supported command.
 - Prove the backend calls cross-root Rust and reviewed C/C++ libraries while the frontend loads
   staged Rust, C/C++, and another supported producer's WASM through module-surface contracts.
 - Prove source-sensitive invalidation and reject missing Cargo/Buck agreement, undeclared native
@@ -1037,7 +1040,8 @@ libraries, mutable sidecar discovery, or signing steps that contaminate determin
 
 Keep frontend building and every library mode as explicit typed inputs, generate least-privilege
 configuration, fail closed on undeclared platform/runtime requirements, use owned process and
-artifact-policy authorities, and separate unsigned construction from credentialed release admission.
+artifact-policy authorities, and keep credential-free platform-ad-hoc construction separate from
+credentialed release signing and admission.
 
 ### 9. Consequences of not implementing this PR
 
@@ -1071,7 +1075,8 @@ strongest language and application paths.
 - Add every Rust and Tauri outcome to protected CI, cache publication, provenance, SBOM, deployment,
   external signing/notarization admission, artifact graph, and backout policies.
 - Prove independent same-system builders produce the same Nix identity and semantic artifact
-  manifest for every representative Rust artifact family and the unsigned Tauri application.
+  manifest for every representative Rust artifact family and the credential-free, explicitly
+  non-release-signed Tauri application.
 - Complete Buck RE and Nix remote-builder parity, materialization, source-snapshot equivalence,
   cache isolation, interruption/owner-death cleanup, and secret redaction.
 - Run final plan/design assessments and close every Rust-flow and Tauri integration-debt entry before
@@ -1092,7 +1097,7 @@ and lock identity without shared mutable Cargo, pnpm, GUI, cache, or credential 
   ambiguous tool or runtime authority.
 - Independent-builder tests compare identities and semantic manifests for native bin/lib/test,
   proc macro, Python extension, Node addon, C/C++ bridge, raw/WASI/browser/component WASM,
-  cross-root composition, and the unsigned Tauri application package.
+  cross-root composition, and the credential-free ad-hoc Tauri application package.
 - Run the complete public Rust patch matrix on both builders and prove Tauri consumers receive the
   same patched or restored source identity.
 - Remote/cache tests prove cold materialization, warm reuse, no credential persistence, bounded disk
@@ -1131,8 +1136,8 @@ publication.
 
 ### 8. Mitigations
 
-Gate artifact families independently, normalize only understood nondeterminism, keep deterministic
-unsigned construction separate from signing admission, preserve failures, explicitly withhold
+Gate artifact families independently, normalize only understood nondeterminism, keep the local
+platform-required ad-hoc envelope separate from credentialed release signing and admission, preserve failures, explicitly withhold
 unsupported claims, and never restore an impure fallback.
 
 ### 9. Consequences of not implementing this PR

@@ -1,0 +1,80 @@
+{ lib, P, ctx, nodeFor, normalizeList, sourcePath }:
+let
+  clean = P.cleanLabel;
+  requiredString = name: field:
+    let value = ctx.get (nodeFor name) field;
+    in if value == null || !(builtins.isString value) || value == ""
+       then builtins.throw "Tauri target ${name} requires ${field}"
+       else value;
+  sourceList = name: field:
+    let value = ctx.get (nodeFor name) field;
+    in if value == null then []
+       else if builtins.isList value && builtins.all builtins.isString value
+       then map (item: builtins.toPath "${ctx.repoRootStr}/${sourcePath name item}") value
+       else builtins.throw "Tauri target ${name} ${field} must be a list of declared sources";
+  stringList = name: field:
+    let value = ctx.get (nodeFor name) field;
+    in if builtins.isList value && builtins.all builtins.isString value
+       then value
+       else builtins.throw "Tauri target ${name} ${field} must be a list of strings";
+  mappedSources = name:
+    let
+      paths = sourceList name "resources";
+      sources = stringList name "resource_sources";
+      destinations = stringList name "resource_destinations";
+    in if builtins.length paths != builtins.length sources
+      || builtins.length paths != builtins.length destinations
+       then builtins.throw "Tauri target ${name} resource mapping fields disagree"
+       else lib.imap0 (index: path: {
+         inherit path;
+         source = builtins.elemAt sources index;
+         destination = builtins.elemAt destinations index;
+       }) paths;
+  artifactRecord = destinations: index: dep: {
+    label = clean dep;
+    artifact = ctx.dependencyArtifactOf dep;
+    destination = builtins.elemAt destinations index;
+  };
+  validateFrontend = name: dep:
+    let labels = P.labelsOf (nodeFor dep);
+    in if builtins.elem "lang:node" labels
+       && (builtins.elem "kind:app" labels || builtins.elem "kind:webapp" labels)
+       && builtins.elem "webapp:static" labels
+       then dep
+       else builtins.throw
+         "Tauri target ${name} frontend_dist must be a Buck-built static Node webapp: ${dep}";
+  validateSidecar = name: dep:
+    let labels = P.labelsOf (nodeFor dep);
+    in if builtins.elem "sidecar:reviewed" labels && builtins.elem "kind:bin" labels
+       then dep
+       else builtins.throw
+         "Tauri target ${name} sidecar_deps requires kind:bin and sidecar:reviewed: ${dep}";
+in {
+  contractFor = name: selectedSystem:
+    let
+      frontend = validateFrontend name (clean (requiredString name "frontend_dist"));
+      sidecarDeps = map (validateSidecar name)
+        (normalizeList "sidecar_deps" (ctx.get (nodeFor name) "sidecar_deps"));
+      sidecarDestinations = stringList name "sidecar_destinations";
+      platform = requiredString name "tauri_platform";
+    in if platform != "aarch64-darwin" then builtins.throw
+      "Tauri target ${name} has no reviewed native package/launch evidence for ${platform}"
+    else if selectedSystem != platform then builtins.throw
+      "Tauri target ${name} requires selected system ${platform}; got ${selectedSystem}"
+    else if builtins.length sidecarDeps != builtins.length sidecarDestinations
+    then builtins.throw "Tauri target ${name} sidecar mapping fields disagree"
+    else {
+      inherit platform;
+      root = requiredString name "tauri_root";
+      config = builtins.toPath
+        "${ctx.repoRootStr}/${sourcePath name (requiredString name "tauri_config")}";
+      frontend = ctx.dependencyArtifactOf frontend;
+      resources = mappedSources name;
+      capabilities = sourceList name "capabilities";
+      permissions = sourceList name "permissions";
+      icons = sourceList name "icons";
+      sidecars = lib.imap0 (artifactRecord sidecarDestinations) sidecarDeps;
+      appCommands = stringList name "app_commands";
+      appWindows = stringList name "app_windows";
+    };
+}

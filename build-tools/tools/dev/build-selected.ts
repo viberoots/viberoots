@@ -43,6 +43,7 @@ import {
   runBoundedArtifactCommand,
 } from "../lib/artifact-command-runner";
 import { DEFAULT_GRAPH_PATH } from "../lib/graph-const";
+import { artifactNixPolicyArgs } from "../lib/artifact-nix-policy";
 
 async function runCommand(opts: {
   command: string;
@@ -112,6 +113,7 @@ async function chooseFlakeRef(opts: {
   attr: "graph-generator-selected" | "graph-generator-selected-wasm";
   env: NodeJS.ProcessEnv;
   devOverrides: DevOverrideValues;
+  immutableViberootsInputRoot: string;
   wasmBackend?: string;
   onlyCpp?: boolean;
   coverage?: boolean;
@@ -161,6 +163,7 @@ async function chooseFlakeRef(opts: {
     env: opts.env,
     selectorEnv: process.env,
     devOverrides: opts.devOverrides,
+    immutableViberootsInputRoot: opts.immutableViberootsInputRoot,
     wasmBackend: opts.wasmBackend,
     onlyCpp: opts.onlyCpp,
     coverage: opts.coverage,
@@ -314,6 +317,7 @@ async function main(artifactToolsRoot: string) {
     attr: parsedSource.attr,
     env: sanitizedEnv,
     devOverrides,
+    immutableViberootsInputRoot: canonicalViberootsReal,
     wasmBackend: getFlagStr("wasm-backend", "").trim(),
     onlyCpp: getFlagBool("planner-only-cpp"),
     coverage: getFlagBool("coverage"),
@@ -353,6 +357,35 @@ async function main(artifactToolsRoot: string) {
             env: flakeEnv,
           })
         : null;
+    if (getFlagBool("print-derivation-identity")) {
+      const nix = ensureNixStoreToolPathSync("nix", flakeEnv);
+      const identity = await runCommand({
+        command: nix,
+        args: [
+          "eval",
+          ...artifactNixPolicyArgs(),
+          "--no-write-lock-file",
+          "--accept-flake-config",
+          "--json",
+          flakeSource.flakeRef,
+          "--apply",
+          "package: [ package.drvPath package.outPath ]",
+        ],
+        env: flakeEnv,
+      });
+      const parsed = JSON.parse(identity.stdout) as unknown;
+      const [rawDrvPath, rawOutPath] = Array.isArray(parsed) ? parsed : [];
+      const drvPath = String(rawDrvPath || "");
+      const outPath = String(rawOutPath || "");
+      if (
+        !/^\/nix\/store\/[a-z0-9]{32}-[^/]+\.drv$/.test(drvPath) ||
+        !/^\/nix\/store\/[a-z0-9]{32}-[^/]+$/.test(outPath)
+      ) {
+        throw new Error("selected derivation identity is not a canonical Nix store identity");
+      }
+      process.stdout.write(`${JSON.stringify({ drvPath, outPath })}\n`);
+      return;
+    }
     const nixTrace = exporterDebug === "1" ? "--show-trace" : "";
     const runOnce = async () => {
       const args = selectedNixBuildArgs({

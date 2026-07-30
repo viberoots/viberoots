@@ -8,6 +8,7 @@ export const REQUIRED_FILTERED_FLAKE_EXCLUDES = [
   ".viberoots/workspace/.viberoots",
   ".viberoots/workspace/backups",
   ".viberoots/workspace/cache",
+  ".viberoots/workspace/cargo-home",
   ".viberoots/workspace/codex-test-logs",
   ".viberoots/workspace/exact-env-smoke.out",
   ".viberoots/workspace/host-path",

@@ -145,6 +145,7 @@ test("Rust scaffold inventory covers the supported PR-10 shapes", async () => {
     "node-addon",
     "proc-macro",
     "python-extension",
+    "tauri-app",
     "wasm",
   ]);
   const expectedMacros = {
@@ -154,6 +155,7 @@ test("Rust scaffold inventory covers the supported PR-10 shapes", async () => {
     "python-extension": "rust_python_extension",
     "node-addon": "rust_node_addon",
     "cxx-bridge": "rust_cxx_bridge_library",
+    "tauri-app": "tauri_app",
     wasm: "rust_wasm_library",
   };
   for (const [shape, macro] of Object.entries(expectedMacros)) {

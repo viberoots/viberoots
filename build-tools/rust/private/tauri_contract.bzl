@@ -1,0 +1,148 @@
+def _source_list(value, field):
+    if not isinstance(value, list):
+        fail("tauri_app: %s must be a list of declared source files" % field)
+    for item in value:
+        if not isinstance(item, str) or item == "":
+            fail("tauri_app: %s must contain non-empty source paths" % field)
+        if item.startswith("/") or ".." in item.split("/") or "\\" in item:
+            fail("tauri_app: %s must remain package-relative: %s" % (field, item))
+        if "*" in item:
+            fail("tauri_app: %s does not accept wildcard paths: %s" % (field, item))
+    return value
+
+def _relative_path(value, field):
+    if not isinstance(value, str) or value == "":
+        fail("tauri_app: %s must be a non-empty relative path" % field)
+    if value.startswith("/") or ".." in value.split("/") or "\\" in value or "*" in value:
+        fail("tauri_app: %s must remain package-relative: %s" % (field, value))
+    return value
+
+def _rooted(root, value):
+    return value if root == "." else root + "/" + value
+
+def _declared_identifiers(value, field, extra_characters = ""):
+    if not isinstance(value, list):
+        fail("tauri_app: %s must be a list of explicit identifiers" % field)
+    seen = []
+    first_characters = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_"
+    remaining_characters = first_characters + "0123456789" + extra_characters
+    for item in value:
+        if not isinstance(item, str) or item == "":
+            fail("tauri_app: %s must contain non-empty identifiers" % field)
+        if item[0] not in first_characters:
+            fail("tauri_app: %s must use a conservative identifier grammar: %s" % (field, item))
+        if [character for character in item[1:].elems() if character not in remaining_characters]:
+            fail("tauri_app: %s must use a conservative identifier grammar: %s" % (field, item))
+        if item in seen:
+            fail("tauri_app: %s must not contain duplicate identifiers: %s" % (field, item))
+        seen.append(item)
+    return value
+
+def _mapped_list(value, field, labels = False):
+    if not isinstance(value, list):
+        fail("tauri_app: %s must be a list of explicit src/dest mappings" % field)
+    sources = []
+    destinations = []
+    for item in value:
+        if not isinstance(item, dict) or sorted(item.keys()) != ["dest", "src"]:
+            fail("tauri_app: %s entries must contain only src and dest" % field)
+        source = item["src"]
+        if labels:
+            if not isinstance(source, str) or source == "":
+                fail("tauri_app: %s src must be a non-empty target label" % field)
+        else:
+            _relative_path(source, field + " src")
+        destination = _relative_path(item["dest"], field + " dest")
+        if destination in destinations:
+            fail("tauri_app: %s destinations must be unique: %s" % (field, destination))
+        sources.append(source)
+        destinations.append(destination)
+    return (sources, destinations)
+
+def prepare_tauri_contract(kind, kwargs):
+    if kind != "tauri":
+        return {}
+    kwargs["labels"] = (kwargs.get("labels", []) or []) + ["app:tauri", "platform:aarch64-darwin"]
+    root = kwargs.pop("tauri_root", ".")
+    if root not in [".", "src-tauri"]:
+        fail("tauri_app: tauri_root must be . or src-tauri")
+    config = kwargs.pop("tauri_config", "tauri.conf.json")
+    if config != "tauri.conf.json":
+        fail("tauri_app: tauri_config must be the canonical tauri-root-relative tauri.conf.json")
+    frontend = kwargs.pop("frontend_dist", None)
+    if not isinstance(frontend, str) or frontend == "":
+        fail("tauri_app: frontend_dist must name one Buck-built frontend target")
+    platform = kwargs.pop("tauri_platform", "aarch64-darwin")
+    if platform != "aarch64-darwin":
+        fail("tauri_app: only aarch64-darwin has reviewed native package and launch evidence; got %s" % platform)
+    resource_sources, resource_destinations = _mapped_list(
+        kwargs.pop("resources", []),
+        "resources",
+    )
+    capabilities = _source_list(kwargs.pop("capabilities", []), "capabilities")
+    permissions = _source_list(kwargs.pop("permissions", []), "permissions")
+    icons = _source_list(kwargs.pop("icons", []), "icons")
+    if not icons:
+        fail("tauri_app: icons must declare at least one package-relative icon")
+    sidecar_deps, sidecar_destinations = _mapped_list(
+        kwargs.pop("sidecar_deps", []),
+        "sidecar_deps",
+        labels = True,
+    )
+    app_commands = _declared_identifiers(kwargs.pop("app_commands", []), "app_commands")
+    app_windows = _declared_identifiers(kwargs.pop("app_windows", ["main"]), "app_windows", "-")
+    if not app_windows:
+        fail("tauri_app: app_windows must declare at least one window")
+    return {
+        "tauri_root": root,
+        "tauri_config": _rooted(root, config),
+        "frontend_dist": frontend,
+        "tauri_platform": platform,
+        "resources": [_rooted(root, value) for value in resource_sources],
+        "resource_sources": resource_sources,
+        "resource_destinations": resource_destinations,
+        "capabilities": [_rooted(root, value) for value in capabilities],
+        "permissions": [_rooted(root, value) for value in permissions],
+        "icons": [_rooted(root, value) for value in icons],
+        "sidecar_deps": sidecar_deps,
+        "sidecar_destinations": sidecar_destinations,
+        "app_commands": app_commands,
+        "app_windows": app_windows,
+    }
+
+def tauri_rule_attrs():
+    return {
+        "tauri_config": attrs.option(attrs.source(), default = None),
+        "tauri_root": attrs.string(default = "."),
+        "frontend_dist": attrs.option(attrs.dep(), default = None),
+        "tauri_platform": attrs.string(default = ""),
+        "resources": attrs.list(attrs.source(), default = []),
+        "resource_sources": attrs.list(attrs.string(), default = []),
+        "resource_destinations": attrs.list(attrs.string(), default = []),
+        "capabilities": attrs.list(attrs.source(), default = []),
+        "permissions": attrs.list(attrs.source(), default = []),
+        "icons": attrs.list(attrs.source(), default = []),
+        "sidecar_deps": attrs.list(attrs.dep(), default = []),
+        "sidecar_destinations": attrs.list(attrs.string(), default = []),
+        "app_commands": attrs.list(attrs.string(), default = []),
+        "app_windows": attrs.list(attrs.string(), default = []),
+    }
+
+def _dep_outputs(deps):
+    outputs = []
+    for dep in deps:
+        outputs.extend(dep[DefaultInfo].default_outputs)
+    return outputs
+
+def tauri_action_inputs(ctx):
+    if ctx.attrs.kind != "tauri":
+        return []
+    if ctx.attrs.tauri_config == None or ctx.attrs.frontend_dist == None:
+        fail("tauri_app requires declared configuration and frontend inputs")
+    return [
+        ctx.attrs.tauri_config,
+    ] + ctx.attrs.resources + ctx.attrs.capabilities + ctx.attrs.permissions + ctx.attrs.icons + _dep_outputs(
+        [ctx.attrs.frontend_dist] + ctx.attrs.sidecar_deps,
+    )
+
+__all__ = ["prepare_tauri_contract", "tauri_action_inputs", "tauri_rule_attrs"]

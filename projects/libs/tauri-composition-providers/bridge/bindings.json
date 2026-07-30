@@ -1,0 +1,13 @@
+{
+  "functions": [
+    {
+      "direction": "import",
+      "header": "native.h",
+      "name": "composition_native_answer",
+      "params": [],
+      "return": "i32"
+    }
+  ],
+  "headers": ["native.h"],
+  "schema": "viberoots.rust-interop.v1"
+}

@@ -67,11 +67,18 @@ export type RunnableTargetHints = {
   framework: string;
   targetKind: string;
   language: string;
+  tauri: boolean;
 };
 
 export function nonRunnableTargetReason(hints: RunnableTargetHints): string {
   if (!hints.targetKind) return "";
-  if (hints.language === "rust" && hints.targetKind !== "bin" && hints.targetKind !== "wasi") {
+  if (hints.tauri && hints.language === "rust" && hints.targetKind === "app") return "";
+  if (
+    hints.language === "rust" &&
+    hints.targetKind !== "bin" &&
+    hints.targetKind !== "tauri" &&
+    hints.targetKind !== "wasi"
+  ) {
     return `${hints.targetKind}-only`;
   }
   if (hints.targetKind === "lib" || hints.targetKind === "test") {
@@ -90,6 +97,7 @@ export async function runnableHintsForTarget(
     framework: "",
     targetKind: "",
     language: "",
+    tauri: false,
   };
   try {
     const graphTxt = await fsp.readFile(path.join(workspaceRoot, DEFAULT_GRAPH_PATH), "utf8");
@@ -105,6 +113,7 @@ export async function runnableHintsForTarget(
       let framework = "";
       let targetKind = "";
       let language = "";
+      let tauri = false;
       for (const label of labels) {
         const parsed = parseLockfileLabel(String(label || ""));
         if (parsed?.importer) importer = parsed.importer;
@@ -115,9 +124,10 @@ export async function runnableHintsForTarget(
         if (value === "framework:vite") framework = "vite";
         if (value === "framework:hatch") framework = "hatch";
         if (value.startsWith("kind:")) targetKind = value.slice("kind:".length);
+        if (value === "app:tauri") tauri = true;
         if (value.startsWith("lang:")) language = value.slice("lang:".length);
       }
-      return { importer, mode, framework, targetKind, language };
+      return { importer, mode, framework, targetKind, language, tauri };
     }
   } catch {}
   return fallback;

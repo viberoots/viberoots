@@ -450,12 +450,35 @@ Native and WASI binaries publish `runnable.kind = "native-bin"` and `run.prod`; 
 tests, and freestanding WASM remain absent from runnable summaries. A dev command is published only
 when an explicit stable contract exists.
 
+Tauri applications use shared `kind:app` plus `app:tauri` and publish
+`runnable.kind = "desktop-app"` with the Nix-built executable, application bundle, and artifact
+manifest. Apple Silicon executables retain the required linker-generated ad-hoc platform envelope;
+the manifest records that it is credential-free, has no team or signing identity, and is neither
+release-signed nor release-admitted. Their `run.dev` selects an explicit bounded Tauri watcher. It observes all
+non-generated files in the package so frontend, configuration, capability, resource, and Rust
+changes rebuild the selected production route. The config may not invoke independent build or dev
+commands.
+
+The Tauri owner root is explicit and bounded to the package root or `src-tauri`. Resource and
+sidecar inputs carry reviewed source-to-bundle destination mappings. Capability policy treats
+declared application commands and windows as the allowed universe. Each configured window has one
+exact capability owner, and that capability grants only its required declared command subset,
+including an empty set for an unprivileged window.
+Frontend JavaScript uses the pinned module-based `@tauri-apps/api` surface with the global API
+disabled. Remote CSP origins, plugins, updater artifacts, credentialed signing, and notarization
+remain outside this construction route and require later reviewed admission.
+
 Rust has an experimental enabled language-manifest entry backed by source-owned templates for CLI
-binaries, libraries, proc macros, Python extensions, Node addons, C++ bridges, and raw/WASI WASM.
+binaries, libraries, proc macros, Python extensions, Node addons, C++ bridges, raw/WASI WASM, and
+Tauri desktop applications.
 Every scaffold creates checked-in Cargo metadata and deterministic locks without invoking host Rust
 tools. Shape-specific lifecycle checks compile or run the applicable binary, library and doc tests,
 proc macro expansion, CPython import, Node addon load, C++ bridge consumer, or raw/WASI module;
 non-runnable shapes reject `r` and `d` before attempting a selected build.
+The Tauri scaffold emits its own `rust_test` target. Checked-in fresh flake-input and submodule
+consumer lifecycles execute `u`, prove `i` leaves tracked bytes unchanged, build the desktop target,
+run that exact test, and launch the packaged executable through the repository's `p`
+production-runnable front door with bounded process-group cleanup.
 
 Native execution evidence must come from a builder matching `aarch64-darwin`, `aarch64-linux`, or
 `x86_64-linux`; cross-evaluation is not native evidence. Rust tests remain local unless a reviewed
@@ -500,6 +523,11 @@ Rust is first-class only when all of the following are demonstrated:
 - Runnable commands resolve only reviewed Nix-store tools and artifacts.
 - Scaffolding, macro inventory, route policy, planner registry, docs, and verify selection remain in
   sync.
+
+PR-11 adds an `aarch64-darwin` Tauri route with pinned cargo-tauri, a staged Buck frontend,
+declared desktop inputs, local ad-hoc platform-envelope metadata, and a deterministic scaffold. It
+does not claim Linux support, credentialed release signing, notarization, publication admission, independent builders,
+production remote execution, or release hermeticity; those remain PR-12 gates.
 
 PR-7 adds native Python and Node managed-runtime extension contracts and explicitly rejects the
 currently unavailable Python WASM ABI. PR-8 adds reviewed C/C++ interoperability without promoting

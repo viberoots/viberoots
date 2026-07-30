@@ -96,6 +96,8 @@ Notes on Nix-backed Python outputs:
 - `rust_python_extension` → Nix build (`rust_nix_build` → selected CPython extension site).
 - `rust_python_wasm_extension` → Nix build (`rust_nix_build` reserved fail-closed route).
 - `rust_node_addon` → Nix build (`rust_nix_build` → stable Node-API `.node` artifact).
+- `tauri_app` → Nix build (`rust_nix_build` → credential-free platform-ad-hoc macOS application
+  bundle plus executable; not release-signed or release-admitted).
 
 All routes require canonical package-local `Cargo.toml` and `Cargo.lock` files, use Nix-store Rust
 tools, and reject placeholder output, stale locks, unsupported dependency sources, and cross-root
@@ -105,6 +107,12 @@ native dependencies resolve through `nixpkg_deps`, `nixpkgs_profile`, and `nixpk
 Native C/C++ inputs use explicit link intent. Rust, C++, and TinyGo WASM static inputs use the same
 direct/transitive closure model and fail closed on ABI, target, libc, allocator, exception, or
 runtime mismatch.
+`tauri_app` uses the shared `kind:app` contract with `app:tauri`, consumes a Buck-built
+`node_asset_stage` frontend with a locked module-based Tauri API, carries explicit resource and
+sidecar destinations plus command/window capabilities, and rejects hidden Tauri build/dev commands. Its current reviewed
+package and launch route is `aarch64-darwin`; Linux is not claimed. Sidecars require reviewed
+`kind:bin` dependencies, while native libraries remain behind reviewed Rust bridge crates and
+Cargo path dependencies.
 wasm-bindgen, wasm-tools, Binaryen, Wasmtime, and the preview1 adapters come from the selected Nix
 toolchain and are recorded in artifact provenance. Rust is scaffoldable as an experimental language.
 

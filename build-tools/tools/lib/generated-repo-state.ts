@@ -17,6 +17,7 @@ export const GENERATED_REPO_STATE_PATHS = [
   path.join(".viberoots", "workspace", "buck"),
   path.join(".viberoots", "workspace", ".viberoots"),
   path.join(".viberoots", "workspace", "cache"),
+  path.join(".viberoots", "workspace", "cargo-home"),
   path.join(".viberoots", "workspace", "codex-test-logs"),
   path.join(".viberoots", "workspace", "exact-env-smoke.out"),
   path.join(".viberoots", "workspace", "host-path"),

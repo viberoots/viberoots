@@ -48,6 +48,7 @@ This reference is a public interface guide for macros used in `TARGETS`. I keep 
   - `rust_proc_macro`
   - `rust_binary`
   - `rust_test`
+  - `tauri_app`
   - `rust_wasm_library`
   - `rust_wasi_binary`
   - `rust_wasm_static_library`
@@ -1709,6 +1710,36 @@ Public args:
 Use this for native Cargo tests. It accepts the same Cargo, source-selection, dependency, patch,
 label, and visibility arguments as `rust_library`. Buck executes the Nix-built Cargo harnesses
 through a bounded project-relative external runner. Tests are not runnable application entries.
+
+### `tauri_app(name, frontend_dist, **kwargs)`
+
+Builds a credential-free, platform-ad-hoc Tauri desktop application. The artifact is not
+release-signed or release-admitted. The target stamps `kind:app`, `app:tauri`, and
+`platform:aarch64-darwin`; only that platform currently has reviewed package and launch evidence.
+
+- `frontend_dist` is required and must name a Buck-built static Node application, normally the
+  output of `node_asset_stage`. Tauri `beforeBuildCommand` and `beforeDevCommand` hooks are rejected.
+- `tauri_root` is `.` or `src-tauri`; `tauri_config` defaults to `tauri.conf.json` within that
+  bounded root.
+- `resources` contains `{"src": "<root-relative source>", "dest": "<bundle destination>"}`
+  mappings. Destinations must be unique and traversal-free.
+- `sidecar_deps` contains equivalent mappings whose `src` values are reviewed `kind:bin`,
+  `sidecar:reviewed` targets.
+- `app_commands`, `app_windows`, `permissions`, and `capabilities` declare the least-privilege
+  command and window universe. Command names use Rust/Tauri identifiers. Each configured window has
+  exactly one capability owner; each capability may admit an exact subset of the declared
+  command-derived permissions, including none. Undeclared windows, commands, plugin or future
+  permissions, wildcards, duplicate identifiers, and ambiguous window coverage are rejected.
+- The frontend uses its locked module-based `@tauri-apps/api` dependency. The global API is
+  rejected.
+- Ordinary Rust `deps` continue to represent Cargo path dependencies. C/C++ code must remain behind
+  `rust_c_ffi_library` or `rust_cxx_bridge_library`; `tauri_app` does not admit direct
+  `link_deps`/`header_deps`.
+
+Production runnable metadata points at the built executable and application bundle. Development
+uses the explicit bounded Tauri watcher. Remote CSP origins, plugins, updater artifacts, signing,
+notarization, publication admission, Linux
+promotion, and release-hermetic claims are outside this experimental macro.
 
 ### `rust_wasm_library(name, wasm_abi = "bare", **kwargs)`
 

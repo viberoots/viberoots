@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-report-composition-evidence"
+description = "Allows the main window to report reviewed composition evidence."
+commands.allow = ["report_composition_evidence"]

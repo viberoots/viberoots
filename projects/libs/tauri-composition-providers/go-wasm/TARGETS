@@ -1,0 +1,3 @@
+load("@viberoots//build-tools/go:defs_wasm.bzl", "nix_go_tiny_wasm_lib")
+
+nix_go_tiny_wasm_lib(name = "go_module", srcs = ["main.go"], visibility = ["PUBLIC"])

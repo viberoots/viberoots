@@ -1,0 +1,3 @@
+load("@viberoots//build-tools/rust:defs.bzl", "rust_wasm_library")
+
+rust_wasm_library(name = "rust_module", crate = "composition_rust_wasm", srcs = ["src/lib.rs"], visibility = ["PUBLIC"])

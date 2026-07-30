@@ -1,0 +1,33 @@
+load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp")
+load("@viberoots//build-tools/rust:defs.bzl", "rust_test", "tauri_app")
+
+node_webapp(
+    name = "frontend_raw",
+    ts_module_roots = ["frontend/src"],
+)
+
+node_asset_stage(
+    name = "frontend",
+    app = ":frontend_raw",
+    labels = ["lang:node", "kind:app", "webapp:static"],
+    out = "dist",
+)
+
+tauri_app(
+    name = "{{ name }}",
+    capabilities = ["capabilities/default.json"],
+    icons = ["icons/icon.png"],
+    crate = "{{ name }}",
+    frontend_dist = ":frontend",
+    resources = [{"src": "help.txt", "dest": "help/help.txt"}],
+    srcs = ["build.rs", "src/lib.rs", "src/main.rs"],
+    tauri_config = "tauri.conf.json",
+    app_windows = ["main"],
+)
+
+rust_test(
+    name = "{{ name }}-test",
+    crate = "{{ name }}",
+    default_features = False,
+    srcs = ["src/lib.rs"],
+)

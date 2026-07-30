@@ -103,7 +103,7 @@ to watch the importer worktree rather than an evaluation bundle.
   `nixpkgs_profile` selects the toolchain and ordinary `nixpkg_deps`; `nixpkg_pins` redirects only
   declared native dependency attrs. Rust tests execute compiled Cargo harnesses through Buck's
   bounded project-relative external runner, and only Rust binaries enter `run.prod` manifests.
-- Rust is an enabled **experimental** language through the PR-10 implementation checkpoint. The reviewed baseline adds
+- Rust is an enabled **experimental** language through the PR-11 implementation checkpoint. The reviewed baseline adds
   direct/transitive C link intent, freestanding WebAssembly, a repository-owned WASI runner,
   scaffolded CLI projects, declared remote-ready evidence, source-based cross-root crates, and
   explicit `rlib`, `staticlib`, `cdylib`, host proc-macro, native CPython-extension, and Node-API
@@ -119,9 +119,14 @@ to watch the importer worktree rather than an evaluation bundle.
   execution still requires a compatible cached toolchain or builder on hosts that cannot construct
   the cross standard library inside their sandbox. PR-10 adds a Nix-owned analyzer/formatter/lint/
   documentation/coverage/debug closure, the Rust quality gate, direct bounded `run.dev` watching,
-  dependency inventories, private-source hygiene, and the Rust scaffold matrix. Tauri integration,
-  release publication, sandbox certification, and three-system execution conformance remain
-  planned in PR-11 and PR-12.
+  dependency inventories, private-source hygiene, and the Rust scaffold matrix. PR-11 adds the
+  `tauri_app` route on reviewed `aarch64-darwin`: a Buck-built staged frontend, declared
+  module-based frontend API, bounded owner root, command/window permissions, explicit
+  resource/sidecar source-to-bundle mappings, pinned cargo-tauri, credential-free Apple Silicon
+  ad-hoc application envelopes that are explicitly not release signatures,
+  explicit production/development runnable contracts, and a deterministic scaffold. Linux Tauri
+  promotion, signing/notarization, release publication, sandbox certification, independent
+  builders, and three-system execution conformance remain PR-12 work.
 - Artifact-producing public macro builds are migrated to Nix-backed paths using dynamic derivations.
 - Planner-visible probes/stubs are allowed only when explicitly documented as non-build exceptions.
 - Patching third-party modules is **ergonomic**, **idempotent**, and **cache-friendly**.

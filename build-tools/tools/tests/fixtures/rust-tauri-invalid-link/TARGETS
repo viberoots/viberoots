@@ -1,0 +1,11 @@
+load("@prelude//:rules.bzl", "filegroup")
+load("@viberoots//build-tools/rust:defs.bzl", "tauri_app")
+
+filegroup(name = "native", srcs = ["native.a"])
+
+tauri_app(
+    name = "desktop",
+    crate = "desktop",
+    frontend_dist = ":frontend",
+    link_deps = [":native"],
+)

@@ -10,10 +10,16 @@ import { runInTemp } from "../lib/test-helpers";
 test("workspace map generation matches providers", async () => {
   await runInTemp("node-workspace-map-gen", async (tmp, $) => {
     const appDir = path.join(tmp, "projects", "apps", "web");
+    const desktopDir = path.join(tmp, "projects", "apps", "desktop");
     const libDir = path.join(tmp, "projects", "libs", "ui");
     await fs.mkdirp(appDir);
+    await fs.mkdirp(desktopDir);
     await fs.mkdirp(libDir);
     await fs.writeJson(path.join(appDir, "package.json"), { name: "@repo/web", version: "0.0.0" });
+    await fs.writeJson(path.join(desktopDir, "package.json"), {
+      name: "@repo/desktop",
+      version: "0.0.0",
+    });
     await fs.writeJson(path.join(libDir, "package.json"), { name: "@repo/ui", version: "0.0.0" });
 
     const nodes = [
@@ -24,6 +30,25 @@ test("workspace map generation matches providers", async () => {
           "lang:node",
           "kind:app",
           "lockfile:projects/apps/web/pnpm-lock.yaml#projects/apps/web",
+        ],
+      },
+      {
+        name: "//projects/apps/desktop:frontend_raw",
+        rule_type: "genrule",
+        labels: [
+          "lang:node",
+          "kind:app",
+          "lockfile:projects/apps/desktop/pnpm-lock.yaml#projects/apps/desktop",
+        ],
+      },
+      {
+        name: "//projects/apps/desktop:frontend",
+        rule_type: "genrule",
+        labels: [
+          "lang:node",
+          "kind:app",
+          "webapp:static",
+          "lockfile:projects/apps/desktop/pnpm-lock.yaml#projects/apps/desktop",
         ],
       },
       {
@@ -62,6 +87,7 @@ test("workspace map generation matches providers", async () => {
       );
     }
     assert.deepEqual(got, {
+      "@repo/desktop": "//projects/apps/desktop:frontend",
       "@repo/ui": "//projects/libs/ui:ui",
       "@repo/web": "//projects/apps/web:web",
     });

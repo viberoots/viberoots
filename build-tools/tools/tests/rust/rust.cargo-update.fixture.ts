@@ -12,12 +12,14 @@ export async function rustUpdateFixture(): Promise<{ root: string; cargo: string
       `#!${process.execPath}`,
       'const fs = require("node:fs");',
       'const path = require("node:path");',
+      'const { spawnSync } = require("node:child_process");',
       "const args = process.argv.slice(2);",
       "const root = path.basename(process.cwd());",
-      'fs.appendFileSync(process.env.FAKE_CARGO_LOG, JSON.stringify({args, root}) + "\\n");',
+      'fs.appendFileSync(process.env.FAKE_CARGO_LOG, JSON.stringify({args, root, cargoHome: process.env.CARGO_HOME, offline: process.env.CARGO_NET_OFFLINE, path: process.env.PATH, token: process.env.CARGO_REGISTRIES_CRATES_IO_TOKEN}) + "\\n");',
+      'if (process.env.FAKE_CARGO_PROBE_TOOLS) { spawnSync("rustc", [], { env: process.env }); spawnSync("rustdoc", [], { env: process.env }); }',
       "const sleep = Number(process.env.FAKE_CARGO_SLEEP_MS || 0);",
       "if (sleep) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, sleep);",
-      "if (process.env.FAKE_CARGO_FAIL_ROOT === root) process.exit(23);",
+      'if (process.env.FAKE_CARGO_FAIL_ROOT === root) { process.stderr.write(process.env.FAKE_CARGO_STDERR || "fixture failure"); process.exit(23); }',
       'const lock = path.join(process.cwd(), "Cargo.lock");',
       'if (args[0] === "update") fs.writeFileSync(lock, "upgrade\\n");',
       'if (args[0] === "metadata" && !args.includes("--locked") && !process.env.FAKE_CARGO_PRESERVE_LOCK) fs.writeFileSync(lock, "reconciled\\n");',
@@ -26,6 +28,17 @@ export async function rustUpdateFixture(): Promise<{ root: string; cargo: string
     ].join("\n"),
     { mode: 0o755 },
   );
+  for (const tool of ["rustc", "rustdoc"]) {
+    await fsp.writeFile(
+      path.join(root, tool),
+      [
+        `#!${process.execPath}`,
+        'const fs = require("node:fs");',
+        'fs.appendFileSync(process.env.FAKE_CARGO_TOOL_LOG, process.argv[1] + "\\n");',
+      ].join("\n"),
+      { mode: 0o755 },
+    );
+  }
   return { root, cargo, log };
 }
 

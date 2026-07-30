@@ -40,6 +40,7 @@ def rust_macro_name(kind):
         "lib": "rust_library",
         "pyext": "rust_python_extension",
         "pyext_wasm": "rust_python_wasm_extension",
+        "tauri": "tauri_app",
         "test": "rust_test",
         "wasm": "rust_wasm_library",
         "wasm_browser": "rust_wasm_browser_package",
@@ -53,7 +54,7 @@ def rust_macro_name(kind):
     return names[kind]
 
 def crate_type_for(kind, value):
-    expected = "bin" if kind in ["bin", "wasi"] else "staticlib" if kind in ["wasm_static", "wasi_static"] else "cdylib" if kind in ["addon", "pyext", "pyext_wasm", "wasm", "wasm_browser", "wasm_component"] else "test" if kind == "test" else None
+    expected = "bin" if kind in ["bin", "tauri", "wasi"] else "staticlib" if kind in ["wasm_static", "wasi_static"] else "cdylib" if kind in ["addon", "pyext", "pyext_wasm", "wasm", "wasm_browser", "wasm_component"] else "test" if kind == "test" else None
     crate_type = value or expected or "rlib"
     allowed = ["bin", "rlib", "staticlib", "cdylib", "proc-macro", "test"]
     if crate_type not in allowed:
@@ -141,7 +142,10 @@ __all__ = [
 ]
 RUST_PUBLIC_ARGS = [
     "addon_name",
+    "app_commands",
+    "app_windows",
     "artifact_contract",
+    "capabilities",
     "build_py_deps",
     "binding_config",
     "cargo_fixed_sources",
@@ -158,9 +162,11 @@ RUST_PUBLIC_ARGS = [
     "default_features",
     "features",
     "exception_policy",
+    "frontend_dist",
     "generated_outputs",
     "header_deps",
     "host_role",
+    "icons",
     "interop_generator",
     "interop_kind",
     "labels",
@@ -180,16 +186,22 @@ RUST_PUBLIC_ARGS = [
     "platform",
     "profile",
     "panic_strategy",
+    "permissions",
     "python_abi",
     "public_crate",
     "remote_builder_smoke",
+    "resources",
     "runtime_deps",
+    "sidecar_deps",
     "source_snapshot",
     "source_snapshot_bundle",
     "source_snapshot_manifest",
     "srcs",
     "target",
     "target_triple",
+    "tauri_config",
+    "tauri_platform",
+    "tauri_root",
     "thread_safety",
     "stl",
     "tool_closure",

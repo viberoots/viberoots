@@ -13,6 +13,7 @@ test("buck project ignore policy excludes mutable non-build state", () => {
   assert.equal(ignored.includes(".viberoots"), false);
   assert.equal(ignored.includes(".viberoots/buck/tmp"), true);
   assert.equal(ignored.includes(".viberoots/workspace/viberoots-flake-input"), true);
+  assert.equal(ignored.includes(".viberoots/workspace/cargo-home"), true);
   assert.equal(ignored.includes("viberoots"), true);
   assert.equal(ignored.includes("viberoots/.direnv"), true);
   assert.equal(ignored.includes("viberoots/.viberoots"), true);
@@ -33,7 +34,7 @@ ignore = .viberoots/buck,.viberoots/workspace/buck/tmp,.claude/worktrees,.codex/
 name = TARGETS
 
 [project]
-ignore = .git, .direnv, .viberoots/buck, .viberoots/buck/tmp, .viberoots/workspace/buck/tmp, .viberoots/workspace/viberoots-flake-input, viberoots, viberoots/.direnv, viberoots/.viberoots, viberoots/buck-out, .claude/worktrees, .codex/worktrees
+ignore = .git, .direnv, .viberoots/buck, .viberoots/buck/tmp, .viberoots/workspace/buck/tmp, .viberoots/workspace/cargo-home, .viberoots/workspace/viberoots-flake-input, viberoots, viberoots/.direnv, viberoots/.viberoots, viberoots/buck-out, .claude/worktrees, .codex/worktrees
 `,
   );
 });

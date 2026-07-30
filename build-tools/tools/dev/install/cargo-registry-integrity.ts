@@ -3,6 +3,8 @@ import { constants } from "node:fs";
 import * as fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { type CargoArchiveRun, verifiedRegistryArchiveCopy } from "./cargo-registry-archive";
+import { cargoRegistrySourceFiles } from "./cargo-registry-source-files";
 
 type CargoChecksum = {
   files: Record<string, string>;
@@ -116,30 +118,30 @@ function checkedRelativePath(relative: string, key: string): string {
   return canonical;
 }
 
-async function sourceFiles(root: string, relative = ""): Promise<string[]> {
-  const files: string[] = [];
-  for (const item of await fsp.readdir(path.join(root, relative), { withFileTypes: true })) {
-    const child = relative ? `${relative}/${item.name}` : item.name;
-    if (item.isSymbolicLink())
-      throw new Error(`Cargo registry source contains a symlink: ${child}`);
-    if (item.isDirectory()) files.push(...(await sourceFiles(root, child)));
-    else if (item.isFile()) files.push(child);
-    else throw new Error(`Cargo registry source contains a non-regular file: ${child}`);
-  }
-  return files;
-}
-
 export async function verifiedRegistrySourceCopy(
   originPath: string,
   key: string,
   source: string,
   lockedChecksum: string,
+  run?: CargoArchiveRun,
+  cargoHome?: string,
 ): Promise<{ root: string; cleanup: () => Promise<void> }> {
   if (!source.startsWith("registry+") || !key.endsWith(`#${source}`)) {
     throw new Error(`Cargo registry materialization identity does not match Cargo.lock: ${key}`);
   }
   const checksumName = ".cargo-checksum.json";
-  const checksumRaw = await fsp.readFile(path.join(originPath, checksumName), "utf8");
+  const checksumRaw = await fsp
+    .readFile(path.join(originPath, checksumName), "utf8")
+    .catch((error: NodeJS.ErrnoException) => {
+      if (error.code === "ENOENT") return undefined;
+      throw error;
+    });
+  if (checksumRaw === undefined) {
+    if (!run || !cargoHome) {
+      throw new Error(`Cargo registry archive verification authority is unavailable for ${key}`);
+    }
+    return verifiedRegistryArchiveCopy(originPath, key, source, lockedChecksum, run, cargoHome);
+  }
   const checksum = parseChecksum(checksumRaw, key, lockedChecksum);
   const declared = new Map<string, string>();
   for (const [relative, digest] of Object.entries(checksum.files)) {
@@ -149,7 +151,9 @@ export async function verifiedRegistrySourceCopy(
     }
     declared.set(canonical, digest.toLowerCase());
   }
-  const actual = (await sourceFiles(originPath)).filter((file) => file !== checksumName).sort();
+  const actual = (await cargoRegistrySourceFiles(originPath))
+    .filter((file) => file !== checksumName)
+    .sort();
   const expected = [...declared.keys()].sort();
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
     throw new Error(`Cargo registry source files do not exactly match checksum metadata: ${key}`);

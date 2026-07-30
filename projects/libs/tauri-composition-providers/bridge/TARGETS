@@ -1,0 +1,12 @@
+load("@viberoots//build-tools/rust:defs.bzl", "rust_c_ffi_library")
+
+rust_c_ffi_library(
+    name = "bridge",
+    binding_config = "bindings.json",
+    crate = "composition_bridge",
+    deps = ["//projects/libs/tauri-composition-providers/backend:backend"],
+    header_deps = ["//projects/libs/tauri-composition-providers/native:headers"],
+    link_deps = ["//projects/libs/tauri-composition-providers/native:native"],
+    srcs = ["src/lib.rs"],
+    visibility = ["PUBLIC"],
+)

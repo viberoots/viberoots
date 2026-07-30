@@ -54,6 +54,7 @@ export const FILTERED_FLAKE_RSYNC_EXCLUDES = [
   ".viberoots/workspace/backups",
   ".viberoots/workspace/buck",
   ".viberoots/workspace/cache",
+  ".viberoots/workspace/cargo-home",
   ".viberoots/workspace/codex-test-logs",
   ".viberoots/workspace/exact-env-smoke.out",
   ".viberoots/workspace/host-path",

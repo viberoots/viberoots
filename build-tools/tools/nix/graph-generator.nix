@@ -353,6 +353,7 @@ let
       else if builtins.elem "lang:rust" labels then
         let kind = LANGS.rust.kindOf n; in
           if kind == "bin" then LANGS.rust.mkApp buildLabel
+          else if kind == "tauri" then LANGS.rust.mkTauri buildLabel
           else if kind == "test" then LANGS.rust.mkTest buildLabel
           else if kind == "lib" then LANGS.rust.mkLib buildLabel
           else if kind == "addon" then LANGS.rust.mkAddon buildLabel
@@ -577,6 +578,7 @@ let
           let nm = ensureFullLabel n; kind = LANGS.rust.kindOf n;
           in { name = nm; value =
             if kind == "bin" then LANGS.rust.mkApp nm
+            else if kind == "tauri" then LANGS.rust.mkTauri nm
             else if kind == "test" then LANGS.rust.mkTest nm
             else if kind == "wasm" then LANGS.rust.mkWasm nm
             else if kind == "wasi" then LANGS.rust.mkWasi nm
@@ -592,10 +594,21 @@ let
         ) safeRustNodes);
         binaryNames = builtins.filter (nm:
           let matches = builtins.filter (n: ensureFullLabel n == nm) safeRustNodes;
-          in matches != [] && builtins.elem (LANGS.rust.kindOf (builtins.head matches)) [ "bin" "wasi" ]
+          in matches != [] && builtins.elem (LANGS.rust.kindOf (builtins.head matches)) [ "bin" "tauri" "wasi" ]
         ) (builtins.attrNames rustTargets);
       in builtins.listToAttrs (map (nm: { name = nm; value = rustTargets.${nm}; }) binaryNames)
     );
+  rustRunnableMeta = builtins.listToAttrs (
+    map (nm:
+      let
+        matches = builtins.filter (n: ensureFullLabel n == nm) nodesList;
+        node = if matches == [] then null else builtins.head matches;
+      in {
+        name = nm;
+        value = { kind = if node == null then "" else LANGS.rust.kindOf node; };
+      }
+    ) (builtins.attrNames rustOutPaths)
+  );
   cppTargets = cppTargetsFromGraph;
 
   # Provide a flake-friendly flat attrset whose keys are safe identifiers: t + [a-z0-9_]+
@@ -750,6 +763,7 @@ let
               ) else if k.template == "rust" then (
                 let A = adapterFor "rust"; in
                 if k.kind == "bin" then A.mkApp buildLabel
+                else if k.kind == "tauri" then A.mkTauri buildLabel
                 else if k.kind == "test" then A.mkTest buildLabel
                 else if k.kind == "wasm" then A.mkWasm buildLabel
                 else if k.kind == "wasi" then A.mkWasi buildLabel
@@ -784,6 +798,7 @@ let
             goOutPaths cppOutPaths nodeOutPaths rustOutPaths modulesTomlFor pkgPathOf targetNameOf sanitize;
     nodeDevImporters = nodeDevImporters;
     nodeRunnableMeta = nodeRunnableMeta;
+    rustRunnableMeta = rustRunnableMeta;
     overridePresentList = overridePresentList;
   };
   all = Manifest.all;

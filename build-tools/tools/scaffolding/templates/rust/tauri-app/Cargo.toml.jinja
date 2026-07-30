@@ -1,0 +1,21 @@
+[package]
+name = "{{ name }}"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "{{ name }}"
+path = "src/main.rs"
+test = false
+bench = false
+required-features = ["desktop"]
+
+[features]
+default = ["desktop"]
+desktop = []
+
+[build-dependencies]
+tauri-build = { version = "=2.3.1", features = [] }
+
+[dependencies]
+tauri = { version = "=2.7.0", features = [] }

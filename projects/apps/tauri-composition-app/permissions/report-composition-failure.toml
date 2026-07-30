@@ -1,0 +1,4 @@
+[[permission]]
+identifier = "allow-report-composition-failure"
+description = "Allows the main window to report composition validation failures."
+commands.allow = ["report_composition_failure"]

@@ -106,6 +106,7 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
       - lib/<sanitized>.wasm
     """
     kw = dict(kwargs)
+    cpp_source_roots = kw.pop("cpp_source_roots", ["."])
     labels = kw.get("labels", []) or []
     # Ensure planner treats emscripten targets as libs (while still stamping kind:wasm).
     kw["labels"] = dedupe_preserve(labels + ["kind:lib"])
@@ -143,6 +144,14 @@ def nix_cpp_wasm_emscripten_lib(name, **kwargs):
         target_triple = "wasm32-unknown-emscripten",
         nix_inputs = cpp_runtime_nix_inputs(),
         visibility = prepared.get("visibility", []),
+    )
+    module_surface(
+        name = name + "__surface",
+        module_kind = "wasm",
+        source_roots = cpp_source_roots,
+        artifact_mapping_policy = "cpp-emscripten-wasm-v1",
+        watch_hints = cpp_source_roots,
+        visibility = ["PUBLIC"],
     )
 
 __all__ = [

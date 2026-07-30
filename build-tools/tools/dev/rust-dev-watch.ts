@@ -20,7 +20,7 @@ export type RustWatchDeps = {
 
 const ignored = new Set(["target", ".git", ".viberoots", "buck-out", "node_modules"]);
 
-async function collect(roots: readonly string[]): Promise<Fingerprint> {
+async function collect(roots: readonly string[], watchAll = false): Promise<Fingerprint> {
   const files = new Map<string, string>();
   const visit = async (current: string): Promise<void> => {
     for (const entry of await fsp.readdir(current, { withFileTypes: true }).catch(() => [])) {
@@ -29,7 +29,8 @@ async function collect(roots: readonly string[]): Promise<Fingerprint> {
       if (entry.isDirectory()) await visit(absolute);
       else if (
         entry.isFile() &&
-        (entry.name.endsWith(".rs") ||
+        (watchAll ||
+          entry.name.endsWith(".rs") ||
           entry.name === "Cargo.toml" ||
           entry.name === "Cargo.lock" ||
           entry.name.endsWith(".patch"))
@@ -81,6 +82,7 @@ export async function stopRustWatchChild(
 export async function runRustWatch(opts: {
   roots: readonly string[];
   pollMs: number;
+  watchAll?: boolean;
   stopGraceMs?: number;
   deps: RustWatchDeps;
   shouldStop: () => boolean;
@@ -92,7 +94,7 @@ export async function runRustWatch(opts: {
     if (handler) instance.removeListener("close", handler);
     closeHandlers.delete(instance);
   };
-  let fingerprint = await collect(opts.roots);
+  let fingerprint = await collect(opts.roots, opts.watchAll);
   const restart = async () => {
     const previous = child;
     await stopRustWatchChild(previous, opts.deps, opts.stopGraceMs);
@@ -114,7 +116,7 @@ export async function runRustWatch(opts: {
   try {
     while (!opts.shouldStop() && opts.deps.ownerAlive()) {
       await opts.deps.wait(opts.pollMs);
-      const next = await collect(opts.roots);
+      const next = await collect(opts.roots, opts.watchAll);
       if (!equal(fingerprint, next)) {
         fingerprint = next;
         await restart();
@@ -143,7 +145,12 @@ function overrideRoots(workspaceRoot: string, argv: readonly string[]): string[]
   });
 }
 
-async function main() {
+export async function runRustWatchEntrypoint(
+  options: {
+    watchAll?: boolean;
+    eventPrefix?: string;
+  } = {},
+) {
   const workspaceRoot = path.resolve(getFlagStr("workspace-root", process.cwd()));
   const target = getFlagStr("target", "");
   const artifactToolsRoot = path.resolve(getFlagStr("artifact-tools-root", ""));
@@ -172,6 +179,7 @@ async function main() {
     await runRustWatch({
       roots: [packageRoot, ...overrideRoots(workspaceRoot, process.argv.slice(2))],
       pollMs,
+      watchAll: options.watchAll,
       shouldStop: () => stopping,
       deps: {
         ownerAlive: () => process.ppid === ownerPid && process.ppid > 1,
@@ -190,7 +198,8 @@ async function main() {
             stdio: "inherit",
             detached: true,
           }),
-        onEvent: (event) => console.error(`[rust-watch] ${event} target=${target}`),
+        onEvent: (event) =>
+          console.error(`[${options.eventPrefix || "rust-watch"}] ${event} target=${target}`),
       },
     });
   } finally {
@@ -200,7 +209,7 @@ async function main() {
 
 const invoked = path.resolve(process.argv[1] || "");
 if (invoked === fileURLToPath(import.meta.url)) {
-  main().catch((error) => {
+  runRustWatchEntrypoint().catch((error) => {
     console.error(error instanceof Error ? error.message : String(error));
     process.exit(1);
   });

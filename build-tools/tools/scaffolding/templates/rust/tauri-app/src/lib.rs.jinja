@@ -1,0 +1,13 @@
+pub fn greeting(name: &str) -> String {
+    format!("Hello, {name}!")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::greeting;
+
+    #[test]
+    fn backend_greeting_includes_the_requested_name() {
+        assert_eq!(greeting("Viberoots"), "Hello, Viberoots!");
+    }
+}

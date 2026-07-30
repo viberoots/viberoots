@@ -169,6 +169,7 @@ def rust_wasm_module_surface(name, link_kind):
         source_roots = ["src"],
         artifact_mapping_policy = "rust-wasm:v2:" + link_kind,
         watch_hints = ["Cargo.toml", "Cargo.lock", "src", "wit"],
+        visibility = ["PUBLIC"],
     )
 
 __all__ = [

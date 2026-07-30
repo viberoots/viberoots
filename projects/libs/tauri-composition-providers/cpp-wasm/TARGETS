@@ -1,0 +1,3 @@
+load("@viberoots//build-tools/cpp:wasm_defs.bzl", "nix_cpp_wasm_emscripten_lib")
+
+nix_cpp_wasm_emscripten_lib(name = "module", exported_functions = ["cpp_wasm_answer"], srcs = ["module.cpp"], visibility = ["PUBLIC"])

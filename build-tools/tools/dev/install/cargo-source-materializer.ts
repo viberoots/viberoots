@@ -63,10 +63,20 @@ function isolatedGitEnvironment(toolsBin: string): NodeJS.ProcessEnv {
 function isolatedTarEnvironment(toolsBin: string): NodeJS.ProcessEnv {
   const env = { ...process.env, PATH: toolsBin };
   delete env.TAR_OPTIONS;
+  delete env.GZIP;
+  delete env.GZIP_BIN;
   return env;
 }
 
-export function cargoSourceMaterialization(root: string): {
+type CommandObservation = {
+  command: "cargo" | "git" | "nix" | "tar";
+  env: NodeJS.ProcessEnv;
+};
+
+export function cargoSourceMaterialization(
+  root: string,
+  deps: { observeCommand?: (observation: CommandObservation) => void } = {},
+): {
   materialize: (
     key: string,
     entry: FixedSourceEntry,
@@ -77,21 +87,26 @@ export function cargoSourceMaterialization(root: string): {
   const git = tool(root, "git");
   const cargo = tool(root, "cargo");
   const tar = tool(root, "tar");
-  const toolsBin = path.dirname(cargo);
+  const toolsBin = path.join(canonicalArtifactToolsRoot(root), "bin");
   const cargoEnv = isolatedCargoEnvironment(root, toolsBin);
   const gitEnv = isolatedGitEnvironment(toolsBin);
   const tarEnv = isolatedTarEnvironment(toolsBin);
   return {
-    runGit: (command, args, cwd) =>
-      checkedCommand(
+    runGit: (command, args, cwd) => {
+      const kind = command === "git" ? "git" : command === "cargo" ? "cargo" : "tar";
+      const env = kind === "cargo" ? cargoEnv : kind === "git" ? gitEnv : tarEnv;
+      deps.observeCommand?.({ command: kind, env: { ...env } });
+      return checkedCommand(
         root,
-        command === "git" ? git : command === "cargo" ? cargo : tar,
+        kind === "git" ? git : kind === "cargo" ? cargo : tar,
         args,
         cwd,
-        command === "cargo" ? cargoEnv : command === "git" ? gitEnv : tarEnv,
-      ),
+        env,
+      );
+    },
     materialize: async (key, entry) => {
       const name = `viberoots-cargo-${Buffer.from(key).toString("hex").slice(0, 24)}`;
+      deps.observeCommand?.({ command: "nix", env: { ...process.env } });
       const storePath = await checkedCommand(
         root,
         nix,

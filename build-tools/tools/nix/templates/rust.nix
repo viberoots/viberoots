@@ -34,7 +34,7 @@ in {
     addonName ? "",
     nodeApiVersion ? 0,
     platform ? "", pythonAbi ? "", artifactNixRoot ? "",
-    interop ? {}, wasm ? {}, coverage ? false,
+    interop ? {}, wasm ? {}, tauri ? {}, coverage ? false,
     }:
     let
       validatedTarget = validateKindTarget kind target;
@@ -57,7 +57,7 @@ in {
       sanitized = H.sanitizeName name;
       featureFlags = lib.optionals (!defaultFeatures) [ "--no-default-features" ]
         ++ lib.optionals (features != []) [ "--features" (lib.concatStringsSep "," features) ];
-      kindFlags = if kind == "bin" || kind == "wasi" then [ "--bin" targetName ] else if kind == "test" then [ "--tests" ] else [ "--lib" ];
+      kindFlags = if builtins.elem kind [ "bin" "tauri" "wasi" ] then [ "--bin" targetName ] else if kind == "test" then [ "--tests" ] else [ "--lib" ];
       cargoProfile = if profile == "dev" then "debug" else "release";
       targetFlags = lib.optionals (validatedTarget != "") [ "--target" validatedTarget ];
       cargoTarget = if validatedTarget == "" then pkgs.stdenv.targetPlatform.rust.rustcTargetSpec else validatedTarget;
@@ -142,7 +142,10 @@ in {
       quality = import ./rust-quality.nix {
         inherit pkgs lib rustToolchain crate packagePath featureFlags coverage;
       };
-      installPhase = baseInstallPhase + import ./rust-evidence-install.nix {
+      tauriContract = import ./rust-tauri.nix {
+        inherit pkgs lib kind tauri targetName cargoTarget cargoProfile;
+      };
+      installPhase = (if kind == "tauri" then tauriContract.installPhase else baseInstallPhase) + import ./rust-evidence-install.nix {
         inherit lib kind coverage interopContract wasmPostprocess compositionEvidence
           dependencyInventory extensionRuntime H name sourcePlan artifactNixRoot pkgs
           producerLineage;
@@ -169,11 +172,7 @@ in {
       cargoBuildType = cargoProfile;
       cargoBuildFlags = [ "--locked" "--package" crate ] ++ kindFlags ++ featureFlags ++ targetFlags;
       cargoTestFlags = [ "--package" crate ] ++ kindFlags ++ featureFlags ++ targetFlags; doCheck = false;
-      dontStrip = builtins.elem kind [ "wasm" "wasi" "wasm_static" "wasi_static" "wasm_browser" "wasm_component" ]; nativeBuildInputs = [ rustc pkgs.pkg-config pkgs.jq pkgs.llvmPackages.lld ]
-        ++ lib.optionals (kind == "test") [ pkgs.viberootsCargoLlvmCov ]
-        ++ lib.optionals (builtins.elem kind [ "wasm_static" "wasi_static" ]) [ pkgs.python3 pkgs.llvmPackages.llvm ]
-        ++ nixpkgDeps ++ nativePackages ++ extensionPackages ++ interopContract.buildInputs ++ wasmPostprocess.buildInputs;
-      buildInputs = nixpkgDeps ++ nativePackages ++ extensionPackages ++ interopContract.buildInputs;
+      dontStrip = builtins.elem kind [ "wasm" "wasi" "wasm_static" "wasi_static" "wasm_browser" "wasm_component" ];
       RUSTC = "${rustc}/bin/rustc";
       RUSTDOC = "${rustc}/bin/rustdoc";
       CARGO = "${rustToolchain}/bin/cargo";
@@ -196,11 +195,11 @@ in {
         ${lib.concatMapStringsSep "\n" (input: "test -e ${lib.escapeShellArg (builtins.toString input)}") patchInputs}
         ${patchPlan.postPatch}
       '';
-      buildPhase = import ./rust-wasm-build.nix {
+      buildPhase = if kind == "tauri" then tauriContract.buildPhase else import ./rust-wasm-build.nix {
         inherit pkgs rustToolchain lib validatedTarget cargoProfile crate kindFlags
           featureFlags targetFlags;
       };
-      preBuild = lib.optionalString (kind == "pyext" && buildPyDeps != []) ''
+      preBuild = tauriContract.preBuild + lib.optionalString (kind == "pyext" && buildPyDeps != []) ''
         export PYTHONNOUSERSITE=1
         for package in ${lib.concatStringsSep " " (map lib.escapeShellArg buildPyDeps)}; do
           ${pkgs.python3}/bin/python -c 'import importlib, sys; importlib.import_module(sys.argv[1])' "$package" ||
@@ -218,6 +217,12 @@ in {
           runtimePackages wasm wasmPostprocess cargoLock;
         inherit dependencyInventory;
       };
+    } // { nativeBuildInputs = [ rustc pkgs.pkg-config pkgs.jq pkgs.llvmPackages.lld ]
+        ++ tauriContract.nativeBuildInputs
+        ++ lib.optionals (kind == "test") [ pkgs.viberootsCargoLlvmCov ]
+        ++ lib.optionals (builtins.elem kind [ "wasm_static" "wasi_static" ]) [ pkgs.python3 pkgs.llvmPackages.llvm ]
+        ++ nixpkgDeps ++ nativePackages ++ extensionPackages ++ interopContract.buildInputs ++ wasmPostprocess.buildInputs;
+      buildInputs = nixpkgDeps ++ nativePackages ++ extensionPackages ++ interopContract.buildInputs ++ tauriContract.buildInputs;
     } // lib.optionalAttrs (builtins.elem kind [ "wasm_static" "wasi_static" ]) {
       "CARGO_PROFILE_${lib.toUpper cargoProfile}_DEBUG" = if wasm.debug then "2" else "0";
       "CARGO_PROFILE_${lib.toUpper cargoProfile}_OPT_LEVEL" =

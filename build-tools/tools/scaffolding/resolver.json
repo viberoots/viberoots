@@ -31,6 +31,7 @@
     "node-addon": "projects/libs/{name}",
     "proc-macro": "projects/libs/{name}",
     "python-extension": "projects/libs/{name}",
+    "tauri-app": "projects/apps/{name}",
     "wasm": "projects/libs/{name}"
   },
   "ts": {

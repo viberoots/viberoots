@@ -36,6 +36,31 @@ test("build consumers do not repair pnpm provisioning state", async () => {
   assert.doesNotMatch(nodeModulesBuild, /NIX_PNPM_EXACT_STORE/);
 });
 
+test("build-selected seals its admitted artifact source into the evaluation bundle", async () => {
+  const selected = await fsp.readFile(
+    viberootsSourcePath("viberoots/build-tools/tools/dev/build-selected.ts"),
+    "utf8",
+  );
+
+  assert.match(
+    selected,
+    /const canonicalViberootsReal = await fsp\.realpath\(canonicalViberootsSource\)/,
+  );
+  assert.match(
+    selected,
+    /makeFilteredFlakeRef\(\{[\s\S]*immutableViberootsInputRoot: opts\.immutableViberootsInputRoot/,
+  );
+  assert.match(
+    selected,
+    /chooseFlakeRef\(\{[\s\S]*immutableViberootsInputRoot: canonicalViberootsReal/,
+  );
+  assert.doesNotMatch(
+    selected,
+    /VIBEROOTS_FLAKE_INPUT_ROOT:\s*canonicalViberootsReal/,
+    "artifact evaluation must consume the sealed bundle lock, not ambient selector injection",
+  );
+});
+
 test("all Nix command surfaces share the repository pnpm 11 authority", async () => {
   const devshell = await fsp.readFile(
     viberootsSourcePath("viberoots/build-tools/tools/nix/devshell.nix"),

@@ -2,13 +2,16 @@
 let
   Semver = import ./rust-semver.nix { inherit lib; };
   rustNames = map (node: clean (P.nameOf node)) rustNodes;
-  runtimeDepNames = node:
-    let value = ctx.get node "runtime_deps";
-    in if value == null then [] else map clean value;
+  nonCargoDepNames = node:
+    lib.concatMap
+      (field:
+        let value = ctx.get node field;
+        in if value == null then [] else map clean value)
+      [ "runtime_deps" "sidecar_deps" ];
   rustDepNames = node:
     builtins.filter (dep: builtins.elem dep rustNames)
       (builtins.filter
-        (dep: !(builtins.elem dep (runtimeDepNames node)))
+        (dep: !(builtins.elem dep (nonCargoDepNames node)))
         (map clean (P.depsOf node)));
   first = values:
     let present = builtins.filter (value: value != null) values;

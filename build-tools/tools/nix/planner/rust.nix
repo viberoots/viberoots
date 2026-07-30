@@ -1,11 +1,8 @@
-{ lib }:
-ctx:
+{ lib }: ctx:
 let
-  P = import ./lib.nix { inherit lib; get = ctx.get; };
+  P = import ./lib.nix { inherit lib; get = ctx.get; }; clean = P.cleanLabel;
   pythonDepsFor = import ./rust-python-deps.nix { inherit P ctx normalizeList; };
-  clean = P.cleanLabel;
-  overrideEnv = "NIX_RUST_DEV_OVERRIDE_JSON";
-  rustDevOverrides = (ctx.languageOverrides or {}).${overrideEnv} or {};
+  overrideEnv = "NIX_RUST_DEV_OVERRIDE_JSON"; rustDevOverrides = (ctx.languageOverrides or {}).${overrideEnv} or {};
   _overrideClassification =
     if rustDevOverrides != {}
        && (ctx.evaluationClassification or "") != "local-development"
@@ -36,9 +33,11 @@ let
     if value == null then []
     else if builtins.isList value && builtins.all builtins.isString value then map clean value
     else builtins.throw "Rust planner ${field} must be a list of labels";
+  sanitizeNativeLinkName = value:
+    lib.replaceStrings [ "//" ":" "/" " " ] [ "" "-" "-" "-" ] value;
   runtimePackagesFor = import ./rust-runtime-deps.nix { inherit lib ctx normalizeList; }; validateInteropProfile = import ./rust-interop-profile.nix { inherit ctx; };
-  Wasm = import ./rust-wasm.nix { inherit lib P ctx nodeFor normalizeList; };
-  nativeInputsFor = name:
+  Wasm = import ./rust-wasm.nix { inherit lib P ctx nodeFor normalizeList; }; Tauri = import ./rust-tauri.nix { inherit lib P ctx nodeFor normalizeList sourcePath; };
+  nativeInputsForOne = name:
     let
       node = nodeFor name;
       interopKind = ctx.get node "interop_kind"; interopConsumer = interopKind != null && interopKind != "";
@@ -70,6 +69,14 @@ let
     in assert _overrides; {
       libraries = map (dep: ctx.dependencyArtifactOf (validate "link" dep)) resolved;
       headers = map (dep: ctx.dependencyArtifactOf (validate "header" dep)) headerDeps;
+      linkNames = map sanitizeNativeLinkName resolved;
+    };
+  nativeInputsFor = names:
+    let inputs = map nativeInputsForOne names;
+    in {
+      libraries = lib.unique (lib.concatMap (input: input.libraries) inputs);
+      headers = lib.unique (lib.concatMap (input: input.headers) inputs);
+      linkNames = lib.unique (lib.concatMap (input: input.linkNames) inputs);
     };
   nixpkgAttrsFor = name:
     let labels = P.labelsOf (nodeFor name);
@@ -80,21 +87,21 @@ let
       node = nodeFor name;
       manifest = ctx.get node "cargo_manifest";
       manifestRel = if manifest == null then "" else sourcePath name manifest;
-      root = dirOf manifestRel;
+      declaredRoot = ctx.get node "cargo_root"; root = if declaredRoot == null || declaredRoot == ""
+        then dirOf manifestRel else sourcePath name declaredRoot;
       expected = packagePath name;
-      canonical = "${expected}/Cargo.toml";
+      packageLocal = root == expected || lib.hasPrefix "${expected}/" root; canonical = "${root}/Cargo.toml";
     in if manifest == null then builtins.throw "Rust target ${name} is missing cargo_manifest"
+       else if !packageLocal then builtins.throw "Rust target ${name} Cargo root must remain within package ${expected}; got ${root}"
        else if manifestRel != canonical then builtins.throw
          "Rust target ${name} cargo_manifest must be canonical package-local ${canonical}; got ${manifestRel}"
-       else if root != expected then builtins.throw
-         "Rust target ${name} Cargo root must be package-local at ${expected}; got ${root}"
        else root;
   cargoLockFor = name:
     let
       node = nodeFor name;
       lock = ctx.get node "cargo_lock";
       lockRel = if lock == null then "" else sourcePath name lock;
-      canonical = "${packagePath name}/Cargo.lock";
+      canonical = "${cargoRootFor name}/Cargo.lock";
     in if lock == null then builtins.throw "Rust target ${name} is missing cargo_lock"
        else if lockRel != canonical then builtins.throw
          "Rust target ${name} cargo_lock must be canonical package-local ${canonical}; got ${lockRel}"
@@ -187,7 +194,11 @@ let
           builtins.toPath "${ctx.repoRootStr}/${sourcePath name wasmContractRaw.wit}";
       };
       nativeInputs = if Wasm.isWasmKind kind
-        then Wasm.inputsFor name kind else nativeInputsFor name;
+        then Wasm.inputsFor name kind
+        else nativeInputsFor (map (root: root.label) sourceComposition.roots);
+      tauri = if kind == "tauri"
+        then Tauri.contractFor name sourcePlan.base_pkgs.stdenv.hostPlatform.system
+        else {};
     in if missing != [] then builtins.throw
       "Rust planner unresolved nixpkg deps for ${name}: ${lib.concatStringsSep ", " (map (record: record.attr) missing)}"
     else assert _nativeInputBoundary; assert _overrideClassification; template.rustPackage {
@@ -217,6 +228,7 @@ let
       pythonAbi = if pythonAbi == null then "" else pythonAbi;
       inherit interop;
       wasm = wasmContract;
+      inherit tauri;
       coverage = ctx.coverageEnabled or false;
     };
 in {
@@ -224,7 +236,6 @@ in {
     ruleTypePrefixes = [ "rust_" ];
     label = "lang:rust";
   } n;
-
   kindOf = n: P.kindOf {
     labels = P.labelsOf n;
     ruleType = P.ruleTypeOf n;
@@ -232,12 +243,8 @@ in {
     config = import ./rust-kind-config.nix;
   };
   modulesFileFor = _: null;
-  mkApp = build "bin"; mkAddon = build "addon";
-  mkLib = build "lib"; mkTest = build "test";
-  mkPyExt = build "pyext"; mkPyExtWasm = build "pyext_wasm";
-  mkWasi = build "wasi"; mkWasm = build "wasm";
-  mkWasmBrowser = build "wasm_browser";
-  mkWasmComponent = build "wasm_component";
-  mkWasmStatic = build "wasm_static";
-  mkWasiStatic = build "wasi_static";
+  mkApp = build "bin"; mkAddon = build "addon"; mkLib = build "lib"; mkTest = build "test";
+  mkPyExt = build "pyext"; mkPyExtWasm = build "pyext_wasm"; mkTauri = build "tauri";
+  mkWasi = build "wasi"; mkWasm = build "wasm"; mkWasmBrowser = build "wasm_browser";
+  mkWasmComponent = build "wasm_component"; mkWasmStatic = build "wasm_static"; mkWasiStatic = build "wasi_static";
 }

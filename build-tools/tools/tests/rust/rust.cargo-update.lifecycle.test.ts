@@ -58,11 +58,63 @@ test("plain and upgrade Rust updates use exact offline argv in temporary copies"
       .split("\n")
       .map((line) => JSON.parse(line).args);
     assert.deepEqual(calls, [
+      ["fetch", "--locked"],
       ["metadata", "--offline", "--format-version", "1"],
       ["metadata", "--locked", "--offline", "--format-version", "1"],
+      ["fetch", "--locked"],
       ["update", "--offline"],
       ["metadata", "--locked", "--offline", "--format-version", "1"],
     ]);
+  } finally {
+    await fsp.rm(value.root, { recursive: true, force: true });
+  }
+});
+
+test("cold Rust update fetches locked sources without ambient Cargo authority or credential leakage", async () => {
+  const value = await fixture();
+  const ambientCargoHome = path.join(value.root, "hostile-ambient-cargo-home");
+  const toolLog = path.join(value.root, "cargo-tool-identities.log");
+  const registryToken = "cold-cache-registry-secret";
+  const urlPassword = "cold-cache-url-password";
+  try {
+    await addCargoRoot(value.root, "cold", "version = 3\n");
+    await assert.rejects(
+      withCargoEnv(
+        {
+          CARGO_HOME: ambientCargoHome,
+          CARGO_NET_OFFLINE: "false",
+          CARGO_REGISTRIES_CRATES_IO_TOKEN: registryToken,
+          PATH: path.join(value.root, "hostile-install-path"),
+          FAKE_CARGO_LOG: value.log,
+          FAKE_CARGO_PROBE_TOOLS: "1",
+          FAKE_CARGO_TOOL_LOG: toolLog,
+          FAKE_CARGO_FAIL_ROOT: "cold",
+          FAKE_CARGO_STDERR: `failed https://fixture:${urlPassword}@registry.example/index token=${registryToken}`,
+        },
+        async () => await repairRustDependencies(value.root, false, false, value.cargo),
+      ),
+      (error: Error) => {
+        assert.doesNotMatch(error.message, new RegExp(registryToken));
+        assert.doesNotMatch(error.message, new RegExp(urlPassword));
+        assert.match(error.message, /https:\/\/\[redacted\]@registry\.example/);
+        assert.match(error.message, /token=\[redacted\]/);
+        return true;
+      },
+    );
+    const [fetch] = (await fsp.readFile(value.log, "utf8"))
+      .trim()
+      .split("\n")
+      .map((line) => JSON.parse(line));
+    assert.deepEqual(fetch.args, ["fetch", "--locked"]);
+    assert.equal(fetch.cargoHome, path.join(value.root, ".viberoots/workspace/cargo-home"));
+    assert.equal(fetch.offline, undefined);
+    assert.equal(fetch.path, path.dirname(value.cargo));
+    assert.equal(fetch.token, undefined);
+    assert.deepEqual(
+      (await fsp.readFile(toolLog, "utf8")).trim().split("\n"),
+      ["rustc", "rustdoc"].map((tool) => path.join(path.dirname(value.cargo), tool)),
+    );
+    await assert.rejects(fsp.access(ambientCargoHome), /ENOENT/);
   } finally {
     await fsp.rm(value.root, { recursive: true, force: true });
   }

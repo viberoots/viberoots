@@ -67,7 +67,7 @@ const MIGRATION_PATTERNS: Pattern[] = [
     label: "migration label: legacy* identifier (replace with behavior name or remove)",
   },
   {
-    re: /\b(?:v[12]_?[A-Za-z][A-Za-z0-9_]*|[A-Za-z][A-Za-z0-9_]*_v[12]|[a-z][A-Za-z0-9]*V[12]|[A-Z][A-Za-z0-9]*V[12])\b/g,
+    re: /\b(?:v[12](?:_[A-Za-z]|[A-Z])[A-Za-z0-9_]*|[A-Za-z][A-Za-z0-9_]*_v[12]|[a-z][A-Za-z0-9]*V[12]|[A-Z][A-Za-z0-9]*V[12])\b/g,
     label: "migration label: internal v1/v2 identifier (use canonical behavior name)",
   },
 ];

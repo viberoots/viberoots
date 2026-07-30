@@ -14,6 +14,7 @@ function repoRsyncExcludeArgs(): string[] {
     "/.viberoots/workspace/buck",
     "/.viberoots/workspace/.viberoots",
     "/.viberoots/workspace/cache",
+    "/.viberoots/workspace/cargo-home",
     "/.viberoots/workspace/codex-test-logs",
     "/.viberoots/workspace/install-cache",
     "/.viberoots/workspace/nix-xdg-cache",

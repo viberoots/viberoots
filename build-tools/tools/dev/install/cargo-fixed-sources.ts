@@ -74,6 +74,7 @@ export async function materializeFixedSources(
     narHash: string;
   }>,
   runGit?: (command: string, args: string[], cwd: string) => Promise<string>,
+  cargoHome?: string,
 ): Promise<FixedSourceMap> {
   const result: FixedSourceMap = {};
   for (const [key, entry] of Object.entries(sources)) {
@@ -82,7 +83,14 @@ export async function materializeFixedSources(
       continue;
     }
     const verified = entry.source.startsWith("registry+")
-      ? await verifiedRegistrySourceCopy(entry.originPath, key, entry.source, entry.checksum)
+      ? await verifiedRegistrySourceCopy(
+          entry.originPath,
+          key,
+          entry.source,
+          entry.checksum,
+          runGit,
+          cargoHome,
+        )
       : runGit
         ? await verifiedGitSourceCopy(entry.originPath, key, entry.source, runGit)
         : (() => {

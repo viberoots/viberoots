@@ -1,0 +1,20 @@
+{
+  "app": {
+    "security": {
+      "capabilities": ["default"],
+      "csp": "default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' ipc: http://ipc.localhost"
+    },
+    "windows": [{ "label": "main", "title": "Typed composition" }],
+    "withGlobalTauri": false
+  },
+  "build": { "frontendDist": "frontend-dist" },
+  "bundle": {
+    "active": true,
+    "icon": ["icons/icon.png"],
+    "resources": { "resource.txt": "assets/resource.txt" },
+    "targets": ["app"]
+  },
+  "identifier": "dev.viberoots.typed-composition",
+  "productName": "Typed composition",
+  "version": "0.1.0"
+}

@@ -1,0 +1,11 @@
+{
+  "name": "@viberoots/tauri-composition-app",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "@tauri-apps/api": "2.7.0"
+  },
+  "devDependencies": {
+    "vite": "5.4.10"
+  }
+}

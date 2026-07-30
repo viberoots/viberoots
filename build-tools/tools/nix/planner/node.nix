@@ -104,7 +104,7 @@ in {
       inherit pkgs H repoStoreRoot repoFsRoot sharedNodeMods lockInfoOfName targetNameOf name nativeAddons;
     } else mkGenLike { inherit name; kind = "bin"; };
   mkWebapp = name: import ./node-webapp.nix {
-    inherit pkgs H repoStoreRoot repoFsRoot viberootsRoot sharedNodeMods lockInfoOfName nodeOfName labelsOf name nativeAddons;
+    inherit lib pkgs H repoStoreRoot repoFsRoot viberootsRoot sharedNodeMods dependencyArtifactOf lockInfoOfName nodeOfName labelsOf name nativeAddons;
     frameworkMissingError =
       "node planner: SSR webapp target ${name} missing framework label (framework:express|framework:next|framework:vite)";
   };

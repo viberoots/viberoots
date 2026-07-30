@@ -116,9 +116,7 @@ export async function verifiedGitSourceCopy(
       throw new Error(`Cargo Git package normalization produced ambiguous archives: ${key}`);
     }
     await fsp.mkdir(root);
-    const gzipArgs = process.env.GZIP_BIN
-      ? [`--use-compress-program=${process.env.GZIP_BIN}`]
-      : ["-z"];
+    const gzipArgs = ["-z"];
     await run(
       "tar",
       [

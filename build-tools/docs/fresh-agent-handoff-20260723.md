@@ -2,7 +2,7 @@
 
 **Prepared:** 2026-07-23
 
-**Last reconciled:** 2026-07-28, after PR-10 focused validation and terminal scope review
+**Last reconciled:** 2026-07-29, after PR-11 focused validation and terminal scope review
 
 **Workspace:** `/Users/kiltyj/Code/viberoots-site`
 
@@ -15,54 +15,79 @@ repository, staged and unstaged diffs, and the referenced logs before editing.
 
 ## 0. Current handoff: this section supersedes all older execution state below
 
-The next `$repo-skills:prs` item is PR-11, `Add A Cross-Language Tauri Desktop Scaffold`, from:
+The next `$repo-skills:prs` item is PR-12, `Prove Hermeticity, Publication Safety, And Final
+Language Parity`, from:
 
 ```text
 plan:   build-tools/docs/rust-language-plan.md
 design: build-tools/docs/lang/rust-design.md
 repo:   /Users/kiltyj/Code/viberoots-site/viberoots
-PR-9 commit: 9748d651 feat(rust): add WASM linking and component parity
+PR-10 commit: c3ca5bb5 feat(rust): complete developer lifecycle parity
 ```
 
-PR-10 implementation, risk-based validation, repeated independent reviewer-fix loops,
+PR-11 implementation, risk-based validation, repeated independent reviewer-fix loops,
 same-progression parity review, and terminal independent scope review are complete in the commit
-containing this handoff; inspect `HEAD` for its SHA. No push is authorized. PR-11 is next.
+containing this handoff; inspect `HEAD` for its SHA. No push is authorized. PR-12 is the sole
+remaining planned PR.
 
-PR-10 adds the Nix-owned Rust 1.88 developer closure and editor authority; rustfmt, Clippy,
-rustdoc/doc tests, benchmark compilation, real cargo-llvm-cov aggregation, dependency inventory,
-private-source hygiene, serialized bounded `run.dev` watching, explicit local override handling,
-and seven scaffold families. Fresh flake and real submodule lifecycles exercise CLI, library,
-proc-macro, Python extension, Node addon, C++ bridge, and raw/WASI WASM shapes. Non-runnable shapes
-reject `r` and `d` before selected builds.
+PR-11 adds a generic cross-language Tauri application route with a Node asset-stage frontend,
+Rust/C/C++ backend composition, Rust/C++/TinyGo WASM frontend composition, typed resources and
+sidecars, bounded multi-window capabilities, exact command-permission TOML admission, production
+packaging/running, a supervised development watcher, and deterministic root or `src-tauri`
+scaffolds. The current reviewed native evidence is `aarch64-darwin`; Linux promotion, protected
+publication, release signing/notarization, independent builders, and final hermeticity remain
+explicitly owned by PR-12.
 
-The final override route is intentionally asymmetric. Public `p` remains fail-closed even if an
-obsolete passthrough marker is spoofed. Public `d` accepts only an explicit Rust override from
-canonical argv, strips ambient artifact-affecting variables, and delegates to a private
-manifest-backed child. Tests prove two child spawns after an override edit, both expected outputs,
-absence of the ambient sentinel, and cleanup. Read-only prebuilds freeze generated artifact-tool
-authority; explicit `u` alone may reconcile it. The generated manifest, artifact-tools GC root, and
-fresh direnv shell must resolve to the same store path.
-
-The terminal exact ten-selector run passed shared 10/10 and enforcement 5/5 in 394 seconds. The
-source fingerprint remained
-`78ac564914960219716b313f90be8d3fcbe321485b954c4b24c87ffd00b5dc98`; the manifest, GC root, and
-fresh direnv authority remained
-`/nix/store/21l6n0hpxc2064rzclrx08164p8a37k4-remote-worker-tools`; and the manifest mtime was
-unchanged. Authoritative logs:
+The final fresh-consumer evidence is production-real. Both checked-in lifecycles run `scaf`, `u`,
+byte-checked read-only `i`, `b`, configured target inspection, ordinary targeted `v`, exact
+packaged executable `p` liveness, process-group cleanup, and Buck cleanup:
 
 ```text
-outer:
-  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/agent-test-logs/
-  v-terminal-final-ten-20260728-175235.log
-verify:
-  /Users/kiltyj/Code/viberoots-site/.viberoots/workspace/buck/verify-logs/
-  verify-2026-07-29T00-52-57-008Z-92548-11c1720f75c1b.log
+fresh flake-input consumer: 1/1, 9m49s
+  /Users/kiltyj/Code/viberoots-site/viberoots/buck-out/
+  tauri-scaffold-flake-lifecycle-final.log
+fresh submodule consumer:   1/1, 10m56s
+  /Users/kiltyj/Code/viberoots-site/viberoots/buck-out/
+  tauri-scaffold-submodule-lifecycle-final.log
 ```
 
-The terminal review found no implementation, security, lifecycle, authority, validation, parity, or
-methodology gap. Its only final findings were two stale documentation statements claiming that
-PR-9/10 remained and that Rust scaffolding was CLI-only; both are corrected in the commit containing
-this handoff, and the follow-up review passed.
+The submodule lifecycle additionally restores and byte-checks the reviewed flake lock, uses an
+immutable `.gitmodules` URL, asserts the filtered-input marker exists, byte-checks a representative
+source file against the visible submodule, and activates the source prelude. Important final focused
+evidence:
+
+```text
+short security/planner/contract gate:
+  permission policy, hostile Cargo archive authority, Cargo-root boundaries,
+  scaffold contract, and Tauri app contract
+  shared 5/5 in 14s, enforcement 5/5 in 5s
+  /Users/kiltyj/Code/viberoots-site/viberoots/buck-out/pr11-final-short-gates.log
+mixed composition runtime: 1/1, 29m49s
+  /Users/kiltyj/Code/viberoots-site/viberoots/buck-out/
+  tauri-composition-runtime-rerun11.log
+frontend asset composition: 1/1, 16m51s
+  /Users/kiltyj/Code/viberoots-site/viberoots/buck-out/
+  tauri-frontend-assets-rerun3.log
+package restoration lifecycle: 1/1, 8m21s
+  /Users/kiltyj/Code/viberoots-site/viberoots/buck-out/
+  tauri-package-restoration-final.log
+```
+
+The terminal reviewer passed the final tree after independently verifying that permission
+identifiers bind one-to-one to `commands.allow`, hostile compression variables are absent from the
+actual production tar-child environment, `src-tauri` Cargo roots reach and are bounded by the Nix
+planner, both fresh-consumer lifecycles exercise the generated test and exact package, and
+same-progression capabilities match mature language/application routes.
+
+The recurring macOS Keychain prompt for `ai.unfairly.desktop.preview.auth.v1` is not acceptable
+shipped-product UX merely because the secret belongs to Unfairly. A shipped consumer must use a
+stable code-signing identity and designated requirement. For Keychain items and APIs that support
+explicit access control, migrate an existing item's narrowly scoped ACL to that identity; do not
+grant broad access. `kSecAttrAccess` does not apply to synchronizable or data-protection-Keychain
+items, so the consumer must choose the migration appropriate to its storage API. PR-11 deliberately
+emits a credential-free platform-ad-hoc package, whose unstable/ad-hoc identity cannot provide that
+product guarantee. External signing/notarization admission is PR-12 scope, while the
+product-specific Keychain migration belongs in the eventual unfairly-app adoption work.
 
 Do not preserve the older staged-versus-unstaged separation described below. It is historical. Do
 not push. The parent consumer repository currently has a modified `viberoots` pointer and its
@@ -71,7 +96,8 @@ commit.
 
 ### How the PR flow is being run
 
-Use `repo-skills:prs` in turbo mode, with minimal-context independent agents:
+Use `repo-skills:prs` with the turbo-style minimal-context independent-agent orchestration. This
+describes agent context and log handling; it does not reduce PR-12's required Full-scope validation:
 
 1. Give each implementation, tester, or reviewer agent only the plan/design paths, PR identifier,
    repository path, and its bounded role. Do not fork the entire conversation into reviewers.
@@ -83,12 +109,10 @@ Use `repo-skills:prs` in turbo mode, with minimal-context independent agents:
 5. Commit through `repo-skills:cc` only after implementation review, validation, timing checks, and
    scope review are green. Never push without explicit user authorization.
 
-PR-10 is complete, so PRs 11-12 remain. Continue them in numeric order with a fresh isolated
-implementation agent and separate isolated reviewer/tester roles for each PR. Use risk-based
-focused suites for PR-11 because PR-9 exercised a complete checkpoint and PR-12 will do so again.
-Run the final full checkpoint for PR-12, or earlier if a material cross-cutting change makes the
-focused evidence insufficient. Record elapsed timing and compare successful full checkpoints with
-the 10,684-second successful baseline.
+PR-11 is complete, so only PR-12 remains. Use a fresh isolated implementation agent and separate
+isolated reviewer/tester roles. Run the final full checkpoint for PR-12, or earlier if a material
+cross-cutting change makes narrower evidence insufficient. Record elapsed timing and compare
+successful full checkpoints with the 10,684-second successful baseline.
 
 For a required full-suite run, stop only for a deterministic failure observed within the first five
 minutes. Once the run has crossed five minutes, continue to its final exit and collect every
@@ -358,7 +382,7 @@ runtime merge, and non-spoofable Python lockfile forwarding fixes. Earlier indep
 confirmed parity with mature Python, Node, and C++ routes at PR-7 while excluding intentional
 PR-8–12 work. No PR-7 scope finding remains open.
 
-### Remaining PRs
+### Remaining PRs after PR-7 (historical)
 
 - PR-11: the cross-language Tauri desktop scaffold.
 - PR-12: final multi-system hermetic graduation, publication, protected-builder, and independent
@@ -918,7 +942,7 @@ Implementation, tester, reviewer, and assessment subagents must be isolated with
 conversation into those agents. Keep full test output in log files; subagents should consume only
 high-signal phase and failure summaries unless they are investigating a saved failure.
 
-### Exact remaining PRs flow and Turbo contract
+### Exact remaining PRs flow and Turbo contract after PR-4 (historical)
 
 The active range is PR-5 through PR-12. Only PR-5 is open/in progress. PR-6 through PR-12 have not
 started. Keep implementation sequential. Turbo Mode changes the validation breadth for a PR; it

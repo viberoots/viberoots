@@ -1,0 +1,16 @@
+[package]
+name = "composition_desktop"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "desktop"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "=2.3.1", features = [] }
+
+[dependencies]
+composition_backend = { path = "../../libs/tauri-composition-providers/backend", version = "0.1.0" }
+composition_bridge = { path = "../../libs/tauri-composition-providers/bridge", version = "0.1.0" }
+tauri = { version = "=2.7.0", features = [] }

@@ -69,6 +69,81 @@ test("registry integrity snapshots only verified files and preserves checksum me
   }
 });
 
+test("registry integrity verifies and extracts modern Cargo cache archives without checksum sidecars", async () => {
+  const owner = await fsp.mkdtemp(path.join(os.tmpdir(), "vbr-registry-archive-"));
+  const origin = path.join(owner, "registry/src/index/dep-1.0.0");
+  const archive = path.join(owner, "registry/cache/index/dep-1.0.0.crate");
+  const archiveBytes = "reviewed crate archive";
+  const archiveChecksum = digest(archiveBytes);
+  try {
+    await fsp.mkdir(origin, { recursive: true });
+    await fsp.mkdir(path.dirname(archive), { recursive: true });
+    await fsp.writeFile(path.join(origin, "Cargo.toml"), "hostile unpacked cache\n");
+    await fsp.writeFile(archive, archiveBytes);
+    const verified = await verifiedRegistrySourceCopy(
+      origin,
+      key,
+      source,
+      archiveChecksum,
+      async (command, args) => {
+        assert.equal(command, "tar");
+        if (args[0] === "-t") {
+          return args.includes("-v")
+            ? "-rw-r--r-- 0/0 45 1970-01-01 00:00 dep-1.0.0/Cargo.toml\n"
+            : "dep-1.0.0/Cargo.toml\n";
+        }
+        const destination = args[args.indexOf("-C") + 1]!;
+        await fsp.writeFile(
+          path.join(destination, "Cargo.toml"),
+          "[package]\nname='dep'\nversion='1.0.0'\n",
+        );
+        return "";
+      },
+      owner,
+    );
+    try {
+      assert.match(
+        await fsp.readFile(path.join(verified.root, "Cargo.toml"), "utf8"),
+        /name='dep'/,
+      );
+      assert.doesNotMatch(
+        await fsp.readFile(path.join(verified.root, "Cargo.toml"), "utf8"),
+        /hostile/,
+      );
+    } finally {
+      await verified.cleanup();
+    }
+    await assert.rejects(
+      verifiedRegistrySourceCopy(origin, key, source, digest("wrong"), async () => "", owner),
+      /archive checksum does not match Cargo\.lock/,
+    );
+    await assert.rejects(
+      verifiedRegistrySourceCopy(
+        origin,
+        key,
+        source,
+        archiveChecksum,
+        async (_command, args) => (args[0] === "-t" ? "dep-1.0.0/../../escaped\n" : ""),
+        owner,
+      ),
+      /unsafe member path/,
+    );
+    await assert.rejects(
+      verifiedRegistrySourceCopy(
+        origin,
+        key,
+        source,
+        archiveChecksum,
+        async () => "",
+        path.join(owner, "ambient-cargo-home"),
+      ),
+      /ENOENT|unsupported source layout/,
+    );
+  } finally {
+    await fsp.rm(owner, { recursive: true, force: true });
+  }
+});
+
 test("registry integrity rejects tampered, missing, and unexpected files", async () => {
   await rejectsMutation(
     (root) => fsp.writeFile(path.join(root, "Cargo.toml"), "tampered\n"),

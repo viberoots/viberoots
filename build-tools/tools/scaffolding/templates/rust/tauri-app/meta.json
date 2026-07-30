@@ -1,0 +1,15 @@
+{
+  "language": "rust",
+  "template": "tauri-app",
+  "resolverDestination": "projects/apps/{name}",
+  "description": "Experimental Rust/Tauri desktop application with a Buck-built frontend",
+  "help": {
+    "usage": "scaf new rust tauri-app <name> [--path=DEST]",
+    "notes": [
+      "Creates a locked Cargo application, locked PNPM frontend, and backend-library Rust test target.",
+      "The Tauri config cannot run beforeBuildCommand or beforeDevCommand; frontend_dist is a Buck dependency.",
+      "Current reviewed native package and launch evidence is aarch64-darwin only."
+    ],
+    "examples": ["scaf new rust tauri-app demo --yes"]
+  }
+}

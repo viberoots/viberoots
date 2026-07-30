@@ -1,0 +1,56 @@
+load("@viberoots//build-tools/cpp:defs.bzl", "nix_cpp_binary")
+load("@viberoots//build-tools/node:defs.bzl", "node_asset_stage", "node_webapp")
+load("@viberoots//build-tools/rust:defs.bzl", "tauri_app")
+
+node_webapp(
+    name = "frontend_raw",
+    labels = ["lang:node", "kind:app", "framework:vite"],
+    lockfile_label = "lockfile:projects/apps/tauri-composition-app/pnpm-lock.yaml#projects/apps/tauri-composition-app",
+    ts_module_roots = ["."],
+)
+
+node_asset_stage(
+    name = "frontend",
+    app = ":frontend_raw",
+    assets = [
+        {"src": "//projects/libs/tauri-composition-providers/rust-wasm:rust_module", "dest": "wasm/rust.wasm"},
+        {"src": "//projects/libs/tauri-composition-providers/cpp-wasm:module", "dest": "wasm/cpp.wasm", "artifact_glob": "*.wasm"},
+        {"src": "//projects/libs/tauri-composition-providers/go-wasm:go_module", "dest": "wasm/go.wasm"},
+    ],
+    labels = ["kind:app", "webapp:static"],
+    lockfile_label = "lockfile:projects/apps/tauri-composition-app/pnpm-lock.yaml#projects/apps/tauri-composition-app",
+    module_deps = [
+        "//projects/libs/tauri-composition-providers/rust-wasm:rust_module",
+        "//projects/libs/tauri-composition-providers/cpp-wasm:module",
+        "//projects/libs/tauri-composition-providers/go-wasm:go_module",
+    ],
+)
+
+tauri_app(
+    name = "desktop",
+    app_commands = ["report_composition_evidence", "report_composition_failure"],
+    capabilities = ["capabilities/default.json"],
+    crate = "composition_desktop",
+    deps = [
+        "//projects/libs/tauri-composition-providers/backend:backend",
+        "//projects/libs/tauri-composition-providers/bridge:bridge",
+    ],
+    frontend_dist = ":frontend",
+    icons = ["icons/icon.png"],
+    permissions = [
+        "permissions/report-composition-evidence.toml",
+        "permissions/report-composition-failure.toml",
+    ],
+    resources = [{"src": "resource.txt", "dest": "assets/resource.txt"}],
+    sidecar_deps = [{"src": ":sidecar", "dest": "bin/composition-sidecar"}],
+    srcs = ["build.rs", "src/main.rs"],
+    app_windows = ["main"],
+)
+
+nix_cpp_binary(
+    name = "sidecar",
+    language_standard = "c11",
+    labels = ["sidecar:reviewed"],
+    srcs = ["sidecar.c"],
+    stl = "none",
+)

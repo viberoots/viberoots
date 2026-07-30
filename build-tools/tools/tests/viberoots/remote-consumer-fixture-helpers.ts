@@ -23,19 +23,26 @@ export async function makeRemoteSource(root: string, $: typeof globalThis.$): Pr
   const bareSource = path.join(root, "remote-viberoots.git");
   const emptyTemplate = path.join(root, "empty-git-template");
   await fsp.mkdir(emptyTemplate, { recursive: true });
+  // Keep the loose-object graph quiescent until it is copied into the deterministic bare source.
+  // Disabling only add-time GC is insufficient: commit may launch background maintenance.
   const gitEnv: NodeJS.ProcessEnv = {
     ...process.env,
     GIT_CONFIG_GLOBAL: "/dev/null",
     GIT_CONFIG_NOSYSTEM: "1",
     GIT_AUTHOR_DATE: "2000-01-01T00:00:00Z",
     GIT_COMMITTER_DATE: "2000-01-01T00:00:00Z",
+    GIT_CONFIG_COUNT: "2",
+    GIT_CONFIG_KEY_0: "gc.auto",
+    GIT_CONFIG_VALUE_0: "0",
+    GIT_CONFIG_KEY_1: "maintenance.auto",
+    GIT_CONFIG_VALUE_1: "0",
   };
   await $({
     stdio: "pipe",
   })`rsync -a --chmod=Du+rwx,Dgo+rx,Fu+rw,Fgo+r --exclude=.git --exclude=.direnv --exclude=.viberoots --exclude=buck-out --exclude=build-tools/tmp ${REPO_ROOT}/ ${source}/`;
   await fsp.chmod(source, 0o755);
   await $({ cwd: source, env: gitEnv })`git init -q --initial-branch=release/v1.4.2`;
-  await $({ cwd: source, env: gitEnv })`git -c gc.auto=0 add .`;
+  await $({ cwd: source, env: gitEnv })`git add .`;
   await $({
     cwd: source,
     env: gitEnv,

@@ -1,0 +1,38 @@
+load("@prelude//:rules.bzl", "filegroup")
+load("@viberoots//build-tools/rust:defs.bzl", "tauri_app")
+
+filegroup(
+    name = "frontend",
+    srcs = ["index.html"],
+    labels = ["lang:node", "kind:app", "webapp:static"],
+)
+
+filegroup(
+    name = "sidecar",
+    srcs = ["help.txt"],
+    labels = ["kind:bin", "sidecar:reviewed"],
+)
+
+tauri_app(
+    name = "desktop",
+    capabilities = ["capabilities/default.json"],
+    crate = "desktop",
+    frontend_dist = ":frontend",
+    icons = ["icons/icon.png"],
+    resources = [{"src": "help.txt", "dest": "help/help.txt"}],
+    sidecar_deps = [{"src": ":sidecar", "dest": "bin/sidecar"}],
+    srcs = ["src/main.rs"],
+    app_windows = ["main"],
+)
+
+tauri_app(
+    name = "desktop_src_tauri",
+    capabilities = ["capabilities/default.json"],
+    crate = "desktop_src_tauri",
+    frontend_dist = ":frontend",
+    icons = ["icons/icon.png"],
+    resources = [{"src": "help.txt", "dest": "help/help.txt"}],
+    srcs = ["src-tauri/src/main.rs"],
+    tauri_root = "src-tauri",
+    app_windows = ["main"],
+)

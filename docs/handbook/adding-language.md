@@ -90,7 +90,11 @@ Define these contracts before implementing a new language route:
   lockfile, generated input, patch, and fixed-source record. Compute the reachable closure from
   declared dependency edges. When copying roots for metadata or remote execution, copy each
   reachable root independently and stop traversal at nested language-root boundaries; never admit an
-  unrelated nested root merely because its ancestor is reachable.
+  unrelated nested root merely because its ancestor is reachable. If an explicit update command
+  populates a cold ecosystem cache, constrain it to the checked-in lock and a workspace-owned cache;
+  keep later metadata/build work offline. Attest immutable package archives against the lock before
+  bounded extraction, preflight normalized member containment and member types, and reject ambient
+  cache roots, traversal, links, devices, and checksum mismatches.
 - **Stable public artifacts:** specify the public filename and ABI/link identifier separately from
   the Buck target name and ecosystem package name. Validate identifiers with a conservative,
   explicit grammar before using them in a path, shell fragment, linker name, or provider. Repeat the
@@ -107,6 +111,12 @@ Define these contracts before implementing a new language route:
 - **Artifact-side Nix authority:** pass required reviewed experimental features (for example,
   `nix-command flakes`) explicitly in the Nix argv. Never rely on ambient `NIX_CONFIG`; every
   invocation must also carry the canonical reviewed or explicitly empty cache policy.
+- **Authoring versus artifact selectors:** keep lifecycle environment helpers phase-specific.
+  Authoring commands such as `u` and `i` may require an exact immutable source selector while they
+  record dependency and evaluation authority. Artifact commands such as `b`, `v`, and runnable
+  execution must remove that selector and consume the recorded evaluation bundle instead. Acceptance
+  harnesses should assert both halves so a selector cannot be silently dropped during authoring or
+  leak into artifact ingress.
 - **Proof-bound snapshots:** a remote snapshot is evidence, not just copied bytes. Include the
   selected target and its complete declared provider/source closure, record a canonical composition
   manifest, and bind it with a digest. Assert selected evaluation, full evaluation, snapshot
@@ -128,6 +138,15 @@ Required acceptance evidence should exercise behavior, not only source assertion
 - Test nested reachable and unrelated roots, external/escaping symlinks, hostile `PATH`/workspace
   state, target/host mismatches, malformed public identifiers, missing graph edges, and remote replay
   with the ambient checkout unavailable.
+- Exercise fresh flake-input and real submodule consumers through the same public lifecycle. A
+  submodule fixture must restore and byte-check the reviewed consumer lock, retain an immutable
+  `.gitmodules` URL, make the source submodule visible through `current`, prove filtered-source
+  marker presence and representative source-byte agreement, activate the source checkout's prelude,
+  and remove fixture-local direnv authority before running public commands. Whole-tree fingerprint
+  agreement requires separate non-empty fingerprint evidence; do not infer it from the current
+  marker. Reuse the mature lifecycle helper instead of rebuilding those activation steps
+  piecemeal; otherwise a fixture can accidentally evaluate unpinned input heads or a generated
+  prelude unrelated to the tested submodule.
 
 ### Command ownership and tool authority
 
@@ -181,13 +200,37 @@ A language is not integrated until its metadata lifecycle follows the repository
   entrypoint's explicit store closure.
 
 Rust is currently enabled as an experimental scaffolded language with package-local Cargo
-authority. Each Cargo root owns its checked-in `Cargo.toml` and `Cargo.lock`. Plain `u` performs
-bounded offline lock reconciliation, while `u --upgrade` performs the intentional offline dependency
-update; both run through the shared managed-command boundary and roll back every affected
-`Cargo.lock` byte-for-byte if any project fails. `i`, `b`, post-clone, and devshell entry remain
-read-only and report `repair: run u` for stale Cargo state. Rust scaffolds create the canonical
-package-local metadata and use only Nix-store Cargo, rustc, runners, and runnable tools. Keep these
-ownership, rollback, and tool-authority contracts intact while Rust remains experimental.
+authority. Each Cargo root owns its checked-in `Cargo.toml` and `Cargo.lock`. Explicit `u` may
+populate the workspace-owned Cargo cache with the already-locked graph, then performs bounded
+offline reconciliation; `u --upgrade` performs the intentional offline dependency update after the
+same locked-cache preparation. Both run through the shared managed-command boundary and roll back
+every affected `Cargo.lock` byte-for-byte if any project fails. `i`, `b`, post-clone, and devshell
+entry remain read-only and report `repair: run u` for stale Cargo state. Rust scaffolds create the
+canonical package-local metadata and use only Nix-store Cargo, rustc, runners, and runnable tools.
+Keep these ownership, rollback, and tool-authority contracts intact while Rust remains experimental.
+
+Application subtypes should preserve the shared application identity instead of inventing another
+top-level kind. The Tauri route stamps `kind:app` plus `app:tauri`; its internal planner kind is not
+an exporter-facing `kind:tauri`. Application-owned config, capabilities, resources, and frontend
+edges must also enter the source snapshot owner inputs. Do not hide those files only in a late Nix
+input list.
+
+For desktop application routes, preserve source and bundle identity separately. A resource or
+sidecar list without a destination is incomplete because the package layout becomes an implicit
+second authority. Keep owner roots bounded to reviewed layouts, carry source-to-destination
+mappings through macro, graph, planner, and manifest layers, and reject traversal or duplicate
+destinations at analysis time. Treat application commands and windows as an allowed universe:
+declare them once, bind each configured window to one exact capability mapping, permit individual
+capabilities to grant only their required command subset (including none), and reject global
+runtime APIs, undeclared/plugin/future permissions, or wildcards. A module-based frontend API must be a locked importer dependency and
+must pass through the existing frontend build rather than appearing as an ambient browser global.
+
+When a native shell embeds a web frontend, build the frontend once through the existing webapp and
+asset-stage module surfaces and pass that artifact as a dependency. Do not add a second raw WASM or
+frontend staging protocol, and reject ecosystem hooks that would rebuild the frontend behind
+Buck's graph. If the application needs broader development watching than an ordinary language
+binary, publish an explicit application watcher in `run.dev`; do not silently fall back to a
+generic watcher whose file scope is incomplete.
 
 ### Language contracts and manifest
 
@@ -475,6 +518,17 @@ Stamping belongs in the macro. If your macro synthesizes helper targets (for exa
 - Measure elapsed time and disk before and after focused runs using the named-path inventory in
   `docs/handbook/getting-started-on-a-pr.md`. Do not broaden source snapshots or copy shared caches to
   make a fixture pass.
+- When a fixture needs a tool already admitted by the development shell, query the declared shell
+  profile closure or pass its exact Nix-store path. Do not call `builtins.getFlake` on a mutable
+  checkout merely to rediscover that tool: path-flake evaluation can copy ignored generated state
+  such as `.viberoots` into the Nix store, multiplying disk use across repeated policy cases.
+- Treat ecosystem homes as generated state, not source. For Rust, exclude
+  `.viberoots/workspace/cargo-home` consistently from filtered snapshots, evaluation bundles, Buck
+  traversal, verifier seeds, and temp-repo copies. A Cargo build mutates `.global-cache` even when
+  every declared app input is unchanged; admitting that SQLite database can churn an unrelated
+  frontend derivation and therefore the enclosing application package. Prove both sides with a
+  focused snapshot test: mutations anywhere under the generated home retain identity, while a
+  declared project source mutation changes it.
 - Run `i && b && v` only after focused tests and scope review are green. Use
   `i && b && ALL_TESTS=1 v` at the plan's full-validation checkpoint, not after every small edit.
 

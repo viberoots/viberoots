@@ -2,11 +2,10 @@ import * as fsp from "node:fs/promises";
 import path from "node:path";
 import { canonicalArtifactToolsRoot } from "../../lib/artifact-environment";
 import { ensureNixStoreToolPathSync } from "../../lib/tool-paths";
-import { runManagedCommand } from "../../lib/managed-command";
 import { staleMetadataError } from "./metadata-mode";
 import { withFileRollback } from "../update-command/file-transaction";
-import { languageUpdateTimeoutMs } from "../update-command/languages";
 import { projectModuleDirs } from "../update-command/surfaces";
+import { assertCargoConfigIsolation, runCargo } from "./cargo-command";
 import { assertSupportedCargoLockSources } from "./cargo-source-policy";
 import {
   fixedSourcesFromCargoMetadata,
@@ -22,59 +21,7 @@ import { cargoLocks, copyCargoRoot } from "./cargo-root-copy";
 
 type LockOutput = { destination: string; bytes?: Buffer };
 
-export async function assertCargoConfigIsolation(
-  cargoRoot: string,
-  cargoHome: string,
-): Promise<void> {
-  const candidates = [path.join(cargoHome, "config"), path.join(cargoHome, "config.toml")];
-  for (let current = path.resolve(cargoRoot); ; current = path.dirname(current)) {
-    candidates.push(path.join(current, ".cargo/config"), path.join(current, ".cargo/config.toml"));
-    if (path.dirname(current) === current) break;
-  }
-  for (const candidate of candidates) {
-    const exists = await fsp.access(candidate).then(
-      () => true,
-      () => false,
-    );
-    if (exists) {
-      throw new Error(
-        `Rust Cargo configuration is unsupported because it can replace dependency sources: ${candidate}`,
-      );
-    }
-  }
-}
-
-async function runCargo(
-  cargoBin: string,
-  args: string[],
-  cwd: string,
-  workspaceRoot: string,
-  env: NodeJS.ProcessEnv = process.env,
-): Promise<string> {
-  const commandEnv = { ...env };
-  for (const key of Object.keys(commandEnv)) {
-    if (key.startsWith("CARGO_") || ["RUSTC", "RUSTFLAGS", "RUSTUP_HOME"].includes(key)) {
-      delete commandEnv[key];
-    }
-  }
-  const cargoHome = path.join(workspaceRoot, ".viberoots", "workspace", "cargo-home");
-  await assertCargoConfigIsolation(cwd, cargoHome);
-  await fsp.mkdir(cargoHome, { recursive: true });
-  const result = await runManagedCommand({
-    command: cargoBin,
-    args,
-    cwd,
-    env: { ...commandEnv, CARGO_HOME: cargoHome, CARGO_NET_OFFLINE: "true" },
-    timeoutMs: languageUpdateTimeoutMs(env),
-  });
-  if (result.ok && !result.interrupted) return result.stdout;
-  const reason = result.timedOut
-    ? `timed out after ${languageUpdateTimeoutMs(env) / 1000}s`
-    : result.interrupted
-      ? "was interrupted"
-      : `exited ${String(result.code)}`;
-  throw new Error(`cargo ${args.join(" ")} ${reason} in ${cwd}\n${result.stderr}`.trim());
-}
+export { assertCargoConfigIsolation } from "./cargo-command";
 
 const metadataArgs = ["metadata", "--offline", "--format-version", "1"];
 const lockedMetadataArgs = ["metadata", "--locked", "--offline", "--format-version", "1"];
@@ -133,6 +80,19 @@ async function prepareCargoRoot(
   const before = await cargoLocks(cargoRoot);
   const copy = await copyCargoRoot(cargoRoot, workspaceRoot);
   try {
+    const rootLock = path.join(cargoRoot, "Cargo.lock");
+    if (
+      await fsp.access(rootLock).then(
+        () => true,
+        () => false,
+      )
+    ) {
+      // Explicit `u` is the reviewed network-bearing authoring boundary. Fetch only
+      // the already-locked graph into the workspace-owned Cargo home; resolution,
+      // metadata validation, fixed-source publication, and all builds remain offline.
+      await assertSupportedCargoLockSources(rootLock);
+      await runCargo(cargoBin, ["fetch", "--locked"], copy.root, workspaceRoot, false);
+    }
     if (upgrade) await runCargo(cargoBin, ["update", "--offline"], copy.root, workspaceRoot);
     else await runCargo(cargoBin, metadataArgs, copy.root, workspaceRoot);
     const metadataJSON = await runCargo(cargoBin, lockedMetadataArgs, copy.root, workspaceRoot);
@@ -208,6 +168,7 @@ export async function repairRustDependencies(
           throw new Error("Cargo fixed-source materialization authority is unavailable");
         }),
       runGitSource || productionMaterialization?.runGit,
+      path.join(root, ".viberoots/workspace/cargo-home"),
     );
     const fixedSourceManifest = fixedSourceManifestPath(root);
     const outputs = [

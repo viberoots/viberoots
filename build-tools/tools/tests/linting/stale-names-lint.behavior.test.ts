@@ -74,6 +74,18 @@ test("stale-names-lint keeps external version strings out of migration-label che
   assert.match(result.stderr, /no stale names found/);
 });
 
+test("stale-names-lint keeps generated store and lock hashes out of migration-label checks", async () => {
+  const fixture = await writeFixture(
+    "flake.lock",
+    JSON.stringify({
+      url: "git+file:///nix/store/v1abc234def567ghi890jklmnopqrstu-viberoots-remote-git",
+      narHash: "sha256-v2lowercasegeneratedlockpayload",
+    }),
+  );
+  const result = await execFileAsync("zx-wrapper", [script, fixture.file], { cwd: fixture.cwd });
+  assert.match(result.stderr, /no stale names found/);
+});
+
 test("stale-names-lint skips opaque binary asset content", async () => {
   const fixture = await writeFixture("image.png", "bnx DemoStateV1 PR-7 legacy-helper\n");
   const result = await execFileAsync("zx-wrapper", [script, fixture.file], { cwd: fixture.cwd });

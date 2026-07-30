@@ -7,6 +7,7 @@ load("@viberoots//build-tools/rust/private:composition_snapshot.bzl", "rust_comp
 load("@viberoots//build-tools/rust/private:extension_contract.bzl", "prepare_python_build_wiring", "validate_addon_name", "validate_extension_kind_args", "validate_node_api_version")
 load("@viberoots//build-tools/rust/private:interop_contract.bzl", "prepare_interop_kwargs")
 load("@viberoots//build-tools/rust/private:macro_contract.bzl", "RUST_PUBLIC_ARGS", "artifact_out", "crate_type_for", "fixed_artifact_contract", "has_nixpkg_inputs", "public_crate_for", "rust_macro_name", "single_cargo_file", "valid_features", "validate_crate_names", "validate_local_patch_dirs", "validate_public_crate", "with_required_target")
+load("@viberoots//build-tools/rust/private:tauri_contract.bzl", "prepare_tauri_contract")
 load("@viberoots//build-tools/rust/private:wasm_contract.bzl", "is_wasm_kind", "prepare_wasm_contract", "rust_wasm_module_surface")
 def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, interop = False):
     kw = dict(kwargs)
@@ -40,17 +41,16 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
     kw["link_closure_overrides"] = link_closure_overrides
     extra = normalize_labels(native.package_name(), kw.pop("extra_module_providers", []))
     unknown = sorted([key for key in kw.keys() if key not in RUST_PUBLIC_ARGS])
-    if unknown:
-        fail("%s: unknown arguments: %s" % (rust_macro_name(kind), ", ".join(unknown)))
+    if unknown: fail("%s: unknown arguments: %s" % (rust_macro_name(kind), ", ".join(unknown)))
     wasm_attrs = prepare_wasm_contract(kind, kw)
-    cargo_manifest = single_cargo_file(kw.pop("cargo_manifest", None), "Cargo.toml", "cargo_manifest")
-    cargo_lock = single_cargo_file(kw.pop("cargo_lock", None), "Cargo.lock", "cargo_lock")
+    tauri_attrs = prepare_tauri_contract(kind, kw)
+    tauri_root = tauri_attrs.get("tauri_root", "."); cargo_prefix = "" if tauri_root == "." else tauri_root + "/"
+    cargo_manifest = single_cargo_file(kw.pop("cargo_manifest", None), cargo_prefix + "Cargo.toml", "cargo_manifest")
+    cargo_lock = single_cargo_file(kw.pop("cargo_lock", None), cargo_prefix + "Cargo.lock", "cargo_lock")
     cargo_output_hashes = kw.pop("cargo_output_hashes", {})
     cargo_fixed_sources = kw.pop("cargo_fixed_sources", {})
-    if not isinstance(cargo_output_hashes, dict):
-        fail("rust target cargo_output_hashes must be a dict of package-version to Nix hash")
-    if not isinstance(cargo_fixed_sources, dict):
-        fail("rust target cargo_fixed_sources must be a dict of source identity to reviewed JSON")
+    if not isinstance(cargo_output_hashes, dict): fail("rust target cargo_output_hashes must be a dict of package-version to Nix hash")
+    if not isinstance(cargo_fixed_sources, dict): fail("rust target cargo_fixed_sources must be a dict of source identity to reviewed JSON")
     for key, value in cargo_fixed_sources.items():
         if not isinstance(key, str) or not isinstance(value, str):
             fail("rust target cargo_fixed_sources keys and reviewed JSON values must be strings")
@@ -78,12 +78,9 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
     validate_crate_names(crate, cargo_package); validate_public_crate(public_crate)
     if interop: generated_outputs += [public_crate + ".h", public_crate + ".rs"] + ([public_crate + ".hpp"] if interop_attrs["interop_kind"] == "cxx" else [])
     else: interop_attrs["module_surface"] = "rust-module:v1:%s:%s:%s" % (kind, crate_type, target or "native")
-    if host_role not in ["host", "target"]:
-        fail("rust target host_role must be host or target")
-    if crate_type == "proc-macro" and host_role != "host":
-        fail("rust proc-macro targets must use the host role")
-    if not isinstance(generated_outputs, list) or not generated_outputs:
-        fail("rust target generated_outputs must be a non-empty list")
+    if host_role not in ["host", "target"]: fail("rust target host_role must be host or target")
+    if crate_type == "proc-macro" and host_role != "host": fail("rust proc-macro targets must use the host role")
+    if not isinstance(generated_outputs, list) or not generated_outputs: fail("rust target generated_outputs must be a non-empty list")
     for generated_output in generated_outputs:
         if not isinstance(generated_output, str) or generated_output == "":
             fail("rust target generated_outputs must contain non-empty strings")
@@ -108,19 +105,20 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
         fail("rust target target must be %s for kind %s" % (expected_target if expected_target else "empty", kind))
     if "local_patch_dirs" in kw:
         validate_local_patch_dirs(kw["local_patch_dirs"])
+    app_deps = tauri_attrs.get("sidecar_deps", []) + ([tauri_attrs["frontend_dist"]] if kind == "tauri" else [])
     wiring = prepare_language_wiring(
         name = name,
         kwargs = kw,
         lang = "rust",
-        kind = kind,
+        kind = "app" if kind == "tauri" else kind,
         MODULE_PROVIDERS = MODULE_PROVIDERS,
-        deps = merge_link_intent_deps(deps, link_deps, header_deps) + runtime_deps + extra,
+        deps = merge_link_intent_deps(deps, link_deps, header_deps) + runtime_deps + app_deps + extra,
     )
     prepared = wiring.kwargs
     prepared.update(remote_kwargs)
-    cargo_root_srcs = native.glob(["**/*.rs"])
-    owner_srcs = dedupe_preserve((prepared.get("srcs", []) or []) + native.glob(
-        ["src/**/*.rs", "build.rs", "benches/**/*.rs", "examples/**/*.rs", "tests/**/*.rs"],
+    cargo_root_srcs = native.glob([cargo_prefix + "**/*.rs"]); tauri_owner_srcs = ([tauri_attrs["tauri_config"]] + tauri_attrs["resources"] + tauri_attrs["capabilities"] + tauri_attrs["permissions"] + tauri_attrs["icons"]) if kind == "tauri" else []
+    owner_srcs = dedupe_preserve((prepared.get("srcs", []) or []) + tauri_owner_srcs + native.glob(
+        [cargo_prefix + "src/**/*.rs", cargo_prefix + "build.rs", cargo_prefix + "benches/**/*.rs", cargo_prefix + "examples/**/*.rs", cargo_prefix + "tests/**/*.rs"],
     ))
     attrs = {
         "name": name,
@@ -132,14 +130,14 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
         "header_deps": prepared.get("header_deps", []) or [],
         "link_closure": prepared.get("link_closure", link_closure),
         "link_closure_overrides": prepared.get("link_closure_overrides", link_closure_overrides),
-        "srcs": dedupe_preserve((prepared.get("srcs", []) or []) + cargo_root_srcs),
+        "srcs": dedupe_preserve((prepared.get("srcs", []) or []) + tauri_owner_srcs + cargo_root_srcs),
         "labels": prepared.get("labels", []) or [],
         "nix_inputs": global_nix_inputs(),
         "cargo_manifest": cargo_manifest,
         "cargo_lock": cargo_lock,
-        "cargo_root": native.package_name(),
+        "cargo_root": native.package_name() + ("" if tauri_root == "." else "/" + tauri_root),
         "cargo_package": cargo_package,
-        "cargo_lock_identity": "%s/Cargo.lock" % native.package_name(),
+        "cargo_lock_identity": "%s%sCargo.lock" % (native.package_name() + "/", cargo_prefix),
         "cargo_output_hashes": cargo_output_hashes,
         "cargo_fixed_sources": cargo_fixed_sources,
         "crate": crate,
@@ -169,6 +167,7 @@ def _rust_nix_target(name, kind, out, kwargs, python_lockfile_label = None, inte
         })
         attrs.update(interop_attrs)
         attrs.update(wasm_attrs)
+        attrs.update(tauri_attrs)
     snapshot_attrs = {key: attrs[key] for key in [
         "cargo_root", "cargo_package", "cargo_manifest", "cargo_lock",
         "cargo_lock_identity", "public_crate", "crate_type", "host_role",
@@ -212,6 +211,8 @@ def rust_proc_macro(name, **kwargs):
     kw = fixed_artifact_contract(kwargs, "rust_proc_macro", "proc-macro", "host"); _rust_nix_target(name = name, kind = "lib", out = artifact_out(public_crate_for(name, kw), "proc-macro"), kwargs = kw)
 def rust_binary(name, **kwargs):
     _rust_nix_target(name = name, kind = "bin", out = name, kwargs = kwargs)
+def tauri_app(name, frontend_dist, **kwargs):
+    kw = dict(kwargs); kw["frontend_dist"] = frontend_dist; _rust_nix_target(name = name, kind = "tauri", out = name + ".tauri", kwargs = kw)
 def rust_test(name, **kwargs):
     _rust_nix_target(name = name, kind = "test", out = name + ".stamp", kwargs = kwargs)
 def rust_wasm_library(name, wasm_abi = "bare", **kwargs):
@@ -246,4 +247,4 @@ def rust_python_wasm_extension(name, backend, **kwargs):
 def rust_node_addon(name, addon_name = None, node_api_version = 8, platform = "selected", **kwargs):
     resolved_name = validate_addon_name(addon_name or name); validate_node_api_version(node_api_version)
     kw = fixed_artifact_contract(kwargs, "rust_node_addon", "cdylib", "target"); kw.update({"addon_name": resolved_name, "node_api_version": node_api_version, "platform": platform}); _rust_nix_target(name = name, kind = "addon", out = resolved_name + ".node", kwargs = kw)
-__all__ = ["rust_binary", "rust_c_ffi_library", "rust_cdylib", "rust_cxx_bridge_library", "rust_library", "rust_node_addon", "rust_proc_macro", "rust_python_extension", "rust_python_wasm_extension", "rust_static_library", "rust_test", "rust_wasi_binary", "rust_wasm_browser_package", "rust_wasm_component", "rust_wasm_library", "rust_wasm_static_library"]
+__all__ = ["rust_binary", "rust_c_ffi_library", "rust_cdylib", "rust_cxx_bridge_library", "rust_library", "rust_node_addon", "rust_proc_macro", "rust_python_extension", "rust_python_wasm_extension", "rust_static_library", "rust_test", "rust_wasi_binary", "rust_wasm_browser_package", "rust_wasm_component", "rust_wasm_library", "rust_wasm_static_library", "tauri_app"]

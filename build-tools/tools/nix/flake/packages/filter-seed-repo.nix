@@ -128,6 +128,8 @@ let
     (lib.hasPrefix ".viberoots/workspace/backups/" rel) ||
     rel == ".viberoots/workspace/cache" ||
     (lib.hasPrefix ".viberoots/workspace/cache/" rel) ||
+    rel == ".viberoots/workspace/cargo-home" ||
+    (lib.hasPrefix ".viberoots/workspace/cargo-home/" rel) ||
     rel == ".viberoots/workspace/codex-test-logs" ||
     (lib.hasPrefix ".viberoots/workspace/codex-test-logs/" rel) ||
     rel == ".viberoots/workspace/install-cache" ||

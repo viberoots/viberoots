@@ -270,7 +270,17 @@ Treat unexpected disk growth during `i`, `b`, or `v` like an execution-time regr
 
 Recent fixes prove these guardrails:
 
-- **Generated state must stay out of reviewed and seeded sources**. Source filters, seed filters, temp-repo rsync, and bootstrap repair paths must exclude generated roots consistently. Recent fixes added guardrails for `.viberoots/buck`, `.viberoots/cache`, `.viberoots/workspace/buck`, `.viberoots/workspace/codex-test-logs`, `viberoots/.viberoots`, `viberoots/buck-out`, `viberoots/node_modules`, `.direnv`, `.nix-gcroots`, `result*`, build outputs, and test logs.
+- **Generated state must stay out of reviewed and seeded sources**. Source filters, evaluation
+  bundles, Buck traversal, seed filters, temp-repo rsync, and bootstrap repair paths must exclude
+  generated roots consistently. This includes `.viberoots/workspace/cargo-home`: Cargo mutates its
+  `.global-cache` SQLite database during an otherwise identical native build, and admitting the
+  generated home into a whole-repo snapshot can churn unrelated frontend and enclosing package
+  identities. Guardrails also cover `.viberoots/buck`, `.viberoots/cache`,
+  `.viberoots/workspace/buck`, `.viberoots/workspace/codex-test-logs`, `viberoots/.viberoots`,
+  `viberoots/buck-out`, `viberoots/node_modules`, `.direnv`, `.nix-gcroots`, `result*`, build outputs,
+  and test logs. A focused stability test should mutate at least two files beneath each generated
+  root and prove the filtered snapshot stays identical, then mutate a declared source and prove the
+  snapshot changes.
 - **Filtered snapshots must not copy mutable app/build outputs**. Repo and flake filters must exclude `node_modules`, `buck-out`, `dist`, `build`, `.vite`, `.next`, `.wasm-producer`, coverage, temp files, and result symlinks so stale local outputs do not enter Nix sources or Buck outputs.
 - **Seed staging must be reusable, bounded, and cleaned by ownership**. Verify should prepare one staged seed per seed key, pin only live seeds, remove stale unlocked stages, and keep cleanup evidence-based so interrupted runs do not accumulate old seeds or kill unrelated concurrent work.
 - **Keep seed inputs complete without broadening copies**. If a temp-repo test needs a new helper or root file, add the minimal required seed/filter coverage or read from `REPO_ROOT` when isolation is not part of the assertion. Do not broaden `TEST_RSYNC_ROOTS` to large trees just to access one file.

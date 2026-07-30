@@ -1,0 +1,10 @@
+[package]
+name = "composition_bridge"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+[dependencies]
+composition_backend = { path = "../backend", version = "0.1.0" }

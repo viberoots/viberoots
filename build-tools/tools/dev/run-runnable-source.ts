@@ -1,3 +1,4 @@
+import * as fsp from "node:fs/promises";
 import path from "node:path";
 import {
   assertArtifactClassificationAdmitted,
@@ -24,6 +25,23 @@ function isLikelyTempWorkspace(workspaceRoot: string): boolean {
     workspaceAbs.startsWith("/private/var/folders/") ||
     workspaceAbs.includes(`${path.sep}buck-out${path.sep}tmp${path.sep}tmpdir${path.sep}`)
   );
+}
+
+export async function canonicalRunnableViberootsSource(artifactToolsRoot: string): Promise<string> {
+  const declared = path.join(artifactToolsRoot, "share", "viberoots-source");
+  const canonical = await fsp.realpath(declared).catch(() => "");
+  if (!/^\/nix\/store\/[a-z0-9]{32}-[^/]+$/.test(canonical)) {
+    throw new Error(
+      `runnable artifact requires recorded immutable viberoots source authority: ${
+        canonical || declared
+      }`,
+    );
+  }
+  await Promise.all([
+    fsp.access(path.join(canonical, "flake.nix")),
+    fsp.access(path.join(canonical, "build-tools", "tools", "dev", "zx-init.mjs")),
+  ]);
+  return canonical;
 }
 
 export async function chooseRunnableFlakeRef(opts: {
@@ -93,6 +111,12 @@ export async function chooseRunnableFlakeRef(opts: {
     artifactToolsRoot: opts.artifactToolsRoot,
   });
 
+  // Artifact ingress has already authenticated this tool closure. Seal that recorded
+  // source into the evaluation bundle so pnpm reconciliation reads the bundle's
+  // path input and lock, never an ambient source selector or the live worktree.
+  const immutableViberootsInputRoot = await canonicalRunnableViberootsSource(
+    opts.artifactToolsRoot,
+  );
   const filtered = await makeFilteredFlakeRef({
     workspaceRoot: opts.workspaceRoot,
     attr: opts.attr,
@@ -102,6 +126,7 @@ export async function chooseRunnableFlakeRef(opts: {
     env: artifactEnv,
     selectorEnv: baseEnv,
     devOverrides,
+    immutableViberootsInputRoot,
   });
   return {
     flakeRef: filtered.flakeRef,

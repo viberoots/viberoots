@@ -13,6 +13,7 @@
 , rustOutPaths
 , nodeDevImporters ? {}
 , nodeRunnableMeta ? {}
+, rustRunnableMeta ? {}
 , modulesTomlFor
 , pkgPathOf
 , targetNameOf
@@ -109,6 +110,7 @@ let
           echo "== rust target: ${n} ==" >> $out/build.log
           bins=""
           first_bin=""
+          rust_kind="${rustRunnableMeta.${n}.kind or ""}"
           if [ -d "${p}/bin" ]; then
             for f in "${p}/bin"/*; do
               if [ -f "$f" ] && [ -x "$f" ]; then
@@ -121,7 +123,21 @@ let
           fi
           if [ -n "$bins" ]; then
             if [ "$first" -eq 0 ]; then echo "," >> $out/manifest.json; fi
-            echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [], \"runnable\": { \"kind\": \"native-bin\", \"run\": { \"prod\": { \"argv\": [ \"$first_bin\" ] } }, \"artifacts\": { \"bins\": [ $bins ] } } }" >> $out/manifest.json
+            if [ "$rust_kind" = "tauri" ]; then
+              app_dir="${p}/app"
+              artifact_manifest="${p}/share/viberoots-tauri/artifact-manifest.json"
+              test -d "$app_dir" || { echo "rust planner: Tauri target ${n} missing app bundle directory $app_dir" >&2; exit 1; }
+              test -f "$artifact_manifest" || { echo "rust planner: Tauri target ${n} missing artifact manifest $artifact_manifest" >&2; exit 1; }
+              app_executable="$(${pkgs.jq}/bin/jq -er '.appExecutable | strings | select(length > 0)' "$artifact_manifest")"
+              case "$app_executable" in
+                "${p}/app/"*.app/Contents/MacOS/*) ;;
+                *) echo "rust planner: Tauri target ${n} declared an executable outside its application bundle" >&2; exit 1 ;;
+              esac
+              test -x "$app_executable" || { echo "rust planner: Tauri target ${n} application executable is not executable" >&2; exit 1; }
+              echo "{ \"label\": \"${n}\", \"kind\": \"app\", \"bins\": [ $bins ], \"aux\": [], \"runnable\": { \"kind\": \"desktop-app\", \"run\": { \"prod\": { \"argv\": [ \"$app_executable\" ] }, \"dev\": { \"argv\": [ \"viberoots-tauri-dev\", \"${n}\" ] } }, \"artifacts\": { \"bins\": [ $bins ], \"applicationBundle\": \"$app_dir\", \"appExecutable\": \"$app_executable\", \"artifactManifest\": \"$artifact_manifest\" } } }" >> $out/manifest.json
+            else
+              echo "{ \"label\": \"${n}\", \"kind\": \"bin\", \"bins\": [ $bins ], \"aux\": [], \"runnable\": { \"kind\": \"native-bin\", \"run\": { \"prod\": { \"argv\": [ \"$first_bin\" ] } }, \"artifacts\": { \"bins\": [ $bins ] } } }" >> $out/manifest.json
+            fi
             first=0
           fi
         ''

@@ -1,9 +1,11 @@
-{ pkgs
+{ lib
+, pkgs
 , H
 , repoStoreRoot
 , repoFsRoot
 , viberootsRoot ? null
 , sharedNodeMods
+, dependencyArtifactOf
 , lockInfoOfName
 , nodeOfName
 , labelsOf
@@ -17,6 +19,10 @@ let
   importerDir = info.importer;
   n = nodeOfName name;
   labs = if n == null then [] else labelsOf n;
+  stageAssets = import ./node-assets.nix {
+    inherit lib pkgs repoStoreRoot importerDir dependencyArtifactOf name;
+    labels = labs;
+  };
   addons = nativeAddons.forTarget name;
   hasSsr = builtins.elem "webapp:ssr" labs;
   framework =
@@ -136,6 +142,7 @@ EOF
         ${pkgs.bash}/bin/bash "$VITE_BIN" build
         test -d dist
         stage_wasm_contract "src/wasm-contract/top.wasm" "dist" "dist/server/wasm"
+        ${stageAssets}
       '' else if framework == "express" || framework == "vite" then ''
         if [ ! -x "$VITE_BIN" ] || [ ! -x "$TSC_BIN" ]; then
           echo "node planner: expected vite and tsc in locked node_modules for ${importerDir}" >&2

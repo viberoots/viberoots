@@ -28,6 +28,7 @@ import { templateRootPath } from "../templates/paths";
 import { canonicalTemplateLanguage, isCanonicalTypeScriptTemplate } from "../templates/taxonomy";
 import { usage } from "../usage";
 import { validateDeploymentScaffoldAnswers } from "./deployment-validation";
+import { applyTauriScaffoldAnswers } from "./tauri-validation";
 
 export async function cmdNew(args: string[], flags: ScafFlags) {
   const [language, templateRaw, name] = args;
@@ -82,6 +83,7 @@ export async function cmdNew(args: string[], flags: ScafFlags) {
     }
   }
   validateDeploymentScaffoldAnswers(canonicalLanguage, template, data);
+  applyTauriScaffoldAnswers(canonicalLanguage, template, data);
   if (canonicalLanguage === "ts") {
     const noTests = (flags["no-tests"] || "").toString().toLowerCase() === "true";
     if (noTests) {

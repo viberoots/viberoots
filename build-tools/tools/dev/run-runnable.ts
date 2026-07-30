@@ -22,6 +22,7 @@ import {
   directRustDevEnvironment,
   directRustDevSpec,
   directStaticWebappDevSpec,
+  directTauriDevSpec,
 } from "./run-runnable-dev-spec";
 import { applyNixCacheHealthPolicy } from "./verify/nix-cache-health";
 import {
@@ -174,6 +175,10 @@ export async function runRunnable(opts: {
         entry.runnable.kind === "webapp-ssr" || hints.mode === "ssr" ? "dev:ssr" : "dev";
       spec = { argv: ["pnpm", "--dir", importer, devScript] };
     }
+  }
+  if (parsed.mode === "dev" && spec?.argv[0] === "viberoots-tauri-dev" && spec.argv[1] === target) {
+    spec = directTauriDevSpec(workspaceRoot, target, artifactToolsRoot, canonicalOverrideArg);
+    sanitizeRustWatcherEnvironment = true;
   }
   if (parsed.mode === "dev" && spec && targetHints?.importer && !opts.resolveEntry) {
     spec =
